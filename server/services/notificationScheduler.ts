@@ -1,10 +1,10 @@
 import cron from "node-cron";
 import { db } from "../db.js";
-import { hiqCrewActivities, hiqCrewActivityParticipants, hiqPolls, hiqPollVotes, hiqCrewMembers, hiqCrews, hiqNotifications } from "../../shared/schema.js";
-import { eq, and, gte, lte, ne, sql } from "drizzle-orm";
+import { hiqCrewActivities, hiqCrewActivityParticipants, hiqPolls, hiqPollVotes, hiqCrewMembers, hiqCrews, hiqNotifications, hiqMembers } from "../../shared/schema.js";
+import { eq, and, gte, lte, ne, sql, inArray } from "drizzle-orm";
 import { notificationService } from "./notificationService.js";
 import { storage } from "../storage/index.js";
-import { msg } from "../lib/i18n.js";
+import { msg, memberLocale, type Locale } from "../lib/i18n.js";
 
 // Runs every 30 minutes
 const SCHEDULE = "*/30 * * * *";
@@ -51,6 +51,23 @@ async function wasRecentlyNotified(reminderKey: string, memberId: string, hoursA
   return !!notif;
 }
 
+// 알림 본문에 넣는 시각은 **한국 시각**으로, 받는 사람의 언어 모양으로 찍는다.
+// 예전엔 toLocaleString("ko-KR") 에 timeZone 이 없어서 서버(Vercel, UTC) 시각이 그대로 나갔다 —
+// 밤 9시 정모가 "오후 12:00"으로, 23:59 마감 투표가 "오후 2:59"로 갔다(2026-09-26 검토 P0).
+const INTL_TAG: Record<Locale, string> = { ko: "ko-KR", en: "en-US", es: "es-ES", tr: "tr-TR", vi: "vi-VN" };
+export function kstTimeLabel(at: Date, locale: Locale = "ko"): string {
+  const s = at.toLocaleString(INTL_TAG[locale] ?? "ko-KR", {
+    timeZone: "Asia/Seoul", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+  });
+  // 외국어 사용자는 한국 시각이라는 걸 알아야 자기 시각으로 옮길 수 있다.
+  return locale === "ko" ? s : `${s} KST`;
+}
+
+async function localeOfMember(memberId: string): Promise<Locale> {
+  const [m] = await db.select({ locale: hiqMembers.locale }).from(hiqMembers).where(eq(hiqMembers.id, memberId));
+  return memberLocale(m);
+}
+
 async function sendActivityReminder(
   activityId: string,
   participantId: string,
@@ -68,7 +85,7 @@ async function sendActivityReminder(
   if (await wasRecentlyNotified(reminderKey, participantId, 20)) return;
 
   const sportCategory = await getCrewSportCategory(crewId);
-  const timeStr = activityDate.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const timeStr = kstTimeLabel(activityDate, await localeOfMember(participantId));
   // 제목·본문은 받는 사람 언어로 풀린다(notificationService). 이모지(📅/⏰)는 사전 값 안에 있다.
   const k = hoursLeft === 24 ? "notif.reminder.activity24" : "notif.reminder.activity1";
 
@@ -98,7 +115,7 @@ async function sendPollReminder(pollId: string, participantId: string, crewId: s
   if (await wasRecentlyNotified(reminderKey, participantId, 20)) return;
 
   const sportCategory = await getCrewSportCategory(crewId);
-  const timeStr = endTime.toLocaleString("ko-KR", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const timeStr = kstTimeLabel(endTime, await localeOfMember(participantId));
 
   await notificationService.sendAndSaveNotification({
     memberId: participantId,
@@ -106,7 +123,8 @@ async function sendPollReminder(pollId: string, participantId: string, crewId: s
     body: msg("notif.reminder.poll.body", { title, time: timeStr }),
     category: sportCategory,
     type: "POLL_REMINDER",
-    params: { url: `/crew/${crewId}`, reminderKey },
+    // 크루 홈이 아니라 투표 탭으로 — 알림을 누른 사람은 투표하러 온 것이다(/crew/:id/:tab 별칭이 poll 을 받는다).
+    params: { url: `/crew/${crewId}/poll`, crewId, tab: "poll", reminderKey },
   }).catch(err => console.error(`[Scheduler] Poll reminder failed for ${participantId}:`, err));
 }
 
@@ -150,11 +168,13 @@ async function runActivityReminders() {
 
 async function runPollReminders() {
   try {
+    // 마감 판정의 정본은 endTime 이다(shared/crewPoll). '일찍 마감'은 endTime 을 지금으로 당기므로
+    // 창(30분~90분 뒤) 밖으로 빠진다. status 조건은 옛 행을 위한 안전장치로만 남긴다.
     const hourWindow = timeWindow(1);
     const polls = await db.select()
       .from(hiqPolls)
       .where(and(
-        eq(hiqPolls.status, "active"),
+        ne(hiqPolls.status, "closed"),
         gte(hiqPolls.endTime, hourWindow.start),
         lte(hiqPolls.endTime, hourWindow.end),
       ));
@@ -174,6 +194,44 @@ async function runPollReminders() {
   } catch (err) {
     console.error("[Scheduler] Poll reminder error:", err);
   }
+}
+
+/**
+ * 투표 '재알림'(작성자·운영진이 누르는 수동 알림)이 최근 hours 시간 안에 나갔는지.
+ * 서버리스라 메모리 카운터는 인스턴스마다 따로 놀아 믿을 수 없다 — 이미 저장되는 알림 행
+ * (params.reminderKey = "pollNudge:<id>")을 그대로 증거로 쓴다. 받는 사람 id 로 좁혀야
+ * (member_id, created_at) 인덱스를 탄다.
+ */
+export async function wasPollNudgedRecently(pollId: string, memberIds: string[], hours = 1): Promise<boolean> {
+  if (memberIds.length === 0) return false;
+  const cutoff = new Date(Date.now() - hours * 60 * 60 * 1000);
+  const [row] = await db.select({ id: hiqNotifications.id })
+    .from(hiqNotifications)
+    .where(and(
+      inArray(hiqNotifications.memberId, memberIds),
+      gte(hiqNotifications.createdAt, cutoff),
+      sql`${hiqNotifications.params}->>'reminderKey' = ${`pollNudge:${pollId}`}`,
+    ))
+    .limit(1);
+  return !!row;
+}
+
+/** 재알림 한 명분 — 크루 투표 알림 설정을 존중하고, 보냈으면 true. */
+export async function sendPollNudge(p: { pollId: string; crewId: string; crewName: string; memberId: string; title: string; endTime: Date | null; category: string }): Promise<boolean> {
+  const setting = await storage.notifs.getCrewNotificationSetting(p.crewId, p.memberId);
+  if (!setting.pollEnabled) return false;
+  const locale = await localeOfMember(p.memberId);
+  await notificationService.sendAndSaveNotification({
+    memberId: p.memberId,
+    title: msg("crewPoll.nudgeTitle", { crew: p.crewName }),
+    body: p.endTime
+      ? msg("crewPoll.nudgeBodyDeadline", { title: p.title, time: kstTimeLabel(p.endTime, locale) })
+      : msg("crewPoll.nudgeBody", { title: p.title }),
+    category: p.category,
+    type: "POLL_REMINDER",
+    params: { url: `/crew/${p.crewId}/poll`, crewId: p.crewId, tab: "poll", reminderKey: `pollNudge:${p.pollId}` },
+  });
+  return true;
 }
 
 // 리마인더 1회 실행. 로컬은 node-cron이, 프로덕션(Vercel)은 /api/cron/reminders가 호출한다.

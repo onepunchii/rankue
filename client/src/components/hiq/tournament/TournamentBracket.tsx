@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { roundName, totalRounds, bracketSize } from "@shared/tournamentBracket";
+import { isSeatSwappable } from "@shared/crewTournamentRules";
 
 // 크루 토너먼트 대진표 — **라사(당구대 천) 위에 올린** 아래→위 세로 피라미드.
 //
@@ -21,6 +22,13 @@ import { roundName, totalRounds, bracketSize } from "@shared/tournamentBracket";
 //
 // 색 규칙: 승패는 초록·흐림으로만, 우승만 금색. 공 색(노랑=4구, 빨강=3쿠션)은 종목 코드라
 // 승패에 절대 쓰지 않는다 — BallDot.tsx 참고.
+//
+// 2026-09-26 크루 정비:
+//  - 글자는 12px 밑으로 내리지 않는다(9.5~11.5px 였다). 카드 배경·그림자는 토큰(bg-surface-1·rk-shadow)만 —
+//    bg-white·shadow 리터럴은 골프(어두운 테마)에서 흰 조각으로 떠 있었다.
+//  - 누를 수 있는 카드만 버튼으로 그린다(canClick). 예전엔 남의 경기·끝난 경기도 버튼처럼 눌리는데 아무 일도 안 일어났다.
+//  - N판 승부는 누적 승수(시리즈 점수)가 주인공이다. 마지막 판 점수는 아래에 작게.
+//  - 자리 바꾸기는 1라운드 ready 칸만(isSeatSwappable = 서버 swapBlockReason 과 같은 기준). 부전승 칸은 막는다.
 
 export interface BracketPlayer {
     memberId: string;
@@ -58,18 +66,20 @@ interface Props {
     meId?: string;
     /** 한 대진의 판 수. 1 이면 승수 표시를 숨긴다. */
     bestOf?: number;
-    /** 경기 카드를 눌렀을 때 — 경기 시작·상세로 보낸다. 조정 모드에서는 무시된다. */
+    /** 경기 카드를 눌렀을 때 — 경기 시작·결과 보기로 보낸다. 조정 모드에서는 무시된다. */
     onMatchClick?: (match: BracketMatch) => void;
+    /** 이 카드를 눌러 뭔가 일어나는지. false 면 버튼이 아니라 그냥 칸으로 그린다. */
+    canClick?: (match: BracketMatch) => boolean;
     /** 크루장 자리 조정 모드. 첫 라운드의 확정 안 된 자리끼리만 맞바꿀 수 있다. */
     swapMode?: boolean;
     selectedSlot?: SlotRef | null;
-    onSlotClick?: (ref: SlotRef, memberId: string | null) => void;
+    onSlotClick?: (ref: SlotRef) => void;
     className?: string;
 }
 
 export function TournamentBracket({
     matches, players, playerCount, meId, bestOf = 1,
-    onMatchClick, swapMode = false, selectedSlot = null, onSlotClick, className,
+    onMatchClick, canClick, swapMode = false, selectedSlot = null, onSlotClick, className,
 }: Props) {
     const { t } = useT();
     const rounds = totalRounds(bracketSize(playerCount));
@@ -129,7 +139,7 @@ export function TournamentBracket({
                                         players={players}
                                         meId={meId}
                                         bestOf={bestOf}
-                                        onClick={onMatchClick}
+                                        onClick={onMatchClick && (!canClick || canClick(m)) ? onMatchClick : undefined}
                                         swapMode={swapMode}
                                         selectedSlot={selectedSlot}
                                         onSlotClick={onSlotClick}
@@ -176,7 +186,7 @@ function RoundLabel({ children }: { children: React.ReactNode }) {
     return (
         <div className="flex items-center gap-2 my-2">
             <span className="h-px flex-1 bg-surface-line" />
-            <span className="rounded-pill bg-surface-3 px-2.5 py-0.5 text-[10.5px] font-semibold tracking-wider text-ink-3 rk-num">
+            <span className="rounded-pill bg-surface-3 px-2.5 py-0.5 text-[12px] font-semibold tracking-wide text-ink-3 rk-num">
                 {children}
             </span>
             <span className="h-px flex-1 bg-surface-line" />
@@ -230,7 +240,7 @@ function MatchCard({ match, players, meId, bestOf = 1, onClick, swapMode, select
     onClick?: (m: BracketMatch) => void;
     swapMode: boolean;
     selectedSlot: SlotRef | null;
-    onSlotClick?: (ref: SlotRef, memberId: string | null) => void;
+    onSlotClick?: (ref: SlotRef) => void;
 }) {
     const { t } = useT();
     const live = match.status === "playing";
@@ -239,13 +249,15 @@ function MatchCard({ match, players, meId, bestOf = 1, onClick, swapMode, select
     const mine = !!meId && (match.p1Id === meId || match.p2Id === meId);
     // 자리 조정은 첫 라운드의 아직 시작 안 한 경기에서만. 윗 라운드는 승자가 자동으로
     // 올라오는 자리라 손으로 바꾸면 기록과 어긋나고, 서버도 400 으로 거절한다.
-    const swappable = swapMode && match.round === 1 && (match.status === "ready" || pending);
+    // 부전승 칸도 막는다 — 부전승자는 대진을 짤 때 이미 윗칸에 올라가 있다(shared/crewTournamentRules).
+    const swappable = swapMode && isSeatSwappable(match);
+    const seriesStarted = bestOf > 1 && ((match.p1Wins ?? 0) + (match.p2Wins ?? 0) > 0 || match.status === "done");
 
     // ── 아직 두 자리가 안 찬 칸: 낮고 조용하게. 글자 없이 형태로만 "아직"을 말한다.
     //    예전엔 "8강 1경기 승자"를 여덟 번 반복해서 화면 절반이 글자로 찼다.
     if (pending && !swappable) {
         return (
-            <div className="w-full max-w-[168px] rounded-[9px] bg-surface-3 h-[38px] flex items-center justify-center">
+            <div className="w-full max-w-[168px] rounded-[9px] bg-surface-3 h-[44px] flex items-center justify-center">
                 <span className="h-px w-5 bg-[var(--surface-line-strong)]" />
             </div>
         );
@@ -253,24 +265,24 @@ function MatchCard({ match, players, meId, bestOf = 1, onClick, swapMode, select
 
     const body = (
         <>
-            <Slot side="p1" match={match} players={players} meId={meId}
+            <Slot side="p1" match={match} players={players} meId={meId} series={seriesStarted}
                 swappable={swappable} selectedSlot={selectedSlot} onSlotClick={onSlotClick} />
             {!bye && (
-                <Slot side="p2" match={match} players={players} meId={meId}
+                <Slot side="p2" match={match} players={players} meId={meId} series={seriesStarted}
                     swappable={swappable} selectedSlot={selectedSlot} onSlotClick={onSlotClick} />
             )}
-            {/* N판 승부 — 누적 승수. 1판 대회면 숨긴다. */}
-            {bestOf > 1 && ((match.p1Wins ?? 0) + (match.p2Wins ?? 0) > 0 || match.status === "done") && (
-                <div className="text-center text-[9.5px] py-0.5 border-t border-surface-line text-ink-3 rk-num font-semibold">
-                    {match.p1Wins ?? 0} - {match.p2Wins ?? 0}
+            {/* N판 승부 — 오른쪽 큰 숫자가 누적 승수이고, 여기엔 마지막 판 점수만 작게. */}
+            {seriesStarted && match.p1Score != null && match.p2Score != null && (
+                <div className="text-center text-[12px] py-0.5 border-t border-surface-line text-ink-3 rk-num font-medium">
+                    {t("crewTourney.lastGame").replace("{a}", String(match.p1Score)).replace("{b}", String(match.p2Score))}
                 </div>
             )}
             {(live || bye) && (
                 <div className={cn(
-                    "text-center text-[9.5px] py-0.5 rk-num font-semibold",
-                    live ? "text-white" : "text-ink-4 border-t border-surface-line",
+                    "text-center text-[12px] py-0.5 rk-num font-semibold",
+                    live ? "text-white" : "text-ink-3 border-t border-surface-line",
                 )} style={live ? { background: "var(--ball-red)" } : undefined}>
-                    {live && <span className="inline-block w-1 h-1 rounded-full bg-white mr-1 align-middle motion-safe:animate-pulse" />}
+                    {live && <span className="inline-block w-1.5 h-1.5 rounded-full bg-white mr-1 align-middle motion-safe:animate-pulse" />}
                     {live ? t("tournament.match.playing") : t("tournament.match.bye")}
                 </div>
             )}
@@ -278,36 +290,38 @@ function MatchCard({ match, players, meId, bestOf = 1, onClick, swapMode, select
     );
 
     const cls = cn(
-        "w-full max-w-[168px] min-w-0 overflow-hidden rounded-[9px] bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]",
+        "w-full max-w-[168px] min-w-0 overflow-hidden rounded-[9px] bg-surface-1 rk-shadow",
         // 내 경기 표시 — 16강이면 카드가 8개라 내 것을 찾기 어렵다. 다만 굵은 초록 테두리는
         // 카드를 통째로 초록으로 만들어 승자 표시(초록 띠)와 뒤섞인다. 얇고 옅게.
-        mine ? "ring-[1.5px] ring-brand/45" : "ring-1 ring-surface-line",
+        // 경기중은 빨강이 가장 강한 신호라 내 경기 초록 테두리보다 우선한다.
+        live ? "ring-2 ring-[var(--ball-red)]" : mine ? "ring-[1.5px] ring-brand/45" : "ring-1 ring-surface-line",
     );
 
-    // 경기중은 빨강이 가장 강한 신호라 내 경기 초록 테두리보다 우선한다.
-    const liveStyle = live ? { boxShadow: `0 0 0 2px var(--ball-red)` } : undefined;
     if (!swapMode && onClick && (match.status === "ready" || live || match.status === "done")) {
         return (
-            <button type="button" onClick={() => onClick(match)} style={liveStyle}
-                className={cn(cls, live && "ring-0", "text-left active:scale-[0.98] transition-transform")}>
+            <button type="button" onClick={() => onClick(match)}
+                className={cn(cls, "text-left active:scale-[0.98] transition-transform")}>
                 {body}
             </button>
         );
     }
-    return <div className={cn(cls, live && "ring-0")} style={liveStyle}>{body}</div>;
+    return <div className={cls}>{body}</div>;
 }
 
-function Slot({ side, match, players, meId, swappable, selectedSlot, onSlotClick }: {
+function Slot({ side, match, players, meId, series, swappable, selectedSlot, onSlotClick }: {
     side: "p1" | "p2";
     match: BracketMatch;
     players: Record<string, BracketPlayer>;
     meId?: string;
+    /** N판 승부가 시작됐으면 오른쪽 숫자를 누적 승수로 바꾼다. */
+    series: boolean;
     swappable: boolean;
     selectedSlot: SlotRef | null;
-    onSlotClick?: (ref: SlotRef, memberId: string | null) => void;
+    onSlotClick?: (ref: SlotRef) => void;
 }) {
     const memberId = side === "p1" ? match.p1Id : match.p2Id;
-    const score = side === "p1" ? match.p1Score : match.p2Score;
+    // N판 승부면 누적 승수가, 단판이면 그 판 점수가 오른쪽 숫자다.
+    const score = series ? (side === "p1" ? match.p1Wins ?? 0 : match.p2Wins ?? 0) : side === "p1" ? match.p1Score : match.p2Score;
     const player = memberId ? players[memberId] : undefined;
     const isWinner = !!match.winnerId && match.winnerId === memberId;
     const isLoser = !!match.winnerId && !!memberId && match.winnerId !== memberId;
@@ -317,14 +331,14 @@ function Slot({ side, match, players, meId, swappable, selectedSlot, onSlotClick
     const content = (
         <>
             <span className={cn(
-                "flex-1 min-w-0 truncate text-[11.5px]",
+                "flex-1 min-w-0 truncate text-[13px]",
                 isWinner ? "font-bold text-ink-1" : isLoser ? "text-ink-4" : player ? "font-medium text-ink-2" : "text-ink-4",
                 isMe && !isLoser && "text-brand",
             )}>
                 {player ? player.nickname : "—"}
             </span>
             {score != null && (
-                <span className={cn("rk-num text-[11.5px]", isWinner ? "font-bold text-brand" : isLoser ? "text-ink-4" : "text-ink-3")}>
+                <span className={cn("rk-num", series ? "text-[15px]" : "text-[13px]", isWinner ? "font-bold text-brand" : isLoser ? "text-ink-4" : "text-ink-3")}>
                     {score}
                 </span>
             )}
@@ -332,17 +346,19 @@ function Slot({ side, match, players, meId, swappable, selectedSlot, onSlotClick
     );
 
     const base = cn(
-        "flex items-center gap-1.5 px-[7px] py-1.5 min-h-[29px] w-full",
-        side === "p2" && "border-t border-surface-line",
+        // 자리 바꾸기 중엔 한 자리가 곧 누르는 곳이라 44px 로 키운다(평소 29px 이면 손가락이 옆 칸을 누른다).
+        "flex items-center gap-1.5 pl-1 pr-2 py-1.5 w-full border-l-[3px]",
+        swappable ? "min-h-11" : "min-h-[30px]",
+        side === "p2" && "border-t border-t-surface-line",
         // 이긴 쪽은 왼쪽 초록 띠로만 말한다. 바탕까지 초록으로 깔면 카드가 흰색이 아니게 되고
-        // 8강·16강처럼 카드가 여러 개일 때 화면이 통째로 초록이 된다.
-        isWinner && "bg-brand/[0.05] shadow-[inset_3px_0_0_rgb(var(--brand))]",
+        // 8강·16강처럼 카드가 여러 개일 때 화면이 통째로 초록이 된다(띠는 그림자 리터럴 대신 테두리 토큰으로).
+        isWinner ? "border-l-brand bg-brand/[0.05]" : "border-l-transparent",
         selected && "ring-2 ring-inset ring-brand bg-brand/5",
     );
 
     if (swappable && onSlotClick) {
         return (
-            <button type="button" className={cn(base, "text-left active:opacity-70")} onClick={() => onSlotClick({ matchId: match.id, side }, memberId)}>
+            <button type="button" className={cn(base, "text-left active:opacity-70")} onClick={() => onSlotClick({ matchId: match.id, side })}>
                 {content}
             </button>
         );
@@ -356,18 +372,18 @@ function ChampionCard({ nickname, isMe }: { nickname: string; isMe: boolean }) {
     const { t } = useT();
     return (
         <div
-            className="mx-auto w-full max-w-[236px] rounded-card px-5 py-4 text-center shadow-[0_4px_16px_rgba(190,138,12,0.35)]"
+            className="mx-auto w-full max-w-[236px] rounded-card px-5 py-4 text-center rk-shadow"
             style={{ background: "var(--gold-fill)" }}
         >
             <Trophy />
-            <span className="mt-1.5 block text-[10px] font-bold tracking-[0.22em] text-white/85 rk-num">
+            <span className="mt-1.5 block text-[12px] font-bold tracking-[0.18em] text-white/85 rk-num">
                 {t("tournament.round.champion")}
             </span>
-            <span className="mt-1 block text-[23px] leading-tight font-bold text-white truncate">
+            <span className="mt-1 block text-[22px] leading-tight font-semibold text-white truncate">
                 {nickname}
             </span>
             {isMe && (
-                <span className="mt-2 inline-block rounded-pill bg-white/25 px-2.5 py-0.5 text-[10.5px] font-bold text-white">
+                <span className="mt-2 inline-block rounded-pill bg-white/25 px-2.5 py-0.5 text-[12px] font-semibold text-white">
                     {t("tournament.champion.me")}
                 </span>
             )}
@@ -381,7 +397,7 @@ function ChampionPending() {
     return (
         <div className="mx-auto w-full max-w-[230px] rounded-card border border-dashed border-[var(--surface-line-strong)] px-5 py-5 text-center">
             <span className="mx-auto block w-6 h-6 opacity-40"><Trophy dim /></span>
-            <span className="mt-1.5 block text-[10.5px] font-semibold tracking-[0.18em] text-ink-4 rk-num">
+            <span className="mt-1.5 block text-[12px] font-semibold tracking-[0.14em] text-ink-3 rk-num">
                 {t("tournament.round.champion")}
             </span>
         </div>

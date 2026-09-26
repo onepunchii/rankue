@@ -488,7 +488,11 @@ router.get("/settlements/:id", requireAuth, asyncHandler(async (req: AuthRequest
     if (!membership || membership.role === "pending") {
         return sendError(res, 403, "err.game.crewMembersOnly");
     }
-    return sendSuccess(res, settlement);
+    // 계좌 주인 = 정산을 만든 사람(총무). 화면은 송금 받는 사람이 총무일 때만 이 계좌를 붙인다 —
+    // 다른 차수를 계산한 사람에게 보낼 돈을 총무 계좌로 보내게 하던 혼동을 막는다(2026-09-26 검토 P1).
+    // 이름만 싣는다(전화·기본 계좌 같은 다른 열은 내보내지 않는다).
+    const creator = settlement.creatorId ? await storage.getMemberById(settlement.creatorId) : null;
+    return sendSuccess(res, { ...settlement, creator: creator ? { id: creator.id, name: creator.name } : null });
 }));
 
 // --- Invites ---

@@ -1024,6 +1024,13 @@ export class CrewRepository {
         });
     }
 
+    /**
+     * 크루 투표 목록. 투표마다 isClosed·voterCount 를 붙여 준다(2026-09-26 크루 정비).
+     *  - isClosed: 마감 판정의 정본은 endTime 이다(shared/crewPoll). status 는 '일찍 마감'에서만 바뀐다.
+     *    예전엔 status 가 한 번도 closed 로 안 바뀌어서 화면·홈 미리보기가 마감된 투표를 '진행 중'으로 보였다.
+     *  - voterCount: 투표한 **사람** 수. totalVotes(표 수)를 "N명 참여"로 쓰면 복수 선택에서 부풀려진다.
+     * 선택지·집계는 투표마다 쿼리하던 N+1 을 IN 한 번씩으로 묶었다(투표 20개면 쿼리 40개였다).
+     */
     async getCrewPolls(crewId: string, memberId?: string) {
         const polls = await db.select({
             poll: hiqPolls,
@@ -1038,42 +1045,92 @@ export class CrewRepository {
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
             .where(eq(hiqPolls.crewId, crewId))
             .orderBy(desc(hiqPolls.createdAt));
+        if (polls.length === 0) return [];
 
-        return await Promise.all(polls.map(async (p) => {
-            const options = await db.select({
+        const ids = polls.map((p) => p.poll.id);
+        const [options, voters, myVotes] = await Promise.all([
+            db.select({
                 id: hiqPollOptions.id,
+                pollId: hiqPollOptions.pollId,
                 text: hiqPollOptions.text,
-                voteCount: sql<number>`count(${hiqPollVotes.id})`
+                voteCount: sql<number>`count(${hiqPollVotes.id})::int`
             })
                 .from(hiqPollOptions)
                 .leftJoin(hiqPollVotes, eq(hiqPollOptions.id, hiqPollVotes.optionId))
-                .where(eq(hiqPollOptions.pollId, p.poll.id))
-                .groupBy(hiqPollOptions.id, hiqPollOptions.text)
-                .orderBy(asc(hiqPollOptions.createdAt));
-
-            const myVotes = memberId
-                ? await db.select({ optionId: hiqPollVotes.optionId })
+                .where(inArray(hiqPollOptions.pollId, ids))
+                .groupBy(hiqPollOptions.id, hiqPollOptions.pollId, hiqPollOptions.text, hiqPollOptions.createdAt)
+                // 만든 순서 그대로 — 같은 시각(한 트랜잭션에서 넣음)이면 id 로 고정해 순서가 흔들리지 않게 한다.
+                .orderBy(asc(hiqPollOptions.createdAt), asc(hiqPollOptions.id)),
+            db.select({
+                pollId: hiqPollVotes.pollId,
+                n: sql<number>`count(distinct ${hiqPollVotes.memberId})::int`
+            })
+                .from(hiqPollVotes)
+                .where(inArray(hiqPollVotes.pollId, ids))
+                .groupBy(hiqPollVotes.pollId),
+            memberId
+                ? db.select({ pollId: hiqPollVotes.pollId, optionId: hiqPollVotes.optionId })
                     .from(hiqPollVotes)
-                    .where(and(eq(hiqPollVotes.pollId, p.poll.id), eq(hiqPollVotes.memberId, memberId)))
-                : [];
+                    .where(and(inArray(hiqPollVotes.pollId, ids), eq(hiqPollVotes.memberId, memberId)))
+                : Promise.resolve([] as Array<{ pollId: string; optionId: string }>),
+        ]);
 
+        const voterBy = new Map(voters.map((v) => [v.pollId, Number(v.n)]));
+        const now = Date.now();
+        return polls.map((p) => {
+            const opts = options
+                .filter((o) => o.pollId === p.poll.id)
+                .map((o) => ({ id: o.id, text: o.text, voteCount: Number(o.voteCount) }));
             return {
                 ...p.poll,
                 author: p.author,
-                options: options.map(o => ({ ...o, voteCount: Number(o.voteCount) })),
-                myVoteIds: myVotes.map(v => v.optionId),
-                totalVotes: options.reduce((sum, o) => sum + Number(o.voteCount), 0)
+                options: opts,
+                myVoteIds: myVotes.filter((v) => v.pollId === p.poll.id).map((v) => v.optionId),
+                totalVotes: opts.reduce((sum, o) => sum + o.voteCount, 0),
+                voterCount: voterBy.get(p.poll.id) ?? 0,
+                isClosed: pollClosedAt(p.poll, now),
             };
-        }));
+        });
+    }
+
+    /** 투표 한 건(권한 확인용) — 목록 전체를 읽어 찾던 삭제 라우트를 대신한다. */
+    async getPollById(pollId: string) {
+        const [poll] = await db.select().from(hiqPolls).where(eq(hiqPolls.id, pollId));
+        return poll ?? null;
+    }
+
+    /**
+     * 일찍 마감 — status 를 closed 로 바꾸고 endTime 도 지금으로 당긴다.
+     * endTime 을 같이 당기는 이유: 마감 판정·리마인더 크론·홈 미리보기가 모두 endTime 을 본다.
+     * status 만 바꾸면 크론이 "1시간 뒤 마감" 알림을 닫힌 투표에 보낼 수 있다.
+     */
+    async closePoll(pollId: string) {
+        const now = new Date();
+        const [poll] = await db.select().from(hiqPolls).where(eq(hiqPolls.id, pollId));
+        if (!poll) throw notFound(msg("err.crewRepo.pollNotFound"));
+        const endTime = poll.endTime && poll.endTime < now ? poll.endTime : now;
+        const [row] = await db.update(hiqPolls).set({ status: "closed", endTime })
+            .where(eq(hiqPolls.id, pollId)).returning();
+        return row;
+    }
+
+    /** 아직 투표하지 않은 정식 크루원 — '재알림' 대상. 승인 대기(pending)는 크루원이 아니라 뺀다. */
+    async getPollNonVoterIds(pollId: string, crewId: string): Promise<string[]> {
+        const rows = await db.select({ memberId: hiqCrewMembers.memberId })
+            .from(hiqCrewMembers)
+            .where(and(
+                eq(hiqCrewMembers.crewId, crewId),
+                ne(hiqCrewMembers.role, "pending"),
+                sql`NOT EXISTS (SELECT 1 FROM ${hiqPollVotes} WHERE ${hiqPollVotes.pollId} = ${pollId} AND ${hiqPollVotes.memberId} = ${hiqCrewMembers.memberId})`,
+            ));
+        return rows.map((r) => r.memberId);
     }
 
     async votePoll(pollId: string, optionId: string, memberId: string) {
         const [poll] = await db.select().from(hiqPolls).where(eq(hiqPolls.id, pollId));
         if (!poll) throw notFound(msg("err.crewRepo.pollNotFound"));
-        if (poll.status === 'closed') throw conflict(msg("err.crewRepo.pollClosed"));
-        // Enforce the deadline server-side — 'status' is never flipped to 'closed' anywhere,
-        // so endTime is the real source of truth for whether voting is open.
-        if (poll.endTime && poll.endTime < new Date()) throw conflict(msg("err.crewRepo.pollClosed"));
+        // 마감 판정은 화면과 같은 함수로 — endTime 이 지났거나 일찍 마감(status closed)이면 닫힘.
+        if (pollClosedAt(poll, Date.now())) throw conflict(msg("err.crewRepo.pollClosed"));
 
         return await db.transaction(async (tx) => {
             // Check whether the member already voted for THIS option FIRST (before any delete),
@@ -1112,6 +1169,12 @@ export class CrewRepository {
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
             .where(eq(hiqPollVotes.optionId, optionId));
     }
+}
+
+// 투표 마감 판정 — shared/crewPoll.ts isPollClosed 와 같은 규칙(endTime 이 정본, 일찍 마감은 status).
+// 파일 머리 import 를 건드리지 않으려고(다른 작업과 겹치는 자리) 여기 한 줄로 둔다. 규칙을 바꾸면 둘 다 바꾼다.
+function pollClosedAt(poll: { status: string; endTime: Date | null }, now: number): boolean {
+    return poll.status === "closed" || (!!poll.endTime && poll.endTime.getTime() <= now);
 }
 
 function getDistanceFromLatLonInKm(lat1: number, lon1: number, lat2: number, lon2: number) {

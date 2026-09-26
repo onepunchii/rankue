@@ -621,8 +621,32 @@ router.post("/:id/reports", requireAuth, asyncHandler(async (req: AuthRequest, r
 
 
 // --- Polls ---
+// 투표·대회·정산 전용 규칙(서버·화면 공용). 파일 머리의 import 줄은 다른 작업과 자주 겹쳐서
+// 이 구역 머리에 둔다 — ES 모듈 import 는 어디에 써도 모듈 맨 위로 끌어올려진다.
+import { normalizePollOptions, checkPollEndTime, isPollClosed, POLL_LIMITS } from "../../../shared/crewPoll.js";
+import { swapBlockReason, checkTournamentDates } from "../../../shared/crewTournamentRules.js";
+import { checkSettlementRound } from "../../../shared/crewSettlement.js";
+import { trRes } from "../../lib/i18n.js";
+import { wasPollNudgedRecently, sendPollNudge } from "../../services/notificationScheduler.js";
+
+// 이 크루의 투표인지 확인하고 돌려준다. :pollId 만 믿으면 남의 크루 투표를 지울 수 있다.
+async function loadCrewPoll(req: AuthRequest, res: any) {
+    const poll = UUID_RE.test(req.params.pollId) ? await storage.crews.getPollById(req.params.pollId) : null;
+    if (!poll || poll.crewId !== req.params.id) {
+        sendError(res, 404, "err.crew.pollNotFound");
+        return null;
+    }
+    return poll;
+}
+
+// 작성자 또는 운영진(크루장·운영진, 슈퍼 관리자는 requireCrewMember 가 'leader' 로 준다).
+// 예전 삭제는 운영진만 됐다 — 자기가 올린 투표를 잘못 만들어도 지울 수 없었다(2026-09-26 검토 P1).
+function canManagePoll(role: string, poll: { authorId: string }, userId: string | undefined): boolean {
+    return poll.authorId === userId || role === "leader" || role === "manage";
+}
 
 // GET /polls - List crew polls — 크루원 전용
+// 응답의 투표마다 isClosed(마감 여부, endTime 기준)·voterCount(투표한 사람 수)가 붙는다.
 router.get("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
     const polls = await storage.getCrewPolls(req.params.id, req.userId);
@@ -632,15 +656,37 @@ router.get("/:id/polls", requireAuth, asyncHandler(async (req: AuthRequest, res:
 // POST /polls - Create poll
 router.post("/:id/polls", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
-    const { options: rawOptions, ...rest } = req.body;
+    const { options: rawOptions, ...rest } = req.body ?? {};
     // 투표 제목·설명·선택지도 필터 — 제목은 크루원 전원의 푸시 본문으로 나간다(검토 policy:R3).
     const screenedPoll = screenCrewBody(rest, ["title", "description"] as const, Array.isArray(rawOptions) ? rawOptions : []);
     if (!screenedPoll.ok) return sendError(res, 400, screenedPoll.reason);
     Object.assign(rest, screenedPoll.value.fields);
-    const options = Array.isArray(rawOptions) ? screenedPoll.value.extra : rawOptions;
+
+    // 길이·개수·중복·마감 확인. 예전엔 선택지 개수만(2개 이상) 봐서 빈 칸·같은 문구·지난 마감이 그대로 들어갔다.
+    const title = String(rest.title ?? "").trim();
+    if (!title) return sendError(res, 400, "err.crewPoll.titleRequired");
+    if (title.length > POLL_LIMITS.titleMax) return sendError(res, 400, msg("err.crewPoll.titleTooLong", { n: POLL_LIMITS.titleMax }));
+    const description = typeof rest.description === "string" ? rest.description.trim() : "";
+    if (description.length > POLL_LIMITS.descMax) return sendError(res, 400, msg("err.crewPoll.descTooLong", { n: POLL_LIMITS.descMax }));
+    const opts = normalizePollOptions(Array.isArray(rawOptions) ? screenedPoll.value.extra : rawOptions);
+    if (!opts.ok) {
+        if (opts.reason === "tooLong") return sendError(res, 400, msg("err.crewPoll.optionTooLong", { n: POLL_LIMITS.optionMax }));
+        if (opts.reason === "duplicate") return sendError(res, 400, "err.crewPoll.optionDuplicate");
+        return sendError(res, 400, msg("err.crewPoll.optionsCount", { min: POLL_LIMITS.minOptions, max: POLL_LIMITS.maxOptions }));
+    }
+    const end = checkPollEndTime(rest.endTime);
+    if (!end.ok) {
+        if (end.reason === "past") return sendError(res, 400, "err.crewPoll.endTimePast");
+        if (end.reason === "tooFar") return sendError(res, 400, msg("err.crewPoll.endTimeTooFar", { n: POLL_LIMITS.maxDays }));
+        return sendError(res, 400, "err.crewPoll.endTimeInvalid");
+    }
+
     const data = {
-        ...rest,
-        endTime: rest.endTime ? new Date(rest.endTime) : undefined,
+        title,
+        description: description || null,
+        isAnonymous: !!rest.isAnonymous,
+        allowMultiple: !!rest.allowMultiple,
+        endTime: end.endTime ?? undefined,
         crewId: req.params.id,
         authorId: req.userId
     };
@@ -650,11 +696,7 @@ router.post("/:id/polls", requireAuth, requireTermsAccepted, asyncHandler(async 
         return sendError(res, 400, validation.error.message);
     }
 
-    if (!options || !Array.isArray(options) || options.length < 2) {
-        return sendError(res, 400, "err.crew.pollMinOptions");
-    }
-
-    const poll = await storage.createPoll(validation.data, options);
+    const poll = await storage.createPoll(validation.data, opts.options);
     // P2: 투표 생성 → 크루원 전원에게 알림
     try {
         const crewData = await storage.getCrew(req.params.id);
@@ -669,7 +711,10 @@ router.post("/:id/polls", requireAuth, requireTermsAccepted, asyncHandler(async 
                     await notificationService.sendAndSaveNotification({
                         memberId: m.member.id,
                         title: msg("notif.crew.pollNew.title", { crew: crewData.crew.name }),
-                        body: msg("notif.crew.pollNew.body", { name: author?.name || "누군가", title: rest.title || "투표" }),
+                        // 이름이 없으면 이름 없는 문장으로 — 예전엔 한국어 "누군가"가 모든 언어 푸시에 그대로 끼었다.
+                        body: author?.name
+                            ? msg("notif.crew.pollNew.body", { name: author.name, title })
+                            : msg("crewPoll.newBodyNoName", { title }),
                         category: crewData.crew.sportCategory || "BILLIARDS",
                         type: "POLL",
                         params: { url: `/crew/${req.params.id}/poll`, crewId: req.params.id, tab: "poll" },
@@ -681,10 +726,11 @@ router.post("/:id/polls", requireAuth, requireTermsAccepted, asyncHandler(async 
 }));
 
 // POST /polls/:pollId/vote - Vote/Toggle vote
+// 같은 선택지를 다시 보내면 취소(토글)다. 화면은 이걸 "투표 취소"로 분명히 보여 준다.
 router.post("/:id/polls/:pollId/vote", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
-    const { optionId } = req.body;
-    if (!optionId) return sendError(res, 400, "err.crew.pollOptionRequired");
+    const { optionId } = req.body ?? {};
+    if (!optionId || typeof optionId !== "string" || !UUID_RE.test(optionId)) return sendError(res, 400, "err.crew.pollOptionRequired");
 
     // Scope check: the option must belong to :pollId, which must belong to crew :id.
     const poll = await storage.getPollByOptionId(optionId);
@@ -696,32 +742,64 @@ router.post("/:id/polls/:pollId/vote", requireAuth, asyncHandler(async (req: Aut
     return sendSuccess(res, result);
 }));
 
-// DELETE /polls/:pollId - Delete poll
+// PATCH /polls/:pollId — 일찍 마감 { status: "closed" } (작성자·운영진)
+// 다 모였는데 마감까지 기다려야 하는 일이 잦았다. 되돌리기(다시 열기)는 두지 않는다 —
+// 닫힌 줄 알고 결정한 뒤에 표가 바뀌면 안 된다.
+router.patch("/:id/polls/:pollId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const role = await requireCrewMember(req, res);
+    if (role === null) return;
+    const poll = await loadCrewPoll(req, res);
+    if (!poll) return;
+    if (!canManagePoll(role, poll, req.userId)) return sendError(res, 403, "err.crewPoll.authorOrStaffOnly");
+    if (req.body?.status !== "closed") return sendError(res, 400, "err.crewPoll.badStatus");
+    if (isPollClosed(poll)) return sendError(res, 409, "err.crewPoll.alreadyClosed");
+    const row = await storage.crews.closePoll(poll.id);
+    return sendSuccess(res, { ...row, isClosed: true });
+}));
+
+// POST /polls/:pollId/remind — 아직 안 한 크루원에게 재알림 (작성자·운영진, 투표당 1시간에 1번)
+router.post("/:id/polls/:pollId/remind", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const role = await requireCrewMember(req, res);
+    if (role === null) return;
+    const poll = await loadCrewPoll(req, res);
+    if (!poll) return;
+    if (!canManagePoll(role, poll, req.userId)) return sendError(res, 403, "err.crewPoll.authorOrStaffOnly");
+    if (isPollClosed(poll)) return sendError(res, 409, "err.crewPoll.alreadyClosed");
+
+    const crewData = await storage.getCrew(req.params.id);
+    if (!crewData) return sendError(res, 404, "err.crew.notFound");
+    const everyone = activeMembers(crewData.members).map((m: any) => m.member.id as string);
+    // 도배 방지 — 같은 투표의 재알림이 1시간 안에 이미 나갔으면 거절한다(누가 보냈든).
+    if (await wasPollNudgedRecently(poll.id, everyone)) return sendError(res, 429, "err.crewPoll.remindTooSoon");
+
+    const blockers = await storage.crews.getBlockerIds(req.userId!);
+    const targets = (await storage.crews.getPollNonVoterIds(poll.id, req.params.id))
+        .filter((id) => id !== req.userId && !blockers.has(id));
+    let sent = 0;
+    await settleNotifications("[PollNudge]", targets.map(async (memberId) => {
+        const ok = await sendPollNudge({
+            pollId: poll.id, crewId: req.params.id, crewName: crewData.crew.name, memberId,
+            title: poll.title, endTime: poll.endTime, category: crewData.crew.sportCategory || "BILLIARDS",
+        });
+        if (ok) sent += 1;
+    }));
+    return sendSuccess(res, { sent, targets: targets.length });
+}));
+
+// DELETE /polls/:pollId - Delete poll (작성자·운영진)
 router.delete("/:id/polls/:pollId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const pollId = req.params.pollId;
-    const crewId = req.params.id;
-
-    // Check permission
-    const userId = req.userId;
-    const polls = await storage.getCrewPolls(crewId, userId);
-    const poll = polls.find((p: any) => p.id === pollId);
-
-    if (!poll) return sendError(res, 404, "err.crew.pollNotFound");
-
-    const crewData = await storage.getCrew(crewId);
-    const me = crewData?.members.find((m: any) => m.member.id === userId);
-    const isAdmin = me && (me.role === 'leader' || me.role === 'manage');
-
-    if (!isAdmin) {
-        return sendError(res, 403, "err.crew.deleteStaffOnly");
-    }
-
-    await storage.deletePoll(pollId);
+    const role = await requireCrewMember(req, res);
+    if (role === null) return;
+    const poll = await loadCrewPoll(req, res);
+    if (!poll) return;
+    if (!canManagePoll(role, poll, req.userId)) return sendError(res, 403, "err.crewPoll.authorOrStaffOnly");
+    await storage.deletePoll(poll.id);
     return sendSuccess(res, { success: true });
 }));
 
 // GET /polls/options/:optionId/votes - Get voters for an option
 router.get("/:id/polls/options/:optionId/votes", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID_RE.test(req.params.optionId)) return sendError(res, 404, "err.crew.pollOptionNotFound");
     // Resolve the poll from the option itself — never trust the :id path param for authorization.
     const poll = await storage.getPollByOptionId(req.params.optionId);
     if (!poll) return sendError(res, 404, "err.crew.pollOptionNotFound");
@@ -819,6 +897,12 @@ router.post("/:id/tournaments", requireAuth, requireTermsAccepted, asyncHandler(
     const format = "knockout";
     const bestOf = Number(req.body?.bestOf ?? 1);
     if (![1, 3, 5].includes(bestOf)) return sendError(res, 400, "err.crew.tournamentBestOf");
+    // 접수 마감·시작 일시(선택). 화면은 KST 로 받아 UTC 절대 시각으로 보낸다. 지난 접수 마감은 받지 않는다 —
+    // 그대로 받으면 만들자마자 아무도 신청 못 하는 대회가 된다(join 이 recruitEnd 로 막는다).
+    const recruitEnd = req.body?.recruitEnd ? new Date(req.body.recruitEnd) : null;
+    const startAt = req.body?.startAt ? new Date(req.body.startAt) : null;
+    const dateErr = checkTournamentDates({ recruitEnd, startAt }, Date.now(), true);
+    if (dateErr) return sendError(res, 400, `err.crewTourney.${dateErr}`);
 
     const tournament = await storage.tournaments.create({
         crewId: req.params.id,
@@ -829,8 +913,8 @@ router.post("/:id/tournaments", requireAuth, requireTermsAccepted, asyncHandler(
         format,
         bestOf,
         maxPlayers,
-        recruitEnd: req.body?.recruitEnd ? new Date(req.body.recruitEnd) : null,
-        startAt: req.body?.startAt ? new Date(req.body.startAt) : null,
+        recruitEnd,
+        startAt,
         prize: prize ?? null,
     });
 
@@ -847,10 +931,14 @@ router.post("/:id/tournaments", requireAuth, requireTermsAccepted, asyncHandler(
                     await notificationService.sendAndSaveNotification({
                         memberId: m.member.id,
                         title: msg("notif.crew.tournamentNew.title", { crew: crewData.crew.name }),
-                        body: msg("notif.crew.tournamentNew.body", { name: creator?.name || "누군가", title }),
+                        // 이름이 없으면 이름 없는 문장으로(예전엔 한국어 "누군가"가 모든 언어 푸시에 끼었다).
+                        body: creator?.name
+                            ? msg("notif.crew.tournamentNew.body", { name: creator.name, title })
+                            : msg("crewTourney.newBodyNoName", { title }),
                         category: crewData.crew.sportCategory || "BILLIARDS",
                         type: "TOURNAMENT",
-                        params: { url: `/crew/${req.params.id}/tournament`, crewId: req.params.id, tab: "tournament" },
+                        // ?open= 으로 그 대회 상세까지 바로 연다(club-detail 이 읽는다).
+                        params: { url: `/crew/${req.params.id}/tournament?open=${tournament.id}`, crewId: req.params.id, tab: "tournament" },
                     });
                 }));
         }
@@ -869,13 +957,17 @@ router.post("/:id/tournaments/:tournamentId/join", requireAuth, asyncHandler(asy
     try {
         const joiner = await storage.getMemberById(req.userId!);
         if (detail.tournament.creatorId !== req.userId) {
+            // 종목은 크루 것을 따른다(예전엔 "BILLIARDS" 고정 — 알림함 종목 거르기가 크루와 어긋날 수 있었다).
+            const crewForJoin = await storage.getCrew(req.params.id);
             await notificationService.sendAndSaveNotification({
                 memberId: detail.tournament.creatorId,
-                title: "notif.crew.tournamentJoin.title",
-                body: msg("notif.crew.tournamentJoin.body", { name: joiner?.name || "누군가", title: detail.tournament.title }),
-                category: "BILLIARDS",
+                title: msg("notif.crew.tournamentJoin.title"),
+                body: joiner?.name
+                    ? msg("notif.crew.tournamentJoin.body", { name: joiner.name, title: detail.tournament.title })
+                    : msg("crewTourney.joinBodyNoName", { title: detail.tournament.title }),
+                category: crewForJoin?.crew?.sportCategory || "BILLIARDS",
                 type: "TOURNAMENT",
-                params: { url: `/crew/${req.params.id}/tournament`, crewId: req.params.id, tab: "tournament" },
+                params: { url: `/crew/${req.params.id}/tournament?open=${detail.tournament.id}`, crewId: req.params.id, tab: "tournament" },
             }).catch((err: any) => console.error("[TournamentJoinNotif]", err));
         }
     } catch (e) { console.error("[Notify] 대회 참가:", e); }
@@ -908,11 +1000,12 @@ router.post("/:id/tournaments/:tournamentId/draw", requireAuth, asyncHandler(asy
                 if (!setting.activityEnabled) return;
                 await notificationService.sendAndSaveNotification({
                     memberId: pid,
-                    title: "notif.crew.tournamentDraw.title",
+                    title: msg("notif.crew.tournamentDraw.title"),
                     body: msg("notif.crew.tournamentDraw.body", { title: detail.tournament.title }),
                     category: crewData?.crew?.sportCategory || "BILLIARDS",
                     type: "TOURNAMENT",
-                    params: { url: `/crew/${req.params.id}/tournament`, crewId: req.params.id, tab: "tournament" },
+                    // 대진표를 보러 오는 알림이라 그 대회 상세로 바로 연다.
+                    params: { url: `/crew/${req.params.id}/tournament?open=${detail.tournament.id}`, crewId: req.params.id, tab: "tournament" },
                 });
             }));
     } catch (e) { console.error("[Notify] 대진 생성:", e); }
@@ -929,8 +1022,12 @@ router.post("/:id/tournaments/:tournamentId/swap", requireAuth, asyncHandler(asy
     const valid = (x: any) => x && typeof x.matchId === "string" && (x.side === "p1" || x.side === "p2");
     if (!valid(a) || !valid(b)) return sendError(res, 400, "err.crew.swapPickTwo");
     // 남의 대회 대진 id 를 끼워 넣지 못하도록, 이 대회의 대진인지 확인한다.
-    const ids = new Set(detail.matches.map((m) => m.id));
-    if (!ids.has(a.matchId) || !ids.has(b.matchId)) return sendError(res, 404, "err.crew.matchNotFound");
+    const ma = detail.matches.find((m) => m.id === a.matchId);
+    const mb = detail.matches.find((m) => m.id === b.matchId);
+    if (!ma || !mb) return sendError(res, 404, "err.crew.matchNotFound");
+    // 부전승 칸·윗 라운드·시작된 경기는 여기서 먼저 거절한다(저장소가 트랜잭션 안에서 한 번 더 본다).
+    const blocked = swapBlockReason(ma, mb, a, b);
+    if (blocked) return sendError(res, 400, blocked);
 
     await storage.tournaments.swapSlots(req.params.tournamentId, a, b);
     return sendSuccess(res, { success: true });
@@ -948,6 +1045,49 @@ router.post("/:id/tournaments/:tournamentId/matches/:matchId/reset", requireAuth
     }
     await storage.tournaments.resetMatch(req.params.tournamentId, req.params.matchId);
     return sendSuccess(res, { success: true });
+}));
+
+// PATCH /tournaments/:tournamentId — 대회 정보 고치기 (크루장/부크루장)
+// 이름·안내·상품·접수 마감·시작 일시만. 종목·정원·판 수는 참가자와 대진에 이미 묶여 있어 바꾸지 않는다.
+// 끝난·취소된 대회는 막는다 — 명예의 전당의 '끝난 날'이 updatedAt 이라, 고치면 날짜가 바뀐다.
+router.patch("/:id/tournaments/:tournamentId", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!await requireCrewAdmin(req, res)) return;
+    const detail = await loadTournament(req, res);
+    if (!detail) return;
+    const t = detail.tournament;
+    if (t.status === "ended" || t.status === "canceled") return sendError(res, 409, "err.crewTourney.editEnded");
+
+    const body = req.body ?? {};
+    const patch: Record<string, unknown> = {};
+    const raw: Record<string, string | undefined> = {};
+    if (body.title !== undefined) {
+        const v = String(body.title ?? "").trim().slice(0, 60);
+        if (!v) return sendError(res, 400, "err.crew.tournamentTitleRequired");
+        raw.title = v;
+    }
+    if (body.description !== undefined) raw.description = body.description ? String(body.description).slice(0, 500) : "";
+    if (body.prize !== undefined) raw.prize = body.prize ? String(body.prize).slice(0, 100) : "";
+    // 개설과 같은 필터(검토 policy:R3) — 이름은 푸시로, 상품 칸은 금전 내기 통로가 될 수 있다.
+    const screened = screenCrewBody(raw, ["title", "description", "prize"] as const);
+    if (!screened.ok) return sendError(res, 400, screened.reason);
+    const f = screened.value.fields;
+    if (raw.title !== undefined) patch.title = f.title ?? raw.title;
+    if (raw.description !== undefined) patch.description = (f.description ?? raw.description)?.trim() || null;
+    if (raw.prize !== undefined) patch.prize = (f.prize ?? raw.prize)?.trim() || null;
+
+    const toDate = (v: unknown) => (v ? new Date(v as any) : null);
+    const recruitEnd = body.recruitEnd !== undefined ? toDate(body.recruitEnd) : t.recruitEnd;
+    const startAt = body.startAt !== undefined ? toDate(body.startAt) : t.startAt;
+    // 접수 마감을 **새로** 지난 시각으로 바꾸는 것만 막는다(그대로 둔 옛 값은 통과).
+    const recruitChanged = body.recruitEnd !== undefined && (recruitEnd?.getTime() ?? null) !== (t.recruitEnd ? new Date(t.recruitEnd).getTime() : null);
+    const dateErr = checkTournamentDates({ recruitEnd, startAt }, Date.now(), recruitChanged);
+    if (dateErr) return sendError(res, 400, `err.crewTourney.${dateErr}`);
+    if (body.recruitEnd !== undefined) patch.recruitEnd = recruitEnd;
+    if (body.startAt !== undefined) patch.startAt = startAt;
+
+    if (Object.keys(patch).length === 0) return sendSuccess(res, t);
+    const row = await storage.tournaments.update(t.id, patch);
+    return sendSuccess(res, row);
 }));
 
 // DELETE /tournaments/:tournamentId — 대회 삭제 (크루장/부크루장)
@@ -1424,9 +1564,33 @@ router.post("/:id/settlements", requireAuth, requireTermsAccepted, asyncHandler(
     const items = Array.isArray(rawItems)
         ? rawItems.map((it: any, i: number) => (it && typeof it === "object" ? { ...it, title: screenedSettlement.value.extra[i] } : it))
         : rawItems;
+    // 차수·금액·계산한 사람 확인(2026-09-26 검토 P1). 예전엔 빈 금액이 0원으로, 계산한 사람이 참석자 밖이면
+    // 아무나로 저장됐다. 화면도 같은 함수(shared/crewSettlement)로 먼저 막는다.
+    const settleTitle = String(screenedSettlement.value.fields.title ?? req.body?.title ?? "").trim();
+    if (!settleTitle) return sendError(res, 400, "err.crewSettle.titleRequired");
+    if (!Array.isArray(items) || items.length === 0 || items.length > 20) return sendError(res, 400, "err.crewSettle.noItems");
+    if (!Array.isArray(participants)) return sendError(res, 400, "err.crewSettle.noParticipants");
+    {
+        const crewForSettle = await storage.getCrew(req.params.id);
+        const memberIds = new Set(activeMembers(crewForSettle?.members).map((m: any) => m.member.id as string));
+        for (const it of items) {
+            const order = it?.roundOrder;
+            const roundIds = participants
+                .filter((p: any) => p && p.roundOrder === order && typeof p.memberId === "string")
+                .map((p: any) => p.memberId as string);
+            // 승인 대기·탈퇴자는 정산 대상이 될 수 없다 — 크루 정식 멤버만.
+            if (roundIds.some((id: string) => !memberIds.has(id))) return sendError(res, 400, "err.crewSettle.noParticipants");
+            const err = checkSettlementRound({ amount: it?.amount, payerId: it?.payerId, participants: roundIds });
+            if (err === "amount") return sendError(res, 400, "err.crewSettle.badAmount");
+            if (err === "participants") return sendError(res, 400, "err.crewSettle.noParticipants");
+            if (err === "payer") return sendError(res, 400, "err.crewSettle.badPayer");
+        }
+    }
+
     const data = {
         ...req.body, // title, date, totalAmount, etc.
         ...screenedSettlement.value.fields,
+        title: settleTitle,
         crewId: req.params.id,
         creatorId: req.userId
     };
@@ -1450,7 +1614,8 @@ router.post("/:id/settlements", requireAuth, requireTermsAccepted, asyncHandler(
             await storage.createCrewChat({
                 crewId: req.params.id,
                 senderId: req.userId,
-                message: `정산 요청: ${settlement.title}`,
+                // 채팅 원문은 한 번 저장돼 모두에게 같게 보인다 — 만든 사람의 언어로 적는다(카드는 metadata 로 그린다).
+                message: trRes(res, "crewSettle.chatMessage", { title: settlement.title }),
                 type: 'settlement',
                 metadata: { settlementId: settlement.id, title: settlement.title, totalAmount },
             } as any);
@@ -1467,7 +1632,7 @@ router.post("/:id/settlements", requireAuth, requireTermsAccepted, asyncHandler(
         const crewData = await storage.getCrew(req.params.id);
         if (crewData && Array.isArray(participants)) {
             const creator = await storage.getMemberById(req.userId!);
-            const creatorName = creator?.name || "크루원";
+            const creatorName = creator?.name ?? null;
 
             // participants는 클라 body에서 그대로 온다 — 크루원 집합과 교집합만 남긴다.
             // (검증이 없으면 임의의 memberId를 실어 아무에게나 푸시를 보낼 수 있었다.)
@@ -1487,7 +1652,10 @@ router.post("/:id/settlements", requireAuth, requireTermsAccepted, asyncHandler(
                 await notificationService.sendAndSaveNotification({
                     memberId: pid,
                     title: msg("notif.crew.settlement.title", { crew: crewData.crew.name }),
-                    body: msg("notif.crew.settlement.body", { name: creatorName, title: settlement.title, amount: totalAmount.toLocaleString() }),
+                    // 이름이 없으면 이름 없는 문장으로(예전엔 한국어 "크루원"이 모든 언어 푸시에 끼었다).
+                    body: creatorName
+                        ? msg("notif.crew.settlement.body", { name: creatorName, title: settlement.title, amount: totalAmount.toLocaleString("ko-KR") })
+                        : msg("crewSettle.bodyNoName", { title: settlement.title, amount: totalAmount.toLocaleString("ko-KR") }),
                     category: crewData.crew.sportCategory || "BILLIARDS",
                     type: "SETTLEMENT",
                     // 정산은 채팅 카드로만 열 수 있다 — 카드를 안 보냈으면 홈으로.

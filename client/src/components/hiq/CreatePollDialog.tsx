@@ -1,19 +1,26 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
-import { useToast } from "@/hooks/use-toast";
 import { Switch } from "@/components/ui/switch";
+import { useToast } from "@/hooks/use-toast";
 import { LucidePlus, LucideX, LucideClock } from "@/lib/icons";
-import { addDays, format } from "date-fns";
-import { ko } from "date-fns/locale";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { CREW_BTN, CREW_TEXT, CrewChip, CrewChipRow, IconButton } from "@/components/hiq/crew-ui";
+import { formatKst } from "@/components/hiq/poll/crewTimeFormat";
+import { POLL_LIMITS, checkPollEndTime, normalizePollOptions } from "@shared/crewPoll";
+import { dateToKstInput, kstEndOfDay, kstInputToDate } from "@shared/crewTime";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+
+// 투표 만들기(2026-09-26 크루 정비).
+//  - 마감 기본값은 "n일 뒤 23:59(한국 시각)". 예전 addDays(now, n) 은 "사흘 뒤 지금 이 분"이라 밤 11시 7분 같은
+//    어정쩡한 마감이 됐고, 목록의 미리보기 시각도 기기 시간대로 찍혀 해외 회원에게 9시간씩 달랐다.
+//  - '직접 고르기'로 날짜·시각을 KST 로 받는다.
+//  - 검증은 서버와 같은 함수(shared/crewPoll) — 빈 칸·중복·60자 초과·지난 마감을 보내기 전에 막는다.
+//  - 틀은 대회 개설 창과 같다: 제목·만들기 버튼은 고정, 본문만 스크롤(폰에서 버튼이 화면 밖으로 밀리지 않게).
 
 interface CreatePollDialogProps {
     open: boolean;
@@ -21,8 +28,11 @@ interface CreatePollDialogProps {
     crewId: string;
 }
 
+const PRESETS = [0, 1, 3, 7] as const;
+type Preset = (typeof PRESETS)[number] | "custom";
+
 export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialogProps) {
-    const { t } = useT();
+    const { t, locale } = useT();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [title, setTitle] = useState("");
@@ -30,29 +40,11 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
     const [options, setOptions] = useState<string[]>(["", ""]);
     const [isAnonymous, setIsAnonymous] = useState(false);
     const [allowMultiple, setAllowMultiple] = useState(false);
-    const [duration, setDuration] = useState("3"); // days
-
-    const createPollMutation = useMutation({
-        mutationFn: async (data: any) => {
-            return await apiRequest(`/api/hiq/crews/${crewId}/polls`, {
-                method: "POST",
-                body: JSON.stringify(data)
-            });
-        },
-        onSuccess: () => {
-            toast({ title: t("createPoll.created") });
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
-            onOpenChange(false);
-            resetForm();
-        },
-        onError: (error: any) => {
-            toast({
-                title: t("createPoll.createFailed"),
-                description: error.message || t("createPoll.genericError"),
-                variant: "destructive"
-            });
-        }
-    });
+    const [preset, setPreset] = useState<Preset>(3);
+    const [customDate, setCustomDate] = useState("");
+    const [customTime, setCustomTime] = useState("23:59");
+    // 창을 여는 순간의 '지금' — 미리보기 마감 시각과 '오늘' 기준이 된다.
+    const [openedAt, setOpenedAt] = useState(() => Date.now());
 
     const resetForm = () => {
         setTitle("");
@@ -60,186 +52,205 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
         setOptions(["", ""]);
         setIsAnonymous(false);
         setAllowMultiple(false);
-        setDuration("3");
+        setPreset(3);
+        setCustomDate("");
+        setCustomTime("23:59");
     };
 
+    useEffect(() => {
+        if (!open) return;
+        const n = Date.now();
+        setOpenedAt(n);
+        // 직접 고르기의 기본 날짜는 사흘 뒤(프리셋 기본과 같게).
+        setCustomDate((d) => d || dateToKstInput(kstEndOfDay(n, 3)).date);
+    }, [open]);
+
+    const endTime: Date | null = useMemo(() => {
+        if (preset === "custom") return kstInputToDate(customDate, customTime);
+        return kstEndOfDay(openedAt, preset);
+    }, [preset, customDate, customTime, openedAt]);
+
+    const createPollMutation = useMutation({
+        mutationFn: (data: any) => apiRequest(`/api/hiq/crews/${crewId}/polls`, { method: "POST", body: JSON.stringify(data) }),
+        onSuccess: () => {
+            toast({ title: t("createPoll.created") });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
+            onOpenChange(false);
+            resetForm();
+        },
+        onError: (error: any) => {
+            toast({ title: t("createPoll.createFailed"), description: error?.message || t("createPoll.genericError"), variant: "destructive" });
+        },
+    });
+
     const addOption = () => {
-        if (options.length >= 10) {
+        if (options.length >= POLL_LIMITS.maxOptions) {
             toast({ title: t("createPoll.maxOptions") });
             return;
         }
         setOptions([...options, ""]);
     };
-
     const removeOption = (index: number) => {
-        if (options.length <= 2) return;
+        if (options.length <= POLL_LIMITS.minOptions) return;
         setOptions(options.filter((_, i) => i !== index));
     };
-
-    const handleOptionChange = (index: number, value: string) => {
-        const newOptions = [...options];
-        newOptions[index] = value;
-        setOptions(newOptions);
-    };
+    const changeOption = (index: number, value: string) => setOptions(options.map((o, i) => (i === index ? value : o)));
 
     const handleSubmit = () => {
-        if (!title.trim()) {
+        const q = title.trim();
+        if (!q) {
             toast({ title: t("createPoll.titleRequired"), variant: "destructive" });
             return;
         }
-
-        const filteredOptions = options.map(o => o.trim()).filter(o => o !== "");
-        if (filteredOptions.length < 2) {
-            toast({ title: t("createPoll.minOptions"), variant: "destructive" });
+        const norm = normalizePollOptions(options);
+        if (!norm.ok) {
+            const msg = norm.reason === "duplicate" ? t("crewPoll.optionDuplicate")
+                : norm.reason === "tooLong" ? t("crewPoll.optionTooLong").replace("{n}", String(POLL_LIMITS.optionMax))
+                    : t("createPoll.minOptions");
+            toast({ title: msg, variant: "destructive" });
             return;
         }
-
+        const end = checkPollEndTime(endTime ? endTime.toISOString() : "invalid");
+        if (!end.ok) {
+            const msg = end.reason === "past" ? t("crewPoll.endPast")
+                : end.reason === "tooFar" ? t("crewPoll.endTooFar").replace("{n}", String(POLL_LIMITS.maxDays))
+                    : t("crewPoll.endInvalid");
+            toast({ title: msg, variant: "destructive" });
+            return;
+        }
         createPollMutation.mutate({
-            title,
-            description,
-            options: filteredOptions,
+            title: q,
+            description: description.trim(),
+            options: norm.options,
             isAnonymous,
             allowMultiple,
-            endTime: addDays(new Date(), parseInt(duration, 10))
+            endTime: end.endTime?.toISOString(),
         });
     };
 
+    const presetLabel = (p: Preset) =>
+        p === "custom" ? t("crewPoll.presetCustom")
+            : p === 0 ? t("crewPoll.presetToday")
+                : p === 1 ? t("crewPoll.presetTomorrow")
+                    : p === 7 ? t("crewPoll.presetWeek")
+                        : t("crewPoll.presetDays").replace("{n}", String(p));
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-white border-black/[0.08] text-ink-1 max-w-md p-0 overflow-hidden rounded-card">
-                <div className="py-6 space-y-6">
-                    <DialogHeader className="px-6">
-                        <DialogTitle className="text-xl font-semibold text-brand">{t("createPoll.title")}</DialogTitle>
-                        <DialogDescription className="text-black/55">
-                            {t("createPoll.description")}
-                        </DialogDescription>
-                    </DialogHeader>
+            <DialogContent className="bg-surface-1 text-ink-1 max-w-[420px] max-h-[88dvh] rounded-card flex flex-col gap-0 p-0">
+                <DialogHeader className="shrink-0 px-4 pt-5 pb-3 pr-14 text-left">
+                    <DialogTitle className={CREW_TEXT.section}>{t("createPoll.title")}</DialogTitle>
+                    <DialogDescription className={CREW_TEXT.sub}>{t("createPoll.description")}</DialogDescription>
+                </DialogHeader>
 
-                    <div className="space-y-5 overflow-y-auto max-h-[60vh] px-6 custom-scrollbar">
-                        {/* Title & Description */}
-                        <div className="space-y-4">
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-black/55">{t("createPoll.questionLabel")}</Label>
+                <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar px-4 pb-2 flex flex-col gap-5">
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="poll-title" className="text-[13px] font-semibold text-ink-2">{t("createPoll.questionLabel")}</Label>
+                        <Input
+                            id="poll-title" value={title} maxLength={POLL_LIMITS.titleMax}
+                            placeholder={t("createPoll.questionPlaceholder")}
+                            onChange={(e) => setTitle(e.target.value)}
+                            className="h-12 text-[15px] bg-surface-2 border-surface-line rounded-tile"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <Label htmlFor="poll-desc" className="text-[13px] font-semibold text-ink-2">{t("createPoll.descLabel")}</Label>
+                        <Textarea
+                            id="poll-desc" value={description} maxLength={POLL_LIMITS.descMax} rows={2}
+                            placeholder={t("createPoll.descPlaceholder")}
+                            onChange={(e) => setDescription(e.target.value)}
+                            className="text-[15px] bg-surface-2 border-surface-line rounded-tile resize-none"
+                        />
+                    </div>
+
+                    {/* 선택지 */}
+                    <div className="flex flex-col gap-2">
+                        <div className="flex items-center justify-between">
+                            <Label className="text-[13px] font-semibold text-ink-2">{t("createPoll.optionsLabel")}</Label>
+                            <span className="text-[12px] font-medium text-ink-3 rk-num">{options.length} / {POLL_LIMITS.maxOptions}</span>
+                        </div>
+                        {options.map((option, idx) => (
+                            <div key={idx} className="flex items-center gap-1">
                                 <Input
-                                    placeholder={t("createPoll.questionPlaceholder")}
-                                    value={title}
-                                    onChange={(e) => setTitle(e.target.value)}
-                                    className="bg-surface-3 border-black/10 h-12 rounded-tile focus:ring-brand/30 placeholder:text-black/40"
+                                    value={option} maxLength={POLL_LIMITS.optionMax}
+                                    aria-label={t("crewPoll.optionN").replace("{n}", String(idx + 1))}
+                                    placeholder={t("crewPoll.optionN").replace("{n}", String(idx + 1))}
+                                    onChange={(e) => changeOption(idx, e.target.value)}
+                                    className="flex-1 min-w-0 h-11 text-[15px] bg-surface-2 border-surface-line rounded-tile"
+                                />
+                                {options.length > POLL_LIMITS.minOptions && (
+                                    <IconButton label={t("crewPoll.removeOption")} onClick={() => removeOption(idx)}>
+                                        <LucideX />
+                                    </IconButton>
+                                )}
+                            </div>
+                        ))}
+                        {options.length < POLL_LIMITS.maxOptions && (
+                            <button type="button" onClick={addOption} className={cn(CREW_BTN.secondary, "w-full border-dashed")}>
+                                <LucidePlus className="w-4 h-4" />
+                                {t("createPoll.addOption")}
+                            </button>
+                        )}
+                    </div>
+
+                    {/* 방식 */}
+                    <div className="rk-card-2 px-4 divide-y divide-surface-line">
+                        <label className="flex items-center justify-between gap-3 min-h-12 cursor-pointer">
+                            <span className="flex flex-col">
+                                <span className="text-[15px] font-medium text-ink-1">{t("createPoll.anonymous")}</span>
+                                <span className={CREW_TEXT.caption}>{t("crewPoll.anonymousHint")}</span>
+                            </span>
+                            <Switch checked={isAnonymous} onCheckedChange={setIsAnonymous} className="data-[state=checked]:bg-brand" />
+                        </label>
+                        <label className="flex items-center justify-between gap-3 min-h-12 cursor-pointer">
+                            <span className="flex flex-col">
+                                <span className="text-[15px] font-medium text-ink-1">{t("createPoll.multiple")}</span>
+                                <span className={CREW_TEXT.caption}>{t("crewPoll.multipleHint")}</span>
+                            </span>
+                            <Switch checked={allowMultiple} onCheckedChange={setAllowMultiple} className="data-[state=checked]:bg-brand" />
+                        </label>
+                    </div>
+
+                    {/* 마감 */}
+                    <div className="flex flex-col gap-2 pb-2">
+                        <Label className="text-[13px] font-semibold text-ink-2">{t("createPoll.deadlineLabel")}</Label>
+                        <CrewChipRow label={t("createPoll.deadlineLabel")} className="-mx-4 px-4">
+                            {[...PRESETS, "custom" as const].map((p) => (
+                                <CrewChip key={String(p)} selected={preset === p} onClick={() => setPreset(p)}>
+                                    {presetLabel(p)}
+                                </CrewChip>
+                            ))}
+                        </CrewChipRow>
+                        {preset === "custom" && (
+                            <div className="grid grid-cols-[1fr_auto] gap-2">
+                                <Input
+                                    type="date" value={customDate} aria-label={t("crewPoll.pickDate")}
+                                    min={dateToKstInput(openedAt).date}
+                                    onChange={(e) => setCustomDate(e.target.value)}
+                                    className="h-11 text-[15px] bg-surface-2 border-surface-line rounded-tile"
+                                />
+                                <Input
+                                    type="time" value={customTime} aria-label={t("crewPoll.pickTime")}
+                                    onChange={(e) => setCustomTime(e.target.value)}
+                                    className="h-11 w-[120px] text-[15px] bg-surface-2 border-surface-line rounded-tile"
                                 />
                             </div>
-                            <div className="space-y-2">
-                                <Label className="text-xs font-semibold text-black/55">{t("createPoll.descLabel")}</Label>
-                                <Textarea
-                                    placeholder={t("createPoll.descPlaceholder")}
-                                    value={description}
-                                    onChange={(e) => setDescription(e.target.value)}
-                                    className="bg-surface-3 border-black/10 rounded-tile resize-none min-h-[80px] placeholder:text-black/40"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Options */}
-                        <div className="space-y-3">
-                            <div className="flex items-center justify-between">
-                                <Label className="text-xs font-semibold text-black/55">{t("createPoll.optionsLabel")}</Label>
-                                <span className="text-[12px] font-medium tabular-nums text-black/55">{options.length} / 10</span>
-                            </div>
-                            <div className="space-y-2">
-                                {options.map((option, idx) => (
-                                    <div key={idx} className="flex gap-2">
-                                        <div className="relative flex-1 group">
-                                            <Input
-                                                placeholder={`${t("createPoll.optionPrefix")} ${idx + 1}`}
-                                                value={option}
-                                                onChange={(e) => handleOptionChange(idx, e.target.value)}
-                                                className="bg-surface-3 border-black/10 h-11 rounded-tile pl-10 placeholder:text-black/40"
-                                            />
-                                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-medium tabular-nums text-black/55 group-focus-within:text-brand">
-                                                {String(idx + 1).padStart(2, '0')}
-                                            </span>
-                                        </div>
-                                        {options.length > 2 && (
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => removeOption(idx)}
-                                                className="h-11 w-11 rounded-tile hover:bg-red-500/10 text-black/40 hover:text-red-500"
-                                            >
-                                                <LucideX className="w-4 h-4" />
-                                            </Button>
-                                        )}
-                                    </div>
-                                ))}
-                                <Button
-                                    variant="outline"
-                                    onClick={addOption}
-                                    className="w-full h-11 border-dashed border-black/10 bg-surface-3 rounded-tile text-black/55 hover:text-ink-1 hover:bg-black/[0.06]"
-                                >
-                                    <LucidePlus className="w-4 h-4 mr-2" />
-                                    {t("createPoll.addOption")}
-                                </Button>
-                            </div>
-                        </div>
-
-                        {/* Settings */}
-                        <div className="space-y-4 pt-2">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div
-                                    className={cn(
-                                        "flex items-center justify-between p-4 rounded-tile border transition-all cursor-pointer",
-                                        isAnonymous ? "bg-brand/10 border-brand/40" : "bg-surface-3 border-black/10 hover:bg-black/[0.06]"
-                                    )}
-                                    onClick={() => setIsAnonymous(!isAnonymous)}
-                                >
-                                    <Label className="text-sm font-semibold text-ink-1 cursor-pointer select-none">{t("createPoll.anonymous")}</Label>
-                                    <Switch checked={isAnonymous} onCheckedChange={setIsAnonymous} className="data-[state=checked]:bg-brand" />
-                                </div>
-
-                                <div
-                                    className={cn(
-                                        "flex items-center justify-between p-4 rounded-tile border transition-all cursor-pointer",
-                                        allowMultiple ? "bg-brand/10 border-brand/40" : "bg-surface-3 border-black/10 hover:bg-black/[0.06]"
-                                    )}
-                                    onClick={() => setAllowMultiple(!allowMultiple)}
-                                >
-                                    <Label className="text-sm font-semibold text-ink-1 cursor-pointer select-none">{t("createPoll.multiple")}</Label>
-                                    <Switch checked={allowMultiple} onCheckedChange={setAllowMultiple} className="data-[state=checked]:bg-brand" />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2 pb-4">
-                                <Label className="text-xs font-semibold text-black/55 pl-1">{t("createPoll.deadlineLabel")}</Label>
-                                <Select value={duration} onValueChange={setDuration}>
-                                    <SelectTrigger className="w-full h-12 bg-surface-3 border-black/10 rounded-tile text-sm px-4 focus:ring-1 focus:ring-brand/40">
-                                        <div className="flex items-center gap-2">
-                                            <LucideClock className="w-4 h-4 text-black/40" />
-                                            <SelectValue />
-                                        </div>
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-white border-black/[0.08] text-ink-1 rounded-tile">
-                                        <SelectItem value="1" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after1Day")} ({format(addDays(new Date(), 1), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="2" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after2Days")} ({format(addDays(new Date(), 2), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="3" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after3Days")} ({format(addDays(new Date(), 3), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="5" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after5Days")} ({format(addDays(new Date(), 5), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="7" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after1Week")} ({format(addDays(new Date(), 7), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="14" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after2Weeks")} ({format(addDays(new Date(), 14), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                        <SelectItem value="30" className="focus:bg-brand/10 focus:text-brand py-3">{t("createPoll.after1Month")} ({format(addDays(new Date(), 30), "M/d HH:mm", { locale: ko })})</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
+                        )}
+                        <p className="flex items-center gap-1.5 text-[13px] font-medium text-ink-2 rk-num">
+                            <LucideClock className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                            {endTime
+                                ? t("crewPoll.deadlineAt").replace("{time}", formatKst(endTime, locale, { weekday: true }))
+                                : t("crewPoll.endInvalid")}
+                        </p>
+                        <p className={CREW_TEXT.caption}>{t("crewPoll.kstNote")}</p>
                     </div>
                 </div>
 
-                <div className="p-6 border-t border-black/10">
-                    <Button
-                        onClick={handleSubmit}
-                        disabled={createPollMutation.isPending}
-                        className="w-full h-12 rk-btn-primary rounded-tile font-semibold text-[15px]"
-                    >
+                <DialogFooter className="shrink-0 px-4 pb-4 pt-3 border-t border-surface-line">
+                    <button type="button" onClick={handleSubmit} disabled={createPollMutation.isPending} className={cn(CREW_BTN.primary, "w-full")}>
                         {createPollMutation.isPending ? t("createPoll.creating") : t("createPoll.submit")}
-                    </Button>
-                </div>
+                    </button>
+                </DialogFooter>
             </DialogContent>
         </Dialog>
     );

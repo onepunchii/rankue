@@ -1,25 +1,39 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
 import {
     LucideTrophy, LucidePlus, LucideChevronLeft, LucideUsers, LucideRefreshCw,
-    LucideArrowLeftRight, LucideTrash2, LucidePlay, LucideLoader2, LucideCheck,
+    LucideArrowLeftRight, LucideTrash2, LucidePlay, LucideCheck, LucidePencil, LucideCalendar, LucideSwords,
 } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { useLocation } from "wouter";
 import { BallDot } from "@/components/hiq/BallDot";
+import {
+    CREW_BTN, CREW_CARD, CREW_TEXT, ConfirmDialog, CrewAvatar, CrewEmpty, CrewError, CrewSection, CrewSkeleton, IconButton,
+} from "@/components/hiq/crew-ui";
 import { TournamentBracket, type BracketMatch, type BracketPlayer, type SlotRef } from "@/components/hiq/tournament/TournamentBracket";
 import { CreateCrewTournamentDialog } from "@/components/hiq/tournament/CreateCrewTournamentDialog";
+import { MatchResultSheet } from "@/components/hiq/tournament/MatchResultSheet";
+import { formatKst } from "@/components/hiq/poll/crewTimeFormat";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
+import { findMyNextMatch } from "@shared/crewTournamentRules";
+import { roundName, totalRounds, bracketSize } from "@shared/tournamentBracket";
 import type { HiqMember, HiqGameHistory } from "@shared/schema";
 
 // 크루 대회 탭. 목록 ↔ 상세를 한 컴포넌트에서 오간다(정모·투표 탭과 같은 결).
 //
 // 흐름: 개설(크루장) → 참가 신청(승인 없이 즉시 확정) → 대진 짜기(크루장, 자리 조정 가능)
 //     → 대진에서 경기 시작(매칭 화면이 열려 핸디캡을 거기서 맞춘다) → 승자 자동 진출 → 우승.
+//
+// 2026-09-26 크루 정비:
+//  - 상세는 대진이 나온 뒤(drawn·ongoing) 15초마다 다시 불러온다. 전역 기본값(5분 캐시, 포커스 새로고침 없음) 때문에
+//    남의 경기가 끝나도 대진표가 그대로였다. 탭에 들어올 때마다(refetchOnMount always) 새로 받는다.
+//  - 상세를 열면 주소에 ?open=<id> 를 남긴다 — 대진에서 경기를 치고 돌아오면(뒤로) 목록이 아니라 그 대진표로 돌아온다.
+//  - 불러오기 실패(지워진 대회를 가리키는 옛 ?open= 링크 = 404)는 끝없이 도는 대신 '찾을 수 없어요' + 뒤로.
+//  - 되돌릴 수 없는 조작(다시 뽑기·섞기·경기 되돌리기·참가 취소·삭제)은 모두 확인 창을 거친다.
+//  - 풀리그 표(LeagueTable)는 지웠다 — 서버가 개설을 항상 토너먼트로 만든다(crew.ts, 2026-09-04 오너 결정).
 
 interface Props {
     crewId: string;
@@ -42,33 +56,41 @@ interface TournamentRow {
 }
 
 export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreate, onAutoOpenHandled, autoOpenTournamentId }: Props) {
-    const { t } = useT();
+    const { t, locale } = useT();
     const [, setLocation] = useLocation();
     // 매칭 화면이 목표 점수를 뽑을 때 쓴다. 대시보드와 같은 쿼리키라 캐시를 그대로 나눠 쓴다.
     const { data: history } = useQuery<HiqGameHistory[]>({ queryKey: ["/api/hiq/history"], enabled: !!me });
-    const [openId, setOpenId] = useState<string | null>(null);
+    const [openId, setOpenIdState] = useState<string | null>(null);
     const [isCreateOpen, setIsCreateOpen] = useState(false);
+
+    // 상세를 열고 닫을 때 주소도 맞춘다(replace — 뒤로 가기 기록을 늘리지 않는다).
+    const setOpenId = (id: string | null) => {
+        setOpenIdState(id);
+        setLocation(id ? `/crew/${crewId}/tournament?open=${id}` : `/crew/${crewId}/tournament`, { replace: true });
+    };
 
     // 홈에서 "만들기"를 눌러 넘어온 경우 다이얼로그를 한 번만 자동으로 연다.
     useEffect(() => {
         if (autoOpenCreate && isAdmin) {
-            setOpenId(null);
+            setOpenIdState(null);
             setIsCreateOpen(true);
             onAutoOpenHandled?.();
         }
     }, [autoOpenCreate, isAdmin, onAutoOpenHandled]);
 
-    // 명예의 전당에서 역대 대회를 눌러 넘어온 경우 그 대진표를 연다.
+    // 명예의 전당·알림·경기 후 뒤로 가기(?open=)로 넘어온 경우 그 대진표를 연다.
     useEffect(() => {
         if (autoOpenTournamentId) {
-            setOpenId(autoOpenTournamentId);
+            setOpenIdState(autoOpenTournamentId);
             onAutoOpenHandled?.();
         }
     }, [autoOpenTournamentId, onAutoOpenHandled]);
 
-    const { data: list, isLoading } = useQuery<TournamentRow[]>({
-        queryKey: [`/api/hiq/crews/${crewId}/tournaments`],
+    const listKey = `/api/hiq/crews/${crewId}/tournaments`;
+    const { data: list, isLoading, isError, refetch } = useQuery<TournamentRow[]>({
+        queryKey: [listKey],
         enabled: !!crewId && isMember,
+        refetchOnMount: "always",
     });
 
     if (openId) {
@@ -81,110 +103,110 @@ export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreat
     }
 
     return (
-        <div className="space-y-6 pt-5 pb-nav">
-            <div className="px-6 flex items-center justify-between">
-                <div>
-                    <h2 className="text-[15px] font-semibold text-ink-3">{t("crewTournament.title")}</h2>
-                    <p className="text-xs text-ink-4 mt-1 font-medium flex items-center gap-1.5 rk-num">
-                        <LucideTrophy className="w-3 h-3" />
-                        {t("crewTournament.count").replace("{n}", String(list?.length ?? 0))}
-                    </p>
-                </div>
-                <div className="flex items-center gap-1.5">
-                    {/* 명예의 전당 — 대회를 보러 온 자리에서 바로 갈 수 있게 */}
-                    <button
-                        type="button"
-                        onClick={() => setLocation(`/crew/${crewId}/hall-of-fame`)}
-                        className="h-10 w-10 rounded-xl border border-surface-line flex items-center justify-center active:opacity-60"
-                        aria-label={t("hallOfFame.title")}
-                    >
-                        <LucideTrophy className="w-4 h-4 text-gold" />
-                    </button>
-                    {isAdmin && (
-                        <Button
-                            onClick={() => setIsCreateOpen(true)}
-                            className="h-10 px-4 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl flex items-center gap-2"
-                        >
-                            <LucidePlus className="w-4 h-4" />
-                            {t("crewTournament.open")}
-                        </Button>
+        <div className="px-4 pt-5 pb-nav flex flex-col gap-4">
+            <header className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                    <h2 className={CREW_TEXT.title}>{t("crewTournament.title")}</h2>
+                    {(list?.length ?? 0) > 0 && (
+                        <p className={cn(CREW_TEXT.sub, "rk-num")}>{t("crewTournament.count").replace("{n}", String(list?.length ?? 0))}</p>
                     )}
                 </div>
-            </div>
+                <div className="flex items-center gap-1 shrink-0">
+                    {/* 명예의 전당 — 대회를 보러 온 자리에서 바로 갈 수 있게 */}
+                    <IconButton label={t("hallOfFame.title")} onClick={() => setLocation(`/crew/${crewId}/hall-of-fame`)} className="text-gold">
+                        <LucideTrophy />
+                    </IconButton>
+                    {isAdmin && (
+                        <button type="button" onClick={() => setIsCreateOpen(true)} className={CREW_BTN.primary}>
+                            <LucidePlus className="w-4 h-4" />
+                            {t("crewTournament.open")}
+                        </button>
+                    )}
+                </div>
+            </header>
 
-            <div className="px-6 space-y-3">
-                {isLoading && (
-                    <div className="flex justify-center py-14">
-                        <LucideLoader2 className="w-5 h-5 animate-spin text-ink-4" />
-                    </div>
-                )}
-
-                {!isLoading && (list?.length ?? 0) === 0 && (
-                    <div className="rk-card px-6 py-12 text-center">
-                        <LucideTrophy className="w-9 h-9 mx-auto text-ink-4 mb-3" />
-                        <p className="text-sm font-semibold text-ink-2">{t("crewTournament.emptyTitle")}</p>
-                        <p className="text-[13px] text-ink-4 mt-1.5 leading-relaxed">
-                            {isAdmin ? t("crewTournament.emptyAdmin") : t("crewTournament.emptyMember")}
-                        </p>
-                    </div>
-                )}
-
-                {list?.map((row) => (
-                    <button
-                        key={row.id}
-                        onClick={() => setOpenId(row.id)}
-                        className="w-full flex items-stretch rounded-tile bg-white overflow-hidden text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:scale-[0.99] transition-transform"
-                    >
-                        {/* 왼쪽 띠가 종목 색 — 목록을 훑을 때 빨강·노랑만 보고 갈린다. */}
-                        <span
-                            className="w-1 shrink-0"
-                            style={{ background: row.gameType === "3c" ? "var(--ball-red)" : "var(--ball-yellow)" }}
-                        />
-                        <span className="flex-1 min-w-0 px-4 py-3.5">
+            {isLoading ? (
+                <CrewSkeleton rows={3} height={84} />
+            ) : isError ? (
+                <CrewError onRetry={() => refetch()} />
+            ) : (list?.length ?? 0) === 0 ? (
+                <CrewEmpty
+                    icon={<LucideTrophy />}
+                    title={t("crewTournament.emptyTitle")}
+                    desc={isAdmin ? t("crewTournament.emptyAdmin") : t("crewTournament.emptyMember")}
+                    action={isAdmin ? { label: t("crewTournament.open"), onClick: () => setIsCreateOpen(true) } : undefined}
+                />
+            ) : (
+                <div className="flex flex-col gap-2.5">
+                    {list!.map((row) => (
+                        <button
+                            key={row.id}
+                            type="button"
+                            onClick={() => setOpenId(row.id)}
+                            className={cn(CREW_CARD, "relative overflow-hidden w-full text-left pl-5 active:scale-[0.99] transition-transform")}
+                        >
+                            {/* 왼쪽 띠가 종목 색 — 목록을 훑을 때 빨강·노랑만 보고 갈린다. */}
+                            <span aria-hidden="true" className="absolute left-0 inset-y-0 w-1"
+                                style={{ background: row.gameType === "3c" ? "var(--ball-red)" : "var(--ball-yellow)" }} />
                             <span className="flex items-center gap-2">
                                 <span className="flex-1 min-w-0 truncate text-[15px] font-semibold text-ink-1">{row.title}</span>
                                 <StatusChip status={row.status} />
                             </span>
-                            <span className="mt-1.5 flex items-center gap-2 text-[12.5px] text-ink-3">
+                            <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[13px] font-medium text-ink-3">
                                 {/* 끝난 대회는 우승자가 제일 중요한 정보다 */}
                                 {row.status === "ended" && row.championName ? (
                                     <span className="flex items-center gap-1 font-semibold text-ink-2">
-                                        <LucideTrophy className="w-3.5 h-3.5" style={{ color: "var(--gold-fill)" }} />
+                                        <LucideTrophy className="w-3.5 h-3.5 text-gold" />
                                         {row.championName}
                                     </span>
                                 ) : (
                                     <span className="flex items-center gap-1 rk-num">
-                                        <LucideUsers className="w-3 h-3" />
+                                        <LucideUsers className="w-3.5 h-3.5" />
                                         {row.participantCount}/{row.maxPlayers}
                                     </span>
                                 )}
                                 <span className="text-ink-4">·</span>
                                 <span>{row.gameType === "3c" ? t("crewTournament.type3c") : t("crewTournament.type4c")}</span>
-                                {row.prize && (
-                                    <><span className="text-ink-4">·</span><span className="truncate">{row.prize}</span></>
-                                )}
+                                {row.prize && <><span className="text-ink-4">·</span><span className="truncate max-w-[40%]">{row.prize}</span></>}
                             </span>
-                        </span>
-                    </button>
-                ))}
-            </div>
+                            <TournamentDates row={row} locale={locale} className="mt-1" />
+                        </button>
+                    ))}
+                </div>
+            )}
 
             <CreateCrewTournamentDialog crewId={crewId} open={isCreateOpen} onOpenChange={setIsCreateOpen} />
         </div>
     );
 }
 
+/** 접수 마감·시작 일시 한 줄(한국 시각). 접수중이면 접수 마감을, 그 뒤엔 시작 일시를 앞세운다. */
+function TournamentDates({ row, locale, className }: { row: Pick<TournamentRow, "status" | "recruitEnd" | "startAt">; locale: Parameters<typeof formatKst>[1]; className?: string }) {
+    const { t } = useT();
+    const parts: string[] = [];
+    if (row.recruitEnd && row.status === "recruiting") parts.push(t("crewTourney.recruitEndAt").replace("{time}", formatKst(row.recruitEnd, locale)));
+    if (row.startAt && row.status !== "ended" && row.status !== "canceled") parts.push(t("crewTourney.startAtAt").replace("{time}", formatKst(row.startAt, locale)));
+    if (parts.length === 0) return null;
+    return (
+        <span className={cn("flex items-center gap-1.5 text-[13px] font-medium text-ink-3 rk-num", className)}>
+            <LucideCalendar className="w-3.5 h-3.5 shrink-0" />
+            <span className="min-w-0">{parts.join(" · ")}</span>
+        </span>
+    );
+}
+
+/** 상태 칩 — 접수중(옅은 초록)·대진 확정(초록 테두리)·진행중(꽉 찬 초록)이 한눈에 갈린다. 예전엔 앞의 둘이 같은 모양이었다. */
 function StatusChip({ status }: { status: string }) {
     const { t } = useT();
     const map: Record<string, { label: string; cls: string }> = {
         recruiting: { label: t("crewTournament.status.recruiting"), cls: "bg-brand/10 text-brand" },
-        drawn: { label: t("crewTournament.status.drawn"), cls: "bg-brand/10 text-brand" },
+        drawn: { label: t("crewTournament.status.drawn"), cls: "border border-brand/50 text-brand" },
         ongoing: { label: t("crewTournament.status.ongoing"), cls: "bg-brand text-brand-fg" },
         ended: { label: t("crewTournament.status.ended"), cls: "bg-surface-3 text-ink-3" },
         canceled: { label: t("crewTournament.status.canceled"), cls: "bg-surface-3 text-ink-4" },
     };
     const s = map[status] ?? map.recruiting;
-    return <span className={cn("rk-chip shrink-0 text-[11px]", s.cls)}>{s.label}</span>;
+    return <span className={cn("rk-chip shrink-0 text-[12px]", s.cls)}>{s.label}</span>;
 }
 
 // ────────────────────────────── 상세 ──────────────────────────────
@@ -200,28 +222,58 @@ interface Detail {
     matches: BracketMatch[];
 }
 
+type ConfirmKind = "leave" | "redraw" | "shuffle" | "reset" | "delete";
+
 function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }: {
     crewId: string; tournamentId: string; isAdmin: boolean;
     me: HiqMember | undefined; history: HiqGameHistory[] | undefined;
     onBack: () => void;
 }) {
-    const { t } = useT();
+    const { t, locale } = useT();
     const { toast } = useToast();
     const qc = useQueryClient();
     const [, setLocation] = useLocation();
     const [swapMode, setSwapMode] = useState(false);
     const [picked, setPicked] = useState<SlotRef | null>(null);
     const [playMatch, setPlayMatch] = useState<{ matchId: string; opponent: HiqMember } | null>(null);
+    const [resultOf, setResultOf] = useState<BracketMatch | null>(null);
+    const [confirm, setConfirm] = useState<{ kind: ConfirmKind; matchId?: string } | null>(null);
+    const [editOpen, setEditOpen] = useState(false);
 
     const key = `/api/hiq/crews/${crewId}/tournaments/${tournamentId}`;
     const listKey = `/api/hiq/crews/${crewId}/tournaments`;
-    const { data, isLoading } = useQuery<Detail>({ queryKey: [key] });
+    const hallKey = `/api/hiq/crews/${crewId}/tournaments/hall-of-fame`;
+    const { data, isLoading, isError, error, refetch } = useQuery<Detail>({
+        queryKey: [key],
+        refetchOnMount: "always",
+        // 대진이 나온 뒤에는 남의 경기 결과가 계속 바뀐다. 화면이 숨겨지면(백그라운드) react-query 가 알아서 멈춘다.
+        refetchInterval: (q) => {
+            const st = (q.state.data as Detail | undefined)?.tournament.status;
+            return st === "drawn" || st === "ongoing" ? 15_000 : false;
+        },
+        // 없는 대회(404)는 다시 물어봐도 없다.
+        retry: (n, err: any) => err?.status !== 404 && n < 1,
+    });
+
+    // 경기 상태가 바뀌면(누가 이겼다 · 우승이 정해졌다) 목록·명예의 전당도 낡은 것으로 표시한다.
+    const signature = data ? `${data.tournament.status}|${data.matches.map((m) => m.status + (m.winnerId ?? "")).join(",")}` : "";
+    const lastSig = useRef<string>("");
+    useEffect(() => {
+        if (!signature) return;
+        if (lastSig.current && lastSig.current !== signature) {
+            qc.invalidateQueries({ queryKey: [listKey] });
+            qc.invalidateQueries({ queryKey: [hallKey] });
+        }
+        lastSig.current = signature;
+    }, [signature, qc, listKey, hallKey]);
 
     const refresh = () => {
         qc.invalidateQueries({ queryKey: [key] });
         qc.invalidateQueries({ queryKey: [listKey] });
+        qc.invalidateQueries({ queryKey: [hallKey] });
     };
     const fail = (err: any) => toast({ title: t("crewTournament.actionFail"), description: err?.message, variant: "destructive" });
+    const done = () => setConfirm(null);
 
     const joinM = useMutation({
         mutationFn: () => apiRequest(`${key}/join`, { method: "POST" }),
@@ -230,26 +282,33 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
     });
     const leaveM = useMutation({
         mutationFn: () => apiRequest(`${key}/join`, { method: "DELETE" }),
-        onSuccess: refresh, onError: fail,
+        onSuccess: () => { toast({ title: t("crewTourney.left") }); done(); refresh(); },
+        onError: fail,
     });
     const drawM = useMutation({
         mutationFn: (shuffle: boolean) => apiRequest(`${key}/draw`, { method: "POST", body: JSON.stringify({ shuffle }) }),
-        onSuccess: () => { toast({ title: t("crewTournament.drawDone") }); setSwapMode(false); setPicked(null); refresh(); },
+        onSuccess: () => { toast({ title: t("crewTournament.drawDone") }); done(); setSwapMode(false); setPicked(null); refresh(); },
         onError: fail,
     });
     const swapM = useMutation({
         mutationFn: (body: { a: SlotRef; b: SlotRef }) => apiRequest(`${key}/swap`, { method: "POST", body: JSON.stringify(body) }),
-        onSuccess: () => { setPicked(null); refresh(); },
+        onSuccess: () => { setPicked(null); toast({ title: t("crewTourney.swapped") }); refresh(); },
         onError: (e) => { setPicked(null); fail(e); },
     });
     const resetM = useMutation({
         mutationFn: (matchId: string) => apiRequest(`${key}/matches/${matchId}/reset`, { method: "POST" }),
-        onSuccess: () => { toast({ title: t("crewTournament.resetDone") }); refresh(); },
+        onSuccess: () => { toast({ title: t("crewTournament.resetDone") }); done(); refresh(); },
         onError: fail,
     });
     const deleteM = useMutation({
         mutationFn: () => apiRequest(key, { method: "DELETE" }),
-        onSuccess: () => { toast({ title: t("crewTournament.deleted") }); qc.invalidateQueries({ queryKey: [listKey] }); onBack(); },
+        onSuccess: () => {
+            toast({ title: t("crewTournament.deleted") });
+            done();
+            qc.invalidateQueries({ queryKey: [listKey] });
+            qc.invalidateQueries({ queryKey: [hallKey] });
+            onBack();
+        },
         onError: fail,
     });
 
@@ -259,25 +318,52 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
         return map;
     }, [data]);
 
-    if (isLoading || !data) {
+    const backBar = (title?: React.ReactNode) => (
+        <div className="flex items-center gap-1 -ml-2">
+            <IconButton label={t("common.back")} onClick={onBack}><LucideChevronLeft /></IconButton>
+            {title}
+        </div>
+    );
+
+    if (isLoading) {
+        return <div className="px-4 pt-3 pb-nav flex flex-col gap-4">{backBar()}<CrewSkeleton rows={3} height={96} /></div>;
+    }
+    if (isError || !data) {
+        const notFound = (error as any)?.status === 404 || (!isError && !data);
         return (
-            <div className="flex justify-center py-24">
-                <LucideLoader2 className="w-5 h-5 animate-spin text-ink-4" />
+            <div className="px-4 pt-3 pb-nav flex flex-col gap-4">
+                {backBar()}
+                {notFound ? (
+                    <CrewEmpty
+                        icon={<LucideTrophy />}
+                        title={t("crewTourney.notFoundTitle")}
+                        desc={t("crewTourney.notFoundDesc")}
+                        action={{ label: t("crewTourney.backToList"), onClick: onBack }}
+                    />
+                ) : (
+                    <CrewError onRetry={() => refetch()} />
+                )}
             </div>
         );
     }
 
     const { tournament: tr, participants, matches } = data;
     const joined = participants.some((p) => p.memberId === me?.id);
-    const isLeague = tr.format === "league";
     // 대회는 2명부터(오너 결정 2026-09-04) — 서버도 같은 기준으로 거절한다.
-    const canDraw = isAdmin && tr.status !== "ended" && participants.length >= 2;
+    const canDraw = isAdmin && tr.status !== "ended" && tr.status !== "canceled" && participants.length >= 2;
     const drawn = matches.length > 0;
-    const willBeLeague = tr.format === "league";
+    const anyStarted = matches.some((m) => m.status === "playing" || m.status === "done");
     const bestOf = tr.bestOf ?? 1;
+    const rounds = totalRounds(bracketSize(participants.length));
+    const roundLabel = (round: number) => {
+        const r = roundName(round, rounds);
+        return r.kind === "final" ? t("tournament.round.final") : t("tournament.round.of").replace("{n}", String(r.remaining));
+    };
+    const nameOf = (id: string | null) => (id && players[id]?.nickname) || "-";
 
     // 자리 조정 — 두 자리를 차례로 누르면 맞바꾼다.
-    const onSlotClick = (ref: SlotRef, memberId: string | null) => {
+    const onSlotClick = (ref: SlotRef) => {
+        if (swapM.isPending) return;
         if (!picked) { setPicked(ref); return; }
         if (picked.matchId === ref.matchId && picked.side === ref.side) { setPicked(null); return; }
         swapM.mutate({ a: picked, b: ref });
@@ -287,10 +373,11 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
     const myTurn = (m: BracketMatch) =>
         !!me && (m.status === "ready" || m.status === "playing") &&
         !!m.p1Id && !!m.p2Id && (m.p1Id === me.id || m.p2Id === me.id);
+    // 누르면 뭔가 일어나는 카드만 버튼으로 — 내 경기(시작·이어하기), 끝났거나 치는 중인 경기(결과 보기).
+    const canClick = (m: BracketMatch) => myTurn(m) || m.status === "done" || m.status === "playing";
 
-    const onMatchClick = (m: BracketMatch) => {
-        if (!myTurn(m) || !me) return;
-
+    const startMatch = (m: BracketMatch) => {
+        if (!me) return;
         // 이미 시작된 경기는 **새로 만들지 않고 그 경기로 들어간다**. 예전엔 '경기중' 카드를
         // 다시 눌러도 매칭 화면이 열려 같은 자리에서 랭킹 경기가 계속 만들어졌다
         // (대진에는 첫 경기만 물려 있어서 승자도 안 올라가고 RP 만 쌓였다).
@@ -299,7 +386,6 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
             else toast({ title: t("crewTournament.alreadyPlaying") });
             return;
         }
-
         const opponentId = m.p1Id === me.id ? m.p2Id : m.p1Id;
         const opp = participants.find((p) => p.memberId === opponentId);
         if (!opp) return;
@@ -317,126 +403,169 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
         });
     };
 
+    const onMatchClick = (m: BracketMatch) => {
+        if (myTurn(m)) return startMatch(m);
+        if (m.status === "done" || m.status === "playing") setResultOf(m);
+    };
+
+    const next = tr.status === "ended" ? null : findMyNextMatch(matches, me?.id);
+    const nextOpp = next ? (next.match.p1Id === me?.id ? next.match.p2Id : next.match.p1Id) : null;
+
+    const confirmCopy: Record<ConfirmKind, { title: string; desc: string; label: string; danger: boolean }> = {
+        leave: { title: t("crewTourney.leaveTitle"), desc: t("crewTourney.leaveDesc"), label: t("crewTournament.leave"), danger: true },
+        redraw: { title: t("crewTourney.redrawTitle"), desc: t("crewTourney.redrawDesc"), label: t("crewTournament.redraw"), danger: true },
+        shuffle: { title: t("crewTourney.shuffleTitle"), desc: t("crewTourney.redrawDesc"), label: t("crewTournament.shuffle"), danger: true },
+        reset: { title: t("crewTourney.resetTitle"), desc: t("crewTourney.resetDesc"), label: t("crewTourney.resetConfirm"), danger: true },
+        delete: { title: t("crewTourney.deleteTitle"), desc: t("crewTournament.deleteConfirm"), label: t("crewTournament.delete"), danger: true },
+    };
+    const busy = leaveM.isPending || drawM.isPending || resetM.isPending || deleteM.isPending;
+
     return (
-        <div className="space-y-5 pt-3 pb-nav">
-            <div className="px-6 pt-1 flex items-center gap-2">
-                <button onClick={onBack} className="-ml-2 p-2 text-ink-3 active:opacity-60" aria-label={t("common.back")}>
-                    <LucideChevronLeft className="w-5 h-5" />
-                </button>
-                <BallDot type={tr.gameType} size={13} />
-                <span className="flex-1 min-w-0 truncate text-[16px] font-semibold text-ink-1">{tr.title}</span>
-                <StatusChip status={tr.status} />
+        <div className="px-4 pt-3 pb-nav flex flex-col gap-5">
+            {/* 머리 */}
+            <div className="flex flex-col gap-1.5">
+                {backBar(
+                    <>
+                        <BallDot type={tr.gameType} size={13} />
+                        <h2 className={cn(CREW_TEXT.section, "flex-1 min-w-0 truncate ml-1")}>{tr.title}</h2>
+                        <StatusChip status={tr.status} />
+                        {isAdmin && tr.status !== "ended" && tr.status !== "canceled" && (
+                            <IconButton label={t("crewTourney.editTitle")} onClick={() => setEditOpen(true)} className="-mr-2">
+                                <LucidePencil />
+                            </IconButton>
+                        )}
+                    </>,
+                )}
+                {/* 메타 한 줄 — 종목·인원·형식·상품을 흩어 놓지 않고 모아 둔다. */}
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[13px] font-medium text-ink-3">
+                    <span>{tr.gameType === "3c" ? t("crewTournament.type3c") : t("crewTournament.type4c")}</span>
+                    <span className="text-ink-4">·</span>
+                    <span className="rk-num">{participants.length}/{tr.maxPlayers}</span>
+                    {/* 2인 대회는 토너먼트라 부를 게 없다 — 판 수가 곧 형식이다. */}
+                    {participants.length > 2 && <><span className="text-ink-4">·</span><span>{t("crewTournament.knockout")}</span></>}
+                    {bestOf > 1 && (
+                        <>
+                            <span className="text-ink-4">·</span>
+                            <span className="rk-num">{t("crewTournament.bestOfWin").replace("{n}", String(bestOf)).replace("{w}", String(Math.ceil(bestOf / 2)))}</span>
+                        </>
+                    )}
+                    {tr.prize && (
+                        <>
+                            <span className="text-ink-4">·</span>
+                            <span className="font-semibold text-gold">{tr.prize}</span>
+                        </>
+                    )}
+                </div>
+                <TournamentDates row={tr} locale={locale} />
+                {tr.description && <p className={cn(CREW_TEXT.sub, "leading-relaxed whitespace-pre-line break-words")}>{tr.description}</p>}
             </div>
 
-            {/* 메타 한 줄 — 종목·인원·형식·상품을 흩어 놓지 않고 모아 둔다.
-                예전엔 상품만 금색 알약으로 혼자 떠 있어 태그처럼 보였다. */}
-            <div className="px-6 -mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12.5px] text-ink-3">
-                <span>{tr.gameType === "3c" ? t("crewTournament.type3c") : t("crewTournament.type4c")}</span>
-                <span className="text-ink-4">·</span>
-                <span className="rk-num">{participants.length}/{tr.maxPlayers}</span>
-                <span className="text-ink-4">·</span>
-                {/* 2인 대회는 토너먼트라 부를 게 없다 — 판 수가 곧 형식이다. */}
-                {participants.length > 2 && !isLeague && <span>{t("crewTournament.knockout")}</span>}
-                {isLeague && <span>{t("crewTournament.league")}</span>}
-                {bestOf > 1 && (
-                    <>
-                        <span className="text-ink-4">·</span>
-                        <span className="rk-num">{bestOf === 1 ? t("crewTournament.bestOf1") : t("crewTournament.bestOfWin").replace("{n}", String(bestOf)).replace("{w}", String(Math.ceil(bestOf / 2)))}</span>
-                    </>
-                )}
-                {tr.prize && (
-                    <>
-                        <span className="text-ink-4">·</span>
-                        <span className="font-medium" style={{ color: "var(--gold)" }}>{tr.prize}</span>
-                    </>
-                )}
-            </div>
-            {tr.description && <p className="px-6 text-[13px] text-ink-3 leading-relaxed">{tr.description}</p>}
-
-            {/* 대진표 (또는 리그 순위표) */}
-            {drawn && (
-                <div className="px-5">
-                    {isLeague ? (
-                        <LeagueTable participants={participants} matches={matches} players={players} onMatchClick={onMatchClick} canPlay={myTurn} bestOf={bestOf} />
-                    ) : (
-                        <TournamentBracket
-                            matches={matches}
-                            players={players}
-                            playerCount={participants.length}
-                            meId={me?.id}
-                            bestOf={bestOf}
-                            onMatchClick={onMatchClick}
-                            swapMode={swapMode}
-                            selectedSlot={picked}
-                            onSlotClick={onSlotClick}
-                        />
+            {/* 내 다음 경기 — 대진표에서 내 칸을 찾지 않아도 되게 맨 위에 */}
+            {next && (
+                <div className={cn(CREW_CARD, "flex items-center gap-3 ring-1 ring-brand/40")}>
+                    <span className="w-10 h-10 rounded-full bg-brand/10 text-brand flex items-center justify-center shrink-0">
+                        <LucideSwords className="w-5 h-5" />
+                    </span>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[12px] font-semibold text-brand">
+                            {t("crewTourney.myNext")} · {roundLabel(next.match.round)}
+                        </p>
+                        <p className="text-[15px] font-semibold text-ink-1 truncate">
+                            {next.waiting && !nextOpp ? t("crewTourney.waitingOpponent") : t("crewTourney.vsName").replace("{name}", nameOf(nextOpp))}
+                        </p>
+                        {bestOf > 1 && !next.waiting && (
+                            <p className="text-[12px] font-medium text-ink-3 rk-num">
+                                {t("crewTourney.seriesNow")
+                                    .replace("{a}", String(next.match.p1Id === me?.id ? next.match.p1Wins ?? 0 : next.match.p2Wins ?? 0))
+                                    .replace("{b}", String(next.match.p1Id === me?.id ? next.match.p2Wins ?? 0 : next.match.p1Wins ?? 0))}
+                            </p>
+                        )}
+                    </div>
+                    {!next.waiting && (
+                        <button type="button" onClick={() => startMatch(next.match)} className={cn(CREW_BTN.primary, "shrink-0 px-3.5")}>
+                            <LucidePlay className="w-4 h-4" />
+                            {next.match.status === "playing" ? t("crewTourney.continueMatch") : t("crewTourney.startMatch")}
+                        </button>
                     )}
                 </div>
             )}
 
+            {/* 대진표 */}
+            {drawn && (
+                <TournamentBracket
+                    matches={matches}
+                    players={players}
+                    playerCount={participants.length}
+                    meId={me?.id}
+                    bestOf={bestOf}
+                    onMatchClick={onMatchClick}
+                    canClick={canClick}
+                    swapMode={swapMode}
+                    selectedSlot={picked}
+                    onSlotClick={onSlotClick}
+                />
+            )}
+
             {swapMode && (
-                <p className="px-6 text-[12.5px] text-brand font-medium">
+                <p className="text-[13px] text-brand font-medium" role="status">
                     {picked ? t("crewTournament.swapPickSecond") : t("crewTournament.swapPickFirst")}
+                    <span className="block text-ink-3 font-medium mt-0.5">{t("crewTourney.swapByeHint")}</span>
                 </p>
             )}
 
             {/* 참가자 */}
-            <div className="px-6 space-y-2">
-                <div className="flex items-center justify-between">
-                    <h3 className="text-[13px] font-semibold text-ink-3">
-                        {t("crewTournament.roster")} <span className="rk-num text-ink-4">{participants.length}/{tr.maxPlayers}</span>
-                    </h3>
-                    {!drawn && participants.length < 2 && (
-                        <span className="text-[11.5px] text-ink-4">{t("crewTournament.minPlayersHint")}</span>
-                    )}
-                </div>
-                <div className="rk-card overflow-hidden">
-                    {participants.length === 0 && (
-                        <p className="px-4 py-6 text-center text-[13px] text-ink-4">{t("crewTournament.noPlayers")}</p>
-                    )}
-                    {participants.map((p, i) => (
-                        <div key={p.id} className={cn("flex items-center gap-2.5 px-4 py-2.5", i > 0 && "border-t border-surface-line")}>
-                            <span className="w-4 text-[11px] text-ink-4 rk-num">{p.seed ?? i + 1}</span>
-                            <span className="w-6 h-6 rounded-full bg-brand/10 text-brand flex items-center justify-center text-[11px] font-semibold shrink-0">
-                                {p.nickname?.[0] ?? "?"}
-                            </span>
-                            <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-ink-2">{p.nickname}</span>
-                            {p.finalRank === 1 && <LucideTrophy className="w-3.5 h-3.5 text-gold" />}
-                            <span className="text-[11.5px] text-ink-3 rk-num">
-                                {(tr.gameType === "3c" ? p.rating3c : p.rating4c) ?? 0} RP
-                            </span>
-                        </div>
-                    ))}
-                </div>
-            </div>
+            <CrewSection title={t("crewTournament.roster")} count={participants.length}>
+                {!drawn && participants.length < 2 && <p className={CREW_TEXT.caption}>{t("crewTournament.minPlayersHint")}</p>}
+                {participants.length === 0 ? (
+                    <CrewEmpty title={t("crewTournament.noPlayers")} />
+                ) : (
+                    <div className="rk-card overflow-hidden">
+                        {participants.map((p, i) => (
+                            <div key={p.id} className={cn("flex items-center gap-3 px-4 min-h-12 py-1.5", i > 0 && "border-t border-surface-line")}>
+                                <span className="w-5 text-center text-[12px] font-medium text-ink-4 rk-num">{p.seed ?? i + 1}</span>
+                                <CrewAvatar name={p.nickname} size={28} />
+                                <span className={cn("flex-1 min-w-0 truncate text-[15px] font-medium", p.memberId === me?.id ? "text-brand" : "text-ink-1")}>{p.nickname}</span>
+                                {p.finalRank === 1 && <LucideTrophy className="w-4 h-4 text-gold" />}
+                                <span className="text-[13px] font-medium text-ink-3 rk-num">
+                                    {t("crewTourney.rp").replace("{n}", String((tr.gameType === "3c" ? p.rating3c : p.rating4c) ?? 0))}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CrewSection>
 
             {/* 조작 */}
-            <div className="px-6 space-y-2.5">
+            <div className="flex flex-col gap-2.5">
                 {tr.status === "recruiting" && !joined && (
-                    <Button onClick={() => joinM.mutate()} disabled={joinM.isPending || participants.length >= tr.maxPlayers}
-                        className="w-full h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl">
+                    <button type="button" onClick={() => joinM.mutate()} disabled={joinM.isPending || participants.length >= tr.maxPlayers} className={cn(CREW_BTN.primary, "w-full h-12")}>
                         {participants.length >= tr.maxPlayers ? t("crewTournament.full") : t("crewTournament.join")}
-                    </Button>
+                    </button>
                 )}
                 {tr.status === "recruiting" && joined && (
-                    <Button variant="outline" onClick={() => leaveM.mutate()} disabled={leaveM.isPending}
-                        className="w-full h-11 rounded-xl border-surface-line text-ink-2">
-                        <LucideCheck className="w-4 h-4 mr-1.5 text-brand" />
+                    <button type="button" onClick={() => setConfirm({ kind: "leave" })} disabled={leaveM.isPending} className={cn(CREW_BTN.secondary, "w-full")}>
+                        <LucideCheck className="w-4 h-4 text-brand" />
                         {t("crewTournament.leave")}
-                    </Button>
+                    </button>
                 )}
 
-                {canDraw && (
+                {canDraw && !anyStarted && (
                     <div className="flex gap-2">
-                        <Button onClick={() => drawM.mutate(false)} disabled={drawM.isPending}
-                            className="flex-1 h-11 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl">
-                            {drawn ? t("crewTournament.redraw") : willBeLeague ? t("crewTournament.drawLeague") : t("crewTournament.draw")}
-                        </Button>
+                        <button
+                            type="button"
+                            // 첫 대진 짜기는 바로, 이미 있는 대진을 다시 뽑는 건 확인 후(자리 조정한 게 날아간다).
+                            onClick={() => (drawn ? setConfirm({ kind: "redraw" }) : drawM.mutate(false))}
+                            disabled={drawM.isPending}
+                            className={cn(CREW_BTN.primary, "flex-1")}
+                        >
+                            {drawn ? t("crewTournament.redraw") : t("crewTournament.draw")}
+                        </button>
                         {drawn && (
-                            <Button variant="outline" onClick={() => drawM.mutate(true)} disabled={drawM.isPending}
-                                className="h-11 px-3 rounded-xl border-surface-line" aria-label={t("crewTournament.shuffle")}>
-                                <LucideRefreshCw className="w-4 h-4 text-ink-2" />
-                            </Button>
+                            <button type="button" onClick={() => setConfirm({ kind: "shuffle" })} disabled={drawM.isPending}
+                                aria-label={t("crewTournament.shuffle")} title={t("crewTournament.shuffle")}
+                                className={cn(CREW_BTN.secondary, "w-11 px-0")}>
+                                <LucideRefreshCw className="w-5 h-5" />
+                            </button>
                         )}
                     </div>
                 )}
@@ -444,36 +573,34 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
                 {/* 시작만 하고 끝내지 않은 경기 되돌리기 — 안 그러면 그 칸이 영구히 "경기중"으로
                     굳고 재추첨도 막혀 대회를 통째로 지워야 한다. */}
                 {isAdmin && matches.some((m) => m.status === "playing") && (
-                    <div className="rk-card p-3.5 space-y-2">
-                        <p className="text-[12.5px] text-ink-3">{t("crewTournament.resetHint")}</p>
+                    <div className={cn(CREW_CARD, "flex flex-col gap-2")}>
+                        <p className={CREW_TEXT.sub}>{t("crewTournament.resetHint")}</p>
                         {matches.filter((m) => m.status === "playing").map((m) => (
                             <button
-                                key={m.id}
-                                onClick={() => resetM.mutate(m.id)}
+                                key={m.id} type="button"
+                                onClick={() => setConfirm({ kind: "reset", matchId: m.id })}
                                 disabled={resetM.isPending}
-                                className="w-full h-10 rounded-xl border border-surface-line text-[13px] text-ink-2 flex items-center justify-center gap-1.5 active:opacity-70"
+                                className={cn(CREW_BTN.secondary, "w-full text-[13px]")}
                             >
-                                <LucideRefreshCw className="w-3.5 h-3.5" />
-                                {t("crewTournament.resetMatch")
-                                    .replace("{a}", (m.p1Id && players[m.p1Id]?.nickname) || "-")
-                                    .replace("{b}", (m.p2Id && players[m.p2Id]?.nickname) || "-")}
+                                <LucideRefreshCw className="w-4 h-4" />
+                                {t("crewTournament.resetMatch").replace("{a}", nameOf(m.p1Id)).replace("{b}", nameOf(m.p2Id))}
                             </button>
                         ))}
                     </div>
                 )}
 
-                {isAdmin && drawn && !isLeague && tr.status !== "ended" && (
-                    <Button variant="outline" onClick={() => { setSwapMode(!swapMode); setPicked(null); }}
-                        className={cn("w-full h-11 rounded-xl border-surface-line", swapMode && "border-brand text-brand")}>
-                        <LucideArrowLeftRight className="w-4 h-4 mr-1.5" />
+                {isAdmin && drawn && tr.status !== "ended" && matches.some((m) => m.round === 1 && m.status === "ready") && (
+                    <button type="button" onClick={() => { setSwapMode(!swapMode); setPicked(null); }}
+                        aria-pressed={swapMode}
+                        className={cn(CREW_BTN.secondary, "w-full", swapMode && "border-brand text-brand")}>
+                        <LucideArrowLeftRight className="w-4 h-4" />
                         {swapMode ? t("crewTournament.swapDone") : t("crewTournament.swapStart")}
-                    </Button>
+                    </button>
                 )}
 
                 {isAdmin && (
-                    <button onClick={() => { if (confirm(t("crewTournament.deleteConfirm"))) deleteM.mutate(); }}
-                        className="w-full h-10 text-[13px] text-ink-4 flex items-center justify-center gap-1.5 active:opacity-60">
-                        <LucideTrash2 className="w-3.5 h-3.5" />
+                    <button type="button" onClick={() => setConfirm({ kind: "delete" })} className={cn(CREW_BTN.ghost, "w-full text-destructive")}>
+                        <LucideTrash2 className="w-4 h-4" />
                         {t("crewTournament.delete")}
                     </button>
                 )}
@@ -489,64 +616,39 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
                 initialType={tr.gameType}
                 tournamentMatch={playMatch}
             />
-        </div>
-    );
-}
 
-/** 풀리그 — 대진표 대신 순위표 + 경기 목록. 3명 이하일 때 쓴다. */
-function LeagueTable({ participants, matches, players, onMatchClick, canPlay, bestOf = 1 }: {
-    participants: Detail["participants"];
-    matches: BracketMatch[];
-    players: Record<string, BracketPlayer>;
-    onMatchClick: (m: BracketMatch) => void;
-    canPlay: (m: BracketMatch) => boolean;
-    bestOf?: number;
-}) {
-    const { t } = useT();
-    const ranked = [...participants].sort((a, b) => (b.wins - a.wins) || (a.losses - b.losses));
-    return (
-        <div className="space-y-4">
-            <div className="rk-card overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-2 border-b border-surface-line text-[11px] text-ink-4 rk-num">
-                    <span className="w-4">#</span>
-                    <span className="flex-1">{t("crewTournament.player")}</span>
-                    <span className="w-12 text-right">{t("crewTournament.record")}</span>
-                </div>
-                {ranked.map((p, i) => (
-                    <div key={p.id} className={cn("flex items-center gap-2 px-4 py-2.5", i > 0 && "border-t border-surface-line")}>
-                        <span className="w-4 text-[12px] text-ink-3 rk-num">{p.finalRank ?? i + 1}</span>
-                        <span className="flex-1 min-w-0 truncate text-[13px] font-medium text-ink-1">{p.nickname}</span>
-                        {p.finalRank === 1 && <LucideTrophy className="w-3.5 h-3.5 text-gold" />}
-                        <span className="w-12 text-right text-[12px] text-ink-2 rk-num">{t("crewTournament.winLoss").replace("{w}", String(p.wins)).replace("{l}", String(p.losses))}</span>
-                    </div>
-                ))}
-            </div>
+            <MatchResultSheet
+                match={resultOf}
+                players={players}
+                bestOf={bestOf}
+                roundLabel={resultOf ? roundLabel(resultOf.round) : ""}
+                onOpenChange={(o) => { if (!o) setResultOf(null); }}
+            />
 
-            <div className="space-y-1.5">
-                {matches.map((m) => {
-                    const done = m.status === "done";
-                    const playable = canPlay(m);
-                    const Row = (
-                        <div className={cn(
-                            "flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-[12.5px]",
-                            done ? "bg-surface-1 border-surface-line" : playable ? "bg-brand/[0.06] border-brand/30" : "border-dashed border-[var(--surface-line-strong)]",
-                        )}>
-                            <span className={cn("flex-1 min-w-0 truncate", m.winnerId === m.p1Id ? "font-semibold text-ink-1" : "text-ink-3")}>
-                                {m.p1Id ? players[m.p1Id]?.nickname : "-"}
-                            </span>
-                            <span className="rk-num text-ink-3 shrink-0">
-                                {bestOf > 1 && (m.p1Wins || m.p2Wins || done) ? `${m.p1Wins}-${m.p2Wins}` : done ? `${m.p1Score ?? 0} : ${m.p2Score ?? 0}` : playable ? <LucidePlay className="w-3.5 h-3.5 text-brand" /> : "vs"}
-                            </span>
-                            <span className={cn("flex-1 min-w-0 truncate text-right", m.winnerId === m.p2Id ? "font-semibold text-ink-1" : "text-ink-3")}>
-                                {m.p2Id ? players[m.p2Id]?.nickname : "-"}
-                            </span>
-                        </div>
-                    );
-                    return playable
-                        ? <button key={m.id} onClick={() => onMatchClick(m)} className="w-full text-left active:scale-[0.99] transition-transform">{Row}</button>
-                        : <div key={m.id}>{Row}</div>;
-                })}
-            </div>
+            <CreateCrewTournamentDialog
+                crewId={crewId}
+                open={editOpen}
+                onOpenChange={setEditOpen}
+                tournament={{ id: tr.id, title: tr.title, description: tr.description, prize: tr.prize, recruitEnd: tr.recruitEnd, startAt: tr.startAt }}
+            />
+
+            <ConfirmDialog
+                open={!!confirm}
+                onOpenChange={(o) => { if (!o) setConfirm(null); }}
+                title={confirm ? confirmCopy[confirm.kind].title : ""}
+                desc={confirm ? confirmCopy[confirm.kind].desc : undefined}
+                confirmLabel={confirm ? confirmCopy[confirm.kind].label : ""}
+                danger={confirm ? confirmCopy[confirm.kind].danger : true}
+                busy={busy}
+                onConfirm={() => {
+                    if (!confirm) return;
+                    if (confirm.kind === "leave") leaveM.mutate();
+                    else if (confirm.kind === "redraw") drawM.mutate(false);
+                    else if (confirm.kind === "shuffle") drawM.mutate(true);
+                    else if (confirm.kind === "reset" && confirm.matchId) resetM.mutate(confirm.matchId);
+                    else if (confirm.kind === "delete") deleteM.mutate();
+                }}
+            />
         </div>
     );
 }

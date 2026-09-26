@@ -1,279 +1,199 @@
-import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { HiqSettlement, HiqSettlementItem } from "@shared/schema";
-import { Button } from "@/components/ui/button";
-import { format } from "date-fns";
-import { ko } from "date-fns/locale";
-import { LucideChevronRight, LucideCopy, LucidePiggyBank, LucideShare2, LucideCheckCircle2, LucideUsers } from "@/lib/icons";
+import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { LucideChevronRight, LucideCopy, LucidePiggyBank, LucideCheckCircle2, LucideUsers, LucideX } from "@/lib/icons";
 import { useToast } from "@/hooks/use-toast";
-import { useState } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { CREW_BTN, CREW_CARD, CREW_TEXT, IconButton } from "@/components/hiq/crew-ui";
+import { formatKst } from "@/components/hiq/poll/crewTimeFormat";
+import { computeTransfers, splitAmount } from "@shared/crewSettlement";
+
+// 정산 상세(2026-09-26 크루 정비).
+//  - 1인 금액은 1원 단위로 정확히(shared/crewSettlement). 예전엔 10원 단위 올림이라 계산한 사람이 더 받았다.
+//  - 송금은 각 차수를 **계산한 사람**에게 간다. 그런데 화면은 모든 송금 아래에 총무(정산을 만든 사람) 계좌만 보여 줘서
+//    2차를 계산한 사람에게 보낼 돈을 총무 계좌로 보내게 만들었다. 지금은 송금마다 받는 사람을 적고,
+//    총무 계좌는 받는 사람이 총무일 때만 붙인다. 다른 사람에게 보낼 때는 "계좌를 물어보세요"로 안내한다.
 
 interface SettlementDetailDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    settlement: any; // Full detail with items and participants
+    settlement: any; // Full detail with items and participants (+ creator {id,name})
     meId?: string;
 }
 
 export function SettlementDetailDialog({ open, onOpenChange, settlement, meId }: SettlementDetailDialogProps) {
-    const { t } = useT();
+    const { t, locale } = useT();
     const { toast } = useToast();
-    const [activeTab, setActiveTab] = useState<'my' | 'all'>('my');
+    const [activeTab, setActiveTab] = useState<"my" | "all">("my");
 
-    if (!settlement) return null;
-
-    // --- Smart Settlement Logic ---
-    const calculateTransfers = () => {
-        const balances: Record<string, number> = {};
-        const memberNames: Record<string, string> = {};
-
-        // 1. Initialize
-        settlement.items.forEach((item: any) => {
-            // Register Payer
-            if (item.payerId) {
-                balances[item.payerId] = (balances[item.payerId] || 0) + item.amount;
-                // If payer relation exists (which we added), use it. Fallback to participant search.
-                if (item.payer?.name) {
-                    memberNames[item.payerId] = item.payer.name;
-                }
-            }
-
-            // Register Attendees
-            const count = item.participants.length;
-            if (count > 0) {
-                const costPerPerson = Math.ceil((item.amount / count) / 10) * 10;
-                item.participants.forEach((p: any) => {
-                    balances[p.memberId] = (balances[p.memberId] || 0) - costPerPerson;
-                    if (p.member?.name) memberNames[p.memberId] = p.member.name;
-                });
-            }
+    const calc = useMemo(() => {
+        if (!settlement) return null;
+        const names: Record<string, string> = {};
+        const items = (settlement.items ?? []).map((item: any) => {
+            if (item.payerId && item.payer?.name) names[item.payerId] = item.payer.name;
+            for (const p of item.participants ?? []) if (p.member?.name) names[p.memberId] = p.member.name;
+            return { amount: Number(item.amount) || 0, payerId: item.payerId ?? null, participants: item.participants ?? [] };
         });
+        if (settlement.creator?.id && settlement.creator?.name) names[settlement.creator.id] = settlement.creator.name;
+        return { names, ...computeTransfers(items) };
+    }, [settlement]);
 
-        // 2. Separate Debtors and Creditors
-        let debtors = Object.entries(balances)
-            .filter(([_, bal]) => bal < -10) // Tolerance for rounding errors
-            .map(([id, bal]) => ({ id, amount: -bal })) // Amount they OWE (positive value)
-            .sort((a, b) => b.amount - a.amount);
+    if (!settlement || !calc) return null;
 
-        let creditors = Object.entries(balances)
-            .filter(([_, bal]) => bal > 10)
-            .map(([id, bal]) => ({ id, amount: bal })) // Amount they GET
-            .sort((a, b) => b.amount - a.amount);
+    const nameOf = (id: string) => calc.names[id] || t("settlementDetail.unknown");
+    const creatorId: string | undefined = settlement.creatorId ?? settlement.creator?.id;
+    const hasAccount = !!(settlement.accountBank || settlement.accountNumber);
+    const myTransfers = calc.transfers.filter((tr) => tr.fromId === meId || tr.toId === meId);
+    const totalAmount = (settlement.items ?? []).reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0);
+    const won = (n: number) => t("crewSettle.won").replace("{n}", n.toLocaleString("ko-KR"));
 
-        const transfers: Array<{
-            fromId: string;
-            fromName: string;
-            toId: string;
-            toName: string;
-            amount: number;
-        }> = [];
-
-        // 3. Match (Greedy)
-        let i = 0;
-        let j = 0;
-
-        while (i < debtors.length && j < creditors.length) {
-            const debtor = debtors[i];
-            const creditor = creditors[j];
-
-            const amount = Math.min(debtor.amount, creditor.amount);
-
-            if (amount > 0) {
-                transfers.push({
-                    fromId: debtor.id,
-                    fromName: memberNames[debtor.id] || t("settlementDetail.unknown"),
-                    toId: creditor.id,
-                    toName: memberNames[creditor.id] || t("settlementDetail.unknown"),
-                    amount: amount
-                });
-            }
-
-            debtor.amount -= amount;
-            creditor.amount -= amount;
-
-            if (debtor.amount < 10) i++;
-            if (creditor.amount < 10) j++;
-        }
-
-        return transfers;
+    const copyAccount = () => {
+        if (!hasAccount) return;
+        const text = `${settlement.accountBank ?? ""} ${settlement.accountNumber ?? ""}`.trim();
+        navigator.clipboard?.writeText(text).then(
+            () => toast({ title: t("settlementDetail.accountCopied") }),
+            () => toast({ title: text }),
+        );
     };
 
-    const allTransfers = calculateTransfers();
-    const myTransfers = allTransfers.filter(tr => tr.fromId === meId || tr.toId === meId);
+    const accountBox = (
+        <button type="button" onClick={copyAccount} className="w-full min-h-14 flex items-center justify-between gap-3 rounded-tile bg-surface-2 border border-surface-line px-3 py-2 text-left active:bg-surface-3">
+            <span className="min-w-0">
+                <span className={cn(CREW_TEXT.caption, "block")}>
+                    {t("crewSettle.accountOf").replace("{name}", creatorId ? nameOf(creatorId) : t("settlementDetail.unknown"))}
+                </span>
+                <span className="block text-[15px] font-semibold text-ink-1 break-all">
+                    {settlement.accountBank} <span className="rk-num">{settlement.accountNumber}</span>
+                    {settlement.accountHolder && <span className="text-ink-3 font-medium"> ({settlement.accountHolder})</span>}
+                </span>
+            </span>
+            <LucideCopy className="w-5 h-5 text-ink-3 shrink-0" aria-label={t("crewSettle.copy")} />
+        </button>
+    );
 
-    // Total spent (for 'All' tab)
-    const totalAmount = settlement.items.reduce((sum: number, item: any) => sum + item.amount, 0);
-
-    const handleCopyAccount = () => {
-        if (!settlement.accountBank && !settlement.accountNumber) return;
-        const text = `${settlement.accountBank} ${settlement.accountNumber}`;
-        navigator.clipboard.writeText(text);
-        toast({ title: t("settlementDetail.accountCopied") });
-    };
+    const tabCls = (on: boolean) => cn(
+        "flex-1 h-11 rounded-pill text-[13px] font-semibold transition-colors",
+        on ? "bg-surface-1 text-ink-1 rk-shadow" : "text-ink-3",
+    );
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-surface-0 border-black/10 text-[rgba(0,0,0,0.87)] max-w-sm max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-card">
-                {/* Header Receipt Style */}
-                <div className="bg-white text-[rgba(0,0,0,0.87)] p-6 rounded-t-card relative overflow-hidden">
-                    <div className="text-center mb-6">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-brand/10 mb-3">
+            <DialogContent hideClose className="bg-surface-0 text-ink-1 max-w-sm max-h-[90dvh] overflow-y-auto p-0 gap-0 rounded-card">
+                <div className="relative px-4 pt-4 pb-5">
+                    <IconButton label={t("crewPoll.close")} onClick={() => onOpenChange(false)} className="absolute right-2 top-2"><LucideX /></IconButton>
+                    <div className="text-center pt-4 pb-4">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-brand/10 mb-2">
                             <LucidePiggyBank className="w-6 h-6 text-brand" />
                         </div>
-                        <h2 className="text-[19px] font-bold mb-1">{settlement.title}</h2>
-                        <p className="text-[12px] text-black/55 font-semibold tabular-nums">
-                            {format(new Date(settlement.createdAt), 'yyyy.MM.dd HH:mm', { locale: ko })}
-                        </p>
+                        <DialogTitle className={cn(CREW_TEXT.section, "break-words")}>{settlement.title}</DialogTitle>
+                        <DialogDescription className={cn(CREW_TEXT.caption, "rk-num mt-0.5")}>
+                            {formatKst(settlement.createdAt, locale, { year: true })}
+                            {creatorId && ` · ${t("crewSettle.byName").replace("{name}", nameOf(creatorId))}`}
+                        </DialogDescription>
                     </div>
 
-                    <div className="flex bg-black/[0.06] rounded-tile p-1 mb-6">
-                        <button
-                            className={cn(
-                                "flex-1 py-2 text-xs font-bold rounded-tile transition-all",
-                                activeTab === 'my' ? "bg-white text-[rgba(0,0,0,0.87)] shadow-[0_1px_2px_rgba(0,0,0,0.06)]" : "text-black/55"
-                            )}
-                            onClick={() => setActiveTab('my')}
-                        >
+                    <div className="flex rounded-pill bg-surface-3 p-1 mb-4" role="tablist">
+                        <button type="button" role="tab" aria-selected={activeTab === "my"} className={tabCls(activeTab === "my")} onClick={() => setActiveTab("my")}>
                             {t("settlementDetail.myTab")}
                         </button>
-                        <button
-                            className={cn(
-                                "flex-1 py-2 text-xs font-bold rounded-tile transition-all",
-                                activeTab === 'all' ? "bg-white text-[rgba(0,0,0,0.87)] shadow-[0_1px_2px_rgba(0,0,0,0.06)]" : "text-black/55"
-                            )}
-                            onClick={() => setActiveTab('all')}
-                        >
+                        <button type="button" role="tab" aria-selected={activeTab === "all"} className={tabCls(activeTab === "all")} onClick={() => setActiveTab("all")}>
                             {t("settlementDetail.allTab")}
                         </button>
                     </div>
 
-                    <AnimatePresence mode="wait">
-                        {activeTab === 'my' ? (
-                            <motion.div
-                                key="my"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="text-center"
-                            >
-                                {myTransfers.length > 0 ? (
-                                    <div className="space-y-4">
-                                        {myTransfers.map((transfer, idx) => {
-                                            const isSending = transfer.fromId === meId;
-                                            return (
-                                                <div key={idx} className="bg-black/[0.03] p-4 rounded-tile">
-                                                    <p className="text-xs font-bold text-black/55 mb-1">
-                                                        {isSending ? t("settlementDetail.amountToSend") : t("settlementDetail.amountToReceive")}
-                                                    </p>
-                                                    <div className="flex items-center justify-center gap-2 mb-2">
-                                                        <span className="font-bold text-lg text-[rgba(0,0,0,0.87)]">{isSending ? `${t("settlementDetail.toPrefix")}${transfer.toName}${t("settlementDetail.toSuffix")}` : `${t("settlementDetail.fromPrefix")}${transfer.fromName}${t("settlementDetail.fromSuffix")}`}</span>
-                                                        <span className={cn("text-xs px-2 py-0.5 rounded-pill font-bold", isSending ? "bg-rose-500/10 text-rose-600" : "bg-sky-500/10 text-sky-600")}>
-                                                            {isSending ? t("settlementDetail.send") : t("settlementDetail.receive")}
-                                                        </span>
-                                                    </div>
-                                                    <div className="text-3xl font-bold tabular-nums text-[rgba(0,0,0,0.87)]">
-                                                        {transfer.amount.toLocaleString()}
-                                                        <span className="text-lg font-bold text-black/45 ml-1">{t("settlementDetail.wonUnit")}</span>
-                                                    </div>
-                                                </div>
-                                            );
-                                        })}
+                    {activeTab === "my" ? (
+                        <div className="flex flex-col gap-3">
+                            {myTransfers.length > 0 ? myTransfers.map((tr, idx) => {
+                                const sending = tr.fromId === meId;
+                                const toCreator = tr.toId === creatorId;
+                                return (
+                                    <div key={idx} className={cn(CREW_CARD, "flex flex-col gap-2 text-center")}>
+                                        <span className={cn("self-center rk-chip text-[12px]", sending ? "bg-destructive/10 text-destructive" : "bg-brand/10 text-brand")}>
+                                            {sending ? t("settlementDetail.amountToSend") : t("settlementDetail.amountToReceive")}
+                                        </span>
+                                        <p className="text-[15px] font-semibold text-ink-1">
+                                            {sending
+                                                ? t("crewSettle.sendTo").replace("{name}", nameOf(tr.toId))
+                                                : t("crewSettle.receiveFrom").replace("{name}", nameOf(tr.fromId))}
+                                        </p>
+                                        <p className="text-[22px] font-semibold text-ink-1 rk-num">{won(tr.amount)}</p>
+                                        {/* 계좌는 받는 사람이 총무일 때만 — 다른 사람에게 보낼 돈을 총무 계좌로 보내지 않게 */}
+                                        {sending && (toCreator && hasAccount
+                                            ? accountBox
+                                            : <p className={CREW_TEXT.caption}>{t("crewSettle.askAccount").replace("{name}", nameOf(tr.toId))}</p>)}
                                     </div>
-                                ) : (
-                                    <div className="py-8">
-                                        <LucideCheckCircle2 className="w-12 h-12 text-brand mx-auto mb-3" />
-                                        <p className="font-bold text-[17px] text-[rgba(0,0,0,0.87)]">{t("settlementDetail.allSettled")}</p>
-                                        <p className="text-[12px] text-black/55 font-medium">{t("settlementDetail.nothingToExchange")}</p>
+                                );
+                            }) : (
+                                <div className="py-6 text-center">
+                                    <LucideCheckCircle2 className="w-12 h-12 text-brand mx-auto mb-2" />
+                                    <p className={CREW_TEXT.section}>{t("settlementDetail.allSettled")}</p>
+                                    <p className={CREW_TEXT.sub}>{t("settlementDetail.nothingToExchange")}</p>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <div className="flex flex-col gap-4">
+                            <div className="flex justify-between items-end border-b border-surface-line pb-3">
+                                <span className="text-[15px] font-semibold text-ink-1">{t("settlementDetail.totalSpent")}</span>
+                                <span className="text-[17px] font-semibold text-ink-1 rk-num">{won(totalAmount)}</span>
+                            </div>
+                            <div className="flex flex-col gap-3">
+                                {(settlement.items ?? []).map((item: any) => {
+                                    const ids = (item.participants ?? []).map((p: any) => p.memberId as string);
+                                    const split = splitAmount(Number(item.amount) || 0, ids, item.payerId);
+                                    return (
+                                        <div key={item.id} className="flex flex-col gap-1 border-b border-dashed border-surface-line pb-3 last:border-0">
+                                            <div className="flex justify-between gap-2">
+                                                <span className="text-[15px] font-semibold text-ink-1 min-w-0 break-words">{item.title}</span>
+                                                <span className="text-[15px] font-semibold text-ink-1 rk-num shrink-0">{won(Number(item.amount) || 0)}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2 text-[13px] font-medium text-ink-3">
+                                                <span className="rk-chip text-[12px] bg-surface-3 text-ink-2">
+                                                    {t("crewSettle.paidBy").replace("{name}", item.payer?.name || t("settlementDetail.payerFallback"))}
+                                                </span>
+                                                <span className="flex items-center gap-1 rk-num">
+                                                    <LucideUsers className="w-3.5 h-3.5" />
+                                                    {t("crewSettle.peopleN").replace("{n}", String(ids.length))}
+                                                    {ids.length > 0 && ` · ${t("crewSettle.perPerson").replace("{n}", split.base.toLocaleString("ko-KR"))}`}
+                                                </span>
+                                            </div>
+                                            {split.remainder > 0 && (
+                                                <p className={cn(CREW_TEXT.caption, "text-right")}>{t("crewSettle.remainderNote").replace("{n}", String(split.remainder))}</p>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="flex flex-col gap-2 pt-3 border-t border-surface-line">
+                                <p className={cn(CREW_TEXT.caption, "text-center")}>{t("settlementDetail.transferList")}</p>
+                                {calc.transfers.length === 0 && <p className={cn(CREW_TEXT.sub, "text-center")}>{t("settlementDetail.nothingToExchange")}</p>}
+                                {calc.transfers.map((tr, idx) => (
+                                    <div key={idx} className="flex items-center justify-between gap-2 min-h-11 rounded-tile bg-surface-2 px-3">
+                                        <span className="flex items-center gap-1.5 min-w-0 text-[13px] font-semibold text-ink-1">
+                                            <span className="truncate">{nameOf(tr.fromId)}</span>
+                                            <LucideChevronRight className="w-3.5 h-3.5 text-ink-4 shrink-0" />
+                                            <span className="truncate">{nameOf(tr.toId)}</span>
+                                        </span>
+                                        <span className="text-[13px] font-semibold text-ink-2 rk-num shrink-0">{won(tr.amount)}</span>
+                                    </div>
+                                ))}
+                                {hasAccount && (
+                                    <div className="flex flex-col gap-1 pt-1">
+                                        {accountBox}
+                                        <p className={CREW_TEXT.caption}>{t("crewSettle.accountOnlyFor").replace("{name}", creatorId ? nameOf(creatorId) : "-")}</p>
                                     </div>
                                 )}
-
-                                {(settlement.accountBank || settlement.accountNumber) && (
-                                    <div
-                                        onClick={handleCopyAccount}
-                                        className="flex items-center justify-between bg-black/[0.03] p-4 rounded-tile cursor-pointer active:scale-95 transition-transform mt-4"
-                                    >
-                                        <div className="text-left">
-                                            <div className="text-[12px] font-bold text-black/55 mb-0.5">{t("settlementDetail.managerAccount")}</div>
-                                            <div className="font-bold text-sm flex items-center gap-1.5 text-[rgba(0,0,0,0.87)]">
-                                                <span>{settlement.accountBank}</span>
-                                                <span className="tabular-nums">{settlement.accountNumber}</span>
-                                                {settlement.accountHolder && <span className="text-black/55 font-medium ml-1">({settlement.accountHolder})</span>}
-                                            </div>
-                                        </div>
-                                        <LucideCopy className="w-4 h-4 text-black/40" />
-                                    </div>
-                                )}
-                            </motion.div>
-                        ) : (
-                            <motion.div
-                                key="all"
-                                initial={{ opacity: 0, y: 10 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                exit={{ opacity: 0, y: -10 }}
-                                className="space-y-4"
-                            >
-                                <div className="flex justify-between items-end border-b border-surface-line pb-4">
-                                    <span className="font-bold text-sm text-[rgba(0,0,0,0.87)]">{t("settlementDetail.totalSpent")}</span>
-                                    <span className="font-bold text-xl tabular-nums text-[rgba(0,0,0,0.87)]">{totalAmount.toLocaleString()}{t("settlementDetail.won")}</span>
-                                </div>
-                                <div className="space-y-3">
-                                    {settlement.items.map((item: any) => (
-                                        <div key={item.id} className="text-sm border-b border-dashed border-surface-line pb-3 last:border-0">
-                                            <div className="flex justify-between mb-1">
-                                                <span className="font-bold text-[rgba(0,0,0,0.87)]">{item.title}</span>
-                                                <span className="font-bold tabular-nums text-[rgba(0,0,0,0.87)]">{item.amount.toLocaleString()}{t("settlementDetail.won")}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-xs text-black/55">
-                                                <div className="flex items-center gap-1">
-                                                    <span className="bg-black/[0.06] text-black/70 px-1.5 py-0.5 rounded-md text-[12px] font-bold">
-                                                        {(item.payer?.name || t("settlementDetail.payerFallback")) + t("settlementDetail.paidSuffix")}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-1">
-                                                    <LucideUsers className="w-3 h-3" />
-                                                    <span className="tabular-nums">
-                                                        {item.participants.length}{t("settlementDetail.personSuffix")}
-                                                        {item.participants.length > 0
-                                                            ? ` (${t("settlementDetail.perPerson")} ${(Math.ceil((item.amount / item.participants.length) / 10) * 10).toLocaleString()}${t("settlementDetail.won")})`
-                                                            : ""}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                <div className="mt-6 pt-4 border-t border-black/10">
-                                    <p className="text-[12px] font-semibold text-black/55 mb-3 text-center">{t("settlementDetail.transferList")}</p>
-                                    <div className="space-y-2">
-                                        {allTransfers.map((transfer, idx) => (
-                                            <div key={idx} className="flex items-center justify-between text-xs bg-black/[0.03] px-3 py-2 rounded-tile">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-[rgba(0,0,0,0.87)]">{transfer.fromName}</span>
-                                                    <LucideChevronRight className="w-3 h-3 text-black/30" />
-                                                    <span className="font-bold text-[rgba(0,0,0,0.87)]">{transfer.toName}</span>
-                                                </div>
-                                                <span className="font-semibold tabular-nums text-black/60">{transfer.amount.toLocaleString()}{t("settlementDetail.won")}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            </motion.div>
-                        )}
-                    </AnimatePresence>
-
-                    {/* Receipt Jagged Edge Bottom */}
-                    <div className="absolute bottom-0 left-0 w-full h-3 bg-surface-0 [clip-path:polygon(0%_0%,5%_100%,10%_0%,15%_100%,20%_0%,25%_100%,30%_0%,35%_100%,40%_0%,45%_100%,50%_0%,55%_100%,60%_0%,65%_100%,70%_0%,75%_100%,80%_0%,85%_100%,90%_0%,95%_100%,100%_0%)]"></div>
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                <div className="p-6">
-                    <Button className="w-full rk-btn-primary h-14 text-[16px] rounded-tile" onClick={() => onOpenChange(false)}>
+                <div className="px-4 pb-4">
+                    <button type="button" className={cn(CREW_BTN.primary, "w-full h-12")} onClick={() => onOpenChange(false)}>
                         {t("settlementDetail.confirm")}
-                    </Button>
+                    </button>
                 </div>
-
             </DialogContent>
         </Dialog>
     );
