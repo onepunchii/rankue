@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DRILLS, drillLayout, drillsForWeek, weekIdFor, findDrill, DRILLS_PER_WEEK } from "./drills.js";
+import { DRILLS, drillLayout, drillsForWeek, weekIdFor, kstWeekIdFor, findDrill, DRILLS_PER_WEEK } from "./drills.js";
 import { TABLES } from "./params.js";
 import { isValidLayout } from "./layouts.js";
 
@@ -21,6 +21,9 @@ describe("ISO 주차", () => {
         expect(weekIdFor(Date.UTC(2026, 8, 6, 23, 59))).toBe("2026-W36"); // 일요일 밤
         expect(weekIdFor(Date.UTC(2021, 0, 3))).toBe("2020-W53");   // 2021-01-03 은 2020년 53주
         expect(weekIdFor(Date.UTC(2024, 11, 30))).toBe("2025-W01");  // 2024-12-30 은 2025년 1주
+        // 한국 기준: 한국 월요일 00:00(= 일요일 15:00 UTC)에 바뀐다
+        expect(kstWeekIdFor(Date.UTC(2026, 8, 6, 14, 59))).toBe("2026-W36");
+        expect(kstWeekIdFor(Date.UTC(2026, 8, 6, 15, 0))).toBe("2026-W37");
         expect(weekIdFor(Date.UTC(1970, 0, 1))).toBe("1970-W01");
     });
 });

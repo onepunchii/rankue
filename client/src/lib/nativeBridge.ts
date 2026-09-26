@@ -365,6 +365,16 @@ function initRouteMemory(): void {
 // ── 진입점 ────────────────────────────────────────────────────────────────
 
 // 앱 진입점(main.tsx)에서 첫 렌더 전에 1회 호출.
+/**
+ * 하드웨어 뒤로가기 가로채기(2026-09-26 검토): 온라인게임 도중 뒤로가기·가장자리 스와이프 한 번에 확인 없이 화면을 떠나
+ * 기록 중인 싱글 경기가 '중단'으로 닫혔다. 화면이 핸들러를 걸면 뒤로가기가 먼저 그쪽으로 간다 — true 를 돌려주면 처리 끝.
+ * 한 번에 하나만(마지막에 건 것). 화면이 떠날 때 null 로 푼다.
+ */
+let backHandler: (() => boolean) | null = null;
+export function setBackHandler(fn: (() => boolean) | null): void {
+    backHandler = fn;
+}
+
 export function initNativeBridge(): void {
     if (!isNative()) return;
     if (platform() === "android") document.documentElement.classList.add("native-android");
@@ -372,6 +382,7 @@ export function initNativeBridge(): void {
     // 안드로이드 하드웨어 뒤로가기: 히스토리 있으면 back, 루트면 앱 종료 (wouter는 history API 기반)
     if (hasPlugin("App")) {
         App.addListener("backButton", () => {
+            if (backHandler && backHandler()) return;
             if (window.location.pathname === "/" || window.history.length <= 1) void App.exitApp().catch(() => { /* 무시 */ });
             else window.history.back();
         }).catch(() => { /* 무시 */ });

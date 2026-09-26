@@ -22,6 +22,7 @@ import { resetTelemetrySession } from "./gestureTelemetry";
 const nav = vi.hoisted(() => ({ search: "", navigate: vi.fn(), apiRequest: vi.fn(), toast: vi.fn() }));
 
 vi.mock("@/lib/i18n", () => ({ useT: () => ({ t: (k: string) => ko[k] ?? k, locale: "ko" }) }));
+vi.mock("@/lib/nativeBridge", () => ({ setBackHandler: () => undefined, isNativeApp: () => false }));
 vi.mock("@/lib/utils", () => ({ cn: (...a: unknown[]) => a.filter((x) => typeof x === "string" && x).join(" ") }));
 vi.mock("@/lib/queryClient", () => ({ apiRequest: nav.apiRequest }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: nav.toast }) }));
@@ -248,7 +249,7 @@ describe("SimulatorPage", () => {
         expect(nav.apiRequest).not.toHaveBeenCalled();
     });
 
-    it("파라미터가 없으면 진입 화면(싱글 / 친구와 대전)이 먼저, 싱글을 누르면 설정 창 · 시작하기로 세션 · 나가기는 확인 뒤 대시보드로", async () => {
+    it("파라미터가 없으면 진입 화면(싱글 / 친구와 대전)이 먼저, 싱글을 누르면 설정 창 · 시작하기로 세션 · 나가기는 확인 뒤 온라인게임 입구로", async () => {
         nav.search = "";
         const h = mount();
         // 진입 화면: 카드 둘, 설정 창은 아직
@@ -273,7 +274,8 @@ describe("SimulatorPage", () => {
         expect(h.container.textContent).toContain(ko["sim.exit.title"]);
         expect(h.container.textContent).toContain(ko["sim.exit.descPractice"]);
         await React.act(async () => { click(byText(h, ko["sim.exit.confirm"])!); await new Promise((r) => setTimeout(r, 10)); });
-        expect(nav.navigate).toHaveBeenCalledWith("/dashboard");
+        // 게임을 나가면 온라인게임 입구로(2026-09-26) — 앱 대시보드로 나가면 '한 판 더' 하려면 다시 들어와야 했다
+        expect(nav.navigate).toHaveBeenCalledWith("/online-game");
     });
 
     it("샷이 끝나면 왼쪽 위 칩 열에 공유 알약이 생기고(툴바 밖), 누르면 결과 토스트가 뜬다(jsdom 은 캔버스가 없어 실패 문구)", async () => {

@@ -2,7 +2,7 @@
  * 대시보드 숫자 — 순수 함수(테스트 동반). 세션 요약·성적 행·대전 목록·드릴 주별 집계를 화면이 바로 그릴 수 있는 꼴로 만든다.
  * 규칙: 에버리지는 점수 합 / 이닝 합(세션 평균의 평균이 아니다) — billiards-domain-rules 의 정본 공식.
  */
-import { weekIdFor } from "@shared/sim/drills";
+import { weekIdFor, kstWeekIdFor } from "@shared/sim/drills";
 import { caromsOf, sessionAverage } from "@shared/sim/handicap";
 import type { DashGameType, DashTableId, SimDrillWeek, SimRatingRow, SimSessionSummary } from "./dashApi";
 
@@ -225,7 +225,7 @@ export function drillSeries(weeks: readonly SimDrillWeek[], nowMs: number, n = 8
     const byId = new Map(weeks.map((w) => [w.weekId, w] as const));
     const out: DrillWeekPoint[] = [];
     for (let k = n - 1; k >= 0; k--) {
-        const weekId = weekIdFor(nowMs - k * 7 * 86_400_000);
+        const weekId = kstWeekIdFor(nowMs - k * 7 * 86_400_000);
         const w = byId.get(weekId);
         out.push({ weekId, weekNo: weekNumber(weekId), attempts: w?.attempts ?? 0, successes: w?.successes ?? 0, cushions: w?.cushions ?? 0 });
     }

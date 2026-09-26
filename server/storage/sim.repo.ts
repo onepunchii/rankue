@@ -523,6 +523,9 @@ export class SimRepository {
                 .where(and(eq(hiqSimSessions.id, id), eq(hiqSimSessions.memberId, memberId))).for("update");
             if (!s) return undefined;
             if (s.status !== "playing") return s;
+            // '완료'는 서버가 가진 세션 상태로 판정한다 — 화면이 finished 라고 보내도 판이 안 끝났으면 중단이다
+            // (2026-09-26 검토: 2/25 에서 finished 를 보내면 완료로 남아 기록·통계를 흐렸다).
+            if (status === "finished" && (s.state as { status?: string } | null)?.status !== "finished") status = "abandoned";
             const [row] = await tx.update(hiqSimSessions)
                 .set({ status, finishedAt: new Date() })
                 .where(eq(hiqSimSessions.id, id)).returning();

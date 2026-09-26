@@ -42,6 +42,10 @@ export interface UseSimulatorOptions extends SimCallbacks {
 }
 
 export interface SimulatorActions {
+    /** 서버에 남은 기록 경기 이어서 치기(simResume) */
+    resume(r: import("./simResume").Resumable): void;
+    /** 솔로: 끊겨 못 보낸 기록 다시 보내기(연결·화면 복귀). 보낼 게 없으면 아무것도 안 한다. */
+    retrySync(): Promise<void>;
     /** setup → aim. 서버 세션 개설은 record 일 때 백그라운드로. */
     start(config: SimSetupConfig, opts?: StartOptions): void;
     /**
@@ -225,6 +229,8 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         undo: () => ctrl.undo(),
         restart: () => ctrl.restart(),
         exit: () => ctrl.exit(),
+        retrySync: () => ctrl.retrySync(),
+        resume: (r) => ctrl.resume(r),
         resign: () => ctrl.resign(),
         claim: () => ctrl.claim(),
         sync: () => ctrl.sync(),

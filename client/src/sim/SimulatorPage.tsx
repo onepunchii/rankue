@@ -28,6 +28,9 @@
  * 세로 고정 레이아웃, env(safe-area-inset-*) 패딩, 태블릿에서는 렌더러가 letterbox 해서 테이블이 잘리지 않는다.
  * 레거시 Expo ReactNativeWebView 방향 브리지는 옮기지 않는다 — 이 화면은 세로 레이아웃 그 자체다.
  */
+import { setBackHandler } from "@/lib/nativeBridge";
+import { loadResume, fetchResumable, clearResume, type Resumable } from "./simResume";
+import { apiRequest } from "@/lib/queryClient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
@@ -142,7 +145,13 @@ const OFFLINE_KEYS: Record<OfflineReason, string> = {
 const HOLD_FF_MS = 200;
 /** 결과 배너 표시 시간 */
 const BANNER_MS = 2400;
+/** 온라인게임을 완전히 떠날 때(입구 화면의 닫기) */
 const EXIT_PATH = "/dashboard";
+/**
+ * 게임·설정·드릴 목록을 닫을 때는 온라인게임 입구로(2026-09-26 검토): 예전엔 앱 대시보드로 나가 버려 '한 판 더' 하려면
+ * 다시 들어와야 했다. 입구의 닫기(EXIT_PATH)만 앱으로 나간다.
+ */
+const ENTRY_PATH = "/online-game";
 /**
  * 테이블이 조작 층을 피해 letterbox 되는 인셋(CSS px). 오른쪽 68 = 툴바 44 + 여백, 아래 = 두께 독(두 줄 106) + 여백 8.
  * 세로가 남는 폰(375×812)에선 폭이 배율을 정하므로 인셋이 테이블 크기를 줄이지 않는다.
@@ -343,13 +352,27 @@ export function SimulatorPage() {
         const d = drillRef.current;
         if (!r || !d || d.scored || sim.mode !== "solo") return;
         setDrill((x) => (x ? { ...x, scored: true } : x));
-        drillApi.attempt(d.drill.id, r.input, r.hash).then((res) => {
-            setDrillPending({ success: res.outcome.scored, cushions: res.outcome.cushionsBeforeSecond });
-        }).catch((e: unknown) => {
-            const code = (e as { code?: string; data?: { code?: string } })?.code ?? (e as { data?: { code?: string } })?.data?.code;
-            if (code !== "ALREADY_ATTEMPTED") toast({ title: t("sim.drill.scoreFailed") });
-        });
-    }, [sim.lastResult, sim.mode, toast, t]);
+        // 채점 전송: 네트워크 끊김이면 두 번 더(1·3초 뒤) 보낸다 — 서버는 같은 드릴 두 번째 시도를 ALREADY_ATTEMPTED 로 막으므로
+        // 다시 보내도 두 번 세지 않는다. 주가 바뀌어(한국 월요일 0시) 이 문제가 이번 주 것이 아니면 그렇다고 알리고 목록을 새로 받는다.
+        const send = (left: number): void => {
+            drillApi.attempt(d.drill.id, r.input, r.hash).then((res) => {
+                setDrillPending({ success: res.outcome.scored, cushions: res.outcome.cushionsBeforeSecond });
+            }).catch((e: unknown) => {
+                const err = e as { status?: number; code?: string; data?: { code?: string } };
+                const code = err?.code ?? err?.data?.code;
+                if (code === "ALREADY_ATTEMPTED") return;
+                if (err?.status === 404) {
+                    toast({ title: t("sim.drill.weekChanged") });
+                    void queryClient.invalidateQueries({ queryKey: DRILL_WEEK_QUERY_KEY });
+                    return;
+                }
+                const retryable = err?.status === undefined || err.status === 0 || err.status >= 500;
+                if (retryable && left > 0) { setTimeout(() => send(left - 1), left === 2 ? 1000 : 3000); return; }
+                toast({ title: t("sim.drill.scoreFailed") });
+            });
+        };
+        send(2);
+    }, [sim.lastResult, sim.mode, toast, t, queryClient]);
     useEffect(() => {
         if (!drillPending || sim.phase === "shooting") return;
         setDrill((x) => (x ? { ...x, result: drillPending } : x));
@@ -378,6 +401,29 @@ export function SimulatorPage() {
         startedRef.current = true;
         actions.start(initial.config, { record: initial.record });
     }, [actions, initial]);
+
+    // 이어서 치기(2026-09-26): 입구를 열 때 이 기기에 적힌 기록 경기가 서버에 아직 진행 중이면 띠로 보여 준다.
+    const [resumable, setResumable] = useState<Resumable | null>(null);
+    useEffect(() => {
+        if (!entryView || sim.phase !== "setup") return;
+        const rec = loadResume();
+        if (!rec) { setResumable(null); return; }
+        let alive = true;
+        void fetchResumable(rec).then((r) => { if (alive) setResumable(r); });
+        return () => { alive = false; };
+    }, [entryView, sim.phase]);
+
+    // 끊겨 못 보낸 솔로 기록은 연결이 돌아오거나 앱으로 돌아오면 다시 보낸다(2026-09-26 검토 — 끝낸 경기가 '중단'으로 닫히던 자리).
+    useEffect(() => {
+        const retry = () => { if (document.visibilityState === "visible") void actions.retrySync(); };
+        window.addEventListener("online", retry);
+        document.addEventListener("visibilitychange", retry);
+        return () => { window.removeEventListener("online", retry); document.removeEventListener("visibilitychange", retry); };
+    }, [actions]);
+    // 경기가 끝났는데 보낼 샷이 남아 있으면 바로 한 번 더 보낸다 — 마지막 샷의 끊김이 결과를 지우지 않게.
+    useEffect(() => {
+        if (sim.mode === "solo" && sim.phase === "finished" && sim.record && sim.queued > 0) void actions.retrySync();
+    }, [sim.mode, sim.phase, sim.record, sim.queued, actions]);
 
     // ?replay=<payload>: 연습 세션을 그 배치로 열고 입력을 넣은 뒤, aim 이 되면 한 번만 자동으로 친다(단계 ref 가드).
     // 재생이 시작되면(lastResult) 해시를 원본과 견줘 "리플레이" / "결과가 달라요"(엔진 버전이 다름) 칩을 정한다.
@@ -1063,6 +1109,16 @@ export function SimulatorPage() {
     }, [actions]);
     const onInnings = useCallback(() => setSheetOpen(true), []);
     const onExitRequest = useCallback(() => setExitOpen(true), []);
+    // 게임 중(조준·샷·대기·끝) 기기 뒤로가기는 나가기 확인을 연다 — 확인이 떠 있으면 닫는다. 입구·목록 화면에서는 평소대로 뒤로 간다.
+    const inGame = sim.phase !== "setup";
+    useEffect(() => {
+        if (!inGame) return;
+        setBackHandler(() => {
+            setExitOpen((open) => !open);
+            return true;
+        });
+        return () => setBackHandler(null);
+    }, [inGame]);
     const onToggleMute = useCallback(() => setMuted((m) => !m), []);
     const onToggleDiamond = useCallback(() => {
         setDiamondTouched(true);
@@ -1136,7 +1192,7 @@ export function SimulatorPage() {
             await actions.exit();
         } finally {
             // 대전은 서버에 남으므로 목록(로비)으로 돌아간다
-            navigate(isMatch ? "/online-game?lobby=1" : drillRef.current ? "/online-game?drills=1" : EXIT_PATH);
+            navigate(isMatch ? "/online-game?lobby=1" : drillRef.current ? "/online-game?drills=1" : ENTRY_PATH);
             setDrill(null);
             setExiting(false);
         }
@@ -1332,7 +1388,7 @@ export function SimulatorPage() {
     const onSetupOpenChange = useCallback((open: boolean) => {
         setSetupOpen(open);
         // 세션 없이 설정을 닫으면 돌아간다 — 진입 화면에서 열었으면 진입 화면으로(setupOpen=false 만), 바로 열렸으면(cfg 깨짐) 대시보드로
-        if (!open && sim.phase === "setup" && !entryView) navigate(EXIT_PATH);
+        if (!open && sim.phase === "setup" && !entryView) navigate(ENTRY_PATH);
     }, [navigate, sim.phase, entryView]);
 
     const finished = sim.session?.status === "finished";
@@ -1676,13 +1732,27 @@ export function SimulatorPage() {
             {showDrills && (
                 <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
-                        <DrillPanel onPlay={onPlayDrill} myMemberId={member?.id} onClose={() => navigate(EXIT_PATH)} />
+                        <DrillPanel onPlay={onPlayDrill} myMemberId={member?.id} onClose={() => navigate(ENTRY_PATH)} />
                     </div>
                 </div>
             )}
             {showEntry && (
                 <div className={cn("fixed inset-0 z-[5] overflow-y-auto", ENTRY_STYLE.page)} style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <SimEntry
+                        resume={resumable ? {
+                            label: t("sim.resume.label")
+                                .replace("{game}", t(resumable.session.rules.gameType === "4c" ? "sim.setup.type4c" : "sim.setup.type3c"))
+                                .replace("{score}", String(resumable.session.players[0]?.score ?? 0))
+                                .replace("{target}", String(resumable.session.players[0]?.target ?? 0))
+                                .replace("{innings}", String(resumable.session.players[0]?.innings ?? 0)),
+                            onResume: () => { actions.resume(resumable); setResumable(null); },
+                            onDiscard: () => {
+                                const id = resumable.id;
+                                clearResume();
+                                setResumable(null);
+                                void apiRequest(`/api/hiq/sim/sessions/${encodeURIComponent(id)}/close`, { method: "POST", body: { status: "abandoned" } }).catch(() => undefined);
+                            },
+                        } : null}
                         onSingle={() => setSetupOpen(true)}
                         onDrills={() => navigate("/online-game?drills=1")}
                         onMulti={() => navigate("/online-game?lobby=1")}
@@ -1795,6 +1865,7 @@ export function SimulatorPage() {
             <ExitConfirm
                 open={exitOpen} onOpenChange={setExitOpen}
                 record={sim.record} offline={isMatch ? false : sim.offline} finished={!!finished} busy={exiting}
+                unsynced={!isMatch && sim.queued > 0}
                 desc={isMatch ? t("sim.match.leaveDesc") : undefined}
                 onConfirm={() => { void exitNow(); }}
             />

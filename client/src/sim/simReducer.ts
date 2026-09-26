@@ -345,6 +345,8 @@ export const INITIAL_STATE: SimCoreState = {
 
 export type SimAction =
     | { readonly type: "start"; readonly session: SessionState; readonly balls: readonly BallState[]; readonly record: boolean; readonly aimAssist?: boolean }
+    /** 서버에 남은 기록 세션을 그 자리부터 잇는다(simResume) — 공·세션·샷 번호가 서버 정본이다. */
+    | { readonly type: "resume"; readonly session: SessionState; readonly balls: readonly BallState[]; readonly serverSessionId: string; readonly shotIdx: number; readonly aimAssist?: boolean }
     /** 서버 세션 개설 응답. shotIdx 0 이면 서버 state(선수 id 가 회원 id)를 정본으로 받아들인다. */
     | { readonly type: "serverSession"; readonly id: string; readonly session?: SessionState }
     | { readonly type: "serverUnavailable" }
@@ -403,6 +405,8 @@ export type SimAction =
         readonly session: SessionState | null;
         readonly outcome?: ShotOutcome;
     }
+    /** 솔로: 끊겼던 기록 다시 보내기(연결 복귀·화면 복귀·나가기 직전). 큐가 남아 있을 때만. */
+    | { readonly type: "soloRetry" }
     /** 내 샷 전송의 네트워크 실패. tries+1 로 큐에 두고 MAX_RETRIES 면 offline(항목은 남는다). */
     | { readonly type: "matchShotFail"; readonly idx: number; readonly input: ShotInput; readonly clientHash: string };
 
@@ -473,6 +477,21 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
                 aimAssist: a.aimAssist ?? true,
                 session: a.session,
                 balls: a.balls,
+                input: initialInput(a.balls, cueBallId, a.session.rules.gameType, isOpeningShot(a.session, a.balls)),
+            };
+        }
+
+        case "resume": {
+            const cueBallId = cueBallIdOf(a.session);
+            return {
+                ...INITIAL_STATE,
+                phase: a.session.status === "finished" ? "finished" : "aim",
+                record: true,
+                aimAssist: a.aimAssist ?? true,
+                session: a.session,
+                balls: a.balls,
+                serverSessionId: a.serverSessionId,
+                shotIdx: a.shotIdx,
                 input: initialInput(a.balls, cueBallId, a.session.rules.gameType, isOpeningShot(a.session, a.balls)),
             };
         }
@@ -577,8 +596,16 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
 
         case "queueShot": {
             // 대전은 offline(일시적 끊김)이어도 큐에 넣는다 — 폴링이 성공하면 다시 보낸다.
-            if (s.phase === "setup" || (s.mode === "solo" && s.offline) || s.queue.some((q) => q.idx === a.idx)) return s;
+            // 솔로는 offline 이어도 **보낼 게 남아 있으면**(네트워크 끊김) 뒤에 붙인다 — 다시 연결되면 순서대로 나간다.
+            // 큐가 비어 있는 offline 은 서버가 거절했거나 개설에 실패한 경우라 이어 보낼 수 없다.
+            if (s.phase === "setup" || (s.mode === "solo" && s.offline && (s.queue.length === 0 || !s.serverSessionId)) || s.queue.some((q) => q.idx === a.idx)) return s;
             return { ...s, queue: enqueue(s.queue, { idx: a.idx, input: a.input, clientHash: a.clientHash, tries: 0 }) };
+        }
+
+        case "soloRetry": {
+            // 끊겼던 솔로 기록 다시 보내기: 보낼 게 남아 있고 서버 세션이 있을 때만 offline 을 풀고 시도 횟수를 0 으로.
+            if (s.mode !== "solo" || !s.offline || s.queue.length === 0 || !s.serverSessionId) return s;
+            return { ...s, offline: false, queue: s.queue.map((q) => ({ ...q, tries: 0 })) };
         }
 
         case "serverLanded": {
@@ -591,7 +618,9 @@ export function simReducer(s: SimCoreState, a: SimAction): SimCoreState {
             const existing = s.queue.find((q) => q.idx === a.idx);
             if (!a.retryable) return { ...s, queue: withoutIdx(s.queue, a.idx), offline: true };
             const tries = (existing ? existing.tries : 0) + 1;
-            if (tries >= MAX_RETRIES) return { ...s, queue: [], offline: true };
+            // 재시도를 다 썼어도 큐는 **버리지 않는다**(2026-09-26 검토) — 예전엔 비워서 마지막 샷 한 번의 끊김으로 끝낸 경기가
+            // '중단'으로 닫혔다. offline 으로 멈춰 두고, 연결이 돌아오거나 나갈 때 soloRetry 로 다시 보낸다.
+            if (tries >= MAX_RETRIES) return { ...s, queue: enqueue(s.queue, { idx: a.idx, input: a.input, clientHash: a.clientHash, tries }), offline: true };
             return { ...s, queue: enqueue(s.queue, { idx: a.idx, input: a.input, clientHash: a.clientHash, tries }) };
         }
 

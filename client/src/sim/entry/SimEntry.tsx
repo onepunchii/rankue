@@ -40,6 +40,8 @@ export interface SimEntryProps {
     /** 머리글 닫기 옆 "대시보드" — 기록·그래프·내 대전 */
     onDash: () => void;
     onClose: () => void;
+    /** 이어서 칠 수 있는 기록 경기(앱이 꺼졌거나 새로고침됐다) — 맨 위 띠로 보여 준다 */
+    resume?: { label: string; onResume: () => void; onDiscard: () => void } | null;
 }
 
 function readLast(): string | null {
@@ -52,7 +54,7 @@ function writeLast(v: EntryChoice): void {
 const PILL = "h-11 px-2 inline-flex items-center justify-center gap-1.5 rounded-pill text-[13px] font-semibold whitespace-nowrap w-full";
 const PRIMARY = "h-11 px-2 inline-flex items-center justify-center rounded-pill text-[14px] font-semibold whitespace-nowrap w-full";
 
-export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank, onPath, onDash, onClose }: SimEntryProps) {
+export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank, onPath, onDash, onClose, resume }: SimEntryProps) {
     const { t } = useT();
     const pill = cn(PILL, st.pill);
     const primary = cn(PRIMARY, st.primary);
@@ -265,6 +267,16 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
                     </button>
                 </div>
             </div>
+            {resume && (
+                <div className="mb-3 rounded-tile bg-brand/90 text-white px-4 py-3 flex items-center gap-3" data-entry="resume">
+                    <span className="flex-1 min-w-0">
+                        <span className="block text-[13px] font-bold">{t("sim.resume.title")}</span>
+                        <span className="block text-[12px] text-white/80 truncate rk-num">{resume.label}</span>
+                    </span>
+                    <button type="button" onClick={resume.onDiscard} className="shrink-0 h-10 px-3 rounded-pill text-[12.5px] font-semibold text-white/80">{t("sim.resume.discard")}</button>
+                    <button type="button" onClick={resume.onResume} className="shrink-0 h-10 px-4 rounded-pill bg-white text-brand text-[13px] font-bold">{t("sim.resume.go")}</button>
+                </div>
+            )}
             <EntryShowcase className={st.showcase} />
             <div className={cn("flex flex-col", st.gap)}>
                 {/* 내 다마수(2026-09-12 오너) — 정보 카드라 늘 맨 위, 접히지 않는다 */}

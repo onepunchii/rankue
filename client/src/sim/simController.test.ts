@@ -344,11 +344,31 @@ describe("네트워크 실패와 재전송 큐", () => {
         }
         expect(api.postShot).toHaveBeenCalledTimes(MAX_RETRIES);
         expect(ctrl.store.get().offline).toBe(true);
-        expect(ctrl.store.get().queue).toEqual([]);
+        // 멈춘 뒤의 샷도 순서대로 쌓아 둔다 — 연결이 돌아오면(retrySync) 한꺼번에 나간다(2026-09-26)
+        expect(ctrl.store.get().queue.map((q) => q.idx)).toEqual([0, 1, 2, 3]);
         expect(cb.onOffline).toHaveBeenCalledTimes(1);
         expect(cb.onOffline).toHaveBeenCalledWith("shot-retries");
         expect(ctrl.store.get().shotIdx).toBe(4);       // 로컬 플레이는 계속
         expect(ctrl.store.get().phase).toBe("aim");
+    });
+
+    it("retrySync: 연결이 돌아오면 쌓인 샷을 순서대로 보내고 기록이 온전하면 완료로 닫을 수 있다", async () => {
+        const { ctrl, api, playOut, srv } = make();
+        await settle();
+        srv.setMode("network");
+        for (let i = 0; i < 3; i++) {
+            aimAtYellow(ctrl);
+            await ctrl.shoot();
+            playOut();
+            await settle();
+        }
+        expect(ctrl.store.get().offline).toBe(true);
+        srv.setMode("ok");
+        await ctrl.retrySync();
+        await settle();
+        expect(ctrl.store.get().offline).toBe(false);
+        expect(ctrl.store.get().queue).toEqual([]);
+        expect((api.postShot as any).mock.calls.slice(-3).map((c: any[]) => c[1].idx)).toEqual([0, 1, 2]);
     });
 
     it("응답만 유실된 재전송(IDX_MISMATCH, 서버 shots = idx+1)은 기록된 것으로 보고 넘어간다", async () => {

@@ -35,6 +35,7 @@ import { aimPhi as aimPhiFromCue, cuePhiForAim } from "./aimAssist";
 import { nearerThicknessPhi } from "./aim";
 import { spinWithVertical } from "./controlsMath";
 import { aimAssistFor } from "./setupPresets";
+import { saveResume, clearResume, type Resumable } from "./simResume";
 import { AIM_EPS_RAD, AIM_REPORT_MS, applyShot, createSession, evaluateShot, isOpeningShot, type SessionState, type ShotOutcome } from "@shared/sim/rules";
 import type { SimSetupConfig } from "./setupPresets";
 import { SHORT_PREVIEW_TAIL_M, MATCH_PREVIEW_CUSHIONS, buildPreviewPaths, type PreviewPaths } from "./overlay/paths";
@@ -378,6 +379,27 @@ export class SimController {
     }
 
     /**
+     * 서버에 남은 기록 경기 이어서 치기(simResume). start 와 같지만 서버 세션을 새로 열지 않고,
+     * 서버가 가진 공·세션·샷 번호에서 잇는다. 다시하기(restart)는 설정의 개시 배치로 새 경기를 연다.
+     */
+    resume(r: Resumable): void {
+        if (this.disposed) return;
+        const prev = this.store.get();
+        this.gen++;
+        this.stopLoop();
+        this.cancelFeedback();
+        this.matchCleanup();
+        this.pb = null;
+        if (prev.phase !== "setup" && prev.mode === "solo" && prev.record && prev.serverSessionId && prev.serverSessionId !== r.id) {
+            this.closeQuietly(prev.serverSessionId, closeStatusFor(prev));
+        }
+        const params = paramsFromConfig(r.config);
+        this.setAux({ setup: { config: r.config, params, players: undefined, balls: undefined }, preview: null, duration: 0, speed: 1, lastResult: null });
+        this.store.dispatch({ type: "resume", session: r.session, balls: r.balls, serverSessionId: r.id, shotIdx: r.shotIdx, aimAssist: aimAssistFor(r.config.mode) });
+        saveResume({ id: r.id, config: r.config, at: Date.now() });
+    }
+
+    /**
      * 네트워크 대전 시작(참가자로 열린 대전 행). 내 차례면 aim, 아니면 waiting(폴링). 끝난 대전은 finished 로 열린다.
      * 행에 state/balls 가 없거나(참가 전) 내가 참가자가 아니면 false.
      */
@@ -448,6 +470,8 @@ export class SimController {
             this.store.dispatch({ type: "exit" });
             return;
         }
+        // 끊겨서 못 보낸 샷이 남았으면 나가기 전에 한 번 더 보낸다(끝낸 경기가 '중단'으로 닫히지 않게).
+        if (s.record && s.serverSessionId && s.queue.length > 0) void this.retrySync();
         // 마지막 샷 전송이 아직 진행 중이면 잠깐 기다린다 — 그 결과(성공/오프라인)가 닫기 상태를 정한다.
         if (s.record && s.serverSessionId && this.pending > 0) {
             await this.waitChain(EXIT_SYNC_WAIT_MS);
@@ -457,6 +481,7 @@ export class SimController {
         const id = s.serverSessionId;
         const status = closeStatusFor(s);
         const record = s.record;
+        if (s.mode === "solo") clearResume();
         this.gen++;
         this.pb = null;
         this.clearPreviewTimer();
@@ -482,7 +507,10 @@ export class SimController {
         this.audio = null;
         this.unsubStore();
         const s = this.store.get();
-        if (s.phase !== "setup" && s.mode === "solo" && s.record && s.serverSessionId) this.closeQuietly(s.serverSessionId, closeStatusFor(s));
+        if (s.phase !== "setup" && s.mode === "solo" && s.record && s.serverSessionId) {
+            this.closeQuietly(s.serverSessionId, closeStatusFor(s));
+            clearResume();
+        }
         this.subs.clear();
     }
 
@@ -642,10 +670,10 @@ export class SimController {
                     // 앞 샷이 아직 확인되지 않았거나 연결이 끊겨 있다 → 순서대로 뒤에 붙인다(폴링 성공 때 나간다).
                     this.store.dispatch({ type: "queueShot", idx, input: shot, clientHash: result.hash });
                 }
-            } else if (s.record && !s.offline) {
+            } else if (s.record && (!s.offline || s.queue.length > 0)) {
                 const cur = this.store.get();
                 const pending: PendingShot = { idx, input: shot, clientHash: result.hash, tries: 0 };
-                if (cur.serverSessionId && cur.queue.length === 0) {
+                if (cur.serverSessionId && cur.queue.length === 0 && !cur.offline) {
                     const sessionId = cur.serverSessionId;
                     void this.serial(async () => { if (gen === this.gen) await this.postOne(gen, sessionId, pending); });
                 } else {
@@ -847,6 +875,8 @@ export class SimController {
                     return;
                 }
                 this.store.dispatch({ type: "serverSession", id: r.session.id, session: r.state });
+                // 이 기기에 적어 둔다 — 앱이 꺼지거나 새로고침돼도 입구에서 이어서 칠 수 있게(2인 로컬 대전은 제외)
+                if (!players) saveResume({ id: r.session.id, config, at: Date.now() });
             } catch {
                 if (gen !== this.gen) return;
                 const was = this.store.get().offline;
@@ -856,6 +886,18 @@ export class SimController {
             }
             await this.flushLoop(gen);
         });
+    }
+
+    /**
+     * 솔로 기록 다시 보내기(2026-09-26 검토): 재시도를 다 써서 offline 으로 멈춘 큐를 다시 보낸다.
+     * 화면이 연결 복귀(online)·앱 복귀(visible) 때, 그리고 나가기·경기 끝 직전에 부른다. 보낼 게 없으면 아무것도 안 한다.
+     */
+    retrySync(): Promise<void> {
+        const s = this.store.get();
+        if (s.mode !== "solo" || !s.record || !s.serverSessionId || s.queue.length === 0) return Promise.resolve();
+        this.store.dispatch({ type: "soloRetry" });
+        const gen = this.gen;
+        return this.serial(() => this.flushLoop(gen));
     }
 
     /** 큐를 idx 순으로 비운다. 실패하면(재시도 대기·포기) 멈춘다 — 뒤 샷을 먼저 보내면 서버가 거부한다. */

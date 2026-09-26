@@ -243,10 +243,23 @@ describe("재전송 큐", () => {
         expect(s.offline).toBe(false);
         s = fail(s, 0);
         expect(MAX_RETRIES).toBe(3);
-        expect(s.queue).toEqual([]);
+        // 재시도를 다 써도 큐는 남는다(2026-09-26) — 연결이 돌아오면 soloRetry 로 다시 보낸다
+        expect(s.queue).toEqual([{ idx: 0, input, clientHash: "h".repeat(16), tries: 3 }]);
         expect(s.offline).toBe(true);
-        // 포기한 뒤엔 무시
+        // 멈춘 동안의 실패 응답은 무시
         expect(fail(s, 1)).toBe(s);
+    });
+    it("soloRetry: 서버 세션이 있고 보낼 게 남았으면 offline 을 풀고 시도 횟수를 0 으로", () => {
+        let s = simReducer(shoot(started(), MISS), { type: "playbackEnd" });
+        s = simReducer(s, { type: "serverSession", id: "sess-1" });
+        s = fail(fail(fail(s, 0), 0), 0);
+        expect(s.offline).toBe(true);
+        const r = simReducer(s, { type: "soloRetry" });
+        expect(r.offline).toBe(false);
+        expect(r.queue.map((q) => q.tries)).toEqual([0]);
+        // 보낼 게 없으면 그대로
+        const empty = { ...s, queue: [] };
+        expect(simReducer(empty, { type: "soloRetry" })).toBe(empty);
     });
     it("큐는 idx 오름차순을 유지", () => {
         let s = started();

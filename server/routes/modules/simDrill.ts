@@ -11,7 +11,7 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import {
     simulateShot, TABLES, DEFAULT_CUE, ENGINE_VERSION,
-    drillsForWeek, findDrill, drillLayout, weekIdFor, readRoute, matchesPattern,
+    drillsForWeek, findDrill, drillLayout, weekIdFor, kstWeekIdFor, readRoute, matchesPattern,
     type SimParams, type ShotInput, type SimEvent, type Drill,
 } from "../../../shared/sim/index.js";
 import { evaluateShot, DEFAULT_3C_RULES } from "../../../shared/sim/rules/index.js";
@@ -67,7 +67,7 @@ const attemptSchema = z.object({
 });
 
 function currentWeekId(): string {
-    return weekIdFor(Date.now());
+    return kstWeekIdFor(Date.now());
 }
 
 // GET /sim/drills/week — 이번 주 드릴 5개 + 내 시도

@@ -10,6 +10,8 @@ interface Props {
     record: boolean;
     offline: boolean;
     finished: boolean;
+    /** 서버에 아직 못 보낸 샷이 남았다(끊김) — 끝난 경기여도 "이미 기록됐어요"라고 하면 거짓말이다 */
+    unsynced?: boolean;
     busy: boolean;
     onConfirm: () => void;
     /** 설명 문구 덮어쓰기(대전: 서버에 남는다는 안내) */
@@ -18,8 +20,9 @@ interface Props {
 
 export const ExitConfirm = memo(function ExitConfirm(p: Props) {
     const { t } = useT();
-    const desc = p.desc ?? (!p.record || p.offline
+    const desc = p.desc ?? (!p.record
         ? t("sim.exit.descPractice")
+        : p.unsynced || p.offline ? t("sim.exit.descUnsynced")
         : p.finished ? t("sim.exit.descFinished") : t("sim.exit.descRecord"));
     return (
         <Dialog open={p.open} onOpenChange={(o) => { if (!p.busy) p.onOpenChange(o); }}>

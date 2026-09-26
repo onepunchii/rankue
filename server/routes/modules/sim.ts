@@ -15,7 +15,7 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import {
     simulateShot, TABLES, DEFAULT_CUE, ENGINE_VERSION, paramsHash,
     type SimParams, type BallState, type ShotInput,
-    weekIdFor, PLACEMENT_MATCHES,
+    weekIdFor, kstWeekIdFor, PLACEMENT_MATCHES,
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot,
@@ -142,7 +142,7 @@ router.get("/sim/stats/me", requireAuth, asyncHandler(async (req: AuthRequest, r
         storage.sim.myRanks(memberId),
         storage.simDrill.myWeeks(memberId, 12),
     ]);
-    return sendSuccess(res, { ratings, matchRatings, matchRecords, sessions, ranks, drillWeeks, currentWeekId: weekIdFor(Date.now()) });
+    return sendSuccess(res, { ratings, matchRatings, matchRecords, sessions, ranks, drillWeeks, currentWeekId: kstWeekIdFor(Date.now()) });
 }));
 
 // GET /sim/rank?gameType&tableId&country=KR|all — 온라인 대전 랭킹(배치 3판 뒤). country 없음/all = 전체, 있으면 그 나라(순위 번호는 전역).
