@@ -138,6 +138,10 @@ export class AdminRepository {
         return store;
     }
 
+    /**
+     * 어드민 가맹점 목록 — 요금제(subscriptionTier 가 실제 과금 기준, plan 은 옛 칸)·점주 연락처·회원 수·
+     * 연결된 매장 페이지(디렉토리 코드)까지. 매장 리스트·결제 관리 화면이 같은 행을 쓴다.
+     */
     async getAllStores() {
         const results = await db.select({
             id: hiqStores.id,
@@ -145,16 +149,23 @@ export class AdminRepository {
             region: hiqStores.region,
             slug: hiqStores.slug,
             plan: hiqStores.plan,
+            subscriptionTier: hiqStores.subscriptionTier,
             subscriptionStatus: hiqStores.subscriptionStatus,
             nextBillingDate: hiqStores.nextBillingDate,
-            ownerName: profiles.nickname
+            createdAt: hiqStores.createdAt,
+            ownerName: profiles.nickname,
+            ownerPhone: profiles.phone,
+            memberCount: sql<number>`(select count(*)::int from hiq_members m where m.store_id = ${hiqStores.id})`,
+            listingCode: sql<string | null>`(select l.code from store_listings l where l.claimed_store_id = ${hiqStores.id} limit 1)`,
         })
             .from(hiqStores)
-            .leftJoin(profiles, eq(hiqStores.ownerId, profiles.id));
+            .leftJoin(profiles, eq(hiqStores.ownerId, profiles.id))
+            .orderBy(desc(hiqStores.createdAt));
 
         return results.map(r => ({
             ...r,
-            ownerName: r.ownerName || "Unknown"
+            ownerName: r.ownerName || "Unknown",
+            memberCount: Number(r.memberCount ?? 0),
         }));
     }
 
@@ -374,6 +385,31 @@ export class AdminRepository {
             dormant30: Math.max(0, total - active30),
             visits7,
         };
+    }
+
+    /**
+     * 어드민 푸시 발송 기록 — 발송 테이블이 따로 없어 인앱 알림(category 'admin', type 'broadcast')을
+     * 같은 제목·내용·분 단위로 묶어 복원한다. 받은 사람 수와 읽은 사람 수(= 열어 본 비율)를 함께 낸다.
+     */
+    async getPushHistory(limit = 20) {
+        const rows = (await db.execute(sql`
+            select title, body, params->>'url' as url,
+                   to_char(date_trunc('minute', min(created_at)), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as sent_at,
+                   count(*)::int as recipients,
+                   count(*) filter (where is_read)::int as read_count
+            from hiq_notifications
+            where category = 'admin' and type = 'broadcast' and created_at >= now() - interval '90 days'
+            group by title, body, params->>'url', date_trunc('minute', created_at)
+            order by min(created_at) desc
+            limit ${limit}`)).rows as Record<string, unknown>[];
+        return rows.map((r) => ({
+            title: String(r.title ?? ""),
+            body: String(r.body ?? ""),
+            url: (r.url as string | null) ?? null,
+            sentAt: String(r.sent_at ?? ""),
+            recipients: Number(r.recipients ?? 0),
+            readCount: Number(r.read_count ?? 0),
+        }));
     }
 
     // --- Notices ---
@@ -1017,7 +1053,7 @@ export class AdminRepository {
      * 건의 목록(최신부터) + 건의마다 보낸 답장(오래된 것부터). 답장은 한 번에 다 읽어 붙인다 — 건의마다 읽으면 N+1.
      * 답장은 건의가 지워지면 함께 지워지므로(FK cascade) 전부 읽어도 목록 밖 건의의 몫은 없다.
      */
-    async getSuggestions(): Promise<(Suggestion & { replies: SuggestionReplyView[] })[]> {
+    async getSuggestions(): Promise<(Suggestion & { replies: SuggestionReplyView[]; submitterName: string | null })[]> {
         const rows = await db.select().from(suggestions).orderBy(desc(suggestions.createdAt));
         if (!rows.length) return [];
         const replies = await db.select({
@@ -1026,7 +1062,16 @@ export class AdminRepository {
             message: suggestionReplies.message,
             createdAt: suggestionReplies.createdAt,
         }).from(suggestionReplies).orderBy(asc(suggestionReplies.createdAt));
-        return attachReplies(rows, replies);
+        // 보낸 사람 이름 — 로그인 회원이 보낸 건의만(비로그인은 연락처뿐). 회원 이름 → 없으면 프로필 닉네임.
+        const userIds: string[] = [...new Set(rows.map((r) => r.userId).filter((v): v is string => !!v))] as string[];
+        const names = new Map<string, string>();
+        if (userIds.length) {
+            const who = await db.select({ profileId: profiles.id, nickname: profiles.nickname, memberName: hiqMembers.name })
+                .from(profiles).leftJoin(hiqMembers, eq(hiqMembers.profileId, profiles.id))
+                .where(inArray(profiles.id, userIds));
+            for (const w of who) if (!names.has(w.profileId)) names.set(w.profileId, w.memberName || w.nickname || "");
+        }
+        return attachReplies<Suggestion>(rows, replies).map((r) => ({ ...r, submitterName: (r.userId && names.get(r.userId)) || null }));
     }
 
     /** 운영자가 앱으로 보낸 답장을 건의에 남긴다(POST /admin/suggestions/:id/reply). */

@@ -530,6 +530,40 @@ export class CrewRepository {
         }));
     }
 
+    /**
+     * 어드민 크루 현황 — **전부**. 예전 어드민 탭은 위 getAllCrews 의 기본값(1쪽 20개)을 그대로 불러
+     * 최근 20개 크루만 보였다. 인원은 가입 대기(pending)를 빼고 센다.
+     */
+    async getAllCrewsForAdmin() {
+        const rows = (await db.execute(sql`
+            select c.id, c.name, c.description, c.short_intro, c.sport_category, c.region, c.join_type,
+                   coalesce(c.max_members, 50)::int as max_members, c.base_listing_code,
+                   to_char(c.created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as created_at,
+                   (select count(*)::int from hiq_crew_members cm where cm.crew_id = c.id and cm.role != 'pending') as member_count,
+                   (select count(*)::int from hiq_crew_members cm where cm.crew_id = c.id and cm.role = 'pending') as pending_count,
+                   lm.name as leader_name, st.name as store_name, sl.name as listing_name
+            from hiq_crews c
+            left join hiq_members lm on lm.id = c.leader_id
+            left join hiq_stores st on st.id = c.base_store_id
+            left join store_listings sl on sl.code = c.base_listing_code
+            order by c.created_at desc`)).rows as Record<string, unknown>[];
+        return rows.map((r) => ({
+            id: String(r.id),
+            name: String(r.name ?? ""),
+            description: (r.description as string | null) ?? (r.short_intro as string | null) ?? "",
+            sportCategory: String(r.sport_category ?? "BILLIARDS") as "BILLIARDS" | "GOLF" | "MIXED",
+            region: (r.region as string | null) ?? null,
+            joinType: String(r.join_type ?? "auto"),
+            maxMembers: Number(r.max_members ?? 50),
+            memberCount: Number(r.member_count ?? 0),
+            pendingCount: Number(r.pending_count ?? 0),
+            leaderName: (r.leader_name as string | null) || "알 수 없음",
+            // 활동 장소 — 디렉토리 매장 이름이 우선, 없으면 제휴 매장, 둘 다 없으면 지역 모임
+            storeName: (r.listing_name as string | null) || (r.store_name as string | null) || "지역 모임",
+            createdAt: String(r.created_at ?? ""),
+        }));
+    }
+
     // --- Crew Activities ---
     async createCrewActivity(data: InsertHiqCrewActivity) {
         const [activity] = await db.insert(hiqCrewActivities).values(data).returning();

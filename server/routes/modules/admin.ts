@@ -156,7 +156,8 @@ router.get("/leads", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
 }));
 
 router.post("/leads/:id/status", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
-    const { status } = req.body;
+    const { status } = req.body || {};
+    if (status !== "NEW" && status !== "CONTACTED" && status !== "REGISTERED") return sendError(res, 400, "상태 값이 올바르지 않습니다");
     await storage.updatePartnerLeadStatus(req.params.id, status);
     return sendSuccess(res, { success: true });
 }));
@@ -176,16 +177,39 @@ router.get("/notices", checkSuperAdmin, asyncHandler(async (req: any, res: any) 
 }));
 
 router.post("/notices", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
-    const notice = await storage.createNotice(req.body);
+    // 받은 본문을 그대로 넣지 않는다 — 칸을 골라 검사한다(id·createdAt 같은 내부 칸이 섞여 들어오지 않게).
+    const title = String(req.body?.title ?? "").trim().slice(0, 100);
+    const content = String(req.body?.content ?? "").trim().slice(0, 5000);
+    const target = req.body?.target === "owners" ? "owners" : "all";
+    if (!title || !content) return sendError(res, 400, "제목과 내용을 입력해주세요");
+    const notice = await storage.createNotice({ title, content, target, hidden: false });
     return sendSuccess(res, notice);
 }));
 
-// 공지 숨김 토글 · 삭제
+// 공지 수정 · 숨김 토글 — 받은 칸만 바꾼다(예전엔 hidden 만 받아 오타 하나에도 지우고 다시 써야 했다).
 router.patch("/notices/:id", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const { db } = await import("../../db.js");
     const { notices } = await import("../../../shared/schema.js");
     const { eq } = await import("drizzle-orm");
-    await db.update(notices).set({ hidden: !!req.body?.hidden }).where(eq(notices.id, req.params.id));
+    const b = req.body || {};
+    const set: Record<string, unknown> = {};
+    if (b.hidden !== undefined) set.hidden = !!b.hidden;
+    if (b.title !== undefined) {
+        const title = String(b.title ?? "").trim().slice(0, 100);
+        if (!title) return sendError(res, 400, "제목을 입력해주세요");
+        set.title = title;
+    }
+    if (b.content !== undefined) {
+        const content = String(b.content ?? "").trim().slice(0, 5000);
+        if (!content) return sendError(res, 400, "내용을 입력해주세요");
+        set.content = content;
+    }
+    if (b.target !== undefined) {
+        if (b.target !== "all" && b.target !== "owners") return sendError(res, 400, "대상이 올바르지 않습니다");
+        set.target = b.target;
+    }
+    if (!Object.keys(set).length) return sendError(res, 400, "바꿀 내용이 없습니다");
+    await db.update(notices).set(set).where(eq(notices.id, req.params.id));
     return sendSuccess(res, { success: true });
 }));
 router.delete("/notices/:id", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
@@ -231,6 +255,11 @@ router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     return sendSuccess(res, { sent, total: memberIds.length });
 }));
 
+// GET /admin/push/history — 최근 90일 어드민 발송 기록(받은 사람·읽은 사람). storage.admin.getPushHistory 주석.
+router.get("/push/history", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    return sendSuccess(res, await storage.admin.getPushHistory(20));
+}));
+
 // --- 신고 큐 (2026-09-11, 스토어 심사 SX1 — Apple 1.2 / Play UGC) ---
 // 예전 GET /reports 는 늘 빈 배열이었다(admin.repo 자리표시) — 신고가 들어와도 운영자가 볼 곳이 없었다.
 const REPORT_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -242,6 +271,12 @@ router.get("/reports", checkSuperAdmin, asyncHandler(async (req: any, res: any) 
     const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 30));
     const offset = Math.max(0, Math.floor(Number(req.query.offset) || 0));
     return sendSuccess(res, await storage.admin.getReportQueue({ filter, limit, offset }));
+}));
+
+// GET /admin/reports/count — 미처리 신고 수만(사이드바 숫자용). 목록 본문(신고자·원문)은 내려 보내지 않는다.
+router.get("/reports/count", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    const page = await storage.admin.getReportQueue({ filter: "open", limit: 1, offset: 0 });
+    return sendSuccess(res, { open: page.openCount });
 }));
 
 // POST /admin/reports/action { targetType, targetId, action }
@@ -268,8 +303,8 @@ router.post("/users/:id/ban", checkSuperAdmin, asyncHandler(async (req: any, res
 }));
 
 router.get("/crews", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
-    const crews = await storage.getAllCrews();
-    return sendSuccess(res, crews);
+    // 전부 — storage.getAllCrews() 는 1쪽 20개 기본값이라 최근 20개만 보였다.
+    return sendSuccess(res, await storage.crews.getAllCrewsForAdmin());
 }));
 
 /**
@@ -394,7 +429,8 @@ router.get("/membership/orders", checkSuperAdmin, asyncHandler(async (req: any, 
 }));
 
 router.patch("/membership/orders/:id/status", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
-    const { status } = req.body;
+    const { status } = req.body || {};
+    if (!["PENDING", "CONTACTED", "COMPLETED", "CANCELLED"].includes(status)) return sendError(res, 400, "상태 값이 올바르지 않습니다");
     const order = await storage.updateGolfMembershipOrderStatus(req.params.id, status);
     return sendSuccess(res, order);
 }));

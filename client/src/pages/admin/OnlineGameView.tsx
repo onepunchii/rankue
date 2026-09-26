@@ -29,10 +29,10 @@ const END: Record<string, string> = { target: "다마수", inningCap: "이닝 �
 
 function Tile({ label, value, sub, highlight = false }: { label: string; value: string; sub?: string; highlight?: boolean }) {
     return (
-        <div className={`p-5 rounded-2xl border shadow-[0_1px_2px_rgba(0,0,0,0.06)] ${highlight ? "bg-brand/[0.06] border-brand/30" : "bg-white border-black/[0.07]"}`}>
-            <span className="text-[10px] font-bold text-black/55 uppercase tracking-widest block mb-2">{label}</span>
-            <div className="text-3xl font-black text-[rgba(0,0,0,0.87)] mb-1">{value}</div>
-            {sub && <div className="text-xs text-black/40">{sub}</div>}
+        <div className={`p-4 rounded-2xl border ${highlight ? "bg-brand/[0.06] border-brand/25" : "bg-white border-black/[0.08]"}`}>
+            <span className="text-[12px] font-bold text-black/50 block mb-1">{label}</span>
+            <div className={`text-[24px] leading-none font-black tabular-nums mb-1.5 ${highlight ? "text-brand" : "text-[rgba(0,0,0,0.87)]"}`}>{value}</div>
+            {sub && <div className="text-[11.5px] text-black/45 leading-snug">{sub}</div>}
         </div>
     );
 }
@@ -61,15 +61,13 @@ export default function OnlineGameView() {
         </div>
     );
     const s = data.sessions, m = data.matches, d = data.drills, a = data.activePlayers;
-    const totalPlayers = new Set<string>();
-    void totalPlayers;
     const sum = (k: "sessions" | "matches" | "drills") => daily.reduce((acc, x) => acc + x[k], 0);
     const series = (k: "sessions" | "matches" | "drills" | "players") => daily.map((x) => ({ label: dayLabel(x.day), value: x[k] }));
 
     return (
         <div className={`space-y-6 ${isFetching ? "opacity-80" : ""}`}>
             <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-black/50 uppercase tracking-widest">기간</span>
+                <span className="text-[12px] font-bold text-black/50">기간</span>
                 {[7, 30, 90].map((n) => (
                     <button
                         key={n} type="button" onClick={() => setDays(n)} aria-pressed={days === n}
@@ -81,13 +79,13 @@ export default function OnlineGameView() {
                 <span className="text-xs text-black/40 ml-auto">기준 {when(data.generatedAt)}</span>
             </div>
 
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
                 <Tile label="활성 이용자 · 오늘" value={fmt(a.d1)} sub={`7일 ${fmt(a.d7)} · 30일 ${fmt(a.d30)}`} highlight />
                 <Tile label="싱글 세션 (전체)" value={fmt(s.total)} sub={`마침 ${fmt(s.finished)} · 진행 중 ${fmt(s.playing)} · 이용자 ${fmt(s.players)}`} />
                 <Tile label="멀티 대전 (전체)" value={fmt(m.total)} sub={`종료 ${fmt(m.finished)} · 진행 중 ${fmt(m.playing)} · 대기 ${fmt(m.waiting)} · 이용자 ${fmt(m.players)}`} />
                 <Tile label="열린 멀티방 (지금)" value={fmt(m.openRooms)} sub={`공개 방 누적 ${fmt(m.publicTotal)} · 비밀번호 ${fmt(m.passwordTotal)} · 푸시 초대 ${fmt(m.invitedTotal)}`} />
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
                 <Tile label="세션 · 오늘 / 7일 / 30일" value={fmt(s.d1)} sub={`${fmt(s.d7)} / ${fmt(s.d30)}`} />
                 <Tile label="대전 · 오늘 / 7일 / 30일" value={fmt(m.d1)} sub={`${fmt(m.d7)} / ${fmt(m.d30)}`} />
                 <Tile label="드릴 시도" value={fmt(d.attempts)} sub={`성공 ${fmt(d.successes)} (${pct(d.successes, d.attempts)}) · 이용자 ${fmt(d.players)} · 7일 ${fmt(d.d7)}`} />
@@ -146,7 +144,7 @@ export default function OnlineGameView() {
 
             <div className="grid lg:grid-cols-2 gap-4">
                 <Card title="상위 이용자" sub="세션 + 대전 수 기준 10명">
-                    <table className="w-full text-sm">
+                    <div className="overflow-x-auto -mx-1 px-1"><table className="w-full text-sm whitespace-nowrap">
                         <thead><tr className="text-[11px] text-black/45"><th className="text-left font-semibold py-1">이름</th><th className="text-right font-semibold">세션</th><th className="text-right font-semibold">대전</th><th className="text-right font-semibold">승</th><th className="text-right font-semibold">레이팅</th><th className="text-right font-semibold">최고 에버</th></tr></thead>
                         <tbody>
                             {data.topPlayers.map((p) => (
@@ -161,10 +159,10 @@ export default function OnlineGameView() {
                             ))}
                             {data.topPlayers.length === 0 && <tr><td colSpan={6} className="py-3 text-black/40">기록 없음</td></tr>}
                         </tbody>
-                    </table>
+                    </table></div>
                 </Card>
                 <Card title="최근 대전" sub="최근 10건">
-                    <table className="w-full text-sm">
+                    <div className="overflow-x-auto -mx-1 px-1"><table className="w-full text-sm whitespace-nowrap">
                         <thead><tr className="text-[11px] text-black/45"><th className="text-left font-semibold py-1">대전</th><th className="text-left font-semibold">종목</th><th className="text-right font-semibold">상태</th><th className="text-right font-semibold">만든 시각</th></tr></thead>
                         <tbody>
                             {data.recentMatches.map((r) => (
@@ -177,7 +175,7 @@ export default function OnlineGameView() {
                             ))}
                             {data.recentMatches.length === 0 && <tr><td colSpan={4} className="py-3 text-black/40">기록 없음</td></tr>}
                         </tbody>
-                    </table>
+                    </table></div>
                 </Card>
             </div>
         </div>

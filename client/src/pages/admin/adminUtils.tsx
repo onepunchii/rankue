@@ -101,3 +101,81 @@ export function KpiTile({ label, value, unit, sub, tone = "default", onClick }: 
         </Comp>
     );
 }
+
+// --- 화면 공용 조각(2026-09-26 어드민 전체 정리) — 모든 탭이 같은 모양의 거르기·검색·빈 화면을 쓴다 ---
+
+/** 가로로 밀리는 거르기 칩. count 가 있으면 옆에 숫자. */
+export function FilterChips<T extends string>({ value, onChange, options }: {
+    value: T; onChange: (v: T) => void;
+    options: { id: T; label: string; count?: number; alert?: boolean }[];
+}) {
+    return (
+        <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
+            {options.map((o) => {
+                const on = value === o.id;
+                return (
+                    <button key={o.id} onClick={() => onChange(o.id)}
+                        className={`shrink-0 h-8 px-3 rounded-full text-[12.5px] font-bold tabular-nums transition-colors ${on ? "bg-brand text-white" : "bg-white border border-black/[0.08] text-black/60 hover:text-black/80"}`}>
+                        {o.label}
+                        {o.count !== undefined && (
+                            <span className={`ml-1 ${on ? "text-white/80" : o.alert && o.count > 0 ? "text-red-600" : "text-black/35"}`}>{o.count}</span>
+                        )}
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+export function SearchBox({ value, onChange, placeholder, className = "" }: { value: string; onChange: (v: string) => void; placeholder: string; className?: string }) {
+    return (
+        <div className={`relative ${className}`}>
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-black/35" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg>
+            <input value={value} onChange={(e) => onChange(e.target.value)} placeholder={placeholder}
+                className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-black/10 text-sm outline-none focus:border-brand/40" />
+        </div>
+    );
+}
+
+export function EmptyState({ children }: { children: React.ReactNode }) {
+    return <div className="rounded-2xl bg-white border border-black/[0.07] p-10 text-center text-[13.5px] text-black/45 leading-relaxed">{children}</div>;
+}
+
+/** 흰 카드 */
+export function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) {
+    return <div className={`bg-white rounded-2xl border border-black/[0.07] ${className}`}>{children}</div>;
+}
+
+/** 작은 상태 알약 */
+export function Pill({ tone = "neutral", children }: { tone?: "brand" | "alert" | "warn" | "neutral" | "info"; children: React.ReactNode }) {
+    const cls = {
+        brand: "bg-brand/10 text-brand",
+        alert: "bg-red-500/10 text-red-600",
+        warn: "bg-amber-500/15 text-amber-800",
+        neutral: "bg-black/[0.05] text-black/55",
+        info: "bg-blue-500/10 text-blue-700",
+    }[tone];
+    return <span className={`inline-flex items-center shrink-0 rounded-full px-2 py-0.5 text-[11.5px] font-bold ${cls}`}>{children}</span>;
+}
+
+/** 전화·문자 링크 버튼(진짜 번호일 때만) */
+export function CallButton({ phone, label = "전화" }: { phone: string | null | undefined; label?: string }) {
+    if (!isRealPhone(phone)) return null;
+    return (
+        <a href={`tel:${phone}`} className="h-9 px-3 rounded-lg border border-black/10 inline-flex items-center justify-center text-[13px] font-bold text-black/65 hover:border-brand/40 hover:text-brand">
+            {label}
+        </a>
+    );
+}
+
+/** "3시간 전"(방금·분·시간·일) */
+export function agoLabel(iso: string | null | undefined): string {
+    return lastSeenLabel(iso);
+}
+
+/** 한국 시각 "9/26 14:05" */
+export function kstDateTime(iso: string | null | undefined): string {
+    if (!iso) return "-";
+    const d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
+}

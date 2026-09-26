@@ -73,7 +73,7 @@ export default function TodayActiveView({ compact = false, onOpenMember, onSeeAl
     const [filter, setFilter] = useState<Filter>("all");
 
     const list = useMemo(() => {
-        let rows = data?.members ?? [];
+        let rows = Array.isArray(data?.members) ? data!.members : [];
         if (filter === "live") rows = rows.filter((m) => m.live);
         if (filter === "new") rows = rows.filter((m) => m.isNew);
         const s = q.trim();
@@ -82,7 +82,10 @@ export default function TodayActiveView({ compact = false, onOpenMember, onSeeAl
     }, [data, filter, q]);
 
     if (isLoading) return <div className="rounded-2xl bg-white border border-black/[0.08] p-8 text-center text-black/45 text-sm">오늘 접속 불러오는 중…</div>;
-    if (!data) return <div className="rounded-2xl bg-white border border-black/[0.08] p-8 text-center text-black/45 text-sm">오늘 접속 정보를 불러오지 못했습니다.</div>;
+    // 모양까지 확인한다 — 옛 캐시나 오류 응답이 들어와도 화면 전체가 멈추지 않게(이 조각은 대시보드 홈에도 있다).
+    if (!data || !Array.isArray(data.members) || !Array.isArray(data.hourly)) {
+        return <div className="rounded-2xl bg-white border border-black/[0.08] p-8 text-center text-black/45 text-sm">오늘 접속 정보를 불러오지 못했습니다.</div>;
+    }
 
     const diff = data.total - data.yesterdaySoFar;
     const shown = compact ? list.slice(0, 8) : list;
@@ -94,8 +97,8 @@ export default function TodayActiveView({ compact = false, onOpenMember, onSeeAl
                     sub={<span>어제 이 시각 {data.yesterdaySoFar}명 · <b className={diff >= 0 ? "text-brand" : "text-red-600"}>{diff >= 0 ? "+" : ""}{diff}</b></span>} />
                 <KpiTile label="지금 접속 중" value={data.live} unit="명" sub="최근 30분 안에 활동" />
                 <KpiTile label="오늘 가입" value={data.newToday} unit="명" sub="한국 날짜 기준" />
-                <KpiTile label="기기" value={(data.platforms.ios ?? 0) + (data.platforms.android ?? 0)} unit="명"
-                    sub={<span>🍎 {data.platforms.ios ?? 0} · 🤖 {data.platforms.android ?? 0} · 🌐 {data.platforms.web ?? 0}</span>} />
+                <KpiTile label="기기" value={(data.platforms?.ios ?? 0) + (data.platforms?.android ?? 0)} unit="명"
+                    sub={<span>🍎 {data.platforms?.ios ?? 0} · 🤖 {data.platforms?.android ?? 0} · 🌐 {data.platforms?.web ?? 0}</span>} />
             </div>
 
             <div className="rounded-2xl bg-white border border-black/[0.08] p-4">
