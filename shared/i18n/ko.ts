@@ -4,6 +4,13 @@
  * 키 규칙: err.<영역>.<이름> · notif.<영역>.<이름>.title|body · ui.<영역>.<이름>
  */
 export const ko: Record<string, string> = {
+  // 크루장 넘기기·크루 좌표 검증(2026-09-26 크루 관리 개선)
+  "err.crew.transferLeaderOnly": "크루장만 크루장을 넘길 수 있습니다",
+  "err.crew.transferTarget": "크루장은 활동 중인 크루원에게만 넘길 수 있습니다",
+  "err.crew.transferSelf": "자기 자신에게는 넘길 수 없습니다",
+  "err.crew.badLocation": "위치 좌표가 올바르지 않습니다",
+  "notif.crew.transfer.title": "[{crew}] 크루장이 되었어요",
+  "notif.crew.transfer.body": "이전 크루장님이 크루장을 넘겼어요. 이제 크루 관리를 맡게 됩니다.",
   "err.common.internal": "서버 내부 오류가 발생했습니다.",
   "err.common.loginRequired": "로그인이 필요합니다",
   "err.common.retryLater": "잠시 후 다시 시도해 주세요",

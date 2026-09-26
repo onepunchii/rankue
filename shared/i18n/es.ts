@@ -4,6 +4,13 @@
  * 키 규칙: err.<영역>.<이름> · notif.<영역>.<이름>.title|body · ui.<영역>.<이름>
  */
 export const es: Record<string, string> = {
+  // 크루장 넘기기·크루 좌표 검증(2026-09-26 크루 관리 개선)
+  "err.crew.transferLeaderOnly": "Solo el líder del crew puede ceder el liderazgo",
+  "err.crew.transferTarget": "El liderazgo solo puede pasar a un miembro activo del crew",
+  "err.crew.transferSelf": "No puedes cederte el liderazgo a ti mismo",
+  "err.crew.badLocation": "Las coordenadas de ubicación no son válidas",
+  "notif.crew.transfer.title": "Ahora eres líder de [{crew}]",
+  "notif.crew.transfer.body": "El líder anterior te cedió el crew. Ahora te encargas de gestionarlo.",
   "err.common.internal": "Ocurrió un error en el servidor.",
   "err.common.loginRequired": "Inicia sesión",
   "err.common.retryLater": "Inténtalo de nuevo en un momento",

@@ -25,7 +25,7 @@ import {
     hiqPollVotes,
     hiqBlocks
 } from "../../shared/schema.js";
-import { eq, and, desc, asc, sql, or, gte, like, inArray, ne } from "drizzle-orm";
+import { eq, and, desc, asc, sql, or, gte, like, ilike, inArray, ne } from "drizzle-orm";
 import { notFound, conflict } from "../utils/errors.js";
 import { msg } from "../lib/i18n.js";
 import type {
@@ -401,12 +401,15 @@ export class CrewRepository {
     }
 
     async getUserCrews(memberId: string, sportCategory?: string) {
-        // First subquery to get counts for all crews user is in
+        // 크루별 인원 — 승인 대기(pending)는 아직 크루원이 아니므로 세지 않는다(joinCrew 정원 규칙과 같다).
+        // 예전엔 대기자까지 세서 "12/20" 이 실제보다 컸다. 내 줄의 role 은 그대로 돌려준다 —
+        // 화면이 대기 중인 크루를 '승인 대기'로 따로 보여 준다(예전엔 대기 신청이 '멤버' 크루처럼 섞여 보였다).
         const memberCounts = db.select({
             crewId: hiqCrewMembers.crewId,
             count: sql<number>`count(${hiqCrewMembers.id})`.as('count')
         })
             .from(hiqCrewMembers)
+            .where(ne(hiqCrewMembers.role, 'pending'))
             .groupBy(hiqCrewMembers.crewId)
             .as('mc');
 
@@ -414,7 +417,7 @@ export class CrewRepository {
             crew: hiqCrews,
             role: hiqCrewMembers.role,
             joinedAt: hiqCrewMembers.joinedAt,
-            memberCount: sql<number>`${memberCounts.count}`
+            memberCount: sql<number>`coalesce(${memberCounts.count}, 0)::int`
         })
             .from(hiqCrewMembers)
             .innerJoin(hiqCrews, eq(hiqCrewMembers.crewId, hiqCrews.id))
@@ -428,13 +431,58 @@ export class CrewRepository {
             .orderBy(desc(hiqCrews.createdAt));
     }
 
+    /**
+     * 크루장 넘기기 — 대상(활동 멤버)을 크루장으로, 지금 크루장을 운영진으로, hiq_crews.leader_id 를 대상으로.
+     * 세 줄이 한 번에 바뀌어야 한다: 중간에 끊기면 크루장이 둘이거나 없는 크루가 남아 삭제·권한 변경이 모두 막힌다.
+     * 크루 행을 FOR UPDATE 로 잠가 동시에 두 번 넘기는 경합(크루장 둘)을 막는다.
+     */
+    async transferCrewLeadership(crewId: string, fromMemberId: string, toMemberId: string) {
+        return await db.transaction(async (tx) => {
+            const [crew] = await tx.select().from(hiqCrews)
+                .where(eq(hiqCrews.id, crewId))
+                .for('update');
+            if (!crew) throw notFound(msg("err.crewRepo.notFound"));
+
+            const rows = await tx.select().from(hiqCrewMembers)
+                .where(and(eq(hiqCrewMembers.crewId, crewId), inArray(hiqCrewMembers.memberId, [fromMemberId, toMemberId])));
+            const from = rows.find((r) => r.memberId === fromMemberId);
+            const to = rows.find((r) => r.memberId === toMemberId);
+            if (!from || from.role !== 'leader') throw conflict(msg("err.crew.transferLeaderOnly"));
+            if (!to || (to.role !== 'member' && to.role !== 'manage')) throw conflict(msg("err.crew.transferTarget"));
+
+            await tx.update(hiqCrewMembers).set({ role: 'leader' }).where(eq(hiqCrewMembers.id, to.id));
+            await tx.update(hiqCrewMembers).set({ role: 'manage' }).where(eq(hiqCrewMembers.id, from.id));
+            await tx.update(hiqCrews).set({ leaderId: toMemberId }).where(eq(hiqCrews.id, crewId));
+        });
+    }
+
     async searchCrews(query?: string, sportCategory?: string, userLat?: number, userLng?: number, viewerCountry?: string) {
         // TODO: For high-performance search on large datasets, consider using
-        // PostgreSQL Full Text Search (GIN Index) instead of LIKE '%query%'.
+        // PostgreSQL Full Text Search (GIN Index) instead of ILIKE '%query%'.
         const leaderMember = alias(hiqMembers, "leader_member");
+        // 검색어 — 대소문자 무시(ILIKE)로 이름·지역·한 줄 소개·소개글·태그까지 본다. 예전엔 LIKE 라 "Seoul" 로 "seoul" 크루를
+        // 못 찾았고 이름·지역만 봤다. 사용자가 친 %·_ 는 와일드카드가 아니라 글자로 찾게 이스케이프한다.
+        const q = (query ?? "").trim().slice(0, 40);
+        const pattern = q ? `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%` : null;
+        // 거리 계산용 좌표 — 우선순위: 크루 자체 좌표 → 파트너 매장 → 디렉토리 매장(아래 JS 계산과 같은 순서).
+        const effLat = sql`coalesce(${hiqCrews.latitude}, ${hiqStores.latitude}, ${storeListings.latitude})`;
+        const effLng = sql`coalesce(${hiqCrews.longitude}, ${hiqStores.longitude}, ${storeListings.longitude})`;
+        const hasUser = userLat != null && userLng != null && Number.isFinite(userLat) && Number.isFinite(userLng);
+        // 거리순은 SQL 에서 LIMIT 전에 한다 — 예전엔 최신 50개를 먼저 자르고 JS 로 거리순 정렬해서 '내 주변'이
+        // 최신 50개 안에서만 순서를 바꿨다(가까운 옛 크루는 영영 안 보였다). 순서만 필요하니 평면 근사
+        // (위도 차² + (경도 차·cos 위도)²)로 충분하다. 좌표 없는 크루는 뒤로(NULLS LAST).
+        const distOrder = hasUser
+            ? sql`(power(${effLat} - ${userLat}::float8, 2) + power((${effLng} - ${userLng}::float8) * cos(radians(${userLat}::float8)), 2)) asc nulls last`
+            : null;
+        // 같은 나라 크루 우선 — 멕시코 유저에게 한국 크루 50개보다 멕시코 크루 1개가 먼저다. 미기록 국가는 KR.
+        const countryOrder = viewerCountry
+            ? sql`case when coalesce(${profiles.countryCode}, 'KR') = ${viewerCountry} then 0 else 1 end`
+            : null;
+
         const crewsWithCount = await db.select({
             crew: hiqCrews,
-            memberCount: sql<number>`count(${hiqCrewMembers.id})`,
+            // 승인 대기(pending)는 아직 크루원이 아니다 — 인원·정원 마감 표시에서 뺀다(joinCrew 정원 규칙과 같다).
+            memberCount: sql<number>`count(${hiqCrewMembers.id}) filter (where ${hiqCrewMembers.role} <> 'pending')`,
             storeLat: hiqStores.latitude,
             storeLng: hiqStores.longitude,
             // 디렉토리(수집 1,195곳) 베이스 매장 좌표. 파트너 매장(hiqStores)만 조인하고
@@ -453,25 +501,28 @@ export class CrewRepository {
             .leftJoin(profiles, eq(profiles.id, leaderMember.profileId))
             .where(
                 and(
-                    query ? or(
-                        like(hiqCrews.name, `%${query}%`),
-                        like(hiqCrews.region, `%${query}%`)
+                    pattern ? or(
+                        ilike(hiqCrews.name, pattern),
+                        ilike(hiqCrews.region, pattern),
+                        ilike(hiqCrews.shortIntro, pattern),
+                        ilike(hiqCrews.description, pattern),
+                        sql`${hiqCrews.tags}::text ilike ${pattern}`,
                     ) : undefined,
                     sportCategory ? eq(hiqCrews.sportCategory, sportCategory as any) : undefined
                 )
             )
             .groupBy(hiqCrews.id, hiqStores.latitude, hiqStores.longitude, storeListings.latitude, storeListings.longitude, profiles.countryCode)
-            .limit(50) // Increased limit for location sorting
-            .orderBy(desc(hiqCrews.createdAt));
+            .orderBy(...[countryOrder, distOrder, desc(hiqCrews.createdAt)].filter((o): o is NonNullable<typeof o> => o != null))
+            .limit(50);
 
-        let results = crewsWithCount.map(r => {
+        return crewsWithCount.map(r => {
             // 우선순위: 크루 자체 좌표 → 파트너 매장 → 디렉토리 매장
-            let lat = r.crew.latitude || r.storeLat || r.listingLat;
-            let lng = r.crew.longitude || r.storeLng || r.listingLng;
+            const lat = r.crew.latitude ?? r.storeLat ?? r.listingLat;
+            const lng = r.crew.longitude ?? r.storeLng ?? r.listingLng;
             let distance: number | undefined;
 
-            if (userLat && userLng && lat && lng) {
-                distance = getDistanceFromLatLonInKm(userLat, userLng, lat, lng);
+            if (hasUser && lat != null && lng != null) {
+                distance = getDistanceFromLatLonInKm(userLat!, userLng!, lat, lng);
             }
 
             return {
@@ -481,25 +532,6 @@ export class CrewRepository {
                 distance
             };
         });
-
-        // 같은 나라 크루 우선 — 멕시코 유저에게 한국 크루 50개보다 멕시코 크루 1개가 먼저다.
-        // 그 안에서는 기존 규칙(거리 → 최신) 유지.
-        const sameCountry = (c: { countryCode: string }) =>
-            viewerCountry && c.countryCode === viewerCountry ? 0 : 1;
-        results.sort((a, b) => {
-            if (viewerCountry) {
-                const d = sameCountry(a) - sameCountry(b);
-                if (d !== 0) return d;
-            }
-            if (userLat && userLng) {
-                if (a.distance !== undefined && b.distance !== undefined) return a.distance - b.distance;
-                if (a.distance !== undefined) return -1;
-                if (b.distance !== undefined) return 1;
-            }
-            return 0;
-        });
-
-        return results;
     }
 
     async getAllCrews(page = 1, limit = 20) {

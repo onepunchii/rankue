@@ -4,6 +4,13 @@
  * 키 규칙: err.<영역>.<이름> · notif.<영역>.<이름>.title|body · ui.<영역>.<이름>
  */
 export const tr: Record<string, string> = {
+  // 크루장 넘기기·크루 좌표 검증(2026-09-26 크루 관리 개선)
+  "err.crew.transferLeaderOnly": "Liderliği yalnızca crew lideri devredebilir",
+  "err.crew.transferTarget": "Liderlik yalnızca aktif bir crew üyesine devredilebilir",
+  "err.crew.transferSelf": "Liderliği kendinize devredemezsiniz",
+  "err.crew.badLocation": "Konum koordinatları geçersiz",
+  "notif.crew.transfer.title": "Artık [{crew}] crew'unun liderisiniz",
+  "notif.crew.transfer.body": "Önceki lider crew'u size devretti. Crew'un yönetimi artık sizde.",
   "err.common.internal": "Sunucuda bir hata oluştu.",
   "err.common.loginRequired": "Lütfen giriş yapın",
   "err.common.retryLater": "Lütfen biraz sonra tekrar deneyin",
