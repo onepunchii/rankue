@@ -20,7 +20,7 @@ import {
 } from "../../../shared/sim/index.js";
 import {
     createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, shotInning, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
-    SHOT_CLOCK_STRIKES, PRESENCE_MS, ABSENT_GRACE_MS, AIM_FRESH_MS,
+    SHOT_CLOCK_STRIKES, PRESENCE_MS, AIM_FRESH_MS,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout } from "../../../shared/sim/layouts.js";
@@ -32,6 +32,7 @@ import { checkContent, maskContacts } from "../../utils/contentFilter.js";
 import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCHES, TARGET_INNINGS, targetFor } from "../../../shared/sim/handicap.js";
 import { countWatchers } from "../../../shared/sim/watchers.js";
 import type { MatchWithNames } from "../../storage/simMatch.repo.js";
+import { startTurnSeenAt } from "../../storage/simMatch.repo.js";
 
 const router = Router();
 
@@ -980,9 +981,9 @@ router.post("/sim/matches/:id/rematch", requireAuth, asyncHandler(async (req: Au
         hostTarget: newHostTarget, guestTarget: newGuestTarget,
         state, balls: openingLayout(m.gameType, TABLES[m.tableId], "white"),
         status: "playing", turn: 0, startedAt: new Date(),
-        // 먼저 치는 사람(옛 게스트)이 지금 화면에 있으면 돌아올 시간만큼 봐주고 40초 룰이 돈다. 없으면 시계를 걸지 않는다 —
-        // 들어와 조준 화면을 열 때(ack) 시작한다. 없는 사람을 몰수패로 만들지 않는다(2026-09-26 검토).
-        turnSeenAt: (newHostId === req.userId || isRecentlySeen(m.guestSeenAt)) ? new Date(Date.now() + ABSENT_GRACE_MS) : null,
+        // 먼저 치는 사람(옛 게스트)의 시계는 새 대전 시작과 같다(startTurnSeenAt): 화면에 있으면 1분, 없으면 푸시를 보고
+        // 돌아올 2분 뒤 40초 룰이 돈다. 끝내 안 오면 시간 초과 세 번 — 한 번도 안 쳤으니 레이팅엔 안 들어간다(2026-09-26 오너).
+        turnSeenAt: startTurnSeenAt(newHostId === req.userId ? new Date() : m.guestSeenAt),
         engineVersion: ENGINE_VERSION, paramsHash: paramsHash(paramsFor(m)),
     });
     // 둘이 동시에 눌렀으면 먼저 적은 쪽이 정본 — 진 쪽이 만든 빈 방은 버린다.

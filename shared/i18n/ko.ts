@@ -193,7 +193,7 @@ export const ko: Record<string, string> = {
   "notif.sim.inviteClosed.title": "대전 초대가 닫혔어요",
   "notif.sim.inviteClosed.body": "상대가 새 방을 열었어요. 새 초대를 기다려 주세요.",
   "notif.sim.started.title": "온라인게임 대전 시작",
-  "notif.sim.started.body": "{name}님이 들어왔어요. 첫 샷은 당신 차례입니다.",
+  "notif.sim.started.body": "{name}님이 들어왔어요. 첫 샷은 당신 차례예요 — 2분 안에 들어와 주세요(그 뒤로 40초 시계가 돌아요).",
   "notif.sim.invite.title": "{name}님의 온라인게임 대전 초대",
   "notif.sim.invite.body": "{game} · {target}점{pw} — 누르면 바로 시작돼요",
   "notif.sim.finished.title": "온라인게임 대전 종료",

@@ -208,8 +208,8 @@ export function MatchMiniChat(p: {
     onExpanded: (v: boolean) => void;
     /** 내 차례에 연 경우: 남은 초와 닫기 */
     myTurn?: { readonly seconds: number | null; readonly onClose: () => void } | null;
-    /** 상대가 자리를 비워 시계가 아직 안 돈다(상대 차례) */
-    away?: boolean;
+    /** 상대가 자리를 비워 시계가 아직 안 돈다(상대 차례). 숫자면 시계가 시작되기까지 남은 초 — 멈춘 게 아니라는 걸 보여 준다. */
+    away?: boolean | number;
     /** 48시간 무응답 승리 주장(가능할 때만) */
     onClaim?: (() => void) | null;
     /** 지금 보고 있는 관전자 수(2026-09-21 오너: "채팅 바에 관전하는 사람 표시가 필요해"). 0 이면 안 그린다. */
@@ -294,7 +294,11 @@ export function MatchMiniChat(p: {
                     </button>
                 </div>
             )}
-            {p.away && <p className="hide-on-keyboard shrink-0 text-center text-[12px] font-medium text-ink-3">{t("sim.match.opponentAway")}</p>}
+            {p.away !== undefined && p.away !== false && (
+                <p className="hide-on-keyboard shrink-0 text-center text-[12px] font-medium text-ink-3 rk-num" role="status">
+                    {typeof p.away === "number" ? t("sim.match.opponentAwayIn").replace("{n}", String(p.away)) : t("sim.match.opponentAway")}
+                </p>
+            )}
             {p.onClaim && (
                 <button type="button" onClick={p.onClaim} className="hide-on-keyboard shrink-0 h-10 w-full rounded-xl bg-brand text-brand-fg text-[13px] font-semibold">
                     {t("sim.match.claim")}

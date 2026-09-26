@@ -193,7 +193,7 @@ export const es: Record<string, string> = {
   "notif.sim.inviteClosed.title": "La invitación al match se cerró",
   "notif.sim.inviteClosed.body": "Tu rival abrió una sala nueva. Espera una nueva invitación.",
   "notif.sim.started.title": "Comenzó el match en línea",
-  "notif.sim.started.body": "{name} se unió. El primer tiro es tuyo.",
+  "notif.sim.started.body": "{name} se unió. El primer tiro es tuyo: entra en 2 minutos (después empieza el reloj de 40 s).",
   "notif.sim.invite.title": "{name} te invitó a un match en línea",
   "notif.sim.invite.body": "{game} · {target} puntos{pw} — toca para empezar ya",
   "notif.sim.finished.title": "Terminó el match en línea",

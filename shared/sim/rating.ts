@@ -10,6 +10,10 @@
  * 3. **판이 성립해야 반영한다.** 두 사람 모두 샷을 MIN_SHOTS_EACH 번 이상 쳐야 한다 — 들어오자마자 기권하는
  *    두 계정 주고받기(점수 농사)를 막는다.
  * 4. **같은 상대와 연달아 치면 폭을 줄인다.** 24시간 안에 같은 두 사람이 이미 반영된 판이 n 판이면 1/(n+1).
+ * 5. **자리 비움은 귀책이다(2026-09-26 오너: "레이팅까지 해야 자리비움에 대한 귀책사유가 되지").** 시간 초과 세 번(실격패)이나
+ *    무응답 승리 주장으로 끝난 판은 샷 수가 모자라도 반영한다 — 단 **진 사람이 한 번이라도 쳤을 때만**(경기에 들어왔던 사람).
+ *    한 번도 안 친 사람(방을 열어 두고 떠난 방장, 들어오자마자 나간 게스트)은 노쇼라 반영하지 않는다 — 두 계정으로
+ *    "들어왔다 나가기"를 반복해 점수를 옮기는 길을 막는다.
  */
 
 export const ELO_K = 24;
@@ -21,19 +25,35 @@ export const SAME_PAIR_WINDOW_MS = 24 * 60 * 60 * 1000;
 
 export type UnratedReason = "manual" | "noGuest" | "tooShort";
 
+/** 자리 비움으로 끝난 판의 endReason — 시간 초과 세 번(실격패)·무응답 승리 주장. */
+export const AT_FAULT_END_REASONS: readonly string[] = ["timeout", "claim"];
+
 export interface RatedCheck {
     handicap: boolean;
     hasGuest: boolean;
     /** [방장 샷 수, 게스트 샷 수] */
     shots: readonly [number, number];
+    /** 끝난 이유(simMatch endReason). 자리 비움 귀책 판정에 쓴다. */
+    endReason?: string | null;
+    /** 0 = 방장 승, 1 = 게스트 승, null = 무승부·없음 */
+    winner?: 0 | 1 | null;
+}
+
+/** 자리 비움 귀책 판: 시간 초과 실격·무응답 주장으로 끝났고, 진 사람이 한 번이라도 쳤다. */
+export function isAtFaultLoss(m: Pick<RatedCheck, "endReason" | "winner" | "shots">): boolean {
+    if (!m.endReason || !AT_FAULT_END_REASONS.includes(m.endReason)) return false;
+    if (m.winner !== 0 && m.winner !== 1) return false;
+    const loserShots = m.shots[m.winner === 0 ? 1 : 0];
+    return loserShots >= 1;
 }
 
 /** 이 판이 레이팅 판인가. 아니면 이유. */
 export function ratingEligibility(m: RatedCheck): { rated: true } | { rated: false; reason: UnratedReason } {
     if (!m.hasGuest) return { rated: false, reason: "noGuest" };
     if (!m.handicap) return { rated: false, reason: "manual" };
-    if (m.shots[0] < MIN_SHOTS_EACH || m.shots[1] < MIN_SHOTS_EACH) return { rated: false, reason: "tooShort" };
-    return { rated: true };
+    if (m.shots[0] >= MIN_SHOTS_EACH && m.shots[1] >= MIN_SHOTS_EACH) return { rated: true };
+    if (isAtFaultLoss(m)) return { rated: true };
+    return { rated: false, reason: "tooShort" };
 }
 
 /**

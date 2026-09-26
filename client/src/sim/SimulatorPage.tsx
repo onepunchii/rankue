@@ -970,6 +970,11 @@ export function SimulatorPage() {
     const clock = clockRemaining !== null && clockRemaining <= SHOT_CLOCK_S && sim.match
         ? { seconds: Math.max(0, Math.ceil(clockRemaining)), mine: sim.match.isMyTurn }
         : null;
+    // 자리를 비운 상대의 시계가 걸리기까지 남은 초(2026-09-26 오너: "자리를 비웠는데 계속 진행이 안 되네").
+    // 서버는 자리 비움에 1~2분 유예를 준다 — 그 동안 숫자 없이 문구만 있으면 멈춘 것처럼 보였다.
+    const awayStartsIn = clockRemaining !== null && clockRemaining > SHOT_CLOCK_S && sim.match && !sim.match.isMyTurn
+        ? Math.ceil(clockRemaining - SHOT_CLOCK_S)
+        : null;
     /**
      * 채팅 초안(2026-09-16). **입력칸 밖**에 둔다 — 상대가 연속 득점하면 재생·결과 배너 때문에 하단 블록이
      * 몇 번씩 마운트를 오가는데, 안에 두면 그때마다 쓰던 글이 날아간다.
@@ -1721,7 +1726,7 @@ export function SimulatorPage() {
                                 maxHeight={chatBoxMax}
                                 expanded={chatExpanded} onExpanded={setChatExpanded}
                                 myTurn={sim.phase === "aim" ? { seconds: clock?.mine ? clock.seconds : null, onClose: () => setAimChatOpen(false) } : null}
-                                away={sim.phase === "waiting" && !clock && sim.match.opponentAway}
+                                away={sim.phase === "waiting" && !clock && sim.match.opponentAway ? (awayStartsIn ?? true) : false}
                                 onClaim={sim.phase === "waiting" && sim.match.canClaim ? () => { void onClaim(); } : null}
                                 watchers={sim.match.watchers ?? 0}
                                 disabled={!sim.match.canChat}

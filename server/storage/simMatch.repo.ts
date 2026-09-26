@@ -8,10 +8,10 @@ import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchChats, hiqSimMatchRatings, 
 import { alias } from "drizzle-orm/pg-core";
 import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot, HiqSimMatchChat } from "../../shared/schema.js";
-import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS } from "../../shared/sim/rules/session.js";
+import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS, START_ABSENT_GRACE_MS, REPEAT_ABSENT_GRACE_MS } from "../../shared/sim/rules/session.js";
 import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
 import { CHAT_PAGE_MAX, chatReject, type ChatReject } from "../../shared/sim/chat.js";
-import { ratingEligibility, ratingDelta, START_RATING, SAME_PAIR_WINDOW_MS, MIN_SHOTS_EACH } from "../../shared/sim/rating.js";
+import { ratingEligibility, ratingDelta, START_RATING, SAME_PAIR_WINDOW_MS, MIN_SHOTS_EACH, AT_FAULT_END_REASONS } from "../../shared/sim/rating.js";
 
 const LIVE = ["waiting", "playing"] as const;
 /** 접속 표시 갱신 간격(폴링마다 쓰지 않고 이 간격이 지났을 때만) */
@@ -26,11 +26,27 @@ const SEEN_THROTTLE_MS = 5_000;
  * 2026-09-15 이전에는 자리 비움이 null 이어서 시계가 **영영 시작되지 않았다** — 남은 사람이 무한정 기다렸다.
  * 늦게 시작해도 시계는 한 번 돌기 시작하면 멈추지 않는다(자리를 비우는 것 자체가 패널티, 2026-09-08 오너 결정).
  */
-export function nextTurnSeenAt(m: { hostSeenAt: Date | null; guestSeenAt: Date | null }, nextTurn: number, finished: boolean, graceMs: number, now = Date.now()): Date | null {
+export function nextTurnSeenAt(
+    m: { hostSeenAt: Date | null; guestSeenAt: Date | null; hostTimeouts?: number; guestTimeouts?: number },
+    nextTurn: number, finished: boolean, graceMs: number, now = Date.now(),
+): Date | null {
     if (finished) return null;
     const seen = nextTurn === 0 ? m.hostSeenAt : m.guestSeenAt;
     const away = !seen || now - seen.getTime() > PRESENCE_MS;
-    return new Date(now + (away ? ABSENT_GRACE_MS : graceMs));
+    if (!away) return new Date(now + graceMs);
+    // 시간 초과를 이미 받았는데 또 자리에 없다 → 바로 센다(REPEAT_ABSENT_GRACE_MS, 2026-09-26 오너)
+    const strikes = (nextTurn === 0 ? m.hostTimeouts : m.guestTimeouts) ?? 0;
+    return new Date(now + (strikes > 0 ? REPEAT_ABSENT_GRACE_MS : ABSENT_GRACE_MS));
+}
+
+/**
+ * 대전 시작(첫 샷 = 방장) 시계. 방장이 보고 있으면 1분, 자리에 없으면 푸시를 보고 돌아올 2분(START_ABSENT_GRACE_MS) 뒤 시작.
+ * 2026-09-26 오전까지는 자리에 없으면 **아예 걸지 않아** 남은 사람이 15분(노쇼 승리 주장)을 멍하니 기다렸다(오너 제보).
+ * 끝내 안 오면 시간 초과 세 번으로 실격 — 한 번도 안 친 사람이라 노쇼로 보고 레이팅엔 넣지 않는다(rating.ts isAtFaultLoss).
+ */
+export function startTurnSeenAt(hostSeenAt: Date | null, now = Date.now()): Date {
+    const present = !!hostSeenAt && now - hostSeenAt.getTime() <= PRESENCE_MS;
+    return new Date(now + (present ? ABSENT_GRACE_MS : START_ABSENT_GRACE_MS));
 }
 
 export interface MatchShotArgs {
@@ -365,11 +381,10 @@ export class SimMatchRepository {
             if (!m || m.status !== "waiting" || m.hostId === guestId) return null;
             const [row] = await tx.update(hiqSimMatches).set({
                 guestId, guestTarget, state, balls, status: "playing", turn: 0,
-                // 첫 샷(방장) 시계: 방장이 대기 화면을 보고 있으면(PRESENCE_MS 안) 돌아볼 시간만큼 봐주고 바로 건다.
-                // 자리에 없으면 **걸지 않는다** — 2026-09-15 부터 늘 걸었더니, 방을 열고 앱을 닫은 방장이(화면이 "닫아도 괜찮다"고
-                // 안내했다) 몇 시간 뒤 누가 들어오자 40초 × 3번으로 몰수패를 당했다(2026-09-26 검토). 방장이 푸시를 보고 들어와
-                // 조준 화면을 열면(ack) 시작하고, 끝내 안 오면 게스트가 NO_SHOW_CLAIM_MS 뒤 승리를 주장한다(레이팅 미반영).
-                turnSeenAt: m.hostSeenAt && Date.now() - m.hostSeenAt.getTime() <= PRESENCE_MS ? new Date(Date.now() + ABSENT_GRACE_MS) : null,
+                // 첫 샷(방장) 시계: 늘 건다(startTurnSeenAt). 자리에 없으면 푸시를 보고 돌아올 2분을 더 봐준다.
+                // 한때(2026-09-26 오전) 자리에 없으면 걸지 않았는데, 그러면 들어온 사람이 15분을 멍하니 기다렸다(오너 제보).
+                // 끝내 안 온 방장의 실격은 노쇼라 레이팅엔 넣지 않는다(한 번도 안 쳤다 — rating.ts).
+                turnSeenAt: startTurnSeenAt(m.hostSeenAt),
                 ...(typeof hostTarget === "number" ? { hostTarget } : {}),
                 startedAt: new Date(), version: m.version + 1,
             }).where(eq(hiqSimMatches.id, id)).returning();
@@ -608,10 +623,10 @@ export class SimMatchRepository {
     private async applyElo(tx: any, m: HiqSimMatch, winnerId: string | null) {
         if (!m.guestId) return;
         const shots = await this.shotCounts(tx, m.id);
-        const ok = ratingEligibility({ handicap: m.handicap, hasGuest: true, shots });
+        const winner = winnerId === null ? null : winnerId === m.hostId ? 0 : 1;
+        const ok = ratingEligibility({ handicap: m.handicap, hasGuest: true, shots, endReason: m.endReason, winner });
         if (!ok.rated) return;
         const prior = await this.samePairPrior(tx, m);
-        const winner = winnerId === null ? null : winnerId === m.hostId ? 0 : 1;
         const da = ratingDelta(winner, prior);
         const ids = [m.hostId, m.guestId];
         for (const [i, id] of ids.entries()) {
@@ -644,7 +659,7 @@ export class SimMatchRepository {
 
     /**
      * 같은 두 사람이 이 판 전 24시간 안에 **반영된** 판 수. 반영 여부는 규칙(rating.ts)과 같은 조건으로 SQL 에서 다시 본다
-     * (핸디전 · 게스트 있음 · 두 사람 다 MIN_SHOTS_EACH 이상 · 끝남).
+     * (핸디전 · 게스트 있음 · 끝남 · 두 사람 다 MIN_SHOTS_EACH 이상 또는 자리 비움 귀책).
      */
     private async samePairPrior(tx: any, m: HiqSimMatch): Promise<number> {
         const [row] = (await tx.execute(sql`
@@ -652,8 +667,14 @@ export class SimMatchRepository {
             where x.id <> ${m.id} and x.status = 'finished' and x.handicap and x.game_type = ${m.gameType}
               and ((x.host_id = ${m.hostId} and x.guest_id = ${m.guestId}) or (x.host_id = ${m.guestId} and x.guest_id = ${m.hostId}))
               and x.finished_at >= now() - make_interval(secs => ${SAME_PAIR_WINDOW_MS / 1000})
-              and (select count(*) from hiq_sim_match_shots s where s.match_id = x.id and s.player_index = 0) >= ${MIN_SHOTS_EACH}
-              and (select count(*) from hiq_sim_match_shots s where s.match_id = x.id and s.player_index = 1) >= ${MIN_SHOTS_EACH}`)).rows as { n: number }[];
+              and (
+                ((select count(*) from hiq_sim_match_shots s where s.match_id = x.id and s.player_index = 0) >= ${MIN_SHOTS_EACH}
+                 and (select count(*) from hiq_sim_match_shots s where s.match_id = x.id and s.player_index = 1) >= ${MIN_SHOTS_EACH})
+                -- 자리 비움 귀책 판(rating.ts isAtFaultLoss): 진 사람이 한 번이라도 쳤다
+                or (x.end_reason in (${sql.join(AT_FAULT_END_REASONS.map((r) => sql`${r}`), sql`, `)}) and x.winner_id is not null
+                    and (select count(*) from hiq_sim_match_shots s where s.match_id = x.id
+                         and s.player_index = (case when x.winner_id = x.host_id then 1 else 0 end)) >= 1)
+              )`)).rows as { n: number }[];
         return Number(row?.n ?? 0);
     }
 
@@ -664,7 +685,7 @@ export class SimMatchRepository {
      */
     async recomputeRatings(dryRun: boolean) {
         const matches = (await db.execute(sql`
-            select m.id, m.host_id, m.guest_id, m.game_type, m.handicap, m.winner_id,
+            select m.id, m.host_id, m.guest_id, m.game_type, m.handicap, m.winner_id, m.end_reason,
                    extract(epoch from coalesce(m.finished_at, m.last_shot_at, m.created_at)) * 1000 as ended_ms,
                    (select count(*)::int from hiq_sim_match_shots s where s.match_id = m.id and s.player_index = 0) as s0,
                    (select count(*)::int from hiq_sim_match_shots s where s.match_id = m.id and s.player_index = 1) as s1
@@ -680,13 +701,16 @@ export class SimMatchRepository {
         const skipped = { manual: 0, tooShort: 0, noGuest: 0 };
         for (const r of matches) {
             const hostId = String(r.host_id), guestId = String(r.guest_id), game = String(r.game_type);
-            const ok = ratingEligibility({ handicap: r.handicap === true, hasGuest: true, shots: [Number(r.s0), Number(r.s1)] });
+            const winnerId = r.winner_id ? String(r.winner_id) : null;
+            const winner = winnerId === null ? null : winnerId === hostId ? 0 : 1;
+            const ok = ratingEligibility({
+                handicap: r.handicap === true, hasGuest: true, shots: [Number(r.s0), Number(r.s1)],
+                endReason: r.end_reason == null ? null : String(r.end_reason), winner,
+            });
             if (!ok.rated) { skipped[ok.reason]++; continue; }
             const ended = Number(r.ended_ms);
             const pairKey = `${[hostId, guestId].sort().join("|")}|${game}`;
             const times = (recentPairs.get(pairKey) ?? []).filter((t) => ended - t < SAME_PAIR_WINDOW_MS);
-            const winnerId = r.winner_id ? String(r.winner_id) : null;
-            const winner = winnerId === null ? null : winnerId === hostId ? 0 : 1;
             const da = ratingDelta(winner, times.length);
             times.push(ended);
             recentPairs.set(pairKey, times);

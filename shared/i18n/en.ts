@@ -193,7 +193,7 @@ export const en: Record<string, string> = {
   "notif.sim.inviteClosed.title": "Match invite closed",
   "notif.sim.inviteClosed.body": "Your opponent opened a new room. Please wait for a new invite.",
   "notif.sim.started.title": "Online match started",
-  "notif.sim.started.body": "{name} joined. You take the first shot.",
+  "notif.sim.started.body": "{name} joined. You take the first shot — come back within 2 minutes (then the 40-second clock starts).",
   "notif.sim.invite.title": "{name} invited you to an online match",
   "notif.sim.invite.body": "{game} · {target} points{pw} — tap to start right away",
   "notif.sim.finished.title": "Online match over",
