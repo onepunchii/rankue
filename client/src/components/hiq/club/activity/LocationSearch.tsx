@@ -36,6 +36,10 @@ interface LocationSearchProps {
 export function LocationSearch({ value, onChange, placeholder, className }: LocationSearchProps) {
     const { t } = useT();
     const [open, setOpen] = useState(false);
+    // 검색어 — 목록(골프장 DB)에 없는 곳(연습장·스크린·해외 골프장)도 적은 그대로 쓸 수 있게 한다.
+    const [query, setQuery] = useState("");
+    const typed = query.trim();
+    const exact = typed ? GOLF_COURSES.some((c) => c.label === typed) : true;
 
     // Find selected course object if value exists
     const selectedCourse = useMemo(() =>
@@ -49,16 +53,17 @@ export function LocationSearch({ value, onChange, placeholder, className }: Loca
                     variant="outline"
                     role="combobox"
                     aria-expanded={open}
+                    // 옆 칸들과 같은 채움 입력 모양(예전엔 밑줄만 있어 혼자 달라 보였다). 호출부가 className 으로 맞춘다.
                     className={cn(
-                        "w-full justify-between h-12 bg-transparent border-b border-t-0 border-x-0 border-black/10 rounded-none px-1 text-sm font-normal hover:bg-transparent hover:text-ink-1",
-                        !value && "text-black/40",
-                        className
+                        "w-full justify-between h-12 bg-surface-2 border-0 rounded-tile px-4 text-[15px] font-medium text-ink-1 hover:bg-surface-3 hover:text-ink-1",
+                        className,
+                        !value && "text-ink-4",
                     )}
                 >
                     {value ? (
-                        <span className="flex items-center gap-2 truncate">
-                            <LucideMapPin className="w-4 h-4 text-brand" />
-                            {value}
+                        <span className="flex items-center gap-2 min-w-0">
+                            <LucideMapPin className="w-4 h-4 shrink-0 text-brand" />
+                            <span className="truncate">{value}</span>
                         </span>
                     ) : (
                         <span>{placeholder ?? t("locationSearch.placeholder")}</span>
@@ -66,11 +71,23 @@ export function LocationSearch({ value, onChange, placeholder, className }: Loca
                     <LucideChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                 </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0 bg-white border-black/10 text-ink-1 rounded-card">
-                <Command className="bg-white text-ink-1 rounded-card">
-                    <CommandInput placeholder={t("locationSearch.searchInputPlaceholder")} className="h-11 border-none focus:ring-0" />
+            <PopoverContent className="w-[min(var(--radix-popover-trigger-width),calc(100vw-32px))] min-w-[260px] p-0 bg-surface-1 border-surface-line text-ink-1 rounded-card">
+                <Command className="bg-surface-1 text-ink-1 rounded-card">
+                    <CommandInput value={query} onValueChange={setQuery} placeholder={t("locationSearch.searchInputPlaceholder")} className="h-11 border-none focus:ring-0" />
                     <CommandList>
-                        <CommandEmpty className="py-4 text-center text-xs text-ink-3">{t("locationSearch.noResults")}</CommandEmpty>
+                        {!typed && <CommandEmpty className="py-4 text-center text-[13px] text-ink-3">{t("locationSearch.noResults")}</CommandEmpty>}
+                        {typed && !exact && (
+                            <CommandGroup>
+                                <CommandItem
+                                    value={`__free__${typed}`}
+                                    onSelect={() => { onChange(typed); setOpen(false); setQuery(""); }}
+                                    className="text-ink-1 rounded-xl aria-selected:bg-brand/15 data-[selected=true]:bg-brand/15 cursor-pointer min-h-11"
+                                >
+                                    <LucideMapPin className="mr-2 h-4 w-4 text-brand" />
+                                    <span className="text-[15px] font-semibold truncate">{t("crewMeet.useTypedPlace").replace("{place}", typed)}</span>
+                                </CommandItem>
+                            </CommandGroup>
+                        )}
                         <CommandGroup>
                             {GOLF_COURSES.map((course) => (
                                 <CommandItem
@@ -80,6 +97,7 @@ export function LocationSearch({ value, onChange, placeholder, className }: Loca
                                         // Set the clean label as the value
                                         onChange(course.label);
                                         setOpen(false);
+                                        setQuery("");
                                     }}
                                     className="text-ink-1 rounded-xl aria-selected:bg-brand/15 data-[selected=true]:bg-brand/15 cursor-pointer py-3"
                                 >

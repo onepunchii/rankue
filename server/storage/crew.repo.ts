@@ -25,9 +25,11 @@ import {
     hiqPollVotes,
     hiqBlocks
 } from "../../shared/schema.js";
-import { eq, and, desc, asc, sql, or, gte, like, ilike, inArray, ne } from "drizzle-orm";
+import { eq, and, desc, asc, sql, or, gte, lt, like, ilike, inArray, ne } from "drizzle-orm";
 import { notFound, conflict } from "../utils/errors.js";
 import { msg } from "../lib/i18n.js";
+import { upcomingActivityCutoff } from "../../shared/crewActivity.js";
+import { CREW_NOTICES_MAX, imageUrlList, type CrewCursor } from "../../shared/crewBoard.js";
 import type {
     InsertHiqCrew,
     HiqCrew,
@@ -48,6 +50,14 @@ const notBlockedBy = (viewerId: string | undefined, authorCol: any) =>
     viewerId
         ? sql`NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE ${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = ${authorCol})`
         : sql`true`;
+
+// 쪽 나누기 정렬·비교는 밀리초로 자른 작성 시각 기준 — DB 는 마이크로초까지 두는데 커서(JS Date/ISO)는 밀리초라,
+// 그대로 비교하면 같은 밀리초 안의 글이 경계에서 빠지거나 두 번 나온다. id 를 두 번째 열쇠로 둬 동률을 가른다.
+const msTrunc = (col: any) => sql`date_trunc('milliseconds', ${col})`;
+// 커서가 없으면 조건 없음. ISO('...Z')를 timestamp(시간대 없음)로 캐스팅하면 Z 가 무시돼 UTC 벽시계 그대로 비교된다 —
+// 이 표의 시각은 UTC 벽시계로 저장돼 있다(Date 를 파라미터로 넘기면 드라이버가 서버 시간대로 바꿀 수 있어 문자열로 넘긴다).
+const cursorBefore = (createdCol: any, idCol: any, cursor?: CrewCursor | null) =>
+    cursor ? sql`(${msTrunc(createdCol)}, ${idCol}) < (${cursor.createdAt}::timestamp, ${cursor.id}::uuid)` : sql`true`;
 
 export class CrewRepository {
     async createCrew(data: InsertHiqCrew): Promise<HiqCrew> {
@@ -609,18 +619,39 @@ export class CrewRepository {
             .orderBy(desc(hiqCrewActivities.activityDate));
     }
 
-    async getUpcomingCrewActivities(crewId: string) {
-        const now = new Date();
+    /**
+     * 다가오는 정모. 예전엔 activity_date >= now 로 5개만 줘서 ① 6번째 정모부터 안 보였고 ② 시작하는 순간 목록에서
+     * 사라졌다(모이는 중에 장소를 다시 볼 수 없었다). 시작 뒤 몇 시간(ACTIVITY_ONGOING_HOURS)은 '진행 중' 으로 남기고,
+     * 상한은 넉넉히 둔다 — 크루 정모가 한 번에 수십 개 잡히는 일은 없다.
+     */
+    async getUpcomingCrewActivities(crewId: string, limit = 30) {
         const activities = await db.select().from(hiqCrewActivities)
-            .where(and(eq(hiqCrewActivities.crewId, crewId), gte(hiqCrewActivities.activityDate, now)))
-            .orderBy(hiqCrewActivities.activityDate)
-            .limit(5);
+            .where(and(eq(hiqCrewActivities.crewId, crewId), gte(hiqCrewActivities.activityDate, upcomingActivityCutoff())))
+            .orderBy(asc(hiqCrewActivities.activityDate), asc(hiqCrewActivities.id))
+            .limit(limit);
+        return this.withActivityParticipants(activities);
+    }
 
-        if (activities.length === 0) return [];
+    /**
+     * 지난 정모(최근 것부터). cursor((시작 시각, id))보다 앞선 것만 — '더 보기' 가 이어 붙인다.
+     * 진행 중 창 안의 정모는 다가오는 목록에 있으므로 여기선 뺀다(두 번 보이지 않게).
+     */
+    async getPastCrewActivities(crewId: string, opts: { cursor?: CrewCursor | null; limit?: number } = {}) {
+        const activities = await db.select().from(hiqCrewActivities)
+            .where(and(
+                eq(hiqCrewActivities.crewId, crewId),
+                lt(hiqCrewActivities.activityDate, upcomingActivityCutoff()),
+                cursorBefore(hiqCrewActivities.activityDate, hiqCrewActivities.id, opts.cursor),
+            ))
+            .orderBy(desc(msTrunc(hiqCrewActivities.activityDate)), desc(hiqCrewActivities.id))
+            .limit(Math.min(Math.max(opts.limit ?? 20, 1), 50));
+        return this.withActivityParticipants(activities);
+    }
 
+    // 참가자를 한 번에 붙인다(N+1 방지). 참가자 행의 gender 는 회원 정보에서 온다 — 팀 편성의 남녀 구분이 이걸 쓴다.
+    private async withActivityParticipants<T extends { id: string }>(activities: T[]) {
+        if (activities.length === 0) return [] as (T & { participants: any[] })[];
         const activityIds = activities.map(a => a.id);
-
-        // Fetch all participants for these activities in ONE query (Fix N+1)
         const allParticipants = await db.select({
             activityId: hiqCrewActivityParticipants.activityId,
             memberId: hiqCrewActivityParticipants.memberId,
@@ -635,9 +666,9 @@ export class CrewRepository {
             .from(hiqCrewActivityParticipants)
             .innerJoin(hiqMembers, eq(hiqCrewActivityParticipants.memberId, hiqMembers.id))
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
-            .where(inArray(hiqCrewActivityParticipants.activityId, activityIds));
+            .where(inArray(hiqCrewActivityParticipants.activityId, activityIds))
+            .orderBy(asc(hiqCrewActivityParticipants.joinedAt));
 
-        // Group participants by activityId
         return activities.map(activity => ({
             ...activity,
             participants: allParticipants.filter(p => p.activityId === activity.id)
@@ -756,8 +787,16 @@ export class CrewRepository {
     }
 
     // --- Community: Posts ---
-    async getCrewPosts(crewId: string, currentMemberId?: string) {
-        const results = await db.select({
+    /**
+     * 글 목록. 예전엔 크루 글 전체를 한 번에 내려줬다 → 쪽 나누기.
+     *  - page 없음(첫 쪽): 고정 공지(최대 CREW_NOTICES_MAX) + 일반 글 limit 개. 응답 모양(배열·필드)은 예전과 같다.
+     *  - page.cursor: 그 글보다 오래된 일반 글만. 공지는 첫 쪽에만 붙는다.
+     *  - page 자체가 없으면(서버 내부 호출: 크루 삭제 때 Blob 모으기) 예전처럼 전부 — 잘라 주면 파일이 고아로 남는다.
+     * 좋아요·댓글 수는 ::int — count(*) 는 bigint 라 Neon 드라이버가 문자열("3")로 돌려줘서 화면의 +1 이 "31" 이 됐다.
+     */
+    async getCrewPosts(crewId: string, currentMemberId?: string, page?: { cursor?: CrewCursor | null; limit: number }) {
+        const limit = page ? page.limit : 100000;
+        const base = () => db.select({
             id: hiqCrewPosts.id,
             crewId: hiqCrewPosts.crewId,
             authorId: hiqCrewPosts.authorId,
@@ -770,8 +809,8 @@ export class CrewRepository {
             authorName: hiqMembers.name,
             authorProfileImage: profiles.profileImageUrl,
             authorRole: hiqCrewMembers.role,
-            likeCount: sql<number>`(SELECT count(*) FROM ${hiqCrewLikes} WHERE ${hiqCrewLikes.postId} = ${hiqCrewPosts.id})`,
-            commentCount: sql<number>`(SELECT count(*) FROM ${hiqCrewComments} WHERE ${hiqCrewComments.postId} = ${hiqCrewPosts.id} AND ${notBlockedBy(currentMemberId, hiqCrewComments.authorId)})`,
+            likeCount: sql<number>`(SELECT count(*)::int FROM ${hiqCrewLikes} WHERE ${hiqCrewLikes.postId} = ${hiqCrewPosts.id})`,
+            commentCount: sql<number>`(SELECT count(*)::int FROM ${hiqCrewComments} WHERE ${hiqCrewComments.postId} = ${hiqCrewPosts.id} AND ${notBlockedBy(currentMemberId, hiqCrewComments.authorId)})`,
             isLiked: currentMemberId ? sql<boolean>`EXISTS(SELECT 1 FROM ${hiqCrewLikes} WHERE ${hiqCrewLikes.postId} = ${hiqCrewPosts.id} AND ${hiqCrewLikes.memberId} = ${currentMemberId})` : sql<boolean>`false`
         })
             .from(hiqCrewPosts)
@@ -780,12 +819,22 @@ export class CrewRepository {
             .leftJoin(hiqCrewMembers, and(
                 eq(hiqCrewPosts.crewId, hiqCrewMembers.crewId),
                 eq(hiqCrewPosts.authorId, hiqCrewMembers.memberId)
-            ))
-            .where(and(eq(hiqCrewPosts.crewId, crewId), notBlockedBy(currentMemberId, hiqCrewPosts.authorId)))
-            .orderBy(desc(hiqCrewPosts.isNotice), desc(hiqCrewPosts.createdAt));
+            ));
+        const visible = and(eq(hiqCrewPosts.crewId, crewId), notBlockedBy(currentMemberId, hiqCrewPosts.authorId));
 
-        return results.map(r => ({
+        const regular = await base()
+            .where(and(visible, eq(hiqCrewPosts.isNotice, false), cursorBefore(hiqCrewPosts.createdAt, hiqCrewPosts.id, page?.cursor)))
+            .orderBy(desc(msTrunc(hiqCrewPosts.createdAt)), desc(hiqCrewPosts.id))
+            .limit(limit);
+        const notices = page?.cursor ? [] : await base()
+            .where(and(visible, eq(hiqCrewPosts.isNotice, true)))
+            .orderBy(desc(msTrunc(hiqCrewPosts.createdAt)), desc(hiqCrewPosts.id))
+            .limit(page ? CREW_NOTICES_MAX : 100000);
+
+        return [...notices, ...regular].map(r => ({
             ...r,
+            likeCount: Number(r.likeCount) || 0,
+            commentCount: Number(r.commentCount) || 0,
             author: {
                 name: r.authorName,
                 profileImageUrl: r.authorProfileImage,
@@ -812,13 +861,28 @@ export class CrewRepository {
         return post;
     }
 
+    /**
+     * 글 삭제. 글 사진은 올릴 때 사진첩에도 같은 URL 로 복사된다(createCrewPost) — 글을 지우면 그 복사본 행도 같이 지운다.
+     * 예전엔 글만 지우고 파일(Blob)을 지워서 사진첩 타일이 깨진 채 남았다. 파일 삭제는 라우트가 참조 확인 뒤에 한다.
+     * 복사본은 (크루, 올린 사람=글쓴이, URL)로 찾는다 — 스키마에 글 id 칸이 없어서(칸을 늘리지 않으려고) 이 셋으로 맞춘다.
+     */
     async deleteCrewPost(postId: string) {
         // Child rows (likes, comments) have no ON DELETE CASCADE, so remove them first
         // inside a transaction — otherwise deleting an engaged post throws an FK violation.
         await db.transaction(async (tx) => {
+            const [post] = await tx.select().from(hiqCrewPosts).where(eq(hiqCrewPosts.id, postId));
             await tx.delete(hiqCrewLikes).where(eq(hiqCrewLikes.postId, postId));
             await tx.delete(hiqCrewComments).where(eq(hiqCrewComments.postId, postId));
             await tx.delete(hiqCrewPosts).where(eq(hiqCrewPosts.id, postId));
+            const urls = imageUrlList(post?.images);
+            if (post && urls.length > 0) {
+                // 사진 좋아요·댓글은 FK 가 ON DELETE CASCADE 라 사진 행만 지우면 따라 지워진다.
+                await tx.delete(hiqCrewPhotos).where(and(
+                    eq(hiqCrewPhotos.crewId, post.crewId),
+                    eq(hiqCrewPhotos.uploaderId, post.authorId),
+                    inArray(hiqCrewPhotos.url, urls),
+                ));
+            }
         });
     }
 
@@ -827,18 +891,63 @@ export class CrewRepository {
             const [post] = await tx.insert(hiqCrewPosts).values(data).returning();
 
             // Sync to Photo Album
-            if (data.images && Array.isArray(data.images) && data.images.length > 0) {
-                for (const url of data.images) {
-                    await tx.insert(hiqCrewPhotos).values({
-                        crewId: post.crewId,
-                        uploaderId: post.authorId,
-                        url: url,
-                        caption: post.title
-                    });
-                }
+            for (const url of imageUrlList(data.images)) {
+                await tx.insert(hiqCrewPhotos).values({
+                    crewId: post.crewId,
+                    uploaderId: post.authorId,
+                    url: url,
+                    caption: post.title
+                });
             }
             return post;
         });
+    }
+
+    /**
+     * 글 고치기(글쓴이·운영진) / 공지 고정(운영진). 사진이 바뀌면 사진첩 복사본도 맞춘다 — 새 사진은 사진첩에 넣고,
+     * 뺀 사진은 사진첩 복사본을 지운다. 뺀 URL 을 돌려주면 라우트가 참조 확인 뒤 파일을 지운다.
+     */
+    async updateCrewPost(postId: string, data: Partial<{ title: string; content: string; category: string; images: string[] | null; isNotice: boolean }>) {
+        return await db.transaction(async (tx) => {
+            const [before] = await tx.select().from(hiqCrewPosts).where(eq(hiqCrewPosts.id, postId)).for('update');
+            if (!before) return { post: null, removedUrls: [] as string[] };
+            const [post] = await tx.update(hiqCrewPosts).set(data).where(eq(hiqCrewPosts.id, postId)).returning();
+            let removedUrls: string[] = [];
+            if (data.images !== undefined) {
+                const oldUrls = imageUrlList(before.images);
+                const newUrls = imageUrlList(data.images);
+                removedUrls = oldUrls.filter(u => !newUrls.includes(u));
+                const added = newUrls.filter(u => !oldUrls.includes(u));
+                if (removedUrls.length > 0) {
+                    await tx.delete(hiqCrewPhotos).where(and(
+                        eq(hiqCrewPhotos.crewId, before.crewId),
+                        eq(hiqCrewPhotos.uploaderId, before.authorId),
+                        inArray(hiqCrewPhotos.url, removedUrls),
+                    ));
+                }
+                for (const url of added) {
+                    await tx.insert(hiqCrewPhotos).values({ crewId: before.crewId, uploaderId: before.authorId, url, caption: post.title });
+                }
+            }
+            return { post, removedUrls };
+        });
+    }
+
+    /**
+     * 아직 어느 글·사진첩 행이 쓰고 있는 URL. 파일(Blob)을 지우기 직전에 부른다 — 글과 사진첩이 같은 URL 을 나눠 쓰므로
+     * 한쪽을 지웠다고 파일까지 지우면 다른 쪽이 깨진다. 크루를 가리지 않는다(같은 파일을 다른 크루가 쓸 수도 있다).
+     */
+    async findReferencedImageUrls(urls: string[]): Promise<Set<string>> {
+        const list = imageUrlList(urls);
+        if (list.length === 0) return new Set();
+        const inPhotos = await db.select({ url: hiqCrewPhotos.url }).from(hiqCrewPhotos).where(inArray(hiqCrewPhotos.url, list));
+        const arr = sql.join(list.map(u => sql`${u}`), sql`, `);
+        // images 는 jsonb 배열 — ?| 는 배열의 최상위 문자열 원소 중 하나라도 겹치면 참. 배열이 아닌 옛 값은 건너뛴다.
+        const inPosts = await db.select({ images: hiqCrewPosts.images }).from(hiqCrewPosts)
+            .where(sql`jsonb_typeof(${hiqCrewPosts.images}) = 'array' AND ${hiqCrewPosts.images} ?| array[${arr}]::text[]`);
+        const found = new Set<string>(inPhotos.map(r => r.url));
+        for (const r of inPosts) for (const u of imageUrlList(r.images)) if (list.includes(u)) found.add(u);
+        return found;
     }
 
     async getCrewPostComments(postId: string, viewerId?: string) {
@@ -877,27 +986,39 @@ export class CrewRepository {
     }
 
     // --- Community: Photos ---
-    async getCrewPhotos(crewId: string, currentMemberId?: string) {
+    /**
+     * 사진첩. 글 목록과 같은 커서 쪽 나누기 + 캡션(예전엔 select 에서 빠져 캡션이 화면에 못 갔다) + ::int 수.
+     * page 가 없으면(서버 내부 호출) 전부 — 크루 삭제가 이걸로 지울 파일을 모은다.
+     */
+    async getCrewPhotos(crewId: string, currentMemberId?: string, page?: { cursor?: CrewCursor | null; limit: number }) {
         const results = await db.select({
             id: hiqCrewPhotos.id,
             crewId: hiqCrewPhotos.crewId,
             uploaderId: hiqCrewPhotos.uploaderId,
             url: hiqCrewPhotos.url,
+            caption: hiqCrewPhotos.caption,
             createdAt: hiqCrewPhotos.createdAt,
             uploaderName: hiqMembers.name,
             uploaderProfileImage: profiles.profileImageUrl,
-            likeCount: sql<number>`(SELECT count(*) FROM ${hiqCrewPhotoLikes} WHERE ${hiqCrewPhotoLikes.photoId} = ${hiqCrewPhotos.id})`,
-            commentCount: sql<number>`(SELECT count(*) FROM ${hiqCrewPhotoComments} WHERE ${hiqCrewPhotoComments.photoId} = ${hiqCrewPhotos.id} AND ${notBlockedBy(currentMemberId, hiqCrewPhotoComments.authorId)})`,
+            likeCount: sql<number>`(SELECT count(*)::int FROM ${hiqCrewPhotoLikes} WHERE ${hiqCrewPhotoLikes.photoId} = ${hiqCrewPhotos.id})`,
+            commentCount: sql<number>`(SELECT count(*)::int FROM ${hiqCrewPhotoComments} WHERE ${hiqCrewPhotoComments.photoId} = ${hiqCrewPhotos.id} AND ${notBlockedBy(currentMemberId, hiqCrewPhotoComments.authorId)})`,
             isLiked: currentMemberId ? sql<boolean>`EXISTS(SELECT 1 FROM ${hiqCrewPhotoLikes} WHERE ${hiqCrewPhotoLikes.photoId} = ${hiqCrewPhotos.id} AND ${hiqCrewPhotoLikes.memberId} = ${currentMemberId})` : sql<boolean>`false`
         })
             .from(hiqCrewPhotos)
             .innerJoin(hiqMembers, eq(hiqCrewPhotos.uploaderId, hiqMembers.id))
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
-            .where(and(eq(hiqCrewPhotos.crewId, crewId), notBlockedBy(currentMemberId, hiqCrewPhotos.uploaderId)))
-            .orderBy(desc(hiqCrewPhotos.createdAt));
+            .where(and(
+                eq(hiqCrewPhotos.crewId, crewId),
+                notBlockedBy(currentMemberId, hiqCrewPhotos.uploaderId),
+                cursorBefore(hiqCrewPhotos.createdAt, hiqCrewPhotos.id, page?.cursor),
+            ))
+            .orderBy(desc(msTrunc(hiqCrewPhotos.createdAt)), desc(hiqCrewPhotos.id))
+            .limit(page ? page.limit : 100000);
 
         return results.map(r => ({
             ...r,
+            likeCount: Number(r.likeCount) || 0,
+            commentCount: Number(r.commentCount) || 0,
             author: {
                 name: r.uploaderName,
                 profileImageUrl: r.uploaderProfileImage

@@ -421,5 +421,21 @@ export const tr: Record<string, string> = {
   "notif.game.started.title": "🎱 Maç başladı",
   "notif.game.started.body": "{host} maçı başlattı. Skor tablosunu aç.",
   "err.chat.leaveNotAllowed": "Bu sohbetten buradan ayrılamazsın",
+  // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
+  "err.crew.badCursor": "Liste konumu geçersiz. Lütfen yenileyin",
+  "err.crew.postCategoryInvalid": "Geçersiz pano kategorisi",
+  "err.crew.postNoticeAdminOnly": "Duyuruyu yalnızca yöneticiler paylaşabilir",
+  "err.crew.postEditForbidden": "Bu gönderiyi yalnızca yazarı veya yöneticiler düzenleyebilir",
+  "err.crew.pinAdminOnly": "Duyuruyu yalnızca yöneticiler sabitleyebilir",
+  "err.crew.postTitleRequired": "Lütfen bir başlık girin",
+  "err.crew.postImagesInvalid": "Geçersiz fotoğraf bilgisi",
+  "err.crew.activityEditForbidden": "Bu buluşmayı yalnızca düzenleyen veya yöneticiler değiştirebilir",
+  "err.crew.activityDeleteForbidden": "Bu buluşmayı yalnızca düzenleyen veya yöneticiler silebilir",
+  "err.crew.activityDateInvalid": "Geçersiz buluşma tarihi",
+  "err.crew.activityMaxInvalid": "Kontenjan en az 2 olmalı",
+  "notif.crew.someone": "Bir ekip üyesi",
+  "notif.crew.activityFallback": "buluşma",
+  "notif.crew.crewFallback": "Ekip",
+  "notif.crew.postFallback": "gönderi",
 };
 export default tr;

@@ -421,5 +421,21 @@ export const ko: Record<string, string> = {
   "notif.game.started.title": "🎱 경기 시작",
   "notif.game.started.body": "{host}님이 경기를 시작했어요. 점수판으로 이동하세요.",
   "err.chat.leaveNotAllowed": "이 방은 채팅에서 나갈 수 없어요",
+  // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
+  "err.crew.badCursor": "목록 위치가 올바르지 않아요. 새로고침해 주세요",
+  "err.crew.postCategoryInvalid": "게시판 분류가 올바르지 않아요",
+  "err.crew.postNoticeAdminOnly": "공지는 운영진만 올릴 수 있어요",
+  "err.crew.postEditForbidden": "글쓴이나 운영진만 고칠 수 있어요",
+  "err.crew.pinAdminOnly": "공지 고정은 운영진만 할 수 있어요",
+  "err.crew.postTitleRequired": "제목을 입력해 주세요",
+  "err.crew.postImagesInvalid": "사진 정보가 올바르지 않아요",
+  "err.crew.activityEditForbidden": "정모를 만든 사람이나 운영진만 고칠 수 있어요",
+  "err.crew.activityDeleteForbidden": "정모를 만든 사람이나 운영진만 지울 수 있어요",
+  "err.crew.activityDateInvalid": "정모 날짜가 올바르지 않아요",
+  "err.crew.activityMaxInvalid": "정원은 2명 이상으로 정해 주세요",
+  "notif.crew.someone": "크루원",
+  "notif.crew.activityFallback": "정모",
+  "notif.crew.crewFallback": "크루",
+  "notif.crew.postFallback": "게시글",
 };
 export default ko;

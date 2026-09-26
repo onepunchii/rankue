@@ -421,5 +421,21 @@ export const en: Record<string, string> = {
   "notif.game.started.title": "🎱 Match started",
   "notif.game.started.body": "{host} started the match. Open the scoreboard.",
   "err.chat.leaveNotAllowed": "You can't leave this chat from here",
+  // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
+  "err.crew.badCursor": "Invalid list position. Please refresh",
+  "err.crew.postCategoryInvalid": "Invalid board category",
+  "err.crew.postNoticeAdminOnly": "Only crew admins can post notices",
+  "err.crew.postEditForbidden": "Only the author or crew admins can edit this post",
+  "err.crew.pinAdminOnly": "Only crew admins can pin notices",
+  "err.crew.postTitleRequired": "Please enter a title",
+  "err.crew.postImagesInvalid": "Invalid photo data",
+  "err.crew.activityEditForbidden": "Only the organizer or crew admins can edit this meetup",
+  "err.crew.activityDeleteForbidden": "Only the organizer or crew admins can delete this meetup",
+  "err.crew.activityDateInvalid": "Invalid meetup date",
+  "err.crew.activityMaxInvalid": "Capacity must be at least 2",
+  "notif.crew.someone": "A crew member",
+  "notif.crew.activityFallback": "meetup",
+  "notif.crew.crewFallback": "Crew",
+  "notif.crew.postFallback": "post",
 };
 export default en;
