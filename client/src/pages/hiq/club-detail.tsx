@@ -465,9 +465,9 @@ export default function HiqClubDetail() {
                                     currentMemberId={me?.id}
                                     onCreatePost={() => setIsCreatePostOpen(true)}
                                     onCreateSettlement={() => setIsCreateSettlementOpen(true)}
-                                    // isError·onRetry 는 게시판 작업(CrewBoardTab 개선)이 추가하는 선택 props 다 — 실패를 '글이 없어요'와
-                                    // 구분해 다시 시도를 보여 준다. 그 변경이 합쳐지기 전에도 타입 검사가 통과하도록 펼쳐 넘긴다.
-                                    {...({ isError: postsQuery.isError, onRetry: () => postsQuery.refetch() } as object)}
+                                    // 불러오기 실패를 '글이 없어요'와 구분해 다시 시도를 보여 준다
+                                    isError={postsQuery.isError}
+                                    onRetry={() => { void postsQuery.refetch(); }}
                                 />
                             )}
                         </motion.div>

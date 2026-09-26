@@ -194,17 +194,16 @@ export const CrewBoardTab = memo(({
             {/* 떠 있는 버튼 */}
             {isMember && (
                 <div className="fixed above-nav right-4 flex flex-col items-end gap-3 z-30">
-                    {isAdmin && (
-                        <button
-                            type="button"
-                            onClick={onCreateSettlement}
-                            className="w-14 h-14 bg-surface-1 text-brand rounded-full flex items-center justify-center rk-shadow active:bg-surface-3"
-                            title={t("crewBoard.createSettlement")}
-                            aria-label={t("crewBoard.createSettlement")}
-                        >
-                            <LucideReceipt className="w-6 h-6" />
-                        </button>
-                    )}
+                    {/* 정산은 모임을 연 사람 누구나 한다 — 서버도 멤버면 만들 수 있다(2026-09-26, 예전엔 화면만 운영진 전용이었다) */}
+                    <button
+                        type="button"
+                        onClick={onCreateSettlement}
+                        className="w-14 h-14 bg-surface-1 text-brand rounded-full flex items-center justify-center rk-shadow active:bg-surface-3"
+                        title={t("crewBoard.createSettlement")}
+                        aria-label={t("crewBoard.createSettlement")}
+                    >
+                        <LucideReceipt className="w-6 h-6" />
+                    </button>
                     <button
                         type="button"
                         onClick={onCreatePost}
