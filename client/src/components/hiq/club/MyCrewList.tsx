@@ -1,61 +1,85 @@
 import { memo } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
 import { MyCrewCard } from "./MyCrewCard";
-import { Button } from "@/components/ui/button";
-import { LucideUsers, LucidePlus } from "@/lib/icons";
+import { CrewRow } from "./CrewRow";
+import { useMyCrews } from "./useMyCrews";
+import { CrewEmpty, CrewError, CrewSkeleton, CREW_TEXT } from "@/components/hiq/crew-ui";
+import { LucideUsers, LogIn } from "@/lib/icons";
+import { goLogin } from "@/components/hiq/LoginGate";
 import { useT } from "@/lib/i18n";
 
 interface MyCrewListProps {
     currentSport: string;
+    /** 크루 만들기 — 페이지 머리의 '만들기'와 같은 동작(게스트면 로그인으로). */
+    onCreate: () => void;
 }
 
-export const MyCrewList = memo(({ currentSport }: MyCrewListProps) => {
+export const MyCrewList = memo(({ currentSport, onCreate }: MyCrewListProps) => {
     const { t } = useT();
-    const [_, setLocation] = useLocation();
+    const [, setLocation] = useLocation();
+    const { data: myCrews, isLoading, isError, refetch, isGuest, authLoading } = useMyCrews(currentSport);
 
-    const { data: myCrews, isLoading } = useQuery<any[]>({
-        queryKey: ["/api/hiq/crews/mine", currentSport],
-        queryFn: async () => await apiRequest(`/api/hiq/crews/mine?sport=${currentSport}`),
-        staleTime: 1000 * 60 * 5, // 5 minutes
-    });
+    // 로그인 확인 중·목록 불러오는 중 — 실제 줄 높이(80px)에 맞춘 뼈대
+    if (authLoading || (!isGuest && isLoading)) return <CrewSkeleton rows={2} height={80} />;
 
-    if (isLoading) {
-        return <div className="h-40 bg-black/[0.04] rounded-card animate-pulse" />;
-    }
-
-    if (!myCrews || myCrews.length === 0) {
+    // 게스트 — 목록 요청(401) 대신 로그인 안내. 크루 둘러보기는 아래에서 그대로 된다.
+    if (isGuest) {
         return (
-            <div className="rk-card flex flex-col items-center justify-center py-12 px-6 text-center">
-                <div className="w-14 h-14 rounded-full bg-brand/10 flex items-center justify-center mb-4">
-                    <LucideUsers className="w-7 h-7 text-brand" />
-                </div>
-                <p className="text-ink-1 font-semibold text-[16px] mb-1">{t("myCrewList.emptyTitle")}</p>
-                <p className="text-ink-3 text-[13px] font-medium mb-5">{t("myCrewList.emptyDesc")}</p>
-                <Button
-                    className="bg-brand text-brand-fg hover:bg-brand-strong font-semibold rounded-full px-7 h-11 text-[14px]"
-                    onClick={() => setLocation("/club/create")}
-                >
-                    <LucidePlus className="w-4 h-4 mr-1.5" />
-                    {t("myCrewList.createCrew")}
-                </Button>
-            </div>
+            <CrewEmpty
+                icon={<LogIn />}
+                title={t("crewMgmt.guestTitle")}
+                desc={t("crewMgmt.guestDesc")}
+                action={{ label: t("crewMgmt.login"), onClick: () => goLogin(setLocation, "/club") }}
+            />
         );
     }
 
+    // 실패는 '크루가 없어요'와 다르다 — 없는 줄 알고 새로 만들게 하면 안 된다.
+    if (isError) return <CrewError onRetry={() => refetch()} />;
+
+    const rows = myCrews ?? [];
+    const active = rows.filter((r) => r.role !== "pending");
+    // 가입 신청 중(승인 대기)은 아직 내 크루가 아니다 — 예전엔 '멤버' 크루처럼 섞여 보였다. 아래에 따로 모은다.
+    const pending = rows.filter((r) => r.role === "pending");
+
     return (
-        <div className="grid grid-cols-1 gap-3">
-            {myCrews.map(({ crew, role, memberCount }) => (
-                <MyCrewCard
-                    key={crew.id}
-                    crew={{ ...crew, memberCount }}
-                    role={role}
-                    onClick={() => setLocation(`/club/${crew.id}`)}
-                    // 인원 칸은 멤버 목록으로 — 크루 홈의 멤버 구역으로 스크롤한다(CrewHomeTab 이 focus 를 읽는다)
-                    onMembers={() => setLocation(`/club/${crew.id}?tab=home&focus=members`)}
+        <div className="flex flex-col gap-2">
+            {active.length === 0 ? (
+                <CrewEmpty
+                    icon={<LucideUsers />}
+                    title={t("myCrewList.emptyTitle")}
+                    desc={t("myCrewList.emptyDesc")}
+                    action={{ label: t("myCrewList.createCrew"), onClick: onCreate }}
                 />
-            ))}
+            ) : (
+                active.map(({ crew, role, memberCount }) => (
+                    <MyCrewCard
+                        key={crew.id}
+                        crew={{ ...crew, memberCount }}
+                        role={role}
+                        onClick={() => setLocation(`/club/${crew.id}`)}
+                        // 인원 칸은 멤버 목록으로 — 크루 홈의 멤버 구역으로 스크롤한다(CrewHomeTab 이 focus 를 읽는다)
+                        onMembers={() => setLocation(`/club/${crew.id}?tab=home&focus=members`)}
+                    />
+                ))
+            )}
+
+            {pending.length > 0 && (
+                <div className="flex flex-col gap-2 mt-3">
+                    <p className={CREW_TEXT.caption}>
+                        {t("crewMgmt.pendingSection")} <span className="rk-num">{pending.length}</span>
+                    </p>
+                    {pending.map(({ crew, memberCount }) => (
+                        <CrewRow
+                            key={crew.id}
+                            crew={{ ...crew, memberCount }}
+                            role="pending"
+                            variant="mine"
+                            onClick={() => setLocation(`/club/${crew.id}`)}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 });

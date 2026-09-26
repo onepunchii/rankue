@@ -4,6 +4,13 @@
  * 키 규칙: err.<영역>.<이름> · notif.<영역>.<이름>.title|body · ui.<영역>.<이름>
  */
 export const vi: Record<string, string> = {
+  // 크루장 넘기기·크루 좌표 검증(2026-09-26 크루 관리 개선)
+  "err.crew.transferLeaderOnly": "Chỉ trưởng crew mới có thể chuyển giao quyền trưởng",
+  "err.crew.transferTarget": "Chỉ có thể chuyển giao cho thành viên crew đang hoạt động",
+  "err.crew.transferSelf": "Bạn không thể chuyển giao cho chính mình",
+  "err.crew.badLocation": "Tọa độ vị trí không hợp lệ",
+  "notif.crew.transfer.title": "Bạn đã trở thành trưởng crew [{crew}]",
+  "notif.crew.transfer.body": "Trưởng crew trước đã chuyển giao crew cho bạn. Giờ bạn phụ trách quản lý crew.",
   "err.common.internal": "Đã xảy ra lỗi ở máy chủ.",
   "err.common.loginRequired": "Vui lòng đăng nhập",
   "err.common.retryLater": "Vui lòng thử lại sau giây lát",

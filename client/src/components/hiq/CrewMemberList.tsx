@@ -7,13 +7,8 @@ import {
     SheetDescription
 } from "@/components/ui/sheet";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
-    LucideCrown,
-    LucideShield,
     LucideSwords,
-    LucideMessageCircle,
     LucideChevronRight,
     LucideLoader2,
     LucideEdit2,
@@ -31,6 +26,10 @@ import { MemberActivityStats } from "@/components/hiq/member/MemberActivityStats
 import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
 import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
+import { CREW_BTN, CREW_CARD, CREW_TEXT, CrewEmpty, CrewRoleBadge, IconButton } from "@/components/hiq/crew-ui";
+import { MemberSearchBar } from "@/components/hiq/club/MemberSearchBar";
+import { golfScoreOf, memberStat } from "@/components/hiq/club/memberStat";
+import { filterSortMembers, type MemberSort } from "@shared/crewManage";
 
 // --- Types ---
 interface EnhancedHiqMember extends HiqMember {
@@ -57,42 +56,51 @@ interface CrewMemberListProps {
     currentUserGender?: string;
     sportCategory?: "BILLIARDS" | "GOLF" | "MIXED";
     crewId: string;
+    /** 보는 사람이 이 크루의 활동 멤버인가. 없으면 목록에서 추정한다(내가 목록에 있고 대기가 아니면 멤버). */
+    isMember?: boolean;
+    /** 크루 주 종목(3c·4c…) — 없으면 캐시된 크루 정보에서 읽는다. 당구 대표 기록을 3구/4구 중 무엇으로 보일지 정한다. */
+    gameType?: string | null;
 }
 
+/** 크루 가입일 — 한국어는 기존처럼 "2026.09.26", 그 밖의 언어는 그 언어의 날짜 모양. */
+function formatJoinDate(value: Date | string, locale: string): string {
+    const d = new Date(value);
+    if (!Number.isFinite(d.getTime())) return "";
+    const s = d.toLocaleDateString(locale, { year: "numeric", month: "2-digit", day: "2-digit" });
+    return locale === "ko" ? s.replace(/\. /g, ".").replace(/\.$/, "") : s;
+}
 
-export function CrewMemberList({ members, currentMemberId, sportCategory = "BILLIARDS", crewId }: CrewMemberListProps) {
+// 멤버 수가 이보다 많을 때만 검색·정렬 줄을 보인다 — 몇 명 안 되는 크루에선 자리만 차지한다.
+const SEARCH_THRESHOLD = 6;
+
+export function CrewMemberList({ members, currentMemberId, sportCategory = "BILLIARDS", crewId, isMember, gameType }: CrewMemberListProps) {
+    const { t, locale } = useT();
+    const { toast } = useToast();
+    const queryClient = useQueryClient();
+    const [selectedMember, setSelectedMember] = useState<CrewMemberItemType | null>(null);
+    const [isSheetOpen, setIsSheetOpen] = useState(false);
+    const [query, setQuery] = useState("");
+    const [sort, setSort] = useState<MemberSort>("role");
+
+    // 비멤버·게스트에게 멤버 전용 요청(대회 기록·대결 신청)을 보내지 않는다 — 서버가 403/401 로 막는다.
+    // 예전엔 비멤버에게도 '대결 신청' 버튼이 보여 누르면 403 토스트가 떴다.
+    const viewerIsMember = isMember ?? (!!currentMemberId && members.some((m) => m.member.id === currentMemberId && m.role !== "pending"));
+    // 크루 주 종목 — 크루 화면이 이미 받아 둔 GET /crews/:id 캐시에서 읽는다(새 요청 없음).
+    const crewGameType = gameType ?? (queryClient.getQueryData<any>([`/api/hiq/crews/${crewId}`])?.crew?.gameType ?? null);
+
     // 크루 대회 우승 횟수 — 명예의 전당과 같은 소스. 회원마다 조회하면 N+1 이라 한 번에 받는다.
     const { data: hallOfFame } = useQuery<{ honors?: Array<{ memberId: string; wins: number }> }>({
         queryKey: [`/api/hiq/crews/${crewId}/tournaments/hall-of-fame`],
-        enabled: !!crewId,
+        enabled: !!crewId && viewerIsMember,
     });
     const winsByMember = useMemo(() => {
         const map: Record<string, number> = {};
         for (const h of hallOfFame?.honors ?? []) map[h.memberId] = (map[h.memberId] ?? 0) + h.wins;
         return map;
     }, [hallOfFame]);
-    const { t } = useT();
-    const { toast } = useToast();
-    const [selectedMember, setSelectedMember] = useState<CrewMemberItemType | null>(null);
-    const [isSheetOpen, setIsSheetOpen] = useState(false);
 
-    // Sort: Leader first, then admins, then joinedAt (ISO string comparison)
-    const sortedMembers = useMemo(() => {
-        return [...members].sort((a, b) => {
-            const roleOrder: Record<string, number> = { leader: 3, manage: 2, member: 1, pending: 0 };
-            const scoreA = roleOrder[a.role] || 0;
-            const scoreB = roleOrder[b.role] || 0;
+    const sortedMembers = useMemo(() => filterSortMembers(members, query, sort, locale), [members, query, sort, locale]);
 
-            if (scoreA !== scoreB) return scoreB - scoreA;
-
-            // Handle both Date and string safely
-            const dateA = new Date(a.joinedAt).getTime();
-            const dateB = new Date(b.joinedAt).getTime();
-            return dateA - dateB;
-        });
-    }, [members]);
-
-    const queryClient = useQueryClient();
     const [isEditingBio, setIsEditingBio] = useState(false);
     const [newBio, setNewBio] = useState("");
 
@@ -115,7 +123,8 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                     member: { ...selectedMember.member, introduction: newBio }
                 });
             }
-        }
+        },
+        onError: (e: any) => toast({ title: e?.message || t("clubSettings.actionFailed"), variant: "destructive" }),
     });
 
     const handleMemberClick = (memberItem: CrewMemberItemType) => {
@@ -124,13 +133,12 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
         setIsSheetOpen(true);
     };
 
-
     const { data: memberActivities } = useQuery({
         queryKey: [`/api/hiq/crews/activities/member`, selectedMember?.member?.id, crewId],
         queryFn: async () => {
             return await apiRequest(`/api/hiq/crews/activities/member/${selectedMember?.member?.id}?crewId=${crewId}`);
         },
-        enabled: isSheetOpen && !!selectedMember
+        enabled: isSheetOpen && !!selectedMember && !!currentMemberId
     });
 
     const isMe = currentMemberId === selectedMember?.member?.id;
@@ -140,14 +148,14 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     const { data: h2h } = useQuery<{ total: number; myWins: number; friendWins: number; winRate: number }>({
         queryKey: [`/api/hiq/stats/h2h/${selectedMember?.member?.id}`],
         // 이 전적은 당구 경기만 센다 — 골프 크루에서 "나와 N승 M패" 로 보여주면 남의 종목 숫자다(2026-09-09 검토).
-        enabled: isSheetOpen && !!selectedMember && !isMe && sportCategory !== "GOLF",
+        enabled: isSheetOpen && !!selectedMember && !isMe && !!currentMemberId && sportCategory !== "GOLF",
         staleTime: 60 * 1000,
     });
 
-    // 대결 신청 상태 — 내가 보낸 것/받은 것(24시간 내 대기 중)
+    // 대결 신청 상태 — 내가 보낸 것/받은 것(24시간 내 대기 중). 크루원 전용 라우트다.
     const { data: challengeData } = useQuery<{ challenges: any[]; myId: string }>({
         queryKey: [`/api/hiq/crews/${crewId}/challenges`],
-        enabled: isSheetOpen,
+        enabled: isSheetOpen && viewerIsMember,
         staleTime: 30 * 1000,
     });
     const sentChallenge = challengeData?.challenges?.find(
@@ -181,38 +189,49 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     const sheetData = useMemo(() => {
         if (!selectedMember) return null;
         const m = selectedMember.member;
-
         if (sportCategory === 'GOLF') {
-            const golfAvgS = m.golfAvgScore || 0;
-            const golfHandi = m.golfHandicap || 0;
             // 데이터가 전혀 없는 경우 0으로 처리하여 '-'가 나오도록 함
-            const golfScore = golfAvgS > 0 ? golfAvgS : (golfHandi > 0 ? golfHandi + 72 : 0);
-            const tier = getTier(golfScore, false, 'GOLF');
-            return { golfScore, tier };
-        } else {
-            // BILLIARDS
-            const tier = getTier(Number(m.handi4c || 0), false, 'BILLIARDS');
-            return { golfScore: 0, tier };
+            const golfScore = golfScoreOf(m);
+            return { golfScore, tier: getTier(golfScore, false, 'GOLF') };
         }
+        return { golfScore: 0, tier: getTier(Number(m.handi4c || 0), false, 'BILLIARDS') };
     }, [selectedMember, sportCategory]);
+
+    // 나이대·성별 — 서버는 크루원이 아닌 조회자에게 둘 다 지워서 보낸다(stripMemberPrivacy).
+    // 모르면 그리지 않는다: 예전엔 성별이 null 이면 '남성'으로 찍혔다.
+    const profileLine = (m: EnhancedHiqMember) => {
+        const parts: string[] = [];
+        if (m.birthYear) parts.push(`${Math.floor((new Date().getFullYear() - m.birthYear) / 10) * 10}${t("crewMemberList.ageSuffix")}`);
+        if (m.gender === "female") parts.push(t("crewMemberList.female"));
+        else if (m.gender === "male") parts.push(t("crewMemberList.male"));
+        return parts.join(" · ");
+    };
 
     return (
         <>
             <div className="flex flex-col gap-2">
-                {sortedMembers.map((item) => (
-                    <MemberListItem
-                        key={item.member.id}
-                        item={item}
-                        currentMemberId={currentMemberId}
-                        sportCategory={sportCategory}
-                        tournamentWins={winsByMember[item.member.id]}
-                        onClick={() => handleMemberClick(item)}
-                    />
-                ))}
+                {members.length >= SEARCH_THRESHOLD && (
+                    <MemberSearchBar query={query} onQuery={setQuery} sort={sort} onSort={setSort} />
+                )}
+                {sortedMembers.length === 0 && query ? (
+                    <CrewEmpty title={t("crewMgmt.noMemberMatch")} />
+                ) : (
+                    sortedMembers.map((item) => (
+                        <MemberListItem
+                            key={item.member.id}
+                            item={item}
+                            currentMemberId={currentMemberId}
+                            sportCategory={sportCategory}
+                            gameType={crewGameType}
+                            tournamentWins={winsByMember[item.member.id]}
+                            onClick={() => handleMemberClick(item)}
+                        />
+                    ))
+                )}
             </div>
 
             <Sheet open={isSheetOpen} onOpenChange={setIsSheetOpen}>
-                <SheetContent side="bottom" className="h-[75vh] rounded-t-[2rem] bg-white border-t border-black/10 p-0 overflow-hidden">
+                <SheetContent side="bottom" hideClose className="max-w-md mx-auto h-[80dvh] rounded-t-card bg-surface-0 border-surface-line p-0 overflow-hidden">
                     <SheetTitle className="sr-only">{t("crewMemberList.sheetTitle")}</SheetTitle>
                     <SheetDescription className="sr-only">{t("crewMemberList.sheetDescription")}</SheetDescription>
 
@@ -221,11 +240,11 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                            예전에는 시트 전체가 스크롤돼 대결 버튼이 내용에 밀려 사라졌다. */
                         <div className="h-full flex flex-col">
                         <div className="flex-1 min-h-0 overflow-y-auto">
-                            <div className="relative pt-12 pb-8 px-6 flex flex-col items-center bg-white">
-                                <div className="absolute top-3 w-12 h-1 bg-black/10 rounded-full left-1/2 -translate-x-1/2" />
+                            <div className="relative pt-10 pb-6 px-4 flex flex-col items-center">
+                                <div className="absolute top-2.5 w-10 h-1 bg-surface-3 rounded-full left-1/2 -translate-x-1/2" aria-hidden="true" />
                                 {/* 회원 신고·차단 — 소개글·프로필 사진도 UGC 다 (Apple 1.2). 오른쪽 위는 시트 닫기 자리라 왼쪽에 둔다 */}
                                 {!isMe && currentMemberId && (
-                                    <div className="absolute top-3 left-3">
+                                    <div className="absolute top-2 left-2">
                                         <UgcActionMenu
                                             targetType="member"
                                             targetId={selectedMember.member.id}
@@ -238,41 +257,25 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                         />
                                     </div>
                                 )}
-                                <Avatar className={cn(
-                                    "w-24 h-24 mb-4 border-4",
-                                    selectedMember.member.gender === 'female' ? "border-pink-500/30" : "border-black/10"
-                                )}>
+                                <Avatar className="w-24 h-24 mb-4 border-4 border-surface-1">
                                     <AvatarImage
                                         src={selectedMember.member.profileImageUrl}
                                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                                     />
-                                    <AvatarFallback className="text-2xl font-semibold bg-surface-3 text-black/40">
+                                    <AvatarFallback className="text-[22px] font-semibold bg-surface-3 text-ink-3">
                                         {selectedMember.member.nickname?.[0] || selectedMember.member.name?.[0]}
                                     </AvatarFallback>
                                 </Avatar>
 
-                                <div className="flex items-center gap-3 mb-1">
-                                    <h2 className="text-3xl font-semibold text-ink-1 tracking-tight">
+                                <div className="flex items-center justify-center flex-wrap gap-2 mb-1 max-w-full">
+                                    <h2 className={cn(CREW_TEXT.title, "truncate max-w-full")}>
                                         {selectedMember.member.nickname || selectedMember.member.name}
                                     </h2>
-                                    <div className="flex items-center gap-1.5">
-                                        {selectedMember.role === 'leader' && (
-                                            <Badge variant="outline" className="bg-[#cba258]/12 border-[#cba258]/25 text-[#cba258] gap-1 px-2">
-                                                <LucideCrown className="w-3 h-3" /> {t("crewMemberList.leader")}
-                                            </Badge>
-                                        )}
-                                        {selectedMember.role === 'manage' && (
-                                            <Badge variant="outline" className="bg-brand/10 border-brand/25 text-brand gap-1 px-2">
-                                                <LucideShield className="w-3 h-3" /> {t("crewMemberList.manager")}
-                                            </Badge>
-                                        )}
-                                    </div>
+                                    <CrewRoleBadge role={selectedMember.role} />
                                 </div>
-                                <p className="text-[13px] font-medium text-black/55 mb-6">
-                                    {selectedMember.member.birthYear ? `${Math.floor((new Date().getFullYear() - selectedMember.member.birthYear) / 10) * 10}${t("crewMemberList.ageSuffix")}` : t("crewMemberList.ageUnknown")}
-                                    {' • '}
-                                    {selectedMember.member.gender === 'female' ? t("crewMemberList.female") : t("crewMemberList.male")}
-                                </p>
+                                {profileLine(selectedMember.member) && (
+                                    <p className={cn(CREW_TEXT.sub, "mb-2")}>{profileLine(selectedMember.member)}</p>
+                                )}
 
                                 <MemberStatsDisplay
                                     sportCategory={sportCategory}
@@ -282,16 +285,16 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
 
                                 {/* 나와의 상대전적 — 크루 멤버를 열었을 때 가장 궁금한 숫자 */}
                                 {!isMe && h2h && h2h.total > 0 && (
-                                    <div className="flex items-center gap-2 px-3.5 py-2 rounded-full bg-brand/[0.07] mb-1">
-                                        <LucideSwords className="w-3.5 h-3.5 text-brand" />
-                                        <span className="text-[12.5px] font-bold text-brand tabular-nums">
+                                    <div className="flex items-center gap-2 px-3.5 py-2 rounded-pill bg-brand/10 mb-1">
+                                        <LucideSwords className="w-4 h-4 text-brand" />
+                                        <span className="text-[13px] font-semibold text-brand rk-num">
                                             {t("crewMemberList.h2hLabel")} {h2h.myWins}{t("crewMemberList.winUnit")} {h2h.friendWins}{t("crewMemberList.loseUnit")}
                                         </span>
                                     </div>
                                 )}
                                 {/* 전적·하이런 — 데이터가 있는데 안 쓰고 있었다 */}
                                 {sportCategory !== "GOLF" && (selectedMember.member.totalBilliardsGames || 0) > 0 && (
-                                    <p className="text-[12px] font-medium text-black/45 tabular-nums">
+                                    <p className={cn(CREW_TEXT.caption, "rk-num")}>
                                         {t("crewMemberList.totalGames")} {selectedMember.member.totalBilliardsGames}
                                         {(selectedMember.member as any).highRun3c || (selectedMember.member as any).highRun4c
                                             ? ` · ${t("crewMemberList.highRun")} ${Math.max((selectedMember.member as any).highRun3c || 0, (selectedMember.member as any).highRun4c || 0)}`
@@ -302,11 +305,8 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
 
                             {/* Activity Persona & Stats */}
                             {memberActivities && (
-                                <div className="px-6 pb-4">
-                                    <div className="flex items-center gap-2 mb-3">
-                                        <div className="w-1.5 h-1.5 rounded-full bg-brand" />
-                                        <h2 className="text-[15px] font-semibold text-black/55">{t("crewMemberList.activityTendency")}</h2>
-                                    </div>
+                                <div className="px-4 pb-4">
+                                    <h2 className={cn(CREW_TEXT.section, "mb-3")}>{t("crewMemberList.activityTendency")}</h2>
                                     <MemberActivityStats
                                         activities={memberActivities.activities || []}
                                         totalCount={memberActivities.totalCount || 0}
@@ -315,22 +315,22 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                 </div>
                             )}
 
-                            <div className="px-6 py-4 space-y-4">
+                            <div className="px-4 pb-6 flex flex-col gap-3">
                                 {/* 소갯말 카드 */}
-                                <div className="p-5 rk-card flex flex-col gap-2">
-                                    <div className="flex items-center justify-between">
-                                        <span className="text-[12px] font-medium text-black/55">{t("crewMemberList.bioLabel")}</span>
-                                        {currentMemberId === selectedMember.member.id && !isEditingBio && (
-                                            <button
+                                <div className={cn(CREW_CARD, "flex flex-col gap-2")}>
+                                    <div className="flex items-center justify-between min-h-11 -my-2">
+                                        <span className={CREW_TEXT.caption}>{t("crewMemberList.bioLabel")}</span>
+                                        {isMe && !isEditingBio && (
+                                            <IconButton
+                                                label={t("crewMemberList.editBio")}
+                                                className="-mr-2"
                                                 onClick={() => {
                                                     setNewBio(selectedMember.member.introduction || "");
                                                     setIsEditingBio(true);
                                                 }}
-                                                className="p-1 hover:bg-black/[0.04] rounded"
-                                                title={t("crewMemberList.editBio")}
                                             >
-                                                <LucideEdit2 className="w-3 h-3 text-black/40" />
-                                            </button>
+                                                <LucideEdit2 />
+                                            </IconButton>
                                         )}
                                     </div>
 
@@ -338,41 +338,39 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                         <div className="flex flex-col gap-3">
                                             <textarea
                                                 autoFocus
-                                                className="w-full bg-black/[0.04] rounded-tile p-4 text-sm text-ink-1 placeholder:text-black/40 focus:outline-none focus:border-brand/50 min-h-[80px] resize-none"
+                                                aria-label={t("crewMemberList.bioLabel")}
+                                                maxLength={200}
+                                                className="w-full bg-surface-1 border border-surface-line rounded-tile p-3.5 text-[15px] font-medium text-ink-1 placeholder:text-ink-4 focus:outline-none focus:border-brand min-h-[88px] resize-none"
                                                 value={newBio}
                                                 onChange={(e) => setNewBio(e.target.value)}
                                                 placeholder={t("crewMemberList.bioPlaceholder")}
                                             />
                                             <div className="flex gap-2">
-                                                <Button
-                                                    onClick={() => setIsEditingBio(false)}
-                                                    variant="ghost"
-                                                    className="flex-1 h-9 text-black/55 text-xs"
-                                                >
+                                                <button type="button" onClick={() => setIsEditingBio(false)} className={cn(CREW_BTN.secondary, "flex-1")}>
                                                     {t("crewMemberList.cancel")}
-                                                </Button>
-                                                <Button
+                                                </button>
+                                                <button
+                                                    type="button"
                                                     onClick={() => updateBioMutation.mutate()}
                                                     disabled={updateBioMutation.isPending}
-                                                    className="flex-1 h-9 rk-btn-primary text-[13px] rounded-tile"
+                                                    className={cn(CREW_BTN.primary, "flex-1")}
                                                 >
-                                                    {updateBioMutation.isPending ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <><LucideCheck className="w-4 h-4 mr-1" /> {t("crewMemberList.save")}</>}
-                                                </Button>
+                                                    {updateBioMutation.isPending ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <><LucideCheck className="w-4 h-4" /> {t("crewMemberList.save")}</>}
+                                                </button>
                                             </div>
                                         </div>
                                     ) : (
-                                        <p className="text-black/70 text-sm leading-relaxed font-medium">
+                                        <p className="text-[15px] font-medium text-ink-2 leading-relaxed">
                                             {selectedMember.member.introduction || t("crewMemberList.noBio")}
                                         </p>
                                     )}
                                 </div>
                                 {/* 크루 활동 정보 카드 */}
-                                <div className="p-5 rk-card space-y-4">
-                                    {/* 가입일 */}
+                                <div className={cn(CREW_CARD, "flex flex-col gap-4")}>
                                     <div className="flex items-center justify-between">
-                                        <span className="text-[12px] font-medium text-black/55">{t("crewMemberList.joinedDate")}</span>
-                                        <span className="text-[13px] font-semibold text-black/60 tabular-nums">
-                                            {new Date(selectedMember.joinedAt).toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.').replace(/\.$/, '')}
+                                        <span className={CREW_TEXT.caption}>{t("crewMemberList.joinedDate")}</span>
+                                        <span className="text-[13px] font-semibold text-ink-2 rk-num">
+                                            {formatJoinDate(selectedMember.joinedAt, locale)}
                                         </span>
                                     </div>
                                     {/* 활동 카운트 3칸 — 전부 0이면 숨긴다. 0/0/0 이 큰 칸 3개를
@@ -381,85 +379,65 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                         + (selectedMember.activityCounts?.group2 || 0)
                                         + (selectedMember.activityCounts?.group3 || 0)) > 0 && (
                                     <div className="grid grid-cols-3 gap-2">
-                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-black/[0.04] ">
-                                            <LucideCalendarCheck className="w-4 h-4 text-brand" />
-                                            <span className="text-[17px] font-bold text-ink-1 tabular-nums">
-                                                {selectedMember.activityCounts?.group1 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">{t("crewMemberList.countUnit")}</span>
-                                            </span>
-                                            <span className="text-[12px] font-medium text-black/55">{sportCategory === 'GOLF' ? t("crewMemberList.rounding") : t("crewMemberList.meetup")}</span>
-                                        </div>
-                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-black/[0.04] ">
-                                            {sportCategory === 'GOLF' ? <LucideMonitor className="w-4 h-4 text-brand" /> : <LucideTrophy className="w-4 h-4 text-brand" />}
-                                            <span className="text-[17px] font-bold text-ink-1 tabular-nums">
-                                                {selectedMember.activityCounts?.group2 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">{t("crewMemberList.countUnit")}</span>
-                                            </span>
-                                            <span className="text-[12px] font-medium text-black/55">{sportCategory === 'GOLF' ? t("crewMemberList.screenGolf") : t("crewMemberList.tournament")}</span>
-                                        </div>
-                                        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-black/[0.04] ">
-                                            <LucideBeer className="w-4 h-4 text-brand" />
-                                            <span className="text-[17px] font-bold text-ink-1 tabular-nums">
-                                                {selectedMember.activityCounts?.group3 || 0}
-                                                <span className="text-[12px] ml-0.5 font-medium text-black/40">{t("crewMemberList.countUnit")}</span>
-                                            </span>
-                                            <span className="text-[12px] font-medium text-black/55">{t("crewMemberList.afterParty")}</span>
-                                        </div>
+                                        <ActivityCount icon={<LucideCalendarCheck />} value={selectedMember.activityCounts?.group1 || 0}
+                                            label={sportCategory === 'GOLF' ? t("crewMemberList.rounding") : t("crewMemberList.meetup")} />
+                                        <ActivityCount icon={sportCategory === 'GOLF' ? <LucideMonitor /> : <LucideTrophy />} value={selectedMember.activityCounts?.group2 || 0}
+                                            label={sportCategory === 'GOLF' ? t("crewMemberList.screenGolf") : t("crewMemberList.tournament")} />
+                                        <ActivityCount icon={<LucideBeer />} value={selectedMember.activityCounts?.group3 || 0} label={t("crewMemberList.afterParty")} />
                                     </div>
                                     )}
                                 </div>
-
                             </div>
+                        </div>
 
-                            </div>
-
-                            {/* 하단 액션 — 예전에는 대결·메시지 둘 다 disabled 라서 프로필을 열어도
-                                할 수 있는 게 없었다. 대결 신청을 실제로 살리고(상대에게 알림),
-                                메시지는 신고·차단이 필수인 UGC 라 별도 작업으로 미룬다. */}
-                            {!isMe && (
-                            <div className="shrink-0 px-6 pt-4 pb-6 bg-cloth flex flex-col gap-2 pb-safe">
+                            {/* 하단 액션 — 대결 신청(상대에게 알림). 크루원끼리만 된다(서버 requireCrewMember) —
+                                비멤버·게스트에게는 버튼을 그리지 않는다. 색은 중립 토큰: 예전 당구 라사·노란 공 색은
+                                골프 크루(어두운 테마)에서도 그대로 나와 어색했다. */}
+                            {!isMe && viewerIsMember && (
+                            <div className="shrink-0 px-4 pt-3 bg-surface-1 border-t border-surface-line flex flex-col gap-2" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
                                 {receivedChallenge ? (
                                     <>
-                                        <p className="text-[13px] font-semibold text-white/90 text-center mb-1">
+                                        <p className="text-[13px] font-semibold text-ink-1 text-center">
                                             {t("crewMemberList.challengeReceived")}
                                         </p>
-                                        <div className="flex gap-3">
-                                            <Button
+                                        <div className="flex gap-2">
+                                            <button
+                                                type="button"
                                                 onClick={() => respondMutation.mutate(true)}
                                                 disabled={respondMutation.isPending}
-                                                className="flex-1 h-12 rounded-tile font-bold text-[15px] bg-ball-yellow text-[rgba(0,0,0,0.82)] hover:bg-ball-yellow active:scale-[0.98] transition-transform border-none"
+                                                className={cn(CREW_BTN.primary, "flex-1")}
                                             >
-                                                <LucideSwords className="w-4 h-4 mr-2" />
+                                                <LucideSwords className="w-4 h-4" />
                                                 {t("crewMemberList.accept")}
-                                            </Button>
-                                            <Button
+                                            </button>
+                                            <button
+                                                type="button"
                                                 onClick={() => respondMutation.mutate(false)}
                                                 disabled={respondMutation.isPending}
-                                                variant="outline"
-                                                className="h-12 px-5 rounded-tile border-white/20 bg-white/10 text-white/80 hover:bg-white/15 hover:text-white"
+                                                className={CREW_BTN.secondary}
                                             >
                                                 {t("crewMemberList.decline")}
-                                            </Button>
+                                            </button>
                                         </div>
                                     </>
                                 ) : (
-                                    <Button
+                                    <button
+                                        type="button"
                                         onClick={() => challengeMutation.mutate()}
                                         disabled={!!sentChallenge || challengeMutation.isPending}
-                                        className="w-full h-12 rounded-tile font-bold text-[15px] bg-ball-yellow text-[rgba(0,0,0,0.82)] hover:bg-ball-yellow active:scale-[0.98] transition-transform disabled:opacity-40 border-none"
-                                        title={t("crewMemberList.matchRequestTitle")}
+                                        className={cn(CREW_BTN.primary, "w-full")}
                                     >
                                         {challengeMutation.isPending ? (
                                             <LucideLoader2 className="w-4 h-4 animate-spin" />
                                         ) : (
                                             <>
-                                                <LucideSwords className="w-4 h-4 mr-2" />
+                                                <LucideSwords className="w-4 h-4" />
                                                 {sentChallenge ? t("crewMemberList.challengeWaiting") : t("crewMemberList.matchRequest")}
                                             </>
                                         )}
-                                    </Button>
+                                    </button>
                                 )}
-                                <p className="text-[12px] font-medium text-white/55 text-center">
+                                <p className={cn(CREW_TEXT.caption, "text-center")}>
                                     {sentChallenge ? t("crewMemberList.challengeWaitingHint") : t("crewMemberList.challengeHint")}
                                 </p>
                             </div>
@@ -472,52 +450,51 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     );
 }
 
-function MemberListItem({ item, currentMemberId, sportCategory, onClick, tournamentWins }: {
+function ActivityCount({ icon, value, label }: { icon: React.ReactNode; value: number; label: string }) {
+    const { t } = useT();
+    return (
+        <div className="flex flex-col items-center gap-1.5 py-3 rounded-tile bg-surface-3 [&_svg]:w-4 [&_svg]:h-4 [&_svg]:text-brand">
+            {icon}
+            <span className="text-[17px] font-semibold text-ink-1 rk-num">
+                {value}
+                <span className="text-[12px] ml-0.5 font-medium text-ink-3">{t("crewMemberList.countUnit")}</span>
+            </span>
+            <span className={CREW_TEXT.caption}>{label}</span>
+        </div>
+    );
+}
+
+function MemberListItem({ item, currentMemberId, sportCategory, gameType, onClick, tournamentWins }: {
     item: CrewMemberItemType,
     currentMemberId?: string,
     sportCategory: string,
+    gameType?: string | null,
     onClick: () => void,
     tournamentWins?: number,
 }) {
     const { t } = useT();
     const m = item.member;
-    const isLeader = item.role === "leader";
-    const isAdmin = item.role === "manage";
     const isMe = m.id === currentMemberId;
 
     const joinedDate = new Date(item.joinedAt);
     const daysSinceJoined = (Date.now() - joinedDate.getTime()) / (1000 * 3600 * 24);
     const isNewbie = daysSinceJoined < 7;
 
-    const avg3c = m.avg3c && m.avg3c > 0 ? m.avg3c.toFixed(3) : "0.000";
-    const avg4c = m.avg4c && m.avg4c > 0 ? m.avg4c.toFixed(3) : "0.000";
-
-    const golfHandi = m.golfHandicap || 0;
-    const golfAvgS = m.golfAvgScore || 0;
-
-    // 데이터가 없는 경우 0으로 처리 (화면에는 '-' 출력)
-    const golfScore = golfAvgS > 0 ? golfAvgS : (golfHandi > 0 ? golfHandi + 72 : 0);
-
+    // 등급 — getTier 는 "GOLD" 같은 영문 코드와 테마 대응 색 클래스(tier-gold, 골프 어두운 테마 포함)를 준다.
+    // 예전엔 한국어 라벨("골드")로 색을 찾아 늘 회색이었고, 라벨도 번역 없이 영문 코드가 찍혔다.
     const tier = sportCategory === 'GOLF'
-        ? getTier(golfScore, false, 'GOLF')
+        ? getTier(golfScoreOf(m), false, 'GOLF')
         : getTier(Number(m.handi4c || 0), false, 'BILLIARDS');
-
-    const tierColor = TIER_COLOR[tier.label] || "text-black/55";
-    const hasStat = sportCategory === 'GOLF' ? golfScore > 0 : !!(m.avg4c && m.avg4c > 0);
-    const statValue = sportCategory === 'GOLF' ? golfScore.toFixed(0) : avg4c;
-    const statUnit = sportCategory === 'GOLF' ? t("crewMemberList.avg") : t("crewMemberList.fourBall");
+    // 대표 기록 — 크루 주 종목(3쿠션이면 3구 에버)에 맞춘다. 기록이 없으면 숫자 칸을 비운다.
+    const stat = memberStat(m, sportCategory, gameType);
 
     return (
-        <div
+        <button
+            type="button"
             onClick={onClick}
-            role="button"
-            tabIndex={0}
-            onKeyDown={(e) => e.key === 'Enter' && onClick()}
             className={cn(
-                "flex items-center gap-3.5 px-4 py-3.5 mb-2.5 rounded-2xl transition-all cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-brand active:scale-[0.99]",
-                isMe
-                    ? "bg-brand/[0.09]"
-                    : "bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:shadow-[0_3px_10px_rgba(0,0,0,0.06)]"
+                "w-full flex items-center gap-3 p-3.5 rounded-card text-left transition-colors outline-none focus-visible:ring-2 focus-visible:ring-brand",
+                isMe ? "bg-brand/10" : "rk-card active:bg-surface-3",
             )}
         >
             {/* Avatar */}
@@ -528,22 +505,19 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick, tournam
                         onError={(e) => { e.currentTarget.style.display = 'none'; }}
                         className="object-cover"
                     />
-                    <AvatarFallback className="bg-brand/10 text-brand text-base font-bold">
+                    <AvatarFallback className="bg-brand/10 text-brand text-[15px] font-semibold">
                         {m.nickname?.[0] || m.name?.[0]}
                     </AvatarFallback>
                 </Avatar>
-                {isMe && (
-                    <span className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-brand rounded-full border-2 border-[#f2f0eb]" />
-                )}
             </div>
 
             {/* Identity */}
             <div className="flex flex-col min-w-0 flex-1 gap-1">
                 <div className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-ink-1 font-semibold text-[16px] leading-tight tracking-tight truncate">
+                    <span className="text-ink-1 font-semibold text-[15px] leading-tight truncate">
                         {m.nickname || m.name}
                     </span>
-                    {isLeader && <LucideCrown className="w-3.5 h-3.5 text-[#cba258] shrink-0" />}
+                    <CrewRoleBadge role={item.role} />
                     {/* 크루 대회 우승 횟수 — 크루 안에서만 보이는 명예라 부담이 없다. */}
                     {!!tournamentWins && tournamentWins > 0 && (
                         <span
@@ -554,58 +528,48 @@ function MemberListItem({ item, currentMemberId, sportCategory, onClick, tournam
                             {tournamentWins}
                         </span>
                     )}
-                    {isAdmin && <LucideShield className="w-3.5 h-3.5 text-black/40 shrink-0" />}
                     {isMe && (
-                        <span className="shrink-0 px-1.5 py-px rounded-full text-[12px] font-semibold text-brand bg-brand/12">{t("crewMemberList.me")}</span>
+                        <span className="shrink-0 text-[12px] font-semibold text-brand">{t("crewMemberList.me")}</span>
                     )}
                 </div>
-                <div className="flex items-center gap-1.5 min-w-0 text-[12px] leading-none">
-                    <span className={cn("font-semibold shrink-0", tierColor)}>{tier.label}</span>
-                    {isNewbie && <><span className="text-black/20">·</span><span className="text-brand/80 font-medium shrink-0">{t("crewMemberList.newbie")}</span></>}
-                    <span className="text-black/20 shrink-0">·</span>
-                    <span className="text-black/40 font-medium truncate">
+                <div className="flex items-center gap-1.5 min-w-0 text-[12px] font-medium leading-none">
+                    <span className={cn("shrink-0 px-1.5 py-0.5 rounded-md border", tier.class)}>{t(`crewMgmt.tier.${tier.label}`)}</span>
+                    {isNewbie && <span className="text-brand shrink-0">{t("crewMemberList.newbie")}</span>}
+                    <span className="text-ink-3 truncate">
                         {m.introduction || (sportCategory === 'GOLF' ? t("crewMemberList.defaultBioGolf") : t("crewMemberList.defaultBioBilliards"))}
                     </span>
                 </div>
             </div>
 
             {/* Stat */}
-            <div className="flex items-center gap-2.5 shrink-0">
-                {hasStat && (
+            <div className="flex items-center gap-2 shrink-0">
+                {stat && (
                     <div className="flex flex-col items-end leading-none">
-                        <span className="text-[18px] font-bold text-ink-1 tabular-nums tracking-tight">{statValue}</span>
-                        <span className="text-[12px] font-medium text-black/40 mt-1">{statUnit}</span>
+                        <span className="text-[17px] font-semibold text-ink-1 rk-num">{stat.value}</span>
+                        <span className="text-[12px] font-medium text-ink-3 mt-1">{t(stat.labelKey)}</span>
                     </div>
                 )}
-                <LucideChevronRight className="w-4 h-4 text-black/30 group-hover:text-black/50 transition-colors" />
+                <LucideChevronRight className="w-4 h-4 text-ink-4" />
             </div>
-        </div>
+        </button>
     );
 }
 
-// Tier label → refined accent color (medal metals, tuned for the warm light theme).
-const TIER_COLOR: Record<string, string> = {
-    "플래티넘": "text-cyan-600",
-    "골드": "text-[#cba258]",
-    "실버": "text-slate-500",
-    "브론즈": "text-orange-600",
-};
-
 // 당구공 한 알 위에 숫자를 얹은 스탯. 공 색이 종목을 말한다(노랑=4구, 빨강=3쿠션).
-// 하이라이트는 실제 공의 반사광을 흉내 낸 작은 점 하나 — 그라데이션 워시가 아니다.
+// 하이라이트는 실제 공의 반사광을 흉내 낸 작은 점 하나 — 공 위의 빛이라 테마와 무관하게 흰색이다.
 const BallStat = ({ label, ballColor, value, sub }: { label: string; ballColor: string; value: string | null; sub: string }) => (
     <div className="flex flex-col items-center gap-2">
         <div
-            className="relative w-[68px] h-[68px] rounded-full flex items-center justify-center shadow-[0_3px_10px_rgba(0,0,0,0.18)]"
+            className="relative w-[68px] h-[68px] rounded-full flex items-center justify-center shadow-[var(--shadow-card)]"
             style={{ background: value ? ballColor : "var(--surface-3)" }}
         >
-            <span className="absolute top-[11px] left-[15px] w-[13px] h-[9px] rounded-full bg-white/35" />
-            <span className={cn("text-[13px] font-bold tracking-tight", value ? "text-white/90" : "text-black/30")}>{label}</span>
+            {value && <span className="absolute top-[11px] left-[15px] w-[13px] h-[9px] rounded-full bg-[var(--ball-white)] opacity-35" />}
+            <span className={cn("text-[13px] font-semibold", value ? "text-[var(--ball-white)]" : "text-ink-4")}>{label}</span>
         </div>
-        <span className="text-[26px] font-bold text-ink-1 tracking-tight tabular-nums leading-none">
-            {value ?? <span className="text-[20px] text-black/25">–</span>}
+        <span className="text-[22px] font-semibold text-ink-1 rk-num leading-none">
+            {value ?? <span className="text-ink-4">–</span>}
         </span>
-        <span className="text-[11.5px] text-black/45 font-medium">{sub}</span>
+        <span className={CREW_TEXT.caption}>{sub}</span>
     </div>
 );
 
@@ -616,21 +580,21 @@ const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => {
         {sportCategory === 'GOLF' ? (
             <>
                 <div className="flex flex-col items-center gap-1">
-                    <div className={cn("flex items-center gap-1 px-2 py-0.5 rounded-md mb-1", sheetData.tier.class)}>
-                        <span className="text-[12px] font-semibold">{sheetData.tier.label}</span>
-                    </div>
-                    <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
+                    <span className={cn("px-2 py-0.5 rounded-md border mb-1 text-[12px] font-semibold", sheetData.tier.class)}>
+                        {t(`crewMgmt.tier.${sheetData.tier.label}`)}
+                    </span>
+                    <span className="text-[22px] font-semibold text-ink-1 rk-num">
                         {sheetData.golfScore > 0 ? sheetData.golfScore.toFixed(0) : "-"}
                     </span>
-                    <span className="text-[12px] text-black/55 font-medium">{t("crewMemberList.avgScore")}</span>
+                    <span className={CREW_TEXT.caption}>{t("crewMgmt.golfAvgStrokes")}</span>
                 </div>
-                <div className="w-px h-16 bg-black/10" />
+                <div className="w-px h-16 bg-surface-line" />
                 <div className="flex flex-col items-center gap-1">
-                    <span className="text-[12px] text-brand font-semibold bg-brand/10 px-2 py-0.5 rounded-full mb-1">{t("crewMemberList.bestScore")}</span>
-                    <span className="text-4xl font-bold text-ink-1 tracking-tight tabular-nums">
+                    <span className="rk-chip bg-brand/10 text-brand mb-1">{t("crewMemberList.bestScore")}</span>
+                    <span className="text-[22px] font-semibold text-ink-1 rk-num">
                         {member.golfBestScore && member.golfBestScore > 0 ? member.golfBestScore : "-"}
                     </span>
-                    <span className="text-[12px] text-black/55 font-medium">{t("crewMemberList.best")}</span>
+                    <span className={CREW_TEXT.caption}>{t("crewMemberList.best")}</span>
                 </div>
             </>
         ) : (
@@ -656,6 +620,3 @@ const MemberStatsDisplay = ({ sportCategory, sheetData, member }: any) => {
     </div>
     );
 };
-
-
-

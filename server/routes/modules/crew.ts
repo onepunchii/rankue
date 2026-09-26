@@ -974,6 +974,45 @@ async function validateBaseListing(data: { baseListingCode?: string | null }): P
     return null;
 }
 
+// 베이스 매장(파트너) 검증 — 실존하고 고를 수 있는 매장만. 예전 PATCH 는 아무 uuid 나 받아서, 없는 매장이나
+// 시스템 매장(hiq·global — 소속 그릇이지 갈 수 있는 매장이 아님)이 베이스캠프로 저장될 수 있었다.
+async function validateBaseStore(data: { baseStoreId?: string | null }): Promise<string | null> {
+    const id = String(data.baseStoreId || "").trim();
+    if (!id) { data.baseStoreId = null; return null; }
+    if (!UUID_RE.test(id)) return "err.crew.storeNotFound";
+    const store = await storage.getStoreById(id);
+    const { isSystemStore } = await import("../../../shared/systemStores.js");
+    if (!store || isSystemStore((store as any).slug)) return "err.crew.storeNotFound";
+    data.baseStoreId = id;
+    return null;
+}
+
+// 좌표 검증 — 없으면(undefined) 건드리지 않고, null 은 지우기. 숫자가 아니거나 범위를 벗어나면 거절한다
+// (깨진 값이 저장되면 거리순 정렬이 그 크루를 엉뚱한 자리에 둔다).
+function validateCoords(data: { latitude?: unknown; longitude?: unknown }): string | null {
+    for (const [key, limit] of [["latitude", 90], ["longitude", 180]] as const) {
+        const v = data[key];
+        if (v === undefined || v === null) continue;
+        const n = Number(v);
+        if (typeof v === "boolean" || !Number.isFinite(n) || Math.abs(n) > limit) return "err.crew.badLocation";
+        data[key] = n;
+    }
+    return null;
+}
+
+// 정원 — 정수 0~1000(0·null = 무제한). 만들기·수정이 같은 규칙을 쓴다(예전엔 수정만 검사했다).
+function badMaxMembers(v: unknown): boolean {
+    if (v === undefined || v === null) return false;
+    const n = Number(v);
+    return !Number.isInteger(n) || n < 0 || n > 1000;
+}
+
+// 태그 — 최대 3개, 각 20자 이하 문자열. 만들기·수정 공통.
+function badTags(v: unknown): boolean {
+    if (v === undefined || v === null) return false;
+    return !Array.isArray(v) || v.length > 3 || v.some((t: any) => typeof t !== "string" || t.length > 20);
+}
+
 // GET /crews/store-search — 크루 베이스 매장 선택용 통합 검색 (파트너 + 디렉토리 1,195곳)
 router.get("/store-search", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const q = String(req.query.q || "").trim().slice(0, 40);
@@ -1024,6 +1063,17 @@ router.post("/", requireAuth, requireTermsAccepted, asyncHandler(async (req: Aut
     }
     // 크루 이름·소개·태그·가입 질문도 공개 탐색에 뜨는 글이라 게시글과 같은 필터를 건다
     // ("#내기환영" 같은 내기 권유 태그 차단, 소개의 연락처 마스킹).
+    // 정원·태그·좌표·파트너 매장 — 수정(PATCH)과 같은 검사. 예전엔 만들기만 비어 있어 정원 -5, 태그 객체,
+    // 없는 매장 id 가 그대로 저장될 수 있었다.
+    if (badMaxMembers(validation.data.maxMembers)) return sendError(res, 400, "err.crew.badMaxMembers");
+    if (validation.data.maxMembers != null) validation.data.maxMembers = Number(validation.data.maxMembers);
+    if (badTags(validation.data.tags)) return sendError(res, 400, "err.crew.badTags");
+    const coordErr = validateCoords(validation.data as any);
+    if (coordErr) return sendError(res, 400, coordErr);
+    if (validation.data.baseStoreId != null) {
+        const err = await validateBaseStore(validation.data as any);
+        if (err) return sendError(res, 400, err);
+    }
     const profile = screenCrewProfile(validation.data as any);
     if (!profile.ok) return sendError(res, 400, profile.reason);
     Object.assign(validation.data, profile.value);
@@ -1060,6 +1110,16 @@ router.post("/", requireAuth, requireTermsAccepted, asyncHandler(async (req: Aut
 
     const crew = await storage.createCrew({ ...validation.data, leaderId: req.userId!, countryCode, latitude, longitude });
     return sendSuccess(res, crew);
+}));
+
+// GET /crews/name-check?name= — 크루 이름을 쓸 수 있는가(만들기 1단계에서 바로 알려 준다).
+// 예전엔 3단계 '만들기'를 눌러야 409 로 알게 돼서, 이름 칸이 있는 1단계로 스스로 돌아가야 했다.
+// 판정은 만들기와 같은 findCrewByName(대소문자·앞뒤 공백 무시). /:id 보다 먼저 등록해야 한다.
+router.get("/name-check", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const name = String(req.query.name || "").trim();
+    if (!name || name.length > 30) return sendSuccess(res, { available: false, reason: "length" });
+    const hit = await storage.crews.findCrewByName(name);
+    return sendSuccess(res, { available: !hit, reason: hit ? "taken" : null });
 }));
 
 // GET /crews/mine - Get my crews
@@ -1142,7 +1202,8 @@ router.post("/:id/join", requireAuth, asyncHandler(async (req: AuthRequest, res:
                         : msg("notif.crew.joinAuto.body", { name: applicantName }),
                     category: crewData.crew.sportCategory || "BILLIARDS",
                     type: "SYSTEM",
-                    params: { url: `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
+                    // 승인 대기 알림은 누르면 곧장 멤버 관리(가입 대기 목록)가 열리게 한다(club-detail 의 ?manage=members).
+                    params: { url: isPending ? `/crew/${req.params.id}/home?manage=members` : `/crew/${req.params.id}/home`, crewId: req.params.id, tab: "home" },
                 })));
         }
     } catch(e) { console.error("[Notify] 크루 가입:", e); }
@@ -1180,6 +1241,27 @@ router.patch("/:id", requireAuth, requireTermsAccepted, asyncHandler(async (req:
         const err = await validateBaseListing(updateData);
         if (err) return sendError(res, 400, err);
     }
+    if (updateData.baseStoreId !== undefined && updateData.baseStoreId !== null) {
+        const err = await validateBaseStore(updateData);
+        if (err) return sendError(res, 400, err);
+    }
+    const coordErr = validateCoords(updateData);
+    if (coordErr) return sendError(res, 400, coordErr);
+    // 지역을 바꾸면 좌표도 새 지역으로 — 좌표를 같이 보내지 않았을 때만 만들기와 같은 도시 수준 지오코딩을 한다.
+    // 그대로 두면 '내 주변' 거리순이 옛 지역 좌표로 계산된다. 지오코딩이 실패하면 좌표를 비운다
+    // (옛 지역 좌표보다 베이스캠프 좌표로 넘어가는 편이 맞다 — searchCrews 가 크루 좌표 → 매장 좌표 순으로 본다).
+    if (updateData.region !== undefined) {
+        updateData.region = updateData.region === null ? null : (String(updateData.region).trim() || null);
+        const regionChanged = (updateData.region ?? "") !== String(data?.crew?.region ?? "").trim();
+        if (regionChanged && updateData.region && updateData.latitude === undefined && updateData.longitude === undefined) {
+            try {
+                const { geocodeCity } = await import("../../lib/geocode.js");
+                const geo = await geocodeCity(updateData.region, (data?.crew as any)?.countryCode);
+                updateData.latitude = geo?.lat ?? null;
+                updateData.longitude = geo?.lng ?? null;
+            } catch (e) { console.error("[CrewRegionGeocode]", e); }
+        }
+    }
     if (updateData.gameType !== undefined && updateData.gameType !== null
         && !['3c', '4c', 'pocket', 'any', 'field', 'screen', 'range'].includes(updateData.gameType)) {
         return sendError(res, 400, "err.crew.badGameType");
@@ -1194,14 +1276,14 @@ router.patch("/:id", requireAuth, requireTermsAccepted, asyncHandler(async (req:
         }
     }
     if (updateData.maxMembers !== undefined && updateData.maxMembers !== null) {
+        if (badMaxMembers(updateData.maxMembers)) return sendError(res, 400, "err.crew.badMaxMembers");
         const n = Number(updateData.maxMembers);
-        if (!Number.isInteger(n) || n < 0 || n > 1000) return sendError(res, 400, "err.crew.badMaxMembers");
         updateData.maxMembers = n;
         // 현재 인원보다 작게 줄이면 신규 가입만 막히고 아무 안내가 없다 — 명시적으로 거부
         const activeCount = (data?.members || []).filter((m: any) => m.role !== 'pending').length;
         if (n > 0 && n < activeCount) return sendError(res, 400, msg("err.crew.maxBelowCurrent", { n: activeCount }));
     }
-    if (updateData.tags !== undefined && (!Array.isArray(updateData.tags) || updateData.tags.length > 3 || updateData.tags.some((t: any) => typeof t !== "string" || t.length > 20))) {
+    if (updateData.tags !== undefined && (updateData.tags === null || badTags(updateData.tags))) {
         return sendError(res, 400, "err.crew.badTags");
     }
     // 이름·소개·태그·가입 질문 필터 — 생성과 같은 규칙(연락처는 가려서 저장, 내기 권유 태그는 거부).
@@ -1364,6 +1446,36 @@ router.delete("/:id/members/:memberId", requireAuth, asyncHandler(async (req: Au
     }
 
     await storage.leaveCrew(crewId, memberId);
+    return sendSuccess(res, { success: true });
+}));
+
+// POST /crews/:id/transfer { memberId } — 크루장 넘기기 (크루장만)
+// 예전엔 넘길 방법이 없어 크루장은 탈퇴도 못 하고(leaderCannotLeave) 크루를 지우는 수밖에 없었다.
+// 대상은 활동 멤버(일반·운영진)만. 넘긴 뒤 이전 크루장은 운영진으로 남는다 — 바로 멤버로 내리면
+// 실수로 넘겼을 때 되돌릴 사람이 없다. 역할 셋(대상·본인·hiq_crews.leader_id)은 리포지토리 트랜잭션이 한 번에 바꾼다.
+router.post("/:id/transfer", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const crewId = req.params.id;
+    const toMemberId = String(req.body?.memberId || "");
+    if (!UUID_RE.test(toMemberId)) return sendError(res, 400, "err.crew.transferTarget");
+    if (toMemberId === req.userId) return sendError(res, 400, "err.crew.transferSelf");
+
+    const membership = await storage.getCrewMembership(crewId, req.userId!);
+    if (!membership || membership.role !== 'leader') return sendError(res, 403, "err.crew.transferLeaderOnly");
+
+    await storage.crews.transferCrewLeadership(crewId, req.userId!, toMemberId);
+
+    try {
+        const data = await storage.getCrew(crewId);
+        await notificationService.sendAndSaveNotification({
+            memberId: toMemberId,
+            title: msg("notif.crew.transfer.title", { crew: data?.crew?.name || "크루" }),
+            body: "notif.crew.transfer.body",
+            category: data?.crew?.sportCategory || "BILLIARDS",
+            type: "SYSTEM",
+            params: { url: `/crew/${crewId}/home`, crewId, tab: "home" },
+        });
+    } catch (e) { console.error("[Notify] 크루장 넘기기:", e); }
+
     return sendSuccess(res, { success: true });
 }));
 

@@ -1,42 +1,37 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useQuery, useMutation } from "@tanstack/react-query";
-import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Button } from "@/components/ui/button";
+import { apiRequest, queryClient, ApiError } from "@/lib/queryClient";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { uploadImage } from "@/lib/imageUtils";
-import {
-    Command,
-    CommandEmpty,
-    CommandGroup,
-    CommandInput,
-    CommandItem,
-    CommandList,
-} from "@/components/ui/command";
 import {
     LucideChevronLeft,
     LucideCheck,
     LucideSearch,
     LucideMapPin,
-    LucideUsers,
     LucideTent,
     LucideCamera,
     LucideImagePlus,
     LucideLoader2,
-    ChevronsUpDown
+    LucideX,
 } from "@/lib/icons";
-import { InsertHiqCrew, HiqMember } from "@shared/schema";
+import { InsertHiqCrew } from "@shared/schema";
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
-import { useEffect } from "react";
+import { useAuth } from "@/hooks/useAuth";
+import { goLogin } from "@/components/hiq/LoginGate";
+import { CREW_BTN, CREW_CARD, CREW_TEXT, IconButton } from "@/components/hiq/crew-ui";
+import { FIELD_INPUT, FIELD_TEXTAREA, Field } from "@/components/hiq/club-settings/formKit";
+import { RegionField } from "@/components/hiq/club-settings/RegionField";
+import { MeetingPicker } from "@/components/hiq/club-settings/MeetingPicker";
+import { CapacityPicker } from "@/components/hiq/club-settings/CapacityPicker";
+import { GameTypePicker, JoinTypePicker, TagPicker } from "@/components/hiq/club-settings/CrewOptionFields";
 
 // 라벨은 i18n 키 — 렌더 시 t()로 감싼다.
 const STEPS = [
@@ -45,30 +40,28 @@ const STEPS = [
     { id: 3, title: "createClub.step3Title", subtitle: "createClub.step3Subtitle" },
 ];
 
+const NAME_MAX = 30; // 서버 err.crew.nameLength 와 같다
+const INTRO_MAX = 60;
+
 export default function CreateClub() {
-    const [_, setLocation] = useLocation();
-    const { t, locale } = useT();
+    const [, setLocation] = useLocation();
+    const { t } = useT();
     const { gate } = useTermsGate();
-    const { data: member } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
+    const { member, isGuest } = useAuth();
     const { toast } = useToast();
     const [uploadingField, setUploadingField] = useState<null | 'emblem' | 'coverImage'>(null);
-
-    // Compress to webp + upload to Blob, then store only the returned URL.
-    const handleImageSelect = async (field: 'emblem' | 'coverImage', file: File, category: string) => {
-        try {
-            setUploadingField(field);
-            // 수정 화면(ClubGeneralTab)과 동일 크기로 통일 — 로고 400px, 커버 1200px
-            const url = await uploadImage(file, category, { maxSize: field === 'coverImage' ? 1200 : 400 });
-            setFormData(prev => ({ ...prev, [field]: url }));
-        } catch (err: any) {
-            toast({ title: t("createClub.imageUploadFailed"), description: err?.message || t("createClub.tryAgain"), variant: "destructive" });
-        } finally {
-            setUploadingField(null);
-        }
-    };
     const [step, setStep] = useState(1);
     const [searchQuery, setSearchQuery] = useState("");
     const { currentSport } = useSport();
+    const [nameError, setNameError] = useState<string | null>(null);
+    const [checkingName, setCheckingName] = useState(false);
+    const logoInput = useRef<HTMLInputElement>(null);
+    const coverInput = useRef<HTMLInputElement>(null);
+
+    // 만들기는 계정이 필요하다 — 게스트가 주소로 바로 들어오면 로그인으로 보내고 여기로 되돌아온다.
+    useEffect(() => {
+        if (isGuest) goLogin(setLocation, "/club/create");
+    }, [isGuest]);
 
     const [formData, setFormData] = useState<Partial<InsertHiqCrew>>({
         name: "",
@@ -84,11 +77,29 @@ export default function CreateClub() {
         maxMembers: 20,
         tags: [],
     });
+    const set = (patch: Partial<InsertHiqCrew>) => setFormData((prev) => ({ ...prev, ...patch }));
+
+    // Compress to webp + upload to Blob, then store only the returned URL.
+    const handleImageSelect = async (field: 'emblem' | 'coverImage', input: HTMLInputElement) => {
+        const file = input.files?.[0];
+        // 같은 파일을 다시 골라도 onChange 가 오게 비운다 — 업로드 실패 뒤 같은 사진으로 다시 시도할 수 있어야 한다.
+        input.value = "";
+        if (!file) return;
+        try {
+            setUploadingField(field);
+            // 수정 화면(ClubGeneralTab)과 동일 크기로 통일 — 로고 400px, 커버 1200px
+            const url = await uploadImage(file, field === 'coverImage' ? 'crew-cover' : 'crew-logo', { maxSize: field === 'coverImage' ? 1200 : 400 });
+            set({ [field]: url });
+        } catch (err: any) {
+            toast({ title: t("createClub.imageUploadFailed"), description: err?.message || t("createClub.tryAgain"), variant: "destructive" });
+        } finally {
+            setUploadingField(null);
+        }
+    };
 
     // Store Selection State
     const [selectedStore, setSelectedStore] = useState<any>(null);
 
-    // Mutation
     const createCrewMutation = useMutation({
         mutationFn: async (data: InsertHiqCrew) => {
             return await apiRequest("/api/hiq/crews", {
@@ -96,60 +107,82 @@ export default function CreateClub() {
                 body: data
             });
         },
-        onSuccess: () => {
-            toast({
-                title: t("createClub.createdTitle"),
-                description: t("createClub.createdDesc"),
-            });
+        onSuccess: (crew: any) => {
+            toast({ title: t("crewMgmt.createdToast"), description: t("createClub.createdDesc") });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/crews"] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/crews/mine"] });
-            setLocation("/club");
+            // 만든 크루로 바로 들어간다 — 예전엔 목록(/club)으로 돌아가 방금 만든 크루를 다시 찾아 눌러야 했다.
+            // 뒤로가기가 만들기 화면으로 돌아오지 않게 replace.
+            setLocation(crew?.id ? `/club/${crew.id}` : "/club", { replace: true });
         },
         onError: (error: Error) => {
-            toast({
-                title: t("createClub.createFailed"),
-                description: error.message,
-                variant: "destructive",
-            });
+            // 이름 중복(409)은 3단계에서 알게 되더라도 이름 칸이 있는 1단계로 데려가 바로 고치게 한다.
+            if (error instanceof ApiError && error.status === 409) {
+                setNameError(error.message || t("crewMgmt.nameTaken"));
+                setStep(1);
+                return;
+            }
+            toast({ title: t("createClub.createFailed"), description: error.message, variant: "destructive" });
         }
     });
 
     // Validations
-    const isStep1Valid = (formData.name?.trim().length ?? 0) > 0;
+    const trimmedName = formData.name?.trim() ?? "";
+    const isStep1Valid = trimmedName.length > 0 && trimmedName.length <= NAME_MAX;
     const isRegionValid = (formData.region?.trim().length ?? 0) > 0;
-    const isStep2Valid = isRegionValid; // 주 활동 지역 is required (field lives on step 2)
-    const isStep3Valid = isRegionValid; // Backstop before submit
 
-    // Handlers
-    const handleNext = () => {
-        if (step === 1 && !isStep1Valid) {
-            toast({ title: t("createClub.nameRequired"), variant: "destructive" });
-            return;
-        }
-        // Validate the required region on the screen that actually contains the field (step 2).
-        if (step === 2 && !isStep2Valid) {
-            toast({ title: t("createClub.regionRequired"), variant: "destructive" });
-            return;
-        }
-        if (step < 3) {
-            setStep(step + 1);
-        } else {
-            // Backstop: enforce required region before submitting.
-            if (!isStep3Valid) {
-                toast({ title: t("createClub.regionRequired"), variant: "destructive" });
-                return;
+    // 1단계 '다음' — 이름을 바로 확인한다(/crews/name-check). 확인 요청이 실패하면 막지 않고 넘어간다 —
+    // 마지막 만들기 요청이 어차피 같은 검사를 한다(위 onError 가 1단계로 되돌린다).
+    const checkName = async (): Promise<boolean> => {
+        setCheckingName(true);
+        try {
+            const res = await apiRequest(`/api/hiq/crews/name-check?name=${encodeURIComponent(trimmedName)}`);
+            if (res?.available === false) {
+                setNameError(t("crewMgmt.nameTaken"));
+                return false;
             }
-            handleSubmit();
+            return true;
+        } catch {
+            return true;
+        } finally {
+            setCheckingName(false);
         }
     };
 
+    const handleNext = async () => {
+        if (step === 1) {
+            if (!isStep1Valid) {
+                setNameError(t("createClub.nameRequired"));
+                return;
+            }
+            if (!(await checkName())) return;
+        }
+        // Validate the required region on the screen that actually contains the field (step 2).
+        if (step >= 2 && !isRegionValid) {
+            toast({ title: t("createClub.regionRequired"), variant: "destructive" });
+            if (step === 3) setStep(2);
+            return;
+        }
+        if (step < 3) setStep(step + 1);
+        else handleSubmit();
+    };
+
     const handleSubmit = () => {
-        if (!member) return;
+        // 회원 정보가 아직 없으면 조용히 멈추지 않는다 — 예전엔 버튼이 아무 반응도 없었다.
+        if (!member) {
+            if (isGuest) goLogin(setLocation, "/club/create");
+            else toast({ title: t("crewMgmt.meLoading"), variant: "destructive" });
+            return;
+        }
 
         // 크루 이름·소개·태그도 공개 UGC 라 첫 생성 전에 약관 동의부터(감사 S4)
         gate(() => createCrewMutation.mutate({
             ...formData as InsertHiqCrew,
+            name: trimmedName,
+            // 서버는 세션으로 크루장을 정한다(이 값은 믿지 않는다) — 스키마 검증에 필요한 자리만 채운다.
             leaderId: member.id,
+            // 무제한(0)은 null — 서버·joinCrew 가 null/0 을 제한 없음으로 본다.
+            maxMembers: formData.maxMembers ? formData.maxMembers : null,
             // 파트너 매장이면 baseStoreId, 디렉토리(1,195곳)면 baseListingCode — 서버가 실존 검증
             baseStoreId: selectedStore?.type === "partner" ? selectedStore.id : null,
             baseListingCode: selectedStore?.type === "listing" ? selectedStore.code : null,
@@ -159,7 +192,7 @@ export default function CreateClub() {
     };
 
     // Store Search Query — 당구는 파트너+디렉토리 통합 검색, 골프는 기존 파트너 검색 유지
-    const { data: storeResults } = useQuery({
+    const { data: storeResults, isFetching: storeSearching } = useQuery({
         queryKey: ["/api/hiq/crews/store-search", currentSport, searchQuery],
         queryFn: async () => {
             if (searchQuery.length < 2) return [];
@@ -175,489 +208,253 @@ export default function CreateClub() {
     // 크루 좌표 — "현재 위치 사용" 버튼으로 취득(앱=GPS 브릿지, 웹=브라우저 폴백).
     // 미사용 시 서버가 지역 텍스트를 도시 수준 지오코딩으로 폴백.
     const { location: gpsLocation, requestLocation } = useNativeBridge();
+    const [locating, setLocating] = useState(false);
     useEffect(() => {
-        if (gpsLocation) {
-            setFormData(prev => ({ ...prev, latitude: gpsLocation.lat, longitude: gpsLocation.lng }));
-        }
+        if (gpsLocation) set({ latitude: gpsLocation.lat, longitude: gpsLocation.lng });
     }, [gpsLocation]);
-
-    // Region Search Query
-    const [regionSearchQuery, setRegionSearchQuery] = useState("");
-    const [isRegionOpen, setIsRegionOpen] = useState(false);
-
-    const { data: regionResults } = useQuery({
-        queryKey: ["/api/hiq/regions/search", regionSearchQuery],
-        queryFn: async () => {
-            // Fetch only if user typed something
-            if (regionSearchQuery.length < 1) return [];
-            return await apiRequest(`/api/hiq/regions/search?q=${regionSearchQuery}`);
-        },
-        enabled: isRegionOpen && regionSearchQuery.length > 0,
-    });
-
-    const toggleTag = (tag: string) => {
-        const currentTags = (formData.tags as string[]) || [];
-        if (currentTags.includes(tag)) {
-            setFormData({ ...formData, tags: currentTags.filter(t => t !== tag) });
-        } else {
-            if (currentTags.length >= 3) return; // Max 3 tags
-            setFormData({ ...formData, tags: [...currentTags, tag] });
+    const pickMyLocation = async () => {
+        setLocating(true);
+        try {
+            const result = await requestLocation();
+            if (result !== "granted") {
+                toast({ title: result === "denied" ? t("crewMgmt.locationDenied") : t("crewMgmt.locationUnavailable"), variant: "destructive" });
+            }
+        } finally {
+            setLocating(false);
         }
     };
 
+    const stepTitle = t(step === 2 && currentSport === "GOLF" ? "createClub.step2TitleGolf" : STEPS[step - 1].title);
+    const stepSubtitle = t(step === 2 && currentSport === "GOLF" ? "createClub.step2SubtitleGolf" : STEPS[step - 1].subtitle);
+    const busy = createCrewMutation.isPending || uploadingField !== null || checkingName;
+
     return (
-        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans pb-36">
-            {/* Header — 전역 .sticky.top-0 세이프에어리어 규칙(index.css)이 py-4의 상단
-                패딩을 env()로 덮어써 헤더가 위에 딱 붙었다. rk-no-safe로 제외하고
-                env+16px을 직접 준다 (웹=16px, 앱=상태바+16px). */}
-            <div className="rk-no-safe sticky top-0 z-10 bg-surface-0 border-b border-surface-line px-5 pb-4 pt-[calc(env(safe-area-inset-top)+1rem)] mt-[calc(-1*env(safe-area-inset-top))] flex items-center justify-between">
-                <Button variant="ghost" className="p-0 h-auto text-black/60 hover:text-[rgba(0,0,0,0.87)]" onClick={() => step > 1 ? setStep(step - 1) : setLocation("/club")}>
-                    <LucideChevronLeft className="w-6 h-6" />
-                </Button>
-                <div className="text-sm font-semibold text-black/70 tabular-nums">
+        <div className="min-h-screen bg-surface-0 text-ink-1 font-sans pb-36">
+            {/* Header — 전역 .sticky.top-0 세이프에어리어 규칙(index.css)이 상단 패딩을 env()로 덮어써
+                헤더가 위에 딱 붙었다. rk-no-safe로 제외하고 env+8px을 직접 준다 (웹=8px, 앱=상태바+8px). */}
+            <div className="rk-no-safe sticky top-0 z-10 bg-surface-0 border-b border-surface-line px-2 pb-2 pt-[calc(env(safe-area-inset-top)+0.5rem)] mt-[calc(-1*env(safe-area-inset-top))] flex items-center justify-between">
+                <IconButton label={t("common.back")} onClick={() => (step > 1 ? setStep(step - 1) : setLocation("/club"))}>
+                    <LucideChevronLeft />
+                </IconButton>
+                <div className="text-[13px] font-semibold text-ink-2 rk-num" aria-live="polite">
                     {step}{t("createClub.stepSuffix")}
                 </div>
-                <div className="w-6" /> {/* Spacer */}
+                <div className="w-11" aria-hidden="true" />
             </div>
 
-            <div className="max-w-md mx-auto px-5 py-8">
+            <div className="max-w-md mx-auto px-4 pt-6">
                 {/* Progress Bar */}
-                <div className="h-1 bg-black/[0.06] rounded-full mb-8">
-                    <motion.div
-                        className="h-full rounded-full bg-brand"
-                        initial={{ width: "33%" }}
-                        animate={{ width: `${(step / 3) * 100}%` }}
-                    />
+                <div className="h-1 bg-surface-3 rounded-full mb-6" role="progressbar" aria-valuemin={1} aria-valuemax={3} aria-valuenow={step}>
+                    <motion.div className="h-full rounded-full bg-brand" initial={{ width: "33%" }} animate={{ width: `${(step / 3) * 100}%` }} />
                 </div>
 
-                <div className="mb-8">
+                <div className="mb-6">
                     {/* 2단계는 골프에서 베이스캠프가 아니라 활동 지역만 받는다 — 제목도 그에 맞춘다 */}
-                    <h1 className="text-2xl font-bold mb-2 tracking-tight">
-                        {t(step === 2 && currentSport === "GOLF" ? "createClub.step2TitleGolf" : STEPS[step - 1].title)}
-                    </h1>
-                    <p className="text-black/55 text-sm">
-                        {t(step === 2 && currentSport === "GOLF" ? "createClub.step2SubtitleGolf" : STEPS[step - 1].subtitle)}
-                    </p>
+                    <h1 className={CREW_TEXT.title}>{stepTitle}</h1>
+                    <p className={cn(CREW_TEXT.sub, "mt-1")}>{stepSubtitle}</p>
                 </div>
 
                 <AnimatePresence mode="wait">
                     {step === 1 && (
-                        <motion.div
-                            key="step1"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            className="space-y-6"
-                        >
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.nameLabel")} <span className="text-brand">*</span></Label>
-                                    <Input
-                                        placeholder={currentSport === "GOLF" ? t("createClub.namePlaceholderGolf") : t("createClub.namePlaceholderBilliards")}
-                                        className="bg-surface-2 border-black/10 h-14 text-xl font-semibold placeholder:text-black/40 rounded-tile"
-                                        value={formData.name || ""}
-                                        onChange={e => setFormData({ ...formData, name: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.introLabel")}</Label>
-                                    <Input
-                                        placeholder={currentSport === "GOLF" ? t("createClub.introPlaceholderGolf") : t("createClub.introPlaceholderBilliards")}
-                                        className="bg-surface-2 border-black/10 h-12 text-[15px] font-medium placeholder:text-black/40 rounded-tile"
-                                        value={formData.shortIntro || ""}
-                                        onChange={e => setFormData({ ...formData, shortIntro: e.target.value })}
-                                    />
-                                </div>
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.descLabel")}</Label>
-                                    <Textarea
-                                        placeholder={currentSport === "GOLF" ? t("createClub.descPlaceholderGolf") : t("createClub.descPlaceholderBilliards")}
-                                        className="bg-surface-2 border-black/10 min-h-[160px] text-[15px] font-medium placeholder:text-black/40 resize-none rounded-tile p-4 leading-relaxed"
-                                        value={formData.description || ""}
-                                        onChange={e => setFormData({ ...formData, description: e.target.value })}
-                                    />
-                                </div>
+                        <motion.div key="step1" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col gap-6">
+                            <Field
+                                label={t("createClub.nameLabel")}
+                                htmlFor="crew-name"
+                                required
+                                aside={`${formData.name?.length ?? 0}/${NAME_MAX}`}
+                                error={nameError}
+                            >
+                                <Input
+                                    id="crew-name"
+                                    autoFocus
+                                    maxLength={NAME_MAX}
+                                    aria-invalid={!!nameError}
+                                    placeholder={currentSport === "GOLF" ? t("createClub.namePlaceholderGolf") : t("createClub.namePlaceholderBilliards")}
+                                    className={cn(FIELD_INPUT, "h-14 text-[17px] font-semibold", nameError && "border-destructive focus-visible:border-destructive")}
+                                    value={formData.name || ""}
+                                    onChange={(e) => { set({ name: e.target.value }); setNameError(null); }}
+                                />
+                            </Field>
+                            <Field label={t("createClub.introLabel")} htmlFor="crew-intro" aside={`${formData.shortIntro?.length ?? 0}/${INTRO_MAX}`}>
+                                <Input
+                                    id="crew-intro"
+                                    maxLength={INTRO_MAX}
+                                    placeholder={currentSport === "GOLF" ? t("crewMgmt.sloganPlaceholderGolf") : t("crewMgmt.sloganPlaceholderBilliards")}
+                                    className={FIELD_INPUT}
+                                    value={formData.shortIntro || ""}
+                                    onChange={(e) => set({ shortIntro: e.target.value })}
+                                />
+                            </Field>
+                            <Field label={t("createClub.descLabel")} htmlFor="crew-desc">
+                                <Textarea
+                                    id="crew-desc"
+                                    placeholder={currentSport === "GOLF" ? t("createClub.descPlaceholderGolf") : t("createClub.descPlaceholderBilliards")}
+                                    className={cn(FIELD_TEXTAREA, "min-h-[160px]")}
+                                    value={formData.description || ""}
+                                    onChange={(e) => set({ description: e.target.value })}
+                                />
+                            </Field>
 
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-3">
-                                        <Label className="text-xs font-semibold text-black/55">{t("createClub.logoLabel")}</Label>
-                                        <input
-                                            type="file"
-                                            id="logo-upload"
-                                            className="hidden"
-                                            accept="image/*"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) handleImageSelect('emblem', file, 'crew-logo');
-                                            }}
-                                        />
-                                        <div
-                                            onClick={() => { if (uploadingField !== 'emblem') document.getElementById('logo-upload')?.click(); }}
-                                            className={cn(
-                                                "aspect-square rounded-tile bg-surface-2 flex flex-col items-center justify-center transition-all group overflow-hidden relative",
-                                                uploadingField === 'emblem' ? "cursor-wait" : "cursor-pointer hover:border-brand/50"
-                                            )}
-                                        >
-                                            {uploadingField === 'emblem' ? (
-                                                <>
-                                                    <LucideLoader2 className="w-6 h-6 text-brand animate-spin mb-2" />
-                                                    <span className="text-[12px] font-medium text-black/55">{t("createClub.uploading")}</span>
-                                                </>
-                                            ) : formData.emblem ? (
-                                                <img src={formData.emblem} className="w-full h-full object-cover" alt="Logo Preview" />
-                                            ) : (
-                                                <>
-                                                    <LucideCamera className="w-6 h-6 text-black/55 transition-colors mb-2 group-hover:text-brand" />
-                                                    <span className="text-[12px] font-medium text-black/55">{t("createClub.uploadPhoto")}</span>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-3">
-                                        <Label className="text-xs font-semibold text-black/55">{t("createClub.coverLabel")}</Label>
-                                        <input
-                                            type="file"
-                                            id="cover-upload"
-                                            className="hidden"
-                                            accept="image/*"
-                                            onChange={(e) => {
-                                                const file = e.target.files?.[0];
-                                                if (file) handleImageSelect('coverImage', file, 'crew-cover');
-                                            }}
-                                        />
-                                        <div
-                                            onClick={() => { if (uploadingField !== 'coverImage') document.getElementById('cover-upload')?.click(); }}
-                                            className={cn(
-                                                "aspect-square rounded-tile bg-surface-2 flex flex-col items-center justify-center transition-all group overflow-hidden relative",
-                                                uploadingField === 'coverImage' ? "cursor-wait" : "cursor-pointer hover:border-brand/50"
-                                            )}
-                                        >
-                                            {uploadingField === 'coverImage' ? (
-                                                <>
-                                                    <LucideLoader2 className="w-6 h-6 text-brand animate-spin mb-2" />
-                                                    <span className="text-[12px] font-medium text-black/55">{t("createClub.uploading")}</span>
-                                                </>
-                                            ) : formData.coverImage ? (
-                                                <img src={formData.coverImage} className="w-full h-full object-cover" alt="Cover Preview" />
-                                            ) : (
-                                                <>
-                                                    <LucideImagePlus className="w-6 h-6 text-black/55 transition-colors mb-2 group-hover:text-brand" />
-                                                    <span className="text-[12px] font-medium text-black/55">{t("createClub.uploadPhoto")}</span>
-                                                </>
-                                            )}
-                                        </div>
-                                    </div>
-                                </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                {([
+                                    { field: 'emblem' as const, label: "createClub.logoLabel", icon: <LucideCamera />, ref: logoInput },
+                                    { field: 'coverImage' as const, label: "createClub.coverLabel", icon: <LucideImagePlus />, ref: coverInput },
+                                ]).map(({ field, label, icon, ref }) => {
+                                    const value = formData[field] as string | undefined;
+                                    const uploading = uploadingField === field;
+                                    return (
+                                        <Field key={field} label={t(label)}>
+                                            <input ref={ref} type="file" className="hidden" accept="image/*" onChange={(e) => handleImageSelect(field, e.currentTarget)} />
+                                            <div className="relative">
+                                                <button
+                                                    type="button"
+                                                    disabled={uploading}
+                                                    onClick={() => ref.current?.click()}
+                                                    aria-label={`${t(label)} ${t("createClub.uploadPhoto")}`}
+                                                    className="w-full aspect-square rounded-card bg-surface-1 border border-dashed border-surface-line flex flex-col items-center justify-center gap-2 overflow-hidden text-ink-3 active:bg-surface-3 disabled:cursor-wait"
+                                                >
+                                                    {uploading ? (
+                                                        <>
+                                                            <LucideLoader2 className="w-6 h-6 text-brand animate-spin" />
+                                                            <span className="text-[12px] font-medium">{t("createClub.uploading")}</span>
+                                                        </>
+                                                    ) : value ? (
+                                                        <img src={value} className="w-full h-full object-cover" alt="" />
+                                                    ) : (
+                                                        <>
+                                                            <span className="[&_svg]:w-6 [&_svg]:h-6">{icon}</span>
+                                                            <span className="text-[12px] font-medium">{t("createClub.uploadPhoto")}</span>
+                                                        </>
+                                                    )}
+                                                </button>
+                                                {value && !uploading && (
+                                                    <IconButton label={t("crewMgmt.removePhoto")} onClick={() => set({ [field]: "" })} className="absolute top-1 right-1 bg-surface-1 shadow-[var(--shadow-card)] [&_svg]:w-4 [&_svg]:h-4">
+                                                        <LucideX />
+                                                    </IconButton>
+                                                )}
+                                            </div>
+                                        </Field>
+                                    );
+                                })}
                             </div>
                         </motion.div>
                     )}
 
                     {step === 2 && (
-                        <motion.div
-                            key="step2"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            className="space-y-6"
-                        >
-                            <div className="space-y-4">
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.regionLabel")} <span className="text-brand">*</span></Label>
-                                    {/* 지역 입력 분기 — ko: 한국 행정동 검색 / 그 외: 도시명 자유 입력
-                                        (지역 DB가 한국 전용이라 글로벌 유저는 검색 결과가 항상 비어 못 만들게 됨) */}
-                                    {locale !== "ko" ? (
-                                        <Input
-                                            value={formData.region || ""}
-                                            onChange={(e) => setFormData({ ...formData, region: e.target.value })}
-                                            placeholder={t("createClub.regionFreeformPlaceholder")}
-                                            className="h-12 bg-surface-2 border-black/10 rounded-tile text-[15px]"
-                                        />
+                        <motion.div key="step2" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col gap-6">
+                            <Field label={t("createClub.regionLabel")} htmlFor="crew-region" required>
+                                <RegionField id="crew-region" value={formData.region || ""} onChange={(region) => set({ region })} />
+                                {/* 좌표 취득 — 거리순 크루 발견용(선택). 안 누르면 서버가 도시 지오코딩 폴백 */}
+                                <button
+                                    type="button"
+                                    onClick={pickMyLocation}
+                                    disabled={locating}
+                                    className={cn("self-start min-h-11 -ml-1 px-1 inline-flex items-center gap-1.5 text-[13px] font-semibold", formData.latitude ? "text-brand" : "text-ink-3")}
+                                >
+                                    {locating ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : formData.latitude ? <LucideCheck className="w-4 h-4" /> : <LucideMapPin className="w-4 h-4" />}
+                                    {formData.latitude ? t("createClub.locationSaved") : t("createClub.useMyLocation")}
+                                </button>
+                            </Field>
+
+                            {/* 베이스캠프는 당구 크루만 — 당구 크루엔 단골 당구장이 있지만 골프 크루는 한 골프장에
+                                매이지 않는다. 게다가 여기 검색은 당구 파트너 매장을 뒤진다(골프장 목록은 비어 있다).
+                                골프는 위의 '주 활동 지역'이 그 역할을 한다(2026-09-09 오너: 골프 크루는 골프에 맞게). */}
+                            {currentSport !== "GOLF" && (
+                                <Field label={t("createClub.step2Title")} htmlFor="crew-store">
+                                    {selectedStore ? (
+                                        <div className="flex items-center justify-between gap-2 pl-3.5 pr-1 py-2 min-h-14 rounded-tile bg-brand/10">
+                                            <div className="min-w-0">
+                                                <div className="text-[15px] font-semibold text-brand truncate">{selectedStore.name}</div>
+                                                <div className="text-[12px] font-medium text-ink-3 truncate">{selectedStore.address}</div>
+                                            </div>
+                                            <button type="button" className={CREW_BTN.ghost} onClick={() => setSelectedStore(null)}>
+                                                {t("clubSettings.baseCampClear")}
+                                            </button>
+                                        </div>
                                     ) : (
-                                    // 인라인 검색 패널 — Popover(포털+fixed 좌표)는 모바일에서
-                                    // 키보드가 뷰포트를 줄이는 순간 앵커 계산이 깨져 (0,0)으로 튄다.
-                                    // 문서 흐름 안에 그리면 구조적으로 어긋날 수 없다.
-                                    <div>
-                                        <Button
-                                            variant="outline"
-                                            role="combobox"
-                                            aria-expanded={isRegionOpen}
-                                            onClick={() => setIsRegionOpen(v => !v)}
-                                            className={cn(
-                                                "w-full justify-between bg-surface-2 border-black/10 h-12 rounded-tile text-[15px] font-medium hover:bg-surface-2 hover:text-[rgba(0,0,0,0.87)]",
-                                                formData.region ? "text-[rgba(0,0,0,0.87)]" : "text-black/40"
-                                            )}
-                                        >
-                                            {formData.region
-                                                ? formData.region
-                                                : t("createClub.regionPlaceholder")}
-                                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                        {isRegionOpen && (
-                                            <div className="mt-2 bg-white text-[rgba(0,0,0,0.87)] rounded-tile shadow-[0_8px_24px_rgba(0,0,0,0.12)] overflow-hidden border border-black/[0.06]">
-                                                <Command shouldFilter={false} className="bg-transparent text-[rgba(0,0,0,0.87)] rounded-tile [&_[cmdk-input-wrapper]]:border-black/10">
-                                                    <CommandInput
-                                                        autoFocus
-                                                        placeholder={t("createClub.regionSearchPlaceholder")}
-                                                        className="h-11 border-none focus:ring-0 text-[15px] text-[rgba(0,0,0,0.87)] placeholder:text-black/40"
-                                                        value={regionSearchQuery}
-                                                        onValueChange={setRegionSearchQuery}
-                                                    />
-                                                    <CommandList className="max-h-[240px] overflow-y-auto overscroll-contain">
-                                                        <CommandEmpty className="py-8 text-center text-[13px] text-black/40">
-                                                            {regionSearchQuery ? t("createClub.noResults") : t("createClub.regionSearchPrompt")}
-                                                        </CommandEmpty>
-                                                        <CommandGroup>
-                                                            {regionResults?.map((region: any) => (
-                                                                <CommandItem
-                                                                    key={region.code}
-                                                                    value={region.fullName}
-                                                                    onSelect={() => {
-                                                                        setFormData({ ...formData, region: region.fullName });
-                                                                        setRegionSearchQuery(region.fullName);
-                                                                        setIsRegionOpen(false);
-                                                                    }}
-                                                                    className="text-[15px] text-black/70 rounded-xl aria-selected:bg-brand/15 aria-selected:text-[rgba(0,0,0,0.87)] data-[selected=true]:bg-brand/15 cursor-pointer py-2.5"
-                                                                >
-                                                                    <LucideCheck
-                                                                        className={cn(
-                                                                            "mr-2 h-4 w-4",
-                                                                            formData.region === region.fullName ? "opacity-100" : "opacity-0"
-                                                                        )}
-                                                                    />
-                                                                    {region.fullName}
-                                                                </CommandItem>
-                                                            ))}
-                                                        </CommandGroup>
-                                                    </CommandList>
-                                                </Command>
+                                        <div className="flex flex-col gap-2">
+                                            <div className="relative">
+                                                <LucideSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-3" aria-hidden="true" />
+                                                <Input
+                                                    id="crew-store"
+                                                    placeholder={t("createClub.storeSearchPlaceholder")}
+                                                    className={cn(FIELD_INPUT, "pl-10")}
+                                                    value={searchQuery}
+                                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                                />
                                             </div>
-                                        )}
-                                    </div>
-                                    )}
-                                    {/* 좌표 취득 — 거리순 크루 발견용(선택). 안 누르면 서버가 도시 지오코딩 폴백 */}
-                                    <button
-                                        type="button"
-                                        onClick={requestLocation}
-                                        className={cn(
-                                            "mt-1.5 text-[12px] font-medium transition-colors",
-                                            formData.latitude ? "text-brand" : "text-black/45 underline underline-offset-2"
-                                        )}
-                                    >
-                                        {formData.latitude ? `📍 ${t("createClub.locationSaved")}` : `📍 ${t("createClub.useMyLocation")}`}
-                                    </button>
-                                </div>
-                                {/* 베이스캠프는 당구 크루만 — 당구 크루엔 단골 당구장이 있지만 골프 크루는 한 골프장에
-                                    매이지 않는다. 게다가 여기 검색은 당구 파트너 매장을 뒤진다(골프장 목록은 비어 있다).
-                                    골프는 위의 '주 활동 지역'이 그 역할을 한다(2026-09-09 오너: 골프 크루는 골프에 맞게). */}
-                                {currentSport !== "GOLF" && (<>
-                                <div className="relative">
-                                    <LucideSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-black/55" />
-                                    <Input
-                                        placeholder={t("createClub.storeSearchPlaceholder")}
-                                        className="bg-surface-2 border-black/10 h-12 rounded-tile pl-10 text-[15px] font-medium placeholder:text-black/40"
-                                        value={searchQuery}
-                                        onChange={e => setSearchQuery(e.target.value)}
-                                    />
-                                </div>
-
-                                {selectedStore ? (
-                                    <Card className="bg-brand/10 border-brand/50">
-                                        <CardContent className="p-4 flex items-center justify-between">
-                                            <div>
-                                                <div className="font-bold text-brand">{selectedStore.name}</div>
-                                                <div className="text-xs text-black/60">{selectedStore.address}</div>
-                                            </div>
-                                            <Button variant="ghost" size="sm" onClick={() => setSelectedStore(null)}>
-                                                {t("createClub.cancel")}
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                ) : (
-                                    <div className="bg-surface-2 rounded-tile overflow-hidden min-h-[200px]">
-                                        {storeResults?.length > 0 ? (
-                                            storeResults.map((store: any) => (
-                                                <div
-                                                    key={store.id || store.code}
-                                                    onClick={() => {
-                                                        setSelectedStore(store);
-                                                        // Auto-fill region hint if likely match from address
-                                                        // "서울 서초구 ..." -> "서울 서초"
-                                                        const regionMatch = store.address?.match(/^(\S+)\s+(\S+)/);
-                                                        if (regionMatch && !formData.region) {
-                                                            setFormData(prev => ({ ...prev, region: `${regionMatch[1]} ${regionMatch[2]}` }));
-                                                        }
-                                                    }}
-                                                    className="p-4 border-b border-black/[0.08] last:border-0 hover:bg-black/[0.04] active:bg-black/[0.06] cursor-pointer flex items-center justify-between group"
-                                                >
-                                                    <div className="min-w-0">
-                                                        <div className="font-bold text-sm transition-colors group-hover:text-brand flex items-center gap-1.5">
-                                                            <span className="truncate">{store.name}</span>
-                                                            {store.type === "partner" && (
-                                                                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[10px] font-bold text-brand leading-none">{t("createClub.partnerBadge")}</span>
-                                                            )}
-                                                        </div>
-                                                        <div className="text-xs text-black/55 truncate">{store.address}</div>
+                                            <div className={cn(CREW_CARD, "p-0 overflow-hidden min-h-[168px]")}>
+                                                {storeResults?.length > 0 ? (
+                                                    storeResults.map((store: any) => (
+                                                        <button
+                                                            type="button"
+                                                            key={store.id || store.code}
+                                                            onClick={() => {
+                                                                setSelectedStore(store);
+                                                                // Auto-fill region hint if likely match from address
+                                                                // "서울 서초구 ..." -> "서울 서초구"
+                                                                const regionMatch = store.address?.match(/^(\S+)\s+(\S+)/);
+                                                                if (regionMatch && !formData.region) set({ region: `${regionMatch[1]} ${regionMatch[2]}` });
+                                                            }}
+                                                            className="w-full min-h-14 px-4 py-2.5 border-b border-surface-line last:border-0 active:bg-surface-3 flex items-center justify-between gap-2 text-left"
+                                                        >
+                                                            <span className="min-w-0">
+                                                                <span className="flex items-center gap-1.5 text-[15px] font-semibold text-ink-1">
+                                                                    <span className="truncate">{store.name}</span>
+                                                                    {store.type === "partner" && <span className="rk-chip shrink-0 bg-brand/10 text-brand">{t("createClub.partnerBadge")}</span>}
+                                                                </span>
+                                                                <span className="block text-[12px] font-medium text-ink-3 truncate">{store.address}</span>
+                                                            </span>
+                                                        </button>
+                                                    ))
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center h-[168px] gap-2 text-ink-3">
+                                                        {storeSearching ? <LucideLoader2 className="w-6 h-6 animate-spin" /> : <LucideMapPin className="w-7 h-7" />}
+                                                        <span className="text-[13px] font-medium">
+                                                            {searchQuery ? t("createClub.noResults") : t("createClub.storeSearchPrompt")}
+                                                        </span>
                                                     </div>
-                                                    <LucideCheck className="w-4 h-4 shrink-0 ml-2 text-black/55 opacity-0 group-hover:opacity-100 transition-all group-hover:text-brand" />
-                                                </div>
-                                            ))
-                                        ) : (
-                                            <div className="flex flex-col items-center justify-center h-[200px] text-black/55 gap-2">
-                                                <LucideMapPin className="w-8 h-8 opacity-40" />
-                                                <span className="text-xs">
-                                                    {searchQuery ? t("createClub.noResults") : t("createClub.storeSearchPrompt")}
-                                                </span>
+                                                )}
                                             </div>
-                                        )}
+                                        </div>
+                                    )}
+                                    <div className="mt-1 p-4 rounded-tile bg-surface-3">
+                                        <h4 className="text-[13px] font-semibold text-ink-1 flex items-center gap-1.5 mb-1">
+                                            <LucideTent className="w-4 h-4 text-brand" />
+                                            {t("createClub.baseCampTitle")}
+                                        </h4>
+                                        <p className="text-[12px] font-medium text-ink-3 leading-relaxed">
+                                            {/* 이 카드는 당구 크루에서만 그려지므로 골프 분기는 없앴다 */}
+                                            {t("createClub.baseCampIntroBilliards")}
+                                            <span className="text-ink-2 font-semibold">{t("createClub.baseCampNotifyBilliards")}</span>
+                                            {t("createClub.baseCampMid")}<span className="text-ink-2 font-semibold">{t("createClub.baseCampPerk")}</span>{t("createClub.baseCampEnd")}
+                                        </p>
                                     </div>
-                                )}
-
-                                <div className="p-4 bg-black/[0.04] rounded-tile ">
-                                    <h4 className="font-bold flex items-center gap-2 mb-2 text-sm">
-                                        <LucideTent className="w-4 h-4 text-brand" />
-                                        {t("createClub.baseCampTitle")}
-                                    </h4>
-                                    <p className="text-xs text-black/55 leading-relaxed">
-                                        {/* 이 카드는 당구 크루에서만 그려지므로 골프 분기는 없앴다 */}
-                                        {t("createClub.baseCampIntroBilliards")}
-                                        <span className="text-black/70 font-bold">{t("createClub.baseCampNotifyBilliards")}</span>
-                                        {t("createClub.baseCampMid")}<span className="text-black/70 font-bold">{t("createClub.baseCampPerk")}</span>{t("createClub.baseCampEnd")}
-                                    </p>
-                                </div>
-                                </>)}
-                            </div>
+                                </Field>
+                            )}
                         </motion.div>
                     )}
 
                     {step === 3 && (
-                        <motion.div
-                            key="step3"
-                            initial={{ opacity: 0, x: 20 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -20 }}
-                            className="space-y-8"
-                        >
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">{t("createClub.meetingDayLabel")}</Label>
-                                        <Input
-                                            placeholder={t("createClub.meetingDayPlaceholder")}
-                                            className="bg-surface-2 border-black/10 h-12 rounded-tile text-[15px] font-medium"
-                                            value={formData.meetingDay || ""}
-                                            onChange={e => setFormData({ ...formData, meetingDay: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="text-xs font-semibold text-black/55">{t("createClub.meetingTimeLabel")}</Label>
-                                        <Input
-                                            placeholder={t("createClub.meetingTimePlaceholder")}
-                                            className="bg-surface-2 border-black/10 h-12 rounded-tile text-[15px] font-medium"
-                                            value={formData.meetingTime || ""}
-                                            onChange={e => setFormData({ ...formData, meetingTime: e.target.value })}
-                                        />
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.gameTypeLabel")}</Label>
-                                    <div className="flex gap-2">
-                                        {(currentSport === "GOLF" ? [
-                                            { id: "any", label: "createClub.gameAny" },
-                                            { id: "field", label: "createClub.gameField" },
-                                            { id: "screen", label: "createClub.gameScreen" },
-                                            { id: "range", label: "createClub.gameRange" }
-                                        ] : [
-                                            { id: "any", label: "createClub.gameAny" },
-                                            { id: "3c", label: "createClub.game3c" },
-                                            { id: "4c", label: "createClub.game4c" },
-                                            { id: "pocket", label: "createClub.gamePocket" }
-                                        ]).map(type => (
-                                            <button
-                                                key={type.id}
-                                                onClick={() => setFormData({ ...formData, gameType: type.id as any })}
-                                                className={`flex-1 py-2 rounded-tile text-sm font-medium transition-colors ${formData.gameType === type.id
-                                                    ? "bg-brand text-brand-fg"
-                                                    : "bg-black/[0.04] text-black/55 hover:text-[rgba(0,0,0,0.87)]"
-                                                    }`}
-                                            >
-                                                {t(type.label)}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.vibeLabel")}</Label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {(currentSport === "GOLF"
-                                            ? ["#매너골프", "#싱글목표", "#명랑골프", "#라운딩", "#스크린", "#초보환영", "#고수환영", "#2030", "#4050", "#주말골퍼"]
-                                            // "#내기환영" 은 뺐다 — 앱이 금전 내기를 권하는 모양이 된다(감사 S5, shared/crewTags.ts)
-                                            // 당구 태그는 언어별 추천 목록(사전에 쉼표로 이어 둔다). 골프는 한국어에서만 열린다.
-                                            : t("clubSettings.billiardsTags").split(",").map(s => s.trim()).filter(Boolean)
-                                        ).map(tag => (
-                                            <button
-                                                key={tag}
-                                                onClick={() => toggleTag(tag)}
-                                                className={`px-3 py-1.5 rounded-pill text-xs font-medium transition-all ${(formData.tags as string[])?.includes(tag)
-                                                    ? "bg-brand text-brand-fg"
-                                                    : "bg-black/[0.04] text-black/55 "
-                                                    }`}
-                                            >
-                                                {tag}
-                                            </button>
-                                        ))}
-                                    </div>
-                                </div>
-
-                                <div className="space-y-2">
-                                    <Label className="text-xs font-semibold text-black/55">{t("createClub.joinTypeLabel")}</Label>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <button
-                                            onClick={() => setFormData({ ...formData, joinType: "auto" })}
-                                            className={`p-3 rounded-tile border text-left space-y-1 ${formData.joinType === "auto"
-                                                ? "border-brand bg-brand/5"
-                                                : "border-black/[0.08] bg-surface-2"
-                                                }`}
-                                        >
-                                            <div className={`font-bold text-sm ${formData.joinType === "auto" ? "text-brand" : "text-[rgba(0,0,0,0.87)]"}`}>{t("createClub.joinAutoTitle")}</div>
-                                            <div className="text-[12px] text-black/55">{t("createClub.joinAutoDesc")}</div>
-                                        </button>
-                                        <button
-                                            onClick={() => setFormData({ ...formData, joinType: "approval" })}
-                                            className={`p-3 rounded-tile border text-left space-y-1 ${formData.joinType === "approval"
-                                                ? "border-brand bg-brand/5"
-                                                : "border-black/[0.08] bg-surface-2"
-                                                }`}
-                                        >
-                                            <div className={`font-bold text-sm ${formData.joinType === "approval" ? "text-brand" : "text-[rgba(0,0,0,0.87)]"}`}>{t("createClub.joinApprovalTitle")}</div>
-                                            <div className="text-[12px] text-black/55">{t("createClub.joinApprovalDesc")}</div>
-                                        </button>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                    <Label className="text-xs font-semibold text-black/55 flex items-center gap-2">
-                                        <LucideUsers className="w-3 h-3" /> {t("createClub.capacityLabel")}
-                                    </Label>
-                                    <div className="flex flex-wrap gap-2">
-                                        {[10, 20, 30, 50, 100].map(num => (
-                                            <button
-                                                key={num}
-                                                onClick={() => setFormData({ ...formData, maxMembers: num })}
-                                                className={`px-4 py-2 rounded-tile text-sm font-bold border transition-all tabular-nums ${formData.maxMembers === num
-                                                    ? "bg-brand text-brand-fg border-brand"
-                                                    : "bg-black/[0.04] text-black/55 border-black/[0.08]"
-                                                    }`}
-                                            >
-                                                {num}{t("createClub.memberUnit")}
-                                            </button>
-                                        ))}
-                                    </div>
-                                    <p className="text-[12px] text-black/55 mt-1">{t("createClub.capacityHint")}</p>
-                                </div>
-                            </div>
+                        <motion.div key="step3" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }} className="flex flex-col gap-6">
+                            <MeetingPicker
+                                day={formData.meetingDay || ""}
+                                time={formData.meetingTime || ""}
+                                onDayChange={(meetingDay) => set({ meetingDay })}
+                                onTimeChange={(meetingTime) => set({ meetingTime })}
+                            />
+                            <Field label={t("createClub.gameTypeLabel")}>
+                                <GameTypePicker sport={currentSport} value={formData.gameType || "any"} onChange={(gameType) => set({ gameType: gameType as any })} />
+                            </Field>
+                            <Field label={t("createClub.vibeLabel")}>
+                                <TagPicker sport={currentSport} value={(formData.tags as string[]) || []} onChange={(tags) => set({ tags })} />
+                            </Field>
+                            <Field label={t("createClub.joinTypeLabel")}>
+                                <JoinTypePicker value={formData.joinType === "approval" ? "approval" : "auto"} onChange={(joinType) => set({ joinType })} />
+                            </Field>
+                            <Field label={t("createClub.capacityLabel")}>
+                                <CapacityPicker value={Number(formData.maxMembers) || 0} onChange={(maxMembers) => set({ maxMembers })} activeCount={1} />
+                            </Field>
                         </motion.div>
                     )}
                 </AnimatePresence>
@@ -665,23 +462,19 @@ export default function CreateClub() {
 
             {/* Bottom Button */}
             <div
-                className="fixed bottom-0 left-0 right-0 px-5 py-6 bg-surface-0 border-t border-surface-line z-20"
-                // 전역 `.fixed.bottom-0 { padding-bottom: env(...) }`가 py-6의 하단 1.5rem을 덮어써
-                // 웹에선 하단 여백이 사라지고 시뮬에선 인셋이 py-6 안으로 파고든다. 인라인으로 전역 규칙을
-                // 이겨, base(1.5rem)는 유지하고 홈인디케이터 인셋을 그 아래에 얹는다.
-                style={{ paddingBottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
+                className="fixed bottom-0 left-0 right-0 px-4 pt-3 bg-surface-0 border-t border-surface-line z-20"
+                // 전역 `.fixed.bottom-0 { padding-bottom: env(...) }`가 pb 클래스를 덮어써
+                // 웹에선 하단 여백이 사라지고 시뮬에선 인셋이 안으로 파고든다. 인라인으로 전역 규칙을
+                // 이겨, base(1rem)는 유지하고 홈인디케이터 인셋을 그 아래에 얹는다.
+                style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom))" }}
             >
-                <Button
-                    className={cn(
-                        "w-full h-14 text-lg font-bold rounded-tile bg-brand text-brand-fg hover:bg-brand/90 transition-all"
-                    )}
-                    onClick={handleNext}
-                    disabled={createCrewMutation.isPending || uploadingField !== null}
-                >
+                <button type="button" className={cn(CREW_BTN.primary, "w-full max-w-md mx-auto flex h-12 text-[17px]")} onClick={handleNext} disabled={busy}>
                     {uploadingField !== null
                         ? t("createClub.uploading")
-                        : createCrewMutation.isPending ? t("createClub.creating") : (step === 3 ? t("createClub.submitDone") : t("createClub.next"))}
-                </Button>
+                        : createCrewMutation.isPending ? t("createClub.creating")
+                        : checkingName ? <LucideLoader2 className="w-5 h-5 animate-spin" />
+                        : (step === 3 ? t("createClub.submitDone") : t("createClub.next"))}
+                </button>
             </div>
         </div>
     );
