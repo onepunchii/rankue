@@ -69,6 +69,8 @@ export function ClubSettingsDialog({ open, onOpenChange, crew, baseStore, baseLi
             <SheetContent
                 side="bottom"
                 hideClose
+                // 열자마자 닫기 버튼에 포커스 링이 걸려 까만 동그라미가 떴다 — 터치 화면에선 첫 포커스를 두지 않는다
+                onOpenAutoFocus={(e) => e.preventDefault()}
                 className="max-w-md mx-auto h-[100dvh] sm:h-[92dvh] sm:rounded-t-card bg-surface-0 border-surface-line p-0 gap-0 flex flex-col"
             >
                 {/* 머리 — 제목 + 닫기. 노치 아래에서 시작한다. */}
