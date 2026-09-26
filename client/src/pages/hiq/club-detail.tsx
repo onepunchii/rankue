@@ -158,12 +158,11 @@ export default function HiqClubDetail() {
     });
 
     const shareToChatMutation = useMutation({
-        mutationFn: async (message: string) => {
-            return await apiRequest(`/api/hiq/crews/${id}/chats`, {
-                method: "POST",
-                body: JSON.stringify({ message })
-            });
-        },
+        // 정모 공유는 채팅에 **정모 카드**로 올린다(2026-09-26 크루 채팅 1단계) — 받은 사람이 카드 안에서 바로 참석한다.
+        // 예전엔 글 한 덩어리를 보내서 채팅에서는 읽기만 했다. 팀 편성 결과처럼 정모 id 가 없는 공유는 그대로 글로.
+        mutationFn: async ({ message, activityId }: { message: string; activityId?: string }) => activityId
+            ? apiRequest(`/api/hiq/chat/rooms/crew:${id}/cards/crew-meetup`, { method: "POST", body: { activityId } })
+            : apiRequest(`/api/hiq/crews/${id}/chats`, { method: "POST", body: JSON.stringify({ message }) }),
         onSuccess: () => {
             toast({ title: t("clubDetail.sharedToChat") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${id}/chats`] });
@@ -450,7 +449,7 @@ export default function HiqClubDetail() {
                                 isLeader={isLeader}
                                 onCreateActivity={() => setIsCreateActivityOpen(true)}
                                 onCreatePoll={() => setIsCreatePollOpen(true)}
-                                onShareToChat={(msg) => shareToChatMutation.mutate(msg)}
+                                onShareToChat={(message, activityId) => shareToChatMutation.mutate({ message, activityId })}
                                 onPollClick={() => setActiveTab('poll')}
                                 onTournamentClick={() => setActiveTab('tournament')}
                                 onCreateTournament={() => { setTournamentAutoCreate(true); setActiveTab('tournament'); }}

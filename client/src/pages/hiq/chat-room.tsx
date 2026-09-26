@@ -8,6 +8,9 @@
  *   읽음 줄 "여기까지 읽었어요"는 **방에 들어온 순간의 커서**로 한 번만 긋고, 내 말풍선 옆 숫자는 아직 안 읽은 사람 수다.
  * + 첨부(2026-09-23): 종목별 카드(당구 매칭 대결·온라인 대전 초대·경기 결과·매장, 골프 조인/부킹·랭큐매치 핀·라운드) — 서버가 만들고 여기서는 끼우기만.
  *   매칭 대결 카드만 예외로 **살아 있다** — 참가 수가 갱신되고 방장이 누르면 그 핀으로 매칭대결하기 화면을 이어받는다.
+ * 크루 방(2026-09-26 크루 채팅 1단계): + 에 "우리 크루" 줄(정모 만들기·투표·정산 요청·공지) — 크루 기능의 만들기 창을 그대로 열고,
+ *   만든 정모·투표·공지를 카드로 붙인다(정산은 서버가 원래 카드를 올린다). 윗줄은 다가오는 정모 띠(없으면 예전 한 줄).
+ *   정모·투표 카드는 크루 API 로 살아 있다 — 카드 안에서 참석·투표.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
@@ -21,7 +24,13 @@ import { useToast } from "@/hooks/use-toast";
 import { ChatRoom, type ChatMsg } from "@/components/hiq/chat/ChatRoom";
 import { cardKind } from "@/components/hiq/chat/ChatCard";
 import { ChatMenuSheet } from "@/components/hiq/chat/ChatMenuSheet";
-import { AttachSheet, type AttachItem } from "@/components/hiq/chat/attach/AttachSheet";
+import { AttachSheet, type AttachItem, type CrewAttachItem } from "@/components/hiq/chat/attach/AttachSheet";
+import { MeetupBanner } from "@/components/hiq/chat/crew/MeetupBanner";
+import { NoticeComposeSheet } from "@/components/hiq/chat/crew/NoticeComposeSheet";
+import { CreateActivityDialog } from "@/components/hiq/CreateActivityDialog";
+import { CreateGolfActivityModal } from "@/components/hiq/club/activity/CreateGolfActivityModal";
+import { CreatePollDialog } from "@/components/hiq/CreatePollDialog";
+import { CreateSettlementDialog } from "@/components/hiq/settlement/CreateSettlementDialog";
 import { SimInviteSheet } from "@/components/hiq/chat/attach/SimInviteSheet";
 import { MatchInviteSheet } from "@/components/hiq/chat/attach/MatchInviteSheet";
 import { RecentGamesPicker } from "@/components/hiq/chat/attach/RecentGamesPicker";
@@ -288,6 +297,10 @@ export default function ChatRoomPage() {
             case "STORE": if (md.code) setLocation(`/stores/${md.code}`); else if (md.slug) setLocation(`/store/${md.slug}`); break;
             case "GOLF_MATCH": if (md.pinCode) setLocation(`/golf/game/new?mode=join&pin=${encodeURIComponent(String(md.pinCode))}`); break;
             case "GOLF_ROUND": if (md.sessionId) setLocation(`/golf/game/${md.sessionId}/result`); break;
+            // 크루 카드 — 참석·투표는 카드 안 버튼이 하고, 카드 자체는 크루의 그 자리로 간다.
+            case "CREW_MEETUP": if (md.crewId) setLocation(`/crew/${md.crewId}/home`); break;
+            case "CREW_POLL": if (md.crewId) setLocation(`/crew/${md.crewId}/poll`); break;
+            case "CREW_NOTICE": if (md.crewId) setLocation(`/crew/${md.crewId}/board`); break;
         }
     }, [info.data, member, setLocation, setSport]);
 
@@ -320,6 +333,48 @@ export default function ChatRoomPage() {
         }
     }, [postCard, setLocation]);
 
+    // 크루 줄: 만들기 창을 열고, 만든 것을 카드로 붙인다. 정산은 서버(POST /settlements, sendToChat)가 카드를 올린다 — 폴링이 가져온다.
+    const [crewPicker, setCrewPicker] = useState<CrewAttachItem | null>(null);
+    const [crewBusy, setCrewBusy] = useState(false);
+    const roomCrewId = info.data?.kind === "crew" ? info.data.crewId : undefined;
+    // 정산 창은 크루원 명단(역할·계좌 기본값)이 필요하다 — 열 때만 읽는다(크루 홈과 같은 키라 캐시를 같이 쓴다).
+    const crewData = useQuery<{ members: any[] }>({ queryKey: [`/api/hiq/crews/${roomCrewId}`], enabled: !!roomCrewId && crewPicker === "CREW_SETTLE" });
+    const postCrewCard = useCallback(async (path: "crew-meetup" | "crew-poll" | "crew-notice", body: Record<string, unknown>) => {
+        const myKey = key;
+        try {
+            const row = await apiRequest(`/api/hiq/chat/rooms/${myKey}/cards/${path}`, { method: "POST", body }) as ChatMsg;
+            if (keyRef.current !== myKey) return;
+            sentIdsRef.current.set(row.id, Date.now());
+            merge([row]);
+        } catch (e: any) {
+            toast({ title: e?.message || t("chat.attach.failed"), variant: "destructive" });
+        }
+    }, [key, merge, t, toast]);
+    const submitSettlement = useCallback(async (data: any) => {
+        if (!roomCrewId) return;
+        setCrewBusy(true);
+        try {
+            await apiRequest(`/api/hiq/crews/${roomCrewId}/settlements`, { method: "POST", body: { ...data, sendToChat: true } });
+            toast({ title: t("clubDetail.settlementCreated") });
+            setCrewPicker(null);
+        } catch (e: any) {
+            toast({ title: t("clubDetail.createFailed"), description: e?.message, variant: "destructive" });
+        } finally { setCrewBusy(false); }
+    }, [roomCrewId, t, toast]);
+    const submitNotice = useCallback(async (v: { title: string; content: string }) => {
+        if (!roomCrewId) return;
+        setCrewBusy(true);
+        try {
+            // 공지사항 카테고리 + isNotice — 게시판 맨 위에 고정된다(운영진만 — 서버가 한 번 더 본다).
+            const post = await apiRequest(`/api/hiq/crews/${roomCrewId}/posts`, { method: "POST", body: { title: v.title, content: v.content, category: "공지사항", isNotice: true } }) as { id: string };
+            void qc.invalidateQueries({ queryKey: [`/api/hiq/crews/${roomCrewId}/posts`] });
+            setCrewPicker(null);
+            if (post?.id) await postCrewCard("crew-notice", { postId: post.id });
+        } catch (e: any) {
+            toast({ title: e?.message || t("chat.actionFailed"), variant: "destructive" });
+        } finally { setCrewBusy(false); }
+    }, [roomCrewId, postCrewCard, qc, t, toast]);
+
     const d = info.data;
     const b = d?.booking;
     // 방 종목: 서버가 준 sport, 없으면 조인·부킹 방은 골프, 그 밖은 지금 앱 모드.
@@ -350,13 +405,15 @@ export default function ChatRoomPage() {
             );
         }
         if (d.kind === "crew") {
-            return (
+            const plain = (
                 <button type="button" onClick={() => setLocation(`/crew/${d.crewId}`)} className="w-full px-4 py-2.5 border-b border-surface-line bg-surface-1 flex items-center gap-2 text-left">
                     <LucideUsers className="w-4 h-4 text-ink-3" />
                     <span className="text-[12.5px] font-medium text-ink-3 flex-1 truncate">{t("chat.crewPinned").replace("{n}", String(d.members.length))}</span>
                     <span className="text-[12px] font-medium text-brand">{t("chat.goCrewHome")}</span>
                 </button>
             );
+            // 다가오는 정모가 있으면 정모 띠, 없으면 예전 한 줄(plain).
+            return d.crewId ? <MeetupBanner crewId={d.crewId} meId={member?.id} onOpen={() => setLocation(`/crew/${d.crewId}/home`)} fallback={plain} /> : plain;
         }
         if (d.kind === "support" && d.id === member?.id) {
             return <p className="px-4 py-2.5 border-b border-surface-line bg-surface-1 text-[12.5px] font-medium text-ink-3">{t("chat.supportPinned")}</p>;
@@ -416,7 +473,40 @@ export default function ChatRoomPage() {
             )}
             {canAttach && (
                 <>
-                    <AttachSheet open={attachOpen} onOpenChange={setAttachOpen} sport={attachSport} roomKind={d.kind} onPick={onPickAttach} />
+                    <AttachSheet
+                        open={attachOpen} onOpenChange={setAttachOpen} sport={attachSport} roomKind={d.kind} onPick={onPickAttach}
+                        canManage={!!d.canManage} onPickCrew={roomCrewId ? setCrewPicker : undefined}
+                    />
+                    {roomCrewId && (
+                        <>
+                            {/* 크루 줄 — 크루 홈과 같은 만들기 창. 만든 정모·투표를 이 방에 카드로 붙인다(만들 때 크루 알림이 나가서 카드 푸시는 서버가 건너뛴다). */}
+                            {attachSport === "GOLF" ? (
+                                <CreateGolfActivityModal
+                                    open={crewPicker === "CREW_MEETUP"} onOpenChange={(o) => { if (!o) setCrewPicker(null); }} crewId={roomCrewId}
+                                    onCreated={(a) => void postCrewCard("crew-meetup", { activityId: a.id })}
+                                />
+                            ) : (
+                                <CreateActivityDialog
+                                    open={crewPicker === "CREW_MEETUP"} onOpenChange={(o) => { if (!o) setCrewPicker(null); }} crewId={roomCrewId} sportCategory="BILLIARDS"
+                                    onCreated={(a) => void postCrewCard("crew-meetup", { activityId: a.id })}
+                                />
+                            )}
+                            <CreatePollDialog
+                                open={crewPicker === "CREW_POLL"} onOpenChange={(o) => { if (!o) setCrewPicker(null); }} crewId={roomCrewId}
+                                onCreated={(p) => void postCrewCard("crew-poll", { pollId: p.id })}
+                            />
+                            {d.canManage && (
+                                <>
+                                    <CreateSettlementDialog
+                                        open={crewPicker === "CREW_SETTLE" && !!crewData.data} onOpenChange={(o) => { if (!o) setCrewPicker(null); }} crewId={roomCrewId}
+                                        members={crewData.data?.members ?? []} me={member ?? undefined} isPending={crewBusy}
+                                        onSubmit={(data) => void submitSettlement(data)}
+                                    />
+                                    <NoticeComposeSheet open={crewPicker === "CREW_NOTICE"} onOpenChange={(o) => { if (!o) setCrewPicker(null); }} busy={crewBusy} onSubmit={(v) => void submitNotice(v)} />
+                                </>
+                            )}
+                        </>
+                    )}
                     {/* 매칭 대결: 카드가 핀을 들고 방에 남는다 — 방장은 이 자리를 뜨지 않고, 나중에 카드를 눌러 이어받는다.
                         1:1 방은 자리가 둘뿐이라 인원 줄을 아예 안 그린다. */}
                     <MatchInviteSheet

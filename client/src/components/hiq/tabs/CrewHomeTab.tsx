@@ -38,7 +38,7 @@ interface CrewHomeTabProps {
     isLeader?: boolean;
     onCreateActivity: () => void;
     onCreatePoll: () => void;
-    onShareToChat: (msg: string) => void;
+    onShareToChat: (msg: string, activityId?: string) => void;
     onPollClick: () => void;
     onTournamentClick: () => void;
     onCreateTournament: () => void;

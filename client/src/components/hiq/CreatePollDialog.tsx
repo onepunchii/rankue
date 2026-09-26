@@ -26,12 +26,14 @@ interface CreatePollDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     crewId: string;
+    /** 새로 만든 투표(서버 행) — 채팅 + 에서 열었으면 그 투표를 카드로 붙인다. */
+    onCreated?: (poll: any) => void;
 }
 
 const PRESETS = [0, 1, 3, 7] as const;
 type Preset = (typeof PRESETS)[number] | "custom";
 
-export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialogProps) {
+export function CreatePollDialog({ open, onOpenChange, crewId, onCreated }: CreatePollDialogProps) {
     const { t, locale } = useT();
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -72,7 +74,8 @@ export function CreatePollDialog({ open, onOpenChange, crewId }: CreatePollDialo
 
     const createPollMutation = useMutation({
         mutationFn: (data: any) => apiRequest(`/api/hiq/crews/${crewId}/polls`, { method: "POST", body: JSON.stringify(data) }),
-        onSuccess: () => {
+        onSuccess: (row: any) => {
+            if (row?.id) onCreated?.(row);
             toast({ title: t("createPoll.created") });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/crews/${crewId}/polls`] });
             onOpenChange(false);

@@ -103,3 +103,50 @@ describe("온라인 대전 — 고른 설정(2026-09-23 오너: 대대·중대·
         expect(page).toContain("sameTarget ? undefined :");
     });
 });
+
+describe("크루 방 카드 — 정모·투표·공지(2026-09-26 크루 채팅 1단계)", () => {
+    const src = code("server/routes/modules/chatCards.ts");
+    const block = (c: string) => {
+        const i = src.indexOf(`router.post("/rooms/:key/cards/${c}"`);
+        const j = src.indexOf("router.post(", i + 10);
+        return src.slice(i, j === -1 ? undefined : j);
+    };
+    it("크루 방에서만 열리고, 그 크루의 것만 붙는다", () => {
+        expect(src).toContain('parseRoomKey(String(req.params.key ?? ""))?.kind !== "crew"');
+        for (const c of ["crew-meetup", "crew-poll", "crew-notice"]) {
+            const b = block(c);
+            expect(b, c).toContain("await openCrewRoom(req, res)");
+            expect(b, c).toContain("return postCard(res, room,");
+            expect(b, c).toMatch(/\.crewId !== room\.ref\.id/);
+        }
+    });
+    it("공지는 운영진만, 공지 글만", () => {
+        const b = block("crew-notice");
+        expect(b).toContain("if (!room.info.canManage)");
+        expect(b).toContain("!post.isNotice");
+    });
+    it("방금 만든 정모·투표는 카드 푸시를 건너뛴다(만들 때 크루 알림이 이미 갔다)", () => {
+        expect(src).toContain("if (!opts?.silent) await notifyRoom(");
+        expect(block("crew-meetup")).toContain("silent: isFresh(a.createdAt, a.creatorId, room.me)");
+        expect(block("crew-poll")).toContain("silent: isFresh(poll.createdAt, poll.authorId, room.me)");
+        expect(block("crew-notice")).not.toContain("silent");
+    });
+    it("화면이 부르는 경로와 그리는 종류가 서버와 같다", () => {
+        const page = read("client/src/pages/hiq/chat-room.tsx");
+        for (const c of ["crew-meetup", "crew-poll", "crew-notice"]) expect(page).toContain(`"${c}"`);
+        const card = read("client/src/components/hiq/chat/ChatCard.tsx");
+        for (const k of ["CREW_MEETUP", "CREW_POLL", "CREW_NOTICE"]) {
+            expect(src).toContain(`"${k}"`);
+            expect(card).toContain(`case "${k}":`);
+        }
+    });
+    it("푸시 사전 키가 다섯 언어에 다 있다", () => {
+        for (const l of ["ko", "en", "es", "tr", "vi"]) {
+            const dict = read(`shared/i18n/${l}.ts`);
+            for (const k of ["CREW_MEETUP", "CREW_POLL", "CREW_NOTICE"]) {
+                expect(dict, `${l} ${k}`).toContain(`"notif.chat.card.${k}"`);
+                expect(dict, `${l} body ${k}`).toContain(`"notif.chat.card.body.${k}"`);
+            }
+        }
+    });
+});

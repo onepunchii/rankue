@@ -15,6 +15,7 @@ import { useT, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { kstDateLabel, kstTime } from "@/lib/kst";
 import { INTL_TAG, type ChatMsg } from "./ChatRoom";
+import { CrewMeetupBody, CrewNoticeBody, CrewPollBody } from "./crew/CrewChatCards";
 
 interface Props {
     msg: ChatMsg;
@@ -28,7 +29,9 @@ interface Props {
  * 눌러서 갈 곳이 있는 카드. GOLF_ROUND 는 일부러 뺐다 — 라운드 결과 화면은 그 라운드 참가자만 열 수 있어서
  * (GET /golf/match/:id 가 403) 정작 보여 주려던 상대에게 실패한다. 카드 본문에 코스·타수·날짜가 다 있다(2026-09-23 리뷰).
  */
-export const CARD_OPENABLE = new Set(["settlement", "GOLF_BOOKING", "SIM_INVITE", "GAME_RESULT", "STORE", "GOLF_MATCH", "MATCH_INVITE"]);
+export const CARD_OPENABLE = new Set(["settlement", "GOLF_BOOKING", "SIM_INVITE", "GAME_RESULT", "STORE", "GOLF_MATCH", "MATCH_INVITE", "CREW_MEETUP", "CREW_POLL", "CREW_NOTICE"]);
+/** 안에 버튼이 있는 크루 카드(2026-09-26) — 껍데기를 div 로 그린다(button 안의 button 금지). */
+const CREW_CARDS = new Set(["CREW_MEETUP", "CREW_POLL", "CREW_NOTICE"]);
 
 /** metadata.type(없으면 정산은 msg.type) — 카드 종류 하나로 정리한다. */
 export function cardKind(msg: ChatMsg): string {
@@ -253,6 +256,18 @@ export function ChatCard({ msg, onOpen, meId }: Props) {
                 </>
             );
             break;
+        case "CREW_MEETUP":
+            badge = t("chat.card.meetup");
+            body = <CrewMeetupBody md={md} meId={meId} />;
+            break;
+        case "CREW_POLL":
+            badge = t("chat.card.poll");
+            body = <CrewPollBody md={md} />;
+            break;
+        case "CREW_NOTICE":
+            badge = t("chat.card.notice");
+            body = <CrewNoticeBody md={md} />;
+            break;
         default:
             // 모르는 종류(앞으로 생길 카드·옛 앱) — 서버 요약 한 줄이라도 보인다.
             badge = t("chat.card.generic");
@@ -263,6 +278,23 @@ export function ChatCard({ msg, onOpen, meId }: Props) {
 
     // 매칭 대결 카드는 안에 [참가하기] 버튼이 들어간다 — button 안의 button 은 못 쓰므로 껍데기를 div 로 바꾼다.
     // (다른 카드는 그대로 button — 회귀를 만들지 않는다.)
+    // 크루 카드(정모·투표·공지): 안에 참석·투표 버튼이 있어 div 껍데기. 카드를 누르면 크루 홈·투표 탭·게시판으로.
+    // 폭을 고정한다 — 선택지 막대·참석 막대가 글자 길이에 따라 들쭉날쭉하지 않게.
+    if (CREW_CARDS.has(kind)) {
+        return (
+            <div
+                role={openable ? "button" : undefined} tabIndex={openable ? 0 : undefined}
+                onClick={() => { if (openable) onOpen?.(); }}
+                onKeyDown={(e) => { if (openable && e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); onOpen?.(); } }}
+                className={cn(shell, "block w-[264px]")}
+            >
+                <span className="block text-[11px] font-semibold text-brand mb-1">{badge}</span>
+                {body}
+                {kind === "CREW_NOTICE" && openable && <span className="block text-[12px] font-medium text-brand mt-1.5">{t("chat.cardOpen")} ›</span>}
+            </div>
+        );
+    }
+
     if (isMatch) {
         return (
             <div

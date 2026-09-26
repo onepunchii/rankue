@@ -44,6 +44,8 @@ interface CreateGolfActivityModalProps {
     onOpenChange: (open: boolean) => void;
     crewId: string;
     initialData?: any; // For Edit Mode
+    /** 새로 만든 정모(서버 행) — 채팅 + 에서 열었으면 그 정모를 카드로 붙인다. 고치기에는 부르지 않는다. */
+    onCreated?: (activity: any) => void;
 }
 
 // 종류는 새로 만들 때만 필수 — 종류 칸이 생기기 전의 옛 정모(category=null)도 고칠 수 있어야 한다.
@@ -67,7 +69,7 @@ type FormValues = z.infer<ReturnType<typeof buildFormSchema>>;
 
 const DEFAULT_MAX: Partial<Record<ActivityCategory, number>> = { GOLF_TOUR: 8, AFTER_PARTY: 10 };
 
-export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialData }: CreateGolfActivityModalProps) {
+export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialData, onCreated }: CreateGolfActivityModalProps) {
     const { t } = useT();
     const dateLocale = useDateLocale();
     const { toast } = useToast();
@@ -198,7 +200,8 @@ export function CreateGolfActivityModal({ open, onOpenChange, crewId, initialDat
                 body: payload,
             });
         },
-        onSuccess: () => {
+        onSuccess: (row: any) => {
+            if (!isEditMode && row?.id) onCreated?.(row);
             toast({
                 title: isEditMode ? t("createGolfActivityModal.toastEditSuccessTitle") : t("createGolfActivityModal.toastCreateSuccessTitle"),
                 description: isEditMode ? t("createGolfActivityModal.toastEditSuccessDesc") : t("createGolfActivityModal.toastCreateSuccessDesc"),

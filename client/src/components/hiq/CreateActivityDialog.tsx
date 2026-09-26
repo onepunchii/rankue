@@ -44,6 +44,8 @@ interface CreateActivityDialogProps {
     crewId: string;
     sportCategory?: 'BILLIARDS' | 'GOLF';
     initialData?: any; // For Edit Mode
+    /** 새로 만든 정모(서버 행) — 채팅 + 에서 열었으면 그 정모를 카드로 붙인다. 고치기에는 부르지 않는다. */
+    onCreated?: (activity: any) => void;
 }
 
 // 값은 i18n 키 — 렌더/사용 시 t()로 감싼다
@@ -68,7 +70,7 @@ const makeFormSchema = (t: (key: string) => string) => z.object({
 
 type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
 
-export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory, initialData }: CreateActivityDialogProps) {
+export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory, initialData, onCreated }: CreateActivityDialogProps) {
     const { t } = useT();
     const dateLocale = useDateLocale();
     const { toast } = useToast();
@@ -173,7 +175,8 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
 
     const mutation = useMutation({
         mutationFn,
-        onSuccess: () => {
+        onSuccess: (row: any) => {
+            if (!isEditMode && row?.id) onCreated?.(row);
             toast({
                 title: isEditMode ? t("createActivity.editSuccessTitle") : t("createActivity.createSuccessTitle"),
                 description: isEditMode ? t("createActivity.editSuccessDesc") : t("createActivity.createSuccessDesc")

@@ -12,6 +12,9 @@
  *   POST /chat/rooms/:key/cards/golf-booking  { bookingId }    골프  ⛳ 조인·부킹 글(기존 GOLF_BOOKING 카드와 같은 모양)
  *   POST /chat/rooms/:key/cards/golf-match    { courseName }   골프  ⛳ 랭큐매치 핀(세션을 만든다)
  *   POST /chat/rooms/:key/cards/golf-round    { historyId }    골프  ⛳ 라운드 결과(내 기록만)
+ *   POST /chat/rooms/:key/cards/crew-meetup   { activityId }   크루  📅 정모(그 크루의 정모만 — 카드 안에서 참석)
+ *   POST /chat/rooms/:key/cards/crew-poll     { pollId }       크루  🗳 투표(그 크루의 투표만 — 카드 안에서 투표)
+ *   POST /chat/rooms/:key/cards/crew-notice   { postId }       크루  📢 공지(운영진, 그 크루의 공지 글만)
  *
  * 응답은 보내기 라우트와 같은 모양(메시지 행 + sender) — 화면이 목록에 바로 끼운다. 요약(message)은 카드를 못 그리는
  * 옛 앱용 한 줄이라 한국어 그대로 저장하고, 카드 본문은 화면이 metadata 로 자기 언어로 그린다.
@@ -32,6 +35,7 @@ import { parseRoomKey, type RoomRef } from "../../storage/chat.repo.js";
 import { msg, localeOf, type I18nText } from "../../lib/i18n.js";
 import { notifyRoom } from "./chat.js";
 import { createSchema as simCreateSchema, createHostMatch } from "./simMatch.js";
+import { kstShortDateTime } from "../../../shared/crewActivity.js";
 
 const router = Router();
 type Sport = "BILLIARDS" | "GOLF";
@@ -84,13 +88,14 @@ async function openRoom(req: AuthRequest, res: any, want: Sport | "ANY"): Promis
  * 카드 행을 만들고 방 사람들에게 푸시한 뒤 보내기 라우트와 같은 모양으로 돌려준다.
  * push: 푸시 본문(받는 사람 언어). url: 누르면 갈 곳(없으면 방).
  */
-async function postCard(res: any, room: Room, type: string, summary: string, metadata: Record<string, unknown>, opts?: { push?: I18nText; url?: string }) {
+async function postCard(res: any, room: Room, type: string, summary: string, metadata: Record<string, unknown>, opts?: { push?: I18nText; url?: string; silent?: boolean }) {
     const { ref, me, info } = room;
     const row = await storage.chat.addMessage({ key: ref.key, senderId: me.id, type: "card", message: summary, metadata: { type, ...metadata } });
     // 1:1 은 제목이 곧 보낸 사람이다 — 방 제목은 보는 사람 기준 상대 이름이라 그대로 쓰면 받는 사람 폰에 자기 이름이 뜬다(chat.ts 와 같다).
     // 대괄호는 '방 이름' 표기라 1:1 에서는 안 쓴다(notif.chat.dm.title 관례).
     const heading = msg(`notif.chat.card.${type}`, { room: ref.kind === "dm" ? me.name : `[${info.title}]` });
-    await notifyRoom(ref, me.id, opts?.push ?? summary.slice(0, 80), heading, room.sport, opts?.url);
+    // silent: 방금 만든 정모·투표를 올리는 카드 — 만들 때 크루 알림이 이미 나갔다(같은 일로 푸시 두 번 방지).
+    if (!opts?.silent) await notifyRoom(ref, me.id, opts?.push ?? summary.slice(0, 80), heading, room.sport, opts?.url);
     const profile = me.profileId ? await storage.getProfile(me.profileId) : null;
     return sendSuccess(res, { ...row, sender: { name: me.name, profileImageUrl: profile?.profileImageUrl ?? null } });
 }
@@ -323,6 +328,74 @@ router.post("/rooms/:key/cards/golf-round", ...golfGate, asyncHandler(async (req
     const summary = `⛳ 라운드 결과 · ${courseName ?? "골프장"} · ${h.score}타`;
     return postCard(res, room, "GOLF_ROUND", summary, { sessionId: h.golfSessionId, courseName, score: h.score, playedAt: h.createdAt, name: room.me.name },
         { push: msg("notif.chat.card.body.GOLF_ROUND", { name: courseName ?? "", n: String(h.score ?? "") }) });
+}));
+
+/* ── 크루(크루 방 전용) ───────────────────────────────── */
+// 2026-09-26 오너: "크루 채팅은 크루와 관계된 + 기능". 카드는 그 크루의 정모·투표·공지를 가리키기만 한다 —
+// 참석 수·표 수는 카드에 굳혀 두지 않고 화면이 크루 API 로 살아 있는 값을 읽는다(참석·투표도 크루 라우트 그대로).
+// 종목 문지기는 없다(크루 방은 크루원만 들어온다) — 골프 크루의 정모도 같은 길로 올린다.
+
+const crewGate = [requireAuth, requireTermsAccepted];
+/** 방금(2분 안) 내가 만든 것 — 만들 때 크루원 알림이 나갔으니 카드 푸시는 건너뛴다. */
+const FRESH_MS = 2 * 60_000;
+const isFresh = (createdAt: Date | string | null | undefined, authorId: string | null | undefined, me: HiqMember) =>
+    authorId === me.id && !!createdAt && Date.now() - new Date(createdAt).getTime() < FRESH_MS;
+
+async function openCrewRoom(req: AuthRequest, res: any): Promise<Room | null> {
+    // 크루 방이 아니면 열기 전에 거른다 — 1:1·조인 방에 남의 크루 정모를 붙이는 길을 막는다.
+    if (parseRoomKey(String(req.params.key ?? ""))?.kind !== "crew") { sendError(res, 400, "err.chat.card.notHere"); return null; }
+    return openRoom(req, res, "ANY");
+}
+
+const crewMeetupSchema = z.object({ activityId: z.string().regex(UUID) });
+
+// 📅 정모 — 그 크루의 정모만. 카드는 제목·시각·장소만 싣고, 참석 수와 [참석하기]는 화면이 크루 API 로 그린다.
+router.post("/rooms/:key/cards/crew-meetup", ...crewGate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const parsed = crewMeetupSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, "err.chat.card.badInput");
+    const room = await openCrewRoom(req, res); if (!room) return;
+    const a = await storage.getCrewActivity(parsed.data.activityId);
+    if (!a || a.crewId !== room.ref.id) return sendError(res, 404, "err.crew.activityNotFound");
+    const when = kstShortDateTime(a.activityDate);
+    const summary = `📅 정모 · ${a.title} · ${when}`;
+    return postCard(res, room, "CREW_MEETUP", summary, {
+        crewId: a.crewId, activityId: a.id, title: a.title, activityDate: a.activityDate,
+        locationName: a.locationName ?? null, maxParticipants: a.maxParticipants ?? null, sport: a.sportCategory,
+    }, { push: msg("notif.chat.card.body.CREW_MEETUP", { title: a.title, when }), silent: isFresh(a.createdAt, a.creatorId, room.me) });
+}));
+
+const crewPollSchema = z.object({ pollId: z.string().regex(UUID) });
+
+// 🗳 투표 — 그 크루의 투표만. 선택지 id 를 실어 둬야 화면이 목록을 못 읽어도(옛 앱) 무엇을 묻는지 보인다.
+router.post("/rooms/:key/cards/crew-poll", ...crewGate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const parsed = crewPollSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, "err.chat.card.badInput");
+    const room = await openCrewRoom(req, res); if (!room) return;
+    const poll = await storage.crews.getPollById(parsed.data.pollId);
+    if (!poll || poll.crewId !== room.ref.id) return sendError(res, 404, "err.crew.pollNotFound");
+    const full = (await storage.getCrewPolls(room.ref.id, room.me.id)).find((p: any) => p.id === poll.id);
+    const options = (full?.options ?? []).map((o: any) => ({ id: o.id, text: o.text }));
+    const summary = `🗳 투표 · ${poll.title}`;
+    return postCard(res, room, "CREW_POLL", summary, {
+        crewId: poll.crewId, pollId: poll.id, title: poll.title, endTime: poll.endTime ?? null,
+        allowMultiple: !!poll.allowMultiple, isAnonymous: !!poll.isAnonymous, options,
+    }, { push: msg("notif.chat.card.body.CREW_POLL", { title: poll.title }), silent: isFresh(poll.createdAt, poll.authorId, room.me) });
+}));
+
+const crewNoticeSchema = z.object({ postId: z.string().regex(UUID) });
+
+// 📢 공지 — 운영진만, 그 크루의 공지 글(isNotice)만. 공지 글을 만들 때는 알림이 없어서 이 카드가 알린다.
+router.post("/rooms/:key/cards/crew-notice", ...crewGate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const parsed = crewNoticeSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, "err.chat.card.badInput");
+    const room = await openCrewRoom(req, res); if (!room) return;
+    if (!room.info.canManage) return sendError(res, 403, "err.crew.postNoticeAdminOnly");
+    const post = await storage.getCrewPost(parsed.data.postId);
+    if (!post || post.crewId !== room.ref.id || !post.isNotice) return sendError(res, 404, "err.crew.postNotFound");
+    const preview = String(post.content ?? "").replace(/\s+/g, " ").trim().slice(0, 140);
+    const summary = `📢 공지 · ${post.title}`;
+    return postCard(res, room, "CREW_NOTICE", summary, { crewId: post.crewId, postId: post.id, title: post.title, preview },
+        { push: msg("notif.chat.card.body.CREW_NOTICE", { title: post.title }) });
 }));
 
 export default router;

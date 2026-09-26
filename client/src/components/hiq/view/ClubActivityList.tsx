@@ -29,7 +29,7 @@ interface ClubActivityListProps {
     currentMemberId?: string;
     sportType: SportType;
     onCreateClick: () => void;
-    onShareToChat?: (message: string) => void;
+    onShareToChat?: (message: string, activityId?: string) => void;
     isAdmin?: boolean;
 }
 
@@ -275,7 +275,7 @@ function ActivityCard({
     isMember: boolean;
     isAdmin: boolean;
     currentMemberId?: string;
-    onShareToChat?: (message: string) => void;
+    onShareToChat?: (message: string, activityId?: string) => void;
     onJoin: () => void;
     joinPending: boolean;
     onLeave: () => void;
@@ -306,7 +306,9 @@ function ActivityCard({
 
     const share = () => {
         const fullMsg = `[${terms.emoji} ${t("clubActivityListView.shareNoticeTitle")}]\n--------------------------\n${t("clubActivityListView.shareMeetupLabel")}${activity.title}\n${t("clubActivityListView.shareLocationLabel")}${activity.locationName || t("clubActivityListView.locationTbd")}\n${t("clubActivityListView.shareDateLabel")}${dateStr}\n${t("clubActivityListView.shareParticipantsLabel")}${countText}\n--------------------------`;
-        if (onShareToChat) onShareToChat(fullMsg); else void navigator.clipboard?.writeText(fullMsg);
+        // 채팅이 있으면 정모 카드로(채팅 안에서 바로 참석) — 알림은 부르는 쪽이 띄운다. 없으면 글로 복사.
+        if (onShareToChat) { onShareToChat(fullMsg, activity.id); return; }
+        void navigator.clipboard?.writeText(fullMsg);
         toast({ title: t("clubActivityListView.shareCopied") });
     };
 
@@ -452,7 +454,7 @@ function TeamWizard({ activity, sportType, currentMemberId, onShareToChat, onClo
     activity: any;
     sportType: SportType;
     currentMemberId?: string;
-    onShareToChat?: (message: string) => void;
+    onShareToChat?: (message: string, activityId?: string) => void;
     onClose: () => void;
 }) {
     const { t } = useT();
