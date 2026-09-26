@@ -4,6 +4,7 @@
  * 불변: 실전 경기 테이블·마감 함수·회원 성적 컬럼은 여기서 절대 참조하지 않는다(sim.guard.test.ts).
  */
 import { Router } from "express";
+import { V0_MAX, THETA_MAX, SHOT_LIMIT_EPS } from "../../../shared/sim/shotLimits.js";
 import { PLACEMENT_MATCHES } from "../../../shared/sim/rank.js";
 import { createHash, randomBytes } from "crypto";
 import { z } from "zod";
@@ -36,6 +37,19 @@ const router = Router();
 
 /** 상대가 이 시간 넘게 안 치면 상대방이 승리를 주장할 수 있다. */
 export const CLAIM_AFTER_MS = 48 * 60 * 60 * 1000;
+/** 접속 중(대전·대기 화면을 PRESENCE_MS 안에 봤다) */
+function isRecentlySeen(at: Date | null | undefined): boolean {
+    return !!at && Date.now() - at.getTime() <= PRESENCE_MS;
+}
+/** 늦은 샷 판정 여유(네트워크·재생 끝 지연) */
+const LATE_SHOT_SLACK_MS = 8_000;
+/**
+ * 첫 샷 전에 안 나타난 상대: 대전이 시작되고 한 번도 치지 않은 채 이만큼 지나면 기다린 사람이 승리를 주장할 수 있다.
+ * 샷이 없으니 레이팅에는 들어가지 않는다(shared/sim/rating.ts MIN_SHOTS_EACH) — 기다린 시간만 돌려주는 장치다.
+ */
+export const NO_SHOW_CLAIM_MS = 15 * 60 * 1000;
+/** 한 판 더 요청이 살아 있는 시간 — 오래 전에 누른 요청으로 떠난 사람을 새 판에 끌어들이지 않는다 */
+const REMATCH_ASK_TTL_MS = 10 * 60 * 1000;
 
 const rules3c = z.object({ gameType: z.literal("3c"), ruleSet: z.enum(["umb", "pba"]), bankShotPoint: z.number().int().min(1).max(5) });
 const rules4c = z.object({
@@ -78,6 +92,29 @@ export function checkRoomPassword(hash: string | null | undefined, pw: string | 
     return createHash("sha256").update(salt + pw).digest("hex") === digest;
 }
 
+/**
+ * 대전 쪽 횟수 제한(2026-09-26 검토): 방 비밀번호는 4자리도 되는데 무한 대입이 됐고, 6자리 방 코드는 훑어볼 수 있었고,
+ * 초대 푸시는 아무에게나 몇 번이든 보낼 수 있었다. 인스턴스 메모리 창(auth.ts 로그인 제한과 같은 방식) — 서버리스 인스턴스마다
+ * 따로 세지만 한 사람이 빠르게 두드리는 건 대부분 같은 인스턴스로 간다.
+ */
+const limitBuckets = new Map<string, { n: number; reset: number }>();
+export function overLimit(key: string, max: number, windowMs: number, now = Date.now()): boolean {
+    const b = limitBuckets.get(key);
+    return !!b && b.reset > now && b.n >= max;
+}
+export function countHit(key: string, windowMs: number, now = Date.now()): void {
+    const b = limitBuckets.get(key);
+    if (!b || b.reset <= now) limitBuckets.set(key, { n: 1, reset: now + windowMs });
+    else b.n += 1;
+    if (limitBuckets.size > 20_000) {
+        for (const [k, v] of limitBuckets) if (v.reset <= now) limitBuckets.delete(k);
+    }
+}
+const PW_FAIL = { max: 5, windowMs: 10 * 60_000 };      // 방·사람마다 틀린 비밀번호
+const CODE_MISS = { max: 15, windowMs: 10 * 60_000 };   // 사람마다 없는 코드
+const INVITE_SAME = { max: 1, windowMs: 3 * 60_000 };   // 같은 방·같은 사람에게 다시 초대
+const INVITE_HOST = { max: 15, windowMs: 60 * 60_000 }; // 한 사람이 보내는 초대
+
 /** 멀티방 목록에 남는 기간 — 이보다 오래된 대기 방은 목록에서 빠진다(취소는 호스트가). */
 const ROOM_LIST_WINDOW_MS = 24 * 60 * 60 * 1000;
 
@@ -92,8 +129,8 @@ const shotSchema = z.object({
     idx: z.number().int().min(0),
     input: z.object({
         cueBallId: z.enum(["white", "yellow"]),
-        phi: z.number().finite(), V0: z.number().gt(0).max(12),
-        a: z.number().min(-0.5).max(0.5), b: z.number().min(-0.5).max(0.5), theta: z.number().min(0).max(1.2),
+        phi: z.number().finite(), V0: z.number().gt(0).max(V0_MAX + SHOT_LIMIT_EPS),
+        a: z.number().min(-0.5).max(0.5), b: z.number().min(-0.5).max(0.5), theta: z.number().min(0).max(THETA_MAX + SHOT_LIMIT_EPS),
     }),
     clientHash: z.string().length(16).optional(),
 });
@@ -153,12 +190,23 @@ function watchCard(m: MatchWithNames) {
     };
 }
 
+/**
+ * 승리 주장이 되는 시각. 보통은 마지막 샷(없으면 시작) + 48시간. 단 **아직 한 번도 안 쳤고 첫 차례 사람의 시계가
+ * 시작되지 않았다**(= 들어온 적이 없다)면 시작 + NO_SHOW_CLAIM_MS — 방을 열고 떠난 방장을 이틀씩 기다리지 않게.
+ */
+function claimableAtOf(m: { shots: number; turnSeenAt: Date | null; lastShotAt: Date | null; startedAt: Date | null; createdAt: Date }): Date {
+    if (m.shots === 0 && !m.turnSeenAt && m.startedAt) return new Date(m.startedAt.getTime() + NO_SHOW_CLAIM_MS);
+    return new Date((m.lastShotAt ?? m.startedAt ?? m.createdAt).getTime() + CLAIM_AFTER_MS);
+}
+
 function publicMatch(m: MatchWithNames, viewerId: string) {
     const myIndex = m.hostId === viewerId ? 0 : m.guestId === viewerId ? 1 : -1;
     return {
         id: m.id, code: m.code, status: m.status,
         gameType: m.gameType, tableId: m.tableId, cushionModel: m.cushionModel, condition: m.condition, aimAssist: m.aimAssist, fullPreview: m.fullPreview,
         isPublic: m.isPublic, hasPassword: !!m.passwordHash, handicap: m.handicap,
+        /** 방장이 지금 대기·대전 화면을 보고 있나(PRESENCE_MS 안) — 방 목록의 "접속 중" 점, 먼저 보여 줄 방 */
+        hostOnline: isRecentlySeen(m.hostSeenAt),
         rules: m.rules, finishType: m.finishType, inningCap: m.inningCap,
         hostName: m.hostName, guestName: m.guestName, hostTarget: m.hostTarget, guestTarget: m.guestTarget,
         /** 헤더 국기용(2026-09-16). ISO 3166-1 alpha-2, 가입할 때 IP 로 자동 — 없는 사람이 더 많다. */
@@ -198,7 +246,7 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         // 쓰리아웃 표시용 [호스트, 게스트] 시간 초과 횟수
         timeouts: [m.hostTimeouts, m.guestTimeouts] as const,
         // 이모지 인사(마지막 하나) — 폴링에 실려 간다. 보낸 지 오래된 건 화면이 알아서 안 띄운다.
-        claimableAt: m.status === "playing" ? new Date((m.lastShotAt ?? m.startedAt ?? m.createdAt).getTime() + CLAIM_AFTER_MS) : null,
+        claimableAt: m.status === "playing" ? claimableAtOf(m) : null,
         // "한 판 더"(2026-09-15): 끝난 대전에서만 뜻이 있다. matchId 가 채워지면 양쪽이 그 방으로 옮겨 간다.
         rematch: m.status === "finished" ? (() => {
             const by = (m.rematchBy as Record<string, string> | null) ?? {};
@@ -336,8 +384,10 @@ router.get("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, re
 
 // GET /sim/matches/code/:code — 코드 조회(참가 화면). /:id 보다 위.
 router.get("/sim/matches/code/:code", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const missKey = `code:${req.userId}`;
+    if (overLimit(missKey, CODE_MISS.max, CODE_MISS.windowMs)) return sendError(res, 429, "err.sim.tooManyTries", "TOO_MANY");
     const m = await storage.simMatch.findLiveByCode(String(req.params.code).trim());
-    if (!m) return sendError(res, 404, "err.sim.codeNotFound");
+    if (!m) { countHit(missKey, CODE_MISS.windowMs); return sendError(res, 404, "err.sim.codeNotFound"); }
     // 이미 시작된 대전은 참가자에게만 보여 준다 — 코드를 찍어 본 남에게 공 배치·이름을 주지 않는다
     if (m.status === "playing" && m.hostId !== req.userId && m.guestId !== req.userId) {
         return sendError(res, 409, "err.sim.alreadyStarted");
@@ -353,7 +403,12 @@ async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body:
         return sendError(res, 409, "err.sim.alreadyStarted");
     }
     if (m.status !== "waiting") return sendError(res, 409, "err.sim.notJoinable");
-    if (!checkRoomPassword(m.passwordHash, body.password)) return sendError(res, 403, "err.sim.badPassword", "BAD_PASSWORD");
+    const pwKey = `pw:${m.id}:${req.userId}`;
+    if (m.passwordHash && overLimit(pwKey, PW_FAIL.max, PW_FAIL.windowMs)) return sendError(res, 429, "err.sim.tooManyTries", "TOO_MANY");
+    if (!checkRoomPassword(m.passwordHash, body.password)) {
+        countHit(pwKey, PW_FAIL.windowMs);
+        return sendError(res, 403, "err.sim.badPassword", "BAD_PASSWORD");
+    }
     const rules = m.rules as Rules;
     // 핸디전(2026-09-12 오너): 참가하는 순간 두 사람의 온라인 에버리지로 각자 목표를 정한다.
     // 비율(실력 차)은 그대로, 길이는 기준 이닝으로 고정된다 — 다마수를 그대로 옮기면 고수 판이 300이닝씩 간다.
@@ -372,6 +427,9 @@ async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body:
     const balls = openingLayout(m.gameType, TABLES[m.tableId], "white");
     const started = await storage.simMatch.start(m.id, req.userId!, guestTarget, state, balls, hostTarget);
     if (!started) return sendError(res, 409, "err.sim.startedOrNotJoinable");
+    // 남의 방에 들어가면 내가 열어 둔 대기 방은 닫는다 — 안 닫으면 누가 그 방에 들어와 내가 이 판을 치는 동안
+    // 저쪽 시계가 돌아 몰수패를 당했다(2026-09-26 검토).
+    await storage.simMatch.cancelOtherWaiting(req.userId!, m.id).catch((e: unknown) => console.warn("[sim] cancelOtherWaiting", (e as Error)?.message));
     const guest = await storage.getMemberById(req.userId!);
     await notify(m.hostId, "notif.sim.started.title", msg("notif.sim.started.body", { name: guest?.name ?? "상대" }), m.id);
     const full = await storage.simMatch.get(m.id);
@@ -475,15 +533,20 @@ router.get("/sim/opponents", requireAuth, asyncHandler(async (req: AuthRequest, 
 router.post("/sim/matches/code/:code/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const parsed = joinSchema.safeParse(req.body ?? {});
     if (!parsed.success) return sendError(res, 400, "err.sim.badInput");
+    const missKey = `code:${req.userId}`;
+    if (overLimit(missKey, CODE_MISS.max, CODE_MISS.windowMs)) return sendError(res, 429, "err.sim.tooManyTries", "TOO_MANY");
     const m = await storage.simMatch.findLiveByCode(String(req.params.code).trim());
-    if (!m) return sendError(res, 404, "err.sim.codeNotFound");
+    if (!m) { countHit(missKey, CODE_MISS.windowMs); return sendError(res, 404, "err.sim.codeNotFound"); }
     return joinAndStart(m, req, res, parsed.data);
 }));
 
 // GET /sim/rooms — 멀티방 목록(공개·대기 중·내 방 아님·24시간 이내). 코드는 숨긴다(비밀번호 방을 코드로 우회하지 못하게).
 router.get("/sim/rooms", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const rows = await storage.simMatch.listPublicWaiting(req.userId!, Date.now() - ROOM_LIST_WINDOW_MS);
-    return sendSuccess(res, rows.map((m) => ({ ...publicMatch(m, req.userId!), code: "" })));
+    // 방장이 보고 있는 방을 먼저 — 들어가면 바로 친다. 자리 비운 방장은 알림을 받고 돌아와야 시작된다.
+    const out = rows.map((m) => ({ ...publicMatch(m, req.userId!), code: "" }));
+    out.sort((a, b) => Number(b.hostOnline) - Number(a.hostOnline));
+    return sendSuccess(res, out);
 }));
 
 // GET /sim/watch — 관전 목록. live = 지금 치고 있는 공개 대전, replays = 최근에 끝난 공개 대전(다시보기).
@@ -518,8 +581,14 @@ router.post("/sim/matches/:id/invite", requireAuth, asyncHandler(async (req: Aut
     if (!m || m.hostId !== req.userId) return sendError(res, 404, "err.sim.matchNotFound");
     if (m.status !== "waiting") return sendError(res, 409, "err.sim.notWaiting");
     if (parsed.data.memberId === req.userId) return sendError(res, 400, "err.sim.inviteSelf");
+    const sameKey = `inv:${m.id}:${parsed.data.memberId}`;
+    const hostKey = `invh:${req.userId}`;
+    if (overLimit(sameKey, INVITE_SAME.max, INVITE_SAME.windowMs)) return sendError(res, 429, "err.sim.inviteCooldown", "INVITE_COOLDOWN");
+    if (overLimit(hostKey, INVITE_HOST.max, INVITE_HOST.windowMs)) return sendError(res, 429, "err.sim.tooManyTries", "TOO_MANY");
     const target = await storage.getMemberById(parsed.data.memberId);
     if (!target) return sendError(res, 404, "err.sim.memberNotFound");
+    countHit(sameKey, INVITE_SAME.windowMs);
+    countHit(hostKey, INVITE_HOST.windowMs);
     await storage.simMatch.setInvited(m.id, target.id);
     // 받는 사람이 한 명이라 종목·테이블·비밀번호 조각은 그 사람 언어로 먼저 풀어 끼운다.
     const loc = memberLocale(target);
@@ -541,7 +610,8 @@ router.get("/sim/matches/:id", requireAuth, asyncHandler(async (req: AuthRequest
     const isPlayer = !!m && (m.hostId === req.userId || m.guestId === req.userId);
     if (!m || (!isPlayer && !isWatchable(m))) return sendError(res, 404, "err.sim.matchNotFound");
     // 접속 표시: 대전 화면을 보고 있다(폴링). 차례가 넘어올 때 시계를 바로 돌릴지 여기서 판단한다(PRESENCE_MS).
-    if (isPlayer && m.status === "playing") await storage.simMatch.touchSeen(m.id, m.hostId === req.userId ? 0 : 1);
+    // 대기 중인 방장도 적는다 — 방 목록이 "방장 접속 중"을 보여 주고, 누가 들어왔을 때 첫 샷 시계를 바로 걸지 정한다.
+    if (isPlayer && (m.status === "playing" || m.status === "waiting")) await storage.simMatch.touchSeen(m.id, m.hostId === req.userId ? 0 : 1);
     // 관전자 표시(2026-09-12): 보고 있는 사람 수를 선수와 다른 관전자에게 보여 주려고 폴링마다 시각을 적는다.
     else if (!isPlayer && m.status === "playing") {
         const now = Date.now();
@@ -560,20 +630,12 @@ router.get("/sim/matches/:id", requireAuth, asyncHandler(async (req: AuthRequest
     return sendSuccess(res, publicMatch(m, req.userId!));
 }));
 
-// POST /sim/matches/:id/timeout — 40초 룰 시간 초과: 차례인 사람은 40초, 상대는 50초(유예 10초) 뒤부터. 서버 시계가 판정한다.
-// 샷 없이 이닝을 넘기고(foul-timeout) 차례를 바꾼다. 클라이언트는 응답의 대전 행으로 스냅한다.
-router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const m = await storage.simMatch.get(req.params.id);
-    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "err.sim.matchNotFound");
-    if (m.status !== "playing") return sendError(res, 409, "err.sim.notPlaying");
-    if (!m.turnSeenAt) return sendError(res, 409, "err.sim.clockNotStarted", "TOO_EARLY");
-    const myIndex = m.hostId === req.userId ? 0 : 1;
-    await storage.simMatch.touchSeen(m.id, myIndex);
-    // 시계는 한 번 시작하면 자리를 비워도 계속 돈다 — 자리를 비우는 것 자체가 패널티다(2026-09-08 오너 결정).
-    // 아예 앱을 안 연 사람은 시계가 시작되지 않으므로 48시간 무응답 승리 주장으로 처리된다.
-    const elapsed = Date.now() - m.turnSeenAt.getTime();
-    const needMs = (m.turn === myIndex ? SHOT_CLOCK_S : SHOT_CLOCK_S + SHOT_CLOCK_GRACE_S) * 1000 - 1500;   // 네트워크 지연 여유 1.5 s
-    if (elapsed < needMs) return sendError(res, 409, "err.sim.tooEarly", "TOO_EARLY");
+/**
+ * 40초 룰 시간 초과 한 번 적용(샷 없이 이닝을 넘기고 차례를 바꾼다, 쓰리아웃이면 실격패). /timeout 과
+ * 늦은 샷 거절(POST shots)이 같이 쓴다. myIndex = 요청한 사람 자리(알림 문구를 고르는 데만 쓴다).
+ * 이미 차례가 바뀌었으면 null.
+ */
+async function applyTimeout(m: MatchWithNames, myIndex: 0 | 1) {
     const state = m.state as SessionState;
     const applied = applyShot(state, timeoutOutcome());
     // 쓰리아웃: 이번이 그 사람의 SHOT_CLOCK_STRIKES 번째 시간 초과면 실격패(2026-09-08 오너)
@@ -587,7 +649,7 @@ router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: Au
         finished, winnerIndex, endReason: out ? "timeout" : finished ? "inningCap" : null,
         strikeIndex: m.turn === 0 ? 0 : 1,
     });
-    if (!row) return sendError(res, 409, "err.sim.stale", "STALE");
+    if (!row) return null;
     const timedOutId = m.turn === 0 ? m.hostId : m.guestId;
     const otherId = m.turn === 0 ? m.guestId : m.hostId;
     if (out) {
@@ -605,6 +667,25 @@ router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: Au
         }
     }
     else await capped(notify(timedOutId, "notif.sim.timeout.title", msg("notif.sim.timeout.body", { strikes, max: SHOT_CLOCK_STRIKES }), m.id));
+    return row;
+}
+
+// POST /sim/matches/:id/timeout — 40초 룰 시간 초과: 차례인 사람은 40초, 상대는 50초(유예 10초) 뒤부터. 서버 시계가 판정한다.
+// 샷 없이 이닝을 넘기고(foul-timeout) 차례를 바꾼다. 클라이언트는 응답의 대전 행으로 스냅한다.
+router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const m = await storage.simMatch.get(req.params.id);
+    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "err.sim.matchNotFound");
+    if (m.status !== "playing") return sendError(res, 409, "err.sim.notPlaying");
+    if (!m.turnSeenAt) return sendError(res, 409, "err.sim.clockNotStarted", "TOO_EARLY");
+    const myIndex = m.hostId === req.userId ? 0 : 1;
+    await storage.simMatch.touchSeen(m.id, myIndex);
+    // 시계는 한 번 시작하면 자리를 비워도 계속 돈다 — 자리를 비우는 것 자체가 패널티다(2026-09-08 오너 결정).
+    // 아예 앱을 안 연 사람은 시계가 시작되지 않으므로 48시간 무응답 승리 주장으로 처리된다.
+    const elapsed = Date.now() - m.turnSeenAt.getTime();
+    const needMs = (m.turn === myIndex ? SHOT_CLOCK_S : SHOT_CLOCK_S + SHOT_CLOCK_GRACE_S) * 1000 - 1500;   // 네트워크 지연 여유 1.5 s
+    if (elapsed < needMs) return sendError(res, 409, "err.sim.tooEarly", "TOO_EARLY");
+    const row = await applyTimeout(m, myIndex);
+    if (!row) return sendError(res, 409, "err.sim.stale", "STALE");
     const full = await storage.simMatch.get(m.id);
     return sendSuccess(res, publicMatch(full!, req.userId!));
 }));
@@ -659,6 +740,13 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
     }
     if (m.turn !== myIndex) return sendError(res, 409, "err.sim.notYourTurn", "NOT_YOUR_TURN");
     if (idx !== m.shots) return sendError(res, 409, msg("err.sim.idxMismatch", { n: m.shots }), "IDX_MISMATCH");
+    // 서버가 시계를 지킨다(2026-09-26 검토): 예전엔 시간 초과를 **상대 화면**이 /timeout 으로 알려야만 처리돼서, 상대 폰이
+    // 잠겨 있으면 치는 사람은 시간 제한이 없었다. 정직한 화면은 40초에 스스로 시간 초과를 보내므로 그 뒤에 오는 샷은 없다 —
+    // 40초 + 유예 + 네트워크 여유가 지난 샷은 받지 않고 시간 초과를 적용한다(차례가 넘어가 화면은 NOT_YOUR_TURN 으로 다시 맞춘다).
+    if (m.turnSeenAt && Date.now() - m.turnSeenAt.getTime() > (SHOT_CLOCK_S + SHOT_CLOCK_GRACE_S) * 1000 + LATE_SHOT_SLACK_MS) {
+        await applyTimeout(m, myIndex);
+        return sendError(res, 409, "err.sim.notYourTurn", "NOT_YOUR_TURN");
+    }
 
     const state = m.state as SessionState;
     const me = currentPlayer(state);
@@ -791,8 +879,7 @@ router.post("/sim/matches/:id/claim", requireAuth, asyncHandler(async (req: Auth
     if (m.status !== "playing") return sendError(res, 409, "err.sim.notPlaying");
     const myIndex = m.hostId === req.userId ? 0 : 1;
     if (m.turn === myIndex) return sendError(res, 409, "err.sim.claimOnMyTurn");
-    const since = (m.lastShotAt ?? m.startedAt ?? m.createdAt).getTime();
-    if (Date.now() - since < CLAIM_AFTER_MS) return sendError(res, 409, "err.sim.tooEarly", "TOO_EARLY");
+    if (Date.now() < claimableAtOf(m).getTime()) return sendError(res, 409, "err.sim.tooEarly", "TOO_EARLY");
     const row = await storage.simMatch.finish(m.id, req.userId!, "claim");
     if (!row) return sendError(res, 409, "err.sim.alreadyFinished");
     await notify(myIndex === 0 ? m.guestId : m.hostId, "notif.sim.finished.title", "notif.sim.finished.claimed", m.id);
@@ -854,7 +941,8 @@ router.post("/sim/matches/:id/rematch", requireAuth, asyncHandler(async (req: Au
     if (asked.rematchId) return sendSuccess(res, { matchId: asked.rematchId, waiting: false });
 
     const otherId = m.hostId === req.userId ? m.guestId : m.hostId;
-    if (!asked.by[otherId]) {
+    const otherAskedAt = asked.by[otherId] ? Date.parse(asked.by[otherId]) : NaN;
+    if (!Number.isFinite(otherAskedAt) || Date.now() - otherAskedAt > REMATCH_ASK_TTL_MS) {
         await notify(otherId, "notif.sim.rematchAsk.title", msg("notif.sim.rematchAsk.body", { name: (m.hostId === req.userId ? m.hostName : m.guestName) ?? "상대" }), m.id);
         return sendSuccess(res, { matchId: null, waiting: true });
     }
@@ -875,12 +963,15 @@ router.post("/sim/matches/:id/rematch", requireAuth, asyncHandler(async (req: Au
         hostId: newHostId, guestId: newGuestId,
         gameType: m.gameType, tableId: m.tableId, cushionModel: m.cushionModel, condition: m.condition,
         aimAssist: m.aimAssist, fullPreview: m.fullPreview, isPublic: m.isPublic, handicap: m.handicap,
+        // 비밀번호 방의 재경기도 잠긴 방이다 — 빠뜨리면 공개 관전 목록에 뜨고 남이 채팅까지 읽었다(2026-09-26 검토).
+        passwordHash: m.passwordHash,
         rules: m.rules, finishType: m.finishType, inningCap: m.inningCap,
         hostTarget: newHostTarget, guestTarget: newGuestTarget,
         state, balls: openingLayout(m.gameType, TABLES[m.tableId], "white"),
         status: "playing", turn: 0, startedAt: new Date(),
-        // 상대가 알림을 보고 돌아올 시간만큼 봐주고 40초 룰이 돈다(자리 비움 유예와 같은 규칙).
-        turnSeenAt: new Date(Date.now() + ABSENT_GRACE_MS),
+        // 먼저 치는 사람(옛 게스트)이 지금 화면에 있으면 돌아올 시간만큼 봐주고 40초 룰이 돈다. 없으면 시계를 걸지 않는다 —
+        // 들어와 조준 화면을 열 때(ack) 시작한다. 없는 사람을 몰수패로 만들지 않는다(2026-09-26 검토).
+        turnSeenAt: (newHostId === req.userId || isRecentlySeen(m.guestSeenAt)) ? new Date(Date.now() + ABSENT_GRACE_MS) : null,
         engineVersion: ENGINE_VERSION, paramsHash: paramsHash(paramsFor(m)),
     });
     // 둘이 동시에 눌렀으면 먼저 적은 쪽이 정본 — 진 쪽이 만든 빈 방은 버린다.

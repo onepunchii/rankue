@@ -148,6 +148,8 @@ export const tr: Record<string, string> = {
   "err.sim.drillNotThisWeek": "Bu haftanın alıştırmalarından değil",
   "err.sim.drillAlreadyAttempted": "Bu alıştırma bu hafta zaten puanlandı",
   "err.sim.codeNotFound": "Kod bulunamadı",
+  "err.sim.tooManyTries": "Çok fazla deneme. Lütfen daha sonra tekrar deneyin",
+  "err.sim.inviteCooldown": "Zaten davet edildi. Biraz sonra tekrar gönderebilirsiniz",
   "err.sim.alreadyStarted": "Bu maç zaten başladı",
   "err.sim.joinOwn": "Kendi maçına katılamazsın",
   "err.sim.notJoinable": "Bu maça katılınamaz",

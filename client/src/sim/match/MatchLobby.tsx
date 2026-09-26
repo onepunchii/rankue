@@ -417,7 +417,11 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                         </p>
                     </div>
                 ) : (
-                    <TargetPicker id="sim-match-target" gameType={gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                    <>
+                        <TargetPicker id="sim-match-target" gameType={gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                        {/* 2026-09-26 오너: 다마수를 손으로 넣는 방은 레이팅에 넣지 않는다(shared/sim/rating.ts) */}
+                        <p className="text-[12px] font-medium text-ink-3">{t("sim.match.friendlyDesc")}</p>
+                    </>
                 )}
             </div>
 
@@ -558,14 +562,17 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
     const targetNum = targetText.trim() === "" ? NaN : Number(targetText);
     const targetOk = isValidTarget(targetNum);
     const needsPassword = !!found?.hasPassword;
-    const canJoin = !!found && targetOk && (!needsPassword || password !== "");
+    // 핸디전 방은 서버가 두 사람의 온라인 기록으로 목표를 정한다 — 게스트가 적을 게 없다(방 목록 참가와 같은 규칙).
+    const foundHandicap = found?.handicap === true;
+    const canJoin = !!found && (foundHandicap || targetOk) && (!needsPassword || password !== "");
 
     const join = async () => {
         if (!found || !canJoin || joining) return;
         setJoining(true);
         setJoinError(null);
         try {
-            const m = needsPassword ? await api.joinMatch(code, targetNum, password) : await api.joinMatch(code, targetNum);
+            const t0 = foundHandicap ? undefined : targetNum;
+            const m = needsPassword ? await api.joinMatch(code, t0, password) : await api.joinMatch(code, t0);
             onCreated?.(m);
             onStarted(m);
         } catch (e) {
@@ -613,13 +620,25 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
                             <span className="text-[12px] font-medium text-ink-4">{t("sim.setup.rules")}</span>
                             <span className="text-[13px] font-semibold text-ink-2">{rulesLabel(found, t)} · {inningCapLabel(found.inningCap, t)}</span>
                         </div>
-                        <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-[12px] font-medium text-ink-4">{t("sim.match.hostTarget")}</span>
-                            <span className="rk-num text-[14px] font-semibold text-ink-1">{found.hostTarget}</span>
-                        </div>
+                        {!foundHandicap && (
+                            <div className="flex items-baseline justify-between gap-2">
+                                <span className="text-[12px] font-medium text-ink-4">{t("sim.match.hostTarget")}</span>
+                                <span className="rk-num text-[14px] font-semibold text-ink-1">{found.hostTarget}</span>
+                            </div>
+                        )}
                     </div>
 
-                    <TargetPicker id="sim-match-guest-target" gameType={found.gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                    {foundHandicap ? (
+                        <div className="rounded-tile border border-brand/30 bg-brand/[0.06] px-4 py-3">
+                            <p className="text-[13px] font-bold text-ink-1">{t("sim.match.handicapRoom")}</p>
+                            <p className="text-[12px] font-medium text-ink-3 mt-0.5">{t("sim.match.handicapJoin")}</p>
+                        </div>
+                    ) : (
+                        <>
+                            <TargetPicker id="sim-match-guest-target" gameType={found.gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                            <p className="text-[12px] font-medium text-ink-3">{t("sim.match.friendlyDesc")}</p>
+                        </>
+                    )}
 
                     {needsPassword && (
                         <div className="space-y-1.5">

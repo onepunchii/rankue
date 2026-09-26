@@ -65,10 +65,14 @@ const Row = memo(function Row({ m, age, onJoin }: { m: MatchPublic; age: string;
                 <span className="flex items-center gap-2 min-w-0">
                     <span className="text-[14px] font-semibold text-ink-1 truncate">{m.hostName}</span>
                     <span className="text-[11px] font-medium text-ink-3 shrink-0">{age}</span>
+                    {/* 방장 접속(2026-09-26): 초록 점 = 들어가면 바로 친다. 없으면 방장이 알림을 받고 와야 시작 */}
+                    {m.hostOnline
+                        ? <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-brand"><span className="w-1.5 h-1.5 rounded-full bg-brand" />{t("sim.rooms.hostOnline")}</span>
+                        : <span className="shrink-0 text-[11px] font-medium text-ink-4">{t("sim.rooms.hostAway")}</span>}
                 </span>
                 <span className="text-[12px] font-medium text-ink-3 truncate">
                     {gameLabel(m, t)}
-                    {m.handicap === true ? <> · <span className="text-brand font-bold">{t("sim.match.handicapRoom")}</span></> : <> · {t("sim.rooms.target").replace("{n}", String(m.hostTarget))}</>}
+                    {m.handicap === true ? <> · <span className="text-brand font-bold">{t("sim.match.handicapRoom")}</span></> : <> · {t("sim.rooms.target").replace("{n}", String(m.hostTarget))} · {t("sim.match.friendly")}</>}
                 </span>
                 {(m.aimAssist === false || m.hasPassword) && (
                     <span className="flex flex-wrap gap-1">
@@ -181,7 +185,10 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
                                 <p className="text-[12px] font-medium text-ink-3 mt-0.5">{t("sim.match.handicapJoin")}</p>
                             </div>
                         ) : (
-                            <TargetPicker id="sim-room-target" gameType={room.gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                            <>
+                                <TargetPicker id="sim-room-target" gameType={room.gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                                <p className="text-[12px] font-medium text-ink-3">{t("sim.match.friendlyDesc")}</p>
+                            </>
                         )}
                         {room.hasPassword && (
                             <div className="space-y-1.5">

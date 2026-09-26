@@ -14,7 +14,9 @@
  * 차트는 시뮬레이터 대시보드의 SVG 차트(TrendLine/Columns — 읽기 줄·문지르기 포함)를 그대로 쓴다. 색은 브랜드 한 색.
  */
 import { Fragment, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
 import { Columns, TrendLine } from "@/sim/dash/charts";
 import { LucideRefreshCw } from "@/lib/icons";
 import { kstDateTime, agoLabel, Pill } from "./adminUtils";
@@ -164,6 +166,65 @@ function Heatmap({ grid }: { grid: number[][] }) {
             </div>
             <p className="mt-1 text-[11px] text-black/35 tabular-nums">기간 합 {fmt(total)}회 · 한국 시각</p>
         </div>
+    );
+}
+
+
+type RecomputeSummary = {
+    dryRun: boolean; finishedMatches: number; ratedMatches: number;
+    skipped: { manual: number; tooShort: number; noGuest: number };
+    players: number; rowsBefore: number;
+    top: { memberId: string; gameType: string; rating: number; matches: number; wins: number }[];
+};
+
+/**
+ * 레이팅 다시 계산(2026-09-26 오너: 핸디전만 반영 · 기대 승률 50:50 — 규칙이 바뀌어 기존 점수를 핸디전 기록으로 새로 쌓는다).
+ * 먼저 미리보기(계산만)로 몇 판이 반영되는지 보고, 적용을 누르면 온라인 대전 레이팅 표를 통째로 다시 쓴다.
+ */
+function RatingRecomputeCard() {
+    const { toast } = useToast();
+    const qc = useQueryClient();
+    const [preview, setPreview] = useState<RecomputeSummary | null>(null);
+    const run = useMutation({
+        mutationFn: async (apply: boolean) => apiRequest("/api/hiq/admin/sim/recompute-ratings", { method: "POST", body: { apply } }) as Promise<RecomputeSummary>,
+        onSuccess: (r) => {
+            setPreview(r);
+            if (!r.dryRun) {
+                toast({ title: `레이팅을 다시 계산했습니다 — ${fmt(r.players)}명 · ${fmt(r.ratedMatches)}판 반영` });
+                qc.invalidateQueries({ predicate: (q) => String(q.queryKey[0] ?? "").includes("/sim/") });
+            }
+        },
+        onError: (e: any) => toast({ title: e?.message || "다시 계산 실패", variant: "destructive" }),
+    });
+    return (
+        <Card title="온라인 대전 레이팅 규칙" sub="핸디전만 반영 · 기대 승률 50:50 · 두 사람 다 3샷 이상 · 같은 상대 24시간 안 연속은 줄여서">
+            <p className="text-[12.5px] text-black/55 leading-relaxed">
+                다마수를 직접 넣는 방(맞대결)은 친선전이라 레이팅·판 수에 넣지 않습니다. 규칙이 바뀌기 전 점수에는 맞대결이 섞여 있어,
+                끝난 대전을 핸디전만 골라 처음부터 다시 쌓을 수 있습니다.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" disabled={run.isPending} onClick={() => run.mutate(false)}
+                    className="h-9 px-3 rounded-lg border border-black/10 text-[13px] font-bold text-black/70 disabled:opacity-50">
+                    {run.isPending && !preview ? "계산 중…" : "미리보기"}
+                </button>
+                {preview?.dryRun && (
+                    <button type="button" disabled={run.isPending}
+                        onClick={() => { if (window.confirm(`온라인 대전 레이팅을 다시 씁니다.\n${fmt(preview.players)}명 · 핸디전 ${fmt(preview.ratedMatches)}판 반영\n(지금 ${fmt(preview.rowsBefore)}줄은 지워집니다)\n\n진행할까요?`)) run.mutate(true); }}
+                        className="h-9 px-3 rounded-lg bg-brand text-white text-[13px] font-bold disabled:opacity-50">
+                        {run.isPending ? "적용 중…" : "이대로 적용"}
+                    </button>
+                )}
+            </div>
+            {preview && (
+                <div className="mt-3 rounded-xl bg-black/[0.03] p-3 text-[12.5px] tabular-nums space-y-1">
+                    <p><b>{preview.dryRun ? "미리보기" : "적용 완료"}</b> · 끝난 대전 {fmt(preview.finishedMatches)}판 중 <b className="text-brand">{fmt(preview.ratedMatches)}판</b> 반영 → {fmt(preview.players)}명</p>
+                    <p className="text-black/50">빠진 판: 맞대결 {fmt(preview.skipped.manual)} · 3샷 미만 {fmt(preview.skipped.tooShort)}</p>
+                    {preview.top.length > 0 && (
+                        <p className="text-black/50">상위: {preview.top.map((t) => `${t.gameType === "3c" ? "3쿠션" : "4구"} ${t.rating}(${t.matches}판)`).join(" · ")}</p>
+                    )}
+                </div>
+            )}
+        </Card>
     );
 }
 
@@ -443,6 +504,8 @@ export default function OnlineGameView({ onOpenMember }: { onOpenMember?: (membe
                     {matchesShown.length === 0 && <li className="py-3 text-[13px] text-black/40">해당하는 대전이 없습니다</li>}
                 </ul>
             </Card>
+
+            <RatingRecomputeCard />
         </div>
     );
 }

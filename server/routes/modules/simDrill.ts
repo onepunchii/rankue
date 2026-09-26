@@ -3,6 +3,7 @@
  * 불변: 실전 경기 테이블·마감 함수·회원 성적 컬럼은 참조하지 않는다(sim.guard.test.ts).
  */
 import { Router } from "express";
+import { V0_MAX, THETA_MAX, SHOT_LIMIT_EPS } from "../../../shared/sim/shotLimits.js";
 import { z } from "zod";
 import { storage } from "../../storage/index.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
@@ -59,8 +60,8 @@ function routeOfStored(drill: Drill, input: unknown, hash: string): AttemptRoute
 const attemptSchema = z.object({
     input: z.object({
         cueBallId: z.literal("white"),
-        phi: z.number().finite(), V0: z.number().gt(0).max(12),
-        a: z.number().min(-0.5).max(0.5), b: z.number().min(-0.5).max(0.5), theta: z.number().min(0).max(1.2),
+        phi: z.number().finite(), V0: z.number().gt(0).max(V0_MAX + SHOT_LIMIT_EPS),
+        a: z.number().min(-0.5).max(0.5), b: z.number().min(-0.5).max(0.5), theta: z.number().min(0).max(THETA_MAX + SHOT_LIMIT_EPS),
     }),
     clientHash: z.string().length(16).optional(),
 });

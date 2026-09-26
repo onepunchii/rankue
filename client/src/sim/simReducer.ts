@@ -58,12 +58,9 @@ export const V0_MIN = 0.2;
  * 옛 기록·공유 링크에는 이보다 큰 값이 남아 있을 수 있어 clampPower 는 V0_LEGACY_MAX 까지 받아 준다
  * (그대로 재생돼야 해시가 맞는다). 화면 눈금은 controlsMath 의 퍼센트 변환이 V0_MAX 로 묶는다.
  */
-export const V0_MAX = 7.5;
-/** 엔진이 받아 주는 상한 — 상한을 낮추기 전(2026-09-12 이전)에 저장된 샷과 공유 링크를 위해 남긴다. */
-export const V0_LEGACY_MAX = 9;
-/** 큐 들림각 상한 (rad). README: v2.0 은 고급 패널에서 0~20°. */
-// 큐 각 상한. 엔진 v2.2 가 공중·착지를 풀어 마세이(30°+)·점프(35°+)가 실제로 나온다. 서버는 1.2 rad 까지 받는다.
-export const THETA_MAX = (60 * Math.PI) / 180;
+// 한도 값은 shared/sim/shotLimits.ts 가 정본이다 — 서버 검증과 같은 값을 쓴다.
+export { V0_MAX, V0_LEGACY_MAX, THETA_MAX } from "@shared/sim/shotLimits";
+import { V0_MAX, V0_LEGACY_MAX, THETA_MAX } from "@shared/sim/shotLimits";
 /** 샷 재전송 시도 상한. 넘으면 이 세션은 더 기록하지 않는다(offline). 대전에선 다음 폴링 성공 때 다시 시도한다. */
 export const MAX_RETRIES = 3;
 /** 미스큐 경계 안쪽 여유. strike 는 a²+b² ≤ max² 를 요구하므로 스케일링 반올림이 경계를 넘지 않게 한다. */

@@ -44,6 +44,15 @@ router.get("/online-game", checkSuperAdmin, asyncHandler(async (req: any, res: a
     return sendSuccess(res, await storage.sim.adminOverview(days));
 }));
 
+// POST /admin/sim/recompute-ratings { apply?: boolean } — 온라인 대전 레이팅을 핸디전 기록만으로 처음부터 다시 계산(2026-09-26 오너).
+// apply 가 아니면 미리보기(계산만). 규칙은 shared/sim/rating.ts.
+router.post("/sim/recompute-ratings", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const apply = req.body?.apply === true;
+    const summary = await storage.simMatch.recomputeRatings(!apply);
+    if (apply) console.info("[admin] 레이팅 재계산", JSON.stringify({ ...summary, top: undefined, by: req.signedCookies?.hiq_partner_auth ?? null }));
+    return sendSuccess(res, summary);
+}));
+
 // GET /admin/activity — 앱 접속 요약(DAU/WAU/MAU · 최근 7일 세션 · 가입 코호트 리텐션 D1/D7/D30), 2026-09-13 오너
 router.get("/activity", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
     return sendSuccess(res, await storage.appSessions.summary(8));

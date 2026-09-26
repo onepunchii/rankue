@@ -148,6 +148,8 @@ export const ko: Record<string, string> = {
   "err.sim.drillNotThisWeek": "이번 주 드릴이 아닙니다",
   "err.sim.drillAlreadyAttempted": "이번 주 이 드릴은 이미 채점했어요",
   "err.sim.codeNotFound": "코드를 찾을 수 없습니다",
+  "err.sim.tooManyTries": "시도가 너무 많아요. 잠시 후 다시 해 주세요",
+  "err.sim.inviteCooldown": "방금 초대했어요. 조금 뒤에 다시 보낼 수 있어요",
   "err.sim.alreadyStarted": "이미 시작된 대전입니다",
   "err.sim.joinOwn": "내가 만든 대전에는 참가할 수 없습니다",
   "err.sim.notJoinable": "참가할 수 없는 대전입니다",

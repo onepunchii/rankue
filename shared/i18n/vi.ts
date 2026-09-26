@@ -148,6 +148,8 @@ export const vi: Record<string, string> = {
   "err.sim.drillNotThisWeek": "Không phải bài tập tuần này",
   "err.sim.drillAlreadyAttempted": "Bài tập này đã được chấm điểm trong tuần này rồi",
   "err.sim.codeNotFound": "Không tìm thấy mã",
+  "err.sim.tooManyTries": "Thử quá nhiều lần. Vui lòng thử lại sau",
+  "err.sim.inviteCooldown": "Đã mời rồi. Bạn có thể gửi lại sau ít phút",
   "err.sim.alreadyStarted": "Trận đấu này đã bắt đầu rồi",
   "err.sim.joinOwn": "Bạn không thể tham gia trận đấu do chính mình tạo",
   "err.sim.notJoinable": "Không thể tham gia trận đấu này",

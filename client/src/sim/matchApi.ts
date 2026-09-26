@@ -123,6 +123,8 @@ export interface MatchPublic {
     readonly isPublic?: boolean;
     /** 비밀번호 방 — 참가할 때 password 가 필요하다. */
     readonly hasPassword?: boolean;
+    /** 방장이 지금 화면을 보고 있나(방 목록) */
+    readonly hostOnline?: boolean;
     /** 핸디전 방(2026-09-12): 참가하는 순간 서버가 두 사람의 온라인 에버리지로 각자 목표를 정한다. 옛 응답엔 없다. */
     readonly handicap?: boolean;
     readonly rules: Rules;

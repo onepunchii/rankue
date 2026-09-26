@@ -5,6 +5,7 @@
  * 불변: 실전 경기 테이블·마감 함수·회원 성적 컬럼은 여기서 절대 참조하지 않는다(sim.guard.test.ts).
  */
 import { Router } from "express";
+import { V0_MAX, THETA_MAX, SHOT_LIMIT_EPS } from "../../../shared/sim/shotLimits.js";
 import { z } from "zod";
 import { storage } from "../../storage/index.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
@@ -57,10 +58,10 @@ const shotSchema = z.object({
     input: z.object({
         cueBallId: z.enum(["white", "yellow"]),
         phi: z.number().finite(),
-        V0: z.number().gt(0).max(12),
+        V0: z.number().gt(0).max(V0_MAX + SHOT_LIMIT_EPS),
         a: z.number().min(-0.5).max(0.5),
         b: z.number().min(-0.5).max(0.5),
-        theta: z.number().min(0).max(1.2),
+        theta: z.number().min(0).max(THETA_MAX + SHOT_LIMIT_EPS),
     }),
     clientHash: z.string().length(16).optional(),
 });

@@ -148,6 +148,8 @@ export const en: Record<string, string> = {
   "err.sim.drillNotThisWeek": "Not one of this week's drills",
   "err.sim.drillAlreadyAttempted": "You've already been scored on this drill this week",
   "err.sim.codeNotFound": "Code not found",
+  "err.sim.tooManyTries": "Too many attempts. Please try again later",
+  "err.sim.inviteCooldown": "Already invited. You can send again in a bit",
   "err.sim.alreadyStarted": "This match has already started",
   "err.sim.joinOwn": "You can't join your own match",
   "err.sim.notJoinable": "This match can't be joined",

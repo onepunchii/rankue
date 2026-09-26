@@ -11,8 +11,8 @@ import type { HiqSimMatch, HiqSimMatchShot, HiqSimMatchChat } from "../../shared
 import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS } from "../../shared/sim/rules/session.js";
 import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
 import { CHAT_PAGE_MAX, chatReject, type ChatReject } from "../../shared/sim/chat.js";
+import { ratingEligibility, ratingDelta, START_RATING, SAME_PAIR_WINDOW_MS, MIN_SHOTS_EACH } from "../../shared/sim/rating.js";
 
-const ELO_K = 24;
 const LIVE = ["waiting", "playing"] as const;
 /** 접속 표시 갱신 간격(폴링마다 쓰지 않고 이 간격이 지났을 때만) */
 const SEEN_THROTTLE_MS = 5_000;
@@ -350,9 +350,11 @@ export class SimMatchRepository {
             if (!m || m.status !== "waiting" || m.hostId === guestId) return null;
             const [row] = await tx.update(hiqSimMatches).set({
                 guestId, guestTarget, state, balls, status: "playing", turn: 0,
-                // 첫 샷(방장)도 시계를 건다 — 방을 열어 두고 앱을 끈 방장 때문에 게스트가 무한정 기다리던 자리다(2026-09-15).
-                // 방장은 "게스트가 들어왔어요" 푸시를 받으므로 돌아올 시간(ABSENT_GRACE_MS)만큼 봐주고 40초 룰이 돈다.
-                turnSeenAt: new Date(Date.now() + ABSENT_GRACE_MS),
+                // 첫 샷(방장) 시계: 방장이 대기 화면을 보고 있으면(PRESENCE_MS 안) 돌아볼 시간만큼 봐주고 바로 건다.
+                // 자리에 없으면 **걸지 않는다** — 2026-09-15 부터 늘 걸었더니, 방을 열고 앱을 닫은 방장이(화면이 "닫아도 괜찮다"고
+                // 안내했다) 몇 시간 뒤 누가 들어오자 40초 × 3번으로 몰수패를 당했다(2026-09-26 검토). 방장이 푸시를 보고 들어와
+                // 조준 화면을 열면(ack) 시작하고, 끝내 안 오면 게스트가 NO_SHOW_CLAIM_MS 뒤 승리를 주장한다(레이팅 미반영).
+                turnSeenAt: m.hostSeenAt && Date.now() - m.hostSeenAt.getTime() <= PRESENCE_MS ? new Date(Date.now() + ABSENT_GRACE_MS) : null,
                 ...(typeof hostTarget === "number" ? { hostTarget } : {}),
                 startedAt: new Date(), version: m.version + 1,
             }).where(eq(hiqSimMatches.id, id)).returning();
@@ -391,6 +393,19 @@ export class SimMatchRepository {
     }
 
     /** 상대가 hours 시간 넘게 안 들어온 waiting 대전을 canceled 로. */
+    /**
+     * 둘 다 떠난 대전 정리(2026-09-26 검토): 7일 넘게 샷·승리 주장이 없는 playing 대전은 무효(canceled, endReason 'stale')로
+     * 닫는다. 레이팅은 건드리지 않는다. 예전엔 영원히 '진행 중'으로 남아 대시보드 배너·대전 목록 폴링을 붙잡았다.
+     */
+    async cleanupStalePlaying(days = 7): Promise<number> {
+        const rows = await db.update(hiqSimMatches)
+            .set({ status: "canceled", endReason: "stale", finishedAt: new Date(), turnSeenAt: null })
+            .where(and(eq(hiqSimMatches.status, "playing"),
+                sql`coalesce(${hiqSimMatches.lastShotAt}, ${hiqSimMatches.startedAt}, ${hiqSimMatches.createdAt}) < now() - make_interval(days => ${days})`))
+            .returning({ id: hiqSimMatches.id });
+        return rows.length;
+    }
+
     async cleanupStaleWaiting(hours = 24): Promise<number> {
         const rows = await db.update(hiqSimMatches)
             .set({ status: "canceled", finishedAt: new Date() })
@@ -524,7 +539,7 @@ export class SimMatchRepository {
     async touchSeen(id: string, playerIndex: 0 | 1): Promise<void> {
         const col = playerIndex === 0 ? hiqSimMatches.hostSeenAt : hiqSimMatches.guestSeenAt;
         await db.update(hiqSimMatches).set(playerIndex === 0 ? { hostSeenAt: new Date() } : { guestSeenAt: new Date() })
-            .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.status, "playing"),
+            .where(and(eq(hiqSimMatches.id, id), inArray(hiqSimMatches.status, ["playing", "waiting"]),
                 or(isNull(col), sql`${col} < now() - make_interval(secs => ${SEEN_THROTTLE_MS / 1000})`)));
     }
 
@@ -570,28 +585,28 @@ export class SimMatchRepository {
     }
 
     /**
-     * 시뮬 대전 Elo. 실전 RP 와 완전히 별개다. 무승부(null)는 0.5.
+     * 시뮬 대전 레이팅. 실전 RP 와 완전히 별개다. 규칙은 shared/sim/rating.ts(핸디전만 · 기대 승률 50:50 ·
+     * 두 사람 다 MIN_SHOTS_EACH 번 이상 · 같은 두 사람 24시간 안 연속은 줄여서).
      * 2026-09-12 부터 **테이블(대대·중대)을 합쳐** hiq_sim_match_ratings 에 (회원, 종목) 한 줄로 쌓는다 — 오너 지시.
-     * 인원이 적어 사다리를 넷으로 쪼개면 한 판에 서너 명밖에 안 남았다.
+     * 반영하지 않는 판은 판 수·승수도 세지 않는다(랭킹 배치 3판에 안 들어간다).
      */
     private async applyElo(tx: any, m: HiqSimMatch, winnerId: string | null) {
-        const ids = [m.hostId, m.guestId!];
-        const rows = await tx.select().from(hiqSimMatchRatings)
-            .where(and(inArray(hiqSimMatchRatings.memberId, ids), eq(hiqSimMatchRatings.gameType, m.gameType)));
-        const rating = (id: string) => rows.find((r: any) => r.memberId === id)?.rating ?? 1000;
-        const [ra, rb] = [rating(ids[0]), rating(ids[1])];
-        const ea = 1 / (1 + Math.pow(10, (rb - ra) / 400));
-        const sa = winnerId === null ? 0.5 : winnerId === ids[0] ? 1 : 0;
-        const da = Math.round(ELO_K * (sa - ea));
+        if (!m.guestId) return;
+        const shots = await this.shotCounts(tx, m.id);
+        const ok = ratingEligibility({ handicap: m.handicap, hasGuest: true, shots });
+        if (!ok.rated) return;
+        const prior = await this.samePairPrior(tx, m);
+        const winner = winnerId === null ? null : winnerId === m.hostId ? 0 : 1;
+        const da = ratingDelta(winner, prior);
+        const ids = [m.hostId, m.guestId];
         for (const [i, id] of ids.entries()) {
             const delta = i === 0 ? da : -da;
             // 무승부는 **양쪽 다 승**으로 센다(2026-09-16 오너: "어차피 둘이 모두 같은 거라면 둘 다 승이 보기 좋다").
             // 랭킹 화면이 패를 `matches - wins` 로 뽑으므로, 여기서 세지 않으면 무승부가 패로 보인다.
-            // 레이팅 값 자체는 위에서 sa=0.5 로 계산하니 영향이 없다 — 표기만 바뀐다.
             const won = winnerId === null || winnerId === id ? 1 : 0;
             await tx.insert(hiqSimMatchRatings).values({
                 memberId: id, gameType: m.gameType,
-                rating: 1000 + delta, matches: 1, wins: won, updatedAt: new Date(),
+                rating: START_RATING + delta, matches: 1, wins: won, updatedAt: new Date(),
             }).onConflictDoUpdate({
                 target: [hiqSimMatchRatings.memberId, hiqSimMatchRatings.gameType],
                 set: {
@@ -602,5 +617,99 @@ export class SimMatchRepository {
                 },
             });
         }
+    }
+
+    /** [방장 샷 수, 게스트 샷 수] */
+    private async shotCounts(tx: any, matchId: string): Promise<[number, number]> {
+        const rows = (await tx.execute(sql`
+            select player_index, count(*)::int as n from hiq_sim_match_shots where match_id = ${matchId} group by player_index`)).rows as { player_index: number; n: number }[];
+        const get = (i: number) => Number(rows.find((r) => Number(r.player_index) === i)?.n ?? 0);
+        return [get(0), get(1)];
+    }
+
+    /**
+     * 같은 두 사람이 이 판 전 24시간 안에 **반영된** 판 수. 반영 여부는 규칙(rating.ts)과 같은 조건으로 SQL 에서 다시 본다
+     * (핸디전 · 게스트 있음 · 두 사람 다 MIN_SHOTS_EACH 이상 · 끝남).
+     */
+    private async samePairPrior(tx: any, m: HiqSimMatch): Promise<number> {
+        const [row] = (await tx.execute(sql`
+            select count(*)::int as n from hiq_sim_matches x
+            where x.id <> ${m.id} and x.status = 'finished' and x.handicap and x.game_type = ${m.gameType}
+              and ((x.host_id = ${m.hostId} and x.guest_id = ${m.guestId}) or (x.host_id = ${m.guestId} and x.guest_id = ${m.hostId}))
+              and x.finished_at >= now() - make_interval(secs => ${SAME_PAIR_WINDOW_MS / 1000})
+              and (select count(*) from hiq_sim_match_shots s where s.match_id = x.id and s.player_index = 0) >= ${MIN_SHOTS_EACH}
+              and (select count(*) from hiq_sim_match_shots s where s.match_id = x.id and s.player_index = 1) >= ${MIN_SHOTS_EACH}`)).rows as { n: number }[];
+        return Number(row?.n ?? 0);
+    }
+
+    /**
+     * 레이팅 전체 다시 계산(2026-09-26 오너: "핸디전 기록만으로 처음부터 다시"). 끝난 대전을 끝난 순서대로 다시 돌려
+     * hiq_sim_match_ratings 를 새로 채운다. dryRun 이면 계산만 하고 쓰지 않는다(어드민이 숫자를 보고 누른다).
+     * 규칙은 applyElo 와 같다(rating.ts). 같은 두 사람 24시간 창도 대전의 끝난 시각 기준으로 똑같이 센다.
+     */
+    async recomputeRatings(dryRun: boolean) {
+        const matches = (await db.execute(sql`
+            select m.id, m.host_id, m.guest_id, m.game_type, m.handicap, m.winner_id,
+                   extract(epoch from coalesce(m.finished_at, m.last_shot_at, m.created_at)) * 1000 as ended_ms,
+                   (select count(*)::int from hiq_sim_match_shots s where s.match_id = m.id and s.player_index = 0) as s0,
+                   (select count(*)::int from hiq_sim_match_shots s where s.match_id = m.id and s.player_index = 1) as s1
+            from hiq_sim_matches m
+            where m.status = 'finished' and m.guest_id is not null
+            order by coalesce(m.finished_at, m.last_shot_at, m.created_at) asc, m.id asc`)).rows as Record<string, unknown>[];
+
+        type Row = { rating: number; matches: number; wins: number; updatedAt: number };
+        const table = new Map<string, Row>();
+        const keyOf = (id: string, g: string) => `${id}|${g}`;
+        const recentPairs = new Map<string, number[]>(); // pair|game → 반영된 판의 끝난 시각들
+        let rated = 0;
+        const skipped = { manual: 0, tooShort: 0, noGuest: 0 };
+        for (const r of matches) {
+            const hostId = String(r.host_id), guestId = String(r.guest_id), game = String(r.game_type);
+            const ok = ratingEligibility({ handicap: r.handicap === true, hasGuest: true, shots: [Number(r.s0), Number(r.s1)] });
+            if (!ok.rated) { skipped[ok.reason]++; continue; }
+            const ended = Number(r.ended_ms);
+            const pairKey = `${[hostId, guestId].sort().join("|")}|${game}`;
+            const times = (recentPairs.get(pairKey) ?? []).filter((t) => ended - t < SAME_PAIR_WINDOW_MS);
+            const winnerId = r.winner_id ? String(r.winner_id) : null;
+            const winner = winnerId === null ? null : winnerId === hostId ? 0 : 1;
+            const da = ratingDelta(winner, times.length);
+            times.push(ended);
+            recentPairs.set(pairKey, times);
+            for (const [i, id] of [hostId, guestId].entries()) {
+                const k = keyOf(id, game);
+                const cur = table.get(k) ?? { rating: START_RATING, matches: 0, wins: 0, updatedAt: ended };
+                cur.rating += i === 0 ? da : -da;
+                cur.matches += 1;
+                cur.wins += winnerId === null || winnerId === id ? 1 : 0;
+                cur.updatedAt = ended;
+                table.set(k, cur);
+            }
+            rated++;
+        }
+
+        const beforeRows = (await db.execute(sql`select count(*)::int as n from hiq_sim_match_ratings`)).rows as { n: number }[];
+        const summary = {
+            dryRun,
+            finishedMatches: matches.length,
+            ratedMatches: rated,
+            skipped,
+            players: table.size,
+            rowsBefore: Number(beforeRows[0]?.n ?? 0),
+            top: [...table.entries()].sort((a, b) => b[1].rating - a[1].rating).slice(0, 5)
+                .map(([k, v]) => ({ memberId: k.split("|")[0], gameType: k.split("|")[1], rating: v.rating, matches: v.matches, wins: v.wins })),
+        };
+        if (dryRun) return summary;
+
+        await db.transaction(async (tx) => {
+            await tx.execute(sql`delete from hiq_sim_match_ratings`);
+            const values = [...table.entries()].map(([k, v]) => {
+                const [memberId, gameType] = k.split("|");
+                return { memberId, gameType: gameType as "3c" | "4c", rating: v.rating, matches: v.matches, wins: v.wins, updatedAt: new Date(v.updatedAt) };
+            });
+            for (let i = 0; i < values.length; i += 500) {
+                await tx.insert(hiqSimMatchRatings).values(values.slice(i, i + 500));
+            }
+        });
+        return summary;
     }
 }
