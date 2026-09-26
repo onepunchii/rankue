@@ -514,11 +514,11 @@ export default function HiqClubDetail() {
                             className="h-full overflow-y-auto custom-scrollbar"
                             style={CONTENT_BOTTOM_PAD}
                         >
-                            {subHeader(t("crewMgmt.pollTitle"))}
-                            {/* 투표도 크루원 전용(서버 requireCrewMember) — 대회 탭과 같은 가입 안내로 막는다. */}
+                            {/* 투표도 크루원 전용(서버 requireCrewMember) — 대회 탭과 같은 가입 안내로 막는다.
+                                크루원이면 탭이 스스로 '‹ 투표 …… [+ 투표 만들기]' 한 줄 머리를 그린다(머리가 두 번 겹치지 않게). */}
                             {isMember ? (
-                                <CrewPollTab crewId={id as string} isAdmin={isAdmin} isMember={isMember} />
-                            ) : membersOnlyNotice}
+                                <CrewPollTab crewId={id as string} isAdmin={isAdmin} isMember={isMember} onBack={() => setActiveTab('home')} />
+                            ) : <>{subHeader(t("crewMgmt.pollTitle"))}{membersOnlyNotice}</>}
                         </motion.div>
                     )}
 
@@ -531,7 +531,7 @@ export default function HiqClubDetail() {
                             className="h-full overflow-y-auto custom-scrollbar"
                             style={CONTENT_BOTTOM_PAD}
                         >
-                            {subHeader(t("crewMgmt.tournamentTitle"))}
+                            {(isGolfCrew || !isMember) && subHeader(t("crewMgmt.tournamentTitle"))}
                             {isGolfCrew ? (
                                 // 대회(대진표)는 당구 크루에서만 열 수 있다(서버 tournamentBilliardsOnly) — '대회 열기'를 보여 주면 누르는 순간 거절된다.
                                 <div className="min-h-full flex flex-col items-center justify-center gap-1.5 px-8 py-12 text-center">
@@ -552,6 +552,7 @@ export default function HiqClubDetail() {
                                     autoOpenCreate={tournamentAutoCreate}
                                     autoOpenTournamentId={tournamentOpenId}
                                     onAutoOpenHandled={() => { setTournamentAutoCreate(false); setTournamentOpenId(null); }}
+                                    onBack={() => setActiveTab('home')}
                                 />
                             ) : membersOnlyNotice}
                         </motion.div>

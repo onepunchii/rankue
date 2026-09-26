@@ -8,7 +8,7 @@ import { useT } from "@/lib/i18n";
 import {
     LucidePlus, LucideZap, LucideRefreshCw, LucideX, LucideMessageCircle, LucideShare2,
     LucideMinus, LucidePencil, LucideTrash2, LucideCalendarDays, LucideMapPin, LucideMoreVertical,
-    LucideChevronDown, LucideLoader2, LucideCheck,
+    LucideChevronDown, LucideLoader2, LucideCheck, LucideClock,
 } from "@/lib/icons";
 import {
     DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -52,14 +52,30 @@ function useDdayPill() {
     const { t } = useT();
     return (activityDate: string) => {
         const phase = activityPhase(activityDate);
-        if (phase === "ongoing") return { text: t("crewMeet.ongoing"), cls: "bg-brand text-brand-fg" };
-        if (phase === "past") return { text: t("clubActivityListView.ended"), cls: "bg-surface-3 text-ink-3" };
+        if (phase === "ongoing") return { text: t("crewMeet.ongoing"), cls: "bg-brand text-brand-fg", strong: true };
+        if (phase === "past") return { text: t("clubActivityListView.ended"), cls: "bg-surface-3 text-ink-3", strong: false };
         const diff = differenceInCalendarDays(new Date(activityDate), new Date());
-        if (diff <= 0) return { text: t("crewMeet.today"), cls: "bg-brand text-brand-fg" };
+        if (diff <= 0) return { text: t("crewMeet.today"), cls: "bg-brand text-brand-fg", strong: true };
         const text = t("crewMeet.dMinus").replace("{n}", String(diff));
-        if (diff <= 3) return { text, cls: "border border-brand text-brand" };
-        return { text, cls: "bg-surface-3 text-ink-2" };
+        if (diff <= 3) return { text, cls: "bg-brand/10 text-brand", strong: false };
+        return { text, cls: "bg-surface-3 text-ink-2", strong: false };
     };
+}
+
+/** 정모 카드 왼쪽 날짜 칸 — 월 · 큰 일 · 요일. 오늘·진행 중이면 초록 채움, 그 밖엔 연한 초록. */
+function DateBlock({ date, strong }: { date: string; strong: boolean }) {
+    const dateLocale = useDateLocale();
+    const d = new Date(date);
+    return (
+        <div
+            className={cn("w-[68px] shrink-0 flex flex-col items-center justify-center gap-0.5 py-3", strong ? "bg-brand text-brand-fg" : "bg-brand/10 text-brand")}
+            aria-hidden="true"
+        >
+            <span className="text-[12px] font-semibold opacity-90">{format(d, "LLL", { locale: dateLocale })}</span>
+            <span className="text-[28px] font-bold leading-none rk-num">{format(d, "d")}</span>
+            <span className="text-[12px] font-semibold opacity-90">{format(d, "EEE", { locale: dateLocale })}</span>
+        </div>
+    );
 }
 
 export function ClubActivityList({
@@ -152,11 +168,10 @@ export function ClubActivityList({
                     action={isMember ? { label: t("clubActivityListView.createTitle"), onClick: onCreateClick } : undefined}
                 />
             ) : (
-                upcoming.map((activity, i) => (
+                upcoming.map((activity) => (
                     <ActivityCard
                         key={activity.id}
                         activity={activity}
-                        featured={i === 0}
                         crewId={crewId}
                         sportType={sportType}
                         isMember={isMember}
@@ -174,11 +189,7 @@ export function ClubActivityList({
                 ))
             )}
 
-            {isMember && upcoming.length > 0 && (
-                <button type="button" onClick={onCreateClick} className={cn(CREW_BTN.secondary, "w-full")}>
-                    <LucidePlus className="w-4 h-4" /> {t("clubActivityListView.createTitle")}
-                </button>
-            )}
+            {/* 새 정모 만들기는 섹션 머리 오른쪽 '+ 정모' 알약으로 옮겼다(2026-09-26 — 만들기 자리를 섹션마다 같게) */}
 
             {/* 지난 정모 — 접어 두고 필요할 때 연다 */}
             <button
@@ -255,11 +266,10 @@ export function ClubActivityList({
 }
 
 function ActivityCard({
-    activity, featured, sportType, isMember, isAdmin, currentMemberId, onShareToChat,
+    activity, sportType, isMember, isAdmin, currentMemberId, onShareToChat,
     onJoin, joinPending, onLeave, leavePending, onEdit, onDelete, onShowPeople,
 }: {
     activity: any;
-    featured: boolean;
     crewId: string;
     sportType: SportType;
     isMember: boolean;
@@ -301,128 +311,137 @@ function ActivityCard({
     };
 
     return (
-        <article className={cn(CREW_CARD, "flex flex-col gap-3", featured && "ring-1 ring-brand/30")}>
-            {/* 상태 · 종류 · 참여 표시 · 관리 메뉴 */}
-            <div className="flex items-center gap-1.5 -mt-1 min-h-11">
-                <span className={cn("rk-chip rk-num", pill.cls)}>{pill.text}</span>
-                {categoryKey && <span className="rk-chip bg-surface-3 text-ink-2">{t(categoryKey)}</span>}
-                {isJoined && (
-                    <span className="rk-chip bg-brand/10 text-brand"><LucideCheck className="w-3 h-3" />{t("clubActivityListView.joinedBadge")}</span>
-                )}
-                <span className="flex-1" />
-                {canManage && (
-                    <DropdownMenu modal={false}>
-                        <DropdownMenuTrigger asChild>
-                            <button type="button" aria-label={t("crewMeet.menu")} title={t("crewMeet.menu")}
-                                className="w-11 h-11 -mr-2 rounded-full inline-flex items-center justify-center text-ink-3 active:bg-surface-3">
-                                <LucideMoreVertical className="w-5 h-5" />
-                            </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="min-w-[160px] rounded-tile bg-surface-1 border-surface-line p-1">
-                            <DropdownMenuItem className="min-h-11 px-3 text-[15px] font-medium text-ink-1 gap-2.5" onSelect={onEdit}>
-                                <LucidePencil className="text-ink-3" /> {t("clubActivityListView.editButton")}
-                            </DropdownMenuItem>
-                            <DropdownMenuItem className="min-h-11 px-3 text-[15px] font-medium text-destructive gap-2.5" onSelect={onDelete}>
-                                <LucideTrash2 /> {t("clubActivityListView.deleteButton")}
-                            </DropdownMenuItem>
-                        </DropdownMenuContent>
-                    </DropdownMenu>
-                )}
-            </div>
+        // 2026-09-26 크루 안쪽 정리: 왼쪽 날짜 칸(월·일·요일) + 오른쪽 내용, 아래 한 줄에 [공유][팀 편성] …… [참석하기].
+        // 예전엔 첫 카드만 큰 제목·초록 테두리였고, 버튼이 가로 전체 버튼 + 동그라미 + 글자 링크로 세 줄에 흩어져 있었다.
+        <article className={cn(CREW_CARD, "p-0 overflow-hidden")}>
+            <div className="flex">
+                <DateBlock date={activity.activityDate} strong={pill.strong} />
+                <div className="flex-1 min-w-0 pl-3.5 pr-4 pt-3 pb-2 flex flex-col gap-1">
+                    {/* 상태 · 종류 · 참여 표시 · 관리 메뉴 */}
+                    <div className="flex items-center gap-1.5 min-h-8">
+                        <span className={cn("rk-chip rk-num", pill.cls)}>{pill.text}</span>
+                        {categoryKey && <span className="rk-chip bg-surface-3 text-ink-2">{t(categoryKey)}</span>}
+                        {isJoined && (
+                            <span className="rk-chip bg-brand/10 text-brand"><LucideCheck className="w-3 h-3" />{t("clubActivityListView.joinedBadge")}</span>
+                        )}
+                        <span className="flex-1" />
+                        {canManage && (
+                            <DropdownMenu modal={false}>
+                                <DropdownMenuTrigger asChild>
+                                    <button type="button" aria-label={t("crewMeet.menu")} title={t("crewMeet.menu")}
+                                        className="w-11 h-11 -my-2 -mr-3 rounded-full inline-flex items-center justify-center text-ink-3 active:bg-surface-3">
+                                        <LucideMoreVertical className="w-5 h-5" />
+                                    </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="min-w-[160px] rounded-tile bg-surface-1 border-surface-line p-1">
+                                    <DropdownMenuItem className="min-h-11 px-3 text-[15px] font-medium text-ink-1 gap-2.5" onSelect={onEdit}>
+                                        <LucidePencil className="text-ink-3" /> {t("clubActivityListView.editButton")}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem className="min-h-11 px-3 text-[15px] font-medium text-destructive gap-2.5" onSelect={onDelete}>
+                                        <LucideTrash2 /> {t("clubActivityListView.deleteButton")}
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                    </div>
 
-            <h3 className={cn("font-semibold text-ink-1 truncate", featured ? "text-[22px]" : "text-[17px]")} title={activity.title}>{activity.title}</h3>
+                    <h3 className="text-[17px] font-semibold text-ink-1 leading-snug line-clamp-2 break-words" title={activity.title}>{activity.title}</h3>
 
-            <dl className="grid grid-cols-[44px_1fr] gap-x-2 gap-y-1.5 text-[15px]">
-                <dt className={CREW_TEXT.caption + " pt-0.5"}>{t("clubActivityListView.dateLabel")}</dt>
-                <dd className="font-medium text-ink-1">{dateStr}</dd>
-                <dt className={CREW_TEXT.caption + " pt-0.5"}>{t("clubActivityListView.locationLabel")}</dt>
-                <dd className="font-medium text-ink-1 min-w-0">
-                    <span className="break-words">{activity.locationName || t("clubActivityListView.locationTbd")}</span>
-                    {activity.locationName && (
-                        <a
-                            href={mapLink({ name: activity.locationName, address: activity.locationName })}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="ml-1 inline-flex items-center gap-0.5 min-h-11 -my-3 align-middle text-[13px] font-semibold text-brand"
-                        >
-                            <LucideMapPin className="w-3.5 h-3.5" />{t("crewMeet.viewMap")}
-                        </a>
+                    {/* 시각 · 장소(지도) — 표 대신 한 줄씩 아이콘으로 */}
+                    <p className="flex items-center gap-1.5 text-[13px] font-medium text-ink-2 rk-num">
+                        <LucideClock className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                        {format(new Date(activity.activityDate), "p", { locale: dateLocale })}
+                    </p>
+                    <p className="flex items-center gap-1.5 text-[13px] font-medium text-ink-2 min-w-0">
+                        <LucideMapPin className="w-3.5 h-3.5 text-ink-3 shrink-0" />
+                        <span className="truncate">{activity.locationName || t("clubActivityListView.locationTbd")}</span>
+                        {activity.locationName && (
+                            <a
+                                href={mapLink({ name: activity.locationName, address: activity.locationName })}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="shrink-0 inline-flex items-center min-h-11 -my-3 px-1 text-[13px] font-semibold text-brand"
+                            >
+                                {t("crewMeet.viewMap")}
+                            </a>
+                        )}
+                    </p>
+                    {activity.cost && (
+                        <p className="text-[13px] font-medium text-ink-2 break-words">
+                            <span className="text-ink-3">{t("clubActivityListView.costLabel")}</span> {activity.cost}
+                        </p>
                     )}
-                </dd>
-                {activity.cost && (
-                    <>
-                        <dt className={CREW_TEXT.caption + " pt-0.5"}>{t("clubActivityListView.costLabel")}</dt>
-                        <dd className="font-medium text-ink-1 break-words">{activity.cost}</dd>
-                    </>
-                )}
-                {activity.description && (
-                    <>
-                        <dt className={CREW_TEXT.caption + " pt-0.5"}>{t("clubActivityListView.memoLabel")}</dt>
-                        <dd className="text-[13px] font-medium text-ink-2 leading-relaxed whitespace-pre-wrap break-words">{activity.description}</dd>
-                    </>
-                )}
-            </dl>
+                    {activity.description && (
+                        <p className="text-[13px] font-medium text-ink-3 leading-relaxed whitespace-pre-wrap break-words line-clamp-2">{activity.description}</p>
+                    )}
 
-            {/* 참석자 — 누르면 전체 명단 */}
-            <button
-                type="button"
-                onClick={onShowPeople}
-                className="flex items-center gap-2 min-h-11 -mx-1 px-1 rounded-tile active:bg-surface-3 text-left"
-                aria-label={`${t("clubActivityListView.attendLabel")} ${countText}`}
-            >
-                <span className="flex -space-x-2">
-                    {participants.slice(0, 5).map((p: any, idx: number) => (
-                        <CrewAvatar key={p.memberId ?? idx} src={p.member?.profileImageUrl} name={p.member?.name} size={28} className="ring-2 ring-surface-1" />
-                    ))}
-                    {participants.length > 5 && (
-                        <span className="w-7 h-7 rounded-full bg-surface-3 ring-2 ring-surface-1 flex items-center justify-center text-[12px] font-semibold text-ink-2 rk-num">
-                            +{participants.length - 5}
+                <div className="flex flex-col gap-1 pt-1">
+                {/* 참석자 — 누르면 전체 명단. 정원이 있으면 채운 만큼 막대로 */}
+                <button
+                    type="button"
+                    onClick={onShowPeople}
+                    className="flex items-center gap-2.5 min-h-11 -mx-1 px-1 rounded-tile active:bg-surface-3 text-left"
+                    aria-label={`${t("clubActivityListView.attendLabel")} ${countText}`}
+                >
+                    <span className="flex -space-x-2 shrink-0">
+                        {participants.slice(0, 4).map((p: any, idx: number) => (
+                            <CrewAvatar key={p.memberId ?? idx} src={p.member?.profileImageUrl} name={p.member?.name} size={28} className="ring-2 ring-surface-1" />
+                        ))}
+                        {participants.length > 4 && (
+                            <span className="w-7 h-7 rounded-full bg-surface-3 ring-2 ring-surface-1 flex items-center justify-center text-[12px] font-semibold text-ink-2 rk-num">
+                                +{participants.length - 4}
+                            </span>
+                        )}
+                    </span>
+                    {cap !== null && (
+                        <span className="flex-1 h-1.5 rounded-full bg-surface-3 overflow-hidden" aria-hidden="true">
+                            <span className="block h-full rounded-full bg-brand" style={{ width: `${Math.min(100, Math.round((participants.length / Math.max(1, cap)) * 100))}%` }} />
                         </span>
                     )}
-                </span>
-                <span className="text-[13px] font-semibold text-ink-2 rk-num">{countText}</span>
-            </button>
+                    <span className={cn("text-[13px] font-semibold text-ink-2 rk-num shrink-0", cap === null && "flex-1")}>{countText}</span>
+                </button>
 
-            {/* 동작 */}
-            {isMember && (
-                <div className="flex gap-2">
-                    {isJoined ? (
-                        <button type="button" onClick={onLeave} disabled={leavePending} className={cn(CREW_BTN.secondary, "flex-1")}>
+                {/* 발: [공유] [팀 편성] …… [참석하기 / 참석 취소] — 한 줄, 주 동작은 오른쪽 끝 */}
+                <div className="flex items-center gap-0.5 -ml-3 -mr-1">
+                    <IconButton label={t("clubActivityListView.shareTitle")} onClick={share}>
+                        <LucideShare2 />
+                    </IconButton>
+                    {canManage && (
+                        <button
+                            type="button"
+                            onClick={() => setTeamOpen(v => !v)}
+                            aria-expanded={teamOpen}
+                            className={cn(CREW_BTN.ghost, "px-2 whitespace-nowrap", teamOpen && "text-brand")}
+                        >
+                            <LucideZap className="w-4 h-4 text-brand" /> {t("clubActivityListView.teamAssignButton")}
+                        </button>
+                    )}
+                    <span className="flex-1" />
+                    {isMember && (isJoined ? (
+                        <button type="button" onClick={onLeave} disabled={leavePending} className={cn(CREW_BTN.secondarySm, "px-3.5 whitespace-nowrap")}>
                             {t("clubActivityListView.leaveButton")}
                         </button>
                     ) : (
-                        <button type="button" onClick={onJoin} disabled={isFull || joinPending} className={cn(CREW_BTN.primary, "flex-1")}>
+                        <button type="button" onClick={onJoin} disabled={isFull || joinPending} className={cn(CREW_BTN.primarySm, "whitespace-nowrap")}>
                             {isFull ? t("clubActivityListView.full") : t("clubActivityListView.joinButton")}
                         </button>
-                    )}
-                    <IconButton label={t("clubActivityListView.shareTitle")} onClick={share} className="bg-surface-3">
-                        <LucideShare2 />
-                    </IconButton>
+                    ))}
                 </div>
-            )}
+                </div>
+                </div>
+            </div>
 
-            {/* 팀 편성 — 참석 줄에서 떼어 따로 둔다(운영진·만든 사람) */}
-            {canManage && (
-                <>
-                    <button
-                        type="button"
-                        onClick={() => setTeamOpen(v => !v)}
-                        aria-expanded={teamOpen}
-                        className={cn(CREW_BTN.ghost, "self-start -ml-3")}
-                    >
-                        <LucideZap className="w-4 h-4 text-brand" /> {t("clubActivityListView.teamAssignButton")}
-                        <LucideChevronDown className={cn("w-4 h-4 transition-transform", teamOpen && "rotate-180")} />
-                    </button>
-                    {teamOpen && (
-                        <TeamWizard
-                            activity={activity}
-                            sportType={sportType}
-                            currentMemberId={currentMemberId}
-                            onShareToChat={onShareToChat}
-                            onClose={() => setTeamOpen(false)}
-                        />
-                    )}
-                </>
+            {/* 팀 편성 — 발의 '팀 편성'으로 펼친다(운영진·만든 사람) */}
+            {canManage && teamOpen && (
+                <div className="px-4 pb-4">
+                    <TeamWizard
+                        activity={activity}
+                        sportType={sportType}
+                        currentMemberId={currentMemberId}
+                        onShareToChat={onShareToChat}
+                        onClose={() => setTeamOpen(false)}
+                    />
+                </div>
             )}
         </article>
     );

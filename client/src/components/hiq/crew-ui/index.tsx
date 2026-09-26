@@ -31,31 +31,78 @@ export const CREW_BTN = {
     secondary: "h-11 px-4 rounded-pill border border-surface-line-strong bg-surface-1 text-ink-1 text-[15px] font-semibold active:bg-surface-3 disabled:opacity-50 inline-flex items-center justify-center gap-1.5",
     ghost: "h-11 px-3 rounded-pill text-ink-2 text-[13px] font-semibold active:bg-surface-3 disabled:opacity-50 inline-flex items-center justify-center gap-1",
     danger: "h-11 px-4 rounded-pill bg-destructive text-destructive-foreground text-[15px] font-semibold disabled:opacity-50 inline-flex items-center justify-center gap-1.5",
+    /** 머리·카드 안의 작은 만들기 알약(연한 초록) — "+ 투표 만들기"처럼. 높이는 44 그대로, 글자·좌우만 줄인다. */
+    add: "h-11 px-3.5 rounded-pill bg-brand/10 text-brand text-[14px] font-semibold active:bg-brand/20 disabled:opacity-50 inline-flex items-center justify-center gap-1 [&_svg]:w-4 [&_svg]:h-4",
+    /** 카드 발의 주 동작(참석하기 등) — 좁은 카드에서 오른쪽 끝에 붙는 알약 */
+    primarySm: "h-11 px-5 rounded-pill bg-brand text-brand-fg text-[14px] font-semibold active:bg-brand-strong disabled:opacity-50 inline-flex items-center justify-center gap-1.5",
+    secondarySm: "h-11 px-4 rounded-pill border border-surface-line-strong bg-surface-1 text-ink-1 text-[14px] font-semibold active:bg-surface-3 disabled:opacity-50 inline-flex items-center justify-center gap-1.5",
 } as const;
 
-/** 섹션 머리: 제목(17) + 선택 숫자 + 오른쪽 '전체보기 ›' 같은 동작. */
-export function CrewSection({ title, count, action, children, className }: {
+/**
+ * 섹션 머리: 제목(17) + 선택 숫자 + 오른쪽 동작.
+ * 정렬 규칙(2026-09-26 크루 안쪽 정리): 만들기는 **언제나 머리 오른쪽의 연한 초록 알약**(add), 목록 화면으로 가는 건 그 옆
+ * '전체보기 ›' 글자. 예전엔 정모는 맨 아래 가로 전체 버튼, 투표는 왼쪽 글자 링크로 섹션마다 자리가 달랐다.
+ */
+export function CrewSection({ title, count, action, add, children, className }: {
     title: ReactNode;
     count?: number;
     action?: { label: string; onClick: () => void };
+    add?: { label: string; onClick: () => void; icon?: ReactNode };
     children?: ReactNode;
     className?: string;
 }) {
     return (
         <section className={cn("flex flex-col gap-2.5", className)}>
-            <header className="flex items-center justify-between gap-3 min-h-11">
-                <h2 className={CREW_TEXT.section}>
+            <header className="flex items-center justify-between gap-2 min-h-11">
+                <h2 className={cn(CREW_TEXT.section, "min-w-0 truncate")}>
                     {title}
                     {count !== undefined && <span className="rk-num ml-1.5 text-brand">{count}</span>}
                 </h2>
-                {action && (
-                    <button type="button" onClick={action.onClick} className="h-11 -mr-2 px-2 text-[13px] font-semibold text-ink-3 active:text-ink-1">
-                        {action.label} ›
-                    </button>
-                )}
+                <span className="flex items-center gap-1 shrink-0">
+                    {add && (
+                        <button type="button" onClick={add.onClick} className={CREW_BTN.add}>
+                            {add.icon ?? <span aria-hidden="true" className="text-[16px] leading-none">+</span>}
+                            {add.label}
+                        </button>
+                    )}
+                    {action && (
+                        <button type="button" onClick={action.onClick} className="h-11 -mr-2 px-2 text-[13px] font-semibold text-ink-3 active:text-ink-1">
+                            {action.label} ›
+                        </button>
+                    )}
+                </span>
             </header>
             {children}
         </section>
+    );
+}
+
+/**
+ * 탭 화면 머리(게시판·사진첩·투표·대회) — [뒤로] 제목(17)+숫자 …… [보조 동작] [만들기]. 한 줄 하나로 끝낸다.
+ * 예전엔 투표·대회가 '‹ 투표' 줄 아래 '크루 투표' 제목을 또 두었고, 게시판은 머리 없이 떠 있는 둥근 버튼 둘(정산·글쓰기)이었다.
+ */
+export function CrewTabHeader({ title, count, onBack, backLabel, children, className }: {
+    title: ReactNode;
+    count?: number;
+    onBack?: () => void;
+    backLabel?: string;
+    /** 오른쪽 동작들(CREW_BTN.add / secondarySm / IconButton) */
+    children?: ReactNode;
+    className?: string;
+}) {
+    return (
+        <header className={cn("flex items-center gap-1 min-h-14 px-4", onBack && "pl-1", className)}>
+            {onBack && (
+                <IconButton label={backLabel ?? ""} onClick={onBack}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6" /></svg>
+                </IconButton>
+            )}
+            <h2 className={cn(CREW_TEXT.section, "flex-1 min-w-0 truncate")}>
+                {title}
+                {count !== undefined && <span className="rk-num ml-1.5 text-brand">{count}</span>}
+            </h2>
+            <span className="flex items-center gap-1.5 shrink-0">{children}</span>
+        </header>
     );
 }
 

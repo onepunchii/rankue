@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { SocialPostCard } from "@/components/hiq/SocialPostCard";
 import { useT } from "@/lib/i18n";
-import { CREW_BTN, CREW_CARD, CREW_TEXT, CrewChip, CrewChipRow, CrewEmpty, CrewError } from "@/components/hiq/crew-ui";
+import { CREW_BTN, CREW_CARD, CREW_TEXT, CrewChip, CrewChipRow, CrewEmpty, CrewError, CrewTabHeader } from "@/components/hiq/crew-ui";
 import { CREW_POST_CATEGORIES, CREW_POSTS_FIRST_PAGE, canonicalCrewPostCategory, crewPostCategoryLabelKey, nextCrewCursor } from "@shared/crewBoard";
 import { postsKey } from "@/components/hiq/crew-board/postCache";
 
@@ -116,7 +116,22 @@ export const CrewBoardTab = memo(({
     const loadingMore = older.isFetching;
 
     return (
-        <div className="min-h-full px-4 pt-4 pb-32 flex flex-col gap-4">
+        <div className="min-h-full pb-nav flex flex-col">
+            {/* 머리: 게시판 n …… [정산] [+ 글쓰기] — 떠 있던 둥근 버튼 둘(정산·글쓰기)을 머리 한 줄로(2026-09-26 크루 안쪽 정리).
+                아이콘만 있는 둥근 버튼은 무엇인지 알 수 없었고, 글 목록 끝을 가렸다. */}
+            <CrewTabHeader title={t("crewBoard.title")} count={allPosts.length || undefined}>
+                {isMember && (
+                    <>
+                        <button type="button" onClick={onCreateSettlement} className={CREW_BTN.secondarySm}>
+                            <LucideReceipt className="w-4 h-4" /> {t("crewBoard.settlementShort")}
+                        </button>
+                        <button type="button" onClick={onCreatePost} className={CREW_BTN.add}>
+                            <LucidePlus /> {t("crewBoard.writeShort")}
+                        </button>
+                    </>
+                )}
+            </CrewTabHeader>
+            <div className="px-4 flex flex-col gap-4">
             {/* 카테고리 칩 — CrewChipRow 가 탭 전체의 좌우 밀기와 싸우지 않게 막는다 */}
             <CrewChipRow label={t("createPost.categoryLabel")}>
                 {[ALL, ...CREW_POST_CATEGORIES].map((cat) => (
@@ -191,30 +206,7 @@ export const CrewBoardTab = memo(({
                 </>
             )}
 
-            {/* 떠 있는 버튼 */}
-            {isMember && (
-                <div className="fixed above-nav right-4 flex flex-col items-end gap-3 z-30">
-                    {/* 정산은 모임을 연 사람 누구나 한다 — 서버도 멤버면 만들 수 있다(2026-09-26, 예전엔 화면만 운영진 전용이었다) */}
-                    <button
-                        type="button"
-                        onClick={onCreateSettlement}
-                        className="w-14 h-14 bg-surface-1 text-brand rounded-full flex items-center justify-center rk-shadow active:bg-surface-3"
-                        title={t("crewBoard.createSettlement")}
-                        aria-label={t("crewBoard.createSettlement")}
-                    >
-                        <LucideReceipt className="w-6 h-6" />
-                    </button>
-                    <button
-                        type="button"
-                        onClick={onCreatePost}
-                        className="w-14 h-14 bg-brand text-brand-fg rounded-full flex items-center justify-center rk-shadow active:bg-brand-strong"
-                        title={t("crewBoard.createPost")}
-                        aria-label={t("crewBoard.createPost")}
-                    >
-                        <LucidePlus className="w-7 h-7" />
-                    </button>
-                </div>
-            )}
+            </div>
         </div>
     );
 });

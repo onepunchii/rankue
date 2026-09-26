@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { LucidePlus, LucideVote } from "@/lib/icons";
-import { CREW_BTN, CREW_TEXT, ConfirmDialog, CrewEmpty, CrewError, CrewSection, CrewSkeleton } from "@/components/hiq/crew-ui";
+import { CREW_BTN, CREW_TEXT, ConfirmDialog, CrewEmpty, CrewError, CrewSection, CrewSkeleton, CrewTabHeader } from "@/components/hiq/crew-ui";
 import { CreatePollDialog } from "@/components/hiq/CreatePollDialog";
 import { PollCard } from "@/components/hiq/poll/PollCard";
 import { PollVotersSheet } from "@/components/hiq/poll/PollVotersSheet";
@@ -24,11 +24,13 @@ interface CrewPollTabProps {
     crewId: string;
     isAdmin: boolean;
     isMember: boolean;
+    /** 머리의 '‹' — 크루 홈으로 */
+    onBack?: () => void;
 }
 
 const CLOSED_PREVIEW = 3;
 
-export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
+export function CrewPollTab({ crewId, isAdmin, isMember, onBack }: CrewPollTabProps) {
     const { toast } = useToast();
     const { t, locale } = useT();
     const { member: me } = useAuth();
@@ -160,17 +162,17 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
     const closedShown = showAllClosed ? closed : closed.slice(0, CLOSED_PREVIEW);
 
     return (
-        <div className="px-4 pt-5 pb-20 flex flex-col gap-6">
-            {/* 화면 제목 + 만들기 */}
-            <header className="flex items-center justify-between gap-3">
-                <h2 className={CREW_TEXT.title}>{t("crewPollTab.title")}</h2>
+        <div className="pb-20 flex flex-col">
+            {/* 머리 한 줄: ‹ 투표 …… [+ 투표 만들기] (2026-09-26 크루 안쪽 정리 — 예전엔 '‹ 투표' 줄 아래 '크루 투표' 제목이 또 있었다) */}
+            <CrewTabHeader title={t("crewPollTab.title")} count={polls?.length || undefined} onBack={onBack} backLabel={t("common.back")}>
                 {isMember && (
-                    <button type="button" onClick={() => setIsCreateOpen(true)} className={CREW_BTN.primary}>
-                        <LucidePlus className="w-4 h-4" />
-                        {t("crewPollTab.createButton")}
+                    <button type="button" onClick={() => setIsCreateOpen(true)} className={CREW_BTN.add}>
+                        <LucidePlus />
+                        {t("crewHome.addPoll")}
                     </button>
                 )}
-            </header>
+            </CrewTabHeader>
+            <div className="px-4 pt-1 flex flex-col gap-6">
 
             {isLoading ? (
                 <CrewSkeleton rows={2} height={260} />
@@ -205,6 +207,8 @@ export function CrewPollTab({ crewId, isAdmin, isMember }: CrewPollTabProps) {
                     )}
                 </>
             )}
+
+            </div>
 
             <CreatePollDialog open={isCreateOpen} onOpenChange={setIsCreateOpen} crewId={crewId} />
 

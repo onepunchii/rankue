@@ -227,7 +227,7 @@ export const CrewHomeTab = memo(({
 
             <div className="px-4 flex flex-col gap-8">
                 {/* 2. 다음 정모 — 크루 홈에서 제일 먼저 궁금한 것 */}
-                <CrewSection title={t("crewHub.nextMeetup")}>
+                <CrewSection title={t("crewHub.nextMeetup")} add={isMember ? { label: t("crewHome.addMeetup"), onClick: onCreateActivity } : undefined}>
                     <ClubActivityList
                         crewId={crew.id}
                         isMember={isMember}
@@ -241,14 +241,14 @@ export const CrewHomeTab = memo(({
 
                 {/* 4. 투표 — 크루원 전용(서버가 비회원에게 403). 예전엔 비회원에게 '투표 없음' 으로 잘못 보였다. */}
                 {isMember && (
-                    <CrewSection title={t("crewHub.polls")} action={{ label: t("crewUi.seeAll"), onClick: onPollClick }}>
+                    <CrewSection title={t("crewHub.polls")} add={{ label: t("crewHome.addPoll"), onClick: onCreatePoll }} action={{ label: t("crewUi.seeAll"), onClick: onPollClick }}>
                         <PollPreview crewId={crew.id} onOpen={onPollClick} onCreate={onCreatePoll} />
                     </CrewSection>
                 )}
 
                 {/* 5. 대회 — 3쿠션/4구 전용이라 골프 크루에는 그리지 않는다(2026-09-09 오너: 두 종목을 아예 가른다). 크루원 전용. */}
                 {isMember && !isGolf && (
-                    <CrewSection title={t("crewHome.tournament")} action={{ label: t("crewUi.seeAll"), onClick: onTournamentClick }}>
+                    <CrewSection title={t("crewHome.tournament")} add={isAdmin ? { label: t("crewHome.addTournament"), onClick: onCreateTournament } : undefined} action={{ label: t("crewUi.seeAll"), onClick: onTournamentClick }}>
                         <TournamentPreview crewId={crew.id} onOpen={onTournamentClick} onCreate={isAdmin ? onCreateTournament : undefined} />
                         {/* 명예의 전당은 전용 페이지로 — 홈에 펼쳐 두면 목록이 길어져 대회가 묻힌다. */}
                         <button
@@ -479,9 +479,6 @@ const PollPreview = ({ crewId, onOpen, onCreate }: { crewId: string; onOpen: () 
                     </button>
                 );
             })}
-            <button type="button" onClick={onCreate} className={cn(CREW_BTN.ghost, "self-start -ml-3")}>
-                <LucidePlus className="w-4 h-4" /> {t("crewHub.createPoll")}
-            </button>
         </div>
     );
 };

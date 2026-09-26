@@ -11,8 +11,7 @@ import { useT } from "@/lib/i18n";
 import { useLocation } from "wouter";
 import { BallDot } from "@/components/hiq/BallDot";
 import {
-    CREW_BTN, CREW_CARD, CREW_TEXT, ConfirmDialog, CrewAvatar, CrewEmpty, CrewError, CrewSection, CrewSkeleton, IconButton,
-} from "@/components/hiq/crew-ui";
+    CREW_BTN, CREW_CARD, CREW_TEXT, ConfirmDialog, CrewAvatar, CrewEmpty, CrewError, CrewSection, CrewSkeleton, IconButton, CrewTabHeader } from "@/components/hiq/crew-ui";
 import { TournamentBracket, type BracketMatch, type BracketPlayer, type SlotRef } from "@/components/hiq/tournament/TournamentBracket";
 import { CreateCrewTournamentDialog } from "@/components/hiq/tournament/CreateCrewTournamentDialog";
 import { MatchResultSheet } from "@/components/hiq/tournament/MatchResultSheet";
@@ -45,6 +44,8 @@ interface Props {
     onAutoOpenHandled?: () => void;
     /** 명예의 전당에서 역대 대회를 눌러 들어온 경우 — 그 대회 대진표를 바로 연다. */
     autoOpenTournamentId?: string | null;
+    /** 머리의 '‹' — 크루 홈으로 */
+    onBack?: () => void;
 }
 
 interface TournamentRow {
@@ -55,7 +56,7 @@ interface TournamentRow {
     creatorId: string; participantCount: number; championName?: string | null;
 }
 
-export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreate, onAutoOpenHandled, autoOpenTournamentId }: Props) {
+export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreate, onAutoOpenHandled, autoOpenTournamentId, onBack }: Props) {
     const { t, locale } = useT();
     const [, setLocation] = useLocation();
     // 매칭 화면이 목표 점수를 뽑을 때 쓴다. 대시보드와 같은 쿼리키라 캐시를 그대로 나눠 쓴다.
@@ -103,27 +104,21 @@ export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreat
     }
 
     return (
-        <div className="px-4 pt-5 pb-nav flex flex-col gap-4">
-            <header className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                    <h2 className={CREW_TEXT.title}>{t("crewTournament.title")}</h2>
-                    {(list?.length ?? 0) > 0 && (
-                        <p className={cn(CREW_TEXT.sub, "rk-num")}>{t("crewTournament.count").replace("{n}", String(list?.length ?? 0))}</p>
-                    )}
-                </div>
-                <div className="flex items-center gap-1 shrink-0">
-                    {/* 명예의 전당 — 대회를 보러 온 자리에서 바로 갈 수 있게 */}
-                    <IconButton label={t("hallOfFame.title")} onClick={() => setLocation(`/crew/${crewId}/hall-of-fame`)} className="text-gold">
-                        <LucideTrophy />
-                    </IconButton>
-                    {isAdmin && (
-                        <button type="button" onClick={() => setIsCreateOpen(true)} className={CREW_BTN.primary}>
-                            <LucidePlus className="w-4 h-4" />
-                            {t("crewTournament.open")}
-                        </button>
-                    )}
-                </div>
-            </header>
+        <div className="pb-nav flex flex-col">
+            {/* 머리 한 줄: ‹ 대회 n …… [명예의 전당] [+ 대회 열기] (2026-09-26 크루 안쪽 정리 — 머리가 두 번 겹치지 않게) */}
+            <CrewTabHeader title={t("crewTournament.title")} count={list?.length || undefined} onBack={onBack} backLabel={t("common.back")}>
+                {/* 명예의 전당 — 대회를 보러 온 자리에서 바로 갈 수 있게 */}
+                <IconButton label={t("hallOfFame.title")} onClick={() => setLocation(`/crew/${crewId}/hall-of-fame`)} className="text-gold">
+                    <LucideTrophy />
+                </IconButton>
+                {isAdmin && (
+                    <button type="button" onClick={() => setIsCreateOpen(true)} className={CREW_BTN.add}>
+                        <LucidePlus />
+                        {t("crewTournament.open")}
+                    </button>
+                )}
+            </CrewTabHeader>
+            <div className="px-4 pt-1 flex flex-col gap-4">
 
             {isLoading ? (
                 <CrewSkeleton rows={3} height={84} />
@@ -174,6 +169,7 @@ export function CrewTournamentTab({ crewId, isAdmin, isMember, me, autoOpenCreat
                     ))}
                 </div>
             )}
+            </div>
 
             <CreateCrewTournamentDialog crewId={crewId} open={isCreateOpen} onOpenChange={setIsCreateOpen} />
         </div>

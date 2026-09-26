@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { CREW_CARD, CREW_TEXT, CrewAvatar, CrewRoleBadge } from "@/components/hiq/crew-ui";
-import { crewPostCategoryLabelKey, CREW_DEFAULT_CATEGORY, canonicalCrewPostCategory } from "@shared/crewBoard";
+import { crewPostCategoryLabelKey, canonicalCrewPostCategory } from "@shared/crewBoard";
 import { PostDetailDialog } from "./PostDetailDialog";
 import { CreatePostDialog } from "./CreatePostDialog";
 import { PostMenu, usePostLike } from "./crew-board/PostMenu";
@@ -88,6 +88,8 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                     <div className="flex items-center gap-1.5 min-w-0">
                         <span className="text-[15px] font-semibold text-ink-1 truncate">{post.author?.name}</span>
                         <CrewRoleBadge role={post.author?.role} />
+                        {/* 분류는 글쓴이 옆에 — 예전엔 카드 맨 아래 오른쪽에, 그것도 '자유'가 아닐 때만 있어 카드마다 자리가 달랐다 */}
+                        {category && <span className="rk-chip bg-surface-3 text-ink-2 shrink-0">{categoryLabel(category)}</span>}
                     </div>
                     <time className={CREW_TEXT.caption} dateTime={post.createdAt}>
                         {post.createdAt ? formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: dateLocale }) : ""}
@@ -148,8 +150,8 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                 </div>
             )}
 
-            {/* 발: 좋아요 · 댓글 (각 44px) · 카테고리 */}
-            <footer className="flex items-center justify-between -mb-2 -ml-2 border-t border-surface-line pt-1">
+            {/* 발: 좋아요 · 댓글 (각 44px) — 왼쪽 정렬, 카드 안쪽 여백에 맞춰 -ml-2 */}
+            <footer className="flex items-center -mb-2 -ml-2 -mt-1">
                 <div className="flex items-center">
                     <button
                         type="button"
@@ -172,9 +174,6 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
                         <span className="text-[13px] font-semibold text-ink-3 rk-num">{commentCount}</span>
                     </button>
                 </div>
-                {category && category !== CREW_DEFAULT_CATEGORY && (
-                    <span className="rk-chip bg-surface-3 text-ink-2">{categoryLabel(category)}</span>
-                )}
             </footer>
 
             {isDetailOpen && (
