@@ -14,6 +14,7 @@ import {
   PBA_INCOME_NOTE_KO, pbaPlayerTitleKo, pbaPlayerDescKo, pbaIncomeAnswerKo, PBA_LIST_TITLE_KO, PBA_LIST_DESC_KO, pbaLatestSeasonRank,
   PBA_LANGS, pbaL10n,
 } from "../shared/pbaMeta.js";
+import { pbaDisplayName, pbaGames, pbaPlayerFaq, pbaPlayerLdNodes, pbaPlayerSummary, type PbaPlayerProfile } from "../shared/pbaPlayerProfile.js";
 import { briefingLineKo, briefingDateKo, briefingTitle, briefingDesc, todayKst } from "../shared/briefingMeta.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
 import {
@@ -1892,58 +1893,49 @@ ${list}
     if (!/^[A-Za-z0-9_-]{1,20}$/.test(req.params.memCode)) {
       return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
     }
-    let p: any = null;
+    let p: PbaPlayerProfile | null = null;
     try {
-      p = await storage.pba.getPlayer(req.params.memCode);
+      // 화면(pba-player.tsx)과 같은 응답 — 우승·기록 순위·리그 평균·비슷한 순위까지(2026-09-27 개편)
+      p = await storage.pba.getPlayerProfile(req.params.memCode);
     } catch (e) {
       console.warn("[prerender] pba-player failed:", (e as Error)?.message);
       return sendUnavailable(res);
     }
     if (!p) return sendGone(res, "선수를 찾을 수 없습니다.", "요청한 선수 정보가 없습니다.");
-    const games = (p.win ?? 0) + (p.lose ?? 0) + (p.draw ?? 0);
+    const x = p.extra;
+    const games = pbaGames(p);
     const winRate = games > 0 ? Math.round(((p.win ?? 0) / games) * 100) : null;
     const ppq = String(req.query.lang ?? "");
     const pplang = (PBA_LANGS as readonly string[]).includes(ppq) ? ppq : "ko";
     const PP = pbaL10n(pplang);
-    const prizeStr = p.careerPrize != null ? `${formatPrizeKo(p.careerPrize)}${pplang === "ko" ? "원" : " KRW"}` : "-";
+    const ko = pplang === "ko";
+    const ls = ko ? "" : `?lang=${pplang}`;
+    const name = pbaDisplayName(p, pplang);
+    const prizeStr = p.careerPrize != null ? `${formatPrizeKo(p.careerPrize)}${ko ? "원" : " KRW"}` : "-";
     // 선수 카드(정사각형 PNG) — 클라이언트 pba-player.tsx useSeo 와 같은 주소(pbaCardUrl)
     const pbaCard = pbaCardUrl(ORIGIN, p.memCode, pplang);
     const pbaCardAlt = `${p.nameKo}${p.nameEn ? ` (${p.nameEn})` : ""} — ${p.league}`;
-    // 크롤 사슬(2026-09-24) — 선수 페이지가 /pba 링크 하나뿐인 막다른 길이었다(480쪽 대부분이 사이트맵으로만 닿았다).
-    // 같은 시즌 상금 순위 ±5 · 우승한 대회 · 통산 기록. 각각 실패해도 페이지는 나간다.
-    const ko = pplang === "ko";
-    const ls = ko ? "" : `?lang=${pplang}`;
-    let nearHtml = "";
-    const lastRanked = [...(p.seasons ?? [])].reverse().find((s: any) => s.prizeRank != null && (s.league === "PBA" || s.league === "LPBA"));
-    if (lastRanked) {
-      try {
-        const r0 = Number(lastRanked.prizeRank);
-        const rows = (await storage.pba.getRankings(lastRanked.league, lastRanked.season, "prize", r0 + 5)) as any[];
-        const near = rows.filter((r) => r.memCode !== p.memCode && r.prizeRank >= r0 - 5 && r.prizeRank <= r0 + 5);
-        if (near.length) {
-          const head = ko
-            ? `${pbaSeasonLabel(lastRanked.season)} 시즌 ${lastRanked.league} 상금랭킹 — 비슷한 순위의 선수`
-            : `${pbaSeasonLabel(lastRanked.season)} ${lastRanked.league} prize ranking — players nearby`;
-          nearHtml = `\n  <h2>${esc(head)}</h2>\n  <ul>\n  ${near.map((r) =>
-            `<li>${ko ? `${r.prizeRank}위` : `No.${r.prizeRank}`} <a href="/pba-player/${esc(encodeURIComponent(r.memCode))}${ls}">${esc(ko ? r.nameKo : (r.nameEn || r.nameKo))}</a></li>`).join("\n  ")}\n  </ul>`;
-        }
-      } catch (e) {
-        console.warn("[prerender] pba-player neighbors failed:", (e as Error)?.message);
-      }
-    }
+    const rk = x?.recordRanks ?? {};
+    const rankTxt = (key: keyof typeof rk) => {
+      const r = rk[key];
+      return r ? (ko ? `${p!.league} ${r.rank}위` : `No. ${r.rank} in ${p!.league}`) : "";
+    };
+    const benchTxt = (v: number | null | undefined, digits: number, suffix = "") =>
+      v != null ? (ko ? `리그 평균 ${v.toFixed(digits)}${suffix}` : `league avg ${v.toFixed(digits)}${suffix}`) : "";
+    const extraOf = (...parts: string[]) => { const t = parts.filter(Boolean).join(", "); return t ? ` (${esc(t)})` : ""; };
+    // 크롤 사슬 — 같은 시즌 상금 순위 ±5 · 우승한 대회 · 통산 기록(화면과 같은 목록)
+    const nearHtml = x?.neighbors
+      ? `\n  <h2>${esc(ko
+          ? `${pbaSeasonLabel(x.neighbors.season)} 시즌 ${x.neighbors.league} 상금랭킹 — 비슷한 순위의 선수`
+          : `${pbaSeasonLabel(x.neighbors.season)} ${x.neighbors.league} prize ranking — players nearby`)}</h2>\n  <ul>\n  ${x.neighbors.rows.map((r) =>
+          `<li>${ko ? `${r.prizeRank}위` : `No.${r.prizeRank}`} <a href="/pba-player/${esc(encodeURIComponent(r.memCode))}${ls}">${esc(ko ? r.nameKo : (r.nameEn || r.nameKo))}</a></li>`).join("\n  ")}\n  </ul>`
+      : "";
     // 우승한 대회 — pba_tournaments.winner_mem_code(대회 페이지가 있는 것만, 최근 먼저). 대회 페이지는 한국어 전용이다.
-    let winsHtml = "";
-    try {
-      const won = (await tournamentsRepo.allPbaRows())
-        .filter((r) => r.winnerMemCode === p.memCode && hasTourPage(r))
-        .sort((a, b) => b.startDate.localeCompare(a.startDate));
-      if (won.length) {
-        winsHtml = `\n  <h2>${esc(ko ? `우승한 대회 ${won.length}개` : `Titles won (${won.length})`)}</h2>\n  <ul>\n  ${won.map((r) =>
-          `<li><a href="${esc(pbaTourPath(r.season, r.tourCode!))}">${esc(tourNameWithSeason(r))}</a></li>`).join("\n  ")}\n  </ul>`;
-      }
-    } catch (e) {
-      console.warn("[prerender] pba-player wins failed:", (e as Error)?.message);
-    }
+    const winsHtml = x && x.wins.length
+      ? `\n  <h2>${esc(ko ? `우승 ${x.wins.length}회` : `Titles won (${x.wins.length})`)}</h2>\n  <ul>\n  ${x.wins.map((w) =>
+          `<li><a href="${esc(w.path)}">${esc(w.title)}</a> — ${esc(w.startDate)}${w.winnerPrize ? ` · ${esc(ko ? `상금 ${formatPrizeKo(w.winnerPrize)}원` : `prize ${formatPrizeKo(w.winnerPrize)} KRW`)}` : ""}</li>`).join("\n  ")}\n  </ul>`
+      : "";
+    const faq = pbaPlayerFaq(p, pplang);
     // 경로 "랭큐 › PBA 투어 랭킹 › 선수" — 보이는 경로와 BreadcrumbList 를 한 목록에서(2026-09-24: 둘이 달랐고 첫 칸이 랭큐가 아니었다).
     // 본문이 한국어라 경로도 한국어 — 예전 BreadcrumbList 와 같은 이름·주소다.
     const ppCrumbs = crumbs([rootCrumb("ko"), { name: "PBA 투어 랭킹", path: "/pba" }, { name: p.nameKo, path: `/pba-player/${encodeURIComponent(p.memCode)}` }]);
@@ -1951,67 +1943,43 @@ ${list}
     noStore(res);
     res.send(
       page({
-        // client/src/pages/hiq/pba-player.tsx 의 useSeo(ko) 와 문자 단위로 같아야 한다
+        // client/src/pages/hiq/pba-player.tsx 의 useSeo 와 문자 단위로 같아야 한다
         lang: pplang,
         image: { url: pbaCard, width: CARD_SIZE, height: CARD_SIZE, alt: pbaCardAlt },
         // ko 는 한글 이름, 그 외 언어는 로마자 원표기(현지 팬이 검색하는 형태)
-        // 통산 상금(제목)·최근 시즌 상금랭킹(설명) — 화면 pba-player.tsx 가 같은 인자로 부른다(2026-09-24)
-        title: PP.playerTitle(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), p.league, prizeStr),
-        desc: PP.playerDesc(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), pplang === "ko" ? p.nameEn : null, p.league, prizeStr, p.average, p.highRun, pbaLatestSeasonRank(p.seasons)),
-        canonical: pplang === "ko"
+        // 통산 상금(제목)·최근 시즌 상금랭킹·우승 횟수(설명) — 화면 pba-player.tsx 가 같은 인자로 부른다
+        title: PP.playerTitle(name, p.league, prizeStr),
+        desc: PP.playerDesc(name, ko ? p.nameEn : null, p.league, prizeStr, p.average, p.highRun, pbaLatestSeasonRank(p.seasons), x?.wins.length),
+        canonical: ko
           ? `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`
           : `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}?lang=${pplang}`,
         altLangs: PBA_LANGS.filter((l) => l !== "ko") as unknown as string[],
         altBase: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
-        jsonLd: [
-          {
-            "@context": "https://schema.org",
-            "@type": "Person",
-            name: p.nameKo,
-            ...(p.nameEn ? { alternateName: p.nameEn } : {}),
-            ...(p.nationCode ? { nationality: p.nationCode } : {}),
-            jobTitle: "Professional billiards player",
-            memberOf: { "@type": "SportsOrganization", name: `${p.league} Tour` },
-            url: `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`,
-            image: pbaCard,
-          },
-          withContext(ppCrumbs.ld),
-          // "OOO 연봉" 은 조회가 많은 질의인데 프로당구엔 연봉 자체가 없다. 없는 수치를 지어내지 않고
-          // 질문에 정확히 답하는 FAQ 를 준다 — AI 검색·구글 FAQ 리치결과 대응.
-          {
-            "@context": "https://schema.org",
-            "@type": "FAQPage",
-            mainEntity: [
-              {
-                "@type": "Question",
-                name: PP.incomeQ(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo)),
-                acceptedAnswer: { "@type": "Answer", text: PP.incomeA(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), prizeStr) },
-              },
-            ],
-          },
-        ],
+        // ProfilePage(주인공 Person: 수상·팔로워) + FAQPage — 화면 useSeo 와 같은 함수(shared/pbaPlayerProfile)
+        jsonLd: [...pbaPlayerLdNodes(p, pplang, pbaCard).map(withContext), withContext(ppCrumbs.ld)],
         body: `<main>
   ${ppCrumbs.html}
-  <h1>${esc(p.nameKo)}</h1>
+  <h1>${esc(name)}</h1>
+  <p>${esc(pbaPlayerSummary(p, pplang))}</p>
   <img src="${esc(pbaCard)}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(pbaCardAlt)}" />
-  <p>${esc(p.nameEn ?? "")} · ${esc(p.league)}${p.nationCode ? ` · ${esc(p.nationCode)}` : ""}</p>
+  <p>${esc(ko ? (p.nameEn ?? "") : p.nameKo)} · ${esc(p.league)}${p.nationCode ? ` · ${esc(p.nationCode)}` : ""}</p>
   <dl>
-    <dt>${esc(PP.careerPrize)}</dt><dd>${esc(prizeStr)}</dd>
-    ${p.win != null ? `<dt>승-패</dt><dd>${p.win}-${p.lose ?? 0}${winRate != null ? ` (승률 ${winRate}%)` : ""}</dd>` : ""}
-    ${p.average != null ? `<dt>에버리지</dt><dd>${p.average}</dd>` : ""}
-    ${p.bankShotRate != null ? `<dt>뱅크샷 성공률</dt><dd>${p.bankShotRate}%</dd>` : ""}
-    ${p.highRun != null ? `<dt>하이런</dt><dd>${p.highRun}</dd>` : ""}
+    <dt>${esc(PP.careerPrize)}</dt><dd>${esc(prizeStr)}${extraOf(rankTxt("careerPrize"))}</dd>
+    ${p.win != null ? `<dt>${ko ? "승-패-무" : "W-L-D"}</dt><dd>${p.win}-${p.lose ?? 0}-${p.draw ?? 0}${winRate != null ? ` (${ko ? "승률" : "win rate"} ${winRate}%)` : ""}</dd>` : ""}
+    ${p.average != null ? `<dt>${ko ? "에버리지" : "Average"}</dt><dd>${p.average.toFixed(3)}${extraOf(rankTxt("average"), benchTxt(x?.bench.average, 3))}</dd>` : ""}
+    ${p.bankShotRate != null ? `<dt>${ko ? "뱅크샷" : "Bank shot"}</dt><dd>${p.bankShotRate}%${extraOf(rankTxt("bankShotRate"), benchTxt(x?.bench.bankShotRate, 1, "%"))}</dd>` : ""}
+    ${p.highRun != null ? `<dt>${ko ? "하이런" : "High run"}</dt><dd>${p.highRun}${extraOf(rankTxt("highRun"))}</dd>` : ""}
   </dl>
-  <p>${esc(PP.incomeNote)}</p>
-  <h2>${esc(PP.incomeQ(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo)))}</h2>
-  <p>${esc(PP.incomeA(pplang === "ko" ? p.nameKo : (p.nameEn || p.nameKo), prizeStr))}</p>
+  <p>${esc(PP.incomeNote)}</p>${winsHtml}
   <h2>${esc(PP.seasonH)}</h2>
   <ul>
-  ${(p.seasons ?? []).map((s: any) => `<li>${esc(pbaSeasonLabel(s.season))} 시즌 — ${s.prizeRank != null ? `상금랭킹 ${s.prizeRank}위, ` : ""}상금 ${esc(formatPrizeKo(s.prize))}원, 포인트 ${s.rankingPoint.toLocaleString("ko-KR")}점</li>`).join("\n  ")}
+  ${p.seasons.map((s) => `<li>${esc(pbaSeasonLabel(s.season))} ${ko ? "시즌" : "season"} — ${s.prizeRank != null ? (ko ? `상금랭킹 ${s.prizeRank}위, ` : `prize rank ${s.prizeRank}, `) : ""}${s.pointRank != null ? (ko ? `포인트랭킹 ${s.pointRank}위, ` : `points rank ${s.pointRank}, `) : ""}${ko ? `상금 ${esc(formatPrizeKo(s.prize))}원, 포인트 ${s.rankingPoint.toLocaleString("ko-KR")}점` : `prize ${esc(formatPrizeKo(s.prize))} KRW, ${s.rankingPoint.toLocaleString("en-US")} pts`}</li>`).join("\n  ")}
   </ul>
-  ${p.umbPlayerId && p.umbCategory ? `<p><a href="/player/${esc(p.umbCategory)}/${esc(p.umbPlayerId)}">이 선수의 UMB 세계랭킹 기록 보기</a></p>` : ""}${winsHtml}${nearHtml}
+  ${p.umbPlayerId && p.umbCategory ? `<p><a href="/player/${esc(p.umbCategory)}/${esc(p.umbPlayerId)}">${esc(ko ? `이 선수의 UMB 세계랭킹 기록 보기${x?.umbRank ? ` (현재 ${x.umbRank}위)` : ""}` : `UMB world ranking history${x?.umbRank ? ` (now No. ${x.umbRank})` : ""}`)}</a></p>` : ""}${nearHtml}
+  <h2>${esc(ko ? "자주 묻는 질문" : "FAQ")}</h2>
+  ${faq.map((f) => `<h3>${esc(f.q)}</h3>\n  <p>${esc(f.a)}</p>`).join("\n  ")}
   <nav><a href="/pba/records">${esc(ko ? "PBA·LPBA 통산 기록 순위" : "PBA·LPBA career records")}</a> · <a href="/tournaments">${esc(ko ? "당구 대회 일정·결과" : "Billiards tournaments")}</a></nav>
-  <p>출처: PBA 투어 공식 기록 — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
+  <p>${x?.updated ? esc(ko ? `기록 갱신 ${dateKo(x.updated)} · ` : `Updated ${x.updated} · `) : ""}${ko ? "출처: PBA 투어 공식 기록" : "Source: PBA Tour official records"} — <a href="https://www.pbatour.org" rel="noopener">pbatour.org</a></p>
   ${hubNav(pplang)}
 </main>`,
       }),

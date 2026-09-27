@@ -1,6 +1,10 @@
 import { Router } from "express";
-import { Response } from "express";
+import { Response, NextFunction } from "express";
 import { storage } from "../../storage/index.js";
+import { requireAuth, AuthRequest } from "../../middleware/auth.js";
+import { requireTermsAccepted } from "../../middleware/terms.js";
+import { checkContent, maskContacts } from "../../utils/contentFilter.js";
+import { msg } from "../../lib/i18n.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { currentPbaSeason } from "../../services/pbaSync.js";
@@ -48,12 +52,76 @@ router.get("/records", asyncHandler(async (_req: any, res: Response) => {
     return sendSuccess(res, await storage.pba.getRecords());
 }));
 
-// GET /pba/player/:memCode — 프로필 + 시즌 히스토리
+// GET /pba/player/:memCode — 프로필 + 시즌 히스토리 + extra(우승·기록 순위·리그 평균·비슷한 순위·팔로워·UMB 순위·갱신일).
+// 공개·CDN 캐시 응답이라 보는 사람마다 다른 값(내 팔로우)은 싣지 않는다 — 그건 아래 /players/pba/:memCode/follow.
 router.get("/player/:memCode", asyncHandler(async (req: any, res: Response) => {
     if (!MEM_CODE_RE.test(req.params.memCode)) return sendError(res, 404, "err.umb.playerNotFound");
-    const player = await storage.pba.getPlayer(req.params.memCode);
+    const player = await storage.pba.getPlayerProfile(req.params.memCode);
     if (!player) return sendError(res, 404, "err.umb.playerNotFound");
     return sendSuccess(res, player);
+}));
+
+/* ── 팔로우·응원글(2026-09-27) — UMB·골프 선수와 같은 표(hiq_player_follows·hiq_player_cheers, category=pba, player_umb_id=memCode).
+   보는 사람마다 다른 응답이라 캐시하지 않는다(위 router.use 의 공개 캐시를 덮어쓴다). 경로의 "pba" 는 화면 PlayerCheers 가
+   `${basePath}/${category}/${id}/cheers` 로 부르기 때문이다. ── */
+const PBA_CAT = "pba" as const;
+const noCache = (_req: any, res: Response, next: NextFunction) => {
+    res.set("Cache-Control", "private, no-store");
+    res.set("CDN-Cache-Control", "no-store");
+    next();
+};
+// 로그인은 선택 — 서명 쿠키만 믿는다(golfRank·umb 와 같다)
+const optionalAuth = (req: AuthRequest, _res: Response, next: NextFunction) => {
+    const userId = (req as any).signedCookies?.hiq_user_id;
+    if (typeof userId === "string" && userId) req.userId = userId;
+    next();
+};
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const CHEER_MAX = 200;
+const CHEER_COOLDOWN_MS = 60_000;
+
+// GET /pba/players/pba/:memCode/follow — { following, followers }
+router.get("/players/pba/:memCode/follow", noCache, optionalAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!MEM_CODE_RE.test(req.params.memCode)) return sendError(res, 404, "err.umb.playerNotFound");
+    const following = req.userId ? await storage.umb.isFollowing(req.userId, PBA_CAT, req.params.memCode) : false;
+    const followers = await storage.pba.followerCount(req.params.memCode);
+    return sendSuccess(res, { following, followers });
+}));
+
+// PUT /pba/players/pba/:memCode/follow { on }
+router.put("/players/pba/:memCode/follow", noCache, requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!MEM_CODE_RE.test(req.params.memCode)) return sendError(res, 404, "err.umb.playerNotFound");
+    if (!(await storage.pba.exists(req.params.memCode))) return sendError(res, 404, "err.umb.playerNotFound");
+    const on = req.body?.on === true;
+    await storage.umb.setFollowing(req.userId!, PBA_CAT, req.params.memCode, on);
+    return sendSuccess(res, { following: on, followers: await storage.pba.followerCount(req.params.memCode) });
+}));
+
+// 응원글 — UMB·골프와 같은 문지기(약관·정지 → 욕설·내기 필터 → 연락처 마스킹 → 60초 쿨다운)
+router.get("/players/pba/:memCode/cheers", noCache, optionalAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!MEM_CODE_RE.test(req.params.memCode)) return sendError(res, 404, "err.umb.playerNotFound");
+    return sendSuccess(res, await storage.umb.listCheers(PBA_CAT, req.params.memCode, req.userId ?? null));
+}));
+
+router.post("/players/pba/:memCode/cheers", noCache, requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!MEM_CODE_RE.test(req.params.memCode)) return sendError(res, 404, "err.umb.playerNotFound");
+    if (!(await storage.pba.exists(req.params.memCode))) return sendError(res, 404, "err.umb.playerNotFound");
+    const content = String(req.body?.content ?? "").trim();
+    if (!content) return sendError(res, 400, "err.umb.cheerEmpty");
+    if (content.length > CHEER_MAX) return sendError(res, 400, msg("err.umb.cheerTooLong", { max: CHEER_MAX }));
+    const filter = checkContent(content);
+    if (filter.blocked) return sendError(res, 400, filter.reason!);
+    const last = await storage.umb.lastCheerAt(req.userId!, PBA_CAT, req.params.memCode);
+    if (last && Date.now() - last.getTime() < CHEER_COOLDOWN_MS) return sendError(res, 429, "err.umb.cheerCooldown", "COOLDOWN");
+    const row = await storage.umb.createCheer({ category: PBA_CAT, playerUmbId: req.params.memCode, authorId: req.userId!, content: maskContacts(content) });
+    return sendSuccess(res, { id: row.id, content: row.content, createdAt: row.createdAt });
+}));
+
+router.delete("/players/pba/:memCode/cheers/:cheerId", noCache, requireAuth, asyncHandler(async (req: AuthRequest, res: Response) => {
+    if (!UUID_RE.test(req.params.cheerId)) return sendError(res, 404, "err.umb.cheerNotFound");
+    const ok = await storage.umb.deleteCheer(req.params.cheerId, req.userId!);
+    if (!ok) return sendError(res, 404, "err.umb.cheerNotFound");
+    return sendSuccess(res, { deleted: true });
 }));
 
 // GET /pba/schedule — 다가오는 대회 (라이브 프록시 + CDN 캐시, DB 저장 없음).

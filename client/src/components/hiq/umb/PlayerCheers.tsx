@@ -33,8 +33,8 @@ function timeAgo(iso: string, t: (k: string) => string): string {
     return t("umb.cheerDayAgo").replace("{n}", String(Math.floor(h / 24)));
 }
 
-/** basePath: 골프 선수(2026-09-13)는 같은 부품을 다른 API 로 — 표는 같다(hiq_player_cheers, category=투어) */
-export function PlayerCheers({ category, playerUmbId, basePath = "/api/hiq/umb/players" }: { category: UmbCategory | GolfTour; playerUmbId: string; basePath?: string }) {
+/** basePath: 골프 선수(2026-09-13)·PBA 선수(2026-09-27)는 같은 부품을 다른 API 로 — 표는 같다(hiq_player_cheers, category=투어·pba) */
+export function PlayerCheers({ category, playerUmbId, basePath = "/api/hiq/umb/players" }: { category: UmbCategory | GolfTour | "pba"; playerUmbId: string; basePath?: string }) {
     const { t } = useT();
     const [, setLocation] = useLocation();
     const { member } = useAuth();

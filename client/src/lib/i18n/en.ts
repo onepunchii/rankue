@@ -1675,6 +1675,7 @@ const en: Dict = {
   "umb.pbaRecord": "W-L",
   "umb.pbaPrize": "Career prize",
   "umb.pbaSeason": "{season}-{next} season · prize #{r} · points #{p}",
+  "umb.pbaOpen": "{league} player page — seasons & titles",
   "umb.pbaSource": "Source: PBA official",
   "umb.prizeUnit": "",
   "umb.streakUp": "{n} weeks rising",

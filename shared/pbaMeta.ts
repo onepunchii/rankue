@@ -63,12 +63,14 @@ export const pbaPlayerTitleKo = (nameKo: string, league: string, prize?: string 
 
 export const pbaPlayerDescKo = (
     nameKo: string, nameEn: string | null | undefined, league: string,
-    prize: string, average: unknown, highRun: unknown, seasonRank?: PbaSeasonRank | null,
+    prize: string, average: unknown, highRun: unknown, seasonRank?: PbaSeasonRank | null, wins?: number,
 ) => {
     // 모든 선수 페이지 끝에 붙던 "프로당구는 연봉제가 아니라 상금 중심입니다."는 뺐다 — 481곳이 같은 문장이었다. 답은 본문·FAQ 에 있다(2026-09-24)
     // 값이 없는 칸은 뺀다 — 기록이 없는 15명은 "통산 상금 -, 에버리지 -, 하이런 -."로 줄표만 늘어섰다(2026-09-24)
     const facts = [
         prize && prize !== "-" ? `통산 상금 ${prize}` : "",
+        // 우승 횟수(2026-09-27) — 모은 대회 결과에 있을 때만. 0회는 적지 않는다(모은 자료 밖의 우승이 있을 수 있다)
+        wins ? `우승 ${wins}회` : "",
         seasonRank ? `${seasonRank.season}-${String(seasonRank.season + 1).slice(2)} 시즌 상금랭킹 ${seasonRank.rank}위` : "",
         average != null && average !== "" ? `에버리지 ${average}` : "",
         highRun != null && highRun !== "" ? `하이런 ${highRun}` : "",
@@ -93,7 +95,7 @@ interface PbaL10n {
     listDesc: string;
     /** prize = pbaPrizeText 글. ko 만 제목에 싣는다 */
     playerTitle: (name: string, league: string, prize?: string | null) => string;
-    playerDesc: (name: string, nameEn: string | null | undefined, league: string, prize: string, average: unknown, highRun: unknown, seasonRank?: PbaSeasonRank | null) => string;
+    playerDesc: (name: string, nameEn: string | null | undefined, league: string, prize: string, average: unknown, highRun: unknown, seasonRank?: PbaSeasonRank | null, wins?: number) => string;
     incomeNote: string;
     incomeQ: (name: string) => string;
     incomeA: (name: string, prize: string) => string;

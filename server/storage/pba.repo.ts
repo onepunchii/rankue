@@ -1,7 +1,10 @@
 import { db } from "../db.js";
-import { pbaPlayers, pbaSeasonRanks } from "../../shared/schema.js";
+import { pbaPlayers, pbaSeasonRanks, hiqPlayerFollows, umbRankings } from "../../shared/schema.js";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { buildPbaRecords, type PbaCareerInput, type PbaLeague, type PbaRecordsReport } from "../../shared/pbaRecordsMeta.js";
+import { buildPbaRecords, pbaLeagueBench, pbaPlayerRecordRanks, type PbaCareerInput, type PbaLeague, type PbaRecordsReport } from "../../shared/pbaRecordsMeta.js";
+import type { PbaPlayerExtra, PbaPlayerProfile } from "../../shared/pbaPlayerProfile.js";
+import { hasTourPage, pbaTourPath, tourNameWithSeason } from "../../shared/tournamentMeta.js";
+import { tournamentsRepo } from "./tournaments.repo.js";
 
 // PBA 투어 읽기 저장소 — 공개 읽기 전용. 시즌 목록은 자주 안 바뀌므로 프로세스 캐시.
 
@@ -11,6 +14,8 @@ const SEASONS_TTL = 5 * 60 * 1000;
 // 통산 기록 순위 — 상세 갱신이 하루 한 번(크론)이라 10분 캐시면 충분하다. API·프리렌더·사이트맵이 같은 값을 본다.
 let recordsCache: { at: number; data: PbaRecordsReport } | null = null;
 const RECORDS_TTL = 10 * 60 * 1000;
+/** 통산 기록 전 선수 줄 — 기록 순위표와 선수 페이지의 '기록 순위·리그 평균'이 같은 값을 본다 */
+let careerCache: { at: number; rows: PbaCareerInput[]; updated: Partial<Record<PbaLeague, string | null>> } | null = null;
 
 export class PbaRepository {
     async getSeasons() {
@@ -77,6 +82,18 @@ export class PbaRepository {
         return { ...pub, seasons: seasonRows };
     }
 
+    /** 이 선수를 팔로우한 랭큐 회원 수 */
+    async followerCount(memCode: string): Promise<number> {
+        const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(hiqPlayerFollows)
+            .where(and(eq(hiqPlayerFollows.category, "pba"), eq(hiqPlayerFollows.playerUmbId, memCode)));
+        return row?.n ?? 0;
+    }
+
+    async exists(memCode: string): Promise<boolean> {
+        const [row] = await db.select({ id: pbaPlayers.id }).from(pbaPlayers).where(eq(pbaPlayers.memCode, memCode)).limit(1);
+        return !!row;
+    }
+
     // 사이트맵·프리렌더용 전체 목록
     async getPlayersForSitemap() {
         return db.select({ memCode: pbaPlayers.memCode, league: pbaPlayers.league, nameKo: pbaPlayers.nameKo })
@@ -85,8 +102,9 @@ export class PbaRepository {
 
     // 통산 기록 순위(/pba/records) — 선수 480명 남짓이라 통째로 읽어 shared/pbaRecordsMeta 의 한 함수로 순위를 매긴다
     // (SQL 과 JS 두 곳에서 따로 정렬하면 공동 순위·동점 순서가 갈린다).
-    async getRecords(): Promise<PbaRecordsReport> {
-        if (recordsCache && Date.now() - recordsCache.at < RECORDS_TTL) return recordsCache.data;
+    /** 통산 기록 전 선수(480명 남짓) + 리그별 갱신일 — 10분 캐시 */
+    private async careerRows() {
+        if (careerCache && Date.now() - careerCache.at < RECORDS_TTL) return careerCache;
         const rows = await db.select({
             memCode: pbaPlayers.memCode,
             league: pbaPlayers.league,
@@ -111,9 +129,72 @@ export class PbaRepository {
         }).from(pbaPlayers).groupBy(pbaPlayers.league);
         const updated: Partial<Record<PbaLeague, string | null>> = {};
         for (const f of fresh) updated[f.league] = f.day;
-        const data = buildPbaRecords(rows as PbaCareerInput[], updated);
+        careerCache = { at: Date.now(), rows: rows as PbaCareerInput[], updated };
+        return careerCache;
+    }
+
+    // 통산 기록 순위(/pba/records) — 선수 480명 남짓이라 통째로 읽어 shared/pbaRecordsMeta 의 한 함수로 순위를 매긴다
+    // (SQL 과 JS 두 곳에서 따로 정렬하면 공동 순위·동점 순서가 갈린다).
+    async getRecords(): Promise<PbaRecordsReport> {
+        if (recordsCache && Date.now() - recordsCache.at < RECORDS_TTL) return recordsCache.data;
+        const { rows, updated } = await this.careerRows();
+        const data = buildPbaRecords(rows, updated);
         recordsCache = { at: Date.now(), data };
         return data;
+    }
+
+    /**
+     * 선수 페이지 전체(2026-09-27 개편) — 프로필·시즌 + extra(우승·기록 순위·리그 평균·비슷한 순위·팔로워·UMB 순위·갱신일).
+     * 공개·캐시되는 응답이라 '내가 팔로우 중인가' 는 싣지 않는다(따로 GET …/follow). extra 조각은 하나가 실패해도 나머지로 나간다.
+     */
+    async getPlayerProfile(memCode: string): Promise<PbaPlayerProfile | null> {
+        const base = await this.getPlayer(memCode);
+        if (!base) return null;
+        const safe = async <T,>(label: string, f: () => Promise<T>, fallback: T): Promise<T> => {
+            try { return await f(); } catch (e) { console.warn(`[pba] profile ${label} 실패:`, (e as Error)?.message); return fallback; }
+        };
+        const career = await safe("career", () => this.careerRows(), null);
+        const lastRanked = [...base.seasons].reverse().find((s) => s.prizeRank != null && (s.league === "PBA" || s.league === "LPBA"));
+        const [wins, neighbors, followers, umbRank, updated] = await Promise.all([
+            safe("wins", async () => (await tournamentsRepo.allPbaRows())
+                .filter((r) => r.winnerMemCode === memCode && hasTourPage(r))
+                .sort((a, b) => b.startDate.localeCompare(a.startDate))
+                .map((r) => ({ season: r.season, title: tourNameWithSeason(r), startDate: r.startDate, winnerPrize: r.winnerPrize, path: pbaTourPath(r.season, r.tourCode!) })), []),
+            safe("neighbors", async () => {
+                if (!lastRanked) return null;
+                const r0 = Number(lastRanked.prizeRank);
+                const league = lastRanked.league as "PBA" | "LPBA";
+                const rows = await this.getRankings(league, lastRanked.season, "prize", r0 + 5);
+                const near = rows.filter((r) => r.memCode !== memCode && r.prizeRank != null && r.prizeRank >= r0 - 5 && r.prizeRank <= r0 + 5)
+                    .map((r) => ({ memCode: r.memCode, nameKo: r.nameKo, nameEn: r.nameEn, nationCode: r.nationCode, prizeRank: r.prizeRank! }));
+                return near.length ? { season: lastRanked.season, league, rows: near } : null;
+            }, null),
+            safe("followers", () => this.followerCount(memCode), 0),
+            safe("umb", async () => {
+                if (!base.umbPlayerId || !base.umbCategory) return null;
+                const [row] = await db.select({ rank: umbRankings.rank, at: umbRankings.editionDate }).from(umbRankings)
+                    .where(and(eq(umbRankings.category, base.umbCategory as "players" | "ladies" | "juniors"), eq(umbRankings.playerUmbId, base.umbPlayerId)))
+                    .orderBy(desc(umbRankings.editionDate)).limit(1);
+                // 두 달 넘게 안 올라온 순위는 '지금 순위'가 아니다
+                return row && Date.now() - new Date(row.at).getTime() < 62 * 86_400_000 ? row.rank : null;
+            }, null),
+            safe("updated", async () => {
+                const [row] = await db.select({
+                    day: sql<string | null>`to_char((${pbaPlayers.updatedAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+                }).from(pbaPlayers).where(eq(pbaPlayers.memCode, memCode));
+                return row?.day ?? null;
+            }, null),
+        ]);
+        const extra: PbaPlayerExtra = {
+            wins,
+            recordRanks: career ? pbaPlayerRecordRanks(career.rows, memCode) : {},
+            bench: career ? pbaLeagueBench(career.rows, base.league) : { average: null, bankShotRate: null, winRate: null, highRunTop: null },
+            neighbors,
+            followers,
+            umbRank,
+            updated,
+        };
+        return { ...(base as unknown as PbaPlayerProfile), extra };
     }
 
     // 요약 — 현재 시즌 상금 1위·포인트 1위 (홈/프리렌더 카드용)

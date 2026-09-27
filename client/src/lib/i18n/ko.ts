@@ -1677,6 +1677,7 @@ export const ko: Dict = {
   "umb.pbaRecord": "승패",
   "umb.pbaPrize": "통산 상금",
   "umb.pbaSeason": "{season}-{next} 시즌 · 상금 {r}위 · 포인트 {p}위",
+  "umb.pbaOpen": "{league} 선수 페이지 — 시즌별 기록·우승 보기",
   "umb.pbaSource": "출처: PBA 공식 기록",
   "umb.prizeUnit": "억",
   "umb.streakUp": "{n}주 연속 상승",

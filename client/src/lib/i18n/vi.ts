@@ -1675,6 +1675,7 @@ const vi: Dict = {
   "umb.pbaRecord": "T-B",
   "umb.pbaPrize": "Tổng thưởng",
   "umb.pbaSeason": "Mùa {season}-{next} · thưởng #{r} · điểm #{p}",
+  "umb.pbaOpen": "Trang cơ thủ {league} — theo mùa & danh hiệu",
   "umb.pbaSource": "Nguồn: PBA chính thức",
   "umb.prizeUnit": "",
   "umb.streakUp": "Tăng {n} tuần liên tiếp",

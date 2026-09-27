@@ -1739,7 +1739,7 @@ export type InsertStoreListing = typeof storeListings.$inferInsert;
  */
 export const hiqPlayerCheers = pgTable("hiq_player_cheers", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
-  category: text("category", { enum: ["players", "ladies", "juniors", "owgr", "rolex", "kpga", "klpga"] }).notNull(),
+  category: text("category", { enum: ["players", "ladies", "juniors", "owgr", "rolex", "kpga", "klpga", "pba"] }).notNull(),
   playerUmbId: text("player_umb_id").notNull(),
   authorId: uuid("author_id").references(() => hiqMembers.id).notNull(),
   content: text("content").notNull(),
@@ -1776,7 +1776,7 @@ export const hiqAppSessions = pgTable("hiq_app_sessions", {
 export const hiqPlayerFollows = pgTable("hiq_player_follows", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
-  category: text("category", { enum: ["players", "ladies", "juniors", "owgr", "rolex", "kpga", "klpga"] }).notNull(),
+  category: text("category", { enum: ["players", "ladies", "juniors", "owgr", "rolex", "kpga", "klpga", "pba"] }).notNull(),
   playerUmbId: text("player_umb_id").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (t) => ({

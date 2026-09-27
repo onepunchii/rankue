@@ -1675,6 +1675,7 @@ const tr: Dict = {
   "umb.pbaRecord": "G-M",
   "umb.pbaPrize": "Toplam ödül",
   "umb.pbaSeason": "{season}-{next} sezonu · ödül #{r} · puan #{p}",
+  "umb.pbaOpen": "{league} oyuncu sayfası — sezonlar ve şampiyonluklar",
   "umb.pbaSource": "Kaynak: resmî PBA",
   "umb.prizeUnit": "",
   "umb.streakUp": "{n} haftadır yükselişte",

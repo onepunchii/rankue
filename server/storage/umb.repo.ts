@@ -5,8 +5,8 @@ import { alias } from "drizzle-orm/pg-core";
 import type { UmbCategory, ParsedRanking, ArchiveEntry } from "../services/umbService.js";
 import type { GolfTour } from "../../shared/golfTours.js";
 
-/** 팔로우·응원글은 당구 부문과 골프 투어가 같은 표를 쓴다(2026-09-13). */
-export type PlayerCategory = UmbCategory | GolfTour;
+/** 팔로우·응원글은 당구 부문과 골프 투어, PBA(2026-09-27, playerUmbId = PBA memCode)가 같은 표를 쓴다. */
+export type PlayerCategory = UmbCategory | GolfTour | "pba";
 import { expiringEvents, projectedRank } from "../../shared/umbExpiry.js";
 import { buildEventHistory } from "../../shared/umbEventHistory.js";
 import { toKoreanName } from "../services/umbKoreanName.js";

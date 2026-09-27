@@ -151,6 +151,46 @@ function valueOf(key: PbaRecordKey, r: PbaCareerInput): number | null {
  */
 const rankKey = (key: PbaRecordKey, v: number) => (key === "winRate" ? Number((v * 100).toFixed(1)) : v);
 
+/** 한 기록의 순위 후보 — 자격(최소 경기 수)·값 있음·정렬까지. 톱 20 표(buildPbaRecords)와 선수 한 명의 순위(pbaPlayerRecordRanks)가 같이 쓴다. */
+function rankedCandidates(pool: PbaCareerInput[], key: PbaRecordKey) {
+    return pool
+        .filter((r) => !PBA_RECORD_DEFS[key].minGames || gamesOf(r) >= PBA_RECORDS_MIN_GAMES)
+        .map((r) => ({ r, v: valueOf(key, r), g: gamesOf(r) }))
+        .filter((x): x is { r: PbaCareerInput; v: number; g: number } => x.v != null && Number.isFinite(x.v) && x.v > 0)
+        .map((x) => ({ ...x, k: rankKey(key, x.v) }))
+        .sort((a, b) => b.k - a.k || b.g - a.g || (a.r.memCode < b.r.memCode ? -1 : a.r.memCode > b.r.memCode ? 1 : 0));
+}
+
+/** 선수 한 명의 기록 순위 — 같은 리그 안에서, 공동 순위는 앞 사람 순위(1, 1, 3). 자격이 없거나 값이 없으면 그 기록은 빠진다. */
+export interface PbaPlayerRecordRank { rank: number; of: number }
+export function pbaPlayerRecordRanks(rows: PbaCareerInput[], memCode: string): Partial<Record<PbaRecordKey, PbaPlayerRecordRank>> {
+    const me = rows.find((r) => r.memCode === memCode);
+    if (!me) return {};
+    const pool = rows.filter((r) => r.league === me.league && r.average != null);
+    const out: Partial<Record<PbaRecordKey, PbaPlayerRecordRank>> = {};
+    for (const key of PBA_RECORD_KEYS) {
+        const cands = rankedCandidates(pool, key);
+        const i = cands.findIndex((c) => c.r.memCode === memCode);
+        if (i < 0) continue;
+        // 공동 순위 = 같은 (표기) 값의 첫 사람 자리
+        const first = cands.findIndex((c) => c.k === cands[i].k);
+        out[key] = { rank: first + 1, of: cands.length };
+    }
+    return out;
+}
+
+/** 리그 평균(에버리지·뱅크샷은 자격 선수 평균, 하이런은 리그 최고) — 선수 페이지의 '리그 평균 대비' 막대 */
+export interface PbaLeagueBench { average: number | null; bankShotRate: number | null; winRate: number | null; highRunTop: number | null }
+export function pbaLeagueBench(rows: PbaCareerInput[], league: PbaLeague): PbaLeagueBench {
+    const pool = rows.filter((r) => r.league === league && r.average != null);
+    const mean = (key: PbaRecordKey) => {
+        const vs = rankedCandidates(pool, key).map((c) => c.v);
+        return vs.length ? vs.reduce((a, b) => a + b, 0) / vs.length : null;
+    };
+    const hr = rankedCandidates(pool, "highRun")[0]?.v ?? null;
+    return { average: mean("average"), bankShotRate: mean("bankShotRate"), winRate: mean("winRate"), highRunTop: hr };
+}
+
 /**
  * 순위표를 만든다. 정렬: 값(표기 자릿수) 내림차순 → 경기 수 많은 순 → memCode(같은 입력이면 늘 같은 순서).
  * 값이 없거나 0 인 선수는 뺀다(상금 0원·하이런 0 은 '기록'이 아니다).
@@ -161,12 +201,7 @@ export function buildPbaRecords(rows: PbaCareerInput[], updated: Partial<Record<
         const pool = rows.filter((r) => r.league === league && r.average != null);
         const qualified = pool.filter((r) => gamesOf(r) >= PBA_RECORDS_MIN_GAMES).length;
         const sections = PBA_RECORD_KEYS.map((key): PbaRecordSection => {
-            const cands = pool
-                .filter((r) => !PBA_RECORD_DEFS[key].minGames || gamesOf(r) >= PBA_RECORDS_MIN_GAMES)
-                .map((r) => ({ r, v: valueOf(key, r), g: gamesOf(r) }))
-                .filter((x): x is { r: PbaCareerInput; v: number; g: number } => x.v != null && Number.isFinite(x.v) && x.v > 0)
-                .map((x) => ({ ...x, k: rankKey(key, x.v) }))
-                .sort((a, b) => b.k - a.k || b.g - a.g || (a.r.memCode < b.r.memCode ? -1 : a.r.memCode > b.r.memCode ? 1 : 0));
+            const cands = rankedCandidates(pool, key);
             const out: PbaRecordRow[] = [];
             for (let i = 0; i < cands.length && out.length < PBA_RECORDS_TOP; i++) {
                 const { r, v, g, k } = cands[i];

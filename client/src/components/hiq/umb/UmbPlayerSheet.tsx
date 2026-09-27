@@ -69,9 +69,12 @@ const AXIS = "rgba(0,0,0,0.35)";
 // ?v=4 — 응답 형태가 바뀔 때 올린다(v4: 2026-09-14 대회 이력 표 eventHistory. v3: 2026-09-13 국내 순위판·PBA·만료 예고·팔로우 추가. 쿼리 캐시가 localStorage 에
 // 남아 있어 키를 올리지 않으면 옛 응답이 10분 동안 그대로 보인다 — 실측). 초기 배포가 브라우저에도 하루짜리
 // stale-while-revalidate를 심어놔서(이후 CDN 전용으로 분리) URL로 캐시를 우회해야 한다.
+/** 상세 쿼리 키 — 팔로우 토글이 같은 키를 고친다(2026-09-27: 토글은 옛 "v3" 키를 고쳐서 하트가 안 바뀌었다) */
+const playerDetailKey = (category: UmbCategory, playerUmbId: string | null) => [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v4"];
+
 export function usePlayerDetail(category: UmbCategory, playerUmbId: string | null) {
     return useQuery<UmbPlayerDetail>({
-        queryKey: [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v4"],
+        queryKey: playerDetailKey(category, playerUmbId),
         queryFn: async () => apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}?v=4`),
         enabled: !!playerUmbId,
         staleTime: 10 * 60 * 1000,
@@ -119,7 +122,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
     const [showAllEvHist, setShowAllEvHist] = useState(false);
     const [followBusy, setFollowBusy] = useState(false);
     const { data, isLoading } = usePlayerDetail(category, playerUmbId);
-    const detailKey = [`/api/hiq/umb/players/${category}/${playerUmbId}`, "v3"];
+    const detailKey = playerDetailKey(category, playerUmbId);
     const dateLocale = locale === "ko" ? "ko-KR" : locale;
 
     /** 관심 선수 켜기/끄기 — 낙관적으로 먼저 바꾸고 실패하면 되돌린다. 비로그인은 안내만. */
@@ -417,6 +420,16 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                             </div>
                         ))}
                     </div>
+                    {/* PBA 선수 페이지로(2026-09-27) — 시즌별 기록·우승·기록 순위는 그쪽에 있다 */}
+                    {pba.memCode && (
+                        <a
+                            href={`/pba-player/${encodeURIComponent(pba.memCode)}`}
+                            onClick={(e) => { e.preventDefault(); setLocation(`/pba-player/${encodeURIComponent(pba.memCode)}`); }}
+                            className="mt-2 flex items-center justify-between rounded-2xl bg-surface-3 px-3.5 h-11 text-[13px] font-semibold text-ink-1 active:opacity-80"
+                        >
+                            {t("umb.pbaOpen").replace("{league}", pba.league)}<span aria-hidden="true" className="text-ink-3">›</span>
+                        </a>
+                    )}
                     {pba.season && (
                         <div className="mt-2">
                             <Chip tone="brand">📅 {t("umb.pbaSeason")
