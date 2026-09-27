@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
 import { LucidePhone, LucideMapPin, LucideShare2 } from "@/lib/icons";
+import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
 
 interface Listing {
   code: string; name: string; region: string; address: string; phone: string | null;
@@ -270,6 +271,9 @@ export default function StoreListingPage() {
                 <span className="text-[11.5px] font-bold leading-none">{t.shareCta}</span>
               </button>
             </div>
+
+            {/* 검색 유입 → 가입(2026-09-27 오너) — 전화·길찾기를 마친 사람에게 다음 거리: 온라인게임 '길 찾기' */}
+            <PathFinderPromo src="store" name={s.name} className="mb-4" />
 
             <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-3 mb-4">
               <div>

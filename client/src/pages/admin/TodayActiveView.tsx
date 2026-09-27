@@ -10,6 +10,7 @@ import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { LucideSearch, LucideRefreshCw, LucideChevronRight } from "@/lib/icons";
 import { KpiTile, PlatformIcon, CountryFlag, kstTime, phoneLabel } from "./adminUtils";
+import PromoFunnelCard from "./PromoFunnelCard";
 
 export type TodayActiveData = {
     total: number;
@@ -178,6 +179,8 @@ export default function TodayActiveView({ compact = false, onOpenMember, onSeeAl
                     </button>
                 )}
             </div>
+            {/* 검색 유입 → 가입 깔때기 — 전체 보기에서만 */}
+            {!compact && <PromoFunnelCard />}
         </div>
     );
 }

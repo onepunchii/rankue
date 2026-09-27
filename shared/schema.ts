@@ -1074,6 +1074,22 @@ export const hiqVisitLogs = pgTable("hiq_visit_logs", {
 //
 // DB 에는 2026-08-13 raw SQL 로 먼저 생성했고, 이 정의는 drizzle push 가
 // "DB 에만 있는 테이블을 지울까요?" 로 제안하지 않게 막는 앵커 역할도 한다.
+/**
+ * 검색 유입 → 가입 깔때기(2026-09-27) — 매장·선수 페이지 '길 찾기' 배너의 단계별 하루 유니크 방문자.
+ * (day, src, step, visitor) PK 라 count(*) 가 곧 그날 그 단계의 사람 수다. 생성 SQL: migrations/promo_events.sql
+ * 표가 없어도 서비스는 그대로 — 비콘은 조용히 실패하고 어드민은 '미설정'으로 보인다.
+ */
+export const promoEvents = pgTable("promo_events", {
+  day: date("day").notNull(),
+  src: text("src").notNull(),
+  step: text("step").notNull(),
+  visitor: text("visitor").notNull(),
+  firstSeen: timestamp("first_seen").defaultNow().notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.day, table.src, table.step, table.visitor] }),
+  index("promo_events_day_idx").on(table.day),
+]);
+
 export const dailyVisits = pgTable("daily_visits", {
   day: date("day").notNull(),
   visitor: text("visitor").notNull(),

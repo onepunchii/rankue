@@ -22,6 +22,7 @@ import { pbaCardUrl } from "@/lib/playerCard";
 import { seasonLabel, formatPrize } from "./pba";
 import { PBA_INCOME_NOTE_KO, formatPrizeKo, pbaL10n, pbaLatestSeasonRank } from "@shared/pbaMeta";
 import { PBA_RECORDS_MIN_GAMES } from "@shared/pbaRecordsMeta";
+import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
 import {
     pbaAge, pbaDisplayName, pbaGames, pbaPlayerFaq, pbaPlayerLdNodes, pbaPlayerSummary, pbaPrizeLabel, type PbaPlayerProfile,
 } from "@shared/pbaPlayerProfile";
@@ -366,6 +367,9 @@ export default function HiqPbaPlayer() {
                         proName={name} proAvg={p.average} proHighRun={p.highRun} proWinRate={winRate}
                         excludeMemCode={p.memCode} umbRank={x?.umbRank ?? null}
                     />
+
+                    {/* 검색 유입 → 가입(2026-09-27 오너) — 온라인게임 '길 찾기'(비회원 3번 무료) */}
+                    <PathFinderPromo src="pba" name={name} />
 
                     {/* 우승 — 누르면 그 대회 페이지 */}
                     {x && x.wins.length > 0 && (

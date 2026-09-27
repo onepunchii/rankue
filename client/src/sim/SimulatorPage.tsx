@@ -42,6 +42,9 @@ import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
+import { goLogin } from "@/components/hiq/LoginGate";
+import { bumpGuestPath, guestPathRemaining, promoEvent, rememberPromoSrc } from "@/lib/promo";
+import { isPromoSrc } from "@shared/promoFunnel";
 import { useGameAudio } from "@/hooks/useGameAudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useKeepAwake } from "../hooks/useKeepAwake"; // 상대 경로 — vitest 에 "@/" 별칭이 없고 SimulatorPage.test 는 "@/" 를 전부 목으로 바꾼다
@@ -70,6 +73,7 @@ import { MatchLobby } from "./match/MatchLobby";
 import { MATCH_LIST_QUERY_KEY } from "./match/queryKeys";
 import { endReasonText, shouldOpenMatch } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
+import { GuestPathGate } from "./components/GuestPathGate";
 import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
 import { setActiveMatchScreen } from "./match/liveMatchCall";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
@@ -232,6 +236,10 @@ export function SimulatorPage() {
     const drillsView = params.get("drills") === "1";
     // 길 찾기(?path=1, 2026-09-08 오너): 공을 놓고 3쿠션 해법을 찾는 연습 세션. 오버레이가 아니라 세션이라 overlayParam 에는 넣지 않는다.
     const pathView = params.get("path") === "1";
+    // 매장·선수 페이지 '길 찾기' 배너에서 왔으면 출처를 기억한다(&src=store|pba|umb) — 이후 길 찾기·가입을 같은 출처로 센다
+    const promoFrom = params.get("src");
+    useEffect(() => { if (!member && isPromoSrc(promoFrom)) rememberPromoSrc(promoFrom); }, [member, promoFrom]);
+    const [guestGate, setGuestGate] = useState(false);
     // 리플레이 링크(?replay=): 대전·로비·드릴·대시보드가 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
     const overlayParam = !!matchId || !!watchId || lobby || drillsView || dashView || roomsView || rankView || joinCode !== "" || pathView;
     const [replay] = useState<ReplayPayload | null>(() => (overlayParam ? null : decodeReplay(params.get(REPLAY_PARAM))));
@@ -1317,6 +1325,12 @@ export function SimulatorPage() {
     /** sheet: false 면 결과 시트를 열지 않고 탐색만 한다(대전의 길 찾기 — 오른쪽 바에 길 하나만 뜬다). */
     const openSolver = useCallback((opts?: { sheet?: boolean }) => {
         if (!sim.config || !sim.params || sim.phase !== "aim") return;
+        // 비회원 길 찾기는 3번 무료(2026-09-27 오너: 검색 유입 → 가입) — 다 쓰면 탐색 대신 가입 안내
+        if (pathViewRef.current && !member && guestPathRemaining() <= 0) {
+            setGuestGate(true);
+            promoEvent("gate");
+            return;
+        }
         solvedKeyRef.current = ballsKey;
         setSolverOpen(opts?.sheet !== false);
         void solver.solve({
@@ -1326,7 +1340,7 @@ export function SimulatorPage() {
             // 길 찾기는 전용 화면이라 예산을 넉넉히 준다 — 전수 탐색이 더 돌고 오차 허용(여유) 추정이 안정된다
             ...(pathViewRef.current ? { budgetMs: PATH_BUDGET_MS } : {}),
         });
-    }, [sim.config, sim.params, sim.phase, sim.balls, sim.cueBallId, sim.session, solver, ballsKey]);
+    }, [sim.config, sim.params, sim.phase, sim.balls, sim.cueBallId, sim.session, solver, ballsKey, member]);
     const retrySolver = useCallback(() => { solverSeedRef.current += 1; openSolver(); }, [openSolver]);
     // 길 찾기에서 결과가 나오면 이 기기의 "찾아본 배치" 수를 올린다(서버에 남기지 않는다)
     const pathCountedRef = useRef("");
@@ -1336,7 +1350,13 @@ export function SimulatorPage() {
         if (pathCountedRef.current === key) return;
         pathCountedRef.current = key;
         bumpPathCount(safeLocalStorage());
-    }, [pathView, solver.status, solver.result, sim.balls]);
+        // 비회원 무료 횟수 — 결과가 나온 탐색만 센다(취소·실패는 안 센다)
+        if (!member) {
+            const left = bumpGuestPath();
+            promoEvent("use");
+            toast({ title: left > 0 ? t("promo.left").replace("{n}", String(left)) : t("promo.leftLast") });
+        }
+    }, [pathView, solver.status, solver.result, sim.balls, member]);
     const onSolverPreview = useCallback((c: SolveCandidate | null) => {
         if (!c || !sim.config) { setSolverPreview(null); return; }
         setSolverPreview({ candidate: c, paths: buildPreviewPaths(c.result, { cueBallId: sim.cueBallId, gameType: sim.config.gameType }) });
@@ -1898,6 +1918,7 @@ export function SimulatorPage() {
                 onApply={onSolverApply} onPreview={onSolverPreview}
                 onCancel={solver.cancel} onRetry={retrySolver}
             />
+            <GuestPathGate open={guestGate} onOpenChange={setGuestGate} onSignup={() => { setGuestGate(false); goLogin(navigate, "/online-game?path=1"); }} />
             <ResignConfirm open={resignOpen} onOpenChange={setResignOpen} busy={exiting} onConfirm={() => { void onResign(); }} />
             <InningSheet
                 open={sheetOpen} onOpenChange={setSheetOpen} log={log} completed={completed} session={sim.session} names={names} phase={sim.phase}

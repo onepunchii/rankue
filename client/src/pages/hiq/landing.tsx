@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
+import { safeReturnPath } from "@shared/promoFunnel";
 import { apiRequest } from "@/lib/queryClient";
 import { LucideChevronRight, LucideDelete, LucideShieldQuestion } from "@/lib/icons";
 import { useQuery } from "@tanstack/react-query";
@@ -143,8 +144,13 @@ export default function Landing() {
             // Honor a ?redirect= return url (e.g. from the QR invite flow) ONLY for
             // existing members — new members must complete registration (res.redirectTo
             // points at /register). startsWith("/") guards against open-redirect.
-            const redirect = new URLSearchParams(window.location.search).get("redirect");
-            const dest = !res.isNew && redirect && redirect.startsWith("/") ? redirect : res.redirectTo;
+            const redirect = safeReturnPath(new URLSearchParams(window.location.search).get("redirect"));
+            // 새 회원은 가입(/register)을 마친 뒤 돌아가도록 redirect 를 이어 준다(2026-09-27 — 길 찾기 가입 안내에서 온 사람이
+            // 가입 뒤 대시보드로 떨어져 하던 걸 잃었다). register 가 같은 검사(safeReturnPath)로 다시 거른다.
+            const dest = !redirect ? res.redirectTo
+                : !res.isNew ? redirect
+                : res.redirectTo?.startsWith("/register") ? `${res.redirectTo}${res.redirectTo.includes("?") ? "&" : "?"}redirect=${encodeURIComponent(redirect)}`
+                : res.redirectTo;
             setTimeout(() => setLocation(dest), 500);
 
         } catch (error: any) {

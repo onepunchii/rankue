@@ -20,6 +20,7 @@ import { PlayerCheers } from "./PlayerCheers";
 import { ProCompareCard } from "@/components/hiq/compare/ProCompareCard";
 import { PlayerPhoto } from "@/components/hiq/PlayerPhoto";
 import { Chip, List, Section, Tile } from "./ui";
+import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
 
 /** 대회 수가 많으면 상위 몇 개만 펴 둔다 — 8개 넘게 늘어져 페이지가 길었다(2026-09-13 오너). */
 const POINTS_FOLD = 5;
@@ -313,6 +314,9 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                 excludeMemCode={pba?.memCode ?? null}
                 umbRank={player.rank}
             />
+
+            {/* 검색 유입 → 가입(2026-09-27 오너) — 공개 선수 페이지에서만(랭킹의 아래 시트에는 넣지 않는다) */}
+            {standalone && <PathFinderPromo src="umb" name={locale === "ko" && player.nativeName ? player.nativeName : player.playerName} />}
 
             {/* 추이 차트 — 순위(기본)/포인트 토글 */}
             {chartData.length >= 2 && (

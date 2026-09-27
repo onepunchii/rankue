@@ -29,10 +29,13 @@ vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: nav.toast }) }))
 vi.mock("@/hooks/useGameAudio", () => ({ useGameAudio: () => ({ getCtx: () => null }) }));
 vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ member: { nickname: "테스터", handi3c: 15 }, isLoading: false, isLoggedIn: true, isGuest: false }) }));
 vi.mock("wouter", () => ({ useLocation: () => ["/online-game", nav.navigate], useSearch: () => nav.search }));
+// 길 찾기 비회원 무료 횟수·가입 안내(2026-09-27) — 이 테스트는 회원이라 쓰이지 않는다
+vi.mock("@/components/hiq/LoginGate", () => ({ goLogin: () => undefined }));
+vi.mock("@/lib/promo", () => ({ bumpGuestPath: () => 2, guestPathRemaining: () => 3, promoEvent: () => undefined, rememberPromoSrc: () => undefined }));
 vi.mock("@/lib/icons", async () => {
     const React = await import("react");
     const I = () => React.createElement("span");
-    return { ChevronDown: I, ChevronLeft: I, ChevronRight: I, LayoutList: I, LucideUndo2: I, X: I, LucideMinus: I, LucidePlus: I, LucideSparkles: I };
+    return { ChevronDown: I, ChevronLeft: I, ChevronRight: I, LayoutList: I, LucideUndo2: I, X: I, LucideMinus: I, LucidePlus: I, LucideSparkles: I, LucideCheck: I };
 });
 vi.mock("@/components/hiq/BallDot", async () => {
     const React = await import("react");

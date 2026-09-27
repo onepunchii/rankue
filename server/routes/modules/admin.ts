@@ -58,6 +58,25 @@ router.get("/activity", checkSuperAdmin, asyncHandler(async (_req: any, res: any
     return sendSuccess(res, await storage.appSessions.summary(8));
 }));
 
+// GET /admin/promo-funnel — 검색 유입 → 가입 깔때기(2026-09-27): 최근 14일, 출처(store·pba·umb)·단계별 하루 유니크 방문자 합.
+// 표(promo_events)가 없으면 { ready: false } — 0 이 아니라 '미설정'(migrations/promo_events.sql 을 아직 안 돌렸다).
+router.get("/promo-funnel", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    const { db } = await import("../../db.js");
+    const { sql } = await import("drizzle-orm");
+    try {
+        const r: any = await db.execute(sql`
+            select src, step, count(*)::int as n
+            from promo_events
+            where day >= (now() at time zone 'Asia/Seoul')::date - 13
+            group by src, step
+        `);
+        const rows = (r.rows ?? r) as { src: string; step: string; n: number }[];
+        return sendSuccess(res, { ready: true, days: 14, rows });
+    } catch {
+        return sendSuccess(res, { ready: false, days: 14, rows: [] });
+    }
+}));
+
 // GET /admin/activity/today — 오늘(한국 날짜) 앱을 연 회원 목록·시간대별 접속자·어제 같은 시각 비교(2026-09-26 오너)
 router.get("/activity/today", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
     return sendSuccess(res, await storage.appSessions.today());
