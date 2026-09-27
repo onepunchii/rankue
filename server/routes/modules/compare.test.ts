@@ -7,8 +7,11 @@ vi.mock("../../storage/index.js", () => ({
     storage: {
         compare: {
             memberRank: vi.fn(async (avg: number) => ({ rank: avg >= 1 ? 10 : 500, total: 1000, topPct: avg >= 1 ? 1 : 50 })),
-            myStats: vi.fn(async () => ({ avg: 0.8, games: 12, highRun: 6, winRate: 0.5, perMonth: 0.01 })),
+            myStats: vi.fn(async (_id: string, type = "3c") => (type === "4c" ? null : { avg: 0.8, games: 12, highRun: 6, winRate: 0.5, perMonth: 0.01 })),
+            handiBasis: vi.fn(async (_id: string, type: string) => (type === "4c" ? { ranked: 2, avg: 0.5 } : { ranked: 9, avg: 0.66 })),
+            peers: vi.fn(async () => ({ count: 3, avg: 0.6, highRun: 7 })),
         },
+        getMemberById: vi.fn(async () => ({ id: "u1", handi3c: 23, handi4c: null })),
         pba: {
             comparePros: vi.fn(async () => [
                 { memCode: "A", nameKo: "A", nameEn: null, league: "LPBA", nationCode: "KR", average: 0.81 },
@@ -59,5 +62,26 @@ describe("GET /compare/me", () => {
         expect(data.stats.games).toBe(12);
         expect(data.members.rank).toBe(500);
         expect(data.pros).toHaveLength(2);
+    });
+});
+
+describe("GET /compare/real", () => {
+    it("3쿠션: 핸디·다음 핸디(최근 10판 평균 기준)·닮은 프로 / 4구: 공식 5판 전이면 준비 안 됨", async () => {
+        const r = await fetch(`${base}/compare/real`, { headers: { "x-test-user": "u1" } });
+        expect(r.headers.get("cache-control")).toBe("private, no-store");
+        const { data } = await r.json();
+        expect(data.preferred).toBe("3c");
+        const c3 = data["3c"];
+        expect(c3.ready).toBe(true);
+        expect(c3.handi).toBe(23);
+        // 0.66 → 핸디 23(0.6 이상), 다음 칸은 25(0.7) — 남은 차이 0.04
+        expect(c3.nextHandi.handi).toBe(25);
+        expect(c3.nextHandi.gap).toBeCloseTo(0.04, 5);
+        expect(c3.pro.memCode).toBe("A");
+        expect(data["4c"].ready).toBe(false);
+        expect(data["4c"].games).toBe(2);
+    });
+    it("로그인 필요", async () => {
+        expect((await fetch(`${base}/compare/real`)).status).toBe(401);
     });
 });

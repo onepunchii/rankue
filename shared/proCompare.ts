@@ -58,6 +58,8 @@ export interface ComparePro {
     league: "PBA" | "LPBA";
     nationCode: string | null;
     average: number;
+    /** 통산 하이런(PBA 공식) — 비교표 칸. 옛 응답엔 없다 */
+    highRun?: number | null;
 }
 
 /** 에버리지가 가장 가까운 프로 n 명(자격 선수만 들어온다). 같은 거리면 에버리지가 높은 쪽 먼저, 그다음 memCode. */
@@ -92,7 +94,9 @@ export const LOOKALIKE_MIN_MATCHES = 3;
 
 /**
  * 재미 등급 — 프로 에버리지 분포에서 내 자리. 0 아마추어 · 1 LPBA 신인급 · 2 LPBA 상위권 · 3 PBA 중위권 · 4 PBA 톱10급.
- * 경계: LPBA 하위 25%·LPBA 중앙값·PBA 중앙값·PBA 10번째 선수. pos 는 전체 프로 중 나보다 낮은 비율(막대 위 점 자리, 2~98).
+ * 경계: LPBA 하위 25%·LPBA 중앙값·PBA 중앙값·PBA 10번째 선수.
+ * pos(0~100)는 사다리 위 점 자리 — 사다리가 등급마다 같은 폭(5칸)이라 **내 등급 칸 안에서** 경계 사이 비율로 놓는다
+ * (전체 분포 백분위로 놓으면 점이 칩의 등급과 다른 칸에 찍힌다). 아마추어 칸은 0 ~ 첫 경계, 톱10 칸은 경계 ~ 최고 프로.
  */
 export function proTier(pool: readonly ComparePro[], avg: number): { tier: 0 | 1 | 2 | 3 | 4; pos: number } | null {
     const lp = pool.filter((p) => p.league === "LPBA").map((p) => p.average).sort((a, b) => a - b);
@@ -102,9 +106,10 @@ export function proTier(pool: readonly ComparePro[], avg: number): { tier: 0 | 1
     const cuts = [q(lp, 0.25), q(lp, 0.5), q(pb, 0.5), pb[pb.length - 10]];
     let tier = 0;
     while (tier < cuts.length && avg >= cuts[tier]) tier++;
-    const all = pool.map((p) => p.average);
-    const below = all.filter((v) => v < avg).length;
-    const pos = Math.max(2, Math.min(98, Math.round((below / all.length) * 100)));
+    const lo = tier === 0 ? 0 : cuts[tier - 1];
+    const hi = tier === 4 ? Math.max(pb[pb.length - 1], cuts[3] + 0.01) : cuts[tier];
+    const frac = Math.max(0, Math.min(1, (avg - lo) / Math.max(1e-6, hi - lo)));
+    const pos = Math.max(2, Math.min(98, Math.round(((tier + frac) / 5) * 100)));
     return { tier: tier as 0 | 1 | 2 | 3 | 4, pos };
 }
 
@@ -133,3 +138,30 @@ export interface LookalikeResponse {
     tier: 0 | 1 | 2 | 3 | 4 | null;
     pos: number | null;
 }
+
+/* ── 실전(매칭 대결) "내 실전 핸디"(2026-09-27, 홈 전적 카드 아래) ── */
+
+export interface RealSide {
+    type: "3c" | "4c";
+    /** 공식(랭크) 경기 수 — 핸디를 매기는 기준 */
+    games: number;
+    needed: number;
+    ready: boolean;
+    /** 프로필 에버리지(avg_3c·avg_4c) */
+    avg: number | null;
+    /** 핸디를 매기는 최근 공식 10경기 평균 — '다음 핸디까지'의 기준 */
+    handiAvg: number | null;
+    highRun: number | null;
+    winRate: number | null;
+    handi: number | null;
+    members: CompareMembers | null;
+    nextHandi: { handi: number; avg: number; gap: number } | null;
+    /** 3쿠션만 — 닮은 프로·다음 프로·재미 등급 */
+    pro: ComparePro | null;
+    next: ComparePro | null;
+    tier: 0 | 1 | 2 | 3 | 4 | null;
+    pos: number | null;
+    /** 4구만 — 같은 핸디 회원(인원·평균 에버·평균 최고 하이런) */
+    peers: { count: number; avg: number | null; highRun: number | null } | null;
+}
+export interface RealCompareResponse { "3c": RealSide; "4c": RealSide; preferred: "3c" | "4c" }

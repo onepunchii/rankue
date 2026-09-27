@@ -10,6 +10,7 @@ import GolfDashboard from "@/golf/pages/Dashboard";
 // New Components
 import { DashboardHeader } from "@/components/hiq/dashboard/DashboardHeader";
 import { PerformanceCard } from "@/components/hiq/dashboard/PerformanceCard";
+import { RealHandicapCard } from "@/components/hiq/dashboard/RealHandicapCard";
 import { RankingListCard } from "@/components/hiq/dashboard/RankingListCard";
 import { WorldRankingCard } from "@/components/hiq/umb/WorldRankingCard";
 import { PbaRankingCard, PBA_CARD_L } from "@/components/hiq/pba/PbaRankingCard";
@@ -231,6 +232,8 @@ function HiqDashboardBilliards() {
 
             {/* 전적 (승률 게이지 + 최근 폼) */}
             <PerformanceCard history={history} />
+            {/* 내 실전 핸디(2026-09-27) — 전적 바로 아래. 3쿠션은 닮은 프로, 4구는 랭큐 회원 순위 */}
+            <RealHandicapCard onStartMatch={() => handleStartGameClick("match")} />
 
             {/* Action Buttons */}
             <QuickActions

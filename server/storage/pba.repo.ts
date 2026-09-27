@@ -106,7 +106,7 @@ export class PbaRepository {
         const { rows } = await this.careerRows();
         return rows
             .filter((r) => r.average != null && r.average > 0 && (r.win ?? 0) + (r.lose ?? 0) + (r.draw ?? 0) >= PBA_RECORDS_MIN_GAMES)
-            .map((r) => ({ memCode: r.memCode, nameKo: r.nameKo, nameEn: r.nameEn, league: r.league, nationCode: r.nationCode, average: r.average! }));
+            .map((r) => ({ memCode: r.memCode, nameKo: r.nameKo, nameEn: r.nameEn, league: r.league, nationCode: r.nationCode, average: r.average!, highRun: r.highRun ?? null }));
     }
 
     // 통산 기록 순위(/pba/records) — 선수 480명 남짓이라 통째로 읽어 shared/pbaRecordsMeta 의 한 함수로 순위를 매긴다

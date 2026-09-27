@@ -18,31 +18,9 @@ import { eq, ne, desc, asc, and, or, sql, gt, inArray } from "drizzle-orm";
 import { notFound } from "../utils/errors.js";
 import { msg } from "../lib/i18n.js";
 import { scoringInnings } from "../../shared/averageRule.js";
+import { HANDICAP_MAP_3C, HANDICAP_MAP_4C } from "../../shared/realHandicap.js";
 
-const HANDICAP_MAP_4C = [
-    { avg: 1.5, handi: 50 },
-    { avg: 1.2, handi: 40 },
-    { avg: 0.9, handi: 30 },
-    { avg: 0.75, handi: 25 },
-    { avg: 0.6, handi: 20 },
-    { avg: 0.45, handi: 15 },
-    { avg: 0.35, handi: 12 },
-    { avg: 0.3, handi: 10 },
-    { avg: 0.24, handi: 8 },
-    { avg: 0.15, handi: 5 },
-    { avg: 0.0, handi: 3 },
-];
-
-const HANDICAP_MAP_3C = [
-    { avg: 1.0, handi: 30 },
-    { avg: 0.7, handi: 25 },
-    { avg: 0.6, handi: 23 },
-    { avg: 0.5, handi: 20 },
-    { avg: 0.4, handi: 18 },
-    { avg: 0.3, handi: 15 },
-    { avg: 0.0, handi: 12 },
-];
-
+// 실전 핸디 기준표 — 홈 '내 실전 핸디' 카드와 같은 표(shared/realHandicap)
 /** 어드민 기록 삭제 결과 — 지운 것과, 되돌린 값의 전후 대조. 실패 사유도 같은 타입으로 돌려준다. */
 export type AdminGameDeleteResult =
     | { ok: false; reason: "not-found" | "tournament" }

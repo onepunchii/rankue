@@ -57,7 +57,9 @@ describe("온라인 닮은 프로 — 재미 등급·다음 목표", () => {
         expect(proTier(pool, 0.9)?.tier).toBe(2);
         expect(proTier(pool, 1.47)?.tier).toBe(3);  // PBA 중앙값 1.45 이상, 10번째(1.50) 미만
         expect(proTier(pool, 1.9)?.tier).toBe(4);
-        expect(proTier(pool, 0.3)?.pos).toBe(2);
+        // 점은 내 등급 칸 안에 — 5칸 사다리의 칸 폭은 20
+        const inSeg = (avg: number) => { const r = proTier(pool, avg)!; return r.pos >= r.tier * 20 && r.pos <= (r.tier + 1) * 20; };
+        for (const a of [0.1, 0.3, 0.7, 0.9, 1.47, 1.9, 5]) expect(inSeg(a), String(a)).toBe(true);
         expect(proTier(pool, 5)?.pos).toBe(98);
     });
     it("표본이 모자라면 등급 없음", () => {
