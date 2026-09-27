@@ -94,7 +94,9 @@ export interface PhotoDeps {
  * (1) 공식 선수 검색 화면과 그 스크립트에서 'ImgURL' 을 쓰는 코드로 배우고, (2) 흔한 업로드 경로로 짐작해 차례로 받아 본다.
  * 한 번 맞은 앞머리는 기억해 다음 선수부터는 첫 시도에 맞힌다.
  */
-const GUESS_PREFIXES = ["/upload", "/uploads", "/files", "/file", "/data", "/resources", "/static", "/img", "/images", "/ko", "/common"];
+const GUESS_PREFIXES = ["/upload", "/uploads", "/files", "/resources", "/resource", "/recource", "/images",
+    "https://pbatour.org", "https://img.pbatour.org", "https://image.pbatour.org", "https://file.pbatour.org", "https://files.pbatour.org",
+    "https://cdn.pbatour.org", "https://static.pbatour.org", "https://upload.pbatour.org", "https://admin.pbatour.org", "https://m.pbatour.org"];
 const LEARN_PAGES = ["/ko/player/search/index", "/en/player/search/index"];
 const LEARN_TTL = 60 * 60 * 1000;
 let learned: { at: number; prefixes: string[]; notes: string[] } | null = null;
@@ -118,41 +120,101 @@ export function joinPrefix(prefix: string, raw: string, origin: string): string 
     return safeImageUrl(`${p}/${path.replace(/^\/+/, "")}`, origin);
 }
 
+/** 텍스트에서 사진 앞머리 후보 — '…/players/…' 의 앞부분, 사진·파일 서버처럼 보이는 절대 주소의 origin */
+export function prefixesFromUrls(text: string): string[] {
+    const out = new Set<string>();
+    for (const m of text.matchAll(/(https?:)?\/\/[a-z0-9.-]+\.[a-z]{2,}(?::\d+)?[^"'\s<>)]*/gi)) {
+        let v = m[0];
+        if (v.startsWith("//")) v = `https:${v}`;
+        const at = v.indexOf("/players/");
+        if (at > 8) { out.add(v.slice(0, at)); continue; }
+        try {
+            const u = new URL(v);
+            if (/amazonaws|cloudfront|cdn|img|image|file|upload|media|storage|static/i.test(u.hostname) && !/jsdelivr|daumcdn|googleapis|gstatic|cloudflare|kakao|naver|facebook|jquery/i.test(u.hostname)) out.add(u.origin);
+        } catch { /* 주소가 아니다 */ }
+    }
+    return [...out].slice(0, 8);
+}
+
+/** 사이트 검색 목록이 주는 사진 값(완전한 주소)과 상세의 경로를 견줘 앞머리를 얻는다 */
+function prefixFromJsonUrls(data: unknown, prefixes: Set<string>, notes: string[], label: string) {
+    let n = 0;
+    const walk = (node: unknown, depth: number) => {
+        if (depth > 5 || node == null || n > 200) return;
+        n++;
+        if (typeof node === "string") {
+            const at = node.indexOf("/players/");
+            if (at >= 0) {
+                if (prefixes.size < 12 && at > 0) prefixes.add(node.slice(0, at));
+                if (notes.length < 60) notes.push(`${label} value ${node.slice(0, 160)}`);
+            }
+            return;
+        }
+        if (Array.isArray(node)) { node.slice(0, 5).forEach((x) => walk(x, depth + 1)); return; }
+        if (typeof node === "object") for (const x of Object.values(node as Record<string, unknown>)) walk(x, depth + 1);
+    };
+    walk(data, 0);
+}
+
 async function learnPrefixes(deps: PhotoDeps, trace: string[]): Promise<string[]> {
-    if (learned && Date.now() - learned.at < LEARN_TTL) { trace.push(`learned(cached) ${JSON.stringify(learned.prefixes)} ${learned.notes.join(" | ")}`); return learned.prefixes; }
+    if (learned && Date.now() - learned.at < LEARN_TTL) { trace.push(`learned(cached) ${JSON.stringify(learned.prefixes)}`, ...learned.notes); return learned.prefixes; }
     const prefixes = new Set<string>();
     const notes: string[] = [];
-    const scan = (label: string, text: string) => {
-        let i = text.indexOf("ImgURL"), n = 0;
-        while (i >= 0 && n < 3) { notes.push(`${label}: …${text.slice(Math.max(0, i - 90), i + 40).replace(/\s+/g, " ")}…`); i = text.indexOf("ImgURL", i + 6); n++; }
-        prefixesFromCode(text).forEach((x) => prefixes.add(x));
+    const ajax = new Set<string>();
+    const snip = (label: string, text: string, needle: string, max: number) => {
+        let i = text.indexOf(needle), k = 0;
+        while (i >= 0 && k < max && notes.length < 60) {
+            notes.push(`${label} [${needle}] …${text.slice(Math.max(0, i - 120), i + 100).replace(/\s+/g, " ")}…`);
+            i = text.indexOf(needle, i + needle.length); k++;
+        }
     };
-    for (const page of LEARN_PAGES) {
-        try {
-            const r = await deps.fetchRaw(page, "text/html");
-            const html = r.ok ? await r.text() : "";
-            notes.push(`${page} ${r.status} len=${html.length}`);
-            if (!html) continue;
+    const scan = (label: string, text: string) => {
+        prefixesFromCode(text).forEach((x) => prefixes.add(x));
+        prefixesFromUrls(text).forEach((x) => prefixes.add(x));
+        for (const m of text.matchAll(/["'`](\/(?:ko|en)?\/?[\w/]*ajax\/[\w/]+)["'`]/g)) ajax.add(m[1]);
+    };
+    const page = LEARN_PAGES[0];
+    try {
+        const r = await deps.fetchRaw(page, "text/html");
+        const html = r.ok ? await r.text() : "";
+        notes.push(`${page} ${r.status} len=${html.length}`);
+        if (html) {
             scan(page, html);
+            snip(page, html, "ImgURL", 3);
             const srcs = [...html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map((m) => m[1])
-                .filter((src) => !/jquery|bootstrap|swiper|gtag|googletag|analytics|kakao|facebook|naver|slick|moment|lodash|polyfill/i.test(src))
+                .filter((src) => !/jquery|bootstrap|swiper|gtag|googletag|analytics|kakao|facebook|naver|slick|moment|lodash|polyfill|angular|masterslider|remodal|chart\.js|daumcdn/i.test(src))
                 .slice(0, 12);
-            notes.push(`scripts ${srcs.join(",")}`);
             for (const src of srcs) {
                 try {
                     const url = new URL(src, new URL(page, deps.origin));
-                    if (!/pbatour\.org$/i.test(url.hostname)) continue;
+                    if (!/pbatour\.org$/i.test(url.hostname)) { notes.push(`js ${src} skip(host)`); continue; }
                     const js = await deps.fetchRaw(url.toString(), "*/*");
-                    if (js.ok) scan(url.pathname, await js.text());
-                } catch { /* 스크립트 하나 실패는 넘어간다 */ }
+                    const text = js.ok ? await js.text() : "";
+                    notes.push(`js ${url.pathname} ${js.status} len=${text.length} ImgURL×${text.split("ImgURL").length - 1} players/×${text.split("players/").length - 1}`);
+                    if (!text) continue;
+                    scan(url.pathname, text);
+                    snip(url.pathname, text, "ImgURL", 4);
+                    snip(url.pathname, text, "players/", 3);
+                    snip(url.pathname, text, "imgDomain", 2);
+                    snip(url.pathname, text, "fileUrl", 2);
+                } catch (e) { notes.push(`js ${src} error ${(e as Error)?.message}`); }
             }
-            if (prefixes.size) break;
-        } catch (e) {
-            notes.push(`${page} error ${(e as Error)?.message}`);
         }
+    } catch (e) {
+        notes.push(`${page} error ${(e as Error)?.message}`);
     }
-    learned = { at: Date.now(), prefixes: [...prefixes], notes: notes.slice(0, 12) };
-    trace.push(`learned ${JSON.stringify(learned.prefixes)} ${learned.notes.join(" | ")}`);
+    // 검색 화면이 부르는 목록 API — 목록의 사진 값이 완전한 주소면 앞머리를 바로 안다
+    notes.push(`ajax ${[...ajax].slice(0, 12).join(",")}`);
+    for (const path of [...ajax].filter((x) => /list|search|player/i.test(x) && !/detail/i.test(x)).slice(0, 4)) {
+        try {
+            const r = await deps.fetchRaw(path, "application/json");
+            const text = r.ok ? await r.text() : "";
+            notes.push(`ajax ${path} ${r.status} len=${text.length}`);
+            if (text.startsWith("{") || text.startsWith("[")) prefixFromJsonUrls(JSON.parse(text), prefixes, notes, path);
+        } catch (e) { notes.push(`ajax ${path} error ${(e as Error)?.message}`); }
+    }
+    learned = { at: Date.now(), prefixes: [...prefixes].slice(0, 12), notes: notes.slice(0, 60) };
+    trace.push(`learned ${JSON.stringify(learned.prefixes)}`, ...learned.notes);
     return learned.prefixes;
 }
 
@@ -166,7 +228,7 @@ export async function findPbaPhoto(memCode: string, deps: PhotoDeps, trace: stri
     const code = encodeURIComponent(memCode);
     const tried = new Set<string>();
     const attempt = async (url: string | null, prefix: string | null) => {
-        if (!url || tried.has(url) || tried.size >= 16) return null;
+        if (!url || tried.has(url) || tried.size >= (full ? 40 : 24)) return null;
         tried.add(url);
         const photo = await fetchPhotoBytes(url, deps, trace).catch((e) => { trace.push(`img ${url} error ${(e as Error)?.message}`); return null; });
         if (photo && prefix !== null) goodPrefix = prefix;

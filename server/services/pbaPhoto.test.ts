@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { imageFromHtml, imageFromJson, joinPrefix, prefixesFromCode, safeImageUrl, sniffImage } from "./pbaPhoto";
+import { imageFromHtml, imageFromJson, joinPrefix, prefixesFromCode, prefixesFromUrls, safeImageUrl, sniffImage } from "./pbaPhoto";
 
 describe("pbaPhoto", () => {
     it("safeImageUrl — 상대 경로는 기준에 붙이고 https 로, 내부 주소·이상한 스킴은 막는다", () => {
@@ -41,5 +41,9 @@ describe("pbaPhoto", () => {
         expect(joinPrefix("/upload/", "/players/a.jpg", o)).toBe("https://www.pbatour.org/upload/players/a.jpg");
         expect(joinPrefix("https://img.pbatour.org", "players/a.jpg", o)).toBe("https://img.pbatour.org/players/a.jpg");
         expect(joinPrefix("/files", "https://www.pbatour.org/players/a.jpg", o)).toBe("https://www.pbatour.org/files/players/a.jpg");
+    });
+    it("prefixesFromUrls — '/players/' 앞부분과 사진 서버 origin, 라이브러리 CDN 은 뺀다", () => {
+        const t = `a="https://pba-img.s3.ap-northeast-2.amazonaws.com/players/PBA/big/x.jpg"; b="https://cdn.jsdelivr.net/npm/chart.js"; c='//img.pbatour.org/banner/a.png'`;
+        expect(prefixesFromUrls(t)).toEqual(["https://pba-img.s3.ap-northeast-2.amazonaws.com", "https://img.pbatour.org"]);
     });
 });
