@@ -85,7 +85,7 @@ router.get("/photo/:memCode", asyncHandler(async (req: any, res: Response) => {
         const url = await resolvePbaPhoto(code, deps, trace);
         let bytes: string = "-";
         if (url) {
-            try { const p = await fetchPhotoBytes(url, deps); bytes = p ? `${p.type} ${p.body.length}B` : "not an image"; }
+            try { const p = await fetchPhotoBytes(url, deps, trace); bytes = p ? `${p.type} ${p.body.length}B` : "not an image"; }
             catch (e) { bytes = `error ${(e as Error)?.message}`; }
         }
         return res.json({ memCode: code, url, bytes, trace });

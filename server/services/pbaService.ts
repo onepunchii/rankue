@@ -216,10 +216,10 @@ export async function fetchJson(path: string): Promise<any> {
  * JSON 이 아닌 응답(선수 페이지 HTML·사진 바이트). pbatour.org 는 위 고정 체인으로, 다른 호스트(사진 CDN 등)는
  * 기본 신뢰 저장소로 검증한다 — 고정 체인 Agent 는 GlobalSign 만 믿어서 다른 CA 의 호스트를 못 연다.
  */
-export async function fetchPbaRaw(url: string, accept: string): Promise<Response> {
+export async function fetchPbaRaw(url: string, accept: string, referer = true): Promise<Response> {
     const u = new URL(url, ORIGIN);
     const init: any = {
-        headers: { "User-Agent": UA, Accept: accept, Referer: `${ORIGIN}/` },
+        headers: { "User-Agent": UA, Accept: accept, ...(referer ? { Referer: `${ORIGIN}/` } : {}) },
         signal: AbortSignal.timeout(10_000),
     };
     if (u.hostname === "pbatour.org" || u.hostname.endsWith(".pbatour.org")) {

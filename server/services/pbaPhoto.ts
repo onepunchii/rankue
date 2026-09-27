@@ -84,7 +84,7 @@ export const PBA_PLAYER_PAGES = (code: string) => [
 
 export interface PhotoDeps {
     fetchJson: (path: string) => Promise<any>;
-    fetchRaw: (url: string, accept: string) => Promise<Response>;
+    fetchRaw: (url: string, accept: string, referer?: boolean) => Promise<Response>;
     origin: string;
 }
 
@@ -95,7 +95,8 @@ export async function resolvePbaPhoto(memCode: string, deps: PhotoDeps, trace: s
         const json = await deps.fetchJson(`/ko/player/search/ajax/detail?memCode=${code}`);
         const data = json?.data;
         trace.push(`json resultCode=${json?.resultCode} keys=${data && typeof data === "object" ? Object.keys(data).join(",") : typeof data}`);
-        const url = safeImageUrl(imageFromJson(data), deps.origin);
+        // 실측(2026-09-27 ?why=1): data.ImgURL(작은 사진)·ImgURLBig(큰 사진) — 작은 것부터, 없으면 모양으로 찾는다
+        const url = safeImageUrl(data?.ImgURL, deps.origin) ?? safeImageUrl(data?.ImgURLBig, deps.origin) ?? safeImageUrl(imageFromJson(data), deps.origin);
         if (url) { trace.push(`json → ${url}`); return url; }
     } catch (e) {
         trace.push(`json error ${(e as Error)?.message}`);
@@ -116,13 +117,29 @@ export async function resolvePbaPhoto(memCode: string, deps: PhotoDeps, trace: s
 
 export const PHOTO_MAX_BYTES = 3 * 1024 * 1024;
 
-/** 사진 바이트 — image/* 이고 3MB 이하만 */
-export async function fetchPhotoBytes(url: string, deps: Pick<PhotoDeps, "fetchRaw">): Promise<{ type: string; body: Buffer } | null> {
-    const r = await deps.fetchRaw(url, "image/avif,image/webp,image/*;q=0.8");
-    if (!r.ok) return null;
-    const type = (r.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
-    if (!type.startsWith("image/") || type.includes("svg")) return null;
-    const body = Buffer.from(await r.arrayBuffer());
-    if (body.length < 200 || body.length > PHOTO_MAX_BYTES) return null;
-    return { type, body };
+/** 파일 머리로 이미지 종류를 알아낸다 — PBA 사진 서버가 content-type 을 image/* 로 주지 않을 때가 있다(실측: '이미지 아님') */
+export function sniffImage(b: Buffer): string | null {
+    if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return "image/jpeg";
+    if (b.length >= 8 && b.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return "image/png";
+    if (b.length >= 12 && b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP") return "image/webp";
+    if (b.length >= 6 && /^GIF8[79]a$/.test(b.toString("latin1", 0, 6))) return "image/gif";
+    return null;
+}
+
+/**
+ * 사진 바이트 — 파일 머리가 jpeg·png·webp·gif 이고 3MB 이하만(보내는 content-type 은 파일 머리를 따른다).
+ * 먼저 Referer 를 붙여 받고, 막히면 한 번 빼고 다시 받는다. trace 에 상태·형식·크기를 남긴다.
+ */
+export async function fetchPhotoBytes(url: string, deps: Pick<PhotoDeps, "fetchRaw">, trace: string[] = []): Promise<{ type: string; body: Buffer } | null> {
+    for (const referer of [true, false]) {
+        const r = await deps.fetchRaw(url, "image/avif,image/webp,image/*;q=0.8,*/*;q=0.5", referer);
+        const ct = r.headers.get("content-type") ?? "";
+        if (!r.ok) { trace.push(`img referer=${referer} status=${r.status} type=${ct}`); continue; }
+        const body = Buffer.from(await r.arrayBuffer());
+        const type = sniffImage(body);
+        trace.push(`img referer=${referer} status=${r.status} type=${ct} len=${body.length} sniff=${type ?? "-"} head=${body.subarray(0, 8).toString("hex")}`);
+        if (type && body.length <= PHOTO_MAX_BYTES) return { type, body };
+        if (!type) return null; // 받긴 했는데 이미지가 아니다 — Referer 탓이 아니니 다시 받지 않는다
+    }
+    return null;
 }

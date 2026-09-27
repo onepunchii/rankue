@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { imageFromHtml, imageFromJson, safeImageUrl } from "./pbaPhoto";
+import { imageFromHtml, imageFromJson, safeImageUrl, sniffImage } from "./pbaPhoto";
 
 describe("pbaPhoto", () => {
     it("safeImageUrl — 상대 경로는 기준에 붙이고 https 로, 내부 주소·이상한 스킴은 막는다", () => {
@@ -24,5 +24,11 @@ describe("pbaPhoto", () => {
         expect(imageFromHtml(html, "M0022424")).toBe("/upload/player/M0022424.jpg");
         expect(imageFromHtml(`<div style="background-image:url('/files/profile/M9.png')"></div>`, "M9")).toBe("/files/profile/M9.png");
         expect(imageFromHtml(`<img src="/img/logo.png"><img src="/img/banner.jpg">`, "M1")).toBeNull();
+    });
+    it("sniffImage — 파일 머리로 종류, HTML 은 null", () => {
+        expect(sniffImage(Buffer.from([0xff, 0xd8, 0xff, 0xdb]))).toBe("image/jpeg");
+        expect(sniffImage(Buffer.from("89504e470d0a1a0a0000", "hex"))).toBe("image/png");
+        expect(sniffImage(Buffer.from("RIFF\0\0\0\0WEBPVP8 ", "latin1"))).toBe("image/webp");
+        expect(sniffImage(Buffer.from("<!DOCTYPE html>"))).toBeNull();
     });
 });
