@@ -21,7 +21,7 @@ export default function PromoFunnelCard() {
             {!d ? (
                 <p className="mt-3 text-[13px] text-black/40">불러오는 중…</p>
             ) : !d.ready ? (
-                <p className="mt-3 text-[13px] text-black/50">미설정 — migrations/promo_events.sql 을 Neon SQL 편집기에서 실행하면 집계가 시작돼요.</p>
+                <p className="mt-3 text-[13px] text-black/50">아직 집계가 없어요 — 배너에서 첫 방문이 들어오면 저절로 시작돼요.</p>
             ) : (
                 <table className="w-full mt-3 text-[12.5px] tabular-nums">
                     <thead>

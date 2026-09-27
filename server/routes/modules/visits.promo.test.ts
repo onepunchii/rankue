@@ -32,8 +32,15 @@ describe("POST /api/promo-event", () => {
         }
         expect(execute).not.toHaveBeenCalled();
     });
-    it("표가 없어 쓰기가 실패해도 200(부가 기능)", async () => {
-        execute.mockRejectedValueOnce(new Error('relation "promo_events" does not exist'));
+    it("표가 없으면 한 번 만들고 다시 넣는다(create table if not exists → insert)", async () => {
+        execute.mockRejectedValueOnce(Object.assign(new Error('relation "promo_events" does not exist'), { code: "42P01" }));
         expect((await post({ v: "abc", src: "umb", step: "signup" })).status).toBe(200);
+        // insert(실패) + create table + create index + insert(재시도)
+        expect(execute).toHaveBeenCalledTimes(4);
+    });
+    it("다른 DB 오류는 조용히 200(부가 기능), 표를 만들지 않는다", async () => {
+        execute.mockRejectedValueOnce(new Error("timeout"));
+        expect((await post({ v: "abc", src: "umb", step: "view" })).status).toBe(200);
+        expect(execute).toHaveBeenCalledTimes(1);
     });
 });

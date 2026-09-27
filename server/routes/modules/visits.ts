@@ -36,6 +36,22 @@ router.post("/visit", async (req, res) => {
 });
 
 // --- 검색 유입 → 가입 깔때기(2026-09-27) ---
+const isUndefinedTable = (e: any) => (e?.code ?? e?.cause?.code) === "42P01" || /relation "promo_events" does not exist/.test(String(e?.message ?? ""));
+let promoTable: Promise<unknown> | null = null;
+function ensurePromoTable() {
+    promoTable ??= (async () => {
+        await db.execute(sql`
+            create table if not exists promo_events (
+              day date not null, src text not null, step text not null, visitor text not null,
+              first_seen timestamp not null default now(),
+              primary key (day, src, step, visitor)
+            )
+        `);
+        await db.execute(sql`create index if not exists promo_events_day_idx on promo_events (day)`);
+    })().catch((e) => { promoTable = null; throw e; });
+    return promoTable;
+}
+
 // POST /api/promo-event { v, src, step } — 매장·선수 페이지 '길 찾기' 배너의 단계(shared/promoFunnel.ts).
 // 인증 없음(가입 전 방문자가 대상). 저장하는 것은 난수 방문자 id·출처·단계뿐이고, 클라가 단계마다 하루 한 번만 보낸다.
 // (day, src, step, visitor) 충돌은 무시 — 같은 사람이 같은 날 여러 번 보내도 1행. 값은 정해진 목록만 받는다.
@@ -45,11 +61,20 @@ router.post("/promo-event", async (req, res) => {
         const body = req.body ?? {};
         const v = typeof body.v === "string" ? body.v.trim() : "";
         if (!v || v.length > 64 || !isPromoSrc(body.src) || !isPromoStep(body.step)) return res.status(400).json({ error: "bad event" });
-        await db.execute(sql`
+        const insert = () => db.execute(sql`
             insert into promo_events (day, src, step, visitor)
             values ((now() at time zone 'Asia/Seoul')::date, ${body.src}, ${body.step}, ${v})
             on conflict do nothing
         `);
+        try {
+            await insert();
+        } catch (e: any) {
+            // 표가 아직 없으면(42P01) 한 번 만들고 다시 넣는다 — migrations/promo_events.sql 과 같은 DDL(추가만, 멱등).
+            // 오너가 SQL 을 따로 돌리지 않아도 첫 집계에서 생긴다(2026-09-27 오너: "직접 해 줘").
+            if (!isUndefinedTable(e)) throw e;
+            await ensurePromoTable();
+            await insert();
+        }
         return res.json({ ok: true });
     } catch {
         // 부가 기능 — 표가 없거나 DB 가 느려도 화면을 깨뜨리지 않는다
