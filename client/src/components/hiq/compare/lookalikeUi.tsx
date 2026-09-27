@@ -7,6 +7,8 @@
  */
 import { useState, type ComponentType, type ReactNode } from "react";
 import { PlayerPhoto } from "@/components/hiq/PlayerPhoto";
+import { CrewAvatar } from "@/components/hiq/crew-ui";
+import { useAuth } from "@/hooks/useAuth";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { flagEmoji } from "@/lib/flag";
@@ -103,26 +105,101 @@ export function ProTwinHeader({ pro, tier, pos, extra, onOpen }: { pro: CompareP
     );
 }
 
-export interface TableCol { label: ReactNode; tone?: "me" | "other" | "next" }
-/** 비교표 — 첫 칸은 항목, 나머지는 숫자(오른쪽 정렬). 칸 색: 나 = 금, 다음 목표 = 초록 */
+export interface TableCol {
+    label: ReactNode;
+    tone?: "me" | "other" | "next";
+    /** 칸 머리 얼굴(나·프로 사진·다음 목표) — 하나라도 있으면 얼굴 머리 + 가운데 정렬 표로 그린다 */
+    avatar?: ReactNode;
+    /** 얼굴 위 작은 꼬리표(예: '다음 목표') */
+    tag?: string;
+}
+const AV = 34;
+/** 비교표 얼굴 — 나(프로필 사진·금테) */
+export function MeAvatar() {
+    const { member } = useAuth();
+    return <CrewAvatar src={(member as any)?.profileImageUrl} name={member?.name ?? "나"} size={AV} className="ring-2 ring-[#F5B721] ring-offset-2 ring-offset-surface-1" />;
+}
+/** 비교표 얼굴 — PBA·LPBA 선수(사진, 없으면 이니셜) */
+export function ProAvatar({ pro, next }: { pro: Pick<ComparePro, "memCode" | "nameKo" | "nameEn">; next?: boolean }) {
+    const { locale } = useT();
+    return <PlayerPhoto memCode={pro.memCode} name={proName(pro as ComparePro, locale)} size={AV} className={next ? "ring-2 ring-brand ring-offset-2 ring-offset-surface-1" : "ring-1 ring-surface-line"} />;
+}
+/** 비교표 얼굴 — 사람이 아닌 목표(다음 핸디 숫자·같은 핸디 무리) */
+export function BadgeAvatar({ children, next }: { children: ReactNode; next?: boolean }) {
+    return (
+        <span className={cn("inline-flex items-center justify-center rounded-full rk-num font-bold text-[14px]",
+            next ? "bg-brand text-brand-fg ring-2 ring-brand/30 ring-offset-2 ring-offset-surface-1" : "bg-surface-3 text-ink-2")}
+            style={{ width: AV, height: AV }}>{children}</span>
+    );
+}
+
+/**
+ * 비교표 — 첫 칸은 항목, 나머지는 숫자. 칸 색: 나 = 금, 다음 목표 = 초록.
+ * 얼굴 머리(2026-09-27 오너: "나·선수·다음이 비교 느낌이 안 난다"): 칸마다 얼굴 + 이름, 나와 둘째 칸 사이에 VS,
+ * 나·다음 칸은 세로로 옅게 물들여 한 줄씩 견줘 읽힌다.
+ */
 export function CompareTable({ cols, rows }: { cols: TableCol[]; rows: { label: string; cells: ReactNode[] }[] }) {
     const tone = (t?: TableCol["tone"]) => (t === "me" ? GOLD_TEXT : t === "next" ? "text-brand" : "text-ink-3");
+    const faces = cols.some((c) => c.avatar);
+    if (!faces) {
+        return (
+            <table className="w-full mt-2.5 rk-num text-[13px]">
+                <thead>
+                    <tr className="border-b border-surface-line">
+                        <th className="w-[22%]" />
+                        {cols.map((c, i) => (
+                            <th key={i} className={cn("py-1.5 text-right text-[11.5px] font-bold truncate max-w-0", tone(c.tone))}>{c.label}</th>
+                        ))}
+                    </tr>
+                </thead>
+                <tbody>
+                    {rows.map((r) => (
+                        <tr key={r.label} className="border-b border-surface-line last:border-0">
+                            <td className="py-2 text-left text-[12.5px] font-semibold text-ink-3">{r.label}</td>
+                            {r.cells.map((c, i) => (
+                                <td key={i} className={cn("py-2 text-right whitespace-nowrap", cols[i]?.tone === "me" ? "font-bold text-ink-1" : "font-semibold text-ink-2")}>{c}</td>
+                            ))}
+                        </tr>
+                    ))}
+                </tbody>
+            </table>
+        );
+    }
+    const tint = (t?: TableCol["tone"]) => (t === "me" ? "bg-[#F5B721]/[0.09]" : t === "next" ? "bg-brand/[0.06]" : "");
+    const last = rows.length - 1;
     return (
-        <table className="w-full mt-2.5 rk-num text-[13px]">
+        <table className="w-full mt-3 rk-num text-[13px] table-fixed border-separate border-spacing-0">
+            <colgroup>
+                <col className="w-[19%]" />
+                {cols.map((_, i) => <col key={i} />)}
+            </colgroup>
             <thead>
-                <tr className="border-b border-surface-line">
-                    <th className="w-[22%]" />
+                <tr>
+                    <th />
                     {cols.map((c, i) => (
-                        <th key={i} className={cn("py-1.5 text-right text-[11.5px] font-bold truncate max-w-0", tone(c.tone))}>{c.label}</th>
+                        <th key={i} className={cn("relative px-1 pt-2 pb-1.5 align-bottom rounded-t-tile", tint(c.tone))}>
+                            {/* 나 ↔ 둘째 칸 사이 VS */}
+                            {i === 1 && cols[0]?.tone === "me" && (
+                                <span className="absolute left-0 top-[27px] -translate-x-1/2 -translate-y-1/2 z-10 w-[22px] h-[22px] rounded-full bg-ink-1 text-surface-1 text-[9px] font-black italic flex items-center justify-center ring-2 ring-surface-1">VS</span>
+                            )}
+                            <span className="flex flex-col items-center gap-1 min-w-0">
+                                {c.avatar}
+                                <span className={cn("block max-w-full truncate text-[11.5px] font-bold leading-tight", tone(c.tone))}>
+                                    {c.tag && <span className="font-semibold opacity-80">{c.tag} </span>}{c.label}
+                                </span>
+                            </span>
+                        </th>
                     ))}
                 </tr>
             </thead>
             <tbody>
-                {rows.map((r) => (
-                    <tr key={r.label} className="border-b border-surface-line last:border-0">
-                        <td className="py-2 text-left text-[12.5px] font-semibold text-ink-3">{r.label}</td>
+                {rows.map((r, ri) => (
+                    <tr key={r.label}>
+                        <td className="py-2 pl-0.5 text-left text-[12.5px] font-semibold text-ink-3 border-t border-surface-line">{r.label}</td>
                         {r.cells.map((c, i) => (
-                            <td key={i} className={cn("py-2 text-right whitespace-nowrap", cols[i]?.tone === "me" ? "font-bold text-ink-1" : "font-semibold text-ink-2")}>{c}</td>
+                            <td key={i} className={cn("py-2 px-1 text-center whitespace-nowrap border-t border-surface-line", tint(cols[i]?.tone),
+                                ri === last && cols[i]?.tone && cols[i]?.tone !== "other" ? "rounded-b-tile" : "",
+                                cols[i]?.tone === "me" ? "font-bold text-ink-1 text-[14px]" : "font-semibold text-ink-2")}>{c}</td>
                         ))}
                     </tr>
                 ))}
@@ -133,7 +210,13 @@ export function CompareTable({ cols, rows }: { cols: TableCol[]; rows: { label: 
 
 /** 다음 목표 칸 — 값 + (남은 차이) 초록. 차이가 0.01 미만이면 셋째 자리까지(둘째 자리로 자르면 "+0.00"이 된다) */
 export function NextCell({ value, gap }: { value: string; gap?: number | null }) {
-    return <>{value}{gap != null && gap > 0 && <span className="text-brand"> (+{gapText(gap)})</span>}</>;
+    // 얼굴 표에서는 칸이 가운데 정렬이라 남은 차이를 값 아래 작게 둔다(한 줄이면 칸을 넘친다)
+    return (
+        <span className="inline-flex flex-col items-center leading-tight">
+            {value}
+            {gap != null && gap > 0 && <span className="text-brand text-[10.5px] font-bold">+{gapText(gap)}</span>}
+        </span>
+    );
 }
 export const gapText = (gap: number) => (gap >= 0.01 ? gap.toFixed(2) : Math.max(0.001, Math.ceil(gap * 1000) / 1000).toFixed(3));
 

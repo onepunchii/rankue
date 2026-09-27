@@ -15,7 +15,7 @@ import { shareImage } from "@/lib/shareImage";
 import { GameController } from "@/lib/icons";
 import { proRatio, type LookalikeResponse } from "@shared/proCompare";
 import { drawCompareCard } from "@/components/hiq/compare/compareCard";
-import { CardActions, CompareTable, NeedMore, NextCell, ProTwinHeader, fill, proName } from "@/components/hiq/compare/lookalikeUi";
+import { BadgeAvatar, CardActions, CompareTable, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, fill, proName } from "@/components/hiq/compare/lookalikeUi";
 
 export function LookalikeProCard() {
     const { t, locale } = useT();
@@ -85,9 +85,11 @@ export function LookalikeProCard() {
             <ProTwinHeader pro={pro} tier={d.tier} pos={d.pos} onOpen={() => openPro(pro.memCode)} />
             <CompareTable
                 cols={[
-                    { label: t("compare.me"), tone: "me" },
-                    { label: proName(pro, locale) },
-                    { label: next ? `${t("lookalike.colNext")} ${proName(next, locale)}` : t("lookalike.colNext"), tone: "next" },
+                    { label: t("compare.me"), tone: "me", avatar: <MeAvatar /> },
+                    { label: proName(pro, locale), avatar: <ProAvatar pro={pro} /> },
+                    next
+                        ? { label: proName(next, locale), tag: t("lookalike.colNext"), tone: "next", avatar: <ProAvatar pro={next} next /> }
+                        : { label: t("lookalike.colNext"), tone: "next", avatar: <BadgeAvatar next>🏆</BadgeAvatar> },
                 ]}
                 rows={[
                     { label: t("lookalike.rowAvg"), cells: [d.avg.toFixed(2), pro.average.toFixed(2), next ? <NextCell value={next.average.toFixed(2)} gap={next.average - d.avg} /> : "🏆"] },

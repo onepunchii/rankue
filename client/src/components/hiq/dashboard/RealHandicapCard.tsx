@@ -16,7 +16,7 @@ import { shareImage } from "@/lib/shareImage";
 import { Swords } from "@/lib/icons";
 import { proRatio, type LookalikeResponse, type RealCompareResponse, type RealSide } from "@shared/proCompare";
 import { drawCompareCard } from "@/components/hiq/compare/compareCard";
-import { CardActions, CompareTable, GOLD_TEXT, NeedMore, NextCell, ProTwinHeader, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
+import { BadgeAvatar, CardActions, CompareTable, GOLD_TEXT, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
 
 export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void }) {
     const { t, locale } = useT();
@@ -66,6 +66,8 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
 
     const next = d.nextHandi;
     const nextCol = next ? fill(t("real.nextHandi"), { n: next.handi }) : t("real.topHandi");
+    // 다음 칸 얼굴 — 사람이 아니라 핸디라서 숫자 동그라미(최고 핸디면 트로피)
+    const nextColFace = { label: next ? fill(t("real.nextHandi"), { n: "" }).trim() : nextCol, tone: "next" as const, avatar: <BadgeAvatar next>{next ? next.handi : "🏆"}</BadgeAvatar> };
     const share = async () => {
         if (sharing) return;
         setSharing(true);
@@ -113,7 +115,7 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
                     extra={d.members ? <span className="inline-flex items-center h-6 px-2.5 rounded-full text-[12px] font-semibold bg-surface-1 text-ink-2 rk-num">{fill(t("compare.topPctLong"), { n: d.members.topPct })}</span> : null}
                 />
                 <CompareTable
-                    cols={[{ label: t("compare.me"), tone: "me" }, { label: proName(pro, locale) }, { label: nextCol, tone: "next" }]}
+                    cols={[{ label: t("compare.me"), tone: "me", avatar: <MeAvatar /> }, { label: proName(pro, locale), avatar: <ProAvatar pro={pro} /> }, nextColFace]}
                     rows={[
                         { label: t("lookalike.rowAvg"), cells: [d.avg.toFixed(2), pro.average.toFixed(2), next ? <NextCell value={next.avg.toFixed(2)} gap={next.gap} /> : "🏆"] },
                         { label: t("lookalike.rowHighRun"), cells: [d.highRun ?? "—", pro.highRun ?? "—", "—"] },
@@ -142,7 +144,7 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
                 </span>
             </div>
             <CompareTable
-                cols={[{ label: t("compare.me"), tone: "me" }, { label: t("real.peersAvg") }, { label: nextCol, tone: "next" }]}
+                cols={[{ label: t("compare.me"), tone: "me", avatar: <MeAvatar /> }, { label: t("real.peersAvg"), avatar: <BadgeAvatar>{d.handi ?? "–"}</BadgeAvatar> }, nextColFace]}
                 rows={[
                     { label: t("lookalike.rowAvg"), cells: [d.avg.toFixed(2), d.peers?.avg != null ? d.peers.avg.toFixed(2) : "—", next ? <NextCell value={next.avg.toFixed(2)} gap={next.gap} /> : "🏆"] },
                     { label: t("lookalike.rowHighRun"), cells: [d.highRun ?? "—", d.peers?.highRun != null ? Math.round(d.peers.highRun) : "—", "—"] },
