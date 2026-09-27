@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { imageFromHtml, imageFromJson, safeImageUrl, sniffImage } from "./pbaPhoto";
+import { imageFromHtml, imageFromJson, joinPrefix, prefixesFromCode, safeImageUrl, sniffImage } from "./pbaPhoto";
 
 describe("pbaPhoto", () => {
     it("safeImageUrl — 상대 경로는 기준에 붙이고 https 로, 내부 주소·이상한 스킴은 막는다", () => {
@@ -30,5 +30,16 @@ describe("pbaPhoto", () => {
         expect(sniffImage(Buffer.from("89504e470d0a1a0a0000", "hex"))).toBe("image/png");
         expect(sniffImage(Buffer.from("RIFF\0\0\0\0WEBPVP8 ", "latin1"))).toBe("image/webp");
         expect(sniffImage(Buffer.from("<!DOCTYPE html>"))).toBeNull();
+    });
+    it("prefixesFromCode — ImgURL 앞에 붙는 문자열(더하기·템플릿)", () => {
+        expect(prefixesFromCode(`src="' + '/upload' + data.ImgURL + '"`)).toEqual(["/upload"]);
+        expect(prefixesFromCode("x = `https://img.pbatour.org${item['ImgURL']}`")).toEqual(["https://img.pbatour.org"]);
+        expect(prefixesFromCode("var a = data.ImgURL;")).toEqual([]);
+    });
+    it("joinPrefix — 앞머리와 경로(절대 주소면 경로만)를 한 번의 / 로 잇는다", () => {
+        const o = "https://www.pbatour.org";
+        expect(joinPrefix("/upload/", "/players/a.jpg", o)).toBe("https://www.pbatour.org/upload/players/a.jpg");
+        expect(joinPrefix("https://img.pbatour.org", "players/a.jpg", o)).toBe("https://img.pbatour.org/players/a.jpg");
+        expect(joinPrefix("/files", "https://www.pbatour.org/players/a.jpg", o)).toBe("https://www.pbatour.org/files/players/a.jpg");
     });
 });

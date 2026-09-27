@@ -9,10 +9,17 @@ const fetchJson = vi.fn(async (path: string) => {
     if (path.includes("M2")) return { resultCode: "000", data: { Average: "1.0" } }; // JSON 엔 없음 → 페이지 HTML
     // 실측 모양 — ImgURL(작은)·ImgURLBig(큰), 사진 서버는 content-type 을 image/* 로 주지 않는다
     if (path.includes("M4")) return { resultCode: "000", data: { ImgURLBig: "/players/PBA/big/M4_B.jpg", ImgURL: "/players/PBA/M4_S.jpg" } };
+    // 실측 2 — ImgURL 을 사이트 뿌리에 붙이면 404, 사이트 스크립트가 붙이는 앞머리를 배워야 한다
+    if (path.includes("M5")) return { resultCode: "000", data: { ImgURL: "/players/PBA/small/M5_S.jpg" } };
+    if (path.includes("M6")) return { resultCode: "000", data: { ImgURL: "/players/PBA/small/M6_S.jpg" } };
     if (path.includes("M3")) return { resultCode: "000", data: { Average: "0.9" } };
     throw new Error("down");
 });
 const fetchPbaRaw = vi.fn(async (url: string) => {
+    if (url.startsWith("https://img.pbatour.org/players/PBA/small/")) return new Response(JPEG, { headers: { "content-type": "image/jpeg" } });
+    if (url.includes("/players/PBA/small/")) return new Response("<h1>404</h1>", { status: 404, headers: { "content-type": "text/html;charset=ISO-8859-1" } });
+    if (url === "/ko/player/search/index") return new Response(`<script src="/js/jquery.min.js"></script><script src="/js/player/search.js?v=3"></script>`, { headers: { "content-type": "text/html" } });
+    if (url === "https://www.pbatour.org/js/player/search.js?v=3") return new Response(`html += '<img src="' + "https://img.pbatour.org" + item.ImgURL + '">';`, { headers: { "content-type": "text/javascript" } });
     if (url.includes("/players/PBA/M4_S")) return new Response(JPEG, { headers: { "content-type": "application/octet-stream" } });
     if (url.includes("/upload/")) return new Response(JPEG, { headers: { "content-type": "image/jpeg" } });
     if (url.includes("search/detail?memCode=M2")) {
@@ -50,6 +57,14 @@ describe("GET /pba/photo/:memCode", () => {
         expect(r.status).toBe(200);
         expect(r.headers.get("content-type")).toContain("image/jpeg");
         expect(fetchPbaRaw).toHaveBeenCalledWith("https://www.pbatour.org/players/PBA/M4_S.jpg", expect.any(String), true);
+    });
+    it("그대로 붙여 404 면 사이트 스크립트에서 앞머리를 배워 받는다, 다음 선수는 첫 시도에", async () => {
+        const r = await get("M5");
+        expect(r.status).toBe(200);
+        expect(fetchPbaRaw).toHaveBeenCalledWith("https://img.pbatour.org/players/PBA/small/M5_S.jpg", expect.any(String), true);
+        const before = fetchPbaRaw.mock.calls.length;
+        expect((await get("M6")).status).toBe(200);
+        expect(fetchPbaRaw.mock.calls.length - before).toBe(1);
     });
     it("JSON 에 없으면 공식 선수 페이지 HTML 에서 찾는다(로고는 건너뜀)", async () => {
         const r = await get("M2");

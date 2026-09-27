@@ -76,27 +76,20 @@ async function photoDeps() {
 router.get("/photo/:memCode", asyncHandler(async (req: any, res: Response) => {
     const code = String(req.params.memCode ?? "");
     if (!MEM_CODE_RE.test(code)) return res.status(404).end();
-    const { resolvePbaPhoto, fetchPhotoBytes } = await import("../../services/pbaPhoto.js");
+    const { findPbaPhoto } = await import("../../services/pbaPhoto.js");
     if (req.query.why === "1") {
         res.set("Cache-Control", "no-store");
         res.set("CDN-Cache-Control", "no-store");
         const trace: string[] = [];
-        const deps = await photoDeps();
-        const url = await resolvePbaPhoto(code, deps, trace);
-        let bytes: string = "-";
-        if (url) {
-            try { const p = await fetchPhotoBytes(url, deps, trace); bytes = p ? `${p.type} ${p.body.length}B` : "not an image"; }
-            catch (e) { bytes = `error ${(e as Error)?.message}`; }
-        }
-        return res.json({ memCode: code, url, bytes, trace });
+        const p = await findPbaPhoto(code, await photoDeps(), trace, true);
+        return res.json({ memCode: code, url: p?.url ?? null, bytes: p ? `${p.type} ${p.body.length}B` : "none", trace });
     }
     let hit = photoCache.get(code);
     if (!hit || Date.now() - hit.at > hit.ttl) {
         let photo: { type: string; body: Buffer } | null = null;
         try {
-            const deps = await photoDeps();
-            const url = await resolvePbaPhoto(code, deps);
-            photo = url ? await fetchPhotoBytes(url, deps) : null;
+            const p = await findPbaPhoto(code, await photoDeps());
+            photo = p ? { type: p.type, body: p.body } : null;
         } catch (e) {
             console.warn("[pba] photo 조회 실패:", (e as Error)?.message);
         }

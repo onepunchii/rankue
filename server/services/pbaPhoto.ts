@@ -88,18 +88,112 @@ export interface PhotoDeps {
     origin: string;
 }
 
-/** 사진 주소 찾기. trace 에는 어디서 무엇을 봤는지 남긴다(?why=1 진단용 — 공개 정보만). */
-export async function resolvePbaPhoto(memCode: string, deps: PhotoDeps, trace: string[] = []): Promise<string | null> {
+/*
+ * 실측(2026-09-27 ?why=1): 상세 JSON 에 ImgURL(작은)·ImgURLBig(큰) 가 있지만 그 값을 사이트 뿌리에 그대로 붙이면 404 다
+ * (https://www.pbatour.org/players/PBA/small/… → 404). 사이트 화면은 앞에 무언가를 붙여 쓴다 — 그 앞머리를
+ * (1) 공식 선수 검색 화면과 그 스크립트에서 'ImgURL' 을 쓰는 코드로 배우고, (2) 흔한 업로드 경로로 짐작해 차례로 받아 본다.
+ * 한 번 맞은 앞머리는 기억해 다음 선수부터는 첫 시도에 맞힌다.
+ */
+const GUESS_PREFIXES = ["/upload", "/uploads", "/files", "/file", "/data", "/resources", "/static", "/img", "/images", "/ko", "/common"];
+const LEARN_PAGES = ["/ko/player/search/index", "/en/player/search/index"];
+const LEARN_TTL = 60 * 60 * 1000;
+let learned: { at: number; prefixes: string[]; notes: string[] } | null = null;
+let goodPrefix: string | null = null;
+/** 짐작이 연달아 빗나가면 한 시간 쉰다 — 선수마다 PBA 에 십여 번씩 묻지 않게(진단 ?why=1 은 늘 끝까지 본다) */
+let guessMiss = { n: 0, at: 0 };
+
+/** 스크립트·HTML 에서 ImgURL 앞에 붙는 문자열 — `"앞머리" + x.ImgURL` · `` `앞머리${x.ImgURL}` `` */
+export function prefixesFromCode(text: string): string[] {
+    const out = new Set<string>();
+    for (const m of text.matchAll(/["'`]([^"'`\s<>]{0,200})["'`]\s*\+\s*[\w$.\[\]'"]{0,80}ImgURL/g)) out.add(m[1]);
+    for (const m of text.matchAll(/`([^`$<>\s]{0,200})\$\{\s*[\w$.\[\]'"]{0,80}ImgURL/g)) out.add(m[1]);
+    return [...out].filter((x) => x && !/[<>]/.test(x)).slice(0, 5);
+}
+
+/** 앞머리 + 경로 → 절대 주소. 앞머리가 비었거나 이상하면 null */
+export function joinPrefix(prefix: string, raw: string, origin: string): string | null {
+    let path = raw.trim();
+    try { if (/^https?:\/\//i.test(path)) { const u = new URL(path); path = u.pathname + u.search; } } catch { return null; }
+    const p = prefix.replace(/\/+$/, "");
+    return safeImageUrl(`${p}/${path.replace(/^\/+/, "")}`, origin);
+}
+
+async function learnPrefixes(deps: PhotoDeps, trace: string[]): Promise<string[]> {
+    if (learned && Date.now() - learned.at < LEARN_TTL) { trace.push(`learned(cached) ${JSON.stringify(learned.prefixes)} ${learned.notes.join(" | ")}`); return learned.prefixes; }
+    const prefixes = new Set<string>();
+    const notes: string[] = [];
+    const scan = (label: string, text: string) => {
+        let i = text.indexOf("ImgURL"), n = 0;
+        while (i >= 0 && n < 3) { notes.push(`${label}: …${text.slice(Math.max(0, i - 90), i + 40).replace(/\s+/g, " ")}…`); i = text.indexOf("ImgURL", i + 6); n++; }
+        prefixesFromCode(text).forEach((x) => prefixes.add(x));
+    };
+    for (const page of LEARN_PAGES) {
+        try {
+            const r = await deps.fetchRaw(page, "text/html");
+            const html = r.ok ? await r.text() : "";
+            notes.push(`${page} ${r.status} len=${html.length}`);
+            if (!html) continue;
+            scan(page, html);
+            const srcs = [...html.matchAll(/<script[^>]+src=["']([^"']+)["']/gi)].map((m) => m[1])
+                .filter((src) => !/jquery|bootstrap|swiper|gtag|googletag|analytics|kakao|facebook|naver|slick|moment|lodash|polyfill/i.test(src))
+                .slice(0, 12);
+            notes.push(`scripts ${srcs.join(",")}`);
+            for (const src of srcs) {
+                try {
+                    const url = new URL(src, new URL(page, deps.origin));
+                    if (!/pbatour\.org$/i.test(url.hostname)) continue;
+                    const js = await deps.fetchRaw(url.toString(), "*/*");
+                    if (js.ok) scan(url.pathname, await js.text());
+                } catch { /* 스크립트 하나 실패는 넘어간다 */ }
+            }
+            if (prefixes.size) break;
+        } catch (e) {
+            notes.push(`${page} error ${(e as Error)?.message}`);
+        }
+    }
+    learned = { at: Date.now(), prefixes: [...prefixes], notes: notes.slice(0, 12) };
+    trace.push(`learned ${JSON.stringify(learned.prefixes)} ${learned.notes.join(" | ")}`);
+    return learned.prefixes;
+}
+
+/** 시험용 — 배운 앞머리·맞은 앞머리를 비운다 */
+export function resetPhotoLearning() { learned = null; goodPrefix = null; guessMiss = { n: 0, at: 0 }; }
+
+/**
+ * 사진 찾기 + 받기. 후보 주소를 차례로 받아 이미지가 나오면 그 바이트. trace 는 ?why=1 진단(공개 정보만).
+ */
+export async function findPbaPhoto(memCode: string, deps: PhotoDeps, trace: string[] = [], full = false): Promise<{ type: string; body: Buffer; url: string } | null> {
     const code = encodeURIComponent(memCode);
+    const tried = new Set<string>();
+    const attempt = async (url: string | null, prefix: string | null) => {
+        if (!url || tried.has(url) || tried.size >= 16) return null;
+        tried.add(url);
+        const photo = await fetchPhotoBytes(url, deps, trace).catch((e) => { trace.push(`img ${url} error ${(e as Error)?.message}`); return null; });
+        if (photo && prefix !== null) goodPrefix = prefix;
+        return photo ? { ...photo, url } : null;
+    };
+    let raws: string[] = [];
     try {
         const json = await deps.fetchJson(`/ko/player/search/ajax/detail?memCode=${code}`);
         const data = json?.data;
         trace.push(`json resultCode=${json?.resultCode} keys=${data && typeof data === "object" ? Object.keys(data).join(",") : typeof data}`);
-        // 실측(2026-09-27 ?why=1): data.ImgURL(작은 사진)·ImgURLBig(큰 사진) — 작은 것부터, 없으면 모양으로 찾는다
-        const url = safeImageUrl(data?.ImgURL, deps.origin) ?? safeImageUrl(data?.ImgURLBig, deps.origin) ?? safeImageUrl(imageFromJson(data), deps.origin);
-        if (url) { trace.push(`json → ${url}`); return url; }
+        raws = [data?.ImgURL, data?.ImgURLBig, imageFromJson(data)].filter((x, i, a): x is string => typeof x === "string" && !!x.trim() && a.indexOf(x) === i);
+        trace.push(`raw ${JSON.stringify(raws)} Resolution=${JSON.stringify(data?.Resolution ?? null)}`);
     } catch (e) {
         trace.push(`json error ${(e as Error)?.message}`);
+    }
+    if (raws.length) {
+        // 이미 맞은 앞머리가 있으면 그것부터
+        if (goodPrefix !== null) for (const raw of raws) { const r = await attempt(goodPrefix === "" ? safeImageUrl(raw, deps.origin) : joinPrefix(goodPrefix, raw, deps.origin), goodPrefix); if (r) return r; }
+        for (const raw of raws) { const r = await attempt(safeImageUrl(raw, deps.origin), ""); if (r) return r; }
+        const resting = !full && goodPrefix === null && guessMiss.n >= 3 && Date.now() - guessMiss.at < LEARN_TTL;
+        if (!resting) {
+            const learnedPrefixes = await learnPrefixes(deps, trace);
+            const raw = raws[0];
+            for (const p of [...learnedPrefixes, ...GUESS_PREFIXES]) { const r = await attempt(joinPrefix(p, raw, deps.origin), p); if (r) return r; }
+            guessMiss = { n: guessMiss.n + 1, at: Date.now() };
+        }
+        if (!full) return null; // JSON 에 사진 칸이 있는 선수 — 페이지 HTML 까지는 보지 않는다(진단만)
     }
     for (const path of PBA_PLAYER_PAGES(code)) {
         try {
@@ -107,7 +201,8 @@ export async function resolvePbaPhoto(memCode: string, deps: PhotoDeps, trace: s
             const html = r.ok ? await r.text() : "";
             const url = html ? safeImageUrl(imageFromHtml(html, memCode), new URL(path, deps.origin).toString()) : null;
             trace.push(`page ${path} ${r.status} len=${html.length} imgs=${(html.match(/<img\b/gi) ?? []).length} → ${url ?? "-"}`);
-            if (url) return url;
+            const got = await attempt(url, null);
+            if (got) return got;
         } catch (e) {
             trace.push(`page ${path} error ${(e as Error)?.message}`);
         }
@@ -134,10 +229,14 @@ export async function fetchPhotoBytes(url: string, deps: Pick<PhotoDeps, "fetchR
     for (const referer of [true, false]) {
         const r = await deps.fetchRaw(url, "image/avif,image/webp,image/*;q=0.8,*/*;q=0.5", referer);
         const ct = r.headers.get("content-type") ?? "";
-        if (!r.ok) { trace.push(`img referer=${referer} status=${r.status} type=${ct}`); continue; }
+        if (!r.ok) {
+            trace.push(`img ${url} referer=${referer} status=${r.status}`);
+            if (r.status === 401 || r.status === 403) continue; // 막힘 — Referer 없이 한 번 더
+            return null;
+        }
         const body = Buffer.from(await r.arrayBuffer());
         const type = sniffImage(body);
-        trace.push(`img referer=${referer} status=${r.status} type=${ct} len=${body.length} sniff=${type ?? "-"} head=${body.subarray(0, 8).toString("hex")}`);
+        trace.push(`img ${url} referer=${referer} status=${r.status} type=${ct} len=${body.length} sniff=${type ?? "-"} head=${body.subarray(0, 8).toString("hex")}`);
         if (type && body.length <= PHOTO_MAX_BYTES) return { type, body };
         if (!type) return null; // 받긴 했는데 이미지가 아니다 — Referer 탓이 아니니 다시 받지 않는다
     }
