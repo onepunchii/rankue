@@ -1,6 +1,6 @@
 // PBA 투어 데이터 수집 — pbatour.org 가 노출하는 비인증 JSON AJAX API 사용.
-// (robots.txt 차단 없음, 2026-08-07 실측. 사실 정보(순위·상금·전적)만 수집하고
-//  선수 사진·로고는 초상권/저작권 문제로 수집하지 않는다.)
+// (robots.txt 차단 없음, 2026-08-07 실측. 사실 정보(순위·상금·전적)만 수집한다.
+//  선수 사진은 2026-09-27 오너 결정으로 화면에 보이되 저장하지 않는다 — services/pbaPhoto.ts, 출처 'PBA' 표기.)
 //
 // 실측한 응답 형태:
 // - 랭킹: /ko/stats/ranking_prize/ajax/list?leagueCode=PBA1&pbaType=PBA&league=1&season=2025&tourCode=0
@@ -210,6 +210,23 @@ export async function fetchJson(path: string): Promise<any> {
     } as any);
     if (!res.ok) throw new Error(`PBA API ${res.status}: ${path}`);
     return res.json();
+}
+
+/**
+ * JSON 이 아닌 응답(선수 페이지 HTML·사진 바이트). pbatour.org 는 위 고정 체인으로, 다른 호스트(사진 CDN 등)는
+ * 기본 신뢰 저장소로 검증한다 — 고정 체인 Agent 는 GlobalSign 만 믿어서 다른 CA 의 호스트를 못 연다.
+ */
+export async function fetchPbaRaw(url: string, accept: string): Promise<Response> {
+    const u = new URL(url, ORIGIN);
+    const init: any = {
+        headers: { "User-Agent": UA, Accept: accept, Referer: `${ORIGIN}/` },
+        signal: AbortSignal.timeout(10_000),
+    };
+    if (u.hostname === "pbatour.org" || u.hostname.endsWith(".pbatour.org")) {
+        const { fetch: uFetch, dispatcher } = await getUndici();
+        return uFetch(u.toString(), { ...init, dispatcher } as any) as unknown as Response;
+    }
+    return fetch(u.toString(), init);
 }
 
 const num = (v: unknown): number | null => {

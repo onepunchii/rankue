@@ -131,10 +131,11 @@ export function CompareTable({ cols, rows }: { cols: TableCol[]; rows: { label: 
     );
 }
 
-/** 다음 목표 칸 — 값 + (남은 차이) 초록 */
+/** 다음 목표 칸 — 값 + (남은 차이) 초록. 차이가 0.01 미만이면 셋째 자리까지(둘째 자리로 자르면 "+0.00"이 된다) */
 export function NextCell({ value, gap }: { value: string; gap?: number | null }) {
-    return <>{value}{gap != null && gap > 0 && <span className="text-brand"> (+{gap.toFixed(2)})</span>}</>;
+    return <>{value}{gap != null && gap > 0 && <span className="text-brand"> (+{gapText(gap)})</span>}</>;
 }
+export const gapText = (gap: number) => (gap >= 0.01 ? gap.toFixed(2) : Math.max(0.001, Math.ceil(gap * 1000) / 1000).toFixed(3));
 
 export function CardActions({ primary, onPro, onShare, sharing }: {
     primary: { label: string; icon: ComponentType<{ className?: string }>; onClick: () => void };

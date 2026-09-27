@@ -16,7 +16,7 @@ import { shareImage } from "@/lib/shareImage";
 import { Swords } from "@/lib/icons";
 import { proRatio, type LookalikeResponse, type RealCompareResponse, type RealSide } from "@shared/proCompare";
 import { drawCompareCard } from "@/components/hiq/compare/compareCard";
-import { CardActions, CompareTable, GOLD_TEXT, NeedMore, NextCell, ProTwinHeader, fill, proName } from "@/components/hiq/compare/lookalikeUi";
+import { CardActions, CompareTable, GOLD_TEXT, NeedMore, NextCell, ProTwinHeader, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
 
 export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void }) {
     const { t, locale } = useT();
@@ -77,7 +77,7 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
                 meLabel: t("compare.me"), proLabel: other,
                 heroValue: ratio != null ? `${ratio}%` : d.members ? fill(t("compare.topPct"), { n: d.members.topPct }) : `${d.handi}`,
                 heroLabel: ratio != null ? fill(t("compare.ofPro"), { name: other }) : t("compare.amongMembers"),
-                sub: [fill(t("real.handiLine"), { n: d.handi ?? "-" }), next ? fill(t("real.nextLine"), { n: next.handi, gap: next.gap.toFixed(2) }) : ""].filter(Boolean).join(" · "),
+                sub: [fill(t("real.handiLine"), { n: d.handi ?? "-" }), next ? fill(t("real.nextLine"), { n: next.handi, gap: gapText(next.gap) }) : ""].filter(Boolean).join(" · "),
                 rows: [
                     { label: t("lookalike.rowAvg"), me: d.avg, pro: d.type === "3c" ? d.pro?.average ?? null : d.peers?.avg ?? null, fmt: (v) => v.toFixed(3) },
                     { label: t("lookalike.rowHighRun"), me: d.highRun, pro: d.type === "3c" ? d.pro?.highRun ?? null : d.peers?.highRun != null ? Math.round(d.peers.highRun) : null, fmt: (v) => String(v) },

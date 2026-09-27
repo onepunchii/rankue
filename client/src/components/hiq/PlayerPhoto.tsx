@@ -1,13 +1,14 @@
 /**
  * 선수 사진(2026-09-27 오너: "UMB·PBA 선수 사진 연동, 출처만 짧게") — PBA 공식 사진을 서버 라우트(/api/hiq/pba/photo/:memCode)가
- * 공식 주소로 돌려보내 그대로 보인다(우리 서버에 저장하지 않는다). 사진이 없거나 못 불러오면 원래 이니셜 동그라미가 남는다.
+ * 받아 대신 보낸다(저장하지 않는다 — PBA 인증서 문제로 앱이 직접 못 연다). 사진이 없거나 못 불러오면 원래 이니셜 동그라미가 남는다.
+ * v=2: 첫 배포(짐작한 칸 이름으로 전부 404)의 하루짜리 캐시를 건너뛴다.
  * 사진이 뜬 곳에는 부르는 쪽이 짧게 출처('사진 PBA')를 적는다 — photoShown 으로 알 수 있다.
  */
 import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { crewColors } from "@shared/crewBrand";
 
-export const pbaPhotoSrc = (memCode: string) => `/api/hiq/pba/photo/${encodeURIComponent(memCode)}`;
+export const pbaPhotoSrc = (memCode: string) => `/api/hiq/pba/photo/${encodeURIComponent(memCode)}?v=2`;
 
 export function PlayerPhoto({ memCode, name, size, className, textClass, onShown, children }: {
     /** PBA memCode — 없으면 이니셜만 */

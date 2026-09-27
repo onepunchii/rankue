@@ -62,40 +62,57 @@ router.get("/player/:memCode", asyncHandler(async (req: any, res: Response) => {
 }));
 
 /* ── 선수 사진(2026-09-27 오너: "사진 연동하고 출처만 짧게") ──
-   PBA 공식 선수 상세의 사진 주소로 **돌려보낸다**(302) — 우리 서버에 사진을 저장하지 않는다. 화면은 'PBA' 출처를 적는다.
-   주소는 프로세스 캐시(하루) + CDN 하루. 사진이 없거나 PBA 가 답하지 않으면 404 — 화면은 이니셜 동그라미로 돌아간다. */
+   PBA 공식 사진을 찾아(services/pbaPhoto.ts) **우리가 받아 대신 보낸다** — pbatour.org 의 인증서 체인 누락 때문에
+   앱(안드로이드 웹뷰)이 직접 열지 못한다. 파일로 저장하지 않는다(프로세스 캐시 + CDN 하루). 화면은 'PBA' 출처를 적는다.
+   없거나 PBA 가 답하지 않으면 404 — 화면은 이니셜 동그라미. 404 는 짧게만 캐시한다(PBA 가 돌아오면 곧 다시 뜨게).
+   ?why=1 은 어디서 무엇을 봤는지 보여 주는 진단(공개 정보만, 캐시 안 함). */
 const PHOTO_TTL = 24 * 60 * 60 * 1000;
-const photoCache = new Map<string, { at: number; url: string | null }>();
-export function pbaPhotoUrl(raw: unknown, origin: string): string | null {
-    if (typeof raw !== "string") return null;
-    const v = raw.trim();
-    if (!v) return null;
-    try {
-        const u = new URL(v, origin);
-        // 공식 응답에서 온 주소만 — https 만 받는다(열린 리다이렉트가 되지 않게 스킴을 좁힌다)
-        return u.protocol === "https:" || u.protocol === "http:" ? u.toString().replace(/^http:/, "https:") : null;
-    } catch { return null; }
+const PHOTO_MISS_TTL = 30 * 60 * 1000;
+const photoCache = new Map<string, { at: number; ttl: number; photo: { type: string; body: Buffer } | null }>();
+async function photoDeps() {
+    const { fetchJson, fetchPbaRaw, PBA_ORIGIN } = await import("../../services/pbaService.js");
+    return { fetchJson, fetchRaw: fetchPbaRaw, origin: PBA_ORIGIN };
 }
 router.get("/photo/:memCode", asyncHandler(async (req: any, res: Response) => {
     const code = String(req.params.memCode ?? "");
     if (!MEM_CODE_RE.test(code)) return res.status(404).end();
+    const { resolvePbaPhoto, fetchPhotoBytes } = await import("../../services/pbaPhoto.js");
+    if (req.query.why === "1") {
+        res.set("Cache-Control", "no-store");
+        res.set("CDN-Cache-Control", "no-store");
+        const trace: string[] = [];
+        const deps = await photoDeps();
+        const url = await resolvePbaPhoto(code, deps, trace);
+        let bytes: string = "-";
+        if (url) {
+            try { const p = await fetchPhotoBytes(url, deps); bytes = p ? `${p.type} ${p.body.length}B` : "not an image"; }
+            catch (e) { bytes = `error ${(e as Error)?.message}`; }
+        }
+        return res.json({ memCode: code, url, bytes, trace });
+    }
     let hit = photoCache.get(code);
-    if (!hit || Date.now() - hit.at > PHOTO_TTL) {
+    if (!hit || Date.now() - hit.at > hit.ttl) {
+        let photo: { type: string; body: Buffer } | null = null;
         try {
-            const { fetchJson, PBA_ORIGIN } = await import("../../services/pbaService.js");
-            const json = await fetchJson(`/ko/player/search/ajax/detail?memCode=${encodeURIComponent(code)}`);
-            hit = { at: Date.now(), url: json?.resultCode === "000" ? pbaPhotoUrl(json?.data?.ImgURL, PBA_ORIGIN) : null };
+            const deps = await photoDeps();
+            const url = await resolvePbaPhoto(code, deps);
+            photo = url ? await fetchPhotoBytes(url, deps) : null;
         } catch (e) {
             console.warn("[pba] photo 조회 실패:", (e as Error)?.message);
-            hit = { at: Date.now() - PHOTO_TTL + 10 * 60 * 1000, url: null }; // 실패는 10분만 기억
         }
-        if (photoCache.size > 2000) photoCache.clear();
+        hit = { at: Date.now(), ttl: photo ? PHOTO_TTL : PHOTO_MISS_TTL, photo };
+        if (photoCache.size > 300) photoCache.clear();
         photoCache.set(code, hit);
+    }
+    if (!hit.photo) {
+        res.set("Cache-Control", "public, max-age=600");
+        res.set("CDN-Cache-Control", "public, s-maxage=1800");
+        return res.status(404).end();
     }
     res.set("Cache-Control", "public, max-age=86400");
     res.set("CDN-Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
-    if (!hit.url) return res.status(404).end();
-    return res.redirect(302, hit.url);
+    res.set("X-Content-Type-Options", "nosniff");
+    return res.type(hit.photo.type).send(hit.photo.body);
 }));
 
 /* ── 팔로우·응원글(2026-09-27) — UMB·골프 선수와 같은 표(hiq_player_follows·hiq_player_cheers, category=pba, player_umb_id=memCode).
