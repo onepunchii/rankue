@@ -18,6 +18,7 @@ import { LucideX } from "@/lib/icons";
 import { ageFrom, regionName as regionNameOf, UMB_SOURCE_URL, type UmbCategory, type UmbPlayerDetail } from "./types";
 import { PlayerCheers } from "./PlayerCheers";
 import { ProCompareCard } from "@/components/hiq/compare/ProCompareCard";
+import { PlayerPhoto } from "@/components/hiq/PlayerPhoto";
 import { Chip, List, Section, Tile } from "./ui";
 
 /** 대회 수가 많으면 상위 몇 개만 펴 둔다 — 8개 넘게 늘어져 페이지가 길었다(2026-09-13 오너). */
@@ -122,6 +123,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
     const [showAllPoints, setShowAllPoints] = useState(false);
     const [showAllEvHist, setShowAllEvHist] = useState(false);
     const [followBusy, setFollowBusy] = useState(false);
+    const [photoShown, setPhotoShown] = useState(false);
     const { data, isLoading } = usePlayerDetail(category, playerUmbId);
     const detailKey = playerDetailKey(category, playerUmbId);
     const dateLocale = locale === "ko" ? "ko-KR" : locale;
@@ -223,16 +225,28 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
         <div className="flex flex-col gap-7 min-w-0 max-w-full overflow-hidden">
             {/* 헤더: 이름 · 부제 · [관심 선수] [성취 뱃지…]. 시트에서는 오른쪽 위 닫기 버튼 자리를 비운다 */}
             <div className={cn(!standalone && "pr-9")}>
-                <TitleTag className="text-[24px] font-bold text-ink-1 leading-tight flex items-center gap-2">
-                    <span className="text-[26px] leading-none">{flagEmoji(player.fed)}</span>
-                    {/* 한국어 화면 + 한글 이름 보유 시 한글 우선, 로마자는 부제로 병기 */}
-                    <span className="min-w-0 truncate">{locale === "ko" && player.nativeName ? player.nativeName : player.playerName}</span>
-                </TitleTag>
-                <DescTag className="text-[12.5px] font-medium text-black/50 mt-1">
-                    {locale === "ko" && player.nativeName ? `${player.playerName} · ` : player.nativeName ? `${player.nativeName} · ` : ""}
-                    {age !== null ? `${t("umb.age").replace("{n}", String(age))} · ` : ""}
-                    {t(`umb.cat${category === "players" ? "Players" : category === "ladies" ? "Ladies" : "Juniors"}`)}
-                </DescTag>
+                {/* 사진(2026-09-27) — PBA 와 이어진 선수만 PBA 공식 사진. 뜨면 아래에 짧게 출처 */}
+                <div className="flex items-center gap-3">
+                    {pba?.memCode && (
+                        <span className="shrink-0 flex flex-col items-center">
+                            <PlayerPhoto memCode={pba.memCode} name={locale === "ko" && player.nativeName ? player.nativeName : player.playerName} size={60}
+                                className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhotoShown(true)} />
+                            {photoShown && <span className="mt-1 text-[9.5px] font-medium text-ink-4">{t("lookalike.photoCredit")}</span>}
+                        </span>
+                    )}
+                    <div className="min-w-0 flex-1">
+                    <TitleTag className="text-[24px] font-bold text-ink-1 leading-tight flex items-center gap-2">
+                        <span className="text-[26px] leading-none">{flagEmoji(player.fed)}</span>
+                        {/* 한국어 화면 + 한글 이름 보유 시 한글 우선, 로마자는 부제로 병기 */}
+                        <span className="min-w-0 truncate">{locale === "ko" && player.nativeName ? player.nativeName : player.playerName}</span>
+                    </TitleTag>
+                    <DescTag className="text-[12.5px] font-medium text-black/50 mt-1">
+                        {locale === "ko" && player.nativeName ? `${player.playerName} · ` : player.nativeName ? `${player.nativeName} · ` : ""}
+                        {age !== null ? `${t("umb.age").replace("{n}", String(age))} · ` : ""}
+                        {t(`umb.cat${category === "players" ? "Players" : category === "ladies" ? "Ladies" : "Juniors"}`)}
+                    </DescTag>
+                    </div>
+                </div>
                 <div className="flex flex-wrap items-center gap-1.5 mt-3">
                     {/* 관심 선수(팔로우, 2026-09-13 오너). 순위 변동 알림이 여기 붙는다. 비로그인은 눌러도 안내만. */}
                     <button

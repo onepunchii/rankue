@@ -1677,6 +1677,7 @@ const vi: Dict = {
   "umb.pbaSeason": "Mùa {season}-{next} · thưởng #{r} · điểm #{p}",
   "umb.pbaOpen": "Trang cơ thủ {league} — theo mùa & danh hiệu",
   "lookalike.titleShort": "Trình online của tôi",
+  "lookalike.photoCredit": "Ảnh: PBA",
   "lookalike.funShort": "10 trận · cho vui",
   "lookalike.meDot": "Tôi",
   "lookalike.tierShort0": "Nghiệp dư",

@@ -15,13 +15,13 @@ import { ShareButton } from "@/components/hiq/ShareButton";
 import { PlayerCardShareButton } from "@/components/hiq/PlayerCardShareButton";
 import { PlayerCheers } from "@/components/hiq/umb/PlayerCheers";
 import { ProCompareCard } from "@/components/hiq/compare/ProCompareCard";
+import { PlayerPhoto } from "@/components/hiq/PlayerPhoto";
 import { Chip } from "@/components/hiq/umb/ui";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { pbaCardUrl } from "@/lib/playerCard";
 import { seasonLabel, formatPrize } from "./pba";
 import { PBA_INCOME_NOTE_KO, formatPrizeKo, pbaL10n, pbaLatestSeasonRank } from "@shared/pbaMeta";
 import { PBA_RECORDS_MIN_GAMES } from "@shared/pbaRecordsMeta";
-import { crewColors } from "@shared/crewBrand";
 import {
     pbaAge, pbaDisplayName, pbaGames, pbaPlayerFaq, pbaPlayerLdNodes, pbaPlayerSummary, pbaPrizeLabel, type PbaPlayerProfile,
 } from "@shared/pbaPlayerProfile";
@@ -57,7 +57,7 @@ const L: Record<Locale, Record<string, string>> = {
         colSeason: "시즌", colPrizeRank: "상금 순위", colPoint: "포인트", colPrize: "상금", more: "{n}시즌 더 보기", less: "접기",
         near: "비슷한 순위의 선수", nearMeta: "{s} {lg} 상금랭킹",
         umb: "UMB 세계랭킹", umbRank: "UMB 세계랭킹 {n}위", umbSub: "세계 무대 기록·순위 변화 보기",
-        faq: "자주 묻는 질문", updated: "기록 갱신 {d}", source: "출처: PBA 투어 공식 기록(pbatour.org)",
+        faq: "자주 묻는 질문", updated: "기록 갱신 {d}", source: "출처: PBA 투어 공식 기록·사진(pbatour.org)", photo: "사진 PBA",
     },
     en: {
         head: "PBA player", back: "PBA Rankings", notFound: "Player not found", age: "age {n}",
@@ -73,7 +73,7 @@ const L: Record<Locale, Record<string, string>> = {
         colSeason: "Season", colPrizeRank: "Prize rank", colPoint: "Points", colPrize: "Prize", more: "{n} more seasons", less: "Show less",
         near: "Players nearby", nearMeta: "{s} {lg} prize ranking",
         umb: "UMB World Ranking", umbRank: "UMB World No. {n}", umbSub: "World ranking history",
-        faq: "FAQ", updated: "Updated {d}", source: "Source: PBA Tour official records (pbatour.org)",
+        faq: "FAQ", updated: "Updated {d}", source: "Source: PBA Tour official records & photos (pbatour.org)", photo: "Photo: PBA",
     },
     vi: {
         head: "Cơ thủ PBA", back: "BXH PBA", notFound: "Không tìm thấy cơ thủ", age: "{n} tuổi",
@@ -89,7 +89,7 @@ const L: Record<Locale, Record<string, string>> = {
         colSeason: "Mùa", colPrizeRank: "Hạng thưởng", colPoint: "Điểm", colPrize: "Thưởng", more: "Thêm {n} mùa", less: "Thu gọn",
         near: "Cơ thủ cùng hạng", nearMeta: "BXH {lg} {s}",
         umb: "BXH thế giới UMB", umbRank: "Hạng {n} thế giới UMB", umbSub: "Lịch sử BXH thế giới",
-        faq: "Câu hỏi thường gặp", updated: "Cập nhật {d}", source: "Nguồn: PBA Tour (pbatour.org)",
+        faq: "Câu hỏi thường gặp", updated: "Cập nhật {d}", source: "Nguồn: PBA Tour (pbatour.org)", photo: "Ảnh: PBA",
     },
     tr: {
         head: "PBA oyuncusu", back: "PBA Sıralaması", notFound: "Oyuncu bulunamadı", age: "{n} yaş",
@@ -105,7 +105,7 @@ const L: Record<Locale, Record<string, string>> = {
         colSeason: "Sezon", colPrizeRank: "Ödül sırası", colPoint: "Puan", colPrize: "Ödül", more: "{n} sezon daha", less: "Daralt",
         near: "Yakın sıradakiler", nearMeta: "{s} {lg} ödül sıralaması",
         umb: "UMB Dünya Sıralaması", umbRank: "UMB Dünya {n}.", umbSub: "Dünya sıralaması geçmişi",
-        faq: "Sık sorulanlar", updated: "Güncelleme {d}", source: "Kaynak: PBA Tour (pbatour.org)",
+        faq: "Sık sorulanlar", updated: "Güncelleme {d}", source: "Kaynak: PBA Tour (pbatour.org)", photo: "Foto: PBA",
     },
     es: {
         head: "Jugador PBA", back: "Ranking PBA", notFound: "Jugador no encontrado", age: "{n} años",
@@ -121,7 +121,7 @@ const L: Record<Locale, Record<string, string>> = {
         colSeason: "Temporada", colPrizeRank: "Premios", colPoint: "Puntos", colPrize: "Premio", more: "{n} temporadas más", less: "Ver menos",
         near: "Jugadores cercanos", nearMeta: "Ranking {lg} {s}",
         umb: "Ranking Mundial UMB", umbRank: "UMB mundial {n}.º", umbSub: "Historial del ranking mundial",
-        faq: "Preguntas frecuentes", updated: "Actualizado {d}", source: "Fuente: PBA Tour (pbatour.org)",
+        faq: "Preguntas frecuentes", updated: "Actualizado {d}", source: "Fuente: PBA Tour (pbatour.org)", photo: "Foto: PBA",
     },
 };
 
@@ -172,6 +172,7 @@ export default function HiqPbaPlayer() {
     const qc = useQueryClient();
     const [metric, setMetric] = useState<Metric>("prizeRank");
     const [allSeasons, setAllSeasons] = useState(false);
+    const [photoShown, setPhotoShown] = useState(false);
 
     const { data: p, isLoading } = useQuery<PbaPlayerProfile>({
         // v2 — 응답에 extra 가 붙었다(2026-09-27). 쿼리 캐시가 localStorage 에 남아 옛 응답을 보이지 않게 키를 올린다.
@@ -268,10 +269,11 @@ export default function HiqPbaPlayer() {
                     {/* 머리 — 이름·배지·한 문장 요약(AI 검색이 인용하는 첫 문장)·팔로우·카드 */}
                     <Card className="pt-5">
                         <div className="flex items-center gap-3.5">
-                            <span className="relative shrink-0 w-[72px] h-[72px] rounded-full flex items-center justify-center text-white text-[30px] font-bold"
-                                style={{ background: `linear-gradient(135deg, ${crewColors(p.memCode)[0]}, ${crewColors(p.memCode)[1]})` }} aria-hidden="true">
-                                {name.trim().charAt(0)}
-                                {p.nationCode && <span className="absolute -right-0.5 -bottom-0.5 text-[20px] leading-none">{flagEmoji(p.nationCode)}</span>}
+                            <span className="shrink-0 flex flex-col items-center">
+                                <PlayerPhoto memCode={p.memCode} name={name} size={72} className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhotoShown(true)}>
+                                    {p.nationCode && <span className="absolute -right-0.5 -bottom-0.5 text-[20px] leading-none">{flagEmoji(p.nationCode)}</span>}
+                                </PlayerPhoto>
+                                {photoShown && <span className="mt-1 text-[9.5px] font-medium text-ink-4">{t.photo}</span>}
                             </span>
                             <div className="min-w-0 flex-1">
                                 <h1 className="text-[24px] font-bold tracking-tight leading-tight truncate">{name}</h1>
@@ -464,13 +466,12 @@ export default function HiqPbaPlayer() {
                             <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-4 px-4 pb-1">
                                 {x.neighbors.rows.map((r) => {
                                     const nm = lang === "ko" ? r.nameKo : (r.nameEn || r.nameKo);
-                                    const [c0, c1] = crewColors(r.memCode);
                                     return (
                                         <a key={r.memCode} href={`/pba-player/${encodeURIComponent(r.memCode)}`}
                                             onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0 }); setLocation(`/pba-player/${encodeURIComponent(r.memCode)}`); }}
                                             className="w-[84px] shrink-0 flex flex-col items-center text-center py-1 active:opacity-80">
                                             <span className="relative">
-                                                <span className="w-11 h-11 rounded-full flex items-center justify-center text-white text-[16px] font-bold" style={{ background: `linear-gradient(135deg, ${c0}, ${c1})` }}>{nm.trim().charAt(0)}</span>
+                                                <PlayerPhoto memCode={r.memCode} name={nm} size={44} />
                                                 <span className="absolute -left-1.5 -top-1 rk-num text-[10.5px] font-bold bg-surface-1 border border-surface-line rounded-full px-1.5">{r.prizeRank}</span>
                                             </span>
                                             <span className="mt-1.5 text-[12.5px] font-semibold w-full truncate">{nm}</span>

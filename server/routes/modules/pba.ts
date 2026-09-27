@@ -61,6 +61,43 @@ router.get("/player/:memCode", asyncHandler(async (req: any, res: Response) => {
     return sendSuccess(res, player);
 }));
 
+/* ── 선수 사진(2026-09-27 오너: "사진 연동하고 출처만 짧게") ──
+   PBA 공식 선수 상세의 사진 주소로 **돌려보낸다**(302) — 우리 서버에 사진을 저장하지 않는다. 화면은 'PBA' 출처를 적는다.
+   주소는 프로세스 캐시(하루) + CDN 하루. 사진이 없거나 PBA 가 답하지 않으면 404 — 화면은 이니셜 동그라미로 돌아간다. */
+const PHOTO_TTL = 24 * 60 * 60 * 1000;
+const photoCache = new Map<string, { at: number; url: string | null }>();
+export function pbaPhotoUrl(raw: unknown, origin: string): string | null {
+    if (typeof raw !== "string") return null;
+    const v = raw.trim();
+    if (!v) return null;
+    try {
+        const u = new URL(v, origin);
+        // 공식 응답에서 온 주소만 — https 만 받는다(열린 리다이렉트가 되지 않게 스킴을 좁힌다)
+        return u.protocol === "https:" || u.protocol === "http:" ? u.toString().replace(/^http:/, "https:") : null;
+    } catch { return null; }
+}
+router.get("/photo/:memCode", asyncHandler(async (req: any, res: Response) => {
+    const code = String(req.params.memCode ?? "");
+    if (!MEM_CODE_RE.test(code)) return res.status(404).end();
+    let hit = photoCache.get(code);
+    if (!hit || Date.now() - hit.at > PHOTO_TTL) {
+        try {
+            const { fetchJson, PBA_ORIGIN } = await import("../../services/pbaService.js");
+            const json = await fetchJson(`/ko/player/search/ajax/detail?memCode=${encodeURIComponent(code)}`);
+            hit = { at: Date.now(), url: json?.resultCode === "000" ? pbaPhotoUrl(json?.data?.ImgURL, PBA_ORIGIN) : null };
+        } catch (e) {
+            console.warn("[pba] photo 조회 실패:", (e as Error)?.message);
+            hit = { at: Date.now() - PHOTO_TTL + 10 * 60 * 1000, url: null }; // 실패는 10분만 기억
+        }
+        if (photoCache.size > 2000) photoCache.clear();
+        photoCache.set(code, hit);
+    }
+    res.set("Cache-Control", "public, max-age=86400");
+    res.set("CDN-Cache-Control", "public, s-maxage=86400, stale-while-revalidate=604800");
+    if (!hit.url) return res.status(404).end();
+    return res.redirect(302, hit.url);
+}));
+
 /* ── 팔로우·응원글(2026-09-27) — UMB·골프 선수와 같은 표(hiq_player_follows·hiq_player_cheers, category=pba, player_umb_id=memCode).
    보는 사람마다 다른 응답이라 캐시하지 않는다(위 router.use 의 공개 캐시를 덮어쓴다). 경로의 "pba" 는 화면 PlayerCheers 가
    `${basePath}/${category}/${id}/cheers` 로 부르기 때문이다. ── */

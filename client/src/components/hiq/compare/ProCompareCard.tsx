@@ -26,8 +26,8 @@ import {
     COMPARE_AVG_MAX, COMPARE_AVG_MIN, normalizeAvg, proRatio, reachMonths,
     type CompareAvgResponse, type CompareMeResponse, type ComparePro,
 } from "@shared/proCompare";
-import { crewColors } from "@shared/crewBrand";
 import { drawCompareCard } from "./compareCard";
+import { PlayerPhoto } from "@/components/hiq/PlayerPhoto";
 
 const STORE_KEY = "rankue-compare-avg";
 const DEFAULT_AVG = 0.8;
@@ -97,11 +97,10 @@ function VsRow({ label, me, pro, meLabel, proLabel, fmt }: { label: string; me: 
 function ProRow({ p, onOpen }: { p: ComparePro; onOpen: (memCode: string) => void }) {
     const { locale, t } = useT();
     const name = locale === "ko" ? p.nameKo : (p.nameEn || p.nameKo);
-    const [c0, c1] = crewColors(p.memCode);
     return (
         <a href={`/pba-player/${encodeURIComponent(p.memCode)}`} onClick={(e) => { e.preventDefault(); onOpen(p.memCode); }}
             className="flex items-center gap-2.5 min-h-12 py-1.5 active:opacity-80">
-            <span className="w-8 h-8 shrink-0 rounded-full text-white text-[13px] font-bold flex items-center justify-center" style={{ background: `linear-gradient(135deg, ${c0}, ${c1})` }}>{name.trim().charAt(0)}</span>
+            <PlayerPhoto memCode={p.memCode} name={name} size={32} />
             <span className="flex-1 min-w-0">
                 <span className="block text-[13.5px] font-semibold truncate">{name} <span className="text-[12px]">{flagEmoji(p.nationCode ?? "")}</span></span>
                 <span className="block text-[12px] text-ink-3 rk-num">{p.league} · {t("compare.avgShort")} {p.average.toFixed(3)}</span>

@@ -1677,6 +1677,7 @@ const tr: Dict = {
   "umb.pbaSeason": "{season}-{next} sezonu · ödül #{r} · puan #{p}",
   "umb.pbaOpen": "{league} oyuncu sayfası — sezonlar ve şampiyonluklar",
   "lookalike.titleShort": "Online seviyem",
+  "lookalike.photoCredit": "Foto: PBA",
   "lookalike.funShort": "Son 10 · eğlence",
   "lookalike.meDot": "Ben",
   "lookalike.tierShort0": "Amatör",

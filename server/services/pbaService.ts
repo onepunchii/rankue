@@ -12,6 +12,8 @@
 //   (통산 기준 검증: 김가영 Prize 9.72억 — 시즌 상금 합산과 부합)
 
 const ORIGIN = "https://www.pbatour.org";
+/** 선수 사진 주소가 상대 경로로 올 때의 기준(routes/pba.ts 의 사진 라우트) */
+export const PBA_ORIGIN = ORIGIN;
 const UA = "Mozilla/5.0 (compatible; RankueBot/1.0; +https://www.rankue.co.kr)";
 
 // pbatour.org 는 TLS 핸드셰이크에서 리프 인증서만 보내고 중간 CA 를 누락한다(서버 설정 오류).

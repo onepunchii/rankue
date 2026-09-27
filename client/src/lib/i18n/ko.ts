@@ -1679,6 +1679,7 @@ export const ko: Dict = {
   "umb.pbaSeason": "{season}-{next} 시즌 · 상금 {r}위 · 포인트 {p}위",
   "umb.pbaOpen": "{league} 선수 페이지 — 시즌별 기록·우승 보기",
   "lookalike.titleShort": "내 온라인 실력",
+  "lookalike.photoCredit": "사진 PBA",
   "lookalike.funShort": "최근 10판 · 재미로 보세요",
   "lookalike.meDot": "나",
   "lookalike.tierShort0": "아마추어",

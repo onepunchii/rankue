@@ -5,12 +5,12 @@
  *  - CardActions: 큰 버튼 하나 + 작은 버튼(프로·공유)
  * 온라인 카드(LookalikeProCard)와 실전 카드(RealHandicapCard)가 같이 쓴다.
  */
-import type { ComponentType, ReactNode } from "react";
+import { useState, type ComponentType, type ReactNode } from "react";
+import { PlayerPhoto } from "@/components/hiq/PlayerPhoto";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { flagEmoji } from "@/lib/flag";
 import { LucideChevronRight, LucideLoader2, LucideShare2, LucideUser } from "@/lib/icons";
-import { crewColors } from "@shared/crewBrand";
 import type { ComparePro } from "@shared/proCompare";
 
 export const GOLD_TEXT = "text-[#8a6a0a]";
@@ -71,15 +71,13 @@ export function TierLadder({ tier, pos }: { tier: number; pos: number }) {
 export function ProTwinHeader({ pro, tier, pos, extra, onOpen }: { pro: ComparePro; tier: number | null; pos: number | null; extra?: ReactNode; onOpen: () => void }) {
     const { t, locale } = useT();
     const name = proName(pro, locale);
-    const [c0, c1] = crewColors(pro.memCode);
+    const [photo, setPhoto] = useState(false);
     return (
         <div className="mt-3 rounded-tile bg-brand/[0.05] p-3">
             <a href={`/pba-player/${encodeURIComponent(pro.memCode)}`} onClick={(e) => { e.preventDefault(); onOpen(); }} className="flex items-center gap-3 active:opacity-80">
-                <span className="relative shrink-0">
-                    <span className="w-14 h-14 rounded-full text-white text-[22px] font-bold flex items-center justify-center ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]"
-                        style={{ background: `linear-gradient(135deg, ${c0}, ${c1})` }}>{name.trim().charAt(0)}</span>
+                <PlayerPhoto memCode={pro.memCode} name={name} size={56} className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhoto(true)}>
                     <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 h-4 rounded-full bg-surface-1 text-brand text-[9px] font-bold leading-4 shadow-sm whitespace-nowrap">{pro.league}</span>
-                </span>
+                </PlayerPhoto>
                 <span className="flex-1 min-w-0">
                     <span className="block text-[11.5px] font-semibold text-ink-3">{t("lookalike.twin")}</span>
                     <span className="flex items-center gap-1 min-w-0">
@@ -88,6 +86,8 @@ export function ProTwinHeader({ pro, tier, pos, extra, onOpen }: { pro: CompareP
                     </span>
                     <span className="block rk-num text-[12px] font-medium text-ink-3">
                         {t("compare.avgShort")} {pro.average.toFixed(2)}{pro.highRun ? ` · ${t("lookalike.rowHighRun")} ${pro.highRun}` : ""}
+                        {/* 사진 출처 — 사진이 떴을 때만, 짧게 */}
+                        {photo && <span className="text-ink-4"> · {t("lookalike.photoCredit")}</span>}
                     </span>
                 </span>
                 <LucideChevronRight className="w-4 h-4 text-ink-4 shrink-0" />

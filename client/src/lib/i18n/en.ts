@@ -1677,6 +1677,7 @@ const en: Dict = {
   "umb.pbaSeason": "{season}-{next} season · prize #{r} · points #{p}",
   "umb.pbaOpen": "{league} player page — seasons & titles",
   "lookalike.titleShort": "My online level",
+  "lookalike.photoCredit": "Photo: PBA",
   "lookalike.funShort": "Last 10 · just for fun",
   "lookalike.meDot": "Me",
   "lookalike.tierShort0": "Amateur",
