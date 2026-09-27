@@ -17,6 +17,7 @@ import { useT } from "@/lib/i18n";
 import { LucideX } from "@/lib/icons";
 import { ageFrom, regionName as regionNameOf, UMB_SOURCE_URL, type UmbCategory, type UmbPlayerDetail } from "./types";
 import { PlayerCheers } from "./PlayerCheers";
+import { ProCompareCard } from "@/components/hiq/compare/ProCompareCard";
 import { Chip, List, Section, Tile } from "./ui";
 
 /** 대회 수가 많으면 상위 몇 개만 펴 둔다 — 8개 넘게 늘어져 페이지가 길었다(2026-09-13 오너). */
@@ -288,6 +289,16 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                     </div>
                 )}
             </div>
+
+            {/* 나와 비교하기(2026-09-27 오너) — 검색으로 들어온 방문자가 먼저 넣어 보고 가입하게. PBA 기록이 있으면 에버리지로, 없으면 순위끼리 */}
+            <ProCompareCard
+                proName={locale === "ko" && player.nativeName ? player.nativeName : player.playerName}
+                proAvg={pba?.average ?? null}
+                proHighRun={pba?.highRun ?? null}
+                proWinRate={pba && pba.win != null && (pba.win + (pba.lose ?? 0) + (pba.draw ?? 0)) > 0 ? pba.win / (pba.win + (pba.lose ?? 0) + (pba.draw ?? 0)) : null}
+                excludeMemCode={pba?.memCode ?? null}
+                umbRank={player.rank}
+            />
 
             {/* 추이 차트 — 순위(기본)/포인트 토글 */}
             {chartData.length >= 2 && (

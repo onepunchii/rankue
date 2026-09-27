@@ -363,6 +363,7 @@ export const ko: Record<string, string> = {
   "err.umb.noBriefing": "브리핑이 없는 날짜입니다",
   "err.umb.countryNotFound": "국가를 찾을 수 없습니다",
   "err.pba.badLeague": "잘못된 리그입니다",
+  "err.compare.badAvg": "에버리지는 0.1~2.5 사이로 넣어 주세요",
   "err.pba.badSeason": "잘못된 시즌입니다",
   "notif.umb.rankEntry.title": "🌍 {name} 세계랭킹 진입",
   "notif.umb.rankEntry.body": "세계 {rank}위 · {points}점",

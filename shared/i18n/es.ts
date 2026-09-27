@@ -363,6 +363,7 @@ export const es: Record<string, string> = {
   "err.umb.noBriefing": "No hay resumen para esta fecha",
   "err.umb.countryNotFound": "País no encontrado",
   "err.pba.badLeague": "Liga no válida",
+  "err.compare.badAvg": "Introduce un promedio entre 0.1 y 2.5",
   "err.pba.badSeason": "Temporada no válida",
   "notif.umb.rankEntry.title": "🌍 {name} entra al ranking mundial",
   "notif.umb.rankEntry.body": "N.º {rank} mundial · {points} pts",

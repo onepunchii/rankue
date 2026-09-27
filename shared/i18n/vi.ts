@@ -363,6 +363,7 @@ export const vi: Record<string, string> = {
   "err.umb.noBriefing": "Không có bản tin cho ngày này",
   "err.umb.countryNotFound": "Không tìm thấy quốc gia",
   "err.pba.badLeague": "Giải đấu không hợp lệ",
+  "err.compare.badAvg": "Nhập average từ 0.1 đến 2.5",
   "err.pba.badSeason": "Mùa giải không hợp lệ",
   "notif.umb.rankEntry.title": "🌍 {name} lọt vào bảng xếp hạng thế giới",
   "notif.umb.rankEntry.body": "Hạng {rank} thế giới · {points} điểm",

@@ -1,0 +1,44 @@
+import { describe, it, expect } from "vitest";
+import { nearestPros, normalizeAvg, proRatio, rankAmong, reachMonths, type ComparePro } from "./proCompare";
+
+describe("나와 비교하기 — 순수 계산", () => {
+    it("입력 정리: 범위·숫자·소수 둘째 자리", () => {
+        expect(normalizeAvg("0.8123")).toBe(0.81);
+        expect(normalizeAvg(1.006)).toBe(1.01);
+        expect(normalizeAvg("abc")).toBeNull();
+        expect(normalizeAvg(0.05)).toBeNull();
+        expect(normalizeAvg(3)).toBeNull();
+        expect(normalizeAvg(null)).toBeNull();
+    });
+    it("순위·상위 %: 나보다 큰 값 수 + 1, 같은 값은 공동, 최소 1%", () => {
+        const d = [1.5, 1.2, 1.0, 1.0, 0.8, 0.6, 0.5, 0.4, 0.3, 0.2];
+        expect(rankAmong(d, 1.0)).toEqual({ rank: 3, total: 10, topPct: 30 });
+        expect(rankAmong(d, 2.0)).toEqual({ rank: 1, total: 10, topPct: 10 });
+        expect(rankAmong(d, 0.1)).toEqual({ rank: 11, total: 10, topPct: 100 });
+        expect(rankAmong([], 1)).toBeNull();
+        const big = Array.from({ length: 1000 }, (_, i) => 2 - i / 1000);
+        expect(rankAmong(big, 2.5)?.topPct).toBe(1);
+    });
+    it("프로 대비 %", () => {
+        expect(proRatio(0.812, 1.582)).toBe(51);
+        expect(proRatio(1, null)).toBeNull();
+        expect(proRatio(1, 0)).toBeNull();
+    });
+    it("예상 기간: 오르지 않거나 10년 넘으면 없음", () => {
+        expect(reachMonths(0.77, 0.041 / 3 * 3)).toBe(19);
+        expect(reachMonths(0.77, 0.001)).toBeNull();
+        expect(reachMonths(0.77, null)).toBeNull();
+        expect(reachMonths(-0.1, 0.05)).toBeNull();
+        expect(reachMonths(2, 0.01)).toBeNull(); // 200개월
+    });
+    it("비슷한 프로: 가까운 순, 이 선수는 뺀다", () => {
+        const pool: ComparePro[] = [
+            { memCode: "A", nameKo: "A", nameEn: null, league: "LPBA", nationCode: "KR", average: 0.82 },
+            { memCode: "B", nameKo: "B", nameEn: null, league: "LPBA", nationCode: "KR", average: 0.78 },
+            { memCode: "C", nameKo: "C", nameEn: null, league: "PBA", nationCode: "KR", average: 1.6 },
+            { memCode: "D", nameKo: "D", nameEn: null, league: "LPBA", nationCode: "KR", average: 0.8 },
+        ];
+        expect(nearestPros(pool, 0.8).map((p) => p.memCode)).toEqual(["D", "A"]);
+        expect(nearestPros(pool, 0.8, 2, "D").map((p) => p.memCode)).toEqual(["A", "B"]);
+    });
+});

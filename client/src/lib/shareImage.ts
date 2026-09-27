@@ -38,15 +38,21 @@ async function shareNative(blob: Blob, filename: string, title: string, text: st
     }
 }
 
-export async function shareImage(opts: { url: string; filename: string; title: string; text: string }): Promise<ShareImageOutcome> {
+/** url(서버가 그린 PNG) 또는 blob(화면이 캔버스로 그린 카드, 2026-09-27 "나 vs 선수") 중 하나 */
+export async function shareImage(opts: { url?: string; blob?: Blob; filename: string; title: string; text: string }): Promise<ShareImageOutcome> {
     const { url, filename, title, text } = opts;
     let blob: Blob;
-    try {
-        const res = await fetch(url, { credentials: "omit" });
-        if (!res.ok) return "failed";
-        blob = await res.blob();
-    } catch {
-        return "failed";
+    if (opts.blob) {
+        blob = opts.blob;
+    } else {
+        if (!url) return "failed";
+        try {
+            const res = await fetch(url, { credentials: "omit" });
+            if (!res.ok) return "failed";
+            blob = await res.blob();
+        } catch {
+            return "failed";
+        }
     }
 
     const native = await shareNative(blob, filename, title, text);

@@ -2,7 +2,7 @@ import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, LabelList } from "recharts";
-import { LucideChevronLeft, LucideChevronRight, LucideChevronDown, LucideGlobe, LucideTrophy, LucideHeart, LucideClock, LucideUser } from "@/lib/icons";
+import { LucideChevronLeft, LucideChevronRight, LucideChevronDown, LucideGlobe, LucideTrophy, LucideHeart, LucideClock } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { useT, type Locale } from "@/lib/i18n";
@@ -14,6 +14,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { ShareButton } from "@/components/hiq/ShareButton";
 import { PlayerCardShareButton } from "@/components/hiq/PlayerCardShareButton";
 import { PlayerCheers } from "@/components/hiq/umb/PlayerCheers";
+import { ProCompareCard } from "@/components/hiq/compare/ProCompareCard";
 import { Chip } from "@/components/hiq/umb/ui";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { pbaCardUrl } from "@/lib/playerCard";
@@ -236,7 +237,6 @@ export default function HiqPbaPlayer() {
     }));
     const seasonsDesc = [...(p?.seasons ?? [])].reverse();
     const shownSeasons = allSeasons ? seasonsDesc : seasonsDesc.slice(0, SEASON_FOLD);
-    const myAvg = member && Number((member as any).avg3c) > 0 ? Number((member as any).avg3c) : null;
     const rankUnit = (n: number) => (lang === "ko" ? `${n}위` : `${n}${t.rankUnit}`);
 
     return (
@@ -359,30 +359,11 @@ export default function HiqPbaPlayer() {
                         {lang === "ko" && <p className="text-[11.5px] text-ink-3 leading-relaxed mt-1.5">{PBA_INCOME_NOTE_KO}</p>}
                     </Card>
 
-                    {/* 나와 비교 — 내 3쿠션 에버리지와 선수 에버리지. 내 기록 화면으로 이어진다(머무는 장치) */}
-                    {p.average != null && (
-                        <button
-                            type="button"
-                            onClick={() => (member ? setLocation(myAvg ? "/history" : "/dashboard") : goLogin(setLocation))}
-                            className="rounded-card border-[1.5px] border-dashed border-surface-line-strong bg-surface-1 p-4 flex items-center gap-3 text-left active:opacity-80"
-                        >
-                            <span className="w-10 h-10 shrink-0 rounded-xl bg-brand/10 text-brand flex items-center justify-center"><LucideUser className="w-5 h-5" /></span>
-                            <span className="flex-1 min-w-0">
-                                <span className="block text-[14px] font-semibold">{t.compare}</span>
-                                <span className="block text-[12.5px] text-ink-3 mt-0.5 rk-num">
-                                    {!member ? t.compareLogin : !myAvg ? t.compareNoRecord
-                                        : myAvg >= p.average ? fill(t.compareAhead, { me: myAvg.toFixed(3) })
-                                            : fill(t.compareMine, { me: myAvg.toFixed(3), gap: `+${(p.average - myAvg).toFixed(3)}` })}
-                                </span>
-                                {myAvg && (
-                                    <span className="block mt-1.5 h-1.5 rounded-full bg-surface-line overflow-hidden">
-                                        <span className="block h-full rounded-full bg-[#F5B721]" style={{ width: `${Math.min(100, Math.round((myAvg / p.average) * 100))}%` }} />
-                                    </span>
-                                )}
-                            </span>
-                            <LucideChevronRight className="w-4 h-4 text-ink-4 shrink-0" />
-                        </button>
-                    )}
+                    {/* 나와 비교하기(2026-09-27) — 가입 전에는 넣어 보고, 회원은 내 기록으로. UMB 선수 페이지와 같은 부품 */}
+                    <ProCompareCard
+                        proName={name} proAvg={p.average} proHighRun={p.highRun} proWinRate={winRate}
+                        excludeMemCode={p.memCode} umbRank={x?.umbRank ?? null}
+                    />
 
                     {/* 우승 — 누르면 그 대회 페이지 */}
                     {x && x.wins.length > 0 && (

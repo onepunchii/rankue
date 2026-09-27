@@ -363,6 +363,7 @@ export const en: Record<string, string> = {
   "err.umb.noBriefing": "No briefing for this date",
   "err.umb.countryNotFound": "Country not found",
   "err.pba.badLeague": "Invalid league",
+  "err.compare.badAvg": "Enter an average between 0.1 and 2.5",
   "err.pba.badSeason": "Invalid season",
   "notif.umb.rankEntry.title": "🌍 {name} enters the world ranking",
   "notif.umb.rankEntry.body": "World No. {rank} · {points} pts",

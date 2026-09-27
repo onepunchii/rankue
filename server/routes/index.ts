@@ -18,6 +18,7 @@ import regionRouter from "./modules/region.js";
 import communityRouter from "./modules/community.js";
 import umbRouter from "./modules/umb.js";
 import pbaRouter from "./modules/pba.js";
+import compareRouter from "./modules/compare.js";
 import tournamentsRouter from "./modules/tournaments.js";
 import golfRankRouter from "./modules/golfRank.js";
 import golfCoursesRouter from "./modules/golfCourses.js";
@@ -91,6 +92,7 @@ router.use("/listings", listingsRouter);
 
 // 13. PBA 투어 (/pba) — 공개 읽기 전용
 router.use("/pba", pbaRouter);
+router.use("/compare", compareRouter);
 
 // 13-0. 당구 대회 (/tournaments) — 허브·PBA 시즌/대회·UMB 대회, 공개 읽기 전용(2026-09-24)
 router.use("/tournaments", tournamentsRouter);

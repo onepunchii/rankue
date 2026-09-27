@@ -363,6 +363,7 @@ export const tr: Record<string, string> = {
   "err.umb.noBriefing": "Bu tarih için özet yok",
   "err.umb.countryNotFound": "Ülke bulunamadı",
   "err.pba.badLeague": "Geçersiz lig",
+  "err.compare.badAvg": "0.1 ile 2.5 arasında bir ortalama girin",
   "err.pba.badSeason": "Geçersiz sezon",
   "notif.umb.rankEntry.title": "🌍 {name} dünya sıralamasına girdi",
   "notif.umb.rankEntry.body": "Dünya {rank}. · {points} puan",

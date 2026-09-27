@@ -1,8 +1,9 @@
 import { db } from "../db.js";
 import { pbaPlayers, pbaSeasonRanks, hiqPlayerFollows, umbRankings } from "../../shared/schema.js";
 import { and, desc, eq, sql } from "drizzle-orm";
-import { buildPbaRecords, pbaLeagueBench, pbaPlayerRecordRanks, type PbaCareerInput, type PbaLeague, type PbaRecordsReport } from "../../shared/pbaRecordsMeta.js";
+import { PBA_RECORDS_MIN_GAMES, buildPbaRecords, pbaLeagueBench, pbaPlayerRecordRanks, type PbaCareerInput, type PbaLeague, type PbaRecordsReport } from "../../shared/pbaRecordsMeta.js";
 import type { PbaPlayerExtra, PbaPlayerProfile } from "../../shared/pbaPlayerProfile.js";
+import type { ComparePro } from "../../shared/proCompare.js";
 import { hasTourPage, pbaTourPath, tourNameWithSeason } from "../../shared/tournamentMeta.js";
 import { tournamentsRepo } from "./tournaments.repo.js";
 
@@ -98,6 +99,14 @@ export class PbaRepository {
     async getPlayersForSitemap() {
         return db.select({ memCode: pbaPlayers.memCode, league: pbaPlayers.league, nameKo: pbaPlayers.nameKo })
             .from(pbaPlayers).orderBy(pbaPlayers.memCode);
+    }
+
+    /** "나와 비교하기"의 비슷한 프로 후보 — 통산 기록 순위와 같은 자격(통산 경기 수)·같은 표 */
+    async comparePros(): Promise<ComparePro[]> {
+        const { rows } = await this.careerRows();
+        return rows
+            .filter((r) => r.average != null && r.average > 0 && (r.win ?? 0) + (r.lose ?? 0) + (r.draw ?? 0) >= PBA_RECORDS_MIN_GAMES)
+            .map((r) => ({ memCode: r.memCode, nameKo: r.nameKo, nameEn: r.nameEn, league: r.league, nationCode: r.nationCode, average: r.average! }));
     }
 
     // 통산 기록 순위(/pba/records) — 선수 480명 남짓이라 통째로 읽어 shared/pbaRecordsMeta 의 한 함수로 순위를 매긴다
