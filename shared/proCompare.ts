@@ -84,3 +84,52 @@ export interface CompareMyStats {
     perMonth: number | null;
 }
 export interface CompareMeResponse { stats: CompareMyStats | null; members: CompareMembers | null; pros: ComparePro[] }
+
+/* ── 온라인게임 "닮은 프로"(2026-09-27, 홈 온라인게임 카드 아래) ── */
+
+/** 닮은 프로를 알려 주기 전 최소 온라인 3쿠션 대전 수 */
+export const LOOKALIKE_MIN_MATCHES = 3;
+
+/**
+ * 재미 등급 — 프로 에버리지 분포에서 내 자리. 0 아마추어 · 1 LPBA 신인급 · 2 LPBA 상위권 · 3 PBA 중위권 · 4 PBA 톱10급.
+ * 경계: LPBA 하위 25%·LPBA 중앙값·PBA 중앙값·PBA 10번째 선수. pos 는 전체 프로 중 나보다 낮은 비율(막대 위 점 자리, 2~98).
+ */
+export function proTier(pool: readonly ComparePro[], avg: number): { tier: 0 | 1 | 2 | 3 | 4; pos: number } | null {
+    const lp = pool.filter((p) => p.league === "LPBA").map((p) => p.average).sort((a, b) => a - b);
+    const pb = pool.filter((p) => p.league === "PBA").map((p) => p.average).sort((a, b) => a - b);
+    if (lp.length < 4 || pb.length < 10) return null;
+    const q = (arr: number[], f: number) => arr[Math.min(arr.length - 1, Math.max(0, Math.floor((arr.length - 1) * f)))];
+    const cuts = [q(lp, 0.25), q(lp, 0.5), q(pb, 0.5), pb[pb.length - 10]];
+    let tier = 0;
+    while (tier < cuts.length && avg >= cuts[tier]) tier++;
+    const all = pool.map((p) => p.average);
+    const below = all.filter((v) => v < avg).length;
+    const pos = Math.max(2, Math.min(98, Math.round((below / all.length) * 100)));
+    return { tier: tier as 0 | 1 | 2 | 3 | 4, pos };
+}
+
+/** 다음 목표 — 내 에버리지보다 높은 프로 가운데 가장 가까운 한 명(없으면 null: 모든 자격 프로보다 높다) */
+export function nextPro(pool: readonly ComparePro[], avg: number, exclude?: string | null): ComparePro | null {
+    let best: ComparePro | null = null;
+    for (const p of pool) {
+        if (p.memCode === exclude || !(p.average > avg)) continue;
+        if (!best || p.average < best.average || (p.average === best.average && p.memCode < best.memCode)) best = p;
+    }
+    return best;
+}
+
+/** GET /sim/lookalike — 로그인 회원의 온라인 3쿠션(최근 10판) 기준 */
+export interface LookalikeResponse {
+    needed: number;
+    /** 최근(최대 10판) 끝난 온라인 3쿠션 대전 수 */
+    matches: number;
+    ready: boolean;
+    avg: number | null;
+    highRun: number | null;
+    /** 온라인 핸디(다마수, 3쿠션) */
+    target: number | null;
+    pro: ComparePro | null;
+    next: ComparePro | null;
+    tier: 0 | 1 | 2 | 3 | 4 | null;
+    pos: number | null;
+}

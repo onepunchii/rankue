@@ -5,6 +5,7 @@ import { useLocation } from "wouter";
 import { useState } from "react";
 import { useT } from "@/lib/i18n";
 import { OnlineGameCard } from "./OnlineGameCard";
+import { LookalikeProCard } from "./LookalikeProCard";
 
 interface QuickActionsProps {
     onStartGame: (mode: "practice" | "match") => void;
@@ -123,6 +124,9 @@ export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => 
 
                 {/* 온라인게임 (가로 2칸) — 타일 + 지금 열린 멀티방(2026-09-21 오너). 장면·방 목록은 OnlineGameCard 안에 있다. */}
                 <OnlineGameCard />
+
+                {/* 내 온라인 실력, 닮은 프로는?(2026-09-27) — 온라인게임 바로 아래, 가로 2칸. 로그인 전·로딩 중에는 자리를 안 차지한다 */}
+                <LookalikeProCard />
 
                 {/* 매장 찾기 (1x1) */}
                 <motion.button

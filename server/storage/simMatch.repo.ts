@@ -212,7 +212,8 @@ export class SimMatchRepository {
         return out;
     }
 
-    async recentMatchRecord(memberId: string, gameType: "3c" | "4c", limit: number): Promise<{ score: number; innings: number; matches: number }> {
+    /** highRun: 그 판들 가운데 내 최고 하이런(캐롬) — "닮은 프로" 카드가 쓴다(2026-09-27). 핸디 계산은 score·innings 만 본다. */
+    async recentMatchRecord(memberId: string, gameType: "3c" | "4c", limit: number): Promise<{ score: number; innings: number; matches: number; highRun: number }> {
         const rows = await db.select({ hostId: hiqSimMatches.hostId, state: hiqSimMatches.state })
             .from(hiqSimMatches)
             .where(and(
@@ -224,16 +225,17 @@ export class SimMatchRepository {
             .orderBy(desc(hiqSimMatches.finishedAt))
             .limit(Math.max(1, limit));
 
-        let score = 0, innings = 0, matches = 0;
+        let score = 0, innings = 0, matches = 0, highRun = 0;
         for (const r of rows) {
-            const players = (r.state as { players?: { score?: number; innings?: number }[] } | null)?.players;
+            const players = (r.state as { players?: { score?: number; innings?: number; highRun?: number }[] } | null)?.players;
             const me = players?.[r.hostId === memberId ? 0 : 1];
             if (!me) continue;
             score += me.score ?? 0;
             innings += me.innings ?? 0;
             matches += 1;
+            highRun = Math.max(highRun, Number(me.highRun) || 0);
         }
-        return { score, innings, matches };
+        return { score, innings, matches, highRun };
     }
 
     /**

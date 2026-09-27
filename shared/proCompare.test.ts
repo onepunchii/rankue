@@ -42,3 +42,30 @@ describe("나와 비교하기 — 순수 계산", () => {
         expect(nearestPros(pool, 0.8, 2, "D").map((p) => p.memCode)).toEqual(["A", "B"]);
     });
 });
+
+import { nextPro, proTier } from "./proCompare";
+describe("온라인 닮은 프로 — 재미 등급·다음 목표", () => {
+    const mk = (i: number, league: "PBA" | "LPBA", average: number): ComparePro => ({ memCode: `${league}${i}`, nameKo: `${league}${i}`, nameEn: null, league, nationCode: "KR", average });
+    // LPBA 0.60~0.95(8명), PBA 1.00~1.95(20명)
+    const pool = [
+        ...Array.from({ length: 8 }, (_, i) => mk(i, "LPBA", 0.6 + i * 0.05)),
+        ...Array.from({ length: 20 }, (_, i) => mk(i, "PBA", 1.0 + i * 0.05)),
+    ];
+    it("경계: LPBA 하위 25%·중앙값·PBA 중앙값·PBA 10번째", () => {
+        expect(proTier(pool, 0.3)?.tier).toBe(0);
+        expect(proTier(pool, 0.7)?.tier).toBe(1);   // LPBA q25=0.65 이상, 중앙값 0.75 미만
+        expect(proTier(pool, 0.9)?.tier).toBe(2);
+        expect(proTier(pool, 1.47)?.tier).toBe(3);  // PBA 중앙값 1.45 이상, 10번째(1.50) 미만
+        expect(proTier(pool, 1.9)?.tier).toBe(4);
+        expect(proTier(pool, 0.3)?.pos).toBe(2);
+        expect(proTier(pool, 5)?.pos).toBe(98);
+    });
+    it("표본이 모자라면 등급 없음", () => {
+        expect(proTier(pool.slice(0, 5), 1)).toBeNull();
+    });
+    it("다음 목표: 나보다 높은 가장 가까운 프로, 없으면 null", () => {
+        expect(nextPro(pool, 0.62)?.average).toBeCloseTo(0.65);
+        expect(nextPro(pool, 0.62, "LPBA1")?.average).toBeCloseTo(0.7);
+        expect(nextPro(pool, 3)).toBeNull();
+    });
+});

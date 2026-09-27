@@ -31,6 +31,7 @@ import {
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
 import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCHES, TARGET_INNINGS, targetFor } from "../../../shared/sim/handicap.js";
 import { countWatchers } from "../../../shared/sim/watchers.js";
+import { LOOKALIKE_MIN_MATCHES, nearestPros, nextPro, proTier, type LookalikeResponse } from "../../../shared/proCompare.js";
 import type { MatchWithNames } from "../../storage/simMatch.repo.js";
 import { startTurnSeenAt } from "../../storage/simMatch.repo.js";
 
@@ -474,6 +475,39 @@ router.get("/sim/handicap", requireAuth, asyncHandler(async (req: AuthRequest, r
         };
     }));
     return sendSuccess(res, { minInnings: MIN_INNINGS, innings: TARGET_INNINGS, boards: out });
+}));
+
+/**
+ * GET /sim/lookalike — 홈 온라인게임 카드 아래 "내 온라인 실력, 닮은 프로는?"(2026-09-27 오너 승인 시안).
+ * **온라인 3쿠션 대전 기록만**(최근 RECENT_MATCHES 판) — 핸디 계산과 같은 에버리지·같은 표. 실전 성적은 읽지 않는다(sim.guard.test).
+ * 프로 쪽은 PBA 공개 통산 기록(통산 기록 순위와 같은 자격). 온라인 물리와 실제 테이블은 달라 화면은 '재미로'라고 적는다.
+ * 사람마다 다른 응답이라 캐시하지 않는다.
+ */
+router.get("/sim/lookalike", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    res.set("Cache-Control", "private, no-store");
+    const pointUnit = pointUnitOf(DEFAULT_3C_RULES);
+    const { avg, record } = await simAverage(req.userId!, "3c", pointUnit);
+    const rec = record as { score: number; innings: number; matches: number; highRun?: number };
+    const ready = rec.matches >= LOOKALIKE_MIN_MATCHES && hasEnoughRecord(rec);
+    const base: LookalikeResponse = {
+        needed: LOOKALIKE_MIN_MATCHES, matches: rec.matches, ready,
+        avg: null, highRun: null, target: null, pro: null, next: null, tier: null, pos: null,
+    };
+    if (!ready) return sendSuccess(res, base);
+    const pool = await storage.pba.comparePros();
+    const [pro] = nearestPros(pool, avg, 1);
+    const tier = proTier(pool, avg);
+    const body: LookalikeResponse = {
+        ...base,
+        avg: Math.round(avg * 1000) / 1000,
+        highRun: rec.highRun && rec.highRun > 0 ? rec.highRun : null,
+        target: targetFor(avg, "3c", pointUnit),
+        pro: pro ?? null,
+        next: nextPro(pool, avg, pro?.memCode ?? null),
+        tier: tier?.tier ?? null,
+        pos: tier?.pos ?? null,
+    };
+    return sendSuccess(res, body);
 }));
 
 /**
