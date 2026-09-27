@@ -305,6 +305,7 @@ export const es: Record<string, string> = {
   "err.game.consentExpired": "La confirmación de tu oponente expiró. Vuelve a unirte con un PIN nuevo.",
   "err.game.seatTaken": "Tu oponente ya inició esta partida. Actualiza el cuadro.",
   "err.game.notParticipant": "No eres participante de esta partida",
+  "err.game.hostOnly": "Solo el anfitrión de la partida puede usar el marcador",
   "err.game.finishedNoDelete": "No se puede eliminar una partida terminada",
   "err.game.finishedNoEdit": "No se puede modificar una partida terminada",
   "err.game.invalidScore": "El puntaje no es válido",
@@ -458,7 +459,7 @@ export const es: Record<string, string> = {
   "notif.chat.card.body.CREW_POLL": "🗳 {title} — vota en la sala",
   "notif.chat.card.body.CREW_NOTICE": "📢 {title}",
   "notif.game.started.title": "🎱 La partida empezó",
-  "notif.game.started.body": "{host} inició la partida. Abre el marcador.",
+  "notif.game.started.body": "{host} inició la partida. Sigue el marcador en vivo.",
   "err.chat.leaveNotAllowed": "No puedes salir de este chat desde aquí",
   // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
   "err.crew.badCursor": "Posición de lista no válida. Actualiza la página",

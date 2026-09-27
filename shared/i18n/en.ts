@@ -305,6 +305,7 @@ export const en: Record<string, string> = {
   "err.game.consentExpired": "Your opponent's join confirmation has expired. Please join again with a new PIN.",
   "err.game.seatTaken": "Your opponent already started this match. Please refresh the bracket.",
   "err.game.notParticipant": "You're not a participant in this match",
+  "err.game.hostOnly": "Only the match host can operate the scoreboard",
   "err.game.finishedNoDelete": "A finished match can't be deleted",
   "err.game.finishedNoEdit": "A finished match can't be edited",
   "err.game.invalidScore": "Invalid score value",
@@ -458,7 +459,7 @@ export const en: Record<string, string> = {
   "notif.chat.card.body.CREW_POLL": "🗳 {title} — vote in the room",
   "notif.chat.card.body.CREW_NOTICE": "📢 {title}",
   "notif.game.started.title": "🎱 Match started",
-  "notif.game.started.body": "{host} started the match. Open the scoreboard.",
+  "notif.game.started.body": "{host} started the match. Watch the live score.",
   "err.chat.leaveNotAllowed": "You can't leave this chat from here",
   // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
   "err.crew.badCursor": "Invalid list position. Please refresh",

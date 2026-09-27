@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useT } from "@/lib/i18n";
+import { useAuth } from "@/hooks/useAuth";
 import { LucidePlay } from "@/lib/icons";
 import type { HiqGame } from "@shared/schema";
 
@@ -13,6 +14,7 @@ import type { HiqGame } from "@shared/schema";
 export function OngoingGameBanner() {
     const { t } = useT();
     const [, setLocation] = useLocation();
+    const { member } = useAuth();
     const { data: game } = useQuery<HiqGame | null>({
         queryKey: ["/api/hiq/game/ongoing/mine"],
         staleTime: 30_000,
@@ -20,6 +22,8 @@ export function OngoingGameBanner() {
 
     if (!game) return null;
 
+    // 점수판은 호스트(player1)만 조작한다 — 참가자에겐 '경기 보기'(관전)로 보인다(2026-09-27 오너)
+    const watching = !!member && game.gameType !== "golf" && game.player1Id !== member.id;
     const names = [game.player1Name, game.player2Name, game.player3Name, game.player4Name]
         .filter(Boolean).join(" vs ");
 
@@ -38,7 +42,7 @@ export function OngoingGameBanner() {
                 </span>
             </span>
             <span className="text-[12px] font-semibold shrink-0 bg-white/20 rounded-pill px-2.5 py-1">
-                {t("dashboard.resumeCta")}
+                {watching ? t("dashboard.watchGame") : t("dashboard.resumeCta")}
             </span>
         </button>
     );

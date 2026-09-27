@@ -305,6 +305,7 @@ export const vi: Record<string, string> = {
   "err.game.consentExpired": "Xác nhận tham gia của đối thủ đã hết hạn. Hãy tham gia lại bằng mã PIN mới.",
   "err.game.seatTaken": "Đối thủ đã bắt đầu trận này. Hãy làm mới bảng đấu.",
   "err.game.notParticipant": "Bạn không phải người tham gia trận này",
+  "err.game.hostOnly": "Chỉ người tạo trận mới điều khiển được bảng điểm",
   "err.game.finishedNoDelete": "Không thể xóa trận đã kết thúc",
   "err.game.finishedNoEdit": "Không thể sửa trận đã kết thúc",
   "err.game.invalidScore": "Giá trị điểm không hợp lệ",
@@ -458,7 +459,7 @@ export const vi: Record<string, string> = {
   "notif.chat.card.body.CREW_POLL": "🗳 {title} — bình chọn trong phòng",
   "notif.chat.card.body.CREW_NOTICE": "📢 {title}",
   "notif.game.started.title": "🎱 Trận đấu đã bắt đầu",
-  "notif.game.started.body": "{host} đã bắt đầu trận đấu. Mở bảng điểm.",
+  "notif.game.started.body": "{host} đã bắt đầu trận. Xem điểm trực tiếp.",
   "err.chat.leaveNotAllowed": "Không thể rời phòng này từ đây",
   // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
   "err.crew.badCursor": "Vị trí danh sách không hợp lệ. Vui lòng tải lại",

@@ -25,6 +25,7 @@ export const GameController = ((Ph as any).GameController ?? F) as Ph.Icon;
 export const Crosshair = ((Ph as any).Crosshair ?? F) as Ph.Icon;
 export const Delete = ((Ph as any).Backspace ?? F) as Ph.Icon;
 export const Dot = ((Ph as any).Circle ?? F) as Ph.Icon;
+export const Eye = ((Ph as any).Eye ?? F) as Ph.Icon;
 export const Flag = ((Ph as any).Flag ?? F) as Ph.Icon;
 export const Flame = ((Ph as any).Fire ?? F) as Ph.Icon;
 export const GripVertical = ((Ph as any).DotsSixVertical ?? F) as Ph.Icon;

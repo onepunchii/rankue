@@ -243,12 +243,24 @@ const assertParticipant = async (gameId: string, userId: string, res: any) => {
     return g;
 };
 
+// 점수 저장·종료·버리기는 **호스트(경기를 만든 사람 = player1, /game/start 가 세션으로 고정)만**(2026-09-27 오너).
+// 예전엔 참가자 누구나 됐다 — '경기 시작' 푸시로 점수판에 들어온 상대가 점수를 누르거나, 화면을 열기만 해도
+// 처음 불러온 점수를 다시 저장해 호스트가 그사이 넣은 점수를 덮었고, '나가기'로 호스트의 경기를 지웠다.
+// 참가자 화면은 관전(읽기 전용)이다 — client pages/hiq/game/[id].tsx.
+const assertHost = async (gameId: string, userId: string, res: any) => {
+    const g = await assertParticipant(gameId, userId, res);
+    if (!g) return null;
+    // 골프 라운드는 같은 라우트를 쓰지만 이번 결정의 대상이 아니다(당구 매칭 대결) — 기존대로 참가자면 된다.
+    if (g.gameType !== "golf" && g.player1Id !== userId) { sendError(res, 403, "err.game.hostOnly", "HOST_ONLY"); return null; }
+    return g;
+};
+
 // DELETE /game/:id — 진행 중인 경기를 버린다(기록·RP 없음).
 // 유저 건의(2026-09-03): 잘못 시작한 경기가 "진행 중"으로 영원히 남아 배너가 계속 떴고,
 // 없애려면 억지로 점수를 채워 FINISH 를 누르는 수밖에 없어 그게 랭킹 기록으로 남았다.
 // 점수판의 나가기가 이 라우트를 부른다(오너 결정: 나가기 = 그 경기 없애기).
 router.delete("/game/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const game = await assertParticipant(req.params.id, req.userId!, res);
+    const game = await assertHost(req.params.id, req.userId!, res);
     if (!game) return;
     if (game.status === "finished") return sendError(res, 409, "err.game.finishedNoDelete");
     // 대진 경기였다면 그 칸을 다시 연다 — 승수는 유지, 이번 판만 없던 일로.
@@ -259,7 +271,7 @@ router.delete("/game/:id", requireAuth, asyncHandler(async (req: AuthRequest, re
 
 // PATCH /game/:id/score
 router.patch("/game/:id/score", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const game = await assertParticipant(req.params.id, req.userId!, res);
+    const game = await assertHost(req.params.id, req.userId!, res);
     if (!game) return;
 
     // 종료된 경기는 되돌릴 수 없다. 이 라우트가 finished 경기에 status:'playing_base'를 써넣을 수
@@ -301,7 +313,7 @@ const FINISH_EDITABLE = [
 
 // POST /game/:id/finish
 router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const before = await assertParticipant(req.params.id, req.userId!, res);
+    const before = await assertHost(req.params.id, req.userId!, res);
     if (!before) return;
 
     // finishHiqGame은 이미 종료된 경기에 대해 fast-path로 기존 행을 그대로 돌려준다(멱등).

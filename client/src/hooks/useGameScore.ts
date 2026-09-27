@@ -9,6 +9,7 @@ import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { arrayMove } from '@dnd-kit/sortable';
 import { GameState } from "@/types/game";
+import { useAuth } from "@/hooks/useAuth";
 
 // 경기 종료는 handleTurnChange 를 거치지 않고 곧장 finish 로 가기 때문에,
 // 진행 중이던 턴의 run 이 어떤 이닝 배열에도 들어가지 않아 '이닝 합계 ≠ 총점'이 됐다.
@@ -26,6 +27,76 @@ function finalizeInnings(state: GameState) {
     arrays[turn - 1].push(run);
 
     return { p1: arrays[0], p2: arrays[1], p3: arrays[2], p4: arrays[3] };
+}
+
+/**
+ * 서버 경기 행 → 점수판 상태. 호스트는 새로고침 때 한 번 되살리는 데, 참가자 관전 화면은 3초마다 새로 받은 행을
+ * 그리는 데 같이 쓴다(2026-09-27 오너: 점수판은 호스트만, 참가자는 관전).
+ */
+export function gameStateFromRow(game: HiqGame): GameState {
+    const rawP1Innings = game.player1Innings as number[] | null | undefined;
+    const rawP2Innings = game.player2Innings as number[] | null | undefined;
+    const rawP3Innings = game.player3Innings as number[] | null | undefined;
+    const rawP4Innings = game.player4Innings as number[] | null | undefined;
+
+    const p1Innings = rawP1Innings ?? [];
+    const p2Innings = rawP2Innings ?? [];
+    const p3Innings = rawP3Innings ?? [];
+    const p4Innings = rawP4Innings ?? [];
+
+    // 진행 중이던 이닝 점수(run)까지 되살린다. run 을 0으로 두면 다음 턴 전환에서
+    // 0이 기록돼 '이닝 합계 ≠ 총점'이 되고 하이런도 어긋난다.
+    // 아직 배열에 확정되지 않은 몫 = 총점 - 확정된 이닝 합계.
+    const deriveRun = (score: number, innings: number[] | null | undefined) => {
+        if (!innings) return 0; // 이닝 기록 자체가 없으면 역산할 근거가 없다
+        const confirmed = innings.reduce((sum, v) => sum + v, 0);
+        return Math.max(0, score - confirmed);
+    };
+
+    // Derive whose turn it is: among active players, the one with the
+    // shortest inning-history array is currently up (fallback: player 1).
+    const activeCount = 1
+        + ((game.player2Id || game.player2Name) ? 1 : 0)
+        + ((game.player3Id || game.player3Name) ? 1 : 0)
+        + ((game.player4Id || game.player4Name) ? 1 : 0);
+    const inningArrays = [p1Innings, p2Innings, p3Innings, p4Innings];
+    let derivedTurn = 1;
+    let minLen = Infinity;
+    for (let i = 0; i < activeCount; i++) {
+        if (inningArrays[i].length < minLen) {
+            minLen = inningArrays[i].length;
+            derivedTurn = i + 1;
+        }
+    }
+
+    return {
+        p1Score: game.player1Score ?? 0,
+        p2Score: game.player2Score ?? 0,
+        p3Score: game.player3Score ?? 0,
+        p4Score: game.player4Score ?? 0,
+        innings: Math.max(1, game.totalInnings ?? 0),
+        p1FinishScore: Number((game as any).finishProgress?.["1"] ?? 0),
+        p2FinishScore: Number((game as any).finishProgress?.["2"] ?? 0),
+        p3FinishScore: Number((game as any).finishProgress?.["3"] ?? 0),
+        p4FinishScore: Number((game as any).finishProgress?.["4"] ?? 0),
+        p1FinishInnings: 0,
+        p2FinishInnings: 0,
+        p3FinishInnings: 0,
+        p4FinishInnings: 0,
+        p1Run: deriveRun(game.player1Score ?? 0, rawP1Innings),
+        p2Run: deriveRun(game.player2Score ?? 0, rawP2Innings),
+        p3Run: deriveRun(game.player3Score ?? 0, rawP3Innings),
+        p4Run: deriveRun(game.player4Score ?? 0, rawP4Innings),
+        p1HighRun: game.player1HighRun ?? 0,
+        p2HighRun: game.player2HighRun ?? 0,
+        p3HighRun: game.player3HighRun ?? 0,
+        p4HighRun: game.player4HighRun ?? 0,
+        currentTurn: derivedTurn as 1 | 2 | 3 | 4,
+        p1Innings,
+        p2Innings,
+        p3Innings,
+        p4Innings
+    };
 }
 
 export function useGameScore(id: string) {
@@ -69,9 +140,22 @@ export function useGameScore(id: string) {
     const hydratedRef = useRef(false);
 
     // Queries
-    const { data: game, isLoading } = useQuery<HiqGame>({
+    // 점수판은 호스트(player1 — 서버가 경기를 만든 사람으로 고정)만 조작한다. 참가자(푸시·이어하기·대진으로 들어온 상대)는
+    // 관전 — 저장하지 않고 3초마다 서버 행을 새로 받아 그린다. 서버도 점수·종료·버리기를 호스트만 받는다(routes/game.ts assertHost).
+    // 골프는 이번 결정의 대상이 아니다(같은 행을 쓰지만 점수판이 따로다).
+    const { member } = useAuth();
+    const memberId = member?.id ?? null;
+    const isSpectator = (g: HiqGame | undefined | null) => !!g && g.gameType !== "golf" && !!memberId && g.player1Id !== memberId;
+    const { data: game, isLoading, error } = useQuery<HiqGame>({
         queryKey: [`/api/hiq/game/${id}`],
+        refetchInterval: (q) => (isSpectator(q.state.data) && q.state.data?.status !== "finished" ? 3000 : false),
+        refetchIntervalInBackground: false,
+        retry: (n, e: any) => !(e instanceof ApiError && e.status === 404) && n < 2,
     });
+    const spectating = isSpectator(game);
+    /** 저장해도 되는 사람 — 호스트로 확인된 뒤에만(회원 정보가 늦게 와도 참가자가 한 번 저장하는 일이 없게) */
+    const canSaveRef = useRef(false);
+    canSaveRef.current = !!game && !!memberId && (game.gameType === "golf" || game.player1Id === memberId);
 
     const { data: player1 } = useQuery<HiqMember>({
         queryKey: [`/api/hiq/members/${game?.player1Id}`],
@@ -204,69 +288,7 @@ export function useGameScore(id: string) {
     useEffect(() => {
         if (hydratedRef.current || !game || game.status === "finished") return;
 
-        const rawP1Innings = game.player1Innings as number[] | null | undefined;
-        const rawP2Innings = game.player2Innings as number[] | null | undefined;
-        const rawP3Innings = game.player3Innings as number[] | null | undefined;
-        const rawP4Innings = game.player4Innings as number[] | null | undefined;
-
-        const p1Innings = rawP1Innings ?? [];
-        const p2Innings = rawP2Innings ?? [];
-        const p3Innings = rawP3Innings ?? [];
-        const p4Innings = rawP4Innings ?? [];
-
-        // 진행 중이던 이닝 점수(run)까지 되살린다. run 을 0으로 두면 다음 턴 전환에서
-        // 0이 기록돼 '이닝 합계 ≠ 총점'이 되고 하이런도 어긋난다.
-        // 아직 배열에 확정되지 않은 몫 = 총점 - 확정된 이닝 합계.
-        const deriveRun = (score: number, innings: number[] | null | undefined) => {
-            if (!innings) return 0; // 이닝 기록 자체가 없으면 역산할 근거가 없다
-            const confirmed = innings.reduce((sum, v) => sum + v, 0);
-            return Math.max(0, score - confirmed);
-        };
-
-        // Derive whose turn it is: among active players, the one with the
-        // shortest inning-history array is currently up (fallback: player 1).
-        const activeCount = 1
-            + ((game.player2Id || game.player2Name) ? 1 : 0)
-            + ((game.player3Id || game.player3Name) ? 1 : 0)
-            + ((game.player4Id || game.player4Name) ? 1 : 0);
-        const inningArrays = [p1Innings, p2Innings, p3Innings, p4Innings];
-        let derivedTurn = 1;
-        let minLen = Infinity;
-        for (let i = 0; i < activeCount; i++) {
-            if (inningArrays[i].length < minLen) {
-                minLen = inningArrays[i].length;
-                derivedTurn = i + 1;
-            }
-        }
-
-        resetGameState({
-            p1Score: game.player1Score ?? 0,
-            p2Score: game.player2Score ?? 0,
-            p3Score: game.player3Score ?? 0,
-            p4Score: game.player4Score ?? 0,
-            innings: Math.max(1, game.totalInnings ?? 0),
-            p1FinishScore: Number((game as any).finishProgress?.["1"] ?? 0),
-            p2FinishScore: Number((game as any).finishProgress?.["2"] ?? 0),
-            p3FinishScore: Number((game as any).finishProgress?.["3"] ?? 0),
-            p4FinishScore: Number((game as any).finishProgress?.["4"] ?? 0),
-            p1FinishInnings: 0,
-            p2FinishInnings: 0,
-            p3FinishInnings: 0,
-            p4FinishInnings: 0,
-            p1Run: deriveRun(game.player1Score ?? 0, rawP1Innings),
-            p2Run: deriveRun(game.player2Score ?? 0, rawP2Innings),
-            p3Run: deriveRun(game.player3Score ?? 0, rawP3Innings),
-            p4Run: deriveRun(game.player4Score ?? 0, rawP4Innings),
-            p1HighRun: game.player1HighRun ?? 0,
-            p2HighRun: game.player2HighRun ?? 0,
-            p3HighRun: game.player3HighRun ?? 0,
-            p4HighRun: game.player4HighRun ?? 0,
-            currentTurn: derivedTurn as 1 | 2 | 3 | 4,
-            p1Innings,
-            p2Innings,
-            p3Innings,
-            p4Innings
-        });
+        resetGameState(gameStateFromRow(game));
         hydratedRef.current = true;
     }, [game]);
 
@@ -276,13 +298,13 @@ export function useGameScore(id: string) {
     // 하이드레이션 이후에는 무조건 저장하되, 연타 시 요청 폭주를 막으려 디바운스를 건다.
     const pendingSaveRef = useRef(false);
     useEffect(() => {
-        if (!hydratedRef.current) return;
+        if (!hydratedRef.current || !canSaveRef.current) return;
         pendingSaveRef.current = true;
         const timer = setTimeout(() => {
             pendingSaveRef.current = false;
             // 대기하는 사이에 경기가 끝났다면 보내지 않는다 — 종료 뒤 도착한 진행 중 저장은
             // 끝난 경기를 다시 playing_base 로 되돌린다.
-            if (finishedRef.current) return;
+            if (finishedRef.current || !canSaveRef.current) return;
             updateScoreMutation.mutate();
         }, 400);
         return () => clearTimeout(timer);
@@ -293,7 +315,7 @@ export function useGameScore(id: string) {
     // status: "playing_base" PATCH 가 나가면 끝난 경기가 다시 진행 중이 돼버린다.
     useEffect(() => {
         return () => {
-            if (!pendingSaveRef.current || finishedRef.current) return;
+            if (!pendingSaveRef.current || finishedRef.current || !canSaveRef.current) return;
             updateScoreMutation.mutate();
         };
     }, []);
@@ -340,6 +362,7 @@ export function useGameScore(id: string) {
     // Game Start Voice
     useEffect(() => {
         const timer = setTimeout(() => {
+            if (!canSaveRef.current) return; // 관전자 폰은 조용히
             speak(t("tts.gameStart"));
         }, 1000);
         return () => clearTimeout(timer);
@@ -562,6 +585,8 @@ export function useGameScore(id: string) {
     return {
         game,
         isLoading,
+        error,
+        spectating,
         players: { 1: player1, 2: player2, 3: player3, 4: player4 }, // Map style for easy access
         totalPlayers,
         gameState,

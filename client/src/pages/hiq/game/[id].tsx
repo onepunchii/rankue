@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useRoute, useLocation } from "wouter";
 import { usePreventZoom } from "@/hooks/usePreventZoom";
 import { useKeepAwake } from "@/hooks/useKeepAwake";
-import { useGameScore } from "@/hooks/useGameScore";
+import { useGameScore, gameStateFromRow } from "@/hooks/useGameScore";
 import { LandscapeGuard } from "@/components/hiq/LandscapeGuard";
 import { PlayerCard, playerThemeColor } from "@/components/hiq/game/PlayerCard";
 import { ScoreboardBottomBar } from "@/components/hiq/game/ScoreboardBottomBar";
@@ -13,6 +13,7 @@ import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortabl
 import { HiqMember } from "@shared/schema";
 import { useT } from "@/lib/i18n";
 import { scoringInnings } from "@shared/averageRule";
+import { Eye } from "@/lib/icons";
 
 /** 선수 번호 → 공 색 이름. 카드와 하단 바(뱅크 버튼)가 같은 표를 본다. */
 const THEMES = ["white", "yellow", "red", "blue"] as const;
@@ -28,7 +29,7 @@ export default function HiqScoreboard() {
     // the hook count between renders (React "rendered fewer hooks" crash) when the route param
     // is briefly undefined during navigation. The `if (!id)` guard lives after all hooks.
     const {
-        game, isLoading, players, totalPlayers,
+        game, isLoading, error, spectating, players, totalPlayers,
         gameState, canUndo, canRedo, undo, redo,
         playerOrder, handleDragEnd, handleCardTap, handleBankShot, handleTurnChange,
         finishMutation, discardMutation, speak
@@ -70,19 +71,38 @@ export default function HiqScoreboard() {
         useSensor(MouseSensor, {})
     );
 
+    // 참가자(호스트가 아닌 사람)는 관전 — 경기가 끝나면 결과 화면으로 넘긴다(2026-09-27 오너).
+    useEffect(() => {
+        if (spectating && game?.status === "finished") setLocation(`/r/${game.id}`, { replace: true });
+    }, [spectating, game?.status, game?.id, setLocation]);
+
     if (!id) return null;
+
+    // 관전자는 자기 화면 상태가 아니라 3초마다 새로 받은 서버 행을 그린다
+    const view = spectating && game ? gameStateFromRow(game) : gameState;
 
     // 에버리지 분모는 저장 규칙(shared/averageRule)과 같아야 한다 — 화면에선 떨어지는데
     // 전적엔 안 떨어지면(또는 반대면) 유저가 둘 중 뭘 믿어야 할지 알 수 없다.
     // 목표(알다마) 도달 이후의 마무리 이닝은 세지 않는다.
     const getAvg = (score: number, playerId: number, target: number) => {
-        const inningData = gameState[`p${playerId}Innings` as keyof typeof gameState] as number[] | undefined;
+        const inningData = view[`p${playerId}Innings` as keyof typeof view] as number[] | undefined;
         // 진행 중인 이닝의 현재 런은 아직 배열에 없다 — 표시용으로만 덧붙여 실시간성을 맞춘다.
-        const run = gameState[`p${playerId}Run` as keyof typeof gameState] as number;
+        const run = view[`p${playerId}Run` as keyof typeof view] as number;
         const live = Array.isArray(inningData) ? [...inningData, run] : undefined;
-        const innings = scoringInnings(live, target, gameState.innings);
+        const innings = scoringInnings(live, target, view.innings);
         return (score / Math.max(1, innings)).toFixed(2);
     };
+
+    if (!game && error) {
+        return (
+            <div className="min-h-screen bg-surface-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
+                <p className="text-[15px] font-semibold text-ink-1">{t("gameScoreboard.spectateGone")}</p>
+                <button type="button" onClick={() => setLocation("/dashboard")} className="h-11 px-6 rounded-full bg-brand text-brand-fg text-[14px] font-semibold">
+                    {t("gameScoreboard.spectateHome")}
+                </button>
+            </div>
+        );
+    }
 
     if (isLoading || !game) {
         return <div className="min-h-screen bg-surface-0 flex items-center justify-center text-[rgba(0,0,0,0.87)]">{t("gameScoreboard.loading")}</div>;
@@ -91,17 +111,18 @@ export default function HiqScoreboard() {
     return (
         <LandscapeGuard>
             <div className="h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
-                <div className="flex-1 flex w-full relative z-0">
+                {/* 관전자는 카드를 누를 수 없다(점수·턴·순서 바꾸기 모두) */}
+                <div className={`flex-1 flex w-full relative z-0 ${spectating ? "pointer-events-none" : ""}`}>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
                         <SortableContext items={playerOrder} strategy={horizontalListSortingStrategy}>
                             {playerOrder.map((playerId) => {
                                 const player = players[playerId as keyof typeof players];
                                 const scoreKey = `p${playerId}Score` as const;
-                                const score = gameState[scoreKey as keyof typeof gameState] as number;
+                                const score = view[scoreKey as keyof typeof view] as number;
                                 const targetKey = `player${playerId}Target` as keyof typeof game;
                                 const target = (game[targetKey] as number) || 0;
-                                const run = gameState[`p${playerId}Run` as keyof typeof gameState] as number;
-                                const highRun = gameState[`p${playerId}HighRun` as keyof typeof gameState] as number;
+                                const run = view[`p${playerId}Run` as keyof typeof view] as number;
+                                const highRun = view[`p${playerId}HighRun` as keyof typeof view] as number;
 
                                 const theme = THEMES[playerId - 1];
 
@@ -119,11 +140,11 @@ export default function HiqScoreboard() {
                                             run={run}
                                             highRun={highRun}
                                             avg={getAvg(score, playerId, target)}
-                                            isTurn={gameState.currentTurn === playerId}
+                                            isTurn={view.currentTurn === playerId}
                                             isFinishMode={target > 0 && score >= target}
                                             finishRemaining={
                                                 game.ruleFinishType !== "none" && (game.finishTargetCount || 0) > 0
-                                                    ? Math.max(0, (game.finishTargetCount || 0) - (gameState[`p${playerId}FinishScore` as keyof typeof gameState] as number))
+                                                    ? Math.max(0, (game.finishTargetCount || 0) - (view[`p${playerId}FinishScore` as keyof typeof view] as number))
                                                     : undefined
                                             }
                                             theme={theme}
@@ -157,27 +178,46 @@ export default function HiqScoreboard() {
 
                 <InningHistoryModal
                     player={inningModalPlayer}
-                    innings={gameState.innings}
+                    innings={view.innings}
                     onClose={() => setInningModalPlayer(null)}
                 />
 
-                <ScoreboardBottomBar
-                    innings={gameState.innings}
-                    onExit={() => { if (discardMutation.isPending) return; if (confirm(t("gameScoreboard.exitConfirm"))) discardMutation.mutate(); }}
-                    canUndo={canUndo}
-                    canRedo={canRedo}
-                    onUndo={() => { undo(); speak(t("gameScoreboard.undo")); }}
-                    onRedo={() => { redo(); speak(t("gameScoreboard.redo")); }}
-                    // PBA 룰(3구) 경기에서만 — 저장만 되고 점수판이 안 읽던 설정이다(2026-09-24).
-                    onBankShot={game.usePbaRule && game.gameType === "3c" ? () => handleBankShot(gameState.currentTurn as 1 | 2 | 3 | 4) : undefined}
-                    bankColor={playerThemeColor(THEMES[gameState.currentTurn - 1])}
-                    bankDisabled={(() => {
-                        const turn = gameState.currentTurn;
-                        const target = (game[`player${turn}Target` as keyof typeof game] as number) || 0;
-                        const score = gameState[`p${turn}Score` as keyof typeof gameState] as number;
-                        return target > 0 && score >= target;
-                    })()}
-                />
+                {spectating ? (
+                    <div className="h-16 bg-white border-t border-black/10 flex items-center justify-between gap-4 px-6 shrink-0 z-50">
+                        {/* 관전 표시는 아래 줄에 — 위에 띄우면 이름·목표를 가린다 */}
+                        <span className="flex items-center gap-2 min-w-0 flex-1">
+                            <span className="inline-flex items-center gap-1 px-2 h-6 rounded-full bg-[#DC2626] text-white text-[11px] font-bold shrink-0">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />{t("gameScoreboard.spectateLive")}
+                            </span>
+                            <Eye className="w-4 h-4 text-black/40 shrink-0" />
+                            <span className="text-[13px] font-semibold text-black/55 truncate">{t("gameScoreboard.spectating").replace("{host}", game.player1Name || "")}</span>
+                        </span>
+                        <span className="text-xl font-bold tabular-nums text-[rgba(0,0,0,0.87)] shrink-0 px-2">{view.innings} {t("scoreboardBottomBar.inning")}</span>
+                        <span className="flex justify-end shrink-0">
+                        <button type="button" onClick={() => setLocation("/dashboard")} className="h-10 px-5 rounded-full border border-black/15 text-[14px] font-semibold text-[rgba(0,0,0,0.87)]">
+                            {t("gameScoreboard.spectateExit")}
+                        </button>
+                        </span>
+                    </div>
+                ) : (
+                    <ScoreboardBottomBar
+                        innings={view.innings}
+                        onExit={() => { if (discardMutation.isPending) return; if (confirm(t("gameScoreboard.exitConfirm"))) discardMutation.mutate(); }}
+                        canUndo={canUndo}
+                        canRedo={canRedo}
+                        onUndo={() => { undo(); speak(t("gameScoreboard.undo")); }}
+                        onRedo={() => { redo(); speak(t("gameScoreboard.redo")); }}
+                        // PBA 룰(3구) 경기에서만 — 저장만 되고 점수판이 안 읽던 설정이다(2026-09-24).
+                        onBankShot={game.usePbaRule && game.gameType === "3c" ? () => handleBankShot(view.currentTurn as 1 | 2 | 3 | 4) : undefined}
+                        bankColor={playerThemeColor(THEMES[view.currentTurn - 1])}
+                        bankDisabled={(() => {
+                            const turn = view.currentTurn;
+                            const target = (game[`player${turn}Target` as keyof typeof game] as number) || 0;
+                            const score = gameState[`p${turn}Score` as keyof typeof gameState] as number;
+                            return target > 0 && score >= target;
+                        })()}
+                    />
+                )}
             </div>
         </LandscapeGuard>
     );

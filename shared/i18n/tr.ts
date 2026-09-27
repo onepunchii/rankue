@@ -305,6 +305,7 @@ export const tr: Record<string, string> = {
   "err.game.consentExpired": "Rakibin katılım onayı süresi doldu. Yeni bir PIN ile tekrar katılın.",
   "err.game.seatTaken": "Rakibiniz bu maçı zaten başlattı. Fikstürü yenileyin.",
   "err.game.notParticipant": "Bu maçın katılımcısı değilsiniz",
+  "err.game.hostOnly": "Skor tablosunu yalnızca maçı açan kişi kullanabilir",
   "err.game.finishedNoDelete": "Bitmiş maç silinemez",
   "err.game.finishedNoEdit": "Bitmiş maç düzenlenemez",
   "err.game.invalidScore": "Geçersiz skor değeri",
@@ -458,7 +459,7 @@ export const tr: Record<string, string> = {
   "notif.chat.card.body.CREW_POLL": "🗳 {title} — odadan oy ver",
   "notif.chat.card.body.CREW_NOTICE": "📢 {title}",
   "notif.game.started.title": "🎱 Maç başladı",
-  "notif.game.started.body": "{host} maçı başlattı. Skor tablosunu aç.",
+  "notif.game.started.body": "{host} maçı başlattı. Canlı skoru takip et.",
   "err.chat.leaveNotAllowed": "Bu sohbetten buradan ayrılamazsın",
   // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
   "err.crew.badCursor": "Liste konumu geçersiz. Lütfen yenileyin",

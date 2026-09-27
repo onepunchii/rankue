@@ -305,6 +305,7 @@ export const ko: Record<string, string> = {
   "err.game.consentExpired": "상대의 참가 확인이 만료되었습니다. 새 핀으로 다시 참가해주세요.",
   "err.game.seatTaken": "상대가 이미 이 경기를 시작했습니다. 대진표를 새로고침해주세요.",
   "err.game.notParticipant": "이 경기의 참가자가 아닙니다",
+  "err.game.hostOnly": "점수판은 경기를 만든 사람만 조작할 수 있어요",
   "err.game.finishedNoDelete": "끝난 경기는 지울 수 없습니다",
   "err.game.finishedNoEdit": "이미 종료된 경기는 수정할 수 없습니다",
   "err.game.invalidScore": "점수 값이 올바르지 않습니다",
@@ -458,7 +459,7 @@ export const ko: Record<string, string> = {
   "notif.chat.card.body.CREW_POLL": "🗳 {title} — 방에서 투표하기",
   "notif.chat.card.body.CREW_NOTICE": "📢 {title}",
   "notif.game.started.title": "🎱 경기 시작",
-  "notif.game.started.body": "{host}님이 경기를 시작했어요. 점수판으로 이동하세요.",
+  "notif.game.started.body": "{host}님이 경기를 시작했어요. 실시간 점수를 확인하세요.",
   "err.chat.leaveNotAllowed": "이 방은 채팅에서 나갈 수 없어요",
   // 크루 게시판·사진첩·정모(2026-09-26 크루 정리)
   "err.crew.badCursor": "목록 위치가 올바르지 않아요. 새로고침해 주세요",
