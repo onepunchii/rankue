@@ -36,6 +36,7 @@ import { notFound, conflict, badRequest } from "../utils/errors.js";
 import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords, passportRegionGroup } from "../../shared/golfRegions.js";
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
 import { courseNameKey } from "../../shared/golfCourse.js";
+import { parseLatLng, sortByDistance } from "../../shared/golfNearby.js";
 import {
     resolvePars, sanitizeScores, isCompleteRound, roundTotals, settleMatch, rulesFor, isGuestId, GUEST_PREFIX, rankRound,
     type CoursePars,
@@ -211,14 +212,14 @@ function seatExpr(limit: SeatLimit) {
  * id 체계가 달라 golf_course_pages 의 이름·옛 이름을 이름 열쇠로 묶는다. 10분 캐시.
  * 같은 열쇠가 서로 다른 페이지로 두 번 나오면 그 열쇠는 버린다(엉뚱한 로고·링크보다 없는 게 낫다).
  */
-type ClubPageInfo = { logo: string | null; slug: string };
+type ClubPageInfo = { logo: string | null; slug: string; lat: number | null; lng: number | null };
 let pageIndexCache: { at: number; map: Map<string, ClubPageInfo> } | null = null;
 async function clubPageIndex(): Promise<Map<string, ClubPageInfo>> {
     if (pageIndexCache && Date.now() - pageIndexCache.at < 10 * 60_000) return pageIndexCache.map;
     const map = new Map<string, ClubPageInfo>();
     const bad = new Set<string>();
     try {
-        const rows = await db.select({ slug: golfCoursePages.slug, name: golfCoursePages.name, aliases: golfCoursePages.aliases, logo: golfCoursePages.logo })
+        const rows = await db.select({ slug: golfCoursePages.slug, name: golfCoursePages.name, aliases: golfCoursePages.aliases, logo: golfCoursePages.logo, lat: golfCoursePages.lat, lng: golfCoursePages.lng })
             .from(golfCoursePages);
         for (const r of rows) {
             for (const n of [r.name, ...(r.aliases ?? [])]) {
@@ -226,7 +227,7 @@ async function clubPageIndex(): Promise<Map<string, ClubPageInfo>> {
                 if (!k || bad.has(k)) continue;
                 const prev = map.get(k);
                 if (prev && prev.slug !== r.slug) { map.delete(k); bad.add(k); continue; }
-                map.set(k, { logo: r.logo ?? null, slug: r.slug });
+                map.set(k, { logo: r.logo ?? null, slug: r.slug, lat: r.lat ?? null, lng: r.lng ?? null });
             }
         }
     } catch (e) { console.warn("[golf] club page index failed:", (e as Error)?.message); }
@@ -286,7 +287,14 @@ export class GolfRepository {
         }
 
         const pages = await clubPageIndex();
-        // Calculate distance and sort if user location is provided
+        const me = parseLatLng(userLat, userLng);
+        // 골프장 원장(rankue_golf_clubs)에 좌표가 빠진 곳은 골프장 페이지(golf_course_pages)의 좌표로 채운다 — 같은 이름 열쇠
+        const coordsOf = (c: typeof clubs[number]) => {
+            const own = parseLatLng(c.latitude, c.longitude);
+            if (own) return own;
+            const pg = pages.get(courseNameKey(c.name));
+            return pg ? parseLatLng(pg.lat, pg.lng) : null;
+        };
         let result = clubs.map(c => ({
             ...c,
             totalHoles: 18, // Default
@@ -297,19 +305,14 @@ export class GolfRepository {
             pageSlug: pages.get(courseNameKey(c.name))?.slug ?? null,
             // 도장깨기 지역 묶음(경기·강원…) — 여권 통계(getGolfPassportStats)와 **같은 규칙**. "경기남부"·주소만 있는 곳도 여기서 묶인다.
             passportRegion: passportRegionGroup(resolveGolfRegionCode(c.region, c.address)),
-            distance: (userLat && userLng && c.latitude && c.longitude)
-                ? getDistanceFromLatLonInKm(userLat, userLng, c.latitude, c.longitude)
-                : undefined
+            distance: (() => {
+                const at = me ? coordsOf(c) : null;
+                return me && at ? getDistanceFromLatLonInKm(me.lat, me.lng, at.lat, at.lng) : undefined;
+            })(),
         }));
 
-        if (userLat && userLng) {
-            result.sort((a, b) => {
-                if (a.distance !== undefined && b.distance !== undefined) {
-                    return a.distance - b.distance;
-                }
-                return 0;
-            });
-        }
+        // 가까운 순 — 좌표 없는 곳은 뒤로(예전 비교는 '없으면 같음'이라 정렬이 깨져 먼 곳이 '가까운 골프장'에 떴다)
+        if (me) result = sortByDistance(result);
 
         return result;
     }

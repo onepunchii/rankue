@@ -136,11 +136,19 @@ export default function GolfNewGame() {
     const { toast } = useToast();
 
     const { location, requestLocation } = useNativeBridge();
+    // 가까운 골프장 — 위치를 묻는 중·결과(2026-09-28 오너: "위치 권한 줘도 가까운 골프장이 안 나온다").
+    // 예전엔 거부·실패해도 아무 말 없이 버튼만 남아 눌러도 반응이 없는 것처럼 보였다.
+    const [locating, setLocating] = useState(false);
+    const [locResult, setLocResult] = useState<"granted" | "denied" | "unavailable" | null>(null);
+    const findNearby = useCallback(async () => {
+        setLocating(true);
+        try { setLocResult(await requestLocation()); } finally { setLocating(false); }
+    }, [requestLocation]);
 
     // Request location on mount
     useEffect(() => {
-        requestLocation();
-    }, [requestLocation]);
+        void findNearby();
+    }, [findNearby]);
 
     // 3. API 데이터 페칭 최적화
     const { data: me } = useQuery<any>({
@@ -463,13 +471,27 @@ export default function GolfNewGame() {
                                                         <ul className="rounded-2xl bg-[#FFFFFF08] divide-y divide-[#FFFFFF0F] overflow-hidden">
                                                             {nearClubs.map((c: any) => <ClubRow key={c.id} club={c} onPick={pickClub} />)}
                                                         </ul>
+                                                    ) : location && !dbClubs ? (
+                                                        <p className="h-12 rounded-2xl bg-[#FFFFFF08] text-[13.5px] text-[#FFFFFF80] flex items-center justify-center">가까운 골프장을 찾는 중…</p>
                                                     ) : (
-                                                        <button
-                                                            type="button" onClick={() => requestLocation()}
-                                                            className="w-full h-12 rounded-2xl bg-[#FFFFFF08] text-[14px] font-medium text-[#FFFFFFCC] inline-flex items-center justify-center gap-2 active:bg-[#FFFFFF0F]"
-                                                        >
-                                                            <LucideMapPin className="w-4 h-4 text-[#8BE84A]" />내 위치로 가까운 골프장 찾기
-                                                        </button>
+                                                        <>
+                                                            <button
+                                                                type="button" onClick={() => { void findNearby(); }} disabled={locating}
+                                                                className="w-full h-12 rounded-2xl bg-[#FFFFFF08] text-[14px] font-medium text-[#FFFFFFCC] inline-flex items-center justify-center gap-2 active:bg-[#FFFFFF0F] disabled:opacity-60"
+                                                            >
+                                                                <LucideMapPin className="w-4 h-4 text-[#8BE84A]" />{locating ? "내 위치 확인 중…" : "내 위치로 가까운 골프장 찾기"}
+                                                            </button>
+                                                            {!locating && locResult && locResult !== "granted" && (
+                                                                <p className="mt-2 px-1 text-[12.5px] leading-relaxed text-[#FFFFFF8C] break-keep">
+                                                                    {locResult === "denied"
+                                                                        ? "위치 권한이 꺼져 있어요. 휴대폰 설정 → 랭큐 → 위치에서 허용해 주세요. 위 검색창에 이름이나 지역(예: 용인)으로도 찾을 수 있어요."
+                                                                        : "지금 위치를 가져오지 못했어요. 휴대폰의 위치 서비스가 켜져 있는지 확인하거나, 위 검색창에 이름·지역으로 찾아 주세요."}
+                                                                </p>
+                                                            )}
+                                                            {!locating && location && dbClubs && (
+                                                                <p className="mt-2 px-1 text-[12.5px] text-[#FFFFFF8C] break-keep">근처 골프장 위치 정보를 찾지 못했어요. 위 검색창에 이름·지역으로 찾아 주세요.</p>
+                                                            )}
+                                                        </>
                                                     )}
                                                 </div>
                                             </div>
