@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
+import { CHAT_WATCH_ONLY_CODES,
     CHAT_CODES, CHAT_COOLDOWN_MS, CHAT_EXTRA_CODES, CHAT_END_CODES, CHAT_FROM_WATCHER, CHAT_FUN_CODES, CHAT_MAX_CHARS,
     CHAT_MAX_PER_MATCH, CHAT_QUICK_CODES, CHAT_WATCH_CODES,
     chatLength, chatReject, clampChatText, isChatCode, normalizeChatText,
@@ -47,7 +47,7 @@ describe("고정 문구 목록", () => {
     it("급해서 타이핑할 수 없는 말만 더했다 — 자유 입력이 주 기능이다", () => {
         expect(CHAT_EXTRA_CODES).toEqual(["oops", "wait", "thanks"]);
         // 결과 창의 마무리 인사(2026-09-18)·농담 문구(2026-09-21)는 서버가 받아 주는 목록에 함께 있다
-        expect(CHAT_CODES).toHaveLength(MATCH_EMOJIS.length + CHAT_EXTRA_CODES.length + CHAT_END_CODES.length + CHAT_FUN_CODES.length + 1);
+        expect(CHAT_CODES).toHaveLength(MATCH_EMOJIS.length + CHAT_EXTRA_CODES.length + CHAT_END_CODES.length + CHAT_FUN_CODES.length + 1 + CHAT_WATCH_ONLY_CODES.length);
         expect(CHAT_CODES).toContain("watching");
         for (const c of CHAT_END_CODES) expect(CHAT_QUICK_CODES).not.toContain(c);
         // 칩 열이 두 줄을 넘으면 테이블을 덮는다
@@ -146,9 +146,13 @@ describe("관전자 응원(2026-09-21)", () => {
         expect(reject({ ...base, from: 0, kind: "text" })).toBeNull();
     });
 
-    it("관전 문구는 전부 서버가 받아 주는 코드이고, 선수 전용 말(잠깐만요·시간 초과 재촉)은 빠져 있다", () => {
+    it("관전 문구는 전부 서버가 받아 주는 코드이고, 선수 전용 말(잠깐만요·시간 초과 재촉·미안)은 빠져 있다", () => {
         for (const c of CHAT_WATCH_CODES) expect(CHAT_CODES).toContain(c);
-        for (const c of ["wait", "hurry", "sorry", "oops"]) expect(CHAT_WATCH_CODES).not.toContain(c);
+        for (const c of ["wait", "hurry", "sorry"]) expect(CHAT_WATCH_CODES).not.toContain(c);
         expect(new Set(CHAT_WATCH_CODES).size).toBe(CHAT_WATCH_CODES.length);
+    });
+
+    it("관전자도 인사·아깝다·새 응원을 보낼 수 있다(2026-09-30 오너)", () => {
+        for (const c of ["hi", "oops", "legend", "haha", "calm"]) expect(CHAT_WATCH_CODES).toContain(c);
     });
 });

@@ -41,6 +41,8 @@ export const CHAT_GLYPH: Readonly<Record<string, string>> = {
     oops: "😖", wait: "⏸️", thanks: "🙌",
     // 가볍게 약 올리는 말·관전 응원(2026-09-21). clap 은 문구 자체에 👏 가 있어 비워 둔다.
     luck: "🍀", tense: "😅", showoff: "😎", comeback: "💪", watching: "👀", gg: "🤝", goodgame: "🏆", again: "🔁",
+    // 관전 응원(2026-09-30)
+    legend: "👑", haha: "😂", calm: "🧘",
 };
 
 /**

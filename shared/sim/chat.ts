@@ -30,7 +30,11 @@ export const CHAT_EXTRA_CODES = ["oops", "wait", "thanks"] as const;
 export const CHAT_CODES: readonly string[] = [
     "hi", "nice", "wow", "sorry", "oops", "wait", "thanks", "fight", "hurry", "gg", "goodgame", "again",
     ...["clap", "luck", "tense", "showoff", "comeback", "watching"],
+    // 관전 응원 추가(2026-09-30 오너: "관전 채팅에 아깝다·하이 등 여러 개를 더"). 뒤에 붙인다 — 앞 순서는 옛 줄과 테스트가 기대한다
+    ...["legend", "haha", "calm"],
 ];
+/** 관전에서만 고르는 새 응원(2026-09-30). 선수 1탭 판(두 줄 고정)에는 넣지 않는다 — 받은 말은 선수 화면에도 그대로 그려진다. */
+export const CHAT_WATCH_ONLY_CODES: readonly string[] = ["legend", "haha", "calm"];
 /**
  * 가볍게 약 올리는 말(2026-09-21 오너: "정해진 문구를 더 추가해 줘, 놀릴 수도 있고 다양하게").
  * 기준은 **당구장에서 웃으며 할 수 있는 말**이다 — 놀리는 쪽이어도 상대를 깎아내리지 않는다.
@@ -42,7 +46,11 @@ export const CHAT_FUN_CODES: readonly string[] = ["clap", "luck", "tense", "show
  * **자유 입력은 없다** — 읽는 사람이 둘에서 여럿으로 늘면 신고·차단이 필요해지는데 그건 유저가 많아지면 붙이기로 했다(9/16).
  * 고정 문구만 열어 두면 그 장치 없이도 안전하다. 응원과 가벼운 농담까지만 담는다.
  */
-export const CHAT_WATCH_CODES: readonly string[] = ["nice", "wow", "clap", "fight", "luck", "watching"];
+export const CHAT_WATCH_CODES: readonly string[] = [
+    // 2026-09-30 오너: "관전 채팅에 아깝다·하이가 없다" — 인사(hi)와 아깝다(oops)를 열고 응원 셋(레전드·ㅋㅋㅋ·침착하게)을 더했다.
+    // oops 는 9/21 에 선수 전용으로 묶어 뺐었지만, 빗나간 샷에 관전자가 거드는 말로도 자연스럽다. 잠깐만요·서두르자·미안은 선수만의 말이라 계속 뺀다.
+    "hi", "nice", "oops", "wow", "clap", "fight", "legend", "haha", "calm", "luck", "watching",
+];
 /** 관전자 자리 번호(선수는 0·1). 화면은 이 값을 보고 "관전" 말풍선으로 그린다. */
 export const CHAT_FROM_WATCHER = 2;
 /**
