@@ -11,6 +11,7 @@
 import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/hooks/useAuth";
+import { kstDateKey } from "@/lib/kst";
 import {
     GOLF_PHOTO_CATEGORY, GOLF_THUMB_CATEGORY, GOLF_PHOTO_LONG_SIDE, GOLF_PHOTO_QUALITY, GOLF_THUMB_LONG_SIDE, GOLF_THUMB_QUALITY,
     GOLF_PHOTO_MAX_RAW_BYTES, COURSE_GALLERY_LIMIT,
@@ -28,6 +29,11 @@ export interface AlbumPhoto {
     height: number | null;
     isPublic: boolean;
     hasCoursePage: boolean;
+    /** 공개 사진이 붙는 골프장 페이지 슬러그·경기 골프장 이름·라운드 날(ISO) — 뷰어의 맥락 줄과 '보러 가기'.
+     *  2026-09-30 v2 에 붙었다 — 기기에 남은 옛 캐시엔 없을 수 있어 선택으로 둔다 */
+    courseSlug?: string | null;
+    courseName?: string | null;
+    playedAt?: string;
     hidden: boolean;
     /** 지금 가림에 이의제기를 냈나 */
     appealed: boolean;
@@ -80,6 +86,14 @@ export function useCoursePhotos(slug: string | null | undefined) {
         enabled: !!slug && !isLoading,
         staleTime: 60_000,
     });
+}
+
+/** 라운드 날 "9월 28일"(한국 날짜) — 앨범 뷰어의 맥락 줄. 골프장 페이지(누구나)는 달까지만 쓴다(photoMonthLabel) */
+export function roundDayLabel(iso: string | null | undefined): string | null {
+    if (!iso) return null;
+    const key = kstDateKey(iso);
+    const [, m, d] = key.split("-").map(Number);
+    return m && d ? `${m}월 ${d}일` : null;
 }
 
 /** 사진 하나를 바꾼 뒤 — 그 경기 앨범·사진첩·골프장 페이지를 다시 받는다 */

@@ -40,6 +40,12 @@ export function fitBox(pts: readonly { lat: number; lng: number }[], aspect: num
     return [cx - w / 2, cy - h / 2, w, h];
 }
 
+/**
+ * 가라앉힌 점(발자국 지도 바탕) — 한 칸의 골프장 수(1·2·3곳 이상) → 밝기. CourseDotMap 의 muted 와 같은 값이다
+ * (발자국 지도는 확대하려고 점을 직접 그린다 — 2026-09-30). 한쪽을 바꾸면 다른 쪽도.
+ */
+export const MUTED_DOT_FILL = ["#FFFFFF33", "#FFFFFF4D", "#FFFFFF6B"] as const;
+
 /** 칸 하나에 여러 골프장이 들어오면 가장 급한 색이 이긴다. */
 export const TONE_RANK: Record<DotTone, number> = { dim: 0, on: 1, booking: 2, join: 3, urgent: 4 };
 

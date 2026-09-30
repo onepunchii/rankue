@@ -27,6 +27,11 @@ export const SITEMAP_PHOTO_LIMIT = 5;
 
 /** 공개로 돌릴 때 한 줄 안내 — 화면 토글과 약관 설명이 같은 말을 쓴다 */
 export const GOLF_PHOTO_PUBLIC_NOTICE = "공개 사진은 이 골프장 페이지에 보여요. 동반자 얼굴이 나온 사진은 비공개로 두세요.";
+/**
+ * 초상권 한 줄(2026-09-30 v2 — 오너: "노란 문단이 경보처럼 읽힌다"). '어디에 올라가는지'는 뷰어 상태 줄이 따로 말하므로
+ * 여기엔 얼굴 얘기만 남긴다. 공개로 돌린 순간·공개 중인 동안 늘 보인다(작은 ⓘ 줄).
+ */
+export const GOLF_PHOTO_FACE_NOTICE = "동반자 얼굴이 나온 사진은 비공개로 두세요";
 
 const BLOB_HOST_RE = /^[a-z0-9]+\.public\.blob\.vercel-storage\.com$/i;
 const EXT_RE = "(webp|jpg|png)";

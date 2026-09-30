@@ -16,6 +16,8 @@ import { ViewSwitcher } from "../components/passport/ViewSwitcher";
 import { Elite60Banner } from "../components/passport/Elite60Banner";
 import { PassportMapTabs, usePassportMapMode } from "../components/passport/PassportMapTabs";
 import { FootprintsPanel } from "../components/passport/FootprintsPanel";
+import { PassportAlbum } from "../components/passport/PassportAlbum";
+import { useMyPhotos } from "../lib/photoApi";
 import { COURSES } from "@/golf/data/golfCourses";
 
 // Hooks
@@ -31,6 +33,8 @@ export default function Passport() {
     const [viewMode, setViewMode] = useState<ViewMode>('map');
     // 지도 보기: 지역 정복 ↔ 발자국(2026-09-30 오너: "도장깨기 지도에 발자국 기능")
     const [mapMode, setMapMode] = usePassportMapMode();
+    // 앨범 탭의 사진 수(라운드 시트 탭과 같은 작은 알약) — 앨범 탭과 같은 캐시라 탭을 열 때 다시 받지 않는다
+    const myPhotos = useMyPhotos();
     const [scannerOpen, setScannerOpen] = useState(false);
 
     // For Region Sheet interactions
@@ -75,9 +79,11 @@ export default function Passport() {
                             exit={{ opacity: 0, y: -20 }}
                         >
                             <PassportStatsCard stats={stats} />
-                            <PassportMapTabs value={mapMode} onChange={setMapMode} />
+                            <PassportMapTabs value={mapMode} onChange={setMapMode} albumCount={myPhotos.data?.length ?? 0} />
                             {mapMode === 'footprints' ? (
                                 <FootprintsPanel />
+                            ) : mapMode === 'album' ? (
+                                <PassportAlbum />
                             ) : (
                                 <RegionMap
                                     regionTotals={stats.regionTotals}

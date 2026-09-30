@@ -78,6 +78,9 @@ const albumCols = {
     appealAt: golfRoundPhotos.appealAt,
     createdAt: golfRoundPhotos.createdAt,
     uploaderName: hiqMembers.name,
+    // 뷰어의 맥락 줄("동강시스타 CC · 7번 홀 · 9월 28일")·'보러 가기' 링크 — 경기 행에서(2026-09-30 오너 피드백)
+    courseName: golfMatchSessions.courseName,
+    sessionCreatedAt: golfMatchSessions.createdAt,
 };
 type AlbumRow = { [K in keyof typeof albumCols]: any };
 
@@ -95,6 +98,11 @@ export interface AlbumPhoto {
     isPublic: boolean;
     /** 골프장 페이지가 있는 골프장인가 — 없으면 공개로 돌려도 보일 곳이 없다 */
     hasCoursePage: boolean;
+    /** 공개 사진이 붙는 골프장 페이지 슬러그(없으면 null) — 뷰어의 '보러 가기' */
+    courseSlug: string | null;
+    /** 그 경기의 골프장 이름·라운드 날(경기를 만든 시각, ISO) — 앨범은 참가자만 보니 날짜까지 싣는다 */
+    courseName: string | null;
+    playedAt: string;
     /** 신고로 가려졌나(본인 사진에만 true 가 올 수 있다) */
     hidden: boolean;
     /** 지금 가림에 대해 이의제기를 냈나 — 가린 뒤에 낸 것만 센다(풀렸다 다시 가려지면 새로 낼 수 있게) */
@@ -115,6 +123,9 @@ const toAlbum = (r: AlbumRow, viewerId: string): AlbumPhoto => ({
     height: r.height ?? null,
     isPublic: !!r.isPublic,
     hasCoursePage: !!r.courseSlug,
+    courseSlug: r.courseSlug ?? null,
+    courseName: r.courseName ?? null,
+    playedAt: new Date(r.sessionCreatedAt ?? r.createdAt).toISOString(),
     hidden: !!r.hiddenAt,
     appealed: !!r.hiddenAt && !!r.appealAt && new Date(r.appealAt).getTime() >= new Date(r.hiddenAt).getTime(),
     mine: r.memberId === viewerId,
@@ -139,6 +150,7 @@ export class GolfPhotoRepository {
         return orEmpty(async () => {
             const rows = await db.select(albumCols)
                 .from(golfRoundPhotos)
+                .innerJoin(golfMatchSessions, eq(golfMatchSessions.id, golfRoundPhotos.sessionId))
                 .innerJoin(hiqMembers, eq(hiqMembers.id, golfRoundPhotos.memberId))
                 .where(and(
                     eq(golfRoundPhotos.sessionId, sessionId),
@@ -153,13 +165,9 @@ export class GolfPhotoRepository {
     /**
      * 내 라운드들의 사진(라운딩 리포트 '사진첩') — 최신부터. 내가 방장이거나 참가자인 경기의 사진 전부(동반자가 올린 것 포함).
      */
-    async listMine(memberId: string, limit = 60): Promise<Array<AlbumPhoto & { courseName: string | null; playedAt: string }>> {
+    async listMine(memberId: string, limit = 60): Promise<AlbumPhoto[]> {
         return orEmpty(async () => {
-            const rows = await db.select({
-                ...albumCols,
-                courseName: golfMatchSessions.courseName,
-                sessionCreatedAt: golfMatchSessions.createdAt,
-            })
+            const rows = await db.select(albumCols)
                 .from(golfRoundPhotos)
                 .innerJoin(golfMatchSessions, eq(golfMatchSessions.id, golfRoundPhotos.sessionId))
                 .innerJoin(hiqMembers, eq(hiqMembers.id, golfRoundPhotos.memberId))
@@ -173,11 +181,7 @@ export class GolfPhotoRepository {
                 ))
                 .orderBy(desc(golfRoundPhotos.createdAt), desc(golfRoundPhotos.id))
                 .limit(Math.min(Math.max(limit, 1), 120));
-            return rows.map((r) => ({
-                ...toAlbum(r, memberId),
-                courseName: r.courseName ?? null,
-                playedAt: new Date(r.sessionCreatedAt).toISOString(),
-            }));
+            return rows.map((r) => toAlbum(r, memberId));
         }, []);
     }
 

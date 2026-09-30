@@ -9,46 +9,20 @@
  * ⚠️ 리터럴 색만 — 골프 테마가 `.bg-white`·`.text-black/*` 를 바꿔 끼운다.
  */
 import { useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
 import { kstDateLabel } from "@/lib/kst";
 import { cn } from "@/lib/utils";
 import { LucideFlag, LucideShare2 } from "@/lib/icons";
-import { FOOT, FOOT_COLORS, trailKm, type FootprintsResponse } from "@shared/golfFootprints";
+import { trailKm } from "@shared/golfFootprints";
 import { useCourseList } from "../../lib/courseApi";
 import { CourseDotMap, type MapDot } from "../course/list/CourseDotMap";
 import { FootprintMap, FOOTPRINT_MAP_ASPECT } from "./FootprintMap";
 import { FootprintShareSheet } from "./FootprintShareSheet";
-
-/** v1 — 응답 모양이 바뀌면 올린다(저장 캐시가 옛 모양을 먼저 그리지 않게). URL 에 붙지 않도록 queryFn 을 직접 준다. */
-const KEY = "/api/hiq/golf/passport/footprints";
-function useFootprints(year: number | null) {
-    return useQuery<FootprintsResponse>({
-        queryKey: [KEY, year ?? "all", "v1"],
-        queryFn: () => apiRequest(`${KEY}${year != null ? `?year=${year}` : ""}`),
-        staleTime: 60_000,
-    });
-}
+import { useFootprints } from "./useFootprints";
+import { StopBadge } from "./StopBadge";
+import { GhostSteps } from "./GhostSteps";
 
 const dot = (iso: string) => kstDateLabel(iso, { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\. /g, ".").replace(/\.$/, "");
-
-/** 빈 발자국 그림 — 점선 빈 도장 칸으로 걸어 들어가는 흐린 발자국 넷(장식, 실제 위치가 아니다) */
-function GhostSteps() {
-    const steps = [[18, 78, -1], [34, 64, 1], [46, 48, -1], [60, 34, 1]] as const;
-    return (
-        <svg viewBox="0 0 120 100" className="w-[132px] h-[110px]" aria-hidden="true">
-            <circle cx="92" cy="22" r="15" fill="none" stroke="#FFFFFF59" strokeWidth="1.6" strokeDasharray="3 3.2" />
-            <text x="92" y="22" textAnchor="middle" dominantBaseline="central" fontSize="13" fontWeight="800" fill="#FFFFFF73">1</text>
-            {steps.map(([x, y, side], i) => (
-                <g key={i} transform={`translate(${x} ${y}) rotate(${48}) scale(${side * 1.25} 1.25)`} fill="#FFFFFF" fillOpacity={0.14 + i * 0.07}>
-                    <path d={FOOT.sole} />
-                    {FOOT.toes.map(([cx, cy, r], k) => <circle key={k} cx={cx} cy={cy} r={r} />)}
-                </g>
-            ))}
-        </svg>
-    );
-}
 
 export function FootprintsPanel() {
     const [, setLocation] = useLocation();
@@ -177,12 +151,7 @@ export function FootprintsPanel() {
                                         aria-pressed={on}
                                         className={cn("w-full flex items-center gap-3 px-4 py-3 text-left transition-colors", on ? "bg-[#FFFFFF0D]" : "active:bg-[#FFFFFF0A]")}
                                     >
-                                        <span
-                                            className="w-7 h-7 shrink-0 rounded-full flex items-center justify-center text-[13px] font-bold tabular-nums"
-                                            style={{ background: latest ? FOOT_COLORS.latest : FOOT_COLORS.stop, color: latest ? "#FFFFFF" : FOOT_COLORS.stopInk }}
-                                        >
-                                            {n}
-                                        </span>
+                                        <StopBadge n={n} latest={latest} />
                                         <span className="flex-1 min-w-0">
                                             <span className="flex items-center gap-1.5">
                                                 <span className="text-[15px] font-semibold text-[#ffffff] truncate">{s.name}</span>

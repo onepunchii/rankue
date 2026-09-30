@@ -15,13 +15,15 @@ import { LucideCamera, LucideLoader2, LucideX, LucideGlobe, LucideLock } from "@
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
-import { GOLF_PHOTO_MAX_PER_ROUND, GOLF_PHOTO_PUBLIC_NOTICE } from "@shared/golfPhoto";
-import { useSessionPhotos, uploadRoundPhoto, useSetPhotoPublic, PHOTO_KEY, type AlbumPhoto } from "../../lib/photoApi";
-import { PhotoViewer, PublicSwitch, type ViewerPhoto } from "./PhotoViewer";
+import { GOLF_PHOTO_MAX_PER_ROUND } from "@shared/golfPhoto";
+import { useSessionPhotos, uploadRoundPhoto, useSetPhotoPublic, PHOTO_KEY, roundDayLabel, type AlbumPhoto } from "../../lib/photoApi";
+import { PhotoViewer, PublicSwitch, FaceNotice, type ViewerPhoto } from "./PhotoViewer";
 
 export const toViewer = (p: AlbumPhoto): ViewerPhoto => ({
     id: p.id, url: p.url, thumbUrl: p.thumbUrl, memberId: p.memberId, name: p.uploaderName, holeNo: p.holeNo,
     mine: p.mine, isPublic: p.isPublic, hasCoursePage: p.hasCoursePage, hidden: p.hidden, appealed: p.appealed,
+    // 맥락 줄 — "동강시스타 CC · 7번 홀 · 9월 28일"(앨범은 참가자만 보니 날까지)
+    courseName: p.courseName ?? null, courseSlug: p.courseSlug ?? null, dateLabel: roundDayLabel(p.playedAt ?? p.createdAt),
 });
 
 /**
@@ -139,7 +141,7 @@ function FreshCard({ fresh, photos, onClose, bottom }: {
                         <LucideX weight="bold" className="w-4 h-4" />
                     </button>
                 </div>
-                {on && <p className="mt-2 text-[12.5px] leading-[1.45] text-[#FFD266] break-keep">{GOLF_PHOTO_PUBLIC_NOTICE}</p>}
+                {on && <FaceNotice className="mt-2" />}
             </div>
         </div>
     );
