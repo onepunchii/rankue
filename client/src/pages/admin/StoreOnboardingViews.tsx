@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { FilterChips, SearchBox, EmptyState, Panel, Pill, CallButton, kstDateTime, agoLabel } from "./adminUtils";
+import { appConfirm } from "@/components/AppDialog";
 
 // --- 공용: 승인 결과 상자 ---
 type IssueResult = { listingCode?: string; storeSlug?: string; partnerPhone?: string; issuedPin?: string | null; notified?: boolean; kind?: "owner" | "report" };
@@ -121,7 +122,7 @@ export function ClaimsView() {
                         <div className="mt-3 flex gap-2">
                             <CallButton phone={c.applicantPhone} />
                             <Button size="sm" variant="ghost" className="h-9 text-red-500 ml-auto" disabled={reject.isPending}
-                                onClick={() => { if (window.confirm(`'${c.listingName ?? c.listingCode}' 클레임을 거절할까요?`)) reject.mutate(c.id); }}>거절</Button>
+                                onClick={() => { void appConfirm({ message: `'${c.listingName ?? c.listingCode}' 클레임을 거절할까요?`, tone: "danger", confirmText: "거절" }).then((ok) => { if (ok) reject.mutate(c.id); }); }}>거절</Button>
                             <Button size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={approve.isPending} onClick={() => approve.mutate(c.id)}>
                                 {approve.isPending ? "처리 중…" : "승인·계정 발급"}
                             </Button>
@@ -210,7 +211,7 @@ export function RegistrationsView() {
                             <div className="mt-3 flex gap-2">
                                 <CallButton phone={r.applicantPhone} />
                                 <Button size="sm" variant="ghost" className="h-9 text-red-500 ml-auto" disabled={reject.isPending}
-                                    onClick={() => { if (window.confirm(`'${r.name}' 등록 신청을 거절할까요?`)) reject.mutate(r.id); }}>거절</Button>
+                                    onClick={() => { void appConfirm({ message: `'${r.name}' 등록 신청을 거절할까요?`, tone: "danger", confirmText: "거절" }).then((ok) => { if (ok) reject.mutate(r.id); }); }}>거절</Button>
                                 <Button size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={approve.isPending} onClick={() => approve.mutate(r.id)}>
                                     {approve.isPending ? "처리 중…" : r.kind === "report" ? "승인·디렉토리 추가" : "승인·페이지 생성"}
                                 </Button>

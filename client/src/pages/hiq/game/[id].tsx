@@ -14,6 +14,7 @@ import { HiqMember } from "@shared/schema";
 import { useT } from "@/lib/i18n";
 import { scoringInnings } from "@shared/averageRule";
 import { Eye } from "@/lib/icons";
+import { appConfirm } from "@/components/AppDialog";
 
 /** 선수 번호 → 공 색 이름. 카드와 하단 바(뱅크 버튼)가 같은 표를 본다. */
 const THEMES = ["white", "yellow", "red", "blue"] as const;
@@ -202,7 +203,7 @@ export default function HiqScoreboard() {
                 ) : (
                     <ScoreboardBottomBar
                         innings={view.innings}
-                        onExit={() => { if (discardMutation.isPending) return; if (confirm(t("gameScoreboard.exitConfirm"))) discardMutation.mutate(); }}
+                        onExit={() => { if (discardMutation.isPending) return; void appConfirm({ message: t("gameScoreboard.exitConfirm"), tone: "danger" }).then((ok) => { if (ok) discardMutation.mutate(); }); }}
                         canUndo={canUndo}
                         canRedo={canRedo}
                         onUndo={() => { undo(); speak(t("gameScoreboard.undo")); }}

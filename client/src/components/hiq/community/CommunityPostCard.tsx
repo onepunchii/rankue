@@ -10,6 +10,7 @@ import { SkillBadge } from "./SkillBadge";
 import { GameResultCard } from "./GameResultCard";
 import { ReportDialog } from "./ReportDialog";
 import { BOARD_KEYS, invalidateCommunityPosts, type CommunityPost } from "./types";
+import { appConfirm } from "@/components/AppDialog";
 
 interface CommunityPostCardProps {
     post: CommunityPost;
@@ -129,7 +130,7 @@ export const CommunityPostCard = ({ post, myId, showBoardChip, onClick, detail, 
                                     <button
                                         onClick={(e) => {
                                             e.stopPropagation(); setIsMenuOpen(false);
-                                            if (window.confirm(t("community.deleteConfirm"))) deleteMutation.mutate();
+                                            void appConfirm({ message: t("community.deleteConfirm"), tone: "danger", confirmText: t("community.delete") }).then((ok) => { if (ok) deleteMutation.mutate(); });
                                         }}
                                         className="w-full h-11 px-4 text-left text-[13.5px] font-semibold text-red-600 hover:bg-red-50 transition-colors"
                                     >

@@ -16,6 +16,7 @@ import { CrewAvatar } from "@/components/hiq/crew-ui";
 import { meetupRsvp } from "@shared/crewChat";
 import { isPollClosed, voterPercent } from "@shared/crewPoll";
 import { INTL_TAG } from "../ChatRoom";
+import { appConfirm } from "@/components/AppDialog";
 
 /** 채팅이 열려 있는 동안 크루 정모·투표를 다시 읽는 간격 — 채팅 폴링(2.5초)보다 훨씬 느리게. */
 const REFRESH_MS = 20_000;
@@ -120,7 +121,7 @@ export function CrewMeetupBody({ md, meId }: { md: any; meId?: string }) {
                                 </span>
                                 <button
                                     type="button" disabled={busy}
-                                    onClick={(e) => { stop(e); if (window.confirm(t("chat.card.meetupLeaveConfirm"))) leave.mutate(); }}
+                                    onClick={(e) => { stop(e); void appConfirm({ message: t("chat.card.meetupLeaveConfirm"), tone: "danger" }).then((ok) => { if (ok) leave.mutate(); }); }}
                                     className="h-10 px-3.5 rounded-[10px] border border-surface-line-strong text-[13px] font-semibold text-ink-2 disabled:opacity-50"
                                 >
                                     {t("chat.card.meetupLeave")}

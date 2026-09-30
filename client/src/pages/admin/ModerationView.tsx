@@ -13,6 +13,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucideRefreshCw, LucideChevronDown, LucideChevronUp } from "@/lib/icons";
+import { appConfirm } from "@/components/AppDialog";
 
 type Action = "blind" | "unblind" | "delete" | "ban" | "unban" | "dismiss" | "appeal_approve" | "appeal_reject";
 type Filter = "open" | "handled" | "all";
@@ -128,9 +129,10 @@ export default function ModerationView() {
         },
     });
 
-    const run = (item: QueueItem, action: Action) => {
+    const run = async (item: QueueItem, action: Action) => {
         const who = item.author ? `\n\n대상: ${item.typeLabel} · ${item.author.name}` : `\n\n대상: ${item.typeLabel}`;
-        if (!window.confirm(`${ACTION_UI[action].confirm}${who}`)) return;
+        const ui = ACTION_UI[action];
+        if (!(await appConfirm({ message: `${ui.confirm}${who}`, tone: ui.tone === "danger" ? "danger" : "default", confirmText: ui.label }))) return;
         act.mutate({ item, action });
     };
 

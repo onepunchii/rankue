@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Columns, TrendLine } from "@/sim/dash/charts";
 import { LucideRefreshCw } from "@/lib/icons";
 import { kstDateTime, agoLabel, Pill } from "./adminUtils";
+import { appConfirm } from "@/components/AppDialog";
 
 interface Overview {
     generatedAt: string;
@@ -209,7 +210,7 @@ function RatingRecomputeCard() {
                 </button>
                 {preview?.dryRun && (
                     <button type="button" disabled={run.isPending}
-                        onClick={() => { if (window.confirm(`온라인 대전 레이팅을 다시 씁니다.\n${fmt(preview.players)}명 · 핸디전 ${fmt(preview.ratedMatches)}판 반영\n(지금 ${fmt(preview.rowsBefore)}줄은 지워집니다)\n\n진행할까요?`)) run.mutate(true); }}
+                        onClick={() => { void appConfirm({ message: `온라인 대전 레이팅을 다시 씁니다.\n${fmt(preview.players)}명 · 핸디전 ${fmt(preview.ratedMatches)}판 반영\n(지금 ${fmt(preview.rowsBefore)}줄은 지워집니다)\n\n진행할까요?`, tone: "danger", confirmText: "적용" }).then((ok) => { if (ok) run.mutate(true); }); }}
                         className="h-9 px-3 rounded-lg bg-brand text-white text-[13px] font-bold disabled:opacity-50">
                         {run.isPending ? "적용 중…" : "이대로 적용"}
                     </button>

@@ -11,6 +11,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucideStore, LucideArrowRight } from "@/lib/icons";
 import { FilterChips, SearchBox, EmptyState, Panel, Pill, CallButton, KpiTile, kstDate, daysSince } from "./adminUtils";
+import { appConfirm } from "@/components/AppDialog";
 
 export type AdminStore = {
     id: string; name: string; region: string | null; slug: string;
@@ -113,7 +114,7 @@ export function StoresView() {
                                     매장 페이지
                                 </Button>
                                 <Button className="ml-auto h-9 text-[13px] bg-black/[0.06] text-[rgba(0,0,0,0.8)] hover:bg-brand hover:text-white" disabled={impersonate.isPending}
-                                    onClick={() => { if (window.confirm(`'${st.name}' 사장님 화면으로 들어갑니다.\n돌아올 땐 사장님 화면 맨 위 '관리자로 돌아가기'를 누르세요.`)) impersonate.mutate(st.id); }}>
+                                    onClick={() => { void appConfirm({ message: `'${st.name}' 사장님 화면으로 들어갑니다.\n돌아올 땐 사장님 화면 맨 위 '관리자로 돌아가기'를 누르세요.`, confirmText: "들어가기" }).then((ok) => { if (ok) impersonate.mutate(st.id); }); }}>
                                     사장님 화면 <LucideArrowRight className="w-4 h-4 ml-1" />
                                 </Button>
                             </div>

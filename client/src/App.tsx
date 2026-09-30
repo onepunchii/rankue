@@ -2,6 +2,7 @@ import { Switch, Route, useLocation } from "wouter";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
+import { AppDialogHost } from "@/components/AppDialog";
 import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
@@ -413,6 +414,8 @@ function App() {
               <AppRoutes />
             </TermsConsentProvider>
             <Toaster />
+            {/* 앱 안내창 — 흰 시스템 confirm/alert 대신(2026-10-01). appConfirm·appAlert 가 여기로 띄운다 */}
+            <AppDialogHost />
             {/* 네이티브 앱 전용 안내(업데이트·알림 권한 사전 설명). 웹에선 아무것도 그리지 않는다. */}
             <NativePrompts />
             {/* 온라인게임 대전 호출 — 방을 열고 다른 화면에 있어도 상대가 들어오면·내 차례면 앱 안에서 바로 알린다(2026-09-26) */}

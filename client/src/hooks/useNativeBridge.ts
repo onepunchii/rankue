@@ -127,7 +127,6 @@ export function useNativeBridge() {
                         break;
                     case 'QR_SCANNED':
                         setScannedQr(message.payload.data);
-                        alert(`QR Scanned: ${message.payload.data}`); // 테스트용 알림
                         break;
                 }
             } catch (e) { }

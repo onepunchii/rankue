@@ -39,6 +39,7 @@ import { FilterBar } from "../components/booking/FilterBar";
 import { EmptyResult, type ActiveFilter } from "../components/booking/EmptyResult";
 import { CourseGroupRow } from "../components/booking/CourseGroupRow";
 import { ShareSheet } from "../components/booking/ShareSheet";
+import { appConfirm } from "@/components/AppDialog";
 
 /**
  * '골프장별 보기' 를 켜 둔 상태를 기억한다(2026-09-23 오너). 묶어 보는 쪽을 좋아하는 사람이
@@ -408,7 +409,7 @@ export default function BookingList() {
         setTimeout(() => document.getElementById(`booking-${item.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 250);
     }, [viewType, weekDates, pickDate, toast]);
     const handleDelete = useCallback((item: any) => {
-        if (window.confirm("이 글을 내릴까요? 되돌릴 수 없어요.")) deleteMutation.mutate(item.id);
+        void appConfirm({ message: "이 글을 내릴까요? 되돌릴 수 없어요.", tone: "danger", confirmText: "내리기" }).then((ok) => { if (ok) deleteMutation.mutate(item.id); });
     }, [deleteMutation]);
 
     // 조인 신청은 기록으로 남긴다. 그전엔 문자 앱만 열고 아무것도 안 남아서 몇 명 찼는지도,

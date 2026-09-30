@@ -15,6 +15,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
 import { FilterChips, SearchBox, Panel, Pill, EmptyState, daysSince, isKstToday, kstDateTime, phoneLabel } from "./adminUtils";
+import { appConfirm } from "@/components/AppDialog";
 
 type Audience = "all" | "today" | "active7" | "dormant" | "new7" | "app" | "pick";
 const AUDIENCE: { id: Audience; label: string; test?: (m: AdminMember) => boolean }[] = [
@@ -72,7 +73,7 @@ export default function PushView() {
 
     const send = async () => {
         const label = AUDIENCE.find((a) => a.id === audience)!.label;
-        if (!window.confirm(`'${label}' ${targetCount.toLocaleString()}명에게 알림을 보냅니다.\n\n${form.title}\n${form.body}\n\n보낸 알림은 되돌릴 수 없습니다.`)) return;
+        if (!(await appConfirm({ message: `'${label}' ${targetCount.toLocaleString()}명에게 알림을 보냅니다.\n\n${form.title}\n${form.body}\n\n보낸 알림은 되돌릴 수 없습니다.`, tone: "danger", confirmText: "보내기" }))) return;
         const payload = { title: form.title.trim(), body: form.body.trim(), url: form.url.trim() || undefined };
         try {
             let sent = 0, total = 0;

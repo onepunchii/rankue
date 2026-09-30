@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { invalidateCommunityPosts } from "./types";
+import { appConfirm } from "@/components/AppDialog";
 
 // 신고 다이얼로그 — 모든 UGC 표면에서 재사용 (Apple 1.2 / Play UGC 필수).
 // 차단 버튼도 함께 제공: 신고와 차단이 한 동선에 있어야 심사 요건을 채운다.
@@ -131,9 +132,8 @@ export const ReportDialog = ({ open, onOpenChange, targetType, targetId, targetA
                     <button
                         disabled={blockMutation.isPending}
                         onClick={() => {
-                            if (window.confirm(blockConfirmText(t, targetType, targetAuthorName))) {
-                                blockMutation.mutate(targetAuthorId);
-                            }
+                            void appConfirm({ message: blockConfirmText(t, targetType, targetAuthorName), tone: "danger", confirmText: t("community.blockMenu") })
+                                .then((ok) => { if (ok) blockMutation.mutate(targetAuthorId); });
                         }}
                         className="w-full h-11 rounded-full text-[13.5px] font-semibold text-red-600/80 hover:bg-red-50 transition-colors"
                     >

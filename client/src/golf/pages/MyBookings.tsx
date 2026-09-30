@@ -40,6 +40,7 @@ import {
 import { useMyWatches } from "../lib/courseApi";
 import { WatchedCourses } from "../components/course/list/WatchedCourses";
 import { GolfBackButton } from "../components/common/GolfBackButton";
+import { appConfirm } from "@/components/AppDialog";
 
 /** 카드의 역할 — 내가 올린 글이냐, 남의 글에 신청했느냐. */
 type Role = "mine" | "applied";
@@ -509,8 +510,8 @@ export default function GolfMyBookings() {
             onGo={() => goToListing(it)}
             onChat={() => setLocation(`/chat/listing/${it.id}`)}
             onToJoin={() => setToJoinItem(it)}
-            onDelete={() => { if (window.confirm("이 글을 내릴까요? 되돌릴 수 없어요.")) deleteMutation.mutate(it.id); }}
-            onCancel={() => { if (window.confirm("신청을 취소할까요?")) cancelMutation.mutate(it.id); }}
+            onDelete={() => { void appConfirm({ message: "이 글을 내릴까요? 되돌릴 수 없어요.", tone: "danger", confirmText: "내리기" }).then((ok) => { if (ok) deleteMutation.mutate(it.id); }); }}
+            onCancel={() => { void appConfirm({ message: "신청을 취소할까요?", tone: "danger", confirmText: "취소할게요", cancelText: "아니요" }).then((ok) => { if (ok) cancelMutation.mutate(it.id); }); }}
         />
     ));
 

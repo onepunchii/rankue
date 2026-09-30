@@ -40,6 +40,7 @@ import { GolfRoundsPicker } from "@/components/hiq/chat/attach/GolfRoundsPicker"
 import { GolfMatchCreateSheet } from "@/components/hiq/chat/attach/GolfMatchCreateSheet";
 import { JoinTypeBadge, joinTypeOf, kakaoMapUrl, kakaoRouteUrl } from "@/golf/components/join/joinUi";
 import { kstDateLabel, kstTime } from "@/lib/kst";
+import { appConfirm } from "@/components/AppDialog";
 
 const POLL_MS = 2500;
 /** 서버가 한 번에 주는 최근 메시지 수(chat.repo messages 와 같은 값) — 이만큼 꽉 차서 오면 위에 더 있다. */
@@ -227,7 +228,7 @@ export default function ChatRoomPage() {
     const retry = useCallback((msg: ChatMsg) => { setMessages((cur) => cur.filter((m) => m.id !== msg.id)); void send(msg.message); }, [send]);
 
     const remove = useCallback(async (msg: ChatMsg) => {
-        if (!window.confirm(t("chat.deleteConfirm"))) return;
+        if (!(await appConfirm({ message: t("chat.deleteConfirm"), tone: "danger", confirmText: t("community.delete") }))) return;
         try {
             await apiRequest(`/api/hiq/chat/rooms/${key}/messages/${msg.id}`, { method: "DELETE" });
             setMessages((cur) => cur.filter((m) => m.id !== msg.id));
@@ -262,7 +263,7 @@ export default function ChatRoomPage() {
         finally { setMenuBusy(false); }
     }, [key, qc, t, toast]);
     const leaveRoom = useCallback(async () => {
-        if (!window.confirm(t("chat.menu.leaveConfirm"))) return;
+        if (!(await appConfirm({ message: t("chat.menu.leaveConfirm"), tone: "danger", confirmText: t("chat.menu.leave") }))) return;
         setMenuBusy(true);
         try {
             await apiRequest(`/api/hiq/chat/rooms/${key}/leave`, { method: "POST" });

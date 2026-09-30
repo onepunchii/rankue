@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { appAlert } from "@/components/AppDialog";
 
 interface ReviewFormSheetProps {
     open: boolean;
@@ -33,7 +34,7 @@ export function ReviewFormSheet({ open, onOpenChange, onSubmit }: ReviewFormShee
 
     const handleSubmit = () => {
         if (formData.ratings.course === 0 || formData.ratings.green === 0 || formData.ratings.service === 0) {
-            alert("별점을 모두 입력해주세요!");
+            void appAlert("별점을 모두 입력해주세요!");
             return;
         }
         onSubmit(formData);

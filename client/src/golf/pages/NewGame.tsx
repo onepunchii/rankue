@@ -20,6 +20,7 @@ import { CourseLogo } from "../components/course/CourseLogo";
 
 // import { COURSES } from "@/golf/data/golfCourses"; // 더 이상 사용하지 않음
 import { useDebounce } from "@/hooks/use-debounce";
+import { appConfirm } from "@/components/AppDialog";
 
 const formatMoney = (amount: number) => new Intl.NumberFormat('ko-KR').format(amount);
 
@@ -368,7 +369,7 @@ export default function GolfNewGame() {
 
     /** 대기방을 접는다. 예전엔 대기실에 접는 버튼이 없어서, 사람이 안 오면 홈 카드가 12시간 남았다. */
     const abandonLobby = async () => {
-        if (!activeSession?.id || !window.confirm("이 방을 없앨까요?")) return;
+        if (!activeSession?.id || !(await appConfirm({ message: "이 방을 없앨까요?", tone: "danger", confirmText: "없애기" }))) return;
         try {
             await apiRequest(`/api/hiq/golf/match/${activeSession.id}/abandon`, { method: "POST" });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/match/active"] });

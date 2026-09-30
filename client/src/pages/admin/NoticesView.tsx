@@ -14,6 +14,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucidePlus } from "@/lib/icons";
 import { FilterChips, EmptyState, Panel, Pill, kstDateTime } from "./adminUtils";
+import { appConfirm } from "@/components/AppDialog";
 
 type Notice = { id: string; title: string; content: string; target: "all" | "owners"; hidden: boolean; createdAt: string };
 const NOTICES_KEY = ["/api/hiq/admin/notices"] as const;
@@ -83,7 +84,7 @@ export default function NoticesView() {
                             {n.hidden ? "보이기" : "가리기"}
                         </Button>
                         <Button size="sm" variant="ghost" className="h-8 text-red-500" disabled={remove.isPending}
-                            onClick={() => { if (window.confirm(`'${n.title}' 공지를 삭제할까요? 되돌릴 수 없습니다. 잠시 내리려면 '가리기'를 쓰세요.`)) remove.mutate(n.id); }}>
+                            onClick={() => { void appConfirm({ message: `'${n.title}' 공지를 삭제할까요? 되돌릴 수 없습니다. 잠시 내리려면 '가리기'를 쓰세요.`, tone: "danger", confirmText: "삭제" }).then((ok) => { if (ok) remove.mutate(n.id); }); }}>
                             삭제
                         </Button>
                     </div>

@@ -18,6 +18,7 @@ import { useTermsGate } from "@/components/hiq/TermsConsent";
 import type { CommunityComment, CommunityPost } from "@/components/hiq/community/types";
 import type { HiqMember } from "@shared/schema";
 import { ShareButton } from "@/components/hiq/ShareButton";
+import { appConfirm } from "@/components/AppDialog";
 
 interface PostDetail extends CommunityPost {
     comments: CommunityComment[];
@@ -163,7 +164,7 @@ export default function HiqCommunityPost() {
                                         <button
                                             onClick={() => {
                                                 setMenuCommentId(null);
-                                                if (window.confirm(t("community.deleteConfirm"))) deleteCommentMutation.mutate(c.id);
+                                                void appConfirm({ message: t("community.deleteConfirm"), tone: "danger", confirmText: t("community.delete") }).then((ok) => { if (ok) deleteCommentMutation.mutate(c.id); });
                                             }}
                                             className="w-full h-10 px-3.5 text-left text-[13px] font-semibold text-red-600 hover:bg-red-50 transition-colors"
                                         >

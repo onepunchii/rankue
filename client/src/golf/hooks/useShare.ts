@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { costText } from "@/golf/components/join/joinUi";
 import { apiRequest } from '@/lib/queryClient';
 import { kstDateKey, kstDateLabel, kstTime } from '@/lib/kst';
+import { appAlert } from "@/components/AppDialog";
 
 /**
  * 링크에 **날짜와 보기(부킹/조인)를 함께 싣는다.**
@@ -30,7 +31,7 @@ export const useShare = () => {
 
     const copyToClipboard = useCallback((text: string) => {
         navigator.clipboard.writeText(text);
-        alert("예약 링크가 복사되었습니다! 친구에게 붙여넣기 하세요.");
+        void appAlert("예약 링크가 복사되었습니다! 친구에게 붙여넣기 하세요.");
         setIsShareModalOpen(false);
     }, []);
 
@@ -72,10 +73,10 @@ export const useShare = () => {
                 method: "POST",
                 body: { crewId: crew.id },
             });
-            alert(`${crew.name} 채팅방에 공유되었습니다!`);
+            void appAlert(`${crew.name} 채팅방에 공유되었습니다!`);
             setIsShareModalOpen(false);
         } catch (e: any) {
-            alert(e?.message || "공유 중 오류가 발생했습니다.");
+            void appAlert(e?.message || "공유 중 오류가 발생했습니다.");
         }
     }, []);
 

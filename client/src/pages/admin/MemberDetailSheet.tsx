@@ -17,6 +17,7 @@ import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAle
 import MemberGamesDialog from "./MemberGamesDialog";
 import { PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday } from "./adminUtils";
 import { TODAY_ACTIVE_KEY } from "./TodayActiveView";
+import { appConfirm } from "@/components/AppDialog";
 
 export type AdminMember = {
     id: string;
@@ -266,7 +267,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                             <button
                                                 disabled={resetPin.isPending}
                                                 onClick={() => {
-                                                    if (window.confirm(`${m.name}(${m.phone}) 님의 PIN 을 임시 PIN 으로 바꿉니다.\n본인 확인을 마쳤나요? 지금 PIN 은 더 이상 쓸 수 없습니다.`)) resetPin.mutate(m.id);
+                                                    void appConfirm({ message: `${m.name}(${m.phone}) 님의 PIN 을 임시 PIN 으로 바꿉니다.\n본인 확인을 마쳤나요? 지금 PIN 은 더 이상 쓸 수 없습니다.`, tone: "danger", confirmText: "초기화" }).then((ok) => { if (ok) resetPin.mutate(m.id); });
                                                 }}
                                                 className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-black/[0.02] disabled:opacity-50"
                                             >
@@ -280,7 +281,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                                 disabled={setStatus.isPending}
                                                 onClick={() => {
                                                     const msg = banned ? `${m.name}님의 정지를 풀까요?` : `${m.name}님의 계정을 정지할까요?\n정지되면 로그인과 활동이 막힙니다.`;
-                                                    if (window.confirm(msg)) setStatus.mutate(!banned);
+                                                    void appConfirm({ message: msg, tone: banned ? "default" : "danger", confirmText: banned ? "정지 풀기" : "정지" }).then((ok) => { if (ok) setStatus.mutate(!banned); });
                                                 }}
                                                 className={`w-full flex items-center gap-3 px-4 py-3.5 text-left disabled:opacity-50 ${banned ? "hover:bg-brand/[0.04]" : "hover:bg-red-500/[0.04]"}`}
                                             >

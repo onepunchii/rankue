@@ -18,6 +18,7 @@ import { JoinApplicants } from './JoinApplicants';
 import { useT } from '@/lib/i18n';
 import { kstDateKey, kstTime } from '@/lib/kst';
 import { SlotDots, JoinTypeBadge, costText, dayLabel, hostSeatLabel, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, openGenderText, slotLegend, slotsOf } from '../join/joinUi';
+import { appConfirm } from "@/components/AppDialog";
 
 interface BookingCardProps {
     item: any;
@@ -290,11 +291,11 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                             {/* 버튼: 조인·부킹 모두 앱 안 신청. 부킹은 인원을 고른 뒤 보낸다. */}
                             <div className="flex gap-2 pt-1">
                                 <button
-                                    onClick={(e) => {
+                                    onClick={async (e) => {
                                         e.stopPropagation();
                                         if (isMine || !onApply) return;
                                         // 확정된 자리의 취소는 되돌릴 수 없다(취소 기록이 남고 올린 분께 알림이 간다) — 내역 시트처럼 확인을 받는다.
-                                        if (myStatus === "accepted" && !window.confirm(isJoin ? "확정된 조인을 취소할까요?\n올린 분께 알림이 가고 취소 기록이 남아요." : "확정된 예약을 취소할까요?\n올린 분께 알림이 가고 취소 기록이 남아요.")) return;
+                                        if (myStatus === "accepted" && !(await appConfirm({ message: isJoin ? "확정된 조인을 취소할까요?\n올린 분께 알림이 가고 취소 기록이 남아요." : "확정된 예약을 취소할까요?\n올린 분께 알림이 가고 취소 기록이 남아요.", tone: "danger", confirmText: "취소할게요", cancelText: "아니요" }))) return;
                                         if (isJoin || item.joinedByMe) { onApply(item); return; }
                                         if (!picking) { setPicking(true); return; }
                                         onApply(item, headcount); setPicking(false);

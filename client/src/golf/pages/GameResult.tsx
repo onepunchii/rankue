@@ -14,6 +14,7 @@ import { useSessionPhotos } from "../lib/photoApi";
 import { RoundDetailSheet, type RoundTarget } from "../components/photos/RoundDetailSheet";
 import { useOnSiteCheckin } from "../hooks/useOnSiteCheckin";
 import { OnSiteStampNote } from "../components/onsite/OnSiteStampNote";
+import { appAlert } from "@/components/AppDialog";
 
 /**
  * 랭큐매치 결과.
@@ -110,8 +111,8 @@ export default function GameResult() {
         try {
             if (navigator.share) { await navigator.share({ title: "랭큐 라운드 결과", text }); return; }
         } catch { return; /* 닫음 */ }
-        try { await navigator.clipboard.writeText(text); alert("결과를 복사했어요. 카톡에 붙여 넣어 보내세요."); }
-        catch { alert(text); }
+        try { await navigator.clipboard.writeText(text); void appAlert("결과를 복사했어요. 카톡에 붙여 넣어 보내세요."); }
+        catch { void appAlert(text); }
     };
 
     return (
