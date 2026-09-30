@@ -11,7 +11,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { LucideCamera, LucideLoader2, LucideX, LucideGlobe, LucideLock } from "@/lib/icons";
+import { LucideCamera, LucideImage, LucideLoader2, LucideX, LucideGlobe, LucideLock } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
@@ -27,8 +27,17 @@ export const toViewer = (p: AlbumPhoto): ViewerPhoto => ({
 });
 
 /**
- * 사진 올리기 한 벌 — 경기 화면·라운드 앨범이 같이 쓴다. pick(holeNo) 로 고르기 창을 연다.
+ * 사진 올리기 한 벌 — 경기 화면·라운드 앨범이 같이 쓴다. pick(holeNo, "camera" | "gallery") 로 연다.
  * 한 장씩 차례로 올린다: 큰 사진 둘을 동시에 캔버스로 풀면 휴대폰 웹뷰가 메모리 부족으로 죽는다.
+ *
+ * 카메라(2026-09-30 오너: "갤러리밖에 안 된다 — 카메라가 먼저"): `capture="environment"` 가 붙은 입력은 바로 후면 카메라를 연다.
+ *  - 안드로이드: 앱 1.2.0 Manifest 의 <queries> IMAGE_CAPTURE 덕에 카메라 앱이 뜬다(CAMERA 권한은 일부러 선언 안 함).
+ *    그 전 앱(1.0.x)은 capture 를 모르고 파일 선택기로 떨어진다 — 그래도 사진은 올라간다.
+ *  - iOS: Info.plist NSCameraUsageDescription 이 있어 바로 카메라. capture 가 없으면 iOS 는 '사진 보관함/사진 찍기' 시트를 띄운다.
+ *  - 찍은 사진은 JPEG(수 MB) → 아래 uploadRoundPhoto 가 긴 변 1600px webp(안 되면 JPEG)·400px 썸네일로 줄여 올린다.
+ *    EXIF 방향은 브라우저가 그릴 때 적용하고(이미지 방향 기본값 from-image), EXIF·GPS 는 캔버스를 거치며 빠진다.
+ *  - ⚠️ 웹 카메라로 찍은 원본은 폰 앨범에 따로 저장되지 않는다(안드로이드 카메라 앱은 앱 캐시에, iOS 는 저장 안 함) —
+ *    원본까지 폰에 남기려면 다음 앱 업데이트에 네이티브 카메라 플러그인(saveToGallery)이 필요하다.
  */
 export function usePhotoUploader(sessionId: string | null | undefined) {
     const qc = useQueryClient();
@@ -39,11 +48,12 @@ export function usePhotoUploader(sessionId: string | null | undefined) {
     const [pending, setPending] = useState(0);
     const [fresh, setFresh] = useState<{ ids: string[]; hole: number | null; hasPage: boolean } | null>(null);
     const input = useRef<HTMLInputElement>(null);
+    const cameraInput = useRef<HTMLInputElement>(null);
     const holeAtPick = useRef<number | null>(null);
 
     const { needsConsent, ask } = useTermsGate();
 
-    const pick = (holeNo: number | null) => {
+    const pick = (holeNo: number | null, source: "camera" | "gallery" = "gallery") => {
         if (!sessionId) return;
         // 사진도 UGC — 첫 사진이면 약관 동의부터(서버도 막는다). 파일 창은 누른 그 순간에만 열려서 동의 뒤 한 번 더 누르게 한다
         // (크루 사진첩과 같은 동선, CrewGalleryTab openPicker).
@@ -53,7 +63,7 @@ export function usePhotoUploader(sessionId: string | null | undefined) {
         }
         if (mineCount + pending >= max) { toast({ title: `한 라운드에 ${max}장까지 올릴 수 있어요` }); return; }
         holeAtPick.current = holeNo;
-        input.current?.click();
+        (source === "camera" ? cameraInput : input).current?.click();
     };
 
     const onFiles = async (files: FileList | null) => {
@@ -85,10 +95,17 @@ export function usePhotoUploader(sessionId: string | null | undefined) {
     };
 
     const inputEl = (
-        <input
-            ref={input} type="file" accept="image/*" multiple className="hidden" aria-hidden tabIndex={-1}
-            onChange={(e) => { void onFiles(e.target.files); e.target.value = ""; }}
-        />
+        <>
+            <input
+                ref={input} type="file" accept="image/*" multiple className="hidden" aria-hidden tabIndex={-1}
+                onChange={(e) => { void onFiles(e.target.files); e.target.value = ""; }}
+            />
+            {/* 카메라 — 한 장씩. multiple 과 같이 두면 일부 웹뷰가 capture 를 무시한다 */}
+            <input
+                ref={cameraInput} type="file" accept="image/*" capture="environment" className="hidden" aria-hidden tabIndex={-1}
+                onChange={(e) => { void onFiles(e.target.files); e.target.value = ""; }}
+            />
+        </>
     );
     // 카드의 자동 닫기 타이머가 이 함수에 걸려 있다 — 렌더마다 새 함수면 타이머가 계속 다시 시작해 안 닫힌다
     const clearFresh = useCallback(() => setFresh(null), []);
@@ -96,11 +113,13 @@ export function usePhotoUploader(sessionId: string | null | undefined) {
 }
 
 /** 방금 올린 사진 — 공개 스위치 한 줄(기본 비공개). 만지지 않으면 잠시 뒤 스스로 닫힌다 */
-function FreshCard({ fresh, photos, onClose, bottom }: {
+function FreshCard({ fresh, photos, onClose, bottom, onMore }: {
     fresh: { ids: string[]; hole: number | null; hasPage: boolean };
     photos: AlbumPhoto[];
     onClose: () => void;
     bottom: string;
+    /** 한 장 더 찍기 — 같은 홀로 카메라를 다시 연다 */
+    onMore?: () => void;
 }) {
     const { toast } = useToast();
     const setPublic = useSetPhotoPublic();
@@ -136,6 +155,12 @@ function FreshCard({ fresh, photos, onClose, bottom }: {
                             {fresh.hasPage ? (on ? "골프장 페이지에 공개" : "나와 동반자만 봐요") : "앨범에만 보여요"}
                         </span>
                     </span>
+                    {onMore && (
+                        <button type="button" onClick={() => { onClose(); onMore(); }} aria-label="한 장 더 찍기"
+                            className="shrink-0 h-8 px-2.5 rounded-full bg-[#FFFFFF14] text-[12.5px] font-semibold text-[#ffffff] flex items-center gap-1 active:bg-[#FFFFFF24]">
+                            <LucideCamera className="w-4 h-4" />한 장 더
+                        </button>
+                    )}
                     {fresh.hasPage && mine.length > 0 && <PublicSwitch on={on} busy={setPublic.isPending} onChange={toggle} label="골프장 페이지에 공개" />}
                     <button type="button" onClick={onClose} aria-label="닫기" className="shrink-0 w-8 h-8 -mr-1 rounded-full flex items-center justify-center text-[#FFFFFF80] active:bg-[#FFFFFF14]">
                         <LucideX weight="bold" className="w-4 h-4" />
@@ -159,7 +184,7 @@ export function useRoundPhotos(sessionId: string | null | undefined, holeNo: num
 
     const button = (
         <button
-            type="button" onClick={() => up.pick(holeNo)} aria-label={`사진 올리기${total ? ` (이번 라운드 ${total}장)` : ""}`}
+            type="button" onClick={() => up.pick(holeNo, "camera")} aria-label={`사진 찍기${total ? ` (이번 라운드 ${total}장)` : ""}`}
             className="relative shrink-0 w-9 h-9 rounded-full bg-[#FFFFFF0F] text-[#FFFFFFCC] flex items-center justify-center active:bg-[#FFFFFF1F]"
         >
             {up.pending > 0 ? <LucideLoader2 className="w-[18px] h-[18px] animate-spin text-[#9BEF5C]" /> : <LucideCamera className="w-[19px] h-[19px]" />}
@@ -173,6 +198,12 @@ export function useRoundPhotos(sessionId: string | null | undefined, holeNo: num
     const strip = total + up.pending > 0 ? (
         <div className="px-4 pt-3">
             <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide" aria-label="이번 라운드 사진">
+                {/* 앨범에서 고르기 — 경기 중엔 카메라가 먼저(머리 📷), 미리 찍어 둔 사진은 여기서 */}
+                <button type="button" onClick={() => up.pick(holeNo, "gallery")} aria-label="앨범에서 사진 고르기"
+                    className="shrink-0 w-11 h-11 rounded-xl border border-dashed border-[#FFFFFF33] text-[#FFFFFFB3] flex flex-col items-center justify-center gap-0.5 active:bg-[#FFFFFF0F]">
+                    <LucideImage className="w-4 h-4" />
+                    <span className="text-[10px] font-semibold leading-none">앨범</span>
+                </button>
                 {Array.from({ length: up.pending }, (_, i) => (
                     <span key={`p${i}`} className="shrink-0 w-11 h-11 rounded-xl bg-[#FFFFFF0F] flex items-center justify-center">
                         <LucideLoader2 className="w-4 h-4 animate-spin text-[#FFFFFF80]" />
@@ -195,7 +226,7 @@ export function useRoundPhotos(sessionId: string | null | undefined, holeNo: num
     const overlay = (
         <>
             {up.inputEl}
-            {up.fresh && <FreshCard fresh={up.fresh} photos={up.photos} onClose={up.clearFresh} bottom={freshBottom} />}
+            {up.fresh && <FreshCard fresh={up.fresh} photos={up.photos} onClose={up.clearFresh} bottom={freshBottom} onMore={() => up.pick(up.fresh?.hole ?? holeNo, "camera")} />}
             <PhotoViewer photos={viewerPhotos} index={viewer} onClose={() => setViewer(null)} />
         </>
     );

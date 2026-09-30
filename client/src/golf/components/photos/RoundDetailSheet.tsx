@@ -10,7 +10,7 @@
  */
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { LucideCamera, LucideGlobe, LucideLoader2 } from "@/lib/icons";
+import { LucideCamera, LucideGlobe, LucideImage, LucideLoader2 } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { kstDateKey } from "@/lib/kst";
@@ -111,12 +111,21 @@ export function AlbumGrid({ sessionId, photos, onOpen }: { sessionId: string; ph
     return (
         <div>
             <div className="grid grid-cols-3 gap-1.5">
-                <button type="button" onClick={() => up.pick(null)}
-                    className="aspect-square rounded-xl border border-dashed border-[#64DD1780] bg-[#64DD170D] flex flex-col items-center justify-center gap-1 text-[#9BEF5C] active:bg-[#64DD171F]">
-                    <LucideCamera className="w-6 h-6" />
-                    <span className="text-[12.5px] font-semibold">사진 추가</span>
-                    <span className="text-[12px] text-[#9BEF5CB3] tabular-nums">{mineCount}/{up.max}</span>
-                </button>
+                {/* 사진 추가 한 칸을 둘로 — 위: 카메라로 찍기, 아래: 앨범에서 고르기(라운드 뒤엔 앨범이 더 흔하다) */}
+                <div className="aspect-square rounded-xl border border-dashed border-[#64DD1780] bg-[#64DD170D] flex flex-col overflow-hidden">
+                    <button type="button" onClick={() => up.pick(null, "camera")} aria-label="카메라로 사진 찍기"
+                        className="flex-1 flex items-center justify-center gap-1.5 text-[#9BEF5C] active:bg-[#64DD171F]">
+                        <LucideCamera className="w-5 h-5" />
+                        <span className="text-[12.5px] font-semibold">찍기</span>
+                    </button>
+                    <span aria-hidden className="mx-3 h-px bg-[#64DD1740]" />
+                    <button type="button" onClick={() => up.pick(null, "gallery")} aria-label="앨범에서 사진 고르기"
+                        className="flex-1 flex items-center justify-center gap-1.5 text-[#9BEF5C] active:bg-[#64DD171F]">
+                        <LucideImage className="w-5 h-5" />
+                        <span className="text-[12.5px] font-semibold">앨범</span>
+                    </button>
+                    <span className="pb-1.5 text-center text-[11px] text-[#9BEF5CB3] tabular-nums">{mineCount}/{up.max}</span>
+                </div>
                 {Array.from({ length: up.pending }, (_, i) => (
                     <span key={`p${i}`} className="aspect-square rounded-xl bg-[#FFFFFF0A] flex items-center justify-center">
                         <LucideLoader2 className="w-5 h-5 animate-spin text-[#FFFFFF73]" />

@@ -151,13 +151,21 @@ function patchPhoto(old: any, id: string, fn: (p: any) => any) {
 
 export class PhotoError extends Error {}
 
+/** HEIC·HEIF(아이폰·갤럭시 '고효율 사진') — 안드로이드 웹뷰(크롬)는 풀지 못한다. iOS 는 고를 때 JPEG 로 바꿔 준다 */
+const isHeic = (f: File) => /image\/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name);
+
 function loadImage(file: File): Promise<{ img: HTMLImageElement; done: () => void }> {
     return new Promise((resolve, reject) => {
         const url = URL.createObjectURL(file);
         const img = new Image();
         img.decoding = "async";
         img.onload = () => resolve({ img, done: () => URL.revokeObjectURL(url) });
-        img.onerror = () => { URL.revokeObjectURL(url); reject(new PhotoError("이 사진은 열 수 없어요. 다른 사진을 골라 주세요")); };
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            reject(new PhotoError(isHeic(file)
+                ? "고효율(HEIC) 사진은 이 기기에서 열 수 없어요 · 카메라로 바로 찍거나 JPG 사진을 골라 주세요"
+                : "이 사진은 열 수 없어요. 다른 사진을 골라 주세요"));
+        };
         img.src = url;
     });
 }
