@@ -16,9 +16,9 @@ const HEAD: Record<Extract<OnSiteView, { kind: "unverified" }>["why"], string> =
 
 /** 칩 아래 한 줄 — 왜 인증이 안 됐고, 이대로 끝내면 어떻게 되나 */
 export function whyLine(view: OnSiteView): string | null {
-    if (view.kind === "no-course") return "이 골프장은 위치 정보가 없어요 · 도장은 기록 도장으로 남아요";
+    if (view.kind === "no-course") return "이 골프장은 위치 정보가 없어요 · 도장은 미인증으로 남아요";
     if (view.kind !== "unverified") return null;
-    return `${HEAD[view.why]} · 인증 없이 끝내면 기록 도장이 돼요`;
+    return `${HEAD[view.why]} · 인증 없이 끝내면 미인증으로 남아요`;
 }
 
 /** 결과 화면 — 기록 도장이 된 이유 */

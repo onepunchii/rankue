@@ -129,9 +129,9 @@ export const StampList = ({ stamps, records = [] }: { stamps: Stamp[]; records?:
  */
 function RecordStamps({ records }: { records: Stamp[] }) {
     return (
-        <section className="mt-6 mb-2" aria-label="기록 도장">
+        <section className="mt-6 mb-2" aria-label="미인증">
             <div className="px-2 flex items-baseline justify-between gap-3">
-                <h3 className="text-[14px] font-semibold text-[#FFFFFF99]">기록 도장 <span className="text-[#FFFFFF59] tabular-nums">{records.length}</span></h3>
+                <h3 className="text-[14px] font-semibold text-[#FFFFFF99]">미인증 <span className="text-[#FFFFFF59] tabular-nums">{records.length}</span></h3>
                 <span className="text-[12px] text-[#FFFFFF59]">정복 수에 안 들어가요</span>
             </div>
             <p className="mt-1 px-2 text-[12.5px] leading-relaxed text-[#FFFFFF73] break-keep">
@@ -142,7 +142,7 @@ function RecordStamps({ records }: { records: Stamp[] }) {
                     const rotation = ((i * 13) % 12) - 6;
                     return (
                         <div key={stamp.id} className="relative aspect-[4/5] bg-[#FFFFFF03] border border-[#FFFFFF0A] rounded-xl flex items-center justify-center overflow-hidden">
-                            <span className="absolute top-1.5 right-1.5 h-[18px] px-1.5 rounded-md bg-[#FFFFFF0F] text-[10.5px] font-semibold leading-[18px] text-[#FFFFFF8C]">기록</span>
+                            <span className="absolute top-1.5 right-1.5 h-[18px] px-1.5 rounded-md bg-[#FFFFFF0F] text-[10.5px] font-semibold leading-[18px] text-[#FFFFFF8C]">미인증</span>
                             <div
                                 className="relative w-[84%] aspect-square rounded-full border-[1.5px] border-dashed border-[#FFFFFF33] flex flex-col items-center justify-center text-center p-1 opacity-70"
                                 style={{ transform: `rotate(${rotation}deg)` }}

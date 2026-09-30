@@ -145,7 +145,7 @@ export function FootprintsPanel() {
                     <span className="font-semibold text-[#8BE84A]">{stops.length}곳</span>
                     <span> · 라운드 {data?.rounds ?? 0}회</span>
                     {km >= 1 && <span> · 이으면 {km.toLocaleString()}km</span>}
-                    {records.length > 0 && <span> · 기록 도장 {records.length}곳</span>}
+                    {records.length > 0 && <span> · 미인증 {records.length}곳</span>}
                     {selected == null && stops.length > 0 && <span className="text-[#FFFFFF59]"> · 번호를 누르면 자세히</span>}
                 </p>
             )}
@@ -185,8 +185,8 @@ export function FootprintsPanel() {
             )}
 
             {records.length > 0 && (
-                <section className="mt-5" aria-label="기록 도장">
-                    <h3 className="px-1 text-[14px] font-semibold text-[#FFFFFF99]">기록 도장 <span className="text-[#FFFFFF59] tabular-nums">{records.length}</span></h3>
+                <section className="mt-5" aria-label="미인증">
+                    <h3 className="px-1 text-[14px] font-semibold text-[#FFFFFF99]">미인증 <span className="text-[#FFFFFF59] tabular-nums">{records.length}</span></h3>
                     <p className="mt-0.5 px-1 text-[12.5px] leading-relaxed text-[#FFFFFF73] break-keep">
                         현장 인증 없이 적은 골프장이라 발자국 길·공유 카드에는 넣지 않았어요. 점수는 그대로 남아요.
                     </p>
@@ -200,7 +200,7 @@ export function FootprintsPanel() {
                                         {dot(s.firstVisitedAt)}{s.visits > 1 ? ` · ${s.visits}회` : ""}{s.lat == null ? " · 지도 위치 없음" : ""}
                                     </span>
                                 </span>
-                                <span className="shrink-0 h-5 px-1.5 rounded-md bg-[#FFFFFF0F] text-[11.5px] font-medium leading-5 text-[#FFFFFF8C]">기록</span>
+                                <span className="shrink-0 h-5 px-1.5 rounded-md bg-[#FFFFFF0F] text-[11.5px] font-medium leading-5 text-[#FFFFFF8C]">미인증</span>
                             </li>
                         ))}
                     </ul>

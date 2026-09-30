@@ -664,10 +664,10 @@ export default function GolfScorecard() {
                             {onSite.view.kind === "verified"
                                 ? "📍 현장 인증됨 — 여권에 또렷한 도장이 찍혀요"
                                 : onSite.view.kind === "no-course"
-                                    ? "이 골프장은 위치 정보가 없어 도장이 흐린 기록 도장으로 남아요 · 점수·평균은 그대로"
+                                    ? "이 골프장은 위치 정보가 없어 도장이 미인증으로 남아요 · 점수·평균은 그대로"
                                     : onSite.view.kind === "checking"
                                         ? "현장 위치를 확인하는 중이에요"
-                                        : "현장 인증이 안 됐어요 — 점수·평균은 남고, 도장은 흐린 기록 도장이 돼요"}
+                                        : "현장 인증이 안 됐어요 — 점수·평균은 남고, 도장은 미인증으로 남아요"}
                         </p>
                     )}
                     <DialogFooter className="flex-row gap-2">

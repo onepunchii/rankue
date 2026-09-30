@@ -20,7 +20,7 @@ export function StampSeal({ onSite, size = 44 }: { onSite: boolean; size?: numbe
             )}
             style={{ width: size, height: size, fontSize: Math.round(size * (onSite ? 0.4 : 0.27)) }}
         >
-            {onSite ? "✓" : "기록"}
+            {onSite ? "✓" : "미인증"}
         </span>
     );
 }
@@ -36,7 +36,7 @@ export function OnSiteStampNote({ summary, busy, onRetry }: { summary: OnSiteSum
             <div className="flex items-center gap-3.5">
                 <StampSeal onSite={ok} />
                 <div className="flex-1 min-w-0">
-                    <p className={cn("text-[15px] font-semibold", ok ? "text-[#9BEF5C]" : "text-[#FFFFFFCC]")}>{ok ? "현장 인증 도장" : "기록 도장"}</p>
+                    <p className={cn("text-[15px] font-semibold", ok ? "text-[#9BEF5C]" : "text-[#FFFFFFCC]")}>{ok ? "현장 인증 도장" : "미인증"}</p>
                     <p className="mt-0.5 text-[12.5px] leading-snug text-[#FFFFFF8C] break-keep">
                         {ok
                             ? (summary.byCompanion ? "동반자 폰 위치로 현장이 확인됐어요" : VERDICT_TEXT.ok)

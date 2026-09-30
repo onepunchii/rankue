@@ -174,7 +174,7 @@ export function GolfRoundReport({ history }: { history: Round[] }) {
                                                                 {isBest && <span className="shrink-0 h-5 px-1.5 rounded bg-[#FF8A3D] text-[11px] font-semibold text-[#ffffff] leading-5">베스트</span>}
                                                                 {/* 현장 인증 — 기록 도장은 점수·평균엔 들어가고 여권 도장만 흐리다. 옛 기록(null)은 표시하지 않는다 */}
                                                                 {r.onSite === true && <span className="shrink-0 h-5 px-1.5 rounded bg-[#64DD171F] text-[11px] font-semibold text-[#9BEF5C] leading-5">현장 인증</span>}
-                                                                {r.onSite === false && <span className="shrink-0 h-5 px-1.5 rounded bg-[#FFFFFF0F] text-[11px] font-medium text-[#FFFFFF8C] leading-5">기록 도장</span>}
+                                                                {r.onSite === false && <span className="shrink-0 h-5 px-1.5 rounded bg-[#FFFFFF0F] text-[11px] font-medium text-[#FFFFFF8C] leading-5">미인증</span>}
                                                             </span>
                                                             <span className="block mt-0.5 text-[12.5px] text-[#FFFFFF73] truncate">{[r.subType, `${r.innings || 18}홀`].filter(Boolean).join(" · ")}</span>
                                                         </span>

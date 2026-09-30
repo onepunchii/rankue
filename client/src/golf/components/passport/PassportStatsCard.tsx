@@ -88,7 +88,7 @@ export const PassportStatsCard = ({ stats, recordCount = 0 }: Props) => {
             )}
             {recordCount > 0 && (
                 <p className="mt-3 text-[12.5px] text-[#FFFFFF73] break-keep leading-relaxed">
-                    현장 인증 없이 적은 <span className="text-[#FFFFFFB3] tabular-nums">{recordCount}곳</span>은 흐린 기록 도장이라 정복 수에 안 들어가요.
+                    현장 인증 없이 친 <span className="text-[#FFFFFFB3] tabular-nums">{recordCount}곳</span>은 미인증이라 정복 수에 안 들어가요.
                 </p>
             )}
         </section>

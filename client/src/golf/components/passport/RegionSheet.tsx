@@ -61,7 +61,7 @@ function Row({ name, logo, done, record, onOpen }: { name: string; logo?: string
                 )}
                 <CourseLogo logo={logo} name={name} size="xs" />
                 <span className={cn("flex-1 min-w-0 block text-[15px] truncate", done ? "font-semibold text-[#ffffff]" : "font-medium text-[#FFFFFFCC]")}>{name}</span>
-                {record && <span className="shrink-0 h-5 px-1.5 rounded-md bg-[#FFFFFF0F] text-[11.5px] font-medium leading-5 text-[#FFFFFF8C]">기록 도장</span>}
+                {record && <span className="shrink-0 h-5 px-1.5 rounded-md bg-[#FFFFFF0F] text-[11.5px] font-medium leading-5 text-[#FFFFFF8C]">미인증</span>}
                 {onOpen && <LucideChevronRight className="w-4 h-4 shrink-0 text-[#FFFFFF33]" />}
             </button>
         </li>
