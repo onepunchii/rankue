@@ -28,7 +28,7 @@ import { readZoomPref, safeLocalStorage, selectRendererKind, type RendererKind }
 import { matchApi, matchConfig, type ChatLine, type MatchPublic, type MatchShot } from "../matchApi";
 import { cueBallIdOf, paramsFromConfig } from "../simReducer";
 import { easeOppAim, OPP_AIM_PULLBACK } from "../match/oppAim";
-import { effectiveBall, makePlayback, startClock, clockTime, type Playback, type PlaybackClock } from "../playback";
+import { effectiveBall, makePlayback, startClock, clockTime, withSpeed, type Playback, type PlaybackClock } from "../playback";
 import { TopBar, type MatchHeaderPlayer } from "../components/TopBar";
 import { InningSheet } from "../components/InningSheet";
 import { QuickChips, CHAT_GLYPH, WATCHER_BUBBLE, WATCHER_CHIP, WATCHER_TAG } from "../match/MatchChat";
@@ -38,7 +38,8 @@ import { matchParamsKey, nextPollMs, normalizeShots, planWatch, shouldSkipAnimat
 import { ShotStrip, type ShotStripState } from "./ShotStrip";
 
 const INSETS: SafeInsets = { top: 8, right: 8, bottom: 8, left: 8 };
-const SPEEDS = [1, 2, 4] as const;
+// 느리게 보기(2026-09-30 오너: "샷 속도를 느리게 하는 옵션") — 0.25·0.5 배. 재생 중에 바꿔도 시계가 그 자리에서 이어진다(playback withSpeed)
+const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 type Speed = typeof SPEEDS[number];
 
 /** 폴링으로 받은 샷을 지금까지 아는 샷에 합친다(같은 idx 는 새 값, idx 순). */
@@ -87,6 +88,11 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     const aliveRef = useRef(true);
     const speedRef = useRef<Speed>(1);
     speedRef.current = speed;
+    // 재생 중에 속도를 바꾸면 **그 샷부터** 바로(예전엔 다음 샷부터였다) — 지금 시각에서 시계를 다시 잡아 공이 튀지 않는다
+    useEffect(() => {
+        const a = animRef.current;
+        if (a) animRef.current = { ...a, clock: withSpeed(a.clock, performance.now(), speed) };
+    }, [speed]);
     const viewRef = useRef<RendererView>("top");
     viewRef.current = view;
     const aimRef = useRef<{ cueBallId: string; phi: number }>({ cueBallId: "white", phi: Math.PI / 2 });
@@ -380,6 +386,21 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         setStripShot(null);
     };
 
+    /**
+     * i 번째 샷을 그 샷 직전 배치에서 다시 친다(2026-09-30 오너: "다시보기 중 이전 샷·다시보기"). 재생 중엔 부르지 않는다 —
+     * 도는 샷의 done() 을 끊으면 playList 가 영영 기다린다(버튼을 animating 동안 막는 이유).
+     */
+    const replayFrom = (i: number) => {
+        const s = replayShots[i];
+        if (!s || animating) return;
+        setAutoPlay(false);
+        animRef.current = null;
+        ballsRef.current = s.preState as BallState[];
+        dirtyRef.current = true;
+        setPlayedShots(i);
+        void playList([s]);
+    };
+
     /* ── 40초 시계: 선수 화면과 같은 계산(서버가 적은 turnSeenAt 부터, 서버 시각 보정) ── */
     const seenAt = match?.status === "playing" && match.turnSeenAt ? Date.parse(match.turnSeenAt) : 0;
     const clockOn = seenAt > 0 && Number.isFinite(seenAt) && !animating;
@@ -455,7 +476,8 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                     ))}
                 </ul>
             )}
-            <div className="shrink-0 px-4 pt-2 flex items-center gap-2">
+            {/* 끝난 대전 다시보기엔 응원 줄이 없다(2026-09-30 오너: "다시보기에서 하이·굿샷·아깝다 입력칸은 없어도") — 보낼 상대가 이미 떠났다 */}
+            {!finished && <div className="shrink-0 px-4 pt-2 flex items-center gap-2">
                 {/* 나도 관전자다 — 내가 보낼 응원이 어떤 색으로 뜨는지, 지금 몇 명이 보는지 같은 보라로 */}
                 {(match?.watchers ?? 0) > 0 && <span className={cn("shrink-0", WATCHER_CHIP)}>👀 {match!.watchers}</span>}
                 <div className="min-w-0 flex-1">
@@ -471,27 +493,50 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                     }}
                 />
                 </div>
-            </div>
+            </div>}
 
             <footer className="shrink-0 px-4 py-3 space-y-2">
                 {finished ? (
-                    <div className="flex items-center gap-2">
-                        <button onClick={restart} className="h-11 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2">{t("sim.watch.restart")}</button>
-                        <button
-                            onClick={() => setAutoPlay((v) => !v)}
-                            disabled={replayShots.length === 0 || playedShots >= replayShots.length}
-                            className="h-11 flex-1 rounded-tile bg-brand text-brand-fg text-[14px] font-bold disabled:opacity-40"
-                        >{autoPlay ? t("sim.watch.pause") : t("sim.watch.play")}</button>
-                        <button
-                            onClick={() => { setAutoPlay(false); const nx = replayShots[playedShots]; if (nx) void playList([nx]); }}
-                            disabled={animating || playedShots >= replayShots.length}
-                            className="h-11 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2 disabled:opacity-40"
-                        >{t("sim.watch.nextShot")}</button>
-                        <button
-                            onClick={() => setSpeed(SPEEDS[(SPEEDS.indexOf(speed) + 1) % SPEEDS.length])}
-                            className="h-11 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2"
-                        >{t("sim.watch.speed").replace("{n}", String(speed))}</button>
-                    </div>
+                    <>
+                        {/* 1줄: 이전 샷 · 재생 · 다음 샷 */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => replayFrom(playedShots - 2)}
+                                disabled={animating || playedShots < 2}
+                                className="h-11 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2 disabled:opacity-40"
+                            >{t("sim.watch.prevShot")}</button>
+                            <button
+                                onClick={() => setAutoPlay((v) => !v)}
+                                disabled={replayShots.length === 0 || playedShots >= replayShots.length}
+                                className="h-11 flex-1 rounded-tile bg-brand text-brand-fg text-[14px] font-bold disabled:opacity-40"
+                            >{autoPlay ? t("sim.watch.pause") : t("sim.watch.play")}</button>
+                            <button
+                                onClick={() => { setAutoPlay(false); const nx = replayShots[playedShots]; if (nx) void playList([nx]); }}
+                                disabled={animating || playedShots >= replayShots.length}
+                                className="h-11 px-3 rounded-tile border border-surface-line text-[13px] font-semibold text-ink-2 disabled:opacity-40"
+                            >{t("sim.watch.nextShot")}</button>
+                        </div>
+                        {/* 2줄: 처음부터 · 이 샷 다시 ··· 속도(느리게 0.25·0.5 배) */}
+                        <div className="flex items-center gap-2">
+                            <button onClick={restart} disabled={animating} className="h-9 px-3 rounded-tile border border-surface-line text-[12.5px] font-semibold text-ink-2 disabled:opacity-40">{t("sim.watch.restart")}</button>
+                            <button
+                                onClick={() => replayFrom(playedShots - 1)}
+                                disabled={animating || playedShots < 1}
+                                className="h-9 px-3 rounded-tile border border-surface-line text-[12.5px] font-semibold text-ink-2 disabled:opacity-40"
+                            >{t("sim.watch.againShot")}</button>
+                            <div role="radiogroup" aria-label={t("sim.watch.speedLabel")} className="ml-auto flex items-center gap-0.5 rounded-pill bg-surface-1 border border-surface-line p-0.5">
+                                {SPEEDS.map((v) => (
+                                    <button
+                                        key={v} role="radio" aria-checked={speed === v} onClick={() => setSpeed(v)}
+                                        className={cn(
+                                            "h-8 min-w-[40px] px-1.5 rounded-pill text-[12px] font-semibold tabular-nums",
+                                            speed === v ? "bg-ink-1 text-surface-0" : "text-ink-3",
+                                        )}
+                                    >{v}×</button>
+                                ))}
+                            </div>
+                        </div>
+                    </>
                 ) : (
                     <p className={cn("text-[11px] text-ink-3 text-center")}>
                         {animating ? t("sim.watch.playing") : t("sim.watch.seen").replace("{n}", String(match.shots))}
