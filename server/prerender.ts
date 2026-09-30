@@ -9,6 +9,7 @@ import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo } from "../shared/storeMeta.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
+import { storeCardUrl } from "./services/storeCard.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW, LANDING_LANGS, landingContent } from "../shared/landingContent.js";
 import {
   formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared,
@@ -565,12 +566,20 @@ const golfImage = () => ({ url: OG_GOLF_IMAGE, width: 1200, height: 630, alt: "�
  * 목록 페이지 맨 위 골프장 카드 줄(2026-09-30) — 세계랭킹 검색 결과 밑에 선수 카드가 줄지어 뜨는 것처럼
  * 네이버가 골프장 카드를 모아 보여 줄 재료. 위에서부터 12곳(목록 정렬 그대로), 카드 밑에 이름.
  */
-function golfCardGallery(ps: GolfPageRow[]): string {
-  const top = ps.slice(0, 12);
-  if (!top.length) return "";
-  return `<section aria-label="대표 골프장">
-  ${top.map((p) => `<figure><a href="${esc(coursePath(p.slug))}"><img src="${esc(golfCourseCardUrl(ORIGIN, p.slug))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(`${p.name} 그린피·회원권 시세 카드`)}" loading="lazy"></a><figcaption>${esc(p.name)}</figcaption></figure>`).join("\n  ")}
+/**
+ * 카드 줄 — 이미지 + 이름을 이은 링크 묶음(2026-09-30). 네이버가 결과 밑에 선수 카드를 줄지어 보여 준 것처럼(세계랭킹),
+ * 목록·이웃 절에 **각자 다른 카드**를 모아 둔다. 텍스트 목록은 그대로 두고 그 위에 얹는다(검색 로봇만 보는 HTML).
+ */
+function cardGallery(label: string, items: { href: string; img: string; name: string; alt: string }[]): string {
+  if (!items.length) return "";
+  return `<section aria-label="${esc(label)}">
+  ${items.map((x) => `<figure><a href="${esc(x.href)}"><img src="${esc(x.img)}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(x.alt)}" loading="lazy"></a><figcaption>${esc(x.name)}</figcaption></figure>`).join("\n  ")}
   </section>`;
+}
+function golfCardGallery(ps: GolfPageRow[]): string {
+  return cardGallery("대표 골프장", ps.slice(0, 12).map((p) => ({
+    href: coursePath(p.slug), img: golfCourseCardUrl(ORIGIN, p.slug), name: p.name, alt: `${p.name} 그린피·회원권 시세 카드`,
+  })));
 }
 
 // ── /golf/course/:slug ────────────────────────────────────────────
@@ -1550,6 +1559,10 @@ export function registerPrerender(app: Express) {
             const nm = lang === "ko" && n.nativeName ? `${n.nativeName} (${n.playerName})` : n.playerName;
             return `<li>${esc(L.rankWord(n.rank))} <a href="/player/${category}/${esc(n.playerUmbId)}${lang === "ko" ? "" : `?lang=${lang}`}">${esc(nm)}</a> (${esc(n.fed)})</li>`;
           }).join("\n  ")}\n  </ul>`;
+          nearHtml += "\n  " + cardGallery(L.nearH, near.map((n) => {
+            const nm = lang === "ko" && n.nativeName ? n.nativeName : n.playerName;
+            return { href: `/player/${category}/${n.playerUmbId}${lang === "ko" ? "" : `?lang=${lang}`}`, img: playerCardUrl(ORIGIN, category, n.playerUmbId, lang), name: nm, alt: `${nm} — ${L.rankWord(n.rank)}` };
+          }));
         }
       } catch (e) {
         console.warn("[prerender] player neighbors failed:", (e as Error)?.message);
@@ -1723,6 +1736,10 @@ ${list}
           if (others.length) {
             nearHtml = `\n  <h2>${esc(G.nearH)}</h2>\n  <ul>\n  ${others.map((r) =>
               `<li>${esc(G.rankWord(r.rank))} <a href="/golfer/${tour}/${esc(r.playerId)}${langSuffix}">${esc(golferNameFull(lang, r))}</a> (${esc(r.country)})</li>`).join("\n  ")}\n  </ul>`;
+            nearHtml += "\n  " + cardGallery(G.nearH, others.map((r) => ({
+              href: `/golfer/${tour}/${r.playerId}${langSuffix}`, img: golferCardUrl(ORIGIN, tour, String(r.playerId), lang),
+              name: golferNameFull(lang, r), alt: `${golferNameFull(lang, r)} — ${G.rankWord(r.rank)}`,
+            })));
           }
         } catch (e) {
           console.warn("[prerender] golfer neighbors failed:", (e as Error)?.message);
@@ -1945,7 +1962,10 @@ ${list}
       ? `\n  <h2>${esc(ko
           ? `${pbaSeasonLabel(x.neighbors.season)} 시즌 ${x.neighbors.league} 상금랭킹 — 비슷한 순위의 선수`
           : `${pbaSeasonLabel(x.neighbors.season)} ${x.neighbors.league} prize ranking — players nearby`)}</h2>\n  <ul>\n  ${x.neighbors.rows.map((r) =>
-          `<li>${ko ? `${r.prizeRank}위` : `No.${r.prizeRank}`} <a href="/pba-player/${esc(encodeURIComponent(r.memCode))}${ls}">${esc(ko ? r.nameKo : (r.nameEn || r.nameKo))}</a></li>`).join("\n  ")}\n  </ul>`
+          `<li>${ko ? `${r.prizeRank}위` : `No.${r.prizeRank}`} <a href="/pba-player/${esc(encodeURIComponent(r.memCode))}${ls}">${esc(ko ? r.nameKo : (r.nameEn || r.nameKo))}</a></li>`).join("\n  ")}\n  </ul>\n  ${cardGallery(ko ? "비슷한 순위의 선수" : "Players nearby", x.neighbors.rows.map((r) => ({
+            href: `/pba-player/${encodeURIComponent(r.memCode)}${ls}`, img: pbaCardUrl(ORIGIN, r.memCode, pplang),
+            name: ko ? r.nameKo : (r.nameEn || r.nameKo), alt: `${ko ? r.nameKo : (r.nameEn || r.nameKo)} — ${ko ? `${r.prizeRank}위` : `No.${r.prizeRank}`}`,
+          })))}`
       : "";
     // 우승한 대회 — pba_tournaments.winner_mem_code(대회 페이지가 있는 것만, 최근 먼저). 대회 페이지는 한국어 전용이다.
     const winsHtml = x && x.wins.length
@@ -2216,6 +2236,7 @@ ${list}
   <nav><a href="/stores">← 매장 찾기</a></nav>
   <h1>${esc(regionQ)} 당구장 ${hit.n.toLocaleString("ko-KR")}곳</h1>
   <p>${esc(regionQ)} 지역 당구장의 주소·영업시간·테이블 구성·요금을 확인하세요.</p>
+  ${cardGallery(`${regionQ} 당구장`, dirRows.slice(0, 12).map((x) => ({ href: `/stores/${x.code}`, img: storeCardUrl(ORIGIN, x.code), name: x.name, alt: `${x.name} 요금·영업시간 카드` })))}
   <h2>${esc(regionQ)} 당구장 목록</h2>
   ${dirRows.map((s) => `<section><h3><a href="/stores/${esc(s.code)}">${esc(s.name)}</a></h3><p>${esc(s.address)}</p></section>`).join("\n  ")}
   <h2>다른 지역 당구장</h2>
@@ -2339,8 +2360,10 @@ ${list}
         title: storeTitleKo(s.name, s.region, s.address), // 시·구·동까지 — 화면 store-listing.tsx 와 같은 인자
         desc: storeDescKo(s.name, s.address, s as any, s.openHours),
         canonical: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
+        // 매장 카드(요금·테이블·영업시간) — 1,199곳 대표 이미지가 하나도 없었다(2026-09-30)
+        image: { url: storeCardUrl(ORIGIN, s.code), width: CARD_SIZE, height: CARD_SIZE, alt: `${s.name} 요금·영업시간 카드` },
         jsonLd: [
-          storeJsonLd(s as any, ORIGIN),
+          { ...storeJsonLd(s as any, ORIGIN), image: storeCardUrl(ORIGIN, s.code) },
           {
             "@context": "https://schema.org",
             "@type": "BreadcrumbList",
@@ -2353,6 +2376,7 @@ ${list}
         ],
         body: `<main>
   <nav><a href="/stores">← 매장 찾기</a> › <a href="${esc(regionHref)}">${esc(s.region)} 당구장</a></nav>
+  <img src="${esc(storeCardUrl(ORIGIN, s.code))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(`${s.name} 요금·영업시간 카드`)}" loading="eager">
   <h1>${esc(s.name)}</h1>
   <p>${esc(s.region)}</p>
   <p><a href="${esc(mapLink(s as any))}" rel="noopener">길찾기 · 지도에서 보기</a>${s.phone ? ` · <a href="tel:${esc(s.phone)}">전화 걸기</a>` : ""}</p>
@@ -2365,7 +2389,7 @@ ${list}
     ${rates.length ? `<dt>요금</dt><dd>${esc(rates.join(", "))}</dd>` : ""}
   </dl>
   ${crews.length ? `<h2>이 매장에서 활동하는 크루</h2><ul>${crews.map((c) => `<li><a href="/club/${esc(c.id)}">${esc(c.name)}</a></li>`).join("")}</ul>` : ""}
-  ${nearby.length ? `<h2>${esc(s.region)}의 다른 당구장</h2><ul>${nearby.map((n) => `<li><a href="/stores/${esc(n.code)}">${esc(n.name)}</a> — ${esc(n.address)}</li>`).join("")}</ul><p><a href="${esc(regionHref)}">${esc(s.region)} 당구장 전체 보기</a></p>` : ""}
+  ${nearby.length ? `<h2>${esc(s.region)}의 다른 당구장</h2><ul>${nearby.map((n) => `<li><a href="/stores/${esc(n.code)}">${esc(n.name)}</a> — ${esc(n.address)}</li>`).join("")}</ul>${cardGallery(`${s.region}의 다른 당구장`, nearby.map((n) => ({ href: `/stores/${n.code}`, img: storeCardUrl(ORIGIN, n.code), name: n.name, alt: `${n.name} 요금·영업시간 카드` })))}<p><a href="${esc(regionHref)}">${esc(s.region)} 당구장 전체 보기</a></p>` : ""}
   ${hubNav("ko")}
 </main>`,
       }),

@@ -7,6 +7,7 @@ import { asc, sql } from "drizzle-orm";
 import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
+import { storeCardUrl } from "./services/storeCard.js";
 import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingIntents } from "../shared/golfCourse.js";
 // seo/* 는 이 파일의 entry 를 되받아 쓴다(순환). entry 는 함수 선언이고 요청 시점에만 불리므로 안전하다.
 import { rankingExtraSitemapParts } from "./seo/rankingExtra.js";
@@ -205,7 +206,8 @@ async function storeParts(): Promise<string[]> {
   try {
     const listings = await db.select({ code: storeListings.code, updatedAt: storeListings.updatedAt })
       .from(storeListings).orderBy(asc(storeListings.code));
-    for (const l of listings) parts.push(entry(`${ORIGIN}/stores/${l.code}`, { changefreq: "monthly", priority: "0.4", lastmod: l.updatedAt }));
+    // 이미지 사이트맵 = 매장 카드(2026-09-30) — 페이지 대표 이미지와 같은 주소
+    for (const l of listings) parts.push(entry(`${ORIGIN}/stores/${l.code}`, { changefreq: "monthly", priority: "0.4", lastmod: l.updatedAt, image: storeCardUrl(ORIGIN, l.code) }));
   } catch (e) {
     console.warn("[sitemap] listings failed:", (e as Error)?.message);
   }

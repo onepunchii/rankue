@@ -4,6 +4,11 @@ import { renderPlayerCardPng, rankWord, type PlayerCardInput } from "./services/
 import { GOLF_TOUR_META, formatRankValue, formatStatValue, type GolfTour } from "../shared/golfTours.js";
 import { PBA_LANGS, pbaL10n, formatPrize, seasonLabel } from "../shared/pbaMeta.js";
 import { renderGolfCourseCardPng, type GolfCourseCardInput } from "./services/golfCourseCard.js";
+import { renderStoreCardPng, type StoreCardInput } from "./services/storeCard.js";
+import { db } from "./db.js";
+import { storeListings } from "../shared/schema.js";
+import { eq } from "drizzle-orm";
+import { storeAreasKo } from "../shared/storeMeta.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
 import { courseWhere, weekdayFee, wonShort, type Fees } from "../shared/golfCourse.js";
 
@@ -12,6 +17,7 @@ import { courseWhere, weekdayFee, wonShort, type Fees } from "../shared/golfCour
 //   /og/golfer/:tour/:id.png          골프 투어 랭킹 (ko·en)
 //   /og/pba-player/:memCode.png       PBA 투어 (ko·en·vi·tr·es)
 //   /og/golf-course/:slug.png         골프장 카드 (2026-09-30)
+//   /og/store/:code.png               당구장 카드 (2026-09-30)
 // /api 아래에 두지 않는 이유: robots.txt 가 /api/ 를 막고 있어 구글이 이미지를 못 가져간다.
 // vercel.json 의 /og/(.*) 라우트가 이 함수로 보낸다. 캐시는 하루(회차가 주간이라 충분).
 
@@ -185,6 +191,24 @@ export async function buildGolfCourseCard(slug: string): Promise<GolfCourseCardI
   };
 }
 
+// ── 당구장 ─────────────────────────────────────────────────────────
+export async function buildStoreCard(code: string): Promise<StoreCardInput | null> {
+  const [s] = await db.select().from(storeListings).where(eq(storeListings.code, code));
+  if (!s) return null;
+  const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
+  const areas = storeAreasKo(s.address, s.region);
+  const tables = ([["대대", s.tableLarge], ["중대", s.tableMedium], ["포켓", s.tablePocket]] as const)
+    .filter(([, n]) => n != null && n > 0).map(([label, n]) => ({ label, n: n as number }));
+  const r10 = ([["대대", s.rate10Large], ["중대", s.rate10Medium], ["포켓", s.rate10Pocket]] as const).filter(([, v]) => v != null);
+  const rates = r10.length ? [`10분당 ${r10.map(([l, v]) => `${l} ${won(v as number)}`).join(" · ")}`] : [];
+  return {
+    name: s.name,
+    // 두 번째로 긴 동네(시·구) — 가장 긴 것(동까지)은 카드 머리에 길다
+    area: areas.length > 1 ? areas[areas.length > 2 ? 1 : 0] : areas[0] ?? s.region,
+    tables, rates, hours: s.openHours,
+  };
+}
+
 // ── 라우트 ─────────────────────────────────────────────────────────
 export function registerOgImages(app: Express) {
   const sendCard = async (res: any, build: () => Promise<PlayerCardInput | null>, what: string) => {
@@ -232,6 +256,23 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] golf course card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  app.get("/og/store/:code.png", async (req, res) => {
+    const code = String(req.params.code ?? "");
+    if (!/^[A-Za-z0-9_-]{1,20}$/.test(code)) return res.status(404).type("text/plain").send("not found");
+    try {
+      const input = await buildStoreCard(code);
+      if (!input) return res.status(404).type("text/plain").send("not found");
+      const png = await renderStoreCardPng(input);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] store card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });

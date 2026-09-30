@@ -203,7 +203,9 @@ export default function StoreListingPage() {
     description: s ? storeDescKo(s.name, s.address, s, s.openHours) : "전국 당구장 디렉토리",
     path: `/stores/${code}`,
     locale,
-    jsonLd: s ? storeJsonLd(s) : null,
+    // 매장 카드 — 프리렌더(/stores/:code)와 같은 주소(2026-09-30)
+    image: s ? `https://www.rankue.co.kr/og/store/${encodeURIComponent(s.code ?? code)}.png` : undefined,
+    jsonLd: s ? { ...storeJsonLd(s), image: `https://www.rankue.co.kr/og/store/${encodeURIComponent(s.code ?? code)}.png` } : null,
   });
 
   const tableRows = s ? [
