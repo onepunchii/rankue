@@ -761,8 +761,12 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     const same = s.pages.filter((x) => x.slug !== slug && x.region === p.region);
     near = [...same.filter((x) => p.city && x.city === p.city), ...same.filter((x) => !p.city || x.city !== p.city)].slice(0, 8).map((x) => ({ x, km: null }));
   }
+  // 글 목록 밑에 가까운 6곳의 카드 줄 — 네이버가 이 골프장 결과 밑에 이웃 골프장 카드를 줄지어 보여 줄 재료(매장·선수 이웃 절과 같다)
   const nearHtml = near.length
-    ? `\n  <h2>${esc(p.name)} 가까운 골프장</h2>\n  <ul>\n  ${near.map(({ x, km }) => golfCourseLi(s, x, byListing, { where: true, km })).join("\n  ")}\n  </ul>`
+    ? `\n  <h2>${esc(p.name)} 가까운 골프장</h2>\n  <ul>\n  ${near.map(({ x, km }) => golfCourseLi(s, x, byListing, { where: true, km })).join("\n  ")}\n  </ul>` +
+      `\n  ${cardGallery(`${p.name} 가까운 골프장`, near.slice(0, 6).map(({ x }) => ({
+        href: coursePath(x.slug), img: golfCourseCardUrl(ORIGIN, x.slug), name: x.name, alt: `${x.name} 그린피·회원권 시세 카드`,
+      })))}`
     : "";
 
   const scope = { region: p.region, city: p.city, short };
