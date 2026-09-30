@@ -110,8 +110,10 @@ export function sessionOnSite(input: {
 }
 
 /**
- * **도장을 세는 기록인가** — 현장 인증(true)이거나 이 규칙 전의 옛 기록(NULL). false 만 '기록 도장'.
+ * **공식 라운드인가** — 현장 인증(true)이거나 이 규칙 전의 옛 기록(NULL). false 만 '미인증'.
  * 여권·발자국·Elite 60 이 모두 이 한 줄을 거친다(server/storage/golfStamps.ts collectStamps).
+ * 2026-10-01 오너 결정으로 평균·베스트·등급도 이 줄을 따른다 — 남과 비교되는 숫자(골프 등급·랭킹·크루 평균·홈 평균)는
+ * 공식만 센다. 미인증은 지우지 않는다: 라운딩 리포트에 따로 모여 있고 본인은 '미인증 포함'으로 합쳐 볼 수 있다.
  */
 export function countsOnSite(onSite: boolean | null | undefined): boolean {
     return onSite !== false;

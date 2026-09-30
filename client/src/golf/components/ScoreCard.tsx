@@ -23,6 +23,7 @@ interface ScoreCardProps {
     pars: number[];
     onScoreChange: (playerId: string, diff: number) => void;
     onPenaltyChange?: (playerId: string, type: 'ob' | 'hazard') => void;
+    /** 예전엔 아래 여백을 정했다(혼자 pb-4 · 여럿 pb-40). 이제 여백은 경기 화면 몫이라 쓰지 않는다 — 부르는 쪽 호환용 */
     isSolo?: boolean;
     isHost?: boolean;
 }
@@ -45,16 +46,21 @@ const toParColor = (n: number) => (n < 0 ? "text-[#7DD3FC]" : n > 0 ? "text-[#FF
  * 18홀 기록표 한 판(전반·후반 두 줄). 혼자 기록 화면과 선수 줄의 '기록표'가 같이 쓴다.
  * 동그라미 = 파보다 적게(버디 하나, 이글 이상 두 겹), 네모 = 파보다 많게(보기 한 겹, 더블 이상 채움). 파는 숫자만.
  */
-export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap }: {
+export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap, putts, gir }: {
     scores: number[]; pars: number[]; currentHole: number;
     /** 사진이 있는 홀(0부터) — 홀 번호 위에 작은 라임 점(2026-09-30 라운드 사진). 누르면 onHoleTap(그 홀 사진으로) */
     photoHoles?: ReadonlySet<number>;
     onHoleTap?: (holeIndex: number) => void;
+    /** 이 홀 기록(2026-10-01) — 내 스코어카드에만 준다. 퍼트 줄을 하나 더 그리고, 그린 적중 홀은 숫자 밑에 라임 점 */
+    putts?: readonly (number | null)[];
+    gir?: readonly (boolean | null)[];
 }) {
+    const hasPutts = !!putts && putts.some((v) => v != null);
     const half = (from: number) => {
         const idx = Array.from({ length: 9 }, (_, i) => from + i);
         const sum = idx.reduce((a, i) => a + (scores[i] || 0), 0);
         const parSum = idx.reduce((a, i) => a + (pars[i] || 0), 0);
+        const puttSum = hasPutts ? idx.reduce((a, i) => a + (putts![i] ?? 0), 0) : 0;
         return (
             <div className="grid grid-cols-[34px_repeat(9,minmax(0,1fr))_36px] gap-y-1 items-center text-center">
                 <span className="text-[11px] text-[#FFFFFF59] text-left">홀</span>
@@ -99,6 +105,22 @@ export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap }: {
                     );
                 })}
                 <span className="text-[12px] font-semibold text-[#ffffff] tabular-nums">{sum || "–"}</span>
+
+                {hasPutts && (
+                    <>
+                        <span className="text-[11px] text-[#FFFFFF59] text-left">퍼트</span>
+                        {idx.map((i) => {
+                            const p = putts![i];
+                            return (
+                                <span key={i} className="relative flex h-6 items-center justify-center">
+                                    <span className={cn("text-[12px] tabular-nums", p == null ? "text-[#FFFFFF33]" : "text-[#FFFFFFB3]")}>{p == null ? "·" : p}</span>
+                                    {gir?.[i] === true && <span role="img" aria-label="그린 적중" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[5px] h-[5px] rounded-full bg-[#9BEF5C]" />}
+                                </span>
+                            );
+                        })}
+                        <span className="text-[12px] text-[#FFFFFFB3] tabular-nums">{puttSum || "–"}</span>
+                    </>
+                )}
             </div>
         );
     };
@@ -111,15 +133,17 @@ export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap }: {
     );
 }
 
-export function ScoreCard({ players, playerScores, currentHole, pars, onScoreChange, isSolo = false, isHost = true }: ScoreCardProps) {
+export function ScoreCard({ players, playerScores, currentHole, pars, onScoreChange, isHost = true }: ScoreCardProps) {
     const [gridFor, setGridFor] = useState<string | null>(null);
     const [jumpFor, setJumpFor] = useState<string | null>(null);
     const { data: member } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
 
     const par = pars[currentHole];
 
+    // 아래 여백(고정 단추 줄 피하기)은 경기 화면이 맨 끝에 한 번 둔다 — 여기 pb-40 이 있으면 밑에 붙는
+    // 안내 줄·'이 홀 기록' 카드(2026-10-01)가 160px 떨어져 떠 보였다.
     return (
-        <div className={cn("px-4 space-y-2", isSolo ? "pb-4" : "pb-40")}>
+        <div className="px-4 space-y-2">
             {players.map((p) => {
                 const scores = playerScores[p.id] || Array(18).fill(0);
                 const { totalStrokes, currentOverPar } = calculateGolfScore(scores, pars, 18, currentHole);

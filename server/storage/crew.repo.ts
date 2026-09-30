@@ -29,6 +29,7 @@ import { eq, and, desc, asc, sql, or, gte, lt, like, ilike, inArray, ne } from "
 import { notFound, conflict } from "../utils/errors.js";
 import { msg } from "../lib/i18n.js";
 import { upcomingActivityCutoff } from "../../shared/crewActivity.js";
+import { countsOnSite } from "../../shared/golfOnSite.js";
 import { CREW_NOTICES_MAX, imageUrlList, type CrewCursor } from "../../shared/crewBoard.js";
 import type {
     InsertHiqCrew,
@@ -183,7 +184,8 @@ export class CrewRepository {
                     ))
                     .orderBy(desc(hiqGameHistory.createdAt));
 
-                const validGames = golfHistory.filter(h => h.score > 0);
+                // 공식 라운드만(현장 인증 + 옛 기록) — 크루 안에서 서로 비교되는 평균이다(2026-10-01 오너)
+                const validGames = golfHistory.filter(h => h.score > 0 && countsOnSite(h.onSite));
                 if (validGames.length > 0) {
                     const totalScore = validGames.reduce((sum, h) => sum + h.score, 0);
                     const avgScore = totalScore / validGames.length;

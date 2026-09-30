@@ -230,5 +230,9 @@ export function useRoundPhotos(sessionId: string | null | undefined, holeNo: num
             <PhotoViewer photos={viewerPhotos} index={viewer} onClose={() => setViewer(null)} />
         </>
     );
-    return { button, strip, overlay };
+    // pick·pending·countAt — '이 홀 기록' 카드의 '이 홀 사진' 단추(2026-10-01)가 **같은 올리기 한 벌**을 쓴다.
+    // 따로 usePhotoUploader 를 만들면 숨은 입력·방금 올린 카드(공개 스위치)가 두 벌이 되어 카드 쪽 사진엔 공개 스위치가 안 떴다.
+    const pick = (source: "camera" | "gallery" = "camera") => up.pick(holeNo, source);
+    const countAt = (hole: number) => up.photos.filter((p) => p.holeNo === hole).length;
+    return { button, strip, overlay, pick, pending: up.pending, countAt };
 }

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
+import { countsOnSite } from "@shared/golfOnSite";
 
 export function useGolfStats(member: any) {
     const { data: historyData, isLoading: isHistoryLoading } = useQuery({
@@ -9,7 +10,8 @@ export function useGolfStats(member: any) {
 
     // Process History Data: apiRequest already returns json.data
     const officialHistory = Array.isArray(historyData) ? historyData : (historyData as any)?.data || [];
-    const validGames = officialHistory.filter((g: any) => g.sportCategory === 'GOLF' && g.score > 0);
+    // 공식 라운드만(현장 인증 + 옛 기록) — 홈 그래프·평균이 라운딩 리포트 기본값과 같은 숫자여야 한다(2026-10-01 오너)
+    const validGames = officialHistory.filter((g: any) => g.sportCategory === 'GOLF' && g.score > 0 && countsOnSite(g.onSite));
 
     // 1. Recent Scores (for Graph) - Reverse to show chronological order left-to-right if needed, 
     // but typically graphs expect chronological. Assuming API returns newest first?

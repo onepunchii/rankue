@@ -40,13 +40,17 @@ import { collectStamps, makeStampResolver, type StampAgg } from "./golfStamps.js
 import { insertCheckin, listCheckins, listCheckinsInTx, readCheckins, realMemberIds, withCheckinTable } from "./golfCheckins.js";
 import { parseLatLng, sortByDistance } from "../../shared/golfNearby.js";
 import {
-    ONSITE_GRACE_MINUTES, ONSITE_MAX_ATTEMPTS, judgeCheckin, sessionOnSite,
+    ONSITE_GRACE_MINUTES, ONSITE_MAX_ATTEMPTS, countsOnSite, judgeCheckin, sessionOnSite,
     type CheckinReason, type Fix, type LatLng, type OnSiteBucket, type OnSiteSource, type OnSiteSummary,
 } from "../../shared/golfOnSite.js";
 import {
     resolvePars, sanitizeScores, isCompleteRound, roundTotals, settleMatch, rulesFor, isGuestId, GUEST_PREFIX, rankRound,
     type CoursePars,
 } from "../../shared/golfMatch.js";
+import {
+    HOLE_STATS_GRACE_MINUTES, applyHolePatches, hasAnyHoleStats, lastTimeByHole, readHoleStats,
+    type HolePatch, type HoleStats, type LastTime, type PastRound, type RoundHoleData,
+} from "../../shared/golfHoleStats.js";
 
 /** 대기방 핀이 살아 있는 시간. 지나면 그 핀으로는 못 들어온다(방장은 홈의 '진행 중 라운드' 로 돌아온다). */
 const PIN_TTL_MS = 6 * 3600_000;
@@ -937,6 +941,13 @@ export class GolfRepository {
         return deleted.length > 0;
     }
 
+    /** 기록의 인증 여부가 바뀐 회원들의 평균·등급을 다시 센다. 실패해도 확인·요약 응답은 막지 않는다 */
+    private async recountGolfStats(memberIds: readonly string[]): Promise<void> {
+        for (const mid of new Set(memberIds)) {
+            await this.updateGolfStats(mid).catch((e) => console.error("[golf] updateGolfStats", e));
+        }
+    }
+
     async updateGolfStats(userId: string): Promise<any> {
         // 1. Get all golf history for this member
         const history = await db.select().from(hiqGameHistory)
@@ -947,8 +958,9 @@ export class GolfRepository {
 
         if (history.length === 0) return null;
 
-        // 2. Calculate Average Score
-        const validGames = history.filter(h => h.score > 0);
+        // 2. Calculate Average Score — 공식 라운드만(현장 인증 + 옛 기록, 2026-10-01 오너).
+        // 이 평균이 골프 등급·랭킹·크루·친구 목록·팀 나누기에 그대로 쓰인다 — 남과 비교되는 숫자라 미인증은 넣지 않는다.
+        const validGames = history.filter(h => h.score > 0 && countsOnSite(h.onSite));
         if (validGames.length === 0) return null;
 
         const totalScore = validGames.reduce((sum, h) => sum + h.score, 0);
@@ -1351,6 +1363,156 @@ export class GolfRepository {
         });
     }
 
+    /**
+     * 이 홀 기록(퍼팅·페어웨이·벌타 태그, 2026-10-01 — 규칙은 shared/golfHoleStats) — **보낸 사람 자기 칸만** 고친다.
+     * 점수·벌타(penalties)·이름·다른 사람의 칸은 손대지 않는다. 행을 잠그고 다시 읽는다: 방장의 점수 저장(updateGolfMatchScore)도
+     * 같은 행을 잠그고 잠근 행의 선수 객체를 펼쳐 쓰니(...dbP), 둘이 엇갈려도 서로의 칸을 지우지 않는다.
+     * updated_at 은 올리지 않는다 — 그 값은 '진행 중 라운드'(12시간)·핀 충돌·옛 기록 짝찾기가 읽는다. 곁다리 기록이 바꿀 일이 아니다.
+     * 끝난 경기는 HOLE_STATS_GRACE_MINUTES 안에서만 받는다(18번 홀 퍼팅을 누르는 사이 방장이 끝내기를 누른 경우).
+     */
+    async updateMyHoleStats(id: string, memberId: string, patches: readonly HolePatch[]): Promise<HoleStats> {
+        return await db.transaction(async (tx) => {
+            const [cur] = await tx.select().from(golfMatchSessions)
+                .where(eq(golfMatchSessions.id, id))
+                .for("update");
+            if (!cur) throw notFound("게임을 찾을 수 없어요");
+            if (cur.status === "waiting") throw conflict("아직 시작하지 않은 경기예요");
+            if (cur.status === "abandoned") throw conflict("접은 경기예요");
+            if (cur.status === "finished") {
+                const t = cur.finishedAt ? new Date(cur.finishedAt).getTime() : NaN;
+                if (!Number.isFinite(t) || t + HOLE_STATS_GRACE_MINUTES * 60_000 < Date.now()) {
+                    throw conflict("끝난 라운드라 이 홀 기록을 고칠 수 없어요");
+                }
+            }
+            const players = (cur.players || []) as any[];
+            const at = players.findIndex((p) => p?.memberId === memberId);
+            if (at < 0) throw notFound("이 경기의 참가자가 아니에요");
+            const next = applyHolePatches(readHoleStats(players[at]), patches);
+            const merged = players.map((p, i) => (i === at ? { ...p, putts: next.putts, fairway: next.fairway, penaltyTags: next.penaltyTags } : p));
+            await tx.update(golfMatchSessions).set({ players: merged }).where(eq(golfMatchSessions.id, id));
+            return next;
+        });
+    }
+
+    /**
+     * 경기 화면 '이 홀 기록' 카드의 재료 — 내 기록 + 지난번 이 홀(같은 골프장·같은 코스·같은 홀에서 친 내 최근 타수).
+     * **내 것만** 싣는다. 지난번을 못 읽어도 카드는 뜬다(빈칸).
+     */
+    async holeStatsView(session: any, memberId: string): Promise<{ mine: HoleStats | null; lastTime: (LastTime | null)[] }> {
+        const me = ((session?.players || []) as any[]).find((p) => p?.memberId === memberId);
+        let lastTime: (LastTime | null)[] = new Array(18).fill(null);
+        try {
+            lastTime = lastTimeByHole(session, await this.myPastRoundsAt(session, memberId));
+        } catch (e) {
+            console.error("[golf] hole stats last time", e);
+        }
+        return { mine: me ? readHoleStats(me) : null, lastTime };
+    }
+
+    /** 같은 골프장에서 내가 끝낸 옛 라운드(최근 순, 이번 경기 제외) — 그 라운드의 **내** 타수만 꺼낸다 */
+    private async myPastRoundsAt(session: any, memberId: string): Promise<PastRound[]> {
+        const sameCourse = session.courseId
+            ? eq(golfMatchSessions.courseId, session.courseId)
+            : session.courseName ? eq(golfMatchSessions.courseName, session.courseName) : null;
+        if (!sameCourse || !UUID_RE.test(String(session.id ?? ""))) return [];
+        const rows = await db.select({
+            players: golfMatchSessions.players,
+            frontCourseName: golfMatchSessions.frontCourseName,
+            backCourseName: golfMatchSessions.backCourseName,
+            finishedAt: golfMatchSessions.finishedAt,
+            updatedAt: golfMatchSessions.updatedAt,
+        }).from(golfMatchSessions)
+            .where(and(
+                eq(golfMatchSessions.status, "finished"),
+                ne(golfMatchSessions.id, session.id),
+                sameCourse,
+                sql`${golfMatchSessions.players} @> ${JSON.stringify([{ memberId }])}::jsonb`,
+            ))
+            .orderBy(sql`coalesce(${golfMatchSessions.finishedAt}, ${golfMatchSessions.updatedAt}) desc`)
+            .limit(40);
+        return rows.map((r) => {
+            const me = ((r.players || []) as any[]).find((p) => p?.memberId === memberId);
+            const at = r.finishedAt ?? r.updatedAt;
+            return {
+                frontCourseName: r.frontCourseName,
+                backCourseName: r.backCourseName,
+                scores: Array.isArray(me?.scores) ? me.scores : null,
+                playedAt: at ? new Date(at).toISOString() : null,
+            };
+        });
+    }
+
+    /**
+     * 라운딩 리포트 '홀 기록 통계'의 재료 — 내 공식 라운드(기록 행이 있는 경기) 중 이 홀 기록을 하나라도 적은 것만.
+     * 통계 식은 화면이 shared summarizeHoleStats 로 센다(서버는 재료만 준다). 남의 기록은 싣지 않는다.
+     */
+    async myHoleStatsRounds(memberId: string): Promise<{ rounds: RoundHoleData[] }> {
+        const rows = await db.select({
+            historyId: hiqGameHistory.id,
+            playedAt: hiqGameHistory.createdAt,
+            sessionId: golfMatchSessions.id,
+            players: golfMatchSessions.players,
+            courseId: golfMatchSessions.courseId,
+            frontCourseName: golfMatchSessions.frontCourseName,
+            backCourseName: golfMatchSessions.backCourseName,
+        }).from(hiqGameHistory)
+            .innerJoin(golfMatchSessions, eq(golfMatchSessions.id, hiqGameHistory.golfSessionId))
+            .where(and(eq(hiqGameHistory.memberId, memberId), eq(hiqGameHistory.sportCategory, "GOLF")))
+            .orderBy(desc(hiqGameHistory.createdAt))
+            .limit(300);
+        const picked: { row: (typeof rows)[number]; scores: number[]; stats: HoleStats }[] = [];
+        for (const row of rows) {
+            const me = ((row.players || []) as any[]).find((p) => p?.memberId === memberId);
+            if (!me) continue;
+            const stats = readHoleStats(me);
+            if (!hasAnyHoleStats(stats)) continue;
+            picked.push({ row, scores: sanitizeScores(me.scores) ?? new Array(18).fill(0), stats });
+        }
+        if (picked.length === 0) return { rounds: [] };
+        const cps = await this.parsForMany(picked.map((x) => x.row));
+        return {
+            rounds: picked.map(({ row, scores, stats }, i) => ({
+                sessionId: row.sessionId,
+                historyId: row.historyId,
+                playedAt: new Date(row.playedAt).toISOString(),
+                scores,
+                pars: cps[i].pars,
+                parKnown: cps[i].known,
+                putts: stats.putts,
+                fairway: stats.fairway,
+                penaltyTags: stats.penaltyTags,
+            })),
+        };
+    }
+
+    /** 여러 경기의 파를 한 번에 — 골프장마다 코스 목록을 한 번만 읽는다(parsFor 를 라운드마다 부르면 라운드 수만큼 조회) */
+    private async parsForMany(list: readonly { courseId: string | null; frontCourseName: string | null; backCourseName: string | null }[]): Promise<CoursePars[]> {
+        const clubIds = [...new Set(list.map((s) => s.courseId).filter((c): c is string => !!c && UUID_RE.test(c)))];
+        const byClub = new Map<string, { name: string; pars: unknown }[]>();
+        if (clubIds.length > 0) {
+            try {
+                const rows = await db.select({ clubId: rankueGolfCourses.clubId, name: rankueGolfCourses.name, pars: rankueGolfCourses.pars })
+                    .from(rankueGolfCourses)
+                    .where(inArray(rankueGolfCourses.clubId, clubIds));
+                for (const r of rows) {
+                    const k = String(r.clubId);
+                    const arr = byClub.get(k) ?? [];
+                    arr.push({ name: r.name, pars: r.pars });
+                    byClub.set(k, arr);
+                }
+            } catch (e) {
+                console.error("[golf] course pars (many)", e);
+            }
+        }
+        return list.map((s) => {
+            const courses = (s.courseId && byClub.get(s.courseId)) || [];
+            return resolvePars(
+                courses.find((c) => c.name === s.frontCourseName)?.pars,
+                courses.find((c) => c.name === s.backCourseName)?.pars,
+            );
+        });
+    }
+
     async updateGolfMatchCourse(id: string, frontName?: string, backName?: string): Promise<any> {
         const updateData: any = { updatedAt: new Date() };
         if (frontName) updateData.frontCourseName = frontName;
@@ -1501,7 +1663,7 @@ export class GolfRepository {
         : Promise<{ last: { verified: boolean; bucket: OnSiteBucket; reason: CheckinReason }; upgraded: boolean; session: any }> {
         const course = await courseCoordsFor(session.courseId, session.courseName);
         const last = judgeCheckin(fix, course);
-        return withCheckinTable(() => db.transaction(async (tx) => {
+        const out = await withCheckinTable<{ last: typeof last; upgraded: string[]; session: any }>(() => db.transaction(async (tx) => {
             const [cur] = await tx.select().from(golfMatchSessions).where(eq(golfMatchSessions.id, session.id)).for("update");
             if (!cur) throw notFound("게임을 찾을 수 없어요");
             if (cur.status === "waiting") throw conflict("아직 시작하지 않은 경기예요");
@@ -1518,7 +1680,7 @@ export class GolfRepository {
                 await insertCheckin(tx, { sessionId: cur.id, memberId, verified: last.verified, bucket: last.bucket, source });
                 checkins.push({ memberId, verified: last.verified, bucket: last.bucket, source, createdAt: new Date() });
             }
-            let upgraded = false;
+            let upgraded: string[] = [];
             if (cur.status === "finished") {
                 const v = sessionOnSite({
                     checkins, memberIds: members, courseKnown: !!course,
@@ -1527,13 +1689,16 @@ export class GolfRepository {
                 if (v.onSite) {
                     const up = await tx.update(hiqGameHistory).set({ onSite: true })
                         .where(and(eq(hiqGameHistory.golfSessionId, cur.id), eq(hiqGameHistory.onSite, false)))
-                        .returning({ id: hiqGameHistory.id });
-                    upgraded = up.length > 0;
+                        .returning({ memberId: hiqGameHistory.memberId });
+                    upgraded = up.map((r) => r.memberId);
                 }
             }
             // 잠근 뒤 읽은 경기 행 — 라우트가 상태 요약을 이걸로 만든다(방금 끝났을 수 있다)
             return { last, upgraded, session: cur };
         }));
+        // 미인증 → 인증으로 올라간 기록은 이제 공식 라운드다 — 평균·등급을 다시 센다(잠금을 쥔 채로 하지 않게 트랜잭션 밖에서)
+        await this.recountGolfStats(out.upgraded);
+        return { last: out.last, upgraded: out.upgraded.length > 0, session: out.session };
     }
 
     /**
@@ -1566,8 +1731,10 @@ export class GolfRepository {
                 });
                 if (v.onSite) {
                     // 판정과 기록이 어긋났다(끝낼 때 확인을 못 읽음) — 같은 규칙이니 기록을 맞춘다. false 만 올린다(옛 NULL 은 그대로)
-                    await db.update(hiqGameHistory).set({ onSite: true })
-                        .where(and(eq(hiqGameHistory.golfSessionId, session.id), eq(hiqGameHistory.onSite, false)));
+                    const up = await db.update(hiqGameHistory).set({ onSite: true })
+                        .where(and(eq(hiqGameHistory.golfSessionId, session.id), eq(hiqGameHistory.onSite, false)))
+                        .returning({ memberId: hiqGameHistory.memberId });
+                    await this.recountGolfStats(up.map((r) => r.memberId));
                     stamp = "onsite";
                 } else {
                     reason = v.reason;

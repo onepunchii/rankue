@@ -7,6 +7,7 @@ import {
     DEFAULT_PAR, MAX_STROKES, isDoubleHole, holeTransactions, settleMatch, rulesFor,
     type CoursePars, type Settlement,
 } from "@shared/golfMatch";
+import { HOLE_STATS_KEY } from "./useHoleStats";
 
 export type { Transaction } from "@shared/golfMatch";
 
@@ -154,6 +155,8 @@ export function useRankueMatch(matchId: string, me?: any, opts?: { redirectOnFin
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/golf/match/${matchId}/checkin`] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/match/active"] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
+            // 라운딩 리포트 '홀 기록 통계' — 방금 끝낸 라운드가 들어간다
+            queryClient.invalidateQueries({ queryKey: [HOLE_STATS_KEY, "mine"] });
             setLocation(`/golf/game/${matchId}/result`, { replace: true });
         },
         onError: (err: any) => {

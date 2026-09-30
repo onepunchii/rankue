@@ -36,6 +36,9 @@ export const LucideAlertCircle = ((Ph as any).Warning ?? F) as Ph.Icon;
 export const LucideArrowLeft = ((Ph as any).ArrowLeft ?? F) as Ph.Icon;
 export const LucideArrowLeftRight = ((Ph as any).ArrowsLeftRight ?? F) as Ph.Icon;
 export const LucideArrowRight = ((Ph as any).ArrowRight ?? F) as Ph.Icon;
+/** 이 홀 기록 페어웨이 미스 방향(2026-10-01) — 티에서 본 왼쪽·오른쪽 */
+export const LucideArrowUpLeft = ((Ph as any).ArrowUpLeft ?? F) as Ph.Icon;
+export const LucideArrowUpRight = ((Ph as any).ArrowUpRight ?? F) as Ph.Icon;
 export const LucideArrowUpDown = ((Ph as any).ArrowsDownUp ?? F) as Ph.Icon;
 export const LucideBadgeCheck = ((Ph as any).SealCheck ?? F) as Ph.Icon;
 export const LucideBarChart3 = ((Ph as any).ChartBar ?? F) as Ph.Icon;

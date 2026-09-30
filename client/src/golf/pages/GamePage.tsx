@@ -12,6 +12,7 @@ import { ScoreCard, HoleGrid } from "../components/ScoreCard";
 import { TransactionCard } from "../components/TransactionCard";
 import { GolfBackButton } from "../components/common/GolfBackButton";
 import { useRoundPhotos } from "../components/photos/RoundPhotoCamera";
+import { HoleStatsCard } from "../components/HoleStatsCard";
 import { useOnSiteCheckin } from "../hooks/useOnSiteCheckin";
 import { OnSiteChip } from "../components/onsite/OnSiteChip";
 import {
@@ -37,6 +38,7 @@ import {
     LucideWallet,
     LucideArrowRight
 } from "lucide-react";
+import { appConfirm } from "@/components/AppDialog";
 
 export default function GolfScorecard() {
     const [, params] = useRoute("/golf/game/:id");
@@ -213,6 +215,29 @@ export default function GolfScorecard() {
 
     const isLast = currentHole === 17;
 
+    // 이 홀 기록(2026-10-01 오너 승인) — 폰 주인 자기 것만. 게스트(앱 없는 동반자)는 폰이 없으니 카드도 없다.
+    // 실제 회원이 나 하나면(혼자 기록·게스트만 데려온 판) 펼쳐서, 여럿이면 한 줄로 접어서 시작한다.
+    const myPlayer: any = me ? localPlayers.find((p: any) => p.memberId === me.id) : null;
+    const realCount = (session.players || []).filter((p: any) => !isGuestId(p.memberId) && !p.isGuest).length;
+    const holeStatsEl = myPlayer && session.status === "playing" ? (
+        <HoleStatsCard
+            key={session.id}
+            sessionId={session.id}
+            hole={currentHole}
+            par={coursePar[currentHole]}
+            parKnown={!!parKnown[currentHole]}
+            strokes={Number(myPlayer.scores?.[currentHole]) || coursePar[currentHole]}
+            frontCourseName={session.frontCourseName ?? null}
+            backCourseName={session.backCourseName ?? null}
+            solo={session.strokeMode === "solo" || realCount <= 1}
+            isHost={isHost}
+            enabled
+            onPhoto={() => photoUi.pick("camera")}
+            photoCount={photoUi.countAt(currentHole + 1)}
+            photoBusy={photoUi.pending > 0}
+        />
+    ) : null;
+
     return (
         <div className="min-h-screen bg-[#050505] text-white font-sans overflow-hidden flex flex-col relative">
             {/* iOS 상태바 검은 막 — #root의 padding-top(env)이 노치에 비추는 body 크림색을 게임 배경색으로 덮어
@@ -387,8 +412,9 @@ export default function GolfScorecard() {
             {photoUi.strip}
 
             {/* Score Cards Area - Only in Group Mode */}
+            {/* 아래 여백(pb-32)은 고정 단추 줄을 피하는 몫 — 예전엔 ScoreCard 안의 pb-40 이라 밑의 안내 줄이 떠 보였다 */}
             {!(session.strokeMode === 'solo' || session.players.length === 1) && (
-                <div className="pt-3">
+                <div className="pt-3 pb-32">
                     <ScoreCard
                         players={playersAdapter}
                         playerScores={playerScoresAdapter}
@@ -406,6 +432,8 @@ export default function GolfScorecard() {
                             방장이 점수를 적어요 · 방장이 홀을 넘기면 여기에도 보여요
                         </p>
                     )}
+
+                    {holeStatsEl && <div className="mt-2">{holeStatsEl}</div>}
                 </div>
             )}
 
@@ -502,6 +530,8 @@ export default function GolfScorecard() {
                         isSolo={true}
                         isHost={isHost}
                     />
+
+                    {holeStatsEl && <div className="mt-3">{holeStatsEl}</div>}
 
                     {!isHost && (
                         <p className="mt-2 mx-4 px-4 py-3 rounded-2xl bg-[#FFFFFF08] text-center text-[13px] text-[#FFFFFF99]">
@@ -718,13 +748,18 @@ export default function GolfScorecard() {
                             </Button>
                         )}
                         {isHost && (
+                            // 예전엔 글자만 있는 단추(ghost)라 폰에선 단추로 안 보였다(2026-10-01 오너) — 빨간 테두리 단추로.
+                            // 되돌릴 수 없는 일이라 앱 안내창으로 한 번 더 묻는다.
                             <Button
                                 variant="ghost"
                                 disabled={isAbandoning}
-                                className="w-full h-12 rounded-2xl text-[#FF6E6E] font-bold hover:bg-[#FF6E6E]/10"
-                                onClick={() => { if (window.confirm("이 경기를 접을까요? 점수와 기록이 남지 않아요.")) abandonMatch(); }}
+                                className="w-full h-12 rounded-2xl border border-[#FF6E6E59] bg-[#FF6E6E14] text-[#FF8A8A] font-bold hover:bg-[#FF6E6E1F] active:bg-[#FF6E6E29]"
+                                onClick={() => {
+                                    void appConfirm({ title: "이 경기를 접을까요?", message: "점수와 기록이 남지 않고, 되돌릴 수 없어요.", tone: "danger", confirmText: "경기 접기", cancelText: "돌아가기" })
+                                        .then((ok) => { if (ok) abandonMatch(); });
+                                }}
                             >
-                                경기 접기 (기록 없음)
+                                경기 접기 · 기록 없음
                             </Button>
                         )}
                         <Button variant="ghost" className="w-full h-12 rounded-2xl text-white/60 font-bold" onClick={() => setExitOpen(false)}>

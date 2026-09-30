@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { HiqGameHistory, HiqMember } from "@shared/schema";
 import { FilterType, ExtendedGameHistory } from "../components/hiq/history/types";
+import { countsOnSite } from "@shared/golfOnSite";
 
 export const useGameStats = (
     history: HiqGameHistory[] | undefined,
@@ -10,10 +11,12 @@ export const useGameStats = (
 ) => {
     return useMemo(() => {
         // Filter history to ONLY show official match games
+        // 골프는 공식 라운드만(현장 인증 + 옛 기록) — 미인증은 라운딩 리포트에만 따로 모인다(2026-10-01 오너)
         const officialHistory = (history?.filter(g =>
             g.gameMode === "match" &&
             (g as any).isRanked &&
-            (filter === "all" || g.gameType === filter)
+            (filter === "all" || g.gameType === filter) &&
+            (currentSport !== "GOLF" || countsOnSite((g as any).onSite))
         ) || []) as ExtendedGameHistory[];
 
         // Main Mode — ALL 탭에서 어느 종목을 대표로 볼지

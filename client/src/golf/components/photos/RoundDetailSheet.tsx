@@ -19,6 +19,9 @@ import { HoleGrid, toParText } from "../ScoreCard";
 import { useSessionPhotos, type AlbumPhoto } from "../../lib/photoApi";
 import { PhotoViewer } from "./PhotoViewer";
 import { usePhotoUploader, toViewer } from "./RoundPhotoCamera";
+import { useAuth } from "@/hooks/useAuth";
+import { roundHoleSummary, type RoundHoleSummary } from "@shared/golfHoleStats";
+import { useMyHoleStatsRounds } from "../../hooks/useHoleStats";
 
 export type RoundTab = "score" | "album";
 export interface RoundTarget {
@@ -59,7 +62,10 @@ function fromSession(s: any): { players: Player[]; pars: number[]; sessionId: st
     return { players, pars, sessionId: s?.id ?? null, courseName: s?.courseName ?? null };
 }
 
-function Scorecards({ players, pars, photoHoles, onHoleTap }: { players: Player[]; pars: number[]; photoHoles: Set<number>; onHoleTap: (i: number) => void }) {
+/** 내 카드에만 붙는 이 홀 기록(2026-10-01) — 퍼트 줄·그린 적중 점·한 줄 요약. 남의 기록은 서버가 주지 않는다 */
+type MyHoleStats = { playerId: string; putts: readonly (number | null)[]; sum: RoundHoleSummary };
+
+function Scorecards({ players, pars, photoHoles, onHoleTap, mine }: { players: Player[]; pars: number[]; photoHoles: Set<number>; onHoleTap: (i: number) => void; mine?: MyHoleStats | null }) {
     const parTotal = pars.reduce((a, b) => a + b, 0);
     return (
         <div className="space-y-3">
@@ -70,9 +76,10 @@ function Scorecards({ players, pars, photoHoles, onHoleTap }: { players: Player[
             )}
             {players.map((p) => {
                 const toPar = parTotal ? p.total - parTotal : null;
+                const my = mine && mine.playerId === p.id && mine.sum.puttHoles + mine.sum.girHoles > 0 ? mine : null;
                 return (
                     <section key={p.id} className="rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] px-4 py-4">
-                        <div className="flex items-baseline justify-between mb-3">
+                        <div className={cn("flex items-baseline justify-between", my ? "mb-1" : "mb-3")}>
                             <span className="text-[15px] font-semibold text-[#ffffff] truncate">{p.name}</span>
                             <span className="shrink-0 tabular-nums">
                                 <span className="text-[22px] font-bold text-[#ffffff]">{p.total || "–"}</span>
@@ -82,8 +89,23 @@ function Scorecards({ players, pars, photoHoles, onHoleTap }: { players: Player[
                                 )}
                             </span>
                         </div>
+                        {my && (
+                            <p className="mb-3 text-[12.5px] text-[#FFFFFF99] tabular-nums">
+                                {my.sum.puttHoles > 0 && <>퍼트 {my.sum.putts}{my.sum.puttHoles < 18 && <span className="text-[#FFFFFF73]"> ({my.sum.puttHoles}홀)</span>}</>}
+                                {my.sum.puttHoles > 0 && my.sum.girHoles > 0 && " · "}
+                                {my.sum.girHoles > 0 && <>그린 적중 {my.sum.girHit}/{my.sum.girHoles}</>}
+                            </p>
+                        )}
                         {pars.length === 18 ? (
-                            <HoleGrid scores={p.scores} pars={pars} currentHole={-1} photoHoles={photoHoles} onHoleTap={onHoleTap} />
+                            <>
+                                <HoleGrid scores={p.scores} pars={pars} currentHole={-1} photoHoles={photoHoles} onHoleTap={onHoleTap}
+                                    putts={my?.putts} gir={my?.sum.gir} />
+                                {my && my.sum.girHit > 0 && (
+                                    <p className="mt-2 flex items-center gap-1.5 text-[12px] text-[#FFFFFF80]">
+                                        <span aria-hidden className="w-[5px] h-[5px] rounded-full bg-[#9BEF5C]" />퍼트 밑 점 = 그린 적중
+                                    </p>
+                                )}
+                            </>
                         ) : (
                             // 파 자료가 없는 코스 — 동그라미·네모(파 대비)를 지어내지 않고 타수만
                             <div className="grid grid-cols-9 gap-1 text-center">
@@ -188,6 +210,14 @@ export function RoundDetailSheet({ target, onClose }: { target: RoundTarget | nu
         if (at >= 0) setViewer(at);
     };
 
+    // 내 이 홀 기록(2026-10-01) — 라운딩 리포트와 같은 조회(캐시 공유). 기록 id 나 경기 id 로 이 라운드를 찾는다
+    const { member } = useAuth();
+    const statsQ = useMyHoleStatsRounds(!!target);
+    const mine = useMemo<MyHoleStats | null>(() => {
+        const r = statsQ.data?.rounds.find((x) => (historyId && x.historyId === historyId) || (sessionId && x.sessionId === sessionId));
+        return r && member ? { playerId: member.id, putts: r.putts, sum: roundHoleSummary(r) } : null;
+    }, [statsQ.data, historyId, sessionId, member]);
+
     const d = target?.date ? ymd(target.date) : null;
     const pars = data?.pars ?? [];
     const parTotal = pars.reduce((a, b) => a + b, 0);
@@ -221,7 +251,7 @@ export function RoundDetailSheet({ target, onClose }: { target: RoundTarget | nu
                         ) : !data || data.players.length === 0 ? (
                             <p className="py-10 text-center text-[13px] text-[#FFFFFF73]">이 라운드의 홀별 기록이 없어요.</p>
                         ) : (
-                            <Scorecards players={data.players} pars={pars} photoHoles={photoHoles} onHoleTap={openHole} />
+                            <Scorecards players={data.players} pars={pars} photoHoles={photoHoles} onHoleTap={openHole} mine={mine} />
                         )
                     ) : !sessionId ? (
                         isLoading ? <div className="py-10 flex justify-center text-[#FFFFFF59]"><LucideLoader2 className="w-5 h-5 animate-spin" /></div>

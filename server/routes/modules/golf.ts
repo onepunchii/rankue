@@ -20,6 +20,7 @@ import { parseFootprintYear } from "../../../shared/golfFootprints.js";
 import { signFootprintShare, footprintCardPath } from "../../lib/footprintShare.js";
 import { parseLatLng } from "../../../shared/golfNearby.js";
 import { ONSITE_SOURCES, type OnSiteSource } from "../../../shared/golfOnSite.js";
+import { sanitizeHolePatches, withoutHoleStats } from "../../../shared/golfHoleStats.js";
 
 const router = Router();
 
@@ -791,7 +792,7 @@ router.post("/match/create", requireAuth, asyncHandler(async (req: AuthRequest, 
     const parsed = matchCreateSchema.safeParse(req.body ?? {});
     if (!parsed.success) return sendError(res, 400, "경기 설정이 올바르지 않아요");
     const session = await storage.createGolfMatchSession(req.userId!, parsed.data as any);
-    return sendSuccess(res, session);
+    return sendSuccess(res, withoutHoleStats(session));
 }));
 
 router.post("/match/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -808,7 +809,7 @@ router.post("/match/join", requireAuth, asyncHandler(async (req: AuthRequest, re
         // 이미 든 방(내 방 포함)에 다시 들어간 건 '맞힌 것' 으로 치지 않는다 — 치면 틀린 번호 4번 → 내 방 입장을
         // 되풀이해 잠금을 영영 피할 수 있었다(2026-09-11 리뷰).
         if (added) clearAttempts(key);
-        return sendSuccess(res, session);
+        return sendSuccess(res, withoutHoleStats(session));
     } catch (e: any) {
         if (e?.statusCode === 404 || e?.statusCode === 409) registerFailure(key);
         throw e;
@@ -838,12 +839,12 @@ async function loadMatch(req: AuthRequest, res: any, hostOnly: boolean): Promise
 router.get("/match/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const session = await loadMatch(req, res, false);
     if (!session) return;
-    return sendSuccess(res, session);
+    return sendSuccess(res, withoutHoleStats(session));
 }));
 
 router.post("/match/:id/start", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!await loadMatch(req, res, true)) return;
-    return sendSuccess(res, await storage.startGolfMatchSession(req.params.id));
+    return sendSuccess(res, withoutHoleStats(await storage.startGolfMatchSession(req.params.id)));
 }));
 
 router.post("/match/:id/score", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -851,24 +852,53 @@ router.post("/match/:id/score", requireAuth, asyncHandler(async (req: AuthReques
     const parsed = matchScoreSchema.safeParse(req.body ?? {});
     if (!parsed.success) return sendError(res, 400, "점수 형식이 올바르지 않아요");
     const session = await storage.updateGolfMatchScore(req.params.id, parsed.data.holeNo, parsed.data.players);
-    return sendSuccess(res, session);
+    return sendSuccess(res, withoutHoleStats(session));
 }));
 
 router.post("/match/:id/finish", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!await loadMatch(req, res, true)) return;
-    return sendSuccess(res, await storage.finishGolfMatchSession(req.params.id));
+    return sendSuccess(res, withoutHoleStats(await storage.finishGolfMatchSession(req.params.id)));
 }));
 
 router.post("/match/:id/abandon", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!await loadMatch(req, res, true)) return;
-    return sendSuccess(res, await storage.abandonGolfMatchSession(req.params.id));
+    return sendSuccess(res, withoutHoleStats(await storage.abandonGolfMatchSession(req.params.id)));
 }));
 
 router.post("/match/:id/course", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!await loadMatch(req, res, true)) return;
     const name = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 40) : undefined);
     const session = await storage.updateGolfMatchCourse(req.params.id, name(req.body?.frontCourseName), name(req.body?.backCourseName));
-    return sendSuccess(res, session);
+    return sendSuccess(res, withoutHoleStats(session));
+}));
+
+// --- 이 홀 기록(2026-10-01 오너 승인: 퍼팅·페어웨이·벌타 태그 — 규칙은 shared/golfHoleStats.ts) ---
+// 점수(방장만)와 달리 **참가자 누구나 자기 칸에만** 쓴다. 타수는 방장 폰 한 대로 적어도 퍼팅·페어웨이는 각자 안다 —
+// 방장만 쓰게 하면 넷 중 셋은 이 카드를 못 쓴다. 저장소가 로그인 회원의 칸(putts·fairway·penaltyTags)만 고치고
+// 점수·벌타(penalties)·이름·남의 칸엔 손대지 않는다. 이 칸은 기록(평균·등급·도장·현장 인증)이 읽지 않는다.
+// 위의 경기 응답은 전부 withoutHoleStats 를 거친다 — 남의 기록은 동반자에게도 안 보이고, 내 것은 여기 GET 으로만 받는다
+// (방장 폰은 경기 응답의 선수 목록을 편집 원본으로 붙들고 있어서, 거기 섞이면 낡은 값이 되살아난다).
+
+router.get("/match/:id/hole-stats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const session = await loadMatch(req, res, false);
+    if (!session) return;
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, await storage.golf.holeStatsView(session, req.userId!));
+}));
+
+router.post("/match/:id/hole-stats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const session = await loadMatch(req, res, false);
+    if (!session) return;
+    const patches = sanitizeHolePatches(req.body?.holes);
+    if (!patches) return sendError(res, 400, "이 홀 기록 형식이 올바르지 않아요");
+    const mine = await storage.golf.updateMyHoleStats(session.id, req.userId!, patches);
+    return sendSuccess(res, { mine });
+}));
+
+/** 라운딩 리포트 '홀 기록 통계' — 내 공식 라운드 중 이 홀 기록을 적은 것만(통계 식은 화면이 shared 로 센다) */
+router.get("/hole-stats/mine", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, await storage.golf.myHoleStatsRounds(req.userId!));
 }));
 
 // --- 현장 인증 도장(2026-09-30 오너 결정: "집에서 전국 도장을 모으지 못하게") ---
