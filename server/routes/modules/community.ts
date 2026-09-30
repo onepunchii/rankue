@@ -232,13 +232,14 @@ router.post("/posts/:id/like", requireAuth, asyncHandler(async (req: AuthRequest
 
 // 크루 콘텐츠(crew_*)는 크루 신고 주소(POST /crews/:id/reports)로만 받는다 — 거기서 대상이 그 크루 것인지,
 // 신고자가 크루원인지 확인한다. 여기서도 받으면 그 확인을 우회한다(검토 code:R6). 화면(ReportDialog)은 이미 crew_* 를 크루 주소로 보낸다.
-const REPORT_TARGETS = ["community_post", "community_comment", "member", "golf_booking", "player_cheer"];
+const REPORT_TARGETS = ["community_post", "community_comment", "member", "golf_booking", "player_cheer", "golf_photo"];
 const REPORT_REASONS = ["abuse", "gambling", "trade", "privacy", "spam", "other"];
 
 // 신고 대상이 실제로 있는지 확인하고 작성자를 돌려준다. null = 없는 대상.
 // 없는 UUID 를 받아 두면 큐가 빈 카드로 차고, 운영자 알림 상한(시간당 대상 수)을 가짜 신고로 먼저 채워
 // 진짜 신고의 알림을 막을 수 있었다(검토 code:R6). 작성자 id 가 없는 골프 매물은 "" 로 존재만 알린다.
-async function reportTargetAuthor(targetType: string, id: string): Promise<string | null> {
+// 라운드 사진은 **볼 수 있었던 사람만** 신고한다 — 공개 사진은 누구나, 비공개 사진은 그 경기 참가자만(앨범에서).
+async function reportTargetAuthor(targetType: string, id: string, reporterId: string): Promise<string | null> {
     switch (targetType) {
         case "community_post":
             return (await storage.community.getPostRaw(id))?.authorId ?? null;
@@ -256,6 +257,14 @@ async function reportTargetAuthor(targetType: string, id: string): Promise<strin
             const c = await storage.umb.getCheerRaw(id);
             return c && !c.deletedAt ? c.authorId : null;
         }
+        case "golf_photo": {
+            const ph = await storage.golfPhotos.get(id);
+            if (!ph) return null;
+            if (ph.isPublic && ph.courseSlug) return ph.memberId;
+            const s: any = await storage.getGolfMatchSession(ph.sessionId);
+            const inRound = !!s && (s.hostId === reporterId || (Array.isArray(s.players) && s.players.some((p: any) => p?.memberId === reporterId)));
+            return inRound ? ph.memberId : null;
+        }
         default:
             return null;
     }
@@ -266,7 +275,7 @@ router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: 
     if (!REPORT_TARGETS.includes(targetType)) return sendError(res, 400, "err.community.badReportTarget");
     if (typeof targetId !== "string" || !UUID_RE.test(targetId)) return sendError(res, 400, "err.community.reportTargetMissing");
     if (!REPORT_REASONS.includes(reason)) return sendError(res, 400, "err.community.reportReasonRequired");
-    const authorId = await reportTargetAuthor(targetType, targetId);
+    const authorId = await reportTargetAuthor(targetType, targetId, req.userId!);
     if (authorId === null) return sendError(res, 404, "err.community.reportTargetNotFound");
     if (authorId === req.userId) return sendError(res, 400, "err.community.cannotReportSelf");
 
@@ -284,6 +293,22 @@ router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: 
         const { notifyAdminsOfReport } = await import("../../services/moderation.js");
         await notifyAdminsOfReport({ targetType, targetId, reason, reporterId: req.userId! });
     } catch (e) { console.error("[Notify] 신고 운영자 알림:", e); }
+
+    // 라운드 사진이 가려지면 골프 알림함으로 — 커뮤니티 이의제기 안내 대신 운영자 확인 안내(사진은 이의제기 칸이 없다)
+    if (result.autoBlinded && result.authorId && targetType === "golf_photo") {
+        try {
+            const ph = await storage.golfPhotos.get(targetId);
+            await notificationService.sendAndSaveNotification({
+                memberId: result.authorId,
+                title: "notif.golfPhoto.hidden.title",
+                body: "notif.golfPhoto.hidden.body",
+                category: "GOLF",
+                type: "MODERATION",
+                params: { url: ph ? `/history?album=${ph.sessionId}` : "/history" },
+            });
+        } catch (e) { console.error("[Notify] 라운드 사진 가림:", e); }
+        return sendSuccess(res, { reported: true });
+    }
 
     // 자동 블라인드 시 작성자에게 즉시 알림 + 이의제기 안내 — 담합·보복 신고 방어 세트
     if (result.autoBlinded && result.authorId) {

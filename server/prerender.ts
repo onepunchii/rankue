@@ -9,6 +9,7 @@ import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo } from "../shared/storeMeta.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
+import { COURSE_GALLERY_LIMIT } from "../shared/golfPhoto.js";
 import { storeCardUrl } from "./services/storeCard.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW, LANDING_LANGS, landingContent } from "../shared/landingContent.js";
 import {
@@ -594,7 +595,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     return golfGone("골프장을 찾을 수 없습니다.", "요청한 골프장 정보가 없습니다.");
   }
   const rows = async (x: any) => { const r: any = await db.execute(x); return (r.rows ?? r) as any[]; };
-  const [prices, hist, rounds] = await Promise.all([
+  const [prices, hist, rounds, photos] = await Promise.all([
     rows(sql`select item_id, label, price, change, year_high, year_low, as_of::text as as_of
              from golf_membership_prices where slug = ${slug} order by price desc`),
     rows(sql`select h.item_id, h.d::text as d, h.price from golf_membership_price_history h
@@ -603,6 +604,8 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     p.clubId
       ? rows(sql`select count(*)::int n from golf_match_sessions where course_id = ${p.clubId} and status = 'finished'`).catch(() => [{ n: 0 }])
       : Promise.resolve([{ n: 0 }]),
+    // 회원이 공개한 라운드 사진(2026-09-30) — 화면과 같은 규칙(가려진 것·정지 계정 제외). 봇은 차단 목록이 없다.
+    storage.golfPhotos.listForCourse(slug, null, COURSE_GALLERY_LIMIT).catch(() => []),
   ]);
   const byListing = golfListingsBySlug(s);
   const listings = byListing.get(slug) ?? [];
@@ -738,6 +741,11 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
 
   const introHtml = p.intro ? `\n  <h2>${esc(p.name)} 소개</h2>\n  <p>${esc(p.intro)}</p>` : "";
 
+  // 라운드 사진 — figure + figcaption(사진 · 닉네임 · 달). 날짜는 달까지만(화면과 같다)
+  const photoHtml = photos.length
+    ? `\n  <h2>${esc(p.name)} 라운드 사진</h2>\n  ${photos.map((ph) => `<figure><img src="${esc(ph.url)}" alt="${esc(`${p.name} 라운드 사진`)}"${ph.width && ph.height ? ` width="${ph.width}" height="${ph.height}"` : ""} loading="lazy"><figcaption>${esc(`사진 · ${ph.credit}${ph.month ? ` · ${ph.month}` : ""}`)}</figcaption></figure>`).join("\n  ")}`
+    : "";
+
   // 지금 올라온 티타임
   const listingHtml = listings.length
     ? `\n  <h2>지금 올라온 티타임 ${listings.length}건</h2>\n  <ul>\n  ${listings.slice(0, 40).map((l) => golfListingLi(s, l, false)).join("\n  ")}\n  </ul>`
@@ -813,7 +821,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
   <dl>
     ${dlHtml}
   </dl>
-  ${mapHtml}${listingHtml}${feeHtml}${priceHtml}${courseHtml}${introHtml}${nearHtml}${hubHtml}
+  ${mapHtml}${listingHtml}${feeHtml}${priceHtml}${courseHtml}${introHtml}${photoHtml}${nearHtml}${hubHtml}
   ${hubNav("ko")}
 </main>`,
   });

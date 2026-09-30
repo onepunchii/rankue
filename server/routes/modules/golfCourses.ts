@@ -8,6 +8,7 @@
  *   GET    /golf-courses/by-id/:courseId    옛 주소(/golf/course/74) → 슬러그
  *   GET    /golf-courses/watches/mine       내 관심 골프장(로그인)
  *   GET    /golf-courses/:slug              골프장 한 곳(시세·이력·글·가까운 곳·라운드)
+ *   GET    /golf-courses/:slug/photos       공개 라운드 사진(가려진 것·차단한 회원 것 제외, 2026-09-30)
  *   PUT    /golf-courses/:slug/watch        관심 등록·조건 바꾸기(로그인)
  *   DELETE /golf-courses/:slug/watch        관심 해제(로그인)
  *
@@ -23,6 +24,7 @@ import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { isUrgentJoin, listingCapacity, distanceKm } from "../../../shared/golfJoin.js";
 import { cityShort, listingIntents, type GolfIntent, type PublicListing } from "../../../shared/golfCourse.js";
+import { COURSE_GALLERY_LIMIT } from "../../../shared/golfPhoto.js";
 
 const router = Router();
 
@@ -256,6 +258,17 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
         watchers: s.watchers.get(slug) ?? 0,
         myWatch: mine[0] ? { filters: mine[0].filters ?? {} } : null,
     });
+}));
+
+// ── 라운드 사진(2026-09-30) ─────────────────────────────────────────
+// 회원이 '공개'로 돌린 라운드 사진 — 사전 승인 없이 바로 뜬다(오너 결정). 그래서 가려진 것(신고 3명)은 빼고,
+// 보는 사람이 차단한 회원의 사진도 뺀다. 크레딧은 이름·달까지만(정확한 날짜·시각은 그날 거기 있었다는 위치 기록이 된다).
+router.get("/:slug/photos", asyncHandler(async (req: any, res: any) => {
+    const slug = String(req.params.slug).normalize("NFC");
+    const s = await loadSummary();
+    if (!s.bySlug.has(slug)) return sendError(res, 404, "골프장을 찾을 수 없어요");
+    const limit = Math.min(Math.max(Math.floor(Number(req.query.limit) || COURSE_GALLERY_LIMIT), 1), 48);
+    return sendSuccess(res, await storage.golfPhotos.listForCourse(slug, viewerId(req), limit));
 }));
 
 // ── 관심 ───────────────────────────────────────────────────────────

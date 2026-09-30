@@ -1,7 +1,7 @@
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef } from "react";
-import { LucideHome, LucideShare2, LucideCrown, LucideArrowRight } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { LucideHome, LucideShare2, LucideCrown, LucideArrowRight, LucideCamera, LucideChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
@@ -10,6 +10,8 @@ import { useRankueMatch } from "../hooks/useRankueMatch";
 import { useMoneyUnit, formatMoney } from "../lib/money";
 import { isCompleteRound, isGuestId, formatRelative, minimalTransfers, rankRound, type Settlement } from "@shared/golfMatch";
 import { kstDateLabel } from "@/lib/kst";
+import { useSessionPhotos } from "../lib/photoApi";
+import { RoundDetailSheet, type RoundTarget } from "../components/photos/RoundDetailSheet";
 
 /**
  * 랭큐매치 결과.
@@ -29,6 +31,10 @@ export default function GameResult() {
     const { data: me } = useQuery<any>({ queryKey: ["/api/hiq/me"] });
     const { session, isLoading, error, moneyResults, moneyTransactions, coursePar, parKnown, hasStakes } = useRankueMatch(matchId || "", me);
     const [unit, setUnit] = useMoneyUnit();
+    // 라운드 사진(2026-09-30) — 결과 화면에서 스코어카드 | 앨범 시트를 연다
+    const photosQ = useSessionPhotos(matchId);
+    const photos = photosQ.data?.photos ?? [];
+    const [detail, setDetail] = useState<RoundTarget | null>(null);
 
     const settlement: Settlement = session?.settlement && typeof session.settlement === "object" && session.settlement.totals
         ? session.settlement
@@ -226,6 +232,33 @@ export default function GameResult() {
                             18홀을 모두 적은 회원만 평균·여권 도장에 기록돼요.
                         </p>
                     )}
+
+                    {/* 스코어카드 · 앨범 — 누르면 탭 두 개짜리 시트(라운딩 리포트와 같은 것) */}
+                    <button
+                        type="button"
+                        onClick={() => setDetail({ sessionId: session.id, title: session.courseName, date: session.finishedAt || session.updatedAt, subType: [session.frontCourseName, session.backCourseName].filter(Boolean).join(" / ") || null, tab: photos.length ? "album" : "score" })}
+                        className="w-full text-left rounded-[1.5rem] bg-[#FFFFFF08] border border-[#FFFFFF1A] px-5 py-4 active:bg-[#FFFFFF0F]"
+                    >
+                        <span className="flex items-center gap-3">
+                            <span className="shrink-0 w-10 h-10 rounded-full bg-[#64DD171F] flex items-center justify-center">
+                                <LucideCamera className="w-5 h-5 text-[#9BEF5C]" />
+                            </span>
+                            <span className="flex-1 min-w-0">
+                                <span className="block text-[15px] font-semibold text-[#ffffff]">스코어카드 · 앨범</span>
+                                <span className="block text-[12.5px] text-[#FFFFFF8C]">{photos.length ? `사진 ${photos.length}장 · 홀별 기록` : "홀별 기록 보기 · 사진 남기기"}</span>
+                            </span>
+                            <LucideChevronRight className="w-4 h-4 shrink-0 text-[#FFFFFF4D]" />
+                        </span>
+                        {photos.length > 0 && (
+                            <span className="mt-3 grid grid-cols-4 gap-1.5">
+                                {photos.slice(-4).map((p) => (
+                                    <span key={p.id} className="aspect-square rounded-xl overflow-hidden bg-[#FFFFFF0A]">
+                                        <img src={p.thumbUrl} alt="" loading="lazy" className="w-full h-full object-cover" />
+                                    </span>
+                                ))}
+                            </span>
+                        )}
+                    </button>
                 </div>
             </div>
 
@@ -248,6 +281,7 @@ export default function GameResult() {
                     </Button>
                 </div>
             </div>
+            <RoundDetailSheet target={detail} onClose={() => setDetail(null)} />
         </div>
     );
 }

@@ -1,9 +1,12 @@
 import { Router } from "express";
 import { storage } from "../../storage/index.js";
-import type { SeatLimit } from "../../storage/golf.repo.js";
+import { coursePageSlugFor, type SeatLimit } from "../../storage/golf.repo.js";
+import { deleteBlobs, isOnOwnBlobHost } from "../../utils/blob.js";
+import { GOLF_PHOTO_CATEGORY, GOLF_THUMB_CATEGORY, GOLF_PHOTO_MAX_PER_ROUND, isOwnGolfPhotoUrl } from "../../../shared/golfPhoto.js";
 import { insertGolfBookingSchema, GolfBooking, insertGolfJoinSchema, GolfJoin, insertGolfMembershipOrderSchema } from "../../../shared/schema.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
+import { requireTermsAccepted } from "../../middleware/terms.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { notifyCrewChat } from "../../services/crewChatNotify.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
@@ -12,6 +15,9 @@ import { notificationService } from "../../services/notificationService.js";
 import { notifyCourseWatchers } from "../../services/golfCourseWatch.js";
 import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, convertibleSeats, conversionSlots, recruitCondition, listingCapacity, type JoinType, type SlotGender } from "../../../shared/golfJoin.js";
 import { msg } from "../../lib/i18n.js";
+import { getGolfFootprints } from "../../storage/golfFootprints.js";
+import { parseFootprintYear } from "../../../shared/golfFootprints.js";
+import { signFootprintShare, footprintCardPath } from "../../lib/footprintShare.js";
 
 const router = Router();
 
@@ -707,6 +713,30 @@ router.get("/passport-stats", requireAuth, asyncHandler(async (req: AuthRequest,
 }));
 
 /**
+ * 골프 발자국(2026-09-30) — 도장을 처음 간 순서로. **본인 것만**(남의 번호를 받는 길이 없다). ?year=2026 이면 그해만.
+ * 동선은 민감한 정보라 공유 카드는 따로 서명한 주소로만 연다(아래 /share, server/lib/footprintShare.ts).
+ */
+router.get("/passport/footprints", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const year = parseFootprintYear(req.query.year);
+    return sendSuccess(res, await getGolfFootprints(req.userId!, year));
+}));
+
+/**
+ * 공유 카드 주소를 만든다 — 본인이 '공유'를 눌렀을 때만. 30일 뒤 닫히는 서명 주소(상대 경로).
+ * 아무것도 저장하지 않는다(서명은 계산이다). 발자국이 없으면 만들 게 없다.
+ */
+router.get("/passport/footprints/share", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const year = parseFootprintYear(req.query.year);
+    const fp = await getGolfFootprints(req.userId!, year);
+    if (!fp.stops.length) return sendError(res, 404, "아직 공유할 발자국이 없어요");
+    const signed = signFootprintShare(req.userId!, year);
+    if (!signed) return sendError(res, 503, "지금은 공유 링크를 만들 수 없어요");
+    // 주소 자체가 열쇠다 — 어디에도 캐시되지 않게
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, { url: footprintCardPath(req.userId!, year, signed.token), expiresAt: new Date(signed.exp * 1000).toISOString() });
+}));
+
+/**
  * 스코어카드 글자 인식 결과를 표로 정리해 돌려준다. **아무것도 저장하지 않는다.**
  *
  * 예전엔 여기서 공용 코스 자료(hiq_course_hole_info)에 홀별 파를 적었다. 두 가지가 겹쳐 있었다:
@@ -837,6 +867,100 @@ router.post("/match/:id/course", requireAuth, asyncHandler(async (req: AuthReque
     const name = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 40) : undefined);
     const session = await storage.updateGolfMatchCourse(req.params.id, name(req.body?.frontCourseName), name(req.body?.backCourseName));
     return sendSuccess(res, session);
+}));
+
+// --- 라운드 사진(2026-09-30 오너: "스코어 등록 때 사진 — 추억 앨범, 공개 사진은 그 골프장 페이지에, 신고·차단") ---
+// 점수와 달리 **참가자 누구나** 자기 사진을 올린다(방장 폰 한 대로 점수를 적어도 사진은 각자 폰으로 찍는다).
+// 파일은 화면이 먼저 POST /api/hiq/upload(golf-photo·golf-thumb, EXIF 제거)로 올리고, 여기선 그 주소를 경기에 붙인다.
+// 바꾸기·지우기는 **자기 사진만**(저장소가 member_id 조건으로 막는다).
+
+const photoAddSchema = z.object({
+    url: z.string().max(400),
+    thumbUrl: z.string().max(400),
+    width: z.coerce.number().int().min(1).max(10000).nullish(),
+    height: z.coerce.number().int().min(1).max(10000).nullish(),
+    holeNo: z.coerce.number().int().min(1).max(18).nullish(),
+    isPublic: z.boolean().optional(),
+});
+
+router.get("/match/:id/photos", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const session = await loadMatch(req, res, false);
+    if (!session) return;
+    const photos = await storage.golfPhotos.listForSession(session.id, req.userId!);
+    return sendSuccess(res, {
+        photos,
+        mineCount: photos.filter((p) => p.mine).length,
+        max: GOLF_PHOTO_MAX_PER_ROUND,
+    });
+}));
+
+// 사진은 UGC 다 — 약관 동의·정지 문지기(커뮤니티 글·크루 사진과 같은 규칙, middleware/terms.ts)
+router.post("/match/:id/photos", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
+    const session = await loadMatch(req, res, false);
+    if (!session) return;
+    const parsed = photoAddSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, "사진 정보가 올바르지 않아요");
+    const d = parsed.data;
+    // 주소가 우리 업로드 API 가 **이 회원에게** 만든 것인지 — 남의 사진·외부 주소를 내 라운드 사진으로 붙이지 못하게
+    if (!isOwnGolfPhotoUrl(d.url, req.userId!, GOLF_PHOTO_CATEGORY) || !isOwnGolfPhotoUrl(d.thumbUrl, req.userId!, GOLF_THUMB_CATEGORY)) {
+        return sendError(res, 400, "사진 주소가 올바르지 않아요");
+    }
+    // 경로가 맞아도 **우리** 저장소여야 한다 — 남의 Blob 저장소에 같은 경로로 올린 파일은 EXIF 제거를 안 거쳤다
+    if (!isOnOwnBlobHost(d.url) || !isOnOwnBlobHost(d.thumbUrl)) return sendError(res, 400, "사진 주소가 올바르지 않아요");
+    const drop = () => deleteBlobs([d.url, d.thumbUrl]); // 못 붙인 사진은 Blob 에 남기지 않는다(내 것임을 위에서 확인했다)
+    if (session.status === "abandoned") { await drop(); return sendError(res, 409, "접은 라운드에는 사진을 올릴 수 없어요"); }
+    const courseSlug = await coursePageSlugFor(session.courseId, session.courseName);
+    const row = await storage.golfPhotos.add({
+        sessionId: session.id,
+        memberId: req.userId!,
+        holeNo: d.holeNo ?? null,
+        url: d.url,
+        thumbUrl: d.thumbUrl,
+        width: d.width ?? null,
+        height: d.height ?? null,
+        // 골프장 페이지가 없는 골프장은 공개로 둘 곳이 없다 — 비공개로만
+        isPublic: !!d.isPublic && !!courseSlug,
+        courseSlug,
+    });
+    if (!row) { await drop(); return sendError(res, 409, `한 라운드에 ${GOLF_PHOTO_MAX_PER_ROUND}장까지 올릴 수 있어요`); }
+    return sendSuccess(res, { id: row.id, courseSlug });
+}));
+
+/** 내 라운드들의 사진(라운딩 리포트 사진첩) — 동반자가 올린 것도 포함, 차단한 회원 것은 빼고 */
+router.get("/photos/mine", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    return sendSuccess(res, await storage.golfPhotos.listMine(req.userId!, 60));
+}));
+
+// 공개로 돌릴 때만 약관 문지기 — 비공개로 되돌리는 건(노출을 줄이는 쪽) 약관 개정 뒤에도 막지 않는다
+const termsIfPublishing = (req: AuthRequest, res: any, next: () => void) =>
+    req.body?.isPublic === true ? requireTermsAccepted(req, res, next) : next();
+
+router.patch("/photos/:photoId", requireAuth, termsIfPublishing, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.photoId)) return sendError(res, 404, "사진을 찾을 수 없어요");
+    if (typeof req.body?.isPublic !== "boolean") return sendError(res, 400, "공개 여부를 골라 주세요");
+    const photo = await storage.golfPhotos.get(req.params.photoId);
+    if (!photo || photo.memberId !== req.userId) return sendError(res, 404, "사진을 찾을 수 없어요");
+    if (req.body.isPublic && !photo.courseSlug) return sendError(res, 409, "골프장 페이지가 없는 골프장이라 공개할 곳이 없어요");
+    await storage.golfPhotos.setPublic(photo.id, req.userId!, req.body.isPublic);
+    return sendSuccess(res, { id: photo.id, isPublic: req.body.isPublic });
+}));
+
+// 이의제기 — 신고로 가려진 내 사진에 원탭(커뮤니티 /community/appeals 와 같은 규칙). 신고 큐가 이 건을 다시 연다.
+router.post("/photos/:photoId/appeal", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.photoId)) return sendError(res, 404, "사진을 찾을 수 없어요");
+    const text = String(req.body?.text || "").slice(0, 500) || "이의제기합니다";
+    const ok = await storage.golfPhotos.appeal(req.params.photoId, req.userId!, text);
+    if (!ok) return sendError(res, 400, "가려진 내 사진에만 이의제기할 수 있어요");
+    return sendSuccess(res, { appealed: true });
+}));
+
+router.delete("/photos/:photoId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.photoId)) return sendError(res, 404, "사진을 찾을 수 없어요");
+    const gone = await storage.golfPhotos.delete(req.params.photoId, req.userId!);
+    if (!gone) return sendError(res, 404, "사진을 찾을 수 없어요");
+    // 서버리스는 응답 뒤에 멈출 수 있다 — Blob 정리를 기다린다(crew 사진 삭제와 같은 원칙)
+    await deleteBlobs([gone.url, gone.thumbUrl]);
+    return sendSuccess(res, { deleted: true });
 }));
 
 // --- Golf Club & Course Routes ---

@@ -14,6 +14,8 @@ import { StampList } from "../components/passport/StampList";
 import { RegionSheet } from "../components/passport/RegionSheet";
 import { ViewSwitcher } from "../components/passport/ViewSwitcher";
 import { Elite60Banner } from "../components/passport/Elite60Banner";
+import { PassportMapTabs, usePassportMapMode } from "../components/passport/PassportMapTabs";
+import { FootprintsPanel } from "../components/passport/FootprintsPanel";
 import { COURSES } from "@/golf/data/golfCourses";
 
 // Hooks
@@ -27,6 +29,8 @@ type ViewMode = 'map' | 'stamp';
 
 export default function Passport() {
     const [viewMode, setViewMode] = useState<ViewMode>('map');
+    // 지도 보기: 지역 정복 ↔ 발자국(2026-09-30 오너: "도장깨기 지도에 발자국 기능")
+    const [mapMode, setMapMode] = usePassportMapMode();
     const [scannerOpen, setScannerOpen] = useState(false);
 
     // For Region Sheet interactions
@@ -71,14 +75,19 @@ export default function Passport() {
                             exit={{ opacity: 0, y: -20 }}
                         >
                             <PassportStatsCard stats={stats} />
-                            <RegionMap
-                                regionTotals={stats.regionTotals}
-                                regionConquered={stats.regionConquered}
-                                onRegionClick={(id) => {
-                                    setRegionalSheetRegion(id);
-                                    setIsRegionalPopupOpen(true);
-                                }}
-                            />
+                            <PassportMapTabs value={mapMode} onChange={setMapMode} />
+                            {mapMode === 'footprints' ? (
+                                <FootprintsPanel />
+                            ) : (
+                                <RegionMap
+                                    regionTotals={stats.regionTotals}
+                                    regionConquered={stats.regionConquered}
+                                    onRegionClick={(id) => {
+                                        setRegionalSheetRegion(id);
+                                        setIsRegionalPopupOpen(true);
+                                    }}
+                                />
+                            )}
                             <Elite60Banner conqueredCount={rankue60ConqueredCount} />
                         </motion.div>
                     )}

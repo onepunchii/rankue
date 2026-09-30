@@ -289,6 +289,9 @@ export const vi: Record<string, string> = {
   "notif.community.comment.body": "{name}: {text}",
   "notif.community.comment.bodyAnon": "Ai đó: {text}",
   "notif.community.autoBlind.body": "Bài viết của bạn đã bị ẩn do nhiều báo cáo. Nếu thấy không hợp lý, bạn có thể khiếu nại ngay trong ứng dụng.",
+  // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
+  "notif.golfPhoto.hidden.title": "📷 Ảnh vòng đấu của bạn đã bị ẩn",
+  "notif.golfPhoto.hidden.body": "Ảnh vòng đấu của bạn đã bị ẩn sau nhiều báo cáo. Nếu bạn thấy không có vấn đề, hãy mở ảnh trong album và nhấn “Khiếu nại” — đội ngũ sẽ xem xét lại.",
   "notif.moderation.blind.title": "⚠️ Bài viết đã bị ẩn",
   "notif.moderation.blind.bodyAppeal": "Báo cáo vi phạm chính sách đã được xác nhận và bài viết của bạn đã bị ẩn. Nếu thấy không hợp lý, bạn có thể khiếu nại ngay trong ứng dụng.",
   "notif.moderation.blind.body": "Báo cáo vi phạm chính sách đã được xác nhận và bài viết của bạn đã bị ẩn.",

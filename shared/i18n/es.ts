@@ -289,6 +289,9 @@ export const es: Record<string, string> = {
   "notif.community.comment.body": "{name}: {text}",
   "notif.community.comment.bodyAnon": "Alguien: {text}",
   "notif.community.autoBlind.body": "Tu publicación se ocultó por acumulación de reportes. Si crees que es injusto, puedes apelar desde la app.",
+  // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
+  "notif.golfPhoto.hidden.title": "📷 Tu foto de ronda fue ocultada",
+  "notif.golfPhoto.hidden.body": "Tu foto de la ronda se ocultó tras varias denuncias. Si crees que no hay problema, ábrela en tu álbum y toca «Apelar»: nuestro equipo la revisará de nuevo.",
   "notif.moderation.blind.title": "⚠️ Publicación oculta",
   "notif.moderation.blind.bodyAppeal": "Se confirmó un reporte por incumplir las normas y tu publicación se ocultó. Si crees que es injusto, puedes apelar desde la app.",
   "notif.moderation.blind.body": "Se confirmó un reporte por incumplir las normas y tu publicación se ocultó.",

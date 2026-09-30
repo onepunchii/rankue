@@ -11,6 +11,7 @@ import { useGolfScore } from "../hooks/useGolfScore";
 import { ScoreCard, HoleGrid } from "../components/ScoreCard";
 import { TransactionCard } from "../components/TransactionCard";
 import { GolfBackButton } from "../components/common/GolfBackButton";
+import { useRoundPhotos } from "../components/photos/RoundPhotoCamera";
 import {
     Select,
     SelectContent,
@@ -147,6 +148,9 @@ export default function GolfScorecard() {
         myHandicap,
         currentHole
     );
+
+    // 라운드 사진(2026-09-30) — 참가자 누구나 자기 사진을 지금 홀로 태그해 올린다. 방금 올린 사진 카드는 아래 단추 줄 위에 뜬다.
+    const photoUi = useRoundPhotos(session?.id, currentHole + 1, "calc(92px + env(safe-area-inset-bottom))");
 
     // 없는 경기·권한 없음이면 'LOADING MATCH…' 를 영원히 돌리지 않고 이유를 말한다.
     // 데이터가 있는데 다시 가져오기만 실패한 거면 점수판을 가리지 않는다 — 아래 배너만 띄운다.
@@ -351,6 +355,7 @@ export default function GolfScorecard() {
                             </SelectContent>
                         </Select>
                     </div>
+                    {photoUi.button}
                     {/* 점수 게임(포인트)을 안 하는 경기엔 볼 게 없다 — 예전엔 스트로크 경기에도 숨은 판돈으로 금액이 떴다 */}
                     {hasStakes && (
                         <button
@@ -369,6 +374,8 @@ export default function GolfScorecard() {
                     })}
                 </div>
             </header>
+
+            {photoUi.strip}
 
             {/* Score Cards Area - Only in Group Mode */}
             {!(session.strokeMode === 'solo' || session.players.length === 1) && (
@@ -703,6 +710,8 @@ export default function GolfScorecard() {
                     </div>
                 </DialogContent>
             </Dialog>
+
+            {photoUi.overlay}
         </div>
     );
 }

@@ -36,6 +36,7 @@ import { notFound, conflict, badRequest } from "../utils/errors.js";
 import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords, passportRegionGroup } from "../../shared/golfRegions.js";
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
 import { courseNameKey } from "../../shared/golfCourse.js";
+import { makeStampResolver } from "./golfStamps.js";
 import { parseLatLng, sortByDistance } from "../../shared/golfNearby.js";
 import {
     resolvePars, sanitizeScores, isCompleteRound, roundTotals, settleMatch, rulesFor, isGuestId, GUEST_PREFIX, rankRound,
@@ -214,7 +215,8 @@ function seatExpr(limit: SeatLimit) {
  */
 type ClubPageInfo = { logo: string | null; slug: string; lat: number | null; lng: number | null };
 let pageIndexCache: { at: number; map: Map<string, ClubPageInfo> } | null = null;
-async function clubPageIndex(): Promise<Map<string, ClubPageInfo>> {
+/** 발자국(storage/golfFootprints.ts)도 쓴다 — 원장에 좌표가 빠진 골프장은 페이지 좌표로 지도에 올린다. */
+export async function clubPageIndex(): Promise<Map<string, ClubPageInfo>> {
     if (pageIndexCache && Date.now() - pageIndexCache.at < 10 * 60_000) return pageIndexCache.map;
     const map = new Map<string, ClubPageInfo>();
     const bad = new Set<string>();
@@ -233,6 +235,22 @@ async function clubPageIndex(): Promise<Map<string, ClubPageInfo>> {
     } catch (e) { console.warn("[golf] club page index failed:", (e as Error)?.message); }
     pageIndexCache = { at: Date.now(), map };
     return map;
+}
+
+/**
+ * 경기의 골프장 → 골프장 페이지 슬러그(2026-09-30 라운드 사진 — 공개 사진이 붙을 페이지). 없으면 null.
+ * 명부 id(courseId = rankue_golf_clubs.id)가 페이지의 club_id 로 바로 이어지면 그걸, 아니면 목록과 같은 이름 열쇠로.
+ */
+export async function coursePageSlugFor(courseId: string | null | undefined, courseName: string | null | undefined): Promise<string | null> {
+    if (courseId && UUID_RE.test(courseId)) {
+        try {
+            // 한 명부 id 가 두 페이지에 걸리면(합치기 전 회원제·대중제) 어느 쪽인지 모른다 — 이름 열쇠로 넘긴다
+            const rows = await db.select({ slug: golfCoursePages.slug }).from(golfCoursePages).where(eq(golfCoursePages.clubId, courseId)).limit(2);
+            if (rows.length === 1) return rows[0].slug;
+        } catch (e) { console.warn("[golf] page slug by club failed:", (e as Error)?.message); }
+    }
+    const k = courseName ? courseNameKey(courseName) : "";
+    return k ? (await clubPageIndex()).get(k)?.slug ?? null : null;
 }
 
 export class GolfRepository {
@@ -950,10 +968,8 @@ export class GolfRepository {
             region: rankueGolfClubs.region, address: rankueGolfClubs.address,
         }).from(rankueGolfClubs);
 
-        const squash = (v: string) => v.replace(/\s+/g, "").toLowerCase();
-        const byId = new Map(clubs.map((c) => [c.id, c]));
-        const byName = new Map<string, (typeof clubs)[number]>();
-        for (const c of clubs) if (!byName.has(squash(c.name))) byName.set(squash(c.name), c);
+        // 도장 규칙(번호 → 이름)은 발자국(golfFootprints.ts)과 같은 함수 — 둘이 갈라지면 도장 수와 발자국 수가 달라진다.
+        const resolveStamp = makeStampResolver(clubs);
         const groupOf = (c: { region: string | null; address: string | null }) =>
             passportRegionGroup(resolveGolfRegionCode(c.region, c.address));
 
@@ -966,15 +982,15 @@ export class GolfRepository {
         type Stamp = { clubId: string | null; name: string; region: string | null; firstDate: Date; lastDate: Date; bestScore: number; rounds: number };
         const stamps = new Map<string, Stamp>();
         for (const h of history) {
-            const club = (h.golfClubId && byId.get(h.golfClubId)) || (h.locationName ? byName.get(squash(h.locationName)) : undefined);
             // 골프장을 모르는 기록(옛 '알 수 없는 구장' 포함)은 라운드 수에만 들어가고 도장은 없다.
-            if (!club && (!h.locationName || h.locationName === "알 수 없는 구장")) continue;
-            const key = club?.id ?? `name:${squash(h.locationName!)}`;
+            const hit = resolveStamp(h);
+            if (!hit) continue;
+            const { key, club } = hit;
             const cur = stamps.get(key);
             if (!cur) {
                 stamps.set(key, {
                     clubId: club?.id ?? null,
-                    name: club?.name ?? h.locationName!,
+                    name: hit.name,
                     region: club ? groupOf(club) : null,
                     firstDate: h.createdAt, lastDate: h.createdAt,
                     bestScore: h.score, rounds: 1,

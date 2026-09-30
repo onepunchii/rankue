@@ -12,8 +12,9 @@ import {
     type InsertHiqCommunityPost,
     type InsertHiqCommunityComment,
     golfBookings,
+    golfRoundPhotos,
 } from "../../shared/schema.js";
-import { eq, and, desc, sql, lt, gte, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, lt, gte, inArray, isNull } from "drizzle-orm";
 
 // 커뮤니티 리포지토리.
 // 원칙 1 — DTO에 phone 등 식별자를 절대 싣지 않는다: SELECT 컬럼을 항상 명시한다.
@@ -305,6 +306,14 @@ export class CommunityRepository {
                     .where(and(eq(golfBookings.id, opts.targetId), eq(golfBookings.isBlinded, false)))
                     .returning({ ownerId: golfBookings.ownerId });
                 if (row) { autoBlinded = true; authorId = row.ownerId ?? null; }
+            } else if (opts.targetType === "golf_photo") {
+                // 라운드 사진은 공개로 돌리면 골프장 페이지에 **사전 승인 없이** 바로 뜬다(2026-09-30 오너) — 그래서 3명이면 시스템이 가린다.
+                // 지우지 않고 가린다: 올린 사람은 앨범에서 '가려진 사진'으로 보고 직접 지울 수 있고, 운영자는 풀 수 있다.
+                const [row] = await db.update(golfRoundPhotos)
+                    .set({ hiddenAt: new Date() })
+                    .where(and(eq(golfRoundPhotos.id, opts.targetId), isNull(golfRoundPhotos.hiddenAt)))
+                    .returning({ memberId: golfRoundPhotos.memberId });
+                if (row) { autoBlinded = true; authorId = row.memberId; }
             } else if (opts.targetType === "community_comment") {
                 const comment = await this.getCommentRaw(opts.targetId);
                 if (comment && !comment.isBlinded) {

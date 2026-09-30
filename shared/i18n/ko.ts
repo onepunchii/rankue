@@ -289,6 +289,9 @@ export const ko: Record<string, string> = {
   "notif.community.comment.body": "{name}님: {text}",
   "notif.community.comment.bodyAnon": "누군가님: {text}",
   "notif.community.autoBlind.body": "신고 누적으로 게시물이 블라인드되었습니다. 부당하다면 앱에서 바로 이의제기할 수 있습니다.",
+  // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
+  "notif.golfPhoto.hidden.title": "📷 라운드 사진이 가려졌어요",
+  "notif.golfPhoto.hidden.body": "신고가 여러 건 들어와 라운드 사진을 가렸어요. 문제가 없다고 생각되면 앨범에서 사진을 열어 '이의제기'를 눌러 주세요. 운영자가 다시 확인해요.",
   "notif.moderation.blind.title": "⚠️ 게시물 블라인드 안내",
   "notif.moderation.blind.bodyAppeal": "운영 정책 위반 신고가 확인되어 게시물이 가려졌습니다. 부당하다면 앱에서 바로 이의제기할 수 있습니다.",
   "notif.moderation.blind.body": "운영 정책 위반 신고가 확인되어 게시물이 가려졌습니다.",

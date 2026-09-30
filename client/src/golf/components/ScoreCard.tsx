@@ -45,7 +45,12 @@ const toParColor = (n: number) => (n < 0 ? "text-[#7DD3FC]" : n > 0 ? "text-[#FF
  * 18홀 기록표 한 판(전반·후반 두 줄). 혼자 기록 화면과 선수 줄의 '기록표'가 같이 쓴다.
  * 동그라미 = 파보다 적게(버디 하나, 이글 이상 두 겹), 네모 = 파보다 많게(보기 한 겹, 더블 이상 채움). 파는 숫자만.
  */
-export function HoleGrid({ scores, pars, currentHole }: { scores: number[]; pars: number[]; currentHole: number }) {
+export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap }: {
+    scores: number[]; pars: number[]; currentHole: number;
+    /** 사진이 있는 홀(0부터) — 홀 번호 위에 작은 라임 점(2026-09-30 라운드 사진). 누르면 onHoleTap(그 홀 사진으로) */
+    photoHoles?: ReadonlySet<number>;
+    onHoleTap?: (holeIndex: number) => void;
+}) {
     const half = (from: number) => {
         const idx = Array.from({ length: 9 }, (_, i) => from + i);
         const sum = idx.reduce((a, i) => a + (scores[i] || 0), 0);
@@ -53,9 +58,21 @@ export function HoleGrid({ scores, pars, currentHole }: { scores: number[]; pars
         return (
             <div className="grid grid-cols-[34px_repeat(9,minmax(0,1fr))_36px] gap-y-1 items-center text-center">
                 <span className="text-[11px] text-[#FFFFFF59] text-left">홀</span>
-                {idx.map((i) => (
-                    <span key={i} className={cn("text-[11px] tabular-nums", i === currentHole ? "text-[#9BEF5C] font-semibold" : "text-[#FFFFFF73]")}>{i + 1}</span>
-                ))}
+                {idx.map((i) => {
+                    const hasPhoto = !!photoHoles?.has(i);
+                    const label = <span className={cn("text-[11px] tabular-nums", i === currentHole ? "text-[#9BEF5C] font-semibold" : hasPhoto ? "text-[#ffffff]" : "text-[#FFFFFF73]")}>{i + 1}</span>;
+                    // 점이 있든 없든 같은 칸 모양(높이 고정) — 단추만 줄 높이가 달라 번호가 들쭉날쭉했다
+                    if (!hasPhoto) return <span key={i} className="relative flex h-4 items-center justify-center">{label}</span>;
+                    return (
+                        <button
+                            key={i} type="button" disabled={!onHoleTap} onClick={() => onHoleTap?.(i)} aria-label={`${i + 1}번 홀 사진 보기`}
+                            className="relative flex h-4 items-center justify-center"
+                        >
+                            <span aria-hidden className="absolute -top-1 left-1/2 -translate-x-1/2 w-[5px] h-[5px] rounded-full bg-[#9BEF5C]" />
+                            {label}
+                        </button>
+                    );
+                })}
                 <span className="text-[11px] text-[#FFFFFF59]">{from === 0 ? "전반" : "후반"}</span>
 
                 <span className="text-[11px] text-[#FFFFFF59] text-left">파</span>

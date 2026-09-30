@@ -7,24 +7,22 @@
  *  - 요약: 평균 타수 큰 숫자 + 베스트·라운드·최근 한 띠 + **최근 라운드 막대**(실제 기록만, 베스트는 주황).
  *  - 목록: 달별 묶음, 날짜 칸 · 골프장 · 타수. 베스트 라운드에 주황 칩.
  *  - 스코어카드: 아래에서 올라오는 시트, 선수마다 경기 화면과 같은 기록표(HoleGrid — 버디 동그라미·보기 네모).
+ *  - 2026-09-30 사진: 시트가 **스코어카드 | 앨범** 두 탭(components/photos/RoundDetailSheet), 요약 밑에 '사진첩'(라운드별 묶음).
+ *    알림의 ?album=<경기 id> 로 들어오면 그 라운드 앨범을 바로 연다(사진이 가려졌다는 알림).
  * ⚠️ 리터럴 색만 — 골프 테마가 `.bg-white`·`.text-black/*` 를 바꿔 끼운다.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
-import { useQuery } from "@tanstack/react-query";
-import { LucideChevronRight, LucideFlag, LucideLoader2 } from "lucide-react";
-import { apiRequest } from "@/lib/queryClient";
+import { LucideChevronRight, LucideFlag } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
-import { kstDateKey } from "@/lib/kst";
 import { GolfBackButton } from "../components/common/GolfBackButton";
-import { HoleGrid, toParText } from "../components/ScoreCard";
+import { RoundDetailSheet, ymd, type RoundTarget } from "../components/photos/RoundDetailSheet";
+import { MyPhotoAlbum } from "../components/photos/MyPhotoAlbum";
 
-type Round = { id: string; score: number; innings?: number | null; createdAt: string; locationName?: string | null; subType?: string | null };
+type Round = { id: string; score: number; innings?: number | null; createdAt: string; locationName?: string | null; subType?: string | null; golfSessionId?: string | null };
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
-const ymd = (iso: string) => { const [y, m, d] = kstDateKey(iso).split("-").map(Number); return { y, m, d, w: WEEK[new Date(Date.UTC(y, m - 1, d)).getUTCDay()] }; };
 
 /**
  * 최근 라운드 막대 — 왼쪽이 옛날. 골프는 **적게 칠수록 좋아서** 막대를 뒤집는다: 잘 친 라운드가 높다(숫자는 막대 위에 그대로).
@@ -54,75 +52,31 @@ function RecentBars({ rounds, best }: { rounds: Round[]; best: number }) {
     );
 }
 
-/** 스코어카드 시트 — 기록 한 줄을 누르면 */
-function ScorecardSheet({ round, onClose }: { round: Round | null; onClose: () => void }) {
-    const { data: game, isLoading } = useQuery<any>({
-        queryKey: [`/api/hiq/history/${round?.id}/detail`],
-        queryFn: () => apiRequest(`/api/hiq/history/${round!.id}/detail`),
-        enabled: !!round,
-    });
-    const pars: number[] = Array.isArray(game?.pars) && game.pars.length === 18 ? game.pars : [];
-    const parTotal = pars.reduce((a, b) => a + b, 0);
-    const players = [1, 2, 3, 4].map((i) => game?.[`player${i}Id`] ? {
-        id: game[`player${i}Id`], name: game[`player${i}Name`] || `선수 ${i}`,
-        scores: (game[`player${i}Innings`] as number[] | undefined) ?? [], total: Number(game[`player${i}Score`] ?? 0),
-    } : null).filter(Boolean) as { id: string; name: string; scores: number[]; total: number }[];
-    const d = round ? ymd(round.createdAt) : null;
-
-    return (
-        <Sheet open={!!round} onOpenChange={(o) => !o && onClose()}>
-            <SheetContent side="bottom" className="bg-[#0F0F0F] border-[#FFFFFF0F] rounded-t-3xl px-0 pb-0 max-h-[88vh] flex flex-col [&>button]:right-5 [&>button]:top-5 [&>button]:opacity-60">
-                <div className="px-5 pt-5 pb-4 shrink-0 border-b border-[#FFFFFF0F]">
-                    <p className="text-[13px] text-[#FFFFFF8C] tabular-nums">{d ? `${d.y}년 ${d.m}월 ${d.d}일 (${d.w})` : ""}</p>
-                    <SheetTitle className="mt-0.5 text-[22px] font-bold tracking-tight text-[#ffffff] truncate pr-8">{round?.locationName || game?.locationName || "스코어카드"}</SheetTitle>
-                    {parTotal > 0 && <p className="mt-1 text-[12.5px] text-[#FFFFFF73]">파 {parTotal} · {round?.subType ?? "18홀"}</p>}
-                </div>
-                <div className="flex-1 overflow-y-auto px-5 py-4 space-y-3 scrollbar-hide" style={{ paddingBottom: "calc(20px + env(safe-area-inset-bottom))" }}>
-                    {isLoading ? (
-                        <div className="py-10 flex justify-center text-[#FFFFFF59]"><LucideLoader2 className="w-5 h-5 animate-spin" /></div>
-                    ) : !game ? (
-                        <p className="py-10 text-center text-[13px] text-[#FFFFFF73]">이 라운드의 홀별 기록이 없어요.</p>
-                    ) : players.map((p) => {
-                        const toPar = parTotal ? p.total - parTotal : null;
-                        return (
-                            <section key={p.id} className="rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] px-4 py-4">
-                                <div className="flex items-baseline justify-between mb-3">
-                                    <span className="text-[15px] font-semibold text-[#ffffff] truncate">{p.name}</span>
-                                    <span className="shrink-0 tabular-nums">
-                                        <span className="text-[22px] font-bold text-[#ffffff]">{p.total || "–"}</span>
-                                        <span className="text-[13px] text-[#FFFFFF73]">타</span>
-                                        {toPar != null && p.total > 0 && (
-                                            <span className={cn("ml-1.5 text-[13px] font-semibold", toPar < 0 ? "text-[#7DD3FC]" : toPar > 0 ? "text-[#FFB27A]" : "text-[#FFFFFFB3]")}>{toParText(toPar)}</span>
-                                        )}
-                                    </span>
-                                </div>
-                                {pars.length === 18 ? (
-                                    <HoleGrid scores={p.scores} pars={pars} currentHole={-1} />
-                                ) : (
-                                    // 파 자료가 없는 코스 — 동그라미·네모(파 대비)를 지어내지 않고 타수만
-                                    <div className="grid grid-cols-9 gap-1 text-center">
-                                        {Array.from({ length: 18 }, (_, i) => (
-                                            <span key={i} className="flex flex-col items-center py-1 rounded-md bg-[#FFFFFF06]">
-                                                <span className="text-[11px] text-[#FFFFFF59] tabular-nums">{i + 1}</span>
-                                                <span className="text-[13px] font-semibold text-[#ffffff] tabular-nums">{p.scores[i] || "·"}</span>
-                                            </span>
-                                        ))}
-                                    </div>
-                                )}
-                            </section>
-                        );
-                    })}
-                </div>
-            </SheetContent>
-        </Sheet>
-    );
-}
-
 export function GolfRoundReport({ history }: { history: Round[] }) {
     const [, setLocation] = useLocation();
-    const [open, setOpen] = useState<Round | null>(null);
+    const [open, setOpen] = useState<RoundTarget | null>(null);
 
     const rounds = useMemo(() => [...history].filter((r) => Number(r.score) > 0).sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt)), [history]);
+    /** 경기 id → 그 라운드의 내 기록(있으면 기록 상세로 스코어카드를 읽는다) */
+    const bySession = useMemo(() => new Map(rounds.filter((r) => r.golfSessionId).map((r) => [r.golfSessionId!, r])), [rounds]);
+    const openRound = (r: Round, tab: RoundTarget["tab"] = "score") =>
+        setOpen({ historyId: r.id, sessionId: r.golfSessionId ?? null, title: r.locationName, date: r.createdAt, subType: r.subType ?? "18홀", tab });
+    const openSession = (sessionId: string, fallback: { courseName?: string | null; playedAt?: string | null } = {}) => {
+        const r = bySession.get(sessionId);
+        if (r) return openRound(r, "album");
+        // 기록이 없는 라운드(18홀을 다 못 적었거나 게스트였던 판)도 앨범은 있다 — 경기로 연다
+        setOpen({ sessionId, title: fallback.courseName, date: fallback.playedAt ?? null, tab: "album" });
+    };
+
+    // 알림(사진이 가려졌어요)의 ?album=<경기 id> — 그 라운드 앨범을 바로 연다. 표시는 지운다(새로고침에 또 열리지 않게).
+    useEffect(() => {
+        const u = new URL(window.location.href);
+        const id = u.searchParams.get("album");
+        if (!id) return;
+        u.searchParams.delete("album");
+        window.history.replaceState(window.history.state, "", u.pathname + u.search + u.hash);
+        if (UUID_RE.test(id)) openSession(id);
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
     const stats = useMemo(() => {
         if (!rounds.length) return null;
         const s = rounds.map((r) => r.score);
@@ -180,6 +134,9 @@ export function GolfRoundReport({ history }: { history: Round[] }) {
                     {stats && <RecentBars rounds={rounds} best={stats.best} />}
                 </section>
 
+                {/* ── 사진첩(2026-09-30) ── */}
+                <MyPhotoAlbum onOpen={(g) => openSession(g.sessionId, { courseName: g.courseName, playedAt: g.playedAt })} />
+
                 {/* ── 공식 라운딩 ── */}
                 <section>
                     <div className="flex items-baseline justify-between mb-2.5">
@@ -205,7 +162,7 @@ export function GolfRoundReport({ history }: { history: Round[] }) {
                                             const isBest = stats?.best === r.score;
                                             return (
                                                 <li key={r.id}>
-                                                    <button type="button" onClick={() => setOpen(r)} className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left active:bg-[#FFFFFF0A]">
+                                                    <button type="button" onClick={() => openRound(r)} className="w-full flex items-center gap-3.5 px-4 py-3.5 text-left active:bg-[#FFFFFF0A]">
                                                         <span className="w-11 shrink-0 text-center">
                                                             <span className="block text-[20px] leading-none font-bold text-[#ffffff] tabular-nums">{d.d}</span>
                                                             <span className="block mt-1 text-[11.5px] text-[#FFFFFF66]">{d.w}요일</span>
@@ -234,7 +191,7 @@ export function GolfRoundReport({ history }: { history: Round[] }) {
                 </section>
             </main>
 
-            <ScorecardSheet round={open} onClose={() => setOpen(null)} />
+            <RoundDetailSheet target={open} onClose={() => setOpen(null)} />
             <HiqNavigation />
         </div>
     );

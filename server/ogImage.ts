@@ -6,11 +6,15 @@ import { PBA_LANGS, pbaL10n, formatPrize, seasonLabel } from "../shared/pbaMeta.
 import { renderGolfCourseCardPng, type GolfCourseCardInput } from "./services/golfCourseCard.js";
 import { renderStoreCardPng, type StoreCardInput } from "./services/storeCard.js";
 import { db } from "./db.js";
-import { storeListings } from "../shared/schema.js";
+import { storeListings, hiqMembers } from "../shared/schema.js";
 import { eq } from "drizzle-orm";
 import { storeAreasKo } from "../shared/storeMeta.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
 import { courseWhere, weekdayFee, wonShort, type Fees } from "../shared/golfCourse.js";
+import { renderGolfFootprintsCardPng, type FootprintsCardInput } from "./services/golfFootprintsCard.js";
+import { getGolfFootprints } from "./storage/golfFootprints.js";
+import { parseFootprintYear } from "../shared/golfFootprints.js";
+import { verifyFootprintShare } from "./lib/footprintShare.js";
 
 // 공개 이미지 라우트 — 선수 카드 PNG (2026-09-14).
 //   /og/player/:category/:umbId.png   UMB 세계랭킹 (ko·en·tr·vi·es)
@@ -18,6 +22,7 @@ import { courseWhere, weekdayFee, wonShort, type Fees } from "../shared/golfCour
 //   /og/pba-player/:memCode.png       PBA 투어 (ko·en·vi·tr·es)
 //   /og/golf-course/:slug.png         골프장 카드 (2026-09-30)
 //   /og/store/:code.png               당구장 카드 (2026-09-30)
+//   /og/golf-footprints/:memberId.png 골프 발자국 카드 (2026-09-30) — **비공개**: 서명(t)·만료가 맞아야 열린다
 // /api 아래에 두지 않는 이유: robots.txt 가 /api/ 를 막고 있어 구글이 이미지를 못 가져간다.
 // vercel.json 의 /og/(.*) 라우트가 이 함수로 보낸다. 캐시는 하루(회차가 주간이라 충분).
 
@@ -209,6 +214,26 @@ export async function buildStoreCard(code: string): Promise<StoreCardInput | nul
   };
 }
 
+// ── 골프 발자국 ────────────────────────────────────────────────────
+/** 탈퇴하면 발자국 카드도 닫는다 — 예전에 보낸 링크가 남아 있어도(탈퇴 회원 행은 del- 전화번호로 익명화된다). */
+export async function buildGolfFootprintsCard(memberId: string, year: number | null): Promise<FootprintsCardInput | null> {
+  const [fp, members, summary] = await Promise.all([
+    getGolfFootprints(memberId, year),
+    db.select({ name: hiqMembers.name, phone: hiqMembers.phone }).from(hiqMembers).where(eq(hiqMembers.id, memberId)).limit(1),
+    loadGolfCourseSummary(),
+  ]);
+  const m = members[0];
+  if (!m || m.phone?.startsWith("del-") || !fp.stops.length) return null;
+  return {
+    nickname: m.name ?? "",
+    year,
+    rounds: fp.rounds,
+    stops: fp.stops,
+    // 바탕 점 지도 — 앱의 골프장 점 지도(CourseDotMap)와 같은 골프장 페이지 좌표
+    dots: summary.pages.filter((p) => p.lat != null && p.lng != null).map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) })),
+  };
+}
+
 // ── 라우트 ─────────────────────────────────────────────────────────
 export function registerOgImages(app: Express) {
   const sendCard = async (res: any, build: () => Promise<PlayerCardInput | null>, what: string) => {
@@ -273,6 +298,29 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] store card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  // 골프 발자국 — 동선이라 공개 카드가 아니다. 서명·만료가 틀리면 있는지 없는지도 알리지 않고 404.
+  // 캐시는 본인 기기에만(private) — CDN 에 남으면 링크가 닫힌 뒤에도 그림이 나간다. 검색엔진에는 싣지 않는다.
+  app.get("/og/golf-footprints/:memberId.png", async (req, res) => {
+    const memberId = String(req.params.memberId ?? "").toLowerCase();
+    const year = req.query.year === undefined ? null : parseFootprintYear(req.query.year);
+    const notFound = () => res.status(404).setHeader("Cache-Control", "no-store").type("text/plain").send("not found");
+    if (req.query.year !== undefined && year == null) return notFound();
+    if (!verifyFootprintShare(memberId, year, req.query.t)) return notFound();
+    try {
+      const input = await buildGolfFootprintsCard(memberId, year);
+      if (!input) return notFound();
+      const png = await renderGolfFootprintsCardPng(input);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "private, max-age=600");
+      res.setHeader("X-Robots-Tag", "noindex, nofollow, noimageindex");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] golf footprints card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });

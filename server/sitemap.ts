@@ -7,6 +7,7 @@ import { asc, sql } from "drizzle-orm";
 import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
+import { SITEMAP_PHOTO_LIMIT } from "../shared/golfPhoto.js";
 import { storeCardUrl } from "./services/storeCard.js";
 import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingIntents } from "../shared/golfCourse.js";
 // seo/* 는 이 파일의 entry 를 되받아 쓴다(순환). entry 는 함수 선언이고 요청 시점에만 불리므로 안전하다.
@@ -62,7 +63,8 @@ export function lastmodDay(d: Date | string): string {
 }
 
 // image: 선수 카드 PNG(/og/…) — 이미지 사이트맵 확장. 구글 이미지·썸네일 발견 경로(2026-09-14).
-export function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; priority?: string; lastmod?: Date | string | null; image?: string }): string {
+// images: 그 뒤에 더 붙일 이미지(골프장 페이지의 공개 라운드 사진, 2026-09-30). URL 하나에 image:image 는 1,000개까지 된다.
+export function entry(loc: string, opts?: { langs?: string[]; changefreq?: string; priority?: string; lastmod?: Date | string | null; image?: string; images?: string[] }): string {
   let alts = "";
   if (opts?.langs && opts.langs.length) {
     const sep = loc.includes("?") ? "&" : "?";
@@ -74,7 +76,7 @@ export function entry(loc: string, opts?: { langs?: string[]; changefreq?: strin
   return (
     `  <url>\n    <loc>${esc(loc)}</loc>${alts}` +
     (opts?.lastmod ? `\n    <lastmod>${lastmodDay(opts.lastmod)}</lastmod>` : "") +
-    (opts?.image ? `\n    <image:image><image:loc>${esc(opts.image)}</image:loc></image:image>` : "") +
+    [...(opts?.image ? [opts.image] : []), ...(opts?.images ?? [])].map((u) => `\n    <image:image><image:loc>${esc(u)}</image:loc></image:image>`).join("") +
     (opts?.changefreq ? `\n    <changefreq>${opts.changefreq}</changefreq>` : "") +
     (opts?.priority ? `\n    <priority>${opts.priority}</priority>` : "") +
     `\n  </url>`
@@ -218,6 +220,11 @@ async function storeParts(): Promise<string[]> {
 // lastmod = 골프장 행 갱신·회원권 시세 기준일·가장 최근 글 중 가장 늦은 날. 비공개·가려진 글은 페이지에 안 나오므로 뺀다.
 async function golfCourseParts(): Promise<string[]> {
   const parts: string[] = [];
+  // 회원이 공개한 라운드 사진(2026-09-30) — 골프장마다 최신 SITEMAP_PHOTO_LIMIT 장, 카드 뒤에. 실패해도 카드는 싣는다.
+  const photos = await storage.golfPhotos.publicImagesBySlug(SITEMAP_PHOTO_LIMIT).catch((e) => {
+    console.warn("[sitemap] golf photos failed:", (e as Error)?.message);
+    return new Map<string, string[]>();
+  });
   try {
     const r: any = await db.execute(sql`
       select p.slug, p.logo, to_char(greatest(
@@ -229,7 +236,7 @@ async function golfCourseParts(): Promise<string[]> {
       from golf_course_pages p where p.slug <> '' and btrim(p.name) <> '' order by p.slug`);
     for (const x of (r.rows ?? r) as { slug: string; logo: string | null; lastmod: string | null }[]) {
       // 이미지 사이트맵 = 골프장 카드(490곳 전부 — 페이지 대표 이미지와 같은 주소, 2026-09-30). 예전엔 로고가 있는 296곳만 로고.
-      parts.push(entry(`${ORIGIN}${coursePath(x.slug)}`, { changefreq: "daily", priority: "0.6", lastmod: x.lastmod, image: golfCourseCardUrl(ORIGIN, x.slug) }));
+      parts.push(entry(`${ORIGIN}${coursePath(x.slug)}`, { changefreq: "daily", priority: "0.6", lastmod: x.lastmod, image: golfCourseCardUrl(ORIGIN, x.slug), images: photos.get(x.slug) }));
     }
   } catch (e) {
     console.warn("[sitemap] golf courses failed:", (e as Error)?.message);

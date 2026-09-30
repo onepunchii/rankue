@@ -3,7 +3,7 @@
  *
  *   머리        이름 · 지역·종류 칩 · 내 위치에서 거리 · 한눈 숫자(지금 티타임·주중 그린피·회원권) · 관심 단추(주 행동)
  *   지금 이 골프장   앞으로의 부킹·조인·긴급(오늘/내일/이번 주/그 뒤). 비었으면 관심 단추로 넘긴다.
- *   회원권 시세 · 그린피 · 코스 · 소개 · 위치 · 랭큐 라운드 · 가까운 골프장(작은 지도) · 지역 링크 — 데이터가 있는 것만.
+ *   회원권 시세 · 그린피 · 코스 · 소개 · 위치 · 라운드 사진(회원 공개분, 2026-09-30) · 랭큐 라운드 · 가까운 골프장(작은 지도) · 지역 링크 — 데이터가 있는 것만.
  *
  * 옛 주소(/golf/course/74 — 패스포트·엘리트60 의 링크)는 숫자다. 슬러그를 받아 **replace** 로 갈아탄다(뒤로 가기에 안 남게).
  * 목록에서 들어오면 목록 캐시로 머리가 먼저 뜬다(prefill) — 느린 폰에서 빈 화면을 오래 보지 않게.
@@ -33,6 +33,7 @@ import { LocationCard } from "@/golf/components/course/detail/LocationCard";
 import { NearbyCourses } from "@/golf/components/course/detail/NearbyCourses";
 import { SectionNav, jumpTo } from "@/golf/components/course/detail/SectionNav";
 import { Card, Section, Skel, type SectionId } from "@/golf/components/course/detail/ui";
+import { CoursePhotoGallery } from "@/golf/components/photos/CoursePhotoGallery";
 
 function decodeSlug(raw: string | undefined): string {
     if (!raw) return "";
@@ -253,6 +254,9 @@ function Body({ d, ids, distance }: { d: CourseDetail; ids: SectionId[]; distanc
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}
             {ids.includes("about") && <AboutInfo key={d.slug} intro={d.intro} info={d.info} grass={d.grass} />}
             <LocationCard name={d.name} address={d.address} lat={d.lat} lng={d.lng} distance={distance} phone={d.phone} website={d.website || d.info?.homepage || null} />
+
+            {/* 회원이 공개한 라운드 사진(2026-09-30) — 없으면 칸을 그리지 않는다 */}
+            <CoursePhotoGallery slug={d.slug} name={d.name} />
 
             {d.rounds > 0 && (
                 <Section title="랭큐 라운드">

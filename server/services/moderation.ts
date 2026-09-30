@@ -129,6 +129,12 @@ async function deleteReportedContent(targetType: ReportTargetType, id: string): 
         case "player_cheer":
             await storage.umb.deleteCheer(id);
             return;
+        case "golf_photo": {
+            // 행과 원본·썸네일 Blob 을 함께 — 행만 지우면 주소를 아는 사람에게 사진이 계속 열린다
+            const gone = await storage.golfPhotos.delete(id);
+            if (gone) await deleteBlobs([gone.url, gone.thumbUrl]);
+            return;
+        }
         case "crew_post": {
             const post = await storage.crews.getCrewPost(id);
             if (!post) return;

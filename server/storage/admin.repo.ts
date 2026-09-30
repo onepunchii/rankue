@@ -26,6 +26,7 @@ import {
     hiqChatMessages,
     hiqNotifications,
     golfBookings,
+    golfRoundPhotos,
     hiqPlayerCheers} from "../../shared/schema.js";
 import type {
     HiqStore,
@@ -49,6 +50,8 @@ import {
     type ReportTargetType, type ModerationAction, type QueueState, type ReportSummary,
 } from "../lib/reportQueue.js";
 import { SUGGESTION_ALERT_TYPE, SUGGESTION_ALERT_WINDOW_MIN, attachReplies, type SuggestionReplyView } from "../lib/suggestionBox.js";
+import { GolfPhotoRepository } from "./golfPhoto.repo.js";
+import { coursePath } from "../../shared/golfCourse.js";
 
 // --- 신고 큐 타입(2026-09-11, SX1) ---
 // 원문을 대상 종류마다 다른 테이블에서 읽어 한 모양으로 맞춘 것.
@@ -114,6 +117,9 @@ export interface ReportQueueItem {
 }
 
 export class AdminRepository {
+    /** 신고 큐가 라운드 사진을 읽고 가릴 때(표가 없을 때의 처리까지 그 저장소가 맡는다) */
+    private golfPhotos = new GolfPhotoRepository();
+
     // --- Store Management ---
     async getStoreBySlug(slug: string): Promise<HiqStore | undefined> {
         const [store] = await db.select().from(hiqStores).where(eq(hiqStores.slug, slug));
@@ -453,6 +459,9 @@ export class AdminRepository {
                                                         WHERE p.id = g.target_id AND p.is_blinded)
                            WHEN 'community_comment' THEN (SELECT c.appeal_at FROM ${hiqCommunityComments} c
                                                            WHERE c.id = g.target_id AND c.is_blinded AND c.deleted_at IS NULL)
+                           -- 라운드 사진 이의제기(9/30). 표는 첫 업로드가 만든다 — 운영 DB 에는 있다(migrations/golf_round_photos.sql)
+                           WHEN 'golf_photo' THEN (SELECT ph.appeal_at FROM ${golfRoundPhotos} ph
+                                                    WHERE ph.id = g.target_id AND ph.hidden_at IS NOT NULL)
                        END AS appeal_at
                 FROM g
             ), q AS (
@@ -711,6 +720,22 @@ export class AdminRepository {
             }
         });
 
+        // 라운드 사진(2026-09-30) — 썸네일을 큐에 띄운다(원본은 링크로). 가림 = hidden_at.
+        job("golf_photo", async (ids) => {
+            const rows = await this.golfPhotos.getMany(ids);
+            for (const r of rows) put("golf_photo", r.id, {
+                title: r.courseName ?? null,
+                images: [r.thumbUrl || r.url],
+                isBlinded: !!r.hiddenAt,
+                blindReason: r.hiddenAt ? "신고 누적 또는 운영자 가림" : null,
+                appealText: r.appealText ?? null, appealAt: r.appealAt ?? null,
+                authorId: r.memberId,
+                meta: ["라운드 사진", r.isPublic ? "공개" : "비공개(앨범만)", r.holeNo ? `${r.holeNo}번 홀` : null].filter(Boolean).join(" · "),
+                link: r.isPublic && r.courseSlug ? coursePath(r.courseSlug) : r.url,
+                createdAt: r.createdAt,
+            });
+        });
+
         job("crew_post", async (ids) => {
             const rows = await db.select({
                 id: hiqCrewPosts.id,
@@ -886,6 +911,8 @@ export class AdminRepository {
                     .set({ isBlinded: blinded, blindReason })
                     .where(eq(golfBookings.id, targetId))
                     .returning({ id: golfBookings.id })).length > 0;
+            case "golf_photo":
+                return this.golfPhotos.setHidden(targetId, blinded);
             default:
                 return false;
         }

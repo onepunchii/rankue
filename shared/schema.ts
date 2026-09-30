@@ -1251,6 +1251,40 @@ export const insertGolfMatchSessionSchema = createInsertSchema(golfMatchSessions
 export type GolfMatchSession = typeof golfMatchSessions.$inferSelect;
 export type InsertGolfMatchSession = z.infer<typeof insertGolfMatchSessionSchema>;
 
+/**
+ * 라운드 사진(2026-09-30 오너: "스코어 등록 때 사진 올리기 — 추억 앨범, 공개 사진은 그 골프장 페이지에").
+ * 한 행 = 사진 한 장. 그 경기에 든 사람이 **자기 사진만** 올리고·공개로 돌리고·지운다.
+ *  - 원본은 긴 변 1600px, thumb 은 400px webp(Blob URL 만 싣는다 — base64 금지, EXIF 는 서버가 한 번 더 걷는다).
+ *  - is_public 기본 false. 공개로 돌린 사진만 골프장 페이지(course_slug)에 **바로** 뜬다(사전 승인 없음, 오너 결정).
+ *    그래서 신고(targetType golf_photo)·차단이 같이 붙고, 서로 다른 3명이 신고하면 hidden_at 이 찍혀 가려진다.
+ *  - course_slug 는 올릴 때 경기의 골프장으로 굳힌다 — 골프장 페이지 슬러그가 없는 골프장이면 null(앨범에만 산다).
+ *  - 글자(캡션)는 두지 않는다 — 글이 붙으면 욕설·연락처 필터까지 따라와야 한다. 사진만.
+ * 생성 SQL: migrations/golf_round_photos.sql(첫 업로드가 표가 없으면 같은 DDL 로 만든다 — storage/golfPhoto.repo).
+ */
+export const golfRoundPhotos = pgTable("golf_round_photos", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  sessionId: uuid("session_id").references(() => golfMatchSessions.id, { onDelete: "cascade" }).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id, { onDelete: "cascade" }).notNull(),
+  /** 찍은 홀(1~18) — 점수 적던 홀로 자동 태그. 모르면 null */
+  holeNo: integer("hole_no"),
+  url: text("url").notNull(),
+  thumbUrl: text("thumb_url").notNull(),
+  width: integer("width"),
+  height: integer("height"),
+  isPublic: boolean("is_public").default(false).notNull(),
+  courseSlug: text("course_slug"),
+  /** 신고 누적 자동 가림·운영자 가림. 올린 사람 본인에게만 '가려진 사진'으로 보인다 */
+  hiddenAt: timestamp("hidden_at"),
+  /** 이의제기(2026-09-30) — 자동 가림은 작성자 알림 + 이의제기 원탭과 한 세트다(커뮤니티 글과 같은 원칙, 담합 신고 방어) */
+  appealText: text("appeal_text"),
+  appealAt: timestamp("appeal_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("golf_round_photos_session_idx").on(t.sessionId),
+  index("golf_round_photos_course_idx").on(t.courseSlug, t.isPublic, t.createdAt),
+]);
+export type GolfRoundPhoto = typeof golfRoundPhotos.$inferSelect;
+
 // 12. 골프 회원권 거래 (Membership Orders)
 export const golfMembershipOrders = pgTable("golf_membership_orders", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
@@ -1614,7 +1648,8 @@ export const hiqReports = pgTable("hiq_reports", {
     // golf_booking 추가(2026-09-09): 골프 매물에 신고·삭제가 하나도 없어 먹튀 글을 내릴 방법이 없었다
     // crew_photo_comment 추가(2026-09-11): 크루 사진 댓글도 신고 대상. DB CHECK 가 없는 text 라 타입만 넓힌다.
     // player_cheer 추가(2026-09-13): 선수 응원글도 신고 대상.
-    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "member", "golf_booking", "player_cheer"],
+    // golf_photo 추가(2026-09-30): 골프장 페이지에 바로 뜨는 공개 라운드 사진(golf_round_photos).
+    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "member", "golf_booking", "player_cheer", "golf_photo"],
   }).notNull(),
   targetId: uuid("target_id").notNull(),
   reporterId: uuid("reporter_id").references(() => hiqMembers.id).notNull(),

@@ -62,6 +62,7 @@ export const TERMS_CONTENT: Record<TermsLang, TermsDoc> = {
                         "크루(동호회) — 게시판, 사진첩, 채팅, 정모와 대회 운영",
                         "커뮤니티 게시판 — 자랑, 질문, 매장 소식, 레슨",
                         "당구장 찾기와 매장 정보, 매장 운영자를 위한 매장 관리 기능",
+                        "골프 — 랭큐매치 라운드 기록과 라운드 사진 앨범, 골프장 정보",
                     ],
                     "회사는 서비스를 개선하기 위해 기능을 바꿀 수 있으며, 중요한 변경은 서비스 안에서 미리 알립니다.",
                 ],
@@ -108,9 +109,10 @@ export const TERMS_CONTENT: Record<TermsLang, TermsDoc> = {
                 body: [
                     [
                         "금전 내기·욕설·거래와 관련된 표현은 올리기 전에 자동으로 걸러지고, 전화번호와 오픈채팅 링크는 자동으로 가려집니다.",
-                        "커뮤니티 글·댓글, 크루 게시글·댓글·사진·채팅, 크루 회원 프로필의 ⋯ 메뉴에서 신고할 수 있습니다. 그 밖의 콘텐츠(크루 소개·투표·정모·대회 등)는 작성자의 크루 회원 프로필에서 신고하거나 " + TERMS_CONTACT_EMAIL + " 로 알려 주세요. 신고한 사실은 상대에게 알려지지 않습니다.",
+                        "커뮤니티 글·댓글, 크루 게시글·댓글·사진·채팅, 크루 회원 프로필, 골프 라운드 사진의 ⋯ 메뉴에서 신고할 수 있습니다. 그 밖의 콘텐츠(크루 소개·투표·정모·대회 등)는 작성자의 크루 회원 프로필에서 신고하거나 " + TERMS_CONTACT_EMAIL + " 로 알려 주세요. 신고한 사실은 상대에게 알려지지 않습니다.",
                         "회사는 접수된 신고를 24시간 안에 검토합니다. 위반이 확인되면 해당 콘텐츠를 삭제하고, 작성자의 계정을 정지해 로그인과 게시를 막을 수 있습니다.",
-                        "커뮤니티 글과 댓글은 서로 다른 이용자 3명이 신고하면 검토 전이라도 자동으로 가려집니다.",
+                        "커뮤니티 글과 댓글, 골프 라운드 사진은 서로 다른 이용자 3명이 신고하면 검토 전이라도 자동으로 가려집니다.",
+                        "골프 라운드 사진은 기본으로 그 라운드를 함께 친 사람만 봅니다. 올린 사람이 ‘공개’로 바꾼 사진만 그 골프장 페이지에 닉네임과 함께 사전 검토 없이 바로 보이며(날짜는 달까지만 표시), 올린 사람은 언제든 비공개로 돌리거나 지울 수 있습니다. 동반자의 얼굴이 나온 사진은 동의 없이 공개하지 마세요.",
                         "조치에 이의가 있으면 이의제기 버튼이나 이메일로 알려 주세요. 다시 검토한 뒤 결과를 반영합니다.",
                     ],
                 ],
@@ -119,7 +121,7 @@ export const TERMS_CONTENT: Record<TermsLang, TermsDoc> = {
                 title: "6. 차단",
                 body: [
                     [
-                        "커뮤니티 글·댓글, 크루 게시글·댓글·사진·채팅이나 크루 회원 프로필의 ⋯ 메뉴에서 ‘차단하기’를 누르면, 그 사용자가 쓴 글·댓글·사진·채팅이 더 이상 보이지 않고 그 사용자 때문에 오는 채팅·댓글·모임 알림도 받지 않습니다.",
+                        "커뮤니티 글·댓글, 크루 게시글·댓글·사진·채팅, 골프 라운드 사진이나 크루 회원 프로필의 ⋯ 메뉴에서 ‘차단하기’를 누르면, 그 사용자가 쓴 글·댓글·사진·채팅이 더 이상 보이지 않고 그 사용자 때문에 오는 채팅·댓글·모임 알림도 받지 않습니다.",
                         "차단한 사용자는 설정 → 차단한 사용자에서 언제든 해제할 수 있습니다.",
                     ],
                 ],
@@ -210,6 +212,7 @@ export const TERMS_CONTENT: Record<TermsLang, TermsDoc> = {
                         "Crews (clubs) — board, photo album, chat, meetups and tournaments",
                         "Community boards — highlights, questions, venue news, lessons",
                         "Billiard hall finder, venue information and management tools for venue owners",
+                        "Golf — RANKUE Match round records, round photo albums and golf course information",
                     ],
                     "The Company may change features to improve the Service and will announce important changes in the Service in advance.",
                 ],
@@ -256,9 +259,10 @@ export const TERMS_CONTENT: Record<TermsLang, TermsDoc> = {
                 body: [
                     [
                         "Expressions related to betting for money, profanity or trading are filtered before posting, and phone numbers and open-chat links are masked automatically.",
-                        "You can report community posts and comments, crew posts, comments, photos and chat messages, and crew member profiles from their ⋯ menu. For other content (crew descriptions, polls, meetups, tournaments and so on), report the author from their crew member profile or email " + TERMS_CONTACT_EMAIL + ". The other user is not told who reported them.",
+                        "You can report community posts and comments, crew posts, comments, photos and chat messages, crew member profiles, and golf round photos from their ⋯ menu. For other content (crew descriptions, polls, meetups, tournaments and so on), report the author from their crew member profile or email " + TERMS_CONTACT_EMAIL + ". The other user is not told who reported them.",
                         "The Company reviews every report within 24 hours. If a violation is confirmed, the content is removed and the author's account may be suspended, which blocks signing in and posting.",
-                        "Community posts and comments reported by three different users are hidden automatically, even before review.",
+                        "Community posts and comments, and golf round photos, reported by three different users are hidden automatically, even before review.",
+                        "Golf round photos are visible only to the people who played that round by default. Only photos the uploader switches to “Public” appear on that golf course's page right away, without prior review, credited with the uploader's nickname (the date is shown only as the month). The uploader can make a photo private again or delete it at any time. Do not make photos showing your playing partners' faces public without their consent.",
                         "If you disagree with an action, use the appeal button or email us. We will review it again and apply the result.",
                     ],
                 ],
@@ -267,7 +271,7 @@ export const TERMS_CONTENT: Record<TermsLang, TermsDoc> = {
                 title: "6. Blocking",
                 body: [
                     [
-                        "Tap “Block” in the ⋯ menu of a community post or comment, a crew post, comment, photo or chat message, or a crew member profile. You will no longer see that user's posts, comments, photos or chat messages, or get chat, comment and meetup notifications caused by them.",
+                        "Tap “Block” in the ⋯ menu of a community post or comment, a crew post, comment, photo or chat message, a golf round photo, or a crew member profile. You will no longer see that user's posts, comments, photos or chat messages, or get chat, comment and meetup notifications caused by them.",
                         "You can unblock users at any time in Settings → Blocked users.",
                     ],
                 ],

@@ -289,6 +289,9 @@ export const en: Record<string, string> = {
   "notif.community.comment.body": "{name}: {text}",
   "notif.community.comment.bodyAnon": "Someone: {text}",
   "notif.community.autoBlind.body": "Your post was hidden after multiple reports. If you think this is unfair, you can appeal right in the app.",
+  // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
+  "notif.golfPhoto.hidden.title": "📷 Your round photo was hidden",
+  "notif.golfPhoto.hidden.body": "Your round photo was hidden after several reports. If you think it's fine, open it in your album and tap “Appeal” — our team will review it again.",
   "notif.moderation.blind.title": "⚠️ Post hidden",
   "notif.moderation.blind.bodyAppeal": "A report of a policy violation was confirmed and your post was hidden. If you think this is unfair, you can appeal right in the app.",
   "notif.moderation.blind.body": "A report of a policy violation was confirmed and your post was hidden.",

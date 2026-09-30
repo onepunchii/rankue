@@ -197,3 +197,6 @@ export const LucideSlidersHorizontal = ((Ph as any).SlidersHorizontal ?? F) as P
 export const LucideExternalLink = ((Ph as any).ArrowSquareOut ?? F) as Ph.Icon;
 export const LucideGolf = ((Ph as any).Golf ?? F) as Ph.Icon;   // Phosphor 에 GolfBall 은 없다(빌드 경고)
 export const LucideChartLine = ((Ph as any).ChartLine ?? F) as Ph.Icon;
+// 도장깨기 발자국(2026-09-30)
+export const LucideFootprints = ((Ph as any).Footprints ?? F) as Ph.Icon;
+export const LucideMapTrifold = ((Ph as any).MapTrifold ?? F) as Ph.Icon;

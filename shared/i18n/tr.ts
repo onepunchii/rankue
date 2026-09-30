@@ -289,6 +289,9 @@ export const tr: Record<string, string> = {
   "notif.community.comment.body": "{name}: {text}",
   "notif.community.comment.bodyAnon": "Biri: {text}",
   "notif.community.autoBlind.body": "Gönderiniz biriken şikâyetler nedeniyle gizlendi. Haksız olduğunu düşünüyorsanız uygulamadan hemen itiraz edebilirsiniz.",
+  // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
+  "notif.golfPhoto.hidden.title": "📷 Tur fotoğrafın gizlendi",
+  "notif.golfPhoto.hidden.body": "Tur fotoğrafın birkaç şikayetten sonra gizlendi. Sorun olmadığını düşünüyorsan albümünde aç ve “İtiraz et”e dokun — ekibimiz tekrar inceleyecek.",
   "notif.moderation.blind.title": "⚠️ Gönderi gizlendi",
   "notif.moderation.blind.bodyAppeal": "Politika ihlali şikâyeti doğrulandı ve gönderiniz gizlendi. Haksız olduğunu düşünüyorsanız uygulamadan hemen itiraz edebilirsiniz.",
   "notif.moderation.blind.body": "Politika ihlali şikâyeti doğrulandı ve gönderiniz gizlendi.",

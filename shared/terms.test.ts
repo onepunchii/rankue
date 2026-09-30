@@ -53,9 +53,13 @@ describe("TERMS_CONTENT", () => {
         expect(TERMS_CONTENT.en.sections.length).toBe(TERMS_CONTENT.ko.sections.length);
     });
 
-    it("비공개 기능(골프)은 서비스 설명에 없다 — 오너 결정", () => {
-        expect(text("ko")).not.toMatch(/골프/);
-        expect(text("en").toLowerCase()).not.toContain("golf");
+    // 2026-09-11 에는 "비공개 기능(골프)은 서비스 설명에 없다"(오너 결정)였다. 골프는 9/13 전체 공개(GOLF_PUBLIC)가 됐고,
+    // 9/30 라운드 사진이 골프장 페이지에 바로 뜨는 UGC 가 되면서 약관이 그 공개·신고·차단 규칙을 적어야 한다(오너 요청).
+    it("골프 라운드 사진 — 공개하면 골프장 페이지에 닉네임과 뜬다·신고·차단·언제든 비공개/삭제가 두 언어에 있다", () => {
+        const ko = text("ko");
+        for (const must of ["골프 라운드 사진", "골프장 페이지", "닉네임", "비공개", "지울 수"]) expect(ko, must).toContain(must);
+        const en = text("en");
+        for (const must of ["golf round photos", "golf course's page", "nickname", "private", "delete"]) expect(en, must).toContain(must);
     });
 
     it("시행일 문구가 약관 버전 날짜와 맞다", () => {
