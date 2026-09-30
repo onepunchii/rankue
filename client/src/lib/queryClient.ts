@@ -4,7 +4,6 @@ import {
   QueryFunction,
   QueryKey,
 } from "@tanstack/react-query";
-import { supabase } from "./supabase";
 import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 
@@ -23,41 +22,9 @@ export class ApiError extends Error {
   }
 }
 
-// 2. Supabase 토큰 획득 (안정성 및 하이브리드 환경 최적화)
-async function getSupabaseToken(): Promise<string | null> {
-  try {
-    const sessionPromise = supabase.auth.getSession();
-    const timeoutPromise = new Promise((_, reject) =>
-      setTimeout(() => reject(new Error("Timeout")), 2000)
-    );
-
-    const { data } = (await Promise.race([
-      sessionPromise,
-      timeoutPromise,
-    ])) as any;
-
-    const token = data?.session?.access_token;
-    if (token) return token;
-  } catch (e) {
-    // Timeout or SDK error
-  }
-
-  // Fallback: 하이브리드 앱 환경에서 SDK 지연 시 직접 로컬스토리지 참조
-  if (typeof window !== "undefined") {
-    try {
-      const authKey = Object.keys(localStorage).find(
-        (key) => key.startsWith("sb-") && key.includes("auth-token")
-      );
-      if (authKey) {
-        const sessionData = JSON.parse(localStorage.getItem(authKey) || "{}");
-        return sessionData.access_token || null;
-      }
-    } catch (e) {
-      return null;
-    }
-  }
-  return null;
-}
+// 2. (삭제됨 2026-09-30) Supabase 토큰 — 슈파베이스 프로젝트는 지워졌고(도메인도 사라졌다) 서버는
+//    서명 쿠키 hiq_user_id 만 믿는다(server/middleware/auth.ts). 매 요청마다 죽은 SDK 세션을 2초 타임아웃으로
+//    기다리며 Authorization 헤더를 붙이던 흔적이라 걷어냈다.
 
 // 3. 통합 API 요청 함수 (DRY 원칙 적용)
 export async function apiRequest(
@@ -70,7 +37,6 @@ export async function apiRequest(
   }
 ): Promise<any> {
   const method = options?.method || "GET";
-  const supabaseToken = await getSupabaseToken();
 
   const headers: Record<string, string> = {
     ...options?.headers,
@@ -83,10 +49,6 @@ export async function apiRequest(
     const searchParams = new URLSearchParams(window.location.search);
     const storeSlug = searchParams.get("store") || "hiq";
     headers["x-store-slug"] = storeSlug;
-  }
-
-  if (supabaseToken) {
-    headers["Authorization"] = `Bearer ${supabaseToken}`;
   }
 
   let finalBody: any = options?.body;
