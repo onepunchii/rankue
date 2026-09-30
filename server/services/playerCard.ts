@@ -23,7 +23,7 @@ import { fileURLToPath } from "node:url";
 type SatoriFn = (typeof import("satori"))["default"];
 type ResvgCtor = (typeof import("@resvg/resvg-js"))["Resvg"];
 let enginesCache: Promise<{ satori: SatoriFn; Resvg: ResvgCtor }> | null = null;
-function engines() {
+export function engines() {
   enginesCache ??= Promise.all([import("satori"), import("@resvg/resvg-js")])
     .then(([s, r]) => ({ satori: s.default, Resvg: r.Resvg }))
     .catch((e) => { enginesCache = null; throw e; });
@@ -95,7 +95,7 @@ function fontDir(): string {
   for (const c of candidates) if (fs.existsSync(path.join(c, "Pretendard-Bold.woff"))) return c;
   throw new Error(`[playerCard] fonts not found: ${candidates.join(", ")}`);
 }
-function fonts(): FontSpec[] {
+export function fonts(): FontSpec[] {
   if (fontsCache) return fontsCache;
   const dir = fontDir();
   fontsCache = ([["Medium", 500], ["Bold", 700], ["ExtraBold", 800]] as const).map(([w, weight]) => ({

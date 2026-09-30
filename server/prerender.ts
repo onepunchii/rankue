@@ -8,6 +8,7 @@ import { DOC_META } from "../shared/docMeta.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo } from "../shared/storeMeta.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
+import { golfCourseCardUrl } from "./services/golfCourseCard.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW, LANDING_LANGS, landingContent } from "../shared/landingContent.js";
 import {
   formatPrizeKo as pbaFormatPrizeKo, seasonLabel as pbaSeasonLabelShared,
@@ -560,6 +561,17 @@ const rootCrumb = (lang = "ko") => (lang === "ko" ? { name: "랭큐", path: "/" 
 
 // 골프 페이지 기본 썸네일 — 그림이 골프 브랜드 이미지라 alt 도 그것만 말한다(골프장 이름을 적으면 그림과 다른 설명이 된다).
 const golfImage = () => ({ url: OG_GOLF_IMAGE, width: 1200, height: 630, alt: "랭큐 골프" });
+/**
+ * 목록 페이지 맨 위 골프장 카드 줄(2026-09-30) — 세계랭킹 검색 결과 밑에 선수 카드가 줄지어 뜨는 것처럼
+ * 네이버가 골프장 카드를 모아 보여 줄 재료. 위에서부터 12곳(목록 정렬 그대로), 카드 밑에 이름.
+ */
+function golfCardGallery(ps: GolfPageRow[]): string {
+  const top = ps.slice(0, 12);
+  if (!top.length) return "";
+  return `<section aria-label="대표 골프장">
+  ${top.map((p) => `<figure><a href="${esc(coursePath(p.slug))}"><img src="${esc(golfCourseCardUrl(ORIGIN, p.slug))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(`${p.name} 그린피·회원권 시세 카드`)}" loading="lazy"></a><figcaption>${esc(p.name)}</figcaption></figure>`).join("\n  ")}
+  </section>`;
+}
 
 // ── /golf/course/:slug ────────────────────────────────────────────
 async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): Promise<GolfRender> {
@@ -755,7 +767,9 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     ...(distinctAliases(p.name, p.aliases).length ? { alternateName: distinctAliases(p.name, p.aliases) } : {}),
     url: canonical,
     description: desc,
-    ...(p.logo ? { logo: `${ORIGIN}${p.logo}`, image: `${ORIGIN}${p.logo}` } : {}),
+    ...(p.logo ? { logo: `${ORIGIN}${p.logo}` } : {}),
+    // 대표 이미지는 골프장 카드(정사각형) — 네이버·구글 썸네일이 가운데를 정사각형으로 자른다(2026-09-30)
+    image: golfCourseCardUrl(ORIGIN, slug),
     ...(p.phone ? { telephone: p.phone } : {}),
     // addressRegion 은 넣지 않는다 — 우리 지역은 '경상·전라' 같은 묶음이라 행정구역으로 적으면 거짓이다(2026-09-24 검토).
     address: {
@@ -777,11 +791,13 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     title,
     desc,
     canonical,
-    image: golfImage(),
+    // 골프장마다 자기 카드(이름·로고·그린피·시세) — 490곳이 같은 가로 그림을 쓰던 것(잘려서 '골프 490곳'만 보였다)을 대신한다
+    image: { url: golfCourseCardUrl(ORIGIN, slug), width: CARD_SIZE, height: CARD_SIZE, alt: `${p.name} 그린피·회원권 시세 — 랭큐 골프` },
     jsonLd: [{ "@context": "https://schema.org", "@graph": [course, crumbs.ld] }],
     body: `<main>
   ${crumbs.html}
-  ${p.logo ? `<img src="${esc(p.logo)}" alt="${esc(`${p.name} 로고`)}" width="160" height="56" loading="eager">` : ""}
+  <img src="${esc(golfCourseCardUrl(ORIGIN, slug))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(`${p.name} 그린피·회원권 시세 카드`)}" loading="eager">
+  ${p.logo ? `<img src="${esc(p.logo)}" alt="${esc(`${p.name} 로고`)}" width="160" height="56" loading="lazy">` : ""}
   <h1>${esc(p.name)}</h1>
   <p>${esc(desc)}</p>
   <h2>${esc(p.name)} 기본 정보</h2>
@@ -888,6 +904,7 @@ function renderGolfList(s: GolfSummary, sc: GolfScope, now: number): GolfRender 
     body: `<main>
   ${crumbs.html}
   <h1>${esc(where)} 골프장 ${sc.pages.length}곳</h1>
+  ${golfCardGallery(sorted)}
   <p>${esc(desc)}</p>${liveHtml}${listHtml}
   <h2>${esc(where)} 티타임</h2>
   <nav aria-label="티타임">${golfIntentLinks(s, sc, now)}</nav>${otherRegions}

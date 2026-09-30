@@ -148,7 +148,9 @@ export default function GolfCoursePage() {
         const jsonLd: Record<string, unknown> = {
             "@context": "https://schema.org", "@type": "GolfCourse", name: d.name, url,
             ...(distinctAliases(d.name, d.aliases).length ? { alternateName: distinctAliases(d.name, d.aliases) } : {}),
-            ...(d.logo ? { logo: ORIGIN + d.logo, image: ORIGIN + d.logo } : {}),
+            ...(d.logo ? { logo: ORIGIN + d.logo } : {}),
+            // 대표 이미지 = 골프장 카드 — 프리렌더(renderGolfCourse)와 같은 주소
+            image: `${ORIGIN}/og/golf-course/${encodeURIComponent(d.slug)}.png`,
             ...(d.phone ? { telephone: d.phone } : {}),
             ...(d.website ? { sameAs: [d.website] } : {}),
             address: {
@@ -157,7 +159,7 @@ export default function GolfCoursePage() {
             },
             ...(d.lat != null && d.lng != null ? { geo: { "@type": "GeoCoordinates", latitude: d.lat, longitude: d.lng } } : {}),
         };
-        return { title: courseTitle(facts), description: courseDescription(facts), path: coursePath(d.slug), jsonLd };
+        return { title: courseTitle(facts), description: courseDescription(facts), path: coursePath(d.slug), image: `${ORIGIN}/og/golf-course/${encodeURIComponent(d.slug)}.png`, jsonLd };
     }, [d, top?.price]);
     useSeo(seo);
 

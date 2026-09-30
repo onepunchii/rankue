@@ -35,21 +35,7 @@ type El = { type: string; props: Record<string, unknown> & { children?: unknown 
 const h = (type: string, style: Record<string, unknown>, ...children: unknown[]): El =>
     ({ type, props: { style: type === "div" ? { display: "flex", ...style } : style, children: children.length === 1 ? children[0] : children } });
 
-// 오른쪽 그림 — 그린(원)과 깃대 하나. 장식은 이것만.
-const flag: El = {
-    type: "svg",
-    props: {
-        width: 360, height: 420, viewBox: "0 0 360 420",
-        children: [
-            { type: "ellipse", props: { cx: 180, cy: 360, rx: 170, ry: 48, fill: "#141414", stroke: LINE, strokeWidth: 2 } },
-            { type: "ellipse", props: { cx: 180, cy: 360, rx: 26, ry: 8, fill: "#000000" } },
-            { type: "rect", props: { x: 176, y: 40, width: 8, height: 322, rx: 4, fill: INK } },
-            { type: "path", props: { d: "M184 44 L318 88 L184 132 Z", fill: LIME } },
-        ],
-    },
-};
-
-const tree = h("div", { width: W, height: H, flexDirection: "column", padding: "64px 72px", backgroundColor: BG, fontFamily: "Pretendard", color: INK },
+const tree = h("div", { width: W, height: H, flexDirection: "column", padding: "56px 72px", backgroundColor: BG, backgroundImage: "radial-gradient(circle at 50% 50%, rgba(100,221,23,0.18) 0%, rgba(10,10,10,0) 55%)", fontFamily: "Pretendard", color: INK },
     // 헤더: 워드마크 + 종목
     h("div", { justifyContent: "space-between", alignItems: "center" },
         h("div", { alignItems: "center" },
@@ -58,21 +44,19 @@ const tree = h("div", { width: W, height: H, flexDirection: "column", padding: "
         ),
         h("div", { fontSize: 24, fontWeight: 700, color: LIME, border: `2px solid ${LIME}`, borderRadius: 999, padding: "6px 20px", letterSpacing: 3 }, "GOLF"),
     ),
-    // 본문 + 그림. 글자 사이 공백은 span 경계에서 잘려 띄움은 marginLeft 로 준다.
-    h("div", { flex: 1, alignItems: "center", justifyContent: "space-between" },
-        h("div", { flexDirection: "column" },
-            h("div", { fontSize: 136, fontWeight: 800, letterSpacing: -4, lineHeight: 1.05 },
-                h("span", {}, "랭큐"), h("span", { color: LIME, marginLeft: 32 }, "골프"),
-            ),
-            h("div", { fontSize: 50, fontWeight: 700, marginTop: 28, letterSpacing: -1 },
-                h("span", {}, "전국 골프장"), h("span", { color: LIME, marginLeft: 14 }, `${COURSES}곳`),
-            ),
-            h("div", { fontSize: 34, fontWeight: 500, color: MUTED, marginTop: 14 }, "부킹 · 조인 · 그린피 · 회원권 시세"),
+    // 본문 — **가운데 정렬**(2026-09-30): 네이버·구글 썸네일은 가운데를 정사각형(630×630)으로 자른다.
+    // 예전엔 글자가 왼쪽·깃발이 오른쪽이라 잘리면 "골프 490곳"만 반쯤 남았다. 중요한 글은 전부 가운데 560px 안에.
+    h("div", { flex: 1, flexDirection: "column", alignItems: "center", justifyContent: "center" },
+        h("div", { fontSize: 120, fontWeight: 800, letterSpacing: -4, lineHeight: 1.05 },
+            h("span", {}, "랭큐"), h("span", { color: LIME, marginLeft: 28 }, "골프"),
         ),
-        flag,
+        h("div", { fontSize: 48, fontWeight: 700, marginTop: 26, letterSpacing: -1 },
+            h("span", {}, "전국 골프장"), h("span", { color: LIME, marginLeft: 14 }, `${COURSES}곳`),
+        ),
+        h("div", { fontSize: 32, fontWeight: 500, color: MUTED, marginTop: 14 }, "부킹 · 조인 · 그린피 · 회원권 시세"),
     ),
-    // 푸터
-    h("div", { justifyContent: "flex-end", paddingTop: 18, borderTop: `2px solid ${LINE}` },
+    // 푸터 — 가운데
+    h("div", { justifyContent: "center", paddingTop: 18, borderTop: `2px solid ${LINE}` },
         h("div", { fontSize: 24, fontWeight: 700, color: MUTED, letterSpacing: 1 }, "www.rankue.co.kr"),
     ),
 );

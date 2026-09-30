@@ -3,11 +3,15 @@ import { storage } from "./storage/index.js";
 import { renderPlayerCardPng, rankWord, type PlayerCardInput } from "./services/playerCard.js";
 import { GOLF_TOUR_META, formatRankValue, formatStatValue, type GolfTour } from "../shared/golfTours.js";
 import { PBA_LANGS, pbaL10n, formatPrize, seasonLabel } from "../shared/pbaMeta.js";
+import { renderGolfCourseCardPng, type GolfCourseCardInput } from "./services/golfCourseCard.js";
+import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
+import { courseWhere, weekdayFee, wonShort, type Fees } from "../shared/golfCourse.js";
 
 // 공개 이미지 라우트 — 선수 카드 PNG (2026-09-14).
 //   /og/player/:category/:umbId.png   UMB 세계랭킹 (ko·en·tr·vi·es)
 //   /og/golfer/:tour/:id.png          골프 투어 랭킹 (ko·en)
 //   /og/pba-player/:memCode.png       PBA 투어 (ko·en·vi·tr·es)
+//   /og/golf-course/:slug.png         골프장 카드 (2026-09-30)
 // /api 아래에 두지 않는 이유: robots.txt 가 /api/ 를 막고 있어 구글이 이미지를 못 가져간다.
 // vercel.json 의 /og/(.*) 라우트가 이 함수로 보낸다. 캐시는 하루(회차가 주간이라 충분).
 
@@ -147,6 +151,40 @@ export async function buildPbaPlayerCard(memCode: string, lang: string): Promise
   };
 }
 
+// ── 골프장 ─────────────────────────────────────────────────────────
+const ORIGIN = "https://www.rankue.co.kr";
+/** 회원권 시세(만원) → 카드 칸에 들어갈 짧은 꼴: 10억 8,000만 → 10.8억, 9,100만 그대로 */
+const shortManwon = (n: number) => (n >= 10000 ? `${(n / 10000).toFixed(n % 10000 ? 1 : 0).replace(/\.0$/, "")}억` : `${n.toLocaleString("ko-KR")}만`);
+/** 로고는 정적 파일(/img/golf-logos/…)이라 함수 번들에 없다 — 사이트에서 받아 data URI 로. 못 받으면 이름 글자. */
+async function logoDataUri(path: string | null | undefined): Promise<string | null> {
+  if (!path || !/^\/img\/golf-logos\/[\w.-]+\.png$/.test(path)) return null;
+  try {
+    const r = await fetch(`${ORIGIN}${path}`, { signal: AbortSignal.timeout(3000) });
+    if (!r.ok) return null;
+    return `data:image/png;base64,${Buffer.from(await r.arrayBuffer()).toString("base64")}`;
+  } catch { return null; }
+}
+export async function buildGolfCourseCard(slug: string): Promise<GolfCourseCardInput | null> {
+  const s = await loadGolfCourseSummary();
+  const p = s.bySlug.get(slug);
+  if (!p || !p.name?.trim()) return null;
+  const fees = p.fees && Array.isArray(p.fees.rows) ? (p.fees as Fees) : null;
+  const fee = weekdayFee(fees);
+  const top = s.top.get(slug);
+  const tiles: GolfCourseCardInput["tiles"] = [];
+  if (fee) tiles.push({ label: "주중 그린피", value: wonShort(fee), accent: "lime" });
+  else if (p.feeFrom) tiles.push({ label: "그린피", value: `${wonShort(p.feeFrom)}~`, accent: "lime" });
+  if (top?.price) tiles.push({ label: "회원권 시세", value: shortManwon(top.price), accent: "orange" });
+  if (p.holes) tiles.push({ label: "코스", value: `${p.holes}홀` });
+  return {
+    name: p.name,
+    where: courseWhere(p.region, p.city),
+    shape: [p.kind, ...(p.grass ?? []).slice(0, 1)].filter(Boolean).join(" · "),
+    logo: await logoDataUri(p.logo),
+    tiles,
+  };
+}
+
 // ── 라우트 ─────────────────────────────────────────────────────────
 export function registerOgImages(app: Express) {
   const sendCard = async (res: any, build: () => Promise<PlayerCardInput | null>, what: string) => {
@@ -178,6 +216,24 @@ export function registerOgImages(app: Express) {
     if (!tour || !/^\d{1,10}$/.test(req.params.id)) return res.status(404).type("text/plain").send("not found");
     const lang = pickLang(req.query.lang, ["ko", "en"]) as "ko" | "en";
     return sendCard(res, () => buildGolferCard(tour, req.params.id, lang), "golfer");
+  });
+
+  // 골프장 카드 — 슬러그는 한글이다(Express 가 이미 풀어 준다)
+  app.get("/og/golf-course/:slug.png", async (req, res) => {
+    const slug = String(req.params.slug ?? "");
+    if (!slug || slug.length > 80) return res.status(404).type("text/plain").send("not found");
+    try {
+      const input = await buildGolfCourseCard(slug);
+      if (!input) return res.status(404).type("text/plain").send("not found");
+      const png = await renderGolfCourseCardPng(input);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] golf course card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
   });
 
   app.get("/og/pba-player/:memCode.png", (req, res) => {

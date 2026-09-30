@@ -6,6 +6,7 @@ import { hreflangOf } from "../shared/aboutContent.js";
 import { asc, sql } from "drizzle-orm";
 import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
+import { golfCourseCardUrl } from "./services/golfCourseCard.js";
 import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingIntents } from "../shared/golfCourse.js";
 // seo/* 는 이 파일의 entry 를 되받아 쓴다(순환). entry 는 함수 선언이고 요청 시점에만 불리므로 안전하다.
 import { rankingExtraSitemapParts } from "./seo/rankingExtra.js";
@@ -225,8 +226,8 @@ async function golfCourseParts(): Promise<string[]> {
       ), 'YYYY-MM-DD') as lastmod
       from golf_course_pages p where p.slug <> '' and btrim(p.name) <> '' order by p.slug`);
     for (const x of (r.rows ?? r) as { slug: string; logo: string | null; lastmod: string | null }[]) {
-      // 로고가 있으면 이미지 사이트맵으로도 알린다 — "OO CC 로고" 이미지 검색에서 골프장 페이지로 들어온다.
-      parts.push(entry(`${ORIGIN}${coursePath(x.slug)}`, { changefreq: "daily", priority: "0.6", lastmod: x.lastmod, ...(x.logo ? { image: `${ORIGIN}${x.logo}` } : {}) }));
+      // 이미지 사이트맵 = 골프장 카드(490곳 전부 — 페이지 대표 이미지와 같은 주소, 2026-09-30). 예전엔 로고가 있는 296곳만 로고.
+      parts.push(entry(`${ORIGIN}${coursePath(x.slug)}`, { changefreq: "daily", priority: "0.6", lastmod: x.lastmod, image: golfCourseCardUrl(ORIGIN, x.slug) }));
     }
   } catch (e) {
     console.warn("[sitemap] golf courses failed:", (e as Error)?.message);
