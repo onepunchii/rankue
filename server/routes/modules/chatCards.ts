@@ -304,7 +304,8 @@ router.post("/rooms/:key/cards/golf-match", ...golfGate, asyncHandler(async (req
     // 내 라운드가 이미 열려 있으면 그 핀을 쓴다 — 새로 만들면 홈의 '진행 중 라운드' 가 빈 방으로 바뀌고
     // 앞서 올린 카드의 핀이 방장 없는 방으로 남는다(2026-09-23 리뷰). SIM_INVITE 의 대기 방 재사용과 같은 규칙.
     const active: any = await storage.getActiveGolfMatch(room.me.id);
-    const mineActive = active && active.hostId === room.me.id ? active : null;
+    // getActiveGolfMatch 는 hostId 대신 isHost 를 준다 — 예전엔 hostId 를 봐서 늘 새 방을 만들었다(2026-10-01)
+    const mineActive = active?.isHost ? active : null;
     const session: any = mineActive ?? await storage.createGolfMatchSession(room.me.id, { courseName: parsed.data.courseName, gameMode: "stroke", strokeMode: "group" });
     const courseName = String(session.courseName || parsed.data.courseName);
     const summary = `⛳ 랭큐매치 · ${courseName} · 핀 ${session.pinCode}`;
