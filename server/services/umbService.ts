@@ -70,7 +70,27 @@ export async function fetchArchive(): Promise<ArchiveEntry[]> {
 
 interface TextRow { y: number; items: Array<{ x: number; str: string }> }
 
+/**
+ * pdfjs 워커를 **우리가 먼저** 올려 둔다(2026-09-30).
+ * Node 에서 pdfjs 는 워커(pdf.worker.mjs)를 실행 중에 동적 import 로 찾는데, Vercel 번들(파일 추적)은 그 경로를 못 봐서
+ * 서버리스에 파일이 빠져 있었다 → 운영 크론이 새 회차마다 "Setting up fake worker failed: Cannot find module …pdf.worker.mjs"
+ * 로 실패하고, 그 오류는 결과 JSON 에만 남아 아무도 못 봤다(7/21 뒤 여자·주니어, 9/6 뒤 남자 회차가 전부 안 들어왔다).
+ * pdfjs 는 `globalThis.pdfjsWorker.WorkerMessageHandler` 가 있으면 파일을 찾지 않는다. 문자열 그대로의 import 라 번들이 파일을 따라온다
+ * (vercel.json includeFiles 에도 같은 파일을 적어 두었다 — 둘 중 하나만 살아도 된다).
+ */
+let workerReady: Promise<void> | null = null;
+function ensurePdfWorker(): Promise<void> {
+    workerReady ??= (async () => {
+        const g = globalThis as { pdfjsWorker?: unknown };
+        if (g.pdfjsWorker) return;
+        // @ts-ignore — 워커 파일엔 타입 선언이 없다(런타임 모듈만 필요하다)
+        g.pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
+    })().catch((e) => { workerReady = null; throw e; });
+    return workerReady;
+}
+
 async function extractRows(data: Uint8Array): Promise<TextRow[][]> {
+    await ensurePdfWorker();
     const doc = await getDocument({ data, useSystemFonts: true }).promise;
     const pages: TextRow[][] = [];
     try {

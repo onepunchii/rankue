@@ -46,8 +46,15 @@ async function handleUmbSync(req: any, res: any) {
     // 동기화 직후에 "새 데이터가 들어왔나"를 확인하고, 밀려 있으면 운영자에게 알린다(하루 한 번).
     const { checkUmbHealth, alertIfUnhealthy } = await import("../../services/feedHealth.js");
     const issues = await checkUmbHealth();
-    const alerted = await alertIfUnhealthy(issues);
-    return sendSuccess(res, { ...result, followAlerts, health: issues, alerted });
+    // 밀림 알림에 **왜** 안 들어갔는지를 붙인다(2026-09-30). 예전엔 "밀림"만 와서, pdfjs 워커가 빠진 채 두 달을 몰랐다 —
+    // 적재 오류는 이 응답 JSON 에만 있었고 크론 응답은 아무도 안 본다. 부문마다 첫 오류 한 줄만.
+    const firstError = new Map<string, string>();
+    for (const e of result.errors) if (!firstError.has(e.category)) firstError.set(e.category, e.error);
+    const withCause = issues.map((i) => (i.kind === "stale" && firstError.has(i.scope)
+        ? { ...i, detail: `${i.detail} · 원인: ${firstError.get(i.scope)!.slice(0, 90)}` }
+        : i));
+    const alerted = await alertIfUnhealthy(withCause);
+    return sendSuccess(res, { ...result, followAlerts, health: withCause, alerted });
 }
 router.get("/umb-sync", asyncHandler(handleUmbSync));
 router.post("/umb-sync", asyncHandler(handleUmbSync));
