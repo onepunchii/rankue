@@ -20,7 +20,7 @@ import { useLocation } from "wouter";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { simulateShot } from "@shared/sim/simulate";
-import type { BallState, SimResult } from "@shared/sim/types";
+import type { BallState, ShotInput, SimResult } from "@shared/sim/types";
 import { SHOT_CLOCK_S, type SessionState } from "@shared/sim/rules";
 import { Canvas2DRenderer } from "../render/Canvas2DRenderer";
 import type { Renderer, RendererView, SafeInsets } from "../render/Renderer";
@@ -30,12 +30,12 @@ import { cueBallIdOf, paramsFromConfig } from "../simReducer";
 import { easeOppAim, OPP_AIM_PULLBACK } from "../match/oppAim";
 import { effectiveBall, makePlayback, startClock, clockTime, type Playback, type PlaybackClock } from "../playback";
 import { TopBar, type MatchHeaderPlayer } from "../components/TopBar";
-import { ShotClock } from "../components/ShotClock";
 import { InningSheet } from "../components/InningSheet";
 import { QuickChips, CHAT_GLYPH, WATCHER_BUBBLE, WATCHER_CHIP, WATCHER_TAG } from "../match/MatchChat";
 import { CHAT_FROM_WATCHER, CHAT_WATCH_CODES } from "@shared/sim/chat";
 import { rebuildInningLog } from "../inningLog";
 import { matchParamsKey, nextPollMs, normalizeShots, planWatch, shouldSkipAnimation } from "./watchPlan";
+import { ShotStrip, type ShotStripState } from "./ShotStrip";
 
 const INSETS: SafeInsets = { top: 8, right: 8, bottom: 8, left: 8 };
 const SPEEDS = [1, 2, 4] as const;
@@ -71,6 +71,8 @@ export default function WatchPage({ matchId }: { matchId: string }) {
      * 자유 입력은 서버가 선수에게만 연다. 폴링은 따로 돌리지 않고 대전 행의 chatSeq 가 늘었을 때만 받는다(샷과 같은 규약).
      */
     const [chat, setChat] = useState<readonly ChatLine[]>([]);
+    /** 샷 띠에 보일 샷 — 재생을 시작하는 순간(따라잡기로 건너뛴 샷도) 적는다. 다시보기를 처음으로 되감으면 비운다 */
+    const [stripShot, setStripShot] = useState<{ idx: number; input: ShotInput; playerIndex: number } | null>(null);
     const chatSeqRef = useRef(-1);
     const [cheering, setCheering] = useState(false);
     const [sheetOpen, setSheetOpen] = useState(false);
@@ -238,6 +240,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
             return;   // 엔진 버전이 달라 재시뮬이 안 되는 옛 대전 — 그 샷은 건너뛴다
         }
         aimRef.current = { cueBallId: s.input.cueBallId, phi: s.input.phi };
+        setStripShot({ idx: s.idx, input: s.input, playerIndex: s.playerIndex });
         const hidden = typeof document !== "undefined" && document.hidden;
         if (skip || hidden) {
             ballsRef.current = result.final;
@@ -374,6 +377,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         ballsRef.current = replayShots[0].preState as BallState[];
         dirtyRef.current = true;
         setPlayedShots(0);
+        setStripShot(null);
     };
 
     /* ── 40초 시계: 선수 화면과 같은 계산(서버가 적은 turnSeenAt 부터, 서버 시각 보정) ── */
@@ -401,6 +405,12 @@ export default function WatchPage({ matchId }: { matchId: string }) {
     if (!match) return <div className="min-h-dvh bg-surface-0 flex items-center justify-center text-ink-3 text-[14px]">{t("sim.watch.loading")}</div>;
 
     const turnName = names[match.turn] ?? "";
+    // 진행 중인데 재생도 없으면 '조준 중'(직전 샷 한 점과 함께), 재생 중·끝난 대전은 그 샷의 당점·세기
+    const stripState: ShotStripState = !finished && !animating
+        ? { kind: "aim", name: turnName, seconds: clockSeconds, last: stripShot ? { input: stripShot.input } : null }
+        : stripShot
+            ? { kind: "shot", name: names[stripShot.playerIndex] ?? "", input: stripShot.input, playing: animating, shotKey: stripShot.idx }
+            : { kind: "idle" };
 
     return (
         <div className="h-dvh flex flex-col bg-surface-0">
@@ -422,16 +432,10 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                         className="absolute top-2 right-2 z-[3] h-9 px-3 rounded-pill bg-surface-1/90 border border-surface-line text-[12px] font-bold text-ink-2"
                     >{view === "top" ? t("sim.watch.view3d") : t("sim.watch.viewTop")}</button>
                 )}
-                {/* 상대가 조준하는 동안 화면이 멈춘 게 아니라는 표시(2026-09-13 오너: "리플레이처럼 보인다") */}
-                {!finished && !animating && (
-                    <div className="absolute inset-x-0 bottom-3 z-[3] flex flex-col items-center gap-1.5 px-4 pointer-events-none">
-                        <div className="rounded-card bg-surface-1/95 border border-surface-line px-4 py-2.5 text-center">
-                            <p className="text-[13px] font-semibold text-ink-1">{t("sim.watch.turnOf").replace("{name}", turnName)}</p>
-                            {clockSeconds !== null && <ShotClock seconds={clockSeconds} mine={false} size={44} className="mt-1" />}
-                        </div>
-                    </div>
-                )}
             </div>
+
+            {/* 샷 띠 — 당구대 **밑**. 조준 중엔 누구 차례·시계(예전엔 테이블 아래쪽을 덮는 카드였다), 샷이 나가면 당점·세기(2026-09-30) */}
+            <ShotStrip state={stripState} maxOffset={params?.cue?.maxOffset} />
 
             {/* 관전 한마디: 오간 말 몇 줄 + 응원 문구(고정). 끝난 대전에서도 잠깐은 인사할 수 있다(서버가 30분까지 받는다). */}
             {chat.length > 0 && (
