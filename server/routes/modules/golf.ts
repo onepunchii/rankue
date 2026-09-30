@@ -18,6 +18,8 @@ import { msg } from "../../lib/i18n.js";
 import { getGolfFootprints } from "../../storage/golfFootprints.js";
 import { parseFootprintYear } from "../../../shared/golfFootprints.js";
 import { signFootprintShare, footprintCardPath } from "../../lib/footprintShare.js";
+import { parseLatLng } from "../../../shared/golfNearby.js";
+import { ONSITE_SOURCES, type OnSiteSource } from "../../../shared/golfOnSite.js";
 
 const router = Router();
 
@@ -867,6 +869,42 @@ router.post("/match/:id/course", requireAuth, asyncHandler(async (req: AuthReque
     const name = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim().slice(0, 40) : undefined);
     const session = await storage.updateGolfMatchCourse(req.params.id, name(req.body?.frontCourseName), name(req.body?.backCourseName));
     return sendSuccess(res, session);
+}));
+
+// --- 현장 인증 도장(2026-09-30 오너 결정: "집에서 전국 도장을 모으지 못하게") ---
+// 라운드 중 참가자 폰이 몇 번(시작·9번 홀·18번 홀·끝내기) 조용히 위치를 보낸다. 서버가 골프장까지 거리를 재고
+// **좌표는 버린다** — 남는 건 인증 여부와 거친 구간뿐(<2km·2-10km·>10km·no-fix·no-course). 위치는 본문으로만 받는다
+// (주소에 실으면 요청 로그에 좌표가 남는다). 점수와 달리 **참가자 누구나** 보낸다 — 동반자 한 명만 현장이어도 경기 전체가 인증된다.
+// 판정은 shared/golfOnSite.ts, 저장은 golf.repo recordGolfCheckin·getGolfOnSiteSummary.
+
+const checkinSchema = z.object({
+    lat: z.number().finite().optional(),
+    lng: z.number().finite().optional(),
+    accuracy: z.number().finite().min(0).max(1_000_000).nullish(),
+    /** 위치를 못 잡은 이유(권한 거부·꺼짐·시간 초과) — 좌표 대신 */
+    fix: z.enum(["denied", "unavailable"]).optional(),
+    source: z.enum(ONSITE_SOURCES as unknown as [OnSiteSource, ...OnSiteSource[]]),
+});
+
+router.get("/match/:id/checkin", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const session = await loadMatch(req, res, false);
+    if (!session) return;
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, await storage.golf.getGolfOnSiteSummary(session, req.userId!));
+}));
+
+router.post("/match/:id/checkin", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const session = await loadMatch(req, res, false);
+    if (!session) return;
+    const parsed = checkinSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, "위치 정보가 올바르지 않아요");
+    const d = parsed.data;
+    const at = d.fix ? null : parseLatLng(d.lat, d.lng);
+    if (!d.fix && !at) return sendError(res, 400, "위치 정보가 올바르지 않아요");
+    const { last, upgraded, session: fresh } = await storage.golf.recordGolfCheckin(session, req.userId!, at ? { ...at, accuracy: d.accuracy ?? null } : null, d.source);
+    // 상태는 잠금 뒤에 읽은 새 값으로(방금 끝났을 수 있다)
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, { ...(await storage.golf.getGolfOnSiteSummary(fresh ?? session, req.userId!)), last, upgraded });
 }));
 
 // --- 라운드 사진(2026-09-30 오너: "스코어 등록 때 사진 — 추억 앨범, 공개 사진은 그 골프장 페이지에, 신고·차단") ---

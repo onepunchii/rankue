@@ -2,6 +2,14 @@ import { useMemo, useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { COURSES } from "@/golf/data/golfCourses";
 import { kstDateLabel } from "@/lib/kst";
+import { apiRequest } from "@/lib/queryClient";
+
+/**
+ * 여권 통계 캐시 열쇠. v2(2026-09-30 현장 인증): 응답에 recordStamps·도장별 onSite 가 붙었다 — 저장 캐시(7일)의 옛 모양을 먼저 그리지 않게.
+ * URL 에 붙지 않도록 queryFn 을 직접 준다. 무효화는 앞부분(["/api/hiq/golf/passport-stats"])으로 해도 잡힌다.
+ */
+export const PASSPORT_STATS_KEY = ["/api/hiq/golf/passport-stats", "v2"] as const;
+export const fetchPassportStats = () => apiRequest("/api/hiq/golf/passport-stats");
 
 export interface Course {
     id: number;
@@ -45,9 +53,11 @@ export interface Stamp {
     rounds: number;
     region: string;
     color: string;
+    /** 인증 도장인가 — false 면 현장 인증 없이 적은 흐린 '기록 도장'(정복·지역·Elite 60 에 안 센다) */
+    onSite: boolean;
 }
 
-interface ServerStamp {
+export interface ServerStamp {
     clubId: string | null;
     name: string;
     region: string | null;
@@ -55,6 +65,13 @@ interface ServerStamp {
     lastDate: string;
     bestScore: number;
     rounds: number;
+    /** 옛 응답엔 없다 — 없으면 인증 도장으로 본다 */
+    onSite?: boolean;
+}
+
+export interface PassportStatsResponse extends PassportStats {
+    stamps: ServerStamp[];
+    recordStamps?: ServerStamp[];
 }
 
 const COLORS = ["#64DD17", "#00E5FF", "#FFD600", "#AA00FF", "#FF4081", "#FF6D00"];
@@ -78,8 +95,9 @@ export function usePassportData() {
         setSavedImages(images);
     }, []);
 
-    const { data, isLoading } = useQuery<Omit<PassportStats, never> & { stamps: ServerStamp[] }>({
-        queryKey: ["/api/hiq/golf/passport-stats"],
+    const { data, isLoading } = useQuery<PassportStatsResponse>({
+        queryKey: PASSPORT_STATS_KEY,
+        queryFn: fetchPassportStats,
     });
 
     const stats = useMemo<PassportStats>(() => ({
@@ -94,8 +112,8 @@ export function usePassportData() {
         regionConquered: data?.regionConquered ?? {},
     }), [data]);
 
-    const stamps = useMemo<Stamp[]>(() => (data?.stamps ?? []).map((s, i) => ({
-        id: s.clubId ?? `name-${i}`,
+    const toStamp = (s: ServerStamp, i: number, onSite: boolean, prefix: string): Stamp => ({
+        id: s.clubId ?? `${prefix}-${i}`,
         clubId: s.clubId,
         name: s.name,
         date: kstDateLabel(s.firstDate, { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '.'),
@@ -103,12 +121,17 @@ export function usePassportData() {
         rounds: s.rounds,
         region: s.region ?? "기타",
         color: COLORS[i % COLORS.length],
-    })), [data]);
+        onSite,
+    });
+    // 인증 도장(현장 인증 + 이 규칙 전 옛 기록) — 정복·지역·Elite 60 은 이것만 센다(서버 golfStamps.collectStamps 와 같은 줄)
+    const stamps = useMemo<Stamp[]>(() => (data?.stamps ?? []).map((s, i) => toStamp(s, i, true, "name")), [data]);
+    // 기록 도장 — 현장 인증 없이 적은 골프장. 흐리게만 보여 준다
+    const recordStamps = useMemo<Stamp[]>(() => (data?.recordStamps ?? []).map((s, i) => toStamp(s, i, false, "record")), [data]);
 
     const handleScanComplete = () => {
         queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/passport-stats"] });
         queryClient.invalidateQueries({ queryKey: ["/api/hiq/history", { sport: "GOLF" }] });
     };
 
-    return { stats, stamps, savedImages, isLoading, handleScanComplete };
+    return { stats, stamps, recordStamps, savedImages, isLoading, handleScanComplete };
 }

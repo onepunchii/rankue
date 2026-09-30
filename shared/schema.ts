@@ -1124,6 +1124,10 @@ export const hiqGameHistory = pgTable("hiq_game_history", {
   // 이어져 있어서, 여권 도장이 화면마다 다르게 세졌고 기록 상세가 404 가 났다(2026-09-11).
   golfSessionId: uuid("golf_session_id"),
   golfClubId: text("golf_club_id"),
+  // 골프: 현장 인증(2026-09-30 오너 결정, shared/golfOnSite.ts). NULL = 이 규칙 전 기록(그대로 인정해 도장으로 센다),
+  // true = 라운드 중 골프장 2km 안에서 확인됨, false = 확인 못 한 라운드 — 점수·평균엔 들어가고 도장은 흐린 '기록 도장'.
+  // 끝낼 때 경기의 확인(golf_round_checkins)으로 한 번 정한다. 기본값을 두지 않는다 — 옛 행이 NULL 로 남아야 옛 도장이 산다.
+  onSite: boolean("on_site"),
   sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -1232,6 +1236,10 @@ export const golfMatchSessions = pgTable("golf_match_sessions", {
   // 볼 때마다 다시 계산하면 끝난 뒤 코스를 바꿀 때 금액이 소급해서 바뀌었다.
   settlement: jsonb("settlement"),
   finishedAt: timestamp("finished_at"),
+  // 현장 인증의 30분 규칙(2026-09-30, shared/golfOnSite.ts) — 진행 중으로 바뀐 때와 실제 회원의 18홀이 처음 다 적힌 때.
+  // 대기방에서 기다린 시간은 라운드가 아니라 created_at 으로 재면 안 된다. 옛 경기는 NULL(시작은 created_at, 다 적은 때는 끝낸 때로 본다).
+  startedAt: timestamp("started_at"),
+  holesDoneAt: timestamp("holes_done_at"),
 
   // Player Data: Array of { memberId, name, scores: [18], penalties: [18] }
   players: jsonb("players").$type<any[]>().default([]).notNull(),
@@ -1284,6 +1292,26 @@ export const golfRoundPhotos = pgTable("golf_round_photos", {
   index("golf_round_photos_course_idx").on(t.courseSlug, t.isPublic, t.createdAt),
 ]);
 export type GolfRoundPhoto = typeof golfRoundPhotos.$inferSelect;
+
+/**
+ * 현장 인증 확인(2026-09-30 오너 결정 — "집에서 전국 도장을 모으지 못하게"). 한 행 = 라운드 중 위치 확인 한 번.
+ * **좌표는 싣지 않는다** — 서버가 골프장까지 거리를 재고 인증 여부와 거친 구간(<2km·2-10km·>10km·no-fix·no-course)만 남긴다.
+ * 끝낼 때 이 표로 경기 판정(동반자 규칙·30분 규칙)을 내 hiq_game_history.on_site 에 굳힌다.
+ * 생성 SQL: migrations/golf_onsite.sql(첫 확인이 표가 없으면 같은 DDL 로 만든다 — storage/golfOnSite.repo).
+ */
+export const golfRoundCheckins = pgTable("golf_round_checkins", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  sessionId: uuid("session_id").references(() => golfMatchSessions.id, { onDelete: "cascade" }).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id, { onDelete: "cascade" }).notNull(),
+  verified: boolean("verified").notNull(),
+  distanceBucket: text("distance_bucket").notNull(),
+  /** start · hole9 · hole18 · finish · retry · result */
+  source: text("source").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("golf_round_checkins_session_idx").on(t.sessionId, t.createdAt),
+]);
+export type GolfRoundCheckin = typeof golfRoundCheckins.$inferSelect;
 
 // 12. 골프 회원권 거래 (Membership Orders)
 export const golfMembershipOrders = pgTable("golf_membership_orders", {

@@ -21,7 +21,7 @@ import { useLocation } from "wouter";
 import { LucideChevronRight, LucideMinus, LucidePlus, LucideRotateCcw } from "@/lib/icons";
 import { kstDateLabel } from "@/lib/kst";
 import { coursePath } from "@shared/golfCourse";
-import { MUTED_DOT_FILL, toCells, type MapBox, type MapDot } from "@shared/golfDotMap";
+import { MUTED_DOT_FILL, mapX, mapY, toCells, type MapBox, type MapDot } from "@shared/golfDotMap";
 import {
     buildTrail, fitFootprintBox, labelsClear, placeFootprints, placedStops, spreadBadges, mixHex, FOOT, FOOT_COLORS, type FootprintStop,
 } from "@shared/golfFootprints";
@@ -61,9 +61,11 @@ const matrix = (v: ZoomView) => `matrix(${n2(v.k * 1000) / 1000} 0 0 ${n2(v.k * 
 interface Mark { key: string; x: number; y: number; ox: number; oy: number; tail: string }
 const place = (m: Mark, v: ZoomView) => `translate(${n2(v.k * m.x + v.tx + m.ox)} ${n2(v.k * m.y + v.ty + m.oy)})${m.tail}`;
 
-export function FootprintMap({ stops, dots, playKey, selected, onSelect }: {
-    /** 처음 간 순서 */
+export function FootprintMap({ stops, records = [], dots, playKey, selected, onSelect }: {
+    /** 처음 간 순서 — 인증 도장만(번호·길) */
     stops: FootprintStop[];
+    /** 현장 인증 없이 적은 골프장(기록 도장, 2026-09-30) — 번호·길 없이 흐린 점선 동그라미만 */
+    records?: FootprintStop[];
     /** 바탕 점(전국 골프장 좌표) */
     dots: MapDot[];
     /** 바뀌면 발자국이 처음부터 다시 걷고 확대가 풀린다(연도 바꾸기) */
@@ -94,8 +96,12 @@ export function FootprintMap({ stops, dots, playKey, selected, onSelect }: {
 
     const placed = useMemo(() => placedStops(stops), [stops]);
     const pts = useMemo(() => placed.map((s) => ({ x: s.x, y: s.y })), [placed]);
+    // 기록 도장 자리 — 틀에는 넣는다(어디서 적었는지는 보이게), 길·번호에는 안 넣는다
+    const placedRecords = useMemo(() => records
+        .filter((r) => r.lat != null && r.lng != null && Number.isFinite(r.lat) && Number.isFinite(r.lng))
+        .map((r) => ({ name: r.name, lat: r.lat as number, lng: r.lng as number, x: mapX(r.lng as number), y: mapY(r.lat as number) })), [records]);
     // 틀은 **값**으로 잡아 둔다 — 같은 도장을 다시 받아(새 배열) 틀이 새로 만들어져도 확대가 풀리지 않게
-    const target0 = useMemo(() => fitFootprintBox(placed, FOOTPRINT_MAP_ASPECT), [placed]);
+    const target0 = useMemo(() => fitFootprintBox([...placed, ...placedRecords], FOOTPRINT_MAP_ASPECT), [placed, placedRecords]);
     const targetKey = target0.map((v) => v.toFixed(2)).join(",");
     // eslint-disable-next-line react-hooks/exhaustive-deps -- targetKey 가 값이다
     const target = useMemo(() => target0, [targetKey]);
@@ -186,6 +192,7 @@ export function FootprintMap({ stops, dots, playKey, selected, onSelect }: {
         });
     });
     geo.labels.forEach((l) => marks.push({ key: `t${l.name}`, x: l.x, y: l.y, ox: 0, oy: 0, tail: "" }));
+    placedRecords.forEach((r, i) => marks.push({ key: `r${i}`, x: r.x, y: r.y, ox: 0, oy: 0, tail: "" }));
     placed.forEach((st, i) => {
         const b = geo.spread[i];
         const ox = (b.x - st.x) * kc, oy = (b.y - st.y) * kc; // 떼어 놓은 만큼(지도 칸 단위, 배율 고정)
@@ -420,6 +427,13 @@ export function FootprintMap({ stops, dots, playKey, selected, onSelect }: {
                         {geo.labels.map((l) => (
                             <g key={`t${l.name}`} ref={reg(`t${l.name}`)} transform={at(`t${l.name}`)} aria-hidden="true">
                                 <text textAnchor="middle" dominantBaseline="central" fontSize={11.5 * u} fontWeight={600} fill="#FFFFFF" fillOpacity={0.3}>{l.name}</text>
+                            </g>
+                        ))}
+                        {/* 기록 도장 — 흐린 점선 동그라미. 누르지 않는다(목록에서 본다) */}
+                        {placedRecords.map((r, i) => (
+                            <g key={`r${i}`} ref={reg(`r${i}`)} transform={at(`r${i}`)} aria-hidden="true">
+                                <circle r={R * u * 0.78} fill="#0F0F0F" fillOpacity={0.75} stroke="#FFFFFF" strokeOpacity={0.6} strokeWidth={1.4 * u} strokeDasharray={`${2.6 * u} ${2 * u}`} />
+                                <circle r={1.8 * u} fill="#FFFFFF" fillOpacity={0.55} />
                             </g>
                         ))}
                         {geo.marks.map((m, i) => (

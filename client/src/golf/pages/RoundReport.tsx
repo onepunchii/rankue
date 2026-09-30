@@ -20,7 +20,8 @@ import { GolfBackButton } from "../components/common/GolfBackButton";
 import { RoundDetailSheet, ymd, type RoundTarget } from "../components/photos/RoundDetailSheet";
 import { MyPhotoAlbum } from "../components/photos/MyPhotoAlbum";
 
-type Round = { id: string; score: number; innings?: number | null; createdAt: string; locationName?: string | null; subType?: string | null; golfSessionId?: string | null };
+/** onSite: 현장 인증(2026-09-30) — true 인증 · false 기록 도장 · null/없음 이 규칙 전 기록(표시 안 함) */
+type Round = { id: string; score: number; innings?: number | null; createdAt: string; locationName?: string | null; subType?: string | null; golfSessionId?: string | null; onSite?: boolean | null };
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 
@@ -171,6 +172,9 @@ export function GolfRoundReport({ history }: { history: Round[] }) {
                                                             <span className="flex items-center gap-1.5 min-w-0">
                                                                 <span className="text-[15px] font-semibold text-[#ffffff] truncate">{r.locationName || "골프장"}</span>
                                                                 {isBest && <span className="shrink-0 h-5 px-1.5 rounded bg-[#FF8A3D] text-[11px] font-semibold text-[#ffffff] leading-5">베스트</span>}
+                                                                {/* 현장 인증 — 기록 도장은 점수·평균엔 들어가고 여권 도장만 흐리다. 옛 기록(null)은 표시하지 않는다 */}
+                                                                {r.onSite === true && <span className="shrink-0 h-5 px-1.5 rounded bg-[#64DD171F] text-[11px] font-semibold text-[#9BEF5C] leading-5">현장 인증</span>}
+                                                                {r.onSite === false && <span className="shrink-0 h-5 px-1.5 rounded bg-[#FFFFFF0F] text-[11px] font-medium text-[#FFFFFF8C] leading-5">기록 도장</span>}
                                                             </span>
                                                             <span className="block mt-0.5 text-[12.5px] text-[#FFFFFF73] truncate">{[r.subType, `${r.innings || 18}홀`].filter(Boolean).join(" · ")}</span>
                                                         </span>

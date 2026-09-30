@@ -227,7 +227,8 @@ export async function buildGolfFootprintsCard(memberId: string, year: number | n
   return {
     nickname: m.name ?? "",
     year,
-    rounds: fp.rounds,
+    // 카드는 인증 도장만(현장 인증 + 옛 기록) — 집에서 적은 라운드(기록 도장)는 '방문 골프장'·'라운드'에 안 센다(2026-09-30 오너 결정)
+    rounds: fp.onSiteRounds,
     stops: fp.stops,
     // 바탕 점 지도 — 앱의 골프장 점 지도(CourseDotMap)와 같은 골프장 페이지 좌표
     dots: summary.pages.filter((p) => p.lat != null && p.lng != null).map((p) => ({ lat: Number(p.lat), lng: Number(p.lng) })),

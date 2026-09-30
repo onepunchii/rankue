@@ -24,8 +24,11 @@ app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 app.use(localeMiddleware);
 
 // Global Request Logger
+// 위치·서명 값은 로그에 남기지 않는다(2026-09-30) — 가까운 골프장(/golf/clubs?lat=&lng=)이 좌표를, 발자국 공유 카드(?t=)가
+// 서명 토큰을 주소에 싣는다. 개인정보처리방침이 "좌표는 저장하지 않음"이라 적은 뒤라 Vercel 로그에도 남기지 않는다.
+const REDACT_QUERY = /([?&](?:lat|lng|lon|latitude|longitude|t|token|sig)=)[^&#]*/gi;
 app.use((req, res, next) => {
-  console.log(`[Global] Incoming Request: ${req.method} ${req.url}`);
+  console.log(`[Global] Incoming Request: ${req.method} ${req.url.replace(REDACT_QUERY, "$1…")}`);
   next();
 });
 

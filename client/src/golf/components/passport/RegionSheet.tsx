@@ -34,13 +34,15 @@ interface Props {
     conqueredCourses: string[]; // List of names
     /** 도장의 골프장 번호(rankue_golf_clubs.id) — 목록을 이 번호로 맞춘다 */
     stampClubIds?: string[];
+    /** 기록 도장(현장 인증 없이 적은 곳)의 골프장 번호 — '아직' 목록에 흐린 표지만 단다(정복 아님) */
+    recordClubIds?: string[];
     /** 서버가 골프장 원장 기준으로 센 묶음별 총수·정복 수. 지도와 같은 숫자를 보여 주려고 받는다. */
     regionTotals?: Record<string, number>;
     regionConquered?: Record<string, number>;
     onGoToGuide: (regionName: string) => void;
 }
 
-function Row({ name, logo, done, onOpen }: { name: string; logo?: string | null; done: boolean; onOpen?: () => void }) {
+function Row({ name, logo, done, record, onOpen }: { name: string; logo?: string | null; done: boolean; record?: boolean; onOpen?: () => void }) {
     return (
         <li>
             <button type="button" onClick={onOpen} disabled={!onOpen} className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-[#FFFFFF0A] disabled:active:bg-transparent">
@@ -48,19 +50,25 @@ function Row({ name, logo, done, onOpen }: { name: string; logo?: string | null;
                     <span className="w-9 h-9 shrink-0 rounded-full bg-[#64DD17] flex items-center justify-center -rotate-12">
                         <LucideStamp className="w-[18px] h-[18px] text-[#051907]" />
                     </span>
+                ) : record ? (
+                    // 기록 도장 — 쳤지만 현장 인증이 없는 곳. 흐린 도장만(정복 아님)
+                    <span className="w-9 h-9 shrink-0 rounded-full border-[1.5px] border-dashed border-[#FFFFFF4D] flex items-center justify-center -rotate-12" aria-hidden>
+                        <LucideStamp className="w-[16px] h-[16px] text-[#FFFFFF59]" />
+                    </span>
                 ) : (
                     // 빈 도장 칸 — 아직 찍지 않은 자리
                     <span className="w-9 h-9 shrink-0 rounded-full border-[1.5px] border-dashed border-[#FFFFFF33]" aria-hidden />
                 )}
                 <CourseLogo logo={logo} name={name} size="xs" />
                 <span className={cn("flex-1 min-w-0 block text-[15px] truncate", done ? "font-semibold text-[#ffffff]" : "font-medium text-[#FFFFFFCC]")}>{name}</span>
+                {record && <span className="shrink-0 h-5 px-1.5 rounded-md bg-[#FFFFFF0F] text-[11.5px] font-medium leading-5 text-[#FFFFFF8C]">기록 도장</span>}
                 {onOpen && <LucideChevronRight className="w-4 h-4 shrink-0 text-[#FFFFFF33]" />}
             </button>
         </li>
     );
 }
 
-export const RegionSheet = ({ isOpen, onClose, regionId, stampClubIds = [], onGoToGuide, regionTotals, regionConquered }: Props) => {
+export const RegionSheet = ({ isOpen, onClose, regionId, stampClubIds = [], recordClubIds = [], onGoToGuide, regionTotals, regionConquered }: Props) => {
     const [, setLocation] = useLocation();
     const regionName = regionId ? REGION_GROUP_MAPPING[regionId] : "";
     // 목록은 **라운드용 골프장 원장**(rankue_golf_clubs) — 도장·지도 숫자와 같은 원장이라 번호로 정확히 맞는다(2026-09-24).
@@ -73,9 +81,12 @@ export const RegionSheet = ({ isOpen, onClose, regionId, stampClubIds = [], onGo
         staleTime: 10 * 60_000,
     });
     const stamped = new Set(stampClubIds.map(String));
+    const recorded = new Set(recordClubIds.map(String));
     const coursesInRegion = regionName ? (clubs.data ?? []).filter((c: any) => c.passportRegion === regionName) : [];
     const done = coursesInRegion.filter((c: any) => stamped.has(String(c.id)));
-    const todo = coursesInRegion.filter((c: any) => !stamped.has(String(c.id)));
+    // 아직 — 기록 도장(쳐 봤지만 현장 인증이 없는 곳)을 맨 위로: 왜 정복이 아닌지 바로 보이게
+    const todo = coursesInRegion.filter((c: any) => !stamped.has(String(c.id)))
+        .sort((a: any, b: any) => Number(recorded.has(String(b.id))) - Number(recorded.has(String(a.id))));
 
     // 숫자는 지도와 같은 것(서버 원장 기준) — 없으면 정적 목록으로 센다
     const total = regionTotals?.[regionName] ?? coursesInRegion.length;
@@ -128,10 +139,10 @@ export const RegionSheet = ({ isOpen, onClose, regionId, stampClubIds = [], onGo
                     <section>
                         <h3 className="mb-2 text-[13px] font-semibold text-[#FFFFFF99]">아직 <span className="text-[#FFFFFF59] tabular-nums">{todo.length}</span></h3>
                         {done.length === 0 && (
-                            <p className="mb-2 text-[12.5px] text-[#FFFFFF73] break-keep">랭큐매치로 18홀을 끝까지 적으면 그 골프장에 도장이 찍혀요.</p>
+                            <p className="mb-2 text-[12.5px] text-[#FFFFFF73] break-keep">골프장에서 랭큐매치로 18홀을 끝까지 적으면 그 골프장에 도장이 찍혀요.</p>
                         )}
                         <ul className="rounded-2xl bg-[#FFFFFF08] divide-y divide-[#FFFFFF0F] overflow-hidden">
-                            {todo.map((c: any) => <Row key={c.id} name={c.name} logo={c.logo} done={false} onOpen={openOf(c)} />)}
+                            {todo.map((c: any) => <Row key={c.id} name={c.name} logo={c.logo} done={false} record={recorded.has(String(c.id))} onOpen={openOf(c)} />)}
                         </ul>
                     </section>
                     </>}

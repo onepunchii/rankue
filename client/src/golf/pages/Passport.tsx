@@ -19,6 +19,7 @@ import { FootprintsPanel } from "../components/passport/FootprintsPanel";
 import { PassportAlbum } from "../components/passport/PassportAlbum";
 import { useMyPhotos } from "../lib/photoApi";
 import { COURSES } from "@/golf/data/golfCourses";
+import { countEliteConquered } from "../lib/elite60";
 
 // Hooks
 import { usePassportData } from "../hooks/usePassportData";
@@ -42,7 +43,7 @@ export default function Passport() {
     const [isRegionalPopupOpen, setIsRegionalPopupOpen] = useState(false);
 
     // Hooks
-    const { stats, stamps, savedImages, isLoading, handleScanComplete } = usePassportData();
+    const { stats, stamps, recordStamps, savedImages, isLoading, handleScanComplete } = usePassportData();
     const [, setLocation] = useLocation();
 
     // View mode change effect: scroll to top
@@ -50,9 +51,10 @@ export default function Passport() {
         window.scrollTo(0, 0);
     }, [viewMode]);
 
-    // Derived state for props
+    // Derived state for props — 인증 도장만(현장 인증 + 옛 기록). 기록 도장은 정복·Elite 60 에 안 센다(2026-09-30)
     const conqueredCourses = stamps.map(s => s.name);
-    const rankue60ConqueredCount = COURSES.filter(c => c.isRankue60 && conqueredCourses.includes(c.name)).length;
+    // Elite 60 화면과 같은 판정(lib/elite60) — 예전엔 여기만 이름이 글자 그대로 같을 때 세서 두 숫자가 달랐다
+    const rankue60ConqueredCount = countEliteConquered(COURSES, stamps);
 
     const handleRegionSheetGoToGuide = (regionName: string) => {
         setIsRegionalPopupOpen(false);
@@ -78,7 +80,7 @@ export default function Passport() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                         >
-                            <PassportStatsCard stats={stats} />
+                            <PassportStatsCard stats={stats} recordCount={recordStamps.length} />
                             <PassportMapTabs value={mapMode} onChange={setMapMode} albumCount={myPhotos.data?.length ?? 0} />
                             {mapMode === 'footprints' ? (
                                 <FootprintsPanel />
@@ -105,7 +107,7 @@ export default function Passport() {
                             animate={{ opacity: 1, y: 0 }}
                             exit={{ opacity: 0, y: -20 }}
                         >
-                            <StampList stamps={stamps} />
+                            <StampList stamps={stamps} records={recordStamps} />
                             <Elite60Banner conqueredCount={rankue60ConqueredCount} />
                         </motion.div>
                     )}
@@ -119,6 +121,7 @@ export default function Passport() {
                 regionId={regionalSheetRegion}
                 conqueredCourses={conqueredCourses}
                 stampClubIds={stamps.map((s) => s.clubId).filter(Boolean) as string[]}
+                recordClubIds={recordStamps.map((s) => s.clubId).filter(Boolean) as string[]}
                 onGoToGuide={handleRegionSheetGoToGuide}
                 regionTotals={stats.regionTotals}
                 regionConquered={stats.regionConquered}

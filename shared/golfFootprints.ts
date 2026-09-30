@@ -36,8 +36,12 @@ export interface FootprintsResponse {
     years: number[];
     /** 그 기간 골프 라운드 수(여권의 '라운드'와 같은 규칙 — 골프장을 모르는 기록도 센다) */
     rounds: number;
-    /** 처음 간 순서 */
+    /** 그중 도장을 세는 라운드(현장 인증 + 이 규칙 전 옛 기록) — 공유 카드의 '라운드 N회' */
+    onSiteRounds: number;
+    /** 처음 간 순서 — **인증 도장만**(현장 인증 + 옛 기록). 번호·길·공유 카드가 이것만 쓴다 */
     stops: FootprintStop[];
+    /** 현장 인증 없이 적은 골프장(기록 도장) — 지도에 흐리게, 번호·길 없이 */
+    records: FootprintStop[];
 }
 
 /** 한국 시각의 연도. 서버(UTC)에서 getFullYear() 를 쓰면 1월 1일 오전 9시 전 라운드가 전년도로 간다. */

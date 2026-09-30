@@ -4,6 +4,8 @@ import { PassportStats } from '@/golf/hooks/usePassportData';
 
 interface Props {
     stats: PassportStats;
+    /** 현장 인증 없이 적은 골프장 수(흐린 기록 도장) — 정복 수에 안 들어간다(2026-09-30) */
+    recordCount?: number;
 }
 
 /**
@@ -16,7 +18,7 @@ interface Props {
  *  - 다음 레벨까지 얼마인지 **막대**로 — 서버가 주는 다음 문턱(nextLevelAt)까지 정복 수. 이전 문턱은 모르니 0부터 잰다.
  *  - 숫자 셋은 얇은 세로선으로 나눈 한 띠(세 칸 너비를 똑같이 — 예전엔 셋째 칸만 왼쪽 여백이 달라 줄이 안 맞았다).
  */
-export const PassportStatsCard = ({ stats }: Props) => {
+export const PassportStatsCard = ({ stats, recordCount = 0 }: Props) => {
     const [, setLocation] = useLocation();
     const toNext = stats.nextLevelAt != null ? Math.max(0, stats.nextLevelAt - stats.conquered) : null;
     const pct = stats.nextLevelAt ? Math.min(100, Math.round((stats.conquered / stats.nextLevelAt) * 100)) : 100;
@@ -81,7 +83,12 @@ export const PassportStatsCard = ({ stats }: Props) => {
 
             {stats.conquered === 0 && (
                 <p className="mt-4 text-[13px] text-[#FFFFFF8C] break-keep leading-relaxed">
-                    랭큐매치로 18홀을 끝까지 적고 라운드를 끝내면, 그 골프장 도장이 찍혀요.
+                    골프장에서 랭큐매치로 18홀을 끝까지 적고 라운드를 끝내면, 그 골프장 도장이 찍혀요.
+                </p>
+            )}
+            {recordCount > 0 && (
+                <p className="mt-3 text-[12.5px] text-[#FFFFFF73] break-keep leading-relaxed">
+                    현장 인증 없이 적은 <span className="text-[#FFFFFFB3] tabular-nums">{recordCount}곳</span>은 흐린 기록 도장이라 정복 수에 안 들어가요.
                 </p>
             )}
         </section>

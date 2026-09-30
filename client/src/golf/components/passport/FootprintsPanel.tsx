@@ -3,6 +3,8 @@
  *
  * 도장(골프장당 하나)을 **처음 간 순서**로 이어 점 지도 위를 걷는다. 숫자는 전부 서버 기록(18홀 완주한 랭큐매치)에서
  * 온다 — 여권 도장과 같은 규칙(server/storage/golfStamps.ts)이라 도장 수와 발자국 수가 늘 같다.
+ *  - 현장 인증(2026-09-30): 번호·길·공유 카드는 인증 도장만. 현장 인증 없이 적은 골프장(기록 도장)은 지도에 흐린 점선 동그라미,
+ *    목록 아래 흐린 묶음으로만 — 길에는 넣지 않는다.
  *  - 연도 칩은 **발자국이 있는 해만**, 두 해 이상일 때만 보인다(한 해뿐이면 '전체'와 같은 그림이라 칩이 군더더기).
  *  - 아래 목록은 지도와 같은 번호 — 누르면 지도에서 그 배지가 말풍선을 연다(좌표 없는 곳은 목록에만).
  *  - 공유는 서명된 비공개 카드(FootprintShareSheet). 발자국이 없으면 공유 단추도 없다.
@@ -44,6 +46,7 @@ export function FootprintsPanel() {
         .map((c) => ({ key: c.slug, lat: c.lat as number, lng: c.lng as number, tone: "on" as const })), [courses.data]);
 
     const stops = data?.stops ?? [];
+    const records = data?.records ?? [];
     const km = useMemo(() => trailKm(stops), [stops]);
     const loading = !data && (all.isPending || cur.isPending);
     const pick = (y: number | null) => { setYear(y); setSelected(null); };
@@ -103,8 +106,16 @@ export function FootprintsPanel() {
                 <span aria-hidden="true" className="absolute inset-0 bg-[radial-gradient(70%_55%_at_45%_50%,#64DD1714_0%,transparent_70%)]" />
                 {loading ? (
                     <div className="absolute inset-0 animate-pulse bg-[#FFFFFF05]" />
-                ) : stops.length > 0 ? (
-                    <FootprintMap stops={stops} dots={dots} playKey={String(year ?? "all")} selected={selected} onSelect={setSelected} />
+                ) : stops.length > 0 || records.length > 0 ? (
+                    <>
+                        <FootprintMap stops={stops} records={records} dots={dots} playKey={String(year ?? "all")} selected={selected} onSelect={setSelected} />
+                        {stops.length === 0 && (
+                            // 기록 도장만 있다 — 흐린 동그라미가 무엇인지, 또렷한 발자국은 어떻게 찍는지 한 줄
+                            <p className="absolute left-3 right-14 bottom-3 rounded-xl bg-[#0F0F0FE6] px-3 py-2 text-[12.5px] leading-snug text-[#FFFFFFB3] break-keep pointer-events-none">
+                                현장 인증된 발자국은 아직 없어요. 골프장에서 라운드를 적으면 또렷한 발자국이 찍혀요.
+                            </p>
+                        )}
+                    </>
                 ) : (
                     <>
                         <div className="absolute inset-0 opacity-50">
@@ -114,7 +125,7 @@ export function FootprintsPanel() {
                             <GhostSteps />
                             <p className="mt-3 text-[17px] font-semibold text-[#ffffff]">아직 발자국이 없어요</p>
                             <p className="mt-1.5 text-[13px] leading-relaxed text-[#FFFFFFA6] break-keep">
-                                랭큐매치로 18홀을 끝까지 적으면<br />그 골프장에 첫 발자국이 찍혀요.
+                                골프장에서 랭큐매치로 18홀을 끝까지 적으면<br />그 골프장에 첫 발자국이 찍혀요.
                             </p>
                             <button
                                 type="button"
@@ -129,15 +140,18 @@ export function FootprintsPanel() {
                 )}
             </div>
 
+            {(stops.length > 0 || records.length > 0) && (
+                <p className="mt-3 px-1 text-[13px] text-[#FFFFFF8C] tabular-nums">
+                    <span className="font-semibold text-[#8BE84A]">{stops.length}곳</span>
+                    <span> · 라운드 {data?.rounds ?? 0}회</span>
+                    {km >= 1 && <span> · 이으면 {km.toLocaleString()}km</span>}
+                    {records.length > 0 && <span> · 기록 도장 {records.length}곳</span>}
+                    {selected == null && stops.length > 0 && <span className="text-[#FFFFFF59]"> · 번호를 누르면 자세히</span>}
+                </p>
+            )}
+
             {stops.length > 0 && (
                 <>
-                    <p className="mt-3 px-1 text-[13px] text-[#FFFFFF8C] tabular-nums">
-                        <span className="font-semibold text-[#8BE84A]">{stops.length}곳</span>
-                        <span> · 라운드 {data?.rounds ?? 0}회</span>
-                        {km >= 1 && <span> · 이으면 {km.toLocaleString()}km</span>}
-                        {selected == null && <span className="text-[#FFFFFF59]"> · 번호를 누르면 자세히</span>}
-                    </p>
-
                     <ol className="mt-3 rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] divide-y divide-[#FFFFFF0F] overflow-hidden">
                         {stops.map((s, i) => {
                             const n = i + 1;
@@ -168,6 +182,29 @@ export function FootprintsPanel() {
                         })}
                     </ol>
                 </>
+            )}
+
+            {records.length > 0 && (
+                <section className="mt-5" aria-label="기록 도장">
+                    <h3 className="px-1 text-[14px] font-semibold text-[#FFFFFF99]">기록 도장 <span className="text-[#FFFFFF59] tabular-nums">{records.length}</span></h3>
+                    <p className="mt-0.5 px-1 text-[12.5px] leading-relaxed text-[#FFFFFF73] break-keep">
+                        현장 인증 없이 적은 골프장이라 발자국 길·공유 카드에는 넣지 않았어요. 점수는 그대로 남아요.
+                    </p>
+                    <ul className="mt-2.5 rounded-2xl bg-[#FFFFFF05] ring-1 ring-inset ring-[#FFFFFF0A] divide-y divide-[#FFFFFF0A] overflow-hidden">
+                        {records.map((s) => (
+                            <li key={`r-${s.clubId ?? s.name}`} className="flex items-center gap-3 px-4 py-3">
+                                <span aria-hidden="true" className="w-7 h-7 shrink-0 rounded-full border-[1.5px] border-dashed border-[#FFFFFF40]" />
+                                <span className="flex-1 min-w-0">
+                                    <span className="block text-[14.5px] font-medium text-[#FFFFFFB3] truncate">{s.name}</span>
+                                    <span className="block mt-0.5 text-[12.5px] text-[#FFFFFF59] tabular-nums">
+                                        {dot(s.firstVisitedAt)}{s.visits > 1 ? ` · ${s.visits}회` : ""}{s.lat == null ? " · 지도 위치 없음" : ""}
+                                    </span>
+                                </span>
+                                <span className="shrink-0 h-5 px-1.5 rounded-md bg-[#FFFFFF0F] text-[11.5px] font-medium leading-5 text-[#FFFFFF8C]">기록</span>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
             )}
 
             <FootprintShareSheet open={shareOpen} onClose={() => setShareOpen(false)} year={year} />

@@ -1,8 +1,9 @@
 import { useState, useMemo } from 'react';
 import { COURSES } from "@/golf/data/golfCourses";
 import { useQuery } from '@tanstack/react-query';
-import { apiRequest } from '@/lib/queryClient';
 import { format } from 'date-fns';
+import { PASSPORT_STATS_KEY, fetchPassportStats, type PassportStatsResponse } from "./usePassportData";
+import { cleanCourseName, countEliteConquered, findEliteStamp } from "../lib/elite60";
 
 export type MainTab = 'Membership' | 'Public';
 export type SubFilter = 'All' | 'Conquered' | 'Locked' | 'Region';
@@ -12,28 +13,24 @@ export function useEliteCourses() {
     const [subFilter, setSubFilter] = useState<SubFilter>('All');
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Fetch real golf game history instead of using MOCK_STAMPS
-    const { data: historyData = [] } = useQuery<any[]>({
-        queryKey: ['/api/hiq/history', { sport: 'GOLF' }],
-        // apiRequest already returns parsed+unwrapped JSON (the array), NOT a Response.
-        // Calling .json() on it threw and left realStamps empty, silently breaking the
-        // entire "conquered courses" / passport-stamp feature.
-        queryFn: async () => await apiRequest('/api/hiq/history?sport=GOLF')
+    // 정복은 여권의 **인증 도장**(현장 인증 + 이 규칙 전 옛 기록)만 — 서버 golfStamps.collectStamps 하나로 센다(2026-09-30).
+    // 예전엔 기록(/history)을 여기서 따로 묶어 현장 인증 없이 적은 라운드(기록 도장)까지 Elite 60 정복으로 셌다.
+    const { data: passport } = useQuery<PassportStatsResponse>({
+        queryKey: PASSPORT_STATS_KEY,
+        queryFn: fetchPassportStats,
     });
 
     const realStamps = useMemo(() => {
         const courseMap: Record<string, any> = {};
 
-        historyData.forEach(game => {
-            const name = game.locationName;
+        (passport?.stamps ?? []).forEach((st) => {
+            const name = st.name;
             if (!name) return;
 
-            const score = game.score || 0;
-            const parsedDate = game.createdAt ? new Date(game.createdAt) : null;
+            const score = st.bestScore > 0 ? st.bestScore : 0;
+            const parsedDate = st.firstDate ? new Date(st.firstDate) : null;
             const date = parsedDate && !isNaN(parsedDate.getTime()) ? format(parsedDate, "yyyy.MM.dd") : "";
-
-            // Clean name for better matching (remove spaces, CC, etc.)
-            const cleanName = name.replace(/\s/g, '').replace(/CC|컨트리클럽|골프클럽|GC/g, '');
+            const cleanName = cleanCourseName(name);
 
             // Track the best score for each course
             if (!courseMap[cleanName] || score < courseMap[cleanName].score) {
@@ -42,19 +39,16 @@ export function useEliteCourses() {
                     cleanName,
                     date,
                     score,
-                    region: game.region || "경기",
+                    region: st.region || "경기",
                     color: score < 85 ? "#64DD17" : score < 95 ? "#00E5FF" : "#FFD600"
                 };
             }
         });
 
         return Object.values(courseMap);
-    }, [historyData]);
+    }, [passport]);
 
-    const findMatch = (courseName: string) => {
-        const cleanTarget = courseName.replace(/\s/g, '').replace(/CC|컨트리클럽|골프클럽|GC/g, '');
-        return realStamps.find(s => s.cleanName === cleanTarget || cleanTarget.includes(s.cleanName) || s.cleanName.includes(cleanTarget));
-    };
+    const findMatch = (courseName: string) => findEliteStamp(courseName, realStamps as { name: string }[]) as any;
 
     const isConquered = (courseName: string) => !!findMatch(courseName);
     const getConqueredInfo = (courseName: string) => findMatch(courseName);
@@ -75,7 +69,7 @@ export function useEliteCourses() {
 
     const stats = useMemo(() => {
         const total = COURSES.filter(c => c.isRankue60).length;
-        const conquered = COURSES.filter(c => c.isRankue60 && isConquered(c.name)).length;
+        const conquered = countEliteConquered(COURSES, realStamps as { name: string }[]);
         const progress = (conquered / total) * 100;
         return { total, conquered, progress };
     }, [realStamps]);

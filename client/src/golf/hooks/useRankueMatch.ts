@@ -149,6 +149,9 @@ export function useRankueMatch(matchId: string, me?: any, opts?: { redirectOnFin
             queryClient.setQueryData(queryKey, data);
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/history", { sport: "GOLF" }] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/passport-stats"] });
+            // 발자국·현장 인증 상태(결과 화면의 인증/기록 도장)도 새 기록 기준으로
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/passport/footprints"] });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/golf/match/${matchId}/checkin`] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/match/active"] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
             setLocation(`/golf/game/${matchId}/result`, { replace: true });

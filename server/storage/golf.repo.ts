@@ -36,8 +36,13 @@ import { notFound, conflict, badRequest } from "../utils/errors.js";
 import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords, passportRegionGroup } from "../../shared/golfRegions.js";
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
 import { courseNameKey } from "../../shared/golfCourse.js";
-import { makeStampResolver } from "./golfStamps.js";
+import { collectStamps, makeStampResolver, type StampAgg } from "./golfStamps.js";
+import { insertCheckin, listCheckins, listCheckinsInTx, readCheckins, realMemberIds, withCheckinTable } from "./golfCheckins.js";
 import { parseLatLng, sortByDistance } from "../../shared/golfNearby.js";
+import {
+    ONSITE_GRACE_MINUTES, ONSITE_MAX_ATTEMPTS, judgeCheckin, sessionOnSite,
+    type CheckinReason, type Fix, type LatLng, type OnSiteBucket, type OnSiteSource, type OnSiteSummary,
+} from "../../shared/golfOnSite.js";
 import {
     resolvePars, sanitizeScores, isCompleteRound, roundTotals, settleMatch, rulesFor, isGuestId, GUEST_PREFIX, rankRound,
     type CoursePars,
@@ -252,6 +257,42 @@ export async function coursePageSlugFor(courseId: string | null | undefined, cou
     const k = courseName ? courseNameKey(courseName) : "";
     return k ? (await clubPageIndex()).get(k)?.slug ?? null : null;
 }
+
+/**
+ * 경기의 골프장 좌표(2026-09-30 현장 인증 — 이 점에서 2km 안이면 현장). 모르면 null: 그 골프장 라운드는 인증할 수 없다.
+ * 순서는 목록(getGolfClubs coordsOf)·발자국과 같다: 원장(rankue_golf_clubs) → 그 명부 id 를 가진 골프장 페이지(한 곳일 때만) →
+ * 페이지 이름 열쇠(원장 이름, 없으면 경기에 적힌 골프장 이름). 원장 652곳 중 548곳, 페이지 490곳 중 462곳이 좌표를 가진다.
+ */
+export async function courseCoordsFor(courseId: string | null | undefined, courseName: string | null | undefined): Promise<LatLng | null> {
+    let clubName: string | null = null;
+    if (courseId && UUID_RE.test(courseId)) {
+        try {
+            const [c] = await db.select({ name: rankueGolfClubs.name, lat: rankueGolfClubs.latitude, lng: rankueGolfClubs.longitude })
+                .from(rankueGolfClubs).where(eq(rankueGolfClubs.id, courseId)).limit(1);
+            const own = c ? parseLatLng(c.lat, c.lng) : null;
+            if (own) return own;
+            clubName = c?.name ?? null;
+            // 한 명부 id 가 두 페이지에 걸리면(합치기 전 회원제·대중제) 어느 쪽인지 모른다 — 이름 열쇠로 넘긴다
+            const rows = await db.select({ lat: golfCoursePages.lat, lng: golfCoursePages.lng })
+                .from(golfCoursePages).where(eq(golfCoursePages.clubId, courseId)).limit(2);
+            const byClub = rows.length === 1 ? parseLatLng(rows[0].lat, rows[0].lng) : null;
+            if (byClub) return byClub;
+        } catch (e) { console.warn("[golf] course coords by club failed:", (e as Error)?.message); }
+    }
+    const pages = await clubPageIndex();
+    for (const n of [clubName, courseName]) {
+        const pg = n ? pages.get(courseNameKey(n)) : undefined;
+        const at = pg ? parseLatLng(pg.lat, pg.lng) : null;
+        if (at) return at;
+    }
+    return null;
+}
+
+/** 끝낸 뒤 늦은 확인을 받는 마감 — 모르면 null */
+const onSiteGraceEnd = (finishedAt: Date | string | null | undefined): Date | null => {
+    const t = finishedAt ? new Date(finishedAt).getTime() : NaN;
+    return Number.isFinite(t) ? new Date(t + ONSITE_GRACE_MINUTES * 60_000) : null;
+};
 
 export class GolfRepository {
     /**
@@ -951,6 +992,7 @@ export class GolfRepository {
      * 숫자를 냈고, (2) 같은 곳을 다시 치면 도장이 하나 더 찍혔고, (3) '상위 N%' 는 공식으로 지어낸 숫자,
      * 분모 520 은 하드코딩이었다. 이제 도장은 **골프장당 하나**(기록의 golf_club_id, 옛 기록은 이름으로),
      * 분모와 지역별 총수는 실제 골프장 원장에서 센다.
+     * 2026-09-30 현장 인증: 정복·지역·레벨은 인증 도장만(옛 NULL 기록은 인정). 셈은 golfStamps.collectStamps 하나.
      */
     async getGolfPassportStats(memberId: string) {
         const history = await db.select({
@@ -958,6 +1000,7 @@ export class GolfRepository {
             golfClubId: hiqGameHistory.golfClubId,
             score: hiqGameHistory.score,
             createdAt: hiqGameHistory.createdAt,
+            onSite: hiqGameHistory.onSite,
         })
             .from(hiqGameHistory)
             .where(and(eq(hiqGameHistory.memberId, memberId), eq(hiqGameHistory.sportCategory, 'GOLF' as any)))
@@ -968,7 +1011,7 @@ export class GolfRepository {
             region: rankueGolfClubs.region, address: rankueGolfClubs.address,
         }).from(rankueGolfClubs);
 
-        // 도장 규칙(번호 → 이름)은 발자국(golfFootprints.ts)과 같은 함수 — 둘이 갈라지면 도장 수와 발자국 수가 달라진다.
+        // 도장 규칙(번호 → 이름, 인증 여부)은 발자국(golfFootprints.ts)과 같은 함수 — 둘이 갈라지면 도장 수와 발자국 수가 달라진다.
         const resolveStamp = makeStampResolver(clubs);
         const groupOf = (c: { region: string | null; address: string | null }) =>
             passportRegionGroup(resolveGolfRegionCode(c.region, c.address));
@@ -979,29 +1022,19 @@ export class GolfRepository {
             if (g) regionTotals[g] = (regionTotals[g] ?? 0) + 1;
         }
 
-        type Stamp = { clubId: string | null; name: string; region: string | null; firstDate: Date; lastDate: Date; bestScore: number; rounds: number };
-        const stamps = new Map<string, Stamp>();
-        for (const h of history) {
-            // 골프장을 모르는 기록(옛 '알 수 없는 구장' 포함)은 라운드 수에만 들어가고 도장은 없다.
-            const hit = resolveStamp(h);
-            if (!hit) continue;
-            const { key, club } = hit;
-            const cur = stamps.get(key);
-            if (!cur) {
-                stamps.set(key, {
-                    clubId: club?.id ?? null,
-                    name: hit.name,
-                    region: club ? groupOf(club) : null,
-                    firstDate: h.createdAt, lastDate: h.createdAt,
-                    bestScore: h.score, rounds: 1,
-                });
-            } else {
-                cur.rounds++;
-                cur.lastDate = h.createdAt;
-                if (h.score > 0 && (cur.bestScore <= 0 || h.score < cur.bestScore)) cur.bestScore = h.score;
-            }
-        }
-        const list = [...stamps.values()];
+        // 골프장을 모르는 기록(옛 '알 수 없는 구장' 포함)은 라운드 수에만 들어가고 도장은 없다.
+        // 현장 인증(2026-09-30): 인증 도장만 정복·지역·레벨에 센다. 기록 도장은 recordStamps 로 따로 — 화면이 흐리게 그린다.
+        const toStamp = (s: StampAgg<(typeof clubs)[number]>) => ({
+            clubId: s.club?.id ?? null,
+            name: s.name,
+            region: s.club ? groupOf(s.club) : null,
+            firstDate: s.first, lastDate: s.last,
+            bestScore: s.bestScore ?? 0, rounds: s.rounds,
+            onSite: s.onSite,
+        });
+        const all = collectStamps(history, resolveStamp);
+        const list = all.filter((s) => s.onSite).map(toStamp);
+        const recordStamps = all.filter((s) => !s.onSite).map(toStamp);
         const regionConquered: Record<string, number> = {};
         for (const st of list) if (st.region) regionConquered[st.region] = (regionConquered[st.region] ?? 0) + 1;
 
@@ -1022,6 +1055,8 @@ export class GolfRepository {
             levelNum,
             nextLevelAt,
             stamps: list,
+            /** 현장 인증 없이 적은 골프장(흐린 기록 도장) — 정복 수·지역·Elite 60 에는 안 센다 */
+            recordStamps,
             regionTotals,
             regionConquered,
         };
@@ -1162,6 +1197,8 @@ export class GolfRepository {
             backCourseName: input.backCourseName || null,
             // 혼자 기록은 기다릴 사람이 없다 — 바로 진행 중으로 연다(예전엔 화면이 점수 저장을 한 번 불러 시작시켰다).
             status: solo ? "playing" : "waiting",
+            // 현장 인증 30분 규칙의 시작 — 혼자 기록은 지금, 함께 기록은 방장이 시작을 누를 때(startGolfMatchSession)
+            startedAt: solo ? new Date() : null,
             currentHole: 1,
             players,
         }).returning();
@@ -1267,8 +1304,9 @@ export class GolfRepository {
     }
 
     async startGolfMatchSession(id: string): Promise<any> {
+        // started_at: 현장 인증 30분 규칙의 시작점 — 대기방에서 기다린 시간은 라운드가 아니다
         const [started] = await db.update(golfMatchSessions)
-            .set({ status: "playing", currentHole: 1, updatedAt: new Date() })
+            .set({ status: "playing", currentHole: 1, startedAt: new Date(), updatedAt: new Date() })
             .where(and(eq(golfMatchSessions.id, id), eq(golfMatchSessions.status, "waiting")))
             .returning();
         if (started) return started;
@@ -1301,9 +1339,12 @@ export class GolfRepository {
                 if (!scores) throw badRequest("점수 형식이 올바르지 않아요 (홀당 1~15타)");
                 return { ...dbP, scores, penalties: sanitizePenalties(inc.penalties) ?? dbP.penalties };
             });
+            // 현장 인증 30분 규칙: 실제 회원의 18홀이 **처음** 다 적힌 때를 남긴다(뒤에 한 홀을 고쳐도 그대로)
+            const holesDone = !current.holesDoneAt
+                && merged.some((p: any) => realMemberIds([p]).length > 0 && isCompleteRound(p.scores));
 
             const [session] = await tx.update(golfMatchSessions)
-                .set({ players: merged, currentHole: holeNo, updatedAt: new Date() })
+                .set({ players: merged, currentHole: holeNo, updatedAt: new Date(), ...(holesDone ? { holesDoneAt: new Date() } : {}) })
                 .where(eq(golfMatchSessions.id, id))
                 .returning();
             return session;
@@ -1361,6 +1402,8 @@ export class GolfRepository {
     /**
      * 경기를 끝낸다. 상태 변경·정산 저장·기록 추가를 **한 트랜잭션**으로 한다.
      * 기록(평균·등급·여권 도장)은 18홀을 다 적은 회원만. 게스트·중도 종료한 사람은 점수판에만 남는다.
+     * 2026-09-30 현장 인증: 그 경기의 확인(golf_round_checkins)으로 한 번 판정해(동반자 규칙·30분 규칙, shared/golfOnSite)
+     * 기록마다 on_site 를 true/false 로 굳힌다. 확인을 못 읽어도 끝내기는 된다(기록 도장이 될 뿐).
      */
     async finishGolfMatchSession(id: string): Promise<any> {
         const [pre] = await db.select().from(golfMatchSessions).where(eq(golfMatchSessions.id, id));
@@ -1369,6 +1412,8 @@ export class GolfRepository {
         if (pre.status !== "playing") throw conflict("진행 중인 경기만 끝낼 수 있어요");
 
         const cp = await this.parsFor(pre);
+        // 골프장은 경기 도중 바뀌지 않는다(코스 이름만 바뀐다) — 좌표는 트랜잭션 밖에서 한 번
+        const course = await courseCoordsFor(pre.courseId, pre.courseName).catch(() => null);
 
         // 기록 대상 후보: 실제 회원만(탈퇴 등으로 없는 번호면 외래키에 걸려 전체가 실패한다).
         const memberIds = ((pre.players || []) as any[])
@@ -1378,22 +1423,33 @@ export class GolfRepository {
             ? new Set((await db.select({ id: hiqMembers.id }).from(hiqMembers).where(inArray(hiqMembers.id, memberIds))).map((r) => r.id))
             : new Set<string>();
 
-        const { session, recorded } = await db.transaction(async (tx) => {
+        const { session, recorded, verdict } = await db.transaction(async (tx) => {
             const [cur] = await tx.select().from(golfMatchSessions)
                 .where(eq(golfMatchSessions.id, id))
                 .for("update");
             if (!cur) throw notFound("게임을 찾을 수 없어요");
-            if (cur.status === "finished") return { session: cur, recorded: [] as string[] };
+            if (cur.status === "finished") return { session: cur, recorded: [] as string[], verdict: null };
             if (cur.status !== "playing") throw conflict("진행 중인 경기만 끝낼 수 있어요");
 
             const players = (cur.players || []) as any[];
+            const complete = players.filter((p) => existing.has(p.memberId) && isCompleteRound(p.scores));
+            const now = new Date();
+            // 현장 인증 판정 — 행을 잠근 **뒤에** 읽는다: 확인 저장(recordGolfCheckin)도 같은 행을 잠그니 방금 온 확인이 빠지지 않는다.
+            // 30분 규칙의 '다 적은 때'는 점수 저장이 남긴 때, 없으면(옛 경기) 지금. 시작은 started_at, 없으면(옛 경기) 만든 때.
+            const holesDoneAt = cur.holesDoneAt ?? (complete.length > 0 ? now : null);
+            const verdict = sessionOnSite({
+                checkins: await listCheckinsInTx(tx, id),
+                memberIds: realMemberIds(players),
+                courseKnown: !!course,
+                startedAt: cur.startedAt ?? cur.createdAt,
+                holesDoneAt,
+            });
             const settlement = settleMatch(players, cp, rulesFor(cur.gameMode, cur as any));
             const [done] = await tx.update(golfMatchSessions)
-                .set({ status: "finished", settlement, finishedAt: new Date(), updatedAt: new Date() })
+                .set({ status: "finished", settlement, finishedAt: now, updatedAt: now, ...(holesDoneAt && !cur.holesDoneAt ? { holesDoneAt } : {}) })
                 .where(eq(golfMatchSessions.id, id))
                 .returning();
 
-            const complete = players.filter((p) => existing.has(p.memberId) && isCompleteRound(p.scores));
             const strokes = complete.map((p) => roundTotals(p.scores, cp.pars).strokes);
             // 승자는 결과 화면과 같은 규칙(shared rankRound): 18홀을 다 친 사람 중 파 대비 가장 적게 친 사람.
             // 게스트가 이겼으면 회원 누구도 승자가 아니다. 혼자 친 라운드엔 승자가 없다. 동타면 공동 승.
@@ -1420,16 +1476,117 @@ export class GolfRepository {
                     scoreJson: p.scores,
                     golfSessionId: cur.id,
                     golfClubId: cur.courseId || null,
+                    // 동반자 규칙: 경기 판정 하나를 참가자 전원에게 — 한 명이라도 현장이면 모두 인증 도장
+                    onSite: verdict.onSite,
                 }).onConflictDoNothing().returning({ id: hiqGameHistory.id });
                 if (ins.length > 0) recorded.push(p.memberId);
             }
-            return { session: done, recorded };
+            return { session: done, recorded, verdict };
         });
 
         for (const mid of recorded) {
             await this.updateGolfStats(mid).catch((e) => console.error("[golf] updateGolfStats", e));
         }
-        return { ...session, pars: cp.pars, parKnown: cp.known, recordedMemberIds: recorded };
+        return { ...session, pars: cp.pars, parKnown: cp.known, recordedMemberIds: recorded, onSite: verdict };
+    }
+
+    /**
+     * 현장 인증 확인 한 번(2026-09-30). 좌표는 여기서 거리로만 바뀌고 저장되지 않는다(judgeCheckin → 인증 여부·구간).
+     * 경기 행을 잠그고 상태를 본다 — 끝내기와 엇갈려도 한쪽이 기다려서 확인이 판정에서 빠지지 않는다.
+     *  - 대기방·접은 경기는 받지 않는다. 끝난 경기는 30분 유예 안에서만(방장이 끝낸 직후의 동반자 폰·느린 GPS).
+     *  - 이미 인증된 경기엔 더 적지 않는다(동반자 규칙상 소용없다). 한 사람이 20번 넘게 적으면 인증되는 확인만 받는다.
+     *  - 끝난 경기에서 이 확인으로 판정이 인증으로 바뀌면 그 경기 기록의 on_site 를 false → true 로(옛 NULL 은 건드리지 않는다).
+     */
+    async recordGolfCheckin(session: { id: string; courseId: string | null; courseName: string | null }, memberId: string, fix: Fix | null, source: OnSiteSource)
+        : Promise<{ last: { verified: boolean; bucket: OnSiteBucket; reason: CheckinReason }; upgraded: boolean; session: any }> {
+        const course = await courseCoordsFor(session.courseId, session.courseName);
+        const last = judgeCheckin(fix, course);
+        return withCheckinTable(() => db.transaction(async (tx) => {
+            const [cur] = await tx.select().from(golfMatchSessions).where(eq(golfMatchSessions.id, session.id)).for("update");
+            if (!cur) throw notFound("게임을 찾을 수 없어요");
+            if (cur.status === "waiting") throw conflict("아직 시작하지 않은 경기예요");
+            if (cur.status === "abandoned") throw conflict("접은 경기예요");
+            if (cur.status === "finished") {
+                const until = onSiteGraceEnd(cur.finishedAt);
+                if (!until || until.getTime() < Date.now()) throw conflict(`끝난 지 ${ONSITE_GRACE_MINUTES}분이 지난 라운드는 다시 확인할 수 없어요`);
+            }
+            const members = realMemberIds(cur.players);
+            const checkins = await readCheckins(tx, cur.id);
+            const already = checkins.some((c) => c.verified && members.includes(c.memberId));
+            const tries = checkins.filter((c) => c.memberId === memberId).length;
+            if (!already && (last.verified || tries < ONSITE_MAX_ATTEMPTS)) {
+                await insertCheckin(tx, { sessionId: cur.id, memberId, verified: last.verified, bucket: last.bucket, source });
+                checkins.push({ memberId, verified: last.verified, bucket: last.bucket, source, createdAt: new Date() });
+            }
+            let upgraded = false;
+            if (cur.status === "finished") {
+                const v = sessionOnSite({
+                    checkins, memberIds: members, courseKnown: !!course,
+                    startedAt: cur.startedAt ?? cur.createdAt, holesDoneAt: cur.holesDoneAt ?? cur.finishedAt,
+                });
+                if (v.onSite) {
+                    const up = await tx.update(hiqGameHistory).set({ onSite: true })
+                        .where(and(eq(hiqGameHistory.golfSessionId, cur.id), eq(hiqGameHistory.onSite, false)))
+                        .returning({ id: hiqGameHistory.id });
+                    upgraded = up.length > 0;
+                }
+            }
+            // 잠근 뒤 읽은 경기 행 — 라우트가 상태 요약을 이걸로 만든다(방금 끝났을 수 있다)
+            return { last, upgraded, session: cur };
+        }));
+    }
+
+    /**
+     * 경기 화면 칩·결과 화면의 현장 인증 상태(보는 사람 기준). 좌표·다른 사람의 거리 구간은 싣지 않는다.
+     * 끝난 경기는 **내 기록의 on_site** 가 답이다(onsite·record·legacy·none) — 판정을 다시 계산하면 옛 경기(NULL)가 기록 도장처럼 보인다.
+     * 단 기록이 false 인데 같은 규칙(확인 + 30분 규칙)으로는 인증이면 — 끝낼 때 확인을 못 읽었던 경우 — 그 자리에서 true 로 바로잡는다.
+     */
+    async getGolfOnSiteSummary(session: any, viewerId: string): Promise<OnSiteSummary> {
+        const [course, checkins] = await Promise.all([
+            courseCoordsFor(session.courseId, session.courseName),
+            listCheckins(session.id),
+        ]);
+        const members = realMemberIds(session.players);
+        const verified = checkins.some((c) => c.verified && members.includes(c.memberId));
+        const mineAll = checkins.filter((c) => c.memberId === viewerId);
+        const mine = [...mineAll].reverse().find((c) => c.verified) ?? mineAll[mineAll.length - 1] ?? null;
+
+        let stamp: OnSiteSummary["stamp"] = null;
+        let reason: OnSiteSummary["reason"] = null;
+        let retryUntil: string | null = null;
+        if (session.status === "finished") {
+            const [row] = await db.select({ onSite: hiqGameHistory.onSite }).from(hiqGameHistory)
+                .where(and(eq(hiqGameHistory.golfSessionId, session.id), eq(hiqGameHistory.memberId, viewerId)))
+                .limit(1);
+            stamp = !row ? "none" : row.onSite == null ? "legacy" : row.onSite ? "onsite" : "record";
+            if (stamp === "record") {
+                const v = sessionOnSite({
+                    checkins, memberIds: members, courseKnown: !!course,
+                    startedAt: session.startedAt ?? session.createdAt, holesDoneAt: session.holesDoneAt ?? session.finishedAt,
+                });
+                if (v.onSite) {
+                    // 판정과 기록이 어긋났다(끝낼 때 확인을 못 읽음) — 같은 규칙이니 기록을 맞춘다. false 만 올린다(옛 NULL 은 그대로)
+                    await db.update(hiqGameHistory).set({ onSite: true })
+                        .where(and(eq(hiqGameHistory.golfSessionId, session.id), eq(hiqGameHistory.onSite, false)));
+                    stamp = "onsite";
+                } else {
+                    reason = v.reason;
+                    const until = onSiteGraceEnd(session.finishedAt);
+                    // 다시 해도 소용없는 이유(30분 규칙·골프장 좌표 없음)면 다시 확인을 권하지 않는다
+                    if (until && until.getTime() > Date.now() && reason !== "too-fast" && reason !== "no-course") retryUntil = until.toISOString();
+                }
+            }
+        }
+        return {
+            status: session.status,
+            courseKnown: !!course,
+            verified,
+            byCompanion: verified && !mineAll.some((c) => c.verified),
+            mine: mine ? { verified: mine.verified, bucket: mine.bucket, at: new Date(mine.createdAt).toISOString() } : null,
+            stamp,
+            reason,
+            retryUntil,
+        };
     }
 
     private async parsView(session: any): Promise<{ pars: number[]; parKnown: boolean[] }> {

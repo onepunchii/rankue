@@ -12,6 +12,8 @@ import { isCompleteRound, isGuestId, formatRelative, minimalTransfers, rankRound
 import { kstDateLabel } from "@/lib/kst";
 import { useSessionPhotos } from "../lib/photoApi";
 import { RoundDetailSheet, type RoundTarget } from "../components/photos/RoundDetailSheet";
+import { useOnSiteCheckin } from "../hooks/useOnSiteCheckin";
+import { OnSiteStampNote } from "../components/onsite/OnSiteStampNote";
 
 /**
  * 랭큐매치 결과.
@@ -35,6 +37,8 @@ export default function GameResult() {
     const photosQ = useSessionPhotos(matchId);
     const photos = photosQ.data?.photos ?? [];
     const [detail, setDetail] = useState<RoundTarget | null>(null);
+    // 현장 인증 도장(2026-09-30) — 내 기록이 인증 도장인지 흐린 기록 도장인지. 끝낸 뒤 30분 안이면 한 번 더 확인할 수 있다.
+    const onSite = useOnSiteCheckin(matchId, { enabled: session?.status === "finished" });
 
     const settlement: Settlement = session?.settlement && typeof session.settlement === "object" && session.settlement.totals
         ? session.settlement
@@ -232,6 +236,8 @@ export default function GameResult() {
                             18홀을 모두 적은 회원만 평균·여권 도장에 기록돼요.
                         </p>
                     )}
+
+                    <OnSiteStampNote summary={onSite.summary} busy={onSite.busy} onRetry={() => { void onSite.retry(); }} />
 
                     {/* 스코어카드 · 앨범 — 누르면 탭 두 개짜리 시트(라운딩 리포트와 같은 것) */}
                     <button

@@ -12,6 +12,8 @@ import { ScoreCard, HoleGrid } from "../components/ScoreCard";
 import { TransactionCard } from "../components/TransactionCard";
 import { GolfBackButton } from "../components/common/GolfBackButton";
 import { useRoundPhotos } from "../components/photos/RoundPhotoCamera";
+import { useOnSiteCheckin } from "../hooks/useOnSiteCheckin";
+import { OnSiteChip } from "../components/onsite/OnSiteChip";
 import {
     Select,
     SelectContent,
@@ -151,6 +153,9 @@ export default function GolfScorecard() {
 
     // 라운드 사진(2026-09-30) — 참가자 누구나 자기 사진을 지금 홀로 태그해 올린다. 방금 올린 사진 카드는 아래 단추 줄 위에 뜬다.
     const photoUi = useRoundPhotos(session?.id, currentHole + 1, "calc(92px + env(safe-area-inset-bottom))");
+
+    // 현장 인증 도장(2026-09-30) — 시작·9번 홀·18번 홀·끝내기 직전에 조용히 위치를 확인한다. 동반자 폰도 확인한다(동반자 규칙).
+    const onSite = useOnSiteCheckin(matchId, { enabled: session?.status === "playing", hole: currentHole });
 
     // 없는 경기·권한 없음이면 'LOADING MATCH…' 를 영원히 돌리지 않고 이유를 말한다.
     // 데이터가 있는데 다시 가져오기만 실패한 거면 점수판을 가리지 않는다 — 아래 배너만 띄운다.
@@ -367,11 +372,15 @@ export default function GolfScorecard() {
                     )}
                 </div>
                 {/* 18홀 진행 막대 — 전반 9칸 | 후반 9칸. 적은 홀은 채우고 지금 홀은 라임 */}
-                <div className="px-4 pb-2.5 flex gap-[3px]" aria-hidden>
+                <div className="px-4 pb-2 flex gap-[3px]" aria-hidden>
                     {Array.from({ length: 18 }, (_, i) => {
                         const done = (localPlayers[0]?.scores?.[i] ?? 0) > 0;
                         return <span key={i} className={cn("h-1 flex-1 rounded-full", i === 9 && "ml-1.5", i === currentHole ? "bg-[#64DD17]" : done ? "bg-[#FFFFFF59]" : "bg-[#FFFFFF14]")} />;
                     })}
+                </div>
+                {/* 현장 인증 칩 — 한 줄짜리 조용한 상태. 이유는 칩 밑에 한 번만 잠깐 */}
+                <div className="px-4 pb-2.5 flex items-center">
+                    <OnSiteChip matchId={session.id} view={onSite.view} onRetry={() => { void onSite.retry(); }} manualAt={onSite.manualAt} />
                 </div>
             </header>
 
@@ -649,6 +658,18 @@ export default function GolfScorecard() {
                             );
                         })}
                     </div>
+                    {/* 현장 인증 — 이대로 끝내면 어떤 도장이 찍히는지(점수·평균은 어느 쪽이든 남는다). 기록될 회원이 없으면 말하지 않는다 */}
+                    {localPlayers.some((p: any) => !isGuestId(p.memberId) && !p.isGuest && isCompleteRound(p.scores)) && (
+                        <p className={cn("-mt-1 mb-1 px-1 text-[12.5px] leading-snug break-keep", onSite.view.kind === "verified" ? "text-[#9BEF5C]" : "text-[#FFFFFF8C]")}>
+                            {onSite.view.kind === "verified"
+                                ? "📍 현장 인증됨 — 여권에 또렷한 도장이 찍혀요"
+                                : onSite.view.kind === "no-course"
+                                    ? "이 골프장은 위치 정보가 없어 도장이 흐린 기록 도장으로 남아요 · 점수·평균은 그대로"
+                                    : onSite.view.kind === "checking"
+                                        ? "현장 위치를 확인하는 중이에요"
+                                        : "현장 인증이 안 됐어요 — 점수·평균은 남고, 도장은 흐린 기록 도장이 돼요"}
+                        </p>
+                    )}
                     <DialogFooter className="flex-row gap-2">
                         <Button variant="ghost" className="flex-1 h-14 rounded-2xl bg-white/5 text-white/70 font-bold" onClick={() => setFinishOpen(false)}>
                             계속 치기
@@ -658,6 +679,8 @@ export default function GolfScorecard() {
                             className="flex-[2] h-14 rounded-2xl bg-[#64DD17] hover:bg-[#76ff03] text-[#051907] font-bold border-none"
                             onClick={() => runOnce(async () => {
                                 if (isHost) { try { await saveCurrentHoleScores(); } catch { return; } }
+                                // 현장 인증 마지막 확인(끝내기 직전) — 최대 5초만 기다린다. 늦게 온 확인은 서버가 30분 유예로 받는다
+                                await onSite.beforeFinish().catch(() => { /* 확인 못 해도 끝내기는 된다 */ });
                                 finishMatch();
                             })}
                         >
