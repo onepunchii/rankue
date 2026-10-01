@@ -2918,7 +2918,7 @@ const en: Dict = {
   "presence.share": "Let friends know I'm in",
   "presence.shareDesc": "Turn off and nobody is told when you open the app",
   "primarySport.title": "Which sport do you play most?",
-  "primarySport.desc": "Rankue will open in this sport — home, alerts and picks follow it.",
+  "primarySport.desc": "Rankue will open in this sport",
   "primarySport.note": "Play both? No problem — you can change it anytime in Settings.",
   "primarySport.billiards": "Billiards",
   "primarySport.billiardsSub": "Scoreboard · Venues · Online matches",

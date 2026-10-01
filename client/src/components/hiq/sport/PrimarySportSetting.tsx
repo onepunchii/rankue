@@ -1,13 +1,13 @@
 /**
  * 설정 → 주 종목(2026-10-01) — 고른 종목으로 앱이 시작한다. 카드를 누르면 바로 저장(서버 + 지금 화면 종목).
- * 고르기 화면과 같은 카드(SportChoiceCards)라 어디서 보든 같은 모양이다.
+ * 큰 카드 대신 두 칸 스위치(SportSegment) — 골프(어두운) 테마에서 흰 카드가 튀던 것(오너 10/1).
  */
 import { useState } from "react";
 import { LucideFlag } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import type { PrimarySport } from "@shared/primarySport";
-import { SportChoiceCards, useSavePrimarySport } from "./PrimarySport";
+import { SportSegment, useSavePrimarySport } from "./PrimarySport";
 
 export function PrimarySportSetting({ current }: { current: string | null }) {
     const { t } = useT();
@@ -37,7 +37,7 @@ export function PrimarySportSetting({ current }: { current: string | null }) {
                 <h2 className="text-[15px] font-bold">{t("primarySport.settingsTitle")}</h2>
             </div>
             <p className="text-[12px] text-black/45 mb-4">{t("primarySport.settingsDesc")}</p>
-            <SportChoiceCards value={value} onChange={(s) => void pick(s)} />
+            <SportSegment value={value} onChange={(s) => void pick(s)} disabled={busy} />
         </section>
     );
 }
