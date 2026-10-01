@@ -26,6 +26,7 @@ import { db } from "../db.js";
 import { COURSES } from "../../client/src/golf/data/golfCourses";
 import { COURSE_COORDS } from "../../client/src/golf/data/courseCoords";
 import { applyDbegl, readDbegl } from "./golf-course-dbegl";
+import { applyOfficialLogos } from "./golf-logos-official";
 // 라벨·이름 다듬기·시세 쓰기는 서버(매일 동기화 크론)도 쓴다 — 이 파일은 client 목록을 끌고 와서 서버가 못 임포트한다.
 import { normName, itemLabel, manText, writePrices, parseFeed, pricesFromFeed, syncMembershipPrices } from "../services/golfPriceSync.js";
 export { normName, itemLabel, manText, writePrices, parseFeed, pricesFromFeed, syncMembershipPrices };
@@ -271,6 +272,9 @@ export async function buildPages(tgmDir: string, opts: { dbeglFile?: string; log
         r.slug = uniqueSlug(r.name, r.city);
         r.aliases = r.aliases ?? []; r.grass = r.grass ?? []; r.play = r.play ?? []; r.extIds = r.extIds ?? [];
     }
+    // 공식 홈페이지 로고·홈페이지 주소(2026-10-01, data/golf-logos-official.json) — 더블이글 로고가 없는 곳만.
+    // 여기서 다시 얹지 않으면 다시 적재할 때 logo = excluded.logo 가 그 로고들을 지운다.
+    applyOfficialLogos(rows);
 
     // 시세
     const prices: any[] = []; const history: any[] = [];

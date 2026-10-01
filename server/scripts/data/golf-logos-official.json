@@ -1,0 +1,523 @@
+{
+ "_note": "공식 홈페이지에서 받은 골프장 로고(2026-10-01). 더블이글 로고가 없는 페이지만 채운다 — golf-course-pages.ts 가 다시 적재해도 유지. 출처(source)를 남기고 로고는 고치지 않는다(-light 는 흰색뿐인 로고 = 어두운 판). website 는 주소·이름이 확실히 맞은 곳만.",
+ "checked": "2026-10-01",
+ "logos": {
+  "123-골프장": {
+   "logo": "/img/golf-logos/g-815f3bc50e.png",
+   "source": "https://123golfclub.co.kr/images/logo.png",
+   "website": "https://123golfclub.co.kr/",
+   "found": "tourapi(search)"
+  },
+  "88CC": {
+   "logo": "/img/golf-logos/g-26fcffd0dd.png",
+   "source": "https://www.88countryclub.co.kr/Mobile/images/logo.png?v=1.0",
+   "website": "https://www.88countryclub.co.kr/",
+   "found": "kgba-address"
+  },
+  "J-PUBLIC": {
+   "logo": "/img/golf-logos/g-2050c14b74.png",
+   "source": "https://jpublicgc-hp-static.holeinonecloud.com/golf_club/bi/15/CI_Black_12026-09-22T15:39:41.807256688.png",
+   "website": "https://www.jpublic.co.kr/",
+   "found": "tourapi(search)"
+  },
+  "JNJ골프리조트": {
+   "logo": "/img/golf-logos/g-02e27d666a.png",
+   "source": "http://www.jnjgolfresort.co.kr/static/pc/images/common/ogimage.png",
+   "found": "tourapi(search)"
+  },
+  "sk핀크스골프장": {
+   "logo": "/img/golf-logos/g-ac81a8bcb6.png",
+   "source": "https://www.thepinx.co.kr/img/logo_pinx_color.b3cbe86e.png",
+   "website": "https://www.thepinx.co.kr/",
+   "found": "kgba-address"
+  },
+  "가든골프클럽": {
+   "logo": "/img/golf-logos/g-e2c5da3e0a.png",
+   "source": "https://kolongolf.com/static/mo/images/common/custom/logo.svg",
+   "website": "https://kolongolf.com/",
+   "found": "tourapi(search)"
+  },
+  "강남300컨트리클럽": {
+   "logo": "/img/golf-logos/g-86242f9536-light.png",
+   "source": "https://www.kn300.com/Content/mobile/img/logo_new.svg",
+   "website": "https://www.kn300.com/",
+   "found": "kgba-address"
+  },
+  "곤지암GC": {
+   "website": "https://www.konjiamgolfclub.co.kr/",
+   "found": "kgba-address"
+  },
+  "골든베이골프리조트": {
+   "logo": "/img/golf-logos/g-88daed5428.png",
+   "source": "https://www.goldenbay.kr/images/logo03.svg",
+   "website": "https://www.goldenbay.kr/",
+   "found": "kgba-address"
+  },
+  "골프존카운티오라": {
+   "logo": "/img/golf-logos/g-f7750bd803.png",
+   "source": "https://ora.golfzoncounty.com/static/img/common/m/logo.png",
+   "website": "https://ora.golfzoncounty.com/",
+   "found": "kgba-address (chain site) -> per-county subsite ora.golfzoncounty.com"
+  },
+  "구니CC": {
+   "logo": "/img/golf-logos/g-6471e70d90.png",
+   "source": "https://www.gunicc.co.kr/image/common/logo.png",
+   "website": "https://www.gunicc.co.kr/",
+   "found": "tourapi(ktriptips 2770827)"
+  },
+  "구미CC": {
+   "logo": "/img/golf-logos/g-834964ec87.png",
+   "source": "https://www.gumicc.com/Mobile/img/logo.svg",
+   "website": "https://www.gumicc.com/",
+   "found": "kgba-address"
+  },
+  "그린필드골프장": {
+   "logo": "/img/golf-logos/g-c043bf21d1.png",
+   "source": "https://greenfieldcc.co.kr/static/mo/images/common/custom/logo.svg",
+   "website": "https://greenfieldcc.co.kr/",
+   "found": "kgba-address"
+  },
+  "기흥CC": {
+   "website": "https://www.ghcc.kr/",
+   "found": "kgba-address"
+  },
+  "남부CC": {
+   "website": "https://www.namboocc.co.kr/",
+   "found": "kgba-address"
+  },
+  "남촌컨트리클럽": {
+   "logo": "/img/golf-logos/g-f98e89122e-light.png",
+   "source": "https://www.namchoncc.co.kr/Content/mobile/img/logo_w.png",
+   "website": "https://www.namchoncc.co.kr/",
+   "found": "kgba-address"
+  },
+  "내장산골프리조트": {
+   "logo": "/img/golf-logos/g-aef9921927.png",
+   "source": "https://www.naejangsancc.com/images/logo.svg",
+   "website": "http://www.naejangsancc.com/",
+   "found": "tourapi(ktriptips 2778936)"
+  },
+  "뉴데이컨트리클럽": {
+   "logo": "/img/golf-logos/g-d9eadd9821.png",
+   "source": "http://www.maronnewday.com/images/logo.png",
+   "website": "http://www.maronnewday.com/",
+   "found": "kgba-address"
+  },
+  "뉴서울컨트리클럽": {
+   "logo": "/img/golf-logos/g-264d6e9694.png",
+   "source": "https://www.newseoulgolf.co.kr/resources/images/main/logo_color.svg",
+   "website": "https://www.newseoulgolf.co.kr/",
+   "found": "kgba-address"
+  },
+  "다산베아채-골프앤리조트": {
+   "logo": "/img/golf-logos/g-a359dec3a5-light.png",
+   "source": "https://www.beachegolf.com/images/logo.png",
+   "website": "http://www.beachegolf.com/",
+   "found": "kgba-name"
+  },
+  "담양레이나CC": {
+   "logo": "/img/golf-logos/g-ea07217a75.png",
+   "source": "https://reinacc.co.kr/images/logo.png",
+   "website": "https://reinacc.co.kr/",
+   "found": "kgba-address"
+  },
+  "대덕복지센터": {
+   "logo": "/img/golf-logos/g-a3d814a6fb.png",
+   "source": "http://www.ddgolf.co.kr/image/logo.png",
+   "website": "http://www.ddgolf.co.kr/",
+   "found": "tourapi(ktriptips 131566: 대덕연구단지 컨트리클럽, same address)"
+  },
+  "대호단양": {
+   "website": "https://www.daehocc.co.kr/",
+   "found": "tourapi(search)"
+  },
+  "더스타휴-컨트리클럽": {
+   "logo": "/img/golf-logos/g-a80262bc91.png",
+   "source": "https://www.thestarhue.com/images/main_new/mlogo.png",
+   "website": "https://www.thestarhue.com/",
+   "found": "kgba-address"
+  },
+  "동서울레스피아": {
+   "logo": "/img/golf-logos/g-141fc8e293.png",
+   "source": "https://www.dongseoulcc.kr/images/logo.svg",
+   "website": "https://www.dongseoulcc.kr/",
+   "found": "tourapi(ktriptips 131577)"
+  },
+  "드림파크골프장": {
+   "logo": "/img/golf-logos/g-fdb2360fbb.png",
+   "source": "https://www.dreamparkcc.or.kr/images/logo.png",
+   "website": "https://www.dreamparkcc.or.kr/",
+   "found": "tourapi(ktriptips 2768223)"
+  },
+  "라데나골프클럽": {
+   "logo": "/img/golf-logos/g-8cead16d1b.png",
+   "source": "https://cdn.development.ladena.co.kr/images/homepage/kakao_ladena.jpg",
+   "website": "https://www.ladena.co.kr",
+   "found": "kgba-address"
+  },
+  "라비돌": {
+   "logo": "/img/golf-logos/g-431d2a8ae2.png",
+   "source": "https://www.laviedor.com/images/main/logo_2309.svg",
+   "website": "http://www.laviedorresort.co.kr/",
+   "found": "tourapi(ktriptips 131417)"
+  },
+  "렉스필드": {
+   "logo": "/img/golf-logos/g-e5a6db9606.png",
+   "source": "https://www.rexfield.com/images/header_logo.svg",
+   "website": "https://www.rexfield.com/",
+   "found": "kgba-address"
+  },
+  "마우나오션": {
+   "logo": "/img/golf-logos/g-c747780d04.png",
+   "source": "https://mauna.co.kr/static/mo/images/common/custom/logo.png",
+   "website": "https://mauna.co.kr/",
+   "found": "kgba-address"
+  },
+  "무주덕유산CC": {
+   "logo": "/img/golf-logos/g-a8912d950b-light.png",
+   "source": "https://www.mdysresort.com/images/main/logo_white.png",
+   "website": "https://www.mdysresort.com/",
+   "found": "kgba-address"
+  },
+  "문경레저타운골프장": {
+   "logo": "/img/golf-logos/g-9292d919d4-light.png",
+   "source": "https://www.mgle.co.kr/mobile/img/footer-logo.png",
+   "website": "https://www.mgle.co.kr/",
+   "found": "kgba-address"
+  },
+  "베스트밸리": {
+   "logo": "/img/golf-logos/g-3557931eaa-light.png",
+   "source": "https://www.bestvalleygc.com/Mobile/Images/logo_w.svg",
+   "website": "https://www.bestvalleygc.com/",
+   "found": "tourapi(ktriptips 2756065)"
+  },
+  "베이사이트골프클럽": {
+   "logo": "/img/golf-logos/g-ca2e67d95f.png",
+   "source": "https://bayside.co.kr/static/mo/images/common/bayside/logo_color.png",
+   "website": "https://bayside.co.kr/",
+   "found": "kgba-address"
+  },
+  "부산컨트리클럽": {
+   "logo": "/img/golf-logos/g-62c024991d.png",
+   "source": "https://lh3.googleusercontent.com/dbcHoUf47S2INwt7NDOlKPbtFumJnw0i47JMF0fs1hXvjh8yOKXu89vrOsBHQzRPq-HReVSQuIfU2unvV2MpaM4-sGnHNNvyy1mcAVWKf6K4aCauhRPjWw=w1200",
+   "website": "https://www.bscc.co.kr/",
+   "found": "kgba-address"
+  },
+  "블랙밸리컨트리클럽": {
+   "logo": "/img/golf-logos/g-60dc805bd6.png",
+   "source": "https://www.blackcc.co.kr/images/logo.svg?v=1",
+   "website": "https://www.blackcc.co.kr/",
+   "found": "kgba-address"
+  },
+  "블랙스톤": {
+   "logo": "/img/golf-logos/g-fe746ba993.png",
+   "source": "https://www.blackstoneresort.com/gate/images/common/img-logo-beige.svg",
+   "found": "kgba-name-other-address"
+  },
+  "블랙스톤리조트": {
+   "logo": "/img/golf-logos/g-fe746ba993.png",
+   "source": "https://www.blackstoneresort.com/gate/images/common/img-logo-beige.svg",
+   "found": "kgba-name-other-address"
+  },
+  "블랙스톤리조트이천": {
+   "logo": "/img/golf-logos/g-fe746ba993.png",
+   "source": "https://www.blackstoneresort.com/gate/images/common/img-logo-beige.svg",
+   "website": "https://www.blackstoneresort.com/",
+   "found": "tourapi(ktriptips 2763830: 블랙스톤GC 이천, same address)"
+  },
+  "블루헤런": {
+   "logo": "/img/golf-logos/g-0d808a19d5.png",
+   "source": "https://www.blueheron.co.kr/static/pc/images/common/ogimage.png",
+   "website": "https://www.blueheron.co.kr",
+   "found": "kgba-address"
+  },
+  "비에이비스타CC": {
+   "logo": "/img/golf-logos/g-e9ecc9fb18-light.png",
+   "source": "https://www.bavista.co.kr/Content/Mobile/images/intro_logo.svg",
+   "found": "kgba-name"
+  },
+  "비전힐스CC": {
+   "website": "https://www.visionhillscc.co.kr/",
+   "found": "kgba-address"
+  },
+  "상떼힐CC": {
+   "logo": "/img/golf-logos/554.png",
+   "source": "reuse",
+   "found": "none"
+  },
+  "석정힐CC": {
+   "logo": "/img/golf-logos/g-13607bc7b3.png",
+   "source": "https://hillcc.com/static/mo/images/common/custom/logo.png",
+   "website": "https://hillcc.com/",
+   "found": "kgba-address"
+  },
+  "설해원-더-레전드-코스": {
+   "logo": "/img/golf-logos/482.png",
+   "source": "reuse",
+   "found": "kgba-address"
+  },
+  "세종에머슨컨트리클럽": {
+   "logo": "/img/golf-logos/g-420c2a5c0e-light.png",
+   "source": "https://www.sejongemerson.co.kr/NEW/image/common/logo.svg",
+   "website": "https://www.sejongemerson.co.kr/",
+   "found": "kgba-address"
+  },
+  "송도골프클럽": {
+   "website": "http://songdogolf.co.kr/",
+   "found": "tourapi(search)"
+  },
+  "송추cc": {
+   "logo": "/img/golf-logos/g-e64f3972b5.png",
+   "source": "https://www.songchoo.co.kr/assets/logo-CHx1my4f.svg",
+   "website": "http://www.songchoo.co.kr/",
+   "found": "kgba-address"
+  },
+  "스타cc": {
+   "logo": "/img/golf-logos/g-4e1b34dcba-light.png",
+   "source": "https://www.starcc.net/Mobile/img/loginlogo.png",
+   "website": "https://www.starcc.net/",
+   "found": "tourapi(ktriptips 2769569)"
+  },
+  "신원CC": {
+   "website": "https://www.swcc.co.kr/",
+   "found": "kgba-address"
+  },
+  "아난티클럽-서울": {
+   "logo": "/img/golf-logos/g-0b0243e686.png",
+   "source": "https://cdn.ananti.kr/plf/ui/img/info/anantiog.jpg",
+   "found": "kgba-name"
+  },
+  "아리스타-CC": {
+   "logo": "/img/golf-logos/g-e77f0773a2.png",
+   "source": "https://www.aristacc.co.kr/images/logo.svg",
+   "website": "https://www.aristacc.co.kr/",
+   "found": "tourapi(ktriptips 2770228)"
+  },
+  "아시아나CC": {
+   "logo": "/img/golf-logos/g-194ee4a687.png",
+   "source": "https://www.asianacc.co.kr/image/new_main/logo.png",
+   "found": "kgba-address"
+  },
+  "아시아드컨드리클럽": {
+   "website": "http://www.asiadcc.co.kr/",
+   "found": "tourapi(ktriptips 576732)"
+  },
+  "안양컨트리클럽": {
+   "logo": "/img/golf-logos/g-d102eb28dd.png",
+   "source": "https://benestgolf.com/resources/reve/img/web/logo.png",
+   "website": "https://www.benestgolf.com/",
+   "found": "kgba-address"
+  },
+  "에덴밸리컨트리클럽": {
+   "logo": "/img/golf-logos/g-8b74c1d574.png",
+   "source": "https://edenvalley.co.kr/images/intro/logo.png",
+   "found": "kgba-address"
+  },
+  "에버리스골프리조트": {
+   "logo": "/img/golf-logos/g-4f58d84239.png",
+   "source": "https://www.shinangolf.com/assets/images/common/og_img.jpg",
+   "website": "https://www.shinangolf.com/",
+   "found": "kgba-address"
+  },
+  "엘리시안-강촌": {
+   "logo": "/img/golf-logos/g-cae4e90cbc.png",
+   "source": "https://www.elysian.co.kr/assets/logo-footer-color-b26ea99b.svg",
+   "website": "https://www.elysian.co.kr/",
+   "found": "kgba-address"
+  },
+  "엘리시안-제주cc": {
+   "logo": "/img/golf-logos/g-cae4e90cbc.png",
+   "source": "https://www.elysian.co.kr/assets/logo-footer-color-b26ea99b.svg",
+   "website": "https://www.elysian.co.kr/",
+   "found": "kgba-address"
+  },
+  "오션힐스청도GC": {
+   "logo": "/img/golf-logos/g-dce7183b0c-light.png",
+   "source": "https://www.oceanhills.com/assets/logo_c-CY2xB3GD.svg",
+   "website": "http://www.oceanhills.com/",
+   "found": "web-search (group site of 오션힐스포항; verify 청도 on page)"
+  },
+  "오션힐스포항CC": {
+   "logo": "/img/golf-logos/g-dce7183b0c-light.png",
+   "source": "https://www.oceanhills.com/assets/logo_c-CY2xB3GD.svg",
+   "website": "http://www.oceanhills.com/",
+   "found": "web-search"
+  },
+  "오크밸리": {
+   "logo": "/img/golf-logos/g-0143609f0f-light.png",
+   "source": "https://oakvalley.co.kr/#inline-svg",
+   "website": "https://oakvalley.co.kr/",
+   "found": "kgba-address (KGBA url hdcgolf.com dead -> verified oakvalley.co.kr)"
+  },
+  "오투리조트-CC": {
+   "logo": "/img/golf-logos/g-f808c2b57c.png",
+   "source": "https://www.o2resort.com/new_m/images/top_logo.png",
+   "website": "http://www.o2resort.com/",
+   "found": "tourapi(ktriptips 637442)"
+  },
+  "오투리조트-골프": {
+   "logo": "/img/golf-logos/g-f808c2b57c.png",
+   "source": "https://www.o2resort.com/new_m/images/top_logo.png",
+   "website": "http://www.o2resort.com/",
+   "found": "tourapi(ktriptips 637442; same resort as 오투리조트 C.C)"
+  },
+  "오펠GC": {
+   "logo": "/img/golf-logos/g-acaaa82cf5.png",
+   "source": "https://www.ophelgc.com/img/mobile/logo.png",
+   "found": "kgba-address"
+  },
+  "올림픽-골프장": {
+   "logo": "/img/golf-logos/g-aa8902582e-light.png",
+   "source": "https://www.olympicgolf.co.kr/assets/olympic-logo-mobile-white-CeZ4T6nG.svg",
+   "website": "http://www.olympicgolf.co.kr/",
+   "found": "tourapi(ktriptips 131609)"
+  },
+  "우정힐스-컨트리클럽": {
+   "logo": "/img/golf-logos/g-c1cd95b4c7-light.png",
+   "source": "https://whcc.kolon.co.kr/image/common/logo.png",
+   "website": "https://whcc.kolon.co.kr/",
+   "found": "kgba-address"
+  },
+  "울산골프장": {
+   "logo": "/img/golf-logos/g-76c34071ae.png",
+   "source": "https://www.ulsancc.co.kr/images/logo.gif",
+   "website": "https://www.ulsancc.co.kr/",
+   "found": "kgba-address"
+  },
+  "이스트밸리컨트리클럽": {
+   "logo": "/img/golf-logos/g-8044ed8a80-light.png",
+   "source": "https://www.eastvalley.co.kr/image/common/logo.png",
+   "website": "https://www.eastvalley.co.kr/",
+   "found": "kgba-name"
+  },
+  "이지스카이CC": {
+   "logo": "/img/golf-logos/g-37b7e27638.png",
+   "source": "https://easyskycc.co.kr/images/logo.svg",
+   "website": "https://easyskycc.co.kr/",
+   "found": "kgba-name"
+  },
+  "잭-니클라우스-골프클럽-코리아": {
+   "logo": "/img/golf-logos/g-735f872d13.png",
+   "source": "https://jacknicklausgc-hp-static.holeinonecloud.com/golf_club/bi/13/CI_Black2026-07-07T14:47:11.642067811.png",
+   "found": "kgba-address"
+  },
+  "제이드팰리스-골프클럽": {
+   "logo": "/img/golf-logos/g-677d6f9a45.png",
+   "source": "https://www.jadepalacegc.com/static/images/common/logo_lg.png",
+   "website": "https://www.jadepalacegc.com/kr/main.do",
+   "found": "kgba-address"
+  },
+  "제일스포츠센타": {
+   "logo": "/img/golf-logos/g-7345a199da.png",
+   "source": "https://www.jaeil-cc.co.kr/jaeil/images/common/logo_m.png",
+   "website": "https://www.jaeil-cc.co.kr/",
+   "found": "kgba-address"
+  },
+  "젠스필드": {
+   "logo": "/img/golf-logos/g-9541125d83.png",
+   "source": "http://www.zensfield.com/image/common/logo.png",
+   "website": "http://www.zensfield.com/",
+   "found": "tourapi(ktriptips 2770074)"
+  },
+  "캐슬렉스제주GC": {
+   "website": "https://castlexjj.com/",
+   "found": "kgba-address"
+  },
+  "코리아퍼브릭": {
+   "website": "https://www.gakorea.com/",
+   "found": "tourapi(ktriptips 2746695: 코리아퍼블릭CC, same address)"
+  },
+  "크라운CC": {
+   "logo": "/img/golf-logos/g-263f121052-light.png",
+   "source": "https://jejucrowncc.com/images/logo.png",
+   "found": "kgba-address"
+  },
+  "클럽나인브릿지": {
+   "website": "https://www.ninebridges.co.kr/",
+   "found": "kgba-address"
+  },
+  "클럽디거창": {
+   "logo": "/img/golf-logos/g-89b8b4e1e5.png",
+   "source": "https://www.clubd.com/images/geochang/logo2.png",
+   "found": "web-search + clubd.com site nav"
+  },
+  "클럽디속리산": {
+   "logo": "/img/golf-logos/g-05cf6a0893.png",
+   "source": "https://www.clubd.com/images/boeun/logo.png",
+   "website": "https://www.clubd.com/boeun/index.do",
+   "found": "tourapi(ktriptips 2770322: 클럽디 보은 — likely renamed 속리산; verify)"
+  },
+  "킹즈락": {
+   "website": "https://kingsrockcc.com/",
+   "found": "kgba-name"
+  },
+  "타미우스CC": {
+   "logo": "/img/golf-logos/g-470df14b7f.png",
+   "source": "https://tameuscc.co.kr/static/pc/images/common/custom/logo.png",
+   "website": "http://tameuscc.co.kr/index.php",
+   "found": "tourapi(ktriptips stay/984562: 타미우스골프&빌리지)"
+  },
+  "테디밸리골프앤리조트": {
+   "logo": "/img/golf-logos/g-771d923ace.png",
+   "source": "http://www.teddyvalley.com/images/common/logo.jpg",
+   "website": "http://www.teddyvalley.com/",
+   "found": "kgba-address"
+  },
+  "티클라우드-컨트리클럽": {
+   "logo": "/img/golf-logos/g-5d73614f91.png",
+   "source": "https://www.teecloud.co.kr/new/img/common/header_logo_m2.png",
+   "website": "https://www.teecloud.co.kr/",
+   "found": "kgba-address"
+  },
+  "프리스틴밸리-GC": {
+   "logo": "/img/golf-logos/g-d11b464052.png",
+   "source": "https://m.pristinevalley.co.kr/images/logo.png",
+   "website": "https://www.pristinevalley.co.kr/",
+   "found": "kgba-name"
+  },
+  "한라산CC": {
+   "logo": "/img/golf-logos/g-1baa4db64b.png",
+   "source": "http://hallasancc.co.kr/images/logo.jpg",
+   "website": "http://www.hallasancc.co.kr/",
+   "found": "tourapi(search)"
+  },
+  "한림광릉CC": {
+   "logo": "/img/golf-logos/g-805aa44356.png",
+   "source": "https://kwangneung.hanlimgolf.co.kr/images/common/logo.png",
+   "website": "https://kwangneung.hanlimgolf.co.kr/",
+   "found": "group site nav (hanlimgolf.co.kr) after TourAPI 한림용인 record"
+  },
+  "해비치CC": {
+   "logo": "/img/golf-logos/g-80e3125ac8.png",
+   "source": "https://www.haevichi.com/ko/pc/img/com/logo_header_CC_seoul.png",
+   "website": "https://www.haevichi.com/ccseoul/ko/",
+   "found": "kgba-address"
+  },
+  "해슬리나인브릿지": {
+   "website": "https://www.haesley.com",
+   "found": "kgba-address"
+  },
+  "해운대비치골프앤리조트": {
+   "logo": "/img/golf-logos/g-b499920de3.png",
+   "source": "https://www.haeundaebeachcc.com/resource/assets/mobile/images/main_bottom_logo.png",
+   "website": "https://www.haeundaebeachcc.com/",
+   "found": "kgba-address"
+  },
+  "해피니스CC": {
+   "logo": "/img/golf-logos/g-cf69a8ad0f-light.png",
+   "source": "https://www.happinesscc.com/images/logo_white.svg",
+   "website": "https://www.happinesscc.com/",
+   "found": "kgba-address"
+  },
+  "화산CC": {
+   "website": "http://www.hwasancc.com/",
+   "found": "kgba-address"
+  },
+  "화성골프클럽": {
+   "logo": "/img/golf-logos/g-4dda2107f0.png",
+   "source": "https://www.hwaseonggc.com/mobile/images/topLogo.svg",
+   "website": "http://www.hwaseonggc.com/",
+   "found": "tourapi(ktriptips 2747215: 화성GC, same address)"
+  }
+ }
+}
