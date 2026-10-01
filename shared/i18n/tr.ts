@@ -292,6 +292,13 @@ export const tr: Record<string, string> = {
   // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
   "notif.golfPhoto.hidden.title": "📷 Tur fotoğrafın gizlendi",
   "notif.golfPhoto.hidden.body": "Tur fotoğrafın birkaç şikayetten sonra gizlendi. Sorun olmadığını düşünüyorsan albümünde aç ve “İtiraz et”e dokun — ekibimiz tekrar inceleyecek.",
+  // 조인·부킹 글 가림·내림(2026-10-01) — 골프 글은 이의제기 칸이 없어 채팅 '운영자 문의'로 안내한다(storage/adminGolfListings)
+  "notif.golfListing.hidden.title": "⚠️ Golf ilanın gizlendi",
+  "notif.golfListing.hidden.body": "{course} {tee} ilanın birkaç şikâyetten sonra gizlendi. Artık listede görünmüyor ve yeni başvuru almıyor. Bir hata olduğunu düşünüyorsan Sohbet'teki “Destek” üzerinden bize yaz.",
+  "notif.golfListing.hiddenByAdmin.body": "{course} {tee} ilanın kurallarımız gereği gizlendi. Artık listede görünmüyor ve yeni başvuru almıyor. Sorun olursa Sohbet'teki “Destek” üzerinden bize yaz.",
+  "notif.golfListing.deleted.title": "Bir golf ilanı kaldırıldı",
+  "notif.golfListing.deleted.body": "{course} {tee} ilanın kurallarımız gereği kaldırıldı. Başvuruları ve sohbet odası da silindi. Sorun olursa Sohbet'teki “Destek” üzerinden bize yaz.",
+  "notif.golfListing.deletedApplicant.body": "Başvurduğun {course} {tee} ilanı kurallarımız gereği kaldırıldı. Başvurun ve sohbet odası da silindi.",
   "notif.moderation.blind.title": "⚠️ Gönderi gizlendi",
   "notif.moderation.blind.bodyAppeal": "Politika ihlali şikâyeti doğrulandı ve gönderiniz gizlendi. Haksız olduğunu düşünüyorsanız uygulamadan hemen itiraz edebilirsiniz.",
   "notif.moderation.blind.body": "Politika ihlali şikâyeti doğrulandı ve gönderiniz gizlendi.",

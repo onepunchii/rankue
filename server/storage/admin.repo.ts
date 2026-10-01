@@ -500,10 +500,15 @@ export class AdminRepository {
         };
     }
 
-    /** 대상 하나의 최신 상태(조치 직전 대조용). 신고가 한 건도 없으면 null. */
-    async getReportTarget(targetType: ReportTargetType, targetId: string): Promise<ReportQueueItem | null> {
+    /**
+     * 대상 하나의 최신 상태(조치 직전 대조용). 신고가 한 건도 없으면 null.
+     * unreported: 신고가 없어도 원문이 있으면 돌려준다 — 골프 관리 '라운드 사진' 화면(2026-10-01)은 운영자가 신고 전에 먼저
+     * 가리고·지우고, 신고 없이 가린 사진의 이의제기도 판정한다. 할 수 있는 조치·처리 기록·작성자 안내는 신고 큐와 같은 길(services/moderation).
+     */
+    async getReportTarget(targetType: ReportTargetType, targetId: string, opts: { unreported?: boolean } = {}): Promise<ReportQueueItem | null> {
         const [item] = await this.buildReportItems([{ targetType, targetId }]);
-        return item && item.reportCount > 0 ? item : null;
+        if (!item) return null;
+        return item.reportCount > 0 || (opts.unreported && item.content.exists) ? item : null;
     }
 
     private async buildReportItems(keys: Array<{ targetType: string; targetId: string }>): Promise<ReportQueueItem[]> {

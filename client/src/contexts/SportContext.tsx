@@ -32,7 +32,10 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
      * 두 종목이 함께 쓰는 화면(/dashboard·/menu…)에서는 저장된 선호를 쓰되, 허용되지 않으면 당구로 본다.
      */
     const routeSport = sportForPath(location);
-    const currentSport: SportType = routeSport ?? (golfOk ? saved : "BILLIARDS");
+    // 관리자·사장님 콘솔은 밝은 화면 한 가지로 만든 화면이다 — 운영자가 골프 모드였다고 골프 테마가 흰 카드·회색 글자를
+    // 바꿔 끼우면 콘솔이 깨진다(2026-10-01 골프 관리 화면 조사). 색만 당구(기본)로 두고, 저장된 선호는 건드리지 않는다.
+    const consolePath = /^\/(admin|partner)(\/|$|\?)/.test(location);
+    const currentSport: SportType = consolePath ? "BILLIARDS" : routeSport ?? (golfOk ? saved : "BILLIARDS");
 
     // 종목이 정해진 주소로 들어왔으면 그게 곧 선택이다 — 골프 선수 페이지에서 '홈'을 누르면 골프 홈으로 이어져야지,
     // 당구 홈으로 튀면 "골프 앱인 줄 알았는데" 가 된다. 반대(당구 전용 주소)도 같다.

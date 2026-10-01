@@ -8,6 +8,7 @@ const m = vi.hoisted(() => ({
     getCrewPost: vi.fn(), deleteCrewPost: vi.fn(), deleteCrewPhoto: vi.fn(), getCrewComment: vi.fn(),
     deleteCrewComment: vi.fn(), deleteCrewPhotoComment: vi.fn(), getCrewPhoto: vi.fn(), deleteCrewChat: vi.fn(),
     getMemberById: vi.fn(), banUser: vi.fn(), send: vi.fn(), deleteBlobs: vi.fn(),
+    getGolfPhoto: vi.fn(), deleteGolfPhoto: vi.fn(),
 }));
 vi.mock("../storage/index.js", () => ({
     storage: {
@@ -22,6 +23,7 @@ vi.mock("../storage/index.js", () => ({
             getCrewComment: m.getCrewComment, deleteCrewComment: m.deleteCrewComment, deleteCrewPhotoComment: m.deleteCrewPhotoComment,
             getCrewPhoto: m.getCrewPhoto, deleteCrewChat: m.deleteCrewChat,
         },
+        golfPhotos: { get: m.getGolfPhoto, delete: m.deleteGolfPhoto },
         getMemberById: m.getMemberById,
         banUser: m.banUser,
     },
@@ -156,6 +158,91 @@ describe("운영자 조치(applyModerationAction)", () => {
         expect(m.setReportTargetBlinded).not.toHaveBeenCalled();
         expect(m.closeReports).toHaveBeenCalledWith("community_post", "t1", "actioned");
         expect(m.logModerationAction).toHaveBeenCalledWith(expect.objectContaining({ action: "appeal_reject" }));
+    });
+});
+
+// 라운드 사진(감사 4.1, 2026-10-01) — 신고 큐와 골프 관리 '라운드 사진' 화면이 같은 실행기를 쓴다.
+describe("라운드 사진 조치(golf_photo)", () => {
+    const photoItem = (actions: string[], over: Record<string, unknown> = {}) => item({
+        targetType: "golf_photo",
+        actions,
+        content: {
+            exists: true, title: "동강시스타", text: null, images: ["https://x.public.blob.vercel-storage.com/hiq/golf-thumb/a.webp"],
+            isBlinded: true, blindReason: null, meta: "라운드 사진 · 비공개(앨범만)",
+            // 비공개 사진의 '원문 열기'는 Blob 주소다 — 작성자 알림 링크로 쓰면 안 된다
+            link: "https://x.public.blob.vercel-storage.com/hiq/golf-photo/a.webp", crewName: null, createdAt: null,
+        },
+        ...over,
+    });
+    const runPhoto = (action: string, extra: Record<string, unknown> = {}) =>
+        applyModerationAction({ targetType: "golf_photo", targetId: "ph1", action: action as any, adminProfileId: "admin-p", ...extra });
+
+    beforeEach(() => {
+        m.getGolfPhoto.mockResolvedValue({ id: "ph1", sessionId: "round-1", memberId: "a1" });
+    });
+
+    it("이의제기 승인: 가림을 풀고, 신고를 기각으로 닫고, 결과를 골프 알림함으로 보내 그 경기 앨범을 연다", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["appeal_approve", "appeal_reject", "delete"]));
+        expect(await runPhoto("appeal_approve")).toEqual({ ok: true, closed: 2 });
+        expect(m.setReportTargetBlinded).toHaveBeenCalledWith("golf_photo", "ph1", false, null);
+        expect(m.closeReports).toHaveBeenCalledWith("golf_photo", "ph1", "dismissed");
+        expect(m.logModerationAction).toHaveBeenCalledWith(expect.objectContaining({ targetType: "golf_photo", action: "appeal_approve", authorMemberId: "a1" }));
+        expect(m.send).toHaveBeenCalledWith(expect.objectContaining({
+            memberId: "a1", category: "GOLF", type: "MODERATION",
+            title: "notif.moderation.appealResult.title", body: "notif.moderation.appealApprove.body",
+            params: { url: "/history?album=round-1" },
+        }));
+    });
+
+    it("이의제기 반려: 가린 채 두고, 신고를 조치로 닫고, 운영자 메모는 처리 기록에만 남긴다", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["appeal_approve", "appeal_reject", "delete"]));
+        await runPhoto("appeal_reject", { note: "  동반자 얼굴이 그대로 보임 \r\n" });
+        expect(m.setReportTargetBlinded).not.toHaveBeenCalled();
+        expect(m.closeReports).toHaveBeenCalledWith("golf_photo", "ph1", "actioned");
+        expect(m.logModerationAction).toHaveBeenCalledWith(expect.objectContaining({ action: "appeal_reject", note: "동반자 얼굴이 그대로 보임" }));
+        const sent = m.send.mock.calls[0][0];
+        expect(sent).toMatchObject({ category: "GOLF", body: "notif.moderation.appealReject.body", params: { url: "/history?album=round-1" } });
+        expect(JSON.stringify(sent)).not.toContain("동반자 얼굴");
+    });
+
+    it("지우기: 행과 원본·썸네일 Blob 을 함께 지우고, 링크 없이 골프 알림함으로 알린다", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["unblind", "delete"]));
+        m.deleteGolfPhoto.mockResolvedValue({ url: "https://x/hiq/golf-photo/a.webp", thumbUrl: "https://x/hiq/golf-thumb/a.webp" });
+        await runPhoto("delete");
+        expect(m.getGolfPhoto).toHaveBeenCalledWith("ph1"); // 경기 id 는 지우기 전에 읽는다
+        expect(m.deleteGolfPhoto).toHaveBeenCalledWith("ph1");
+        expect(m.deleteBlobs).toHaveBeenCalledWith(["https://x/hiq/golf-photo/a.webp", "https://x/hiq/golf-thumb/a.webp"]);
+        expect(m.closeReports).toHaveBeenCalledWith("golf_photo", "ph1", "actioned");
+        expect(m.logModerationAction).toHaveBeenCalledWith(expect.objectContaining({ action: "delete", note: "동강시스타" }));
+        const sent = m.send.mock.calls[0][0];
+        expect(sent).toMatchObject({ category: "GOLF", body: "notif.moderation.delete.body" });
+        expect(sent.params).toBeUndefined();
+    });
+
+    it("가리기는 이의제기 안내 문구로 간다(사진도 앨범에서 이의제기할 수 있다)", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["blind", "delete"], { content: { ...photoItem([]).content, isBlinded: false } }));
+        await runPhoto("blind");
+        expect(m.setReportTargetBlinded).toHaveBeenCalledWith("golf_photo", "ph1", true, expect.any(String));
+        expect(m.send.mock.calls[0][0]).toMatchObject({ category: "GOLF", body: "notif.moderation.blind.bodyAppeal" });
+    });
+
+    it("골프 관리 화면은 신고가 없는 사진에도 조치한다(allowUnreported) — 신고 큐 경로는 그대로 신고가 있어야 한다", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["blind", "delete"], { reportCount: 0 }));
+        await runPhoto("delete", { allowUnreported: true });
+        expect(m.getReportTarget).toHaveBeenCalledWith("golf_photo", "ph1", { unreported: true });
+        vi.clearAllMocks();
+        m.getReportTarget.mockResolvedValue(null);
+        expect(await run("community_post", "blind")).toMatchObject({ ok: false, status: 404, message: "신고 내역을 찾을 수 없습니다" });
+        expect(m.getReportTarget).toHaveBeenCalledWith("community_post", "t1", { unreported: false });
+        expect(await runPhoto("blind", { allowUnreported: true })).toMatchObject({ ok: false, status: 404, message: "대상을 찾을 수 없습니다" });
+    });
+
+    it("열린 이의제기가 있으면 '보이기'는 409 — 풀기는 승인으로만", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["appeal_approve", "appeal_reject", "delete"]));
+        expect(await runPhoto("unblind", { allowUnreported: true })).toMatchObject({ ok: false, status: 409 });
+        expect(m.setReportTargetBlinded).not.toHaveBeenCalled();
+        expect(m.logModerationAction).not.toHaveBeenCalled();
+        expect(m.send).not.toHaveBeenCalled();
     });
 });
 

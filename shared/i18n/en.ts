@@ -292,6 +292,13 @@ export const en: Record<string, string> = {
   // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
   "notif.golfPhoto.hidden.title": "📷 Your round photo was hidden",
   "notif.golfPhoto.hidden.body": "Your round photo was hidden after several reports. If you think it's fine, open it in your album and tap “Appeal” — our team will review it again.",
+  // 조인·부킹 글 가림·내림(2026-10-01) — 골프 글은 이의제기 칸이 없어 채팅 '운영자 문의'로 안내한다(storage/adminGolfListings)
+  "notif.golfListing.hidden.title": "⚠️ Your golf listing was hidden",
+  "notif.golfListing.hidden.body": "Your {course} {tee} listing was hidden after several reports. It no longer shows in the list and can't take new requests. If you think this is a mistake, let us know via “Support” in Chat.",
+  "notif.golfListing.hiddenByAdmin.body": "Your {course} {tee} listing was hidden under our policy. It no longer shows in the list and can't take new requests. If you have questions, ask us via “Support” in Chat.",
+  "notif.golfListing.deleted.title": "A golf listing was taken down",
+  "notif.golfListing.deleted.body": "Your {course} {tee} listing was taken down under our policy. Its requests and chat room were removed too. If you have questions, ask us via “Support” in Chat.",
+  "notif.golfListing.deletedApplicant.body": "The {course} {tee} listing you requested was taken down under our policy. Your request and the chat room were removed too.",
   "notif.moderation.blind.title": "⚠️ Post hidden",
   "notif.moderation.blind.bodyAppeal": "A report of a policy violation was confirmed and your post was hidden. If you think this is unfair, you can appeal right in the app.",
   "notif.moderation.blind.body": "A report of a policy violation was confirmed and your post was hidden.",

@@ -5,21 +5,18 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { SUGGESTION_REPLY_TYPE } from "../../lib/suggestionBox.js";
 import { randomInt } from "crypto";
 import { hashPassword } from "../../services/hiqService.js";
+import { checkSuperAdmin, adminLog } from "../../middleware/adminAuth.js";
+import adminGolfRouter from "./adminGolf/index.js";
+import { getMemberGolfForAdmin, setBookingManagerRole } from "../../storage/adminMemberGolf.js";
+import { getGolfPushHistory } from "../../storage/adminGolfPush.js";
+import { isGolfQuietHour } from "../../../shared/golfPushQuiet.js";
 
 const router = Router();
 
-// --- Admin Middleware ---
-const checkSuperAdmin = asyncHandler(async (req: any, res: any, next: any) => {
-    // Trust only the SIGNED partner cookie (a forged value is rejected).
-    const profileId = req.signedCookies?.hiq_partner_auth;
-    if (!profileId) return sendError(res, 401, "로그인이 필요합니다 (Admin)");
+// --- Admin Middleware --- checkSuperAdmin 은 middleware/adminAuth.ts(2026-10-01 — 골프 관리 라우터도 같은 가드를 쓴다)
 
-    const profile = await storage.getProfile(profileId);
-    if (!profile || (profile.role !== "super_admin" && profile.role !== "admin")) {
-        return sendError(res, 403, "관리자 권한이 없습니다.");
-    }
-    next();
-});
+// 골프 관리 콘솔(2026-10-01) — 화면별 라우터, 가드는 adminGolf/index.ts 가 건다
+router.use("/golf", adminGolfRouter);
 
 // /partner/login 과 같은 쿠키 옵션 — 모든 가드가 signedCookies 로 읽으므로 서명이 빠지면 안 된다.
 const PARTNER_COOKIE_OPTS = {
@@ -165,6 +162,50 @@ router.get("/members/:id/games", checkSuperAdmin, asyncHandler(async (req: any, 
     return sendSuccess(res, await storage.games.adminMemberGames(req.params.id, limit));
 }));
 
+// 회원 id 모양 검사 — uuid 가 아닌 값이 DB 까지 가면 '잘못된 uuid' 오류로 500 이 난다
+const MEMBER_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * GET /admin/members/:id/golf — 회원 상세 시트의 '골프' 칸(2026-10-01 오너: "골프 부분이 어드민에 많이 빠져 있다 — 넣을 수 있는 거 다 넣자").
+ * 등급·평균·베스트·공식 라운드 · 현장 인증 비율 · 최근 라운드 10 · 조인/부킹 신청 평판(신청·승인·취소·노쇼) · 올린 글.
+ * 회원 목록에 싣지 않고 시트를 열 때만 부른다(storage/adminMemberGolf 머리말). 노쇼 이력은 평판 정보라 관리자만 본다.
+ */
+router.get("/members/:id/golf", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    if (!MEMBER_ID_RE.test(req.params.id)) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    const golf = await getMemberGolfForAdmin(req.params.id);
+    if (!golf) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    return sendSuccess(res, golf);
+}));
+
+/**
+ * POST /admin/members/:id/booking-manager { on: boolean } — 골프 부킹매니저 지정·해제(2026-10-01).
+ * 부킹매니저는 따로 된 칸이 아니라 계정 역할 profiles.role 한 칸이다. 그래서 user ↔ booking_manager 사이만 바꾼다 —
+ * 매장 사장님(store_owner)·관리자는 이미 매장 판매자라 409 로 거절한다(바꾸면 그 권한을 덮어쓴다, shared/adminMemberGolf 머리말).
+ * 바꾸는 것은 "지금 값이 from 일 때만" 한 문장이라 그 사이 매장 승인이 끼어들어도 사장님 권한을 지우지 않는다. 이미 올린 글은 그대로다.
+ */
+router.post("/members/:id/booking-manager", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    if (typeof req.body?.on !== "boolean") return sendError(res, 400, "켤지 끌지(on)를 보내 주세요");
+    if (!MEMBER_ID_RE.test(req.params.id)) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    const on: boolean = req.body.on;
+    const member = await storage.getMemberById(req.params.id);
+    if (!member) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    if (!member.profileId) return sendError(res, 409, "로그인 계정이 연결되지 않은 회원이라 역할을 바꿀 수 없습니다");
+    const r = await setBookingManagerRole(member.profileId, on);
+    if (r.status === "missing") return sendError(res, 404, "계정을 찾을 수 없습니다");
+    if (r.status === "blocked") {
+        const why = r.role === "store_owner"
+            ? "매장 사장님 계정은 이미 매장 판매자입니다 — 바꾸면 사장님 권한이 지워져서 여기서는 바꾸지 않습니다"
+            : r.role === "admin" || r.role === "super_admin"
+                ? "관리자 계정은 이미 매장 판매자입니다 — 바꾸면 관리자 권한이 지워져서 여기서는 바꾸지 않습니다"
+                : `지금 역할(${r.role})이 일반 회원도 부킹매니저도 아니라 바꾸지 않습니다`;
+        return sendError(res, 409, why);
+    }
+    if (r.status === "changed") {
+        adminLog(req, on ? "부킹매니저 지정" : "부킹매니저 해제", { memberId: member.id, profileId: member.profileId, from: r.from, to: r.role });
+    }
+    return sendSuccess(res, { role: r.role, changed: r.status === "changed" });
+}));
+
 // DELETE /admin/games/:id — 끝난 경기까지 지운다(어드민만). 전적 행·RP·에버리지를 함께 되돌린다.
 // 회원용 DELETE /game/:id 는 진행 중인 경기만 지운다 — 끝난 경기는 랭킹에 반영돼 참가자가 지우면 안 되기 때문이다.
 // 잘못 만든 판을 억지로 끝낸 기록(1이닝 16점 같은)이 에버리지·하이런을 오염시킬 때 쓴다(2026-09-12 테스터 제보).
@@ -248,8 +289,24 @@ router.delete("/notices/:id", checkSuperAdmin, asyncHandler(async (req: any, res
     return sendSuccess(res, { success: true });
 }));
 
+/**
+ * '골프 알림 받는 회원' 묶음(2026-10-01) — 긴급 조인 방송과 같은 명단(storage.notifs.listGolfPushMembers):
+ * 기기 알림을 받을 수 있고(푸시 토큰) 골프 흔적(핸디 입력·골프 글·조인 신청·골프 기록·골프 크루)이 있는 회원.
+ * 그 함수는 순서 없이 limit 만 거니 넉넉히 잡고, 꽉 차면 capped 로 알린다.
+ */
+const GOLF_AUDIENCE_MAX = 5000;
+
+// GET /admin/push/golf-audience — 그 묶음의 인원과 지금이 골프 조용한 시간인지(보내기 전에 화면이 보여 준다)
+router.get("/push/golf-audience", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    const ids = await storage.notifs.listGolfPushMembers([], GOLF_AUDIENCE_MAX);
+    return sendSuccess(res, { count: ids.length, capped: ids.length >= GOLF_AUDIENCE_MAX, quiet: isGolfQuietHour(Date.now()) });
+}));
+
 // 푸시함 — 선택한 회원(들)에게 인앱 알림 + 네이티브 푸시 발송.
-// memberIds: uuid[] 또는 "all". 인앱 알림함에도 남으므로 토큰 없는 회원도 수신한다.
+// memberIds: uuid[] · "all" · "golf"(골프 알림 받는 회원). 인앱 알림함에도 남으므로 토큰 없는 회원도 수신한다.
+// 골프 묶음은 category 'GOLF' 로 저장한다(2026-10-01) — 알림함이 종목별이라 'admin' 이면 골프 모드 알림함에 안 뜬다.
+//   설정에서 '골프 알림'을 끈 회원은 기기 알림 없이 알림함에만 남는다(pref golf).
+//   조용한 시간(한국 21~08시)에는 기기를 울리지 않고 알림함에만 넣는다 — 긴급 조인 방송과 같은 규칙(shared/golfPushQuiet).
 router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const title = String(req.body?.title || "").trim().slice(0, 60);
     const body = String(req.body?.body || "").trim().slice(0, 200);
@@ -258,10 +315,13 @@ router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     const rawUrl = String(req.body?.url || "").trim();
     const url = /^\/[A-Za-z0-9_\-./?=&%]*$/.test(rawUrl) && !rawUrl.startsWith("//") ? rawUrl.slice(0, 200) : "";
 
+    const golf = req.body?.memberIds === "golf";
     let memberIds: string[];
     if (req.body?.memberIds === "all") {
         const all = await storage.getAllMembersForAdmin();
         memberIds = (all as any[]).map((m) => m.id);
+    } else if (golf) {
+        memberIds = await storage.notifs.listGolfPushMembers([], GOLF_AUDIENCE_MAX);
     } else if (Array.isArray(req.body?.memberIds)) {
         const UUID_RE = /^[0-9a-f-]{36}$/i;
         memberIds = req.body.memberIds.filter((id: any) => typeof id === "string" && UUID_RE.test(id)).slice(0, 500);
@@ -270,22 +330,39 @@ router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     }
     if (!memberIds.length) return sendError(res, 400, "받는 사람이 없습니다");
 
+    const quiet = golf && isGolfQuietHour(Date.now());
+    const category = golf ? "GOLF" : "admin";
+    const params = url ? { url } : undefined;
     const { notificationService } = await import("../../services/notificationService.js");
     let sent = 0;
     for (const memberId of memberIds) {
         try {
-            await notificationService.sendAndSaveNotification({ memberId, title, body, category: "admin", type: "broadcast", ...(url ? { params: { url } } : {}) });
+            if (quiet) {
+                // 조용한 시간 — 서비스를 거치면 기기 알림이 나가므로 알림함 저장만 직접 한다(서비스의 1단계와 같은 행)
+                await storage.createNotification({ memberId, title, body, category, type: "broadcast", params, isRead: false });
+            } else {
+                await notificationService.sendAndSaveNotification({
+                    memberId, title, body, category, type: "broadcast",
+                    ...(golf ? { pref: "golf" as const } : {}),
+                    ...(params ? { params } : {}),
+                });
+            }
             sent++;
         } catch (e) {
             console.warn(`[admin push] ${memberId} 실패:`, (e as Error)?.message);
         }
     }
-    return sendSuccess(res, { sent, total: memberIds.length });
+    const audience = golf ? "golf" : req.body?.memberIds === "all" ? "all" : "pick";
+    adminLog(req, "푸시 발송", { audience, title, url: url || null, total: memberIds.length, sent, quiet });
+    return sendSuccess(res, { sent, total: memberIds.length, ...(golf ? { audience: "golf", quiet } : {}) });
 }));
 
 // GET /admin/push/history — 최근 90일 어드민 발송 기록(받은 사람·읽은 사람). storage.admin.getPushHistory 주석.
+// 골프 묶음 발송(category 'GOLF')은 storage/adminGolfPush 가 같은 방식으로 따로 읽어 시각순으로 합친다(그 줄엔 audience: 'golf').
 router.get("/push/history", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
-    return sendSuccess(res, await storage.admin.getPushHistory(20));
+    const [main, golf] = await Promise.all([storage.admin.getPushHistory(20), getGolfPushHistory(20)]);
+    const merged = [...main, ...golf].sort((a, b) => (a.sentAt < b.sentAt ? 1 : a.sentAt > b.sentAt ? -1 : 0)).slice(0, 20);
+    return sendSuccess(res, merged);
 }));
 
 // --- 신고 큐 (2026-09-11, 스토어 심사 SX1 — Apple 1.2 / Play UGC) ---

@@ -8,7 +8,7 @@ import { storage } from "../storage/index.js";
 import { notificationService } from "./notificationService.js";
 import { deleteBlobs } from "../utils/blob.js";
 import {
-    reportKey, reportStatusForAction, authorNoticeFor, shouldAlertAdmins, buildReportAlert, snapshotNote,
+    reportKey, reportStatusForAction, authorNoticeFor, authorNoticeRoute, shouldAlertAdmins, buildReportAlert, snapshotNote, previewText,
     REPORT_ALERT_TYPE, REPORT_QUEUE_URL, APPEALABLE_TARGETS,
     type ReportTargetType, type ModerationAction,
 } from "../lib/reportQueue.js";
@@ -48,14 +48,23 @@ export async function applyModerationAction(p: {
     targetId: string;
     action: ModerationAction;
     adminProfileId: string | null;
+    /**
+     * 신고가 없는 대상에도(원문이 있으면) 조치한다 — 골프 관리 '라운드 사진' 화면(2026-10-01, routes/modules/adminGolf/photos.ts).
+     * 할 수 있는 조치(availableActions)·처리 기록·작성자 안내는 신고 큐와 똑같이 간다. 그래서 hiq_moderation_actions 가 한 줄 역사로 남는다.
+     */
+    allowUnreported?: boolean;
+    /** 처리 기록에만 남는 운영자 메모(이의제기 판정 사유 등). 작성자에게는 가지 않는다 — 받는 사람 언어로 풀 수 없는 자유 문장이다. */
+    note?: string | null;
 }): Promise<ModerationResult> {
-    const item = await storage.admin.getReportTarget(p.targetType, p.targetId);
-    if (!item) return { ok: false, status: 404, message: "신고 내역을 찾을 수 없습니다" };
+    const item = await storage.admin.getReportTarget(p.targetType, p.targetId, { unreported: !!p.allowUnreported });
+    if (!item) return { ok: false, status: 404, message: p.allowUnreported ? "대상을 찾을 수 없습니다" : "신고 내역을 찾을 수 없습니다" };
     if (!item.actions.includes(p.action)) {
         return { ok: false, status: 409, message: "지금 할 수 없는 조치입니다. 목록을 새로고침해 주세요." };
     }
+    // 라운드 사진의 작성자 안내는 그 경기 앨범을 연다 — 지우면 행이 없어지니 조치 전에 경기 id 를 읽어 둔다.
+    const roundId = p.targetType === "golf_photo" ? (await storage.golfPhotos.get(p.targetId))?.sessionId ?? null : null;
 
-    let note: string | null = null;
+    let note: string | null = previewText(p.note, 500);
     switch (p.action) {
         case "blind":
             await storage.admin.setReportTargetBlinded(p.targetType, p.targetId, true, ADMIN_BLIND_REASON);
@@ -97,15 +106,16 @@ export async function applyModerationAction(p: {
     // 작성자 안내 — 알림 실패가 조치를 실패로 만들면 안 된다(조치는 이미 끝났다).
     const notice = authorNoticeFor(p.action, p.targetType) && authorNoticeKeysFor(p.action, p.targetType);
     if (notice && item.author && p.targetType !== "member") {
+        // 어느 알림함(골프 사진은 골프 알림함)·어디로 여나. 지운 글로 보내면 빈 화면이다 — 원문이 남는 조치에만 링크를 싣는다.
+        const route = authorNoticeRoute({ targetType: p.targetType, action: p.action, link: item.content.link, roundId });
         try {
             await notificationService.sendAndSaveNotification({
                 memberId: item.author.memberId,
                 title: notice.title,
                 body: notice.body,
-                category: "admin",
+                category: route.category,
                 type: "MODERATION",
-                // 지운 글로 보내면 빈 화면이다 — 원문이 남는 조치에만 링크를 싣는다.
-                ...(p.action !== "delete" && item.content.link ? { params: { url: item.content.link } } : {}),
+                ...(route.url ? { params: { url: route.url } } : {}),
             });
         } catch (e) { console.error("[Notify] 신고 처리 결과:", e); }
     }

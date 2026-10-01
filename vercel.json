@@ -4,7 +4,8 @@
     {
       "src": "api/index.ts",
       "use": "@vercel/node",
-      "config": { "includeFiles": ["server/assets/**", "node_modules/harfbuzzjs/hb.wasm", "node_modules/@resvg/resvg-js-linux-x64-gnu/**", "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs"] }
+      "config": { "includeFiles": ["server/assets/**", "node_modules/harfbuzzjs/hb.wasm", "node_modules/@resvg/resvg-js-linux-x64-gnu/**", "node_modules/pdfjs-dist/legacy/build/pdf.worker.mjs",
+          "server/scripts/data/**"] }
     },
     {
       "src": "package.json",

@@ -292,6 +292,13 @@ export const es: Record<string, string> = {
   // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
   "notif.golfPhoto.hidden.title": "📷 Tu foto de ronda fue ocultada",
   "notif.golfPhoto.hidden.body": "Tu foto de la ronda se ocultó tras varias denuncias. Si crees que no hay problema, ábrela en tu álbum y toca «Apelar»: nuestro equipo la revisará de nuevo.",
+  // 조인·부킹 글 가림·내림(2026-10-01) — 골프 글은 이의제기 칸이 없어 채팅 '운영자 문의'로 안내한다(storage/adminGolfListings)
+  "notif.golfListing.hidden.title": "⚠️ Tu publicación de golf fue ocultada",
+  "notif.golfListing.hidden.body": "Ocultamos tu publicación de {course} {tee} tras varias denuncias. Ya no aparece en la lista y no recibe nuevas solicitudes. Si crees que es un error, avísanos desde «Soporte» en Chat.",
+  "notif.golfListing.hiddenByAdmin.body": "Ocultamos tu publicación de {course} {tee} según nuestras normas. Ya no aparece en la lista y no recibe nuevas solicitudes. Si tienes dudas, escríbenos desde «Soporte» en Chat.",
+  "notif.golfListing.deleted.title": "Se retiró una publicación de golf",
+  "notif.golfListing.deleted.body": "Retiramos tu publicación de {course} {tee} según nuestras normas. También se eliminaron sus solicitudes y su sala de chat. Si tienes dudas, escríbenos desde «Soporte» en Chat.",
+  "notif.golfListing.deletedApplicant.body": "La publicación de {course} {tee} que solicitaste se retiró según nuestras normas. También se eliminaron tu solicitud y la sala de chat.",
   "notif.moderation.blind.title": "⚠️ Publicación oculta",
   "notif.moderation.blind.bodyAppeal": "Se confirmó un reporte por incumplir las normas y tu publicación se ocultó. Si crees que es injusto, puedes apelar desde la app.",
   "notif.moderation.blind.body": "Se confirmó un reporte por incumplir las normas y tu publicación se ocultó.",

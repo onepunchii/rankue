@@ -748,6 +748,9 @@ export class GameRepository {
         if ((linked?.n ?? 0) > 0) return { ok: false, reason: "tournament" };
 
         const gameType = game.gameType as "3c" | "4c";
+        // 당구 판(3c·4c)만 RP·에버리지를 되돌린다(2026-10-01 감사 4.4). 예전엔 3c 가 아니면 전부 4c 로 봐서
+        // gameType "golf" 판을 지우면 그 회원의 rating4c 를 깎고 avg4c·average 를 골프 타수로 다시 썼다. 다른 종목은 행만 지운다.
+        const billiards = game.gameType === "3c" || game.gameType === "4c";
         const memberIds = [game.player1Id, game.player2Id, game.player3Id, game.player4Id]
             .filter((id): id is string => !!id);
         const before = await this._memberStatsFor(memberIds, gameType);
@@ -757,7 +760,7 @@ export class GameRepository {
             await tx.delete(hiqGameHistory).where(eq(hiqGameHistory.gameId, gameId));
             await tx.delete(hiqGames).where(eq(hiqGames.id, gameId));
 
-            if (game.isRanked) {
+            if (game.isRanked && billiards) {
                 const ratingField = gameType === "3c" ? "rating3c" : "rating4c";
                 const handiField = gameType === "3c" ? "handi3c" : "handi4c";
                 for (const pid of memberIds) {
@@ -774,7 +777,7 @@ export class GameRepository {
         });
 
         // 커밋 뒤에 돌려야 방금 지운 행이 집계에서 빠진다.
-        for (const pid of memberIds) await this._recomputeUserAverage(pid, gameType);
+        if (billiards) for (const pid of memberIds) await this._recomputeUserAverage(pid, gameType);
         const after = await this._memberStatsFor(memberIds, gameType);
 
         return {

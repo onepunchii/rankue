@@ -15,7 +15,7 @@ import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideCheckCircle, LucideLogOut,
     LucideBell, LucideCreditCard, LucideShieldAlert, LucideMenu, LucideUsersRound, LucideMail, LucideFlag, GameController,
-    LucideZap, LucideMegaphone, LucideUserPlus,
+    LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin,
 } from "@/lib/icons";
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
@@ -32,6 +32,11 @@ import {
     type Claim, type Registration, type PartnerLead, CLAIMS_KEY, REGISTRATIONS_KEY, LEADS_KEY, LEAD_STATUS_LABEL,
 } from "./StoreOnboardingViews";
 import MemberDetailSheet, { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
+import GolfOverviewView from "./golf/GolfOverviewView";
+import GolfListingsView from "./golf/GolfListingsView";
+import GolfRoundsView from "./golf/GolfRoundsView";
+import GolfPhotosView from "./golf/GolfPhotosView";
+import GolfCoursesView from "./golf/GolfCoursesView";
 import { KpiTile, Panel, Pill, agoLabel } from "./adminUtils";
 
 /** 배열이 아닌 응답에도 화면이 죽지 않게(빈 목록으로) */
@@ -45,10 +50,11 @@ type GlobalStats = {
     newUsersToday?: number;
 };
 
-type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game";
+type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
+    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders"] as const;
 
 // --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
 // 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
@@ -73,8 +79,16 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
     { title: "콘텐츠", items: [
         { id: "crews", label: "크루 현황", icon: LucideUsersRound },
         { id: "online-game", label: "온라인게임", icon: GameController },
-        { id: "golf-orders", label: "골프 회원권", icon: LucideFlag },
         { id: "notices", label: "공지사항", icon: LucideMegaphone },
+    ] },
+    // 골프(2026-10-01) — 그전엔 '골프 회원권' 하나뿐이었다
+    { title: "골프", items: [
+        { id: "golf-overview", label: "골프 현황", icon: LucideBarChart3 },
+        { id: "golf-listings", label: "조인·부킹", icon: LucideCalendarCheck },
+        { id: "golf-rounds", label: "라운드", icon: LucideFlagTriangleRight },
+        { id: "golf-photos", label: "라운드 사진", icon: LucideCamera },
+        { id: "golf-courses", label: "골프장 데이터", icon: LucideMapPin },
+        { id: "golf-orders", label: "골프 회원권", icon: LucideFlag },
     ] },
 ];
 
@@ -356,6 +370,11 @@ export default function AdminDashboard() {
                     {tab === "crews" && <CrewsView />}
                     {tab === "online-game" && <OnlineGameView onOpenMember={setOpenMemberId} />}
                     {tab === "golf-orders" && <GolfOrdersView />}
+                    {tab === "golf-overview" && <GolfOverviewView onOpenTab={(t) => setTab(t as Tab)} />}
+                    {tab === "golf-listings" && <GolfListingsView onOpenMember={setOpenMemberId} />}
+                    {tab === "golf-rounds" && <GolfRoundsView onOpenMember={setOpenMemberId} />}
+                    {tab === "golf-photos" && <GolfPhotosView onOpenMember={setOpenMemberId} />}
+                    {tab === "golf-courses" && <GolfCoursesView />}
                     {tab === "notices" && <NoticesView />}
 
                     <MemberDetailSheet member={openMember} onClose={() => setOpenMemberId(null)} />
@@ -378,6 +397,11 @@ function getTabTitle(tab: string) {
         case "notices": return "공지사항";
         case "moderation": return "신고/제재";
         case "golf-orders": return "골프 회원권 접수";
+        case "golf-overview": return "골프 현황";
+        case "golf-listings": return "조인·부킹";
+        case "golf-rounds": return "라운드";
+        case "golf-photos": return "라운드 사진";
+        case "golf-courses": return "골프장 데이터";
         case "online-game": return "온라인게임 이용 현황";
         case "claims": return "매장 클레임";
         case "registrations": return "신규 매장 등록";
@@ -400,6 +424,11 @@ const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     stores: "계약된 매장과 사장님 화면(대리 접속).",
     crews: "모든 크루 — 종목·인원·가입 대기.",
     "golf-orders": "골프 회원권 매수·매도 상담 접수.",
+    "golf-overview": "골프 라운드·조인·사진·골프장 데이터와 외부 자료 동기화 상태를 한눈에.",
+    "golf-listings": "조인·부킹 글과 신청, 긴급 조인 알림. 가리기·지우기.",
+    "golf-rounds": "랭큐매치 라운드 — 멈춘 방 정리, 잘못된 기록 무효화.",
+    "golf-photos": "라운드 사진 — 공개 사진 가리기·지우기, 이의제기 처리.",
+    "golf-courses": "골프장 페이지의 빈칸(로고·홈페이지·전화·파)과 홀별 파 입력.",
     "online-game": "지금 → 오늘 → 기간(직전 대비) → 깔때기·재방문·품질 순서로 봅니다. 한국 시각 기준.",
     notices: "앱 공지 — 쓰기·고치기·가리기.",
 };

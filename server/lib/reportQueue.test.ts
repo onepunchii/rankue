@@ -3,8 +3,8 @@ import { readFileSync } from "node:fs";
 import {
     REPORT_TARGET_TYPES, MODERATION_ACTIONS, TARGET_LABEL, ACTION_LABEL, REASON_LABEL,
     summarizeReports, isAppealOpen, reportStatusForAction, queueState, isOverdue, availableActions,
-    shouldAlertAdmins, buildReportAlert, authorNoticeFor, previewText, snapshotNote, reportKey,
-    REPORT_ALERT_HOURLY_CAP, REPORT_ALERT_PER_REPORTER_CAP, type ActionContext,
+    shouldAlertAdmins, buildReportAlert, authorNoticeFor, authorNoticeRoute, previewText, snapshotNote, reportKey,
+    REPORT_ALERT_HOURLY_CAP, REPORT_ALERT_PER_REPORTER_CAP, APPEALABLE_TARGETS, type ActionContext,
 } from "./reportQueue.js";
 import { hiqReports } from "../../shared/schema.js";
 
@@ -127,6 +127,24 @@ describe("가능한 조치(availableActions)", () => {
     it("이의제기 경로가 없는 대상엔 이의제기 버튼을 만들지 않는다", () => {
         expect(availableActions({ ...base, targetType: "golf_booking", isBlinded: true, appealOpen: true })).not.toContain("appeal_approve");
     });
+
+    // 감사 4.1(2026-10-01): 라운드 사진 이의제기가 큐에 '판단 필요'로 뜨는데 판정 버튼이 없어 작성자가 결과를 못 받았다.
+    describe("라운드 사진(golf_photo)", () => {
+        const photo: ActionContext = { ...base, targetType: "golf_photo" };
+        it("가려진 사진에 이의제기가 열려 있으면 승인·반려가 먼저 뜨고, 해제는 승인으로만", () => {
+            expect(availableActions({ ...photo, isBlinded: true, appealOpen: true, pendingCount: 0 }))
+                .toEqual(["appeal_approve", "appeal_reject", "delete", "ban"]);
+        });
+        it("신고 누적으로 가렸고 이의제기가 없으면 다시 보이기·지우기", () => {
+            expect(availableActions({ ...photo, isBlinded: true })).toEqual(["unblind", "delete", "ban", "dismiss"]);
+        });
+        it("보이는 사진은 가리기·지우기(신고 없이 운영자가 먼저 볼 때도 같다)", () => {
+            expect(availableActions({ ...photo, pendingCount: 0, author: null })).toEqual(["blind", "delete"]);
+        });
+        it("지워진 사진은 판정할 것이 없다", () => {
+            expect(availableActions({ ...photo, exists: false, isBlinded: true, appealOpen: true, pendingCount: 0, author: null })).toEqual([]);
+        });
+    });
 });
 
 describe("운영자 알림 도배 방지(shouldAlertAdmins)", () => {
@@ -165,12 +183,33 @@ describe("운영자 알림 도배 방지(shouldAlertAdmins)", () => {
 describe("작성자 안내(authorNoticeFor)", () => {
     it("이의제기 경로가 있는 대상에만 이의제기 안내를 붙인다", () => {
         expect(authorNoticeFor("blind", "community_comment")?.body).toContain("이의제기");
+        expect(authorNoticeFor("blind", "golf_photo")?.body).toContain("이의제기");
         expect(authorNoticeFor("blind", "golf_booking")?.body).not.toContain("이의제기");
+    });
+    it("이의제기 승인·반려는 결과를 알린다", () => {
+        expect(authorNoticeFor("appeal_approve", "golf_photo")?.title).toBe("이의제기 결과 안내");
+        expect(authorNoticeFor("appeal_reject", "golf_photo")?.title).toBe("이의제기 결과 안내");
     });
     it("기각·정지·정지 해제는 따로 알리지 않는다", () => {
         expect(authorNoticeFor("dismiss", "community_post")).toBeNull();
         expect(authorNoticeFor("ban", "community_post")).toBeNull();
         expect(authorNoticeFor("unban", "member")).toBeNull();
+    });
+});
+
+describe("작성자 안내가 가는 곳(authorNoticeRoute)", () => {
+    it("라운드 사진은 골프 알림함으로 가서 그 경기 앨범을 연다 — 당구 알림함에 쌓이면 골프만 쓰는 사람은 못 본다", () => {
+        expect(authorNoticeRoute({ targetType: "golf_photo", action: "appeal_approve", link: "https://x.public.blob.vercel-storage.com/a.webp", roundId: "r1" }))
+            .toEqual({ category: "GOLF", url: "/history?album=r1" });
+        expect(authorNoticeRoute({ targetType: "golf_photo", action: "appeal_reject", link: null, roundId: null }))
+            .toEqual({ category: "GOLF", url: "/history" });
+    });
+    it("지운 콘텐츠로는 링크를 싣지 않는다", () => {
+        expect(authorNoticeRoute({ targetType: "golf_photo", action: "delete", link: "/golf/course/x", roundId: "r1" }).url).toBeNull();
+        expect(authorNoticeRoute({ targetType: "community_post", action: "delete", link: "/community/p1" }).url).toBeNull();
+    });
+    it("나머지는 운영 알림(당구 쪽)으로 원문을 연다", () => {
+        expect(authorNoticeRoute({ targetType: "community_post", action: "blind", link: "/community/p1" })).toEqual({ category: "admin", url: "/community/p1" });
     });
 });
 
@@ -194,6 +233,18 @@ describe("다른 곳과 목록이 맞다", () => {
         // 크루 사진 댓글처럼 다른 경로(크루 라우트)로만 받는 종류가 있어 부분집합으로 본다.
         for (const t of list("REPORT_TARGETS")) expect(REPORT_TARGET_TYPES as readonly string[]).toContain(t);
         expect([...list("REPORT_REASONS")].sort()).toEqual(Object.keys(REASON_LABEL).sort());
+    });
+    it("이의제기를 받는 대상마다 접수 경로와 큐 SQL 의 이의제기 칸이 있다 — 하나라도 빠지면 '판단 필요'가 닫히지 않는다", () => {
+        const community = readFileSync(new URL("../routes/modules/community.ts", import.meta.url), "utf8");
+        const golf = readFileSync(new URL("../routes/modules/golf.ts", import.meta.url), "utf8");
+        const repo = readFileSync(new URL("../storage/admin.repo.ts", import.meta.url), "utf8");
+        const communityAppeals = JSON.parse(community.match(/router\.post\("\/appeals"[\s\S]*?if \(!(\[[^\]]+\])\.includes\(targetType\)\)/)![1]) as string[];
+        for (const t of APPEALABLE_TARGETS) {
+            const route = t === "golf_photo" ? golf.includes(`router.post("/photos/:photoId/appeal"`) : communityAppeals.includes(t);
+            expect(route, `${t} 이의제기 접수 경로`).toBe(true);
+            expect(repo, `${t} 큐 SQL appeal_at`).toContain(`WHEN '${t}' THEN`);
+        }
+        for (const t of communityAppeals) expect(APPEALABLE_TARGETS as readonly string[]).toContain(t);
     });
     it("모든 종류·조치에 한국어 이름이 있다", () => {
         for (const t of REPORT_TARGET_TYPES) expect(TARGET_LABEL[t]).toBeTruthy();

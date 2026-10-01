@@ -34,8 +34,12 @@ export const DELETABLE_TARGETS: readonly ReportTargetType[] = [
     "community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "player_cheer",
     "golf_photo",
 ];
-/** 작성자가 이의제기할 수 있는 대상(POST /community/appeals 가 받는 것과 같다). */
-export const APPEALABLE_TARGETS: readonly ReportTargetType[] = ["community_post", "community_comment"];
+/**
+ * 작성자가 이의제기할 수 있는 대상 — 커뮤니티 글·댓글은 POST /community/appeals, 라운드 사진은 앨범의 '가려진 사진'에서
+ * POST /golf/photos/:id/appeal(2026-09-30). 여기서 빠지면 큐가 이의제기를 '판단 필요'로 띄우고도 승인·반려 버튼을 만들지 않고
+ * (해제도 '승인으로만' 막혀 있다) 작성자는 결과를 영영 못 받는다 — 라운드 사진이 그랬다(2026-10-01 감사 4.1).
+ */
+export const APPEALABLE_TARGETS: readonly ReportTargetType[] = ["community_post", "community_comment", "golf_photo"];
 
 /** 신고 접수 후 이 시간 안에 처리한다(운영 약속). 넘기면 큐에서 빨갛게 표시한다. */
 export const REPORT_SLA_HOURS = 24;
@@ -298,6 +302,25 @@ export function authorNoticeFor(action: ModerationAction, targetType: ReportTarg
         default:
             return null;
     }
+}
+
+/**
+ * 작성자 안내가 어느 알림함으로 가서 무엇을 여나(2026-10-01).
+ * 라운드 사진은 골프 알림함(category GOLF)으로 보내 그 경기 앨범을 연다 — 자동 가림 안내(routes/modules/community.ts)와 같은 곳.
+ * 'admin' 으로 보내면 당구 알림함에만 쌓여(storage/notification.repo sportWhere) 골프만 쓰는 사람은 결과를 못 본다.
+ * 사진의 원문 링크(link)는 비공개면 Blob 주소라 알림이 열 곳이 아니다. 지운 콘텐츠로는 링크를 싣지 않는다(빈 화면).
+ */
+export function authorNoticeRoute(p: {
+    targetType: ReportTargetType;
+    action: ModerationAction;
+    link: string | null;
+    /** 라운드 사진이 붙은 경기 id — 앨범을 연다. 모르면 기록 화면 */
+    roundId?: string | null;
+}): { category: "GOLF" | "admin"; url: string | null } {
+    if (p.targetType === "golf_photo") {
+        return { category: "GOLF", url: p.action === "delete" ? null : p.roundId ? `/history?album=${p.roundId}` : "/history" };
+    }
+    return { category: "admin", url: p.action === "delete" ? null : p.link };
 }
 
 /** 큐 미리보기용 본문 — 빈 줄 도배만 줄이고 줄바꿈은 살린다. */

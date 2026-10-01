@@ -292,6 +292,13 @@ export const vi: Record<string, string> = {
   // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
   "notif.golfPhoto.hidden.title": "📷 Ảnh vòng đấu của bạn đã bị ẩn",
   "notif.golfPhoto.hidden.body": "Ảnh vòng đấu của bạn đã bị ẩn sau nhiều báo cáo. Nếu bạn thấy không có vấn đề, hãy mở ảnh trong album và nhấn “Khiếu nại” — đội ngũ sẽ xem xét lại.",
+  // 조인·부킹 글 가림·내림(2026-10-01) — 골프 글은 이의제기 칸이 없어 채팅 '운영자 문의'로 안내한다(storage/adminGolfListings)
+  "notif.golfListing.hidden.title": "⚠️ Tin golf của bạn đã bị ẩn",
+  "notif.golfListing.hidden.body": "Tin {course} {tee} của bạn đã bị ẩn sau nhiều báo cáo. Tin không còn hiện trong danh sách và không nhận đăng ký mới. Nếu bạn thấy đây là nhầm lẫn, hãy báo cho chúng tôi qua “Hỗ trợ” trong Trò chuyện.",
+  "notif.golfListing.hiddenByAdmin.body": "Tin {course} {tee} của bạn đã bị ẩn theo chính sách. Tin không còn hiện trong danh sách và không nhận đăng ký mới. Nếu có thắc mắc, hãy hỏi chúng tôi qua “Hỗ trợ” trong Trò chuyện.",
+  "notif.golfListing.deleted.title": "Một tin golf đã bị gỡ",
+  "notif.golfListing.deleted.body": "Tin {course} {tee} của bạn đã bị gỡ theo chính sách. Các đăng ký và phòng trò chuyện của tin cũng đã được xóa. Nếu có thắc mắc, hãy hỏi chúng tôi qua “Hỗ trợ” trong Trò chuyện.",
+  "notif.golfListing.deletedApplicant.body": "Tin {course} {tee} mà bạn đã đăng ký đã bị gỡ theo chính sách. Đăng ký của bạn và phòng trò chuyện cũng đã được xóa.",
   "notif.moderation.blind.title": "⚠️ Bài viết đã bị ẩn",
   "notif.moderation.blind.bodyAppeal": "Báo cáo vi phạm chính sách đã được xác nhận và bài viết của bạn đã bị ẩn. Nếu thấy không hợp lý, bạn có thể khiếu nại ngay trong ứng dụng.",
   "notif.moderation.blind.body": "Báo cáo vi phạm chính sách đã được xác nhận và bài viết của bạn đã bị ẩn.",

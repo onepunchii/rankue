@@ -313,14 +313,25 @@ router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: 
     // 자동 블라인드 시 작성자에게 즉시 알림 + 이의제기 안내 — 담합·보복 신고 방어 세트
     if (result.autoBlinded && result.authorId) {
         try {
-            await notificationService.sendAndSaveNotification({
-                memberId: result.authorId,
-                title: "notif.moderation.blind.title",
-                body: "notif.community.autoBlind.body",
-                category: "BILLIARDS",
-                type: "COMMUNITY",
-                params: { url: targetType === "community_post" ? `/community/${targetId}` : "/community" },
-            });
+            if (targetType === "golf_booking") {
+                // 골프 조인·부킹 글(2026-10-01 감사 4.2): 예전엔 아래 커뮤니티 안내가 그대로 나가 당구 알림함에 '/community' 링크와
+                // "이의제기할 수 있다"가 갔다 — 골프 글엔 이의제기 칸이 없다(APPEALABLE_TARGETS). 골프 알림함으로, 내 글 목록 링크와
+                // 채팅 '운영자 문의' 안내를 보낸다. 운영자 가리기(adminGolf/listings)와 같은 모양이라 문구를 한곳(golfListingNotice)에서 만든다.
+                const booking = await storage.getGolfBooking(targetId);
+                if (booking) {
+                    const { golfListingNotice } = await import("../../storage/adminGolfListings.js");
+                    await notificationService.sendAndSaveNotification({ memberId: result.authorId, ...golfListingNotice("autoHidden", booking) });
+                }
+            } else {
+                await notificationService.sendAndSaveNotification({
+                    memberId: result.authorId,
+                    title: "notif.moderation.blind.title",
+                    body: "notif.community.autoBlind.body",
+                    category: "BILLIARDS",
+                    type: "COMMUNITY",
+                    params: { url: targetType === "community_post" ? `/community/${targetId}` : "/community" },
+                });
+            }
         } catch (e) { console.error("[Notify] 블라인드:", e); }
     }
     return sendSuccess(res, { reported: true });
