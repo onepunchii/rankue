@@ -164,12 +164,19 @@ export function HoleStatsCard(props: HoleStatsCardProps) {
                             {/* 그린 — 레귤러 온은 적지 않는다. 퍼팅을 고르면 타수 − 퍼팅 으로 바로 판정한다 */}
                             <Row label="그린">
                                 <div className="flex-1 min-w-0 h-11 flex items-center gap-2" aria-live="polite">
-                                    {e.putts == null ? (
-                                        <span className="text-[13px] text-[#FFFFFF66] truncate">퍼팅을 고르면 레귤러 온이 나와요</span>
-                                    ) : misfit ? (
+                                    {misfit ? (
                                         <span className="text-[13px] font-medium text-[#FFB27A] truncate">퍼팅 수가 타수({strokes})와 안 맞아요</span>
-                                    ) : gir === null ? (
-                                        <span className="text-[13px] text-[#FFFFFF80] truncate">{e.putts === 0 ? "칩인" : `${toGreen}타 만에 그린`} · 파를 몰라 판정 안 해요</span>
+                                    ) : !parKnown ? (
+                                        // 이 코스는 홀별 파 자료가 없다(머리의 노란 '파 미확인'과 같은 홀). 레귤러 온 기준(파3 1타·파4 2타·파5 3타)을
+                                        // 정할 수 없어서 판정을 지어내지 않는다 — '파를 몰라 판정 안 해요'가 무슨 말이냐는 오너 질문(10/1)으로 풀어 썼다.
+                                        <>
+                                            <span className="shrink-0 h-6 px-2 rounded-md bg-[#FFD2661A] text-[12px] font-semibold leading-6 text-[#FFD266]">파 미확인</span>
+                                            <span className="min-w-0 text-[12px] leading-snug text-[#FFFFFF80] break-keep">
+                                                {toGreen != null && <>{e.putts === 0 ? "칩인" : `${toGreen}타 만에 그린`} · </>}파 정보가 없어 레귤러 온은 계산 안 해요
+                                            </span>
+                                        </>
+                                    ) : e.putts == null ? (
+                                        <span className="text-[13px] text-[#FFFFFF66] truncate">퍼팅을 고르면 레귤러 온이 나와요</span>
                                     ) : (
                                         <>
                                             <span className={cn(
