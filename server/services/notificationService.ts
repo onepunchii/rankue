@@ -122,7 +122,8 @@ export class NotificationService {
             return;
         }
         // 2-1. 카테고리별 켬/끔(2026-09-13 오너). **푸시만** 막는다 — 알림함 저장은 위에서 이미 끝났다.
-        const prefKey = params.pref ?? prefKeyFor(category, type);
+        // 옛 호출부(golf.ts·chat.ts·관심 골프장)는 pref:"golf" 를 넘긴다 — 골프 칸이 성격별로 나뉘어(2026-10-01) type 으로 다시 고른다
+        const prefKey = params.pref && params.pref !== "golf" ? params.pref : prefKeyFor(category, type, deepLinkParams);
         if (!isPushAllowed((member as { pushPrefs?: unknown }).pushPrefs, prefKey)) {
             console.log(`[Push] Muted by member ${memberId} (${prefKey}), ${kept}.`);
             return;
