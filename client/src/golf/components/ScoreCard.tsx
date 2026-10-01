@@ -114,7 +114,7 @@ export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap, put
                             return (
                                 <span key={i} className="relative flex h-6 items-center justify-center">
                                     <span className={cn("text-[12px] tabular-nums", p == null ? "text-[#FFFFFF33]" : "text-[#FFFFFFB3]")}>{p == null ? "·" : p}</span>
-                                    {gir?.[i] === true && <span role="img" aria-label="그린 적중" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[5px] h-[5px] rounded-full bg-[#9BEF5C]" />}
+                                    {gir?.[i] === true && <span role="img" aria-label="레귤러 온" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[5px] h-[5px] rounded-full bg-[#9BEF5C]" />}
                                 </span>
                             );
                         })}
@@ -133,7 +133,7 @@ export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap, put
     );
 }
 
-export function ScoreCard({ players, playerScores, currentHole, pars, onScoreChange, isHost = true }: ScoreCardProps) {
+export function ScoreCard({ players, playerScores, currentHole, pars, onScoreChange, isHost = true, isSolo = false }: ScoreCardProps) {
     const [gridFor, setGridFor] = useState<string | null>(null);
     const [jumpFor, setJumpFor] = useState<string | null>(null);
     const { data: member } = useQuery<HiqMember>({ queryKey: ["/api/hiq/me"] });
@@ -163,10 +163,13 @@ export function ScoreCard({ players, playerScores, currentHole, pars, onScoreCha
                                 <span className={cn("font-semibold", toParColor(currentOverPar))}>{toParText(currentOverPar)}</span>
                                 <span className="text-[#FFFFFF59]"> · {totalStrokes}타</span>
                             </span>
-                            <button
-                                type="button" onClick={() => setGridFor(gridFor === p.id ? null : p.id)} aria-expanded={gridFor === p.id}
-                                className="shrink-0 h-7 px-2.5 -mr-1 rounded-full text-[12px] text-[#FFFFFF99] active:bg-[#FFFFFF14]"
-                            >{gridFor === p.id ? "접기" : "기록표"}</button>
+                            {/* 혼자 기록은 바로 위에 기록표가 늘 펼쳐져 있어 단추가 겹친다(2026-10-01 오너) — 여럿일 때만 */}
+                            {!isSolo && (
+                                <button
+                                    type="button" onClick={() => setGridFor(gridFor === p.id ? null : p.id)} aria-expanded={gridFor === p.id}
+                                    className="shrink-0 h-7 px-2.5 -mr-1 rounded-full text-[12px] text-[#FFFFFF99] active:bg-[#FFFFFF14]"
+                                >{gridFor === p.id ? "접기" : "기록표"}</button>
+                            )}
                         </div>
 
                         {/* 이번 홀 타수 — [−] 숫자 [+]. 숫자를 누르면 크게 벌어진 점수로 바로 가는 칩 */}

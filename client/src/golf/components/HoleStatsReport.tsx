@@ -1,6 +1,7 @@
 /**
  * 라운딩 리포트 '홀 기록 통계'(2026-10-01 오너 승인) — 경기 화면 '이 홀 기록' 카드에 적은 것만으로 센다(shared summarizeHoleStats).
- *   평균 퍼트 · 페어웨이 안착률 · 그린 적중률 · OB 횟수. 적은 게 없는 칸은 숨기고, 아무것도 없으면 통째로 없다.
+ *   평균 퍼트 · 페어웨이 안착률 · 레귤러 온. 적은 게 없는 칸은 숨기고, 아무것도 없으면 통째로 없다.
+ *   (2026-10-01 오너: 벌타 태그를 화면에서 빼서 OB 칸도 뺐다. 페어웨이는 페어웨이/러프 둘 — 막대도 두 칸)
  *   '기록한 N라운드 기준' — 안 적은 홀·라운드는 분모에도 넣지 않는다(안 적은 걸 0 으로 세면 통계가 거짓이 된다).
  * 그림 규칙(dataviz): 큰 숫자는 흰 글자·비례 숫자(tabular 는 줄 맞춤 표에만), 비율은 같은 색조 막대(적중 = 라임, 바탕 = 옅은 라임),
  * 페어웨이는 왼쪽·안착·오른쪽 세 칸을 **실제 방향대로** 놓고 안착만 라임 — 색이 아니라 자리와 글자가 뜻을 말한다.
@@ -37,12 +38,12 @@ function Meter({ rate, label }: { rate: number; label: string }) {
     );
 }
 
-/** 왼쪽 미스 | 안착 | 오른쪽 미스 — 칸 사이 2px 틈(바탕색), 바깥 끝만 둥글게. 0 인 칸은 그리지 않는다 */
-function FairwayBar({ left, hit, right }: { left: number; hit: number; right: number }) {
-    const total = left + hit + right;
-    const segs = ([["L", left, "bg-[#6B6B6B]"], ["H", hit, "bg-[#64DD17]"], ["R", right, "bg-[#6B6B6B]"]] as const).filter(([, n]) => n > 0);
+/** 페어웨이 | 러프 — 칸 사이 2px 틈(바탕색), 바깥 끝만 둥글게. 0 인 칸은 그리지 않는다 */
+function FairwayBar({ hit, miss }: { hit: number; miss: number }) {
+    const total = hit + miss;
+    const segs = ([["H", hit, "bg-[#64DD17]"], ["M", miss, "bg-[#6B6B6B]"]] as const).filter(([, n]) => n > 0);
     return (
-        <div role="img" aria-label={`왼쪽 미스 ${left}홀 · 안착 ${hit}홀 · 오른쪽 미스 ${right}홀`} className="h-2 flex gap-[2px]">
+        <div role="img" aria-label={`페어웨이 ${hit}홀 · 러프 ${miss}홀`} className="h-2 flex gap-[2px]">
             {segs.map(([k, n, color], i) => (
                 <span
                     key={k}
@@ -55,8 +56,8 @@ function FairwayBar({ left, hit, right }: { left: number; hit: number; right: nu
 }
 
 export function HoleStatsTiles({ summary }: { summary: HoleStatsSummary }) {
-    const { putts, fairway, gir, ob } = summary;
-    if (summary.rounds === 0 || (!putts && !fairway && !gir && !ob)) return null;
+    const { putts, fairway, gir } = summary;
+    if (summary.rounds === 0 || (!putts && !fairway && !gir)) return null;
     return (
         <section aria-label="홀 기록 통계">
             <div className="flex items-baseline justify-between mb-2.5">
@@ -69,17 +70,14 @@ export function HoleStatsTiles({ summary }: { summary: HoleStatsSummary }) {
                 )}
                 {fairway && (
                     <Tile label="페어웨이 안착률" value={String(pct(fairway.rate))} unit="%"
-                        caption={<span className="flex justify-between gap-2"><span>왼쪽 {fairway.left}</span><span>오른쪽 {fairway.right}</span></span>}>
-                        <FairwayBar left={fairway.left} hit={fairway.hit} right={fairway.right} />
+                        caption={<span className="flex justify-between gap-2"><span>페어웨이 {fairway.hit}</span><span>러프 {fairway.miss}</span></span>}>
+                        <FairwayBar hit={fairway.hit} miss={fairway.miss} />
                     </Tile>
                 )}
                 {gir && (
-                    <Tile label="그린 적중률" value={String(pct(gir.rate))} unit="%" caption={<>{gir.holes}홀 중 {gir.hit}홀</>}>
-                        <Meter rate={gir.rate} label={`그린 적중 ${gir.holes}홀 중 ${gir.hit}홀`} />
+                    <Tile label="레귤러 온" value={String(pct(gir.rate))} unit="%" caption={<>{gir.holes}홀 중 {gir.hit}홀</>}>
+                        <Meter rate={gir.rate} label={`레귤러 온 ${gir.holes}홀 중 ${gir.hit}홀`} />
                     </Tile>
-                )}
-                {ob && (
-                    <Tile label="OB 횟수" value={String(ob.total)} unit="회" caption={<>라운드당 {one(ob.perRound)}</>} />
                 )}
             </div>
         </section>

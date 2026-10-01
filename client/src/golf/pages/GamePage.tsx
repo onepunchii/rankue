@@ -8,7 +8,7 @@ import { useRankueMatch } from "../hooks/useRankueMatch";
 import { useMoneyUnit, formatMoney } from "../lib/money";
 import { roundTotals, isCompleteRound, isGuestId, formatRelative } from "@shared/golfMatch";
 import { useGolfScore } from "../hooks/useGolfScore";
-import { ScoreCard, HoleGrid } from "../components/ScoreCard";
+import { ScoreCard, HoleGrid, toParText } from "../components/ScoreCard";
 import { TransactionCard } from "../components/TransactionCard";
 import { GolfBackButton } from "../components/common/GolfBackButton";
 import { useRoundPhotos } from "../components/photos/RoundPhotoCamera";
@@ -145,6 +145,11 @@ export default function GolfScorecard() {
         }
         return me.golfHandicap || 18;
     }, [me]);
+    /** 내 핸디가 어디서 온 숫자인지 — 핸디 카드에 한 줄(평균은 공식 라운드만, 2026-10-01) */
+    const handicapSource = !me ? "기본값"
+        : me.golfAvgScore && me.golfAvgScore > 0 ? `공식 평균 ${Math.round(me.golfAvgScore)}타`
+        : me.golfHandicap ? "직접 입력"
+        : "기본값";
 
     const golfScore = useGolfScore(
         session?.players?.[0]?.scores || [],
@@ -232,9 +237,6 @@ export default function GolfScorecard() {
             solo={session.strokeMode === "solo" || realCount <= 1}
             isHost={isHost}
             enabled
-            onPhoto={() => photoUi.pick("camera")}
-            photoCount={photoUi.countAt(currentHole + 1)}
-            photoBusy={photoUi.pending > 0}
         />
     ) : null;
 
@@ -437,58 +439,41 @@ export default function GolfScorecard() {
                 </div>
             )}
 
-            {/* Solo Mode: 1. Handicap Pace Maker */}
+            {/* Solo Mode: 1. 내 핸디 + 페이스 — 2026-10-01 오너: "내 핸디가 얼마인지 보이게, 디자인 살짝".
+                왼쪽 칸이 내 핸디(어디서 온 숫자인지 한 줄), 오른쪽이 지금까지의 페이스. 첫 홀 전에도 핸디는 보인다. */}
             {(() => {
                 const isSolo = session.strokeMode === 'solo' || session.players.length === 1;
                 if (!isSolo) return null;
-
-                const {
-                    completedHolesCount,
-                    totalStrokes,
-                    currentOverPar,
-                    handicapAllowed,
-                    netScore,
-                    paceStatus
-                } = golfScore;
-
-                // 스코어 입력이 없으면 표시 안 함
-                if (completedHolesCount === 0) return null;
-
-                // 상태 메시지 유지 (paceStatus에 맞게 간소화하거나 기존 로직 유지 가능)
-                let statusMessage = "";
-                let statusColor = "";
-
-                if (netScore <= -2) {
-                    statusMessage = `🔥 핸디캡보다 ${Math.abs(netScore)}타 앞서고 있어요! (완벽)`;
-                    statusColor = "text-[#9BEF5C]";
-                } else if (netScore === -1) {
-                    statusMessage = `✨ 핸디캡보다 1타 앞서는 중! (우수)`;
-                    statusColor = "text-[#9BEF5C]";
-                } else if (netScore === 0) {
-                    statusMessage = `👍 핸디캡대로 진행 중 (본전)`;
-                    statusColor = "text-white";
-                } else if (netScore <= 2) {
-                    statusMessage = `⚠️ 핸디캡보다 ${netScore}타 뒤처짐 (주의)`;
-                    statusColor = "text-[#FFB27A]";
-                } else {
-                    statusMessage = `🚨 핸디캡보다 ${netScore}타 뒤처짐 (부진)`;
-                    statusColor = "text-[#FF8A8C]";
-                }
-
+                const { completedHolesCount, currentOverPar, handicapAllowed, netScore } = golfScore;
+                const started = completedHolesCount > 0;
+                const tone = !started || netScore === 0 ? "text-[#ffffff]" : netScore < 0 ? "text-[#9BEF5C]" : netScore <= 2 ? "text-[#FFB27A]" : "text-[#FF8A8C]";
+                const headline = !started ? "첫 홀을 적으면 페이스가 나와요"
+                    : netScore < 0 ? `핸디보다 ${Math.abs(netScore)}타 앞서요`
+                    : netScore === 0 ? "핸디대로 가고 있어요"
+                    : `핸디보다 ${netScore}타 뒤져요`;
+                const detail = started
+                    ? `${completedHolesCount}홀 ${toParText(currentOverPar)} · 핸디로는 ${toParText(handicapAllowed)}`
+                    : `18홀 ${toParText(myHandicap)}면 핸디대로예요`;
                 return (
                     <div className="px-4 pt-3">
-                        {/* 핸디캡 페이스 — 한 줄 요약. 이모지·경고 문구 줄 대신 숫자와 짧은 말 하나 */}
-                        <div className="rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] px-4 py-3.5 flex items-center gap-3">
-                            <span className="flex-1 min-w-0">
-                                <span className="block text-[12px] text-[#FFFFFF73]">핸디캡 {myHandicap} 기준 페이스</span>
-                                <span className={cn("block mt-0.5 text-[14px] font-medium", statusColor)}>
-                                    {netScore < 0 ? `핸디캡보다 ${Math.abs(netScore)}타 앞서요` : netScore === 0 ? "핸디캡대로 가고 있어요" : `핸디캡보다 ${netScore}타 뒤져요`}
+                        <div className="rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] p-1.5 flex items-stretch gap-1.5">
+                            <div className="w-[92px] shrink-0 rounded-xl bg-[#FFFFFF0A] px-3 py-2.5">
+                                <span className="block text-[11.5px] text-[#FFFFFF80]">내 핸디</span>
+                                <span className="block mt-1 text-[28px] leading-none font-bold text-[#ffffff] tabular-nums">{myHandicap}</span>
+                                <span className="block mt-1.5 text-[10.5px] leading-tight text-[#FFFFFF59] break-keep">{handicapSource}</span>
+                            </div>
+                            <div className="flex-1 min-w-0 pl-2 pr-2.5 py-2 flex items-center gap-2">
+                                <span className="flex-1 min-w-0">
+                                    <span className={cn("block text-[14.5px] font-semibold break-keep", tone)}>{headline}</span>
+                                    <span className="block mt-1 text-[12px] text-[#FFFFFF73] tabular-nums break-keep">{detail}</span>
                                 </span>
-                            </span>
-                            <span className="shrink-0 text-right">
-                                <span className="block text-[11px] text-[#FFFFFF59]">넷</span>
-                                <span className={cn("block text-[26px] leading-none font-bold tabular-nums", statusColor)}>{netScore >= 0 ? `+${netScore}` : netScore}</span>
-                            </span>
+                                {started && (
+                                    <span className="shrink-0 text-right">
+                                        <span className="block text-[11px] text-[#FFFFFF59]">핸디 대비</span>
+                                        <span className={cn("block mt-0.5 text-[26px] leading-none font-bold tabular-nums", tone)}>{netScore > 0 ? `+${netScore}` : netScore}</span>
+                                    </span>
+                                )}
+                            </div>
                         </div>
                     </div>
                 );

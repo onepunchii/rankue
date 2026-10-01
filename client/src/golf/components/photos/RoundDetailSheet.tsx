@@ -62,7 +62,7 @@ function fromSession(s: any): { players: Player[]; pars: number[]; sessionId: st
     return { players, pars, sessionId: s?.id ?? null, courseName: s?.courseName ?? null };
 }
 
-/** 내 카드에만 붙는 이 홀 기록(2026-10-01) — 퍼트 줄·그린 적중 점·한 줄 요약. 남의 기록은 서버가 주지 않는다 */
+/** 내 카드에만 붙는 이 홀 기록(2026-10-01) — 퍼트 줄·레귤러 온 점·한 줄 요약. 남의 기록은 서버가 주지 않는다 */
 type MyHoleStats = { playerId: string; putts: readonly (number | null)[]; sum: RoundHoleSummary };
 
 function Scorecards({ players, pars, photoHoles, onHoleTap, mine }: { players: Player[]; pars: number[]; photoHoles: Set<number>; onHoleTap: (i: number) => void; mine?: MyHoleStats | null }) {
@@ -93,7 +93,7 @@ function Scorecards({ players, pars, photoHoles, onHoleTap, mine }: { players: P
                             <p className="mb-3 text-[12.5px] text-[#FFFFFF99] tabular-nums">
                                 {my.sum.puttHoles > 0 && <>퍼트 {my.sum.putts}{my.sum.puttHoles < 18 && <span className="text-[#FFFFFF73]"> ({my.sum.puttHoles}홀)</span>}</>}
                                 {my.sum.puttHoles > 0 && my.sum.girHoles > 0 && " · "}
-                                {my.sum.girHoles > 0 && <>그린 적중 {my.sum.girHit}/{my.sum.girHoles}</>}
+                                {my.sum.girHoles > 0 && <>레귤러 온 {my.sum.girHit}/{my.sum.girHoles}</>}
                             </p>
                         )}
                         {pars.length === 18 ? (
@@ -102,7 +102,7 @@ function Scorecards({ players, pars, photoHoles, onHoleTap, mine }: { players: P
                                     putts={my?.putts} gir={my?.sum.gir} />
                                 {my && my.sum.girHit > 0 && (
                                     <p className="mt-2 flex items-center gap-1.5 text-[12px] text-[#FFFFFF80]">
-                                        <span aria-hidden className="w-[5px] h-[5px] rounded-full bg-[#9BEF5C]" />퍼트 밑 점 = 그린 적중
+                                        <span aria-hidden className="w-[5px] h-[5px] rounded-full bg-[#9BEF5C]" />퍼트 밑 점 = 레귤러 온
                                     </p>
                                 )}
                             </>

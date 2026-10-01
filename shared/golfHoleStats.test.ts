@@ -201,7 +201,7 @@ describe("라운딩 리포트 통계(summarizeHoleStats)", () => {
         expect(sum.putts!.perHole).toBeCloseTo(7 / 3);
         expect(sum.putts!.per18).toBeCloseTo((7 / 3) * 18);
         expect(sum.gir).toEqual({ holes: 3, hit: 2, rate: 2 / 3 });
-        expect(sum.fairway).toEqual({ holes: 2, hit: 1, left: 1, right: 0, rate: 0.5 });
+        expect(sum.fairway).toEqual({ holes: 2, hit: 1, miss: 1, left: 1, right: 0, rate: 0.5 });
         expect(sum.ob).toEqual({ total: 1, perRound: 1 });
     });
     it("숫자가 안 맞는 퍼팅(퍼팅 ≥ 타수)은 퍼팅·적중 둘 다에서 뺀다", () => {
@@ -221,7 +221,19 @@ describe("라운딩 리포트 통계(summarizeHoleStats)", () => {
         const sum = summarizeHoleStats([round({ stats: st, parKnown: known })]);
         expect(sum.putts!.holes).toBe(2);
         expect(sum.gir).toEqual({ holes: 1, hit: 1, rate: 1 });
-        expect(sum.fairway).toEqual({ holes: 1, hit: 0, left: 0, right: 1, rate: 0 });
+        expect(sum.fairway).toEqual({ holes: 1, hit: 0, miss: 1, left: 0, right: 1, rate: 0 });
+    });
+
+    it("러프(M)는 빗나감으로 센다 — 2026-10-01 화면은 페어웨이·러프 둘만 적는다", () => {
+        expect(sanitizeHolePatch({ holeNo: 4, fairway: "M" })?.fairway).toBe("M");
+        const fairway: (string | null)[] = new Array(18).fill(null); fairway[0] = "H"; fairway[1] = "M"; fairway[2] = "M";
+        const st = readHoleStats({ fairway });
+        expect(st.fairway.slice(0, 3)).toEqual(["H", "M", "M"]);
+        const sum = summarizeHoleStats([{
+            sessionId: "s", scores: new Array(18).fill(4), pars: new Array(18).fill(4), parKnown: new Array(18).fill(true),
+            putts: new Array(18).fill(null), fairway: st.fairway, penaltyTags: st.penaltyTags,
+        }]);
+        expect(sum.fairway).toEqual({ holes: 3, hit: 1, miss: 2, left: 0, right: 0, rate: 1 / 3 });
     });
     it("벌타 태그를 한 번도 안 쓴 사람의 OB 는 0 이 아니라 모름(null)", () => {
         const st = blankHoleStats();

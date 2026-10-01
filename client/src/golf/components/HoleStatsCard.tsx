@@ -2,10 +2,11 @@
  * 경기 화면 '이 홀 기록' 카드(2026-10-01 오너 승인) — 점수 입력 카드 밑 빈자리에, **폰 주인 자기 것만**(v1).
  *
  *   퍼팅     0 · 1 · 2 · 3 · 4+     한 번 더 누르면 지운다. 0 은 칩인(작은 칸)
- *   페어웨이  왼쪽 · 안착 · 오른쪽     파4·파5 만(파를 모르는 홀은 보인다 — 적는 건 사람이 고른다)
- *   벌타     OB · 해저드 · 벙커       여럿 고른다. **태그만** — 타수는 위의 +/− 가 정본(처음 켤 때 한 번 알려 준다)
- *   그린 적중 입력 없이 계산(타수 − 퍼팅 ≤ 파 − 2) — 퍼팅을 적으면 머리에 작은 배지. 숫자가 안 맞으면 주황 한 줄
- *   맨 아래   지난번 이 홀 5타 · 보기(같은 골프장·코스·홀의 내 최근 기록, 있을 때만) | 이 홀 사진(머리 📷 와 같은 올리기)
+ *   페어웨이  페어웨이 · 러프         파4·파5 만(파를 모르는 홀은 보인다 — 적는 건 사람이 고른다)
+ *   그린     레귤러 온 / 실패         입력 없이 퍼팅으로 계산(타수 − 퍼팅 ≤ 파 − 2) — 몇 타 만에 올렸는지도 같이. 숫자가 안 맞으면 주황 한 줄
+ *   맨 아래   지난번 이 홀 5타 · 보기(같은 골프장·코스·홀의 내 최근 기록, 있을 때만)
+ * 2026-10-01 오너 조정: 벌타 태그는 헷갈려서 뺐고, 페어웨이는 왼쪽·오른쪽 대신 페어웨이/러프 둘, 레귤러 온을 한 줄로 또렷하게,
+ * '이 홀 사진'은 머리의 카메라와 겹쳐서 뺐다.
  *
  * 혼자 기록(실제 회원이 나 하나)이면 펼쳐서, 여럿이면 한 줄('이 홀 기록 +')로 접어서 시작한다 — 여럿일 땐 점수 줄이
  * 화면을 채우고, 이 기록은 곁다리라서. 펼침은 기기에 기억한다(혼자·여럿 따로). 적지 않아도 점수·평균·도장엔 아무 일도 없다.
@@ -14,12 +15,8 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useToast } from "@/hooks/use-toast";
-import { LucideCamera, LucideChevronUp, LucidePlus, LucideArrowUpLeft, LucideArrowUpRight, LucideLoader2 } from "@/lib/icons";
-import {
-    FAIRWAY_LABEL, PENALTY_LABEL, PENALTY_TAGS, PUTTS_PLUS, fairwayApplies, greenInRegulation, puttsFit,
-    type Fairway, type HoleEntry, type PenaltyTag,
-} from "@shared/golfHoleStats";
+import { LucideChevronUp, LucidePlus } from "@/lib/icons";
+import { PUTTS_PLUS, fairwayApplies, greenInRegulation, puttsFit, type HoleEntry } from "@shared/golfHoleStats";
 import { useHoleStats } from "../hooks/useHoleStats";
 import { scoreName } from "./ScoreCard";
 
@@ -76,8 +73,6 @@ function useRememberedOpen(solo: boolean): [boolean, (v: boolean) => void] {
     return [open, (v: boolean) => { setOpen(v); try { localStorage.setItem(key, v ? "1" : "0"); } catch { /* 저장 못 해도 이번 화면은 된다 */ } }];
 }
 
-const PENALTY_HINT_KEY = "rankue_golf_penalty_tag_hint";
-
 export interface HoleStatsCardProps {
     sessionId: string;
     /** 지금 홀(0부터) */
@@ -93,16 +88,11 @@ export interface HoleStatsCardProps {
     isHost: boolean;
     /** 진행 중일 때만 읽고 쓴다 */
     enabled: boolean;
-    onPhoto: () => void;
-    /** 이 홀에 붙은 사진 수(누구 것이든) · 올리는 중 */
-    photoCount: number;
-    photoBusy?: boolean;
 }
 
 export function HoleStatsCard(props: HoleStatsCardProps) {
-    const { sessionId, hole, par, parKnown, strokes, solo, isHost, enabled, onPhoto, photoCount, photoBusy } = props;
+    const { sessionId, hole, par, parKnown, strokes, solo, enabled } = props;
     const hs = useHoleStats(sessionId, { enabled, front: props.frontCourseName, back: props.backCourseName, hole });
-    const { toast } = useToast();
     const [open, setOpen] = useRememberedOpen(solo);
 
     const e: HoleEntry = hs.entry(hole);
@@ -111,35 +101,17 @@ export function HoleStatsCard(props: HoleStatsCardProps) {
     const misfit = e.putts != null && !puttsFit(strokes, e.putts);
     const last = hs.lastTime?.[hole] ?? null;
     const lastName = last && parKnown ? scoreName(last.strokes - par) : null;
+    /** 러프 — 그 전에 적힌 왼쪽·오른쪽(L·R)도 러프로 보여 준다 */
+    const rough = e.fairway === "M" || e.fairway === "L" || e.fairway === "R";
+    /** 몇 타 만에 그린에 올렸나(칩인이면 0 퍼팅이라 '칩인'으로) */
+    const toGreen = e.putts != null && !misfit ? strokes - e.putts : null;
 
-    const onTag = (t: PenaltyTag) => {
-        const turningOn = !e.penaltyTags.includes(t);
-        hs.toggleTag(hole, t);
-        if (!turningOn) return;
-        // 태그가 벌타를 더해 주는 줄 알기 쉽다 — 처음 켤 때 한 번만 말한다(기기에 기억)
-        try {
-            if (localStorage.getItem(PENALTY_HINT_KEY)) return;
-            localStorage.setItem(PENALTY_HINT_KEY, "1");
-        } catch { return; }
-        toast({ title: "기록용 태그예요", description: isHost ? "타수는 그대로예요 · 벌타는 위의 ＋로 더해 주세요" : "타수는 그대로예요 · 타수는 방장이 적어요" });
-    };
-
-    // 접었을 때의 한 줄 요약 — 적은 것만, 셋까지(넘치면 +n)
+    // 접었을 때의 한 줄 요약 — 적은 것만(퍼팅 · 페어웨이 · 레귤러 온, 많아야 셋)
     const pills: { key: string; tone: "plain" | "lime" | "orange"; text: string }[] = [];
     if (e.putts != null) pills.push({ key: "p", tone: "plain", text: `퍼팅 ${puttLabel(e.putts)}` });
-    if (e.fairway && showFairway) pills.push({ key: "f", tone: e.fairway === "H" ? "lime" : "plain", text: e.fairway === "H" ? "안착" : `${FAIRWAY_LABEL[e.fairway]} 미스` });
-    for (const t of e.penaltyTags) pills.push({ key: t, tone: "orange", text: PENALTY_LABEL[t] });
-    if (gir) pills.push({ key: "g", tone: "lime", text: "그린 적중" });
-    const shown = pills.slice(0, 3);
-    const more = pills.length - shown.length;
-
-    const fairwayChip = (v: Fairway) => (
-        <Chip key={v} on={e.fairway === v} tone={v === "H" ? "lime" : "white"} onClick={() => hs.setFairway(hole, v)} label={`페어웨이 ${FAIRWAY_LABEL[v]}`} className="flex-1 min-w-0">
-            {v === "L" && <LucideArrowUpLeft weight="bold" className="w-4 h-4 shrink-0 opacity-70" />}
-            {FAIRWAY_LABEL[v]}
-            {v === "R" && <LucideArrowUpRight weight="bold" className="w-4 h-4 shrink-0 opacity-70" />}
-        </Chip>
-    );
+    if (e.fairway && showFairway) pills.push({ key: "f", tone: e.fairway === "H" ? "lime" : "plain", text: e.fairway === "H" ? "페어웨이" : "러프" });
+    if (gir !== null) pills.push({ key: "g", tone: gir ? "lime" : "plain", text: gir ? "레귤러 온" : "레귤러 온 실패" });
+    if (misfit) pills.push({ key: "x", tone: "orange", text: "퍼팅 확인" });
 
     return (
         <section className="mx-4 rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F]" aria-label="이 홀 기록">
@@ -150,22 +122,14 @@ export function HoleStatsCard(props: HoleStatsCardProps) {
             >
                 <span className="shrink-0 text-[14px] font-semibold text-[#ffffff]">이 홀 기록</span>
                 {open ? (
-                    <>
-                        {!solo && <span className="shrink-0 text-[12px] text-[#FFFFFF73]">나만 봐요</span>}
-                        <span className="flex-1 min-w-0 flex justify-end">
-                            {misfit ? (
-                                <span className="text-[12px] font-medium text-[#FFB27A] truncate">퍼팅 수가 타수와 안 맞아요</span>
-                            ) : gir ? (
-                                <span className="h-6 px-2 rounded-full bg-[#64DD1724] text-[12px] font-semibold leading-6 text-[#9BEF5C]">그린 적중</span>
-                            ) : null}
-                        </span>
-                    </>
+                    <span className="flex-1 min-w-0">
+                        {!solo && <span className="text-[12px] text-[#FFFFFF73]">나만 봐요</span>}
+                    </span>
                 ) : (
                     <span className="flex-1 min-w-0 flex items-center gap-1 overflow-hidden">
-                        {shown.length === 0
-                            ? <span className="text-[12.5px] text-[#FFFFFF73] truncate">퍼팅 · 페어웨이 · 벌타</span>
-                            : shown.map((p) => <Pill key={p.key} tone={p.tone}>{p.text}</Pill>)}
-                        {more > 0 && <Pill tone="plain">+{more}</Pill>}
+                        {pills.length === 0
+                            ? <span className="text-[12.5px] text-[#FFFFFF73] truncate">퍼팅 · 페어웨이 · 레귤러 온</span>
+                            : pills.map((p) => <Pill key={p.key} tone={p.tone}>{p.text}</Pill>)}
                     </span>
                 )}
                 <span aria-hidden className={cn("shrink-0 w-7 h-7 -mr-1 rounded-full flex items-center justify-center", open ? "text-[#FFFFFF80]" : "bg-[#FFFFFF14] text-[#FFFFFFD9]")}>
@@ -193,35 +157,39 @@ export function HoleStatsCard(props: HoleStatsCardProps) {
                             </Row>
                             {showFairway && (
                                 <Row label="페어웨이">
-                                    {(["L", "H", "R"] as const).map(fairwayChip)}
+                                    <Chip on={e.fairway === "H"} tone="lime" onClick={() => hs.setFairway(hole, "H")} label="페어웨이 안착" className="flex-1 min-w-0">페어웨이</Chip>
+                                    <Chip on={rough} onClick={() => hs.setFairway(hole, rough ? e.fairway : "M")} label="러프" className="flex-1 min-w-0">러프</Chip>
                                 </Row>
                             )}
-                            <Row label="벌타">
-                                {PENALTY_TAGS.map((t) => (
-                                    <Chip key={t} on={e.penaltyTags.includes(t)} tone="orange" onClick={() => onTag(t)} label={`${PENALTY_LABEL[t]} 태그`} className="flex-1 min-w-0">
-                                        {PENALTY_LABEL[t]}
-                                    </Chip>
-                                ))}
+                            {/* 그린 — 레귤러 온은 적지 않는다. 퍼팅을 고르면 타수 − 퍼팅 으로 바로 판정한다 */}
+                            <Row label="그린">
+                                <div className="flex-1 min-w-0 h-11 flex items-center gap-2" aria-live="polite">
+                                    {e.putts == null ? (
+                                        <span className="text-[13px] text-[#FFFFFF66] truncate">퍼팅을 고르면 레귤러 온이 나와요</span>
+                                    ) : misfit ? (
+                                        <span className="text-[13px] font-medium text-[#FFB27A] truncate">퍼팅 수가 타수({strokes})와 안 맞아요</span>
+                                    ) : gir === null ? (
+                                        <span className="text-[13px] text-[#FFFFFF80] truncate">{e.putts === 0 ? "칩인" : `${toGreen}타 만에 그린`} · 파를 몰라 판정 안 해요</span>
+                                    ) : (
+                                        <>
+                                            <span className={cn(
+                                                "shrink-0 h-8 px-3 rounded-full text-[13px] font-semibold leading-8",
+                                                gir ? "bg-[#64DD17] text-[#051907]" : "bg-[#FFFFFF14] text-[#FFFFFFCC]",
+                                            )}>{gir ? "레귤러 온" : "레귤러 온 실패"}</span>
+                                            <span className="min-w-0 truncate text-[12.5px] text-[#FFFFFF80] tabular-nums">
+                                                {e.putts === 0 ? "칩인" : `${toGreen}타 만에 그린`}{!gir && ` · 파${par}는 ${par - 2}타`}
+                                            </span>
+                                        </>
+                                    )}
+                                </div>
                             </Row>
 
-                            {/* 지난번 이 홀 | 이 홀 사진 */}
-                            <div className="!mt-3 pt-3 border-t border-[#FFFFFF0F] flex items-center gap-3">
-                                <span className="flex-1 min-w-0 text-[12.5px] text-[#FFFFFF80] truncate">
-                                    {last && (
-                                        <>지난번 이 홀 <span className="font-semibold text-[#ffffff] tabular-nums">{last.strokes}타</span>{lastName && <> · {lastName}</>}</>
-                                    )}
-                                </span>
-                                <button
-                                    type="button" onClick={onPhoto} aria-label={`이 홀 사진 찍기${photoCount ? ` (${photoCount}장)` : ""}`}
-                                    className="shrink-0 h-9 pl-2.5 pr-3 rounded-full bg-[#FFFFFF0F] text-[13px] font-medium text-[#FFFFFFD9] inline-flex items-center gap-1.5 active:bg-[#FFFFFF1F]"
-                                >
-                                    {photoBusy ? <LucideLoader2 className="w-4 h-4 animate-spin text-[#9BEF5C]" /> : <LucideCamera className="w-[17px] h-[17px]" />}
-                                    이 홀 사진
-                                    {photoCount > 0 && (
-                                        <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-[#64DD17] text-[#051907] text-[11px] font-bold leading-[18px] text-center tabular-nums">{photoCount}</span>
-                                    )}
-                                </button>
-                            </div>
+                            {/* 지난번 이 홀 — 있을 때만 */}
+                            {last && (
+                                <p className="!mt-3 pt-3 border-t border-[#FFFFFF0F] text-[12.5px] text-[#FFFFFF80] truncate">
+                                    지난번 이 홀 <span className="font-semibold text-[#ffffff] tabular-nums">{last.strokes}타</span>{lastName && <> · {lastName}</>}
+                                </p>
+                            )}
                         </div>
                     </motion.div>
                 )}

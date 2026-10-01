@@ -7,6 +7,8 @@
  *    자기 칸에만 쓴다(POST /golf/match/:id/hole-stats — 저장소가 로그인 회원의 칸만 고친다).
  *    남의 기록은 경기 응답에서 걷어 낸다(withoutHoleStats) — 동반자에게도 안 보인다. 내 것은 전용 GET 으로만.
  *  - 벌타 태그(OB·해저드·벙커)는 **태그일 뿐** 타수를 바꾸지 않는다. 타수의 정본은 방장의 +/− 다.
+ *    2026-10-01 오너: "벌타는 헷갈리니 빼자" — 화면에서 뺐다. 칸·검증은 남긴다(그 전에 적힌 기록, 열려 있던 화면의 요청이 400 이 되지 않게).
+ *  - 페어웨이도 같은 날 오너: "러프인지 페어웨이인지만" — 화면은 페어웨이(H)·러프(M) 둘. 그 전 몇 시간 동안 적힌 왼쪽(L)·오른쪽(R)은 러프로 센다.
  *  - 기존 players[].penalties({ ob, hz, bunk, putt3 }) 와 섞지 않는다. 그 칸은 방장이 모두에게 적던 옛 게임 규칙용
  *    표시인데(지금 화면엔 켜는 곳이 없다), 방장 폰의 점수 저장이 **홀마다 통째로 덮어쓴다** — 동반자가 적은 태그를
  *    거기 두면 방장이 다음 홀로 넘길 때 방장 폰의 옛 값으로 지워진다. 그래서 칸 이름부터 따로(penaltyTags) 둔다.
@@ -23,13 +25,14 @@ export const MAX_PUTTS = 9;
 /** 끝난 라운드에도 이만큼은 받는다 — 18번 홀 퍼팅을 누르는 사이 방장이 '라운드 끝내기'를 누르면 마지막 저장이 튕겼다 */
 export const HOLE_STATS_GRACE_MINUTES = 30;
 
-export type Fairway = "L" | "H" | "R";
-export const FAIRWAYS: readonly Fairway[] = ["L", "H", "R"];
+/** H 페어웨이 · M 러프(빗나감, 방향은 안 묻는다) · L/R 옛 값(왼쪽·오른쪽 러프) */
+export type Fairway = "H" | "M" | "L" | "R";
+export const FAIRWAYS: readonly Fairway[] = ["H", "M", "L", "R"];
 export type PenaltyTag = "ob" | "hazard" | "bunker";
 /** 이 순서로 저장·표시한다 */
 export const PENALTY_TAGS: readonly PenaltyTag[] = ["ob", "hazard", "bunker"];
 export const PENALTY_LABEL: Record<PenaltyTag, string> = { ob: "OB", hazard: "해저드", bunker: "벙커" };
-export const FAIRWAY_LABEL: Record<Fairway, string> = { L: "왼쪽", H: "안착", R: "오른쪽" };
+export const FAIRWAY_LABEL: Record<Fairway, string> = { H: "페어웨이", M: "러프", L: "왼쪽 러프", R: "오른쪽 러프" };
 
 /** players JSON 에서 이 기록이 사는 칸 — 경기 응답에서 걷어 낼 때도 이 목록을 쓴다 */
 export const HOLE_STAT_KEYS = ["putts", "fairway", "penaltyTags"] as const;
@@ -58,7 +61,7 @@ export function blankHoleStats(): HoleStats {
 }
 
 export const isPutts = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= MAX_PUTTS;
-export const isFairway = (v: unknown): v is Fairway => v === "L" || v === "H" || v === "R";
+export const isFairway = (v: unknown): v is Fairway => v === "H" || v === "M" || v === "L" || v === "R";
 export const isPenaltyTag = (v: unknown): v is PenaltyTag => PENALTY_TAGS.includes(v as PenaltyTag);
 
 /** 알려진 태그만, 중복 없이, 정해진 순서로 */
@@ -276,8 +279,8 @@ export interface HoleStatsSummary {
     rounds: number;
     /** 맞게 적힌 퍼팅만(퍼팅 ≥ 타수인 홀은 뺀다). perHole 홀당 · per18 18홀 환산 */
     putts: { holes: number; total: number; perHole: number; per18: number; threePutts: number } | null;
-    /** 페어웨이가 있는 홀(파4·5, 파 모름)에 적은 것만. rate 0~1 */
-    fairway: { holes: number; hit: number; left: number; right: number; rate: number } | null;
+    /** 페어웨이가 있는 홀(파4·5, 파 모름)에 적은 것만. miss = 러프(옛 왼쪽·오른쪽 포함). rate 0~1 */
+    fairway: { holes: number; hit: number; miss: number; left: number; right: number; rate: number } | null;
     /** 퍼팅을 적었고 파를 아는 홀만. rate 0~1 */
     gir: { holes: number; hit: number; rate: number } | null;
     /**
@@ -312,7 +315,7 @@ export function summarizeHoleStats(rounds: readonly RoundHoleData[]): HoleStatsS
             if (g !== null) { girHoles++; if (g) girHit++; }
             if (fw != null && fairwayApplies(par, known)) {
                 fwHoles++;
-                if (fw === "H") fwHit++; else if (fw === "L") fwLeft++; else fwRight++;
+                if (fw === "H") fwHit++; else if (fw === "L") fwLeft++; else if (fw === "R") fwRight++;
             }
             if (tags.length > 0) tagsUsed = true;
             if (tags.includes("ob")) obTotal++;
@@ -322,7 +325,7 @@ export function summarizeHoleStats(rounds: readonly RoundHoleData[]): HoleStatsS
     return {
         rounds: recorded,
         putts: puttHoles > 0 ? { holes: puttHoles, total: puttTotal, perHole: puttTotal / puttHoles, per18: (puttTotal / puttHoles) * HOLE_COUNT, threePutts } : null,
-        fairway: fwHoles > 0 ? { holes: fwHoles, hit: fwHit, left: fwLeft, right: fwRight, rate: fwHit / fwHoles } : null,
+        fairway: fwHoles > 0 ? { holes: fwHoles, hit: fwHit, miss: fwHoles - fwHit, left: fwLeft, right: fwRight, rate: fwHit / fwHoles } : null,
         gir: girHoles > 0 ? { holes: girHoles, hit: girHit, rate: girHit / girHoles } : null,
         ob: tagsUsed && recorded > 0 ? { total: obTotal, perRound: obTotal / recorded } : null,
     };
