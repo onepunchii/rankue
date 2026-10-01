@@ -184,6 +184,21 @@ function HiqDashboardBilliards() {
     // 비로그인 방문자(검색 유입이 하단 '홈' 탭을 누른 경우). 예전에는 여기서 null 을 반환해
     // 흰 화면만 남았다 — 방문자에겐 앱이 고장 난 것으로 보인다.
     if (!member) {
+        // 골프 페이지(선수·랭킹·골프장)에서 '홈'을 눌러 온 비로그인 방문자 — 당구 홈 안내 대신 골프 안내(2026-10-01 오너)
+        const golfEntry = locale === "ko" && (() => { try { return localStorage.getItem("rankue_current_sport") === "GOLF"; } catch { return false; } })();
+        if (golfEntry) {
+            return (
+                <LoginGate
+                    icon={LucideHome}
+                    title={t("loginGate.golfHomeTitle")}
+                    desc={t("loginGate.golfHomeDesc")}
+                    links={[
+                        { label: t("loginGate.linkGolfCourses"), to: "/golf/courses" },
+                        { label: t("loginGate.linkGolfRanking"), to: "/golf-ranking" },
+                    ]}
+                />
+            );
+        }
         return (
             <LoginGate
                 icon={LucideHome}

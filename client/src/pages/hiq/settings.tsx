@@ -10,6 +10,7 @@ import { flagEmoji } from "@/lib/flag";
 import { cn } from "@/lib/utils";
 import { BlockedMembersSection } from "@/components/hiq/community/BlockedMembersSection";
 import { NotificationKinds } from "@/components/hiq/settings/NotificationKinds";
+import { PrimarySportSetting } from "@/components/hiq/sport/PrimarySportSetting";
 import {
     canOpenNotificationSettings, forgetPushToken, isNativeApp, openNotificationSettings, pushPermission, requestPushPermission,
     storedPushToken, type PushPermission,
@@ -229,6 +230,9 @@ export default function HiqSettings() {
                 {/* 알림 종류 — 당구 | 골프 탭, 종목마다 자기 색(2026-10-01 오너). 끄면 푸시만 멈추고 알림함에는 남는다.
                     OS 알림을 아예 꺼 둔 기기에서도 보여 준다 — 나중에 켰을 때의 설정이기도 하다. */}
                 <NotificationKinds golfAllowed={!!member?.golfAccess} />
+
+                {/* 주 종목(2026-10-01) — 앱을 열면 이 종목으로 시작한다. 골프를 쓰는 회원에게만 */}
+                {member?.golfAccess && <PrimarySportSetting current={(member as any)?.primarySport ?? null} />}
 
                 {/* 커뮤니티 */}
                 <section className="rk-card p-5">

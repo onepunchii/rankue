@@ -20,14 +20,16 @@ export type AuthMember = HiqMember & {
 //  - 반대로 순간적인 네트워크 오류까지 즉시 "게스트"로 단정하면, 로그인해 쓰던 사람이
 //    지하철에서 잠깐 끊겼을 때 로그인 안내를 보게 된다. 그건 한 번 더 시도해야 한다.
 export function useAuth() {
-    const { data: member, isLoading } = useQuery<AuthMember>({
+    // 비로그인이면 data 가 null 로 온다(queryClient getQueryFn — 401 을 '답'으로 받는다). 오류가 아니라서
+    // 하단 탭처럼 나중에 붙는 화면이 다시 묻지 않고, 홈이 로딩으로 되돌아가지 않는다.
+    const { data: member, isLoading } = useQuery<AuthMember | null>({
         queryKey: ["/api/hiq/me"],
         retry: (failureCount, error: any) => (error?.status === 401 ? false : failureCount < 1),
         staleTime: 5 * 60 * 1000,
     });
 
     return {
-        member,
+        member: member ?? undefined,
         isLoading,
         isLoggedIn: !!member,
         /** 확인이 끝났고 로그인되어 있지 않음 — 이때만 로그인 안내를 그린다(확인 중엔 스피너). */

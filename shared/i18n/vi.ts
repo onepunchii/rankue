@@ -343,6 +343,7 @@ export const vi: Record<string, string> = {
   "err.member.handleFormat": "Handle phải dài 3–20 ký tự: chữ thường, số, _ (không bắt đầu bằng số)",
   "err.member.handleTaken": "Handle này đã được sử dụng",
   "err.member.noPrefsToChange": "Không có cài đặt thông báo nào để thay đổi",
+  "err.member.badSport": "Hãy chọn bi-a hoặc golf",
   "err.member.termsOutdated": "Điều khoản đã thay đổi. Hãy làm mới màn hình rồi đồng ý lại",
   "err.member.invalidId": "ID thành viên không hợp lệ",
   "err.member.invalidTargetId": "ID thành viên đối thủ không hợp lệ",

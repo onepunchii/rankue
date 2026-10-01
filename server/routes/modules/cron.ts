@@ -102,7 +102,18 @@ async function handleGolfSync(req: any, res: any) {
     // 새 회차가 생긴 투어만 관심 선수 알림
     const { notifyGolfFollowers } = await import("../../services/playerFollowAlerts.js");
     const followAlerts = await notifyGolfFollowers(results.filter((r) => r.newEdition).map((r) => r.tour));
-    return sendSuccess(res, { results, followAlerts });
+    // 골프 랭킹 수집 상태 점검(2026-10-01 오너 "응 다 고치고") — 수집이 멈췄거나 세계 투어 회차가 늦으면 운영자에게 하루 한 번.
+    // KPGA·KLPGA 의 '늦음'은 대회 없는 주가 있어 알리지 않고 어드민 골프 현황에만 띄운다(feedHealth.checkGolfHealth).
+    let golfHealth: unknown = null;
+    try {
+        const { checkGolfHealth, alertIfUnhealthy, GOLF_ALERT_TITLE, GOLF_ALERT_URL } = await import("../../services/feedHealth.js");
+        const health = await checkGolfHealth();
+        const alerted = await alertIfUnhealthy(health, { title: GOLF_ALERT_TITLE, url: GOLF_ALERT_URL });
+        golfHealth = { issues: health, alerted };
+    } catch (e) {
+        console.error("[cron] golf health", e);
+    }
+    return sendSuccess(res, { results, followAlerts, golfHealth });
 }
 router.get("/golf-sync", asyncHandler(handleGolfSync));
 router.post("/golf-sync", asyncHandler(handleGolfSync));

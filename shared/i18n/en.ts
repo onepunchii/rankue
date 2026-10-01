@@ -343,6 +343,7 @@ export const en: Record<string, string> = {
   "err.member.handleFormat": "Handle must be 3–20 characters: lowercase letters, numbers, _ (can't start with a number)",
   "err.member.handleTaken": "This handle is already taken",
   "err.member.noPrefsToChange": "No notification settings to change",
+  "err.member.badSport": "Choose billiards or golf",
   "err.member.termsOutdated": "The terms have been updated. Please refresh and agree again",
   "err.member.invalidId": "Invalid member ID",
   "err.member.invalidTargetId": "Invalid opponent member ID",

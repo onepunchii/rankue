@@ -343,6 +343,7 @@ export const es: Record<string, string> = {
   "err.member.handleFormat": "El handle debe tener 3–20 caracteres: minúsculas, números y _ (no puede empezar con número)",
   "err.member.handleTaken": "Este handle ya está en uso",
   "err.member.noPrefsToChange": "No hay ajustes de notificaciones para cambiar",
+  "err.member.badSport": "Elige billar o golf",
   "err.member.termsOutdated": "Los términos se actualizaron. Actualiza la pantalla y acepta de nuevo",
   "err.member.invalidId": "El ID de usuario no es válido",
   "err.member.invalidTargetId": "El ID del oponente no es válido",

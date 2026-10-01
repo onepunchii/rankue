@@ -343,6 +343,7 @@ export const ko: Record<string, string> = {
   "err.member.handleFormat": "핸들은 영문 소문자·숫자·_ 3~20자여야 합니다 (숫자 시작 불가)",
   "err.member.handleTaken": "이미 사용 중인 핸들입니다",
   "err.member.noPrefsToChange": "바꿀 알림 설정이 없습니다",
+  "err.member.badSport": "종목은 당구 또는 골프만 고를 수 있습니다",
   "err.member.termsOutdated": "약관이 새로 바뀌었어요. 화면을 새로고침한 뒤 다시 동의해 주세요",
   "err.member.invalidId": "회원 ID가 올바르지 않습니다",
   "err.member.invalidTargetId": "상대 회원 ID가 올바르지 않습니다",

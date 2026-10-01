@@ -3,22 +3,15 @@
  * 골프 모드는 검정 바탕·라임 강조(index.css [data-sport="GOLF"])라 black/… 알파 색은 안 보인다.
  * 이 파일의 클래스는 골프 모드에서도 당구 모드에서도 제 색이 난다.
  */
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** 공개 골프 페이지는 어느 모드로 들어와도 골프 토큰으로 그린다(검색 유입은 당구 모드가 기본이라). 나갈 때 되돌린다. */
-export function useGolfTheme() {
-    useEffect(() => {
-        const el = document.documentElement;
-        const prev = el.getAttribute("data-sport");
-        const apply = () => el.setAttribute("data-sport", "GOLF");
-        apply();
-        // 첫 진입(새로고침)에는 SportProvider 의 effect 가 이 뒤에 돌아 당구로 되돌린다(자식 effect 가 먼저) — 한 틱 뒤 다시 건다
-        const t1 = setTimeout(apply, 0);
-        const t2 = setTimeout(apply, 250);
-        return () => { clearTimeout(t1); clearTimeout(t2); if (prev) el.setAttribute("data-sport", prev); else el.removeAttribute("data-sport"); };
-    }, []);
-}
+/**
+ * (2026-10-01 걷어냄) 예전엔 공개 골프 페이지가 직접 data-sport=GOLF 를 걸고, 나갈 때 들어올 때 값으로 되돌렸다.
+ * 9/21 부터 SportContext 가 주소(/golfer·/golf-ranking)로 골프를 고르는데, 이 되돌리기가 그 뒤에 돌아
+ * 홈·로그인까지 골프 색으로 굳혔다(오너 제보: 비로그인으로 골프 페이지 → 홈이 검은 화면). 이제 아무것도 하지 않는다.
+ */
+export function useGolfTheme() { /* SportContext 가 맡는다 */ }
 
 export function GSection({ emoji, title, meta, desc, children }: { emoji: string; title: string; meta?: ReactNode; desc?: string; children: ReactNode }) {
     return (

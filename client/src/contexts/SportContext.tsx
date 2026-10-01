@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useLayoutEffect, useState 
 import { useLocation } from "wouter";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { sportForPath } from "@shared/sportRoute";
+import { useAuth } from "@/hooks/useAuth";
 
 export type SportType = "BILLIARDS" | "GOLF";
 
@@ -13,6 +14,8 @@ interface SportContextType {
 const SportContext = createContext<SportContextType | undefined>(undefined);
 
 const STORAGE_KEY = "rankue_current_sport";
+/** 이 세션에 주 종목을 한 번 맞췄나 */
+const BOOT_KEY = "rankue_primary_sport_applied";
 
 function readSaved(): SportType {
     try { return localStorage.getItem(STORAGE_KEY) === "GOLF" ? "GOLF" : "BILLIARDS"; } catch { return "BILLIARDS"; }
@@ -34,8 +37,26 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
     const routeSport = sportForPath(location);
     // 관리자·사장님 콘솔은 밝은 화면 한 가지로 만든 화면이다 — 운영자가 골프 모드였다고 골프 테마가 흰 카드·회색 글자를
     // 바꿔 끼우면 콘솔이 깨진다(2026-10-01 골프 관리 화면 조사). 색만 당구(기본)로 두고, 저장된 선호는 건드리지 않는다.
-    const consolePath = /^\/(admin|partner)(\/|$|\?)/.test(location);
+    // 로그인·가입 화면(/ · /hiq · /register)도 같은 이유로 밝은 화면 한 가지(2026-10-01 오너: "골프로 들어오면 로그인 화면 색이 이상하다").
+    // 골프로 들어온 사람에겐 화면이 강조색만 라임으로 바꾼다(landing.tsx) — 테마 전체를 덮어씌우지 않는다.
+    const consolePath = /^\/(admin|partner|register)(\/|$|\?)/.test(location) || location === "/" || location === "/hiq";
     const currentSport: SportType = consolePath ? "BILLIARDS" : routeSport ?? (golfOk ? saved : "BILLIARDS");
+
+    // 주 종목(2026-10-01) — 앱을 열 때(세션마다 한 번) 회원이 고른 종목으로 시작한다. 폰을 바꾸거나 다시 깔아도 골프 회원은 골프로.
+    // 세션 안에서 사용자가 종목을 바꾸면 그대로 둔다(한 번만 맞춘다). 주소가 종목을 정하는 화면은 위에서 이미 주소가 이긴다.
+    const { member } = useAuth();
+    const primary = (member as { primarySport?: string | null } | undefined)?.primarySport;
+    useEffect(() => {
+        if (primary !== "GOLF" && primary !== "BILLIARDS") return;
+        try {
+            if (sessionStorage.getItem(BOOT_KEY)) return;
+            sessionStorage.setItem(BOOT_KEY, "1");
+        } catch { return; }
+        if (primary !== saved) {
+            setSaved(primary);
+            try { localStorage.setItem(STORAGE_KEY, primary); } catch { /* 저장소를 못 쓰는 환경 */ }
+        }
+    }, [primary]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // 종목이 정해진 주소로 들어왔으면 그게 곧 선택이다 — 골프 선수 페이지에서 '홈'을 누르면 골프 홈으로 이어져야지,
     // 당구 홈으로 튀면 "골프 앱인 줄 알았는데" 가 된다. 반대(당구 전용 주소)도 같다.

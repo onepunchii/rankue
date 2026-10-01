@@ -343,6 +343,7 @@ export const tr: Record<string, string> = {
   "err.member.handleFormat": "Kullanıcı adı 3–20 karakter olmalı: küçük harf, rakam, _ (rakamla başlayamaz)",
   "err.member.handleTaken": "Bu kullanıcı adı zaten alınmış",
   "err.member.noPrefsToChange": "Değiştirilecek bildirim ayarı yok",
+  "err.member.badSport": "Bilardo veya golf seçin",
   "err.member.termsOutdated": "Koşullar güncellendi. Sayfayı yenileyip tekrar onaylayın",
   "err.member.invalidId": "Geçersiz üye kimliği",
   "err.member.invalidTargetId": "Geçersiz rakip üye kimliği",

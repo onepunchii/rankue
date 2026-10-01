@@ -378,7 +378,7 @@ export interface AdminRoundDetail {
     history: { id: string; memberId: string; name: string | null; score: number; onSite: boolean | null; isWinner: boolean; at: string }[];
     /** 18홀을 다 적은 실제 회원이 있는데 끝난 경기에 기록이 하나도 없다 — 무효화했거나 회원이 탈퇴한 경우 */
     missingHistory: boolean;
-    actions: { abandon: boolean; void: boolean };
+    actions: { abandon: boolean; void: boolean; finish: boolean };
 }
 
 const isoOf = (v: Date | string | null | undefined): string | null => {
@@ -488,6 +488,8 @@ export async function roundDetail(session: any): Promise<AdminRoundDetail> {
         actions: {
             abandon: session.status === "waiting" || session.status === "playing",
             void: session.status === "finished" && history.length > 0,
+            // 멈춘 라운드를 기록으로 끝내기(2026-10-01) — 진행 중이고 18홀을 다 적은 회원이 하나라도 있을 때만
+            finish: session.status === "playing" && cards.some((c) => c.isMember && c.complete),
         },
     };
 }

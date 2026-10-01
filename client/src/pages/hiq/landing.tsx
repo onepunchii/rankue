@@ -1,3 +1,4 @@
+import type React from "react";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
@@ -202,8 +203,14 @@ export default function Landing() {
         );
     }
 
+    // 골프 페이지(골프 선수·랭킹·골프장)에서 로그인으로 온 사람 — 밝은 화면은 그대로 두고 강조색만 골프 초록(2026-10-01 오너:
+    // "골프로 들어오면 로그인 화면 색이 이상하다"). 예전엔 골프 테마가 통째로 덮여 입력칸·입장하기가 어둡게 묻히고 구글 단추만 튀었다.
+    // 라임(#64DD17)은 흰 바탕 글자로 너무 옅어서 한 단계 짙은 잔디색을 쓴다.
+    const golfEntry = (() => { try { return localStorage.getItem("rankue_current_sport") === "GOLF"; } catch { return false; } })();
+    const accentStyle = golfEntry ? ({ "--brand": "63 160 16", "--brand-strong": "52 138 12", "--brand-fg": "255 255 255" } as React.CSSProperties) : undefined;
+
     return (
-        <div className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-5 relative overflow-hidden bg-surface-0 font-sans">
+        <div style={accentStyle} className="min-h-[100dvh] w-full flex flex-col items-center justify-center px-5 relative overflow-hidden bg-surface-0 font-sans">
             {/* Main Container */}
             <motion.div
                 initial={{ opacity: 0, y: 20 }}

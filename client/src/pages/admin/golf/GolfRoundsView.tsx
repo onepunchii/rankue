@@ -87,7 +87,7 @@ interface RoundDetail {
     photos: { total: number; public: number; hidden: number };
     history: { id: string; memberId: string; name: string | null; score: number; onSite: boolean | null; isWinner: boolean; at: string }[];
     missingHistory: boolean;
-    actions: { abandon: boolean; void: boolean };
+    actions: { abandon: boolean; void: boolean; finish: boolean };
 }
 interface StatSnap { avg: number | null; best: number | null; grade: string | null; rounds: number }
 interface VoidResult {
@@ -494,7 +494,24 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
         onError: (e: any) => toast({ title: "무효화 실패", description: e?.message ?? "", variant: "destructive" }),
         onSettled: () => qc.invalidateQueries({ queryKey: GOLF_ROUNDS_KEY }),
     });
-    const busy = abandon.isPending || voidRound.isPending;
+    const finish = useMutation({
+        mutationFn: async (sid: string) => apiRequest(`${BASE}/${sid}/finish`, { method: "POST" }) as Promise<{ recordedMemberIds: string[]; legacy: boolean }>,
+        onSuccess: (r) => toast({
+            title: "기록으로 끝냈습니다",
+            description: `${Array.isArray(r?.recordedMemberIds) ? r.recordedMemberIds.length : 0}명의 기록을 남겼습니다.${r?.legacy ? " 현장 인증 규칙 전 라운드라 옛 기록으로 남겼습니다." : ""}`,
+        }),
+        onError: (e: any) => toast({ title: "끝내기 실패", description: e?.message ?? "", variant: "destructive" }),
+        onSettled: () => qc.invalidateQueries({ queryKey: GOLF_ROUNDS_KEY }),
+    });
+    const busy = abandon.isPending || voidRound.isPending || finish.isPending;
+    const askFinish = async (r: RoundDetail) => {
+        const done = r.players.filter((p) => !p.isGuest && p.holesPlayed >= 18).length;
+        const message = `이 라운드를 끝내고 기록으로 남길까요?\n\n${courseOf(r)} · 방장 ${r.host.name ?? "?"}\n`
+            + `18홀을 다 적은 회원 ${done}명의 기록이 평균·등급·여권 도장에 들어갑니다. 정산도 지금 점수로 굳습니다.`
+            + (Date.parse(r.startedAt ?? r.createdAt ?? "") < Date.parse("2026-09-30T00:00:00+09:00") ? "\n현장 인증 규칙(9/30) 전 라운드라 옛 기록으로 남습니다." : "");
+        if (!(await appConfirm({ message, confirmText: "기록으로 끝내기" }))) return;
+        finish.mutate(r.id);
+    };
 
     const askAbandon = async (r: RoundDetail) => {
         const holes = r.players.reduce((m, p) => Math.max(m, p.holesPlayed), 0);
@@ -520,7 +537,7 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
     const guests = d ? d.players.length - members : 0;
     const checkins = Array.isArray(d?.checkins) ? d!.checkins : [];
     const history = Array.isArray(d?.history) ? d!.history : [];
-    const hasActions = !!d && (d.actions.abandon || d.actions.void);
+    const hasActions = !!d && (d.actions.abandon || d.actions.void || d.actions.finish);
 
     return (
         <Sheet open={!!id} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -679,6 +696,15 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
 
                         {hasActions && (
                             <div className="shrink-0 bg-white border-t border-black/[0.07] px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] space-y-2">
+                                {d.actions.finish && (
+                                    <div className="flex items-center gap-3">
+                                        <button disabled={busy} onClick={() => askFinish(d)}
+                                            className="h-10 px-5 shrink-0 rounded-xl text-[13.5px] font-bold bg-brand text-white hover:bg-brand-strong transition-colors active:scale-[0.99] disabled:opacity-40">
+                                            기록으로 끝내기
+                                        </button>
+                                        <span className="text-[12px] text-black/45 leading-snug">방장이 '끝내기'를 못 누르고 멈춘 라운드 — 18홀을 다 적은 회원만 기록됩니다.</span>
+                                    </div>
+                                )}
                                 {d.actions.abandon && (
                                     <div className="flex items-center gap-3">
                                         <button disabled={busy} onClick={() => askAbandon(d)}

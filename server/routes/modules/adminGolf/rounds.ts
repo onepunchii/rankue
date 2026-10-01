@@ -17,6 +17,8 @@ import {
  *   GET  /:id              상세 — 점수판·정산(읽기 전용)·현장 확인·사진 수·기록
  *   POST /:id/abandon      대기·진행 중 방 접기(기록은 남지 않는다)
  *   POST /:id/void         끝난 라운드의 기록 무효화 — 평균·등급·랭킹·여권 도장에서 뺀다. 되돌릴 수 없다
+ *   POST /:id/finish       멈춘 라운드를 기록으로 끝내기 — 사용자 '라운드 끝내기'와 같은 길. 현장 인증 규칙(9/30) 전에
+ *                          시작한 라운드는 옛 기록(on_site NULL)으로 둔다 — 기존 도장을 인정한 원칙과 같다(2026-10-01 오너)
  *
  * 쓰기는 전부 adminLog 로 남긴다. 고정 경로(/cleanup-stale)를 /:id 보다 먼저 둔다.
  */
@@ -70,6 +72,33 @@ router.post("/:id/abandon", asyncHandler(async (req: any, res: any) => {
         sessionId: req.params.id, from: session.status, holesEntered: sum.holesEntered, members: sum.members, guests: sum.guests,
     });
     return sendSuccess(res, { id: done.id, status: done.status, previous: session.status });
+}));
+
+/** 현장 인증 규칙이 생긴 때(2026-09-30 00:00 KST). 그 전에 시작한 라운드는 '규칙 전 기록'으로 남긴다 */
+const ONSITE_RULE_START = Date.parse("2026-09-30T00:00:00+09:00");
+
+router.post("/:id/finish", asyncHandler(async (req: any, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "라운드를 찾을 수 없습니다.");
+    const session = await storage.golf.getGolfMatchSession(req.params.id);
+    if (!session) return sendError(res, 404, "라운드를 찾을 수 없습니다.");
+    if (session.status !== "playing") return sendError(res, 409, "진행 중인 라운드만 기록으로 끝낼 수 있습니다.");
+    const detail = await roundDetail(req.params.id);
+    if (!detail?.actions.finish) return sendError(res, 409, "18홀을 다 적은 회원이 없습니다 — 기록할 게 없어 '접기'를 쓰세요.");
+    // 사용자 '라운드 끝내기'와 같은 저장소 함수 — 18홀을 다 적은 회원만 기록, 정산 저장, 현장 판정까지 한 트랜잭션
+    const done: any = await storage.golf.finishGolfMatchSession(req.params.id);
+    const recorded: string[] = Array.isArray(done?.recordedMemberIds) ? done.recordedMemberIds : [];
+    const startedMs = Date.parse(String(session.startedAt ?? session.createdAt ?? ""));
+    const legacy = Number.isFinite(startedMs) && startedMs < ONSITE_RULE_START;
+    if (legacy && recorded.length) {
+        // 규칙 전 라운드 — 확인이 없어 '미인증'으로 굳은 값을 옛 기록(NULL)으로 되돌리고 평균·등급을 다시 센다
+        const { db } = await import("../../../db.js");
+        const { sql } = await import("drizzle-orm");
+        await db.execute(sql`update hiq_game_history set on_site = null
+            where golf_session_id = ${req.params.id} and sport_category = 'GOLF' and on_site = false`);
+        for (const mid of recorded) await storage.updateGolfStats(mid).catch((e: unknown) => console.error("[admin] golf finish recount", e));
+    }
+    adminLog(req, "golf.round.finish", { sessionId: req.params.id, recorded: recorded.length, legacy });
+    return sendSuccess(res, { id: req.params.id, status: "finished", recordedMemberIds: recorded, legacy });
 }));
 
 router.post("/:id/void", asyncHandler(async (req: any, res: any) => {

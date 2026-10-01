@@ -162,7 +162,15 @@ export const getQueryFn = <T>(): QueryFunction<T> => async ({ queryKey, signal }
     url += (url.includes("?") ? "&" : "?") + queryString;
   }
 
-  return apiRequest(url, { method: "GET", signal });
+  try {
+    return await apiRequest(url, { method: "GET", signal });
+  } catch (e) {
+    // 로그인 확인(/api/hiq/me)의 401 은 '오류'가 아니라 '비로그인'이라는 **답**이다 — null 로 돌려 성공으로 둔다(2026-10-01).
+    // 오류로 두면 데이터가 없는 채라, 새 화면(하단 탭 등)이 붙을 때마다 다시 묻고 그동안 상태가 '로딩'으로 되돌아갔다 —
+    // 비로그인 홈이 로딩 ↔ 로그인 안내를 끝없이 오가며 방문자 한 명이 몇 초에 수백 번 /me 를 불렀다(오너 제보, 실측 227회).
+    if (url === "/api/hiq/me" && (e as { status?: number } | null)?.status === 401) return null as T;
+    throw e;
+  }
 };
 
 // 5. QueryClient 설정
@@ -202,6 +210,8 @@ if (typeof window !== "undefined") {
       shouldDehydrateQuery: (query) => {
         if (query.state.status !== "success") return false;
         const key = String(query.queryKey[0] ?? "");
+        // 비로그인 답(null)은 저장하지 않는다 — 다음 실행에 '로그인 안 됨'이 먼저 그려지면 안 된다
+        if (key === "/api/hiq/me" && query.state.data == null) return false;
         return !key.startsWith("/api/hiq/game/");
       },
     },

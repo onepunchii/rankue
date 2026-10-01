@@ -89,8 +89,16 @@ router.get("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =
         profile = await storage.getProfile(member.profileId);
     }
 
+    // 주 종목을 아직 안 골랐으면 기본값을 기록으로 추정해 함께 준다(고르는 화면의 처음 선택). 고른 회원은 묻지 않는다.
+    let suggestedSport: string | null = null;
+    if (!(member as any).primarySport) {
+        const { suggestedSportFor } = await import("../../storage/primarySport.js");
+        suggestedSport = await suggestedSportFor(member.id).catch(() => "BILLIARDS");
+    }
+
     return sendSuccess(res, {
         ...member,
+        suggestedSport,
         role: profile?.role?.trim() || 'user',
         profileImageUrl: profile?.profileImageUrl,
         nickname: profile?.nickname || member.name,
@@ -188,6 +196,15 @@ router.get("/me/notification-prefs", requireAuth, asyncHandler(async (req: AuthR
 }));
 
 /** PATCH /me/notification-prefs — 보낸 카테고리만 바꾼다. 모르는 키는 버린다(normalizePrefs). */
+/** POST /me/primary-sport { sport } — 주 종목 고르기·바꾸기(2026-10-01). 가입 화면·처음 한 번 묻는 창·설정이 같이 쓴다 */
+router.post("/me/primary-sport", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { isPrimarySport } = await import("../../../shared/primarySport.js");
+    const sport = req.body?.sport;
+    if (!isPrimarySport(sport)) return sendError(res, 400, "err.member.badSport");
+    await storage.updateMember(req.userId!, { primarySport: sport });
+    return sendSuccess(res, { primarySport: sport });
+}));
+
 router.patch("/me/notification-prefs", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
     if (!member) return sendError(res, 404, "err.member.infoNotFound");

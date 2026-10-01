@@ -134,6 +134,8 @@ export const hiqMembers = pgTable("hiq_members", {
    * 규칙은 shared/notificationPrefs.ts. 끄면 푸시만 멈추고 인앱 알림함에는 그대로 쌓인다.
    */
   pushPrefs: jsonb("push_prefs"),
+  /** 주 종목(2026-10-01) — "BILLIARDS" | "GOLF", null 이면 아직 안 고름. shared/primarySport */
+  primarySport: text("primary_sport"),
   rating3c: integer("rating_3c").default(0).notNull(),
   rating4c: integer("rating_4c").default(0).notNull(),
   avg3c: doublePrecision("avg_3c").default(0),
