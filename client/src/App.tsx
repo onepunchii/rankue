@@ -4,6 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { AppDialogHost } from "@/components/AppDialog";
 import { PrimarySportGate } from "@/components/hiq/sport/PrimarySport";
+import { PresenceArrivals } from "@/components/hiq/presence/PresenceArrivals";
 import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
@@ -419,6 +420,8 @@ function App() {
             <AppDialogHost />
             {/* 주 종목 한 번 묻기(2026-10-01) — 가입 직후·기존 회원 다음 접속 때 한 번. 고른 종목으로 앱이 시작한다 */}
             <PrimarySportGate />
+            {/* 친구·크루 접속 배너(2026-10-01) — 앱을 보고 있을 때만, 폰은 울리지 않는다 */}
+            <PresenceArrivals />
             {/* 네이티브 앱 전용 안내(업데이트·알림 권한 사전 설명). 웹에선 아무것도 그리지 않는다. */}
             <NativePrompts />
             {/* 온라인게임 대전 호출 — 방을 열고 다른 화면에 있어도 상대가 들어오면·내 차례면 앱 안에서 바로 알린다(2026-09-26) */}

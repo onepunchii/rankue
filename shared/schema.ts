@@ -1854,6 +1854,17 @@ export const hiqAppSessions = pgTable("hiq_app_sessions", {
   memberIdx: index("hiq_app_sessions_member_idx").on(t.memberId, t.openedAt),
 }));
 
+/**
+ * 친구·크루 접속 알림 설정(2026-10-01, shared/presence). 행이 없으면 둘 다 켜짐 — 끈 사람만 행이 생긴다.
+ * share=false 면 내가 들어와도 아무에게도 안 알린다. receive=false 면 남이 들어와도 배너를 안 띄운다.
+ */
+export const hiqPresencePrefs = pgTable("hiq_presence_prefs", {
+  memberId: uuid("member_id").primaryKey().references(() => hiqMembers.id),
+  share: boolean("share").default(true).notNull(),
+  receive: boolean("receive").default(true).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const hiqPlayerFollows = pgTable("hiq_player_follows", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),

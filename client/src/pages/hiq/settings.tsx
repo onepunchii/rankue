@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { BlockedMembersSection } from "@/components/hiq/community/BlockedMembersSection";
 import { NotificationKinds } from "@/components/hiq/settings/NotificationKinds";
 import { PrimarySportSetting } from "@/components/hiq/sport/PrimarySportSetting";
+import { PresenceSettings } from "@/components/hiq/presence/PresenceSettings";
 import {
     canOpenNotificationSettings, forgetPushToken, isNativeApp, openNotificationSettings, pushPermission, requestPushPermission,
     storedPushToken, type PushPermission,
@@ -233,6 +234,9 @@ export default function HiqSettings() {
 
                 {/* 주 종목(2026-10-01) — 앱을 열면 이 종목으로 시작한다. 골프를 쓰는 회원에게만 */}
                 {member?.golfAccess && <PrimarySportSetting current={(member as any)?.primarySport ?? null} />}
+
+                {/* 친구 접속(2026-10-01) — 앱 안 배너 받기·내 접속 알리기 */}
+                {member && <PresenceSettings />}
 
                 {/* 커뮤니티 */}
                 <section className="rk-card p-5">

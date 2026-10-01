@@ -4,6 +4,7 @@ import golfArcadeRouter from "./modules/golfArcade.js";
 import { requireGolfAccess } from "../middleware/golfAccess.js";
 import crewRouter from "./modules/crew.js";
 import chatRouter from "./modules/chat.js";
+import presenceRouter from "./modules/presence.js";
 import chatCardsRouter from "./modules/chatCards.js";
 import authRouter from "./modules/auth.js";
 import adminRouter from "./modules/admin.js";
@@ -42,6 +43,8 @@ router.use("/golf-courses", golfCoursesRouter);
 router.use("/crews", crewRouter);
 // 채팅 허브(2026-09-21): 크루 방 + 조인·부킹 방 목록, 읽음, 조인·부킹 방 메시지
 router.use("/chat", chatRouter);
+// 친구·크루 접속 알림(2026-10-01) — 앱 안 배너용
+router.use("/presence", presenceRouter);
 // 채팅 + 첨부 카드(2026-09-23): 서버만 카드를 만든다 — /chat/rooms/:key/cards/<종류>
 router.use("/chat", chatCardsRouter);
 

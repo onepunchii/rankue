@@ -212,6 +212,8 @@ if (typeof window !== "undefined") {
         const key = String(query.queryKey[0] ?? "");
         // 비로그인 답(null)은 저장하지 않는다 — 다음 실행에 '로그인 안 됨'이 먼저 그려지면 안 된다
         if (key === "/api/hiq/me" && query.state.data == null) return false;
+        // 친구 접속 배너는 지금 이 순간의 답이라 저장하지 않는다(2026-10-01)
+        if (key.startsWith("/api/hiq/presence/")) return false;
         return !key.startsWith("/api/hiq/game/");
       },
     },
