@@ -169,6 +169,8 @@ const shortManwon = (n: number) => (n >= 10000 ? `${(n / 10000).toFixed(n % 1000
 /** 로고는 정적 파일(/img/golf-logos/…)이라 함수 번들에 없다 — 사이트에서 받아 data URI 로. 못 받으면 이름 글자. */
 async function logoDataUri(path: string | null | undefined): Promise<string | null> {
   if (!path || !/^\/img\/golf-logos\/[\w.-]+\.png$/.test(path)) return null;
+  // 흰색뿐인 로고(-light.png)는 카드의 흰 판에서 안 보인다 — 이름 글자로(2026-10-01)
+  if (/-light\.png$/i.test(path)) return null;
   try {
     const r = await fetch(`${ORIGIN}${path}`, { signal: AbortSignal.timeout(3000) });
     if (!r.ok) return null;
