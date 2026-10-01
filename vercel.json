@@ -64,6 +64,10 @@
       "handle": "filesystem"
     },
     {
+      "src": "/assets/(.*)",
+      "status": 404
+    },
+    {
       "src": "/\\.well-known/.*",
       "status": 404
     },

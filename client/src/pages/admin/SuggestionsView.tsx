@@ -33,7 +33,9 @@ const TYPE_LABEL: Record<string, { label: string; tone: "alert" | "brand" | "inf
 export default function SuggestionsView() {
     const { toast } = useToast();
     const qc = useQueryClient();
-    const { data: suggestions = [], isLoading } = useQuery<Suggestion[]>({ queryKey: SUGGESTIONS_KEY });
+    const { data: rawSuggestions, isLoading } = useQuery<Suggestion[]>({ queryKey: SUGGESTIONS_KEY });
+    // 배열이 아닌 응답(세션 만료·옛 캐시)에 .filter 로 화면 전체가 죽지 않게(2026-10-01)
+    const suggestions = Array.isArray(rawSuggestions) ? rawSuggestions : [];
     const [filter, setFilter] = useState<"unread" | "unreplied" | "all">("unread");
     const [type, setType] = useState<string>("all");
     const [q, setQ] = useState("");

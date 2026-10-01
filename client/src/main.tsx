@@ -3,11 +3,16 @@ import { IconContext } from "@phosphor-icons/react";
 import App from "./App";
 import "./index.css";
 import { initErrorReporter } from "./lib/errorReporter";
+import { installChunkReload } from "./lib/chunkReload";
+import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { initNativeBridge, isNativeApp } from "./lib/nativeBridge";
 import { initKeyboardAvoid } from "./lib/keyboardAvoid";
 
 // 클라이언트 에러 수집기 마운트 (프로덕션에서 /api/errors 로 익명 전송)
 initErrorReporter();
+
+// 배포 직후 옛 조각 파일을 못 읽으면 한 번 새로고침(흰 화면 원인 1위, 2026-10-01) — lib/chunkReload
+installChunkReload();
 
 // 네이티브 앱(Capacitor) 브릿지 — 뒤로가기·오프라인 복귀·딥링크·푸시 리스너. 웹에선 no-op.
 // 오프라인 복귀 경로를 첫 렌더 전에 적용하므로 반드시 render 보다 먼저 부른다.
@@ -35,7 +40,10 @@ window.addEventListener('unhandledrejection', (event) => {
 
 createRoot(document.getElementById("root")!).render(
     <IconContext.Provider value={{ weight: "duotone" }}>
-        <App />
+        {/* 어느 화면이 터져도 흰 화면 대신 안내 카드 — components/AppErrorBoundary */}
+        <AppErrorBoundary>
+            <App />
+        </AppErrorBoundary>
     </IconContext.Provider>
 );
 

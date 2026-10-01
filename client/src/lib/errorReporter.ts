@@ -5,12 +5,19 @@
 const sent = new Set<string>();
 let count = 0;
 
+/** 오류 화면(AppErrorBoundary)이 잡은 렌더 오류도 같은 길로 보낸다 — React 가 잡은 오류는 window 'error' 로 오지 않는다 */
+export function reportClientError(message: string, stack?: string | null) {
+    report(message, stack);
+}
+
 function report(message: string, stack?: string | null) {
     if (!message || count >= 5) return;
     // 로컬 개발 중 발생한 에러는 쌓지 않음 (프로덕션 모니터링 전용)
     if (/^(localhost|127\.|192\.168\.|0\.0\.0\.0)/.test(location.hostname)) return;
-    // 브라우저 확장·네트워크 순단 등 조치 불가능한 소음 제외
-    if (/ResizeObserver|Script error\.?|Load failed|NetworkError|Failed to fetch|AbortError/i.test(message)) return;
+    // 브라우저 확장·네트워크 순단 등 조치 불가능한 소음 제외.
+    // 단 'Failed to fetch dynamically imported module'(배포 뒤 옛 조각 파일)은 흰 화면의 원인이라 남긴다(2026-10-01)
+    if (/ResizeObserver|Script error\.?|Load failed|NetworkError|AbortError/i.test(message)) return;
+    if (/Failed to fetch/i.test(message) && !/dynamically imported module/i.test(message)) return;
     const key = message.slice(0, 200);
     if (sent.has(key)) return;
     sent.add(key);

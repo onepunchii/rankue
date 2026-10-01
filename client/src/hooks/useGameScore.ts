@@ -370,6 +370,8 @@ export function useGameScore(id: string) {
 
     const handleDragEnd = (event: any) => {
         const { active, over } = event;
+        // 카드를 목록 밖에 놓으면 over 가 null 이다 — 예전엔 over.id 에서 터졌다(오류 수집 10건, 2026-10-01)
+        if (!active || !over) return;
         if (active.id !== over.id) {
             setPlayerOrder((items) => {
                 const oldIndex = items.indexOf(active.id);

@@ -34,6 +34,9 @@ import {
 import MemberDetailSheet, { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
 import { KpiTile, Panel, Pill, agoLabel } from "./adminUtils";
 
+/** 배열이 아닌 응답에도 화면이 죽지 않게(빈 목록으로) */
+const asList = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
+
 type GlobalStats = {
     totalStores: number;
     totalUsers: number;
@@ -172,14 +175,15 @@ export default function AdminDashboard() {
     const [openMemberId, setOpenMemberId] = useState<string | null>(null);
 
     const { data: stats } = useQuery<GlobalStats>({ queryKey: ["/api/hiq/admin/stats"] });
-    const { data: members = [] } = useQuery<AdminMember[]>({ queryKey: ADMIN_MEMBERS_KEY });
+    // 응답이 배열이 아닐 때(세션 만료 응답·옛 캐시) .filter·.find 에서 대시보드 전체가 흰 화면이 됐다(오류 수집 10건, 2026-10-01) — 받는 자리에서 배열로
+    const members = asList<AdminMember>(useQuery<AdminMember[]>({ queryKey: ADMIN_MEMBERS_KEY }).data);
     const openMember = openMemberId ? members.find((m) => m.id === openMemberId) ?? null : null;
     // 밀린 일 숫자 — 각 화면과 같은 열쇠(같은 요청 한 번)
-    const { data: leads = [] } = useQuery<PartnerLead[]>({ queryKey: LEADS_KEY });
-    const { data: suggestions = [] } = useQuery<Suggestion[]>({ queryKey: SUGGESTIONS_KEY });
-    const { data: claims = [] } = useQuery<Claim[]>({ queryKey: CLAIMS_KEY });
-    const { data: registrations = [] } = useQuery<Registration[]>({ queryKey: REGISTRATIONS_KEY });
-    const { data: golfOrders = [] } = useQuery<{ status: string }[]>({ queryKey: GOLF_ORDERS_KEY });
+    const leads = asList<PartnerLead>(useQuery<PartnerLead[]>({ queryKey: LEADS_KEY }).data);
+    const suggestions = asList<Suggestion>(useQuery<Suggestion[]>({ queryKey: SUGGESTIONS_KEY }).data);
+    const claims = asList<Claim>(useQuery<Claim[]>({ queryKey: CLAIMS_KEY }).data);
+    const registrations = asList<Registration>(useQuery<Registration[]>({ queryKey: REGISTRATIONS_KEY }).data);
+    const golfOrders = asList<{ status: string }>(useQuery<{ status: string }[]>({ queryKey: GOLF_ORDERS_KEY }).data);
     const { data: reportCount } = useQuery<{ open: number }>({ queryKey: ["/api/hiq/admin/reports/count"], refetchInterval: 120_000 });
 
     const pending = useMemo(() => ({
