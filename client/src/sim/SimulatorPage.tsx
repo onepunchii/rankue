@@ -253,7 +253,6 @@ export function SimulatorPage() {
     const entryView = !overlayParam && !replay && readCfgParam(search) === null && params.get(REPLAY_PARAM) === null;
     // ?solo=1 — 홈 '혼자 치기' 카드(2026-10-04)가 진입 화면을 건너뛰고 바로 혼자 치기 설정 창을 연다. 닫으면 진입 화면이다.
     const [setupOpen, setSetupOpen] = useState((!entryView && initial === null && replay === null && !overlayParam) || (entryView && params.get("solo") === "1"));
-    const soloParamRef = useRef(entryView && params.get("solo") === "1");
     const lobbyTab = params.get("tab") === "join" ? "join" as const : undefined;
     // 드릴 모드: 고정 배치에서 첫 샷만 서버가 채점(문제당 1회), 그 뒤는 연습. scored 전엔 공 배치를 막는다.
     const [drill, setDrill] = useState<{ drill: WeekDrill; week: DrillWeek; scored: boolean; result: { success: boolean; cushions: number } | null } | null>(null);
@@ -1253,8 +1252,8 @@ export function SimulatorPage() {
             setEndDismissed(false);
             // 대전은 서버에 남으므로 목록(로비)으로 돌아간다
             // 홈으로 갈 땐 기록을 바꿔 끼운다(replace) — 쌓으면 홈에서 '뒤로'가 방금 나온 판(?cfg·?match)을 다시 연다(2026-10-04 리뷰)
-            if (isMatch) navigate("/online-game?lobby=1");
-            else if (drillRef.current) navigate("/online-game?drills=1");
+            if (isMatch) navigate("/online-game?lobby=1", { replace: true });
+            else if (drillRef.current) navigate("/online-game?drills=1", { replace: true });
             else navigate(ENTRY_PATH, { replace: true });
             setDrill(null);
             setExiting(false);
@@ -1458,10 +1457,11 @@ export function SimulatorPage() {
         setLog(EMPTY_LOG);
         setBanner(null);
         actions.start(config, { record: opts.record });
-        // 홈 '바로 치기'(?solo=1)로 왔으면 시작한 **뒤에** 주소를 입구로 — 판 도중 새로고침하면 설정 창 대신 홈의 '이어서 치기'로
-        // 이어진다. 시작 전에 바꾸면 한 박자 동안 '설정 단계 + 맨 입구'로 보여 회원을 홈으로 돌려보낼 수 있다.
-        if (soloParamRef.current) { soloParamRef.current = false; navigate(GUEST_ENTRY_PATH, { replace: true }); }
-    }, [actions, navigate]);
+        // 주소에 ?solo=1 이 있으면(홈 '바로 치기'·대시보드 '연습 시작') 시작한 **뒤에** 입구 주소로 — 판 도중 새로고침하면 설정 창 대신
+        // 홈의 '이어서 치기'로 이어진다. 시작 전에 바꾸면 한 박자 동안 '설정 단계 + 맨 입구'로 보여 회원을 홈으로 돌려보낼 수 있다.
+        // 마운트 때 값이 아니라 지금 주소를 본다 — ?dash=1 로 열린 화면에서 연습 시작으로 붙은 solo 도 지워야 한다(2026-10-04 리뷰).
+        if (params.get("solo") === "1") navigate(GUEST_ENTRY_PATH, { replace: true });
+    }, [actions, navigate, params]);
 
     const onSetupOpenChange = useCallback((open: boolean) => {
         setSetupOpen(open);

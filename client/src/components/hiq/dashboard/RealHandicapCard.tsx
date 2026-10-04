@@ -19,7 +19,7 @@ import { shareImage } from "@/lib/shareImage";
 import { LucidePlay } from "@/lib/icons";
 import { proRatio, type LookalikeResponse, type RealCompareResponse, type RealSide } from "@shared/proCompare";
 import { drawCompareCard } from "@/components/hiq/compare/compareCard";
-import { BadgeAvatar, CardActions, CompareTable, FormDots, GOLD_TEXT, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, RecordStrip, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
+import { BadgeAvatar, CardActions, CompareTable, FormDots, GOLD_TEXT, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, RecordStrip, RecordValue, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
 
 type HistoryRow = { sportCategory?: string | null; gameMode?: string | null; isRanked?: boolean | null; gameType?: string | null; isWinner?: boolean | null };
 
@@ -66,7 +66,7 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
             },
             {
                 label: t("performanceCard.title"),
-                value: fill(t("real.stripRecord"), { w: wins, l: losses }),
+                value: <RecordValue template={t("real.stripRecord")} w={wins} l={losses} />,
                 sub: mine.length ? fill(t("real.stripRate"), { n: Math.round((wins / mine.length) * 100) }) : t("real.stripNone"),
                 onClick: () => setLocation("/history"),
             },

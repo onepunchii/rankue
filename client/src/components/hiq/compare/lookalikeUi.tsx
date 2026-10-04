@@ -288,6 +288,21 @@ export function RecordStrip({ cells }: { cells: StripCell[] }) {
     );
 }
 
+/**
+ * 전적 값 — "{w}승 {l}패" 같은 번역 틀에서 숫자는 크게, 글자는 작게(2026-10-04 리뷰: 360px 폰에서 '103승 97패'가 잘렸다).
+ * 언어마다 틀이 달라도({w}W {l}L · {w}G {l}M) 같은 방식으로 나눈다.
+ */
+export function RecordValue({ template, w, l }: { template: string; w: number; l: number }) {
+    const parts = template.split(/(\{w\}|\{l\})/).filter(Boolean);
+    return (
+        <>
+            {parts.map((p, i) => p === "{w}" || p === "{l}"
+                ? <span key={i}>{p === "{w}" ? w : l}</span>
+                : <span key={i} className="text-[11.5px] font-semibold text-ink-2">{p}</span>)}
+        </>
+    );
+}
+
 /** 최근 경기 점 — 새것이 왼쪽. 승 초록·패 빨강, 비어 있으면 옅은 테두리 점 다섯 */
 export function FormDots({ results }: { results: ("W" | "L")[] }) {
     const { t } = useT();

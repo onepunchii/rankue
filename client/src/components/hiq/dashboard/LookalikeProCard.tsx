@@ -22,7 +22,7 @@ import { shareImage } from "@/lib/shareImage";
 import { GameController } from "@/lib/icons";
 import { proRatio, type LookalikeResponse } from "@shared/proCompare";
 import { drawCompareCard } from "@/components/hiq/compare/compareCard";
-import { BadgeAvatar, CardActions, CompareTable, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, RecordStrip, fill, proName } from "@/components/hiq/compare/lookalikeUi";
+import { BadgeAvatar, CardActions, CompareTable, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, RecordStrip, RecordValue, fill, proName } from "@/components/hiq/compare/lookalikeUi";
 import { useOnlineRecord } from "@/sim/entry/useOnlineRecord";
 import { HANDICAP_QUERY_KEY } from "@/sim/entry/HandicapCard";
 import { matchApi } from "@/sim/matchApi";
@@ -64,14 +64,15 @@ export function LookalikeProCard() {
         <RecordStrip cells={[
             {
                 label: t("home.stripMatchRecord"),
-                value: fill(t("real.stripRecord"), { w: wins, l: Math.max(0, played - wins) }),
+                value: <RecordValue template={t("real.stripRecord")} w={wins} l={Math.max(0, played - wins)} />,
                 sub: played ? fill(t("real.stripRate"), { n: Math.round((wins / played) * 100) }) : t("real.stripNone"),
                 onClick: () => setLocation("/online-game?dash=1&sec=matches"),
             },
             {
                 label: t("sim.rank.title"),
-                value: board?.rank != null ? `#${board.rank}` : played > 0 ? t("sim.rank.unrankedShort") : "—",
-                sub: board?.rank != null ? fill(t("home.rankOf"), { n: board.total.toLocaleString() }) : played > 0 ? `${played}/${placement}` : t("real.stripNone"),
+                // 배치 중이면 숫자(2/3)를 값으로, '배치 중'은 아래 줄로 — 긴 번역(Sin clasificar)이 값 칸에서 잘리지 않게
+                value: board?.rank != null ? `#${board.rank}` : played > 0 ? `${played}/${placement}` : "—",
+                sub: board?.rank != null ? fill(t("home.rankOf"), { n: board.total.toLocaleString() }) : played > 0 ? t("sim.rank.unrankedShort") : t("real.stripNone"),
                 onClick: () => setLocation("/online-game?rank=1"),
             },
             {
