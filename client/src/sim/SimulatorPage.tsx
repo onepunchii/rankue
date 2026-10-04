@@ -246,7 +246,8 @@ export function SimulatorPage() {
     const [initial] = useState(() => (overlayParam || replay ? null : decodePageConfig(readCfgParam(search))));
     // 파라미터가 하나도 없으면 진입 화면(싱글 / 친구와 대전 / 멀티방)부터. cfg 가 있는데 깨졌으면 예전처럼 설정 창을 바로 연다.
     const entryView = !overlayParam && !replay && readCfgParam(search) === null && params.get(REPLAY_PARAM) === null;
-    const [setupOpen, setSetupOpen] = useState(!entryView && initial === null && replay === null && !overlayParam);
+    // ?solo=1 — 홈 '혼자 치기' 카드(2026-10-04)가 진입 화면을 건너뛰고 바로 혼자 치기 설정 창을 연다. 닫으면 진입 화면이다.
+    const [setupOpen, setSetupOpen] = useState((!entryView && initial === null && replay === null && !overlayParam) || (entryView && params.get("solo") === "1"));
     const lobbyTab = params.get("tab") === "join" ? "join" as const : undefined;
     // 드릴 모드: 고정 배치에서 첫 샷만 서버가 채점(문제당 1회), 그 뒤는 연습. scored 전엔 공 배치를 막는다.
     const [drill, setDrill] = useState<{ drill: WeekDrill; week: DrillWeek; scored: boolean; result: { success: boolean; cushions: number } | null } | null>(null);

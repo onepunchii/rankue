@@ -22,6 +22,7 @@ import { matchApi, type MatchPublic } from "@/sim/matchApi";
 import { ROOMS_QUERY_KEY, roomAge } from "@/sim/match/RoomList";
 import { MyRoomRow, useMyOpenRoom } from "@/sim/match/MyRoomRow";
 import { gameLabel } from "@/sim/match/matchView";
+import { LucideChevronRight, LucideUsers } from "@/lib/icons";
 
 const EntryShowcase = lazy(() => import("@/sim/entry/EntryShowcase").then((m) => ({ default: m.EntryShowcase })));
 
@@ -104,13 +105,16 @@ export function OnlineGameCard() {
     // 내가 연 방은 위 목록에서 빠진다(내 방엔 내가 참가할 수 없다) — 따로 한 줄로 보여 준다.
     const { room: myRoom } = useMyOpenRoom(matchApi, !!member);
 
+    // 2026-10-04 오너: "멀티랑 혼자하기 카드를 홈으로 따로 빼자 — 지금은 눌러서 들어가야 나온다.
+    // 그리고 '온라인게임'이라 하니 혼자 하고 싶은 사람이 머뭇거린다." → 카드 둘.
+    //  · 혼자 치기: 3D 테이블 타일 그대로, 누르면 진입 화면을 건너뛰고 설정 창(/online-game?solo=1)
+    //  · 같이 치기: 열린 방 줄 + 방 만들기(예전 아랫단). 머리를 누르면 방 목록(?rooms=1)
     return (
-        <div className="col-span-2 rounded-3xl overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-            {/* 타일: 살아 있는 3D 테이블 위에 제목(누르면 온라인게임 진입 화면) */}
+        <>
             <motion.button
                 whileTap={{ scale: 0.99 }}
-                onClick={() => setLocation("/online-game")}
-                className="relative block w-full h-[168px] overflow-hidden bg-[#174479] text-left"
+                onClick={() => setLocation("/online-game?solo=1")}
+                className="relative block w-full h-[156px] rounded-3xl overflow-hidden bg-[#174479] text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
             >
                 <div ref={sceneRef} className="absolute inset-0">
                     {sceneMounted && (
@@ -119,49 +123,74 @@ export function OnlineGameCard() {
                         </Suspense>
                     )}
                 </div>
-                <div className="relative h-full flex flex-col justify-end p-5 bg-gradient-to-t from-black/55 via-black/10 to-transparent">
-                    <span className="block text-[21px] font-bold text-white leading-tight">{t("quickActions.simTitle")}</span>
-                    <span className="block text-[13px] font-medium text-white/85 mt-1 leading-snug">{t("quickActions.simDesc")}</span>
-                </div>
-                {list.length > 0 && (
-                    <span className="absolute top-4 right-4 h-7 px-3 rounded-pill bg-brand text-brand-fg text-[12px] font-bold inline-flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-white" aria-hidden="true" />
-                        {t("sim.entry.roomsOpen")} {list.length}
+                <div className="relative h-full flex items-end justify-between gap-3 p-5 bg-gradient-to-t from-black/55 via-black/10 to-transparent">
+                    <span className="min-w-0">
+                        <span className="block text-[21px] font-bold text-white leading-tight">{t("home.soloTitle")}</span>
+                        <span className="block text-[13px] font-medium text-white/85 mt-1 leading-snug">{t("home.soloDesc")}</span>
                     </span>
-                )}
+                    <span className="shrink-0 h-10 pl-4 pr-3 rounded-full bg-[#ffffff] text-[14px] font-bold text-[#174479] flex items-center gap-0.5">
+                        {t("home.soloCta")}
+                        <LucideChevronRight className="w-4 h-4" />
+                    </span>
+                </div>
             </motion.button>
 
-            {/* 방 줄: 있으면 바로 참가, 없으면 방을 여는 쪽으로 민다 */}
-            <div className={cn("divide-y divide-black/[0.06]", (shown.length > 0 || myRoom) && "border-t border-black/[0.06]")}>
-                {myRoom && <MyRoomRow room={myRoom} onEnter={() => setLocation("/online-game?lobby=1")} className="bg-brand/[0.04]" />}
-                {shown.map((m) => (
-                    <RoomRow key={m.id} m={m} onJoin={() => setLocation(`/online-game?rooms=1&room=${m.id}`)} />
-                ))}
-            </div>
-            <div className="px-4 py-3 flex items-center gap-2 border-t border-black/[0.06]">
-                {shown.length === 0 && !myRoom && (
-                    <span className="flex-1 min-w-0 text-[12.5px] font-medium text-black/45 truncate">
-                        {rooms.isPending && member ? t("sim.rooms.loading") : t("sim.rooms.empty")}
-                    </span>
-                )}
-                {list.length > MAX_ROWS && (
-                    <button
-                        type="button" onClick={() => setLocation("/online-game?rooms=1")}
-                        className="flex-1 h-10 rounded-pill border border-black/10 text-[13px] font-bold text-black/60 hover:bg-black/[0.03]"
-                    >
-                        {t("sim.entry.rooms")} {list.length}
-                    </button>
-                )}
+            <div className="rounded-3xl overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                 <button
-                    type="button" onClick={() => setLocation("/online-game?lobby=1&public=1")}
-                    className={cn(
-                        "h-10 px-4 rounded-pill bg-brand text-brand-fg text-[13px] font-bold active:scale-[0.98] transition-transform",
-                        shown.length === 0 && !myRoom && list.length <= MAX_ROWS ? "shrink-0" : "flex-1",
-                    )}
+                    type="button"
+                    onClick={() => setLocation("/online-game?rooms=1")}
+                    className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-black/[0.015]"
                 >
-                    {t("sim.entry.roomCreate")}
+                    <span className="w-10 h-10 shrink-0 rounded-2xl bg-brand/10 flex items-center justify-center">
+                        <LucideUsers className="w-[21px] h-[21px] text-brand" />
+                    </span>
+                    <span className="flex-1 min-w-0">
+                        <span className="flex items-center gap-2">
+                            <span className="text-[15px] font-semibold text-ink-1">{t("home.togetherTitle")}</span>
+                            {list.length > 0 && (
+                                <span className="h-5 px-2 rounded-pill bg-brand text-brand-fg text-[11px] font-bold inline-flex items-center gap-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-white" aria-hidden="true" />
+                                    {t("sim.entry.roomsOpen")} {list.length}
+                                </span>
+                            )}
+                        </span>
+                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5 truncate">{t("home.togetherDesc")}</span>
+                    </span>
+                    <LucideChevronRight className="w-4 h-4 text-black/30 shrink-0" />
                 </button>
+
+                {/* 방 줄: 있으면 바로 참가, 없으면 방을 여는 쪽으로 민다 */}
+                <div className={cn("divide-y divide-black/[0.06]", (shown.length > 0 || myRoom) && "border-t border-black/[0.06]")}>
+                    {myRoom && <MyRoomRow room={myRoom} onEnter={() => setLocation("/online-game?lobby=1")} className="bg-brand/[0.04]" />}
+                    {shown.map((m) => (
+                        <RoomRow key={m.id} m={m} onJoin={() => setLocation(`/online-game?rooms=1&room=${m.id}`)} />
+                    ))}
+                </div>
+                <div className="px-4 py-3 flex items-center gap-2 border-t border-black/[0.06]">
+                    {shown.length === 0 && !myRoom && (
+                        <span className="flex-1 min-w-0 text-[12.5px] font-medium text-black/45 truncate">
+                            {rooms.isPending && member ? t("sim.rooms.loading") : t("sim.rooms.empty")}
+                        </span>
+                    )}
+                    {list.length > MAX_ROWS && (
+                        <button
+                            type="button" onClick={() => setLocation("/online-game?rooms=1")}
+                            className="flex-1 h-10 rounded-pill border border-black/10 text-[13px] font-bold text-black/60 hover:bg-black/[0.03]"
+                        >
+                            {t("sim.entry.rooms")} {list.length}
+                        </button>
+                    )}
+                    <button
+                        type="button" onClick={() => setLocation("/online-game?lobby=1&public=1")}
+                        className={cn(
+                            "h-10 px-4 rounded-pill bg-brand text-brand-fg text-[13px] font-bold active:scale-[0.98] transition-transform",
+                            shown.length === 0 && !myRoom && list.length <= MAX_ROWS ? "shrink-0" : "flex-1",
+                        )}
+                    >
+                        {t("sim.entry.roomCreate")}
+                    </button>
+                </div>
             </div>
-        </div>
+        </>
     );
 }

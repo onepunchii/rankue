@@ -5,7 +5,7 @@
  * 노란 '매칭 대결'(칼 아이콘·"실력이 맞는 상대와 1:1 랭킹 경기")이 사실은 **점수판**이라는 게 안 보였다
  * (오너: "매칭대결이라 하니 헷갈린다"). 앱이 상대를 찾아 주는 게 아니라 눈앞의 상대와 칠 점수판을 여는 버튼이고,
  * 2~4인이며 앱이 없는 상대는 이름만 넣으면 된다.
- *  - 점수판 구역: 큰 점수판 카드(점수판 모양의 내 3구·4구 다마) + 혼자 연습 + PIN으로 합류. 세 입구가 다 같은 점수판이다.
+ *  - 점수판 구역: 큰 점수판 카드(맨 위에 내 3구·4구 다마) + 혼자 연습 + PIN으로 합류. 세 입구가 다 같은 점수판이다.
  *    공 세 개 색을 그대로 쓴다 — 혼자 연습 흰 공, 점수판 노란 공, PIN 빨간 공.
  *  - 둘러보기 구역: 매장 찾기 + 커뮤니티.
  *  - 구역 머리 오른쪽 '설명' → HomeGuideDialog(실제 점수판 사진·쓰는 법).
@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import type { RealCompareResponse, RealSide } from "@shared/proCompare";
 import { Target, LogIn, LucideMessageCircle, LucideStore, LucideInfo, LucideChevronRight } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
+import { BallCluster } from "@/components/hiq/ui/BilliardBall";
 
 /** 구역 머리 — 제목·한 줄 설명, 오른쪽에 '설명' 단추(또는 다른 조작) */
 export function HomeSectionHeader({ title, desc, onGuide, children }: { title: string; desc?: string; onGuide?: () => void; children?: ReactNode }) {
@@ -45,42 +46,52 @@ export function HomeSectionHeader({ title, desc, onGuide, children }: { title: s
 }
 
 /**
- * 실제 점수판(/game/:id) 모양을 빌린 **내 다마** 판 — 왼쪽 3구 다마, 오른쪽 4구 다마, 가운데 '내 다마' 원.
- * 처음엔 장식 숫자(18 : 14)였는데 오너(10/4): "내용도 의미도 없다 — 나와 연동되는 3구 다마·4구 다마로".
- * 값은 아래 '내 실전 핸디' 카드와 같은 /api/hiq/compare/real(캐시 공유 — 요청이 늘지 않는다)의 handi —
- * 서버가 경기 기록으로 매기는 값이라 홈 안에서 두 숫자가 어긋나지 않는다.
- * 주로 치는 종목(preferred) 칸이 점수판의 '내 차례' 칸처럼 흰 바탕·굵은 테두리. 공식 5경기 전이면 '—'와 진행(2/5).
+ * 노란 점수판 카드 위의 **내 다마** 판(2026-10-04 오너 두 번: 장식 숫자 18 : 14 는 "의미가 없다 → 나와 연동되는 3구·4구 다마로",
+ * 그다음 점수판 모양은 "이해가 안 간다 → 점수판 말고 내 다마를 잘 표현하는 디자인으로").
+ * 흰 판에 '내 다마' 머리 + 3구 | 4구 두 칸. 칸마다 위쪽 RP 카드와 같은 공 묶음(3구 흰·노랑·빨강, 4구 + 빨강 하나)이라 종목이 바로 읽힌다.
+ * 값은 아래 '내 실전 핸디' 카드와 같은 /api/hiq/compare/real 의 handi(캐시 공유 — 요청이 늘지 않는다).
+ * 서버가 공식 경기 기록으로 매기는 값이라 홈 안에서 두 숫자가 어긋나지 않는다. 공식 5경기 전이면 "공식 N경기 더 치면 나와요".
  */
-export function MiniScoreboard() {
+export function MyDamaPanel() {
     const { t } = useT();
     const { member } = useAuth();
     const q = useQuery<RealCompareResponse>({ queryKey: ["/api/hiq/compare/real"], enabled: !!member, staleTime: 60_000, retry: false });
     const d = q.data;
-    const active = d?.preferred ?? "3c";
     const value = (s?: RealSide) => (s?.ready && s.handi ? String(s.handi) : "—");
-    const panel = (type: "3c" | "4c") => {
+    const cell = (type: "3c" | "4c") => {
         const s = d?.[type];
-        const on = type === active;
+        const ready = !!(s?.ready && s.handi);
         return (
-            <div className={on ? "bg-[#ffffff] shadow-[inset_0_0_0_3px_#334155] px-3 pt-1.5" : "bg-[#E7E5E0] px-3 pt-1.5"}>
-                <div className={`flex items-center justify-between gap-1 text-[11px] font-bold ${on ? "text-[#334155]" : "text-[#6F6B63]"}`}>
-                    <span className="truncate">{t(type === "3c" ? "home.mini3c" : "home.mini4c")}</span>
-                    {s && !s.ready && <span className="shrink-0 font-semibold tabular-nums opacity-80">{fill(t("home.miniGames"), { n: Math.min(s.games, s.needed), m: s.needed })}</span>}
+            <div className="flex-1 min-w-0 px-3.5 pt-2 pb-3">
+                <div className="flex items-center gap-1.5">
+                    <BallCluster colors={type === "3c" ? ["white", "yellow", "red"] : ["white", "yellow", "red", "red"]} size={15} />
+                    <span className="text-[12.5px] font-bold text-[#5B4A1E]">{t(type === "3c" ? "home.mini3c" : "home.mini4c")}</span>
                 </div>
-                <span className={`block text-center text-[34px] leading-[1] font-bold tabular-nums ${on ? "text-[#334155]" : "text-[#6F6B63]"}`}>{value(s)}</span>
+                {ready ? (
+                    <span className="block mt-1.5 text-[30px] leading-none font-bold tabular-nums tracking-tight text-[#141414]">{s!.handi}</span>
+                ) : s ? (
+                    <span className="block mt-1.5 text-[12.5px] leading-snug font-semibold text-[#8A7A55] break-keep">
+                        {fill(t("home.miniNeed"), { n: Math.max(1, s.needed - s.games) })}
+                    </span>
+                ) : (
+                    <span className="block mt-1.5 text-[30px] leading-none font-bold text-[#D9CFB5]">—</span>
+                )}
             </div>
         );
     };
     return (
         <div
-            role="img"
+            role="group"
             aria-label={fill(t("home.miniAria"), { a: value(d?.["3c"]), b: value(d?.["4c"]) })}
-            className="relative grid grid-cols-2 h-[78px] rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(122,86,0,0.22)]"
+            className="rounded-2xl bg-[#ffffff] shadow-[0_2px_10px_rgba(122,86,0,0.18)]"
         >
-            {panel("3c")}
-            {panel("4c")}
-            <div className="absolute left-1/2 bottom-1.5 -translate-x-1/2 w-[48px] h-[48px] rounded-full bg-[#ffffff] border-[2.5px] border-[#006241] flex items-center justify-center px-1">
-                <span className="text-[11px] leading-[1.15] font-bold text-[#006241] text-center break-keep">{t("home.miniMine")}</span>
+            <div className="flex items-center justify-between gap-2 px-3.5 pt-2.5">
+                <span className="text-[13px] font-bold text-[#7A5600]">{t("home.miniMine")}</span>
+                <span className="text-[11px] font-medium text-[#9A8A66] truncate">{t("home.miniBasis")}</span>
+            </div>
+            <div className="flex divide-x divide-[#F1E7CD]">
+                {cell("3c")}
+                {cell("4c")}
             </div>
         </div>
     );
@@ -99,7 +110,7 @@ export function ScoreboardActions({ onStartGame, onJoinGame }: { onStartGame: (m
                 onClick={() => onStartGame("match")}
                 className="col-span-2 rounded-3xl bg-[#F5B721] p-4 pb-[18px] text-left shadow-[0_8px_24px_rgba(245,183,33,0.35)] transition-colors hover:bg-[#F0B01A]"
             >
-                <MiniScoreboard />
+                <MyDamaPanel />
                 <div className="mt-3.5 flex items-center justify-between gap-3 px-1">
                     <span className="text-[22px] font-bold text-white leading-tight">{t("quickActions.matchTitle")}</span>
                     <span className="shrink-0 h-10 pl-4 pr-3 rounded-full bg-[#ffffff] text-[14px] font-bold text-[#7A5600] flex items-center gap-0.5 shadow-[0_2px_6px_rgba(122,86,0,0.18)]">
