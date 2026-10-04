@@ -9,7 +9,6 @@ import GolfDashboard from "@/golf/pages/Dashboard";
 
 // New Components
 import { DashboardHeader } from "@/components/hiq/dashboard/DashboardHeader";
-import { PerformanceCard } from "@/components/hiq/dashboard/PerformanceCard";
 import { RealHandicapCard } from "@/components/hiq/dashboard/RealHandicapCard";
 import { RankingListCard } from "@/components/hiq/dashboard/RankingListCard";
 import { WorldRankingCard } from "@/components/hiq/umb/WorldRankingCard";
@@ -27,7 +26,7 @@ import { ScoreCorrectionModal } from "@/components/hiq/dashboard/ScoreCorrection
 import { RPGuideModal } from "@/components/hiq/dashboard/RPGuideModal";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { LoginGate } from "@/components/hiq/LoginGate";
-import { LucideRefreshCw, LucideZap, ChevronUp, ChevronDown, LucideHome } from "@/lib/icons";
+import { LucideHome } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 
 import { useLocation, useSearch } from "wouter";
@@ -50,7 +49,7 @@ function HiqDashboardBilliards() {
     const [guide, setGuide] = useState<HomeGuideTopic | null>(null);
 
     // Use Custom Hook for Data
-    const { member, history, rankings, analysis, isLoading } = useDashboardStats(rankingTab);
+    const { member, history, rankings, isLoading } = useDashboardStats(rankingTab);
 
     // Dedicated 3-cushion ranking list, fetched independently of the ranking tab so the
     // header '상위 N%' percentile is computed against the correct 3c population even when
@@ -87,47 +86,6 @@ function HiqDashboardBilliards() {
         return Math.max(1, Math.round(((myIndex + 1) / ranked.length) * 100));
     }, [rankings, rankings3c, member, rankingTab]);
 
-    const getTrend = useCallback(() => {
-        if (!analysis?.summary) return { label: t("dashboard.trendSteady"), color: "text-black/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
-        const overall = parseFloat(analysis.summary.overallAvg || "0");
-        const recent = parseFloat(analysis.summary.recentAvg || "0");
-
-        if (overall === 0) return { label: t("dashboard.trendNew"), color: "text-brand", icon: <LucideZap className="w-3 h-3" /> };
-        if (recent > overall * 1.05) return { label: t("dashboard.trendRising"), color: "text-brand", icon: <ChevronUp className="w-3 h-3" /> };
-        if (recent < overall * 0.95) return { label: t("dashboard.trendFalling"), color: "text-black/40", icon: <ChevronDown className="w-3 h-3" /> };
-        return { label: t("dashboard.trendSteady"), color: "text-black/55", icon: <LucideRefreshCw className="w-3 h-3 animate-spin-slow" /> };
-    }, [analysis, t]);
-
-    // Live Avg Helpers
-    const calculateLiveAvg = (type: '3c' | '4c') => {
-        if (!history) return "0.000";
-        const validGames = history.filter(g =>
-            g.gameType === type &&
-            g.gameMode === "match" &&
-            (g as any).isRanked
-        );
-        if (validGames.length === 0) return "0.000";
-        const totalScore = validGames.reduce((acc, g) => acc + g.score, 0);
-        const totalInnings = validGames.reduce((acc, g) => acc + g.innings, 0);
-        return totalInnings > 0 ? (totalScore / totalInnings).toFixed(3) : "0.000";
-    };
-
-    const getTier = (avg: number, is3c: boolean) => {
-        // 1. Base Tier (Absolute Evaluation by Average)
-        let tier = { label: t("dashboard.tierBronze"), class: "tier-bronze", icon: "🥉" };
-        if (is3c) {
-            if (avg >= 0.90) tier = { label: t("dashboard.tierPlatinum"), class: "tier-platinum", icon: "💎" };
-            else if (avg >= 0.56) tier = { label: t("dashboard.tierGold"), class: "tier-gold", icon: "🥇" };
-            else if (avg >= 0.36) tier = { label: t("dashboard.tierSilver"), class: "tier-silver", icon: "🥈" };
-        } else {
-            if (avg >= 5.00) tier = { label: t("dashboard.tierPlatinum"), class: "tier-platinum", icon: "💎" };
-            else if (avg >= 3.00) tier = { label: t("dashboard.tierGold"), class: "tier-gold", icon: "🥇" };
-            else if (avg >= 1.51) tier = { label: t("dashboard.tierSilver"), class: "tier-silver", icon: "🥈" };
-        }
-        return tier;
-    };
-
-
     // Modal State Management
     const [modalState, setModalState] = useState({
         game: false,
@@ -148,6 +106,24 @@ function HiqDashboardBilliards() {
     const search = useSearch();
     const [matchInvite, setMatchInvite] = useState<{ code: string; gameType?: "3c" | "4c"; seats?: number; target?: number } | null>(null);
     const matchParamRef = useRef(false);
+
+    // 온라인게임에서 닫기·나가기로 돌아오면(?sec=game) 당구 게임 구역으로 내려 준다 — 홈이 입구다(2026-10-04 오너: "홈에서 다").
+    // 카드가 그려진 뒤에 내려야 해서 한 박자 늦게, 내린 뒤엔 주소를 깨끗이 돌려 둔다(새로고침해도 다시 내려가지 않게).
+    useEffect(() => {
+        if (!member || isLoading) return;
+        const p = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+        if (p.get("sec") !== "game") return;
+        let tries = 0;
+        let timer = 0;
+        const go = () => {
+            const el = document.getElementById("home-game");
+            if (!el && ++tries < 20) { timer = window.setTimeout(go, 75); return; }
+            el?.scrollIntoView({ block: "start" });
+            setLocation("/dashboard", { replace: true });
+        };
+        timer = window.setTimeout(go, 60);
+        return () => window.clearTimeout(timer);
+    }, [member, isLoading, search, setLocation]);
 
     const handleStartGameClick = (mode: "practice" | "match") => {
         // 홈 버튼으로 여는 길은 예전 그대로 — 지난 카드의 핀을 물고 들어가지 않게 비운다.
@@ -226,15 +202,7 @@ function HiqDashboardBilliards() {
         <div className="min-h-screen bg-surface-0 px-5 pb-nav">
 
             {/* Header / Profile */}
-            <DashboardHeader
-                member={member}
-                onOpenRpGuide={() => toggleModal('rpGuide', true)}
-                liveAvg3c={calculateLiveAvg('3c')}
-                liveAvg4c={calculateLiveAvg('4c')}
-                getPercentile={getPercentile}
-                getTrend={getTrend}
-                tier={getTier(parseFloat(analysis?.summary?.overallAvg || "0"), false)}
-            />
+            <DashboardHeader member={member} />
 
             {/* 진행 중 경기 이어하기 — 이탈한 경기로 돌아갈 유일한 입구.
                 이게 없어서 앱을 껐다 켜면 경기가 영구히 미완료로 남았다(완주율 33% 실측). */}
@@ -253,21 +221,26 @@ function HiqDashboardBilliards() {
                 </button>
             )}
 
-            {/* 홈 구역(2026-10-04 오너: "빠른 실행보다 각 섹션별로 — 점수판 / 온라인게임 / 기타").
-                점수판이 맨 위 — 앱의 첫 약속이 '손안의 당구 점수판'이다. 전적·실전 핸디는 점수판으로 친 경기의 기록이라 같은 구역. */}
-            <section className="mt-8 mb-10">
+            {/* 내 실전 기록 — 맨 위(2026-10-04 오너: "3쿠션·4구 RP 카드와 전적 카드는 중복 — 실전 핸디 카드에 통합해 맨 위로").
+                머리 아래 기록 띠(랭킹 점수·전적·최근 5경기) + 닮은 프로·비교표. 공식 경기가 없으면 첫 경기 안내. */}
+            <RealHandicapCard
+                onStartMatch={() => handleStartGameClick("match")}
+                onOpenRpGuide={() => toggleModal('rpGuide', true)}
+                getPercentile={getPercentile}
+                history={history as any}
+                onPreview={() => setGuide("scoreboard")}
+            />
+
+            {/* 홈 구역(2026-10-04 오너: "빠른 실행보다 각 섹션별로 — 점수판 / 당구 게임 / 기타").
+                점수판 구역은 입구 셋(점수판·혼자 연습·PIN으로 합류)만 — 기록은 위 카드로 모였다. */}
+            <section className="mt-10 mb-10">
                 <HomeSectionHeader title={t("home.secScoreboard")} desc={t("home.secScoreboardDesc")} onGuide={() => setGuide("scoreboard")} />
-                <div className="space-y-3">
-                    <ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={() => toggleModal('join', true)} />
-                    {/* 전적 (승률 게이지 + 최근 폼). 경기가 하나도 없으면 첫 경기 안내 */}
-                    <PerformanceCard history={history} onPreview={() => setGuide("scoreboard")} onStart={() => handleStartGameClick("match")} />
-                    {/* 내 실전 핸디(2026-09-27) — 3쿠션은 닮은 프로, 4구는 랭큐 회원 순위 */}
-                    <RealHandicapCard onStartMatch={() => handleStartGameClick("match")} />
-                </div>
+                <ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={() => toggleModal('join', true)} />
             </section>
 
-            {/* 온라인게임 — 열린 방 타일 + 온라인 기록으로 찾는 닮은 프로 */}
-            <section className="mb-10">
+            {/* 당구 게임(예전 이름 온라인게임) — 혼자 치기 · 같이 치기 · 내 온라인 실력(대전 기록 띠 + 닮은 프로).
+                홈이 온라인게임의 입구다(2026-10-04) — 게임·멀티방·랭킹을 닫으면 ?sec=game 으로 이 구역에 돌아온다. */}
+            <section id="home-game" className="mb-10 scroll-mt-4">
                 <HomeSectionHeader title={t("home.secOnline")} desc={t("home.secOnlineDesc")} onGuide={() => setGuide("online")} />
                 <div className="space-y-3">
                     <OnlineGameCard />

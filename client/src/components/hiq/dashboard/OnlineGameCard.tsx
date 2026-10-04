@@ -1,6 +1,7 @@
 /**
- * 홈의 온라인게임 카드 — 가로로 펼친 타일 + **지금 열린 멀티방 줄**(2026-09-21 오너: "온라인게임을 활성화하고 싶다.
- * 홈 카드를 가로로 확장해서 현재 멀티방 내역이 나오고 바로 들어갈 수 있게").
+ * 홈 당구 게임 구역의 두 카드(2026-10-04 — 홈이 온라인게임 입구다): **혼자 치기**(초록 다이 그림 · 이어서 치기 · 이번 주 드릴 · 길 찾기)와
+ * **같이 치기**(블루 다이 그림 · 친구 초대 · 코드로 참가 · 지금 열린 멀티방 줄 · 방 만들기).
+ * 멀티방 줄은 2026-09-21 오너: "온라인게임을 활성화하고 싶다. 홈 카드를 가로로 확장해서 현재 멀티방 내역이 나오고 바로 들어갈 수 있게".
  *
  * 왜 홈에 방 목록인가: 대전은 상대가 있어야 시작되는데, 방은 홈 → 온라인게임 → 멀티방까지 두 번 더 들어가야 보였다.
  * 열린 방이 하나라도 있는 순간을 홈에서 바로 보여 주는 것이 "사람이 있다"는 유일한 신호다.
@@ -11,7 +12,7 @@
  * 이미 있는 참가 창이 그대로 한다. 홈에서 참가 규칙을 두 번 구현하지 않는다.
  * 열린 방이 없으면(보통의 경우다) 줄 대신 "방 만들기"를 크게 둔다 — 빈 목록을 보여 주는 것보다 방을 하나 여는 게 낫다.
  */
-import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
@@ -22,28 +23,29 @@ import { matchApi, type MatchPublic } from "@/sim/matchApi";
 import { ROOMS_QUERY_KEY, roomAge } from "@/sim/match/RoomList";
 import { MyRoomRow, useMyOpenRoom } from "@/sim/match/MyRoomRow";
 import { gameLabel } from "@/sim/match/matchView";
-import { LucideChevronRight, LucideUsers } from "@/lib/icons";
+import { Crosshair, LucideChevronRight, LucideHash, LucidePath, LucideUserPlus } from "@/lib/icons";
+import { drillApi, weekProgress, DRILL_WEEK_QUERY_KEY } from "@/sim/drill/drillApi";
+import { loadResume, fetchResumable, clearResume, type Resumable } from "@/sim/simResume";
+import { apiRequest } from "@/lib/queryClient";
 
-const EntryShowcase = lazy(() => import("@/sim/entry/EntryShowcase").then((m) => ({ default: m.EntryShowcase })));
+/**
+ * 카드 그림(2026-10-04 오너: "혼자 치기는 그린 다이, 다이 밖 색도 신경 쓰고, 큰 원점(다이아몬드)이 많다 — 깔끔하게 나무 다이로.
+ * 같이 치기는 블루 다이로"). 게임 렌더러(ThreeRenderer)로 개시 배치를 선수 시점에서 한 번 그려 webp 로 둔다 — 다이아몬드·스폿을 끄고,
+ * 바닥 평면을 숨겨 테이블 둘레가 천 색을 아주 어둡게 한 색(초록 #142219 · 남색 #0F1A2E)이 되게. 혼자 = 중대(초록)·흰 공,
+ * 같이 = 대대(파랑)·노란 공(상대 차례 느낌). 예전엔 살아 있는 3D 장면이었는데 카드가 둘이 되며 WebGL 을 둘 띄우지 않으려고 그림으로 —
+ * 홈이 three.js 를 받지 않는다. 게임 속 테이블(다이아몬드로 겨냥)은 그대로다.
+ */
+const SOLO_IMG = "/img/home/solo-table.webp";
+const TOGETHER_IMG = "/img/home/together-table.webp";
 
 /** 홈에서는 대기 화면보다 느리게 본다 — 방이 생기는 일은 드물고, 홈은 배터리를 오래 쓴다. */
 const HOME_ROOMS_REFETCH_MS = 20_000;
 /** 줄에 그리는 방 수. 더 있으면 "전체 보기"가 받는다. */
 const MAX_ROWS = 3;
 
-/** 화면이 뜨고 한숨 돌린 뒤(idle) + 타일이 보일 때 장면을 붙인다. 보이지 않으면 paused. */
-function useLiveScene(ref: React.RefObject<HTMLElement>): { mount: boolean; paused: boolean } {
-    const [idle, setIdle] = useState(false);
+/** 카드가 화면에 보이는지 — 안 보이면 열린 방 목록을 다시 묻지 않는다(홈은 배터리를 오래 쓴다). */
+function useVisible(ref: React.RefObject<HTMLElement>): boolean {
     const [visible, setVisible] = useState(false);
-    useEffect(() => {
-        const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
-        if (typeof w.requestIdleCallback === "function") {
-            const id = w.requestIdleCallback(() => setIdle(true), { timeout: 1500 });
-            return () => w.cancelIdleCallback?.(id);
-        }
-        const t = setTimeout(() => setIdle(true), 700);
-        return () => clearTimeout(t);
-    }, []);
     useEffect(() => {
         const el = ref.current;
         if (!el) return;
@@ -52,7 +54,7 @@ function useLiveScene(ref: React.RefObject<HTMLElement>): { mount: boolean; paus
         io.observe(el);
         return () => io.disconnect();
     }, [ref]);
-    return { mount: idle && visible, paused: !visible };
+    return visible;
 }
 
 function RoomRow({ m, onJoin }: { m: MatchPublic; onJoin: () => void }) {
@@ -87,10 +89,8 @@ export function OnlineGameCard() {
     const [, setLocation] = useLocation();
     const { t } = useT();
     const { member } = useAuth();
-    const sceneRef = useRef<HTMLDivElement>(null);
-    const scene = useLiveScene(sceneRef);
-    const [sceneMounted, setSceneMounted] = useState(false);
-    useEffect(() => { if (scene.mount) setSceneMounted(true); }, [scene.mount]);
+    const roomsRef = useRef<HTMLDivElement>(null);
+    const roomsVisible = useVisible(roomsRef);
 
     // 멀티방 화면과 같은 캐시 키 — 홈에서 본 목록이 그대로 이어진다. 화면 밖이면 쉰다.
     const rooms = useQuery({
@@ -98,94 +98,160 @@ export function OnlineGameCard() {
         queryFn: () => matchApi.listRooms(),
         enabled: !!member,
         staleTime: 10_000,
-        refetchInterval: scene.paused ? false : HOME_ROOMS_REFETCH_MS,
+        refetchInterval: roomsVisible ? HOME_ROOMS_REFETCH_MS : false,
     });
+    // 이어서 치기(예전엔 온라인게임 입구의 띠) — 이 기기에 적힌 기록 경기가 서버에서 아직 진행 중이면 '혼자 치기' 카드에 띠로.
+    // 홈이 입구가 됐으니(2026-10-04) 여기서 보여 준다. 누르면 ?resume=1 로 바로 그 판을 잇는다.
+    const [resumable, setResumable] = useState<Resumable | null>(null);
+    useEffect(() => {
+        if (!member) return;
+        const rec = loadResume();
+        if (!rec) { setResumable(null); return; }
+        let alive = true;
+        void fetchResumable(rec).then((r) => { if (alive) setResumable(r); });
+        return () => { alive = false; };
+    }, [member?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    const discardResume = () => {
+        if (!resumable) return;
+        const id = resumable.id;
+        clearResume();
+        setResumable(null);
+        void apiRequest(`/api/hiq/sim/sessions/${encodeURIComponent(id)}/close`, { method: "POST", body: { status: "abandoned" } }).catch(() => undefined);
+    };
+    // 이번 주 드릴 — 진입 화면·드릴 화면과 같은 캐시
+    const week = useQuery({ queryKey: DRILL_WEEK_QUERY_KEY, queryFn: () => drillApi.getWeek(), enabled: !!member, staleTime: 30_000 });
+    const drill = week.data ? weekProgress(week.data) : null;
     const list = rooms.data ?? [];
     const shown = list.slice(0, MAX_ROWS);
     // 내가 연 방은 위 목록에서 빠진다(내 방엔 내가 참가할 수 없다) — 따로 한 줄로 보여 준다.
     const { room: myRoom } = useMyOpenRoom(matchApi, !!member);
 
     // 2026-10-04 오너: "멀티랑 혼자하기 카드를 홈으로 따로 빼자 — 지금은 눌러서 들어가야 나온다.
-    // 그리고 '온라인게임'이라 하니 혼자 하고 싶은 사람이 머뭇거린다." → 카드 둘.
-    //  · 혼자 치기: 3D 테이블 타일 그대로, 누르면 진입 화면을 건너뛰고 설정 창(/online-game?solo=1)
-    //  · 같이 치기: 열린 방 줄 + 방 만들기(예전 아랫단). 머리를 누르면 방 목록(?rooms=1)
+    // '온라인게임'이라 하니 혼자 하고 싶은 사람이 머뭇거린다" → 이어서 "드릴·길 찾기까지 빼서 진입 화면을 거칠 필요 없게".
+    // 홈이 곧 입구다. 진입 화면(SimEntry)의 혼자/같이 두 묶음을 그대로 카드 둘로 옮겼다.
+    //  · 혼자 치기: 3D 테이블(누르면 바로 설정 창 ?solo=1, 닫으면 홈으로) + 아랫단 이번 주 드릴 · 길 찾기
+    //  · 같이 치기: 머리(누르면 멀티방) + 친구 초대(초록) · 코드로 참가(노랑 — 진입 화면 규칙) + 열린 방 줄 + 방 만들기
+    const cell = "min-w-0 px-4 py-3 flex items-center gap-3 text-left transition-colors hover:bg-black/[0.02] active:bg-black/[0.04]";
     return (
         <>
-            <motion.button
-                whileTap={{ scale: 0.99 }}
-                onClick={() => setLocation("/online-game?solo=1")}
-                className="relative block w-full h-[156px] rounded-3xl overflow-hidden bg-[#174479] text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
-            >
-                <div ref={sceneRef} className="absolute inset-0">
-                    {sceneMounted && (
-                        <Suspense fallback={null}>
-                            <EntryShowcase className="absolute inset-0 bg-[#174479]" paused={scene.paused} />
-                        </Suspense>
-                    )}
-                </div>
-                <div className="relative h-full flex items-end justify-between gap-3 p-5 bg-gradient-to-t from-black/55 via-black/10 to-transparent">
-                    <span className="min-w-0">
-                        <span className="block text-[21px] font-bold text-white leading-tight">{t("home.soloTitle")}</span>
-                        <span className="block text-[13px] font-medium text-white/85 mt-1 leading-snug">{t("home.soloDesc")}</span>
-                    </span>
-                    <span className="shrink-0 h-10 pl-4 pr-3 rounded-full bg-[#ffffff] text-[14px] font-bold text-[#174479] flex items-center gap-0.5">
-                        {t("home.soloCta")}
-                        <LucideChevronRight className="w-4 h-4" />
-                    </span>
-                </div>
-            </motion.button>
-
             <div className="rounded-3xl overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                <button
-                    type="button"
-                    onClick={() => setLocation("/online-game?rooms=1")}
-                    className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-black/[0.015]"
+                <motion.button
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setLocation("/online-game?solo=1")}
+                    className="relative block w-full h-[156px] overflow-hidden bg-[#142219] text-left"
                 >
-                    <span className="w-10 h-10 shrink-0 rounded-2xl bg-brand/10 flex items-center justify-center">
-                        <LucideUsers className="w-[21px] h-[21px] text-brand" />
-                    </span>
-                    <span className="flex-1 min-w-0">
-                        <span className="flex items-center gap-2">
-                            <span className="text-[15px] font-semibold text-ink-1">{t("home.togetherTitle")}</span>
-                            {list.length > 0 && (
-                                <span className="h-5 px-2 rounded-pill bg-brand text-brand-fg text-[11px] font-bold inline-flex items-center gap-1">
-                                    <span className="w-1.5 h-1.5 rounded-full bg-white" aria-hidden="true" />
-                                    {t("sim.entry.roomsOpen")} {list.length}
-                                </span>
-                            )}
+                    <img src={SOLO_IMG} alt="" width={1050} height={468} className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="relative h-full flex items-end justify-between gap-3 p-5 bg-gradient-to-t from-black/55 via-black/10 to-transparent">
+                        <span className="min-w-0">
+                            <span className="block text-[21px] font-bold text-white leading-tight">{t("home.soloTitle")}</span>
+                            <span className="block text-[13px] font-medium text-white/85 mt-1 leading-snug truncate">{t("home.soloDesc")}</span>
                         </span>
-                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5 truncate">{t("home.togetherDesc")}</span>
-                    </span>
-                    <LucideChevronRight className="w-4 h-4 text-black/30 shrink-0" />
-                </button>
+                        <span className="shrink-0 h-10 pl-4 pr-3 rounded-full bg-[#ffffff] text-[14px] font-bold text-[#0B5D3B] flex items-center gap-0.5">
+                            {t("home.soloCta")}
+                            <LucideChevronRight className="w-4 h-4" />
+                        </span>
+                    </div>
+                </motion.button>
+                {resumable && (
+                    <div className="flex items-center gap-3 px-4 py-3 bg-brand/[0.06] border-b border-black/[0.06]">
+                        <span className="flex-1 min-w-0">
+                            <span className="block text-[13px] font-bold text-brand">{t("sim.resume.title")}</span>
+                            <span className="block text-[12px] font-medium text-black/55 truncate tabular-nums">
+                                {t("sim.resume.label")
+                                    .replace("{game}", t(resumable.session.rules.gameType === "4c" ? "sim.setup.type4c" : "sim.setup.type3c"))
+                                    .replace("{score}", String(resumable.session.players[0]?.score ?? 0))
+                                    .replace("{target}", String(resumable.session.players[0]?.target ?? 0))
+                                    .replace("{innings}", String(resumable.session.players[0]?.innings ?? 0))}
+                            </span>
+                        </span>
+                        <button type="button" onClick={discardResume} className="shrink-0 h-9 px-3 rounded-full text-[12.5px] font-semibold text-black/50 hover:bg-black/[0.04]">
+                            {t("sim.resume.discard")}
+                        </button>
+                        <button type="button" onClick={() => setLocation("/online-game?resume=1")} className="shrink-0 h-9 px-4 rounded-full bg-brand text-brand-fg text-[13px] font-bold active:scale-[0.98] transition-transform">
+                            {t("sim.resume.go")}
+                        </button>
+                    </div>
+                )}
+                <div className="grid grid-cols-2 divide-x divide-black/[0.06]">
+                    <button type="button" onClick={() => setLocation("/online-game?drills=1")} className={cell}>
+                        <span className="w-9 h-9 shrink-0 rounded-xl bg-brand/10 flex items-center justify-center"><Crosshair className="w-[19px] h-[19px] text-brand" /></span>
+                        <span className="min-w-0">
+                            <span className="block text-[11.5px] font-semibold text-black/50 truncate">{t("sim.drill.title")}</span>
+                            <span className="block text-[14px] font-bold text-ink-1 tabular-nums leading-tight truncate">
+                                {drill ? `${drill.successes}/${drill.total}` : t("home.drillStart")}
+                            </span>
+                        </span>
+                    </button>
+                    <button type="button" onClick={() => setLocation("/online-game?path=1")} className={cell}>
+                        <span className="w-9 h-9 shrink-0 rounded-xl bg-brand/10 flex items-center justify-center"><LucidePath className="w-[19px] h-[19px] text-brand" /></span>
+                        <span className="min-w-0">
+                            <span className="block text-[11.5px] font-semibold text-black/50 truncate">{t("sim.path.title")}</span>
+                            <span className="block text-[14px] font-bold text-ink-1 leading-tight truncate">{t("sim.path.threeOnly")}</span>
+                        </span>
+                    </button>
+                </div>
+            </div>
+
+            <div ref={roomsRef} className="rounded-3xl overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
+                {/* 같이 치기 — 블루 다이 그림(대대·노란 공). 누르면 멀티방 목록 */}
+                <motion.button
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setLocation("/online-game?rooms=1")}
+                    className="relative block w-full h-[156px] overflow-hidden bg-[#0F1A2E] text-left"
+                >
+                    <img src={TOGETHER_IMG} alt="" width={1050} height={468} className="absolute inset-0 w-full h-full object-cover" />
+                    {list.length > 0 && (
+                        <span className="absolute top-4 right-4 h-7 px-3 rounded-pill bg-brand text-brand-fg text-[12px] font-bold inline-flex items-center gap-1">
+                            <span className="w-1.5 h-1.5 rounded-full bg-white" aria-hidden="true" />
+                            {t("sim.entry.roomsOpen")} {list.length}
+                        </span>
+                    )}
+                    <div className="relative h-full flex items-end justify-between gap-3 p-5 bg-gradient-to-t from-black/55 via-black/10 to-transparent">
+                        <span className="min-w-0">
+                            <span className="block text-[21px] font-bold text-white leading-tight">{t("home.togetherTitle")}</span>
+                            <span className="block text-[13px] font-medium text-white/85 mt-1 leading-snug truncate">{t("home.togetherDesc")}</span>
+                        </span>
+                        <span className="shrink-0 h-10 pl-4 pr-3 rounded-full bg-[#ffffff] text-[14px] font-bold text-[#174479] flex items-center gap-0.5">
+                            {t("sim.entry.rooms")}
+                            <LucideChevronRight className="w-4 h-4" />
+                        </span>
+                    </div>
+                </motion.button>
+                <div className="grid grid-cols-2 gap-2 p-4">
+                    <button
+                        type="button" onClick={() => setLocation("/online-game?lobby=1")}
+                        className="h-11 rounded-full bg-brand text-brand-fg text-[13.5px] font-bold inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                    >
+                        <LucideUserPlus className="w-4 h-4" />{t("sim.entry.invite")}
+                    </button>
+                    <button
+                        type="button" onClick={() => setLocation("/online-game?lobby=1&tab=join")}
+                        className="h-11 rounded-full bg-[#F5B721] text-[#3D2A00] text-[13.5px] font-bold inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
+                    >
+                        <LucideHash className="w-4 h-4" />{t("sim.entry.join")}
+                    </button>
+                </div>
 
                 {/* 방 줄: 있으면 바로 참가, 없으면 방을 여는 쪽으로 민다 */}
-                <div className={cn("divide-y divide-black/[0.06]", (shown.length > 0 || myRoom) && "border-t border-black/[0.06]")}>
-                    {myRoom && <MyRoomRow room={myRoom} onEnter={() => setLocation("/online-game?lobby=1")} className="bg-brand/[0.04]" />}
-                    {shown.map((m) => (
-                        <RoomRow key={m.id} m={m} onJoin={() => setLocation(`/online-game?rooms=1&room=${m.id}`)} />
-                    ))}
-                </div>
+                {(shown.length > 0 || myRoom) && (
+                    <div className="divide-y divide-black/[0.06] border-t border-black/[0.06]">
+                        {myRoom && <MyRoomRow room={myRoom} onEnter={() => setLocation("/online-game?lobby=1")} className="bg-brand/[0.04]" />}
+                        {shown.map((m) => (
+                            <RoomRow key={m.id} m={m} onJoin={() => setLocation(`/online-game?rooms=1&room=${m.id}`)} />
+                        ))}
+                    </div>
+                )}
                 <div className="px-4 py-3 flex items-center gap-2 border-t border-black/[0.06]">
-                    {shown.length === 0 && !myRoom && (
-                        <span className="flex-1 min-w-0 text-[12.5px] font-medium text-black/45 truncate">
-                            {rooms.isPending && member ? t("sim.rooms.loading") : t("sim.rooms.empty")}
-                        </span>
-                    )}
-                    {list.length > MAX_ROWS && (
-                        <button
-                            type="button" onClick={() => setLocation("/online-game?rooms=1")}
-                            className="flex-1 h-10 rounded-pill border border-black/10 text-[13px] font-bold text-black/60 hover:bg-black/[0.03]"
-                        >
-                            {t("sim.entry.rooms")} {list.length}
-                        </button>
-                    )}
+                    <span className="flex-1 min-w-0 text-[12.5px] font-medium text-black/45 truncate">
+                        {shown.length === 0 && !myRoom
+                            ? (rooms.isPending && member ? t("sim.rooms.loading") : t("sim.rooms.empty"))
+                            : list.length > MAX_ROWS
+                                ? <button type="button" onClick={() => setLocation("/online-game?rooms=1")} className="font-semibold text-black/60">{t("sim.entry.rooms")} {list.length} →</button>
+                                : null}
+                    </span>
                     <button
                         type="button" onClick={() => setLocation("/online-game?lobby=1&public=1")}
-                        className={cn(
-                            "h-10 px-4 rounded-pill bg-brand text-brand-fg text-[13px] font-bold active:scale-[0.98] transition-transform",
-                            shown.length === 0 && !myRoom && list.length <= MAX_ROWS ? "shrink-0" : "flex-1",
-                        )}
+                        className="shrink-0 h-9 px-4 rounded-pill border border-black/10 text-[13px] font-bold text-ink-1 hover:bg-black/[0.03] active:scale-[0.98] transition-transform"
                     >
                         {t("sim.entry.roomCreate")}
                     </button>

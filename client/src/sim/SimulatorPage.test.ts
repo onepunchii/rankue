@@ -19,7 +19,7 @@ import { paramsFromConfig } from "./simReducer";
 import { encodeReplay, replaySource } from "./share/replayLink";
 import { resetTelemetrySession } from "./gestureTelemetry";
 
-const nav = vi.hoisted(() => ({ search: "", navigate: vi.fn(), apiRequest: vi.fn(), toast: vi.fn() }));
+const nav = vi.hoisted(() => ({ search: "", navigate: vi.fn(), apiRequest: vi.fn(), toast: vi.fn(), member: { nickname: "테스터", handi3c: 15 } as Record<string, unknown> | null }));
 
 vi.mock("@/lib/i18n", () => ({ useT: () => ({ t: (k: string) => ko[k] ?? k, locale: "ko" }) }));
 vi.mock("@/lib/nativeBridge", () => ({ setBackHandler: () => undefined, isNativeApp: () => false }));
@@ -27,7 +27,7 @@ vi.mock("@/lib/utils", () => ({ cn: (...a: unknown[]) => a.filter((x) => typeof 
 vi.mock("@/lib/queryClient", () => ({ apiRequest: nav.apiRequest }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: nav.toast }) }));
 vi.mock("@/hooks/useGameAudio", () => ({ useGameAudio: () => ({ getCtx: () => null }) }));
-vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ member: { nickname: "테스터", handi3c: 15 }, isLoading: false, isLoggedIn: true, isGuest: false }) }));
+vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ member: nav.member, isLoading: false, isLoggedIn: !!nav.member, isGuest: !nav.member }) }));
 vi.mock("wouter", () => ({ useLocation: () => ["/online-game", nav.navigate], useSearch: () => nav.search }));
 // 길 찾기 비회원 무료 횟수·가입 안내(2026-09-27) — 이 테스트는 회원이라 쓰이지 않는다
 vi.mock("@/components/hiq/LoginGate", () => ({ goLogin: () => undefined }));
@@ -138,6 +138,7 @@ afterEach(() => {
     nav.apiRequest.mockReset();
     nav.navigate.mockReset();
     nav.toast.mockReset();
+    nav.member = { nickname: "테스터", handi3c: 15 };
 });
 
 function mount(): Harness {
@@ -252,35 +253,65 @@ describe("SimulatorPage", () => {
         expect(nav.apiRequest).not.toHaveBeenCalled();
     });
 
-    it("파라미터가 없으면 진입 화면(싱글 / 친구와 대전)이 먼저, 싱글을 누르면 설정 창 · 시작하기로 세션 · 나가기는 확인 뒤 온라인게임 입구로", async () => {
+    it("회원이 파라미터 없이 오면 입구 화면 대신 홈 당구 게임 구역으로 돌려보낸다(2026-10-04 — 홈이 입구)", () => {
+        nav.search = "";
+        const h = mount();
+        expect(nav.navigate).toHaveBeenCalledWith("/dashboard?sec=game", { replace: true });
+        // 회원에게는 입구 화면이 한 번도 그려지지 않는다(번쩍이지 않게)
+        expect(h.container.textContent).not.toContain(ko["sim.entry.groupSolo"]);
+        expect(h.container.querySelector("[role=dialog]")).toBeNull();
+    });
+
+    it("?solo=1(홈 '바로 치기')이면 설정 창이 바로 · 시작하면 주소에서 solo 를 지우고 · 나가기는 홈 당구 게임 구역으로", async () => {
+        nav.search = "solo=1";
+        const h = mount();
+        expect(h.container.querySelector("[role=dialog]")).not.toBeNull();
+        expect(h.container.textContent).toContain(ko["sim.setup.title"]);
+        expect(nav.navigate).not.toHaveBeenCalled();
+        // 기록 끄고 시작(서버 없이)
+        click(h.container.querySelector("#sim-opt-record")!);
+        click(byText(h, ko["sim.setup.start"])!);
+        expect(h.container.querySelector("[role=dialog]")).toBeNull();
+        expect(h.container.textContent).toContain("0/15");
+        // 시작한 뒤에 주소를 입구로(판 도중 새로고침이 설정 창을 다시 열지 않게) — 홈으로 돌려보내지는 않는다
+        expect(nav.navigate).toHaveBeenCalledWith("/online-game", { replace: true });
+        expect(nav.navigate).not.toHaveBeenCalledWith("/dashboard?sec=game", { replace: true });
+
+        click(byLabel(h, ko["sim.controls.exit"])!);
+        expect(h.container.textContent).toContain(ko["sim.exit.title"]);
+        expect(h.container.textContent).toContain(ko["sim.exit.descPractice"]);
+        await React.act(async () => { click(byText(h, ko["sim.exit.confirm"])!); await new Promise((r) => setTimeout(r, 10)); });
+        // 게임을 나가면 홈 당구 게임 구역으로 — '한 판 더'는 거기 '바로 치기' 한 번. 기록은 바꿔 끼운다(홈에서 '뒤로'가 판을 다시 열지 않게)
+        expect(nav.navigate).toHaveBeenCalledWith("/dashboard?sec=game", { replace: true });
+        // 나가기 확인은 닫혀 있어야 한다 — 남아 있으면 다음 판의 결과·재대결 창까지 막았다(2026-09-26 오너 제보)
+        expect(h.container.textContent).not.toContain(ko["sim.exit.title"]);
+    });
+
+    it("?solo=1 설정 창을 취소하면 홈 당구 게임 구역으로", () => {
+        nav.search = "solo=1";
+        const h = mount();
+        click(byText(h, ko["sim.common.cancel"])!);
+        expect(nav.navigate).toHaveBeenCalledWith("/dashboard?sec=game", { replace: true });
+    });
+
+    it("로그인 전 방문자는 예전처럼 진입 화면(싱글 / 친구와 대전) → 연습 시작 → 나가기는 입구로", async () => {
+        nav.member = null;
         nav.search = "";
         const h = mount();
         // 진입 화면: 카드 둘, 설정 창은 아직
         expect(h.container.querySelector("[role=dialog]")).toBeNull();
         expect(h.container.textContent).toContain(ko["sim.entry.groupSolo"]);
         expect(h.container.textContent).toContain(ko["sim.entry.groupTogether"]);
-        expect(h.container.textContent).toContain(ko["sim.entry.singleEmpty"]);
+        expect(nav.navigate).not.toHaveBeenCalled();
         // 그룹 머리는 펼치기, 실제 시작은 펼쳐진 옵션 "연습 시작"(혼자 그룹은 처음부터 펼쳐져 있다)
         click(h.container.querySelector('[data-entry="practice"]')!);
         expect(h.container.querySelector("[role=dialog]")).not.toBeNull();
-        expect(h.container.textContent).toContain(ko["sim.setup.title"]);
-        // 기록 끄고 시작(서버 없이)
         click(h.container.querySelector("#sim-opt-record")!);
         click(byText(h, ko["sim.setup.start"])!);
-        expect(h.container.querySelector("[role=dialog]")).toBeNull();
         expect(h.container.textContent).toContain("0/15");
-        // 진입 화면의 기록 읽기(레이팅·대전·드릴·멀티방·내 대전 순위)만 서버를 부르고, 세션은 만들지 않는다
-        // 진입 화면이 읽는 것: 순위·성적·대전·드릴·방 목록 + 내 다마수(2026-09-12 핸디 카드)
-        expect(nav.apiRequest.mock.calls.filter((c) => !/rank\/me|ratings|matches|drills|rooms|handicap/.test(String(c[0])))).toHaveLength(0);
-
         click(byLabel(h, ko["sim.controls.exit"])!);
-        expect(h.container.textContent).toContain(ko["sim.exit.title"]);
-        expect(h.container.textContent).toContain(ko["sim.exit.descPractice"]);
         await React.act(async () => { click(byText(h, ko["sim.exit.confirm"])!); await new Promise((r) => setTimeout(r, 10)); });
-        // 게임을 나가면 온라인게임 입구로(2026-09-26) — 앱 대시보드로 나가면 '한 판 더' 하려면 다시 들어와야 했다
-        expect(nav.navigate).toHaveBeenCalledWith("/online-game");
-        // 같은 화면으로 돌아오므로 나가기 확인은 닫혀 있어야 한다 — 남아 있으면 다음 판의 결과·재대결 창까지 막았다(2026-09-26 오너 제보)
-        expect(h.container.textContent).not.toContain(ko["sim.exit.title"]);
+        expect(nav.navigate).toHaveBeenCalledWith("/online-game", { replace: true });
     });
 
     it("샷이 끝나면 왼쪽 위 칩 열에 공유 알약이 생기고(툴바 밖), 누르면 결과 토스트가 뜬다(jsdom 은 캔버스가 없어 실패 문구)", async () => {

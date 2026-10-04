@@ -12,7 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { flagEmoji } from "@/lib/flag";
-import { LucideChevronRight, LucideLoader2, LucideShare2, LucideUser } from "@/lib/icons";
+import { HelpCircle, LucideChevronRight, LucideLoader2, LucideShare2, LucideUser } from "@/lib/icons";
 import type { ComparePro } from "@shared/proCompare";
 
 export const GOLD_TEXT = "text-[#8a6a0a]";
@@ -241,6 +241,63 @@ export function CardActions({ primary, onPro, onShare, sharing }: {
                 </button>
             )}
         </div>
+    );
+}
+
+/**
+ * 기록 띠(2026-10-04 오너: "3쿠션·4구 RP 카드와 전적 카드가 중복 — 이 카드(실전 핸디)에 통합, 디자인은 최대한 살려서").
+ * 카드 머리 바로 아래 세 칸, 가는 선으로만 나눈다(상자 안에 상자를 겹치지 않게).
+ *  실전: 랭킹 점수(상위 %) · 전적 · 최근 5경기 / 온라인: 대전 전적 · 랭킹 · 진행 중(내 차례).
+ * 칸을 누르면 그 기록 화면으로 간다.
+ */
+export interface StripCell {
+    label: string;
+    value: ReactNode;
+    sub?: ReactNode;
+    subTone?: "brand" | "muted";
+    onClick?: () => void;
+    /** 라벨 옆 작은 '?' — 누르면 설명이 열리는 칸(랭킹 점수 → RP 안내) */
+    hint?: boolean;
+}
+export function RecordStrip({ cells }: { cells: StripCell[] }) {
+    return (
+        <div
+            className="mt-3 grid rounded-tile border border-surface-line divide-x divide-surface-line overflow-hidden"
+            style={{ gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))` }}
+        >
+            {cells.map((c, i) => {
+                const body = (
+                    <>
+                        <span className="flex items-center gap-1 text-[11px] font-semibold text-ink-3 min-w-0">
+                            <span className="truncate">{c.label}</span>
+                            {c.hint && <HelpCircle className="w-3 h-3 shrink-0 text-ink-4" aria-hidden="true" />}
+                        </span>
+                        <span className="block mt-1.5 h-[18px] text-[16px] leading-[18px] font-bold text-ink-1 rk-num truncate">{c.value}</span>
+                        <span className={cn("block mt-1.5 text-[11px] font-semibold rk-num truncate", c.subTone === "brand" ? "text-brand" : "text-ink-4")}>
+                            {c.sub ?? " "}
+                        </span>
+                    </>
+                );
+                return c.onClick ? (
+                    <button key={i} type="button" onClick={c.onClick} className="min-w-0 px-2.5 py-2.5 text-left transition-colors active:bg-surface-3">{body}</button>
+                ) : (
+                    <div key={i} className="min-w-0 px-2.5 py-2.5">{body}</div>
+                );
+            })}
+        </div>
+    );
+}
+
+/** 최근 경기 점 — 새것이 왼쪽. 승 초록·패 빨강, 비어 있으면 옅은 테두리 점 다섯 */
+export function FormDots({ results }: { results: ("W" | "L")[] }) {
+    const { t } = useT();
+    const five = results.slice(0, 5);
+    return (
+        <span className="inline-flex items-center gap-1 align-middle" role="img" aria-label={five.map((r) => t(r === "W" ? "formBadges.win" : "formBadges.loss")).join(" ")}>
+            {five.length
+                ? five.map((r, i) => <span key={i} className={cn("w-2.5 h-2.5 rounded-full", r === "W" ? "bg-brand" : "bg-[#E5484D]")} />)
+                : Array.from({ length: 5 }, (_, i) => <span key={i} className="w-2.5 h-2.5 rounded-full border border-surface-line-strong" />)}
+        </span>
     );
 }
 

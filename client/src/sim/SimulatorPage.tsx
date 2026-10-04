@@ -153,10 +153,13 @@ const BANNER_MS = 2400;
 /** 온라인게임을 완전히 떠날 때(입구 화면의 닫기) */
 const EXIT_PATH = "/dashboard";
 /**
- * 게임·설정·드릴 목록을 닫을 때는 온라인게임 입구로(2026-09-26 검토): 예전엔 앱 대시보드로 나가 버려 '한 판 더' 하려면
- * 다시 들어와야 했다. 입구의 닫기(EXIT_PATH)만 앱으로 나간다.
+ * 게임·설정·드릴·멀티방·랭킹·대시보드를 닫을 때 돌아가는 곳 = **홈의 당구 게임 구역**(2026-10-04 오너: "온라인게임 페이지로 안 가게,
+ * 나는 홈에서 다 하고 싶다"). 혼자 치기·드릴·길 찾기·같이 치기·내 온라인 실력(전적·랭킹·다마수)이 홈 카드에 다 있다.
+ * ?sec=game 이면 홈이 그 구역으로 내려 준다 — '한 판 더'도 '바로 치기' 한 번(예전 2026-09-26 엔 이 이유로 입구로 돌아왔다).
  */
-const ENTRY_PATH = "/online-game";
+const HOME_HUB_PATH = "/dashboard?sec=game";
+/** 로그인 전 방문자는 홈 카드가 없다 — 예전처럼 온라인게임 입구로 돌아온다(홈으로 보내면 로그인 화면에 떨어진다). */
+const GUEST_ENTRY_PATH = "/online-game";
 /**
  * 테이블이 조작 층을 피해 letterbox 되는 인셋(CSS px). 오른쪽 68 = 툴바 44 + 여백, 아래 = 두께 독(두 줄 106) + 여백 8.
  * 세로가 남는 폰(375×812)에선 폭이 배율을 정하므로 인셋이 테이블 크기를 줄이지 않는다.
@@ -208,7 +211,9 @@ export function SimulatorPage() {
     const { t } = useT();
     const { toast } = useToast();
     const { getCtx } = useGameAudio();
-    const { member } = useAuth();
+    const { member, isLoading: authLoading } = useAuth();
+    // 닫기·나가기가 돌아가는 곳 — 회원은 홈 당구 게임 구역, 방문자는 입구(2026-10-04 리뷰)
+    const ENTRY_PATH = member ? HOME_HUB_PATH : GUEST_ENTRY_PATH;
     const [, navigate] = useLocation();
     const search = useSearch();
 
@@ -248,6 +253,7 @@ export function SimulatorPage() {
     const entryView = !overlayParam && !replay && readCfgParam(search) === null && params.get(REPLAY_PARAM) === null;
     // ?solo=1 — 홈 '혼자 치기' 카드(2026-10-04)가 진입 화면을 건너뛰고 바로 혼자 치기 설정 창을 연다. 닫으면 진입 화면이다.
     const [setupOpen, setSetupOpen] = useState((!entryView && initial === null && replay === null && !overlayParam) || (entryView && params.get("solo") === "1"));
+    const soloParamRef = useRef(entryView && params.get("solo") === "1");
     const lobbyTab = params.get("tab") === "join" ? "join" as const : undefined;
     // 드릴 모드: 고정 배치에서 첫 샷만 서버가 채점(문제당 1회), 그 뒤는 연습. scored 전엔 공 배치를 막는다.
     const [drill, setDrill] = useState<{ drill: WeekDrill; week: DrillWeek; scored: boolean; result: { success: boolean; cushions: number } | null } | null>(null);
@@ -486,7 +492,7 @@ export function SimulatorPage() {
                 navigate(`/online-game?match=${joined.id}`, { replace: true });
             } catch {
                 toast({ title: t("sim.match.inviteGone") });
-                navigate("/online-game", { replace: true });
+                navigate(ENTRY_PATH, { replace: true });
             }
         })();
     }, [joinCode, autoJoin, sameTarget, member, navigate, queryClient, toast, t]);
@@ -1246,11 +1252,14 @@ export function SimulatorPage() {
             setResignOpen(false);
             setEndDismissed(false);
             // 대전은 서버에 남으므로 목록(로비)으로 돌아간다
-            navigate(isMatch ? "/online-game?lobby=1" : drillRef.current ? "/online-game?drills=1" : ENTRY_PATH);
+            // 홈으로 갈 땐 기록을 바꿔 끼운다(replace) — 쌓으면 홈에서 '뒤로'가 방금 나온 판(?cfg·?match)을 다시 연다(2026-10-04 리뷰)
+            if (isMatch) navigate("/online-game?lobby=1");
+            else if (drillRef.current) navigate("/online-game?drills=1");
+            else navigate(ENTRY_PATH, { replace: true });
             setDrill(null);
             setExiting(false);
         }
-    }, [actions, navigate, isMatch]);
+    }, [actions, navigate, isMatch, ENTRY_PATH]);
 
     const openMatch = useCallback((m: MatchPublic) => {
         if (m.status === "waiting") return;
@@ -1449,13 +1458,20 @@ export function SimulatorPage() {
         setLog(EMPTY_LOG);
         setBanner(null);
         actions.start(config, { record: opts.record });
-    }, [actions]);
+        // 홈 '바로 치기'(?solo=1)로 왔으면 시작한 **뒤에** 주소를 입구로 — 판 도중 새로고침하면 설정 창 대신 홈의 '이어서 치기'로
+        // 이어진다. 시작 전에 바꾸면 한 박자 동안 '설정 단계 + 맨 입구'로 보여 회원을 홈으로 돌려보낼 수 있다.
+        if (soloParamRef.current) { soloParamRef.current = false; navigate(GUEST_ENTRY_PATH, { replace: true }); }
+    }, [actions, navigate]);
 
     const onSetupOpenChange = useCallback((open: boolean) => {
         setSetupOpen(open);
-        // 세션 없이 설정을 닫으면 돌아간다 — 진입 화면에서 열었으면 진입 화면으로(setupOpen=false 만), 바로 열렸으면(cfg 깨짐) 대시보드로
-        if (!open && sim.phase === "setup" && !entryView) navigate(ENTRY_PATH);
-    }, [navigate, sim.phase, entryView]);
+        // 세션 없이 설정을 닫으면 돌아간다 — 진입 화면에서 열었으면 진입 화면으로(setupOpen=false 만), 바로 열렸으면(cfg 깨짐) 대시보드로.
+        // 홈 '혼자 치기'(?solo=1, 2026-10-04)로 왔으면 홈이 입구였으니 홈으로 — 진입 화면에 떨어지면 길을 잃는다.
+        if (!open && sim.phase === "setup") {
+            if (!entryView) navigate(ENTRY_PATH, { replace: true });
+            else if (params.get("solo") === "1") navigate(ENTRY_PATH, { replace: true });
+        }
+    }, [navigate, sim.phase, entryView, params, ENTRY_PATH]);
 
     const finished = sim.session?.status === "finished";
     // 새 판이 시작되면(조준 단계로 들어오면) 지난 판에서 닫은 결과 창·나가기 확인 상태를 되돌린다 — 화면이 판 사이에
@@ -1472,6 +1488,26 @@ export function SimulatorPage() {
     const showRooms = roomsView && sim.phase === "setup";
     const showRank = rankView && sim.phase === "setup";
     const showEntry = entryView && sim.phase === "setup" && !setupOpen;
+    // 회원은 입구 화면 대신 홈 당구 게임 구역으로(2026-10-04 오너: "온라인게임 페이지로 안 가게, 홈에서 다").
+    // 로그인 전 방문자는 홈 카드가 없으니 입구를 그대로 둔다. 로그인 확인 중·이어서 치기 중에는 아무것도 그리지 않는다(입구가 번쩍이지 않게).
+    const resumeParam = params.get("resume") === "1";
+    const hubRedirect = showEntry && !resumeParam && !!member;
+    const entryHold = showEntry && (authLoading || resumeParam || hubRedirect);
+    // 이어서 치기를 불러오는 동안 빈 화면 대신 한 줄(2026-10-04 리뷰)
+    const resumeLoading = showEntry && resumeParam;
+    useEffect(() => { if (hubRedirect) navigate(ENTRY_PATH, { replace: true }); }, [hubRedirect, navigate, ENTRY_PATH]);
+    // 이어서 치기 — 홈 '혼자 치기' 카드의 띠에서 온다(예전엔 입구 화면의 띠). 이을 수 없으면 알리고 홈으로.
+    const resumeRef = useRef(false);
+    useEffect(() => {
+        if (!resumeParam || resumeRef.current || sim.phase !== "setup") return;
+        resumeRef.current = true;
+        const rec = loadResume();
+        if (!rec) { navigate(ENTRY_PATH, { replace: true }); return; }
+        void fetchResumable(rec).then((r) => {
+            if (r) { actions.resume(r); navigate(GUEST_ENTRY_PATH, { replace: true }); }
+            else { toast({ title: t("sim.resume.gone") }); navigate(ENTRY_PATH, { replace: true }); }
+        });
+    }, [resumeParam, sim.phase, actions, navigate, toast, t, ENTRY_PATH]);
     const endSubtitle = sim.match
         ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t)
         : null;
@@ -1806,11 +1842,11 @@ export function SimulatorPage() {
             {showDrills && (
                 <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
-                        <DrillPanel onPlay={onPlayDrill} myMemberId={member?.id} onClose={() => navigate(ENTRY_PATH)} />
+                        <DrillPanel onPlay={onPlayDrill} myMemberId={member?.id} onClose={() => navigate(ENTRY_PATH, { replace: true })} />
                     </div>
                 </div>
             )}
-            {showEntry && (
+            {showEntry && !entryHold && (
                 <div className={cn("fixed inset-0 z-[5] overflow-y-auto", ENTRY_STYLE.page)} style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <SimEntry
                         resume={resumable ? {
@@ -1846,7 +1882,7 @@ export function SimulatorPage() {
                         onWatch={(id) => navigate(`/online-game?watch=${id}`)}
                         onCreate={() => navigate("/online-game?lobby=1&public=1")}
                         onEnterMine={() => navigate("/online-game?lobby=1")}
-                        onClose={() => navigate("/online-game", { replace: true })}
+                        onClose={() => navigate(ENTRY_PATH, { replace: true })}
                         autoJoinId={roomParam ?? undefined}
                         myHandi={member ? { handi3c: member.handi3c, handi4c: member.handi4c } : undefined}
                     />
@@ -1858,13 +1894,18 @@ export function SimulatorPage() {
             )}
             {showRank && (
                 <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    <RankPage onClose={() => navigate("/online-game", { replace: true })} />
+                    <RankPage onClose={() => navigate(ENTRY_PATH, { replace: true })} />
                 </div>
             )}
             {/* 관전·다시보기: 읽기 전용 화면을 위에 덮는다(대전 화면·시뮬 세션과 완전히 분리) */}
             {watchId && (
                 <div className="sim-dark fixed inset-0 z-[6] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <WatchPage matchId={watchId} />
+                </div>
+            )}
+            {resumeLoading && (
+                <div className="fixed inset-0 z-[5] bg-surface-1 flex items-center justify-center" role="status">
+                    <p className="text-[14px] font-semibold text-ink-2">{t("sim.resume.loading")}</p>
                 </div>
             )}
             {joinCode !== "" && sim.phase === "setup" && (
@@ -1876,9 +1917,9 @@ export function SimulatorPage() {
                 <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <SimDash
                         initialSection={dashSection}
-                        onClose={() => navigate("/online-game", { replace: true })}
+                        onClose={() => navigate(ENTRY_PATH, { replace: true })}
                         onOpenMatch={openMatch}
-                        onPractice={() => { navigate("/online-game", { replace: true }); setSetupOpen(true); }}
+                        onPractice={() => { navigate("/online-game?solo=1", { replace: true }); setSetupOpen(true); }}
                         onDrills={() => navigate("/online-game?drills=1")}
                         onLobby={() => navigate("/online-game?lobby=1")}
                         onRank={() => navigate("/online-game?rank=1")}
@@ -1890,7 +1931,7 @@ export function SimulatorPage() {
                     <MatchLobby
                         initialTab={lobbyTab} initialPublic={lobbyPublic} initialCode={lobbyCode || undefined} initialRoomId={roomParam ?? undefined}
                         onStarted={openMatch} onCreated={() => { void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY }); }}
-                        onClose={() => navigate("/online-game", { replace: true })}
+                        onClose={() => navigate(ENTRY_PATH, { replace: true })}
                     />
                     {/* 내 대전 목록은 대시보드의 대전 섹션으로 옮겼다(2026-09-08 오너) — 로비는 만들기·참가만 */}
                     <div className="w-full max-w-[420px] mx-auto px-5 pb-8">

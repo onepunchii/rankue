@@ -118,6 +118,8 @@ export const LucidePhone = ((Ph as any).Phone ?? F) as Ph.Icon;
 export const LucidePiggyBank = ((Ph as any).PiggyBank ?? F) as Ph.Icon;
 export const LucidePin = ((Ph as any).PushPin ?? F) as Ph.Icon;
 export const LucidePlay = ((Ph as any).Play ?? F) as Ph.Icon;
+/** 길 찾기(공 경로) — 홈 혼자 치기 카드(2026-10-04) */
+export const LucidePath = ((Ph as any).Path ?? F) as Ph.Icon;
 export const LucidePlus = ((Ph as any).Plus ?? F) as Ph.Icon;
 export const LucidePrinter = ((Ph as any).Printer ?? F) as Ph.Icon;
 export const LucideReceipt = ((Ph as any).Receipt ?? F) as Ph.Icon;

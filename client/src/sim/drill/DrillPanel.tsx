@@ -2,14 +2,15 @@ import { memo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
-import { drillApi, weekProgress, type DrillApi, type DrillWeek, type WeekDrill } from "./drillApi";
+import { drillApi, weekProgress, DRILL_WEEK_QUERY_KEY, type DrillApi, type DrillWeek, type WeekDrill } from "./drillApi";
 
 /**
  * 이번 주 드릴 5문제와 주간 래더. 문제당 채점 시도는 한 번(서버가 막는다), 그 뒤엔 연습으로 몇 번이든 다시 칠 수 있다.
  * 페이지는 onPlay(drill, week) 로 시뮬레이터를 드릴 모드로 연다. 머리글은 로비(MatchLobby)와 같은 꼴 — 제목·설명 왼쪽, 닫기 알약 오른쪽.
  * 흰 바탕 위의 안쪽 상자·칩은 surface-3(5% 먹) — surface-2 는 흰색이라 바탕과 구분이 안 됐다(실측 2026-09-07).
  */
-export const DRILL_WEEK_QUERY_KEY = ["sim-drills", "week"] as const;
+// 키는 drillApi(작은 모듈)로 옮겼다 — 홈 '혼자 치기' 카드가 이 패널(엔진)을 끌어오지 않고 같은 캐시를 쓰게(2026-10-04)
+export { DRILL_WEEK_QUERY_KEY };
 export const DRILL_LADDER_QUERY_KEY = ["sim-drills", "ladder"] as const;
 const LADDER_TOP = 10;
 

@@ -99,4 +99,7 @@ export function createDrillApi(request: Request): DrillApi {
     };
 }
 
+/** 이번 주 드릴 쿼리 키 — DrillPanel·온라인게임 진입·홈 혼자 치기 카드가 같은 캐시를 쓴다 */
+export const DRILL_WEEK_QUERY_KEY = ["sim-drills", "week"] as const;
+
 export const drillApi: DrillApi = createDrillApi((url, options) => apiRequest(url, options));

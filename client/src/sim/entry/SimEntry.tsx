@@ -2,19 +2,17 @@ import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
-import { MATCH_LIST_QUERY_KEY, MATCH_LIST_REFETCH_MS } from "../match/queryKeys";
 import { matchApi } from "../matchApi";
 import { ROOMS_QUERY_KEY } from "../match/RoomList";
-import { drillApi, weekProgress } from "../drill/drillApi";
-import { DRILL_WEEK_QUERY_KEY } from "../drill/DrillPanel";
+import { drillApi, weekProgress, DRILL_WEEK_QUERY_KEY } from "../drill/drillApi";
 import { ChartIcon, ChevronRightIcon } from "../components/railIcons";
 import { EntryShowcase } from "./EntryShowcase";
 import { HandicapCard } from "./HandicapCard";
 import { BallMotif } from "./BallMotif";
 import { CodeIcon, DrillIcon, InviteIcon, PathIcon, PracticeIcon, RankIcon, RoomsIcon } from "./entryIcons";
-import { ENTRY_LAST_KEY, entryOrder, matchRecord, type EntryChoice, type EntryMatchRow } from "./entryStats";
+import { ENTRY_LAST_KEY, entryOrder, type EntryChoice } from "./entryStats";
+import { useOnlineRecord } from "./useOnlineRecord";
 import { ENTRY_STYLE as st } from "./entryTheme";
 
 /**
@@ -59,47 +57,21 @@ export function SimEntry({ onSingle, onDrills, onMulti, onJoin, onRooms, onRank,
     const pill = cn(PILL, st.pill);
     const primary = cn(PRIMARY, st.primary);
     const { member } = useAuth();
-    const matches = useQuery<EntryMatchRow[]>({
-        queryKey: MATCH_LIST_QUERY_KEY,
-        queryFn: async () => (await apiRequest("/api/hiq/sim/matches")) ?? [],
-        enabled: !!member,
-        staleTime: 10_000,
-        refetchInterval: (q) => ((q.state.data ?? []).some((m) => m.status === "playing") ? MATCH_LIST_REFETCH_MS * 3 : false),
-    });
+    // 전적·내 차례·순위는 홈 '내 온라인 실력' 카드와 같은 계산(useOnlineRecord — 서버 합계 전적, 가장 높은 순위)
+    const { record, bestBoard, placingMatches, placement } = useOnlineRecord();
     const week = useQuery({ queryKey: DRILL_WEEK_QUERY_KEY, queryFn: () => drillApi.getWeek(), enabled: !!member, staleTime: 30_000 });
     const rooms = useQuery({ queryKey: ROOMS_QUERY_KEY, queryFn: () => matchApi.listRooms(), enabled: !!member, staleTime: 10_000 });
 
-    const listRecord = matchRecord(matches.data ?? []);
     const drill = week.data ? weekProgress(week.data) : null;
     const order = entryOrder(readLast());
     const top = order[0];
     const openRooms = rooms.data?.length ?? 0;
-    const myRank = useQuery<{ placement: number; boards: { gameType: "3c" | "4c"; matches: number; wins?: number; rank: number | null; total: number }[] }>({
-        queryKey: ["/api/hiq/sim/rank/me"],
-        queryFn: async () => (await apiRequest("/api/hiq/sim/rank/me")) ?? { placement: 3, boards: [] },
-        enabled: !!member,
-        staleTime: 30_000,
-    });
-
-    // 전적은 서버 합계(랭킹 보드)로 본다 — 대전 목록은 최근 20개뿐이라 새 대전이 생길 때마다 승수가 흔들렸다
-    // (2026-09-16 테스터 제보: "17승 2패 → 18승 2패 → 17승 1패"). 진행 중·내 차례 수는 지금 상태라 목록이 맞다.
-    // 무승부는 서버 wins 에 이미 포함돼 있다(오너 규칙: 둘 다 승).
-    const boardTotals = (myRank.data?.boards ?? []).reduce((a, b) => ({ w: a.w + (b.wins ?? 0), m: a.m + (b.matches ?? 0) }), { w: 0, m: 0 });
-    const record = boardTotals.m > 0
-        ? { ...listRecord, wins: boardTotals.w, losses: Math.max(0, boardTotals.m - boardTotals.w) }
-        : listRecord;
-    // 두 판(3쿠션·4구) 중 **가장 높은 순위**(숫자가 작은 쪽). 같으면 사람이 많은 판을 보여 준다.
-    // 2026-09-12 부터 대대·중대는 합쳐져 판이 넷에서 둘로 줄었다.
-    const bestBoard = (myRank.data?.boards ?? [])
-        .filter((b) => b.rank !== null)
-        .sort((a, b) => (a.rank! - b.rank!) || (b.total - a.total))[0];
-    const placingMatches = Math.max(0, ...(myRank.data?.boards ?? []).map((b) => b.matches));
     const boardLabel = (b: { gameType: "3c" | "4c" }) =>
         t(b.gameType === "4c" ? "sim.setup.type4c" : "sim.setup.type3c");
     const rankValue: { text: string; muted: boolean } | null = bestBoard
         ? { text: `#${bestBoard.rank} · ${boardLabel(bestBoard)}`, muted: false }
         : placingMatches > 0
-            ? { text: t("sim.rank.unranked").replace("{n}", String(placingMatches)).replace("{m}", String(myRank.data?.placement ?? 3)), muted: true }
+            ? { text: t("sim.rank.unranked").replace("{n}", String(placingMatches)).replace("{m}", String(placement)), muted: true }
             : null;
 
     const go = (group: EntryChoice, fn: () => void) => { writeLast(group); fn(); };

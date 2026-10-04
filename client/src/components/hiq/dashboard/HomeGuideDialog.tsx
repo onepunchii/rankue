@@ -4,7 +4,7 @@
  * 점수판: 실제 점수판 화면 사진(/img/guide/scoreboard.webp — 로컬 Vite 에 가짜 경기 응답을 끼워 찍은 진짜 화면, 운영 DB 무관)
  *   + 쓰는 법 다섯 줄(누르는 자리까지 실제 동작과 같게: 내 칸 위 +1·아래 −1, 상대 칸 = 차례 넘김 — useGameScore.handleCardTap)
  *   + 같은 점수판의 다른 입구(혼자 연습·PIN으로 합류)와 기록이 이어지는 곳(전적·실전 핸디).
- * 온라인게임: 3D 테이블 사진 + 혼자 치기·같이 치기·닮은 프로. 둘러보기: 매장 찾기·커뮤니티.
+ * 당구 게임: 홈 혼자 치기 카드와 같은 초록 다이 그림 + 혼자 치기·같이 치기·닮은 프로. 둘러보기: 매장 찾기·커뮤니티.
  * 예전 '게임 모드 안내'(빠른 실행 머리의 ?)를 대신한다.
  */
 import type { ComponentType, ReactNode } from "react";
@@ -118,9 +118,9 @@ export function HomeGuideDialog({ topic, onClose, onStartGame, onJoinGame }: {
                                 <img
                                     src="/img/guide/online.webp"
                                     width={1200}
-                                    height={579}
+                                    height={535}
                                     alt={t("home.secOnline")}
-                                    className="w-full h-auto rounded-2xl bg-[#174479]"
+                                    className="w-full h-auto rounded-2xl bg-[#142219]"
                                 />
                             </figure>
                             <div className="mt-4 space-y-2">

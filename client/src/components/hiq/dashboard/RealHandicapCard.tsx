@@ -1,5 +1,8 @@
 /**
- * 홈 전적 카드 아래 "내 실전 핸디"(2026-09-27, 오너 승인 시안 → 콤팩트 개편).
+ * 홈 맨 위 "내 실전 기록"(2026-09-27 "내 실전 핸디" 오너 승인 시안 → 콤팩트 개편 →
+ * 2026-10-04 오너: "3쿠션·4구 RP 카드와 전적 카드가 중복 — 이 카드가 마음에 드니 디자인을 최대한 살려 통합, 맨 위로").
+ * 머리 바로 아래 기록 띠(RecordStrip) 세 칸 — 랭킹 점수(상위 %, ?는 RP 안내) · 전적(승률) · 최근 5경기. 3쿠션·4구 탭을 따른다.
+ * 그 아래는 예전 그대로.
  * 실전 매칭 대결 기록만 — 3쿠션은 닮은 프로·재미 등급·사다리 + 비교표(나 | 닮은 프로 | 다음 핸디),
  * 4구는 프로 기록이 없어 랭큐 회원 순위 + 비교표(나 | 같은 핸디 회원 평균 | 다음 핸디). 버튼 [매칭 대결][프로][공유].
  * '다음 핸디까지'는 핸디를 매기는 기준(최근 공식 10경기 평균, shared/realHandicap)으로 센다 — 실제로 오르는 값과 맞게.
@@ -13,12 +16,24 @@ import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { shareImage } from "@/lib/shareImage";
-import { Swords } from "@/lib/icons";
+import { LucidePlay } from "@/lib/icons";
 import { proRatio, type LookalikeResponse, type RealCompareResponse, type RealSide } from "@shared/proCompare";
 import { drawCompareCard } from "@/components/hiq/compare/compareCard";
-import { BadgeAvatar, CardActions, CompareTable, GOLD_TEXT, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
+import { BadgeAvatar, CardActions, CompareTable, FormDots, GOLD_TEXT, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, RecordStrip, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
 
-export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void }) {
+type HistoryRow = { sportCategory?: string | null; gameMode?: string | null; isRanked?: boolean | null; gameType?: string | null; isWinner?: boolean | null };
+
+export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, history, onPreview }: {
+    onStartMatch: () => void;
+    /** 랭킹 점수 칸 — RP 안내 창 */
+    onOpenRpGuide?: () => void;
+    /** 상위 % (홈이 랭킹 목록으로 계산) */
+    getPercentile?: (type: "3c" | "4c") => number | null;
+    /** 내 경기 기록(최신순) — 전적·최근 5경기 */
+    history?: HistoryRow[];
+    /** 공식 경기가 하나도 없을 때 '점수판 미리 보기' */
+    onPreview?: () => void;
+}) {
     const { t, locale } = useT();
     const { member } = useAuth();
     const { toast } = useToast();
@@ -29,30 +44,76 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
     const online = useQuery<LookalikeResponse>({ queryKey: ["/api/hiq/sim/lookalike"], enabled: !!member, staleTime: 60_000, retry: false });
     const [tab, setTab] = useState<"3c" | "4c" | null>(null);
     useEffect(() => { if (q.data && tab === null) setTab(q.data.preferred); }, [q.data, tab]);
-    if (!member || !q.data || !tab) return null;
-    const d: RealSide = q.data[tab];
+    if (!member) return null;
+    const cur: "3c" | "4c" = tab ?? q.data?.preferred ?? "3c";
+
+    // 기록 띠 — 고른 종목의 공식(랭크) 매칭만. history 는 최신순.
+    const mine = (Array.isArray(history) ? history : []).filter((g) => g.sportCategory === "BILLIARDS" && g.gameMode === "match" && g.isRanked && g.gameType === cur);
+    const wins = mine.filter((g) => g.isWinner).length;
+    const losses = mine.length - wins;
+    const rating = (cur === "3c" ? (member as any).rating3c : (member as any).rating4c) ?? 0;
+    const pct = getPercentile?.(cur) ?? null;
+    const strip = (
+        <RecordStrip cells={[
+            {
+                label: t("real.stripRp"),
+                value: <>{rating}<span className="ml-0.5 text-[11px] font-bold text-brand">RP</span></>,
+                // 상위 % 는 홈 랭킹 목록으로 셀 수 있을 때만(모집단을 모르면 비운다 — 예전 헤더의 '분석 중' 은 대부분 영원히 그대로였다)
+                sub: pct ? fill(t("real.stripTop"), { n: pct }) : undefined,
+                subTone: "brand",
+                onClick: onOpenRpGuide,
+                hint: !!onOpenRpGuide,
+            },
+            {
+                label: t("performanceCard.title"),
+                value: fill(t("real.stripRecord"), { w: wins, l: losses }),
+                sub: mine.length ? fill(t("real.stripRate"), { n: Math.round((wins / mine.length) * 100) }) : t("real.stripNone"),
+                onClick: () => setLocation("/history"),
+            },
+            {
+                label: t("performanceCard.recentFive"),
+                value: <FormDots results={mine.slice(0, 5).map((g) => (g.isWinner ? "W" : "L"))} />,
+                onClick: () => setLocation("/history"),
+            },
+        ]} />
+    );
 
     const tabs = (
         <div className="inline-flex p-[3px] rounded-full bg-surface-3 shrink-0" role="tablist">
             {(["3c", "4c"] as const).map((k) => (
-                <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
-                    className={cn("h-7 px-3 rounded-full text-[12.5px] font-bold transition-colors", tab === k ? "bg-surface-1 text-ink-1 shadow-sm" : "text-ink-3")}>
+                <button key={k} type="button" role="tab" aria-selected={cur === k} onClick={() => setTab(k)}
+                    className={cn("h-7 px-3 rounded-full text-[12.5px] font-bold transition-colors", cur === k ? "bg-surface-1 text-ink-1 shadow-sm" : "text-ink-3")}>
                     {k === "3c" ? t("real.tab3c") : t("real.tab4c")}
                 </button>
             ))}
         </div>
     );
     const head = (
-        <div className="flex items-center justify-between gap-2">
-            <h3 className="text-[14.5px] font-bold text-ink-1 truncate">🎱 {t("real.title")}</h3>
-            {tabs}
-        </div>
+        <>
+            <div className="flex items-center justify-between gap-2">
+                <h3 className="text-[14.5px] font-bold text-ink-1 truncate">🎱 {t("real.titleRecord")}</h3>
+                {tabs}
+            </div>
+            {strip}
+        </>
     );
-    const matchAction = { label: t("real.match"), icon: Swords, onClick: onStartMatch };
+
+    // 실전 비교(닮은 프로·비교표)는 따로 불러온다 — 그동안 머리·기록 띠는 먼저 보이고 아래만 자리를 잡아 둔다
+    if (!q.data) {
+        return (
+            <section className="rk-card rounded-3xl p-4">
+                {head}
+                {!q.isError && <div className="mt-3 h-[208px] rounded-tile bg-surface-3 animate-pulse" aria-hidden="true" />}
+            </section>
+        );
+    }
+    const d: RealSide = q.data[cur];
+
+    const matchAction = { label: t("real.match"), icon: LucidePlay, onClick: onStartMatch };
 
     if (!d.ready || d.avg == null) {
         return (
-            <section className="rk-card p-4">
+            <section className="rk-card rounded-3xl p-4">
                 {head}
                 <NeedMore
                     title={fill(t("real.needTitle"), { n: d.needed })}
@@ -60,6 +121,11 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
                     pct={(d.games / d.needed) * 100}
                     action={matchAction}
                 />
+                {mine.length === 0 && onPreview && (
+                    <button type="button" onClick={onPreview} className="w-full mt-2 h-9 rounded-full text-[13px] font-semibold text-ink-2 hover:bg-surface-3 transition-colors">
+                        {t("home.firstGamePreview")} →
+                    </button>
+                )}
             </section>
         );
     }
@@ -108,7 +174,7 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
         const pro = d.pro;
         const openPro = () => setLocation(`/pba-player/${encodeURIComponent(pro.memCode)}`);
         return (
-            <section className="rk-card p-4">
+            <section className="rk-card rounded-3xl p-4">
                 {head}
                 <ProTwinHeader
                     pro={pro} tier={d.tier} pos={d.pos} onOpen={openPro}
@@ -131,7 +197,7 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
     // 4구 — 랭큐 회원끼리
     const m = d.members;
     return (
-        <section className="rk-card p-4">
+        <section className="rk-card rounded-3xl p-4">
             {head}
             <div className="mt-3 flex items-center gap-3 rounded-tile bg-brand/[0.05] p-3">
                 <span className={cn("w-12 h-12 shrink-0 rounded-xl bg-[#F5B721]/20 flex flex-col items-center justify-center rk-num", GOLD_TEXT)}>

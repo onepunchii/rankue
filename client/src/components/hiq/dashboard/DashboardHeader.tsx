@@ -1,7 +1,4 @@
-import { ChevronsUp, HelpCircle, Bell, LucideMenu, LucideChevronDown, LucideTranslate } from "@/lib/icons";
-import { motion } from "framer-motion";
-import { cn } from "@/lib/utils";
-import { BallCluster } from "../ui/BilliardBall";
+import { Bell, LucideMenu, LucideChevronDown, LucideTranslate } from "@/lib/icons";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
@@ -11,29 +8,17 @@ import { NotificationInbox, UNREAD_COUNT_KEY } from "@/components/hiq/menu/Notif
 import { useT } from "@/lib/i18n";
 import { useSport } from "@/contexts/SportContext";
 
+/**
+ * 당구 홈 머리 — 종목 전환 알약 · 이름 · 알림 · 언어 · 메뉴.
+ * 3쿠션·4구 RP 카드 두 장은 2026-10-04 '내 실전 기록' 카드(RealHandicapCard)의 기록 띠로 합쳤다(오너: "중복, 통합해서 맨 위로").
+ */
 interface DashboardHeaderProps {
     member: any;
-    onOpenRpGuide: () => void;
-    liveAvg3c: string;
-    liveAvg4c: string;
-    getPercentile: (type: '3c' | '4c') => number | null;
-    getTrend: () => { label: string, color: string, icon: React.ReactNode };
-    tier: { label: string, class: string, icon: string };
 }
 
-export const DashboardHeader = ({
-    member,
-    onOpenRpGuide,
-    liveAvg3c,
-    liveAvg4c,
-    getPercentile,
-    getTrend,
-    tier
-}: DashboardHeaderProps) => {
+export const DashboardHeader = ({ member }: DashboardHeaderProps) => {
     const { t } = useT();
     const { currentSport, setSport } = useSport();
-    const pct3c = getPercentile('3c');
-    const trend = getTrend();
     const [, setLocation] = useLocation();
     const [notifOpen, setNotifOpen] = useState(false);
     const [langOpen, setLangOpen] = useState(false);
@@ -44,9 +29,9 @@ export const DashboardHeader = ({
     const unread = notifCount?.unread || 0;
 
     return (
-        <header className="pt-7 pb-2">
+        <header className="pt-7 pb-5">
             {/* Top bar: greeting + profile */}
-            <div className="flex items-center justify-between mb-7 gap-3">
+            <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
                     {/* 종목 전환(2026-09-23 오너: "더 심플하게. 검정 배경에 흰 글자, 아이콘도 변경, '모드'는 빼고 당구·골프로").
                         색을 토큰이 아니라 **검정·흰색 그대로** 쓰는 게 의도다 — 이 알약은 제 배경의 반대색이어야 눈에 띈다.
@@ -100,71 +85,6 @@ export const DashboardHeader = ({
 
             <LanguageSheet open={langOpen} onOpenChange={setLangOpen} />
 
-            {/* Rating cards — clean flat white, single green accent */}
-            <div className="grid grid-cols-2 gap-3">
-                {/* 3-Cushion */}
-                <motion.div
-                    whileTap={{ scale: 0.98 }}
-                    className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
-                >
-                    <div className="flex items-start justify-between mb-3">
-                        <span className="text-[14px] font-bold text-brand tracking-tight">{t("dashboardHeader.threeCushion")}</span>
-                        <BallCluster colors={["white", "yellow", "red"]} size={22} />
-                    </div>
-
-                    <div className="flex items-baseline gap-1.5">
-                        <span className="text-[42px] leading-[0.9] font-bold text-ink-1 tabular-nums tracking-tight">{member.rating3c || 0}</span>
-                        <span className="text-[14px] font-bold text-brand">RP</span>
-                        <button onClick={onOpenRpGuide} className="ml-0.5 text-brand/40 hover:text-brand transition-colors">
-                            <HelpCircle className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <div className="mt-4 flex flex-col items-start gap-2">
-                        <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">{t("dashboardHeader.average")} {liveAvg3c}</span>
-                        {pct3c ? (
-                            <span className="inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
-                                <ChevronsUp className="w-3.5 h-3.5" />
-                                {t("dashboardHeader.topPrefix")} {pct3c}%
-                            </span>
-                        ) : (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full bg-brand/10 text-[12px] font-semibold text-brand">
-                                {t("dashboardHeader.analyzing")}
-                            </span>
-                        )}
-                    </div>
-                </motion.div>
-
-                {/* 4-Ball */}
-                <motion.div
-                    whileTap={{ scale: 0.98 }}
-                    className="rounded-2xl p-5 bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
-                >
-                    <div className="flex items-start justify-between mb-3">
-                        <span className="text-[14px] font-bold text-ink-1 tracking-tight">{t("dashboardHeader.fourBall")}</span>
-                        <BallCluster colors={["white", "yellow", "red", "red"]} size={22} />
-                    </div>
-
-                    <div className="flex items-baseline gap-1.5">
-                        <span className="text-[42px] leading-[0.9] font-bold text-ink-1 tabular-nums tracking-tight">{member.rating4c || 0}</span>
-                        <span className="text-[14px] font-bold text-brand">RP</span>
-                        <button onClick={onOpenRpGuide} className="ml-0.5 text-brand/40 hover:text-brand transition-colors">
-                            <HelpCircle className="w-4 h-4" />
-                        </button>
-                    </div>
-
-                    <div className="mt-4 flex flex-col items-start gap-2">
-                        <span className="text-[12px] font-medium text-black/45 tabular-nums shrink-0">{t("dashboardHeader.average")} {liveAvg4c}</span>
-                        <span className={cn(
-                            "inline-flex items-center gap-0.5 px-2 py-1 rounded-full bg-brand/[0.07] text-[12px] font-semibold",
-                            trend.color
-                        )}>
-                            {trend.icon}
-                            {trend.label}
-                        </span>
-                    </div>
-                </motion.div>
-            </div>
         </header>
     );
 };

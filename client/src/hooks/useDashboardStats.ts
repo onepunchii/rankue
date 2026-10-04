@@ -24,11 +24,7 @@ export const useDashboardStats = (rankingType: '3c' | '4c' = '4c') => {
         }
     });
 
-    // 4. Analysis for stats radar chart & cards
-    const { data: analysis } = useQuery<any>({
-        queryKey: [`/api/hiq/stats/analysis`, { type: '4c' }], // Default to 4c context initially
-        enabled: !!member,
-    });
+    // (분석 요청 /api/hiq/stats/analysis 는 2026-10-04 홈 머리 RP 카드와 함께 빠졌다 — 추세 칩만 그걸 썼다)
 
     const isLoading = isMemberLoading || isHistoryLoading;
 
@@ -36,7 +32,6 @@ export const useDashboardStats = (rankingType: '3c' | '4c' = '4c') => {
         member,
         history,
         rankings,
-        analysis,
         isLoading
     };
 };
