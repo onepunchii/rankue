@@ -460,7 +460,7 @@ export const es: Record<string, string> = {
   "notif.chat.card.body.GOLF_ROUND": "⛳ {name} · {n} golpes",
   "notif.golf.urgent.title": "⚡ Join urgente hoy a las {time} · {region}",
   "notif.golf.urgent.body": "{course} · Green fee ₩{fee} · {open} plaza(s) — el carrito y el caddie se reparten a partes iguales",
-  "notif.chat.card.MATCH_INVITE": "🎱 {room} · Partida en mesa",
+  "notif.chat.card.MATCH_INVITE": "🎱 {room} · Invitación al marcador",
   "notif.chat.card.body.MATCH_INVITE.3c": "🎱 Tres bandas · {seats} jugadores — únete desde la sala",
   "notif.chat.card.body.MATCH_INVITE.4c": "🎱 4 bolas · {seats} jugadores — únete desde la sala",
   "notif.chat.card.CREW_MEETUP": "📅 {room} · Quedada",

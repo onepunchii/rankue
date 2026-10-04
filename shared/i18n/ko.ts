@@ -460,7 +460,7 @@ export const ko: Record<string, string> = {
   "notif.chat.card.body.GOLF_ROUND": "⛳ {name} · {n}타",
   "notif.golf.urgent.title": "⚡ 오늘 {time} 긴급 조인 · {region}",
   "notif.golf.urgent.body": "{course} · 그린피 {fee}원 · {open}자리 — 카트·캐디피는 N빵이에요",
-  "notif.chat.card.MATCH_INVITE": "🎱 {room} · 매칭 대결",
+  "notif.chat.card.MATCH_INVITE": "🎱 {room} · 점수판 초대",
   "notif.chat.card.body.MATCH_INVITE.3c": "🎱 3쿠션 · {seats}인 — 방에서 참가하기",
   "notif.chat.card.body.MATCH_INVITE.4c": "🎱 4구 · {seats}인 — 방에서 참가하기",
   "notif.chat.card.CREW_MEETUP": "📅 {room} · 정모",

@@ -52,7 +52,7 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
 
     if (!d.ready || d.avg == null) {
         return (
-            <section className="rk-card p-4 mb-6">
+            <section className="rk-card p-4">
                 {head}
                 <NeedMore
                     title={fill(t("real.needTitle"), { n: d.needed })}
@@ -108,7 +108,7 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
         const pro = d.pro;
         const openPro = () => setLocation(`/pba-player/${encodeURIComponent(pro.memCode)}`);
         return (
-            <section className="rk-card p-4 mb-6">
+            <section className="rk-card p-4">
                 {head}
                 <ProTwinHeader
                     pro={pro} tier={d.tier} pos={d.pos} onOpen={openPro}
@@ -131,7 +131,7 @@ export function RealHandicapCard({ onStartMatch }: { onStartMatch: () => void })
     // 4구 — 랭큐 회원끼리
     const m = d.members;
     return (
-        <section className="rk-card p-4 mb-6">
+        <section className="rk-card p-4">
             {head}
             <div className="mt-3 flex items-center gap-3 rounded-tile bg-brand/[0.05] p-3">
                 <span className={cn("w-12 h-12 shrink-0 rounded-xl bg-[#F5B721]/20 flex flex-col items-center justify-center rk-num", GOLD_TEXT)}>

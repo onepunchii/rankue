@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { previewRows, RankPreviewToggle, type RankPreview } from "@/components/hiq/dashboard/RankPreview";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -19,7 +20,8 @@ export const MoveBadge = ({ move }: { move: number | null }) => {
 };
 
 // 홈 세계 랭킹 카드 — UMB 공식 랭킹 톱10 + 요약 한 줄. 선수 탭 → 상세 시트.
-export const WorldRankingCard = () => {
+// preview(홈): 3명까지 보이고 펼치면 10명(RankPreview).
+export const WorldRankingCard = ({ preview }: { preview?: RankPreview } = {}) => {
     const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const [category, setCategory] = useState<UmbCategory>("players");
@@ -127,7 +129,7 @@ export const WorldRankingCard = () => {
                 {!isLoading && rows.length === 0 && (
                     <div className="py-10 text-center text-black/40 text-[13.5px] font-medium">{t("umb.empty")}</div>
                 )}
-                {rows.map((r) => {
+                {previewRows(rows, preview).map((r) => {
                     const isKr = r.fed === homeFed;
                     return (
                         <button
@@ -157,6 +159,7 @@ export const WorldRankingCard = () => {
                         </button>
                     );
                 })}
+                <RankPreviewToggle preview={preview} total={rows.length} />
             </div>
 
             {/* 전체 보기 + 출처 */}

@@ -1,214 +1,179 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Target, Swords, LogIn, GameController, HelpCircle, LucideMessageCircle, LucideStore } from "@/lib/icons";
+/**
+ * 당구 홈의 구역들(2026-10-04 오너: "빠른 실행보다 각 섹션별로 — 점수판 / 온라인게임 / 기타").
+ *
+ * 예전엔 '빠른 실행' 한 상자에 혼자 연습·매칭 대결·핀 참여·온라인게임·닮은 프로·매장·커뮤니티가 섞여 있었고,
+ * 노란 '매칭 대결'(칼 아이콘·"실력이 맞는 상대와 1:1 랭킹 경기")이 사실은 **점수판**이라는 게 안 보였다
+ * (오너: "매칭대결이라 하니 헷갈린다"). 앱이 상대를 찾아 주는 게 아니라 눈앞의 상대와 칠 점수판을 여는 버튼이고,
+ * 2~4인이며 앱이 없는 상대는 이름만 넣으면 된다.
+ *  - 점수판 구역: 큰 점수판 카드(점수판 모양의 내 3구·4구 다마) + 혼자 연습 + PIN으로 합류. 세 입구가 다 같은 점수판이다.
+ *    공 세 개 색을 그대로 쓴다 — 혼자 연습 흰 공, 점수판 노란 공, PIN 빨간 공.
+ *  - 둘러보기 구역: 매장 찾기 + 커뮤니티.
+ *  - 구역 머리 오른쪽 '설명' → HomeGuideDialog(실제 점수판 사진·쓰는 법).
+ * 온라인게임 구역은 OnlineGameCard·LookalikeProCard 를 그대로 쓴다(dashboard.tsx).
+ */
+import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useAuth } from "@/hooks/useAuth";
+import type { RealCompareResponse, RealSide } from "@shared/proCompare";
+import { Target, LogIn, LucideMessageCircle, LucideStore, LucideInfo, LucideChevronRight } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
-import { OnlineGameCard } from "./OnlineGameCard";
-import { LookalikeProCard } from "./LookalikeProCard";
 
-interface QuickActionsProps {
-    onStartGame: (mode: "practice" | "match") => void;
-    onJoinGame: () => void;
+/** 구역 머리 — 제목·한 줄 설명, 오른쪽에 '설명' 단추(또는 다른 조작) */
+export function HomeSectionHeader({ title, desc, onGuide, children }: { title: string; desc?: string; onGuide?: () => void; children?: ReactNode }) {
+    const { t } = useT();
+    return (
+        <header className="mb-3.5 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+                <h2 className="text-[19px] font-bold tracking-tight text-ink-1">{title}</h2>
+                {desc && <p className="text-[13px] font-medium text-black/55 mt-1 break-keep">{desc}</p>}
+            </div>
+            {onGuide && (
+                <button
+                    type="button"
+                    onClick={onGuide}
+                    className="shrink-0 h-8 pl-2 pr-3 rounded-full bg-black/[0.05] flex items-center gap-1 text-[12.5px] font-semibold text-black/60 hover:bg-black/[0.08] active:scale-95 transition-all"
+                >
+                    <LucideInfo className="w-4 h-4" />
+                    {t("home.guideBtn")}
+                </button>
+            )}
+            {children}
+        </header>
+    );
 }
 
-export const QuickActions = ({ onStartGame, onJoinGame }: QuickActionsProps) => {
-    const [, setLocation] = useLocation();
+/**
+ * 실제 점수판(/game/:id) 모양을 빌린 **내 다마** 판 — 왼쪽 3구 다마, 오른쪽 4구 다마, 가운데 '내 다마' 원.
+ * 처음엔 장식 숫자(18 : 14)였는데 오너(10/4): "내용도 의미도 없다 — 나와 연동되는 3구 다마·4구 다마로".
+ * 값은 아래 '내 실전 핸디' 카드와 같은 /api/hiq/compare/real(캐시 공유 — 요청이 늘지 않는다)의 handi —
+ * 서버가 경기 기록으로 매기는 값이라 홈 안에서 두 숫자가 어긋나지 않는다.
+ * 주로 치는 종목(preferred) 칸이 점수판의 '내 차례' 칸처럼 흰 바탕·굵은 테두리. 공식 5경기 전이면 '—'와 진행(2/5).
+ */
+export function MiniScoreboard() {
     const { t } = useT();
-    const [isHelpModalOpen, setIsHelpModalOpen] = useState(false);
-    // 시뮬레이터: 진입 화면(싱글 / 친구와 대전)으로. 설정 창은 그 화면 안에서 연다.
-    const handleOnlineGameClick = () => setLocation("/online-game");
-
-    // 처음 오는 사람을 위한 각 메뉴 안내 — 매칭 대결이 핵심이라 강조 표기
-    const guideItems = [
-        {
-            icon: Swords,
-            titleKey: "quickActions.matchTitle",
-            descKey: "quickActions.guideMatchDesc",
-            highlight: true,
-        },
-        {
-            icon: Target,
-            titleKey: "quickActions.practiceTitle",
-            descKey: "quickActions.guidePracticeDesc",
-            highlight: false,
-        },
-        {
-            icon: LogIn,
-            titleKey: "quickActions.pinTitle",
-            descKey: "quickActions.guidePinDesc",
-            highlight: false,
-        },
-        {
-            icon: LucideStore,
-            titleKey: "quickActions.storeTitle",
-            descKey: "quickActions.guideStoreDesc",
-            highlight: false,
-        },
-        {
-            icon: GameController,
-            titleKey: "quickActions.simTitle",
-            descKey: "quickActions.guideSimDesc",
-            highlight: false,
-        },
-        {
-            icon: LucideMessageCircle,
-            titleKey: "quickActions.communityTitle",
-            descKey: "quickActions.guideCommunityDesc",
-            highlight: false,
-        },
-    ];
-
-    return (
-        <div className="mb-12 relative z-10">
-            <header className="mb-4 flex items-start justify-between gap-3">
-                <div>
-                    <h2 className="text-[19px] font-bold text-ink-1 tracking-tight">{t("quickActions.title")}</h2>
-                    <p className="text-[13px] font-medium text-black/55 mt-1">{t("quickActions.subtitle")}</p>
+    const { member } = useAuth();
+    const q = useQuery<RealCompareResponse>({ queryKey: ["/api/hiq/compare/real"], enabled: !!member, staleTime: 60_000, retry: false });
+    const d = q.data;
+    const active = d?.preferred ?? "3c";
+    const value = (s?: RealSide) => (s?.ready && s.handi ? String(s.handi) : "—");
+    const panel = (type: "3c" | "4c") => {
+        const s = d?.[type];
+        const on = type === active;
+        return (
+            <div className={on ? "bg-[#ffffff] shadow-[inset_0_0_0_3px_#334155] px-3 pt-1.5" : "bg-[#E7E5E0] px-3 pt-1.5"}>
+                <div className={`flex items-center justify-between gap-1 text-[11px] font-bold ${on ? "text-[#334155]" : "text-[#6F6B63]"}`}>
+                    <span className="truncate">{t(type === "3c" ? "home.mini3c" : "home.mini4c")}</span>
+                    {s && !s.ready && <span className="shrink-0 font-semibold tabular-nums opacity-80">{fill(t("home.miniGames"), { n: Math.min(s.games, s.needed), m: s.needed })}</span>}
                 </div>
-                <button
-                    onClick={() => setIsHelpModalOpen(true)}
-                    aria-label={t("quickActions.guideTitle")}
-                    className="shrink-0 mt-0.5 w-8 h-8 rounded-full bg-black/[0.04] flex items-center justify-center hover:bg-black/[0.08] active:scale-95 transition-all"
-                >
-                    <HelpCircle className="w-[19px] h-[19px] text-black/45" />
-                </button>
-            </header>
-
-            <div className="grid grid-cols-2 gap-3 auto-rows-min">
-                {/* 혼자 연습 (1x1) */}
-                <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => onStartGame("practice")}
-                    className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
-                >
-                    <div className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center">
-                        <Target className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
-                    </div>
-                    <div>
-                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.practiceTitle")}</span>
-                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.practiceDesc")}</span>
-                    </div>
-                </motion.button>
-
-                {/* 매칭 대결 (hero, 세로 2칸) — 노란색(2026-09-08 오너: 온라인게임 타일이 3D 장면이 되면서 색을 넘겨받음) */}
-                <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    onClick={() => onStartGame("match")}
-                    className="row-span-2 h-[276px] rounded-3xl bg-[#F5B721] flex flex-col justify-between p-6 text-left shadow-[0_8px_24px_rgba(245,183,33,0.35)] transition-colors hover:bg-[#F0B01A]"
-                >
-                    {/* 아이콘·글씨는 흰색(2026-09-08 오너). 노란 바탕과 대비가 약해서 아이콘 자리는 진하게 깔고 설명은 흰색 90 %로 둔다 */}
-                    <div className="w-14 h-14 rounded-3xl bg-black/[0.18] flex items-center justify-center">
-                        <Swords className="w-7 h-7 text-white" strokeWidth={2} />
-                    </div>
-                    <div>
-                        <span className="block text-[21px] font-bold text-white leading-tight">{t("quickActions.matchTitle")}</span>
-                        <span className="block text-[13px] font-medium text-white/90 mt-2 leading-snug">{t("quickActions.matchDescLine1")}<br />{t("quickActions.matchDescLine2")}</span>
-                    </div>
-                </motion.button>
-
-                {/* 핀 코드 참여 (1x1) — 당구공 빨간색 */}
-                <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    onClick={onJoinGame}
-                    className="h-[132px] rounded-3xl bg-[#E02D2D] flex flex-col justify-between p-5 text-left shadow-[0_4px_14px_rgba(224,45,45,0.35)] transition-colors hover:bg-[#D42828]"
-                >
-                    <div className="w-11 h-11 rounded-2xl bg-white/15 flex items-center justify-center">
-                        <LogIn className="w-[22px] h-[22px] text-white" strokeWidth={2} />
-                    </div>
-                    <div>
-                        <span className="block text-[15px] font-semibold text-white leading-tight">{t("quickActions.pinTitle")}</span>
-                        <span className="block text-[12.5px] font-medium text-white/80 mt-0.5">{t("quickActions.pinDesc")}</span>
-                    </div>
-                </motion.button>
-
-                {/* 온라인게임 (가로 2칸) — 타일 + 지금 열린 멀티방(2026-09-21 오너). 장면·방 목록은 OnlineGameCard 안에 있다. */}
-                <OnlineGameCard />
-
-                {/* 내 온라인 실력, 닮은 프로는?(2026-09-27) — 온라인게임 바로 아래, 가로 2칸. 로그인 전·로딩 중에는 자리를 안 차지한다 */}
-                <LookalikeProCard />
-
-                {/* 매장 찾기 (1x1) */}
-                <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => setLocation("/stores")}
-                    className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
-                >
-                    <div className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center">
-                        <LucideStore className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
-                    </div>
-                    <div>
-                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.storeTitle")}</span>
-                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.storeDesc")}</span>
-                    </div>
-                </motion.button>
-
-                {/* 커뮤니티 (1x1, 흰색) — 예전 시뮬레이터 자리 */}
-                <motion.button
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => setLocation("/community")}
-                    className="h-[132px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-5 text-left transition-colors hover:bg-black/[0.015]"
-                >
-                    <div className="w-11 h-11 rounded-2xl bg-brand/10 flex items-center justify-center">
-                        <LucideMessageCircle className="w-[22px] h-[22px] text-brand" strokeWidth={2} />
-                    </div>
-                    <div>
-                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.communityTitle")}</span>
-                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.communityDesc")}</span>
-                    </div>
-                </motion.button>
+                <span className={`block text-center text-[34px] leading-[1] font-bold tabular-nums ${on ? "text-[#334155]" : "text-[#6F6B63]"}`}>{value(s)}</span>
             </div>
-
-            {/* 처음 오는 사람을 위한 메뉴 안내 모달 */}
-            <Dialog open={isHelpModalOpen} onOpenChange={setIsHelpModalOpen}>
-                <DialogContent hideClose className="bg-white text-ink-1 max-w-md w-[92%] rounded-[32px] p-0 overflow-hidden shadow-[0_24px_80px_rgba(0,0,0,0.18)] focus:outline-none">
-                    <div className="p-7">
-                        <DialogHeader className="mb-6 text-left">
-                            <DialogTitle className="text-[22px] font-bold tracking-tight text-ink-1">{t("quickActions.guideTitle")}</DialogTitle>
-                            <DialogDescription className="text-[13px] font-medium text-black/55 mt-1">
-                                {t("quickActions.guideDesc")}
-                            </DialogDescription>
-                        </DialogHeader>
-
-                        <button
-                            onClick={() => setIsHelpModalOpen(false)}
-                            title={t("quickActions.close")}
-                            className="absolute top-6 right-6 w-9 h-9 rounded-full bg-black/[0.04] flex items-center justify-center hover:bg-black/[0.08] transition-all"
-                        >
-                            <span className="text-xl text-black/40 leading-none">&times;</span>
-                        </button>
-
-                        <div className="flex flex-col gap-2.5">
-                            {guideItems.map(({ icon: Icon, titleKey, descKey, highlight }) => (
-                                <div
-                                    key={titleKey}
-                                    className={`flex gap-3.5 p-3.5 rounded-3xl ${highlight ? "bg-brand/[0.06]" : "bg-black/[0.03]"}`}
-                                >
-                                    <div className={`w-11 h-11 shrink-0 rounded-2xl flex items-center justify-center ${highlight ? "bg-brand" : "bg-brand/10"}`}>
-                                        <Icon className={`w-[22px] h-[22px] ${highlight ? "text-white" : "text-brand"}`} strokeWidth={2} />
-                                    </div>
-                                    <div className="flex-1 min-w-0 pt-0.5">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="text-[15px] font-bold text-ink-1">{t(titleKey)}</span>
-                                            {highlight && (
-                                                <span className="text-[10.5px] font-bold text-brand bg-brand/10 px-1.5 py-0.5 rounded-full leading-none">{t("quickActions.coreBadge")}</span>
-                                            )}
-                                        </div>
-                                        <p className="text-[12.5px] font-medium text-black/55 mt-1 leading-relaxed">{t(descKey)}</p>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-
-                        <button
-                            onClick={() => setIsHelpModalOpen(false)}
-                            className="mt-5 w-full h-12 rounded-full bg-brand text-white text-[15px] font-bold active:scale-[0.98] transition-transform"
-                        >
-                            {t("quickActions.gotIt")}
-                        </button>
-                    </div>
-                </DialogContent>
-            </Dialog>
+        );
+    };
+    return (
+        <div
+            role="img"
+            aria-label={fill(t("home.miniAria"), { a: value(d?.["3c"]), b: value(d?.["4c"]) })}
+            className="relative grid grid-cols-2 h-[78px] rounded-2xl overflow-hidden shadow-[0_2px_10px_rgba(122,86,0,0.22)]"
+        >
+            {panel("3c")}
+            {panel("4c")}
+            <div className="absolute left-1/2 bottom-1.5 -translate-x-1/2 w-[48px] h-[48px] rounded-full bg-[#ffffff] border-[2.5px] border-[#006241] flex items-center justify-center px-1">
+                <span className="text-[11px] leading-[1.15] font-bold text-[#006241] text-center break-keep">{t("home.miniMine")}</span>
+            </div>
         </div>
     );
-};
+}
+
+const fill = (s: string, v: Record<string, string | number>) => s.replace(/\{(\w+)\}/g, (_, k) => String(v[k] ?? ""));
+
+/** 점수판 구역의 입구 셋 — 큰 점수판 카드 + 혼자 연습 + PIN으로 합류 */
+export function ScoreboardActions({ onStartGame, onJoinGame }: { onStartGame: (mode: "practice" | "match") => void; onJoinGame: () => void }) {
+    const { t } = useT();
+    return (
+        <div className="grid grid-cols-2 gap-3">
+            {/* 점수판 — 노란 공. 글씨는 흰색(2026-09-08 오너), 아이콘 자리에 실제 점수판을 줄인 그림 */}
+            <motion.button
+                whileTap={{ scale: 0.98 }}
+                onClick={() => onStartGame("match")}
+                className="col-span-2 rounded-3xl bg-[#F5B721] p-4 pb-[18px] text-left shadow-[0_8px_24px_rgba(245,183,33,0.35)] transition-colors hover:bg-[#F0B01A]"
+            >
+                <MiniScoreboard />
+                <div className="mt-3.5 flex items-center justify-between gap-3 px-1">
+                    <span className="text-[22px] font-bold text-white leading-tight">{t("quickActions.matchTitle")}</span>
+                    <span className="shrink-0 h-10 pl-4 pr-3 rounded-full bg-[#ffffff] text-[14px] font-bold text-[#7A5600] flex items-center gap-0.5 shadow-[0_2px_6px_rgba(122,86,0,0.18)]">
+                        {t("quickActions.matchCta")}
+                        <LucideChevronRight className="w-4 h-4" />
+                    </span>
+                </div>
+                <span className="block px-1 mt-1 text-[13px] font-medium text-white/90 leading-snug break-keep">
+                    {t("quickActions.matchDescLine1")} · {t("quickActions.matchDescLine2")}
+                </span>
+                <span className="ml-1 mt-2.5 inline-flex items-center h-6 px-2.5 rounded-full bg-black/[0.14] text-[11.5px] font-semibold text-white">
+                    {t("quickActions.matchChip")}
+                </span>
+            </motion.button>
+
+            {/* 혼자 연습 — 흰 공 */}
+            <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={() => onStartGame("practice")}
+                className="h-[120px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-[18px] text-left transition-colors hover:bg-black/[0.015]"
+            >
+                <div className="w-10 h-10 rounded-2xl bg-brand/10 flex items-center justify-center">
+                    <Target className="w-[21px] h-[21px] text-brand" strokeWidth={2} />
+                </div>
+                <div>
+                    <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{t("quickActions.practiceTitle")}</span>
+                    <span className="block text-[12.5px] font-medium text-black/50 mt-0.5">{t("quickActions.practiceDesc")}</span>
+                </div>
+            </motion.button>
+
+            {/* PIN으로 합류 — 빨간 공 */}
+            <motion.button
+                whileTap={{ scale: 0.97 }}
+                onClick={onJoinGame}
+                className="h-[120px] rounded-3xl bg-[#E02D2D] flex flex-col justify-between p-[18px] text-left shadow-[0_4px_14px_rgba(224,45,45,0.35)] transition-colors hover:bg-[#D42828]"
+            >
+                <div className="w-10 h-10 rounded-2xl bg-white/15 flex items-center justify-center">
+                    <LogIn className="w-[21px] h-[21px] text-white" strokeWidth={2} />
+                </div>
+                <div>
+                    <span className="block text-[15px] font-semibold text-white leading-tight">{t("quickActions.pinTitle")}</span>
+                    <span className="block text-[12.5px] font-medium text-white/80 mt-0.5">{t("quickActions.pinDesc")}</span>
+                </div>
+            </motion.button>
+        </div>
+    );
+}
+
+/** 둘러보기 구역 — 매장 찾기 + 커뮤니티 */
+export function ExploreActions() {
+    const { t } = useT();
+    const [, setLocation] = useLocation();
+    const items = [
+        { to: "/stores", Icon: LucideStore, title: t("quickActions.storeTitle"), desc: t("quickActions.storeDesc") },
+        { to: "/community", Icon: LucideMessageCircle, title: t("quickActions.communityTitle"), desc: t("quickActions.communityDesc") },
+    ];
+    return (
+        <div className="grid grid-cols-2 gap-3">
+            {items.map(({ to, Icon, title, desc }) => (
+                <motion.button
+                    key={to}
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => setLocation(to)}
+                    className="h-[120px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-[18px] text-left transition-colors hover:bg-black/[0.015]"
+                >
+                    <div className="w-10 h-10 rounded-2xl bg-brand/10 flex items-center justify-center">
+                        <Icon className="w-[21px] h-[21px] text-brand" strokeWidth={2} />
+                    </div>
+                    <div>
+                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{title}</span>
+                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5 truncate">{desc}</span>
+                    </div>
+                </motion.button>
+            ))}
+        </div>
+    );
+}

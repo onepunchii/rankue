@@ -51,8 +51,8 @@ const FEATURES: { name: string; desc: string; icon: ReactNode }[] = [
         ),
     },
     {
-        name: "당구 매칭 대결",
-        desc: "상대와 1:1 경기. 핀(PIN) 코드를 입력하면 서로 다른 폰에서 같은 점수판에 함께 들어옵니다.",
+        name: "함께 쓰는 당구 점수판",
+        desc: "상대와 2~4인 경기. 핀(PIN) 코드를 입력하면 서로 다른 폰에서 같은 점수판에 함께 들어옵니다. 앱이 없는 상대는 이름만 넣으면 됩니다.",
         icon: (
             <Ico>
                 <circle cx="7.5" cy="8" r="3" />

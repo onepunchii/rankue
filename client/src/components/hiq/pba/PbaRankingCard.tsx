@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { previewRows, RankPreviewToggle, type RankPreview } from "@/components/hiq/dashboard/RankPreview";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -29,7 +30,7 @@ export const PBA_CARD_L: Record<Locale, { title: string; subtitle: string; seaso
     es: { title: "Ranking PBA Tour", subtitle: "Ranking de premios del billar profesional coreano", season: "temporada", prizeNo1: "Líder en premios", loading: "Cargando...", empty: "Sin datos", viewAll: "Ver todo", source: "Fuente: PBA Tour", prizeUnit: "" },
 };
 
-export const PbaRankingCard = () => {
+export const PbaRankingCard = ({ preview }: { preview?: RankPreview } = {}) => {
     const { locale } = useT();
     const t = PBA_CARD_L[locale] ?? PBA_CARD_L.ko;
     const [, setLocation] = useLocation();
@@ -86,7 +87,7 @@ export const PbaRankingCard = () => {
                 {!isLoading && rows.length === 0 && (
                     <div className="py-10 text-center text-black/40 text-[13.5px] font-medium">{t.empty}</div>
                 )}
-                {rows.map((r) => (
+                {previewRows(rows, preview).map((r) => (
                     <button
                         key={r.memCode}
                         onClick={() => setLocation(`/pba-player/${r.memCode}`)}
@@ -109,6 +110,7 @@ export const PbaRankingCard = () => {
                         </div>
                     </button>
                 ))}
+                <RankPreviewToggle preview={preview} total={rows.length} />
             </div>
 
             {/* 전체 보기 + 출처 */}

@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { LucideTrophy, LucideTrendingUp, LucideInfo } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
+import { previewRows, RankPreviewToggle, type RankPreview } from "./RankPreview";
 
 interface RankingListCardProps {
     rankings: HiqMember[] | undefined;
@@ -13,6 +14,8 @@ interface RankingListCardProps {
     // 대시보드 랭킹 섹션(세계|매장 토글)이 제목을 대신 그릴 때 자체 헤더 생략 —
     // 3c/4c 스위치만 우측 정렬로 남긴다
     hideHeader?: boolean;
+    /** 홈: 3명까지 보이고 펼치면 10명. 내가 그 아래면 내 줄을 한 줄 덧붙인다(2026-10-04) */
+    preview?: RankPreview;
 }
 
 // 평균은 소스에 따라 2자리("0.43")로 오기도 해서 표시만 3자리로 통일한다.
@@ -21,7 +24,7 @@ const formatAvg = (value: unknown) => {
     return isNaN(n) ? "0.000" : n.toFixed(3);
 };
 
-export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMemberId, hideHeader }: RankingListCardProps) => {
+export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMemberId, hideHeader, preview }: RankingListCardProps) => {
     const { t } = useT();
 
     // Sort logic (just in case API didn't sort, though it should)
@@ -34,9 +37,13 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
     // rating 컬럼은 notNull default 0이라 `!== undefined`로는 아무도 걸러지지 않았고,
     // 0 RP 회원과 익명화된 탈퇴회원까지 대시보드 랭킹에 노출됐다.
     // 랭킹 페이지(/ranking)와 같은 기준(> 0)으로 맞추고 탈퇴회원도 뺀다.
-    const displayRankings = sortedRankings
-        .filter(r => ((activeTab === '3c' ? r.rating3c : r.rating4c) || 0) > 0 && r.name !== "탈퇴회원")
-        .slice(0, 10);
+    const eligible = sortedRankings
+        .filter(r => ((activeTab === '3c' ? r.rating3c : r.rating4c) || 0) > 0 && r.name !== "탈퇴회원");
+    const displayRankings = eligible.slice(0, 10);
+    // 보여 줄 줄 + (내가 보이는 줄 밖이면) 내 줄. 서버가 상위 20명만 주므로 20위 밖이면 내 줄은 없다.
+    const shown = previewRows(displayRankings, preview).map((member, idx) => ({ member, rank: idx + 1, gap: false }));
+    const myIdx = eligible.findIndex(r => String(r.id) === String(currentMemberId));
+    if (myIdx >= shown.length) shown.push({ member: eligible[myIdx], rank: myIdx + 1, gap: true });
 
     return (
         <div className={cn("space-y-4", !hideHeader && "mb-10")}>
@@ -86,9 +93,8 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
 
             <div className="flex flex-col gap-2">
                 <AnimatePresence mode="popLayout">
-                    {displayRankings.map((member, idx) => {
+                    {shown.map(({ member, rank, gap }, idx) => {
                         const isMe = String(member.id) === String(currentMemberId);
-                        const rank = idx + 1;
                         const rp = activeTab === '3c' ? member.rating3c : member.rating4c;
                         return (
                             <motion.div
@@ -100,6 +106,7 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                                 transition={{ duration: 0.2, delay: idx * 0.05 }}
                                 className={cn(
                                     "flex items-center gap-3 px-3.5 py-2.5 rounded-2xl transition-colors",
+                                    gap && "mt-2",
                                     isMe ? "bg-brand/[0.12]" : "bg-white shadow-[0_1px_2px_rgba(0,0,0,0.04)]"
                                 )}
                             >
@@ -136,6 +143,8 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                         );
                     })}
                 </AnimatePresence>
+
+                <RankPreviewToggle preview={preview} total={displayRankings.length} />
 
                 {displayRankings.length === 0 && (
                     <div className="py-12 text-center text-black/40 text-[14px] font-medium">

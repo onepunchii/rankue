@@ -16,7 +16,11 @@ import { WorldRankingCard } from "@/components/hiq/umb/WorldRankingCard";
 import { PbaRankingCard, PBA_CARD_L } from "@/components/hiq/pba/PbaRankingCard";
 import { OngoingGameBanner } from "@/components/hiq/dashboard/OngoingGameBanner";
 import { SimMatchBanner } from "@/components/hiq/dashboard/SimMatchBanner";
-import { QuickActions } from "@/components/hiq/dashboard/QuickActions";
+import { HomeSectionHeader, ScoreboardActions, ExploreActions } from "@/components/hiq/dashboard/QuickActions";
+import { OnlineGameCard } from "@/components/hiq/dashboard/OnlineGameCard";
+import { LookalikeProCard } from "@/components/hiq/dashboard/LookalikeProCard";
+import { HomeGuideDialog, type HomeGuideTopic } from "@/components/hiq/dashboard/HomeGuideDialog";
+import { useRankPreview } from "@/components/hiq/dashboard/RankPreview";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
 import { PinCodeModal } from "@/components/hiq/dashboard/PinCodeModal";
 import { ScoreCorrectionModal } from "@/components/hiq/dashboard/ScoreCorrectionModal";
@@ -40,6 +44,10 @@ function HiqDashboardBilliards() {
     const [rankingTab, setRankingTab] = useState<'3c' | '4c'>('4c');
     // 랭킹 섹션 소스 — 기본 세계(UMB), 토글로 PBA·매장
     const [rankingSource, setRankingSource] = useState<'world' | 'pba' | 'store'>('world');
+    // 랭킹 카드는 3명까지 보이고 펼치면 10명(2026-10-04) — 세 소스가 같은 접힘 상태를 쓴다
+    const rankPreview = useRankPreview();
+    // 구역 머리 '설명' 창 — 점수판·온라인게임·둘러보기
+    const [guide, setGuide] = useState<HomeGuideTopic | null>(null);
 
     // Use Custom Hook for Data
     const { member, history, rankings, analysis, isLoading } = useDashboardStats(rankingTab);
@@ -245,16 +253,33 @@ function HiqDashboardBilliards() {
                 </button>
             )}
 
-            {/* 전적 (승률 게이지 + 최근 폼) */}
-            <PerformanceCard history={history} />
-            {/* 내 실전 핸디(2026-09-27) — 전적 바로 아래. 3쿠션은 닮은 프로, 4구는 랭큐 회원 순위 */}
-            <RealHandicapCard onStartMatch={() => handleStartGameClick("match")} />
+            {/* 홈 구역(2026-10-04 오너: "빠른 실행보다 각 섹션별로 — 점수판 / 온라인게임 / 기타").
+                점수판이 맨 위 — 앱의 첫 약속이 '손안의 당구 점수판'이다. 전적·실전 핸디는 점수판으로 친 경기의 기록이라 같은 구역. */}
+            <section className="mt-8 mb-10">
+                <HomeSectionHeader title={t("home.secScoreboard")} desc={t("home.secScoreboardDesc")} onGuide={() => setGuide("scoreboard")} />
+                <div className="space-y-3">
+                    <ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={() => toggleModal('join', true)} />
+                    {/* 전적 (승률 게이지 + 최근 폼). 경기가 하나도 없으면 첫 경기 안내 */}
+                    <PerformanceCard history={history} onPreview={() => setGuide("scoreboard")} onStart={() => handleStartGameClick("match")} />
+                    {/* 내 실전 핸디(2026-09-27) — 3쿠션은 닮은 프로, 4구는 랭큐 회원 순위 */}
+                    <RealHandicapCard onStartMatch={() => handleStartGameClick("match")} />
+                </div>
+            </section>
 
-            {/* Action Buttons */}
-            <QuickActions
-                onStartGame={handleStartGameClick}
-                onJoinGame={() => toggleModal('join', true)}
-            />
+            {/* 온라인게임 — 열린 방 타일 + 온라인 기록으로 찾는 닮은 프로 */}
+            <section className="mb-10">
+                <HomeSectionHeader title={t("home.secOnline")} desc={t("home.secOnlineDesc")} onGuide={() => setGuide("online")} />
+                <div className="space-y-3">
+                    <OnlineGameCard />
+                    <LookalikeProCard />
+                </div>
+            </section>
+
+            {/* 둘러보기 — 매장 찾기·커뮤니티 */}
+            <section className="mb-10">
+                <HomeSectionHeader title={t("home.secExplore")} desc={t("home.secExploreDesc")} onGuide={() => setGuide("explore")} />
+                <ExploreActions />
+            </section>
 
             {/* 랭킹 섹션 — 기본은 UMB 세계랭킹(볼거리·매주 갱신), PBA·매장 랭킹은 토글로.
                 매장 데이터가 쌓이면 기본값 재검토 (오너 결정 2026-08-05) */}
@@ -295,9 +320,9 @@ function HiqDashboardBilliards() {
                 </header>
 
                 {rankingSource === "world" ? (
-                    <WorldRankingCard />
+                    <WorldRankingCard preview={rankPreview} />
                 ) : rankingSource === "pba" ? (
-                    <PbaRankingCard />
+                    <PbaRankingCard preview={rankPreview} />
                 ) : (
                     <>
                         <RankingListCard
@@ -306,6 +331,7 @@ function HiqDashboardBilliards() {
                             onTabChange={setRankingTab}
                             currentMemberId={member.id}
                             hideHeader
+                            preview={rankPreview}
                         />
                         {/* 매장 랭킹이 비어 있는 초기엔 이 링크가 매장 탭의 실질 콘텐츠다 */}
                         <button
@@ -336,6 +362,13 @@ function HiqDashboardBilliards() {
                 initialGameType={matchInvite?.gameType}
                 initialSeats={matchInvite?.seats}
                 initialTarget={matchInvite?.target}
+            />
+
+            <HomeGuideDialog
+                topic={guide}
+                onClose={() => setGuide(null)}
+                onStartGame={handleStartGameClick}
+                onJoinGame={() => toggleModal('join', true)}
             />
 
             <PinCodeModal
