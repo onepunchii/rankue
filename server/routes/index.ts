@@ -23,6 +23,7 @@ import compareRouter from "./modules/compare.js";
 import tournamentsRouter from "./modules/tournaments.js";
 import golfRankRouter from "./modules/golfRank.js";
 import golfCoursesRouter from "./modules/golfCourses.js";
+import tourNewsRouter from "./modules/tourNews.js";
 import listingsRouter from "./modules/listings.js";
 import appMetaRouter from "./modules/appMeta.js";
 
@@ -102,6 +103,8 @@ router.use("/tournaments", tournamentsRouter);
 
 // 13-1. 골프 랭킹 (/golf-rank) — 공개 읽기 전용(2026-09-13 오너: 골프는 공개 전체). 골프 접근 통제를 타지 않는다
 router.use("/golf-rank", golfRankRouter);
+// 투어 소식 (/tour-news/:topic) — 네이버 뉴스 검색을 그 자리에서. 공개 읽기 전용(2026-10-05)
+router.use("/tour-news", tourNewsRouter);
 
 // 14. 앱 메타 (/app) — 스토어에 올라가 있는 버전(옛 앱 업데이트 안내 자동 켜기용), 공개
 router.use("/app", appMetaRouter);

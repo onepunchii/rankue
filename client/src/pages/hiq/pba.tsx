@@ -8,6 +8,7 @@ import { flagEmoji } from "@/lib/flag";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { TourNews } from "@/components/hiq/TourNews";
 import { PBA_INCOME_NOTE_KO, PBA_LIST_TITLE_KO, PBA_LIST_DESC_KO } from "@shared/pbaMeta";
 import { cn } from "@/lib/utils";
 
@@ -279,6 +280,9 @@ export default function HiqPba() {
                     })
                 )}
             </div>
+
+            {/* 투어 소식(2026-10-05) — 네이버 뉴스 검색 결과 다섯 줄. 한국어 기사라 한국어 화면에서만, 고른 리그(PBA·LPBA)를 따른다 */}
+            {locale === "ko" && <TourNews key={league} topic={league === "LPBA" ? "lpba" : "pba"} />}
 
             {/* 통산 기록 순위·대회 일정(2026-09-24) — 같은 공개 데이터의 다른 단면. UMB 버튼과 같은 모양 */}
             <div className="mt-5 grid grid-cols-2 gap-2">

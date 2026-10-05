@@ -11,6 +11,8 @@ import { GolfBackButton } from "@/golf/components/common/GolfBackButton";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { ShareButton } from "@/components/hiq/ShareButton";
 import { GOLF_TOURS, GOLF_TOUR_META, STAT_HIGHLIGHTS, formatRankValue, formatStatValue, isGolfTour } from "@shared/golfTours";
+import { TourNews } from "@/components/hiq/TourNews";
+import type { TourNewsTopic } from "@shared/tourNews";
 import { regionName } from "@/components/hiq/umb/types";
 import { GolferSheet } from "@/components/hiq/golf/GolferSheet";
 import { GMove, useGolfTheme } from "@/components/hiq/golf/ui";
@@ -20,6 +22,8 @@ import { golfRankingDesc, golfRankingPath, golfRankingTitle, golfSeoLang } from 
 
 const PAGE_SIZE = 50;
 const API = "/api/hiq/golf-rank";
+/** 랭킹 탭 → 소식 주제(세계랭킹 OWGR 은 PGA 투어, 롤렉스는 LPGA 투어 기사가 그 선수들 소식이다) */
+const NEWS_TOPIC: Partial<Record<GolfTour, TourNewsTopic>> = { owgr: "pga", rolex: "lpga", kpga: "kpga", klpga: "klpga" };
 
 // 골프 랭킹 전체 페이지(2026-09-13 오너: "골프 탭에 당구와 비슷한 랭킹 — PGA·LPGA·KPGA·KLPGA, 공개 전체").
 // 당구 세계랭킹 페이지(world-ranking.tsx)와 같은 골격: 투어 탭 + [선수|국가|기록] + 검색·한국 필터 + 이번 주 상승.
@@ -320,6 +324,8 @@ export default function HiqGolfRanking() {
                             {isLoadingMore ? t("golf.loading") : t("golf.loadMore")}
                         </button>
                     )}
+                    {/* 투어 소식(2026-10-05) — 고른 투어의 네이버 뉴스 검색 결과 다섯 줄. 한국어 화면에서만 */}
+                    {locale === "ko" && NEWS_TOPIC[tour] && <TourNews key={tour} topic={NEWS_TOPIC[tour]!} className="mt-3" />}
                     <a href={meta.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-center text-[11px] font-medium text-ink-4 py-3">
                         {t("golf.source").replace("{name}", meta.sourceName)}
                     </a>

@@ -15,8 +15,7 @@ import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideCheckCircle, LucideLogOut,
     LucideBell, LucideCreditCard, LucideShieldAlert, LucideMenu, LucideUsersRound, LucideMail, LucideFlag, GameController,
-    LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin,
-} from "@/lib/icons";
+    LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin, LucideTrendingUp } from "@/lib/icons";
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
 import MembersView from "./MembersView";
@@ -24,6 +23,7 @@ import TodayActiveView from "./TodayActiveView";
 import PushView from "./PushView";
 import SuggestionsView, { type Suggestion, SUGGESTIONS_KEY } from "./SuggestionsView";
 import NoticesView from "./NoticesView";
+import SearchTrendView from "./SearchTrendView";
 import CrewsView from "./CrewsView";
 import GolfOrdersView, { GOLF_ORDERS_KEY } from "./GolfOrdersView";
 import { StoresView, BillingView } from "./StoresView";
@@ -51,7 +51,7 @@ type GlobalStats = {
 };
 
 type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
-    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses";
+    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
 const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders"] as const;
@@ -62,6 +62,8 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
     { title: "한눈에", items: [
         { id: "dashboard", label: "대시보드", icon: LucideLayoutDashboard },
         { id: "today", label: "오늘 접속", icon: LucideZap },
+        // 검색 수요(2026-10-05) — 네이버 검색어 트렌드. 무엇을 만들지 정하기 전에 재 본다
+        { id: "search-trend", label: "검색 수요", icon: LucideTrendingUp },
     ] },
     { title: "회원", items: [
         { id: "members", label: "회원 관리", icon: LucideUsers },
@@ -376,6 +378,7 @@ export default function AdminDashboard() {
                     {tab === "golf-photos" && <GolfPhotosView onOpenMember={setOpenMemberId} />}
                     {tab === "golf-courses" && <GolfCoursesView />}
                     {tab === "notices" && <NoticesView />}
+                    {tab === "search-trend" && <SearchTrendView />}
 
                     <MemberDetailSheet member={openMember} onClose={() => setOpenMemberId(null)} />
                 </div>

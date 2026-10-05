@@ -9,6 +9,7 @@ import { useT } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
 import { LucideChevronLeft, LucideSearch, LucideTrendingUp } from "@/lib/icons";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { TourNews } from "@/components/hiq/TourNews";
 import { UmbPlayerSheet } from "@/components/hiq/umb/UmbPlayerSheet";
 import { MoveBadge } from "@/components/hiq/umb/WorldRankingCard";
 import { UMB_CATEGORIES, UMB_SOURCE_URL, displayName, regionName as intlRegionName, resolveHomeFed, type UmbCategory, type UmbRankingRow, type UmbRankingsResponse } from "@/components/hiq/umb/types";
@@ -395,6 +396,8 @@ export default function HiqWorldRanking() {
                         {isLoadingMore ? t("umb.loading") : t("umb.loadMore")}
                     </button>
                 )}
+                {/* 3쿠션 소식(2026-10-05) — 네이버 뉴스 검색 결과 다섯 줄. 한국어 화면에서만 */}
+                {locale === "ko" && <TourNews topic="carom" className="mt-3" />}
                 {/* PBA 투어 교차 링크 — 국내 프로 랭킹은 별도 페이지 */}
                 <button
                     onClick={() => setLocation("/pba")}

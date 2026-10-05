@@ -30,6 +30,21 @@ const PARTNER_COOKIE_OPTS = {
 
 // --- Admin Routes ---
 
+// 검색 수요(2026-10-05) — 네이버 검색어 트렌드(NAVER API HUB). 무엇을 만들지 정할 때 수요를 재는 도구다(shared/searchTrend 머리말).
+// 운영자가 누를 때만 부르고 저장하지 않는다. 값은 한 조회 안에서의 상대값이라, 견줄 검색어는 한 번에 같이 넣어야 한다.
+router.post("/search-trend", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { cleanTrendRequest } = await import("../../../shared/searchTrend.js");
+    const clean = cleanTrendRequest(req.body);
+    if (!clean) return sendError(res, 400, "검색어 묶음을 하나 이상 넣어 주세요");
+    const { fetchSearchTrend } = await import("../../services/naverTrend.js");
+    const r = await fetchSearchTrend(clean);
+    if (!r.ok) {
+        return sendError(res, r.reason === "nokey" ? 501 : r.reason === "quota" ? 429 : 502,
+            r.reason === "nokey" ? "네이버 API 키가 없습니다" : r.reason === "quota" ? "네이버 API 호출 한도를 넘었습니다" : `네이버 응답 오류${r.detail ? ` — ${r.detail}` : ""}`);
+    }
+    return sendSuccess(res, r.result);
+}));
+
 router.get("/stats", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const stats = await storage.getGlobalStats();
     return sendSuccess(res, stats);
