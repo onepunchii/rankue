@@ -171,6 +171,7 @@ export const LucideTrendingUp = ((Ph as any).TrendUp ?? F) as Ph.Icon;
 export const LucideTrophy = ((Ph as any).Trophy ?? F) as Ph.Icon;
 export const LucideUndo2 = ((Ph as any).ArrowArcLeft ?? F) as Ph.Icon;
 export const LucideUpload = ((Ph as any).UploadSimple ?? F) as Ph.Icon;
+export const LucideSteeringWheel = ((Ph as any).SteeringWheel ?? F) as Ph.Icon;
 export const LucideUser = ((Ph as any).User ?? F) as Ph.Icon;
 export const LucideUserCheck = ((Ph as any).UserCircleCheck ?? F) as Ph.Icon;
 export const LucideUserCircle = ((Ph as any).UserCircle ?? F) as Ph.Icon;

@@ -12,7 +12,7 @@
  * ⚠️ 비로그인(당구 테마)에서도 열리는 화면 — 색은 리터럴만(CourseShell 머리말).
  */
 import { useEffect, useMemo, useState } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -20,6 +20,7 @@ import { LucideChevronDown, LucideChevronRight } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { wonShort, type GolfIntent } from "@shared/golfCourse";
 import { GOLF_GUIDE, GOLF_INTRO, golfFaq, guideTabFor, type GuideTab } from "@shared/golfGuide";
+import { FIND_FEATURES, findPath, hasFindTag } from "@shared/golfFind";
 import type { CourseListItem, HubListing } from "@/golf/lib/courseApi";
 import { HubListingRow } from "./list/HubListingRow";
 
@@ -198,6 +199,7 @@ export function GolfFaq({ intent, onGuide, className }: { intent: GolfIntent | n
 }
 
 // ── 지역 한눈에 ───────────────────────────────────────────────────
+// 아래 '조건별 목록' 줄(2026-10-05)은 조건마다 자기 주소가 있는 목록(/golf/find/…)으로 건다 — 검색엔진용 화면(golfFindLinksHtml)과 같은 글.
 /** 골프장 줄의 태그 이름(자료 그대로) */
 const GLANCE_FEATS: [string, string][] = [["노캐디", "노캐디"], ["2인가능", "2인 가능"], ["3인가능", "3인 가능"]];
 
@@ -213,6 +215,7 @@ export function RegionGlance({ items, where, feats, onFeat, feeSort, onFeeSort, 
     const fees = useMemo(() => items.map((c) => c.feeFrom).filter((n): n is number => typeof n === "number" && n > 0), [items]);
     const counts = useMemo(() => GLANCE_FEATS.map(([k, label]) => ({ k, label, n: items.filter((c) => (c.play ?? []).includes(k)).length })), [items]);
     const tiles = counts.filter((c) => c.n > 0);
+    const finds = useMemo(() => FIND_FEATURES.filter((f) => items.some((c) => hasFindTag(c, f))), [items]);
     if (!fees.length && !tiles.length) return null;
     const tile = (on: boolean) => cn(
         "min-w-0 rounded-2xl px-3.5 py-3 text-left transition-colors",
@@ -240,6 +243,14 @@ export function RegionGlance({ items, where, feats, onFeat, feeSort, onFeeSort, 
                     );
                 })}
             </div>
+            {finds.length > 0 && (
+                <p className="mt-3 flex flex-wrap items-center gap-x-2.5 gap-y-1 text-[13px] text-[#FFFFFF73]">
+                    <span>조건별 목록</span>
+                    {finds.map((f) => (
+                        <Link key={f.key} href={findPath(f.key)} className="font-medium text-[#FFFFFFB3] active:text-white">{f.noun}</Link>
+                    ))}
+                </p>
+            )}
         </section>
     );
 }

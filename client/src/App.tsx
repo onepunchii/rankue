@@ -179,6 +179,11 @@ const golfReadFallback = <div className="min-h-[100dvh] bg-[#0A0A0A]" aria-busy=
 function GolfChecklistRoute() {
   return <Suspense fallback={golfReadFallback}><GolfChecklist /></Suspense>;
 }
+// 조건으로 찾는 골프장 목록(2026-10-05) — 2인 플레이 · 노캐디 · 3인 플레이. 공개 페이지(로그인 없이 열린다).
+const GolfFind = lazy(() => import("@/golf/pages/GolfFind"));
+function GolfFindRoute() {
+  return <Suspense fallback={golfReadFallback}><GolfFind /></Suspense>;
+}
 
 /**
  * 골프 화면 문지기. 허용되지 않으면 홈으로 돌린다.
@@ -324,6 +329,8 @@ function AppRoutes() {
           슬러그는 한글(정본). 옛 숫자 주소(/golf/course/74)는 GolfCoursePage 가 슬러그로 바꿔 준다.
           wouter 는 기본이 정확 일치라(regexparam, loose 아님) /golf/booking 이 /golf/booking-list 를 먹지 않는다. */}
       <Route path="/golf/checklist" component={GolfChecklistRoute} />
+      <Route path="/golf/find/:key" component={GolfFindRoute} />
+      <Route path="/golf/find/:key/:region" component={GolfFindRoute} />
       <Route path="/golf/course/:slug" component={GolfCoursePage} />
       <Route path="/golf/courses" component={GolfCourseHub} />
       <Route path="/golf/courses/:region" component={GolfCourseHub} />

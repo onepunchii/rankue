@@ -14,6 +14,7 @@ import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingInt
 import { rankingExtraSitemapParts } from "./seo/rankingExtra.js";
 import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
 import { golfGuideSitemapParts } from "./seo/golfGuide.js";
+import { FIND_FEATURES, findPath, findRegionCounts, hasFindTag } from "../shared/golfFind.js";
 import { tournamentsSitemapParts } from "./seo/tournaments.js";
 import { pbaRecordsSitemapParts } from "./seo/pbaRecords.js";
 import { todayKst } from "../shared/briefingMeta.js";
@@ -280,6 +281,13 @@ async function golfHubParts(): Promise<string[]> {
           live.set(kc, (live.get(kc) ?? 0) + 1);
         }
       }
+    }
+    // 조건으로 찾기(2인 플레이·노캐디·3인 플레이) — 한 곳이라도 있는 조건·지역만(0곳은 프리렌더가 noindex 로 낸다)
+    for (const f of FIND_FEATURES) {
+      const matched = s.pages.filter((p) => hasFindTag(p, f));
+      if (!matched.length) continue;
+      parts.push(entry(`${ORIGIN}${findPath(f.key)}`, { changefreq: "weekly", priority: "0.7" }));
+      for (const r of findRegionCounts(matched)) if (r.count > 0) parts.push(entry(`${ORIGIN}${findPath(f.key, r.region)}`, { changefreq: "weekly", priority: "0.5" }));
     }
     for (const intent of GOLF_INTENTS) {
       parts.push(entry(`${ORIGIN}${listPath({ intent })}`, { changefreq: "hourly", priority: "0.7" }));

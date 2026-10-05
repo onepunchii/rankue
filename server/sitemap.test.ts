@@ -40,3 +40,33 @@ describe("골프 랭킹 hreflang — 실제로 서빙하는 en 만", () => {
     expect(xml).not.toContain("2026-09-28");
   });
 });
+
+describe("골프 허브 섹션 — 읽을거리와 조건별 목록(2026-10-05)", () => {
+  it("준비물 체크리스트 + 한 곳이라도 있는 조건·지역만", async () => {
+    const { loadGolfCourseSummary } = await import("./routes/modules/golfCourses.js");
+    const pages = [
+      { slug: "a", name: "가CC", region: "경기", city: "용인시", play: ["노캐디", "2인가능"] },
+      { slug: "b", name: "나CC", region: "강원", city: "춘천시", play: ["노캐디"] },
+      { slug: "c", name: "다CC", region: "경기", city: "이천시", play: [] },
+      { slug: "", name: "", region: "제주", city: null, play: ["3인가능"] }, // 이름·슬러그가 빈 행은 세지 않는다
+    ];
+    (loadGolfCourseSummary as any).mockResolvedValue({ pages, listings: [], bySlug: new Map(pages.map((p) => [p.slug, p])) });
+    const xml = await generateSitemapSection("golf-hubs");
+    const has = (path: string) => xml.includes(`<loc>https://www.rankue.co.kr${path}</loc>`);
+    expect(has("/golf/checklist")).toBe(true);
+    expect(has("/golf/find/nocaddie")).toBe(true);
+    expect(has(`/golf/find/nocaddie/${encodeURIComponent("경기")}`)).toBe(true);
+    expect(has(`/golf/find/nocaddie/${encodeURIComponent("강원")}`)).toBe(true);
+    expect(has(`/golf/find/nocaddie/${encodeURIComponent("제주")}`)).toBe(false);
+    expect(has("/golf/find/2people")).toBe(true);
+    expect(has(`/golf/find/2people/${encodeURIComponent("강원")}`)).toBe(false);
+    expect(xml).not.toContain("/golf/find/3people"); // 한 곳도 없다(빈 행은 뺀다)
+  });
+  it("골프장 요약을 못 읽어도 준비물 체크리스트는 싣는다(본문이 코드에 있다)", async () => {
+    const { loadGolfCourseSummary } = await import("./routes/modules/golfCourses.js");
+    (loadGolfCourseSummary as any).mockRejectedValue(new Error("db down"));
+    const xml = await generateSitemapSection("golf-hubs");
+    expect(xml).toContain("<loc>https://www.rankue.co.kr/golf/checklist</loc>");
+    expect(xml).not.toContain("/golf/find/");
+  });
+});

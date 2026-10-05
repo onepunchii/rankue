@@ -34,6 +34,10 @@ import { renderRankingExtra, type RankingExtraRender } from "./seo/rankingExtra.
 import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js";
 import { renderGolfChecklist } from "./seo/golfGuide.js";
 import { PACK_NAV_LABEL, PACK_PATH } from "../shared/golfPack.js";
+import {
+  FIND_FEATURES, FIND_JOIN_LABEL, FIND_NOTE, findDescription, findFaq, findFeature, findHeading, findPath, findRegionCounts, findTitle,
+  hasFindTag, isFindKey, isFindRegion,
+} from "../shared/golfFind.js";
 import { renderTournaments, type TournamentsRender } from "./seo/tournaments.js";
 import { renderPbaRecords, type PbaRecordsRender } from "./seo/pbaRecords.js";
 import { tournamentsRepo } from "./storage/tournaments.repo.js";
@@ -363,6 +367,7 @@ function aboutBody(c: AboutContent, lang: string): string {
 //   /golf/course/:slug                   골프장 한 곳(정본) — 기본정보·그린피·회원권 시세·코스·소개·티타임·가까운 곳
 //   /golf/courses[/:region[/:city]]      목록 허브 — 항상 색인
 //   /golf/{booking|join|urgent}[/…]      의도 허브 — 글이 0건인 지역·시군 조합은 noindex(최상위는 항상 색인)
+//   /golf/find/:key[/:region]            조건으로 찾기(2026-10-05) — 2인 플레이·노캐디·3인 플레이. 0곳인 지역은 noindex
 // 제목·설명·주소·돈 표기는 전부 shared/golfCourse.ts — 화면(useSeo)·사이트맵과 같은 함수다.
 // 데이터에 없는 것(평점·난이도·잔디·사진·전화)은 그리지 않는다. 정적 목록의 그 값들은 가짜였다.
 // 이 페이지들은 네이버(Yeti)의 유일한 색인 경로다 — JS 를 돌리지 않으므로 여기 없는 글자는 네이버에 없다.
@@ -373,7 +378,7 @@ type GolfListingRow = GolfSummary["listings"][number];
 export interface GolfRender { status: 200 | 301 | 404; tag: string; html: string; location?: string }
 
 /** /golf/booking-list/… 같은 앱 화면은 걸리지 않는다(키워드 뒤가 '/' 또는 끝이어야 한다). */
-const GOLF_PAGE_RE = /^\/golf\/(?:course|courses|booking|join|urgent)(?:\/.*)?$/;
+const GOLF_PAGE_RE = /^\/golf\/(?:course|courses|booking|join|urgent|find)(?:\/.*)?$/;
 
 /** 경로 한 조각 → 한글. 잘못된 퍼센트 인코딩은 null(=404). 맥의 NFD 한글도 NFC 로 접는다. */
 function golfDecode(seg: string): string | null {
@@ -897,7 +902,12 @@ function golfGlanceHtml(where: string, pages: GolfPageRow[]): string {
     count("2인가능") ? `2인 가능 ${count("2인가능")}곳` : "",
     count("3인가능") ? `3인 가능 ${count("3인가능")}곳` : "",
   ].filter(Boolean);
-  return bits.length ? `\n  <h2>${esc(where)} 골프장 한눈에</h2>\n  <p>${esc(bits.join(" · "))}</p>` : "";
+  return bits.length ? `\n  <h2>${esc(where)} 골프장 한눈에</h2>\n  <p>${esc(bits.join(" · "))}</p>${golfFindLinksHtml(pages)}` : "";
+}
+/** 조건별 목록으로 가는 줄 — 화면의 '지역 한눈에' 아래 줄과 같은 글. 그 범위에 한 곳이라도 있는 조건만(전국 목록으로 건다) */
+function golfFindLinksHtml(pages: GolfPageRow[]): string {
+  const fs = FIND_FEATURES.filter((f) => pages.some((p) => hasFindTag(p, f)));
+  return fs.length ? `\n  <p>조건별 목록: ${fs.map((f) => `<a href="${esc(findPath(f.key))}">${esc(f.noun)}</a>`).join(" · ")}</p>` : "";
 }
 /** 이용 방법 — 그 페이지의 의도 절 + (조인·전체면) 글 올리기 절 */
 function golfGuideHtml(intent: GolfIntent | null): string {
@@ -1096,6 +1106,77 @@ function renderGolfIntent(s: GolfSummary, intent: GolfIntent, sc: GolfScope, now
  * 골프장 페이지 경로 하나를 렌더한다(검증 스크립트가 Express 없이 부른다). pathname 은 **인코딩된 그대로**(req.path).
  * DB 예외는 그대로 던진다 — 부른 쪽이 503 으로 바꾼다(404 로 내면 일시 장애 동안 정본 URL 이 색인에서 빠진다).
  */
+// ── /golf/find/:key[/:region] 조건으로 찾기(2026-10-05) ───────────────
+// 글·제목·설명은 shared/golfFind(화면 GolfFind.tsx 와 같은 글). 표시가 있는 곳만 싣는다 — 없는 곳을 "안 된다"고 말하지 않는다.
+function renderGolfFind(s: GolfSummary, segs: string[], now: number): GolfRender {
+  const gone = () => golfGone("목록을 찾을 수 없습니다.", "요청한 조건의 골프장 목록이 없습니다.");
+  if (segs.length < 1 || segs.length > 2 || !isFindKey(segs[0])) return gone();
+  const key = segs[0];
+  const f = findFeature(key);
+  const region = segs[1] != null ? golfDecode(segs[1]) : null;
+  if (segs[1] != null && !isFindRegion(region)) return gone();
+  const matched = s.pages.filter((p) => hasFindTag(p, f));
+  const byRegion = findRegionCounts(matched);
+  const pages = region ? matched.filter((p) => p.region === region) : matched;
+  const byListing = golfListingsBySlug(s);
+  const sorted = golfSort(s, pages, byListing, now, null);
+  const count = sorted.length;
+  const o = { key, region, count };
+  const where = region ? (REGION_LABEL[region] ?? region) : "전국";
+  const heading = findHeading(key, region);
+  const crumbs = golfCrumbs([
+    { name: "전국 골프장", path: listPath() },
+    { name: f.noun, path: findPath(key) },
+    ...(region ? [{ name: where, path: findPath(key, region) }] : []),
+  ]);
+  const ul = (ps: GolfPageRow[], withWhere: boolean) => `<ul>\n  ${ps.map((p) => golfCourseLi(s, p, byListing, { where: withWhere })).join("\n  ")}\n  </ul>`;
+  // 전국은 지역별로 묶고, 지역 페이지는 한 목록으로
+  const listHtml = !count ? `\n  <p>${esc(`${where}에는 확인된 ${f.noun}이 아직 없어요.`)}</p>`
+    : region ? `\n  <h2>${esc(heading)} 목록</h2>\n  ${ul(sorted, false)}`
+    : GOLF_REGIONS.map((r) => {
+      const ps = sorted.filter((p) => p.region === r);
+      return ps.length ? `\n  <h2><a href="${esc(findPath(key, r))}">${esc(findHeading(key, r))}</a> ${ps.length}곳</h2>\n  ${ul(ps, false)}` : "";
+    }).join("");
+  const regionLinks = byRegion.filter((r) => r.count > 0 && r.region !== region)
+    .map((r) => `<a href="${esc(findPath(key, r.region))}">${esc(REGION_LABEL[r.region] ?? r.region)} ${r.count}곳</a>`);
+  const others = FIND_FEATURES.filter((x) => x.key !== key && s.pages.some((p) => hasFindTag(p, x)))
+    .map((x) => `<a href="${esc(findPath(x.key))}">${esc(x.noun)}</a>`);
+  const faq = findFaq({ key, count: matched.length, byRegion });
+  const html = page({
+    title: findTitle(o),
+    desc: findDescription(o),
+    canonical: `${ORIGIN}${findPath(key, region)}`,
+    noindex: count === 0,
+    image: golfImage(),
+    jsonLd: [{
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "ItemList", name: heading, numberOfItems: count,
+          itemListElement: sorted.map((p, i) => ({ "@type": "ListItem", position: i + 1, name: p.name, url: `${ORIGIN}${coursePath(p.slug)}` })),
+        },
+        crumbs.ld,
+        // 같은 문답을 여러 페이지에 달지 않는다 — 전국 페이지에만
+        ...(region ? [] : [{ "@type": "FAQPage", mainEntity: faq.map((x) => ({ "@type": "Question", name: x.q, acceptedAnswer: { "@type": "Answer", text: x.a } })) }]),
+      ],
+    }],
+    body: `<main>
+  ${crumbs.html}
+  <h1>${esc(heading)} ${count}곳</h1>
+  <p>${esc(f.lead)}</p>${regionLinks.length ? `\n  <p>${region ? `<a href="${esc(findPath(key))}">전국 ${matched.length}곳</a> · ` : ""}${regionLinks.join(" · ")}</p>` : ""}${listHtml}
+  <p>${esc(FIND_NOTE)}</p>${f.join ? `\n  <p>${esc(f.join)} <a href="${esc(listPath({ intent: "join", region }))}">${esc(`${where} ${FIND_JOIN_LABEL}`)}</a></p>` : ""}
+  <h2>알아 둘 것</h2>
+  <ul>
+  ${f.points.map((t) => `<li>${esc(t)}</li>`).join("\n  ")}
+  </ul>
+  <h2>자주 묻는 것</h2>${faq.map((x) => `\n  <h3>${esc(x.q)}</h3>\n  <p>${esc(x.a)}</p>`).join("")}${others.length ? `\n  <h2>다른 조건으로 찾기</h2>\n  <p>${others.join(" · ")}</p>` : ""}
+  <nav aria-label="더 보기"><a href="${esc(listPath({ region }))}">${esc(`${where} 골프장 전체`)}</a> · <a href="${esc(PACK_PATH)}">${esc(PACK_NAV_LABEL)}</a></nav>
+  ${hubNav("ko")}
+</main>`,
+  });
+  return { status: 200, tag: `golf-find:${key}${region ? `:${encodeURIComponent(region)}` : ""}`, html };
+}
+
 export async function renderGolfPath(pathname: string): Promise<GolfRender | null> {
   const path = pathname.replace(/\/+$/, "");
   if (!GOLF_PAGE_RE.test(path)) return null;
@@ -1106,6 +1187,7 @@ export async function renderGolfPath(pathname: string): Promise<GolfRender | nul
     if (rest.length !== 1) return golfGone("골프장을 찾을 수 없습니다.", "요청한 골프장 정보가 없습니다.");
     return renderGolfCourse(s, rest[0], now);
   }
+  if (kind === "find") return renderGolfFind(s, rest, now);
   const intent = kind === "courses" ? null : (kind as GolfIntent);
   const sc = golfScope(s, rest, intent);
   if (!sc) return golfGone("지역을 찾을 수 없습니다.", "요청한 지역의 골프장 정보가 없습니다.");

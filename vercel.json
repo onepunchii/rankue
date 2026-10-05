@@ -51,7 +51,7 @@
       "dest": "/api/index.ts"
     },
     {
-      "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking(?:/country/[^/]+|/movers)?|billiards/terms(?:/[^/]+)?|tournaments(?:/pba/[^/]+(?:/[^/]+)?|/umb/[^/]+)?|pba(?:/records)?|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|golf-ranking|golfer/[^/]+/[^/]+|(?:store|club|r)/[^/]+|golf/course/[^/]+|golf/(?:courses|booking|join|urgent)(?:/[^/]+){0,2}|golf/checklist)/?",
+      "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking(?:/country/[^/]+|/movers)?|billiards/terms(?:/[^/]+)?|tournaments(?:/pba/[^/]+(?:/[^/]+)?|/umb/[^/]+)?|pba(?:/records)?|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|golf-ranking|golfer/[^/]+/[^/]+|(?:store|club|r)/[^/]+|golf/course/[^/]+|golf/(?:courses|booking|join|urgent)(?:/[^/]+){0,2}|golf/checklist|golf/find/[^/]+(?:/[^/]+)?)/?",
       "has": [
         {
           "type": "header",
