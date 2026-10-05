@@ -90,6 +90,63 @@ describe("searchNearby", () => {
     });
 });
 
+describe("이름을 바꿔 다시 묻기 — 'SKY72 골프클럽(바다코스)'는 그대로는 0건이다(2026-10-05 오너 신고)", () => {
+    const item = (title: string, lat: number, lng: number) => ({ title, category: "음식점>한식", roadAddress: `${title} 주소`, mapx: String(Math.round(lng * 1e7)), mapy: String(Math.round(lat * 1e7)) });
+    const HERE = { lat: 37.4834, lng: 126.4688, radiusKm: 15 };
+    const near = (t: string) => item(t, 37.49, 126.47), far = (t: string) => item(t, 35.1, 129.0);
+    const queries = () => calls().map((c: any[]) => new URL(String(c[0])).searchParams.get("query"));
+    const seq = (...answers: any[][]) => { const f = globalThis.fetch as any; f.mockReset(); for (const a of answers) f.mockResolvedValueOnce(ok(a)); };
+
+    it("첫 이름이 0건이면 다음 이름으로 — 답을 낸 검색어를 돌려준다", async () => {
+        seq([], [near("가"), near("나")]);
+        const r = await searchNearbyWord({ names: [{ name: "SKY72 골프클럽" }, { name: "SKY72CC" }, { name: "인천 공항동로", area: true }], at: HERE }, "한우");
+        expect(queries()).toEqual(["SKY72 골프클럽 근처 한우", "SKY72CC 근처 한우"]); // 답이 나면 더 묻지 않는다
+        expect(r).toEqual({ ok: true, query: "SKY72CC 근처 한우", items: [{ name: "가", category: "음식점>한식", address: "가 주소" }, { name: "나", category: "음식점>한식", address: "나 주소" }] });
+    });
+    it("엉뚱한 동네의 답은 통째로 버리고 다시 묻는다 — 한 줄씩 거르지 않는다", async () => {
+        seq([far("부산1"), far("부산2"), far("부산3"), near("여기")], [near("가"), far("멀리"), near("나")]);
+        const r = await searchNearbyWord({ names: [{ name: "가든CC" }, { name: "가든 골프장" }], at: HERE }, "맛집");
+        // 첫 답은 넷 중 하나만 가까워 버렸다. 둘째 답은 셋 중 둘이 가까워 쓴다 — 먼 것('멀리')도 그대로, 순서도 그대로.
+        expect(r.ok && r.items.map((x) => x.name)).toEqual(["가", "멀리", "나"]);
+        expect(r.ok && r.query).toBe("가든 골프장 근처 맛집");
+    });
+    it("주소로 만든 이름의 답은 거리로 의심하지 않는다(우리 좌표가 틀린 골프장이 있다)", async () => {
+        seq([], [far("가"), far("나")]);
+        const r = await searchNearbyWord({ names: [{ name: "써미트CC" }, { name: "진안 부귀면", area: true }], at: HERE }, "맛집");
+        expect(r.ok && r.items).toHaveLength(2);
+        expect(r.ok && r.query).toBe("진안 부귀면 근처 맛집");
+    });
+    it("자리를 모르면 거리로 가리지 않는다 · 한 곳뿐인 답은 그 한 곳이 가까우면 쓴다", async () => {
+        seq([far("가")]);
+        expect((await searchNearbyWord({ names: [{ name: "가CC" }, { name: "나CC" }], at: null }, "맛집") as any).items).toHaveLength(1);
+        seq([near("하나")]);
+        expect((await searchNearbyWord({ names: [{ name: "강화 선두리" }], at: HERE }, "맛집") as any).items).toHaveLength(1);
+        seq([far("하나")], []);
+        expect(await searchNearbyWord({ names: [{ name: "가CC" }, { name: "나CC" }], at: HERE }, "맛집")).toEqual({ ok: true, query: "가CC 근처 맛집", items: [] });
+    });
+    it("다 물어도 없으면 빈 목록 — 검색어는 첫 이름의 것(화면이 지도에서 찾아보기로 쓴다)", async () => {
+        seq([], [], []);
+        const r = await searchNearbyWord({ names: [{ name: "베르힐CC 영종" }, { name: "베르힐CC" }, { name: "인천 한상중앙로", area: true }], at: HERE }, "맛집");
+        expect(queries()).toHaveLength(3);
+        expect(r).toEqual({ ok: true, query: "베르힐CC 영종 근처 맛집", items: [] });
+    });
+    it("첫 물음이 막히면 그 까닭을 알리고, 다시 묻다가 막히면 '못 찾음'으로 끝낸다", async () => {
+        const f = globalThis.fetch as any;
+        f.mockReset(); f.mockResolvedValueOnce({ ok: false, status: 429, json: async () => ({}) });
+        expect(await searchNearbyWord({ names: [{ name: "가" + "CC" }, { name: "나CC" }] }, "맛집")).toEqual({ ok: false, reason: "quota" });
+        expect(calls()).toHaveLength(1);
+        f.mockReset(); f.mockResolvedValueOnce(ok([])).mockRejectedValueOnce(new Error("timeout")).mockResolvedValueOnce(ok([near("가")]));
+        expect(await searchNearbyWord({ names: [{ name: "가CC" }, { name: "나CC" }, { name: "다CC" }] }, "맛집")).toEqual({ ok: true, query: "가CC 근처 맛집", items: [] });
+        expect(calls()).toHaveLength(2);
+    });
+    it("좌표는 재는 데만 쓰고 내보내지 않는다", async () => {
+        seq([near("가"), near("나")]);
+        const r = await searchNearbyWord({ names: [{ name: "가CC" }], at: HERE }, "맛집");
+        expect(r.ok && Object.keys(r.items[0])).toEqual(["name", "category", "address"]);
+        expect(JSON.stringify(r)).not.toMatch(/mapx|mapy|37\.49/);
+    });
+});
+
 describe("약관 — 저장·캐싱·가공 금지를 코드로", () => {
     const read = (f: string) => readFileSync(path.resolve(process.cwd(), f), "utf8");
     const service = read("server/services/naverLocal.ts");
@@ -101,7 +158,8 @@ describe("약관 — 저장·캐싱·가공 금지를 코드로", () => {
     });
     it("라우트는 no-store 로 답하고, 검색어를 손님에게서 받지 않는다(골프장 이름 + 정해 둔 칩)", () => {
         expect(route).toContain('res.set("Cache-Control", "no-store")');
-        expect(route).toContain("searchNearby(page.name, kind)");
+        expect(route).toContain("searchNearby(target, kind)");
+        expect(route).toContain("names: nearbySearchNames(page)"); // 이름은 우리 자료(이름·별칭·주소)에서만 만든다
         expect(route).toContain("isNearbyKind(req.query.kind)");
         expect(route).not.toMatch(/req\.query\.(q|query)\b/);
     });

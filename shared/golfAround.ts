@@ -21,6 +21,7 @@
  * 네이버 검색 API 특약(2026-09-07 시행 — 기사 요약으로 확인) 때문에 지키는 것 — 바꾸기 전에 약관 원문을 볼 것:
  *   · 저장·캐싱 금지 → 열 때마다 실시간으로 부른다. DB·CDN·검색엔진용 화면에 두지 않는다.
  *   · 가공 금지 → 순서·낱말 그대로. 거리로 거르거나 다시 줄 세우지 않고, 거리 표시도 얹지 않는다.
+ *     (검색어를 바꿔 다시 묻는 것은 한다 — 아래 '검색에 쓸 이름'. 그때도 받은 결과는 통째로 쓰거나 통째로 버린다.)
  *   · 결과가 나오는 화면에 광고 금지 · AI 활용(요약 등) 금지.
  * ⚠️ shared 상대 임포트는 반드시 ./x.js(서버리스 규칙).
  */
@@ -52,6 +53,68 @@ export const nearbyMenu = (kind: NearbyKind): NearbyMenu => BY_KEY.get(kind) ?? 
 /** 네이버에 보내는 검색어 — 화면의 '네이버 지도에서 더 보기'도 같은 말로 연다 */
 export const nearbyWordQuery = (courseName: string, word: string) => `${courseName} 근처 ${word}`;
 export const nearbyQuery = (courseName: string, kind: NearbyKind) => nearbyWordQuery(courseName, NEARBY_WORD[kind]);
+
+// ── 검색에 쓸 이름(2026-10-05 오너 신고: "스카이72는 음식점이 안 나온다 — (바다코스) 때문 같다") ─────────────
+// 맞았다. 그리고 그 한 곳이 아니었다: "{이름} 근처 맛집" 을 490곳 전부에 해 보니 69곳이 0건, 22곳은 엉뚱한 동네가 나왔다(15km 밖).
+// 괄호("SKY72 골프클럽(바다코스)") · 점("구니C.C") · 긴 법인 이름("건설공제조합세종필드골프클럽") · 바뀐 이름이 주범이다.
+// 그래서 이름을 차례로 바꿔 가며 묻는다 — 다듬은 이름 → 줄인 이름+CC → 줄인 이름+골프장 → 별칭 → 마지막 낱말을 뗀 이름 →
+// 주소의 "시군 읍면동"(없으면 "시군 도로 이름"). 고친 뒤 490곳을 다시 재니 빈 목록은 한두 곳이다. 끝내 안 되면 빈 목록 + 네이버 지도 줄.
+// 이름을 바꿔 묻는 것은 **검색어를 고르는 일**이다 — 받은 결과는 여전히 한 줄도 고치거나 거르거나 다시 줄 세우지 않는다.
+export interface NearbyName {
+    name: string;
+    /** 주소로 만든 이름(시군 + 읍면동) — 골프장 좌표가 틀린 곳이 있어, 이 이름의 결과는 거리로 의심하지 않는다 */
+    area?: boolean;
+}
+/** 한 번 물을 때 바꿔 볼 이름의 수 — 대부분 첫 이름에서 끝난다 */
+export const NEARBY_MAX_TRIES = 6;
+/** 이름 다듬기 — 괄호와 그 안("(바다코스)"·닫히지 않은 "(" 뒤), C.C·G.C 의 점, &·쉼표 */
+export function cleanCourseName(s: string): string {
+    return s.replace(/[(\[（][^)\]）]*[)\]）]?/g, " ").replace(/([CcGg])\.\s*([Cc])\.?/g, "$1$2").replace(/[&,·]/g, " ").replace(/\s+/g, " ").trim();
+}
+const NAME_SUFFIX = /\s*(컨트리클럽|컨드리클럽|컨트리구락부|골프클럽|골프앤리조트|골프리조트|골프장|골프|리조트|CC|GC)\s*$/i;
+/** 꼬리말을 뗀 이름 — "뉴데이컨트리클럽" → "뉴데이" */
+function coreCourseName(s: string): string {
+    let x = cleanCourseName(s);
+    for (let i = 0; i < 2; i++) x = x.replace(NAME_SUFFIX, "").trim();
+    return x;
+}
+/** 주소의 읍·면·동 — "…(부곡동)" 꼴도 받는다. 도로 이름(공항동로)은 걸리지 않는다 */
+export function addressDong(address: string | null | undefined): string | null {
+    const m = /([가-힣0-9]+(?:읍|면|동))(?=[\s)(]|$)/.exec(address ?? "");
+    return m ? m[1] : null;
+}
+/** 주소의 도로 이름 — 읍·면·동이 없는 도로명 주소("제주시 명림로 375")의 마지막 수단. "영종해안남로321번길" → "영종해안남로" */
+export function addressRoad(address: string | null | undefined): string | null {
+    for (const tok of (address ?? "").split(/\s+/)) {
+        const base = tok.replace(/\d+(?:번길|길)$/, ""); // 갈래 길 번호를 떼고 큰길 이름만
+        if (/^(?:[가-힣0-9]*[가-힣]|\d+)(?:로|길)$/.test(base)) return base;
+    }
+    return null;
+}
+const shortCity = (city: string | null | undefined, address: string | null | undefined): string => {
+    const c = (city ?? "").trim() || (address ?? "").trim().split(/\s+/)[0] || "";
+    const s = c.replace(/(특별자치도|특별자치시|광역시|특별시)$/, "").replace(/(시|군)$/, "");
+    return s.length >= 2 ? s : c;
+};
+/** 검색에 쓸 이름들 — 차례대로 물어본다(겹치는 것은 한 번만) */
+export function nearbySearchNames(p: { name: string; aliases?: readonly string[] | null; city?: string | null; address?: string | null }): NearbyName[] {
+    const out: NearbyName[] = [];
+    const add = (name: string, area = false) => {
+        const n = name.replace(/\s+/g, " ").trim();
+        if (n.length >= 2 && !out.some((x) => x.name === n)) out.push(area ? { name: n, area: true } : { name: n });
+    };
+    const clean = cleanCourseName(p.name), core = coreCourseName(p.name);
+    add(clean || p.name);
+    if (core && core !== clean) { add(`${core}CC`); add(`${core} 골프장`); }
+    for (const a of (p.aliases ?? []).slice(0, 2)) add(cleanCourseName(String(a ?? "")));
+    const tokens = clean.split(" ");
+    if (tokens.length >= 2) add(tokens.slice(0, -1).join(" ")); // "베르힐CC 영종" → "베르힐CC"
+    // 주소 이름은 늘 마지막 — 다른 이름이 자리를 다 차지해도 빠지지 않게 따로 붙인다. 읍·면·동이 있으면 그것, 없으면 도로 이름.
+    const city = shortCity(p.city, p.address), place = addressDong(p.address) ?? addressRoad(p.address);
+    const names = out.slice(0, NEARBY_MAX_TRIES - 1);
+    if (city && place && !names.some((x) => x.name === `${city} ${place}`)) names.push({ name: `${city} ${place}`, area: true });
+    return names;
+}
 
 /** 화면에 까는 칩 — 냉면은 여름(6~8월)이거나 지금 골라져 있을 때만(겨울에 냉면 칩은 뜬금없다) */
 export function menuChips(current: NearbyKind, month: number): NearbyMenu[] {

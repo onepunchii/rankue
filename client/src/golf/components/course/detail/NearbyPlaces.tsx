@@ -20,7 +20,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { kstDateKey } from "@/lib/kst";
 import { LucideArrowUpRight } from "@/lib/icons";
-import { menuChips, menuForBrief, naverMapSearchUrl, nearbyMenu, nearbyWordQuery, type NearbyKind, type NearbyPlace } from "@shared/golfAround";
+import { cleanCourseName, menuChips, menuForBrief, naverMapSearchUrl, nearbyMenu, nearbyWordQuery, type NearbyKind, type NearbyPlace } from "@shared/golfAround";
 import { localDishLabel, localDishes, type LocalDish } from "@shared/golfLocalDish";
 import { useCourseNearby } from "@/golf/lib/courseApi";
 import { BriefIcon, type RoundPick } from "./WeatherCard";
@@ -63,7 +63,9 @@ export function NearbyPlaces({ slug, name, region, city, round }: { slug: string
     }, [seen]);
 
     const q = useCourseNearby(slug, kind, seen, dish?.word);
-    const query = nearbyWordQuery(name, word);
+    // '더 보기'는 서버가 실제로 답을 받은 검색어로 연다(이름을 바꿔 물었으면 그 이름). 아직 없으면 다듬은 이름으로 —
+    // "SKY72 골프클럽(바다코스)"처럼 괄호가 든 이름은 그대로는 지도에서도 안 잡힌다.
+    const query = q.data?.query || nearbyWordQuery(cleanCourseName(name) || name, word);
     const items = q.data?.items ?? [];
     const loading = !seen || q.isPending;
 

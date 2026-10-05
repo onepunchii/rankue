@@ -68,8 +68,8 @@ describe("길 — 서버는 사전에서 꺼낸 낱말만 검색어로 쓴다", 
     const route = routes.slice(routes.indexOf('router.get("/:slug/nearby"'), routes.indexOf("// ── 날씨(2026-10-05)"));
     it("라우트 — findLocalDish 로 거른 뒤에만 searchNearbyWord", () => {
         expect(route).toContain("findLocalDish(page.region, page.city, req.query.dish)");
-        expect(route).toContain("dish ? await searchNearbyWord(page.name, dish.word) : await searchNearby(page.name, kind)");
-        expect(route).not.toMatch(/searchNearbyWord\(page\.name, (String\()?req\.query/);
+        expect(route).toContain("dish ? await searchNearbyWord(target, dish.word) : await searchNearby(target, kind)");
+        expect(route).not.toMatch(/searchNearbyWord\([^)]*req\.query/);
         expect(route).toContain('res.set("Cache-Control", "no-store")');
     });
     it("검색엔진용 화면 — 사전(우리 글)은 싣고, 네이버 결과는 싣지 않는다", () => {

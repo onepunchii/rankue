@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { NEARBY_MENUS, NEARBY_KINDS, menuChips, menuForBrief, nearbyMenu, nearbyQuery } from "./golfAround";
+import { readFileSync } from "fs";
+import path from "path";
+import {
+    NEARBY_MAX_TRIES, NEARBY_MENUS, NEARBY_KINDS, addressDong, addressRoad, cleanCourseName, menuChips, menuForBrief, nearbyMenu, nearbyQuery, nearbySearchNames,
+} from "./golfAround";
 import { roundBrief } from "./golfRoundBrief";
 import type { WxHour } from "./golfWeather";
 
@@ -86,5 +90,70 @@ describe("날씨가 고른 첫 칩 — 한 줄 평의 갈래를 따른다", () =
         for (const tone of tones) for (const teeHour of [7, 12, 17]) for (const pop of [0, 40]) for (const minTmp of [-3, 12]) {
             expect(menuForBrief({ tone, teeHour, minTmp, pop }).line).not.toMatch(/한잔|한 잔|술|맥주|소주|막걸리/);
         }
+    });
+});
+
+describe("검색에 쓸 이름 — 이름 그대로는 다섯 곳 중 한 곳꼴로 안 잡힌다(2026-10-05 오너 신고: 스카이72)", () => {
+    const names = (p: Parameters<typeof nearbySearchNames>[0]) => nearbySearchNames(p).map((x) => `${x.name}${x.area ? "@" : ""}`);
+    it("이름 다듬기 — 괄호와 그 안, C.C·G.C 의 점, &·쉼표", () => {
+        expect(cleanCourseName("SKY72 골프클럽(바다코스)")).toBe("SKY72 골프클럽");
+        expect(cleanCourseName("구니C.C")).toBe("구니CC");
+        expect(cleanCourseName("더반G.C.")).toBe("더반GC");
+        expect(cleanCourseName("오션힐스포항C.C(")).toBe("오션힐스포항CC"); // 닫히지 않은 괄호
+        expect(cleanCourseName("한맥C.C&노블리아")).toBe("한맥CC 노블리아");
+        expect(cleanCourseName("클럽72CC 레이크,클래식코스")).toBe("클럽72CC 레이크 클래식코스");
+        expect(cleanCourseName("레이크사이드CC")).toBe("레이크사이드CC"); // 멀쩡한 이름은 그대로
+    });
+    it("주소의 읍·면·동 — 괄호 속 동도, 도로 이름(공항동로)은 아니다", () => {
+        expect(addressDong("경기 용인시 처인구 모현읍 능원로 181")).toBe("모현읍");
+        expect(addressDong("울진군 매화면 오산리 산26")).toBe("매화면");
+        expect(addressDong("안산시 상록구 태마당로28(부곡동)")).toBe("부곡동");
+        expect(addressDong("대전 유성구 유성대로 1689번길 69(전민동 463번지)")).toBe("전민동");
+        for (const a of ["인천시 중구 공항동로 392", "제주시 명림로 375", "경북 안동시 풍산로 1", "", null, undefined]) expect(addressDong(a), String(a)).toBeNull();
+    });
+    it("주소의 도로 이름 — 갈래 길 번호는 뗀다", () => {
+        expect(addressRoad("제주시 명림로 375")).toBe("명림로");
+        expect(addressRoad("인천 중구 영종해안남로321번길 184")).toBe("영종해안남로");
+        expect(addressRoad("인천시 강화군 해안남로 474번길 59")).toBe("해안남로");
+        expect(addressRoad("울산 울주군 서생면 용연길 206-52")).toBe("용연길");
+        expect(addressRoad("제주특별자치도 제주시 516로 2695번지")).toBe("516로");
+        for (const a of ["경기 용인시 처인구", "", null]) expect(addressRoad(a), String(a)).toBeNull();
+    });
+    it("스카이72 — 괄호를 뗀 이름이 먼저, 그다음 줄인 이름", () => {
+        expect(names({ name: "SKY72 골프클럽(바다코스)", aliases: ["클럽72CC 오션코스", "클럽72CC 레이크,클래식코스"], city: "인천시", address: "인천시 중구 공항동로 392" }))
+            .toEqual(["SKY72 골프클럽", "SKY72CC", "SKY72 골프장", "클럽72CC 오션코스", "클럽72CC 레이크 클래식코스", "인천 공항동로@"]);
+    });
+    it("점이 든 이름·긴 이름·별칭·마지막 낱말을 뗀 이름·주소", () => {
+        expect(names({ name: "구니C.C", city: "군위군", address: "경북 군위군 군위읍 동서길 1" })).toEqual(["구니CC", "구니 골프장", "군위 군위읍@"]);
+        expect(names({ name: "뉴데이컨트리클럽", city: "천안시", address: "충남 천안시 동남구 북면 위례성로 1" })).toEqual(["뉴데이컨트리클럽", "뉴데이CC", "뉴데이 골프장", "천안 북면@"]);
+        expect(names({ name: "클럽72CC 하늘코스", aliases: ["SKY72 골프클럽(하늘코스)"], city: "인천시", address: "인천시 중구 공항동로135번길 267" }))
+            .toEqual(["클럽72CC 하늘코스", "SKY72 골프클럽", "클럽72CC", "인천 공항동로@"]);
+        expect(names({ name: "라헨느", city: "제주시", address: "제주시 명림로 375" })).toEqual(["라헨느", "제주 명림로@"]);
+        expect(names({ name: "대덕복지센터", city: null, address: "대전 유성구 유성대로 1689번길 69(전민동 463번지)" })).toEqual(["대덕복지센터", "대전 전민동@"]);
+    });
+    it("멀쩡한 이름은 첫 이름이 그대로다 — 대부분 한 번에 끝난다", () => {
+        const got = nearbySearchNames({ name: "레이크사이드CC", city: "용인시", address: "경기 용인시 처인구 모현읍 능원로 181" });
+        expect(got[0]).toEqual({ name: "레이크사이드CC" });
+        expect(got.at(-1)).toEqual({ name: "용인 모현읍", area: true });
+    });
+    it("겹치지 않고, 여섯을 넘지 않고, 주소 이름은 늘 마지막에 남는다", () => {
+        const got = nearbySearchNames({ name: "가나 다라 마바 골프클럽(동코스)", aliases: ["별칭하나CC", "별칭둘CC", "별칭셋CC"], city: "용인시", address: "경기 용인시 처인구 백암면 1" });
+        expect(got.length).toBeLessThanOrEqual(NEARBY_MAX_TRIES);
+        expect(new Set(got.map((x) => x.name)).size).toBe(got.length);
+        expect(got.at(-1)).toEqual({ name: "용인 백암면", area: true });
+        expect(got.filter((x) => x.area)).toHaveLength(1);
+        // 이름이 비어도 터지지 않는다
+        expect(nearbySearchNames({ name: "(가)", city: "용인시", address: "" }).length).toBeGreaterThanOrEqual(1);
+    });
+});
+
+describe("골프장 상세 — 구역의 key 는 서로 다르다(2026-10-05 '소개'가 두 번 뜬 사고)", () => {
+    it("같은 key 를 쓰는 형제가 없다 — 넷이 똑같이 key={d.slug} 였을 때 옛 구역이 지워지지 않았다", () => {
+        const src = readFileSync(path.resolve(process.cwd(), "client/src/golf/pages/GolfCoursePage.tsx"), "utf8");
+        const body = src.slice(src.indexOf("function Body("));
+        const keys = [...body.matchAll(/<(\w+) key=\{([^}]+\}?`?)\}/g)].map((m) => `${m[2]}`);
+        expect(keys.length).toBeGreaterThanOrEqual(4);
+        expect(new Set(keys).size).toBe(keys.length);
+        expect(body).not.toMatch(/<\w+ key=\{d\.slug\}/);
     });
 });

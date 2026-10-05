@@ -272,20 +272,23 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
     }, [linked, weather]);
     return (
         <>
+            {/* ⚠️ 아래 구역들의 key 는 **서로 달라야 한다**(골프장을 옮길 때 안의 상태를 비우려고 슬러그를 붙인다).
+                2026-10-05 사고: 넷이 똑같이 key={d.slug} 였는데, 날씨가 뼈대(key 없음)에서 카드(key 있음)로 바뀌는 순간 리액트가
+                남은 형제를 key 로 찾다가 같은 key 끼리 덮어써서 옛 '시세'·'소개' 구역을 지우지 못했다 — 화면에 구역이 두 번 떴다. */}
             <SectionNav ids={ids} />
             {ids.includes("tee") && <TeeTimes slug={d.slug} name={d.name} listings={d.listings} counts={d.counts} myWatch={d.myWatch} watchers={d.watchers} />}
             {/* 랭큐 골프 소개(2026-10-05) — 검색으로 들어온 비로그인 방문자에게만. 티타임 바로 아래, 시세·그린피 정보는 가리지 않게 */}
             <GolfGuestIntro className="mx-4 mt-8" />
             {/* 날씨(2026-10-05) — 골프장 이름에 붙여 가장 많이 찾는 말. 티타임 다음, 시세·그린피 앞 */}
-            {ids.includes("weather") && (weather ? <WeatherCard key={d.slug} wx={weather} myTees={d.myTees} onRound={setRound} slug={d.slug} name={d.name} initial={linked} /> : <WeatherSkeleton />)}
-            {ids.includes("price") && <MembershipPrices key={d.slug} prices={d.prices} />}
+            {ids.includes("weather") && (weather ? <WeatherCard key={`wx:${d.slug}`} wx={weather} myTees={d.myTees} onRound={setRound} slug={d.slug} name={d.name} initial={linked} /> : <WeatherSkeleton />)}
+            {ids.includes("price") && <MembershipPrices key={`price:${d.slug}`} prices={d.prices} />}
             {ids.includes("fee") && d.fees && <GreenFees fees={d.fees} />}
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}
-            {ids.includes("about") && <AboutInfo key={d.slug} intro={d.intro} info={d.info} grass={d.grass} />}
+            {ids.includes("about") && <AboutInfo key={`about:${d.slug}`} intro={d.intro} info={d.info} grass={d.grass} />}
             <LocationCard name={d.name} address={d.address} lat={d.lat} lng={d.lng} distance={distance} phone={d.phone} website={d.website || d.info?.homepage || null} />
             {/* 근처 먹거리·카페·숙소(2026-10-05) — 네이버 지역 검색을 그 자리에서. 위치 바로 아래(라운드 끝나고 어디서 먹을지).
                 날씨에서 보고 있는 라운드(round)가 첫 메뉴 칩을 고른다 */}
-            {ids.includes("food") && <NearbyPlaces key={d.slug} slug={d.slug} name={d.name} region={d.region} city={d.city} round={round} />}
+            {ids.includes("food") && <NearbyPlaces key={`food:${d.slug}`} slug={d.slug} name={d.name} region={d.region} city={d.city} round={round} />}
 
             {/* 회원이 공개한 라운드 사진(2026-09-30) — 없으면 칸을 그리지 않는다 */}
             <CoursePhotoGallery slug={d.slug} name={d.name} />

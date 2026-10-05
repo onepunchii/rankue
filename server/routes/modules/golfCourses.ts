@@ -25,7 +25,8 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { isUrgentJoin, listingCapacity, distanceKm } from "../../../shared/golfJoin.js";
 import { GOLF_REGIONS, cityShort, listingIntents, type GolfIntent, type PublicListing } from "../../../shared/golfCourse.js";
 import { COURSE_GALLERY_LIMIT } from "../../../shared/golfPhoto.js";
-import { isNearbyKind } from "../../../shared/golfAround.js";
+import { isNearbyKind, nearbySearchNames } from "../../../shared/golfAround.js";
+import { weatherPoint } from "../../../shared/golfWeatherZones.js";
 import { findLocalDish } from "../../../shared/golfLocalDish.js";
 
 const router = Router();
@@ -318,6 +319,7 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
 // ── 근처 맛집·카페·숙소(2026-10-05) ────────────────────────────────
 // 네이버 지역 검색을 그 자리에서 불러 그대로 돌려준다. 약관상 저장·캐싱·가공이 안 돼(shared/golfAround 머리말)
 // 응답은 no-store 이고 순서도 그대로다. 검색어는 서버가 만든다 — 아무 말이나 받아 주면 남의 검색 대리가 된다.
+// 응답의 query 는 실제로 답을 낸 검색어다(이름을 바꿔 물었으면 바꾼 이름) — 화면의 '네이버 지도에서 더 보기'가 그 말로 연다.
 // 하루 한도(25,000회)를 한 사람이 태우지 못하게 인스턴스 안에서 IP 당 1분 30회로 막는다(서버리스라 느슨한 막이다).
 const nearbyHits = new Map<string, { n: number; until: number }>();
 function nearbyAllow(ip: string, now = Date.now()): boolean {
@@ -336,7 +338,11 @@ router.get("/:slug/nearby", asyncHandler(async (req: any, res: any) => {
     res.set("Cache-Control", "no-store");
     if (!nearbyAllow(String(req.ip ?? ""))) return sendError(res, 429, "잠시 뒤에 다시 시도해 주세요");
     const { searchNearby, searchNearbyWord } = await import("../../services/naverLocal.js");
-    const r = dish ? await searchNearbyWord(page.name, dish.word) : await searchNearby(page.name, kind);
+    // 이름 그대로는 다섯 곳 중 한 곳꼴로 안 잡힌다("SKY72 골프클럽(바다코스)") — 다듬은 이름·별칭·주소의 읍면동을 차례로 묻는다.
+    // 자리(at)는 엉뚱한 동네의 답을 버리는 데만 쓴다: 믿을 만한 좌표면 15km, 시군 중심으로 대신 잡았으면 40km.
+    const pt = weatherPoint(page);
+    const target = { names: nearbySearchNames(page), at: pt ? { lat: pt.lat, lng: pt.lng, radiusKm: pt.approx ? 40 : 15 } : null };
+    const r = dish ? await searchNearbyWord(target, dish.word) : await searchNearby(target, kind);
     if (!r.ok) return sendError(res, r.reason === "nokey" ? 501 : r.reason === "quota" ? 429 : 502, "지금은 불러올 수 없어요", `NEARBY_${r.reason.toUpperCase()}`);
     return sendSuccess(res, { query: r.query, items: r.items });
 }));
