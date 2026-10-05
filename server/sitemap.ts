@@ -14,6 +14,7 @@ import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingInt
 import { rankingExtraSitemapParts } from "./seo/rankingExtra.js";
 import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
 import { golfGuideSitemapParts } from "./seo/golfGuide.js";
+import { golfTermsSitemapParts } from "./seo/golfTerms.js";
 import { FIND_FEATURES, findPath, findRegionCounts, hasFindTag } from "../shared/golfFind.js";
 import { tournamentsSitemapParts } from "./seo/tournaments.js";
 import { pbaRecordsSitemapParts } from "./seo/pbaRecords.js";
@@ -30,7 +31,7 @@ import { todayKst } from "../shared/briefingMeta.js";
 //   /sitemap-golf-courses.xml  골프장 475곳 전부(2026-09-24) — 시세가 매일 바뀌어 daily
 //   /sitemap-golf-hubs.xml     골프장 목록·지역·시군 + 부킹·조인·취소티 허브(글이 있는 조합만)
 //   /sitemap-rankings.xml      국가별 세계랭킹(남자 10명 이상) + 순위 변동 한 장(2026-09-24)
-//   /sitemap-terms.xml         당구 용어 사전 허브 + 용어 페이지(본문 300자 이상, 2026-09-24)
+//   /sitemap-terms.xml         당구 용어 사전 허브 + 용어 페이지(본문 300자 이상, 2026-09-24) + 골프 용어 사전(2026-10-05)
 //   /sitemap-tournaments.xml   당구 대회 허브 + PBA 시즌·대회(끝나고 우승자 있는 것) + UMB 대회(포인트 받은 선수 16명 이상, 2026-09-24)
 //   /sitemap-pba-records.xml   PBA·LPBA 통산 기록 순위 한 장(두 리그 모두 30경기 이상 선수 20명 이상일 때만, 2026-09-24)
 //
@@ -310,7 +311,8 @@ async function golfHubParts(): Promise<string[]> {
 const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
   core: coreParts, players: playerParts, pba: pbaParts, golf: golfParts, stores: storeParts,
   "golf-courses": golfCourseParts, "golf-hubs": golfHubParts,
-  rankings: rankingExtraSitemapParts, terms: billiardsTermsSitemapParts,
+  // 용어 사전 — 당구(2026-09-24) + 골프(2026-10-05). 둘 다 본문이 코드에 있다.
+  rankings: rankingExtraSitemapParts, terms: async () => [...(await billiardsTermsSitemapParts()), ...golfTermsSitemapParts()],
   tournaments: tournamentsSitemapParts, "pba-records": pbaRecordsSitemapParts,
 };
 

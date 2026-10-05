@@ -33,6 +33,8 @@ import { JOIN_TYPE_LABEL, distanceKm, formatDistance, type JoinType } from "../s
 import { renderRankingExtra, type RankingExtraRender } from "./seo/rankingExtra.js";
 import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js";
 import { renderGolfChecklist } from "./seo/golfGuide.js";
+import { renderGolfTerms, type GolfTermsRender } from "./seo/golfTerms.js";
+import { GOLF_TERMS_NAV_LABEL, GOLF_TERMS_PATH } from "../shared/golfTermsMeta.js";
 import { PACK_NAV_LABEL, PACK_PATH } from "../shared/golfPack.js";
 import {
   FIND_FEATURES, FIND_JOIN_LABEL, FIND_NOTE, findDescription, findFaq, findFeature, findHeading, findPath, findRegionCounts, findTitle,
@@ -137,8 +139,8 @@ export function hubNav(lang = "ko"): string {
     [`/golf-ranking${golfQ}`, H.golf],
     // 골프장 허브(2026-09-24) — 골프 예약·시세는 한국 전용이라 한국어 문서에만 건다.
     ...(ko ? [["/golf/courses", "전국 골프장"] as [string, string]] : []),
-    // 골프 읽을거리(2026-10-05) — 준비물 체크리스트. 한국어 전용.
-    ...(ko ? [[PACK_PATH, PACK_NAV_LABEL] as [string, string]] : []),
+    // 골프 읽을거리(2026-10-05) — 준비물 체크리스트 · 용어 사전. 한국어 전용.
+    ...(ko ? [[PACK_PATH, PACK_NAV_LABEL] as [string, string], [GOLF_TERMS_PATH, GOLF_TERMS_NAV_LABEL] as [string, string]] : []),
     // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 문서에만 건다.
     ...(ko ? [["/billiards/terms", "당구 용어"] as [string, string]] : []),
     // 당구 대회(2026-09-24) — 프리렌더가 한국어 전용(?lang= 무시)이라 한국어 문서에만 건다.
@@ -1989,6 +1991,25 @@ ${list}
     const r = renderGolfChecklist();
     noStore(res);
     res.setHeader("X-Prerender", r.tag);
+    res.status(r.status).send(r.html);
+  });
+
+  // ── /golf/terms[/:slug] 골프 용어 사전(2026-10-05) ────────────────
+  // 정규식 라우트라 req.path 가 인코딩된 채로 온다(한글 슬러그) — 디코드는 renderGolfTerms 가 한다. 본문이 코드에 있어 DB 를 안 탄다.
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  app.get(/^\/golf\/terms(?:\/[^/]+)?\/?$/, (req, res, next) => {
+    if (!isBot(req)) return next();
+    let r: GolfTermsRender | null;
+    try {
+      r = renderGolfTerms(req.path);
+    } catch (e) {
+      console.warn("[prerender] golf terms failed:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
+    if (!r) return next();
+    noStore(res);
+    res.setHeader("X-Prerender", r.tag); // 슬러그는 인코딩돼 ASCII
+    if (r.status === 301 && r.location) return res.redirect(301, r.location);
     res.status(r.status).send(r.html);
   });
 

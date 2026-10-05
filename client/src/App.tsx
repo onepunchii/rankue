@@ -184,6 +184,11 @@ const GolfFind = lazy(() => import("@/golf/pages/GolfFind"));
 function GolfFindRoute() {
   return <Suspense fallback={golfReadFallback}><GolfFind /></Suspense>;
 }
+// 골프 용어 사전(2026-10-05) — 본문(shared/golfTerms.ts)이 길어 메인 청크에서 뺀다. 허브와 용어 한 개가 같은 화면 파일.
+const GolfTerms = lazy(() => import("@/golf/pages/GolfTerms"));
+function GolfTermsRoute() {
+  return <Suspense fallback={golfReadFallback}><GolfTerms /></Suspense>;
+}
 
 /**
  * 골프 화면 문지기. 허용되지 않으면 홈으로 돌린다.
@@ -329,6 +334,8 @@ function AppRoutes() {
           슬러그는 한글(정본). 옛 숫자 주소(/golf/course/74)는 GolfCoursePage 가 슬러그로 바꿔 준다.
           wouter 는 기본이 정확 일치라(regexparam, loose 아님) /golf/booking 이 /golf/booking-list 를 먹지 않는다. */}
       <Route path="/golf/checklist" component={GolfChecklistRoute} />
+      <Route path="/golf/terms" component={GolfTermsRoute} />
+      <Route path="/golf/terms/:slug" component={GolfTermsRoute} />
       <Route path="/golf/find/:key" component={GolfFindRoute} />
       <Route path="/golf/find/:key/:region" component={GolfFindRoute} />
       <Route path="/golf/course/:slug" component={GolfCoursePage} />
