@@ -55,6 +55,8 @@ export interface WatchFilters {
 export interface CourseDetail {
     slug: string; name: string; region: string; city: string | null; address: string | null;
     lat: number | null; lng: number | null; kind: string | null; holes: number | null;
+    /** 미니 지도에 찍을 자리(2026-10-05) — 골프장 좌표가 없거나 틀렸으면 시군 중심(approx). 옛 응답엔 없다 */
+    spot?: { lat: number; lng: number; approx: boolean } | null;
     parts: { courseId: number; kind: string; holes: number | null }[] | null;
     /** 랭큐매치 코스별 파 */
     courses: { name: string; par: number; holes: number }[] | null;
@@ -95,10 +97,12 @@ const qs = (o: Record<string, string | null | undefined>) => {
     const s = p.toString(); return s ? `?${s}` : "";
 };
 
-export function useCourseList(o: { region?: string | null; city?: string | null; intent?: GolfIntent | null } = {}) {
+/** enabled=false 면 받지 않고 캐시에 있는 것만 쓴다 — 화면에 들어올 때 받는 작은 지도(HereMap)가 쓴다 */
+export function useCourseList(o: { region?: string | null; city?: string | null; intent?: GolfIntent | null } = {}, enabled = true) {
     return useQuery<CourseListItem[]>({
         queryKey: [COURSES_KEY, "list", o.region ?? null, o.city ?? null, o.intent ?? null],
         queryFn: () => apiRequest(`${COURSES_KEY}${qs({ region: o.region, city: o.city, intent: o.intent })}`),
+        enabled,
         staleTime: 30_000,
         // 지역 칩을 누를 때마다 목록·숫자가 통째로 비었다가 다시 뜨지 않게
         placeholderData: keepPreviousData,

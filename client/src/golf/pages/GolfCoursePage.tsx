@@ -33,6 +33,7 @@ import { GreenFees } from "@/golf/components/course/detail/GreenFees";
 import { CourseLayout } from "@/golf/components/course/detail/CourseLayout";
 import { AboutInfo } from "@/golf/components/course/detail/AboutInfo";
 import { LocationCard } from "@/golf/components/course/detail/LocationCard";
+import { hereTone } from "@shared/golfHereMap";
 import { NearbyCourses } from "@/golf/components/course/detail/NearbyCourses";
 import { NearbyPlaces } from "@/golf/components/course/detail/NearbyPlaces";
 import { SectionNav, jumpTo } from "@/golf/components/course/detail/SectionNav";
@@ -285,7 +286,8 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             {ids.includes("fee") && d.fees && <GreenFees fees={d.fees} />}
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}
             {ids.includes("about") && <AboutInfo key={`about:${d.slug}`} intro={d.intro} info={d.info} grass={d.grass} />}
-            <LocationCard name={d.name} address={d.address} lat={d.lat} lng={d.lng} distance={distance} phone={d.phone} website={d.website || d.info?.homepage || null} />
+            <LocationCard name={d.name} address={d.address} lat={d.lat} lng={d.lng} distance={distance} phone={d.phone} website={d.website || d.info?.homepage || null} region={d.region} tone={hereTone(d.counts, !!d.myWatch)}
+                here={d.spot ?? (d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null)} />
             {/* 근처 먹거리·카페·숙소(2026-10-05) — 네이버 지역 검색을 그 자리에서. 위치 바로 아래(라운드 끝나고 어디서 먹을지).
                 날씨에서 보고 있는 라운드(round)가 첫 메뉴 칩을 고른다 */}
             {ids.includes("food") && <NearbyPlaces key={`food:${d.slug}`} slug={d.slug} name={d.name} region={d.region} city={d.city} round={round} />}

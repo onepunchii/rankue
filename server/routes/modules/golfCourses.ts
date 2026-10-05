@@ -298,6 +298,8 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
         : s.pages.filter((x) => x.slug !== slug && x.region === p.region && cityMatch(x, p.city ?? undefined)).slice(0, 8).map((x) => ({ ...listItem(s, x, now), km: null }));
     return sendSuccess(res, {
         slug: p.slug, name: p.name, region: p.region, city: p.city, address: p.address, lat: p.lat, lng: p.lng,
+        // 미니 지도('여기')에 찍을 자리 — 날씨와 같은 규칙: 골프장 좌표가 먼저, 없거나 시군에서 터무니없이 멀면(좌표 오류) 시군 중심
+        spot: (() => { const w = weatherPoint(p); return w ? { lat: w.lat, lng: w.lng, approx: w.approx } : null; })(),
         kind: p.kind, holes: p.holes, parts: p.parts, courses: p.courses, intro: p.intro, info: p.info, fees: p.fees,
         courseIds: p.courseIds, updatedAt: p.updatedAt,
         logo: p.logo, grass: p.grass, play: p.play, phone: p.phone, website: p.website, feeFrom: p.feeFrom, aliases: p.aliases,

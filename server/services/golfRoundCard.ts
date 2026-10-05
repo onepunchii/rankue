@@ -37,6 +37,8 @@ export interface GolfRoundCardInput {
     sunLine: string | null;
     /** "기상청 10/5 17시 발표" */
     stamp: string;
+    /** 한 귀퉁이의 '여기' 점 지도(전국 골프장 점 + 이 골프장 하나) — 좌표를 모르면 null. 점만 그린다(shared/golfHereMap) */
+    map?: { uri: string; width: number; height: number } | null;
 }
 
 const BG = "#0A0A0A";
@@ -76,8 +78,18 @@ function windGlyph(s: number): El {
     return h("div", { width: s, height: s, position: "relative" }, bar(0.8, 0.24), bar(0.56, 0.46), bar(0.7, 0.68));
 }
 
+/** 이름 한 줄의 너비 어림(px) — Pretendard 800 을 재 본 값: 한글 0.84em · 대문자 0.72em · 소문자·숫자 0.58em · 빈칸 0.26em, 자간 −2 */
+function nameWidth(s: string, size: number): number {
+    let w = 0;
+    for (const ch of s) w += (ch === " " ? 0.26 : /[A-Z]/.test(ch) ? 0.72 : ch.charCodeAt(0) < 128 ? 0.58 : 0.84) * size - 2;
+    return w;
+}
+
 function tree(p: GolfRoundCardInput): El {
-    const nameSize = p.name.length > 14 ? 60 : p.name.length > 9 ? 72 : 84;
+    // 이름 크기: 글자 수로 정한 크기에서, 한 줄에 안 들어가면 더 줄인다(귀퉁이 지도가 자리를 쓴다). 그래도 넘치면 낱말 단위로 접는다
+    const room = CARD_SIZE - 136 - (p.map ? p.map.width + 36 : 0);
+    const byLength = p.name.length > 14 ? 60 : p.name.length > 9 ? 72 : 84;
+    const nameSize = [84, 72, 60, 52, 46].find((s) => s <= byLength && nameWidth(p.name, s) <= room) ?? 46;
     const verdictSize = p.verdict.length > 9 ? 78 : 96;
     const big = p.tone === "wind" ? windGlyph(150) : glyph(p.tone === "night" ? "clear" : p.sky, p.tone === "night", 150);
     const hours = p.hours.slice(0, 6);
@@ -102,10 +114,13 @@ function tree(p: GolfRoundCardInput): El {
                 h("div", { width: 18, height: 18, borderRadius: 9, background: LIME, marginRight: 14 }), "RANKUE GOLF"),
             h("div", { fontSize: 32, fontWeight: 700, color: MUTED }, "라운드 브리핑"),
         ),
-        // 어디서 · 언제
-        h("div", { flexDirection: "column" },
-            h("div", { fontSize: nameSize, fontWeight: 800, letterSpacing: -2, lineHeight: 1.1 }, p.name),
-            h("div", { marginTop: 12, fontSize: 40, fontWeight: 500, color: MUTED }, `${p.dateLabel} · ${p.teeLabel}`),
+        // 어디서 · 언제 — 오른쪽 귀퉁이에 '여기' 점 지도(우리 지도와 같은 점 문법, 2026-10-05). 이름이 길면 지도 옆에서 두 줄로 접힌다
+        h("div", { alignItems: "center", justifyContent: "space-between" },
+            h("div", { flexDirection: "column", flex: 1, minWidth: 0 },
+                h("div", { fontSize: nameSize, fontWeight: 800, letterSpacing: -2, lineHeight: 1.1, wordBreak: "keep-all" }, p.name),
+                h("div", { marginTop: 12, fontSize: 40, fontWeight: 500, color: MUTED }, `${p.dateLabel} · ${p.teeLabel}`),
+            ),
+            ...(p.map ? [{ type: "img", props: { src: p.map.uri, width: p.map.width, height: p.map.height, style: { width: p.map.width, height: p.map.height, marginLeft: 36, flexShrink: 0 } } } as El] : []),
         ),
         // 한 줄 평 + 근거 숫자
         h("div", { alignItems: "center" },

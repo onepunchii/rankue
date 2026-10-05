@@ -10,6 +10,8 @@ import { storeListings, hiqMembers } from "../shared/schema.js";
 import { eq } from "drizzle-orm";
 import { storeAreasKo } from "../shared/storeMeta.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
+import { hereMapSvg } from "../shared/golfHereMap.js";
+import { weatherPoint } from "../shared/golfWeatherZones.js";
 import { courseWhere, weekdayFee, wonShort, type Fees } from "../shared/golfCourse.js";
 import { renderGolfFootprintsCardPng, type FootprintsCardInput } from "./services/golfFootprintsCard.js";
 import { renderGolfRoundCardPng, type GolfRoundCardInput } from "./services/golfRoundCard.js";
@@ -208,6 +210,19 @@ export async function buildGolfCourseCard(slug: string): Promise<GolfCourseCardI
  * 그 골프장·그 날·그 티오프의 카드 재료. 받아 둔 예보만 읽는다 — 없으면 null(404). 화면의 날씨 카드와 같은 브리핑이다.
  * 날씨 모듈은 여기서 지연 로드한다(카드 라우트가 불릴 때만 필요하다).
  */
+/**
+ * 라운드 카드 한 귀퉁이의 '여기' 점 지도 — 전국 골프장 점에 이 골프장 하나를 라임으로 켠다(화면의 미니 지도와 같은 셈).
+ * 자리는 날씨와 같은 규칙(골프장 좌표 → 없거나 틀리면 시군 중심). **점만** 그린다 — 시도 윤곽선 자료는 밖으로 나가는 그림에 싣지 않는다.
+ */
+function roundCardMap(pages: readonly { lat?: unknown; lng?: unknown }[], p: { region?: string | null; city?: string | null; lat?: unknown; lng?: unknown }): GolfRoundCardInput["map"] {
+  const num = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+  const w = weatherPoint({ region: p.region, city: p.city, lat: num(p.lat), lng: num(p.lng) });
+  if (!w) return null;
+  const dots = pages.map((x) => ({ lat: num(x.lat), lng: num(x.lng) })).filter((x): x is { lat: number; lng: number } => x.lat != null && x.lng != null);
+  const m = hereMapSvg(dots, w, { width: 150, cols: 19, color: "#64DD17", bg: "#0A0A0A", mark: 7.5 });
+  return m ? { uri: `data:image/svg+xml;base64,${Buffer.from(m.svg).toString("base64")}`, width: m.width, height: m.height } : null;
+}
+
 export async function buildGolfRoundCard(slug: string, ref: RoundRef, nowMs = Date.now()): Promise<GolfRoundCardInput | null> {
   const s = await loadGolfCourseSummary();
   const p = s.bySlug.get(slug);
@@ -238,6 +253,7 @@ export async function buildGolfRoundCard(slug: string, ref: RoundRef, nowMs = Da
     gear: b.gear,
     sunLine: r.sun ? `해 짐 ${r.sun.set} · 18홀은 ${lastTee18(r.sun.set)} 전에 티오프` : null,
     stamp: `기상청 ${baseLabel(r.base)} 발표${r.approx ? ` · ${r.approx} 기준` : ""}`,
+    map: roundCardMap(s.pages, p),
   };
 }
 
