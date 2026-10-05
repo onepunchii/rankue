@@ -6,21 +6,30 @@ import { isNativeApp, nativePlatform, openStorePage } from "@/lib/nativeBridge";
 import { nativeSocialAvailable, nativeSocialIdToken } from "@/lib/nativeSignIn";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { queryClient, refreshAfterLogin } from "@/lib/queryClient";
+import { kakaoLoginAvailable, useKakaoStart } from "@/lib/kakaoLogin";
 import { isTermsAccepted } from "@shared/terms";
+import { safeReturnPath } from "@shared/promoFunnel";
 
 // 소셜 로그인(구글·애플) — 글로벌(비한국어) 유저의 기본 진입.
 // 웹:          구글 GIS + 애플 SIWA JS(Services ID) → id_token → 서버(/api/hiq/social) JWKS 재검증.
 // 앱(Capacitor): @capgo/capacitor-social-login 네이티브 플러그인으로 id_token 획득 → 같은 /api/hiq/social.
 //   (웹뷰에서 구글 OAuth 리다이렉트는 정책상 차단되므로 네이티브 플러그인 사용 — mapix 표준)
+// 카카오(2026-10-05 오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플"): **한국어 화면 + 웹**에서만, 맨 위.
+//   id_token 이 아니라 전체 화면 이동이다 — 카카오에 다녀와 /auth/kakao(pages/hiq/kakao-callback.tsx)가 서버에 인가 코드를 넘긴다.
+//   약관 동의·'나' 새로 받기도 그 화면이 한다(이 파일의 submitToken 과 같은 규칙).
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const APPLE_SERVICES_ID = import.meta.env.VITE_APPLE_SERVICES_ID as string | undefined;
 
 const APPLE_LOCALE: Record<string, string> = { ko: "ko_KR", en: "en_US", vi: "vi_VN", tr: "tr_TR", es: "es_ES" };
 
-/** 소셜 로그인 노출 가능 여부 — 앱(네이티브 플러그인) 또는 웹(키 배포됨) */
-export function socialLoginAvailable(): boolean {
-  return isNativeApp() || !!GOOGLE_CLIENT_ID;
+/**
+ * 소셜 로그인 노출 가능 여부 — 앱(네이티브 플러그인) 또는 웹(키 배포됨).
+ * locale 을 넘기면 카카오만 되는 경우(한국어 웹인데 구글 키가 없음)도 센다. 카카오는 한국어 화면에서만 보이므로
+ * 다른 언어에서는 예전과 같은 답이다 — 구글 키 없는 영어 화면에 빈 소셜 묶음이 뜨지 않는다.
+ */
+export function socialLoginAvailable(locale?: string): boolean {
+  return isNativeApp() || !!GOOGLE_CLIENT_ID || (locale === "ko" && kakaoLoginAvailable());
 }
 
 declare global {
@@ -65,7 +74,26 @@ function AppleLogo() {
   );
 }
 
-export default function SocialLogin({ hint = true }: { hint?: boolean }) {
+// 카카오 말풍선 심볼 — 카카오 디자인 가이드의 로그인 단추용(바탕 #FEE500 위에 #191919).
+function KakaoSymbol() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden>
+      <path
+        fill="#191919"
+        fillRule="evenodd"
+        clipRule="evenodd"
+        d="M9 .6C4.029.6 0 3.713 0 7.552c0 2.388 1.558 4.493 3.932 5.745l-.999 3.648c-.088.323.28.58.563.393l4.376-2.888c.37.036.745.057 1.128.057 4.971 0 9-3.113 9-6.955C18 3.713 13.971.6 9 .6"
+      />
+    </svg>
+  );
+}
+
+/**
+ * kakao: 카카오 단추를 이 자리에 둘 것인가(기본 true). 매장 화이트라벨 진입(?store=·매장 주소)의 로그인 화면은 false 로 부른다 —
+ * 카카오 로그인은 매장과 무관하게 글로벌 회원을 만들고, 카카오에 다녀오는 길에 매장 표시(?store=)가 사라져 취소·실패 뒤
+ * 기본 로그인 화면으로 떨어진다(거기서 번호를 넣으면 매장 회원이 '미가입'으로 판정된다). 2026-10-05 검토.
+ */
+export default function SocialLogin({ hint = true, kakao = true }: { hint?: boolean; kakao?: boolean }) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useT();
@@ -78,6 +106,31 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
   const inApp = isNativeApp();
   const nativeSocial = inApp && nativeSocialAvailable();
   const { ask: askTerms } = useTermsGate();
+
+  // 카카오 — 한국어 화면에서만 보인다(앱 안·키 없음·등록 안 된 주소는 kakaoLoginAvailable 이 끈다). 매장 진입은 부른 쪽이 끈다(kakao).
+  const showKakao = kakao && locale === "ko" && kakaoLoginAvailable();
+  // 카카오로 보냈던 이 화면이 되살아났다(뒤로 가기 · 새 탭에서 끝내고 이 탭으로 돌아옴) — 그 사이 로그인이 끝났는지 서버에 묻고,
+  // 끝났으면 로그인 화면이 처음 뜰 때(landing 의 로그인 확인)와 같은 규칙으로 넘긴다: '나'를 새로 받은 **뒤에** 보던 곳이나 홈으로.
+  // 안 그러면 로그인된 사람에게 로그인 폼이 그대로 보인다(landing 의 확인은 화면이 붙을 때 한 번만 돈다).
+  const onKakaoReturn = useCallback(() => {
+    void (async () => {
+      try {
+        const me = await fetch("/api/hiq/me", { credentials: "include" });
+        if (!me.ok) return;
+      } catch { return; /* 못 물어봤으면 그대로 둔다 — 로그인 폼은 여전히 쓸 수 있다 */ }
+      await refreshAfterLogin();
+      setLocation(safeReturnPath(new URLSearchParams(window.location.search).get("redirect")) ?? "/dashboard", { replace: true });
+    })();
+  }, [setLocation]);
+  // 누르면 꾸러미를 남기고 카카오로 넘어간다. SDK 는 단추가 보일 때 미리 실린다(index.html 에는 없다) —
+  // 중복 누름 방지·'뒤로' 왔을 때 풀기까지 useKakaoStart 가 한다.
+  const { busy: kakaoBusy, start: startKakao } = useKakaoStart(showKakao, () => {
+    toast({ title: t("login.failedTitle"), description: t("login.kakaoStartFailed"), variant: "destructive" });
+  }, onKakaoReturn);
+  const handleKakao = useCallback(() => {
+    // 로그인 화면에 실려 온 ?redirect= 를 들려 보낸다 — 카카오에 다녀와도 보던 곳으로 돌아가게(돌아온 화면이 다시 거른다)
+    startKakao({ mode: "login", redirect: new URLSearchParams(window.location.search).get("redirect") });
+  }, [startKakao]);
 
   const submitToken = useCallback(async (provider: "google" | "apple", idToken: string, name?: string) => {
     setBusy(true);
@@ -255,16 +308,33 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
     );
   }
 
-  // ── 웹: GIS + SIWA JS ──
-  if (!GOOGLE_CLIENT_ID) return null;
+  // ── 웹: 카카오(한국어만) + GIS + SIWA JS ──
+  if (!GOOGLE_CLIENT_ID && !showKakao) return null;
   return (
     <div ref={wrapRef} className="w-full flex flex-col items-center gap-3">
       {hint && <p className="text-[12px] font-medium text-black/55 text-center">{t("login.socialHint")}</p>}
+      {/* 카카오 — 맨 위. 카카오 디자인 가이드: 바탕 #FEE500 · 글자와 심볼 #191919 · 모서리 12px · 말풍선 심볼.
+          높이·폭은 아래 구글·애플 단추와 같다. 색은 리터럴로 둔다(테마 토큰을 타면 가이드 색이 바뀐다). */}
+      {showKakao && (
+        <button
+          type="button"
+          onClick={handleKakao}
+          disabled={kakaoBusy || busy}
+          aria-busy={kakaoBusy}
+          className="w-full h-[44px] rounded-[12px] bg-[#FEE500] text-[#191919] flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-60 active:scale-[0.98] transition-transform"
+        >
+          <KakaoSymbol />
+          <span>{t("login.kakao")}</span>
+        </button>
+      )}
+
       {/* GIS가 이 컨테이너 내부 DOM을 직접 소유 — React 자식을 절대 넣지 말 것(removeChild 충돌) */}
-      <div className="w-full flex justify-center items-center h-[44px] relative">
-        <div ref={googleBtnRef} />
-        {!gisReady && <div className="absolute inset-0 rounded-full bg-black/[0.04] animate-pulse pointer-events-none" />}
-      </div>
+      {GOOGLE_CLIENT_ID && (
+        <div className="w-full flex justify-center items-center h-[44px] relative">
+          <div ref={googleBtnRef} />
+          {!gisReady && <div className="absolute inset-0 rounded-full bg-black/[0.04] animate-pulse pointer-events-none" />}
+        </div>
+      )}
 
       {APPLE_SERVICES_ID && (
         <button

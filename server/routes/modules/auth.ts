@@ -7,6 +7,8 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { msg } from "../../lib/i18n.js";
 import { verifyGoogleIdToken, verifyAppleIdToken } from "../../lib/socialAuth.js";
+import { exchangeKakaoCode, kakaoConfigured, kakaoRedirectAllowed, kakaoRejected, type KakaoFailReason } from "../../lib/kakaoAuth.js";
+import { isLoginPhone } from "../../../shared/loginPhone.js";
 import { recordTermsAcceptance, isMemberSuspended, SUSPENDED_TEXT } from "../../middleware/terms.js";
 import { isTermsAccepted, ACCOUNT_SUSPENDED_CODE } from "../../../shared/terms.js";
 import { screenMemberProfile } from "../../utils/crewModeration.js";
@@ -69,14 +71,15 @@ export function checkRateLimit(key: string): { limited: boolean; retryAfterSec: 
     return { limited: false, retryAfterSec: 0 };
 }
 
-export function registerFailure(key: string): void {
+/** max: 이 키가 잠기는 횟수 — 대부분 MAX_ATTEMPTS(5), 여러 사람이 한 주소를 나눠 쓰는 키(아래 LOGIN_UNKNOWN_MAX)만 따로 준다. */
+export function registerFailure(key: string, max: number = MAX_ATTEMPTS): void {
     const now = Date.now();
     let entry = attemptStore.get(key);
     if (!entry || now - entry.first > WINDOW_MS) {
         entry = { count: 0, first: now, lockedUntil: 0 };
     }
     entry.count += 1;
-    if (entry.count >= MAX_ATTEMPTS) {
+    if (entry.count >= max) {
         entry.lockedUntil = now + LOCKOUT_MS;
     }
     attemptStore.set(key, entry);
@@ -86,14 +89,66 @@ export function clearAttempts(key: string): void {
     attemptStore.delete(key);
 }
 
+// --- 바깥 호출의 자리 잡기(2026-10-05 카카오 로그인 검토) ---
+// 위의 실패 세기는 응답이 **돌아온 뒤에** 오른다. 카카오 교환처럼 요청 한 건이 바깥 호출 한 건이 되는 길에서는
+// 확인(checkRateLimit)과 기록(registerFailure) 사이에 await 가 끼어, 한꺼번에 몰려온 요청이 전부 통과해 카카오를 두드렸다.
+// 그래서 부르기 전에 자리를 **동기적으로** 잡는다: 창 안의 실패 수 + 지금 진행 중인 수가 MAX_ATTEMPTS 에 닿으면 받지 않는다.
+// 카카오가 느린 날에도 키 하나당 대기 중인 호출이 다섯으로 묶이고, 느린 것을 실패로 세지 않으므로 15분 잠금도 생기지 않는다.
+// 이것도 인스턴스 안에서만 통하는 최선 노력이다(메모리 Map) — 인스턴스를 넘는 한도는 플랫폼 방화벽 규칙이나 공유 저장소가 있어야 한다.
+const inFlight = new Map<string, number>();
+/** 자리가 없을 때 화면에 알려 줄 '다시 해 볼 때까지'(초). 진행 중인 호출은 길어야 카카오 제한 시간 안에 끝난다. */
+const SLOT_RETRY_SEC = 5;
+
+/**
+ * 자리를 잡는다. 잡았으면 **끝났을 때 한 번 부를 함수**를 돌려준다(성공·실패·예외 모두 — try/finally 로 감쌀 것).
+ * 자리가 없으면 null. 잡는 동안 await 가 없어 동시에 온 요청도 순서대로 센다.
+ */
+export function takeAttemptSlot(key: string): (() => void) | null {
+    const now = Date.now();
+    const entry = attemptStore.get(key);
+    const failures = entry && now - entry.first <= WINDOW_MS ? entry.count : 0;
+    const busy = inFlight.get(key) ?? 0;
+    if (failures + busy >= MAX_ATTEMPTS) return null;
+    inFlight.set(key, busy + 1);
+    let released = false;
+    return () => {
+        if (released) return;
+        released = true;
+        const left = (inFlight.get(key) ?? 1) - 1;
+        if (left > 0) inFlight.set(key, left);
+        else inFlight.delete(key);
+    };
+}
+
+/**
+ * 전화번호 로그인에서 '없는 번호'(isNew) 답을 IP 하나가 15분 동안 받을 수 있는 횟수(2026-10-05 검토).
+ * 로그인의 잠금 키에는 번호가 들어가서(login:<번호>:<ip>) 번호를 바꿔 가며 훑는 것은 막지 못했다 — 번호마다 새 키다.
+ * '없는 번호' 답은 새로 가입하려는 사람도 받는 정상 답이라 PIN 실패(5회)보다 훨씬 넉넉하게 둔다:
+ * 당구장·골프장 와이파이처럼 여러 사람이 한 주소로 나오는 곳에서 가입이 몰려도 걸리지 않게.
+ */
+// 30 이던 것을 200 으로 올렸다(2026-10-06): 통신사 망은 수천 명이 한 주소를 나눠 쓰고(휴대폰 데이터), 매장 행사에서는 한 와이파이로
+// 가입이 몰린다. 한도에 걸리면 그 주소의 **기존 회원 로그인까지** 15분 막히므로, 사람이 닿을 수 없는 높이에 둔다 — 번호를 훑는 쪽은 그래도 걸린다.
+const LOGIN_UNKNOWN_MAX = 200;
+
 // POST /login - Login with phone number
 router.post("/login", asyncHandler(async (req: any, res: any) => {
-    const { phone, storeSlug, password } = req.body;
+    const { phone, storeSlug, password } = req.body ?? {};
+
+    // 전화번호 자리에 소셜·탈퇴 자리표시자(`social:kakao:…` 등)를 보내는 것을 DB 를 보기 **전에** 끊는다(2026-10-05 검토).
+    // 소셜로 가입한 프로필은 PIN 이 없어서, 이 꼴을 받아 주면 PIN 없이 그 계정의 쿠키가 나갔다. 있는 계정인지도 알려 주지 않는다.
+    if (!isLoginPhone(phone)) return sendError(res, 400, "err.auth.phoneInvalid");
 
     const key = attemptKey('login', phone, req.ip);
     const rl = checkRateLimit(key);
     if (rl.limited) {
         return sendError(res, 429, msg("err.auth.loginTooMany", { sec: rl.retryAfterSec }));
+    }
+    // 번호를 바꿔 가며 훑는 것은 위 키(번호가 들어간다)로 못 막는다 — '없는 번호' 답을 IP 하나로 따로 센다.
+    // IP 는 clientIp(x-forwarded-for 첫 값): trust proxy 를 켜지 않아 req.ip 는 앞단 주소일 수 있고, 그러면 모두가 한 키를 나눠 쓴다.
+    const probeKey = attemptKey('login-unknown', 'any', clientIp(req));
+    const probe = checkRateLimit(probeKey);
+    if (probe.limited) {
+        return sendError(res, 429, msg("err.auth.loginTooMany", { sec: probe.retryAfterSec }));
     }
 
     let result: Awaited<ReturnType<typeof hiqService.login>>;
@@ -104,6 +159,8 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
         if (err?.message === "INVALID_PASSWORD") registerFailure(key);
         throw err;
     }
+    // 없는 번호였다 — 가입하려는 사람의 정상 답이지만 훑는 쪽도 이 답으로 구분하므로 센다(넉넉한 한도, 성공해도 지우지 않는다).
+    if (result.isNew) registerFailure(probeKey, LOGIN_UNKNOWN_MAX);
 
     if (!result.isNew && !result.requiresPassword && result.member) {
         clearAttempts(key);
@@ -173,6 +230,200 @@ router.post("/social", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, result);
 }));
 
+// --- 카카오 로그인(웹 전용) — 2026-10-05 오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플" ---
+// 구글·애플(/social)은 화면이 id_token 을 들고 오지만, 카카오는 **인가 코드**를 들고 온다 — 서버가 토큰과 바꾼다(lib/kakaoAuth).
+// 그래서 /social 에 끼워 넣지 않고 길을 따로 뒀다. 카카오 토큰은 저장하지 않는다.
+
+/**
+ * 시도 횟수 제한에 쓸 접속 IP. 이 앱은 trust proxy 를 켜지 않아서, 프록시 뒤(Vercel)에서는 req.ip 가 접속자가 아니라
+ * 앞단 주소로 잡힐 수 있다 — 그러면 모두가 한 키를 나눠 써서, 누군가 잘못된 코드를 다섯 번 보내는 것만으로
+ * 그 인스턴스의 카카오 로그인이 15분 동안 모두에게 잠긴다(카카오는 한국 화면의 첫 번째 단추다).
+ * 그래서 Vercel 이 붙여 주는 x-forwarded-for 의 첫 값을 먼저 본다(오류 수집 routes/modules/errors.ts 와 같은 방식).
+ */
+function clientIp(req: { headers: Record<string, unknown>; ip?: string }): string | undefined {
+    const fwd = String(req.headers["x-forwarded-for"] ?? "").split(",")[0].trim();
+    return (fwd || req.ip || undefined)?.slice(0, 64);
+}
+
+/**
+ * 본문이 JSON 으로 왔는가. 이 서버는 폼 본문(urlencoded)도 읽는다 — 그대로 두면 남의 사이트가 숨긴 폼으로
+ * 자기 카카오 코드를 보내 방문자를 **공격자 계정으로 로그인**시킬 수 있다(로그인 CSRF). 폼은 application/json 을 못 보내고,
+ * 다른 사이트의 fetch 는 사전 요청(preflight)에서 막힌다. 화면은 fetch + JSON 으로만 부른다.
+ */
+function isJsonBody(req: { is?: (type: string) => unknown }): boolean {
+    return typeof req.is === "function" && !!req.is("application/json");
+}
+
+/**
+ * 카카오 교환 실패 → 응답. 화면에는 **종류만** 준다 — 카카오가 준 오류 본문(KOE320 등)은 서버 로그에만 있다.
+ * 네 번째 값(code)은 화면이 문구와 상관없이 갈래를 탈 수 있게 붙이는 꼬리표다.
+ *   503 KAKAO_NOT_CONFIGURED · 400 KAKAO_BAD_REDIRECT · 400 KAKAO_BAD_REQUEST · 401 KAKAO_EXCHANGE_FAILED · 401 KAKAO_UNREACHABLE
+ */
+function sendKakaoFailure(res: any, reason: KakaoFailReason) {
+    switch (reason) {
+        case "not-configured": return sendError(res, 503, "err.auth.kakaoUnavailable", "KAKAO_NOT_CONFIGURED");
+        case "bad-redirect": return sendError(res, 400, "err.auth.kakaoRedirectNotAllowed", "KAKAO_BAD_REDIRECT");
+        case "bad-code": return sendError(res, 400, "err.auth.kakaoParamsRequired", "KAKAO_BAD_REQUEST");
+        case "timeout":
+        case "network":
+        case "upstream": return sendError(res, 401, "err.auth.kakaoUnreachable", "KAKAO_UNREACHABLE");
+        default: return sendError(res, 401, "err.auth.kakaoFailed", "KAKAO_EXCHANGE_FAILED");
+    }
+}
+
+// POST /social/kakao — 카카오 로그인·가입. body: { code, redirectUri }
+// redirectUri 는 화면이 인가 때 쓴 값 그대로(카카오에 다시 보내야 한다) — 허용 목록 밖이면 400.
+// 허용 목록은 운영 원본 하나다. 개발용 localhost 는 개발 서버에서만 받는다(lib/kakaoAuth kakaoRedirectAllowed).
+// 같은 code 를 두 번 보내면 카카오가 KOE320 을 준다 → 401. 두 번 부르지 않는 것은 화면 몫이다.
+router.post("/social/kakao", asyncHandler(async (req: any, res: any) => {
+    const { code, redirectUri } = req.body ?? {};
+    // 키가 없으면 기능이 꺼진 것이다 — 화면은 단추를 숨기지만, 옛 화면이나 직접 호출에는 친절한 503 을 준다
+    if (!kakaoConfigured()) return sendKakaoFailure(res, "not-configured");
+    if (!isJsonBody(req) || typeof code !== "string" || !code) return sendKakaoFailure(res, "bad-code");
+    if (!kakaoRedirectAllowed(redirectUri)) return sendKakaoFailure(res, "bad-redirect");
+
+    // 무차별 시도 방어 — /social 과 같은 레이트리밋(키는 ip 기준). 우리 서버가 카카오를 두드리는 망치가 되지 않게.
+    // 인스턴스 안에서만 통하는 최선 노력이다(메모리 Map) — 위 takeAttemptSlot 의 설명 참고.
+    const key = attemptKey('social', 'kakao', clientIp(req));
+    const rl = checkRateLimit(key);
+    if (rl.limited) {
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
+    }
+    // 실패는 카카오가 답한 뒤에야 세어진다 — 그 사이에 몰려온 요청은 자리 수로 막는다(부르기 전에 잡고, 끝나면 놓는다)
+    const release = takeAttemptSlot(key);
+    if (!release) {
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: SLOT_RETRY_SEC }));
+    }
+
+    let exchanged: Awaited<ReturnType<typeof exchangeKakaoCode>>;
+    try {
+        exchanged = await exchangeKakaoCode(code, redirectUri);
+    } finally {
+        release();
+    }
+    if (!exchanged.ok) {
+        // 카카오가 느리거나 죽은 것은 세지 않는다 — 보낸 값이 거절됐을 때만(코드 만료·재사용 등)
+        if (kakaoRejected(exchanged.reason)) registerFailure(key);
+        return sendKakaoFailure(res, exchanged.reason);
+    }
+
+    // 카카오 닉네임은 본인이 자유롭게 적는 글자다 — 랭킹·크루에 그대로 뜨는 이름이라 가입(POST /register)과 같은 필터를 건다.
+    // 걸리면 로그인을 막지 않고 이름만 버린다(기본 이름 "랭큐회원"으로 시작하고, 프로필에서 바꾼다).
+    const identity = exchanged.identity.name && !screenMemberProfile({ name: exchanged.identity.name }).ok
+        ? { ...exchanged.identity, name: null }
+        : exchanged.identity;
+
+    // 카카오는 한국 서비스다 — 헤더가 없는 곳(로컬·서버리스 밖)에서만 KR 로 둔다(전화 가입과 같은 규칙).
+    const result = await hiqService.socialLogin("kakao", identity, undefined, ipCountry(req) ?? "KR");
+    // 연결해 둔 옛 계정으로 들어온 경우 국가가 비어 있을 수 있다 — 한 번 채운다(이미 있으면 그대로).
+    await fillCountry(result.member.profileId, req);
+    clearAttempts(key);
+    if (await isMemberSuspended(result.member.id)) {
+        res.clearCookie('hiq_user_id', { path: '/' });
+        return sendError(res, 403, SUSPENDED_TEXT, ACCOUNT_SUSPENDED_CODE);
+    }
+
+    res.cookie('hiq_user_id', result.member.id, {
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        signed: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
+        path: '/'
+    });
+
+    return sendSuccess(res, result);
+}));
+
+/**
+ * 카카오 연결·해제의 본인 확인(PIN) 결과 → 응답. 통과했으면 null 을 돌려준다(응답을 보내지 않았다).
+ *   409 KAKAO_NO_PROFILE · 409 KAKAO_PIN_REQUIRED(PIN 없는 계정 — 확인할 방법이 없어 열지 않는다) · 401 KAKAO_PIN_WRONG
+ * 틀린 PIN 은 실패 횟수에 센다 — 쿠키를 쥔 사람이 이 길로 PIN 을 맞혀 보지 못하게(다섯 번이면 15분 잠긴다).
+ */
+function sendKakaoPinFailure(res: any, key: string, checked: "ok" | "no-profile" | "no-pin" | "wrong-pin") {
+    if (checked === "no-profile") return sendError(res, 409, "err.auth.kakaoNoProfile", "KAKAO_NO_PROFILE");
+    if (checked === "no-pin") return sendError(res, 409, "err.auth.kakaoPinRequired", "KAKAO_PIN_REQUIRED");
+    if (checked === "wrong-pin") {
+        registerFailure(key);
+        return sendError(res, 401, "err.auth.kakaoPinWrong", "KAKAO_PIN_WRONG");
+    }
+    return null;
+}
+
+// POST /social/kakao/link — 로그인한 회원이 내 계정에 카카오를 붙인다(설정 '연결된 로그인'). body: { code, redirectUri, pin }
+// 전화번호로 가입한 회원이 카카오로 들어오면 계정이 둘로 갈린다 — 미리 붙여 두면 카카오로 들어와도 같은 계정이다.
+// 쿠키는 건드리지 않는다(누구로 로그인했는지는 그대로).
+// 결과: 200 { linked: true } · 409 KAKAO_TAKEN · 409 KAKAO_NO_PROFILE · 409 KAKAO_OTHER_LINKED · 409 KAKAO_PIN_REQUIRED · 401 KAKAO_PIN_WRONG
+//
+// 쿠키만으로는 붙여 주지 않는다(2026-10-05 검토): 연결은 30일짜리 로그인을 **PIN 과 무관한 영구 로그인 수단**으로 바꾸는 길이다.
+// 그래서 로그인 PIN 을 같이 받고, 카카오를 부르기 **전에** 확인한다 — 틀려도 한 번만 쓸 수 있는 인가 코드가 소모되지 않아
+// 같은 화면에서 PIN 만 다시 넣으면 된다.
+router.post("/social/kakao/link", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { code, redirectUri, pin } = req.body ?? {};
+    if (!kakaoConfigured()) return sendKakaoFailure(res, "not-configured");
+    if (!isJsonBody(req) || typeof code !== "string" || !code) return sendKakaoFailure(res, "bad-code");
+    if (!kakaoRedirectAllowed(redirectUri)) return sendKakaoFailure(res, "bad-redirect");
+
+    // 로그인한 회원이라 키는 회원 기준 — 한 사람이 잘못된 코드·PIN 을 계속 보내는 것만 막는다
+    const key = attemptKey('social-link', 'kakao', req.userId);
+    const rl = checkRateLimit(key);
+    if (rl.limited) {
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
+    }
+
+    // 본인 확인 — 카카오를 부르기 전에
+    const pinFailed = sendKakaoPinFailure(res, key, await hiqService.checkKakaoPin(req.userId!, pin));
+    if (pinFailed) return pinFailed;
+
+    // 로그인 길과 같은 자리 잡기 — 실패가 세어지기 전에 몰려온 요청을 막는다
+    const release = takeAttemptSlot(key);
+    if (!release) {
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: SLOT_RETRY_SEC }));
+    }
+
+    let exchanged: Awaited<ReturnType<typeof exchangeKakaoCode>>;
+    try {
+        exchanged = await exchangeKakaoCode(code, redirectUri);
+    } finally {
+        release();
+    }
+    if (!exchanged.ok) {
+        if (kakaoRejected(exchanged.reason)) registerFailure(key);
+        return sendKakaoFailure(res, exchanged.reason);
+    }
+    clearAttempts(key);
+
+    const linked = await hiqService.linkKakao(req.userId!, exchanged.identity);
+    if (linked === "taken") return sendError(res, 409, "err.auth.kakaoTaken", "KAKAO_TAKEN");
+    if (linked === "no-profile") return sendError(res, 409, "err.auth.kakaoNoProfile", "KAKAO_NO_PROFILE");
+    if (linked === "no-pin") return sendError(res, 409, "err.auth.kakaoPinRequired", "KAKAO_PIN_REQUIRED");
+    if (linked === "other-linked") return sendError(res, 409, "err.auth.kakaoOtherLinked", "KAKAO_OTHER_LINKED");
+    return sendSuccess(res, { linked: true });
+}));
+
+// DELETE /social/kakao/link — 내 계정에서 카카오를 뗀다(설정 '연결된 로그인' → 해제). body: { pin }
+// 연결만 있고 해제가 없으면 잘못 붙은(또는 남이 붙여 둔) 카카오를 주인이 되돌릴 길이 없다(2026-10-05 검토).
+// 연결과 같은 PIN 확인을 거친다. 카카오로 **가입한** 계정은 떼면 들어올 길이 없어져 거절한다.
+// 카카오를 부르지 않으므로 키가 없어도(기능이 꺼져 있어도) 뗄 수 있다.
+// 결과: 200 { linked: false } · 400(pin 없음) · 409 KAKAO_SIGNUP_ACCOUNT · 409 KAKAO_NO_PROFILE · 409 KAKAO_PIN_REQUIRED · 401 KAKAO_PIN_WRONG
+router.delete("/social/kakao/link", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { pin } = req.body ?? {};
+    if (typeof pin !== "string" || !pin) return sendError(res, 400, "err.auth.missingFields");
+
+    const key = attemptKey('social-link', 'kakao', req.userId);
+    const rl = checkRateLimit(key);
+    if (rl.limited) {
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
+    }
+
+    const unlinked = await hiqService.unlinkKakao(req.userId!, pin);
+    if (unlinked === "signup-account") return sendError(res, 409, "err.auth.kakaoUnlinkSignup", "KAKAO_SIGNUP_ACCOUNT");
+    const pinFailed = sendKakaoPinFailure(res, key, unlinked);
+    if (pinFailed) return pinFailed;
+    clearAttempts(key);
+    return sendSuccess(res, { linked: false });
+}));
+
 // POST /register
 router.post("/register", asyncHandler(async (req: any, res: any) => {
     // 가입 화면의 약관 동의(감사 S4) — 화면이 필수 동의를 받은 뒤 본 약관 버전을 함께 보낸다.
@@ -183,6 +434,8 @@ router.post("/register", asyncHandler(async (req: any, res: any) => {
     if (!validation.success) {
         return sendError(res, 400, validation.error.errors[0].message);
     }
+    // 전화번호 자리에 소셜·탈퇴 자리표시자를 받지 않는다 — 로그인과 같은 검사(shared/loginPhone). DB 를 보기 전에 끊는다.
+    if (!isLoginPhone(validation.data.phone)) return sendError(res, 400, "err.auth.phoneInvalid");
     // 가입 이름도 랭킹·크루·커뮤니티에 그대로 뜨는 공개 문구다 — 프로필 수정(PATCH /me)과 같은 필터(검토 policy:R5).
     const screenedName = screenMemberProfile({ name: validation.data.name });
     if (!screenedName.ok) return sendError(res, 400, screenedName.reason);
@@ -264,6 +517,8 @@ router.post("/push-token", requireAuth, asyncHandler(async (req: AuthRequest, re
 router.post("/reset-pin/question", asyncHandler(async (req: any, res: any) => {
     const { phone } = req.body;
     if (!phone) return sendError(res, 400, "err.auth.phoneRequired");
+    // 자리표시자(`social:…`·`del-…`)는 전화번호가 아니다 — 로그인과 같은 검사로 DB 를 보기 전에 끊는다
+    if (!isLoginPhone(phone)) return sendError(res, 400, "err.auth.phoneInvalid");
 
     const key = attemptKey('reset-question', phone, req.ip);
     const rl = checkRateLimit(key);
@@ -288,6 +543,7 @@ router.post("/reset-pin/question", asyncHandler(async (req: any, res: any) => {
 router.post("/reset-pin/verify", asyncHandler(async (req: any, res: any) => {
     const { phone, answer, newPin } = req.body;
     if (!phone || !answer || !newPin) return sendError(res, 400, "err.auth.missingFields");
+    if (!isLoginPhone(phone)) return sendError(res, 400, "err.auth.phoneInvalid");
 
     const key = attemptKey('reset-verify', phone, req.ip);
     const rl = checkRateLimit(key);

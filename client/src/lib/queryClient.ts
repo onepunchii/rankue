@@ -205,6 +205,17 @@ export async function refreshAfterLogin(): Promise<void> {
   } catch { /* 못 받았으면 다음 화면이 다시 묻는다(옛 답은 이미 버렸다) */ }
 }
 
+// 5-1. 되살아난 문서(bfcache)는 답을 전부 낡은 것으로 본다(2026-10-05 카카오 로그인 검토).
+// 카카오 로그인은 문서를 떠났다가 **새 문서**에서 끝난다 — refreshAfterLogin 은 그 새 문서의 캐시만 고친다.
+// 거기서 '뒤로'를 누르면 떠나기 전 문서가 통째로 되살아나는데, 그 안의 '나 = 없음'과 비로그인으로 받은 답들은 5분 동안 그대로다.
+// '나'만이 아니라 전부 표시하는 이유는 refreshAfterLogin 의 ②와 같다(내 관심·내 티타임이 빠진 골프장 상세 등).
+// 처음 뜨는 문서(persisted=false)와 평소의 탭 전환에는 아무 일도 하지 않는다.
+if (typeof window !== "undefined") {
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) void queryClient.invalidateQueries();
+  });
+}
+
 // 6. Persistence (Cache Buster v2.2)
 if (typeof window !== "undefined") {
   const persister = createSyncStoragePersister({

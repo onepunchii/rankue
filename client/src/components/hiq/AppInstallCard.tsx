@@ -3,6 +3,8 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { isNativeApp } from "@/lib/nativeBridge";
 import { detectPlatform, iosStoreUrl, androidStoreUrl } from "@shared/appLinks";
+import { isKakaoOnlyAccount } from "@shared/kakaoLogin";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * 각 페이지 맨 아래에 놓는 앱 설치 카드(2026-09-09 오너: "각 페이지 하단에 우리 og 이미지로 세련되게").
@@ -26,6 +28,10 @@ type Store = "ios" | "android";
 export function AppInstallCard({ className }: { className?: string }) {
     const { t } = useT();
     const [store, setStore] = useState<Store | null>(null);
+    // 들어올 길이 카카오뿐인 회원에게는 권하지 않는다(2026-10-05 카카오 로그인 검토): 스토어 앱에는 카카오 단추가 없어
+    // 앱을 깔아도 자기 계정으로 못 들어가고, 거기서 전화번호·구글을 누르면 새 계정이 생겨 기록이 갈린다.
+    const { member } = useAuth();
+    const kakaoOnly = isKakaoOnlyAccount(member?.connections);
 
     useEffect(() => {
         if (typeof window === "undefined") return;
@@ -36,7 +42,7 @@ export function AppInstallCard({ className }: { className?: string }) {
         if (p === "ios" || p === "android") setStore(p);
     }, []);
 
-    if (!store) return null;
+    if (!store || kakaoOnly) return null;
     const href = store === "ios" ? iosStoreUrl("page_banner") : androidStoreUrl("page_banner");
 
     return (

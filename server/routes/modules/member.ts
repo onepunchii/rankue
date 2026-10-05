@@ -111,6 +111,11 @@ router.get("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =
             phone: !member.phone?.startsWith("social:"),
             google: !!profile?.googleSub,
             apple: !!profile?.appleSub,
+            // 카카오(2026-10-05) — 전화번호 회원이 '카카오 연결'로 붙였거나 카카오로 가입했다
+            kakao: !!profile?.kakaoSub,
+            // 로그인 PIN 이 있는가(값이 아니라 있고 없음만). 카카오 연결·해제는 PIN 으로 본인 확인을 하므로
+            // PIN 없는 계정(매장에서 번호만으로 등록 · 구글·애플 전용)에는 설정 화면이 단추를 보여 주지 않는다.
+            pin: !!profile?.password,
         }
     });
 }));

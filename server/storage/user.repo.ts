@@ -20,6 +20,7 @@ import type {
 } from "../../shared/schema.js";
 import { eq, desc, asc, and, or, ne, sql, gt, gte, inArray, isNull } from "drizzle-orm";
 import { pushTokenVariants } from "../services/pushNative.js";
+import { pickLoginMember } from "../lib/loginMember.js";
 
 // SECURITY: 남에게 보이는 응답(랭킹·상대목록·검색·타인 프로필)은 반드시 이 화이트리스트로만 셀렉트한다.
 // hiqMembers를 통째로 select하면 phone과 정산 계좌(defaultAccount*)까지 API로 새어 나간다.
@@ -58,19 +59,62 @@ export class UserRepository {
     }
 
     // 소셜 로그인 식별자(sub)로 프로필 조회 — 글로벌 유저(비한국) 가입 경로
-    async getProfileBySocialSub(provider: "google" | "apple", sub: string): Promise<Profile | undefined> {
-        const col = provider === "google" ? profiles.googleSub : profiles.appleSub;
+    // 2026-10-05 카카오 추가(오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플"). sub = 카카오 회원번호.
+    async getProfileBySocialSub(provider: "google" | "apple" | "kakao", sub: string): Promise<Profile | undefined> {
+        const col = provider === "google" ? profiles.googleSub : provider === "apple" ? profiles.appleSub : profiles.kakaoSub;
         const [profile] = await db.select().from(profiles).where(eq(col, sub));
         return profile;
     }
 
-    // 프로필에 연결된 멤버 조회(글로벌 스토어 우선) — 소셜 로그인 세션 발급용
+    /**
+     * 내 프로필에 카카오 회원번호를 적는다(설정 '연결된 로그인' → 카카오 연결, 2026-10-05).
+     * **비어 있을 때만** 적는 조건부 UPDATE 한 문장 — 그 사이 다른 요청이 먼저 적었으면 덮지 않고 false 를 돌려준다.
+     * 같은 번호가 다른 프로필에 이미 있으면 DB 의 유니크 제약(23505)이 던진다 — 부르는 쪽(hiqService.linkKakao)이 '이미 연결됨'으로 바꾼다.
+     */
+    async linkProfileKakaoSub(profileId: string, kakaoSub: string): Promise<boolean> {
+        const rows = await db.update(profiles)
+            .set({ kakaoSub, updatedAt: new Date() })
+            .where(and(eq(profiles.id, profileId), isNull(profiles.kakaoSub)))
+            .returning({ id: profiles.id });
+        return rows.length > 0;
+    }
+
+    /**
+     * 내 프로필에서 카카오를 뗀다(설정 '연결된 로그인' → 해제, 2026-10-05 검토: 연결만 있고 해제가 없어 잘못 붙은 카카오를 되돌릴 길이 없었다).
+     * **지금 붙어 있는 그 번호일 때만** 지우는 조건부 UPDATE — 그 사이 다른 값으로 바뀌었으면 건드리지 않고 false.
+     * 떼도 되는 계정인지(다른 로그인 수단이 남는지·PIN 확인)는 부르는 쪽(hiqService.unlinkKakao)이 본다.
+     */
+    async unlinkProfileKakaoSub(profileId: string, kakaoSub: string): Promise<boolean> {
+        const rows = await db.update(profiles)
+            .set({ kakaoSub: null, updatedAt: new Date() })
+            .where(and(eq(profiles.id, profileId), eq(profiles.kakaoSub, kakaoSub)))
+            .returning({ id: profiles.id });
+        return rows.length > 0;
+    }
+
+    // 프로필에 연결된 멤버 조회 — **가장 먼저 만든 행 하나**(매장을 가리지 않는다). 운영자 알림 대상(admin.ts)이 쓰고,
+    // admin.repo getStaffMemberIds 가 같은 기준에 맞춰져 있다 — 정렬을 바꾸지 말 것. 로그인은 아래 getLoginMemberByProfileId 를 쓴다.
     async getMemberByProfileId(profileId: string): Promise<HiqMember | undefined> {
         const [member] = await db.select().from(hiqMembers)
             .where(eq(hiqMembers.profileId, profileId))
             .orderBy(asc(hiqMembers.createdAt))
             .limit(1);
         return member;
+    }
+
+    /**
+     * 소셜 로그인이 들어갈 회원 행(2026-10-05 검토). 한 프로필에 회원 행이 여럿이면 본 사이트(hiq) → 글로벌 → 가장 오래된 것 순.
+     * 전화번호 회원이 hiq 행에서 카카오를 연결해 뒀는데 카카오 로그인이 더 오래된 제휴 매장 행으로 들어가던 것을 막는다
+     * (규칙과 이유는 lib/loginMember). 위 getMemberByProfileId 는 다른 곳이 같은 기준에 기대고 있어 건드리지 않고 따로 뒀다.
+     * 한 사람의 회원 행은 몇 줄뿐이라 다 읽어 고른다.
+     */
+    async getLoginMemberByProfileId(profileId: string): Promise<HiqMember | undefined> {
+        const rows = await db.select({ member: hiqMembers, storeSlug: hiqStores.slug })
+            .from(hiqMembers)
+            .leftJoin(hiqStores, eq(hiqMembers.storeId, hiqStores.id))
+            .where(eq(hiqMembers.profileId, profileId))
+            .orderBy(asc(hiqMembers.createdAt));
+        return pickLoginMember(rows.map((r) => ({ member: r.member, storeSlug: r.storeSlug, createdAt: r.member.createdAt })));
     }
 
     async getProfileByPhone(phone: string): Promise<Profile | undefined> {

@@ -48,8 +48,34 @@ export function detectLocale(): Locale {
 type Ctx = { locale: Locale; t: (key: string) => string; setLocale: (l: Locale) => void };
 const I18nCtx = createContext<Ctx>({ locale: "ko", t: (k) => ko[k] ?? k, setLocale: () => {} });
 
+/** 주소의 ?lang= 이 지원 언어면 그 값, 아니면 null. */
+function localeFromUrl(): Locale | null {
+  try {
+    const v = new URLSearchParams(window.location.search).get("lang");
+    return v && VALID.has(v as Locale) ? (v as Locale) : null;
+  } catch { return null; }
+}
+
+/**
+ * 첫 그림에 쓸 언어 — 읽기만 한다(저장은 아래 effect 가 한다). 순서는 위 주석 그대로: URL ?lang= → 저장된 선택 → 기기 언어.
+ *
+ * 예전에는 "ko" 로 시작하고 붙은 뒤 effect 에서 진짜 언어로 바꿨다. 그래서 다른 언어 회원의 **첫 그림은 늘 한국어 판정**이었고,
+ * "한국어 화면에서만"인 것들이 한 번씩 켜졌다 — 2026-10-05 카카오 로그인 검토: 영어·베트남어 회원이 /settings 를 직접 열면
+ * 카카오 줄이 한 번 그려지고 카카오 SDK 가 실렸다(자식의 effect 는 그 그림의 값으로 돈다 — 실린 스크립트는 되돌릴 수 없다).
+ * 이 앱은 createRoot 만 쓴다(hydrateRoot 없음) — 서버가 그린 것과 맞출 일이 없어 처음부터 진짜 언어로 시작해도 된다.
+ * 사전이 아직 안 왔을 때 t() 가 한국어로 떨어지는 것은 예전과 같다.
+ */
+function resolveInitialLocale(): Locale {
+  if (typeof window === "undefined") return "ko";
+  const fromUrl = localeFromUrl();
+  if (fromUrl) return fromUrl;
+  let saved: string | null = null;
+  try { saved = localStorage.getItem(STORAGE); } catch { /* ignore */ }
+  return saved && VALID.has(saved as Locale) ? (saved as Locale) : detectLocale();
+}
+
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>("ko");
+  const [locale, setLocaleState] = useState<Locale>(resolveInitialLocale);
   const [dicts, setDicts] = useState<Partial<Record<Locale, Dict>>>({ ko });
   const dictsRef = useRef(dicts);
   dictsRef.current = dicts;
@@ -64,18 +90,11 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  // 붙을 때 한 번: 부작용만 한다 — ?lang= 으로 온 언어를 저장하고, 첫 언어의 사전을 싣는다(언어 자체는 위에서 이미 정했다).
   useEffect(() => {
-    let target: Locale;
-    let fromUrl: string | null = null;
-    try { fromUrl = new URLSearchParams(window.location.search).get("lang"); } catch { /* ignore */ }
-    if (fromUrl && VALID.has(fromUrl as Locale)) {
-      target = fromUrl as Locale;
-      try { localStorage.setItem(STORAGE, target); } catch { /* ignore */ }
-    } else {
-      let saved: string | null = null;
-      try { saved = localStorage.getItem(STORAGE); } catch { /* ignore */ }
-      target = saved && VALID.has(saved as Locale) ? (saved as Locale) : detectLocale();
-    }
+    const fromUrl = localeFromUrl();
+    if (fromUrl) { try { localStorage.setItem(STORAGE, fromUrl); } catch { /* ignore */ } }
+    const target = fromUrl ?? resolveInitialLocale();
     setLocaleState(target);
     void ensure(target);
   }, [ensure]);

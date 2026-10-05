@@ -11,6 +11,8 @@ import { useStore } from "@/contexts/StoreContext";
 import { PinResetDialog } from "@/components/hiq/PinResetDialog";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import SocialLogin, { socialLoginAvailable } from "@/components/hiq/SocialLogin";
+import { kakaoLoginAvailable, kakaoLoginOpen } from "@/lib/kakaoLogin";
+import { isNativeApp } from "@/lib/nativeBridge";
 import { Capacitor } from "@capacitor/core";
 import MarketingLanding from "./marketing-landing";
 
@@ -24,10 +26,8 @@ export default function Landing() {
     const [memberName, setMemberName] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [isResetOpen, setIsResetOpen] = useState(false);
-    // 로그인 방식 분기 — 한국어는 전화번호, 그 외 언어는 구글·애플이 기본.
-    // 소셜 불가 상황(키 미배포·앱 웹뷰 브릿지 전)은 전화로 폴백. PIN 확인 단계는 항상 전화 카드.
+    // 로그인 방식 분기 — 사용자가 직접 고르면(phoneMode) 그쪽, 아니면 아래 kakaoFirst·showPhone 이 기본을 정한다.
     const [phoneMode, setPhoneMode] = useState<boolean | null>(null);
-    const showPhone = requiresPassword || (phoneMode ?? (locale === "ko" || !socialLoginAvailable()));
 
     // 마케팅 랜딩을 먼저 보여줄지. 앱 안이거나, 화이트라벨 매장 진입(?store=)이거나,
     // 한 번 시작을 누른 뒤에는 곧장 로그인 폼으로 간다(랜딩이 매번 끼면 방해만 된다).
@@ -59,6 +59,24 @@ export default function Landing() {
         }
         return "hiq";
     };
+
+    // 첫 화면에 무엇을 먼저 보여 줄까(2026-10-05 오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플").
+    //  - 한국어 + 웹 + 카카오 가능(kakaoFirst): 소셜 묶음(카카오·구글·애플)이 먼저, 그 아래 작은 글씨 "전화번호로 로그인".
+    //    전화번호 길은 기존 회원·매장에서 등록한 회원이 쓰므로 없애지 않는다.
+    //  - 한국어인데 카카오가 안 되는 곳(앱 안·키 없음)과 매장 화이트라벨(?store=·매장 주소) 진입: 예전 그대로 전화번호가 먼저.
+    //  - 그 외 언어: 예전 그대로 구글·애플이 먼저, 소셜을 못 쓰면(키 미배포) 전화로.
+    //  PIN 확인 단계는 항상 전화 카드.
+    // 매장 진입에서는 카카오 단추 자체를 두지 않는다(2026-10-05 검토): 카카오에 다녀오면 매장 표시(?store=)가 사라져
+    // 취소·실패 뒤 기본 로그인 화면으로 떨어지고, 거기서 번호를 넣은 매장 회원이 '미가입'으로 판정돼 기본 매장에 또 가입하게 된다.
+    const storeEntry = resolveStoreSlug() !== "hiq";
+    const kakaoFirst = locale === "ko" && kakaoLoginAvailable() && !storeEntry;
+    const showPhone = requiresPassword || (phoneMode ?? (locale === "ko" ? !kakaoFirst : !socialLoginAvailable(locale)));
+    // 전화 카드 아래에 소셜 묶음을 둘 수 있는가 — 매장 진입은 카카오를 세지 않는다(구글 키 없이 카카오만 있는 배포에서
+    // '또는' 줄만 그려지고 아래가 비는 것을 막는다).
+    const socialBelowPhone = socialLoginAvailable(storeEntry ? undefined : locale);
+    // 스토어 앱 안의 한국어 화면: 앱에는 카카오 단추가 없다(웹뷰가 카카오로 못 넘어간다). 웹에서 카카오로 가입한 사람이
+    // 여기서 전화번호나 구글을 누르면 **새 계정**이 만들어져 기록이 갈린다 — 누르기 전에 한 줄로 알린다(2026-10-05 검토).
+    const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp();
 
     // 이미 로그인했는지 확인. 결과가 나오기 전까지는 로그인 폼을 그리지 않는다 —
     // 예전에는 확인을 기다리지 않고 폼부터 렌더해서, 앱을 열 때마다 "휴대폰 번호 입력"
@@ -243,18 +261,26 @@ export default function Landing() {
                     </motion.div>
                 </div>
 
-                {/* Input Area — 한국어(또는 앱): 전화번호 / 그 외 언어: 구글·애플 */}
+                {/* Input Area — 한국어 웹: 카카오·구글·애플 / 한국어 앱·매장 진입: 전화번호 / 그 외 언어: 구글·애플 */}
                 {!showPhone ? (
                     <div className="px-7 py-10 flex flex-col items-center gap-6">
                         <div className="w-full max-w-[320px] flex flex-col">
-                            <SocialLogin />
+                            {/* 한국어 화면은 단추만 — 안내 문구("전 세계 랭킹에 도전")는 다른 언어 방문자에게 쓰던 말이다 */}
+                            <SocialLogin hint={!kakaoFirst} kakao={!storeEntry} />
                         </div>
-                        <button
-                            onClick={() => setPhoneMode(true)}
-                            className="text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4"
-                        >
-                            {t("login.phoneLoginLink")}
-                        </button>
+                        <div className="w-full max-w-[320px] flex flex-col items-center gap-2">
+                            {/* 전화번호로 가입한 기존 회원이 카카오를 먼저 누르면 빈 새 계정이 생기고 기록이 갈린다 —
+                                전화번호 길이 자기 길이라는 것을 알아보게 안내를 붙인다(2026-10-05 검토) */}
+                            {kakaoFirst && (
+                                <p className="text-[12px] font-medium text-black/45 text-center leading-relaxed break-keep">{t("login.phoneExistingHint")}</p>
+                            )}
+                            <button
+                                onClick={() => setPhoneMode(true)}
+                                className="text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4"
+                            >
+                                {t(kakaoFirst ? "login.phoneLogin" : "login.phoneLoginLink")}
+                            </button>
+                        </div>
                     </div>
                 ) : (
                 /* 로그인 수단 3종(전화·구글·애플)을 **하나의 320px 열**에 담는다.
@@ -318,17 +344,28 @@ export default function Landing() {
                             </button>
                         )}
 
-                        {/* 구글·애플 — 같은 열, 같은 폭. PIN 확인 단계는 본인 확인 중이라 제외
-                            (오너 결정 2026-08-12: 한국어 포함 전 로케일 3종 노출). */}
-                        {!requiresPassword && socialLoginAvailable() && (
+                        {/* 구글·애플(한국어 화면은 카카오도) — 같은 열, 같은 폭. PIN 확인 단계는 본인 확인 중이라 제외
+                            (오너 결정 2026-08-12: 한국어 포함 전 로케일 3종 노출).
+                            한국어 웹(kakaoFirst)은 소셜 묶음이 첫 화면이라 여기서 또 늘어놓지 않고 돌아가는 길만 둔다(2026-10-05). */}
+                        {!requiresPassword && (kakaoFirst ? (
+                            <button
+                                onClick={() => setPhoneMode(false)}
+                                className="mt-5 self-center text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4"
+                            >
+                                {t("login.socialBackLink")}
+                            </button>
+                        ) : socialBelowPhone && (
                             <>
                                 <div className="flex items-center gap-3 my-5">
                                     <span className="flex-1 h-[1px] bg-black/[0.08]" />
                                     <span className="text-[11.5px] font-medium text-black/35">{t("login.or")}</span>
                                     <span className="flex-1 h-[1px] bg-black/[0.08]" />
                                 </div>
-                                <SocialLogin hint={false} />
+                                <SocialLogin hint={false} kakao={!storeEntry} />
                             </>
+                        ))}
+                        {!requiresPassword && kakaoWebOnlyHint && (
+                            <p className="mt-5 text-[12px] font-medium text-black/45 text-center leading-relaxed break-keep">{t("login.kakaoWebOnly")}</p>
                         )}
                     </div>
                 </div>

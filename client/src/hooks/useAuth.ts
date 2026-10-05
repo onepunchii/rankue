@@ -9,7 +9,9 @@ export type AuthMember = HiqMember & {
     profileImageUrl?: string | null;
     handle?: string | null;
     countryCode?: string | null;
-    connections?: { phone: boolean; google: boolean; apple: boolean };
+    // kakao·pin(2026-10-05)은 없을 수 있다 — 기기에 저장해 둔 옛 답(7일)에는 이 칸이 없다.
+    // pin = 로그인 PIN 이 있는가(값이 아니라 있고 없음) — 카카오 연결·해제 단추를 보일지 정한다.
+    connections?: { phone: boolean; google: boolean; apple: boolean; kakao?: boolean; pin?: boolean };
 };
 
 // 로그인 상태 단일 진입점. 검색으로 들어온 비로그인 방문자가 개인 화면(홈·기록·라이벌)에

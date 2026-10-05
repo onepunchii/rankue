@@ -59,7 +59,8 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
     // 약관·개인정보처리방침·고객지원·계정삭제도 밝은 화면 한 가지다(뿌리가 bg-white + text-gray-*): 골프 테마는 흰 바탕만 어둡게 바꾸고
     // 회색 글자는 그대로 둬서 검정 바탕에 검정 글자가 된다. 2026-10-05 홈을 비로그인에 열면서 골프를 보던 방문자가 가입 화면의
     // '보기'(/privacy)에서 이 화면을 만나게 됐다 — 골프 모드 회원이 설정·동의 시트에서 열 때도 같아서 조건 없이 당구(기본)색으로 둔다.
-    const consolePath = /^\/(admin|partner|register|terms|privacy|support|account-delete)(\/|$|\?)/.test(location) || location === "/" || location === "/hiq";
+    // 카카오 로그인에서 돌아오는 화면(/auth/kakao, 2026-10-05)도 로그인 화면과 같은 밝은 화면 한 가지다.
+    const consolePath = /^\/(admin|partner|register|terms|privacy|support|account-delete|auth)(\/|$|\?)/.test(location) || location === "/" || location === "/hiq";
     const currentSport: SportType = consolePath ? "BILLIARDS" : routeSport ?? (golfVisible ? saved : "BILLIARDS");
 
     // 주 종목(2026-10-01) — 앱을 열 때(세션마다 한 번) 회원이 고른 종목으로 시작한다. 폰을 바꾸거나 다시 깔아도 골프 회원은 골프로.

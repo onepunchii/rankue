@@ -16,6 +16,7 @@ import {
     canOpenNotificationSettings, forgetPushToken, isNativeApp, openNotificationSettings, pushPermission, requestPushPermission,
     storedPushToken, type PushPermission,
 } from "@/lib/nativeBridge";
+import { kakaoLoginAvailable, kakaoLoginOpen, useKakaoStart } from "@/lib/kakaoLogin";
 
 // 설정 — 전체메뉴 톱니바퀴 진입. 1순위: 계정 연결 상태 + 언어. (형 결정: 2026-07)
 export default function HiqSettings() {
@@ -91,8 +92,60 @@ export default function HiqSettings() {
     };
 
     const conn = member?.connections ?? {};
-    const connections: { key: string; label: string; linked: boolean }[] = [
+    // 카카오 연결(2026-10-05 오너: "카카오도 오픈") — 전화번호로 가입한 회원이 카카오로 들어오면 계정이 둘로 갈린다.
+    // 그래서 로그인한 채로 여기서 내 계정에 카카오를 붙인다: 로그인과 같은 길로 카카오에 다녀오고(/auth/kakao), 서버가 내 프로필에 적는다.
+    // 단추는 한국어 화면 + 웹(kakaoLoginAvailable — 앱 안에서는 카카오로 못 넘어간다) + 프로필이 있는 회원에게만.
+    // 매장에서 전화번호만으로 등록된 회원(profileId 없음)은 붙일 곳이 없어 서버가 409 로 거절한다 — 누를 수 없게 처음부터 숨긴다.
+    // **로그인 PIN 이 있는 계정만**(conn.pin, 2026-10-05 검토): 연결은 쿠키만으로 해 주지 않고 PIN 으로 본인을 확인한다(돌아온 화면이 묻는다).
+    // PIN 없는 계정(번호만으로 등록 · 구글·애플 전용)은 확인할 방법이 없어 서버가 거절하므로 단추도 보여 주지 않는다.
+    // 기기에 남은 옛 '나' 답에는 pin 칸이 없다 — `=== true` 로 보고, 새 답이 오면 단추가 나타난다.
+    const canLinkKakao = locale === "ko" && kakaoLoginAvailable() && !!member?.profileId && conn.pin === true && !conn.kakao;
+    const { busy: kakaoLinking, start: startKakao } = useKakaoStart(canLinkKakao, () => {
+        toast({ title: t("login.kakaoStartFailed"), variant: "destructive" });
+    }, () => {
+        // 카카오에 보냈던 이 화면이 되살아났다 — 새 탭·새 문서에서 연결이 끝났을 수 있으니 '나'를 다시 받아 '연결됨'으로 바뀌게 한다
+        void queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
+    });
+
+    // 카카오 해제(2026-10-05 검토) — 연결만 있고 되돌릴 길이 없으면 잘못 붙은 카카오(가족 것·남이 붙여 둔 것)를 주인이 못 뗀다.
+    // 연결과 같은 PIN 확인을 거친다. 전화번호로 가입한 계정에서만: 카카오로 가입한 계정은 떼면 들어올 길이 없어 서버가 거절한다.
+    // 카카오에 다녀오지 않으므로 앱 안에서도 된다.
+    const canUnlinkKakao = !!conn.kakao && conn.pin === true && !!conn.phone;
+    const [unlinkOpen, setUnlinkOpen] = useState(false);
+    const [unlinkPin, setUnlinkPin] = useState("");
+    const [unlinking, setUnlinking] = useState(false);
+    const unlinkKakao = async () => {
+        if (unlinking || unlinkPin.length < 4) return;
+        setUnlinking(true);
+        try {
+            await apiRequest("/api/hiq/social/kakao/link", { method: "DELETE", body: { pin: unlinkPin } });
+            toast({ title: t("kakao.unlinked") });
+            setUnlinkOpen(false);
+            await queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
+        } catch (e: any) {
+            // 서버가 만든 문구(PIN 이 틀림·시도가 많음)만 그대로 보여 준다 — 연결이 끊겼을 때의 원문은 우리 문구로 바꾼다
+            const fromServer = e?.data?.success === false && typeof e.data.message === "string" ? e.data.message : "";
+            toast({ title: fromServer || t("kakao.unlinkFailed"), variant: "destructive" });
+        } finally {
+            setUnlinkPin("");
+            setUnlinking(false);
+        }
+    };
+
+    // 앱 안의 한국어 화면: 카카오 줄이 '미연결'로만 보이고 왜 못 누르는지 설명이 없었다(2026-10-05 검토).
+    // "웹에서 연결"만 적으면 웹에 가서 첫 단추인 '카카오로 시작하기'를 누르게 되고 그러면 빈 새 계정이 생긴다 —
+    // 그래서 "전화번호로 로그인한 뒤"를 꼭 넣는다. 웹에서도 연결할 수 없는 회원(프로필·PIN 없음)에게는 거짓말이 되므로 보여 주지 않는다.
+    const kakaoLinkOnWebHint = kakaoLoginOpen() && isNativeApp() && locale === "ko" && !!member?.profileId && conn.pin === true && !!conn.phone && !conn.kakao;
+
+    const connections: { key: string; label: string; linked: boolean; onLink?: () => void; onUnlink?: () => void }[] = [
         { key: "phone", label: t("settings.connPhone"), linked: !!conn.phone },
+        // 카카오 줄은 한국어 화면이거나 이미 연결한 회원에게만 보인다 — 다른 언어 화면은 예전 그대로다
+        // 카카오가 닫혀 있는 동안(새 앱 빌드 승인 전, 2026-10-06)에는 줄 자체를 그리지 않는다 — 이미 연결된 회원만 예외
+        ...((locale === "ko" && kakaoLoginOpen()) || conn.kakao ? [{
+            key: "kakao", label: t("settings.connKakao"), linked: !!conn.kakao,
+            onLink: canLinkKakao ? () => startKakao({ mode: "link", redirect: "/settings" }) : undefined,
+            onUnlink: canUnlinkKakao ? () => { setUnlinkPin(""); setUnlinkOpen((open) => !open); } : undefined,
+        }] : []),
         { key: "google", label: "Google", linked: !!conn.google },
         { key: "apple", label: "Apple", linked: !!conn.apple },
     ];
@@ -274,16 +327,74 @@ export default function HiqSettings() {
                     <p className="text-[12px] text-black/45 mb-4">{t("settings.connectionsDesc")}</p>
                     <div className="space-y-2">
                         {connections.map((c) => (
-                            <div key={c.key} className="flex items-center justify-between h-12 px-4 bg-black/[0.03] rounded-tile">
-                                <span className="text-[14px] font-medium">{c.label}</span>
-                                {c.linked ? (
-                                    <span className="text-[12px] font-bold text-brand flex items-center gap-1"><LucideCheck className="w-3.5 h-3.5" /> {t("settings.linked")}</span>
-                                ) : (
-                                    <span className="text-[12px] font-medium text-black/30">{t("settings.notLinked")}</span>
+                            <div key={c.key}>
+                                <div className="flex items-center justify-between h-12 px-4 bg-black/[0.03] rounded-tile">
+                                    <span className="text-[14px] font-medium">{c.label}</span>
+                                    {c.linked ? (
+                                        <span className="flex items-center gap-3">
+                                            <span className="text-[12px] font-bold text-brand flex items-center gap-1"><LucideCheck className="w-3.5 h-3.5" /> {t("settings.linked")}</span>
+                                            {c.onUnlink && (
+                                                <button
+                                                    type="button"
+                                                    onClick={c.onUnlink}
+                                                    aria-expanded={unlinkOpen}
+                                                    aria-label={`${c.label} ${t("settings.disconnect")}`}
+                                                    className="text-[12px] font-medium text-black/45 underline underline-offset-4 active:opacity-70"
+                                                >
+                                                    {t("settings.disconnect")}
+                                                </button>
+                                            )}
+                                        </span>
+                                    ) : c.onLink ? (
+                                        <button
+                                            type="button"
+                                            onClick={c.onLink}
+                                            disabled={kakaoLinking}
+                                            aria-label={`${c.label} ${t("settings.connect")}`}
+                                            className="h-8 px-3.5 rounded-full bg-brand/[0.1] text-[12.5px] font-bold text-brand disabled:opacity-50 active:scale-[0.97] transition-transform"
+                                        >
+                                            {t("settings.connect")}
+                                        </button>
+                                    ) : (
+                                        <span className="text-[12px] font-medium text-black/30">{t("settings.notLinked")}</span>
+                                    )}
+                                </div>
+                                {/* 해제 — 로그인 PIN 으로 본인 확인을 한 번 더 받는다(브라우저 기본 창을 쓰지 않고 줄 아래에서 바로) */}
+                                {c.onUnlink && unlinkOpen && (
+                                    <form
+                                        onSubmit={(e) => { e.preventDefault(); void unlinkKakao(); }}
+                                        className="mt-2 px-1"
+                                    >
+                                        <p className="text-[12px] text-black/55 mb-2 break-keep">{t("kakao.unlinkPinDesc")}</p>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="password"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                autoComplete="current-password"
+                                                autoFocus
+                                                aria-label={t("login.pinPlaceholder")}
+                                                placeholder={t("login.pinPlaceholder")}
+                                                value={unlinkPin}
+                                                onChange={(e) => setUnlinkPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 8))}
+                                                className="flex-1 min-w-0 h-12 px-4 bg-black/[0.04] rounded-tile outline-none text-[15px] font-semibold tabular-nums"
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={unlinking || unlinkPin.length < 4}
+                                                className="h-12 px-4 shrink-0 rounded-tile bg-black/[0.08] text-[13.5px] font-bold text-ink-1 disabled:opacity-40 active:scale-[0.98] transition-transform"
+                                            >
+                                                {unlinking ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : t("settings.disconnect")}
+                                            </button>
+                                        </div>
+                                    </form>
                                 )}
                             </div>
                         ))}
                     </div>
+                    {kakaoLinkOnWebHint && (
+                        <p className="text-[12px] text-black/45 mt-3 leading-relaxed break-keep">{t("settings.kakaoLinkOnWeb")}</p>
+                    )}
                 </section>
 
                 {/* 법적 고지 · 계정 */}

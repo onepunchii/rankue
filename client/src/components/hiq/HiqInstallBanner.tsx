@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useT } from "@/lib/i18n";
 import { isNativeApp } from "@/lib/nativeBridge";
+import { isKakaoOnlyAccount } from "@shared/kakaoLogin";
+import { useAuth } from "@/hooks/useAuth";
 
 // ── 스토어 링크 ────────────────────────────────────────────────
 // 네이티브 앱이 출시된 플랫폼은 PWA 대신 스토어로 보낸다. 특히 iOS 는 PWA 설치가
@@ -25,6 +27,8 @@ export function HiqInstallBanner() {
     const [isIOS, setIsIOS] = useState(false);
     const [isAndroid, setIsAndroid] = useState(false);
     const [showIOSGuide, setShowIOSGuide] = useState(false);
+    const { member } = useAuth();
+    const kakaoOnly = isKakaoOnlyAccount(member?.connections);
 
     useEffect(() => {
         // Only run on client
@@ -104,7 +108,9 @@ export function HiqInstallBanner() {
         setDeferredPrompt(null);
     };
 
-    if (!isVisible) return null;
+    // 들어올 길이 카카오뿐인 회원에게는 띄우지 않는다(2026-10-05 카카오 로그인 검토): 스토어 앱에는 카카오 단추가 없어
+    // 앱을 깔아도 자기 계정으로 못 들어가고, 거기서 전화번호·구글을 누르면 새 계정이 생겨 기록이 갈린다.
+    if (!isVisible || kakaoOnly) return null;
 
     return (
         <>
