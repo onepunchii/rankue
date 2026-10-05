@@ -7,7 +7,8 @@ vi.mock("./notificationService.js", () => ({ notificationService: {} }));
 
 import {
     isAlertable, matchesWatch, planWatchAlerts, alertText, dayText, seatsLeft, isKstWeekend,
-    type WatchListing, type Watcher, type SentHistory,
+    planAreaAlerts, areaAlertText, areaKey,
+    type WatchListing, type Watcher, type SentHistory, type AreaListing, type AreaSub,
 } from "./golfCourseWatch";
 
 // 2026-09-24(목) 10:00 KST = 01:00Z
@@ -170,5 +171,99 @@ describe("alertText", () => {
         const late = Date.parse("2026-09-24T14:30:00Z");
         expect(dayText(kst("2026-09-25T06:00:00"), late)).toBe("내일");
         expect(dayText(kst("2026-09-24T23:50:00"), late)).toBe("오늘");
+    });
+});
+
+// ── 지역 알림(2026-10-05) ─────────────────────────────────────────
+describe("planAreaAlerts — 지역 알림", () => {
+    const at = (over: Partial<AreaListing> & { listing?: WatchListing } = {}): AreaListing => ({
+        slug: "에이치원클럽", courseName: "에이치원클럽", region: "경기", city: "이천시", listing: join(), ...over,
+    });
+    const sub = (over: Partial<AreaSub> = {}): AreaSub => ({ memberId: "m1", region: "경기", cities: [], filters: null, ...over });
+    const none = new Map<string, SentHistory>();
+
+    it("그 지역을 켠 사람에게 한 통 — 여러 글은 묶고 이른 티가 먼저", () => {
+        const plan = planAreaAlerts({
+            listings: [
+                at({ listing: join({ id: "late", datetime: kst("2026-09-28T07:00:00") }) }),
+                at({ slug: "남촌", courseName: "남촌CC", city: "광주시", listing: join({ id: "early", courseId: "80", datetime: kst("2026-09-26T07:00:00") }) }),
+            ],
+            subs: [sub()], history: none, nowMs: NOW,
+        });
+        expect(plan).toHaveLength(1);
+        expect(plan[0].listings.map((l) => l.listing.id)).toEqual(["early", "late"]);
+        expect(plan[0].push).toBe(true);
+    });
+
+    it("다른 지역 글은 가지 않는다", () => {
+        expect(planAreaAlerts({ listings: [at({ region: "강원", city: "춘천시" })], subs: [sub()], history: none, nowMs: NOW })).toEqual([]);
+    });
+
+    it("시군을 골랐으면 그 시군만 — 전체 이름·짧은 이름 둘 다 맞는다", () => {
+        const ls = [at({ city: "이천시" }), at({ slug: "남촌", courseName: "남촌CC", city: "광주시", listing: join({ id: "g", courseId: "80" }) })];
+        const full = planAreaAlerts({ listings: ls, subs: [sub({ cities: ["광주시"] })], history: none, nowMs: NOW });
+        expect(full[0].listings.map((l) => l.slug)).toEqual(["남촌"]);
+        const short = planAreaAlerts({ listings: ls, subs: [sub({ cities: ["이천"] })], history: none, nowMs: NOW });
+        expect(short[0].listings.map((l) => l.slug)).toEqual(["에이치원클럽"]);
+    });
+
+    it("조건(종류·요일)은 관심 골프장과 같은 규칙", () => {
+        const ls = [at({ listing: booking({ id: "b" }) }), at({ listing: join({ id: "j" }) })];
+        const onlyJoin = planAreaAlerts({ listings: ls, subs: [sub({ filters: { kinds: ["join"] } })], history: none, nowMs: NOW });
+        expect(onlyJoin[0].listings.map((l) => l.listing.id)).toEqual(["j"]);
+        // 9/27 은 일요일 — 주중만 켠 사람에겐 가지 않는다
+        expect(planAreaAlerts({ listings: ls, subs: [sub({ filters: { days: ["weekday"] } })], history: none, nowMs: NOW })).toEqual([]);
+    });
+
+    it("같은 글로 관심 골프장 알림을 받는 사람에겐 또 보내지 않는다(covered)", () => {
+        const ls = [at(), at({ slug: "남촌", courseName: "남촌CC", city: "광주시", listing: join({ id: "g", courseId: "80" }) })];
+        const plan = planAreaAlerts({ listings: ls, subs: [sub()], history: none, nowMs: NOW, covered: new Set(["m1|에이치원클럽"]) });
+        expect(plan[0].listings.map((l) => l.slug)).toEqual(["남촌"]);
+        expect(planAreaAlerts({ listings: [at()], subs: [sub()], history: none, nowMs: NOW, covered: new Set(["m1|에이치원클럽"]) })).toEqual([]);
+    });
+
+    it("20분 안에 같은 지역으로 울렸으면 알림함에만(push=false) · 긴급 방송을 받은 사람도 조용히", () => {
+        const recent = new Map<string, SentHistory>([["m1", { today: 1, recentSlugs: new Set([areaKey("경기")]) }]]);
+        expect(planAreaAlerts({ listings: [at()], subs: [sub()], history: recent, nowMs: NOW })[0].push).toBe(false);
+        expect(planAreaAlerts({ listings: [at()], subs: [sub()], history: none, nowMs: NOW, silent: new Set(["m1"]) })[0].push).toBe(false);
+    });
+
+    it("하루 상한은 관심 알림과 합쳐 센다 — 방금 울린 관심 알림(rung)도 더한다", () => {
+        const almost = new Map<string, SentHistory>([["m1", { today: 19, recentSlugs: new Set() }]]);
+        expect(planAreaAlerts({ listings: [at()], subs: [sub()], history: almost, nowMs: NOW })[0].push).toBe(true);
+        expect(planAreaAlerts({ listings: [at()], subs: [sub()], history: almost, nowMs: NOW, rung: new Map([["m1", 1]]) })[0].push).toBe(false);
+    });
+
+    it("비공개·지난 글은 지역 알림도 가지 않는다", () => {
+        expect(planAreaAlerts({ listings: [at({ listing: join({ isBlind: true }) })], subs: [sub()], history: none, nowMs: NOW })).toEqual([]);
+        expect(planAreaAlerts({ listings: [at({ listing: join({ datetime: kst("2026-09-24T09:00:00") }) })], subs: [sub()], history: none, nowMs: NOW })).toEqual([]);
+    });
+});
+
+describe("areaAlertText — 지역 알림 문구", () => {
+    const one = (l: WatchListing, name = "에이치원클럽"): AreaListing => ({ slug: name, courseName: name, region: "경기", city: "이천시", listing: l });
+
+    it("한 건 — 지역 이름(수도권 꼬리 없이) + 골프장 · 날짜 · 자리 · 비용, 그 글로 간다", () => {
+        const t = areaAlertText({ region: "경기", listings: [one(join({ id: "j9", costMode: "SPLIT" }))] }, NOW);
+        expect(t.title).toBe("⛳ 경기 조인이 올라왔어요");
+        expect(t.body).toBe("에이치원클럽 · 9/27(일) 1부 06:34 · 조인 2자리 · 1/N");
+        expect(t.url).toBe("/golf/booking-list/j9?date=2026-09-27&view=JOIN");
+    });
+
+    it("부킹 한 건", () => {
+        const t = areaAlertText({ region: "강원", listings: [one(booking({ id: "b9" }))] }, NOW);
+        expect(t.title).toBe("⛳ 강원 부킹 티타임이 나왔어요");
+        expect(t.url).toBe("/golf/booking-list/b9?date=2026-09-27&view=BOOKING");
+    });
+
+    it("여러 건 — 둘까지 적고 외 N건, 조인이 섞여 있으면 그 지역 조인 목록으로", () => {
+        const t = areaAlertText({ region: "경기", listings: [
+            one(join({ id: "1", datetime: kst("2026-09-26T07:00:00") }), "남촌CC"),
+            one(booking({ id: "2", datetime: kst("2026-09-27T06:34:00") })),
+            one(booking({ id: "3", datetime: kst("2026-09-28T07:00:00") })),
+        ] }, NOW);
+        expect(t.title).toBe("⛳ 경기 티타임 3건이 올라왔어요");
+        expect(t.body).toBe("남촌CC 9/26(토) 07:00, 에이치원클럽 9/27(일) 06:34 외 1건");
+        expect(t.url).toBe(`/golf/join/${encodeURIComponent("경기")}`);
     });
 });

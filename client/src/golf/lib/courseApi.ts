@@ -144,3 +144,31 @@ export function useCourseWatch(slug: string) {
     });
     return { watch, unwatch };
 }
+
+// ── 지역 알림(2026-10-05) ─────────────────────────────────────────
+/** 한 회원·한 지역에 한 줄. cities 가 비면 그 지역 전체. 조건은 관심 골프장과 같은 모양. */
+export interface AreaAlert { region: string; cities: string[]; filters: WatchFilters }
+
+export function useMyAreaAlerts(enabled: boolean) {
+    return useQuery<AreaAlert[]>({
+        queryKey: [COURSES_KEY, "alerts"], queryFn: () => apiRequest(`${COURSES_KEY}/alerts/mine`), enabled, staleTime: 20_000,
+        // 배열이 아닌 응답(오프라인 껍데기의 HTML 등 — apiRequest 는 JSON 이 아니면 Response 를 그대로 돌려준다)은 빈 목록으로.
+        // 안 그러면 .some()/.find() 에서 화면이 죽는다(흰 화면 원인 '비배열').
+        select: (d) => (Array.isArray(d) ? d.filter((a) => a && typeof a.region === "string").map((a) => ({ region: a.region, cities: Array.isArray(a.cities) ? a.cities : [], filters: a.filters ?? {} })) : []),
+    });
+}
+
+/** 지역 알림 켜기(조건 저장)·끄기 */
+export function useAreaAlert() {
+    const qc = useQueryClient();
+    const done = () => qc.invalidateQueries({ queryKey: [COURSES_KEY, "alerts"] });
+    const save = useMutation({
+        mutationFn: (a: AreaAlert) => apiRequest(`${COURSES_KEY}/alerts/${encodeURIComponent(a.region)}`, { method: "PUT", body: { cities: a.cities, filters: a.filters } }),
+        onSuccess: done,
+    });
+    const remove = useMutation({
+        mutationFn: (region: string) => apiRequest(`${COURSES_KEY}/alerts/${encodeURIComponent(region)}`, { method: "DELETE" }),
+        onSuccess: done,
+    });
+    return { save, remove };
+}

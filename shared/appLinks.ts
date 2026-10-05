@@ -17,6 +17,7 @@ export type AppLinkSource =
     | "page_banner"      // 각 페이지 하단에 붙는 카드형 배너(2026-09-09 오너)
     | "desktop_side_panel"
     | "web_landing"
+    | "golf_alert"       // 골프 알림을 브라우저에서 켠 직후 — 푸시는 앱에서만 울린다(2026-10-05)
     | "share";          // 유저가 친구에게 직접 보낸 링크
 
 export const iosStoreUrl = (source: AppLinkSource) =>

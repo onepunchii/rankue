@@ -25,7 +25,7 @@ import { db } from "../db.js";
 import { storage } from "../storage/index.js";
 import { notificationService } from "./notificationService.js";
 import { isUrgentJoin, kstHour, listingCapacity } from "../../shared/golfJoin.js";
-import { coursePath, listingIntents, teePart, wonShort, type GolfIntent } from "../../shared/golfCourse.js";
+import { REGION_LABEL, cityShort, coursePath, listPath, listingIntents, teePart, wonShort, type GolfIntent } from "../../shared/golfCourse.js";
 
 export const WATCH_COOLDOWN_MIN = 20;
 export const WATCH_DAILY_CAP = 20;
@@ -215,21 +215,47 @@ export function alertText(a: Pick<WatchAlert, "slug" | "name" | "listings">, now
 const rowsOf = (r: any) => (r.rows ?? r) as any[];
 const pgArray = (xs: readonly (string | number)[]) => `{${xs.map((x) => `"${String(x).replace(/["\\]/g, "")}"`).join(",")}}`;
 
+/** 보내기는 시작만 하고(result 는 계획에서 이미 정해진다) 기다림(done)은 호출하는 쪽이 모아서 한다 — 두 알림을 차례로 기다리면 응답이 12초까지 는다. */
+interface Started<T> { result: T; done: Promise<unknown> }
+const waitFor = (sends: Promise<unknown>[]): Promise<unknown> =>
+    Promise.race([Promise.allSettled(sends), new Promise((r) => setTimeout(r, WATCH_WAIT_MS))]);
+/** 글쓴이와 차단 관계(어느 쪽이 걸었든)인 사람에게는 그 글 알림을 보내지 않는다. `col` 은 받는 사람 id 열. */
+const notBlocked = (col: ReturnType<typeof sql.raw>, ownerId: string) => sql`not exists (
+            select 1 from hiq_blocks b
+            where (b.blocker_id = ${col} and b.blocked_id = ${ownerId}::uuid) or (b.blocker_id = ${ownerId}::uuid and b.blocked_id = ${col}))`;
+
 /**
  * 새 글·전환된 글을 관심 등록한 사람에게 알린다. 라우트는 응답 **전에** await 하고, 실패는 삼킨다(글 올리기가 실패하면 안 된다).
  * 반환: 보낸 수(푸시 포함) · 밤이라 알림함에만 남긴 수.
  */
-export async function notifyCourseWatchers(ownerId: string, rows: WatchListing[], opts: { silent?: ReadonlySet<string> } = {}): Promise<{ pushed: number; inboxOnly: number }> {
+export interface CourseWatchResult {
+    pushed: number; inboxOnly: number;
+    /** 이번에 관심 골프장 알림을 받은 `${memberId}|${slug}` — 지역 알림이 같은 글로 또 보내지 않게 */
+    covered: Set<string>;
+    /** 이번에 울린(푸시) 수, 회원별 — 지역 알림의 하루 상한에 더한다 */
+    rung: Map<string, number>;
+}
+const noWatch = (): CourseWatchResult => ({ pushed: 0, inboxOnly: 0, covered: new Set(), rung: new Map() });
+
+export async function notifyCourseWatchers(ownerId: string, rows: WatchListing[], opts: { silent?: ReadonlySet<string> } = {}): Promise<CourseWatchResult> {
+    const s = await startCourseWatch(ownerId, rows, opts);
+    await s.done;
+    return s.result;
+}
+
+async function startCourseWatch(ownerId: string, rows: WatchListing[], opts: { silent?: ReadonlySet<string> } = {}): Promise<Started<CourseWatchResult>> {
+    const none = (): Started<CourseWatchResult> => ({ result: noWatch(), done: Promise.resolve() });
     const nowMs = Date.now();
     const usable = rows.filter((r) => isAlertable(r, nowMs));
-    if (!usable.length) return { pushed: 0, inboxOnly: 0 };
+    if (!usable.length) return none();
     const ids = [...new Set(usable.map((r) => Number(r.courseId)))];
 
     const watchRows = rowsOf(await db.execute(sql`
         select w.member_id, w.slug, w.filters, p.name, p.course_ids
         from golf_course_watches w join golf_course_pages p on p.slug = w.slug
-        where p.course_ids && ${pgArray(ids)}::int[] and w.member_id <> ${ownerId}::uuid`));
-    if (!watchRows.length) return { pushed: 0, inboxOnly: 0 };
+        where p.course_ids && ${pgArray(ids)}::int[] and w.member_id <> ${ownerId}::uuid
+          and ${notBlocked(sql.raw("w.member_id"), ownerId)}`));
+    if (!watchRows.length) return none();
 
     // 글 → 골프장(slug). 한 course_id 는 한 골프장에만 있다(적재 규칙).
     const slugOfCourse = new Map<number, string>();
@@ -255,16 +281,19 @@ export async function notifyCourseWatchers(ownerId: string, rows: WatchListing[]
     }
 
     const plan = planWatchAlerts({ listings, watchers, history, nowMs, silent: opts.silent });
-    if (!plan.length) return { pushed: 0, inboxOnly: 0 };
+    if (!plan.length) return none();
 
     const hour = kstHour(nowMs);
     const quiet = hour < WATCH_PUSH_FROM_HOUR || hour >= WATCH_PUSH_UNTIL_HOUR;
     let pushed = 0, inboxOnly = 0;
+    const covered = new Set<string>();
+    const rung = new Map<string, number>();
     const sends = plan.map((a) => {
         const t = alertText(a, nowMs);
         // 밤이거나 소리를 아낄 알림이면 푸시 없이 알림함에만. 아침에 열면 거기 있다.
         const ring = a.push && !quiet;
-        if (ring) pushed++; else inboxOnly++;
+        if (ring) { pushed++; rung.set(a.memberId, (rung.get(a.memberId) ?? 0) + 1); } else inboxOnly++;
+        covered.add(`${a.memberId}|${a.slug}`);
         const params = { url: t.url, watchSlug: a.slug, teeAt: t.teeAt, n: a.listings.length, pushed: ring };
         const base = { memberId: a.memberId, title: t.title, body: t.body, category: "GOLF", type: "GOLF_URGENT", params };
         return (ring
@@ -272,6 +301,178 @@ export async function notifyCourseWatchers(ownerId: string, rows: WatchListing[]
             : storage.createNotification({ ...base, isRead: false })
         ).catch((e: unknown) => console.error("[GolfCourseWatch]", e));
     });
-    await Promise.race([Promise.allSettled(sends), new Promise((r) => setTimeout(r, WATCH_WAIT_MS))]);
-    return { pushed, inboxOnly };
+    return { result: { pushed, inboxOnly, covered, rung }, done: waitFor(sends) };
+}
+
+// ── 지역 알림(2026-10-05) ─────────────────────────────────────────
+/**
+ * 오너: "2단계까지 진행" — 검색으로 들어온 사람이 빈 조인 목록에서 "이 지역에 올라오면 알려 주세요"를 켠다(golf_area_alerts).
+ * 관심 골프장과 **같은 형식·같은 제한**을 쓴다: type GOLF_URGENT, params.watchSlug = "@지역"(관심 알림으로 세어지고 golf_watch 설정을 탄다),
+ * 같은 지역 20분에 한 통, 관심 알림과 **합쳐서** 하루 20통, 밤엔 알림함에만, 긴급 방송을 받은 사람은 조용히.
+ * 같은 글로 관심 골프장 알림을 이미 받는 사람에게는 지역 알림을 또 보내지 않는다(covered).
+ */
+export const areaKey = (region: string) => `@${region}`;
+export interface AreaSub { memberId: string; region: string; cities: string[]; filters: WatchFilters | null }
+export interface AreaListing { slug: string; courseName: string; region: string; city: string | null; listing: WatchListing }
+export interface AreaAlert { memberId: string; region: string; listings: AreaListing[]; push: boolean }
+
+const inCities = (city: string | null, cities: readonly string[]) =>
+    !cities.length || (!!city && (cities.includes(city) || cities.includes(cityShort(city))));
+
+/** 누구에게 어느 지역 알림을 보낼지(순수 함수). 한 사람·한 지역당 한 통(여러 글은 묶는다). */
+export function planAreaAlerts(input: {
+    listings: AreaListing[];
+    subs: AreaSub[];
+    history: ReadonlyMap<string, SentHistory>;
+    nowMs: number;
+    dailyCap?: number;
+    silent?: ReadonlySet<string>;
+    /** 이번 묶음에서 관심 골프장 알림을 받는 `${memberId}|${slug}` */
+    covered?: ReadonlySet<string>;
+    /** 이번 묶음에서 방금 울린 관심 알림 수(회원별) — 하루 상한에 더한다 */
+    rung?: ReadonlyMap<string, number>;
+}): AreaAlert[] {
+    const cap = input.dailyCap ?? WATCH_DAILY_CAP;
+    const usable = input.listings.filter((l) => isAlertable(l.listing, input.nowMs));
+    if (!usable.length) return [];
+    const perMember = new Map<string, AreaAlert[]>();
+    for (const s of input.subs) {
+        const hit = usable
+            .filter((l) => l.region === s.region && inCities(l.city, s.cities)
+                && !input.covered?.has(`${s.memberId}|${l.slug}`)
+                && matchesWatch(l.listing, s.filters, input.nowMs))
+            .sort((a, b) => ms(a.listing.datetime) - ms(b.listing.datetime));
+        if (!hit.length) continue;
+        const list = perMember.get(s.memberId) ?? [];
+        if (list.some((a) => a.region === s.region)) continue; // (member, region) 은 표의 키 — 입력을 믿지 않는다
+        const recent = !!input.history.get(s.memberId)?.recentSlugs.has(areaKey(s.region));
+        list.push({ memberId: s.memberId, region: s.region, listings: hit, push: !recent && !input.silent?.has(s.memberId) });
+        perMember.set(s.memberId, list);
+    }
+    const out: AreaAlert[] = [];
+    for (const [memberId, alerts] of perMember) {
+        let room = Math.max(0, cap - (input.history.get(memberId)?.today ?? 0) - (input.rung?.get(memberId) ?? 0));
+        alerts.sort((a, b) => ms(a.listings[0].listing.datetime) - ms(b.listings[0].listing.datetime));
+        for (const a of alerts) { if (a.push) { if (room > 0) room--; else a.push = false; } out.push(a); }
+    }
+    return out;
+}
+
+/** 지역 알림의 제목·본문·딥링크. 한 건이면 그 글로, 여러 건이면 그 지역 조인(또는 부킹) 목록으로. */
+export function areaAlertText(a: Pick<AreaAlert, "region" | "listings">, nowMs: number): { title: string; body: string; url: string; teeAt: string } {
+    const label = (REGION_LABEL[a.region] ?? a.region).replace(/·수도권$/, "");
+    const ls = a.listings;
+    const first = ls[0];
+    const teeAt = new Date(ms(first.listing.datetime)).toISOString();
+    if (ls.length === 1) {
+        const l = first.listing;
+        const title = isUrgentJoin(l, nowMs) ? `⛳ ${label} 긴급 조인이 떴어요`
+            : isJoin(l) ? `⛳ ${label} 조인이 올라왔어요`
+            : `⛳ ${label} 부킹 티타임이 나왔어요`;
+        const kind = isJoin(l) ? `조인 ${seatsLeft(l)}자리` : "부킹";
+        const body = [first.courseName, `${dayText(l.datetime, nowMs)} ${teePart(l.datetime)}부 ${timeText(l.datetime)}`, kind, feeText(l)].filter(Boolean).join(" · ");
+        return { title, body, url: `/golf/booking-list/${l.id}?date=${kstDateOf(ms(l.datetime))}&view=${isJoin(l) ? "JOIN" : "BOOKING"}`, teeAt };
+    }
+    const head = ls.slice(0, 2).map((x) => `${x.courseName} ${dayText(x.listing.datetime, nowMs)} ${timeText(x.listing.datetime)}`).join(", ");
+    const more = ls.length > 2 ? ` 외 ${ls.length - 2}건` : "";
+    const anyJoin = ls.some((x) => isJoin(x.listing));
+    return {
+        title: `⛳ ${label} 티타임 ${ls.length}건이 올라왔어요`,
+        body: `${head}${more}`,
+        url: listPath({ intent: anyJoin ? "join" : "booking", region: a.region }),
+        teeAt,
+    };
+}
+
+/**
+ * 새 글·전환된 글을 그 지역 알림을 켠 사람에게 알린다. 관심 골프장 알림 **다음에** 부른다(covered·rung 을 넘겨 겹치지 않게).
+ * 실패는 호출하는 쪽이 삼킨다(글 올리기가 실패하면 안 된다).
+ */
+type AreaOpts = { silent?: ReadonlySet<string>; covered?: ReadonlySet<string>; rung?: ReadonlyMap<string, number> };
+type AreaResult = { pushed: number; inboxOnly: number };
+
+export async function notifyAreaSubscribers(ownerId: string, rows: WatchListing[], opts: AreaOpts = {}): Promise<AreaResult> {
+    const s = await startAreaAlerts(ownerId, rows, opts);
+    await s.done;
+    return s.result;
+}
+
+async function startAreaAlerts(ownerId: string, rows: WatchListing[], opts: AreaOpts = {}): Promise<Started<AreaResult>> {
+    const none = (): Started<AreaResult> => ({ result: { pushed: 0, inboxOnly: 0 }, done: Promise.resolve() });
+    const nowMs = Date.now();
+    const usable = rows.filter((r) => isAlertable(r, nowMs));
+    if (!usable.length) return none();
+    const ids = [...new Set(usable.map((r) => Number(r.courseId)))];
+    const pages = rowsOf(await db.execute(sql`
+        select slug, name, region, city, course_ids from golf_course_pages where course_ids && ${pgArray(ids)}::int[]`));
+    if (!pages.length) return none();
+    const pageOfCourse = new Map<number, { slug: string; name: string; region: string; city: string | null }>();
+    for (const p of pages) for (const c of p.course_ids ?? []) pageOfCourse.set(Number(c), { slug: p.slug, name: p.name, region: p.region, city: p.city ?? null });
+    const listings: AreaListing[] = usable.flatMap((l) => {
+        const p = pageOfCourse.get(Number(l.courseId));
+        return p ? [{ slug: p.slug, courseName: p.name, region: p.region, city: p.city, listing: l }] : [];
+    });
+    const regions = [...new Set(listings.map((l) => l.region))];
+    if (!regions.length) return none();
+
+    // 탈퇴 회원은 행이 '탈퇴회원'으로 남는다 — 알림을 만들지 않는다(deleteAccount 가 지우지만 한 번 더 막는다).
+    const subRows = rowsOf(await db.execute(sql`
+        select a.member_id, a.region, a.cities, a.filters
+        from golf_area_alerts a join hiq_members m on m.id = a.member_id
+        where a.region = any(${pgArray(regions)}::text[]) and a.member_id <> ${ownerId}::uuid and m.name <> '탈퇴회원'
+          and ${notBlocked(sql.raw("a.member_id"), ownerId)}`));
+    if (!subRows.length) return none();
+    const subs: AreaSub[] = subRows.map((r) => ({ memberId: String(r.member_id), region: r.region, cities: Array.isArray(r.cities) ? r.cities : [], filters: r.filters ?? null }));
+
+    const memberIds = [...new Set(subs.map((s) => s.memberId))];
+    const sent = rowsOf(await db.execute(sql`
+        select member_id, params->>'watchSlug' as slug,
+               (created_at > now() - make_interval(mins => ${WATCH_COOLDOWN_MIN})) as recent
+        from hiq_notifications
+        where member_id = any(${pgArray(memberIds)}::uuid[]) and type = 'GOLF_URGENT' and params ? 'watchSlug'
+          and coalesce(params->>'pushed', 'true') = 'true'
+          and created_at > now() - interval '24 hours'`));
+    const history = new Map<string, { today: number; recentSlugs: Set<string> }>();
+    for (const s of sent) {
+        const k = String(s.member_id);
+        const h = history.get(k) ?? { today: 0, recentSlugs: new Set<string>() };
+        h.today++; if (s.recent) h.recentSlugs.add(s.slug);
+        history.set(k, h);
+    }
+
+    // rung(방금 울린 관심 알림)은 위 history 에 벌써 들어왔을 수도 있다(보내기가 진행 중이라) — 겹쳐 세면 상한 쪽으로 한두 통 보수적일 뿐이다.
+    const plan = planAreaAlerts({ listings, subs, history, nowMs, silent: opts.silent, covered: opts.covered, rung: opts.rung });
+    if (!plan.length) return none();
+
+    const hour = kstHour(nowMs);
+    const quiet = hour < WATCH_PUSH_FROM_HOUR || hour >= WATCH_PUSH_UNTIL_HOUR;
+    let pushed = 0, inboxOnly = 0;
+    const sends = plan.map((a) => {
+        const t = areaAlertText(a, nowMs);
+        const ring = a.push && !quiet;
+        if (ring) pushed++; else inboxOnly++;
+        const params = { url: t.url, watchSlug: areaKey(a.region), watchArea: a.region, teeAt: t.teeAt, n: a.listings.length, pushed: ring };
+        const base = { memberId: a.memberId, title: t.title, body: t.body, category: "GOLF", type: "GOLF_URGENT", params };
+        return (ring
+            ? notificationService.sendAndSaveNotification({ ...base, pref: "golf" })
+            : storage.createNotification({ ...base, isRead: false })
+        ).catch((e: unknown) => console.error("[GolfAreaAlert]", e));
+    });
+    return { result: { pushed, inboxOnly }, done: waitFor(sends) };
+}
+
+/**
+ * 글이 올라오면 부르는 한 곳 — 관심 골프장 알림을 먼저 **계획**하고, 그 결과(누가 어느 골프장으로 받나·몇 통 울리나)를 넘겨
+ * 지역 알림이 같은 글로 또 울리지 않게 한다. 두 알림의 실패는 서로를 막지 않는다.
+ * 보내기는 둘 다 시작해 놓고 **한 번에** 기다린다(각자 최대 WATCH_WAIT_MS — 차례로 기다리면 글 올리기 응답이 12초까지 는다).
+ */
+export async function notifyListingAlerts(ownerId: string, rows: WatchListing[], opts: { silent?: ReadonlySet<string> } = {}): Promise<{ pushed: number; inboxOnly: number }> {
+    const course = await startCourseWatch(ownerId, rows, opts).catch((e) => { console.error("[GolfCourseWatch]", e); return null; });
+    const area = await startAreaAlerts(ownerId, rows, { silent: opts.silent, covered: course?.result.covered, rung: course?.result.rung })
+        .catch((e) => { console.error("[GolfAreaAlert]", e); return null; });
+    await Promise.allSettled([course?.done, area?.done]);
+    return {
+        pushed: (course?.result.pushed ?? 0) + (area?.result.pushed ?? 0),
+        inboxOnly: (course?.result.inboxOnly ?? 0) + (area?.result.inboxOnly ?? 0),
+    };
 }

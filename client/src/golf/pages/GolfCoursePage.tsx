@@ -34,6 +34,7 @@ import { NearbyCourses } from "@/golf/components/course/detail/NearbyCourses";
 import { SectionNav, jumpTo } from "@/golf/components/course/detail/SectionNav";
 import { Card, Section, Skel, type SectionId } from "@/golf/components/course/detail/ui";
 import { CoursePhotoGallery } from "@/golf/components/photos/CoursePhotoGallery";
+import { GolfGuestIntro } from "@/golf/components/course/GolfGuide";
 
 function decodeSlug(raw: string | undefined): string {
     if (!raw) return "";
@@ -249,6 +250,8 @@ function Body({ d, ids, distance }: { d: CourseDetail; ids: SectionId[]; distanc
         <>
             <SectionNav ids={ids} />
             {ids.includes("tee") && <TeeTimes slug={d.slug} name={d.name} listings={d.listings} counts={d.counts} myWatch={d.myWatch} watchers={d.watchers} />}
+            {/* 랭큐 골프 소개(2026-10-05) — 검색으로 들어온 비로그인 방문자에게만. 티타임 바로 아래, 시세·그린피 정보는 가리지 않게 */}
+            <GolfGuestIntro className="mx-4 mt-8" />
             {ids.includes("price") && <MembershipPrices key={d.slug} prices={d.prices} />}
             {ids.includes("fee") && d.fees && <GreenFees fees={d.fees} />}
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}

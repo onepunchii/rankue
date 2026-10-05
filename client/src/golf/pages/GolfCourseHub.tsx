@@ -7,6 +7,10 @@
  * 주소·제목·설명은 shared/golfCourse 의 함수로만 만든다 — 서버 프리렌더·사이트맵과 같은 글이어야 한다.
  * 지역·의도·시군을 바꾸는 것은 전부 <a>(wouter Link)다: 검색엔진이 허브 사이를 따라다녀야 한다.
  *
+ * 2026-10-05(오너: "검색이 는다 — 비로그인 방문자에게 랭큐 골프를 알릴 배너와 설명, 더 넣을 정보"): 소개 배너(비로그인만) ·
+ * 이용 방법 시트 · 빈 목록의 지역 알림·내 티타임 올리기 · 지역 한눈에(실제 숫자) · 그린피 낮은 순 · 자주 묻는 것.
+ * 전국에 글이 한두 건이라 방문자 대부분은 빈 목록을 본다 — 그 자리에서 할 일을 주는 것이 핵심이다.
+ *
  * ⚠️ 색은 리터럴만(CourseShell 주석). 비로그인은 당구 테마라 bg-white·토큰이 밝게 풀린다.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -18,7 +22,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { goLogin } from "@/components/hiq/LoginGate";
-import { LucideSearch, LucideX, LucideChevronRight } from "@/lib/icons";
+import { LucideSearch, LucideX, LucideChevronRight, HelpCircle } from "@/lib/icons";
 import {
     GOLF_REGIONS, ORIGIN, REGION_LABEL, cityShort, listDescription, listPath, listTitle, type GolfIntent,
 } from "@shared/golfCourse";
@@ -28,6 +32,9 @@ import { CourseShell } from "../components/course/CourseShell";
 import { CourseDotMap, type MapDot } from "../components/course/list/CourseDotMap";
 import { CourseRow, CourseRowSkeleton, matchesCourseQuery } from "../components/course/list/CourseRow";
 import { HubListingRow } from "../components/course/list/HubListingRow";
+import { GOLF_POST_PATH, GolfFaq, GolfGuideSheet, GolfIntroBanner, RegionGlance } from "../components/course/GolfGuide";
+import { AreaAlertButton } from "../components/course/AreaAlert";
+import { guideTabFor, type GuideTab } from "@shared/golfGuide";
 
 const PAGE = 60;
 const LISTING_PAGE = 8;
@@ -41,7 +48,7 @@ const INTENT_TABS: { intent: GolfIntent | null; label: string; color: string }[]
 /** "지금 올라온 ___이 없어요" 에 들어갈 말 */
 const INTENT_NOUN: Record<GolfIntent, string> = { booking: "부킹", join: "조인", urgent: "긴급 조인" };
 
-type Sort = "rec" | "near" | "price" | "name";
+type Sort = "rec" | "near" | "fee" | "price" | "name";
 
 const safeDecode = (s: string | undefined) => {
     if (!s) return null;
@@ -65,8 +72,10 @@ const inScope = (c: { region: string; city: string | null }, region: string | nu
 export default function GolfCourseHub() {
     const [path, setLocation] = useLocation();
     const { intent, region, city } = useMemo(() => parsePath(path), [path]);
-    const { member } = useAuth();
+    const { member, isLoading: authLoading } = useAuth();
     const golfOk = useGolfAccess();
+    // 이용 방법 시트 — 그 페이지의 의도(조인·부킹·긴급) 탭으로 연다
+    const [guide, setGuide] = useState<GuideTab | null>(null);
 
     const list = useCourseList({ region, city, intent });
     const all = useCourseList({});             // 지도는 늘 전국 점을 그린다(지역을 고르면 그쪽으로 당겨 들어간다)
@@ -163,6 +172,8 @@ export default function GolfCourseHub() {
             && feats.every((f) => (c.play ?? []).includes(f) || (c.grass ?? []).includes(f))
             && (!onlyWatched || watchOf.has(c.slug)));
         if (sort === "near") rows.sort((a, b) => (kmOf.get(a.slug) ?? 1e9) - (kmOf.get(b.slug) ?? 1e9));
+        // 그린피 낮은 순 — 값이 없는 곳은 뒤로(모르는 값을 0원처럼 앞에 두지 않는다)
+        else if (sort === "fee") rows.sort((a, b) => (a.feeFrom ?? 1e12) - (b.feeFrom ?? 1e12) || a.name.localeCompare(b.name, "ko"));
         else if (sort === "price") rows.sort((a, b) => (b.price?.price ?? -1) - (a.price?.price ?? -1) || a.name.localeCompare(b.name, "ko"));
         else if (sort === "name") rows.sort((a, b) => a.name.localeCompare(b.name, "ko"));
         return rows;
@@ -180,6 +191,24 @@ export default function GolfCourseHub() {
         else setLocation(`/golf/course/${encodeURIComponent(l.slug)}`); // 골프를 안 쓰는 회원 — 글 목록은 닫혀 있으니 골프장 페이지로
     };
 
+    // 내 티타임 올리기 — 조인 목록의 올리기 시트로 바로(로그인 전이면 로그인하고 그리로)
+    const POST_TO = GOLF_POST_PATH;
+    const postTee = () => {
+        if (golfOk) setLocation(POST_TO);
+        else if (!member) goLogin(setLocation, POST_TO);
+        else setGuide("post"); // 골프를 안 쓰는 회원 — 올리는 곳이 닫혀 있다. 방법만 보여 준다
+    };
+    const toCourseList = () => document.getElementById("golf-course-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const whereShort = city ? cityShort(city) : region ?? "전국";
+    const alertScope = { region, city, intent, regions: regions.data };
+    const guidePrimary = (tab: GuideTab) => {
+        if (!member) return { label: "로그인하고 시작하기", onClick: () => goLogin(setLocation, tab === "post" ? POST_TO : undefined) };
+        if (!golfOk) return null;
+        if (tab === "post") return { label: "조인 올리기", onClick: () => setLocation(POST_TO) };
+        if (tab === "urgent") return { label: "긴급 조인 보기", onClick: () => { setGuide(null); setLocation(listPath({ intent: "urgent" })); } };
+        return { label: tab === "booking" ? "부킹 보러 가기" : "조인 보러 가기", onClick: () => setLocation(`/golf/booking-list?view=${tab === "booking" ? "BOOKING" : "JOIN"}`) };
+    };
+
     const backTo = city ? listPath({ intent, region }) : region ? listPath({ intent }) : intent ? "/golf/courses" : member ? "/dashboard" : "/";
     const hubRows = hub.data ?? [];
     const tabColor = INTENT_TABS.find((t) => t.intent === intent)!.color;
@@ -188,7 +217,14 @@ export default function GolfCourseHub() {
     const DOT: Record<GolfIntent, string> = { booking: "#64DD17", join: "#FF6B00", urgent: "#FF3B30" };
 
     return (
-        <CourseShell backTo={backTo}>
+        <CourseShell
+            backTo={backTo}
+            right={member ? (
+                <button type="button" onClick={() => setGuide(guideTabFor(intent))} className="h-8 pl-2 pr-3 rounded-full bg-[#FFFFFF14] text-[13px] font-medium inline-flex items-center gap-1 active:bg-[#FFFFFF24]">
+                    <HelpCircle className="w-4 h-4" />이용 방법
+                </button>
+            ) : undefined}
+        >
             {/* ── 머리 ── 제목 하나 + 조용한 한 줄. 검색어 같은 부제("부킹·조인·그린피·회원권 시세")는 <title> 에만 둔다. */}
             <div className="px-5 pt-5">
                 {crumbs.length > 1 && (
@@ -210,6 +246,11 @@ export default function GolfCourseHub() {
                     )}
                 </p>
             </div>
+
+            {/* ── 랭큐 골프 소개 ── 검색으로 막 들어온 비로그인 방문자에게만. 회원은 머리의 '이용 방법'으로 같은 시트를 연다. */}
+            {!authLoading && !member && (
+                <GolfIntroBanner className="mx-5 mt-4" onGuide={() => setGuide(guideTabFor(intent))} onPost={postTee} />
+            )}
 
             {/* ── 검색 ── 이 화면에서 제일 많이 하는 일이라 맨 위 */}
             <div className="px-5 mt-5">
@@ -304,16 +345,28 @@ export default function GolfCourseHub() {
             {/* ── 지금 올라온 글(의도 허브만) ── */}
             {intent && (
                 <section className="mt-8">
-                    <h2 className="px-5 mb-3 flex items-baseline gap-2 text-[19px] font-bold tracking-tight text-[#FFFFFF]">
-                        지금 올라온 {INTENT_NOUN[intent]}
-                        {hubRows.length > 0 && <span className="text-[15px] font-medium text-[#FFFFFF66] tabular-nums">{Math.max(listingCount, hubRows.length)}</span>}
-                    </h2>
+                    <div className="px-5 mb-3 flex items-center justify-between gap-3">
+                        <h2 className="flex items-baseline gap-2 text-[19px] font-bold tracking-tight text-[#FFFFFF]">
+                            지금 올라온 {INTENT_NOUN[intent]}
+                            {hubRows.length > 0 && <span className="text-[15px] font-medium text-[#FFFFFF66] tabular-nums">{Math.max(listingCount, hubRows.length)}</span>}
+                        </h2>
+                        {/* 글이 있을 때는 제목 옆 작은 단추, 없을 때는 아래 큰 단추 — 지역 알림 단추는 한 화면에 하나 */}
+                        {!hub.isPending && hubRows.length > 0 && <AreaAlertButton variant="chip" what={`${whereShort} ${INTENT_NOUN[intent]}`} {...alertScope} />}
+                    </div>
                     {hub.isPending ? (
                         <div className="mx-5 h-[68px] rounded-2xl bg-[#FFFFFF08] animate-pulse" />
                     ) : hubRows.length === 0 ? (
-                        <p className="mx-5 rounded-2xl bg-[#FFFFFF08] px-4 py-4 text-[14px] leading-relaxed text-[#FFFFFF8C] break-keep">
-                            지금 올라온 {INTENT_NOUN[intent]}이 없어요. 골프장 옆 <span className="text-[#FFFFFF]">☆</span>을 눌러 두면 올라올 때 알려 드려요.
-                        </p>
+                        // 빈 목록 — 방문자 대부분이 보는 상태다. "없어요" 로 끝내지 않고 여기서 할 일 둘을 준다(2026-10-05).
+                        <div className="mx-5 rounded-2xl bg-[#FFFFFF08] p-4">
+                            <p className="text-[15px] font-medium text-[#FFFFFFE6]">지금 올라온 {INTENT_NOUN[intent]}이 없어요</p>
+                            <p className="mt-1 text-[13.5px] leading-relaxed text-[#FFFFFF8C] break-keep">
+                                알림을 켜 두면 올라오는 대로 알려 드려요. 티타임에 자리가 남았다면 직접 올려 보세요.
+                            </p>
+                            <AreaAlertButton variant="big" what={`${whereShort} ${INTENT_NOUN[intent]}`} className="mt-3.5" {...alertScope} />
+                            <button type="button" onClick={postTee} className="mt-2 w-full h-11 rounded-xl bg-[#FFFFFF0F] text-[14px] font-medium text-[#FFFFFFCC] active:bg-[#FFFFFF1A]">
+                                내 티타임 올리기
+                            </button>
+                        </div>
                     ) : (
                         <>
                             <ul className="mx-5 rounded-2xl bg-[#FFFFFF08] overflow-hidden divide-y divide-[#FFFFFF0F]">
@@ -327,8 +380,20 @@ export default function GolfCourseHub() {
                 </section>
             )}
 
+            {/* ── 지역 한눈에 ── 목록 응답에서 센 실제 숫자. 누르면 그 조건으로 골프장 목록을 건다. */}
+            {list.isSuccess && (
+                <RegionGlance
+                    className="mt-8" items={items} where={city ? cityShort(city) : regionLabel ?? "전국"}
+                    feats={feats}
+                    onFeat={(k) => { setFeats((a) => (a.includes(k) ? a.filter((x) => x !== k) : [...a, k])); toCourseList(); }}
+                    feeSort={sort === "fee"}
+                    onFeeSort={() => { setSort((v) => (v === "fee" ? "rec" : "fee")); toCourseList(); }}
+                />
+            )}
+            {!intent && <AreaAlertButton variant="row" what={whereShort} className="mx-5 mt-3 w-[calc(100%-2.5rem)]" {...alertScope} />}
+
             {/* ── 골프장 목록 ── 상자 없이 전체 폭, 줄 사이는 얇은 선 */}
-            <section className="mt-8 pb-6">
+            <section id="golf-course-list" className="mt-8 pb-6 scroll-mt-16">
                 <div className="px-5 flex items-baseline gap-2">
                     <h2 className="text-[19px] font-bold tracking-tight text-[#FFFFFF]">{city ? `${cityShort(city)} 골프장` : regionLabel ? `${regionLabel} 골프장` : "전국 골프장"}</h2>
                     {list.isSuccess && <span className="text-[15px] font-medium text-[#FFFFFF66] tabular-nums">{q || feats.length || onlyWatched ? `${shown.length} / ${courseCount}` : courseCount}</span>}
@@ -336,7 +401,7 @@ export default function GolfCourseHub() {
 
                 {/* 정렬 — 글자 탭 */}
                 <div className="px-5 mt-2 flex gap-4 overflow-x-auto scrollbar-hide">
-                    {([["rec", "추천"], ["near", "가까운 순"], ["price", "시세 높은 순"], ["name", "이름순"]] as [Sort, string][]).map(([k, label]) => (
+                    {([["rec", "추천"], ["near", "가까운 순"], ["fee", "그린피 낮은 순"], ["price", "시세 높은 순"], ["name", "이름순"]] as [Sort, string][]).map(([k, label]) => (
                         <button
                             key={k} type="button" onClick={() => { if (k === "near" && !me) askNear(); setSort(k); }} aria-pressed={sort === k}
                             className={cn("h-9 text-[14px] whitespace-nowrap shrink-0 transition-colors", sort === k ? "text-[#FFFFFF] font-semibold" : "text-[#FFFFFF66] font-medium active:text-[#FFFFFF]")}
@@ -364,6 +429,11 @@ export default function GolfCourseHub() {
                 </ul>
                 {shown.length > limit && <MoreButton onClick={() => setLimit((n) => n + PAGE)} rest={shown.length - limit} unit="곳" />}
             </section>
+
+            {/* ── 자주 묻는 것 ── 서버 프리렌더와 같은 글(shared/golfGuide) */}
+            <GolfFaq intent={intent} onGuide={() => setGuide(guideTabFor(intent))} className="mt-4 pb-8" />
+
+            <GolfGuideSheet open={guide !== null} onOpenChange={(v) => { if (!v) setGuide(null); }} initialTab={guide ?? guideTabFor(intent)} primary={guidePrimary} />
         </CourseShell>
     );
 }

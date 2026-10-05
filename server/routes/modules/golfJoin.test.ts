@@ -169,7 +169,8 @@ describe("부킹 → 조인 전환(2026-09-23 오너: '내가 올린 부킹 내�
         // 긴급 방송과 관심 알림은 함께 기다린다(2026-09-24 — 차례로 기다리면 응답이 12초까지 늘었다). 둘 다 응답 전이어야 한다.
         const together = block.indexOf("await Promise.allSettled([");
         const broadcast = block.indexOf("broadcastUrgentJoin(", together);
-        const watch = block.indexOf("notifyCourseWatchers(", together);
+        // 관심 골프장 알림 + 지역 알림(2026-10-05)은 notifyListingAlerts 한 함수가 차례로 보낸다
+        const watch = block.indexOf("notifyListingAlerts(", together);
         const success = block.indexOf("return sendSuccess(res");
         expect(notify).toBeGreaterThan(-1);
         expect(notify).toBeLessThan(success);

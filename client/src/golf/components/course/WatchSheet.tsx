@@ -6,6 +6,8 @@
  *
  * 조건을 안 고르면 전부 받는다 — 그게 기본이다. 서버(cleanFilters)는 아는 칸만 받으므로 여기서도 빈 칸은 보내지 않는다.
  *
+ * 칩·칸(Multi·Single·Field)과 선택지는 지역 알림 시트(AreaAlertSheet)도 같이 쓴다 — 두 시트가 같은 모양이어야 한다(2026-10-05).
+ *
  * ⚠️ 이 페이지들은 비로그인(당구 테마)에서도 열린다 — 색은 리터럴만(CourseShell 머리말).
  * ⚠️ 목록에서는 이 단추가 카드 링크 안에 있다. 시트는 portal 이지만 React 이벤트는 React 나무를 따라 올라가
  *    카드의 Link 에 닿는다 — 시트 안을 누를 때마다 골프장으로 넘어가 버린다. 그래서 감싸서 끊는다(stop).
@@ -20,20 +22,21 @@ import { goLogin } from "@/components/hiq/LoginGate";
 import { cn } from "@/lib/utils";
 import { useCourseWatch, type WatchFilters } from "@/golf/lib/courseApi";
 import type { GolfIntent } from "@shared/golfCourse";
+import { announceAlertOn } from "./AlertReach";
 
 type Day = NonNullable<WatchFilters["days"]>[number];
 type Part = NonNullable<WatchFilters["parts"]>[number];
 
-const KIND_OPTS: { v: GolfIntent; label: string }[] = [
+export const KIND_OPTS: { v: GolfIntent; label: string }[] = [
     { v: "booking", label: "부킹" }, { v: "join", label: "조인" }, { v: "urgent", label: "긴급·취소티" },
 ];
-const DAY_OPTS: { v: Day; label: string }[] = [{ v: "weekday", label: "주중" }, { v: "weekend", label: "주말" }];
-const PART_OPTS: { v: Part; label: string }[] = [{ v: "1", label: "1부" }, { v: "2", label: "2부" }, { v: "3", label: "3부" }];
-const FEE_OPTS: { v: number | undefined; label: string }[] = [
+export const DAY_OPTS: { v: Day; label: string }[] = [{ v: "weekday", label: "주중" }, { v: "weekend", label: "주말" }];
+export const PART_OPTS: { v: Part; label: string }[] = [{ v: "1", label: "1부" }, { v: "2", label: "2부" }, { v: "3", label: "3부" }];
+export const FEE_OPTS: { v: number | undefined; label: string }[] = [
     { v: undefined, label: "상관없음" }, { v: 100_000, label: "10만원" }, { v: 150_000, label: "15만원" }, { v: 200_000, label: "20만원" },
 ];
 /** 조인 빈자리 — '1자리'는 모든 조인이라 '혼자'(=상관없음)로 둔다. 사람은 "몇 명이 가나"로 생각한다. */
-const SEAT_OPTS: { v: number | undefined; label: string }[] = [
+export const SEAT_OPTS: { v: number | undefined; label: string }[] = [
     { v: undefined, label: "혼자" }, { v: 2, label: "2명" }, { v: 3, label: "3명" },
 ];
 
@@ -52,7 +55,7 @@ export function watchSummary(f: WatchFilters | null | undefined): string {
 }
 
 /** 보낼 꼴로 — 빈 칸·전부 고른 칸은 뺀다(전부 = 조건 없음). */
-function clean(f: WatchFilters): WatchFilters {
+export function cleanWatchFilters(f: WatchFilters): WatchFilters {
     const out: WatchFilters = {};
     if (f.kinds?.length && f.kinds.length < KIND_OPTS.length) out.kinds = f.kinds;
     if (f.days?.length && f.days.length < DAY_OPTS.length) out.days = f.days;
@@ -63,13 +66,13 @@ function clean(f: WatchFilters): WatchFilters {
     return out;
 }
 
-const chipCls = (on: boolean) => cn(
+export const chipCls = (on: boolean) => cn(
     "h-10 px-3.5 rounded-full text-[14px] font-medium border transition-colors whitespace-nowrap",
     on ? "bg-[#FFFFFF] border-[#FFFFFF] text-[#0A0A0A] font-semibold" : "bg-[#FFFFFF08] border-[#FFFFFF1A] text-[#FFFFFFB3] active:bg-[#FFFFFF14]",
 );
 
 /** 여러 개 고르는 칩 — '전부'가 켜져 있으면 조건 없음. 다 고르면 다시 '전부'로 접는다. */
-function Multi<T extends string>({ opts, value, onChange }: { opts: { v: T; label: string }[]; value: T[] | undefined; onChange: (v: T[] | undefined) => void }) {
+export function Multi<T extends string>({ opts, value, onChange }: { opts: { v: T; label: string }[]; value: T[] | undefined; onChange: (v: T[] | undefined) => void }) {
     const cur = value ?? [];
     const toggle = (v: T) => {
         const next = cur.includes(v) ? cur.filter((x) => x !== v) : [...cur, v];
@@ -84,7 +87,7 @@ function Multi<T extends string>({ opts, value, onChange }: { opts: { v: T; labe
         </div>
     );
 }
-function Single<T>({ opts, value, onChange }: { opts: { v: T; label: string }[]; value: T; onChange: (v: T) => void }) {
+export function Single<T>({ opts, value, onChange }: { opts: { v: T; label: string }[]; value: T; onChange: (v: T) => void }) {
     return (
         <div className="flex flex-wrap gap-2">
             {opts.map((o) => (
@@ -93,7 +96,7 @@ function Single<T>({ opts, value, onChange }: { opts: { v: T; label: string }[];
         </div>
     );
 }
-function Field({ label, children }: { label: string; children: ReactNode }) {
+export function Field({ label, children }: { label: string; children: ReactNode }) {
     return (
         <section className="space-y-2.5">
             <h3 className="text-[13px] font-medium text-[#FFFFFF80]">{label}</h3>
@@ -119,15 +122,16 @@ export function WatchSheet({ slug, name, open, onOpenChange, myWatch }: SheetPro
     const saved = useRef(myWatch); saved.current = myWatch;
     useEffect(() => { if (open) setF({ ...(saved.current?.filters ?? {}) }); }, [open]);
 
-    const cleaned = useMemo(() => clean(f), [f]);
+    const cleaned = useMemo(() => cleanWatchFilters(f), [f]);
     const summary = watchSummary(cleaned);
     const joinish = !cleaned.kinds || cleaned.kinds.includes("join") || cleaned.kinds.includes("urgent");
     const busy = watch.isPending || unwatch.isPending;
 
     const save = () => watch.mutate(cleaned, {
         onSuccess: () => {
-            toast({ title: myWatch ? "조건을 바꿨어요" : "관심 등록했어요 — 올라오면 바로 알려 드려요" });
             onOpenChange(false);
+            if (myWatch) toast({ title: "조건을 바꿨어요" });
+            else void announceAlertOn("관심 등록했어요");
         },
         onError: (e: any) => toast({ variant: "destructive", title: e?.message || "등록하지 못했어요" }),
     });
@@ -230,7 +234,7 @@ export function WatchButton({ slug, myWatch, watchers, size = "lg", name, classN
         // 목록의 별: 한 번에 등록(전부 받기). 이미 켜진 별은 조건을 고치러 들어간다.
         if (size === "sm" && !on) {
             watch.mutate({}, {
-                onSuccess: () => toast({ title: `${name ?? "관심 골프장"} — 티타임이 올라오면 알려 드려요` }),
+                onSuccess: () => { void announceAlertOn("관심 골프장으로 등록했어요", `${name ?? "관심 골프장"} — 티타임이 올라오면 알려 드려요`); },
                 onError: (err: any) => toast({ variant: "destructive", title: err?.message || "등록하지 못했어요" }),
             });
             return;

@@ -601,6 +601,9 @@ export class UserRepository {
             await tx.delete(hiqInvites).where(or(eq(hiqInvites.hostId, memberId), eq(hiqInvites.guestId, memberId)));
             await tx.delete(hiqNotifications).where(eq(hiqNotifications.memberId, memberId));
             await tx.delete(hiqCrewMembers).where(eq(hiqCrewMembers.memberId, memberId));
+            // 골프 관심 골프장·지역 알림 — 회원 행이 '탈퇴회원'으로 남아 FK cascade 가 돌지 않는다. 남겨 두면 떠난 사람에게 알림 행이 계속 쌓인다.
+            await tx.execute(sql`delete from golf_course_watches where member_id = ${memberId}::uuid`);
+            await tx.execute(sql`delete from golf_area_alerts where member_id = ${memberId}::uuid`);
 
             // 2. 회원 행 익명화 — phone은 notNull+unique(storeId,phone)이라 고유 placeholder로 대체.
             //    레이팅/평균/방문 0 초기화로 랭킹·상대 검색에서 실질적으로 사라진다.

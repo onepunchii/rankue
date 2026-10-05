@@ -12,7 +12,7 @@ import { notifyCrewChat } from "../../services/crewChatNotify.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { z } from "zod";
 import { notificationService } from "../../services/notificationService.js";
-import { notifyCourseWatchers } from "../../services/golfCourseWatch.js";
+import { notifyListingAlerts } from "../../services/golfCourseWatch.js";
 import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, convertibleSeats, conversionSlots, recruitCondition, listingCapacity, type JoinType, type SlotGender } from "../../../shared/golfJoin.js";
 import { msg } from "../../lib/i18n.js";
 import { getGolfFootprints } from "../../storage/golfFootprints.js";
@@ -223,7 +223,8 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
     const sentUrgent = urgent ? await urgentTargets(req.userId!).catch(() => [] as string[]) : [];
     await Promise.allSettled([
         urgent && sentUrgent.length ? broadcastUrgentJoin(req.userId!, urgent, sentUrgent).catch((e) => console.error("[GolfUrgentBroadcast]", e)) : null,
-        notifyCourseWatchers(req.userId!, results as any[], { silent: new Set(sentUrgent) }).catch((e) => console.error("[GolfCourseWatch]", e)),
+        // 관심 골프장 알림 → 지역 알림(2026-10-05) 순서로 한 함수가 보낸다 — 같은 글로 두 번 울리지 않게
+        notifyListingAlerts(req.userId!, results as any[], { silent: new Set(sentUrgent) }).catch((e) => console.error("[GolfListingAlerts]", e)),
     ]);
 
     return sendSuccess(res, results);
@@ -293,7 +294,7 @@ router.post("/bookings/:id/to-join", requireAuth, asyncHandler(async (req: AuthR
     // 관심 골프장 알림 — 남은 자리는 방금 연 자리 수(open)다(팔린 자리는 이미 찬 칸). 긴급 방송과 동시에, 방송 받은 사람은 조용히.
     await Promise.allSettled([
         sentUrgent.length ? broadcastUrgentJoin(req.userId!, updated, sentUrgent).catch((e) => console.error("[GolfUrgentBroadcast]", e)) : null,
-        notifyCourseWatchers(req.userId!, [{ ...(updated as any), seatsLeft: open }], { silent: new Set(sentUrgent) }).catch((e) => console.error("[GolfCourseWatch]", e)),
+        notifyListingAlerts(req.userId!, [{ ...(updated as any), seatsLeft: open }], { silent: new Set(sentUrgent) }).catch((e) => console.error("[GolfListingAlerts]", e)),
     ]);
     const [withCounts] = await withJoinCounts([updated], req.userId);
     return sendSuccess(res, withCounts);

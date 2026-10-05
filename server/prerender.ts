@@ -24,6 +24,7 @@ import {
   GOLF_REGIONS, GOLF_INTENTS, REGION_LABEL, INTENT_LABEL, cityShort, coursePath, listPath, manwonText, wonShort, weekdayFee,
   courseTitle, courseDescription, listTitle, listDescription, listingIntents, teePart, distinctAliases, type Fees, type GolfIntent,
 } from "../shared/golfCourse.js";
+import { GOLF_GUIDE, GOLF_INTRO, golfFaq, guideTabFor } from "../shared/golfGuide.js";
 import { JOIN_TYPE_LABEL, distanceKm, formatDistance, type JoinType } from "../shared/golfJoin.js";
 // seo/* 는 이 파일의 page·esc·hubNav 를 되받아 쓴다(순환). 둘 다 요청 시점에만 부르므로 초기화 순서와 무관하다.
 import { renderRankingExtra, type RankingExtraRender } from "./seo/rankingExtra.js";
@@ -834,6 +835,41 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
 /** 티타임 그린피로 믿을 만한 값(1천원~200만원). 입력 실수(27 → 27원)가 가격 범위를 망치지 않게. */
 function l0(v: number): boolean { return Number.isFinite(v) && v >= 1000 && v <= 2_000_000; }
 
+// ── 소개·이용 방법·한눈에·자주 묻는 것(2026-10-05) — 화면(GolfGuide.tsx)과 같은 글(shared/golfGuide) ──────
+/** 그 범위 골프장을 숫자로 — 화면의 '지역 한눈에'와 같은 셈(그린피 최저 · 노캐디 · 2인 · 3인 가능). 값이 없으면 빈 문자열. */
+function golfGlanceHtml(where: string, pages: GolfPageRow[]): string {
+  const fees = pages.map((p) => p.feeFrom).filter((n): n is number => typeof n === "number" && n > 0);
+  const count = (k: string) => pages.filter((p) => (p.play ?? []).includes(k)).length;
+  const bits = [
+    fees.length ? `그린피 ${wonShort(Math.min(...fees))}부터(${fees.length}곳 기준)` : "",
+    count("노캐디") ? `노캐디 ${count("노캐디")}곳` : "",
+    count("2인가능") ? `2인 가능 ${count("2인가능")}곳` : "",
+    count("3인가능") ? `3인 가능 ${count("3인가능")}곳` : "",
+  ].filter(Boolean);
+  return bits.length ? `\n  <h2>${esc(where)} 골프장 한눈에</h2>\n  <p>${esc(bits.join(" · "))}</p>` : "";
+}
+/** 이용 방법 — 그 페이지의 의도 절 + (조인·전체면) 글 올리기 절 */
+function golfGuideHtml(intent: GolfIntent | null): string {
+  const tab = guideTabFor(intent);
+  const secs = GOLF_GUIDE.filter((g) => g.tab === tab || (tab === "join" && g.tab === "post"));
+  return `\n  <h2>${esc(GOLF_INTRO.name)} 이용 방법</h2>\n  <p>${esc(GOLF_INTRO.line)} — ${esc(GOLF_INTRO.points.join(" · "))}</p>` + secs.map((g) => `
+  <h3>${esc(g.label)}</h3>
+  <p>${esc(g.lead)}</p>
+  <ol>
+  ${g.steps.map((x) => `<li>${esc(x)}</li>`).join("\n  ")}
+  </ol>${g.note ? `\n  <p>${esc(g.note)}</p>` : ""}`).join("");
+}
+function golfFaqHtml(intent: GolfIntent | null): string {
+  return `\n  <h2>자주 묻는 것</h2>` + golfFaq(intent).map((f) => `\n  <h3>${esc(f.q)}</h3>\n  <p>${esc(f.a)}</p>`).join("");
+}
+/** FAQ 구조화 데이터 — 같은 문답을 여러 페이지에 달지 않는다(전국 의도 허브 세 곳에만). */
+function golfFaqLd(intent: GolfIntent | null) {
+  return {
+    "@type": "FAQPage",
+    mainEntity: golfFaq(intent).map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })),
+  };
+}
+
 // ── /golf/courses[/:region[/:city]] ──────────────────────────────
 function renderGolfList(s: GolfSummary, sc: GolfScope, now: number): GolfRender {
   const byListing = golfListingsBySlug(s);
@@ -926,9 +962,9 @@ function renderGolfList(s: GolfSummary, sc: GolfScope, now: number): GolfRender 
   ${crumbs.html}
   <h1>${esc(where)} 골프장 ${sc.pages.length}곳</h1>
   ${golfCardGallery(sorted)}
-  <p>${esc(desc)}</p>${liveHtml}${listHtml}
+  <p>${esc(desc)}</p>${liveHtml}${golfGlanceHtml(where, sc.pages)}${listHtml}
   <h2>${esc(where)} 티타임</h2>
-  <nav aria-label="티타임">${golfIntentLinks(s, sc, now)}</nav>${otherRegions}
+  <nav aria-label="티타임">${golfIntentLinks(s, sc, now)}</nav>${otherRegions}${golfGuideHtml(null)}${golfFaqHtml(null)}
   ${hubNav("ko")}
 </main>`,
   });
@@ -992,11 +1028,11 @@ function renderGolfIntent(s: GolfSummary, intent: GolfIntent, sc: GolfScope, now
     canonical,
     noindex,
     image: golfImage(),
-    jsonLd: [{ "@context": "https://schema.org", "@graph": [crumbs.ld] }],
+    jsonLd: [{ "@context": "https://schema.org", "@graph": sc.region ? [crumbs.ld] : [crumbs.ld, golfFaqLd(intent)] }],
     body: `<main>
   ${crumbs.html}
   <h1>${esc(title.split(" | ")[0])}</h1>
-  <p>${esc(desc)}</p>${liveHtml}${subHtml}${coursesHtml}
+  <p>${esc(desc)}</p>${liveHtml}${subHtml}${golfGlanceHtml(where, sc.pages)}${coursesHtml}${golfGuideHtml(intent)}${golfFaqHtml(intent)}
   <h2>다른 티타임</h2>
   <nav aria-label="티타임">${golfIntentLinks(s, sc, now, intent)}</nav>
   ${hubNav("ko")}

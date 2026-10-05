@@ -23,7 +23,7 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { isUrgentJoin, listingCapacity, distanceKm } from "../../../shared/golfJoin.js";
-import { cityShort, listingIntents, type GolfIntent, type PublicListing } from "../../../shared/golfCourse.js";
+import { GOLF_REGIONS, cityShort, listingIntents, type GolfIntent, type PublicListing } from "../../../shared/golfCourse.js";
 import { COURSE_GALLERY_LIMIT } from "../../../shared/golfPhoto.js";
 
 const router = Router();
@@ -209,6 +209,42 @@ router.get("/watches/mine", requireAuth, asyncHandler(async (req: AuthRequest, r
         slug: w.slug, name: w.name, region: w.region, city: w.city, filters: w.filters ?? {},
         counts: countFor(s.listings.filter((l) => l.slug === w.slug), now),
     })));
+}));
+
+// ── 지역 알림(2026-10-05 오너: "2단계까지 진행") ───────────────────────
+// 검색으로 들어온 사람이 빈 조인·부킹 목록에서 "이 지역에 올라오면 알려 주세요"를 켠다. 한 회원·한 지역에 한 줄,
+// cities 가 비면 지역 전체. 조건(filters)은 관심 골프장과 같은 모양·같은 청소(cleanFilters). 보내기는 services/golfCourseWatch.
+// ⚠️ "/:slug" 보다 먼저 등록한다.
+const isGolfRegion = (r: string) => (GOLF_REGIONS as readonly string[]).includes(r);
+
+router.get("/alerts/mine", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const r: any = await db.execute(sql`
+        select region, cities, filters from golf_area_alerts where member_id = ${req.userId}::uuid order by created_at asc`);
+    return sendSuccess(res, ((r.rows ?? r) as any[]).map((a) => ({ region: a.region, cities: Array.isArray(a.cities) ? a.cities : [], filters: a.filters ?? {} })));
+}));
+
+router.put("/alerts/:region", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const region = String(req.params.region).normalize("NFC");
+    if (!isGolfRegion(region)) return sendError(res, 404, "지역을 찾을 수 없어요");
+    // 시군은 그 지역에 실제로 골프장이 있는 곳만(전체 이름으로 맞춰 저장 — 짧은 이름으로 와도 받는다)
+    const s = await loadSummary();
+    const full = new Map<string, string>();
+    for (const p of s.pages) if (p.region === region && p.city) { full.set(p.city, p.city); full.set(cityShort(p.city), p.city); }
+    const cities = [...new Set((Array.isArray(req.body?.cities) ? req.body.cities : [])
+        .map((c: unknown) => full.get(String(c).normalize("NFC")))
+        .filter((c: string | undefined): c is string => !!c))].slice(0, 40) as string[];
+    const filters = cleanFilters(req.body?.filters);
+    await db.execute(sql`
+        insert into golf_area_alerts (member_id, region, cities, filters)
+        values (${req.userId}::uuid, ${region}, ${`{${cities.map((c) => `"${c.replace(/["\\]/g, "")}"`).join(",")}}`}::text[], ${JSON.stringify(filters)}::jsonb)
+        on conflict (member_id, region) do update set cities = excluded.cities, filters = excluded.filters, updated_at = now()`);
+    return sendSuccess(res, { region, cities, filters });
+}));
+
+router.delete("/alerts/:region", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const region = String(req.params.region).normalize("NFC");
+    await db.execute(sql`delete from golf_area_alerts where member_id = ${req.userId}::uuid and region = ${region}`);
+    return sendSuccess(res, { region });
 }));
 
 // ── 한 곳 ──────────────────────────────────────────────────────────

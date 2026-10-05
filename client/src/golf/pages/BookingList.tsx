@@ -165,6 +165,15 @@ export default function BookingList() {
         if (viewParam === 'JOIN' || viewParam === 'BOOKING' || viewParam === 'ALL') {
             setViewType(viewParam);
         }
+        // 공개 허브·이용 방법의 '내 티타임 올리기'(?new=1, 2026-10-05) — 조인 올리기 시트를 바로 연다.
+        // 주소에서 지운다(새로고침·뒤로 가기로 시트가 또 열리지 않게). 조인 글은 로그인한 누구나 올릴 수 있다.
+        if (params.get('new') === '1') {
+            params.delete('new');
+            const rest = params.toString();
+            window.history.replaceState(window.history.state, "", window.location.pathname + (rest ? `?${rest}` : ""));
+            setViewType('JOIN');
+            setIsCreateModalOpen(true);
+        }
 
         if (dateParam) {
             const idx = weekDates.findIndex(d => d.fullDate === dateParam);

@@ -15,6 +15,7 @@ import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { GolfBackButton } from "../common/GolfBackButton";
+import { AlertReachHost } from "./AlertReach";
 
 export const COURSE_COLORS = {
     bg: "#0A0A0A",
@@ -64,6 +65,7 @@ export function CourseShell({ title, right, backTo = "/golf/courses", hideBottom
                 </div>
             </header>
             <main className="max-w-[720px] mx-auto">{children}</main>
+            <AlertReachHost />
             {golfOk ? <HiqNavigation /> : !isLoading && !member && !hideBottomCta ? (
                 <div className="fixed inset-x-0 bottom-0 z-40 bg-[#0A0A0AF2] border-t border-[#FFFFFF14] px-4 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
                     <button type="button" onClick={() => goLogin(setLocation)} className="w-full h-12 rounded-xl bg-[#FFC43D] text-[#1F1500] text-[15px] font-semibold active:bg-[#F0B22A]">
