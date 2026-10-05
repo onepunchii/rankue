@@ -15,10 +15,11 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import {
-    buildWeather, landOf, latestMidBase, latestShortBase, parseShort, pickMidLand, pickMidTa, toGrid,
+    buildWeather, kstParts, landOf, latestMidBase, latestShortBase, midDays, parseShort, pickMidLand, pickMidTa, sunTimes, toGrid,
     type CourseWeather, type KmaItem, type MidLand, type MidSaved, type MidTa, type WxGrid,
 } from "../../shared/golfWeather.js";
 import { weatherPoint } from "../../shared/golfWeatherZones.js";
+import { teeWxFromDay, teeWxFromHours, type TeeWx } from "../../shared/golfRoundBrief.js";
 
 const SHORT_URL = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst";
 const MID_LAND_URL = "https://apis.data.go.kr/1360000/MidFcstInfoService/getMidLandFcst";
@@ -170,6 +171,54 @@ export async function getCourseWeather(page: WeatherPage, opts: { fetch: boolean
         at: { lat: Math.round(point.lat * 1000) / 1000, lng: Math.round(point.lng * 1000) / 1000 }, nowMs,
         approx: point.approx ? cityName(point.zone.key) : null,
     });
+}
+
+// ── 글마다의 티타임 날씨 ──────────────────────────────────────────
+/**
+ * 조인·부킹 글 여러 건의 티타임 날씨를 한 번에(2026-10-05, 글의 날씨 배지). **받아 둔 것만 읽는다** — 목록을 여는 일로
+ * 기상청을 두드리지 않는다(크론과 골프장 상세가 채운다). 격자·구역은 겹치는 것끼리 묶어 두 번의 조회로 끝낸다.
+ * 앞 나흘은 그 골프장 격자의 그 라운드, 그 뒤는 넓은 지역 예보의 그 날 반나절. 낡았거나 없으면 그 글은 빠진다.
+ */
+export async function teeWeatherFor(items: { id: string; page: WeatherPage; datetime: Date | string }[], nowMs = Date.now()): Promise<Map<string, TeeWx>> {
+    const out = new Map<string, TeeWx>();
+    if (!weatherEnabled() || !items.length) return out;
+    const age = (base: string) => nowMs - (Date.UTC(+base.slice(0, 4), +base.slice(4, 6) - 1, +base.slice(6, 8), +base.slice(8, 10)) - 9 * 3600_000);
+    const plan = items.map((it) => {
+        const pt = weatherPoint(it.page);
+        const t = it.datetime instanceof Date ? it.datetime.getTime() : Date.parse(it.datetime);
+        if (!pt || !Number.isFinite(t) || t <= nowMs - 3600_000) return null;
+        const k = kstParts(t);
+        return { id: it.id, pt, grid: toGrid(pt.lat, pt.lng), land: landOf(pt.zone.ta).regId, ta: pt.zone.ta, ymd: k.ymd, key: k.key, hour: k.h };
+    }).filter(<T,>(x: T | null): x is T => x !== null);
+    if (!plan.length) return out;
+
+    const nxs = [...new Set(plan.map((p) => p.grid.nx))], nys = [...new Set(plan.map((p) => p.grid.ny))];
+    const [gridRows, mids] = await Promise.all([
+        // nx·ny 를 따로 거르면 필요 없는 조합이 조금 딸려 오지만(둘 다 맞는 것만 쓴다) 조회는 하나로 끝난다
+        db.execute(sql`select nx, ny, base, data from golf_weather_grid where nx = any(${`{${nxs.join(",")}}`}::int[]) and ny = any(${`{${nys.join(",")}}`}::int[])`).then(rowsOf),
+        readMid([...new Set(plan.flatMap((p) => [p.land, p.ta]))]),
+    ]);
+    const grids = new Map<string, WxGrid>();
+    for (const r of gridRows) if (age(r.base) <= SHORT_MAX_AGE_MS) grids.set(`${r.nx},${r.ny}`, { ...(r.data as WxGrid), base: r.base });
+    const midCache = new Map<string, ReturnType<typeof midDays>>();
+    for (const p of plan) {
+        const g = grids.get(`${p.grid.nx},${p.grid.ny}`);
+        const dayHours = g ? g.hours.filter((h) => h.t.startsWith(p.ymd)) : [];
+        let wx: TeeWx | null = dayHours.length ? teeWxFromHours(dayHours, p.hour, sunTimes(p.pt.lat, p.pt.lng, p.key)) : null;
+        if (!wx) {
+            const mk = `${p.land}|${p.ta}`;
+            let days = midCache.get(mk);
+            if (!days) {
+                const l = mids.get(p.land), t = mids.get(p.ta);
+                days = midDays(l && age(l.base) <= MID_MAX_AGE_MS ? { base: l.base, data: l.data as MidLand } : null, t && age(t.base) <= MID_MAX_AGE_MS ? { base: t.base, data: t.data as MidTa } : null);
+                midCache.set(mk, days);
+            }
+            const day = days.find((d) => d.date === p.key);
+            wx = day ? teeWxFromDay(day, p.hour) : null;
+        }
+        if (wx) out.set(p.id, wx);
+    }
+    return out;
 }
 
 // ── 데워 두기(크론) ────────────────────────────────────────────────

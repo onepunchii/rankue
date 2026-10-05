@@ -97,6 +97,12 @@ async function loadSummary(): Promise<Summary> {
             l.isUrgent = isUrgentJoin(l, now);
             return l;
         }).filter(Boolean) as (PublicListing & { slug: string })[];
+        // 글마다 그 티타임의 날씨(2026-10-05) — 받아 둔 예보만 읽는다(기상청을 부르지 않는다). 못 읽어도 목록은 그대로 나간다.
+        try {
+            const { teeWeatherFor } = await import("../../services/golfWeather.js");
+            const wx = await teeWeatherFor(listings.map((l) => ({ id: l.id, page: bySlug.get(l.slug)!, datetime: l.datetime })), now);
+            for (const l of listings) l.wx = wx.get(l.id) ?? null;
+        } catch (e) { console.error("[GolfTeeWeather]", e); }
 
         // 목록에 한 숫자만 보일 때의 대표 시세 — '일반' → '개인' → **가장 싼 것**(회원권 "얼마부터"를 보는 자리다.
         // 가장 비싼 걸 고르면 태광CC 가 무기명 40억으로 보였다 — 2026-09-24)

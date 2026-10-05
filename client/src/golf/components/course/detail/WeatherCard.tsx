@@ -12,13 +12,10 @@
  *
  * ⚠️ 비로그인(당구 테마)에서도 열리는 화면 — 색은 리터럴만(CourseShell 머리말). 글자 12px 이상.
  */
-import { Fragment, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { kstDateKey } from "@/lib/kst";
-import {
-    LucideChevronLeft, LucideChevronRight, LucideCloud, LucideCloudMoon, LucideCloudRain, LucideCloudSnow, LucideCloudSun,
-    LucideMoon, LucideSun, LucideSunHorizon, LucideWind,
-} from "@/lib/icons";
+import { LucideChevronLeft, LucideChevronRight, LucideMoon, LucideSunHorizon, LucideWind } from "@/lib/icons";
 import {
     WIND_LEVEL, baseLabel, dayPop, daySky, dowOf, kstParts, sunTimes,
     type CourseWeather, type WxDay, type WxHour, type WxKind,
@@ -26,27 +23,12 @@ import {
 import {
     PART_TEE_HOUR, briefReason, lastTee18, nearestTee, partOfHour, roundBrief, teeHours, type RoundBrief,
 } from "@shared/golfRoundBrief";
+import { WX_RAIN, WxIcon, popColor } from "../TeeWx";
 import { Card, Section, Skel } from "./ui";
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
-const RAIN = "#4DA3FF";
-const AMBER = "#FFC43D";
-const KIND_COLOR: Record<WxKind, string> = {
-    clear: AMBER, partly: "#E6E6E6", cloudy: "#A6A6A6", rain: RAIN, shower: RAIN, sleet: "#8CC4FF", snow: "#CFE8FF",
-};
+const RAIN = WX_RAIN;
 
-function WxIcon({ kind, night, className, style }: { kind: WxKind; night?: boolean; className?: string; style?: CSSProperties }) {
-    const I = kind === "clear" ? (night ? LucideMoon : LucideSun)
-        : kind === "partly" ? (night ? LucideCloudMoon : LucideCloudSun)
-        : kind === "cloudy" ? LucideCloud
-        : kind === "snow" || kind === "sleet" ? LucideCloudSnow
-        : LucideCloudRain;
-    const color = night && (kind === "clear" || kind === "partly") ? "#C9D1FF" : KIND_COLOR[kind];
-    return <I weight="fill" className={className} style={{ color, ...style }} aria-hidden />;
-}
-
-/** 강수확률 색 — 30% 미만은 조용히, 60% 부터는 또렷하게 */
-const popColor = (pop: number | null | undefined) => (pop == null || pop < 30 ? "#FFFFFF59" : pop < 60 ? "#8CC4FF" : RAIN);
 /** 강수량 글을 좁은 칸에 맞게 — "1.0mm" → "1mm", "1mm 미만" → "~1mm", "50.0mm 이상" → "50mm+" */
 const pcpShort = (s: string) => s.replace(/\.0/g, "").replace(/^(\S+?)\s*미만$/, "~$1").replace(/^(\S+?)\s*이상$/, "$1+");
 /** 골프에서 바람이 일이 되는 선 — 8m/s 부터 색을 준다(단계 예보는 '강함') */

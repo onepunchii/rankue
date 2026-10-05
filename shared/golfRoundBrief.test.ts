@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { briefLine, briefReason, lastTee18, nearestTee, partOfHour, roundBrief, sunLine, teeHours, PART_TEE_HOUR } from "./golfRoundBrief";
+import {
+    briefLine, briefReason, lastTee18, nearestTee, partOfHour, roundBrief, sunLine, teeHours, teeWxFromDay, teeWxFromHours, teeWxText, PART_TEE_HOUR,
+} from "./golfRoundBrief";
 import { teePart } from "./golfCourse";
 import type { WxHour } from "./golfWeather";
 
@@ -138,5 +140,34 @@ describe("해·문구", () => {
         expect(briefLine(b)).toBe("1부(07시 티오프) 쌀쌀한 새벽 티 — 구름많음, 비 20% · 바람 2m/s · 9°→14°");
         const rain = roundBrief(day((hr) => (hr >= 13 ? { kind: "rain", pop: 70, tmp: 16 } : { tmp: 16 })), 12, SUN)!;
         expect(briefLine(rain)).toBe("2부(12시 티오프) 우중 라운드 — 비, 비 70% · 바람 2m/s · 16°");
+    });
+});
+
+describe("글 한 줄의 티타임 날씨", () => {
+    it("그 라운드로 본다 — 티오프 기온 + 라운드 중 가장 높은 비 확률, 비가 끼면 그림도 비", () => {
+        const w = teeWxFromHours(day((hr) => ({ tmp: hr + 2, pop: hr === 10 ? 60 : 0, kind: hr === 10 ? "rain" : "clear" })), 7, SUN)!;
+        expect(w).toMatchObject({ kind: "rain", tmp: 9, pop: 60, src: "short", verdict: "우중 라운드" });
+        expect(teeWxText(w)).toBe("9° 비 60%");
+        const fine = teeWxFromHours(day((hr) => ({ tmp: hr + 2, kind: hr < 9 ? "partly" : "clear" })), 12, SUN)!;
+        expect(fine).toMatchObject({ kind: "clear", tmp: 14, pop: 0 });  // 비가 없으면 티오프 때의 하늘
+        expect(teeWxText(fine)).toBe("14°");                              // 30% 미만이면 확률은 적지 않는다
+        expect(fine.reason).toBe("비 0% · 바람 2m/s · 14°→19°");
+    });
+    it("세 시간 간격인 날은 가장 가까운 칸 — 두 시간 넘게 벌어지면 붙이지 않는다", () => {
+        const coarse = [6, 9, 12, 15, 18].map((x) => h(x, { tmp: x + 3, wsd: null, wq: 1 }));
+        expect(teeWxFromHours(coarse, 7, SUN)!.tmp).toBe(9);   // 6시 칸
+        expect(teeWxFromHours(coarse, 8, SUN)!.tmp).toBe(12);  // 9시 칸
+        expect(teeWxFromHours(day().filter((x) => +x.t.slice(8) >= 14), 7, SUN)).toBeNull(); // 오늘 아침 7시 글인데 예보는 14시부터
+        expect(teeWxFromHours([h(0)], 7, SUN)).toBeNull();     // 닷새째의 0시 한 줄
+        expect(teeWxFromHours([], 7, SUN)).toBeNull();
+    });
+    it("넓은 지역 예보 — 12시 전은 오전, 아니면 오후. 기온은 없다", () => {
+        const d = { date: "2026-10-12", src: "mid" as const, am: { kind: "clear" as const, pop: 10 }, pm: { kind: "rain" as const, pop: 60 }, tmn: 13, tmx: 27, wsd: null };
+        expect(teeWxFromDay(d, 7)).toEqual({ kind: "clear", tmp: null, pop: 10, src: "mid" });
+        expect(teeWxFromDay(d, 13)).toEqual({ kind: "rain", tmp: null, pop: 60, src: "mid" });
+        expect(teeWxText(teeWxFromDay(d, 7)!)).toBe("");          // 그림만
+        expect(teeWxText(teeWxFromDay(d, 13)!)).toBe("비 60%");
+        expect(teeWxFromDay({ ...d, am: null }, 7)).toMatchObject({ kind: "rain" }); // 오전이 없으면 오후로
+        expect(teeWxFromDay({ ...d, am: null, pm: null }, 7)).toBeNull();
     });
 });

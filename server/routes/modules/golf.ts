@@ -46,7 +46,7 @@ router.get("/bookings", asyncHandler(async (req: AuthRequest, res: any) => {
     // 화면 질의를 그대로 필터로 넘기되, 서버 전용 키(ownerId·includeBlinded·limit)는 지운다 — 남의 글 목록이나 가려진 글을 못 꺼내게.
     const { ownerId: _o, includeBlinded: _b, limit: _l, sinceDays: _s, ...filters } = req.query as Record<string, unknown>;
     const bookings = await storage.getGolfBookings(date, filters);
-    return sendSuccess(res, await withJoinCounts(bookings as any[], req.userId));
+    return sendSuccess(res, await withTeeWeather(await withJoinCounts(bookings as any[], req.userId)));
 }));
 
 router.get("/bookings/counts", asyncHandler(async (req: any, res: any) => {
@@ -653,6 +653,25 @@ router.post("/bookings/:id/share/crew", requireAuth, asyncHandler(async (req: Au
 }));
 
 /** 목록에 '몇 명 찼는지'와 '내가 신청했는지'를 얹는다 — 화면이 그걸 알아야 신청/취소를 가른다. */
+/**
+ * 글마다 그 티타임의 날씨(2026-10-05) — 날짜별 목록 응답에만 붙인다. 받아 둔 예보만 읽고(기상청을 부르지 않는다),
+ * 못 읽으면 글은 그대로 나간다. **비공개 글은 뺀다** — 위치를 가린 글이라 그 자리의 날씨도 싣지 않는다.
+ * 골프장 마스터가 없는 글(스크린·파크의 course_id "venue")도 자리 좌표를 몰라 빠진다.
+ */
+async function withTeeWeather<T extends Record<string, any>>(rows: T[]): Promise<T[]> {
+    try {
+        const usable = rows.filter((r) => !r.isBlind && /^[0-9]+$/.test(String(r.courseId ?? "")));
+        if (!usable.length) return rows;
+        const [{ loadGolfCourseSummary }, { teeWeatherFor }] = await Promise.all([import("./golfCourses.js"), import("../../services/golfWeather.js")]);
+        const s = await loadGolfCourseSummary();
+        const wx = await teeWeatherFor(usable.flatMap((r) => { const page = s.byCourseId.get(Number(r.courseId)); return page ? [{ id: String(r.id), page, datetime: r.datetime }] : []; }));
+        return wx.size ? rows.map((r) => (wx.has(r.id) ? { ...r, wx: wx.get(r.id) } : r)) : rows;
+    } catch (e) {
+        console.error("[GolfTeeWeather]", e);
+        return rows;
+    }
+}
+
 async function withJoinCounts(rows: any[], userId?: string) {
     const ids = rows.map((r) => r.id);
     // 긴급 여부는 컬럼이 아니라 계산이다(shared/golfJoin) — 시간이 지나 자격을 잃으면 배지도 저절로 사라진다.
@@ -698,7 +717,7 @@ router.get("/joins", asyncHandler(async (req: AuthRequest, res: any) => {
     const date = req.query.date as string | undefined;
     if (!validDate(date)) return sendError(res, 400, "날짜가 올바르지 않아요");
     const joins = await storage.getGolfJoins({ date, ...req.query });
-    return sendSuccess(res, await withJoinCounts(joins as any[], req.userId));
+    return sendSuccess(res, await withTeeWeather(await withJoinCounts(joins as any[], req.userId)));
 }));
 
 /*

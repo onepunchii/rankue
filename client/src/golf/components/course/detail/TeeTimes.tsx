@@ -19,6 +19,7 @@ import { teePart, wonShort, type PublicListing } from "@shared/golfCourse";
 import { SlotDots, costText, hostSeatLabel, joinTypeOf, slotsOf, JoinTypeBadge } from "../../join/joinUi";
 import type { WatchFilters } from "@/golf/lib/courseApi";
 import { WatchButton } from "../WatchSheet";
+import { TeeWxInline } from "../TeeWx";
 import { Card, Section, dayDiff, kstWeekday, todayKey } from "./ui";
 
 type Group = { key: string; title: string; showDate: boolean; items: PublicListing[] };
@@ -77,6 +78,8 @@ function Row({ l, showDate, onOpen }: { l: PublicListing; showDate: boolean; onO
                         <span className={cn("shrink-0 px-1.5 h-[22px] inline-flex items-center rounded-md text-[12px] font-semibold", kind.cls)}>{kind.label}</span>
                         {join && joinTypeOf(l) !== "FIELD" && <JoinTypeBadge type={joinTypeOf(l)} className="text-[12px]" />}
                         {showDate && <span className="text-[13px] text-[#FFFFFFB3] truncate">{kstDateLabel(l.datetime, { weekday: "short" })}</span>}
+                        {/* 그 티타임의 날씨(2026-10-05) — 아래 '날씨' 구역의 한 줄 평과 같은 계산 */}
+                        <TeeWxInline wx={l.wx} compact className="shrink-0 text-[13px] text-[#FFFFFFB3]" />
                     </span>
                     {join ? (
                         <span className="mt-1.5 flex items-center gap-2">

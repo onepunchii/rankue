@@ -9,7 +9,7 @@
  * 화면(WeatherCard)과 검색엔진용 화면(prerender)이 같은 함수를 쓴다.
  * ⚠️ shared 상대 임포트는 반드시 ./x.js(서버리스 규칙).
  */
-import { WIND_LEVEL, WX_LABEL, isWet, type WxHour, type WxKind } from "./golfWeather.js";
+import { WIND_LEVEL, WX_LABEL, isWet, type WxDay, type WxHour, type WxKind } from "./golfWeather.js";
 
 /** 18홀 한 라운드에 걸리는 시간(분) — 전반·그늘집·후반 합쳐 네 시간 반. 시간 창과 '마지막 티' 역산에 쓴다 */
 export const ROUND_MINUTES = 270;
@@ -128,6 +128,42 @@ export function roundBrief(dayHours: readonly WxHour[], teeHour: number, sun: { 
     };
     if (!winds.length && wqs.length) base.wq = Math.max(...wqs);
     return { ...base, ...verdictOf(base), gear: gearOf(base) };
+}
+
+// ── 글 한 줄에 붙이는 티타임 날씨(2026-10-05, 조인·부킹 글의 날씨 배지) ─────────────
+/**
+ * 조인·부킹 글 옆에 붙는 작은 날씨. short = 그 골프장 격자의 그 라운드(앞 나흘), mid = 넓은 지역 예보의 그 날 반나절(시간별이 없다).
+ * 글 줄에는 그림 + 티오프 기온 + (비 확률이 30% 이상일 때만) 확률만 보이고, 한 줄 평·근거는 눌렀을 때 쓰는 말이다.
+ */
+export interface TeeWx {
+    kind: WxKind;
+    /** 티오프 때 기온 — 넓은 지역 예보에는 없다 */
+    tmp: number | null;
+    /** 라운드 중(또는 그 반나절) 가장 높은 강수확률 */
+    pop: number | null;
+    src: "short" | "mid";
+    /** 한 줄 평과 근거 — short 만 */
+    verdict?: string;
+    reason?: string;
+}
+/** 예보의 시각이 티오프 시각과 이만큼(시간) 넘게 벌어지면 붙이지 않는다 — 나흘째는 세 시간 간격이라 한 시간 반까지는 가장 가까운 칸을 쓴다 */
+const TEE_SNAP_HOURS = 2;
+/** 그 날의 시간별 예보에서 — 티오프 시각에 가장 가까운 칸으로 그 라운드를 본다. 맞는 칸이 없으면 null */
+export function teeWxFromHours(dayHours: readonly WxHour[], teeHour: number, sun: { rise: string; set: string } | null): TeeWx | null {
+    const tee = nearestTee(teeHours(dayHours), teeHour);
+    if (tee == null || Math.abs(tee - teeHour) > TEE_SNAP_HOURS) return null;
+    const b = roundBrief(dayHours, tee, sun);
+    if (!b) return null;
+    return { kind: b.wet ?? b.hours[0].kind, tmp: b.startTmp, pop: b.pop, src: "short", verdict: b.verdict, reason: briefReason(b) };
+}
+/** 넓은 지역 예보의 하루에서 — 티오프가 낮 12시 전이면 오전, 아니면 오후 */
+export function teeWxFromDay(day: WxDay, teeHour: number): TeeWx | null {
+    const half = (teeHour < 12 ? day.am : day.pm) ?? day.pm ?? day.am;
+    return half ? { kind: half.kind, tmp: null, pop: half.pop, src: "mid" } : null;
+}
+/** 글 줄에 적는 말 — "9°", "9° 비 60%", (넓은 지역 예보) "비 40%" 또는 빈 문자열(그림만) */
+export function teeWxText(w: TeeWx): string {
+    return [w.tmp != null ? `${w.tmp}°` : "", (w.pop ?? 0) >= 30 ? `비 ${w.pop}%` : ""].filter(Boolean).join(" ");
 }
 
 /** 근거 숫자 한 줄 — "비 0% · 바람 3m/s · 9°→18°" */

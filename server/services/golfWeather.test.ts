@@ -5,7 +5,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const h = vi.hoisted(() => ({ execute: vi.fn() }));
 vi.mock("../db.js", () => ({ db: { execute: h.execute } }));
 
-import { getCourseWeather, warmWeather } from "./golfWeather";
+import { readFileSync } from "fs";
+import path from "path";
+import { getCourseWeather, teeWeatherFor, warmWeather } from "./golfWeather";
 import { toGrid } from "../../shared/golfWeather";
 
 /** drizzle sql 객체 → 글(표 이름·동사만 보면 된다) */
@@ -31,13 +33,14 @@ function shortItems(base: string) {
 const kmaOk = (items: any[]) => ({ json: async () => ({ response: { header: { resultCode: "00", resultMsg: "NORMAL_SERVICE" }, body: { items: { item: items } } } }) });
 const kmaNoData = () => ({ json: async () => ({ response: { header: { resultCode: "03", resultMsg: "NO_DATA" } } }) });
 
-interface Fake { grid: { base: string; data: any; ms: number } | null; mids: Record<string, { base: string; data: any; ms: number }>; writes: string[] }
+interface Fake { grid: { base: string; data: any; ms: number } | null; mids: Record<string, { base: string; data: any; ms: number }>; writes: string[]; grids?: any[] }
 function fakeDb(state: Fake) {
     h.execute.mockReset();
     h.execute.mockImplementation(async (q: any) => {
         const t = sqlText(q).replace(/\s+/g, " ").trim();
         if (t.startsWith("select base, data") && t.includes("golf_weather_grid")) return { rows: state.grid ? [state.grid] : [] };
         if (t.startsWith("select reg_id") && t.includes("golf_weather_mid")) return { rows: Object.entries(state.mids).map(([reg_id, v]) => ({ reg_id, ...v })) };
+        if (t.startsWith("select nx, ny, base, data") && t.includes("golf_weather_grid")) return { rows: state.grids ?? [] }; // 글마다의 날씨(묶음 조회)
         if (t.startsWith("select nx, ny") && t.includes("golf_weather_grid")) return { rows: [] };
         state.writes.push(t.split(" ").slice(0, 3).join(" "));
         return { rows: [] };
@@ -150,5 +153,63 @@ describe("warmWeather — 크론", () => {
         const r = await warmWeather([PAGE, near], { budgetMs: 2000, nowMs: NOW });
         expect(r).toMatchObject({ grids: toGrid(near.lat, near.lng).nx === toGrid(PAGE.lat, PAGE.lng).nx && toGrid(near.lat, near.lng).ny === toGrid(PAGE.lat, PAGE.lng).ny ? 1 : 2, mids: 2, midOk: 2, gridFail: 0 });
         expect(calls().filter((u: string) => u.includes("getMid"))).toHaveLength(2);
+    });
+});
+
+describe("teeWeatherFor — 글마다의 티타임 날씨", () => {
+    const g = toGrid(PAGE.lat, PAGE.lng);
+    const grids = () => [{ nx: g.nx, ny: g.ny, ...storedGrid("202610051100", NOW) }, { nx: g.nx + 9, ny: g.ny, ...storedGrid("202610051100", NOW) }];
+    const mids = {
+        "11B00000": { base: "202610050600", ms: NOW, data: { wf5Am: "맑음", wf5Pm: "흐리고 비", rnSt5Am: 10, rnSt5Pm: 60 } },
+        "11B20612": { base: "202610050600", ms: NOW, data: { taMin5: 12, taMax5: 24 } },
+    };
+
+    it("받아 둔 것만 읽는다 — 기상청을 부르지 않고, 조회는 두 번(격자 묶음 + 구역 묶음)", async () => {
+        fakeDb({ grid: null, mids, writes: [], grids: grids() });
+        const m = await teeWeatherFor([
+            { id: "a", page: PAGE, datetime: new Date(kst("2026-10-06T07:12:00")) },
+            { id: "b", page: { ...PAGE, lat: PAGE.lat - 0.001 }, datetime: "2026-10-06T04:20:00.000Z" }, // 같은 격자의 이웃 골프장, 13:20 KST
+        ], NOW);
+        expect(calls()).toHaveLength(0);
+        expect(h.execute).toHaveBeenCalledTimes(2);
+        expect(m.get("a")).toMatchObject({ src: "short", tmp: 15, pop: 20, kind: "clear" });
+        expect(m.get("b")).toMatchObject({ src: "short", tmp: 15 });
+        expect(m.get("a")!.verdict).toBeTruthy();
+    });
+    it("시간별이 없는 먼 날은 넓은 지역 예보의 그 반나절 — 기온 없이", async () => {
+        fakeDb({ grid: null, mids, writes: [], grids: grids() });
+        const m = await teeWeatherFor([
+            { id: "am", page: PAGE, datetime: new Date(kst("2026-10-10T07:00:00")) },
+            { id: "pm", page: PAGE, datetime: new Date(kst("2026-10-10T13:00:00")) },
+            { id: "far", page: PAGE, datetime: new Date(kst("2026-10-20T07:00:00")) },
+        ], NOW);
+        expect(m.get("am")).toEqual({ kind: "clear", tmp: null, pop: 10, src: "mid" });
+        expect(m.get("pm")).toEqual({ kind: "rain", tmp: null, pop: 60, src: "mid" });
+        expect(m.has("far")).toBe(false); // 열흘 밖은 붙이지 않는다
+    });
+    it("지난 글·좌표도 시군도 모르는 글·낡은 예보는 빠진다", async () => {
+        fakeDb({ grid: null, mids: {}, writes: [], grids: [{ nx: g.nx, ny: g.ny, ...storedGrid("202610030200", NOW) }] });
+        const m = await teeWeatherFor([
+            { id: "past", page: PAGE, datetime: new Date(NOW - 3 * 3600_000) },
+            { id: "nowhere", page: { region: "경기", city: null, lat: null, lng: null }, datetime: new Date(kst("2026-10-06T07:00:00")) },
+            { id: "stale", page: PAGE, datetime: new Date(kst("2026-10-06T07:00:00")) },
+        ], NOW);
+        expect(m.size).toBe(0);
+    });
+    it("키가 없거나 글이 없으면 DB 도 안 읽는다", async () => {
+        fakeDb({ grid: null, mids: {}, writes: [] });
+        expect((await teeWeatherFor([], NOW)).size).toBe(0);
+        delete process.env.DATA_GO_KR_KEY;
+        expect((await teeWeatherFor([{ id: "a", page: PAGE, datetime: new Date(kst("2026-10-06T07:00:00")) }], NOW)).size).toBe(0);
+        expect(h.execute).not.toHaveBeenCalled();
+    });
+    it("앱 안 목록은 비공개 글·골프장 없는 글에 날씨를 붙이지 않고, 실패해도 목록은 나간다", () => {
+        const src = readFileSync(path.resolve(process.cwd(), "server/routes/modules/golf.ts"), "utf8");
+        const fn = src.slice(src.indexOf("async function withTeeWeather"), src.indexOf("async function withJoinCounts"));
+        expect(fn).toContain("!r.isBlind");
+        expect(fn).toContain('/^[0-9]+$/.test(String(r.courseId ?? ""))');
+        expect(fn).toMatch(/catch \(e\) \{[\s\S]*return rows;/);
+        // 날짜별 목록 두 곳에만 붙인다
+        expect(src.match(/withTeeWeather\(await withJoinCounts/g)).toHaveLength(2);
     });
 });

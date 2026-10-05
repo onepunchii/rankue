@@ -19,6 +19,7 @@ import { useT } from '@/lib/i18n';
 import { kstDateKey, kstTime } from '@/lib/kst';
 import { SlotDots, JoinTypeBadge, costText, dayLabel, hostSeatLabel, joinTypeOf, kakaoMapUrl, kakaoRouteUrl, openGenderText, slotLegend, slotsOf } from '../join/joinUi';
 import { appConfirm } from "@/components/AppDialog";
+import { TeeWxInline } from '../course/TeeWx';
 
 interface BookingCardProps {
     item: any;
@@ -126,9 +127,11 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
                 )}
 
                 {/* 시계: 18:26 한 줄 + D-day */}
-                <div className="w-[66px] h-14 shrink-0 flex flex-col items-center justify-center rounded-xl bg-white/[0.05] border border-white/[0.06]">
+                {/* 그 티타임의 날씨(2026-10-05)가 있으면 셋째 줄 — 그림 + 티오프 기온, 비 올 때만 확률(칸이 좁아 '비' 글자는 뺀다) */}
+                <div className={cn("w-[66px] shrink-0 flex flex-col items-center justify-center rounded-xl bg-white/[0.05] border border-white/[0.06]", item.wx ? "h-[70px]" : "h-14")}>
                     <span className="rk-num text-[19px] font-semibold text-white leading-none">{kstTime(item.datetime)}</span>
                     <span className={cn("mt-1 text-[11px] font-medium leading-none", dday === "오늘" ? accentText : "text-white/45")}>{dday}</span>
+                    <TeeWxInline wx={item.wx} compact className="mt-1.5 text-[11.5px] font-medium leading-none text-white/60" iconClassName="w-[13px] h-[13px]" />
                 </div>
 
                 <div className="min-w-0 flex-1 space-y-1">

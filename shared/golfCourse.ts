@@ -10,6 +10,7 @@
  * ⚠️ shared 상대 임포트는 반드시 ./x.js(서버리스 규칙, 2026-08-16·09-14 사고).
  */
 import { isUrgentJoin, type UrgentJoinLike } from "./golfJoin.js";
+import type { TeeWx } from "./golfRoundBrief.js";
 
 export const ORIGIN = "https://www.rankue.co.kr";
 
@@ -198,6 +199,8 @@ export interface PublicListing extends UrgentJoinLike {
     joinApplied: number;
     joinCapacity: number;
     isUrgent: boolean;
+    /** 그 티타임의 날씨(2026-10-05) — 받아 둔 예보가 있을 때만. 없으면 칸을 그리지 않는다 */
+    wx?: TeeWx | null;
 }
 /** 이 글이 어떤 허브에 속하나 — 긴급은 조인의 한 갈래지만 허브는 따로 둔다. */
 export function listingIntents(l: Pick<PublicListing, "listingType"> & UrgentJoinLike, nowMs: number): GolfIntent[] {

@@ -7,6 +7,7 @@ import { kstDateKey, kstDateLabel, kstTime } from "@/lib/kst";
 import { cityShort, teePart, wonShort } from "@shared/golfCourse";
 import type { HubListing } from "../../../lib/courseApi";
 import { SlotDots, dayLabel, hostSeatLabel, slotsOf } from "../../join/joinUi";
+import { TeeWxInline } from "../TeeWx";
 
 /** 티오프까지 남은 시간(긴급은 날짜가 아니라 시간이 문제다). */
 function timeLeft(iso: string, now: number): string {
@@ -47,9 +48,14 @@ export function HubListingRow({ l, now, onOpen }: { l: HubListing; now: number; 
                         {l.isUrgent && <span className="shrink-0 h-5 px-1.5 rounded-md bg-[#FF3B3024] text-[#FF6B63] text-[12px] font-semibold leading-5">긴급</span>}
                         <span className="text-[15px] font-semibold text-[#FFFFFF] truncate">{l.courseName}</span>
                     </span>
-                    <span className="mt-0.5 block text-[13px] text-[#FFFFFF80] truncate tabular-nums">
-                        {kstTime(l.datetime)} · {teePart(l.datetime)}부{l.city ? ` · ${cityShort(l.city)}` : ""}
-                        {l.isUrgent ? <span className="text-[#FF6B63]"> · {timeLeft(l.datetime, now)}</span> : null}
+                    {/* 둘째 줄: 시각·부·시군은 좁으면 줄이고, 날씨는 줄이지 않는다(줄 끝에서 말줄임에 먹혔다 — 2026-10-05 실측) */}
+                    <span className="mt-0.5 flex items-center gap-1.5 min-w-0 text-[13px] text-[#FFFFFF80] tabular-nums">
+                        <span className="truncate">
+                            {kstTime(l.datetime)} · {teePart(l.datetime)}부{l.city ? ` · ${cityShort(l.city)}` : ""}
+                            {l.isUrgent ? <span className="text-[#FF6B63]"> · {timeLeft(l.datetime, now)}</span> : null}
+                        </span>
+                        {/* 그 티타임의 날씨 — 그림 + 티오프 기온, 비 올 땐 확률. 예보가 없으면 안 그린다 */}
+                        <TeeWxInline wx={l.wx} compact className="shrink-0" />
                     </span>
                 </span>
 
