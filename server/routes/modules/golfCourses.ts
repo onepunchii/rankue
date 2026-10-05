@@ -296,6 +296,20 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
     });
 }));
 
+// ── 날씨(2026-10-05) ──────────────────────────────────────────────
+// 기상청 단기(5km 격자)·중기 예보. 상세와 따로 받는다 — 상세는 30초마다 다시 받는데 날씨는 세 시간에 한 번 바뀐다.
+// 낡았으면 여기서 그 격자만 새로 받아 저장한다(services/golfWeather). 못 받으면 null — 화면은 구역을 그리지 않는다.
+// 모두에게 같은 공개 자료라 CDN 에 10분 둔다.
+router.get("/:slug/weather", asyncHandler(async (req: any, res: any) => {
+    const s = await loadSummary();
+    const page = s.bySlug.get(String(req.params.slug).normalize("NFC"));
+    if (!page) return sendError(res, 404, "골프장을 찾을 수 없어요");
+    const { getCourseWeather } = await import("../../services/golfWeather.js");
+    const weather = await getCourseWeather(page, { fetch: true }).catch((e) => { console.error("[GolfWeather]", e); return null; });
+    res.set("Cache-Control", weather ? "public, max-age=300, s-maxage=600, stale-while-revalidate=1800" : "no-store");
+    return sendSuccess(res, weather);
+}));
+
 // ── 라운드 사진(2026-09-30) ─────────────────────────────────────────
 // 회원이 '공개'로 돌린 라운드 사진 — 사전 승인 없이 바로 뜬다(오너 결정). 그래서 가려진 것(신고 3명)은 빼고,
 // 보는 사람이 차단한 회원의 사진도 뺀다. 크레딧은 이름·달까지만(정확한 날짜·시각은 그날 거기 있었다는 위치 기록이 된다).

@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { kstDateKey } from "@/lib/kst";
 
 /** 섹션 id — 위의 섹션 줄(SectionNav)이 이걸로 건너간다. */
-export type SectionId = "tee" | "price" | "fee" | "course" | "about" | "map" | "near";
+export type SectionId = "tee" | "weather" | "price" | "fee" | "course" | "about" | "map" | "near";
 
 /** 상단 바(56) + 섹션 줄(48) — 건너뛴 섹션 제목이 그 밑에 가리지 않게. */
 export const SCROLL_MARGIN = "calc(96px + env(safe-area-inset-top))";

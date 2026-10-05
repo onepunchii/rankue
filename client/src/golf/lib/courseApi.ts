@@ -8,6 +8,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { Fees, GolfIntent, PublicListing } from "@shared/golfCourse";
+import type { CourseWeather } from "@shared/golfWeather";
 
 export const COURSES_KEY = "/api/hiq/golf-courses";
 
@@ -117,6 +118,17 @@ export function useCourseDetail(slug: string | null | undefined) {
         enabled: !!slug, staleTime: 20_000, refetchInterval: 30_000,
         // 없는 골프장(404)은 다시 물어도 없다 — 안내가 늦게 뜨지 않게
         retry: (n, e: any) => e?.status !== 404 && n < 1,
+    });
+}
+/** 골프장 날씨(기상청) — 세 시간에 한 번 바뀌는 자료라 상세(30초)와 따로, 10분에 한 번만 다시 받는다. 없으면 null. */
+export function useCourseWeather(slug: string | null | undefined) {
+    return useQuery<CourseWeather | null>({
+        queryKey: [COURSES_KEY, "weather", slug],
+        queryFn: async () => {
+            const r: any = await apiRequest(`${COURSES_KEY}/${encodeURIComponent(slug!)}/weather`);
+            return r && Array.isArray(r.days) && Array.isArray(r.hours) ? (r as CourseWeather) : null;
+        },
+        enabled: !!slug, staleTime: 10 * 60_000, refetchInterval: 15 * 60_000, retry: 0,
     });
 }
 export function useMyWatches(enabled: boolean) {

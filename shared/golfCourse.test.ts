@@ -25,16 +25,17 @@ describe("courseWhere — 묶음 region 대신 실제 도", () => {
 });
 
 describe("courseTitle", () => {
-    it("시세가 있으면 회원권 시세가 먼저(옛 이름은 괄호)", () => {
+    // 낱말 순서 = 골프장 이름에 붙여 찾는 순서(네이버 검색량 2026-10-05: 날씨 100 · 회원권 0~13 · 그린피 2~3). 날씨가 맨 앞이다.
+    it("날씨가 맨 앞, 시세가 있으면 회원권 시세가 그다음(옛 이름은 괄호)", () => {
         expect(courseTitle(c({ name: "레이크사이드CC", region: "경기", city: "용인시", kind: "회원제+대중제", topPrice: 108000 })))
-            .toBe("레이크사이드CC 회원권 시세·부킹·조인·그린피 | 랭큐 골프");
+            .toBe("레이크사이드CC 날씨·회원권 시세·그린피·부킹·조인 | 랭큐 골프");
         expect(courseTitle(c({ name: "로제비앙GC", region: "경기", city: "광주시", topPrice: 5000, aliases: ["큐로CC"] })))
-            .toBe("로제비앙GC(큐로CC) 회원권 시세·부킹·조인·그린피 | 랭큐 골프");
+            .toBe("로제비앙GC(큐로CC) 날씨·회원권 시세·그린피·부킹·조인 | 랭큐 골프");
     });
-    it("시세가 없으면 그린피가 먼저 — 옛 이름이 없으면 괄호에 시군, 이름에 시군이 있으면 생략", () => {
-        expect(courseTitle(c({ name: "360도CC", region: "경기", city: "여주시" }))).toBe("360도CC(여주) 그린피·부킹·조인 | 랭큐 골프");
-        expect(courseTitle(c({ name: "로제비앙GC", region: "경기", city: "광주시", aliases: ["큐로CC"] }))).toBe("로제비앙GC(큐로CC) 그린피·부킹·조인 | 랭큐 골프");
-        expect(courseTitle(c({ name: "용인CC", region: "경기", city: "용인시" }))).toBe("용인CC 그린피·부킹·조인 | 랭큐 골프");
+    it("시세가 없으면 날씨·그린피 — 옛 이름이 없으면 괄호에 시군, 이름에 시군이 있으면 생략", () => {
+        expect(courseTitle(c({ name: "360도CC", region: "경기", city: "여주시" }))).toBe("360도CC(여주) 날씨·그린피·부킹·조인 | 랭큐 골프");
+        expect(courseTitle(c({ name: "로제비앙GC", region: "경기", city: "광주시", aliases: ["큐로CC"] }))).toBe("로제비앙GC(큐로CC) 날씨·그린피·부킹·조인 | 랭큐 골프");
+        expect(courseTitle(c({ name: "용인CC", region: "경기", city: "용인시" }))).toBe("용인CC 날씨·그린피·부킹·조인 | 랭큐 골프");
     });
 });
 
@@ -50,8 +51,8 @@ describe("courseDescription — 이름으로 시작, 강한 숫자 먼저", () =
             .toBe("경주CC 그린피 13만원부터 — 경북 경주 27홀 대중제 골프장.");
     });
     it("요금이 없어도 이름·도·시군이 들어간 한 문장 — 권유 문구 없이", () => {
-        expect(courseDescription(c({}))).toBe("OKCC 그린피·부킹·조인 — 전북 완주 9홀 대중제 골프장.");
-        expect(courseDescription(c({ listingCount: 2 }))).toBe("OKCC 그린피·부킹·조인 — 전북 완주 9홀 대중제 골프장. 지금 올라온 티타임 2건.");
+        expect(courseDescription(c({}))).toBe("OKCC 날씨·그린피·부킹·조인 — 전북 완주 9홀 대중제 골프장.");
+        expect(courseDescription(c({ listingCount: 2 }))).toBe("OKCC 날씨·그린피·부킹·조인 — 전북 완주 9홀 대중제 골프장. 지금 올라온 티타임 2건.");
     });
     it("덧붙임(글 수·특징)은 100자를 넘기지 않는다", () => {
         const d = courseDescription(c({

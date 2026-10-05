@@ -147,6 +147,15 @@ export const LucideStore = ((Ph as any).Storefront ?? F) as Ph.Icon;
 export const LucideSunHorizon = ((Ph as any).SunHorizon ?? F) as Ph.Icon;
 export const LucideSun = ((Ph as any).Sun ?? F) as Ph.Icon;
 export const LucideMoonStars = ((Ph as any).MoonStars ?? F) as Ph.Icon;
+/** 골프장 날씨(2026-10-05) */
+export const LucideMoon = ((Ph as any).Moon ?? F) as Ph.Icon;
+export const LucideCloud = ((Ph as any).Cloud ?? F) as Ph.Icon;
+export const LucideCloudSun = ((Ph as any).CloudSun ?? F) as Ph.Icon;
+export const LucideCloudMoon = ((Ph as any).CloudMoon ?? F) as Ph.Icon;
+export const LucideCloudRain = ((Ph as any).CloudRain ?? F) as Ph.Icon;
+export const LucideCloudSnow = ((Ph as any).CloudSnow ?? F) as Ph.Icon;
+export const LucideWind = ((Ph as any).Wind ?? F) as Ph.Icon;
+export const LucideDrop = ((Ph as any).Drop ?? F) as Ph.Icon;
 export const LucideUserMinus = ((Ph as any).UserMinus ?? F) as Ph.Icon;
 export const LucideCurrencyKrw = ((Ph as any).CurrencyKrw ?? F) as Ph.Icon;
 export const LucideSword = ((Ph as any).Sword ?? F) as Ph.Icon;

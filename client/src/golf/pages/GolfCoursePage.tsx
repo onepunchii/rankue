@@ -20,11 +20,13 @@ import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { hasPlugin, isNative } from "@shared/nativeCaps";
 import { distanceKm, formatDistance, isKoreaCoord } from "@shared/golfJoin";
 import { ORIGIN, REGION_LABEL, cityShort, courseDescription, coursePath, courseTitle, distinctAliases, listPath } from "@shared/golfCourse";
-import { COURSES_KEY, slugForCourseId, useCourseDetail, type CourseDetail, type CourseListItem } from "@/golf/lib/courseApi";
+import { COURSES_KEY, slugForCourseId, useCourseDetail, useCourseWeather, type CourseDetail, type CourseListItem } from "@/golf/lib/courseApi";
+import type { CourseWeather } from "@shared/golfWeather";
 import { CourseShell } from "@/golf/components/course/CourseShell";
 import { CourseLogo } from "@/golf/components/course/CourseLogo";
 import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/CourseHeader";
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";
+import { WeatherCard, WeatherSkeleton } from "@/golf/components/course/detail/WeatherCard";
 import { MembershipPrices, topPrice } from "@/golf/components/course/detail/MembershipPrices";
 import { GreenFees } from "@/golf/components/course/detail/GreenFees";
 import { CourseLayout } from "@/golf/components/course/detail/CourseLayout";
@@ -122,6 +124,8 @@ export default function GolfCoursePage() {
     }, [legacy, slug, setLocation]);
 
     const q = useCourseDetail(legacy ? null : slug);
+    // 날씨는 상세와 따로 받는다(세 시간에 한 번 바뀐다). 받는 동안은 뼈대, 없으면(null) 구역도 섹션 줄의 칩도 그리지 않는다.
+    const wx = useCourseWeather(legacy ? null : slug);
     const d = q.data;
     const prefill = usePrefill(legacy ? "" : slug);
     const notFound = legacyMissing || (q.error as any)?.status === 404;
@@ -191,6 +195,7 @@ export default function GolfCoursePage() {
     const has = (d ? {
         // 글이 붙을 수 없는 골프장(자료로만 만든 새 페이지)은 '지금 이 골프장'도 관심 단추도 없다 — 약속할 수 없는 알림이다.
         tee: d.bookable,
+        weather: wx.isPending || !!wx.data,
         price: d.prices.length > 0,
         fee: !!d.fees?.rows?.some((r) => r.nonMember || r.member || r.family),
         course: !!d.courses?.some((c) => c.holes > 0) || (d.parts?.filter((p) => p.holes).length ?? 0) >= 2,
@@ -235,7 +240,7 @@ export default function GolfCoursePage() {
                             </div>
                         ) : <BodySkeleton />
                     ) : (
-                        <Body d={d} ids={ids} distance={distKm != null ? formatDistance(distKm) : null} />
+                        <Body d={d} ids={ids} distance={distKm != null ? formatDistance(distKm) : null} weather={wx.data ?? null} />
                     )}
                 </>
             )}
@@ -243,7 +248,7 @@ export default function GolfCoursePage() {
     );
 }
 
-function Body({ d, ids, distance }: { d: CourseDetail; ids: SectionId[]; distance: string | null }) {
+function Body({ d, ids, distance, weather }: { d: CourseDetail; ids: SectionId[]; distance: string | null; weather: CourseWeather | null }) {
     const city = cityShort(d.city);
     const tgm = d.prices.length > 0 || !!d.fees || !!d.intro;
     return (
@@ -252,6 +257,8 @@ function Body({ d, ids, distance }: { d: CourseDetail; ids: SectionId[]; distanc
             {ids.includes("tee") && <TeeTimes slug={d.slug} name={d.name} listings={d.listings} counts={d.counts} myWatch={d.myWatch} watchers={d.watchers} />}
             {/* 랭큐 골프 소개(2026-10-05) — 검색으로 들어온 비로그인 방문자에게만. 티타임 바로 아래, 시세·그린피 정보는 가리지 않게 */}
             <GolfGuestIntro className="mx-4 mt-8" />
+            {/* 날씨(2026-10-05) — 골프장 이름에 붙여 가장 많이 찾는 말. 티타임 다음, 시세·그린피 앞 */}
+            {ids.includes("weather") && (weather ? <WeatherCard wx={weather} /> : <WeatherSkeleton />)}
             {ids.includes("price") && <MembershipPrices key={d.slug} prices={d.prices} />}
             {ids.includes("fee") && d.fees && <GreenFees fees={d.fees} />}
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}

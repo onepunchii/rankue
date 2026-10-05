@@ -152,6 +152,22 @@ async function handleGolfPrices(req: any, res: any) {
 router.get("/golf-prices", asyncHandler(handleGolfPrices));
 router.post("/golf-prices", asyncHandler(handleGolfPrices));
 
+// 골프장 날씨 데우기(2026-10-05) — 매시 20분. 기상청 단기예보 한 번이 1초 남짓이라 격자 388개를 한 번에 못 돈다:
+// 가장 낡은 격자부터 시간 예산(6초)만큼만 새로 받고, 나머지는 다음 시간에 이어서 돈다. 사람이 여는 골프장은
+// 상세 API 가 그 자리에서 새로 받으므로(services/golfWeather.getCourseWeather) 이 크론은 검색엔진용 화면을 위한 것이다.
+async function handleGolfWeather(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { loadGolfCourseSummary } = await import("./golfCourses.js");
+    const { warmWeather } = await import("../../services/golfWeather.js");
+    const s = await loadGolfCourseSummary();
+    const budget = Math.min(20_000, Math.max(1000, Number(req.query.budget) || 6000));
+    return sendSuccess(res, await warmWeather(s.pages, { budgetMs: budget }));
+}
+router.get("/golf-weather", asyncHandler(handleGolfWeather));
+router.post("/golf-weather", asyncHandler(handleGolfWeather));
+
 /** 알림함 보존 기간(오너 결정 2026-09-23). 읽은 것도 안 읽은 것도 이 날짜가 지나면 지운다. */
 const NOTIFICATION_KEEP_DAYS = 7;
 

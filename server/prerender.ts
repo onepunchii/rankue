@@ -25,6 +25,8 @@ import {
   courseTitle, courseDescription, listTitle, listDescription, listingIntents, teePart, distinctAliases, type Fees, type GolfIntent,
 } from "../shared/golfCourse.js";
 import { GOLF_GUIDE, GOLF_INTRO, golfFaq, guideTabFor } from "../shared/golfGuide.js";
+import { WIND_LEVEL, baseLabel, dayLabel, dayLine, dayPop, daySky, type WxDay } from "../shared/golfWeather.js";
+import { getCourseWeather } from "./services/golfWeather.js";
 import { JOIN_TYPE_LABEL, distanceKm, formatDistance, type JoinType } from "../shared/golfJoin.js";
 // seo/* 는 이 파일의 page·esc·hubNav 를 되받아 쓴다(순환). 둘 다 요청 시점에만 부르므로 초기화 순서와 무관하다.
 import { renderRankingExtra, type RankingExtraRender } from "./seo/rankingExtra.js";
@@ -747,6 +749,31 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     ? `\n  <h2>${esc(p.name)} 라운드 사진</h2>\n  ${photos.map((ph) => `<figure><img src="${esc(ph.url)}" alt="${esc(`${p.name} 라운드 사진`)}"${ph.width && ph.height ? ` width="${ph.width}" height="${ph.height}"` : ""} loading="lazy"><figcaption>${esc(`사진 · ${ph.credit}${ph.month ? ` · ${ph.month}` : ""}`)}</figcaption></figure>`).join("\n  ")}`
     : "";
 
+  // 날씨(2026-10-05) — 기상청 예보. 받아 둔 것만 읽는다(검색 로봇이 올 때마다 기상청을 두드리지 않는다 — 크론이 데워 둔다).
+  // 골프장 이름에 붙여 가장 많이 찾는 말이라 표로 싣는다. 화면(WeatherCard)과 같은 자료·같은 문구(shared/golfWeather).
+  let weatherHtml = "";
+  const wx = await getCourseWeather(p, { fetch: false }).catch(() => null);
+  if (wx && wx.days.length) {
+    const lead = wx.days.slice(0, 2).map((d) => dayLine(d)).join(" / ");
+    const row = (d: WxDay) => {
+      const pop = dayPop(d);
+      const wind = d.wsd != null ? `${d.wsd}m/s` : d.wq ? WIND_LEVEL[d.wq] : "—";
+      return `<tr><th scope="row">${esc(dayLabel(d.date))}</th><td>${esc(daySky(d) || "—")}</td><td>${d.tmn != null ? `${d.tmn}°` : "—"}</td><td>${d.tmx != null ? `${d.tmx}°` : "—"}</td><td>${pop != null ? `${pop}%` : "—"}</td><td>${esc(wind)}</td></tr>`;
+    };
+    const mid = wx.days.some((d) => d.src === "mid");
+    weatherHtml = `
+  <h2>${esc(p.name)} 날씨</h2>
+  <p>${esc(lead)}</p>
+  <table>
+    <caption>${esc(`${p.name} 날씨 — 오늘부터 ${wx.days.length}일(기상청 ${baseLabel(wx.base)} 발표)`)}</caption>
+    <thead><tr><th scope="col">날짜</th><th scope="col">하늘</th><th scope="col">최저</th><th scope="col">최고</th><th scope="col">강수확률</th><th scope="col">바람(낮 최대)</th></tr></thead>
+    <tbody>
+    ${wx.days.map(row).join("\n    ")}
+    </tbody>
+  </table>
+  <p>${esc(`자료: 기상청 단기·중기예보. ${wx.approx ? `골프장 좌표가 없어 ${wx.approx} 기준 예보를 싣습니다.` : "앞 나흘은 이 골프장 자리(5km 격자) 예보입니다."}${mid && wx.midArea ? ` 닷새째부터는 넓은 지역 예보(${wx.midArea})입니다.` : ""}`)}</p>`;
+  }
+
   // 지금 올라온 티타임
   const listingHtml = listings.length
     ? `\n  <h2>지금 올라온 티타임 ${listings.length}건</h2>\n  <ul>\n  ${listings.slice(0, 40).map((l) => golfListingLi(s, l, false)).join("\n  ")}\n  </ul>`
@@ -826,7 +853,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
   <dl>
     ${dlHtml}
   </dl>
-  ${mapHtml}${listingHtml}${feeHtml}${priceHtml}${courseHtml}${introHtml}${photoHtml}${nearHtml}${hubHtml}
+  ${mapHtml}${listingHtml}${weatherHtml}${feeHtml}${priceHtml}${courseHtml}${introHtml}${photoHtml}${nearHtml}${hubHtml}
   ${hubNav("ko")}
 </main>`,
   });

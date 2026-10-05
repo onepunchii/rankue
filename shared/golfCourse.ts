@@ -139,11 +139,13 @@ const courseOld = (c: CourseSeoFacts) => distinctAliases(c.name, c.aliases).find
 export function courseTitle(c: CourseSeoFacts): string {
     // 개명한 골프장은 옛 이름을 괄호로 — 아직 옛 이름으로 찾는 사람이 많다(한 개만, 제목이 길어지지 않게)
     const old = courseOld(c);
-    if (c.topPrice) return `${c.name}${old ? `(${old})` : ""} 회원권 시세·부킹·조인·그린피 | 랭큐 골프`;
-    // 시세가 없는 곳(대중제 311곳 대부분)은 '그린피'가 첫 검색어다. 옛 이름이 없으면 괄호에 시군을 — "360도CC(여주)"(2026-09-24)
+    // 낱말 순서는 사람들이 골프장 이름에 붙여 찾는 순서다(네이버 검색량 2026-10-05: 날씨 100 · 맛집 30 · 회원권 0~13 · 예약 0~10 · 그린피 2~3).
+    // 날씨는 기상청 예보를 이 페이지에 싣기 시작한 날부터 맨 앞이다. 뒤쪽(부킹·조인)은 검색 결과에서 잘려도 된다.
+    if (c.topPrice) return `${c.name}${old ? `(${old})` : ""} 날씨·회원권 시세·그린피·부킹·조인 | 랭큐 골프`;
+    // 시세가 없는 곳(대중제 311곳 대부분). 옛 이름이 없으면 괄호에 시군을 — "360도CC(여주)"(2026-09-24)
     const city = cityShort(c.city);
-    const paren = old ?? (city && !c.name.includes(city) && c.name.length + city.length <= 23 ? city : "");
-    return `${c.name}${paren ? `(${paren})` : ""} 그린피·부킹·조인 | 랭큐 골프`;
+    const paren = old ?? (city && !c.name.includes(city) && c.name.length + city.length <= 20 ? city : "");
+    return `${c.name}${paren ? `(${paren})` : ""} 날씨·그린피·부킹·조인 | 랭큐 골프`;
 }
 /**
  * 검색 결과 설명 — 이름으로 시작하고(검색어와 겹치면 굵게 뜬다) 가장 강한 숫자(시세 → 그린피)를 앞에 둔다.
@@ -156,7 +158,8 @@ export function courseDescription(c: CourseSeoFacts): string {
         c.topPrice ? `회원권 시세 ${manwonText(c.topPrice)}` : "",
         fee ? `주중 비회원 그린피 ${wonShort(fee)}` : c.feeFrom ? `그린피 ${wonShort(c.feeFrom)}부터` : "",
     ].filter(Boolean).join(" · ");
-    let out = `${c.name} ${nums || "그린피·부킹·조인"} — ${`${courseWhere(c.region, c.city)} ${shape}`.trim()} 골프장.`;
+    // 숫자가 없는 곳은 찾는 말을 적는다 — 날씨가 먼저(courseTitle 과 같은 순서). 숫자가 있는 곳의 설명은 그대로 둔다(490곳에 같은 꼬리말을 달지 않는다).
+    let out = `${c.name} ${nums || "날씨·그린피·부킹·조인"} — ${`${courseWhere(c.region, c.city)} ${shape}`.trim()} 골프장.`;
     // 글이 없을 때 붙던 권유 문장("…알림으로 받으세요")은 뺐다 — 골프장 473곳 설명마다 같은 문장이 반복됐다(2026-09-24 검토).
     const traits = [...(c.grass ?? []), ...(c.play ?? []).map((p) => PLAY_WORD[p] ?? p)];
     for (const extra of [c.listingCount ? `지금 올라온 티타임 ${c.listingCount}건.` : "", traits.length ? `${traits.join(" · ")}.` : ""]) {
