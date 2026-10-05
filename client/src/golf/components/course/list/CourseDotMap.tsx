@@ -12,6 +12,10 @@
  * 당겨 들어가는 동안 점이 커지며 자리를 잡는다.
  *
  * 누르는 기능은 없다(점이 손가락보다 작다). 보는 그림이라 aria-hidden.
+ *
+ * 넷째 판(2026-10-05 오너: "이 점들이 우리만의 시그니처 — 4번(경계선) 이미지와 합치고, 키우고, 더 살리자" → 시안 → "응 순서대로"):
+ *   · `under` — 점 밑에 시도 윤곽선을 깐다(KoreaOutline). 윤곽선의 지역 면이 누를 자리가 된다(점은 손가락을 비켜 준다).
+ *   · `pulse` — 글이 올라온 점에 숨 쉬는 테두리. · 점의 뜻에 '내 관심'(호박색)이 하나 늘었다(shared/golfDotMap DotTone).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 // 투영·틀 맞추기·벌집 격자는 shared 로 옮겼다(2026-09-30) — 발자국 지도·공유 카드가 **같은 좌표**로 겹쳐 그려야 해서.
@@ -24,6 +28,10 @@ const LIVE_FILL: Record<"booking" | "join" | "urgent", string> = {
     join: "#FF6B00",
     urgent: "#FF3B30",
 };
+/** 내 관심 골프장(2026-10-05) — 관심 단추·알림과 같은 호박색. 글이 올라온 점(위 셋)보다는 작고 조용하게 */
+export const WATCH_FILL = "#FFC43D";
+/** 범례가 같은 색을 쓴다 */
+export const DOT_COLOR = { ...LIVE_FILL, watch: WATCH_FILL, course: "#FFFFFFA6" } as const;
 /** 한 칸의 골프장 수 → 밝기(1·2·3곳 이상). 한 칸에 점 하나라 반투명이어도 겹쳐 뿌예지지 않는다. */
 const ON_FILL = ["#FFFFFF6B", "#FFFFFFA6", "#FFFFFFE6"] as const;
 const DIM_FILL = "#FFFFFF1F";
@@ -37,7 +45,7 @@ const ON_COLOR = { on: ["#FFFFFF66", "#FFFFFFA6", "#FFFFFFF2"] as const, dim: "#
 
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 
-export function CourseDotMap({ dots, focus, box: fixedBox, aspect = 0.62, cols = 34, bg = "#111111", onColor = false, muted = false, className, children }: {
+export function CourseDotMap({ dots, focus, box: fixedBox, aspect = 0.62, cols = 34, bg = "#111111", onColor = false, muted = false, pulse = false, className, under, children }: {
     dots: MapDot[];
     /** 당겨 볼 점들(지역·시군의 골프장). 없으면 전국. */
     focus: { lat: number; lng: number }[] | null;
@@ -56,7 +64,11 @@ export function CourseDotMap({ dots, focus, box: fixedBox, aspect = 0.62, cols =
     onColor?: boolean;
     /** 점을 한 단계 흐리게 — 위에 겹쳐 그린 것(발자국)을 돋보이게 */
     muted?: boolean;
+    /** 글이 올라온 점에 숨 쉬는 테두리(2026-10-05) — '지금 있다'를 움직임으로. 움직임 줄이기를 켠 기기에서는 멈춘 옅은 고리 */
+    pulse?: boolean;
     className?: string;
+    /** 점 **밑에** 깔 것(시도 윤곽선 — KoreaOutline). 같은 viewBox 안이라 점과 한 몸으로 움직인다. */
+    under?: ReactNode;
     /** 점 위에 겹쳐 그릴 것(발자국) — **같은 viewBox 안**이라 당겨 들어가는 동안에도 점과 한 몸으로 움직인다. */
     children?: ReactNode;
 }) {
@@ -85,21 +97,41 @@ export function CourseDotMap({ dots, focus, box: fixedBox, aspect = 0.62, cols =
     // 격자는 도착할 화면(target) 기준 — 애니메이션 중에 칸이 바뀌면 점이 깜빡인다.
     const g = target[2] / cols;
     const cells = useMemo(() => toCells(dots, g), [dots, g]);
+    const still = useMemo(() => typeof window !== "undefined" && !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches, []);
 
     return (
         // 겹쳐 그린 것(발자국)이 있으면 그쪽이 누를 수 있는 단추를 품는다 — 그때는 지도 전체를 가리지 않는다.
         <svg viewBox={box.join(" ")} preserveAspectRatio="xMidYMid meet" className={className} aria-hidden={children ? undefined : "true"} shapeRendering="geometricPrecision">
-            {cells.map((c) => {
-                if (c.tone === "booking" || c.tone === "join" || c.tone === "urgent") {
-                    return onColor
-                        ? <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.46} fill={ON_COLOR.live} stroke={ON_COLOR.ring} strokeWidth={g * 0.14} />
-                        : <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.5} fill={LIVE_FILL[c.tone]} stroke={bg} strokeWidth={g * 0.16} paintOrder="stroke" />;
-                }
-                const fill = onColor
-                    ? (c.tone === "dim" ? ON_COLOR.dim : ON_COLOR.on[Math.min(c.n, 3) - 1])
-                    : (c.tone === "dim" ? DIM_FILL : (muted ? MUTED_FILL : ON_FILL)[Math.min(c.n, 3) - 1]);
-                return <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.3} fill={fill} />;
-            })}
+            {under}
+            {/* 점은 누르는 것이 아니다 — 밑의 윤곽선(지역 면)이 손가락을 받게 비켜 준다 */}
+            <g pointerEvents="none">
+                {cells.map((c) => {
+                    if (c.tone === "booking" || c.tone === "join" || c.tone === "urgent") {
+                        if (onColor) return <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.46} fill={ON_COLOR.live} stroke={ON_COLOR.ring} strokeWidth={g * 0.14} />;
+                        const dot = <circle cx={c.x} cy={c.y} r={g * 0.5} fill={LIVE_FILL[c.tone]} stroke={bg} strokeWidth={g * 0.16} paintOrder="stroke" />;
+                        if (!pulse) return <g key={c.key}>{dot}</g>;
+                        return (
+                            <g key={c.key}>
+                                {still
+                                    ? <circle cx={c.x} cy={c.y} r={g * 1.05} fill={LIVE_FILL[c.tone]} fillOpacity={0.2} />
+                                    : (
+                                        <circle cx={c.x} cy={c.y} r={g * 0.6} fill={LIVE_FILL[c.tone]} fillOpacity={0.3}>
+                                            <animate attributeName="r" values={`${g * 0.6};${g * 1.3};${g * 0.6}`} dur="2.8s" repeatCount="indefinite" />
+                                            <animate attributeName="fill-opacity" values="0.3;0.04;0.3" dur="2.8s" repeatCount="indefinite" />
+                                        </circle>
+                                    )}
+                                {dot}
+                            </g>
+                        );
+                    }
+                    // 내 관심 — 색 바탕(홈 배너) 위에서는 그리지 않는다(그쪽은 점을 흰 단계로만 쓴다)
+                    if (c.tone === "watch" && !onColor) return <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.4} fill={WATCH_FILL} stroke={bg} strokeWidth={g * 0.12} paintOrder="stroke" />;
+                    const fill = onColor
+                        ? (c.tone === "dim" ? ON_COLOR.dim : ON_COLOR.on[Math.min(c.n, 3) - 1])
+                        : (c.tone === "dim" ? DIM_FILL : (muted ? MUTED_FILL : ON_FILL)[Math.min(c.n, 3) - 1]);
+                    return <circle key={c.key} cx={c.x} cy={c.y} r={g * 0.3} fill={fill} />;
+                })}
+            </g>
             {children}
         </svg>
     );

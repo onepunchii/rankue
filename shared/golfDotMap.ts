@@ -6,7 +6,11 @@
  * (옮기기만 했다 — 숫자·규칙은 2026-09-24 셋째 판 그대로다.)
  */
 
-export type DotTone = "dim" | "on" | "booking" | "join" | "urgent";
+/**
+ * 점의 뜻. dim = 지금 범위 밖 · on = 골프장 · watch = 내 관심(2026-10-05 — 로그인한 사람에게만) · 나머지 셋 = 지금 올라온 글.
+ * 색은 화면(CourseDotMap)이 정한다: 조인 주황 · 부킹 라임 · 긴급 빨강 · 내 관심 호박색.
+ */
+export type DotTone = "dim" | "on" | "watch" | "booking" | "join" | "urgent";
 export interface MapDot { key: string; lat: number; lng: number; tone: DotTone }
 /** [x, y, 너비, 높이] — SVG viewBox 와 같은 순서 */
 export type MapBox = [number, number, number, number];
@@ -47,7 +51,7 @@ export function fitBox(pts: readonly { lat: number; lng: number }[], aspect: num
 export const MUTED_DOT_FILL = ["#FFFFFF33", "#FFFFFF4D", "#FFFFFF6B"] as const;
 
 /** 칸 하나에 여러 골프장이 들어오면 가장 급한 색이 이긴다. */
-export const TONE_RANK: Record<DotTone, number> = { dim: 0, on: 1, booking: 2, join: 3, urgent: 4 };
+export const TONE_RANK: Record<DotTone, number> = { dim: 0, on: 1, watch: 2, booking: 3, join: 4, urgent: 5 };
 
 export interface DotCell { key: string; x: number; y: number; n: number; tone: DotTone }
 

@@ -15,15 +15,9 @@ import { LucideStamp, LucideChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { coursePath } from "@shared/golfCourse";
 import { CourseLogo } from "../course/CourseLogo";
+import { OUTLINE_GROUP } from "@/golf/lib/koreaOutline";
 
-const REGION_GROUP_MAPPING: Record<string, string> = {
-    "Seoul": "경기", "Gyeonggi": "경기", "Incheon": "경기",
-    "Gangwon": "강원",
-    "North Chungcheong": "충청", "South Chungcheong": "충청", "Daejeon": "충청", "Sejong": "충청",
-    "North Jeolla": "전라", "South Jeolla": "전라", "Gwangju": "전라",
-    "North Gyeongsang": "경상", "South Gyeongsang": "경상", "Busan": "경상", "Daegu": "경상", "Ulsan": "경상",
-    "Jeju": "제주"
-};
+const REGION_GROUP_MAPPING = OUTLINE_GROUP;
 /** 지도(RegionMap)와 같은 기준 — 그 묶음 골프장의 20%를 가 보면 금색(마스터). */
 const MASTER_RATIO = 0.2;
 

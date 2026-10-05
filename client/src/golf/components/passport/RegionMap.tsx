@@ -1,15 +1,9 @@
 import { cn } from "@/lib/utils";
 import { KOREA_MAP_PATHS } from "@/golf/data/koreaMapData";
+import { OUTLINE_GROUP } from "@/golf/lib/koreaOutline";
 
-/** 지도 path 의 영문 광역 id → 여권 묶음. 서울·인천은 경기와 한 묶음이라 같은 색으로 칠해진다. */
-export const REGION_GROUP_MAPPING: Record<string, string> = {
-    "Seoul": "경기", "Gyeonggi": "경기", "Incheon": "경기",
-    "Gangwon": "강원",
-    "North Chungcheong": "충청", "South Chungcheong": "충청", "Daejeon": "충청", "Sejong": "충청",
-    "North Jeolla": "전라", "South Jeolla": "전라", "Gwangju": "전라",
-    "North Gyeongsang": "경상", "South Gyeongsang": "경상", "Busan": "경상", "Daegu": "경상", "Ulsan": "경상",
-    "Jeju": "제주"
-};
+/** 지도 path 의 영문 광역 id → 여권 묶음. 서울·인천은 경기와 한 묶음이라 같은 색으로 칠해진다. 정본은 lib/koreaOutline. */
+export const REGION_GROUP_MAPPING: Readonly<Record<string, string>> = OUTLINE_GROUP;
 
 /** 그 묶음 골프장의 20%를 가 보면 금색(마스터). */
 const MASTER_RATIO = 0.2;

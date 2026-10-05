@@ -29,7 +29,8 @@ import {
 import { distanceKm, isKoreaCoord } from "@shared/golfJoin";
 import { useCourseList, useCourseRegions, useHubListings, useMyWatches, type CourseListItem, type HubListing, type WatchFilters } from "../lib/courseApi";
 import { CourseShell } from "../components/course/CourseShell";
-import { CourseDotMap, type MapDot } from "../components/course/list/CourseDotMap";
+import { CourseDotMap, DOT_COLOR, type MapDot } from "../components/course/list/CourseDotMap";
+import { KoreaOutline } from "../components/course/list/KoreaOutline";
 import { CourseRow, CourseRowSkeleton, matchesCourseQuery } from "../components/course/list/CourseRow";
 import { HubListingRow } from "../components/course/list/HubListingRow";
 import { GOLF_POST_PATH, GolfFaq, GolfGuideSheet, GolfIntroBanner, RegionGlance } from "../components/course/GolfGuide";
@@ -141,12 +142,16 @@ export default function GolfCourseHub() {
     const dots: MapDot[] = useMemo(() => (all.data ?? []).filter((c) => c.lat != null && c.lng != null).map((c) => {
         const on = inScope(c, region, city);
         const k = c.counts;
-        const tone: MapDot["tone"] = !on ? "dim"
+        const live: MapDot["tone"] = !on ? "dim"
             : intent ? (k[intent] > 0 ? intent : "on")
             : k.urgent > 0 ? "urgent" : k.join > 0 ? "join" : k.booking > 0 ? "booking" : "on";
+        // 글이 없는 내 관심 골프장은 호박색 점(2026-10-05) — 글이 올라오면 그 글의 색이 이긴다
+        const tone: MapDot["tone"] = live === "on" && watchOf.has(c.slug) ? "watch" : live;
         return { key: c.slug, lat: c.lat!, lng: c.lng!, tone };
-    }), [all.data, region, city, intent]);
+    }), [all.data, region, city, intent, watchOf]);
     const focus = useMemo(() => (region ? dots.filter((d) => d.tone !== "dim") : null), [dots, region]);
+    // 지도의 지역 면을 누르면 그 지역으로(2026-10-05) — 고른 지역을 한 번 더 누르면 한 단계 위로(시군 → 지역 → 전국)
+    const pickRegion = (g: string) => setLocation(listPath({ intent, region: g === region && !city ? null : g }));
 
     // ── 목록: 검색·정렬·쪽 ──
     const [q, setQ] = useState("");
@@ -213,7 +218,8 @@ export default function GolfCourseHub() {
     const hubRows = hub.data ?? [];
     const tabColor = INTENT_TABS.find((t) => t.intent === intent)!.color;
 
-    const liveBits = (["urgent", "join", "booking"] as const).filter((k) => sums[k] > 0);
+    // 이 범위에서 내가 관심 등록한 골프장 수 — 지도 범례의 '내 관심'
+    const watchedHere = useMemo(() => items.filter((c) => watchOf.has(c.slug)).length, [items, watchOf]);
     const DOT: Record<GolfIntent, string> = { booking: "#64DD17", join: "#FF6B00", urgent: "#FF3B30" };
 
     return (
@@ -319,26 +325,40 @@ export default function GolfCourseHub() {
                 </div>
             )}
 
-            {/* ── 지도 요약 ── 왼쪽은 숫자, 오른쪽은 점 지도(점 하나 = 골프장 한 곳, 색 = 지금 티타임) */}
-            <section aria-label="지도" className="mx-5 mt-4 h-[148px] rounded-2xl bg-[#FFFFFF06] flex overflow-hidden">
-                <div className="flex-1 min-w-0 p-4 flex flex-col">
-                    <span className="text-[13px] text-[#FFFFFF73] truncate">{city ? cityShort(city) : regionLabel ?? "전국"}</span>
-                    <span className="mt-0.5 text-[26px] font-bold tracking-tight text-[#FFFFFF] tabular-nums leading-none">
-                        {list.isSuccess ? courseCount.toLocaleString() : "·"}<span className="ml-0.5 text-[15px] font-semibold text-[#FFFFFF8C]">곳</span>
-                    </span>
-                    <div className="mt-auto space-y-1">
-                        {liveBits.length ? liveBits.map((k) => (
-                            <span key={k} className="flex items-center gap-1.5 text-[12.5px] text-[#FFFFFFB3] tabular-nums">
-                                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: DOT[k] }} />
-                                {INTENT_TABS.find((t) => t.intent === k)!.label} {sums[k]}건
-                            </span>
-                        )) : (
-                            <span className="text-[12.5px] text-[#FFFFFF59]">지금 올라온 티타임 없음</span>
-                        )}
+            {/* ── 지도 ── 점 지도가 이 화면의 얼굴이다(2026-10-05 넷째 판 — 오너: "이 점들이 우리만의 시그니처, 더 살리자").
+                카드 반쪽(158×148)이던 것을 화면 폭 전체로 키우고, 시도 윤곽선을 옅게 깔았다. 윤곽선의 지역 면을 누르면 그 지역으로 간다.
+                점 하나 = 골프장(격자 한 칸), 색 = 지금 올라온 글(조인 주황 · 부킹 라임 · 긴급 빨강) · 내 관심(호박색). 아래 범례가 그 뜻을 말한다.
+                의도 허브(조인·부킹·긴급)는 글 목록이 바로 밑이라 지도를 낮게 둔다. */}
+            <section aria-label="지도" className="mx-5 mt-4 rounded-2xl bg-[#FFFFFF06] overflow-hidden">
+                <div className="px-4 pt-4 flex items-end justify-between gap-3">
+                    <div className="min-w-0">
+                        <span className="block text-[13px] text-[#FFFFFF73] truncate">{city ? cityShort(city) : regionLabel ?? "전국"}</span>
+                        <span className="block mt-0.5 text-[26px] font-bold tracking-tight text-[#FFFFFF] tabular-nums leading-none">
+                            {list.isSuccess ? courseCount.toLocaleString() : "·"}<span className="ml-0.5 text-[15px] font-semibold text-[#FFFFFF8C]">곳</span>
+                        </span>
                     </div>
+                    <span className="shrink-0 pb-0.5 text-[12.5px] text-[#FFFFFF73]">{region ? "한 번 더 누르면 넓게" : "지도를 눌러 지역 고르기"}</span>
                 </div>
-                <div className="w-[46%] shrink-0 relative">
-                    <CourseDotMap dots={dots} focus={focus} aspect={1.04} cols={30} bg="#0F0F0F" className="absolute inset-0 w-full h-full" />
+                <CourseDotMap
+                    dots={dots} focus={focus} aspect={intent ? 1.3 : 0.95} cols={intent ? 40 : 30} bg="#0F0F0F" pulse
+                    className={cn("block w-full", intent ? "aspect-[1.3]" : "aspect-[0.95]")}
+                    under={<KoreaOutline active={region} onPick={pickRegion} />}
+                />
+                <div className="px-4 pt-1 pb-3.5 flex flex-wrap items-center gap-x-3.5 gap-y-1 text-[12.5px] text-[#FFFFFFB3] tabular-nums">
+                    {(intent ? [intent] : (["join", "booking", "urgent"] as const)).map((k) => (
+                        <span key={k} className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: DOT_COLOR[k] }} />
+                            {INTENT_TABS.find((t) => t.intent === k)!.label}{sums[k] > 0 && <span className="font-semibold text-[#FFFFFF]">{sums[k]}</span>}
+                        </span>
+                    ))}
+                    {watchedHere > 0 && (
+                        <span className="inline-flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: DOT_COLOR.watch }} />내 관심<span className="font-semibold text-[#FFFFFF]">{watchedHere}</span>
+                        </span>
+                    )}
+                    <span className="inline-flex items-center gap-1.5 text-[#FFFFFF8C]">
+                        <span className="w-2 h-2 rounded-full" style={{ backgroundColor: DOT_COLOR.course }} />골프장
+                    </span>
                 </div>
             </section>
 
