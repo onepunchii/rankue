@@ -260,7 +260,7 @@ function Body({ d, ids, distance, weather }: { d: CourseDetail; ids: SectionId[]
             {/* 랭큐 골프 소개(2026-10-05) — 검색으로 들어온 비로그인 방문자에게만. 티타임 바로 아래, 시세·그린피 정보는 가리지 않게 */}
             <GolfGuestIntro className="mx-4 mt-8" />
             {/* 날씨(2026-10-05) — 골프장 이름에 붙여 가장 많이 찾는 말. 티타임 다음, 시세·그린피 앞 */}
-            {ids.includes("weather") && (weather ? <WeatherCard wx={weather} /> : <WeatherSkeleton />)}
+            {ids.includes("weather") && (weather ? <WeatherCard wx={weather} myTees={d.myTees} /> : <WeatherSkeleton />)}
             {ids.includes("price") && <MembershipPrices key={d.slug} prices={d.prices} />}
             {ids.includes("fee") && d.fees && <GreenFees fees={d.fees} />}
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}

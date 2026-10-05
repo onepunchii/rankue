@@ -256,13 +256,23 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
     if (!p) return sendError(res, 404, "골프장을 찾을 수 없어요");
     const q = async (x: any) => { const r: any = await db.execute(x); return (r.rows ?? r) as any[]; };
     const me = viewerId(req);
-    const [prices, hist, rounds, mine] = await Promise.all([
+    const [prices, hist, rounds, mine, myTeeRows] = await Promise.all([
         q(sql`select item_id, label, price, change, year_high, year_low, as_of from golf_membership_prices where slug = ${slug} order by price desc`),
         q(sql`select h.item_id, h.d, h.price from golf_membership_price_history h
               join golf_membership_prices m on m.item_id = h.item_id
               where m.slug = ${slug} and h.d > current_date - interval '400 days' order by h.item_id, h.d`),
         p.clubId ? q(sql`select count(*)::int n from golf_match_sessions where course_id = ${p.clubId} and status = 'finished'`) : Promise.resolve([{ n: 0 }]),
         me ? q(sql`select filters from golf_course_watches where member_id = ${me}::uuid and slug = ${slug}`) : Promise.resolve([]),
+        // 이 골프장에서 내가 치는 티타임(2026-10-05 라운드 브리핑) — 날씨를 그 시각에 맞춰 준다.
+        // '내가 친다' = 내가 올린 조인(호스트가 같이 친다) 또는 확정(accepted)된 신청. 내가 올린 **부킹**은 파는 티타임이라 뺀다.
+        // 가려진 글은 빼고, 이미 시작한 라운드도 다섯 시간까지는 남긴다(치는 중에 열어 볼 수 있다).
+        me && p.courseIds.length ? q(sql`
+            select b.id, b.datetime, b.listing_type from golf_bookings b
+            where b.course_id = any(${`{${p.courseIds.map((c) => `"${Number(c)}"`).join(",")}}`}::text[])
+              and b.is_blinded = false and b.datetime > now() - interval '5 hours' and b.datetime < now() + interval '5 days'
+              and ((b.owner_id = ${me}::uuid and b.listing_type = 'JOIN')
+                or exists (select 1 from golf_join_requests r where r.booking_id = b.id and r.member_id = ${me}::uuid and r.status = 'accepted'))
+            order by b.datetime asc limit 5`) : Promise.resolve([]),
     ]);
     // 이력 — 1년치 일간이면 점이 300개를 넘는다. 차트에는 120점이면 충분하다(마지막 점은 반드시 남긴다).
     const byItem = new Map<string, { d: string; p: number }[]>();
@@ -294,6 +304,7 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
         rounds: Number(rounds[0]?.n ?? 0),
         watchers: s.watchers.get(slug) ?? 0,
         myWatch: mine[0] ? { filters: mine[0].filters ?? {} } : null,
+        myTees: myTeeRows.map((r) => ({ id: r.id, datetime: utcIso(r.datetime), listingType: r.listing_type === "JOIN" ? "JOIN" : "BOOKING" })),
     });
 }));
 

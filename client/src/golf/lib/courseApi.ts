@@ -73,6 +73,8 @@ export interface CourseDetail {
     watchers: number;
     /** 로그인한 내가 관심 등록했으면 조건, 아니면 null */
     myWatch: { filters: WatchFilters } | null;
+    /** 이 골프장에서 내가 치는 티타임(내가 올린 조인·확정된 신청, 닷새 안) — 날씨를 그 시각에 맞춘다. 비로그인은 빈 목록 */
+    myTees?: { id: string; datetime: string; listingType: "BOOKING" | "JOIN" }[];
     logo: string | null;
     grass: string[];
     play: string[];

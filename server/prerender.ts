@@ -25,7 +25,8 @@ import {
   courseTitle, courseDescription, listTitle, listDescription, listingIntents, teePart, distinctAliases, type Fees, type GolfIntent,
 } from "../shared/golfCourse.js";
 import { GOLF_GUIDE, GOLF_INTRO, golfFaq, guideTabFor } from "../shared/golfGuide.js";
-import { WIND_LEVEL, baseLabel, dayLabel, dayLine, dayPop, daySky, type WxDay } from "../shared/golfWeather.js";
+import { WIND_LEVEL, baseLabel, dayLabel, dayLine, dayPop, daySky, sunTimes, type WxDay } from "../shared/golfWeather.js";
+import { PART_TEE_HOUR, briefLine, nearestTee, partOfHour, roundBrief, sunLine, teeHours } from "../shared/golfRoundBrief.js";
 import { getCourseWeather } from "./services/golfWeather.js";
 import { JOIN_TYPE_LABEL, distanceKm, formatDistance, type JoinType } from "../shared/golfJoin.js";
 // seo/* 는 이 파일의 page·esc·hubNav 를 되받아 쓴다(순환). 둘 다 요청 시점에만 부르므로 초기화 순서와 무관하다.
@@ -761,9 +762,28 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
       return `<tr><th scope="row">${esc(dayLabel(d.date))}</th><td>${esc(daySky(d) || "—")}</td><td>${d.tmn != null ? `${d.tmn}°` : "—"}</td><td>${d.tmx != null ? `${d.tmx}°` : "—"}</td><td>${pop != null ? `${pop}%` : "—"}</td><td>${esc(wind)}</td></tr>`;
     };
     const mid = wx.days.some((d) => d.src === "mid");
+    // 티타임별 한 줄(라운드 브리핑, 2026-10-05) — 화면과 같은 규칙(shared/golfRoundBrief). 시간별 예보가 있는 앞 이틀의 1·2·3부.
+    const teeLis: string[] = [];
+    let sunText = "";
+    for (const d of wx.days.filter((x) => x.src === "short").slice(0, 2)) {
+      const dayHours = wx.hours.filter((h) => h.t.startsWith(d.date.replace(/-/g, "")));
+      const avail = teeHours(dayHours);
+      const sun = sunTimes(wx.at.lat, wx.at.lng, d.date);
+      if (sun && !sunText) sunText = `${dayLabel(d.date)} ${sunLine(sun)}`;
+      for (const part of [1, 2, 3] as const) {
+        const tee = nearestTee(avail.filter((h) => partOfHour(h) === part), PART_TEE_HOUR[part]);
+        const b = tee != null ? roundBrief(dayHours, tee, sun) : null;
+        if (b) teeLis.push(`<li>${esc(`${dayLabel(d.date)} ${briefLine(b)}`)}</li>`);
+      }
+    }
+    const teeHtml = teeLis.length ? `
+  <h3>${esc(p.name)} 티타임별 날씨</h3>
+  <ul>
+  ${teeLis.join("\n  ")}
+  </ul>${sunText ? `\n  <p>${esc(sunText)}</p>` : ""}` : "";
     weatherHtml = `
   <h2>${esc(p.name)} 날씨</h2>
-  <p>${esc(lead)}</p>
+  <p>${esc(lead)}</p>${teeHtml}
   <table>
     <caption>${esc(`${p.name} 날씨 — 오늘부터 ${wx.days.length}일(기상청 ${baseLabel(wx.base)} 발표)`)}</caption>
     <thead><tr><th scope="col">날짜</th><th scope="col">하늘</th><th scope="col">최저</th><th scope="col">최고</th><th scope="col">강수확률</th><th scope="col">바람(낮 최대)</th></tr></thead>
