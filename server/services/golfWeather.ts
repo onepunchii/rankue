@@ -7,7 +7,7 @@
  * 받아 오는 때 — 서버리스라 상주 프로세스가 없고, 단기예보 한 번이 1초 남짓이라 격자 388개를 한 번에 돌 수 없다.
  *   · 상세를 열 때: 그 격자가 새 발표보다 낡았으면 그 자리에서 한 번 받아 저장한다(getCourseWeather, fetch: true).
  *     같은 격자를 10분 안에 다시 조르지 않는다(발표가 늦어 NO_DATA 가 와도 매 요청마다 두드리지 않게).
- *   · 크론(매시): 가장 낡은 격자부터 시간 예산만큼 데워 둔다(warmWeather) — 검색엔진용 화면은 저장된 것만 읽는다.
+ *   · 크론(20분마다): 가장 낡은 격자부터 시간 예산만큼 데워 둔다(warmWeather) — 검색엔진용 화면은 저장된 것만 읽는다.
  *   · 받아 오다 실패하면 가진 것(낡은 예보)을 그대로 쓴다. 지난 시간은 화면에서 빠진다.
  *
  * 판정·파싱은 shared/golfWeather(순수 함수, golfWeather.test.ts). 표는 migrations/golf_weather.sql.
@@ -52,7 +52,7 @@ async function kma(url: string, params: Record<string, string | number>, timeout
 }
 
 /** 단기예보 한 격자. 방금 발표가 아직 안 열렸으면(NO_DATA) 그 앞 발표로 물러선다. */
-export async function fetchShort(nx: number, ny: number, nowMs: number, timeoutMs = 6000): Promise<WxGrid | null> {
+export async function fetchShort(nx: number, ny: number, nowMs: number, timeoutMs = 5000): Promise<WxGrid | null> {
     for (let back = 0; back < 2; back++) {
         const base = latestShortBase(nowMs, back);
         const r = await kma(SHORT_URL, { numOfRows: 1500, base_date: base.slice(0, 8), base_time: base.slice(8, 12), nx, ny }, timeoutMs);
@@ -64,7 +64,7 @@ export async function fetchShort(nx: number, ny: number, nowMs: number, timeoutM
     }
     return null;
 }
-async function fetchMid<T>(url: string, regId: string, nowMs: number, pick: (row: Record<string, unknown>) => T, timeoutMs = 5000): Promise<MidSaved<T> | null> {
+async function fetchMid<T>(url: string, regId: string, nowMs: number, pick: (row: Record<string, unknown>) => T, timeoutMs = 4000): Promise<MidSaved<T> | null> {
     for (let back = 0; back < 2; back++) {
         const base = latestMidBase(nowMs, back);
         const r = await kma(url, { numOfRows: 10, regId, tmFc: base }, timeoutMs);
@@ -116,7 +116,7 @@ export interface WeatherPage { region?: string | null; city?: string | null; lat
 
 /** 같은 인스턴스에서 같은 격자를 동시에 두 번 받지 않게 */
 const inflight = new Map<string, Promise<WxGrid | null>>();
-function refreshGrid(nx: number, ny: number, nowMs: number, had: boolean, timeoutMs = 6000): Promise<WxGrid | null> {
+function refreshGrid(nx: number, ny: number, nowMs: number, had: boolean, timeoutMs = 5000): Promise<WxGrid | null> {
     const k = `${nx},${ny}`;
     let p = inflight.get(k);
     if (!p) {
@@ -221,8 +221,8 @@ export async function warmWeather(pages: WeatherPage[], opts: { budgetMs?: numbe
     }
     const due = [...grids].filter(([k]) => { const h = have.get(k); return !h || (h.base < latest && nowMs - h.ms > RETRY_MS); })
         .sort((a, b) => (have.get(a[0])?.ms ?? 0) - (have.get(b[0])?.ms ?? 0));
-    // 한 번에 3초까지만 기다린다 — 예산이 끝날 무렵 시작한 호출이 서버리스 시간 제한까지 끌고 가지 않게
-    const short = await pool(due, 8, until, async ([k, g]) => !!(await refreshGrid(g.nx, g.ny, nowMs, have.has(k), 3000)));
+    // 한 번에 2.5초까지만 기다린다 — 예산이 끝날 무렵 시작한 호출이 서버리스 시간 제한까지 끌고 가지 않게(크론이 그만큼 남겨 둔다)
+    const short = await pool(due, 8, until, async ([k, g]) => !!(await refreshGrid(g.nx, g.ny, nowMs, have.has(k), 2500)));
 
     return {
         grids: grids.size, gridDue: due.length, gridOk: short.ok, gridFail: short.fail, gridLeft: short.left,

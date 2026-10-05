@@ -152,18 +152,23 @@ async function handleGolfPrices(req: any, res: any) {
 router.get("/golf-prices", asyncHandler(handleGolfPrices));
 router.post("/golf-prices", asyncHandler(handleGolfPrices));
 
-// 골프장 날씨 데우기(2026-10-05) — 매시 20분. 기상청 단기예보 한 번이 1초 남짓이라 격자 388개를 한 번에 못 돈다:
-// 가장 낡은 격자부터 시간 예산(6초)만큼만 새로 받고, 나머지는 다음 시간에 이어서 돈다. 사람이 여는 골프장은
+// 골프장 날씨 데우기(2026-10-05) — 20분마다. 기상청 단기예보 한 번이 1초 남짓이라 격자 393개를 한 번에 못 돈다:
+// 가장 낡은 격자부터 조금씩 새로 받고, 나머지는 다음 차례에 이어서 돈다. 사람이 여는 골프장은
 // 상세 API 가 그 자리에서 새로 받으므로(services/golfWeather.getCourseWeather) 이 크론은 검색엔진용 화면을 위한 것이다.
+// 시간: 서버리스 시간 제한을 10초로 보고 넉넉히 그 안에 끝낸다. 식은 인스턴스는 이 함수가 불리기 전 준비에만 2초쯤 들고
+// (운영 실측: 할 일이 없을 때도 3초), 그건 여기서 잴 수 없다 — 그래서 '7초 - 여기서 쓴 시간 - 마지막 호출이 끝날 여유 2.5초'만 쓴다. 한 번에 20격자 남짓.
 async function handleGolfWeather(req: any, res: any) {
+    const t0 = Date.now();
     const secret = process.env.CRON_SECRET;
     if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
     if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
     const { loadGolfCourseSummary } = await import("./golfCourses.js");
     const { warmWeather } = await import("../../services/golfWeather.js");
     const s = await loadGolfCourseSummary();
-    const budget = Math.min(20_000, Math.max(1000, Number(req.query.budget) || 6000));
-    return sendSuccess(res, await warmWeather(s.pages, { budgetMs: budget }));
+    const manual = Number(req.query.budget); // 손으로 부를 때만(?budget=) — 로컬·점검용
+    const budget = manual > 0 ? Math.min(20_000, manual) : Math.max(1000, 7000 - (Date.now() - t0) - 2500);
+    const result = await warmWeather(s.pages, { budgetMs: budget });
+    return sendSuccess(res, { ...result, budgetMs: budget, tookMs: Date.now() - t0 });
 }
 router.get("/golf-weather", asyncHandler(handleGolfWeather));
 router.post("/golf-weather", asyncHandler(handleGolfWeather));

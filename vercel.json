@@ -118,7 +118,7 @@
       "path": "/api/cron/golf-prices",
       "schedule": "40 12 * * *"
     },
-    { "path": "/api/cron/golf-weather", "schedule": "20 * * * *" }
+    { "path": "/api/cron/golf-weather", "schedule": "5,25,45 * * * *" }
   ],
   "env": {
     "VERCEL": "true"
