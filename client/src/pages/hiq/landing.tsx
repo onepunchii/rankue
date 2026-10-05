@@ -4,7 +4,7 @@ import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { useToast } from "@/hooks/use-toast";
 import { safeReturnPath } from "@shared/promoFunnel";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, refreshAfterLogin } from "@/lib/queryClient";
 import { LucideChevronRight, LucideDelete, LucideShieldQuestion } from "@/lib/icons";
 import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@/contexts/StoreContext";
@@ -73,7 +73,11 @@ export default function Landing() {
                 if (!alive) return;
                 if (res.ok) {
                     setAuthState("in");
-                    setLocation("/dashboard", { replace: true });
+                    // 이미 로그인돼 있다 — 화면이 '비로그인'으로 기억하고 있어 여기로 보낸 것일 수 있으니 '나'를 새로 받고,
+                    // 보던 곳(?redirect=)이 있으면 홈이 아니라 거기로 돌려보낸다(2026-10-05)
+                    await refreshAfterLogin();
+                    if (!alive) return;
+                    setLocation(safeReturnPath(new URLSearchParams(window.location.search).get("redirect")) ?? "/dashboard", { replace: true });
                     return;
                 }
             } catch { /* 네트워크 실패는 미로그인으로 취급 */ }
@@ -152,7 +156,9 @@ export default function Landing() {
                 : !res.isNew ? redirect
                 : res.redirectTo?.startsWith("/register") ? `${res.redirectTo}${res.redirectTo.includes("?") ? "&" : "?"}redirect=${encodeURIComponent(redirect)}`
                 : res.redirectTo;
-            setTimeout(() => setLocation(dest), 500);
+            // 로그인된 사람(기존 회원)은 '나'를 새로 받은 뒤에 옮긴다 — 안 그러면 돌아간 화면이 비로그인으로 그려진다(queryClient.refreshAfterLogin)
+            if (!res.isNew) await refreshAfterLogin();
+            setTimeout(() => setLocation(dest), res.isNew ? 500 : 200);
 
         } catch (error: any) {
             toast({

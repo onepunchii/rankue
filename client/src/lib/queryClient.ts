@@ -188,6 +188,23 @@ export const queryClient = new QueryClient({
   },
 });
 
+/**
+ * 로그인·가입에 **성공한 직후** 부른다(2026-10-05 오너 제보: "로그인했는데 로그인이 안 됐다고 나온다").
+ *
+ * 비로그인으로 공개 페이지(골프장·랭킹)를 보던 사람은 '나 = 없음(null)'이 5분짜리 답으로 캐시에 들어 있다
+ * (2026-10-01 에 401 을 오류가 아니라 답으로 바꾼 뒤부터). 로그인 화면들은 성공하면 화면만 옮겼지 이 답을 버리지 않아서,
+ * 돌아온 화면이 5분 동안 비로그인으로 그려졌다 — 머리의 '로그인' 단추, 가입 안내, 골프 화면에서 당구 홈으로 튕김.
+ * 그래서: ① 옛 답을 버리고 ② 비로그인으로 받아 둔 다른 답(내 관심·내 티타임이 빠진 골프장 상세 등)도 낡은 것으로 표시하고
+ * ③ '나'를 먼저 받아 둔다 — 다음 화면이 처음부터 로그인된 채로 그려지게.
+ */
+export async function refreshAfterLogin(): Promise<void> {
+  queryClient.removeQueries({ queryKey: ["/api/hiq/me"] });
+  void queryClient.invalidateQueries();
+  try {
+    await queryClient.fetchQuery({ queryKey: ["/api/hiq/me"], staleTime: 0 });
+  } catch { /* 못 받았으면 다음 화면이 다시 묻는다(옛 답은 이미 버렸다) */ }
+}
+
 // 6. Persistence (Cache Buster v2.2)
 if (typeof window !== "undefined") {
   const persister = createSyncStoragePersister({

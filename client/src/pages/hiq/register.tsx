@@ -10,7 +10,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { promoEvent } from "@/lib/promo";
 import { safeReturnPath } from "@shared/promoFunnel";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, refreshAfterLogin } from "@/lib/queryClient";
 import { insertHiqMemberSchema, type InsertHiqMember } from "../../../../shared/schema";
 import { LucideChevronRight, LucideCheckCircle2, LucideSparkles } from "@/lib/icons";
 import { useQuery } from "@tanstack/react-query";
@@ -134,6 +134,8 @@ export default function HiqRegister() {
                 body: { ...data, termsVersion: TERMS_VERSION },
             });
             setIsCompleted(true);
+            // 가입과 함께 로그인된다 — 환영 화면이 떠 있는 동안 '나'를 새로 받아 둔다(돌아간 화면이 비로그인으로 그려지지 않게)
+            void refreshAfterLogin();
             // 검색 유입 깔때기(2026-09-27) — '길 찾기' 배너를 거쳐 온 사람의 가입을 센다(배너를 안 거쳤으면 보내지 않는다)
             promoEvent("signup");
             // 가입 전 보던 곳(예: 온라인게임 길 찾기)으로 돌려보낸다 — 우리 경로만

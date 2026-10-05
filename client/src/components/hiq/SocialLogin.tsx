@@ -5,7 +5,7 @@ import { useT } from "@/lib/i18n";
 import { isNativeApp, nativePlatform, openStorePage } from "@/lib/nativeBridge";
 import { nativeSocialAvailable, nativeSocialIdToken } from "@/lib/nativeSignIn";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
-import { queryClient } from "@/lib/queryClient";
+import { queryClient, refreshAfterLogin } from "@/lib/queryClient";
 import { isTermsAccepted } from "@shared/terms";
 
 // 소셜 로그인(구글·애플) — 글로벌(비한국어) 유저의 기본 진입.
@@ -105,6 +105,8 @@ export default function SocialLogin({ hint = true }: { hint?: boolean }) {
       // LoginGate 가 붙여 보낸 ?redirect= 로 돌아간다 — 라이벌을 보려다 로그인한 사람은
       // 라이벌로 되돌아와야 한다. startsWith("/") 로 오픈 리다이렉트를 막는다(전화 로그인과 동일).
       const back = new URLSearchParams(window.location.search).get("redirect");
+      // '나'를 새로 받은 뒤에 옮긴다 — 안 그러면 돌아간 화면이 비로그인으로 그려진다(queryClient.refreshAfterLogin)
+      await refreshAfterLogin();
       setLocation(back?.startsWith("/") ? back : (j.data?.redirectTo || "/dashboard"));
     } catch (err) {
       // 서버가 알려준 실패 사유(레이트리밋·검증 실패 등)를 그대로 보여준다 — 일반 문구만으로는 원인 추적 불가
