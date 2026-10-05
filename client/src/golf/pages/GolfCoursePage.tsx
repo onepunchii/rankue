@@ -270,7 +270,7 @@ function Body({ d, ids, distance, weather }: { d: CourseDetail; ids: SectionId[]
             <LocationCard name={d.name} address={d.address} lat={d.lat} lng={d.lng} distance={distance} phone={d.phone} website={d.website || d.info?.homepage || null} />
             {/* 근처 먹거리·카페·숙소(2026-10-05) — 네이버 지역 검색을 그 자리에서. 위치 바로 아래(라운드 끝나고 어디서 먹을지).
                 날씨에서 보고 있는 라운드(round)가 첫 메뉴 칩을 고른다 */}
-            {ids.includes("food") && <NearbyPlaces key={d.slug} slug={d.slug} name={d.name} round={round} />}
+            {ids.includes("food") && <NearbyPlaces key={d.slug} slug={d.slug} name={d.name} region={d.region} city={d.city} round={round} />}
 
             {/* 회원이 공개한 라운드 사진(2026-09-30) — 없으면 칸을 그리지 않는다 */}
             <CoursePhotoGallery slug={d.slug} name={d.name} />

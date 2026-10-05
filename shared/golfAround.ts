@@ -15,6 +15,9 @@
  *   · 날씨가 첫 칩을 고른다(menuForBrief) — 라운드 브리핑의 한 줄 평(shared/golfRoundBrief)에서. 규칙이지 추천 점수가 아니다.
  *     술을 권하는 말은 쓰지 않는다(다들 차를 몰고 온다).
  *
+ * 이 동네 대표 메뉴(같은 날 — "순서대로"의 5번): 시군마다 이름난 먹거리 칩이 하나 더 붙는다(shared/golfLocalDish — 우리가 쓴 사전).
+ *   누르면 같은 꼴("{골프장} 근처 닭갈비")로 찾는다. 서버는 그 골프장 시군의 사전에 있는 낱말만 받는다.
+ *
  * 네이버 검색 API 특약(2026-09-07 시행 — 기사 요약으로 확인) 때문에 지키는 것 — 바꾸기 전에 약관 원문을 볼 것:
  *   · 저장·캐싱 금지 → 열 때마다 실시간으로 부른다. DB·CDN·검색엔진용 화면에 두지 않는다.
  *   · 가공 금지 → 순서·낱말 그대로. 거리로 거르거나 다시 줄 세우지 않고, 거리 표시도 얹지 않는다.
@@ -47,7 +50,8 @@ export const isNearbyKind = (v: unknown): v is NearbyKind => typeof v === "strin
 export const nearbyMenu = (kind: NearbyKind): NearbyMenu => BY_KEY.get(kind) ?? NEARBY_MENUS[0];
 
 /** 네이버에 보내는 검색어 — 화면의 '네이버 지도에서 더 보기'도 같은 말로 연다 */
-export const nearbyQuery = (courseName: string, kind: NearbyKind) => `${courseName} 근처 ${NEARBY_WORD[kind]}`;
+export const nearbyWordQuery = (courseName: string, word: string) => `${courseName} 근처 ${word}`;
+export const nearbyQuery = (courseName: string, kind: NearbyKind) => nearbyWordQuery(courseName, NEARBY_WORD[kind]);
 
 /** 화면에 까는 칩 — 냉면은 여름(6~8월)이거나 지금 골라져 있을 때만(겨울에 냉면 칩은 뜬금없다) */
 export function menuChips(current: NearbyKind, month: number): NearbyMenu[] {

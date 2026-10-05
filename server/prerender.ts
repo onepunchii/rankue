@@ -35,6 +35,7 @@ import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js"
 import { renderGolfChecklist } from "./seo/golfGuide.js";
 import { renderGolfTerms, type GolfTermsRender } from "./seo/golfTerms.js";
 import { GOLF_TERMS_NAV_LABEL, GOLF_TERMS_PATH } from "../shared/golfTermsMeta.js";
+import { localDishLabel, localDishLine, localDishes } from "../shared/golfLocalDish.js";
 import { PACK_NAV_LABEL, PACK_PATH } from "../shared/golfPack.js";
 import {
   FIND_FEATURES, FIND_JOIN_LABEL, FIND_NOTE, findDescription, findFaq, findFeature, findHeading, findPath, findRegionCounts, findTitle,
@@ -821,6 +822,10 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     near = [...same.filter((x) => p.city && x.city === p.city), ...same.filter((x) => !p.city || x.city !== p.city)].slice(0, 8).map((x) => ({ x, km: null }));
   }
   // 글 목록 밑에 가까운 6곳의 카드 줄 — 네이버가 이 골프장 결과 밑에 이웃 골프장 카드를 줄지어 보여 줄 재료(매장·선수 이웃 절과 같다)
+  // 이 동네 대표 메뉴(2026-10-05) — 우리가 쓴 사전(shared/golfLocalDish)이라 여기 실을 수 있다. 화면의 칩 줄과 같은 글.
+  // 네이버 검색 결과(가게 목록)는 여전히 싣지 않는다 — 약관 때문이다(화면의 '근처' 구역 머리말). 이 파일은 그쪽 모듈을 부르지 않는다.
+  const dishes = localDishes(p.region, p.city);
+  const dishHtml = dishes.length ? `\n  <h2>${esc(localDishLabel(p.city))}</h2>\n  <p>${esc(localDishLine(dishes))}</p>` : "";
   const nearHtml = near.length
     ? `\n  <h2>${esc(p.name)} 가까운 골프장</h2>\n  <ul>\n  ${near.map(({ x, km }) => golfCourseLi(s, x, byListing, { where: true, km })).join("\n  ")}\n  </ul>` +
       `\n  ${cardGallery(`${p.name} 가까운 골프장`, near.slice(0, 6).map(({ x }) => ({
@@ -884,7 +889,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
   <dl>
     ${dlHtml}
   </dl>
-  ${mapHtml}${listingHtml}${weatherHtml}${feeHtml}${priceHtml}${courseHtml}${introHtml}${photoHtml}${nearHtml}${hubHtml}
+  ${mapHtml}${listingHtml}${weatherHtml}${feeHtml}${priceHtml}${courseHtml}${introHtml}${dishHtml}${photoHtml}${nearHtml}${hubHtml}
   ${hubNav("ko")}
 </main>`,
   });

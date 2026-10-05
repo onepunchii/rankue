@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readFileSync } from "fs";
 import path from "path";
-import { searchNearby } from "./naverLocal";
+import { searchNearby, searchNearbyWord } from "./naverLocal";
 import { NEARBY_KINDS, isNearbyKind, naverMapSearchUrl, nearbyQuery, plainText } from "../../shared/golfAround";
 
 // 골프장 상세 '근처'(네이버 지역 검색). 약관(저장·캐싱·가공 금지)을 코드가 지키는지가 시험의 절반이다.
@@ -74,6 +74,15 @@ describe("searchNearby", () => {
         expect(await searchNearby("a", "food")).toEqual({ ok: false, reason: "error" });
         (globalThis.fetch as any).mockRejectedValueOnce(new Error("timeout"));
         expect(await searchNearby("a", "food")).toEqual({ ok: false, reason: "error" });
+    });
+    it("이 동네 대표 메뉴 — 낱말 하나로 같은 꼴의 검색어(부르는 쪽이 사전에서 꺼낸 낱말)", async () => {
+        const r = await searchNearbyWord("라비에벨CC", "닭갈비");
+        const u = new URL(String(calls()[0][0]));
+        expect(u.searchParams.get("query")).toBe("라비에벨CC 근처 닭갈비");
+        expect(u.searchParams.get("display")).toBe("5");
+        expect(u.searchParams.get("sort")).toBe("random");
+        expect(r.ok && r.query).toBe("라비에벨CC 근처 닭갈비");
+        expect(r.ok && r.items).toHaveLength(2);
     });
     it("결과가 없으면 빈 목록(성공)", async () => {
         (globalThis.fetch as any).mockResolvedValueOnce(ok([]));

@@ -3,7 +3,7 @@
  * 키: NAVER_HUB_CLIENT_ID / NAVER_HUB_CLIENT_SECRET(없으면 nokey). 하루 25,000회.
  * 여기서는 부르고 모양만 맞춘다 — **아무것도 저장하지 않는다**(메모리에도). 순서도 그대로.
  */
-import { nearbyQuery, plainText, type NearbyKind, type NearbyPlace } from "../../shared/golfAround.js";
+import { NEARBY_WORD, nearbyWordQuery, plainText, type NearbyKind, type NearbyPlace } from "../../shared/golfAround.js";
 
 const URL_LOCAL = "https://naverapihub.apigw.ntruss.com/search/v1/local";
 
@@ -11,10 +11,19 @@ export type NearbySearch =
     | { ok: true; query: string; items: NearbyPlace[] }
     | { ok: false; reason: "nokey" | "quota" | "error" };
 
-export async function searchNearby(courseName: string, kind: NearbyKind, timeoutMs = 3500): Promise<NearbySearch> {
+/** 정해 둔 칩(맛집·해장국 …)으로 찾는다 */
+export function searchNearby(courseName: string, kind: NearbyKind, timeoutMs = 3500): Promise<NearbySearch> {
+    return searchNearbyWord(courseName, NEARBY_WORD[kind], timeoutMs);
+}
+
+/**
+ * 낱말 하나로 찾는다 — 이 동네 대표 메뉴(shared/golfLocalDish)가 이 길로 온다.
+ * 낱말은 **부르는 쪽이 사전에서 꺼낸 것**이어야 한다(라우트가 findLocalDish 로 거른다) — 손님이 친 말을 그대로 넣지 않는다.
+ */
+export async function searchNearbyWord(courseName: string, word: string, timeoutMs = 3500): Promise<NearbySearch> {
     const id = process.env.NAVER_HUB_CLIENT_ID, secret = process.env.NAVER_HUB_CLIENT_SECRET;
     if (!id || !secret) return { ok: false, reason: "nokey" };
-    const query = nearbyQuery(courseName, kind);
+    const query = nearbyWordQuery(courseName, word);
     const u = new URL(URL_LOCAL);
     u.searchParams.set("query", query);
     u.searchParams.set("display", "5");   // 지역 검색은 한 번에 다섯 곳이 끝이다

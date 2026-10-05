@@ -26,6 +26,7 @@ import { isUrgentJoin, listingCapacity, distanceKm } from "../../../shared/golfJ
 import { GOLF_REGIONS, cityShort, listingIntents, type GolfIntent, type PublicListing } from "../../../shared/golfCourse.js";
 import { COURSE_GALLERY_LIMIT } from "../../../shared/golfPhoto.js";
 import { isNearbyKind } from "../../../shared/golfAround.js";
+import { findLocalDish } from "../../../shared/golfLocalDish.js";
 
 const router = Router();
 
@@ -330,10 +331,12 @@ router.get("/:slug/nearby", asyncHandler(async (req: any, res: any) => {
     const page = s.bySlug.get(String(req.params.slug).normalize("NFC"));
     if (!page) return sendError(res, 404, "골프장을 찾을 수 없어요");
     const kind = isNearbyKind(req.query.kind) ? req.query.kind : "food";
+    // 이 동네 대표 메뉴(?dish=닭갈비) — 그 골프장 시군의 사전에 있는 낱말일 때만. 아니면 못 본 척하고 kind 로 간다.
+    const dish = findLocalDish(page.region, page.city, req.query.dish);
     res.set("Cache-Control", "no-store");
     if (!nearbyAllow(String(req.ip ?? ""))) return sendError(res, 429, "잠시 뒤에 다시 시도해 주세요");
-    const { searchNearby } = await import("../../services/naverLocal.js");
-    const r = await searchNearby(page.name, kind);
+    const { searchNearby, searchNearbyWord } = await import("../../services/naverLocal.js");
+    const r = dish ? await searchNearbyWord(page.name, dish.word) : await searchNearby(page.name, kind);
     if (!r.ok) return sendError(res, r.reason === "nokey" ? 501 : r.reason === "quota" ? 429 : 502, "지금은 불러올 수 없어요", `NEARBY_${r.reason.toUpperCase()}`);
     return sendSuccess(res, { query: r.query, items: r.items });
 }));

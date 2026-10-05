@@ -138,11 +138,12 @@ export function useCourseWeather(slug: string | null | undefined) {
  * 근처 맛집·카페·숙소(네이버 지역 검색) — 약관상 저장·캐싱이 안 되는 자료라 브라우저에서도 1분만 들고 있는다(탭을 오갈 때 깜박이지 않을 만큼).
  * 구역이 화면에 들어온 뒤(enabled)에만 부른다.
  */
-export function useCourseNearby(slug: string | null | undefined, kind: NearbyKind, enabled: boolean) {
+export function useCourseNearby(slug: string | null | undefined, kind: NearbyKind, enabled: boolean, dish?: string | null) {
     return useQuery<NearbyResult>({
-        queryKey: [COURSES_KEY, "nearby", slug, kind],
+        queryKey: [COURSES_KEY, "nearby", slug, dish ? `dish:${dish}` : kind],
         queryFn: async () => {
-            const r: any = await apiRequest(`${COURSES_KEY}/${encodeURIComponent(slug!)}/nearby?kind=${kind}`);
+            // 이 동네 대표 메뉴는 ?dish= 로 — 서버가 그 시군의 사전에 있는 낱말만 받는다
+            const r: any = await apiRequest(`${COURSES_KEY}/${encodeURIComponent(slug!)}/nearby?${dish ? `dish=${encodeURIComponent(dish)}` : `kind=${kind}`}`);
             return { query: String(r?.query ?? ""), items: Array.isArray(r?.items) ? r.items : [] };
         },
         enabled: !!slug && enabled, staleTime: 60_000, gcTime: 60_000, retry: 0, refetchOnWindowFocus: false, refetchOnReconnect: false,
