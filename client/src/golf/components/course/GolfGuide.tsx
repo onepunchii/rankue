@@ -24,18 +24,20 @@ import type { CourseListItem, HubListing } from "@/golf/lib/courseApi";
 import { HubListingRow } from "./list/HubListingRow";
 
 // ── 소개 배너 ─────────────────────────────────────────────────────
+// 흰 카드 · 검은 단추 · 포인트는 주황 단추 하나(2026-10-05 오너: "그린 배경 빼고 흰색 카드에 검은 버튼, 포인트는 주황 버튼").
+// 어두운 화면에서 이 카드만 밝아 검색으로 들어온 사람 눈에 먼저 들어온다 — 색을 더 얹지 않는다.
 export function GolfIntroBanner({ onGuide, onPost, className }: { onGuide: () => void; onPost: () => void; className?: string }) {
     return (
-        <section aria-label={GOLF_INTRO.name} className={cn("rounded-2xl p-4 bg-[#64DD170D] ring-1 ring-inset ring-[#64DD1738]", className)}>
-            <span className="text-[13px] font-semibold text-[#8BE84A]">{GOLF_INTRO.name}</span>
-            <p className="mt-1 text-[18px] leading-snug font-semibold tracking-tight text-[#FFFFFF] break-keep">{GOLF_INTRO.line}</p>
+        <section aria-label={GOLF_INTRO.name} className={cn("rounded-2xl p-4 bg-[#FFFFFF]", className)}>
+            <span className="text-[13px] font-semibold text-[#0A0A0A99]">{GOLF_INTRO.name}</span>
+            <p className="mt-1 text-[18px] leading-snug font-bold tracking-tight text-[#0A0A0A] break-keep">{GOLF_INTRO.line}</p>
             <ul className="mt-2.5 flex flex-wrap gap-1.5">
                 {GOLF_INTRO.points.map((p) => (
-                    <li key={p} className="h-7 px-2.5 rounded-full bg-[#FFFFFF0F] text-[12.5px] font-medium text-[#FFFFFFCC] inline-flex items-center whitespace-nowrap">{p}</li>
+                    <li key={p} className="h-7 px-2.5 rounded-full bg-[#0A0A0A0D] text-[12.5px] font-medium text-[#0A0A0AB3] inline-flex items-center whitespace-nowrap">{p}</li>
                 ))}
             </ul>
             <div className="mt-3.5 flex gap-2">
-                <button type="button" onClick={onGuide} className="h-10 px-4 rounded-full bg-[#FFFFFF] text-[#0A0A0A] text-[14px] font-semibold active:bg-[#E6E6E6] transition-colors">
+                <button type="button" onClick={onGuide} className="h-10 px-4 rounded-full bg-[#0A0A0A] text-[#FFFFFF] text-[14px] font-semibold active:bg-[#2B2B2B] transition-colors">
                     이용 방법
                 </button>
                 <button type="button" onClick={onPost} className="h-10 px-4 rounded-full bg-[#FF6B00] text-[#FFFFFF] text-[14px] font-semibold active:bg-[#E86100] transition-colors">
