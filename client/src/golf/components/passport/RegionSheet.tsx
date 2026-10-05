@@ -15,16 +15,13 @@ import { LucideStamp, LucideChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { coursePath } from "@shared/golfCourse";
 import { CourseLogo } from "../course/CourseLogo";
-import { OUTLINE_GROUP } from "@/golf/lib/koreaOutline";
-
-const REGION_GROUP_MAPPING = OUTLINE_GROUP;
-/** 지도(RegionMap)와 같은 기준 — 그 묶음 골프장의 20%를 가 보면 금색(마스터). */
-const MASTER_RATIO = 0.2;
+import { MASTER_RATIO } from "./regionProgress";
 
 interface Props {
     isOpen: boolean;
     onClose: () => void;
-    regionId: string | null;
+    /** 지역 묶음 이름("경기") — 예전엔 지도 path 의 영문 시도 id 였다(지역 지도를 발자국 지도에 합치며 바꿈, 2026-10-05) */
+    region: string | null;
     conqueredCourses: string[]; // List of names
     /** 도장의 골프장 번호(rankue_golf_clubs.id) — 목록을 이 번호로 맞춘다 */
     stampClubIds?: string[];
@@ -62,9 +59,9 @@ function Row({ name, logo, done, record, onOpen }: { name: string; logo?: string
     );
 }
 
-export const RegionSheet = ({ isOpen, onClose, regionId, stampClubIds = [], recordClubIds = [], onGoToGuide, regionTotals, regionConquered }: Props) => {
+export const RegionSheet = ({ isOpen, onClose, region, stampClubIds = [], recordClubIds = [], onGoToGuide, regionTotals, regionConquered }: Props) => {
     const [, setLocation] = useLocation();
-    const regionName = regionId ? REGION_GROUP_MAPPING[regionId] : "";
+    const regionName = region ?? "";
     // 목록은 **라운드용 골프장 원장**(rankue_golf_clubs) — 도장·지도 숫자와 같은 원장이라 번호로 정확히 맞는다(2026-09-24).
     // 예전엔 옛 정적 목록(이름)과 도장(원장 이름 "H1")을 글자로 비교해 머리는 1곳인데 '정복한 곳'이 비었고, 총수도 달랐다(168 vs 164).
     const clubs = useQuery<any[]>({

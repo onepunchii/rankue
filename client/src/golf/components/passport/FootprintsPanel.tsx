@@ -8,6 +8,9 @@
  *  - 연도 칩은 **발자국이 있는 해만**, 두 해 이상일 때만 보인다(한 해뿐이면 '전체'와 같은 그림이라 칩이 군더더기).
  *  - 아래 목록은 지도와 같은 번호 — 누르면 지도에서 그 배지가 말풍선을 연다(좌표 없는 곳은 목록에만).
  *  - 공유는 서명된 비공개 카드(FootprintShareSheet). 발자국이 없으면 공유 단추도 없다.
+ *  - 지역 정복과 한 장(2026-10-05 오너: "4번 지도를 점과 합치자"): 지도 밑에 시도 윤곽선을 깔고 **가 본 지역을 칠한다**
+ *    (라임 → 20% 를 가 보면 금색). '지역 정복' 탭은 없앴고, 지역별 숫자와 현황 시트는 지도 아래 여섯 칸(RegionProgressGrid)에서.
+ *    칠은 연도 칩과 무관하게 **전체 기간**이다 — 정복은 쌓이는 것이라 해를 골라도 줄지 않는다.
  * ⚠️ 리터럴 색만 — 골프 테마가 `.bg-white`·`.text-black/*` 를 바꿔 끼운다.
  */
 import { useMemo, useRef, useState } from "react";
@@ -18,6 +21,9 @@ import { LucideFlag, LucideShare2 } from "@/lib/icons";
 import { trailKm } from "@shared/golfFootprints";
 import { useCourseList } from "../../lib/courseApi";
 import { CourseDotMap, type MapDot } from "../course/list/CourseDotMap";
+import { KoreaOutline } from "../course/list/KoreaOutline";
+import { RegionProgressGrid } from "./RegionProgressGrid";
+import { regionPaint, regionProgress } from "./regionProgress";
 import { FootprintMap, FOOTPRINT_MAP_ASPECT } from "./FootprintMap";
 import { FootprintShareSheet } from "./FootprintShareSheet";
 import { useFootprints } from "./useFootprints";
@@ -26,7 +32,13 @@ import { GhostSteps } from "./GhostSteps";
 
 const dot = (iso: string) => kstDateLabel(iso, { year: "numeric", month: "2-digit", day: "2-digit" }).replace(/\. /g, ".").replace(/\.$/, "");
 
-export function FootprintsPanel() {
+export function FootprintsPanel({ regionTotals, regionConquered, onRegion }: {
+    /** 서버가 센 지역별 골프장 수·가 본 수(인증 도장만) — 지도의 칠과 아래 여섯 칸이 같은 숫자를 쓴다 */
+    regionTotals: Readonly<Record<string, number>>;
+    regionConquered: Readonly<Record<string, number>>;
+    /** 지역 칸을 누르면(정복 현황 시트) */
+    onRegion: (region: string) => void;
+}) {
     const [, setLocation] = useLocation();
     const [year, setYear] = useState<number | null>(null);
     const [selected, setSelected] = useState<number | null>(null);
@@ -44,6 +56,13 @@ export function FootprintsPanel() {
     const dots = useMemo<MapDot[]>(() => (courses.data ?? [])
         .filter((c) => c.lat != null && c.lng != null)
         .map((c) => ({ key: c.slug, lat: c.lat as number, lng: c.lng as number, tone: "on" as const })), [courses.data]);
+
+    // 지역 정복 — 윤곽선의 칠(가 본 지역)과 아래 여섯 칸
+    const regions = useMemo(() => regionProgress(regionTotals, regionConquered), [regionTotals, regionConquered]);
+    const outline = useMemo(() => {
+        const paint = regionPaint(regions);
+        return <KoreaOutline stroke="#FFFFFF26" fills={paint.fills} strokes={paint.strokes} />;
+    }, [regions]);
 
     const stops = data?.stops ?? [];
     const records = data?.records ?? [];
@@ -108,7 +127,7 @@ export function FootprintsPanel() {
                     <div className="absolute inset-0 animate-pulse bg-[#FFFFFF05]" />
                 ) : stops.length > 0 || records.length > 0 ? (
                     <>
-                        <FootprintMap stops={stops} records={records} dots={dots} playKey={String(year ?? "all")} selected={selected} onSelect={setSelected} />
+                        <FootprintMap stops={stops} records={records} dots={dots} playKey={String(year ?? "all")} selected={selected} onSelect={setSelected} under={outline} />
                         {stops.length === 0 && (
                             // 기록 도장만 있다 — 흐린 동그라미가 무엇인지, 또렷한 발자국은 어떻게 찍는지 한 줄
                             <p className="absolute left-3 right-14 bottom-3 rounded-xl bg-[#0F0F0FE6] px-3 py-2 text-[12.5px] leading-snug text-[#FFFFFFB3] break-keep pointer-events-none">
@@ -119,7 +138,7 @@ export function FootprintsPanel() {
                 ) : (
                     <>
                         <div className="absolute inset-0 opacity-50">
-                            <CourseDotMap dots={dots} focus={null} aspect={FOOTPRINT_MAP_ASPECT} cols={36} bg="#0F0F0F" muted className="absolute inset-0 w-full h-full" />
+                            <CourseDotMap dots={dots} focus={null} aspect={FOOTPRINT_MAP_ASPECT} cols={36} bg="#0F0F0F" muted under={outline} className="absolute inset-0 w-full h-full" />
                         </div>
                         <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-8 bg-[radial-gradient(60%_50%_at_50%_50%,#0F0F0FE6_0%,#0F0F0F99_60%,transparent_100%)]">
                             <GhostSteps />
@@ -150,9 +169,11 @@ export function FootprintsPanel() {
                 </p>
             )}
 
+            <RegionProgressGrid regions={regions} onPick={onRegion} />
+
             {stops.length > 0 && (
                 <>
-                    <ol className="mt-3 rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] divide-y divide-[#FFFFFF0F] overflow-hidden">
+                    <ol className="mt-4 rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] divide-y divide-[#FFFFFF0F] overflow-hidden">
                         {stops.map((s, i) => {
                             const n = i + 1;
                             const latest = n === stops.length;

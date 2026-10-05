@@ -9,7 +9,6 @@ import { ScorecardScanner } from "../components/ScorecardScanner";
 // Components
 import { PassportHeader } from "../components/passport/PassportHeader";
 import { PassportStatsCard } from "../components/passport/PassportStatsCard";
-import { RegionMap } from "../components/passport/RegionMap";
 import { StampList } from "../components/passport/StampList";
 import { RegionSheet } from "../components/passport/RegionSheet";
 import { ViewSwitcher } from "../components/passport/ViewSwitcher";
@@ -32,7 +31,7 @@ type ViewMode = 'map' | 'stamp';
 
 export default function Passport() {
     const [viewMode, setViewMode] = useState<ViewMode>('map');
-    // 지도 보기: 지역 정복 ↔ 발자국(2026-09-30 오너: "도장깨기 지도에 발자국 기능")
+    // 지도 보기: 발자국(지역 정복이 그 지도에 칠해진다 — 2026-10-05 한 장으로 합침) ↔ 앨범
     const [mapMode, setMapMode] = usePassportMapMode();
     // 앨범 탭의 사진 수(라운드 시트 탭과 같은 작은 알약) — 앨범 탭과 같은 캐시라 탭을 열 때 다시 받지 않는다
     const myPhotos = useMyPhotos();
@@ -82,16 +81,14 @@ export default function Passport() {
                         >
                             <PassportStatsCard stats={stats} recordCount={recordStamps.length} />
                             <PassportMapTabs value={mapMode} onChange={setMapMode} albumCount={myPhotos.data?.length ?? 0} />
-                            {mapMode === 'footprints' ? (
-                                <FootprintsPanel />
-                            ) : mapMode === 'album' ? (
+                            {mapMode === 'album' ? (
                                 <PassportAlbum />
                             ) : (
-                                <RegionMap
+                                <FootprintsPanel
                                     regionTotals={stats.regionTotals}
                                     regionConquered={stats.regionConquered}
-                                    onRegionClick={(id) => {
-                                        setRegionalSheetRegion(id);
+                                    onRegion={(region) => {
+                                        setRegionalSheetRegion(region);
                                         setIsRegionalPopupOpen(true);
                                     }}
                                 />
@@ -118,7 +115,7 @@ export default function Passport() {
             <RegionSheet
                 isOpen={isRegionalPopupOpen}
                 onClose={() => setIsRegionalPopupOpen(false)}
-                regionId={regionalSheetRegion}
+                region={regionalSheetRegion}
                 conqueredCourses={conqueredCourses}
                 stampClubIds={stamps.map((s) => s.clubId).filter(Boolean) as string[]}
                 recordClubIds={recordStamps.map((s) => s.clubId).filter(Boolean) as string[]}

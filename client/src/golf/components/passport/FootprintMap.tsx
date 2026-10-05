@@ -13,7 +13,9 @@
  *  - 1배에선 세로 쓸기가 페이지 스크롤이다(touch-action: pan-y). 확대했을 때만 지도가 손가락을 가져간다(none).
  *  - 두드리기와 끌기는 움직인 거리로 가른다. 끌거나 벌린 뒤의 click 은 삼킨다(배지 말풍선이 잘못 열리지 않게).
  *  - 동작 줄이기(prefers-reduced-motion)면 걷는 애니메이션·확대 미끄러짐 없이 바로 그 그림으로.
- * 공유 카드(server/services/golfFootprintsCard.ts)는 이 파일을 쓰지 않는다 — 같은 shared 셈으로 따로 그린다.
+ * 셋째 판(2026-10-05 오너: "4번(지역 정복 지도)을 점과 합치자" → "응 순서대로" 3번) — 세상 겹 맨 밑에 시도 윤곽선(`under`).
+ *  가 본 지역은 옅은 라임, 20% 를 가 본 지역은 금색으로 칠해져 '지역 정복' 지도가 따로 필요 없다.
+ * 공유 카드(server/services/golfFootprintsCard.ts)는 이 파일을 쓰지 않는다 — 같은 shared 셈으로 따로 그린다(윤곽선 없이 점만).
  * ⚠️ 리터럴 색만 — 골프 테마가 `.bg-white`·`.text-black/*` 를 바꿔 끼운다.
  */
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
@@ -61,7 +63,7 @@ const matrix = (v: ZoomView) => `matrix(${n2(v.k * 1000) / 1000} 0 0 ${n2(v.k * 
 interface Mark { key: string; x: number; y: number; ox: number; oy: number; tail: string }
 const place = (m: Mark, v: ZoomView) => `translate(${n2(v.k * m.x + v.tx + m.ox)} ${n2(v.k * m.y + v.ty + m.oy)})${m.tail}`;
 
-export function FootprintMap({ stops, records = [], dots, playKey, selected, onSelect }: {
+export function FootprintMap({ stops, records = [], dots, playKey, selected, onSelect, under }: {
     /** 처음 간 순서 — 인증 도장만(번호·길) */
     stops: FootprintStop[];
     /** 현장 인증 없이 적은 골프장(기록 도장, 2026-09-30) — 번호·길 없이 흐린 점선 동그라미만 */
@@ -73,6 +75,11 @@ export function FootprintMap({ stops, records = [], dots, playKey, selected, onS
     /** 고른 도장 번호(1부터) */
     selected: number | null;
     onSelect: (n: number | null) => void;
+    /**
+     * 점 **밑에** 깔 것(2026-10-05 — 시도 윤곽선과 '가 본 지역' 칠, KoreaOutline). 세상 겹 안이라 확대·이동을 같이 탄다.
+     * 누르는 자리는 아니다 — 이 지도의 두드리기는 배지·두 번 두드려 확대가 이미 쓰고 있다(지역은 지도 아래 칸에서 고른다).
+     */
+    under?: ReactNode;
 }) {
     const [, setLocation] = useLocation();
     const wrapRef = useRef<HTMLDivElement>(null);
@@ -401,6 +408,7 @@ export function FootprintMap({ stops, records = [], dots, playKey, selected, onS
                 <svg ref={svgRef} viewBox={shown.current.join(" ")} preserveAspectRatio="xMidYMid meet" className="absolute inset-0 w-full h-full" shapeRendering="geometricPrecision">
                     {/* 세상 겹 — 점과 길은 통째로 확대된다 */}
                     <g ref={worldRef} transform={matrix(lv)}>
+                        {under}
                         {dotPaths.map((d, i) => d && (
                             <path key={i} d={d} fill="none" stroke={MUTED_DOT_FILL[i]} strokeWidth={dotD} strokeLinecap="round" vectorEffect="non-scaling-stroke" />
                         ))}
