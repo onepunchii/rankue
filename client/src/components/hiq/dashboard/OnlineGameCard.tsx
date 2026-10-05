@@ -11,6 +11,16 @@
  * "초대가 만료됐거나…" 로 튕겨 나갔다(2026-09-22 오너).
  * 이미 있는 참가 창이 그대로 한다. 홈에서 참가 규칙을 두 번 구현하지 않는다.
  * 열린 방이 없으면(보통의 경우다) 줄 대신 "방 만들기"를 크게 둔다 — 빈 목록을 보여 주는 것보다 방을 하나 여는 게 낫다.
+ *
+ * 비로그인(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다") —
+ *  · 혼자 치기(바로 치기 · 길 찾기)는 비로그인도 되는 화면이라 그대로 연다.
+ *  · 이번 주 드릴은 회원의 것이다 — 문제 목록·주간 순위·채점이 전부 로그인 필수(server/routes/modules/simDrill.ts)라 그냥 보내면
+ *    "목록을 불러오지 못했어요"에서 끝난다. 입구에서 가입 안내로 잇고, 값 자리도 "시작 전"(회원의 주간 기록이 비었다는 말) 대신 가입 안내를 적는다.
+ *  · 같이 치기는 회원끼리의 대전이라 입구 전부(멀티방 · 친구 초대 · 코드로 참가 · 방 만들기)를 가입 안내로 잇는다(together).
+ *    가입 뒤에는 가려던 곳으로 돌아온다.
+ *  · 방 목록은 회원만 받는다. 비로그인에게 "열린 방이 없어요"라고 하면 받아 보지도 않고 없다고 하는 거짓 빈 값이라,
+ *    그 자리에는 "가입하면 같이 칠 수 있어요" 한 줄을 둔다.
+ * 회원에게는 달라지는 게 없다 — guard 는 회원이면 동작을 그대로 실행한다.
  */
 import { useEffect, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -27,6 +37,7 @@ import { Crosshair, LucideChevronRight, LucideHash, LucidePath, LucideUserPlus }
 import { drillApi, weekProgress, DRILL_WEEK_QUERY_KEY } from "@/sim/drill/drillApi";
 import { loadResume, fetchResumable, clearResume, type Resumable } from "@/sim/simResume";
 import { apiRequest } from "@/lib/queryClient";
+import { useGuestGate } from "@/components/hiq/GuestGate";
 
 /**
  * 카드 그림(2026-10-04 오너: "혼자 치기는 그린 다이, 다이 밖 색도 신경 쓰고, 큰 원점(다이아몬드)이 많다 — 깔끔하게 나무 다이로.
@@ -89,6 +100,19 @@ export function OnlineGameCard() {
     const [, setLocation] = useLocation();
     const { t } = useT();
     const { member } = useAuth();
+    const gate = useGuestGate();
+    // 같이 치기의 입구는 전부 이 함수로 — 비로그인은 가입 안내 시트, 가입 뒤 가려던 주소(to)로 돌아온다. 회원은 바로 간다.
+    const together = (to: string) => gate.guard(() => setLocation(to), {
+        title: t("guestHome.gateTogetherTitle"),
+        desc: t("guestHome.gateTogetherDesc"),
+        from: to,
+    });
+    // 이번 주 드릴의 입구 — 드릴은 대전이 아니라 주간 채점 기록이라 가입 안내 문구를 따로 둔다. 가입 뒤에는 드릴 화면으로 돌아온다.
+    const openDrills = () => gate.guard(() => setLocation("/online-game?drills=1"), {
+        title: t("guestHome.gateDrillTitle"),
+        desc: t("guestHome.gateDrillDesc"),
+        from: "/online-game?drills=1",
+    });
     const roomsRef = useRef<HTMLDivElement>(null);
     const roomsVisible = useVisible(roomsRef);
 
@@ -120,11 +144,13 @@ export function OnlineGameCard() {
     };
     // 이번 주 드릴 — 진입 화면·드릴 화면과 같은 캐시
     const week = useQuery({ queryKey: DRILL_WEEK_QUERY_KEY, queryFn: () => drillApi.getWeek(), enabled: !!member, staleTime: 30_000 });
-    const drill = week.data ? weekProgress(week.data) : null;
-    const list = rooms.data ?? [];
+    // 비로그인은 쿼리가 꺼져 있다 — 캐시에 남은 옛 답(지난 계정의 드릴·방 목록·내 방)도 그리지 않는다
+    const drill = !gate.isGuest && week.data ? weekProgress(week.data) : null;
+    const list = gate.isGuest ? [] : rooms.data ?? [];
     const shown = list.slice(0, MAX_ROWS);
     // 내가 연 방은 위 목록에서 빠진다(내 방엔 내가 참가할 수 없다) — 따로 한 줄로 보여 준다.
-    const { room: myRoom } = useMyOpenRoom(matchApi, !!member);
+    const { room: openRoom } = useMyOpenRoom(matchApi, !!member);
+    const myRoom = gate.isGuest ? null : openRoom;
 
     // 2026-10-04 오너: "멀티랑 혼자하기 카드를 홈으로 따로 빼자 — 지금은 눌러서 들어가야 나온다.
     // '온라인게임'이라 하니 혼자 하고 싶은 사람이 머뭇거린다" → 이어서 "드릴·길 찾기까지 빼서 진입 화면을 거칠 필요 없게".
@@ -173,12 +199,13 @@ export function OnlineGameCard() {
                     </div>
                 )}
                 <div className="grid grid-cols-2 divide-x divide-black/[0.06]">
-                    <button type="button" onClick={() => setLocation("/online-game?drills=1")} className={cell}>
+                    <button type="button" onClick={openDrills} className={cell}>
                         <span className="w-9 h-9 shrink-0 rounded-xl bg-brand/10 flex items-center justify-center"><Crosshair className="w-[19px] h-[19px] text-brand" /></span>
                         <span className="min-w-0">
                             <span className="block text-[11.5px] font-semibold text-black/50 truncate">{t("sim.drill.title")}</span>
                             <span className="block text-[14px] font-bold text-ink-1 tabular-nums leading-tight truncate">
-                                {drill ? `${drill.successes}/${drill.total}` : t("home.drillStart")}
+                                {/* 비로그인은 드릴을 받지 않았다 — '시작 전'(거짓 빈 값) 대신 가입하면 되는 일을 적는다 */}
+                                {drill ? `${drill.successes}/${drill.total}` : gate.isGuest ? t("guestHome.drillJoin") : t("home.drillStart")}
                             </span>
                         </span>
                     </button>
@@ -196,7 +223,7 @@ export function OnlineGameCard() {
                 {/* 같이 치기 — 블루 다이 그림(대대·노란 공). 누르면 멀티방 목록 */}
                 <motion.button
                     whileTap={{ scale: 0.99 }}
-                    onClick={() => setLocation("/online-game?rooms=1")}
+                    onClick={() => together("/online-game?rooms=1")}
                     className="relative block w-full h-[156px] overflow-hidden bg-[#0F1A2E] text-left"
                 >
                     <img src={TOGETHER_IMG} alt="" width={1050} height={468} className="absolute inset-0 w-full h-full object-cover" />
@@ -219,13 +246,13 @@ export function OnlineGameCard() {
                 </motion.button>
                 <div className="grid grid-cols-2 gap-2 p-4">
                     <button
-                        type="button" onClick={() => setLocation("/online-game?lobby=1")}
+                        type="button" onClick={() => together("/online-game?lobby=1")}
                         className="h-11 rounded-full bg-brand text-brand-fg text-[13.5px] font-bold inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
                     >
                         <LucideUserPlus className="w-4 h-4" />{t("sim.entry.invite")}
                     </button>
                     <button
-                        type="button" onClick={() => setLocation("/online-game?lobby=1&tab=join")}
+                        type="button" onClick={() => together("/online-game?lobby=1&tab=join")}
                         className="h-11 rounded-full bg-[#F5B721] text-[#3D2A00] text-[13.5px] font-bold inline-flex items-center justify-center gap-1.5 active:scale-[0.98] transition-transform"
                     >
                         <LucideHash className="w-4 h-4" />{t("sim.entry.join")}
@@ -235,28 +262,33 @@ export function OnlineGameCard() {
                 {/* 방 줄: 있으면 바로 참가, 없으면 방을 여는 쪽으로 민다 */}
                 {(shown.length > 0 || myRoom) && (
                     <div className="divide-y divide-black/[0.06] border-t border-black/[0.06]">
-                        {myRoom && <MyRoomRow room={myRoom} onEnter={() => setLocation("/online-game?lobby=1")} className="bg-brand/[0.04]" />}
+                        {myRoom && <MyRoomRow room={myRoom} onEnter={() => together("/online-game?lobby=1")} className="bg-brand/[0.04]" />}
                         {shown.map((m) => (
-                            <RoomRow key={m.id} m={m} onJoin={() => setLocation(`/online-game?rooms=1&room=${m.id}`)} />
+                            <RoomRow key={m.id} m={m} onJoin={() => together(`/online-game?rooms=1&room=${m.id}`)} />
                         ))}
                     </div>
                 )}
                 <div className="px-4 py-3 flex items-center gap-2 border-t border-black/[0.06]">
                     <span className="flex-1 min-w-0 text-[12.5px] font-medium text-black/45 truncate">
-                        {shown.length === 0 && !myRoom
-                            ? (rooms.isPending && member ? t("sim.rooms.loading") : t("sim.rooms.empty"))
-                            : list.length > MAX_ROWS
-                                ? <button type="button" onClick={() => setLocation("/online-game?rooms=1")} className="font-semibold text-black/60">{t("sim.entry.rooms")} {list.length} →</button>
-                                : null}
+                        {/* 비로그인은 방 목록을 받지 않았다 — '열린 방이 없어요'(거짓 빈 값) 대신 가입하면 되는 일을 적는다 */}
+                        {gate.isGuest
+                            ? t("guestHome.togetherJoin")
+                            : shown.length === 0 && !myRoom
+                                ? (rooms.isPending && member ? t("sim.rooms.loading") : t("sim.rooms.empty"))
+                                : list.length > MAX_ROWS
+                                    ? <button type="button" onClick={() => together("/online-game?rooms=1")} className="font-semibold text-black/60">{t("sim.entry.rooms")} {list.length} →</button>
+                                    : null}
                     </span>
                     <button
-                        type="button" onClick={() => setLocation("/online-game?lobby=1&public=1")}
+                        type="button" onClick={() => together("/online-game?lobby=1&public=1")}
                         className="shrink-0 h-9 px-4 rounded-pill border border-black/10 text-[13px] font-bold text-ink-1 hover:bg-black/[0.03] active:scale-[0.98] transition-transform"
                     >
                         {t("sim.entry.roomCreate")}
                     </button>
                 </div>
             </div>
+            {/* 가입 안내 시트 — guard 가 여는 것. 한 번만 그린다 */}
+            {gate.sheet}
         </>
     );
 }

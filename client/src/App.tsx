@@ -9,6 +9,7 @@ import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
+import { goLogin } from "@/components/hiq/LoginGate";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
 import { NativePrompts } from "@/components/hiq/NativePrompts";
 import { LiveMatchBanner } from "@/sim/match/LiveMatchBanner";
@@ -83,7 +84,7 @@ import StoreDetail from "@/pages/store-detail";
 import SharedResult from "@/pages/hiq/shared-result";
 
 import { StoreProvider } from "./contexts/StoreContext";
-import { I18nProvider } from "@/lib/i18n";
+import { I18nProvider, useT } from "@/lib/i18n";
 import { SportProvider } from "./contexts/SportContext";
 import { TermsConsentProvider } from "@/components/hiq/TermsConsent";
 import { DesktopFrame } from "@/components/hiq/DesktopFrame";
@@ -191,23 +192,50 @@ function GolfTermsRoute() {
 }
 
 /**
- * 골프 화면 문지기. 허용되지 않으면 홈으로 돌린다.
+ * 골프 화면 문지기. 비로그인은 로그인으로 보내고(끝나면 가려던 골프 화면으로 돌아온다), 로그인했지만 허용되지 않은 사람은 홈으로 돌린다.
  * 로그인 확인 중에는 아무것도 그리지 않는다 — 잠깐 골프가 보였다 사라지는 것보다 낫다.
+ *
+ * 2026-10-05 오너 결정("홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다"): 예전엔 비로그인도 /dashboard 로 돌렸다.
+ * 그때 홈은 로그인 안내 한 장이라 그게 맞았지만, 이제 방문자에게 골프 홈이 열려 있어서 홈에서 조인·내 예약·여권을 누르면
+ * 아무 말 없이 홈으로 되돌아오는 막다른 길이 된다. 방문자는 로그인으로 보낸다.
+ *
+ * 단, **한국어로 보는 방문자만** 로그인으로 보낸다. 골프는 한국어 화면에서만 열려서(useGolfAccess) 다른 언어로 보는 방문자는
+ * 가입·로그인을 마치고 돌아와도 이 문이 열리지 않는다 — 열리지 않는 화면을 보라고 가입을 시키게 된다(공개 골프 랭킹의 '조인'·'내 예약' 탭).
+ * 그 사람은 예전처럼 홈으로 돌린다. 홈은 이제 로그인 안내 한 장이 아니라 비로그인에게 열린 당구 예시 홈이다.
  */
 function GolfOnly({ children }: { children: ReactNode }) {
-  const { isLoading } = useAuth();
+  const { isLoading, isGuest } = useAuth();
   const golfOk = useGolfAccess();
+  const { locale } = useT();
   const [, setLocation] = useLocation();
   useEffect(() => {
-    if (!isLoading && !golfOk) {
-      // 초대 링크(?pin=)로 왔는데 아직 로그인 전이면, 로그인 뒤 골프 홈에서 이어서 들어가게 핀을 잠깐 남긴다.
+    if (isLoading) return;
+    const KEY = "rankue_golf_pending_pin";
+    if (golfOk) {
+      // 로그인 뒤 초대 주소(?pin=)로 곧장 돌아왔으면 남겨 둔 핀은 이 주소가 쓴다 — 지우지 않으면 다음에 골프 홈을 열 때 같은 방으로 또 들어간다.
+      // 남긴 핀이 없는 사람(처음부터 로그인돼 있던 회원)에겐 아무 일도 없다.
       try {
         const pin = new URLSearchParams(window.location.search).get("pin");
-        if (pin) sessionStorage.setItem("rankue_golf_pending_pin", pin);
+        if (pin && sessionStorage.getItem(KEY) === pin) sessionStorage.removeItem(KEY);
       } catch { /* 저장소를 못 쓰는 환경 */ }
-      setLocation("/dashboard", { replace: true });
+      return;
     }
-  }, [isLoading, golfOk, setLocation]);
+    // 초대 링크(?pin=)로 왔는데 아직 로그인 전이면, 로그인 뒤 골프 홈에서 이어서 들어가게 핀을 잠깐 남긴다.
+    // (로그인 뒤 이 주소로 못 돌아오는 길 — 새로 가입하는 경우 등 — 의 안전망이다.)
+    try {
+      const pin = new URLSearchParams(window.location.search).get("pin");
+      if (pin) sessionStorage.setItem(KEY, pin);
+    } catch { /* 저장소를 못 쓰는 환경 */ }
+    if (isGuest && locale === "ko") {
+      // 한국어로 보는 비로그인(확인 끝) — 로그인으로. 끝나면 가려던 골프 화면(지금 주소)으로 돌아온다.
+      // 자리를 바꿔 끼운다(replace): 로그인 화면에서 '뒤로'를 누르면 이 문으로 돌아와 다시 로그인으로 튕기는 걸 막는다.
+      goLogin((to) => setLocation(to, { replace: true }), window.location.pathname + window.location.search);
+      return;
+    }
+    // 로그인했지만 골프 허용이 없는 사람(한국어가 아닌 화면 등), 그리고 한국어가 아닌 비로그인 — 홈으로.
+    // (한국어가 아닌 비로그인은 가입해도 이 문이 열리지 않으므로 로그인으로 보내지 않는다.)
+    setLocation("/dashboard", { replace: true });
+  }, [isLoading, isGuest, golfOk, locale, setLocation]);
   if (isLoading || !golfOk) return null;
   return <>{children}</>;
 }

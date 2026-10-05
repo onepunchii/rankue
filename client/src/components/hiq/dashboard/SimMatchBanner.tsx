@@ -39,7 +39,8 @@ export function SimMatchBanner() {
     const playing = (data ?? []).filter((m) => m.status === "playing");
     const mine = playing.filter((m) => m.turn === m.myIndex);
     const first = mine[0] ?? playing[0];
-    if (!first) return null;
+    // 비로그인 홈이 열렸다(2026-10-05) — 쿼리는 꺼져 있어도 캐시에 남은 옛 대전이 그려질 수 있어 회원일 때만 그린다
+    if (!member || !first) return null;
     const isMine = first.turn === first.myIndex;
     const opponent = (first.myIndex === 0 ? first.guestName : first.hostName) ?? "";
     const others = playing.length - 1;

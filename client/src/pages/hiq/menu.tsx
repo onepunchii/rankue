@@ -38,7 +38,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { AppInstallCard } from "@/components/hiq/AppInstallCard";
 import { apiRequest } from "@/lib/queryClient";
 import { uploadImage } from "@/lib/imageUtils";
-import { useGolfAccess } from "@/hooks/useGolfAccess";
+import { useGolfVisible } from "@/hooks/useGolfAccess";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -71,7 +71,8 @@ export default function HiqMenu() {
     const queryClient = useQueryClient();
     const [isUploading, setIsUploading] = useState(false);
     const { currentSport, setSport } = useSport();
-    const golfOk = useGolfAccess();
+    // 종목 전환은 '볼 수 있는가'로 가른다(2026-10-05 홈을 비로그인에 열면서) — 골프 홈을 둘러보던 한국어 방문자가 메뉴에서 당구로 갔다가 되돌아올 수 있게
+    const golfOk = useGolfVisible();
     // 당구 전용 항목은 골프 모드에서 그리지 않는다 — 매장(당구장)·UMB·PBA·RP 안내·파트너는 골프와 무관하다
     // (2026-09-09 오너: 당구는 당구 전체 페이지, 골프는 골프 전체 페이지).
     const isGolf = currentSport === "GOLF";

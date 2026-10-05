@@ -5,6 +5,7 @@ import { useT } from "@/lib/i18n";
 import { LucideTrophy, LucideTrendingUp, LucideInfo } from "@/lib/icons";
 import { motion, AnimatePresence } from "framer-motion";
 import { previewRows, RankPreviewToggle, type RankPreview } from "./RankPreview";
+import { SampleBadge } from "@/components/hiq/GuestGate";
 
 interface RankingListCardProps {
     rankings: HiqMember[] | undefined;
@@ -16,6 +17,13 @@ interface RankingListCardProps {
     hideHeader?: boolean;
     /** 홈: 3명까지 보이고 펼치면 10명. 내가 그 아래면 내 줄을 한 줄 덧붙인다(2026-10-04) */
     preview?: RankPreview;
+    /**
+     * 비로그인 홈의 예시 랭킹(2026-10-05 오너 결정: "가입 안 한 사람에겐 예시로 보여 준다 — 랭킹 1위와 내 수지를 비슷하게").
+     * rankings 에 shared/guestSample 의 예시 다섯 줄이 들어왔다는 표시다 — 카드 머리에 "예시" 표시를 단다.
+     * 줄은 눌리지 않는다(원래도 링크가 아니다). 예시는 접지 않고 다섯 줄을 다 그린다 — '10위까지 펼치기' 단추를 달면
+     * 예시가 열 줄인 것처럼 읽히는데 눌러도 5위까지뿐이다. 그래서 예시일 땐 preview 를 쓰지 않는다(아래 pv).
+     */
+    sample?: boolean;
 }
 
 // 평균은 소스에 따라 2자리("0.43")로 오기도 해서 표시만 3자리로 통일한다.
@@ -24,7 +32,7 @@ const formatAvg = (value: unknown) => {
     return isNaN(n) ? "0.000" : n.toFixed(3);
 };
 
-export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMemberId, hideHeader, preview }: RankingListCardProps) => {
+export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMemberId, hideHeader, preview, sample = false }: RankingListCardProps) => {
     const { t } = useT();
 
     // Sort logic (just in case API didn't sort, though it should)
@@ -40,8 +48,10 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
     const eligible = sortedRankings
         .filter(r => ((activeTab === '3c' ? r.rating3c : r.rating4c) || 0) > 0 && r.name !== "탈퇴회원");
     const displayRankings = eligible.slice(0, 10);
+    // 예시(다섯 줄)는 접지 않는다 — 접으면 펼치기 단추가 '10위까지'라고 적힌다. 회원은 받은 preview 그대로.
+    const pv = sample ? undefined : preview;
     // 보여 줄 줄 + (내가 보이는 줄 밖이면) 내 줄. 서버가 상위 20명만 주므로 20위 밖이면 내 줄은 없다.
-    const shown = previewRows(displayRankings, preview).map((member, idx) => ({ member, rank: idx + 1, gap: false }));
+    const shown = previewRows(displayRankings, pv).map((member, idx) => ({ member, rank: idx + 1, gap: false }));
     const myIdx = eligible.findIndex(r => String(r.id) === String(currentMemberId));
     if (myIdx >= shown.length) shown.push({ member: eligible[myIdx], rank: myIdx + 1, gap: true });
 
@@ -50,7 +60,7 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
             {/* hideHeader(대시보드 랭킹 섹션): 헤더의 [세계|매장] 토글과 겹쳐 보이지 않게
                 3쿠션/4구를 세계 카드의 부문 칩과 같은 모양·위치(좌측 칩 줄)로 그린다 */}
             {hideHeader ? (
-                <div className="flex gap-1.5">
+                <div className={cn("flex gap-1.5", sample && "items-center")}>
                     {(["3c", "4c"] as const).map(tab => (
                         <button
                             key={tab}
@@ -63,13 +73,19 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                             {t(tab === "3c" ? "rankingListCard.tab3c" : "rankingListCard.tab4c")}
                         </button>
                     ))}
+                    {/* 예시 줄 바로 위, 칩 줄 오른쪽 끝 — 같은 화면의 세계·PBA 랭킹(진짜)과 섞여 읽히지 않게 */}
+                    {sample && <SampleBadge className="ml-auto" />}
                 </div>
             ) : (
             <header className="mb-2 flex items-end justify-between">
                 <div>
-                    <h2 className="text-[19px] font-bold tracking-tight text-ink-1">{t("rankingListCard.title")}</h2>
+                    <h2 className="text-[19px] font-bold tracking-tight text-ink-1">
+                        {t("rankingListCard.title")}
+                        {sample && <SampleBadge className="ml-1.5 align-middle" />}
+                    </h2>
                     <p className="text-black/55 text-[13px] mt-1 flex items-center gap-1.5 font-medium">
-                        <LucideTrophy className="w-3.5 h-3.5 text-[#cba258]" /> {t("rankingListCard.subtitle")}
+                        {/* 예시에 '실시간 상위 10명'이라고 쓰면 거짓이다 */}
+                        <LucideTrophy className="w-3.5 h-3.5 text-[#cba258]" /> {sample ? t("guestHome.rankSubtitle") : t("rankingListCard.subtitle")}
                     </p>
                 </div>
 
@@ -144,7 +160,7 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                     })}
                 </AnimatePresence>
 
-                <RankPreviewToggle preview={preview} total={displayRankings.length} />
+                <RankPreviewToggle preview={pv} total={displayRankings.length} />
 
                 {displayRankings.length === 0 && (
                     <div className="py-12 text-center text-black/40 text-[14px] font-medium">

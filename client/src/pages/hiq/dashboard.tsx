@@ -25,8 +25,9 @@ import { PinCodeModal } from "@/components/hiq/dashboard/PinCodeModal";
 import { ScoreCorrectionModal } from "@/components/hiq/dashboard/ScoreCorrectionModal";
 import { RPGuideModal } from "@/components/hiq/dashboard/RPGuideModal";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
-import { LoginGate } from "@/components/hiq/LoginGate";
-import { LucideHome } from "@/lib/icons";
+import { useAuth } from "@/hooks/useAuth";
+import { GuestJoinCta, useGuestGate } from "@/components/hiq/GuestGate";
+import { GUEST_SAMPLE } from "@shared/guestSample";
 import { useT } from "@/lib/i18n";
 
 import { useLocation, useSearch } from "wouter";
@@ -55,10 +56,20 @@ function HiqDashboardBilliards() {
     // header '상위 N%' percentile is computed against the correct 3c population even when
     // the bottom 매장 랭킹 tab is on 4구. Shares the react-query cache with useDashboardStats'
     // rankings query when rankingTab === '3c' (same key + queryFn).
+    // 로그인 필수 API 라 비로그인은 부르지 않는다 — 홈을 비로그인에 열면서(2026-10-05) enabled 가 없으면 401 이 재시도까지 두 번 난다.
     const { data: rankings3c } = useQuery<HiqMember[]>({
         queryKey: ["/api/hiq/rankings", "3c"],
         queryFn: async () => await apiRequest("/api/hiq/rankings?type=3c"),
+        enabled: !!member,
     });
+
+    // 비로그인 홈(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다 — 랭킹 1위와 내 수지를 비슷하게.
+    // 내 기록을 쌓으려 할 때 가입을 유도한다"). 예전엔 비로그인이면 로그인 안내(LoginGate) 한 장으로 끝냈다.
+    //  · sample: 비로그인이 **확인된** 때만 예시 인물(shared/guestSample). '내 실전 기록'·점수판의 내 다마·매장 랭킹 세 곳이 같은 사람을 그린다.
+    //  · gate.guard: 회원이면 동작을 그대로 실행하고, 비로그인이면 가입 안내 시트를 연다.
+    // 회원에게는 sample 이 null 이고 guard 가 그냥 지나가므로 화면도 동작도 예전 그대로다.
+    const gate = useGuestGate();
+    const sample = gate.isGuest ? GUEST_SAMPLE.billiards : null;
 
     // UI Logic Helpers (Keep strict UI logic here or move to utils if generic)
     const getPercentile = useCallback((type: '3c' | '4c') => {
@@ -125,15 +136,31 @@ function HiqDashboardBilliards() {
         return () => window.clearTimeout(timer);
     }, [member, isLoading, search, setLocation]);
 
+    // 점수판의 입구는 전부 이 두 함수를 거친다 — 점수판 카드(경기 시작)·혼자 연습·'내 실전 기록'의 경기 시작·설명 창의 단추, 그리고 PIN 합류.
+    // 그래서 비로그인을 막는 자리도 여기 한 곳이다: 빈 생성 창이 뜨거나 PIN 여섯 자리를 다 누른 뒤에야 실패하지 않게 **입구에서** 가입 안내로 잇는다.
     const handleStartGameClick = (mode: "practice" | "match") => {
-        // 홈 버튼으로 여는 길은 예전 그대로 — 지난 카드의 핀을 물고 들어가지 않게 비운다.
-        setMatchInvite(null);
-        setStartGameMode(mode);
-        toggleModal('game', true);
+        gate.guard(() => {
+            // 홈 버튼으로 여는 길은 예전 그대로 — 지난 카드의 핀을 물고 들어가지 않게 비운다.
+            setMatchInvite(null);
+            setStartGameMode(mode);
+            toggleModal('game', true);
+        }, {
+            title: t(mode === "match" ? "guestHome.gateMatchTitle" : "guestHome.gatePracticeTitle"),
+            desc: t(mode === "match" ? "guestHome.gateMatchDesc" : "guestHome.gatePracticeDesc"),
+            from: "/dashboard",
+        });
+    };
+
+    const handleJoinGameClick = () => {
+        gate.guard(() => toggleModal('join', true), {
+            title: t("guestHome.gatePinTitle"),
+            desc: t("guestHome.gatePinDesc"),
+            from: "/dashboard",
+        });
     };
 
     useEffect(() => {
-        // 로그인 전이면 주소를 건드리지 않는다 — LoginGate 가 이 주소로 되돌아와야 한다.
+        // 로그인 전이면 주소를 건드리지 않는다 — 머리의 '로그인'·가입 안내 한 줄이 이 주소로 되돌아온다(goLogin 이 지금 주소를 기억한다).
         if (!member || matchParamRef.current) return;
 
         const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
@@ -165,38 +192,15 @@ function HiqDashboardBilliards() {
         );
     }
 
-    // 비로그인 방문자(검색 유입이 하단 '홈' 탭을 누른 경우). 예전에는 여기서 null 을 반환해
-    // 흰 화면만 남았다 — 방문자에겐 앱이 고장 난 것으로 보인다.
-    if (!member) {
-        // 골프 페이지(선수·랭킹·골프장)에서 '홈'을 눌러 온 비로그인 방문자 — 당구 홈 안내 대신 골프 안내(2026-10-01 오너)
-        const golfEntry = locale === "ko" && (() => { try { return localStorage.getItem("rankue_current_sport") === "GOLF"; } catch { return false; } })();
-        if (golfEntry) {
-            return (
-                <LoginGate
-                    icon={LucideHome}
-                    title={t("loginGate.golfHomeTitle")}
-                    desc={t("loginGate.golfHomeDesc")}
-                    links={[
-                        { label: t("loginGate.linkGolfCourses"), to: "/golf/courses" },
-                        { label: t("loginGate.linkGolfRanking"), to: "/golf-ranking" },
-                    ]}
-                />
-            );
-        }
-        return (
-            <LoginGate
-                icon={LucideHome}
-                title={t("loginGate.homeTitle")}
-                desc={t("loginGate.homeDesc")}
-                links={[
-                    { label: t("loginGate.linkStores"), to: "/stores" },
-                    { label: t("loginGate.linkWorld"), to: "/world-ranking" },
-                    { label: t("loginGate.linkPba"), to: "/pba" },
-                    { label: t("loginGate.linkCommunity"), to: "/community" },
-                ]}
-            />
-        );
-    }
+    // 비로그인 방문자(검색 유입이 하단 '홈' 탭을 누른 경우)도 여기서 끝내지 않고 아래 홈을 그대로 본다(2026-10-05 오너 결정).
+    // 맨 처음엔 null 을 돌려줘 흰 화면이었고(고장으로 보였다), 그다음엔 로그인 안내 한 장이었다 — 무엇을 하는 앱인지 보기도 전에 가입부터 요구했다.
+    // 골프에서 온 한국어 방문자의 '내 골프 홈' 안내도 걷었다: 그 사람은 이제 종목이 골프라 맨 아래 HiqDashboard 가 골프 홈을 끼운다.
+    // 아래에서 member 는 없을 수 있다(undefined) — 회원의 것은 카드마다 숨기거나 sample 로 그린다.
+
+    // 예시 랭킹 — 지금 탭(3쿠션·4구)의 다섯 줄. 이름은 사전 키로 그린다(다섯 언어). 1위가 예시 인물이고 '내 실전 기록' 예시와 같은 숫자다.
+    const sampleRankings = sample
+        ? (sample.rankings[rankingTab].map((r) => ({ ...r, name: t(r.nameKey) })) as unknown as HiqMember[])
+        : null;
 
     return (
         <div className="min-h-screen bg-surface-0 px-5 pb-nav">
@@ -229,13 +233,22 @@ function HiqDashboardBilliards() {
                 getPercentile={getPercentile}
                 history={history as any}
                 onPreview={() => setGuide("scoreboard")}
+                sample={sample}
             />
+            {/* 예시 카드 바로 아래 가입 안내 한 줄 — 비로그인에게만. 가입하면 지금 보던 홈으로 돌아온다 */}
+            {sample && (
+                <GuestJoinCta
+                    className="mt-3"
+                    title={t("guestHome.recordCtaTitle")}
+                    desc={t("guestHome.recordCtaDesc")}
+                />
+            )}
 
             {/* 홈 구역(2026-10-04 오너: "빠른 실행보다 각 섹션별로 — 점수판 / 당구 게임 / 기타").
                 점수판 구역은 입구 셋(점수판·혼자 연습·PIN으로 합류)만 — 기록은 위 카드로 모였다. */}
             <section className="mt-10 mb-10">
                 <HomeSectionHeader title={t("home.secScoreboard")} desc={t("home.secScoreboardDesc")} onGuide={() => setGuide("scoreboard")} />
-                <ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={() => toggleModal('join', true)} />
+                <ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={handleJoinGameClick} sample={sample} />
             </section>
 
             {/* 당구 게임(예전 이름 온라인게임) — 혼자 치기 · 같이 치기 · 내 온라인 실력(대전 기록 띠 + 닮은 프로).
@@ -265,9 +278,10 @@ function HiqDashboardBilliards() {
                                     : t("rankingListCard.title")}
                         </h2>
                         <p className="text-black/55 text-[13px] mt-1 font-medium truncate">
+                            {/* 예시 랭킹에 '실시간 상위 10명'이라고 쓰면 거짓이다 — 비로그인에겐 가입하면 보이는 것을 적는다 */}
                             {rankingSource === "world" ? t("umb.subtitle")
                                 : rankingSource === "pba" ? (PBA_CARD_L[locale] ?? PBA_CARD_L.ko).subtitle
-                                    : t("rankingListCard.subtitle")}
+                                    : sample ? t("guestHome.rankSubtitle") : t("rankingListCard.subtitle")}
                         </p>
                     </div>
                     <div className="flex bg-brand/[0.08] p-1 rounded-full relative h-9 shrink-0">
@@ -298,13 +312,15 @@ function HiqDashboardBilliards() {
                     <PbaRankingCard preview={rankPreview} />
                 ) : (
                     <>
+                        {/* 매장 랭킹은 회원의 것(로그인 필수) — 비로그인은 예시 다섯 줄을 "예시" 표시와 함께 본다 */}
                         <RankingListCard
-                            rankings={rankings}
+                            rankings={sampleRankings ?? rankings}
                             activeTab={rankingTab}
                             onTabChange={setRankingTab}
-                            currentMemberId={member.id}
+                            currentMemberId={sample ? sample.member.id : member?.id ?? ""}
                             hideHeader
                             preview={rankPreview}
+                            sample={!!sample}
                         />
                         {/* 매장 랭킹이 비어 있는 초기엔 이 링크가 매장 탭의 실질 콘텐츠다 */}
                         <button
@@ -341,7 +357,7 @@ function HiqDashboardBilliards() {
                 topic={guide}
                 onClose={() => setGuide(null)}
                 onStartGame={handleStartGameClick}
-                onJoinGame={() => toggleModal('join', true)}
+                onJoinGame={handleJoinGameClick}
             />
 
             <PinCodeModal
@@ -349,16 +365,22 @@ function HiqDashboardBilliards() {
                 onOpenChange={(v) => toggleModal('join', v)}
             />
 
-            <ScoreCorrectionModal
-                open={modalState.score}
-                onOpenChange={(v) => toggleModal('score', v)}
-                member={member}
-            />
+            {/* 회원 행이 있어야 그리는 창 — 비로그인에겐 여는 길도 없다 */}
+            {member && (
+                <ScoreCorrectionModal
+                    open={modalState.score}
+                    onOpenChange={(v) => toggleModal('score', v)}
+                    member={member}
+                />
+            )}
 
             <RPGuideModal
                 open={modalState.rpGuide}
                 onOpenChange={(v) => toggleModal('rpGuide', v)}
             />
+
+            {/* 가입 안내 시트 — 점수판 입구의 guard 가 여는 것. 한 번만 그린다 */}
+            {gate.sheet}
 
             <HiqNavigation />
         </div>
@@ -373,5 +395,16 @@ function HiqDashboardBilliards() {
  */
 export default function HiqDashboard() {
     const { currentSport } = useSport();
+    const { isLoading } = useAuth();
+    // 로그인 확인 중의 골프 홈(2026-10-05) — 한국어 화면은 확인을 기다리지 않고 저장된 종목(골프)으로 시작한다(useGolfVisible).
+    // 골프 홈에는 '확인 중' 모습이 없어서 그대로 끼우면 빈 숫자(0.0)를 먼저 그렸다가 예시(방문자)나 내 기록(회원)으로 바뀐다 — 그동안은 돌림표만.
+    // 종목이 이미 골프라 토큰이 검정 바탕·라임으로 풀린다. '나'가 저장돼 있는 회원은 확인 중이 없어 예전처럼 곧장 골프 홈이다.
+    if (currentSport === "GOLF" && isLoading) {
+        return (
+            <div className="min-h-screen bg-surface-0 flex items-center justify-center" aria-busy="true">
+                <div className="w-8 h-8 border-2 border-surface-line border-t-brand rounded-full animate-spin" />
+            </div>
+        );
+    }
     return currentSport === "GOLF" ? <GolfDashboard /> : <HiqDashboardBilliards />;
 }

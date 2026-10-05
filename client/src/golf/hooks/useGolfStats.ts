@@ -5,7 +5,11 @@ import { countsOnSite } from "@shared/golfOnSite";
 export function useGolfStats(member: any) {
     const { data: historyData, isLoading: isHistoryLoading } = useQuery({
         queryKey: ["/api/hiq/history", { sport: "GOLF" }],
-        queryFn: async () => await apiRequest("/api/hiq/history?sport=GOLF")
+        queryFn: async () => await apiRequest("/api/hiq/history?sport=GOLF"),
+        // 비로그인은 부르지 않는다(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다").
+        // 내 기록은 로그인 필수라 401 만 돌아온다 — 비로그인 골프 홈은 이 값 대신 예시(shared/guestSample)를 그린다.
+        // 회원에게는 달라지는 게 없다: 골프 홈은 '나'를 받은 뒤에야 그려진다.
+        enabled: !!member,
     });
 
     // Process History Data: apiRequest already returns json.data

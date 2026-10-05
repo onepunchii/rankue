@@ -9,6 +9,7 @@ import { HiqMember } from "@shared/schema";
 import { useStore } from "@/contexts/StoreContext";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
+import { goLogin } from "@/components/hiq/LoginGate";
 
 export default function HiqJoin() {
     const { t } = useT();
@@ -67,9 +68,11 @@ export default function HiqJoin() {
                     {t("join.loginRequiredDesc1")}<br />
                     {t("join.loginRequiredDesc2")}
                 </p>
+                {/* goLogin 으로 보낸다(2026-10-05) — 예전 주소(/?redirect=…)에는 login=1 이 빠져 로그인 폼이 아니라 소개 화면부터 떴다.
+                    초대를 받고 온 사람이 '로그인 하러 가기'를 눌렀는데 소개 화면이 나오면 길을 잃는다. 끝나면 이 초대(/join/코드)로 돌아온다. */}
                 <Button
                     className="w-full h-14 text-lg font-bold rk-btn-primary rounded-tile"
-                    onClick={() => setLocation("/?redirect=" + encodeURIComponent(`/join/${code}`))}
+                    onClick={() => goLogin(setLocation, `/join/${code}`)}
                 >
                     {t("join.goLogin")}
                 </Button>

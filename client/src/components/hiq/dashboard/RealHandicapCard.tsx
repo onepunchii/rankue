@@ -6,7 +6,14 @@
  * 실전 매칭 대결 기록만 — 3쿠션은 닮은 프로·재미 등급·사다리 + 비교표(나 | 닮은 프로 | 다음 핸디),
  * 4구는 프로 기록이 없어 랭큐 회원 순위 + 비교표(나 | 같은 핸디 회원 평균 | 다음 핸디). 버튼 [매칭 대결][프로][공유].
  * '다음 핸디까지'는 핸디를 매기는 기준(최근 공식 10경기 평균, shared/realHandicap)으로 센다 — 실제로 오르는 값과 맞게.
- * 온라인 에버는 한 줄 비교로만 보인다(계산에 섞지 않는다). 공식 경기 5판 전에는 진행 막대. 로그인 전에는 그리지 않는다.
+ * 온라인 에버는 한 줄 비교로만 보인다(계산에 섞지 않는다). 공식 경기 5판 전에는 진행 막대.
+ *
+ * 비로그인(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다" — "랭킹 1위와 내 수지를 비슷하게").
+ * 예전엔 로그인 전이면 통째로 사라졌다. 이제 홈이 예시 인물(shared/guestSample)을 sample 로 넘기면 **같은 카드 모양**을 그 숫자로 그리고
+ * 제목 옆에 "예시" 표시를 단다. 예시는 실제 선수 이름을 쓰지 않아(닮은 프로 없음) 3쿠션도 '회원끼리' 갈래로 그려진다 — 그 갈래의
+ * 4구 전용 문구 둘(순위 이름·아래 한 줄)은 예시용 문구로 바꾼다. 전적·최근 5경기 칸은 눌리지 않고(/history 는 내 기록 화면이다)
+ * 공유 단추는 뺀다(예시 숫자가 내 기록인 것처럼 밖으로 나가면 안 된다). '경기 시작'은 홈의 문(guard)이 가입 안내로 잇는다.
+ * 회원에게는 sample 이 없어 아무것도 달라지지 않는다.
  */
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -19,11 +26,14 @@ import { shareImage } from "@/lib/shareImage";
 import { LucidePlay } from "@/lib/icons";
 import { proRatio, type LookalikeResponse, type RealCompareResponse, type RealSide } from "@shared/proCompare";
 import { drawCompareCard } from "@/components/hiq/compare/compareCard";
+import { SampleBadge } from "@/components/hiq/GuestGate";
+import { CrewAvatar } from "@/components/hiq/crew-ui";
+import type { GuestSampleBilliards } from "@shared/guestSample";
 import { BadgeAvatar, CardActions, CompareTable, FormDots, GOLD_TEXT, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, RecordStrip, RecordValue, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
 
 type HistoryRow = { sportCategory?: string | null; gameMode?: string | null; isRanked?: boolean | null; gameType?: string | null; isWinner?: boolean | null };
 
-export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, history, onPreview }: {
+export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, history, onPreview, sample }: {
     onStartMatch: () => void;
     /** 랭킹 점수 칸 — RP 안내 창 */
     onOpenRpGuide?: () => void;
@@ -33,6 +43,8 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     history?: HistoryRow[];
     /** 공식 경기가 하나도 없을 때 '점수판 미리 보기' */
     onPreview?: () => void;
+    /** 비로그인 홈의 예시 인물 — 넘기면 내 기록 대신 이 숫자로 같은 카드를 그리고 "예시" 표시를 단다. 회원이면 넘기지 않는다 */
+    sample?: GuestSampleBilliards | null;
 }) {
     const { t, locale } = useT();
     const { member } = useAuth();
@@ -43,16 +55,25 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     // 온라인 에버 한 줄 — 온라인 카드와 같은 쿼리(캐시를 같이 쓴다)
     const online = useQuery<LookalikeResponse>({ queryKey: ["/api/hiq/sim/lookalike"], enabled: !!member, staleTime: 60_000, retry: false });
     const [tab, setTab] = useState<"3c" | "4c" | null>(null);
-    useEffect(() => { if (q.data && tab === null) setTab(q.data.preferred); }, [q.data, tab]);
-    if (!member) return null;
-    const cur: "3c" | "4c" = tab ?? q.data?.preferred ?? "3c";
+    // 예시일 땐 서버 응답·회원 행·경기 기록 자리에 예시 값을 넣는다 — 아래 그리는 코드는 회원과 같은 길을 탄다.
+    // (비로그인은 위 두 쿼리가 꺼져 있다. 캐시에 남은 옛 답이 있어도 예시가 먼저다)
+    const data = sample ? sample.real : q.data;
+    const me = sample ? sample.member : member;
+    const games: HistoryRow[] | undefined = sample ? sample.history : history;
+    useEffect(() => { if (data && tab === null) setTab(data.preferred); }, [data, tab]);
+    // 로그인 확인 중이거나, 예시도 회원도 없을 때만 비운다 — 비로그인 홈은 sample 을 넘기므로 카드가 사라지지 않는다
+    if (!me) return null;
+    const cur: "3c" | "4c" = tab ?? data?.preferred ?? "3c";
 
     // 기록 띠 — 고른 종목의 공식(랭크) 매칭만. history 는 최신순.
-    const mine = (Array.isArray(history) ? history : []).filter((g) => g.sportCategory === "BILLIARDS" && g.gameMode === "match" && g.isRanked && g.gameType === cur);
+    const mine = (Array.isArray(games) ? games : []).filter((g) => g.sportCategory === "BILLIARDS" && g.gameMode === "match" && g.isRanked && g.gameType === cur);
     const wins = mine.filter((g) => g.isWinner).length;
     const losses = mine.length - wins;
-    const rating = (cur === "3c" ? (member as any).rating3c : (member as any).rating4c) ?? 0;
-    const pct = getPercentile?.(cur) ?? null;
+    const rating = (cur === "3c" ? (me as any).rating3c : (me as any).rating4c) ?? 0;
+    // 예시의 상위 % 는 예시 랭킹 다섯 줄 안에서 센 값이다(진짜 회원 통계가 아니다 — 이 카드의 "예시" 표시 아래에서만 쓴다)
+    const pct = sample ? sample.percentile[cur] : getPercentile?.(cur) ?? null;
+    // 전적·최근 5경기 칸은 내 기록 화면으로 간다 — 예시에서는 누를 곳이 아니다(눌러서 로그인 안내에 떨어지지 않게)
+    const openHistory = sample ? undefined : () => setLocation("/history");
     const strip = (
         <RecordStrip cells={[
             {
@@ -68,12 +89,12 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
                 label: t("performanceCard.title"),
                 value: <RecordValue template={t("real.stripRecord")} w={wins} l={losses} />,
                 sub: mine.length ? fill(t("real.stripRate"), { n: Math.round((wins / mine.length) * 100) }) : t("real.stripNone"),
-                onClick: () => setLocation("/history"),
+                onClick: openHistory,
             },
             {
                 label: t("performanceCard.recentFive"),
                 value: <FormDots results={mine.slice(0, 5).map((g) => (g.isWinner ? "W" : "L"))} />,
-                onClick: () => setLocation("/history"),
+                onClick: openHistory,
             },
         ]} />
     );
@@ -88,10 +109,13 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
             ))}
         </div>
     );
+    const title = <h3 className="text-[14.5px] font-bold text-ink-1 truncate">🎱 {t("real.titleRecord")}</h3>;
     const head = (
         <>
-            <div className="flex items-center justify-between gap-2">
-                <h3 className="text-[14.5px] font-bold text-ink-1 truncate">🎱 {t("real.titleRecord")}</h3>
+            {/* 예시 숫자는 진짜처럼 보이면 안 된다 — 제목 바로 옆에 "예시" 표시(회원은 제목만, 예전 그대로).
+                제목이 긴 언어(영어·스페인어)에서는 표시 때문에 제목이 잘리지 않게 탭이 아래 줄로 내려간다(flex-wrap — 예시일 때만). */}
+            <div className={cn("flex items-center justify-between gap-2", sample && "flex-wrap")}>
+                {sample ? <div className="flex items-center gap-1.5 min-w-0">{title}<SampleBadge /></div> : title}
                 {tabs}
             </div>
             {strip}
@@ -99,7 +123,7 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     );
 
     // 실전 비교(닮은 프로·비교표)는 따로 불러온다 — 그동안 머리·기록 띠는 먼저 보이고 아래만 자리를 잡아 둔다
-    if (!q.data) {
+    if (!data) {
         return (
             <section className="rk-card rounded-3xl p-4">
                 {head}
@@ -107,7 +131,7 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
             </section>
         );
     }
-    const d: RealSide = q.data[cur];
+    const d: RealSide = data[cur];
 
     const matchAction = { label: t("real.match"), icon: LucidePlay, onClick: onStartMatch };
 
@@ -134,6 +158,12 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     const nextCol = next ? fill(t("real.nextHandi"), { n: next.handi }) : t("real.topHandi");
     // 다음 칸 얼굴 — 사람이 아니라 핸디라서 숫자 동그라미(최고 핸디면 트로피)
     const nextColFace = { label: next ? fill(t("real.nextHandi"), { n: "" }).trim() : nextCol, tone: "next" as const, avatar: <BadgeAvatar next>{next ? next.handi : "🏆"}</BadgeAvatar> };
+    // 비교표 '나' 칸의 얼굴. 예시일 땐 MeAvatar 를 쓰지 않는다 — MeAvatar 는 로그인한 회원의 사진·이름만 보고, 없으면 한글 "나"를 그대로 적는다
+    // (예전엔 비로그인이면 이 카드가 통째로 없어 닿지 않던 길이다). 영어·스페인어·터키어·베트남어 방문자에게 칸 이름은 Me 인데 얼굴만 한글이 됐다.
+    // 예시는 칸 이름(compare.me)과 같은 말의 첫 글자를 같은 금테 동그라미로 그린다 — 한국어 화면은 예전과 같은 "나"다. 회원은 그대로 MeAvatar.
+    const meFace = sample
+        ? <CrewAvatar name={t("compare.me")} size={34} className="ring-2 ring-[#F5B721] ring-offset-2 ring-offset-surface-1" />
+        : <MeAvatar />;
     const share = async () => {
         if (sharing) return;
         setSharing(true);
@@ -181,7 +211,7 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
                     extra={d.members ? <span className="inline-flex items-center h-6 px-2.5 rounded-full text-[12px] font-semibold bg-surface-1 text-ink-2 rk-num">{fill(t("compare.topPctLong"), { n: d.members.topPct })}</span> : null}
                 />
                 <CompareTable
-                    cols={[{ label: t("compare.me"), tone: "me", avatar: <MeAvatar /> }, { label: proName(pro, locale), avatar: <ProAvatar pro={pro} /> }, nextColFace]}
+                    cols={[{ label: t("compare.me"), tone: "me", avatar: meFace }, { label: proName(pro, locale), avatar: <ProAvatar pro={pro} /> }, nextColFace]}
                     rows={[
                         { label: t("lookalike.rowAvg"), cells: [d.avg.toFixed(2), pro.average.toFixed(2), next ? <NextCell value={next.avg.toFixed(2)} gap={next.gap} /> : "🏆"] },
                         { label: t("lookalike.rowHighRun"), cells: [d.highRun ?? "—", pro.highRun ?? "—", "—"] },
@@ -205,20 +235,22 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
                     <span className="text-[9.5px] font-bold mt-0.5">{t("real.topWord")}</span>
                 </span>
                 <span className="flex-1 min-w-0">
-                    <span className="block text-[11.5px] font-semibold text-ink-3">{t("real.rank4c")}</span>
+                    {/* 예시의 순위는 예시 랭킹 다섯 줄 안에서 센 값 — '랭큐 회원 4구 순위'라고 쓰면 진짜 회원 통계로 읽힌다 */}
+                    <span className="block text-[11.5px] font-semibold text-ink-3">{t(sample ? "guestHome.sampleRank" : "real.rank4c")}</span>
                     <span className="block text-[15px] font-bold rk-num truncate">{m ? fill(t("real.rankLine"), { total: m.total.toLocaleString(), rank: m.rank.toLocaleString() }) : "—"}</span>
                 </span>
             </div>
             <CompareTable
-                cols={[{ label: t("compare.me"), tone: "me", avatar: <MeAvatar /> }, { label: t("real.peersAvg"), avatar: <BadgeAvatar>{d.handi ?? "–"}</BadgeAvatar> }, nextColFace]}
+                cols={[{ label: t("compare.me"), tone: "me", avatar: meFace }, { label: t("real.peersAvg"), avatar: <BadgeAvatar>{d.handi ?? "–"}</BadgeAvatar> }, nextColFace]}
                 rows={[
                     { label: t("lookalike.rowAvg"), cells: [d.avg.toFixed(2), d.peers?.avg != null ? d.peers.avg.toFixed(2) : "—", next ? <NextCell value={next.avg.toFixed(2)} gap={next.gap} /> : "🏆"] },
                     { label: t("lookalike.rowHighRun"), cells: [d.highRun ?? "—", d.peers?.highRun != null ? Math.round(d.peers.highRun) : "—", "—"] },
                     { label: t("lookalike.rowHandi"), cells: [d.handi ?? "—", d.peers ? fill(t("real.peersCount"), { h: d.handi ?? "-", n: d.peers.count }) : "—", next ? next.handi : "—"] },
                 ]}
             />
-            <p className="text-[11.5px] text-ink-4 mt-2">{t("real.note4c")}</p>
-            <CardActions primary={matchAction} onShare={() => void share()} sharing={sharing} />
+            <p className="text-[11.5px] text-ink-4 mt-2">{t(sample ? "guestHome.sampleNote" : "real.note4c")}</p>
+            {/* 예시는 공유하지 않는다 — 예시 숫자가 내 실전 핸디 그림으로 밖에 나가면 안 된다 */}
+            <CardActions primary={matchAction} onShare={sample ? undefined : () => void share()} sharing={sharing} />
         </section>
     );
 }

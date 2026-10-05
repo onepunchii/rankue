@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { LucideChevronRight, LucideFlag, LucideUsers } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 interface ActiveMatch {
     id: string;
@@ -15,14 +16,20 @@ interface ActiveMatch {
 /**
  * 홈 맨 위의 '진행 중 라운드'. 예전엔 앱을 닫거나 뒤로 가기 한 번이면 진행 중 경기로 돌아올 길이 없어서,
  * 9/9 이후 만든 방 4개가 전부 대기·진행 중인 채 버려져 있었다(2026-09-11 리뷰).
+ *
+ * 비로그인(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다") —
+ * 진행 중 라운드는 회원의 것이라 부르지 않는다(로그인 필수 — 창에 돌아올 때마다 401 이 났을 것이다). 자료가 없으니 카드도 그려지지 않는다.
  */
 export function ActiveRoundCard() {
     const [, setLocation] = useLocation();
+    const { member, isGuest } = useAuth();
     const { data } = useQuery<ActiveMatch | null>({
         queryKey: ["/api/hiq/golf/match/active"],
         refetchOnWindowFocus: true,
+        enabled: !!member,
     });
-    if (!data) return null;
+    // 비로그인이면 숨긴다 — 로그아웃한 뒤에도 남아 있을 수 있는 예전 답(캐시)을 그리지 않는다
+    if (isGuest || !data) return null;
 
     const waiting = data.status === "waiting";
     const open = () => {

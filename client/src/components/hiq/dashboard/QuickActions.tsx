@@ -10,12 +10,19 @@
  *  - 둘러보기 구역: 매장 찾기 + 커뮤니티.
  *  - 구역 머리 오른쪽 '설명' → HomeGuideDialog(실제 점수판 사진·쓰는 법).
  * 당구 게임 구역(혼자 치기·같이 치기)은 OnlineGameCard, 내 온라인 실력은 LookalikeProCard(dashboard.tsx).
+ *
+ * 비로그인(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다") —
+ * 점수판 카드의 '내 다마'는 예시 인물의 숫자 + "예시" 표시로 그린다(홈이 sample 을 넘긴다).
+ * 입구 셋(경기 시작·혼자 연습·PIN 합류)을 막는 일은 여기서 하지 않는다 — 받은 onStartGame·onJoinGame 을 부를 뿐이고,
+ * 홈(dashboard.tsx)의 그 두 함수가 비로그인을 가입 안내로 잇는다(설명 창·'내 실전 기록' 카드의 단추도 같은 함수를 거친다).
  */
 import type { ReactNode } from "react";
 import { motion } from "framer-motion";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import type { RealCompareResponse } from "@shared/proCompare";
+import type { GuestSampleBilliards } from "@shared/guestSample";
+import { SampleBadge } from "@/components/hiq/GuestGate";
 import { useLocation } from "wouter";
 import { Target, LogIn, LucideMessageCircle, LucideStore, LucideInfo, LucideChevronRight } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
@@ -51,13 +58,15 @@ export function HomeSectionHeader({ title, desc, onGuide, children }: { title: s
  * 온라인게임 '내 다마수' 카드와 같은 짜임이라 두 곳이 같은 말로 읽힌다(값은 실전 기록 — 온라인 다마와 따로).
  * 값은 '내 실전 기록' 카드와 같은 /api/hiq/compare/real(캐시 공유 — 요청이 늘지 않는다).
  * 4구 스케일(3~50)이 '150다마' 같은 말과 달라 단위는 붙이지 않는다(실전 카드 비교표의 핸디 줄과 같은 숫자).
+ * 비로그인은 예시 인물의 숫자를 그린다 — "—" 로 비워 두면 '아직 없다'는 거짓 빈 값이 된다. 위 '내 실전 기록' 예시 카드와 같은 숫자다.
  */
-function MyDamaPanel() {
+function MyDamaPanel({ sample }: { sample?: GuestSampleBilliards | null }) {
     const { t } = useT();
     const { member } = useAuth();
     const q = useQuery<RealCompareResponse>({ queryKey: ["/api/hiq/compare/real"], enabled: !!member, staleTime: 60_000, retry: false });
+    const data = sample ? sample.real : q.data;
     const cell = (type: "3c" | "4c") => {
-        const s = q.data?.[type];
+        const s = data?.[type];
         const ready = !!(s?.ready && s.handi);
         return (
             <div className="flex-1 min-w-0 px-3.5 pt-2 pb-3">
@@ -81,6 +90,8 @@ function MyDamaPanel() {
         <div className="rounded-2xl bg-[#ffffff] shadow-[0_2px_10px_rgba(122,86,0,0.18)]">
             <div className="flex items-center justify-between gap-2 px-3.5 pt-2.5">
                 <span className="text-[13px] font-bold text-[#7A5600]">{t("home.damaTitle")}</span>
+                {/* 예시 숫자에는 "예시" 표시 — 제목 바로 옆에 붙고(mr-auto) '자동'은 오른쪽 끝 그대로 */}
+                {sample && <SampleBadge className="mr-auto" />}
                 <span className="text-[11px] font-semibold text-[#9A8A66]">{t("sim.entry.handicapAuto")}</span>
             </div>
             <div className="flex divide-x divide-[#F1E7CD]">
@@ -91,8 +102,12 @@ function MyDamaPanel() {
     );
 }
 
-/** 점수판 구역의 입구 셋 — 큰 점수판 카드 + 혼자 연습 + PIN으로 합류 */
-export function ScoreboardActions({ onStartGame, onJoinGame }: { onStartGame: (mode: "practice" | "match") => void; onJoinGame: () => void }) {
+/** 점수판 구역의 입구 셋 — 큰 점수판 카드 + 혼자 연습 + PIN으로 합류. sample 은 비로그인 홈의 예시 인물('내 다마' 판에 그린다) */
+export function ScoreboardActions({ onStartGame, onJoinGame, sample }: {
+    onStartGame: (mode: "practice" | "match") => void;
+    onJoinGame: () => void;
+    sample?: GuestSampleBilliards | null;
+}) {
     const { t } = useT();
     return (
         <div className="grid grid-cols-2 gap-3">
@@ -103,7 +118,7 @@ export function ScoreboardActions({ onStartGame, onJoinGame }: { onStartGame: (m
                 onClick={() => onStartGame("match")}
                 className="col-span-2 rounded-3xl bg-[#F5B721] p-4 pb-5 text-left shadow-[0_8px_24px_rgba(245,183,33,0.35)] transition-colors hover:bg-[#F0B01A]"
             >
-                <MyDamaPanel />
+                <MyDamaPanel sample={sample} />
                 <span className="block mt-4 px-1 text-[22px] font-bold text-white leading-tight">{t("quickActions.matchTitle")}</span>
                 <span className="block mt-1 px-1 text-[13px] font-medium text-white/90 leading-snug break-keep">
                     {t("quickActions.matchDescLine1")} · {t("quickActions.matchDescLine2")}

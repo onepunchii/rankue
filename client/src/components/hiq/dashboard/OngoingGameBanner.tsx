@@ -11,6 +11,9 @@ import type { HiqGame } from "@shared/schema";
 // 그 경기로 돌아갈 경로가 앱 어디에도 없어서, 경기가 영구히 playing_base 로 남았다.
 // 전체 완주율 33%, 외국 유저 7명은 19경기 전부 미완료(완주율 0%)였다.
 // 서버는 최근 24시간 것만 돌려준다 — 며칠 지난 미완 경기는 들이밀지 않는다.
+//
+// 비로그인(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다") —
+// 진행 중 경기는 회원의 것이라 묻지도 그리지도 않는다(로그인 필수 API 라 401 만 난다. 캐시에 남은 옛 답도 그리지 않는다).
 export function OngoingGameBanner() {
     const { t } = useT();
     const [, setLocation] = useLocation();
@@ -18,9 +21,10 @@ export function OngoingGameBanner() {
     const { data: game } = useQuery<HiqGame | null>({
         queryKey: ["/api/hiq/game/ongoing/mine"],
         staleTime: 30_000,
+        enabled: !!member,
     });
 
-    if (!game) return null;
+    if (!member || !game) return null;
 
     // 점수판은 호스트(player1)만 조작한다 — 참가자에겐 '경기 보기'(관전)로 보인다(2026-09-27 오너)
     const watching = !!member && game.gameType !== "golf" && game.player1Id !== member.id;

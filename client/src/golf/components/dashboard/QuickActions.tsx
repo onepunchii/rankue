@@ -6,6 +6,7 @@ import {
     LucideChevronRight,
     LucideFlag,
 } from "lucide-react";
+import { useGuestGate } from "@/components/hiq/GuestGate";
 
 interface QuickActionsProps {
     onOpenGameMode: () => void;
@@ -24,15 +25,32 @@ const SHOW_GOLF_GAMES = false;
 
 export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) {
     const [, setLocation] = useLocation();
+    /**
+     * 비로그인 방문자의 문(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다" —
+     * 내 기록을 쌓으려 할 때 가입을 권한다).
+     *
+     * 네 타일은 전부 회원 전용 화면의 입구다 — 셋(라운드 기록·매치 입장·골프 여권)은 내 기록이 쌓이는 곳이고, 프로암은 아직 '준비 중' 안내 화면이다.
+     * 방문자가 누르면 **입구에서** 가입 안내 시트를 연다 —
+     * 번호 네 자리를 다 누른 뒤에, 또는 다음 화면으로 넘어간 뒤에 '로그인이 필요합니다'를 보는 일이 없게.
+     * from 은 가려던 주소라 가입을 마치면 그 화면에서 바로 이어진다. 회원이면 guard 가 예전 동작을 그대로 실행한다.
+     */
+    const gate = useGuestGate("dark");
 
     return (
         <>
+            {/* 가입 안내 시트 — 방문자가 타일을 눌렀을 때만 열린다(닫혀 있으면 아무것도 그리지 않는다) */}
+            {gate.sheet}
             {/* Hero Actions (Top Row) */}
             <div className="grid grid-cols-2 gap-4 mb-4 relative z-10">
                 {/* 1. Rankue Match */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
-                    onClick={onOpenGameMode}
+                    onClick={() => gate.guard(onOpenGameMode, {
+                        title: "가입하고 라운드를 기록하세요",
+                        // '골프장에서' — 홈의 핸디캡·그래프는 현장 인증된 라운드만 센다(countsOnSite). 집에서 적은 라운드로는 쌓이지 않는다
+                        desc: "골프장에서 스코어를 적으면 핸디캡과 그래프가 쌓여요. 가입하면 새 라운드 화면에서 바로 이어집니다.",
+                        from: "/golf/game/new?mode=match",
+                    })}
                     className="aspect-[4/5] rounded-[2rem] bg-gradient-to-br from-[#64DD17] to-[#388E3C] p-6 flex flex-col justify-between items-start text-left shadow-2xl shadow-[#64DD17]/20 group relative overflow-hidden"
                 >
                     <div className="w-full h-32 flex items-center justify-center -mt-2">
@@ -52,7 +70,12 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                 {/* 2. Enter Code (Big) */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
-                    onClick={onOpenJoin}
+                    onClick={() => gate.guard(onOpenJoin, {
+                        title: "가입하고 매치에 들어가세요",
+                        desc: "동반자가 알려 준 핀 번호로 같은 라운드에 들어가요. 가입하면 번호 입력 화면에서 바로 이어집니다.",
+                        // 번호 입력만 있는 화면 — 가입을 마치면 홈으로 돌아와 타일을 다시 찾지 않아도 된다
+                        from: "/golf/game/new?mode=join",
+                    })}
                     className="aspect-[4/5] rounded-[2rem] bg-[#1a1a1a] border border-[#64DD17]/30 p-6 flex flex-col justify-between items-start text-left shadow-2xl shadow-[#64DD17]/10 group relative overflow-hidden"
                 >
                     <div className="absolute inset-0 bg-gradient-to-br from-[#64DD17]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
@@ -113,7 +136,11 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                 {/* 3. Golf Passport */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setLocation('/golf/passport')}
+                    onClick={() => gate.guard(() => setLocation('/golf/passport'), {
+                        title: "가입하고 골프 여권을 만드세요",
+                        desc: "라운드한 골프장이 내 여권에 도장으로 쌓여요. 가입하면 여권 화면에서 바로 이어집니다.",
+                        from: "/golf/passport",
+                    })}
                     className="aspect-[4/5] rounded-[2rem] bg-white/[0.03] border border-white/10 p-6 flex flex-col justify-between items-start text-left hover:bg-white/[0.05] transition-colors group relative overflow-hidden backdrop-blur-sm shadow-xl"
                 >
                     <div className="w-full h-32 flex items-center justify-center -mt-2">
@@ -134,7 +161,12 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                     프로암은 크루 성적에 이유를 준다(2026-09-09 오너). 회원권 시세 정보 자체는 남아 있다. */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => setLocation('/golf/proam')}
+                    onClick={() => gate.guard(() => setLocation('/golf/proam'), {
+                        // 프로암은 아직 응모를 열지 않았다(pages/ProAm.tsx '준비 중') — 열려 있다고도, 소식을 보내 준다고도 하지 않는다(알림 장치가 없다)
+                        title: "가입하고 프로암 안내를 보세요",
+                        desc: "랭큐 프로암은 준비 중이에요. 아직 응모는 열리지 않았어요. 가입하면 안내 화면에서 바로 이어집니다.",
+                        from: "/golf/proam",
+                    })}
                     className="aspect-[4/5] rounded-[2rem] bg-white/[0.03] border border-white/10 p-6 flex flex-col justify-between items-start text-left hover:bg-white/[0.05] transition-colors group relative overflow-hidden backdrop-blur-sm shadow-xl"
                 >
                     <div className="absolute inset-0 bg-gradient-to-br from-[#64DD17]/10 to-transparent opacity-0 group-hover:opacity-30 transition-opacity" />

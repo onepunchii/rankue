@@ -6,6 +6,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { kstDateKey, kstTime } from "@/lib/kst";
 import { DATE_STRIP_DAYS } from "../../constants/booking";
+import { useAuth } from "@/hooks/useAuth";
 
 /**
  * 홈 맨 위의 **긴급티**.
@@ -31,6 +32,10 @@ import { DATE_STRIP_DAYS } from "../../constants/booking";
  * 같은 테두리, 같은 자리에 같은 것을 놓는다(①값 ②남은 시간 ③어디 ④자리). 급한 정도는
  * 바탕색이 아니라 **내용**(배지·남은 시간·값)이 말한다. 카드 한 장에 강조색은 **하나**뿐이다:
  * 긴급이면 앰버, 아니면 라임. 둘이 한 화면에 같이 뜨는 일은 없다.
+ *
+ * ── 2026-10-05 비로그인(오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다") ─────
+ * 방문자에게는 이 자리를 **그리지 않는다.** 매물 목록(/api/hiq/golf/bookings)은 로그인 필수라 방문자는 받을 수 없는데,
+ * 못 받은 것을 "지금 열린 긴급티가 없어요"라고 그리면 거짓 빈 값이다(있을 수도 있다). 두 쿼리도 부르지 않는다 — 1분마다 401 이 쌓인다.
  */
 
 /**
@@ -184,18 +189,20 @@ export function HotDealTicker() {
     const [, setLocation] = useLocation();
     const [idx, setIdx] = useState(0);
     const paused = useRef(false);
+    const { member, isGuest } = useAuth();
 
     // 긴급 조인(오늘·떨이 그린피)이 먼저다. 서버가 isUrgentJoin 과 같은 조건으로 거른다(urgent=1).
     const urgentQ = useQuery<Deal[]>({
         queryKey: ["/api/hiq/golf/bookings", "urgent-joins"],
         queryFn: () => apiRequest(`/api/hiq/golf/bookings?${new URLSearchParams({ urgent: "1", upcoming: "1" }).toString()}`),
         refetchInterval: 60_000,
+        enabled: !!member,
     });
     // 긴급이 없을 때만 예전 특가 매물로 떨어진다 — 자리를 비워 두지 않는다.
     const hasUrgent = (urgentQ.data?.length ?? 0) > 0;
     const dealQ = useQuery<Deal[]>({
         queryKey: ["/api/hiq/golf/bookings", "hot-deals"],
-        enabled: !urgentQ.isPending && !hasUrgent,
+        enabled: !!member && !urgentQ.isPending && !hasUrgent,
         queryFn: () => {
             const params = new URLSearchParams({
                 startDate: kstDateKey(Date.now()),
@@ -236,6 +243,9 @@ export function HotDealTicker() {
         });
         setLocation(`/golf/booking-list?${q.toString()}`);
     }, [setLocation]);
+
+    // 비로그인에게는 숨긴다 — 받지 못한 목록을 '없다'고도, 끝나지 않는 로딩으로도 그리지 않는다(훅은 위에서 다 불렀다).
+    if (isGuest) return null;
 
     // 로딩 — 다른 얼굴을 만들지 않는다. 같은 뼈대 안에서 글자 자리만 비워 둔다.
     if (isLoading) {

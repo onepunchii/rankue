@@ -12,6 +12,7 @@ import { useSport } from "@/contexts/SportContext";
 import { useT, type Locale } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { goLogin } from "@/components/hiq/LoginGate";
 import { JOIN_TYPE_LABEL } from "@shared/golfJoin";
 import { FriendPicker } from "@/components/hiq/chat/FriendPicker";
 import { INTL_TAG } from "@/components/hiq/chat/ChatRoom";
@@ -62,7 +63,7 @@ function teeLabel(iso: string, locale: Locale): string {
 export default function ChatHub() {
     const { t, locale } = useT();
     const [, setLocation] = useLocation();
-    const { member } = useAuth();
+    const { member, isGuest } = useAuth();
     const { currentSport } = useSport();
     const q = useQuery<ChatRoomRow[]>({
         queryKey: CHAT_ROOMS_KEY(currentSport),
@@ -126,7 +127,16 @@ export default function ChatHub() {
                 </div>
             )}
             <main className="px-3 pt-2">
-                {!member ? (
+                {isGuest ? (
+                    // 비로그인(확인 끝) — 예전엔 "로그인하면 대화가 보여요" 한 줄뿐이라 갈 곳이 없었다(2026-10-05 홈을 비로그인에 열면서
+                    // 하단 '채팅' 탭이 방문자에게도 닿는다). 로그인 단추를 붙인다 — 끝나면 이 화면(/chat)으로 돌아온다.
+                    <div className="py-16 px-6 text-center space-y-4">
+                        <p className="text-[13px] font-medium text-ink-3">{t("chat.loginNeeded")}</p>
+                        <button type="button" onClick={() => goLogin(setLocation)} className="h-11 px-5 rounded-full bg-brand text-brand-fg text-[14px] font-semibold active:scale-[0.98] transition-transform">
+                            {t("loginGate.cta")}
+                        </button>
+                    </div>
+                ) : !member ? (
                     <p className="py-16 text-center text-[13px] font-medium text-ink-3">{t("chat.loginNeeded")}</p>
                 ) : q.isPending ? (
                     <div className="flex justify-center py-16 text-ink-3"><LucideLoader2 className="w-5 h-5 animate-spin" /></div>
