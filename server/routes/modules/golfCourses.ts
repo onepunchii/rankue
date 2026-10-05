@@ -25,6 +25,7 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { isUrgentJoin, listingCapacity, distanceKm } from "../../../shared/golfJoin.js";
 import { GOLF_REGIONS, cityShort, listingIntents, type GolfIntent, type PublicListing } from "../../../shared/golfCourse.js";
 import { COURSE_GALLERY_LIMIT } from "../../../shared/golfPhoto.js";
+import { isNearbyKind } from "../../../shared/golfAround.js";
 
 const router = Router();
 
@@ -294,6 +295,30 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
         watchers: s.watchers.get(slug) ?? 0,
         myWatch: mine[0] ? { filters: mine[0].filters ?? {} } : null,
     });
+}));
+
+// ── 근처 맛집·카페·숙소(2026-10-05) ────────────────────────────────
+// 네이버 지역 검색을 그 자리에서 불러 그대로 돌려준다. 약관상 저장·캐싱·가공이 안 돼(shared/golfAround 머리말)
+// 응답은 no-store 이고 순서도 그대로다. 검색어는 서버가 만든다 — 아무 말이나 받아 주면 남의 검색 대리가 된다.
+// 하루 한도(25,000회)를 한 사람이 태우지 못하게 인스턴스 안에서 IP 당 1분 30회로 막는다(서버리스라 느슨한 막이다).
+const nearbyHits = new Map<string, { n: number; until: number }>();
+function nearbyAllow(ip: string, now = Date.now()): boolean {
+    if (nearbyHits.size > 5000) nearbyHits.clear();
+    const h = nearbyHits.get(ip);
+    if (!h || h.until < now) { nearbyHits.set(ip, { n: 1, until: now + 60_000 }); return true; }
+    return ++h.n <= 30;
+}
+router.get("/:slug/nearby", asyncHandler(async (req: any, res: any) => {
+    const s = await loadSummary();
+    const page = s.bySlug.get(String(req.params.slug).normalize("NFC"));
+    if (!page) return sendError(res, 404, "골프장을 찾을 수 없어요");
+    const kind = isNearbyKind(req.query.kind) ? req.query.kind : "food";
+    res.set("Cache-Control", "no-store");
+    if (!nearbyAllow(String(req.ip ?? ""))) return sendError(res, 429, "잠시 뒤에 다시 시도해 주세요");
+    const { searchNearby } = await import("../../services/naverLocal.js");
+    const r = await searchNearby(page.name, kind);
+    if (!r.ok) return sendError(res, r.reason === "nokey" ? 501 : r.reason === "quota" ? 429 : 502, "지금은 불러올 수 없어요", `NEARBY_${r.reason.toUpperCase()}`);
+    return sendSuccess(res, { query: r.query, items: r.items });
 }));
 
 // ── 날씨(2026-10-05) ──────────────────────────────────────────────

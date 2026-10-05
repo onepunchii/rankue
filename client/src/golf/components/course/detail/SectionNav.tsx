@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import type { SectionId } from "./ui";
 
 export const SECTION_LABEL: Record<SectionId, string> = {
-    tee: "티타임", weather: "날씨", price: "시세", fee: "그린피", course: "코스", about: "소개", map: "위치", near: "주변",
+    tee: "티타임", weather: "날씨", price: "시세", fee: "그린피", course: "코스", about: "소개", map: "위치", food: "맛집", near: "주변",
 };
 
 export function jumpTo(id: SectionId) {

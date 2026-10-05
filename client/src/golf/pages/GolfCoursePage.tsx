@@ -33,6 +33,7 @@ import { CourseLayout } from "@/golf/components/course/detail/CourseLayout";
 import { AboutInfo } from "@/golf/components/course/detail/AboutInfo";
 import { LocationCard } from "@/golf/components/course/detail/LocationCard";
 import { NearbyCourses } from "@/golf/components/course/detail/NearbyCourses";
+import { NearbyPlaces } from "@/golf/components/course/detail/NearbyPlaces";
 import { SectionNav, jumpTo } from "@/golf/components/course/detail/SectionNav";
 import { Card, Section, Skel, type SectionId } from "@/golf/components/course/detail/ui";
 import { CoursePhotoGallery } from "@/golf/components/photos/CoursePhotoGallery";
@@ -201,6 +202,7 @@ export default function GolfCoursePage() {
         course: !!d.courses?.some((c) => c.holes > 0) || (d.parts?.filter((p) => p.holes).length ?? 0) >= 2,
         about: !!d.intro || !!d.grass?.length || !!(d.info && (d.info.opened || d.info.members || d.info.membershipTypes)),
         map: true,
+        food: true,
         near: d.nearby.length > 0,
     } : null) as Record<SectionId, boolean> | null;
     const ids = has ? (Object.keys(has) as SectionId[]).filter((k) => has[k]) : [];
@@ -264,6 +266,8 @@ function Body({ d, ids, distance, weather }: { d: CourseDetail; ids: SectionId[]
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}
             {ids.includes("about") && <AboutInfo key={d.slug} intro={d.intro} info={d.info} grass={d.grass} />}
             <LocationCard name={d.name} address={d.address} lat={d.lat} lng={d.lng} distance={distance} phone={d.phone} website={d.website || d.info?.homepage || null} />
+            {/* 근처 맛집·카페·숙소(2026-10-05) — 네이버 지역 검색을 그 자리에서. 위치 바로 아래(라운드 끝나고 어디서 먹을지) */}
+            {ids.includes("food") && <NearbyPlaces key={d.slug} slug={d.slug} name={d.name} />}
 
             {/* 회원이 공개한 라운드 사진(2026-09-30) — 없으면 칸을 그리지 않는다 */}
             <CoursePhotoGallery slug={d.slug} name={d.name} />
