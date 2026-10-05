@@ -13,9 +13,10 @@
  * ⚠️ 비로그인(당구 테마)에서도 열리는 화면 — 색은 리터럴만(CourseShell 머리말). 글자 12px 이상.
  */
 import { Fragment, useEffect, useMemo, useState } from "react";
+import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { kstDateKey } from "@/lib/kst";
-import { LucideChevronLeft, LucideChevronRight, LucideMoon, LucideSunHorizon, LucideWind } from "@/lib/icons";
+import { LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideMoon, LucideSunHorizon, LucideWind } from "@/lib/icons";
 import {
     WIND_LEVEL, baseLabel, dayPop, daySky, dowOf, kstParts, sunTimes,
     type CourseWeather, type WxDay, type WxHour, type WxKind,
@@ -23,7 +24,9 @@ import {
 import {
     PART_TEE_HOUR, briefReason, lastTee18, nearestTee, partOfHour, roundBrief, teeHours, type RoundBrief,
 } from "@shared/golfRoundBrief";
+import { PACK_BASE, PACK_PATH, gearEmoji } from "@shared/golfPack";
 import { WX_RAIN, WxIcon, popColor } from "../TeeWx";
+import { PackList, usePackChecked } from "../PackList";
 import { Card, Section, Skel } from "./ui";
 
 const DOW = ["일", "월", "화", "수", "목", "금", "토"];
@@ -112,11 +115,42 @@ function Brief({ b, sun }: { b: RoundBrief; sun: { rise: string; set: string } |
                 <div className="mt-4 px-5 flex flex-wrap items-center gap-1.5">
                     <span className="mr-0.5 text-[12.5px] text-[#FFFFFF66]">챙길 것</span>
                     {b.gear.map((g) => (
-                        <span key={g} className="h-7 px-2.5 rounded-full bg-[#FFFFFF0F] text-[12.5px] font-medium text-[#FFFFFFCC] inline-flex items-center whitespace-nowrap">{g}</span>
+                        <span key={g} className="h-7 pl-2 pr-2.5 rounded-full bg-[#FFFFFF0F] text-[12.5px] font-medium text-[#FFFFFFCC] inline-flex items-center gap-1 whitespace-nowrap">
+                            {gearEmoji(g) && <span className="text-[13px] leading-none" aria-hidden>{gearEmoji(g)}</span>}
+                            {g}
+                        </span>
                     ))}
                 </div>
             )}
         </>
+    );
+}
+
+/**
+ * 늘 챙기는 것(2026-10-05, 준비물 체크리스트) — 접힌 한 줄에 몇 개 챙겼는지, 펼치면 눌러서 지워 가는 격자.
+ * 날씨만 보러 온 사람에게는 한 줄이고, 내 티타임을 보고 있는 사람에게는 펼친 채로 연다.
+ */
+function PackRow({ open: wantOpen }: { open: boolean }) {
+    const [open, setOpen] = useState(wantOpen);
+    useEffect(() => { if (wantOpen) setOpen(true); }, [wantOpen]);
+    const { checked } = usePackChecked();
+    return (
+        <div className="mt-2 px-5">
+            <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="h-8 flex items-center gap-1.5 text-[12.5px] text-[#FFFFFF66] active:text-white">
+                늘 챙기는 것
+                <span className="tabular-nums text-[#FFFFFF99]">{checked.length}/{PACK_BASE.length}</span>
+                <LucideChevronDown weight="bold" className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+            </button>
+            {open && (
+                <>
+                    <PackList className="mt-0.5" />
+                    <Link href={PACK_PATH} className="mt-1.5 h-8 inline-flex items-center gap-0.5 text-[13px] font-medium text-[#FFFFFF99] active:text-white">
+                        비 오는 날 · 겨울에 더 챙길 것
+                        <LucideChevronRight weight="bold" className="w-3.5 h-3.5" aria-hidden />
+                    </Link>
+                </>
+            )}
+        </div>
     );
 }
 
@@ -304,6 +338,7 @@ export function WeatherCard({ wx, myTees, onRound }: { wx: CourseWeather; myTees
                             </div>
                         </div>
                         <Brief b={brief} sun={sun} />
+                        <PackRow open={!!mineHere} />
                     </>
                 ) : dayHours.length > 0 ? (
                     // 오늘 라운드 시간이 다 지났다(19시 넘어 열었다) — 한 줄 평 없이 남은 시간만

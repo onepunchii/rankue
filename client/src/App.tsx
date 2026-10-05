@@ -173,6 +173,13 @@ function BilliardsTermRoute() {
   return <Suspense fallback={termsFallback}><BilliardsTerm /></Suspense>;
 }
 
+// 골프 읽을거리(2026-10-05) — 준비물 체크리스트. 글이 길어 메인 청크에서 뺀다. 골프 공개 틀(CourseShell)이 어두운 바탕이라 기다리는 화면도 어둡게.
+const GolfChecklist = lazy(() => import("@/golf/pages/GolfChecklist"));
+const golfReadFallback = <div className="min-h-[100dvh] bg-[#0A0A0A]" aria-busy="true" />;
+function GolfChecklistRoute() {
+  return <Suspense fallback={golfReadFallback}><GolfChecklist /></Suspense>;
+}
+
 /**
  * 골프 화면 문지기. 허용되지 않으면 홈으로 돌린다.
  * 로그인 확인 중에는 아무것도 그리지 않는다 — 잠깐 골프가 보였다 사라지는 것보다 낫다.
@@ -316,6 +323,7 @@ function AppRoutes() {
       {/* 골프장 페이지(2026-09-24) — 검색 유입용 공개 페이지라 GolfOnly 를 타지 않는다(GolfOnly 는 비로그인을 /dashboard 로 쫓아낸다).
           슬러그는 한글(정본). 옛 숫자 주소(/golf/course/74)는 GolfCoursePage 가 슬러그로 바꿔 준다.
           wouter 는 기본이 정확 일치라(regexparam, loose 아님) /golf/booking 이 /golf/booking-list 를 먹지 않는다. */}
+      <Route path="/golf/checklist" component={GolfChecklistRoute} />
       <Route path="/golf/course/:slug" component={GolfCoursePage} />
       <Route path="/golf/courses" component={GolfCourseHub} />
       <Route path="/golf/courses/:region" component={GolfCourseHub} />

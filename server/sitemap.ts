@@ -13,6 +13,7 @@ import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingInt
 // seo/* 는 이 파일의 entry 를 되받아 쓴다(순환). entry 는 함수 선언이고 요청 시점에만 불리므로 안전하다.
 import { rankingExtraSitemapParts } from "./seo/rankingExtra.js";
 import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
+import { golfGuideSitemapParts } from "./seo/golfGuide.js";
 import { tournamentsSitemapParts } from "./seo/tournaments.js";
 import { pbaRecordsSitemapParts } from "./seo/pbaRecords.js";
 import { todayKst } from "../shared/briefingMeta.js";
@@ -247,7 +248,8 @@ async function golfCourseParts(): Promise<string[]> {
 // 골프장 허브 — 목록(전국·지역 6·시군 전부)은 항상, 의도 허브는 최상위 3개 + **글이 있는** 지역·시군 조합만.
 // 빈 조합은 프리렌더가 noindex 로 내보낸다 — 사이트맵에 올리면 "제출됨·noindex" 경고만 쌓인다.
 async function golfHubParts(): Promise<string[]> {
-  const parts: string[] = [];
+  // 골프 읽을거리(준비물 체크리스트) — 본문이 코드에 있어 DB 가 죽어도 싣는다
+  const parts: string[] = [...golfGuideSitemapParts()];
   try {
     const raw = await loadGolfCourseSummary();
     // 이름·슬러그가 빈 행은 프리렌더도 싣지 않는다(server/prerender.ts golfView) — 같은 기준
