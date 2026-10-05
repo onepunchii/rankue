@@ -23,11 +23,13 @@ describe("검색어 — 실측으로 고른 꼴", () => {
         expect(nearbyQuery("레이크사이드CC", "food")).toBe("레이크사이드CC 근처 맛집");
         expect(nearbyQuery("해비치CC 제주", "cafe")).toBe("해비치CC 제주 근처 카페");
         expect(nearbyQuery("용평CC", "stay")).toBe("용평CC 근처 숙소");
-        expect([...NEARBY_KINDS]).toEqual(["food", "cafe", "stay"]);
+        // 처음 셋(맛집·카페·숙소)의 열쇠는 그대로다 — 옛 화면이 ?kind=food|cafe|stay 로 부른다
+        for (const k of ["food", "cafe", "stay"]) expect(NEARBY_KINDS).toContain(k);
+        expect(NEARBY_KINDS[0]).toBe("food");
     });
-    it("종류는 셋 중 하나만 — 아무 말이나 검색어로 받지 않는다", () => {
-        expect(isNearbyKind("food")).toBe(true);
-        for (const v of ["맛집", "", null, undefined, 1, "food ", "golf", ["food"]]) expect(isNearbyKind(v)).toBe(false);
+    it("종류는 정해 둔 칩 가운데 하나만 — 아무 말이나 검색어로 받지 않는다", () => {
+        for (const k of NEARBY_KINDS) expect(isNearbyKind(k)).toBe(true);
+        for (const v of ["맛집", "해장국", "", null, undefined, 1, "food ", "golf", ["food"], "__proto__", "constructor"]) expect(isNearbyKind(v)).toBe(false);
     });
     it("네이버 지도 주소 · 글자 다듬기(강조 태그·엔티티만)", () => {
         expect(naverMapSearchUrl("레이크사이드CC 근처 맛집")).toBe(`https://map.naver.com/p/search/${encodeURIComponent("레이크사이드CC 근처 맛집")}`);
@@ -88,7 +90,7 @@ describe("약관 — 저장·캐싱·가공 금지를 코드로", () => {
     it("서비스는 DB 도 메모리도 쓰지 않는다 — 순서를 바꾸는 코드도 없다", () => {
         expect(service).not.toMatch(/from "\.\.\/db\.js"|db\.execute|new Map\(|\.sort\(|\.reverse\(/);
     });
-    it("라우트는 no-store 로 답하고, 검색어를 손님에게서 받지 않는다(골프장 이름 + 종류 셋)", () => {
+    it("라우트는 no-store 로 답하고, 검색어를 손님에게서 받지 않는다(골프장 이름 + 정해 둔 칩)", () => {
         expect(route).toContain('res.set("Cache-Control", "no-store")');
         expect(route).toContain("searchNearby(page.name, kind)");
         expect(route).toContain("isNearbyKind(req.query.kind)");

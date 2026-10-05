@@ -26,7 +26,7 @@ import { CourseShell } from "@/golf/components/course/CourseShell";
 import { CourseLogo } from "@/golf/components/course/CourseLogo";
 import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/CourseHeader";
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";
-import { WeatherCard, WeatherSkeleton } from "@/golf/components/course/detail/WeatherCard";
+import { WeatherCard, WeatherSkeleton, type RoundPick } from "@/golf/components/course/detail/WeatherCard";
 import { MembershipPrices, topPrice } from "@/golf/components/course/detail/MembershipPrices";
 import { GreenFees } from "@/golf/components/course/detail/GreenFees";
 import { CourseLayout } from "@/golf/components/course/detail/CourseLayout";
@@ -253,6 +253,8 @@ export default function GolfCoursePage() {
 function Body({ d, ids, distance, weather }: { d: CourseDetail; ids: SectionId[]; distance: string | null; weather: CourseWeather | null }) {
     const city = cityShort(d.city);
     const tgm = d.prices.length > 0 || !!d.fees || !!d.intro;
+    // 날씨 카드에서 보고 있는 라운드 — 먹거리 구역이 따라온다
+    const [round, setRound] = useState<RoundPick | null>(null);
     return (
         <>
             <SectionNav ids={ids} />
@@ -260,14 +262,15 @@ function Body({ d, ids, distance, weather }: { d: CourseDetail; ids: SectionId[]
             {/* 랭큐 골프 소개(2026-10-05) — 검색으로 들어온 비로그인 방문자에게만. 티타임 바로 아래, 시세·그린피 정보는 가리지 않게 */}
             <GolfGuestIntro className="mx-4 mt-8" />
             {/* 날씨(2026-10-05) — 골프장 이름에 붙여 가장 많이 찾는 말. 티타임 다음, 시세·그린피 앞 */}
-            {ids.includes("weather") && (weather ? <WeatherCard wx={weather} myTees={d.myTees} /> : <WeatherSkeleton />)}
+            {ids.includes("weather") && (weather ? <WeatherCard key={d.slug} wx={weather} myTees={d.myTees} onRound={setRound} /> : <WeatherSkeleton />)}
             {ids.includes("price") && <MembershipPrices key={d.slug} prices={d.prices} />}
             {ids.includes("fee") && d.fees && <GreenFees fees={d.fees} />}
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}
             {ids.includes("about") && <AboutInfo key={d.slug} intro={d.intro} info={d.info} grass={d.grass} />}
             <LocationCard name={d.name} address={d.address} lat={d.lat} lng={d.lng} distance={distance} phone={d.phone} website={d.website || d.info?.homepage || null} />
-            {/* 근처 맛집·카페·숙소(2026-10-05) — 네이버 지역 검색을 그 자리에서. 위치 바로 아래(라운드 끝나고 어디서 먹을지) */}
-            {ids.includes("food") && <NearbyPlaces key={d.slug} slug={d.slug} name={d.name} />}
+            {/* 근처 먹거리·카페·숙소(2026-10-05) — 네이버 지역 검색을 그 자리에서. 위치 바로 아래(라운드 끝나고 어디서 먹을지).
+                날씨에서 보고 있는 라운드(round)가 첫 메뉴 칩을 고른다 */}
+            {ids.includes("food") && <NearbyPlaces key={d.slug} slug={d.slug} name={d.name} round={round} />}
 
             {/* 회원이 공개한 라운드 사진(2026-09-30) — 없으면 칸을 그리지 않는다 */}
             <CoursePhotoGallery slug={d.slug} name={d.name} />

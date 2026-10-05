@@ -76,9 +76,9 @@ function HourCols({ hours, sun, anyPcp }: { hours: WxHour[]; sun: { rise: string
 }
 
 // ── 라운드 브리핑 ─────────────────────────────────────────────────
-/** 한 줄 평 옆 그림 — 바람·밤은 그 그림, 나머지는 라운드 중 하늘(비·눈이 있으면 그것) */
-function BriefIcon({ b }: { b: RoundBrief }) {
-    const cls = "w-11 h-11 shrink-0";
+/** 한 줄 평 옆 그림 — 바람·밤은 그 그림, 나머지는 라운드 중 하늘(비·눈이 있으면 그것). 먹거리 구역의 머리 줄도 같은 그림을 쓴다 */
+export function BriefIcon({ b, className }: { b: RoundBrief; className?: string }) {
+    const cls = className ?? "w-11 h-11 shrink-0";
     if (b.tone === "wind") return <LucideWind weight="bold" className={cls} style={{ color: "#FF9F0A" }} aria-hidden />;
     if (b.tone === "night") return <LucideMoon weight="fill" className={cls} style={{ color: "#C9D1FF" }} aria-hidden />;
     if (b.wet) return <WxIcon kind={b.wet} className={cls} />;
@@ -184,8 +184,10 @@ const chip = (on: boolean) => cn(
 );
 
 export interface MyTee { id: string; datetime: string }
+/** 지금 보고 있는 라운드 — 먹거리 구역이 같은 날·같은 티오프를 따라오게 밖으로 알린다("내일" · "07시" · 그 브리핑) */
+export interface RoundPick { dayLabel: string; teeLabel: string; brief: RoundBrief }
 
-export function WeatherCard({ wx, myTees }: { wx: CourseWeather; myTees?: MyTee[] }) {
+export function WeatherCard({ wx, myTees, onRound }: { wx: CourseWeather; myTees?: MyTee[]; onRound?: (r: RoundPick | null) => void }) {
     const today = kstDateKey(new Date());
     const short = useMemo(() => wx.days.filter((d) => d.src === "short"), [wx.days]);
     const hoursOf = (date: string) => { const ymd = date.replace(/-/g, ""); return wx.hours.filter((h) => h.t.startsWith(ymd)); };
@@ -225,6 +227,13 @@ export function WeatherCard({ wx, myTees }: { wx: CourseWeather; myTees?: MyTee[
     const idx = teeSel != null ? avail.indexOf(teeSel) : -1;
     const mineHere = mine.find((m) => m.date === day.date && nearestTee(avail, m.hour) === teeSel) ?? null;
     const firstMid = wx.days.findIndex((d) => d.src === "mid");
+    // 내 티타임을 고른 채면 그 시각 그대로(08:40) — 예보는 그 시(8시)부터 본다
+    const teeLabel = mineHere ? mineHere.label : teeSel != null ? `${teeSel}시` : "";
+    // 고른 날·시각이 바뀔 때만 알린다(브리핑은 그 둘과 예보 발표 시각으로 정해진다). 날씨가 사라지면 비운다.
+    useEffect(() => {
+        onRound?.(brief ? { dayLabel: dayName(day.date, today), teeLabel, brief } : null);
+        return () => onRound?.(null);
+    }, [day.date, teeSel, teeLabel, wx.base, today]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const pickDay = (date: string) => {
         setTouched(true); setPicked(date);
@@ -288,8 +297,7 @@ export function WeatherCard({ wx, myTees }: { wx: CourseWeather; myTees?: MyTee[
                                 <button type="button" onClick={() => step(-1)} disabled={idx <= 0} aria-label="더 이른 시각" className="w-7 h-8 rounded-full flex items-center justify-center text-[#FFFFFFB3] disabled:opacity-30 active:bg-[#FFFFFF1A]">
                                     <LucideChevronLeft weight="bold" className="w-4 h-4" />
                                 </button>
-                                {/* 내 티타임을 고른 채면 그 시각 그대로(08:40) — 예보는 그 시(8시)부터 본다 */}
-                                <span className="min-w-[66px] px-0.5 text-center text-[13.5px] font-semibold text-white tabular-nums whitespace-nowrap" aria-live="polite">{mineHere ? mineHere.label : `${teeSel}시`} 티오프</span>
+                                <span className="min-w-[66px] px-0.5 text-center text-[13.5px] font-semibold text-white tabular-nums whitespace-nowrap" aria-live="polite">{teeLabel} 티오프</span>
                                 <button type="button" onClick={() => step(1)} disabled={idx < 0 || idx >= avail.length - 1} aria-label="더 늦은 시각" className="w-7 h-8 rounded-full flex items-center justify-center text-[#FFFFFFB3] disabled:opacity-30 active:bg-[#FFFFFF1A]">
                                     <LucideChevronRight weight="bold" className="w-4 h-4" />
                                 </button>
