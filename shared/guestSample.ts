@@ -5,7 +5,10 @@
  * 지키는 것
  *  - 예시는 진짜처럼 보이면 안 된다. 이 값을 그리는 카드마다 "예시" 표시(components/hiq/GuestGate 의 SampleBadge)를 붙인다.
  *    덩어리·줄마다 sample: true 가 있다 — 진짜 응답과 섞였을 때 가려낼 수 있게.
- *  - 실제 회원·선수 이름을 쓰지 않는다. 별명은 당구 용어로 지었고, 닮은 프로(pro·next·tier·pos)는 비워 둔다.
+ *  - **이 자료에는** 실제 회원·선수를 넣지 않는다. 별명은 당구 용어로 지었고, 닮은 프로(pro·next·tier·pos)는 비워 둔다.
+ *    프로는 화면이 공개 API 로 그때 불러온다(2026-10-06 오너 결정: "실제 '나'를 우리 로고로 사용하고 프로도 실존 인물로 해줘. 그래야 실감나지") —
+ *    RealHandicapCard 가 예시 인물의 3쿠션 에버리지로 GET /api/hiq/compare/avg 를 불러 닮은 프로·재미 등급·회원 분포 자리를 덧씌운다.
+ *    실제 선수의 이름·기록을 여기에 적어 두면 낡는다(순위·에버리지가 바뀐다) — 그래서 자료는 비우고 그릴 때 받는다.
  *  - 숫자를 손으로 적지 않는다. 아래 '경기 목록'만 적고 다마(수지)·에버리지·랭킹 점수·전적·순위는 서버와 같은 식으로 센다
  *    (shared/realHandicap 의 handicapFor·nextHandicap, shared/proCompare 의 rankAmong). 시험(guestSample.test.ts)이 같은 함수로 검산한다.
  *  - 날짜가 없다. 예시가 시간이 지나 낡아 보이지 않게 — 순서만 있다(history 는 최신순).
@@ -19,7 +22,8 @@
  *   .history      GET /api/hiq/history 모양(최신순, 3쿠션 다음 4구). RealHandicapCard 의 history prop — 전적(승·패·승률)과 최근 5경기 점.
  *   .real         GET /api/hiq/compare/real 응답(RealCompareResponse). RealHandicapCard 의 비교표(나 · 같은 핸디 평균 · 다음 핸디)와
  *                 점수판 카드 MyDamaPanel 의 3쿠션 | 4구 숫자(handi)·근거 한 줄(games·handiAvg).
- *                 닮은 프로는 비웠으므로(pro: null) 3쿠션도 RealHandicapCard 의 '회원끼리' 갈래로 그려진다 — 그 갈래가 쓰는 peers 를 3쿠션에도 채워 뒀다.
+ *                 닮은 프로는 비웠다(pro: null). RealHandicapCard 가 공개 API 로 실제 프로를 받으면 3쿠션은 프로 갈래로 그리고(2026-10-06),
+ *                 받는 동안·못 받았을 때는 '회원끼리' 갈래로 그려진다 — 그 갈래가 쓰는 peers 를 3쿠션에도 채워 뒀다.
  *   .percentile   RealHandicapCard 의 getPercentile(type) 값(랭킹 점수 칸 아래 "상위 n%"). 예시 랭킹 다섯 줄 안에서 센 값이다.
  *   .rankings     GET /api/hiq/rankings?type=3c|4c 응답(매장 랭킹). RankingListCard 의 rankings prop — 탭(3c·4c)마다 다섯 줄.
  *                 **1위가 예시 인물**이고 수지·에버리지·랭킹 점수가 위 카드들과 같은 숫자다. 줄의 average 는 그 탭 종목의 공식 에버리지.
@@ -234,7 +238,7 @@ const realSide = (type: GT): RealSide => {
         // 회원 분포가 아니라 예시 다섯 명 안에서의 순위다 — 진짜 회원 수를 꾸며 내지 않는다
         members: rankAmong(PEOPLE.map((p) => p[type].avg).sort((a, b) => b - a), s.avg),
         nextHandi: up ? { handi: up.handi, avg: up.avg, gap: Math.max(0.001, up.avg - s.handiAvg) } : null,
-        // 닮은 프로·다음 프로·재미 등급은 실제 선수 기록이라 예시에 넣지 않는다
+        // 닮은 프로·다음 프로·재미 등급은 실제 선수 기록이라 예시 자료에 넣지 않는다 — 화면(RealHandicapCard)이 공개 API 로 그때 불러온다(2026-10-06)
         pro: null, next: null, tier: null, pos: null,
         peers: peersOf(type, s.handi),
     };

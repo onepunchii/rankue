@@ -3,6 +3,8 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 // 당구 홈의 예시 랭킹이 카드의 거르는 조건을 통과하는지 볼 때 쓴다(순수 자료 — DB·서버 모듈을 물지 않는다)
 import { GUEST_SAMPLE } from "./guestSample.js";
+// 예시 카드가 공개 API 에 묻는 에버리지가 서버가 받는 범위 안인지 볼 때 쓴다(순수 함수)
+import { normalizeAvg } from "./proCompare.js";
 
 /**
  * 2026-10-05 오너 결정: "골프·당구 홈을 비로그인도 다 볼 수 있게 열고, 가입 안 한 사람에겐 예시로 보여 주고,
@@ -105,6 +107,8 @@ describe("골프 홈", () => {
         });
     });
 
+    // 2026-10-06 가입·로그인 팝업: goLogin 은 이제 **팝업**을 연다. 이 문은 아무것도 그리지 않는 채 자동으로 보내는 곳이라
+    // (빈 화면 위에 팝업이 뜨고, 닫으면 갇힌다) 로그인 **화면**으로 보내는 goLoginPage 를 쓴다 — 아래 단언의 함수 이름을 그렇게 바꿨다.
     describe("골프 전용 문(GolfOnly) — 비로그인은 로그인으로, 끝나면 가려던 화면으로", () => {
         const app = client("App.tsx");
         const fn = code(app.slice(app.indexOf("function GolfOnly"), app.indexOf("function AppRoutes")));
@@ -118,10 +122,13 @@ describe("골프 홈", () => {
         /** 로그인으로 보내는 갈래 — 한국어로 보는 비로그인만 */
         const GUEST_KO = 'if (isGuest && locale === "ko") {';
 
-        it("한국어 비로그인(확인 끝)은 goLogin 으로 — 지금 주소(경로 + 질의)를 돌아올 곳으로 넘긴다", () => {
+        it("한국어 비로그인(확인 끝)은 goLoginPage 로(로그인 화면 — 팝업이 아니다) — 지금 주소(경로 + 질의)를 돌아올 곳으로 넘긴다", () => {
             const guest = fn.slice(fn.indexOf(GUEST_KO));
             expect(fn.indexOf(GUEST_KO)).toBeGreaterThan(0);
-            expect(guest).toMatch(/goLogin\([^;]*window\.location\.pathname \+ window\.location\.search\)/);
+            expect(guest).toMatch(/goLoginPage\([^;]*window\.location\.pathname \+ window\.location\.search\)/);
+            // 팝업을 여는 goLogin 은 이 문에 없다
+            expect(fn).not.toMatch(/\bgoLogin\(/);
+            expect(app).toContain('import { goLoginPage } from "@/components/hiq/LoginGate";');
             // 로그인 화면에서 '뒤로' → 이 문 → 다시 로그인으로 튕기지 않게 자리를 바꿔 끼운다
             expect(guest).toContain("setLocation(to, { replace: true })");
         });
@@ -132,9 +139,9 @@ describe("골프 홈", () => {
             expect(fn).toContain("const { locale } = useT();");
             // 언어가 바뀌면 다시 판단한다
             expect(fn).toMatch(/\}, \[[^\]]*\blocale\b[^\]]*\]\);/);
-            // goLogin 은 그 갈래 안 한 군데뿐
-            expect(fn.match(/goLogin\(/g)).toHaveLength(1);
-            expect(fn.indexOf("goLogin(")).toBeGreaterThan(fn.indexOf(GUEST_KO));
+            // goLoginPage 는 그 갈래 안 한 군데뿐
+            expect(fn.match(/goLoginPage\(/g)).toHaveLength(1);
+            expect(fn.indexOf("goLoginPage(")).toBeGreaterThan(fn.indexOf(GUEST_KO));
         });
 
         it("로그인했지만 골프 허용이 없는 사람·한국어가 아닌 비로그인은 홈으로 — 로그인 갈래 뒤에 온다", () => {
@@ -144,13 +151,13 @@ describe("골프 홈", () => {
 
         it("확인 중에는 아무 데도 보내지 않는다", () => {
             expect(fn).toContain("if (isLoading) return;");
-            expect(fn.indexOf("if (isLoading) return;")).toBeLessThan(fn.indexOf("goLogin("));
+            expect(fn.indexOf("if (isLoading) return;")).toBeLessThan(fn.indexOf("goLoginPage("));
         });
 
         it("초대 핀(?pin=)은 그대로 남긴다 — 그 주소로 곧장 돌아왔으면 지워서 두 번 들어가지 않게", () => {
             expect(fn).toContain('"rankue_golf_pending_pin"');
             expect(fn).toContain("sessionStorage.setItem(KEY, pin)");
-            expect(fn.indexOf("sessionStorage.setItem(KEY, pin)")).toBeLessThan(fn.indexOf("goLogin("));
+            expect(fn.indexOf("sessionStorage.setItem(KEY, pin)")).toBeLessThan(fn.indexOf("goLoginPage("));
             expect(fn).toContain("if (pin && sessionStorage.getItem(KEY) === pin) sessionStorage.removeItem(KEY);");
         });
     });
@@ -349,9 +356,32 @@ describe("골프 홈", () => {
             expect(src).not.toContain('"/?redirect="');
         });
 
-        it("goLogin 은 login=1 과 돌아올 곳을 같이 붙인다", () => {
-            const src = client("components/hiq/LoginGate.tsx");
-            expect(src).toContain("setLocation(`/?login=1&redirect=${encodeURIComponent(back)}`)");
+        // 2026-10-06 가입·로그인 팝업: 예전 단언은 goLogin 안의 주소 한 줄이었다. goLogin 은 이제 팝업을 열고,
+        // 로그인 화면으로 가는 길(goLoginPage · 팝업의 '전화번호로 계속하기')은 주소를 loginPagePath 한 곳에서 만든다.
+        it("로그인 화면 주소는 login=1 과 돌아올 곳을 같이 붙인다 — 만드는 곳은 loginPagePath 하나", () => {
+            const gate = client("components/hiq/LoginGate.tsx");
+            const page = gate.slice(gate.indexOf("export function goLoginPage"), gate.indexOf("export function goLogin("));
+            expect(page).toContain("setLocation(loginPagePath(back));");
+            const sheet = client("components/hiq/LoginSheet.tsx");
+            const path = sheet.slice(sheet.indexOf("export function loginPagePath"), sheet.indexOf("export function openLoginSheet"));
+            expect(path).toContain('return `/?login=1${phone ? "&phone=1" : ""}&redirect=${encodeURIComponent(back)}`;');
+            // login=1 이 빠진 주소를 만드는 곳이 없다 — 맨 '/' 는 비로그인을 예시 홈으로 보낸다(landing)
+            for (const src of [gate, sheet]) expect(src).not.toContain("`/?redirect=");
+        });
+
+        // 2026-10-06 검토: 가입(/register) 첫 단계의 '이전'은 setLocation("/") 였다. 맨 '/' 가 로그인 화면이던 때의 코드다 — 이제 맨 '/' 는
+        // 비로그인을 예시 홈으로 보내므로, 번호를 고치려던 새 회원(아직 쿠키가 없다)이 가입 흐름 밖으로 떨어졌다.
+        it("가입 첫 단계의 '이전'은 로그인 화면(전화번호 카드)으로 — 맨 '/' 로 보내지 않는다. 돌아갈 곳도 이어 준다", () => {
+            const src = code(client("pages/hiq/register.tsx"));
+            expect(src).toContain('import { loginPagePath } from "@/components/hiq/LoginSheet";');
+            const prev = src.slice(src.indexOf("const prevStep = () => {"), src.indexOf("const requiredAgreed ="));
+            expect(prev.length).toBeGreaterThan(0);
+            // login=1 · phone=1 을 달고, 들고 온 ?redirect= 는 우리 사이트 안의 경로만 이어 준다
+            expect(prev).toContain('setLocation(loginPagePath(safeReturnPath(queryParams.get("redirect")) ?? "/dashboard", true));');
+            expect(prev).not.toContain('setLocation("/")');
+            // 이 화면 어디에도 표시 없는 맨 '/' 로 기록을 쌓는 곳이 없다 — 번호 없이 직접 연 경우는 자리를 바꿔 끼운다('뒤로'로 돌아와 다시 튕기지 않게)
+            expect(src).not.toContain('setLocation("/")');
+            expect(src).toContain('setLocation("/", { replace: true });');
         });
 
         it("하단 탭: 내 것 배지 쿼리는 로그인했을 때만", () => {
@@ -564,12 +594,19 @@ describe("당구 홈", () => {
             expect(koValue("guestHome.sampleNote")).toContain("예시");
         });
 
-        it("비교표 '나' 칸의 얼굴: 예시일 땐 MeAvatar(회원 사진, 없으면 한글 '나')가 아니라 칸 이름과 같은 말의 첫 글자 — 다섯 언어", () => {
-            expect(src).toContain('? <CrewAvatar name={t("compare.me")}');
+        // 2026-10-06 오너: "실제 '나'를 우리 로고로 사용하고 프로도 실존 인물로 해줘. 그래야 실감나지" — 예전 단언은
+        // "칸 이름(compare.me)과 같은 말의 첫 글자"였다. 이제 예시의 얼굴은 글자가 아니라 랭큐 로고(앱 아이콘)라 그 단언을 새 규칙으로 바꿨다.
+        it("비교표 '나' 칸의 얼굴: 예시일 땐 MeAvatar(회원 사진, 없으면 한글 '나')가 아니라 랭큐 로고 — 금색 테는 그대로, 다섯 언어가 같은 그림", () => {
+            const face = src.slice(src.indexOf("const meFace = sample"), src.indexOf(": <MeAvatar />;"));
+            expect(face).toContain('? <CrewAvatar src="/icon-192.png"');
+            expect(face).toContain("ring-2 ring-[#F5B721]");
+            // 로고 파일이 실제로 있다(없으면 깨진 그림이 뜬다 — CrewAvatar 는 src 가 있으면 글자로 돌아가지 않는다)
+            expect(() => readFileSync(resolve(__dirname, "../client/public/icon-192.png"))).not.toThrow();
             expect(src).toContain(": <MeAvatar />;");
             // MeAvatar 를 직접 그리는 자리는 그 한 군데(회원 갈래)뿐 — 비교표 두 곳은 meFace 를 쓴다
             expect(src.match(/<MeAvatar \/>/g)).toHaveLength(1);
             expect(src.match(/avatar: meFace \}/g)).toHaveLength(2);
+            // 칸 이름은 여전히 사전 키
             for (const l of LOCALES) expect(dictHas(l, "compare.me"), l).toBe(true);
         });
 
@@ -577,6 +614,108 @@ describe("당구 홈", () => {
             expect(src).toContain('const openHistory = sample ? undefined : () => setLocation("/history");');
             expect(src.match(/setLocation\("\/history"\)/g)).toHaveLength(1);
             expect(src).toContain("onShare={sample ? undefined : () => void share()}");
+        });
+
+        /* ── 예시 카드의 실제 프로(2026-10-06 오너: "프로도 실존 인물로") ──
+         * 예시 자료(GUEST_SAMPLE)에는 실제 선수를 넣지 않는다. 프로는 카드가 공개 API 로 그때 불러와 3쿠션 칸에 덧씌운다. */
+        describe("예시의 닮은 프로 — 자료가 아니라 공개 API 에서", () => {
+            const AVG_API = "/api/hiq/compare/avg?avg=";
+
+            it("예시일 때만 공개 API 를 부른다 — 회원은 부르지 않는다(/compare/real 이 같은 값을 준다)", () => {
+                const call = queryCall(client(`${DASH}/RealHandicapCard.tsx`), AVG_API);
+                expect(call).toContain("useQuery<CompareAvgResponse>");
+                expect(call).toContain("enabled: !!sample");
+                expect(call).not.toContain("!!member");
+                // 선수 페이지 '나와 비교하기'와 같은 키·같은 신선도(10분) — 캐시를 같이 쓴다. 실패하면 다시 묻지 않고 '회원끼리' 갈래로 남는다
+                expect(call).toContain("staleTime: 10 * 60_000");
+                expect(call).toContain("retry: false");
+                expect(src.split(AVG_API)).toHaveLength(2);
+                expect(code(client("components/hiq/compare/ProCompareCard.tsx"))).toContain("queryKey: [`/api/hiq/compare/avg?avg=${tryAvg.toFixed(2)}${exclude}`]");
+            });
+
+            it("묻는 값은 예시 인물의 3쿠션 에버리지, 소수 둘째 자리 — 서버가 받는 범위 안", () => {
+                expect(src).toContain('const sampleAvg3c = sample?.real["3c"].avg ?? null;');
+                expect(src).toContain("queryKey: [`/api/hiq/compare/avg?avg=${(sampleAvg3c ?? 0).toFixed(2)}`]");
+                const avg = GUEST_SAMPLE.billiards.real["3c"].avg;
+                expect(avg).not.toBeNull();
+                expect(normalizeAvg(avg!.toFixed(2))).toBe(Number(avg!.toFixed(2)));
+            });
+
+            it("새 쿼리도 조기 반환 앞 — 그리고 예시가 아니면 답을 읽지 않는다(선수 페이지에서 받아 둔 같은 키의 캐시가 있어도)", () => {
+                expect(src.indexOf("const twin = useQuery<CompareAvgResponse>(")).toBeGreaterThan(0);
+                expect(src.indexOf("const twin = useQuery<CompareAvgResponse>(")).toBeLessThan(src.indexOf("if (!me) return null;"));
+                expect(src).toContain('const twinRes = sample && cur === "3c" ? twin.data ?? null : null;');
+                // twin.data 를 읽는 곳은 그 한 줄뿐 — 4구 탭·회원에게는 닿지 않는다
+                expect(src.match(/\btwin\.data\b/g)).toHaveLength(1);
+                expect(src).toContain('const twinLoading = !!sample && cur === "3c" && twin.isLoading;');
+            });
+
+            it("받은 pros[0]·tier·pos·members 를 3쿠션 칸에 덧씌운다 — 못 받으면 예시 자료 그대로('회원끼리' 갈래)", () => {
+                expect(src).toContain("twinRes.pros[0] ?? null");
+                const overlay = src.slice(src.indexOf("const d: RealSide = "), src.indexOf("const twinLoading"));
+                expect(overlay).toContain("const d: RealSide = twinRes && twinPro");
+                expect(overlay).toContain("? { ...data[cur], pro: twinPro, tier: twinRes.tier ?? null, pos: twinRes.pos ?? null, members: twinRes.members ?? null }");
+                expect(overlay).toContain(": data[cur];");
+                // 예시의 members(예시 다섯 명 안 순위)를 '랭큐 회원 상위 n%' 칩에 되살리지 않는다 — 응답에 없으면 칩이 빠진다
+                expect(overlay).not.toMatch(/members: twinRes\.members \?\? (?!null)/);
+            });
+
+            it("옛 본문(CDN 캐시)에는 tier·pos 가 없다 — 타입이 선택 필드이고, 프로 머리는 없을 때 칩·사다리를 그리지 않는다", () => {
+                const types = readFileSync(resolve(__dirname, "proCompare.ts"), "utf8");
+                const res = types.slice(types.indexOf("export interface CompareAvgResponse"), types.indexOf("export interface CompareMyStats"));
+                expect(res).toContain("tier?: 0 | 1 | 2 | 3 | 4 | null;");
+                expect(res).toContain("pos?: number | null;");
+                const ui = code(client("components/hiq/compare/lookalikeUi.tsx"));
+                expect(ui).toContain("{tier != null && <TierChip tier={tier} />}");
+                expect(ui).toContain("{tier != null && pos != null && <TierLadder tier={tier} pos={pos} />}");
+            });
+
+            /** 프로 갈래 — 3쿠션이고 닮은 프로가 있을 때 */
+            const proBranch = src.slice(src.indexOf('if (d.type === "3c" && d.pro) {'), src.indexOf("const m = d.members;"));
+
+            it("예시의 프로 갈래에는 공유 단추가 없다 — 프로 단추(공개 선수 페이지)는 둔다", () => {
+                expect(proBranch.length).toBeGreaterThan(0);
+                expect(proBranch).toContain("<CardActions primary={matchAction} onPro={openPro} onShare={sample ? undefined : () => void share()} sharing={sharing} />");
+                // 가드 없는 공유가 카드 어디에도 남아 있지 않다 — 두 갈래 모두 예시면 undefined
+                expect(src).not.toContain("onShare={() => void share()}");
+                expect(src.match(/onShare=\{sample \? undefined : \(\) => void share\(\)\}/g)).toHaveLength(2);
+                expect(proBranch).toContain("setLocation(`/pba-player/${encodeURIComponent(pro.memCode)}`)");
+            });
+
+            it("online.data 를 예시에서 읽지 않는다 — 로그아웃 뒤 캐시에 남은 이전 회원의 온라인 에버가 섞이지 않게", () => {
+                const first = src.indexOf("online.data");
+                expect(first).toBeGreaterThan(0);
+                expect(src.slice(first - "!sample && ".length, first)).toBe("!sample && ");
+                // 읽는 곳은 그 한 식뿐(ready · avg != null · avg.toFixed) — 전부 !sample 뒤에 묶여 있다
+                expect(src).toContain('!sample && online.data?.ready && online.data.avg != null && d.type === "3c" ? fill(t("real.onlineAvg"), { v: online.data.avg.toFixed(2) }) : "",');
+                expect(src.match(/\bonline\.data\b/g)).toHaveLength(3);
+            });
+
+            it("프로 갈래에도 예시임을 알리는 한 줄 — 내 숫자는 예시, 프로 기록은 실제. 제목 옆 SampleBadge 는 그대로", () => {
+                expect(proBranch).toContain('{sample && <p className="text-[12px] text-ink-3 mt-1">{t("guestHome.sampleProNote")}</p>}');
+                expect(proBranch).toContain("{head}");
+                const line = koValue("guestHome.sampleProNote");
+                expect(line).toBe("내 숫자는 예시예요. 프로 기록은 실제입니다. 가입하고 경기를 치면 내 기록으로 바뀌어요");
+                for (const l of LOCALES) expect(dictHas(l, "guestHome.sampleProNote"), l).toBe(true);
+            });
+
+            it("'경기 시작' 단추는 프로 갈래에서도 같은 것 — 홈의 문(가입 안내)을 탄다", () => {
+                expect(proBranch).toContain("primary={matchAction}");
+            });
+
+            it("받는 동안의 자리 잡기는 '회원끼리' 갈래에만, 받는 동안만", () => {
+                expect(src.match(/\{twinLoading && /g)).toHaveLength(1);
+                expect(src.indexOf("{twinLoading && ")).toBeGreaterThan(src.indexOf("const m = d.members;"));
+            });
+
+            it("예시 자료에는 실제 선수가 없다 — 프로는 그릴 때만 붙는다", () => {
+                for (const type of ["3c", "4c"] as const) {
+                    const side = GUEST_SAMPLE.billiards.real[type];
+                    expect([side.pro, side.next, side.tier, side.pos]).toEqual([null, null, null, null]);
+                }
+                // 홈은 여전히 예시 자료만 넘긴다 — 프로를 부르는 것은 카드 안
+                expect(home).not.toContain("/api/hiq/compare/avg");
+            });
         });
 
         it("'경기 시작' 단추는 홈의 문을 거친다", () => {

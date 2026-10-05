@@ -15,7 +15,7 @@ import { PushNotifications, type PushNotificationSchema, type ActionPerformed, t
 import { navigate } from "wouter/use-browser-location";
 import { apiRequest } from "@/lib/queryClient";
 import { hasPlugin, isNative, nativeSupports, platform } from "@shared/nativeCaps";
-import { deepLinkToPath, LAST_PATH_KEY, resumeTarget, sanitizeInternalPath, type SavedPath } from "@shared/deepLink";
+import { handledLinkKey, LAST_PATH_KEY, openedAppLink, resumeTarget, sanitizeInternalPath, type SavedPath } from "@shared/deepLink";
 import { androidStoreUrl, iosStoreUrl } from "@shared/appLinks";
 
 export function isNativeApp(): boolean {
@@ -285,10 +285,38 @@ function handledLinks(): string[] {
     }
 }
 
+// 적는 것은 주소 원문이 아니라 단방향 키다(2026-10-06 검토) — '앱에서 열기' 토큰이 실린 rankue:// 주소 원문이
+// 앱 세션 내내 sessionStorage 에 남아 있었다(토큰은 받는 쪽이 쓰지 않고 버려도 만료까지 살아 있다).
 function markLinkHandled(url: string): void {
-    const list = handledLinks().filter((x) => x !== url);
-    list.push(url);
+    const key = handledLinkKey(url);
+    const list = handledLinks().filter((x) => x !== key);
+    list.push(key);
     storageSet("session", HANDLED_LINKS_KEY, JSON.stringify(list.slice(-HANDLED_LINKS_MAX)));
+}
+
+function wasLinkHandled(url: string): boolean {
+    const list = handledLinks();
+    // 원문 비교는 이 규칙이 실리기 전에 적어 둔 값(같은 앱 세션)을 알아보려는 것뿐이다 — 새로 적는 값은 전부 키다
+    return list.includes(handledLinkKey(url)) || list.includes(url);
+}
+
+// ── '앱에서 열기' 토큰 ─────────────────────────────────────────────────────
+// 웹의 로그인을 넘겨받는 한 번짜리 토큰(shared/loginHandoff)은 주소에 싣지 않고 여기로 건넨다(2026-10-06 검토).
+// 받는 쪽(components/hiq/HandoffRedeemer)이 한 번 꺼내 가면 비워진다. 저장소에는 적지 않는다(이 모듈의 변수에만).
+let deliveredHandoff: string | null = null;
+const handoffListeners = new Set<() => void>();
+
+/** 받아 둔 '앱에서 열기' 토큰을 꺼낸다 — 한 번 꺼내면 비워진다. 없으면 null. */
+export function takeDeliveredHandoff(): string | null {
+    const token = deliveredHandoff;
+    deliveredHandoff = null;
+    return token;
+}
+
+/** 토큰이 도착할 때마다 부른다. 돌려주는 함수로 끊는다. */
+export function onHandoffDelivered(listener: () => void): () => void {
+    handoffListeners.add(listener);
+    return () => { handoffListeners.delete(listener); };
 }
 
 function openDeepLink(url: string | undefined, replace: boolean): void {
@@ -298,9 +326,15 @@ function openDeepLink(url: string | undefined, replace: boolean): void {
     const now = Date.now();
     if (url === lastLink.url && now - lastLink.at < 3000) return;
     lastLink = { url, at: now };
-    // 우리 주소가 아니면(구글 로그인 복귀 같은 다른 스킴) 건드리지 않는다
-    const path = deepLinkToPath(url);
-    if (path) navigateInApp(path, replace);
+    // 우리 주소가 아니면(구글 로그인 복귀 같은 다른 스킴) 건드리지 않는다.
+    // '앱에서 열기' 토큰은 경로에서 떼고, 커스텀 스킴(rankue://)으로 온 것만 받는 쪽에 건넨다(shared/deepLink openedAppLink)
+    const { path, handoff } = openedAppLink(url);
+    if (!path) return;
+    if (handoff) {
+        deliveredHandoff = handoff;
+        handoffListeners.forEach((l) => l());
+    }
+    navigateInApp(path, replace);
 }
 
 function initDeepLinks(): void {
@@ -311,7 +345,7 @@ function initDeepLinks(): void {
         try {
             const url = (await App.getLaunchUrl())?.url;
             if (!url) return;
-            if (handledLinks().includes(url)) return;
+            if (wasLinkHandled(url)) return;
             openDeepLink(url, true);
         } catch { /* 옛 바이너리·미지원 */ }
     })();
@@ -375,15 +409,39 @@ export function setBackHandler(fn: (() => boolean) | null): void {
     backHandler = fn;
 }
 
+/**
+ * 겹쳐 거는 뒤로가기 핸들러(2026-10-06 검토) — 떠 있는 팝업(가입·로그인 시트)이 화면보다 **먼저** '뒤로'를 받는다.
+ * setBackHandler 는 한 칸짜리라 팝업이 그 칸을 쓰면 게임 화면이 걸어 둔 '나가기 확인'이 지워진다(게임 화면에서도 가입 팝업이 열린다).
+ * 그래서 팝업은 따로 쌓는다: 맨 나중에 건 것부터 묻고, true 를 돌려주면 처리 끝. 돌려주는 함수로 자기 것만 푼다.
+ */
+const backLayers: Array<() => boolean> = [];
+export function pushBackHandler(fn: () => boolean): () => void {
+    backLayers.push(fn);
+    return () => {
+        const at = backLayers.lastIndexOf(fn);
+        if (at !== -1) backLayers.splice(at, 1);
+    };
+}
+
 export function initNativeBridge(): void {
     if (!isNative()) return;
     if (platform() === "android") document.documentElement.classList.add("native-android");
 
-    // 안드로이드 하드웨어 뒤로가기: 히스토리 있으면 back, 루트면 앱 종료 (wouter는 history API 기반)
+    // 안드로이드 하드웨어 뒤로가기: 떠 있는 팝업 → 화면이 건 핸들러 → 뒤로 갈 곳이 있으면 back, 없으면 앱 종료 (wouter는 history API 기반)
     if (hasPlugin("App")) {
-        App.addListener("backButton", () => {
+        App.addListener("backButton", (e) => {
+            for (let i = backLayers.length - 1; i >= 0; i--) {
+                if (backLayers[i]()) return;
+            }
             if (backHandler && backHandler()) return;
-            if (window.location.pathname === "/" || window.history.length <= 1) void App.exitApp().catch(() => { /* 무시 */ });
+            // '뒤로 갈 곳이 있는가'는 웹뷰가 알려 준 값(canGoBack = WebView.canGoBack)으로 본다(2026-10-06 검토).
+            // 예전에는 주소가 '/' 이면 무조건 종료였다 — 로그인 화면이 앱의 첫 화면(뿌리)일 때의 규칙이다. 이제 비로그인은 예시 홈에서
+            // 시작해 로그인 화면(/?login=1…)으로 **들어오므로**, 거기서 '뒤로'는 종료가 아니라 예시 홈으로 돌아가야 한다.
+            // history.length 는 뒤로 가도 줄지 않아 뿌리 판단에 못 쓴다. 값을 못 받는 바이너리에서만 옛 판단으로 떨어진다.
+            const canGoBack = typeof e?.canGoBack === "boolean"
+                ? e.canGoBack
+                : !(window.location.pathname === "/" || window.history.length <= 1);
+            if (!canGoBack) void App.exitApp().catch(() => { /* 무시 */ });
             else window.history.back();
         }).catch(() => { /* 무시 */ });
     }

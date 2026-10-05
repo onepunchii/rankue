@@ -10,10 +10,20 @@
  *
  * 비로그인(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다" — "랭킹 1위와 내 수지를 비슷하게").
  * 예전엔 로그인 전이면 통째로 사라졌다. 이제 홈이 예시 인물(shared/guestSample)을 sample 로 넘기면 **같은 카드 모양**을 그 숫자로 그리고
- * 제목 옆에 "예시" 표시를 단다. 예시는 실제 선수 이름을 쓰지 않아(닮은 프로 없음) 3쿠션도 '회원끼리' 갈래로 그려진다 — 그 갈래의
- * 4구 전용 문구 둘(순위 이름·아래 한 줄)은 예시용 문구로 바꾼다. 전적·최근 5경기 칸은 눌리지 않고(/history 는 내 기록 화면이다)
+ * 제목 옆에 "예시" 표시를 단다. 전적·최근 5경기 칸은 눌리지 않고(/history 는 내 기록 화면이다)
  * 공유 단추는 뺀다(예시 숫자가 내 기록인 것처럼 밖으로 나가면 안 된다). '경기 시작'은 홈의 문(guard)이 가입 안내로 잇는다.
  * 회원에게는 sample 이 없어 아무것도 달라지지 않는다.
+ *
+ * 예시 카드의 프로와 '나' 얼굴(2026-10-06 오너 결정: "실제 '나'를 우리 로고로 사용하고 프로도 실존 인물로 해줘. 그래야 실감나지").
+ *  - 규칙: **예시 자료(GUEST_SAMPLE)에는 실제 선수를 넣지 않는다. 프로는 화면이 공개 API 로 그때 불러온다.**
+ *    예시 인물의 3쿠션 에버리지로 GET /api/hiq/compare/avg(로그인 불필요 — 선수 페이지 '나와 비교하기'와 같은 쿼리·캐시)를 불러
+ *    닮은 프로(pros[0])·재미 등급(tier·pos)·랭큐 회원 분포에서의 자리(members)를 3쿠션 칸에 덧씌운다 → 회원과 같은 프로 갈래가 그려진다.
+ *    members 도 응답 것을 쓴다 — 예시 자료의 members 는 예시 다섯 명 안 순위라 '랭큐 회원 상위 n%' 칩에 넣으면 지어낸 통계가 된다.
+ *  - 받는 동안·실패했을 때(오프라인 등)·4구 탭은 예전의 '회원끼리' 예시 갈래 그대로다 — 그 갈래의 4구 전용 문구 둘(순위 이름·아래 한 줄)은 예시용 문구.
+ *    옛 본문(CDN 캐시)에는 tier·pos 가 없다 — 그때는 등급 칩·사다리 없이 프로와 비교표만 그린다.
+ *  - 프로 갈래에서도 예시는: 공유 단추 없음, 온라인 에버 줄 없음(로그아웃 뒤 캐시에 남은 이전 회원 값이 섞이지 않게),
+ *    "내 숫자는 예시예요. 프로 기록은 실제입니다…" 한 줄. 프로 페이지로 가는 단추는 둔다(공개 페이지).
+ *  - '나' 얼굴은 글자 대신 랭큐 로고(/icon-192.png, 금색 테 유지). 회원은 그대로 MeAvatar.
  */
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -24,7 +34,7 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { shareImage } from "@/lib/shareImage";
 import { LucidePlay } from "@/lib/icons";
-import { proRatio, type LookalikeResponse, type RealCompareResponse, type RealSide } from "@shared/proCompare";
+import { proRatio, type CompareAvgResponse, type LookalikeResponse, type RealCompareResponse, type RealSide } from "@shared/proCompare";
 import { drawCompareCard } from "@/components/hiq/compare/compareCard";
 import { SampleBadge } from "@/components/hiq/GuestGate";
 import { CrewAvatar } from "@/components/hiq/crew-ui";
@@ -60,6 +70,16 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     const data = sample ? sample.real : q.data;
     const me = sample ? sample.member : member;
     const games: HistoryRow[] | undefined = sample ? sample.history : history;
+    // 예시 카드의 닮은 프로(2026-10-06 오너: "프로도 실존 인물로") — 예시 자료에는 실제 선수가 없으니, 예시 인물의 3쿠션 에버리지로
+    // 공개 API 를 그때 부른다. 선수 페이지 '나와 비교하기'(ProCompareCard)와 같은 키라 캐시를 같이 쓴다(서버가 소수 둘째 자리로 자른다).
+    // 예시일 때만 켠다 — 회원은 /compare/real 이 자기 기록으로 같은 값을 준다. 실패하면 '회원끼리' 갈래로 남으면 되니 다시 묻지 않는다.
+    const sampleAvg3c = sample?.real["3c"].avg ?? null;
+    const twin = useQuery<CompareAvgResponse>({
+        queryKey: [`/api/hiq/compare/avg?avg=${(sampleAvg3c ?? 0).toFixed(2)}`],
+        enabled: !!sample && sampleAvg3c != null,
+        staleTime: 10 * 60_000,
+        retry: false,
+    });
     useEffect(() => { if (data && tab === null) setTab(data.preferred); }, [data, tab]);
     // 로그인 확인 중이거나, 예시도 회원도 없을 때만 비운다 — 비로그인 홈은 sample 을 넘기므로 카드가 사라지지 않는다
     if (!me) return null;
@@ -131,7 +151,19 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
             </section>
         );
     }
-    const d: RealSide = data[cur];
+    // 예시의 3쿠션 칸에 실제 프로를 덧씌운다 — 공개 API 가 답했을 때만. 그러면 아래 프로 갈래가 회원과 같은 코드로 그린다.
+    // members 는 응답 것(실제 랭큐 회원 분포에서 이 에버리지의 자리)으로 바꾼다 — 예시 자료의 members 는 예시 다섯 명 안 순위다.
+    // tier·pos 는 옛 본문(CDN 캐시)에 없을 수 있다 → null 이면 ProTwinHeader 가 등급 칩·사다리를 그리지 않는다.
+    // 회원(sample 없음)은 twin 을 읽지 않는다 — 꺼진 쿼리라도 선수 페이지에서 받아 둔 같은 키의 캐시가 있을 수 있다.
+    const twinRes = sample && cur === "3c" ? twin.data ?? null : null;
+    // 닮은 프로 = 에버리지가 가장 가까운 한 명(pros[0], 회원용 /real 과 같은 고르는 법). 모양이 어긋난 답이면 쓰지 않는다(아래에서 toFixed 를 부른다)
+    const twinFirst = twinRes && Array.isArray(twinRes.pros) ? twinRes.pros[0] ?? null : null;
+    const twinPro = twinFirst && twinFirst.memCode && typeof twinFirst.average === "number" ? twinFirst : null;
+    const d: RealSide = twinRes && twinPro
+        ? { ...data[cur], pro: twinPro, tier: twinRes.tier ?? null, pos: twinRes.pos ?? null, members: twinRes.members ?? null }
+        : data[cur];
+    // 받는 동안만 — 프로 갈래로 바뀔 때 카드가 한꺼번에 길어지지 않게 그 차이만큼 자리를 잡아 둔다(아래 '회원끼리' 갈래에서 쓴다)
+    const twinLoading = !!sample && cur === "3c" && twin.isLoading;
 
     const matchAction = { label: t("real.match"), icon: LucidePlay, onClick: onStartMatch };
 
@@ -160,9 +192,10 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     const nextColFace = { label: next ? fill(t("real.nextHandi"), { n: "" }).trim() : nextCol, tone: "next" as const, avatar: <BadgeAvatar next>{next ? next.handi : "🏆"}</BadgeAvatar> };
     // 비교표 '나' 칸의 얼굴. 예시일 땐 MeAvatar 를 쓰지 않는다 — MeAvatar 는 로그인한 회원의 사진·이름만 보고, 없으면 한글 "나"를 그대로 적는다
     // (예전엔 비로그인이면 이 카드가 통째로 없어 닿지 않던 길이다). 영어·스페인어·터키어·베트남어 방문자에게 칸 이름은 Me 인데 얼굴만 한글이 됐다.
-    // 예시는 칸 이름(compare.me)과 같은 말의 첫 글자를 같은 금테 동그라미로 그린다 — 한국어 화면은 예전과 같은 "나"다. 회원은 그대로 MeAvatar.
+    // 2026-10-06 오너: "실제 '나'를 우리 로고로 사용" — 예시는 글자 대신 랭큐 로고(앱 아이콘 /icon-192.png)를 같은 금테 동그라미로 그린다.
+    // 언어와 상관없는 그림이라 다섯 언어가 같은 얼굴이다(칸 이름은 그대로 compare.me). 회원은 그대로 MeAvatar.
     const meFace = sample
-        ? <CrewAvatar name={t("compare.me")} size={34} className="ring-2 ring-[#F5B721] ring-offset-2 ring-offset-surface-1" />
+        ? <CrewAvatar src="/icon-192.png" name={t("compare.me")} size={34} className="ring-2 ring-[#F5B721] ring-offset-2 ring-offset-surface-1" />
         : <MeAvatar />;
     const share = async () => {
         if (sharing) return;
@@ -190,10 +223,11 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
         } finally { setSharing(false); }
     };
 
+    // 온라인 에버는 회원의 것 — 예시에서는 읽지 않는다(쿼리는 꺼져 있어도, 로그아웃 뒤 캐시에 남은 이전 회원의 값이 예시 카드에 찍히면 안 된다)
     const foot = (
         <p className="text-[11.5px] text-ink-4 mt-2 rk-num">
             {[
-                online.data?.ready && online.data.avg != null && d.type === "3c" ? fill(t("real.onlineAvg"), { v: online.data.avg.toFixed(2) }) : "",
+                !sample && online.data?.ready && online.data.avg != null && d.type === "3c" ? fill(t("real.onlineAvg"), { v: online.data.avg.toFixed(2) }) : "",
                 fill(t("real.games"), { n: d.games }),
                 t("real.handiNote"),
             ].filter(Boolean).join(" · ")}
@@ -219,12 +253,15 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
                     ]}
                 />
                 {foot}
-                <CardActions primary={matchAction} onPro={openPro} onShare={() => void share()} sharing={sharing} />
+                {/* 예시 카드에 실제 선수가 섞인다 — 어느 숫자가 예시이고 어느 것이 실제인지 한 줄로 갈라 준다(나 = 예시, 프로 = 실제 기록) */}
+                {sample && <p className="text-[12px] text-ink-3 mt-1">{t("guestHome.sampleProNote")}</p>}
+                {/* 예시는 공유하지 않는다 — 예시 숫자가 '프로와 견준 내 실전 핸디' 그림으로 밖에 나가면 안 된다. 프로 단추는 공개 선수 페이지라 둔다 */}
+                <CardActions primary={matchAction} onPro={openPro} onShare={sample ? undefined : () => void share()} sharing={sharing} />
             </section>
         );
     }
 
-    // 4구 — 랭큐 회원끼리
+    // 4구 — 랭큐 회원끼리. 예시의 3쿠션도 프로를 받는 동안·못 받았을 때는 이 갈래다
     const m = d.members;
     return (
         <section className="rk-card rounded-3xl p-4">
@@ -240,6 +277,8 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
                     <span className="block text-[15px] font-bold rk-num truncate">{m ? fill(t("real.rankLine"), { total: m.total.toLocaleString(), rank: m.rank.toLocaleString() }) : "—"}</span>
                 </span>
             </div>
+            {/* 예시의 닮은 프로를 받는 동안만: 프로 머리(사진·등급 칩·사다리)가 이 상자보다 긴 만큼 자리를 잡아 둔다 — 답이 오면 아래 표·단추가 덜 밀린다 */}
+            {twinLoading && <div className="mt-2 h-20 rounded-tile bg-surface-3 animate-pulse" aria-hidden="true" />}
             <CompareTable
                 cols={[{ label: t("compare.me"), tone: "me", avatar: meFace }, { label: t("real.peersAvg"), avatar: <BadgeAvatar>{d.handi ?? "–"}</BadgeAvatar> }, nextColFace]}
                 rows={[

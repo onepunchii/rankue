@@ -74,7 +74,17 @@ export function nearestPros(pool: readonly ComparePro[], avg: number, n = 2, exc
 
 /** 서버 응답 — GET /compare/avg?avg= (공개) · GET /compare/me (회원) */
 export interface CompareMembers { rank: number; total: number; topPct: number }
-export interface CompareAvgResponse { avg: number; members: CompareMembers | null; pros: ComparePro[] }
+export interface CompareAvgResponse {
+    avg: number;
+    members: CompareMembers | null;
+    pros: ComparePro[];
+    /**
+     * 재미 등급·사다리 위 자리(proTier) — 2026-10-06 추가: 비로그인 홈의 예시 카드가 실제 프로와 함께 등급 칩·사다리를 그린다.
+     * 선택 필드다 — CDN 에 10분(낡은 채로는 하루까지) 남는 옛 본문에는 없으니 화면은 없을 때를 견뎌야 한다. 프로가 모자라면 null.
+     */
+    tier?: 0 | 1 | 2 | 3 | 4 | null;
+    pos?: number | null;
+}
 export interface CompareMyStats {
     /** 회원 3쿠션 에버리지(프로필 값) */
     avg: number;

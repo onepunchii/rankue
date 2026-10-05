@@ -8,7 +8,7 @@ import { HANDI_MIN_GAMES, nextHandicap } from "../../../shared/realHandicap.js";
 
 /**
  * "나와 비교하기"(2026-09-27, 선수 페이지 PBA·UMB).
- *   GET /compare/avg?avg=0.80&exclude=<memCode>  공개 — 가입 전 방문자가 넣은 에버리지: 랭큐 회원 중 순위·상위 %, 비슷한 프로 2명
+ *   GET /compare/avg?avg=0.80&exclude=<memCode>  공개 — 가입 전 방문자가 넣은 에버리지: 랭큐 회원 중 순위·상위 %, 비슷한 프로 2명, 재미 등급(tier·pos)
  *   GET /compare/me?exclude=<memCode>            회원 — 내 3쿠션 요약(경기·하이런·승률·월평균 변화) + 같은 순위·비슷한 프로
  *   GET /compare/real                            회원 — 홈 "내 실전 핸디"(3쿠션·4구): 핸디·다음 핸디까지·회원 순위, 3쿠션은 닮은 프로·재미 등급, 4구는 같은 핸디 회원
  * 공개 쪽은 입력이 소수 둘째 자리로 잘려 캐시가 잘 맞는다. 회원 쪽은 사람마다 달라 캐시하지 않는다.
@@ -23,7 +23,14 @@ router.get("/avg", asyncHandler(async (req: any, res: Response) => {
     const [members, pool] = await Promise.all([storage.compare.memberRank(avg), storage.pba.comparePros()]);
     res.set("Cache-Control", "public, max-age=0, must-revalidate");
     res.set("CDN-Cache-Control", "public, s-maxage=600, stale-while-revalidate=86400");
-    const body: CompareAvgResponse = { avg, members, pros: nearestPros(pool, avg, 2, excludeOf(req.query.exclude)) };
+    // 재미 등급·사다리 자리(2026-10-06 오너: 비로그인 홈 예시 카드에 "프로도 실존 인물로 — 그래야 실감나지").
+    // 예시 카드는 로그인 없이 이 공개 응답으로 닮은 프로를 그리는데, 등급은 프로 전체 분포가 있어야 셀 수 있다 — 이미 든 pool 로 같이 싣는다.
+    // exclude 는 '비슷한 프로' 목록에서만 뺀다(등급 경계는 전체 분포 그대로 — 회원용 /real 과 같은 식).
+    const tier = proTier(pool, avg);
+    const body: CompareAvgResponse = {
+        avg, members, pros: nearestPros(pool, avg, 2, excludeOf(req.query.exclude)),
+        tier: tier?.tier ?? null, pos: tier?.pos ?? null,
+    };
     return sendSuccess(res, body);
 }));
 

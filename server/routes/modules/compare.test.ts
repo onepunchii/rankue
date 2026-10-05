@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import express from "express";
 import type { AddressInfo } from "net";
+import { proTier } from "../../../shared/proCompare.js";
 
 // "나와 비교하기" API — 공개 입력(에버리지 검증·캐시 머리글·비슷한 프로에서 이 선수 빼기)과 회원 전용 쪽
 vi.mock("../../storage/index.js", () => ({
@@ -48,6 +49,59 @@ describe("GET /compare/avg", () => {
     it("범위 밖 입력은 400", async () => {
         expect((await fetch(`${base}/compare/avg?avg=9`)).status).toBe(400);
         expect((await fetch(`${base}/compare/avg?avg=abc`)).status).toBe(400);
+    });
+
+    // 2026-10-06 오너: 비로그인 홈 예시 카드에 "프로도 실존 인물로" — 예시 카드는 로그인 없이 이 공개 응답으로 닮은 프로를 그린다.
+    // 등급 칩·사다리(tier·pos)는 프로 전체 분포가 있어야 셀 수 있어 서버가 같이 싣는다(회원용 /real 과 같은 proTier).
+    describe("재미 등급(tier·pos)", () => {
+        // LPBA 4명(0.6~0.9) · PBA 21명(1.00~2.00, 0.05 간격) → 경계 = 0.6 · 0.7 · 1.5(PBA 중앙값) · 1.55(PBA 위에서 10번째)
+        const pool = [
+            ...[0.6, 0.7, 0.8, 0.9].map((average, i) => ({ memCode: `L${i}`, nameKo: `L${i}`, nameEn: null, league: "LPBA" as const, nationCode: "KR", average })),
+            ...Array.from({ length: 21 }, (_, i) => ({ memCode: `P${i}`, nameKo: `P${i}`, nameEn: null, league: "PBA" as const, nationCode: "KR", average: Math.round((1 + i * 0.05) * 100) / 100 })),
+        ];
+        const withPool = async () => {
+            const { storage } = await import("../../storage/index.js");
+            vi.mocked(storage.pba.comparePros).mockResolvedValueOnce(pool as any);
+        };
+
+        it("프로 분포가 충분하면 응답에 실린다 — 서버가 든 풀 전체로 센 값(두 명짜리 pros 로는 못 센다)", async () => {
+            await withPool();
+            const { data } = await (await fetch(`${base}/compare/avg?avg=0.53`)).json();
+            // 0.53 은 첫 경계(0.6) 아래 = 아마추어 칸(0). 칸 안 자리 0.53 ÷ 0.6 → 사다리 전체의 18%
+            expect(data.tier).toBe(0);
+            expect(data.pos).toBe(18);
+            expect({ tier: data.tier, pos: data.pos }).toEqual(proTier(pool, 0.53));
+            // 닮은 프로는 그대로 가장 가까운 순 — 화면은 첫 번째를 쓴다
+            expect(data.pros.map((p: any) => p.memCode)).toEqual(["L0", "L1"]);
+            expect(proTier(data.pros, 0.53)).toBeNull();
+        });
+
+        it("등급이 올라가는 입력도 같은 식 — LPBA 하위 25%~중앙값 사이는 1등급", async () => {
+            await withPool();
+            const { data } = await (await fetch(`${base}/compare/avg?avg=0.65`)).json();
+            expect({ tier: data.tier, pos: data.pos }).toEqual({ tier: 1, pos: 30 });
+            expect({ tier: data.tier, pos: data.pos }).toEqual(proTier(pool, 0.65));
+        });
+
+        it("exclude 는 비슷한 프로 목록에서만 뺀다 — 등급 경계는 그대로", async () => {
+            await withPool();
+            const { data } = await (await fetch(`${base}/compare/avg?avg=0.53&exclude=L0`)).json();
+            expect(data.pros.map((p: any) => p.memCode)).toEqual(["L1", "L2"]);
+            expect({ tier: data.tier, pos: data.pos }).toEqual(proTier(pool, 0.53));
+        });
+
+        it("프로가 모자라면(LPBA 4명·PBA 10명 미만) null 로 실린다 — 칸이 빠지지 않는다", async () => {
+            const { data } = await (await fetch(`${base}/compare/avg?avg=0.8`)).json();
+            expect(data).toHaveProperty("tier", null);
+            expect(data).toHaveProperty("pos", null);
+        });
+
+        it("회원용 /real 은 그대로 — 같은 풀이면 같은 등급을 준다", async () => {
+            await withPool();
+            const { data } = await (await fetch(`${base}/compare/real`, { headers: { "x-test-user": "u1" } })).json();
+            // 모의 회원의 3쿠션 에버리지는 0.8
+            expect({ tier: data["3c"].tier, pos: data["3c"].pos }).toEqual(proTier(pool, 0.8));
+        });
     });
 });
 

@@ -1868,6 +1868,30 @@ export const hiqPresencePrefs = pgTable("hiq_presence_prefs", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+/**
+ * '앱에서 열기' 로그인 넘겨주기(2026-10-06 오너: "웹에서 로그인한 사람이 앱을 깔았을 때 다시 로그인하지 않고 그대로 이어 쓰게").
+ * 웹이 받은 한 번짜리 토큰을 앱이 쿠키와 바꾼다 — 규칙은 shared/loginHandoff, 라우트는 server/routes/modules/handoff.ts.
+ * **토큰 원문은 저장하지 않는다**: token_hash = sha256(토큰) hex. 이 표가 새도 로그인할 수 있는 값이 나오지 않는다.
+ * used_at 이 null 이면 아직 안 쓴 것. 바꾸기는 `UPDATE … WHERE used_at IS NULL AND expires_at > now() RETURNING` 한 문장이라 두 번 쓰이지 않는다.
+ * 시각은 전부 시간대가 있는 열이고 비교는 DB 의 now() 로만 한다(서버 인스턴스 시계·KST 기기의 9시간 함정을 타지 않는다).
+ * 쌓이지 않게: 발급할 때 그 회원의 10분 넘은 행과, 누구 것이든 만료된 지 하루 넘은 행을 지운다(server/storage/loginHandoff.repo.ts).
+ * 회원 행이 지워지면 같이 지워진다(시험 스크립트가 회원을 통째로 지운다 — 이 표가 그걸 막으면 안 된다).
+ * 적용 SQL: migrations/login_handoffs.sql — **표를 먼저 만들고** 코드를 배포한다(없으면 POST /api/hiq/handoff 가 500).
+ */
+export const hiqLoginHandoffs = pgTable("hiq_login_handoffs", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  tokenHash: text("token_hash").notNull().unique(),
+  memberId: uuid("member_id").references(() => hiqMembers.id, { onDelete: "cascade" }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  usedAt: timestamp("used_at", { withTimezone: true }),
+}, (t) => [
+  // 회원별 최근 발급 수(10분에 5번)와 청소가 탄다
+  index("hiq_login_handoffs_member_idx").on(t.memberId, t.createdAt),
+  // 만료된 지 오래된 행 청소가 탄다
+  index("hiq_login_handoffs_expires_idx").on(t.expiresAt),
+]);
+
 export const hiqPlayerFollows = pgTable("hiq_player_follows", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),

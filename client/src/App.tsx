@@ -5,11 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { AppDialogHost } from "@/components/AppDialog";
 import { PrimarySportGate } from "@/components/hiq/sport/PrimarySport";
 import { PresenceArrivals } from "@/components/hiq/presence/PresenceArrivals";
-import { HiqInstallBanner } from "@/components/hiq/HiqInstallBanner";
+import { AppInstallSheet } from "@/components/hiq/AppInstallSheet";
+import { HandoffRedeemer } from "@/components/hiq/HandoffRedeemer";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
-import { goLogin } from "@/components/hiq/LoginGate";
+import { goLoginPage } from "@/components/hiq/LoginGate";
+import { LoginSheetHost } from "@/components/hiq/LoginSheet";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
 import { NativePrompts } from "@/components/hiq/NativePrompts";
 import { LiveMatchBanner } from "@/sim/match/LiveMatchBanner";
@@ -230,7 +232,8 @@ function GolfOnly({ children }: { children: ReactNode }) {
     if (isGuest && locale === "ko") {
       // 한국어로 보는 비로그인(확인 끝) — 로그인으로. 끝나면 가려던 골프 화면(지금 주소)으로 돌아온다.
       // 자리를 바꿔 끼운다(replace): 로그인 화면에서 '뒤로'를 누르면 이 문으로 돌아와 다시 로그인으로 튕기는 걸 막는다.
-      goLogin((to) => setLocation(to, { replace: true }), window.location.pathname + window.location.search);
+      // 팝업(goLogin)이 아니라 로그인 **화면**으로 보낸다(goLoginPage, 2026-10-06) — 이 문은 아무것도 그리지 않아서, 빈 화면 위에 팝업이 뜨고 닫으면 갇힌다.
+      goLoginPage((to) => setLocation(to, { replace: true }), window.location.pathname + window.location.search);
       return;
     }
     // 로그인했지만 골프 허용이 없는 사람(한국어가 아닌 화면 등), 그리고 한국어가 아닌 비로그인 — 홈으로.
@@ -442,20 +445,16 @@ function AppRoutes() {
   );
 }
 
-// 시뮬레이터 화면은 하단 조작부가 꽉 차 있어 설치 배너를 띄우지 않는다(실측 2026-09-07: 샷 버튼을 덮음).
-// 본문 아래에 AppInstallCard 를 놓은 페이지에서도 띄우지 않는다 — 한 화면에 설치 권유가 둘이면 소음이다
-// (2026-09-09 오너: 각 페이지 하단에 카드형 배너). 나머지 화면은 떠 있는 배너가 계속 맡는다.
-const PAGE_BANNER_ROUTES = ["/dashboard", "/club", "/friends", "/history", "/menu"];
+// 앱 설치 팝업(2026-10-06 오너: "웹으로 진입 시 기기에 따른 앱 설치 팝업창 잘 디자인해서 만들어줘. 지금 팝업보다 잘") — 예전의 떠 있는 띠를 대신한다.
+// 어느 주소에서 막는지는 여기가 아니라 shared/installPrompt **한 곳**이 정한다(isPromptBlockedPath): 온라인게임(2026-09-07 실측: 샷 버튼을 덮음) ·
+// 골프 아크/레인지(2026-09-15: 스윙 패드를 덮음) · 공개 골프 페이지(바닥의 '로그인하고 취소티 알림 받기' 줄과 겹친다)에 더해
+// 점수판 · 스코어카드 · 로그인/가입 · 약관 · 콘솔. 이 게이트는 지금 경로를 건네기만 한다.
+// 본문 아래에 AppInstallCard 를 놓은 화면(홈 · 크루 · 친구 · 기록 · 메뉴)에서는 예전엔 띠를 껐다 — 이제는 뜬다: 한 번 뜨고 쉬는 팝업이라
+// 가장 오래 머무는 홈에서 떠야 효과가 있다. '한 화면에 설치 권유 둘은 소음'(2026-09-09)은 그 카드가 화면에 보이는 동안 팝업이 기다리는 것으로 지킨다.
+// PC 에는 그 카드가 없고 옆 패널(DesktopFrame)의 QR · 스토어 단추가 그 자리다 — 옆 패널이 보이는 동안은 팝업이 스스로 뜨지 않는다(2026-10-06 검토).
 function InstallBannerGate() {
   const [location] = useLocation();
-  if (location.startsWith("/online-game")) return null;
-  // 골프 온라인게임(미니골프·필드 연습장)도 하단이 조작부다(실측 2026-09-15: 스윙 패드를 덮음).
-  if (location.startsWith("/golf/arcade") || location.startsWith("/golf/range")) return null;
-  // 공개 골프장 페이지(2026-09-24)는 비로그인에게 바닥에 '로그인하고 취소티 알림 받기' 줄을 깐다(CourseShell) —
-  // 설치 배너가 같은 자리(fixed bottom, z-50)에 떠서 그 단추를 덮는다. 한 화면에 바닥 권유 둘은 소음이다.
-  if (/^\/golf\/(course|courses|booking|join|urgent)(\/|$)/.test(location)) return null;
-  if (PAGE_BANNER_ROUTES.includes(location)) return null;
-  return <HiqInstallBanner />;
+  return <AppInstallSheet path={location} />;
 }
 
 function App() {
@@ -464,9 +463,14 @@ function App() {
       <I18nProvider>
         <StoreProvider>
           <SportProvider>
+            {/* '앱에서 열기'(2026-10-06) — 웹의 로그인을 넘겨받는다: 앱이 커스텀 스킴으로 받아 건넨 한 번짜리 토큰을, 물어본 뒤 쿠키와 바꾼다. 화면 없음.
+                주소에 실려 온 토큰은 쓰지 않고 지우기만 한다(2026-10-06 검토). 다른 화면보다 먼저 둔다(주소에서 지우는 일이 가장 먼저여야 한다) */}
+            <HandoffRedeemer />
             {/* 이용약관 동의 시트 — 첫 글쓰기·첫 소셜 로그인 때 뜬다(감사 S4). 화면 어디서나 useTermsGate 로 부른다 */}
             <TermsConsentProvider>
               <AppRoutes />
+              {/* 가입·로그인 팝업(2026-10-06) — goLogin·가입 안내(guard)가 여기로 띄운다. 약관 동의(useTermsGate)를 쓰므로 이 Provider 안쪽이어야 한다 */}
+              <LoginSheetHost />
             </TermsConsentProvider>
             <Toaster />
             {/* 앱 안내창 — 흰 시스템 confirm/alert 대신(2026-10-01). appConfirm·appAlert 가 여기로 띄운다 */}
@@ -479,9 +483,9 @@ function App() {
             <NativePrompts />
             {/* 온라인게임 대전 호출 — 방을 열고 다른 화면에 있어도 상대가 들어오면·내 차례면 앱 안에서 바로 알린다(2026-09-26) */}
             <LiveMatchBanner />
-            {/* 앱 설치 유도 — iOS/안드로이드 스토어 우선, 미출시 플랫폼은 PWA 폴백.
-                컴포넌트는 예전부터 있었지만 **어디에도 마운트돼 있지 않아 죽어 있었다**(번들에서도 빠졌다).
-                여기 붙여야 실제로 뜬다. 네이티브 앱 안에서는 컴포넌트가 스스로 숨는다. */}
+            {/* 앱 설치 팝업(2026-10-06) — 웹으로 들어온 사람에게 기기에 맞는 길 하나(아이폰 App Store · 안드로이드 Google Play · PC 는 QR),
+                로그인한 사람에게는 '앱에서 열기'. 들어오자마자 뜨지 않고 닫으면 쉰다(shared/installPrompt).
+                네이티브 앱 안 · 홈 화면에 추가한 웹앱에서는 스스로 숨는다. 가입 팝업(LoginSheetHost)이 열려 있으면 뜨지 않는다. */}
             <InstallBannerGate />
             {/* 일별 유니크 접속자 비콘 — 하루 1회만 전송 */}
             <VisitBeacon />

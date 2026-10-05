@@ -13,8 +13,6 @@ import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import SocialLogin, { socialLoginAvailable } from "@/components/hiq/SocialLogin";
 import { kakaoLoginAvailable, kakaoLoginOpen } from "@/lib/kakaoLogin";
 import { isNativeApp } from "@/lib/nativeBridge";
-import { Capacitor } from "@capacitor/core";
-import MarketingLanding from "./marketing-landing";
 
 export default function Landing() {
     const [, setLocation] = useLocation();
@@ -27,24 +25,10 @@ export default function Landing() {
     const [isLoading, setIsLoading] = useState(false);
     const [isResetOpen, setIsResetOpen] = useState(false);
     // 로그인 방식 분기 — 사용자가 직접 고르면(phoneMode) 그쪽, 아니면 아래 kakaoFirst·showPhone 이 기본을 정한다.
-    const [phoneMode, setPhoneMode] = useState<boolean | null>(null);
-
-    // 마케팅 랜딩을 먼저 보여줄지. 앱 안이거나, 화이트라벨 매장 진입(?store=)이거나,
-    // 한 번 시작을 누른 뒤에는 곧장 로그인 폼으로 간다(랜딩이 매번 끼면 방해만 된다).
-    const [showIntro, setShowIntro] = useState(() => {
-        try {
-            if (Capacitor.isNativePlatform()) return false;
-            const p = new URLSearchParams(window.location.search);
-            if (p.get("store") || p.get("login")) return false;
-            if (window.location.pathname !== "/") return false;
-            return localStorage.getItem("rankue-intro-seen") !== "1";
-        } catch {
-            return false;
-        }
+    // 가입·로그인 팝업의 '전화번호로 계속하기'로 온 사람(?phone=1, LoginSheet loginPagePath)은 이미 골랐다 — 전화번호 카드부터 연다(2026-10-06).
+    const [phoneMode, setPhoneMode] = useState<boolean | null>(() => {
+        try { return new URLSearchParams(window.location.search).has("phone") ? true : null; } catch { return null; }
     });
-    const markIntroSeen = () => {
-        try { localStorage.setItem("rankue-intro-seen", "1"); } catch { /* ignore */ }
-    };
 
     // Resolve the tenant slug from the URL exactly as StoreContext does, so a
     // white-label tenant logs into its OWN store rather than a hardcoded "hiq".
@@ -59,6 +43,26 @@ export default function Landing() {
         }
         return "hiq";
     };
+
+    // 랭큐 첫 주소(/)를 **그냥** 연 사람인가 — 그렇다면 비로그인도 로그인 폼·소개 화면 대신 예시 홈(/dashboard)으로 보낸다.
+    // 2026-10-06 오너: "랭큐 직접 들어가면 로그인 페이지인데 이것도 샘플로. … 누구나 어떠한 플랫폼인지 알아가기 쉽게." 웹·앱 모두.
+    // 로그인 화면을 남기는 경우(= 맨 '/' 가 아니다):
+    //   ?login   로그인하러 온 사람 — 골프 전용 문·크루 만들기(goLoginPage), 팝업의 '전화번호로 계속하기'. 전화번호 가입·기존 회원의 길이다
+    //   ?redirect 끝나면 돌아갈 곳이 실린 옛 링크
+    //   ?store · 매장 주소(서브도메인)  자기 매장으로 로그인해야 한다 — 예시 홈으로 넘기면 매장 로그인 입구가 사라진다
+    //   /hiq     호환 주소
+    // 화면이 붙을 때 **한 번만** 판단한다 — 그릴 때마다 보면 PIN 확인 단계 같은 폼 상태가 날아간다.
+    // 예전의 소개 화면(MarketingLanding)은 여기서 더는 띄우지 않는다(컴포넌트와 /about 은 그대로 있다) — 소개는 예시 홈이 맡는다.
+    const [bareRoot] = useState(() => {
+        try {
+            if (window.location.pathname !== "/") return false;
+            const p = new URLSearchParams(window.location.search);
+            if (p.has("login") || p.has("redirect") || p.has("store")) return false;
+            return resolveStoreSlug() === "hiq";
+        } catch {
+            return false;
+        }
+    });
 
     // 첫 화면에 무엇을 먼저 보여 줄까(2026-10-05 오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플").
     //  - 한국어 + 웹 + 카카오 가능(kakaoFirst): 소셜 묶음(카카오·구글·애플)이 먼저, 그 아래 작은 글씨 "전화번호로 로그인".
@@ -99,10 +103,14 @@ export default function Landing() {
                     return;
                 }
             } catch { /* 네트워크 실패는 미로그인으로 취급 */ }
-            if (alive) setAuthState("out");
+            if (!alive) return;
+            // 비로그인이 맨 '/' 를 열었다 — 예시 홈으로. 로그인 폼을 그리지 않고(확인 중 화면을 유지한 채) 자리를 바꿔 끼운다:
+            // '뒤로'를 눌러 이 주소로 돌아와 다시 튕기지 않게, 그리고 앱의 '뒤로 = 종료' 판단이 그대로 통하게.
+            if (bareRoot) { setLocation("/dashboard", { replace: true }); return; }
+            setAuthState("out");
         })();
         return () => { alive = false; };
-    }, [setLocation]);
+    }, [setLocation, bareRoot]);
 
     const { store: brand, isLoading: isBrandLoading, error: brandError } = useStore();
 
@@ -194,17 +202,9 @@ export default function Landing() {
     // valid number can never render as an inert-looking button.
     const canSubmit = requiresPassword ? password.length >= 4 : phone.length >= 10;
 
-    // 검색으로 들어온 방문자에게는 로그인 폼 대신 마케팅 랜딩을 먼저 보여준다.
-    // 홈(/)이 곧바로 "휴대폰 번호를 입력하세요"라 랭큐를 모르는 사람이 그대로 이탈했고,
-    // 검색엔진 입장에서도 제품 설명이 없는 로그인 폼이라 색인 가치가 낮았다.
-    // 앱(Capacitor)·화이트라벨 매장(?store=)·이미 시작을 누른 사람은 기존 흐름 그대로 간다.
-    // 로그인 상태면 마케팅 랜딩도 건너뛴다 — 이미 쓰는 사람에게 소개 화면은 방해다.
-    if (showIntro && authState === "out") {
-        return <MarketingLanding onStart={() => { setShowIntro(false); markIntroSeen(); }} />;
-    }
-
     // 인증 확인 중이거나(=대시보드로 갈 수도 있다) 이미 로그인해 이동하는 중이면
     // 로그인 폼 대신 스플래시를 유지한다. 이게 앱 실행 시 화면이 스쳐 지나가던 원인이었다.
+    // 맨 '/' 를 연 비로그인도 여기 머문다 — 예시 홈으로 넘어가는 중이다(위 bareRoot).
     if (authState !== "out" || isBrandLoading || !brand) {
         return (
             <div className="min-h-screen bg-surface-0 flex flex-col items-center justify-center gap-4">

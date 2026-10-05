@@ -379,6 +379,11 @@ export const en: Record<string, string> = {
   "err.auth.kakaoUnlinkSignup": "This account was created with Kakao, so Kakao can't be disconnected.",
   "err.auth.phoneInvalid": "That phone number isn't valid",
   "err.auth.socialAccountOnly": "This account was created with a social login. Please sign in the way you signed up (Kakao, Google or Apple).",
+  // '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰(routes/modules/handoff.ts). 실패 이유는 구분해 알려 주지 않는다
+  "err.auth.handoffInvalid": "This link to the app has expired or was already used. Please sign in.",
+  "err.auth.handoffBadRequest": "The request format isn't valid",
+  // 이미 로그인된 요청은 바꿔 주지 않는다(2026-10-06 검토) — 앱에서 쓰던 계정이 말없이 바뀌지 않게
+  "err.auth.handoffSignedIn": "You're already signed in. To switch accounts, please log out first.",
   "err.umb.badCategory": "Invalid category",
   "err.umb.badPage": "Invalid page value",
   "err.umb.playerNotFound": "Player not found",

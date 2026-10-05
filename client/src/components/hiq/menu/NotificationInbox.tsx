@@ -258,6 +258,11 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                         className="fixed inset-0 bg-black/60 z-[100]"
                     />
                     <motion.div
+                        // 열린 창이라는 표식(2026-10-06 검토) — 스스로 뜨는 팝업(앱 설치)이 '다른 창이 떠 있다'를 이 표식으로 안다.
+                        // 표식이 없어서 설치 팝업이 이 알림함(z-101) 밑에 안 보이게 열려 누름을 가로챘다. 나가는 움직임 동안에도 남는다.
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label={t("notificationInbox.title")}
                         initial={{ x: "100%" }}
                         animate={{ x: 0 }}
                         exit={{ x: "100%" }}

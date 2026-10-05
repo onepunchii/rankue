@@ -17,6 +17,8 @@ import { safeReturnPath } from "@shared/promoFunnel";
 // 카카오(2026-10-05 오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플"): **한국어 화면 + 웹**에서만, 맨 위.
 //   id_token 이 아니라 전체 화면 이동이다 — 카카오에 다녀와 /auth/kakao(pages/hiq/kakao-callback.tsx)가 서버에 인가 코드를 넘긴다.
 //   약관 동의·'나' 새로 받기도 그 화면이 한다(이 파일의 submitToken 과 같은 규칙).
+// 팝업(2026-10-06 오너: "회원가입은 … 올라오는 간편 회원가입 팝업으로") — 가입·로그인 팝업(LoginSheet)도 이 단추 묶음을 그대로 쓴다.
+//   부른 쪽이 redirect·onDone·tone 을 준다. 셋 다 안 주면(로그인 화면) 모양도 동작도 예전 그대로다.
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 const APPLE_SERVICES_ID = import.meta.env.VITE_APPLE_SERVICES_ID as string | undefined;
@@ -88,12 +90,77 @@ function KakaoSymbol() {
   );
 }
 
-/**
- * kakao: 카카오 단추를 이 자리에 둘 것인가(기본 true). 매장 화이트라벨 진입(?store=·매장 주소)의 로그인 화면은 false 로 부른다 —
- * 카카오 로그인은 매장과 무관하게 글로벌 회원을 만들고, 카카오에 다녀오는 길에 매장 표시(?store=)가 사라져 취소·실패 뒤
- * 기본 로그인 화면으로 떨어진다(거기서 번호를 넣으면 매장 회원이 '미가입'으로 판정된다). 2026-10-05 검토.
- */
-export default function SocialLogin({ hint = true, kakao = true }: { hint?: boolean; kakao?: boolean }) {
+/** 팝업(LoginSheet)에 넣을 때의 색 — 밝은 시트(당구) / 어두운 시트(골프). */
+export type SocialTone = "light" | "dark";
+
+type Look = { stack: string; note: string; hint: string; update: string; google: string; googleFocus: string; apple: string; appleWeb: string; busy: string };
+
+// 로그인 화면(tone 을 안 줬을 때)의 모양 — 예전 그대로다. 여기 글자는 바꾸지 않는다.
+const PAGE_LOOK: Look = {
+  stack: "w-full flex flex-col items-center gap-3",
+  note: "text-[12.5px] font-medium text-black/60 text-center",
+  hint: "text-[12px] font-medium text-black/55 text-center",
+  update: "w-full max-w-[320px] h-[44px] rounded-full bg-white border border-black/15 flex items-center justify-center text-[15px] font-medium text-black/80 active:scale-[0.98] transition-transform",
+  google: "w-full max-w-[320px] h-[44px] rounded-full bg-white border border-black/15 flex items-center justify-center gap-2.5 text-[15px] font-medium text-black/80 disabled:opacity-40 active:scale-[0.98] transition-transform",
+  // 로그인 화면의 구글 단추는 공식 GIS 단추가 그대로 보인다 — 초점 테도 GIS 것이 보여 따로 그리지 않는다
+  googleFocus: "",
+  apple: "w-full max-w-[320px] h-[44px] rounded-full bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 active:scale-[0.98] transition-transform",
+  appleWeb: "w-full h-[44px] rounded-full bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 transition-opacity",
+  busy: "text-[12px] text-black/40",
+};
+
+// 팝업의 모양(2026-10-06) — 단추들이 **같은 폭·같은 높이(48px)·같은 모서리(12px, 카카오 가이드의 값)** 로 세로로 선다.
+// 단추 색은 전부 리터럴이다: 구글·애플 가이드의 색이라 테마 토큰을 타면 안 되고, 골프 테마(어두운 화면)는 흰 바탕·검정 글자 유틸을
+// 다른 색으로 바꿔 끼운다(index.css). 어두운 시트에서는 애플 단추를 흰색으로 뒤집는다(검정 단추는 어두운 바탕에 묻힌다).
+const SHEET_BTN = "w-full h-12 rounded-[12px] flex items-center justify-center gap-2.5 text-[15px] font-medium";
+const SHEET_LOOK: Record<SocialTone, Look> = {
+  light: {
+    stack: "w-full flex flex-col items-stretch gap-2.5",
+    note: "text-[13px] font-medium text-ink-2 text-center break-keep",
+    hint: "text-[13px] font-medium text-ink-2 text-center break-keep",
+    update: `${SHEET_BTN} bg-surface-1 border border-surface-line-strong text-ink-1 active:scale-[0.98] transition-transform`,
+    google: `${SHEET_BTN} bg-[#FFFFFF] border border-[#DADCE0] text-[#1F1F1F] disabled:opacity-40 active:scale-[0.98] transition-transform`,
+    googleFocus: "outline outline-2 outline-offset-2 outline-[#1A73E8]",
+    apple: `${SHEET_BTN} bg-[#000000] text-[#FFFFFF] disabled:opacity-40 active:scale-[0.98] transition-transform`,
+    appleWeb: `${SHEET_BTN} bg-[#000000] text-[#FFFFFF] disabled:opacity-40 active:scale-[0.98] transition-transform`,
+    busy: "text-[12px] text-ink-3 text-center",
+  },
+  dark: {
+    stack: "w-full flex flex-col items-stretch gap-2.5",
+    note: "text-[13px] font-medium text-[#FFFFFFB3] text-center break-keep",
+    hint: "text-[13px] font-medium text-[#FFFFFFB3] text-center break-keep",
+    update: `${SHEET_BTN} bg-[#FFFFFF14] border border-[#FFFFFF38] text-[#FFFFFF] active:scale-[0.98] transition-transform`,
+    google: `${SHEET_BTN} bg-[#FFFFFF] border border-[#FFFFFF] text-[#1F1F1F] disabled:opacity-40 active:scale-[0.98] transition-transform`,
+    googleFocus: "outline outline-2 outline-offset-2 outline-[#8AB4F8]",
+    apple: `${SHEET_BTN} bg-[#FFFFFF] text-[#000000] disabled:opacity-40 active:scale-[0.98] transition-transform`,
+    appleWeb: `${SHEET_BTN} bg-[#FFFFFF] text-[#000000] disabled:opacity-40 active:scale-[0.98] transition-transform`,
+    busy: "text-[12px] text-[#FFFFFF99] text-center",
+  },
+};
+
+/** 구글 공식 단추(GIS, large)의 높이는 40px 로 고정이다. 팝업에서는 이 단추를 투명하게 덮어 쓰는데, 48px 칸을 꼭 덮도록 세로로 늘린다(40 × 1.25 = 50). */
+const GIS_STRETCH_Y = 1.25;
+
+interface SocialLoginProps {
+  hint?: boolean;
+  /**
+   * 카카오 단추를 이 자리에 둘 것인가(기본 true). 매장 화이트라벨 진입(?store=·매장 주소)의 로그인 화면은 false 로 부른다 —
+   * 카카오 로그인은 매장과 무관하게 글로벌 회원을 만들고, 카카오에 다녀오는 길에 매장 표시(?store=)가 사라져 취소·실패 뒤
+   * 기본 로그인 화면으로 떨어진다(거기서 번호를 넣으면 매장 회원이 '미가입'으로 판정된다). 2026-10-05 검토.
+   */
+  kakao?: boolean;
+  /**
+   * 로그인 뒤 돌아갈 곳을 부른 쪽이 정한다(팝업). **주면 주소의 ?redirect= 보다 먼저다** — 지금 주소와 같거나 비어 있으면(null)
+   * 화면을 옮기지 않고 그 자리에 둔다. 안 주면(로그인 화면) 예전처럼 주소의 ?redirect= 를 읽고, 없으면 홈으로 간다.
+   */
+  redirect?: string | null;
+  /** 로그인이 끝났다 — '나'를 새로 받은 **뒤**, 화면을 옮기기 전에 부른다. 팝업을 닫는 데 쓴다. */
+  onDone?: () => void;
+  /** 팝업의 색. 주면 단추들이 팝업 모양(같은 폭·48px·같은 모서리)으로 선다. 안 주면 로그인 화면의 예전 모양 그대로. */
+  tone?: SocialTone;
+}
+
+export default function SocialLogin({ hint = true, kakao = true, redirect, onDone, tone }: SocialLoginProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useT();
@@ -101,11 +168,41 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
   const googleBtnRef = useRef<HTMLDivElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const [gisWidth, setGisWidth] = useState(0);
+  // 단추 묶음의 실제 폭 — 팝업에서 투명한 구글 단추를 칸 폭에 맞춰 늘릴 때 쓴다(GIS 는 200~400px 만 그린다)
+  const [wrapWidth, setWrapWidth] = useState(0);
   const [gisReady, setGisReady] = useState(false);
   const [appleReady, setAppleReady] = useState(false);
+  // 팝업의 구글 단추에 키보드 초점이 와 있는가 — 초점을 받는 것은 투명하게 덮은 GIS 단추라, 테는 우리가 그린 틀에 직접 단다(아래 효과)
+  const [gisFocused, setGisFocused] = useState(false);
+  // 팝업이 붙을 때 '이미 로그인돼 있는가'를 한 번 확인하는 동안 — 그 사이 단추 묶음이 누름을 받지 않는다(아래 효과 · stackClass).
+  // 로그인 화면(redirect 를 안 줬다)은 늘 false
+  const [checking, setChecking] = useState(redirect !== undefined);
   const inApp = isNativeApp();
   const nativeSocial = inApp && nativeSocialAvailable();
   const { ask: askTerms } = useTermsGate();
+  // 팝업 모양인가(tone 을 줬다) — 아니면 로그인 화면의 예전 모양
+  const sheet = tone !== undefined;
+  const look = tone ? SHEET_LOOK[tone] : PAGE_LOOK;
+
+  // 부른 쪽이 준 값은 ref 로 읽는다 — submitToken 이 바뀌면 구글 단추(GIS)를 다시 초기화하므로, 부른 쪽이 다시 그려질 때마다 단추가 흔들리지 않게.
+  const given = useRef({ redirect, onDone });
+  given.current = { redirect, onDone };
+  /** 돌아갈 곳 — 부른 쪽이 준 값(redirect prop)이 주소의 ?redirect= 보다 먼저다. */
+  const returnTo = useCallback((): string | null => {
+    const fromCaller = given.current.redirect;
+    return fromCaller !== undefined ? fromCaller : new URLSearchParams(window.location.search).get("redirect");
+  }, []);
+  /**
+   * 부른 쪽이 돌아갈 곳을 정해 준 로그인(팝업)의 마무리 — 닫고(onDone), 가려던 곳이 지금 주소와 다를 때만 옮긴다.
+   * 같거나 없으면 **그 자리에 그대로** 둔다(보던 골프장·선수 페이지에 남는다). '나'를 새로 받은 뒤에만 부른다.
+   */
+  const finishInPlace = useCallback((back: string | null) => {
+    given.current.onDone?.();
+    const dest = safeReturnPath(back);
+    if (!dest || dest === window.location.pathname + window.location.search) return;
+    // 같은 화면에 표시만 붙는 주소(?alert=1 처럼 '누르려던 것을 이어서 연다')는 자리를 바꿔 끼운다 — '뒤로'가 한 번 더 필요해지지 않게
+    setLocation(dest, { replace: dest.split(/[?#]/)[0] === window.location.pathname });
+  }, [setLocation]);
 
   // 카카오 — 한국어 화면에서만 보인다(앱 안·키 없음·등록 안 된 주소는 kakaoLoginAvailable 이 끈다). 매장 진입은 부른 쪽이 끈다(kakao).
   const showKakao = kakao && locale === "ko" && kakaoLoginAvailable();
@@ -119,18 +216,73 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
         if (!me.ok) return;
       } catch { return; /* 못 물어봤으면 그대로 둔다 — 로그인 폼은 여전히 쓸 수 있다 */ }
       await refreshAfterLogin();
+      // 팝업에서 카카오로 보냈던 화면이면 닫기만 한다 — 로그인 화면이 아니라 보던 화면이라, 홈으로 보내지 않고 그 자리에 둔다
+      if (given.current.redirect !== undefined) { finishInPlace(null); return; }
       setLocation(safeReturnPath(new URLSearchParams(window.location.search).get("redirect")) ?? "/dashboard", { replace: true });
     })();
-  }, [setLocation]);
+  }, [setLocation, finishInPlace]);
   // 누르면 꾸러미를 남기고 카카오로 넘어간다. SDK 는 단추가 보일 때 미리 실린다(index.html 에는 없다) —
   // 중복 누름 방지·'뒤로' 왔을 때 풀기까지 useKakaoStart 가 한다.
   const { busy: kakaoBusy, start: startKakao } = useKakaoStart(showKakao, () => {
     toast({ title: t("login.failedTitle"), description: t("login.kakaoStartFailed"), variant: "destructive" });
   }, onKakaoReturn);
   const handleKakao = useCallback(() => {
-    // 로그인 화면에 실려 온 ?redirect= 를 들려 보낸다 — 카카오에 다녀와도 보던 곳으로 돌아가게(돌아온 화면이 다시 거른다)
-    startKakao({ mode: "login", redirect: new URLSearchParams(window.location.search).get("redirect") });
-  }, [startKakao]);
+    // 돌아갈 곳을 들려 보낸다 — 카카오에 다녀와도 보던 곳으로 돌아가게(돌아온 화면이 다시 거른다).
+    // 로그인 화면은 주소에 실려 온 ?redirect=, 팝업은 부른 쪽이 준 주소(returnTo — 화면이 통째로 넘어가므로 '그대로 있기'도 지금 주소가 실려 온다)
+    startKakao({ mode: "login", redirect: returnTo() });
+  }, [startKakao, returnTo]);
+
+  // 팝업이 붙을 때 한 번: 이미 로그인돼 있는가(2026-10-06 검토). 다른 탭에서 로그인한 뒤 먼저 열어 둔 탭으로 돌아오면 화면은
+  // '나 = 없음'을 5분 동안 쥐고 있어 머리에 '로그인'이 보인다. 예전에는 그 단추가 로그인 화면으로 보냈고, 로그인 화면이 서버에 물어
+  // 보던 곳으로 되돌려 주었다(landing 의 로그인 확인). 팝업은 묻지 않고 단추부터 보여서, 로그인된 사람이 구글·애플을 다시 눌렀다 —
+  // 전화번호로 로그인한 사람이면 새 계정이 만들어지고 세션이 그쪽으로 바뀐다.
+  // 로그인돼 있으면 '나'를 새로 받은 **뒤에** 팝업의 마무리(finishInPlace: 닫고, 가려던 곳이 따로 있을 때만 옮긴다)로 끝낸다.
+  // 확인이 끝날 때까지 단추 묶음은 누름을 받지 않는다(모양은 그대로 둔다 — 열 때마다 단추가 흐려졌다 돌아오면 어색하다).
+  // 로그인 화면(redirect 를 안 줬다)에서는 돌지 않는다 — 그 확인은 landing 이 한다.
+  useEffect(() => {
+    if (given.current.redirect === undefined) return;
+    let alive = true;
+    void (async () => {
+      try {
+        const me = await fetch("/api/hiq/me", { credentials: "include" });
+        if (!alive) return;
+        if (me.ok) {
+          await refreshAfterLogin();
+          if (alive) finishInPlace(returnTo());
+          return;
+        }
+      } catch { /* 못 물어봤으면 비로그인으로 본다 — 단추를 풀어 로그인할 수 있게 */ }
+      if (alive) setChecking(false);
+    })();
+    return () => { alive = false; };
+  }, [finishInPlace, returnTo]);
+
+  // 팝업의 구글 단추 초점 테(2026-10-06 검토). 초점을 받는 GIS 단추는 다른 출처의 iframe 이고 투명한 틀 안에 있어, Tab 으로 돌 때
+  // 구글 차례에만 화면 어디에도 초점 표시가 없었다. iframe 안의 초점은 CSS(:focus-within)로 잡히지 않는다 — 초점이 iframe 으로 들어가면
+  // 이 창에 blur 가 나고 document.activeElement 가 그 iframe 이 되므로, 그때 우리가 그린 틀에 테를 단다. 빠져나오면 focus/focusin 으로 꺼진다.
+  useEffect(() => {
+    if (!sheet || inApp || !GOOGLE_CLIENT_ID) return;
+    let timer: number | undefined;
+    const check = () => {
+      window.clearTimeout(timer);
+      // activeElement 는 이벤트가 끝난 뒤에 바뀐다
+      timer = window.setTimeout(() => {
+        const box = googleBtnRef.current;
+        setGisFocused(!!box && box.contains(document.activeElement));
+      }, 0);
+    };
+    window.addEventListener("blur", check);
+    window.addEventListener("focus", check);
+    document.addEventListener("focusin", check);
+    document.addEventListener("focusout", check);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("blur", check);
+      window.removeEventListener("focus", check);
+      document.removeEventListener("focusin", check);
+      document.removeEventListener("focusout", check);
+    };
+  }, [sheet, inApp]);
 
   const submitToken = useCallback(async (provider: "google" | "apple", idToken: string, name?: string) => {
     setBusy(true);
@@ -157,9 +309,13 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
       }
       // LoginGate 가 붙여 보낸 ?redirect= 로 돌아간다 — 라이벌을 보려다 로그인한 사람은
       // 라이벌로 되돌아와야 한다. startsWith("/") 로 오픈 리다이렉트를 막는다(전화 로그인과 동일).
-      const back = new URLSearchParams(window.location.search).get("redirect");
+      // 팝업에서는 주소에 ?redirect= 가 없다 — 부른 쪽이 준 값이 먼저다(returnTo).
+      const back = returnTo();
       // '나'를 새로 받은 뒤에 옮긴다 — 안 그러면 돌아간 화면이 비로그인으로 그려진다(queryClient.refreshAfterLogin)
       await refreshAfterLogin();
+      // 팝업(부른 쪽이 돌아갈 곳을 정했다): 닫고, 가려던 곳이 따로 있을 때만 옮긴다. 새 회원도 같다
+      if (given.current.redirect !== undefined) { finishInPlace(back); return; }
+      given.current.onDone?.();
       setLocation(back?.startsWith("/") ? back : (j.data?.redirectTo || "/dashboard"));
     } catch (err) {
       // 서버가 알려준 실패 사유(레이트리밋·검증 실패 등)를 그대로 보여준다 — 일반 문구만으로는 원인 추적 불가
@@ -169,7 +325,7 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
     } finally {
       setBusy(false);
     }
-  }, [setLocation, toast, t, askTerms]);
+  }, [setLocation, toast, t, askTerms, returnTo, finishInPlace]);
 
   // 앱(Capacitor): 네이티브 플러그인 → id_token → 서버. 취소 시 조용히 종료.
   const nativeSignIn = useCallback(async (provider: "google" | "apple") => {
@@ -194,7 +350,11 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
   useEffect(() => {
     const el = wrapRef.current;
     if (!el || inApp) return;
-    const measure = () => setGisWidth(Math.max(200, Math.min(400, Math.round(el.getBoundingClientRect().width))));
+    const measure = () => {
+      const width = Math.round(el.getBoundingClientRect().width);
+      setWrapWidth(width);
+      setGisWidth(Math.max(200, Math.min(400, width)));
+    };
     measure();
     const ro = new ResizeObserver(measure);
     ro.observe(el);
@@ -259,16 +419,20 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
     } catch { /* 유저 취소 등 무시 */ }
   }, [submitToken]);
 
+  // 단추 묶음의 틀 — '이미 로그인돼 있는가'를 확인하는 동안(팝업이 붙은 직후 잠깐)은 누름을 받지 않는다.
+  // 투명하게 덮은 구글 단추(다른 출처의 iframe)도 이 틀의 pointer-events 를 물려받아 같이 잠긴다.
+  const stackClass = checking ? `${look.stack} pointer-events-none` : look.stack;
+
   // ── 옛 앱(네이티브 소셜 로그인 플러그인 없음 — iOS 1.0.x): 누르면 Unimplemented 로 깨지는 버튼 대신 업데이트 안내.
   //    웹 구글·애플 로그인도 대신 쓸 수 없다(구글은 앱 웹뷰 안의 OAuth 를 정책상 막는다). 웹뷰에서도 되는
   //    전화번호 로그인은 랜딩에 그대로 남는다. (감사 C1)
   if (inApp && !nativeSocial) {
     return (
-      <div className="w-full flex flex-col items-center gap-3">
-        <p className="text-[12.5px] font-medium text-black/60 text-center">{t("login.updateForSocial")}</p>
+      <div className={stackClass}>
+        <p className={look.note}>{t("login.updateForSocial")}</p>
         <button
           onClick={openStorePage}
-          className="w-full max-w-[320px] h-[44px] rounded-full bg-white border border-black/15 flex items-center justify-center text-[15px] font-medium text-black/80 active:scale-[0.98] transition-transform"
+          className={look.update}
         >
           {t("login.updateApp")}
         </button>
@@ -279,12 +443,12 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
   // ── 앱(Capacitor): 네이티브 플러그인 버튼 ──
   if (inApp) {
     return (
-      <div className="w-full flex flex-col items-center gap-3">
-        {hint && <p className="text-[12px] font-medium text-black/55 text-center">{t("login.socialHint")}</p>}
+      <div className={stackClass}>
+        {hint && <p className={look.hint}>{t("login.socialHint")}</p>}
         <button
           onClick={() => nativeSignIn("google")}
           disabled={busy}
-          className="w-full max-w-[320px] h-[44px] rounded-full bg-white border border-black/15 flex items-center justify-center gap-2.5 text-[15px] font-medium text-black/80 disabled:opacity-40 active:scale-[0.98] transition-transform"
+          className={look.google}
         >
           <GoogleG />
           <span>{t("login.continueGoogle")}</span>
@@ -296,14 +460,14 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
           <button
             onClick={() => nativeSignIn("apple")}
             disabled={busy}
-            className="w-full max-w-[320px] h-[44px] rounded-full bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 active:scale-[0.98] transition-transform"
+            className={look.apple}
             style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
           >
             <AppleLogo />
             <span>{t("login.continueApple")}</span>
           </button>
         )}
-        {busy && <p className="text-[12px] text-black/40">{t("common.loading")}</p>}
+        {busy && <p className={look.busy}>{t("common.loading")}</p>}
       </div>
     );
   }
@@ -311,25 +475,45 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
   // ── 웹: 카카오(한국어만) + GIS + SIWA JS ──
   if (!GOOGLE_CLIENT_ID && !showKakao) return null;
   return (
-    <div ref={wrapRef} className="w-full flex flex-col items-center gap-3">
-      {hint && <p className="text-[12px] font-medium text-black/55 text-center">{t("login.socialHint")}</p>}
+    <div ref={wrapRef} className={stackClass}>
+      {hint && <p className={look.hint}>{t("login.socialHint")}</p>}
       {/* 카카오 — 맨 위. 카카오 디자인 가이드: 바탕 #FEE500 · 글자와 심볼 #191919 · 모서리 12px · 말풍선 심볼.
-          높이·폭은 아래 구글·애플 단추와 같다. 색은 리터럴로 둔다(테마 토큰을 타면 가이드 색이 바뀐다). */}
+          높이·폭은 아래 구글·애플 단추와 같다(로그인 화면 44px · 팝업 48px). 색은 리터럴로 둔다(테마 토큰을 타면 가이드 색이 바뀐다). */}
       {showKakao && (
         <button
           type="button"
           onClick={handleKakao}
           disabled={kakaoBusy || busy}
           aria-busy={kakaoBusy}
-          className="w-full h-[44px] rounded-[12px] bg-[#FEE500] text-[#191919] flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-60 active:scale-[0.98] transition-transform"
+          className={`w-full ${sheet ? "h-12" : "h-[44px]"} rounded-[12px] bg-[#FEE500] text-[#191919] flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-60 active:scale-[0.98] transition-transform`}
         >
           <KakaoSymbol />
           <span>{t("login.kakao")}</span>
         </button>
       )}
 
+      {/* 팝업의 구글 단추 — **보이는 것**은 우리가 그린 단추(높이 48px·모서리 12px, 다른 단추와 한 벌 · 구글 G 와 가이드 색),
+          **눌리는 것**은 그 위에 투명하게 덮은 공식 GIS 단추다. GIS 는 높이(40px)와 모서리를 바꿀 수 없어 그대로 두면 혼자 작고 둥글다.
+          같은 폭으로 그린 뒤 세로로 늘려(GIS_STRETCH_Y) 칸을 꼭 덮는다 — 어디를 눌러도 GIS 가 받아 구글 창을 연다.
+          우리 단추는 그림일 뿐이다(aria-hidden · 눌림 없음): 화면 낭독기와 키보드는 GIS 단추를 읽는다. 준비 전에는 흐리게 둔다.
+          키보드 초점이 GIS 단추에 오면 이 틀에 테를 단다(gisFocused). */}
+      {GOOGLE_CLIENT_ID && sheet && (
+        <div className={`relative overflow-hidden ${look.google}${gisReady ? "" : " opacity-60"}${gisFocused ? ` ${look.googleFocus}` : ""}`}>
+          <span aria-hidden className="pointer-events-none flex items-center gap-2.5">
+            <GoogleG />
+            <span>{t("login.continueGoogle")}</span>
+          </span>
+          <div className="absolute inset-0 opacity-0">
+            {/* GIS가 이 컨테이너 내부 DOM을 직접 소유 — React 자식을 절대 넣지 말 것(removeChild 충돌) */}
+            <div
+              ref={googleBtnRef}
+              style={{ transformOrigin: "0 0", transform: `scale(${gisWidth ? Math.max(1, wrapWidth / gisWidth) : 1}, ${GIS_STRETCH_Y})` }}
+            />
+          </div>
+        </div>
+      )}
       {/* GIS가 이 컨테이너 내부 DOM을 직접 소유 — React 자식을 절대 넣지 말 것(removeChild 충돌) */}
-      {GOOGLE_CLIENT_ID && (
+      {GOOGLE_CLIENT_ID && !sheet && (
         <div className="w-full flex justify-center items-center h-[44px] relative">
           <div ref={googleBtnRef} />
           {!gisReady && <div className="absolute inset-0 rounded-full bg-black/[0.04] animate-pulse pointer-events-none" />}
@@ -340,7 +524,7 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
         <button
           onClick={handleAppleWeb}
           disabled={!appleReady || busy}
-          className="w-full h-[44px] rounded-full bg-black text-white flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 transition-opacity"
+          className={look.appleWeb}
           style={{ fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" }}
         >
           <AppleLogo />
@@ -348,7 +532,7 @@ export default function SocialLogin({ hint = true, kakao = true }: { hint?: bool
         </button>
       )}
 
-      {busy && <p className="text-[12px] text-black/40">{t("common.loading")}</p>}
+      {busy && <p className={look.busy}>{t("common.loading")}</p>}
     </div>
   );
 }

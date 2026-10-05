@@ -379,6 +379,11 @@ export const vi: Record<string, string> = {
   "err.auth.kakaoUnlinkSignup": "Tài khoản này được tạo bằng Kakao nên không thể hủy liên kết Kakao.",
   "err.auth.phoneInvalid": "Số điện thoại không hợp lệ",
   "err.auth.socialAccountOnly": "Tài khoản này được tạo bằng đăng nhập mạng xã hội. Vui lòng đăng nhập bằng cách bạn đã đăng ký (Kakao, Google hoặc Apple).",
+  // '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰(routes/modules/handoff.ts). 실패 이유는 구분해 알려 주지 않는다
+  "err.auth.handoffInvalid": "Liên kết mở ứng dụng này đã hết hạn hoặc đã được dùng. Vui lòng đăng nhập.",
+  "err.auth.handoffBadRequest": "Định dạng yêu cầu không hợp lệ",
+  // 이미 로그인된 요청은 바꿔 주지 않는다(2026-10-06 검토) — 앱에서 쓰던 계정이 말없이 바뀌지 않게
+  "err.auth.handoffSignedIn": "Bạn đã đăng nhập rồi. Để đổi tài khoản, vui lòng đăng xuất trước.",
   "err.umb.badCategory": "Hạng mục không hợp lệ",
   "err.umb.badPage": "Giá trị trang không hợp lệ",
   "err.umb.playerNotFound": "Không tìm thấy vận động viên",

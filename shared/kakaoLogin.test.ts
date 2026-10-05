@@ -349,6 +349,8 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
     const SCREEN_FILES = [
         "lib/kakaoLogin.ts", "pages/hiq/kakao-callback.tsx", "components/hiq/SocialLogin.tsx",
         "pages/hiq/landing.tsx", "pages/hiq/settings.tsx",
+        // 가입·로그인 팝업도 카카오 안내 문구를 쓴다(2026-10-06 검토) — 빠져 있으면 팝업이 쓰는 키가 사전 검사에서 빠진다
+        "components/hiq/LoginSheet.tsx",
     ];
     const lib = code(client("lib/kakaoLogin.ts"));
     const social = code(client("components/hiq/SocialLogin.tsx"));
@@ -405,7 +407,10 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
 
     it("한국어 화면에서만 보인다 — 로그인 단추는 맨 위, 다른 언어의 동작은 그대로", () => {
         // 부른 쪽이 끌 수 있다(kakao=false) — 매장 진입의 로그인 화면
-        expect(social).toContain("export default function SocialLogin({ hint = true, kakao = true }: { hint?: boolean; kakao?: boolean }) {");
+        // 2026-10-06 가입·로그인 팝업(LoginSheet): prop 이 늘었다(redirect·onDone·tone) — 예전 단언은 prop 둘뿐인 한 줄 서명이었다.
+        // 카카오 쪽 기본값(kakao = true)은 그대로이고, 새 prop 은 기본값이 없다(안 주면 로그인 화면의 예전 모양·동작).
+        expect(social).toContain("export default function SocialLogin({ hint = true, kakao = true, redirect, onDone, tone }: SocialLoginProps) {");
+        expect(social).toMatch(/interface SocialLoginProps \{[\s\S]*?\n  kakao\?: boolean;[\s\S]*?\n  redirect\?: string \| null;[\s\S]*?\n  onDone\?: \(\) => void;[\s\S]*?\n  tone\?: SocialTone;\n\}/);
         expect(social).toContain('const showKakao = kakao && locale === "ko" && kakaoLoginAvailable();');
         // 소셜을 쓸 수 있는가: 카카오는 locale 이 ko 일 때만 센다 — 구글 키 없는 영어 화면에 빈 소셜 묶음이 뜨지 않는다
         expect(social).toContain('return isNativeApp() || !!GOOGLE_CLIENT_ID || (locale === "ko" && kakaoLoginAvailable());');
@@ -422,8 +427,15 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(web).toContain("bg-[#FEE500]");
         expect(web).toContain("text-[#191919]");
         expect(web).toContain('{t("login.kakao")}');
-        // 로그인 화면에 실려 온 ?redirect= 를 들려 보낸다
-        expect(social).toContain('startKakao({ mode: "login", redirect: new URLSearchParams(window.location.search).get("redirect") });');
+        // 로그인 화면에 실려 온 ?redirect= 를 들려 보낸다.
+        // 2026-10-06 가입·로그인 팝업: 예전 단언은 주소를 그 자리에서 읽는 한 줄이었다. 이제 returnTo() 한 곳이 정한다 —
+        // 부른 쪽이 준 값(redirect prop, 팝업)이 먼저이고, 안 줬으면(로그인 화면) 예전처럼 주소의 ?redirect= 다.
+        expect(social).toContain('startKakao({ mode: "login", redirect: returnTo() });');
+        const returnTo = social.slice(social.indexOf("const returnTo = useCallback("), social.indexOf("const finishInPlace = useCallback("));
+        expect(returnTo).toContain("const fromCaller = given.current.redirect;");
+        expect(returnTo).toContain('return fromCaller !== undefined ? fromCaller : new URLSearchParams(window.location.search).get("redirect");');
+        // 카카오 단추의 높이만 팝업에서 48px 로 맞춘다 — 색·모서리·심볼·누름 동작은 한 벌이다
+        expect(web).toContain('className={`w-full ${sheet ? "h-12" : "h-[44px]"} rounded-[12px] bg-[#FEE500] text-[#191919] ');
     });
 
     it("로그인 화면 순서 — 한국어 웹은 소셜 묶음이 먼저, 앱 안·매장 진입·비밀번호 단계·다른 언어는 예전 그대로", () => {
@@ -471,6 +483,32 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(ko).toMatch(/"login\.kakaoWebOnly": "[^"]*www\.rankue\.co\.kr[^"]*새 계정[^"]*"/);
     });
 
+    // 2026-10-06 검토: '로그인'을 누르면 이제 로그인 화면이 아니라 가입·로그인 팝업이 먼저 뜬다. 위 두 안내는 로그인 화면에만 있어서,
+    // 팝업에서 소셜 단추를 누르는 사람은 안내를 못 본 채 새 계정이 만들어진다 — 스위치가 켜지는 순간 드러날 구멍이었다.
+    it("팝업(LoginSheet)에서도 계정이 갈리기 전에 알린다 — 로그인 화면과 같은 조건 · 같은 문구", () => {
+        const sheet = code(client("components/hiq/LoginSheet.tsx"));
+        // 카카오 단추가 팝업에 실제로 그려질 때만 기존 회원 안내 — SocialLogin 에 넘기는 kakao={!storeEntry} 와 같은 값으로 묶는다
+        expect(sheet).toContain('const kakaoShown = !storeEntry && locale === "ko" && kakaoLoginAvailable();');
+        expect(sheet).toContain("<SocialLogin hint={false} kakao={!storeEntry} ");
+        expect(sheet).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp();');
+        const hint = sheet.indexOf('{t("login.phoneExistingHint")}');
+        expect(hint).toBeGreaterThan(0);
+        expect(sheet.lastIndexOf("{kakaoShown && (", hint)).toBeGreaterThan(0);
+        // 안내가 가리키는 길(전화번호 단추)이 바로 아래다
+        expect(sheet.indexOf("onClick={toPhone}", hint)).toBeGreaterThan(hint);
+        const webOnly = sheet.indexOf('{t("login.kakaoWebOnly")}');
+        expect(webOnly).toBeGreaterThan(hint);
+        expect(sheet.lastIndexOf("{kakaoWebOnlyHint && (", webOnly)).toBeGreaterThan(hint);
+        // 두 안내는 한 번씩만 그린다
+        expect(sheet.match(/t\("login\.phoneExistingHint"\)/g)).toHaveLength(1);
+        expect(sheet.match(/t\("login\.kakaoWebOnly"\)/g)).toHaveLength(1);
+        // 스위치가 꺼져 있으면 두 조건 모두 false 다 — 닫혀 있는 동안 '카카오'라는 말이 팝업 어디에도 나오지 않는다
+        expect(lib).toMatch(/export function kakaoLoginAvailable\(\): boolean \{\s*if \(!KAKAO_OPEN\) return false;/);
+        expect(lib).toMatch(/export function kakaoLoginOpen\(\): boolean \{\s*return KAKAO_OPEN && !!KAKAO_JS_KEY;/);
+        // 한국어 팝업의 순서도 로그인 화면과 같다: 카카오가 되는 곳만 소셜이 먼저, 아니면(앱 안 · 스위치 꺼짐 · 매장 진입) 전화번호가 먼저
+        expect(sheet).toContain('const phoneFirst = locale === "ko" ? !kakaoShown : !social;');
+    });
+
     it("설정의 '연결' — 한국어 + 웹 + 프로필과 PIN 이 있는 회원에게만, 같은 길로(mode=link) 다녀온다", () => {
         const settings = code(client("pages/hiq/settings.tsx"));
         // PIN 이 있는 계정만(2026-10-05 검토): 연결은 PIN 으로 본인을 확인한다. 옛 '나' 답에는 pin 칸이 없어 === true 로 본다
@@ -508,13 +546,30 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
     });
 
     // 2026-10-05 검토: 들어올 길이 카카오뿐인 회원이 설치 권유를 따라 앱을 깔면 자기 계정으로 들어갈 길이 없다
-    it("앱 설치 권유 — 카카오로만 들어오는 회원에게는 띄우지 않는다(카드·떠 있는 배너 둘 다)", () => {
-        for (const f of ["components/hiq/AppInstallCard.tsx", "components/hiq/HiqInstallBanner.tsx"]) {
-            const src = code(client(f));
-            expect(src, f).toContain('import { isKakaoOnlyAccount } from "@shared/kakaoLogin";');
-            expect(src, f).toContain("const kakaoOnly = isKakaoOnlyAccount(member?.connections);");
-            expect(src, f).toMatch(/if \(![A-Za-z]+ \|\| kakaoOnly\) return null;/);
-        }
+    //
+    // 2026-10-06 바뀐 것(오너: "앱 설치 팝업창 … 지금 팝업보다 잘" · "앱에서 열기도"): 떠 있는 배너(HiqInstallBanner)가 팝업(AppInstallSheet)으로
+    // 바뀌면서 이 단언이 둘로 갈렸다. 예전에는 카드·배너 둘 다 `if (!… || kakaoOnly) return null;` 이었다.
+    //  - 본문 끝의 카드(AppInstallCard)는 그대로 — 스토어로만 보내는 카드라 이 회원에게는 여전히 막다른 길이다.
+    //  - 팝업은 이 회원에게 숨지 않는다. 웹의 로그인을 앱으로 넘겨주는 '앱에서 열기'가 생겨서, 그 단추를 **첫째**로 올리고
+    //    "앱에는 카카오 로그인이 아직 없어요…" 한 줄을 붙인다. '앱에서 열기'가 없는 PC 에서는 예전처럼 띄우지 않는다.
+    //    (모양을 정하는 규칙과 그 시험은 shared/installPrompt · shared/installPrompt.test.ts)
+    it("앱 설치 권유 — 카카오로만 들어오는 회원: 카드는 띄우지 않고, 팝업은 '앱에서 열기'를 첫째 단추로 준다", () => {
+        const card = code(client("components/hiq/AppInstallCard.tsx"));
+        expect(card).toContain('import { isKakaoOnlyAccount } from "@shared/kakaoLogin";');
+        expect(card).toContain("const kakaoOnly = isKakaoOnlyAccount(member?.connections);");
+        expect(card).toMatch(/if \(![A-Za-z]+ \|\| kakaoOnly\) return null;/);
+
+        const sheet = code(client("components/hiq/AppInstallSheet.tsx"));
+        expect(sheet).toContain('import { isKakaoOnlyAccount } from "@shared/kakaoLogin";');
+        expect(sheet).toContain("const kakaoOnly = isKakaoOnlyAccount(member?.connections);");
+        // 숨기지 않고 모양을 바꾼다 — 가르는 값을 규칙에 넘긴다
+        expect(sheet).not.toMatch(/kakaoOnly\) return null;/);
+        expect(sheet).toContain("installSheetPlan({ device: env.device, loggedIn: isLoggedIn, kakaoOnly })");
+        expect(sheet).toContain('{t("installSheet.kakaoNote")}');
+        // 옛 배너 파일은 새 팝업을 부르는 껍데기만 남았다 — 자기 규칙이 없다
+        const banner = code(client("components/hiq/HiqInstallBanner.tsx"));
+        expect(banner).toContain("<AppInstallSheet path={location} />");
+        expect(banner).not.toContain("kakaoOnly");
     });
 
     // 2026-10-05 검토: 언어가 "ko" 로 시작했다가 붙은 뒤에 바뀌어서, 다른 언어 회원이 /settings 를 직접 열면 첫 그림이

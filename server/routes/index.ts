@@ -7,6 +7,7 @@ import chatRouter from "./modules/chat.js";
 import presenceRouter from "./modules/presence.js";
 import chatCardsRouter from "./modules/chatCards.js";
 import authRouter from "./modules/auth.js";
+import handoffRouter from "./modules/handoff.js";
 import adminRouter from "./modules/admin.js";
 import partnerRouter from "./modules/partner.js";
 import memberRouter from "./modules/member.js";
@@ -46,6 +47,8 @@ router.use("/crews", crewRouter);
 router.use("/chat", chatRouter);
 // 친구·크루 접속 알림(2026-10-01) — 앱 안 배너용
 router.use("/presence", presenceRouter);
+// '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰. 루트 모듈(/)들보다 먼저 건다
+router.use("/handoff", handoffRouter);
 // 채팅 + 첨부 카드(2026-09-23): 서버만 카드를 만든다 — /chat/rooms/:key/cards/<종류>
 router.use("/chat", chatCardsRouter);
 

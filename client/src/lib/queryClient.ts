@@ -3,6 +3,8 @@ import {
   QueryClient,
   QueryFunction,
   QueryKey,
+  hashKey,
+  type QueryObserver,
 } from "@tanstack/react-query";
 import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
@@ -203,6 +205,37 @@ export async function refreshAfterLogin(): Promise<void> {
   try {
     await queryClient.fetchQuery({ queryKey: ["/api/hiq/me"], staleTime: 0 });
   } catch { /* 못 받았으면 다음 화면이 다시 묻는다(옛 답은 이미 버렸다) */ }
+}
+
+// 5-0. 그 자리에 남는 로그인의 뒷정리(2026-10-06 — 가입·로그인 팝업에서 처음 생겼고, '앱에서 열기'도 쓰게 되어 여기로 옮겼다).
+// refreshAfterLogin 은 옛 '나' 답을 통째로 버리고(removeQueries) 새 쿼리로 다시 받는다. TanStack Query 는 지워진 쿼리를
+// 보던 구독자(useAuth 를 쓰는, 이미 떠 있는 화면들)에게 알리지 않는다 — 구독자는 다음에 다시 그려질 때에야 새 쿼리를 찾는다.
+// 화면을 옮기는 로그인에서는 새 화면이 새 답을 읽어서 드러나지 않지만, **화면을 옮기지 않는 로그인**(가입·로그인 팝업 · '앱에서 열기')은
+// 머리의 '로그인' 단추·예시 숫자·종목 판단(SportProvider)이 그대로 남는다("로그인했는데 로그인이 안 됐다고 나온다"가 다시 나온다).
+// 그래서 '나' 쿼리가 지워질 때 그것을 보던 구독자를 적어 두었다가, 그 자리에 남는 로그인이 끝난 뒤(새 답이 온 뒤) rebindAuthWatchers 로
+// 같은 옵션으로 다시 맞춘다 — setOptions 가 캐시에서 쿼리를 다시 찾아 새 답에 붙고, 값이 달라졌으면 화면에 알린다.
+// refreshAfterLogin 안에서 저절로 하지 않는 이유: 화면을 옮기는 로그인(로그인 화면 · 카카오 복귀)에서는 떠나는 화면이 옮기기 직전에
+// 회원 상태로 한 번 다시 그려진다. 새 답이 오기 전에 맞추면 화면들이 '확인 중'으로 한 번 뒤집히므로 끝난 뒤에만 부른다.
+const ME_HASH = hashKey(["/api/hiq/me"]);
+type AuthWatcher = QueryObserver<any, any, any, any, any>;
+const orphans = new Set<AuthWatcher>();
+
+// 적는 일은 늘 한다(화면이 붙어 있는지와 무관하게) — 약관을 거절해 로그아웃할 때처럼 refreshAfterLogin 밖에서 지워지는 경우도 잡힌다
+queryClient.getQueryCache().subscribe((e) => {
+  if (e.type !== "removed" || e.query.queryHash !== ME_HASH) return;
+  // 그새 화면에서 사라진 것은 버린다(쌓이지 않게)
+  orphans.forEach((o) => { if (!o.hasListeners()) orphans.delete(o); });
+  e.query.observers.forEach((o) => orphans.add(o));
+});
+
+/** 화면을 옮기지 않는 로그인이 끝난 직후(`await refreshAfterLogin()` 뒤) 부른다 — 떠 있는 화면들이 새 '나'를 읽는다. */
+export function rebindAuthWatchers(): void {
+  const list = Array.from(orphans);
+  orphans.clear();
+  for (const o of list) {
+    // 이미 다시 그려져 새 쿼리에 붙은 구독자에게는 아무 일도 일어나지 않는다(같은 쿼리·같은 값)
+    if (o.hasListeners()) o.setOptions(o.options);
+  }
 }
 
 // 5-1. 되살아난 문서(bfcache)는 답을 전부 낡은 것으로 본다(2026-10-05 카카오 로그인 검토).

@@ -3463,6 +3463,14 @@ export const ko: Dict = {
   "guest.sheetCta": "가입하고 계속하기",
   "guest.sheetClose": "조금 더 둘러보기",
   "guest.joinStart": "가입하고 시작하기",
+  // 가입·로그인 팝업(2026-10-06) — 아래에서 올라오는 시트(components/hiq/LoginSheet). {terms}·{privacy} 자리는 화면이 링크로 바꿔 끼운다
+  "loginSheet.title": "랭큐 시작하기",
+  "loginSheet.desc": "기록을 쌓으려면 계정이 필요해요. 보던 화면에서 바로 이어집니다.",
+  "loginSheet.phone": "전화번호로 계속하기",
+  "loginSheet.legal": "계속하면 {terms}과 {privacy}에 동의하게 됩니다",
+  "loginSheet.terms": "이용약관",
+  "loginSheet.privacy": "개인정보처리방침",
+  "loginSheet.close": "닫기",
   // 비로그인 당구 홈(2026-10-05 오너: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로") — pages/hiq/dashboard · components/hiq/dashboard/*
   "guestHome.browsing": "둘러보는 중이에요",
   "guestHome.login": "로그인",
@@ -3470,6 +3478,8 @@ export const ko: Dict = {
   "guestHome.recordCtaDesc": "점수판으로 친 경기가 수지와 전적이 됩니다",
   "guestHome.sampleRank": "예시 랭킹 순위",
   "guestHome.sampleNote": "예시 숫자예요. 가입하고 경기를 치면 내 기록으로 바뀌어요",
+  // 예시 카드의 프로 갈래(2026-10-06 오너: "프로도 실존 인물로") — 나 = 예시, 프로 = 실제 선수·실제 기록임을 한 줄로 가른다(RealHandicapCard)
+  "guestHome.sampleProNote": "내 숫자는 예시예요. 프로 기록은 실제입니다. 가입하고 경기를 치면 내 기록으로 바뀌어요",
   "guestHome.rankSubtitle": "가입 후 실제 랭킹이 보여요",
   "guestHome.gateMatchTitle": "가입하고 점수판을 열어 보세요",
   "guestHome.gateMatchDesc": "점수판으로 친 경기가 수지와 전적으로 쌓여요. 가입하면 홈으로 돌아옵니다.",
@@ -3513,4 +3523,34 @@ export const ko: Dict = {
   "kakao.unlinkFailed": "카카오 연결을 해제하지 못했어요. 잠시 후 다시 시도해 주세요.",
   "settings.disconnect": "해제",
   "settings.kakaoLinkOnWeb": "카카오 연결은 웹(www.rankue.co.kr)에서 전화번호로 로그인한 뒤 설정에서 할 수 있어요.",
+  // '앱에서 열기'(2026-10-06 오너: "웹에서 로그인한 사람이 앱을 깔았을 때 다시 로그인하지 않고 그대로") — 앱이 웹의 로그인을 넘겨받은 직후 한 줄(HandoffRedeemer)
+  "handoff.welcome": "웹에서 쓰던 계정으로 들어왔어요",
+  // 2026-10-06 검토 — 바꾸기 전에 묻는다(남이 보낸 링크로 그 사람 계정에 들어가지 않게) · 들어온 뒤 어느 계정인지 이름을 보여 준다
+  "handoff.confirmTitle": "웹에서 쓰던 계정으로 들어갈까요?",
+  "handoff.confirmDesc": "방금 웹에서 '앱에서 열기'를 눌렀다면 계속해 주세요.\n누르지 않았는데 이 창이 떴다면 취소해 주세요. 다른 사람의 계정으로 들어가게 될 수 있어요.",
+  "handoff.confirmOk": "계속하기",
+  "handoff.welcomeAccount": "지금 계정: {name}",
+  // 앱 설치 팝업(2026-10-06 오너: "웹으로 진입 시 기기에 따른 앱 설치 팝업창 잘 디자인해서" · "앱에서 열기도") — components/hiq/AppInstallSheet.
+  // 좋은 점 두 줄은 코드에서 확인된 것만: 웹 푸시 없음(main.tsx) · 홈 화면 아이콘. 화면 켜 두기는 웹도 브라우저 Wake Lock 으로 되므로
+  // (hooks/useKeepAwake 의 웹 갈래) 적지 않는다 — '앱에서만 되는 것'이 아니다(2026-10-06 검토).
+  "installSheet.title": "랭큐를 앱으로",
+  "installSheet.desc": "웹과 같은 화면에, 앱에서만 되는 것을 더했어요.",
+  "installSheet.descDesktop": "앱은 휴대폰에서 받을 수 있어요.",
+  "installSheet.perkPush": "푸시 알림은 앱에서만 울려요",
+  "installSheet.perkHome": "홈 화면 아이콘으로 바로 열려요",
+  "installSheet.storeIos": "App Store에서 받기",
+  "installSheet.storeAndroid": "Google Play에서 받기",
+  "installSheet.open": "이미 깔았어요 · 앱에서 열기",
+  "installSheet.openPrimary": "앱에서 열기",
+  "installSheet.opening": "앱을 여는 중…",
+  "installSheet.openAgain": "한 번 더 눌러 주세요",
+  "installSheet.openStuck": "앱이 아직 없다면 먼저 받아 주세요.",
+  "installSheet.openFailed": "앱에서 열기를 준비하지 못했어요. 잠시 뒤 다시 눌러 주세요.",
+  "installSheet.openNeedsLogin": "로그인이 풀렸어요. 다시 로그인한 뒤 눌러 주세요.",
+  "installSheet.kakaoNote": "앱에는 카카오 로그인이 아직 없어요. 앱을 먼저 받은 뒤 이 화면으로 돌아와 이 단추를 누르면 지금 계정 그대로 들어가요.",
+  "installSheet.qrTitle": "휴대폰 카메라로 찍어 주세요",
+  "installSheet.qrDesc": "휴대폰에서 랭큐가 열리고, 그 기기의 스토어 단추가 바로 떠요.",
+  "installSheet.qrAlt": "휴대폰에서 랭큐를 여는 QR 코드",
+  "installSheet.stay": "웹으로 계속 볼게요",
+  "installSheet.close": "닫기",
 };

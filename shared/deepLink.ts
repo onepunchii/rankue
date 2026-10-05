@@ -4,6 +4,8 @@
 // '//evil.com'(프로토콜 상대 주소)이나 '/\evil.com'(브라우저가 \ 를 / 로 바꾼다) 같은 값이
 // 다른 사이트로의 이동이 된다. 그래서 "우리 사이트 안의 경로"만 통과시킨다.
 
+import { takeHandoffFromUrl } from "./loginHandoff.js";
+
 export const SITE_ORIGIN = "https://www.rankue.co.kr";
 const SITE_HOSTS = new Set(["www.rankue.co.kr", "rankue.co.kr"]);
 const MAX_PATH_LENGTH = 2048;
@@ -64,6 +66,45 @@ export function deepLinkToPath(url: unknown): string | null {
         return sanitizeInternalPath(u.pathname + u.search + u.hash);
     }
     return null;
+}
+
+/** 앱을 연 URL 이 우리 커스텀 스킴(rankue://open…)인가 — https 앱 링크와 가른다. */
+export function isAppSchemeLink(url: unknown): boolean {
+    return typeof url === "string" && RANKUE_OPEN.test(url);
+}
+
+/**
+ * 앱을 연 URL → 옮겨 갈 경로와 '앱에서 열기' 토큰(2026-10-06 검토 — 링크로 남의 계정에 로그인시키는 길을 좁힌다).
+ *   path     옮겨 갈 경로. 토큰(?handoff=)은 **늘 뗀다** — 주소 표시줄·'마지막 경로' 기억에 토큰이 실리지 않는다.
+ *   handoff  받는 쪽(components/hiq/HandoffRedeemer)에 건넬 토큰. **커스텀 스킴으로 온 것만** 건넨다 —
+ *            웹의 '앱에서 열기'가 만드는 주소는 rankue://open?path=… 하나뿐이다(안드로이드 intent 도 앱에는 이 모양으로 온다).
+ *            https 앱 링크에 실린 토큰은 버린다: 메신저가 자동으로 링크로 만들어 주는 주소라, 남이 보낸 자기 토큰을 눌러 그 사람 계정으로
+ *            로그인되는 가장 싼 길이었다.
+ */
+export function openedAppLink(url: unknown): { path: string | null; handoff: string | null } {
+    const full = deepLinkToPath(url);
+    if (!full) return { path: null, handoff: null };
+    const taken = takeHandoffFromUrl(full);
+    if (!taken.present) return { path: full, handoff: null };
+    return { path: taken.cleaned, handoff: isAppSchemeLink(url) ? taken.token : null };
+}
+
+/**
+ * 처리한 딥링크를 기기(sessionStorage)에 적어 둘 때 쓰는 키 — 주소 원문 대신 짧은 단방향 해시(2026-10-06 검토).
+ * 원문에는 '앱에서 열기' 토큰(?handoff=) · 초대 핀(?pin=) · 다른 스킴의 복귀 주소처럼 남으면 안 되는 것이 실릴 수 있다.
+ * 같은 주소는 늘 같은 키다(= 같은 링크인지 견주는 데는 충분하다). 53비트라 키에서 원문을 되찾을 수 없다.
+ */
+export function handledLinkKey(url: string): string {
+    let h1 = 0xdeadbeef ^ url.length;
+    let h2 = 0x41c6ce57 ^ url.length;
+    for (let i = 0; i < url.length; i++) {
+        const ch = url.charCodeAt(i);
+        h1 = Math.imul(h1 ^ ch, 2654435761);
+        h2 = Math.imul(h2 ^ ch, 1597334677);
+    }
+    h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+    h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+    return `k${(4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36)}.${url.length.toString(36)}`;
 }
 
 /** 오프라인 안내 페이지에서 돌아왔을 때 되돌아갈 경로를 기억하는 저장소 키와 유효 시간. */

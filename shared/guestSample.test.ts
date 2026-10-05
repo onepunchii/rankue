@@ -114,7 +114,9 @@ describe("당구 — 다마(수지)·에버리지·전적이 서로 맞는다", 
         }
     });
 
-    it("실제 선수 기록은 넣지 않는다 — 닮은 프로·다음 프로·재미 등급은 비운다", () => {
+    // 2026-10-06 오너: "프로도 실존 인물로 해줘" — 그래도 **이 자료에는** 실제 선수를 넣지 않는다(적어 두면 낡는다).
+    // 프로는 화면(RealHandicapCard)이 공개 API 로 그때 불러와 덧씌운다 — 그 규칙은 shared/guestHome.test.ts 가 지킨다.
+    it("예시 자료에는 실제 선수 기록을 넣지 않는다 — 닮은 프로·다음 프로·재미 등급은 비운다(프로는 화면이 공개 API 로 그때 불러온다)", () => {
         for (const type of TYPES) {
             expect(B.real[type].pro).toBeNull();
             expect(B.real[type].next).toBeNull();
@@ -239,13 +241,24 @@ const LOCALES = ["ko", "en", "es", "tr", "vi"] as const;
 const dictHas = (locale: string, key: string) => client(`lib/i18n/${locale}.ts`).includes(`"${key}":`);
 const koValue = (key: string) => new RegExp(`"${key.replace(/\./g, "\\.")}":\\s*"([^"]*)"`).exec(client("lib/i18n/ko.ts"))?.[1];
 
+// 2026-10-06 오너: "회원가입은 실제로 하려고 할 때 저 화면보다는 올라오는 간편 회원가입 팝업으로".
+// GuestGate 는 자기 안내 시트("가입하고 계속하기" → 다시 로그인 화면)를 버리고 앱에 하나뿐인 가입·로그인 팝업(LoginSheet)을 바로 연다.
+// 그래서 아래 단언 셋을 새 규칙으로 바꿨다: 시트 문구 키(guest.sheet*)는 GuestGate 가 더는 쓰지 않고(팝업 문구는 loginSheet.*),
+// SheetDescription 은 팝업 쪽에 있으며, guard 는 goLogin 이 아니라 openLoginSheet 로 제목·설명·돌아갈 곳을 넘긴다.
 describe("비로그인 부품(GuestGate) — 문구는 다섯 언어 사전에", () => {
     const src = client("components/hiq/GuestGate.tsx");
+    const sheet = client("components/hiq/LoginSheet.tsx");
 
     it("부품이 쓰는 키가 ko·en·es·tr·vi 에 전부 있다", () => {
         const keys = Array.from(src.matchAll(/t\("(guest\.[A-Za-z0-9]+)"\)/g), (m) => m[1]);
-        expect(new Set(keys)).toEqual(new Set(["guest.sample", "guest.sheetTitle", "guest.sheetDesc", "guest.sheetCta", "guest.sheetClose", "guest.joinStart"]));
+        expect(new Set(keys)).toEqual(new Set(["guest.sample", "guest.joinStart"]));
         for (const key of keys) for (const l of LOCALES) expect(dictHas(l, key), `${l} ${key}`).toBe(true);
+        // 팝업이 쓰는 키도 다섯 언어에 전부 있다
+        const sheetKeys = Array.from(sheet.matchAll(/t\("(loginSheet\.[A-Za-z0-9]+)"\)/g), (m) => m[1]);
+        expect(new Set(sheetKeys)).toEqual(new Set([
+            "loginSheet.title", "loginSheet.desc", "loginSheet.phone", "loginSheet.legal", "loginSheet.terms", "loginSheet.privacy", "loginSheet.close",
+        ]));
+        for (const key of sheetKeys) for (const l of LOCALES) expect(dictHas(l, key), `${l} ${key}`).toBe(true);
     });
 
     it("예시 이름의 사전 키가 다섯 언어에 있고, 한국어 값은 예시 자료의 이름과 같다", () => {
@@ -259,7 +272,7 @@ describe("비로그인 부품(GuestGate) — 문구는 다섯 언어 사전에",
     });
 
     it("사실과 다른 가입 문구를 쓰지 않는다 — 전화 가입은 여러 화면이다", () => {
-        for (const key of ["guest.sheetTitle", "guest.sheetDesc", "guest.sheetCta", "guest.joinStart"]) {
+        for (const key of ["loginSheet.title", "loginSheet.desc", "loginSheet.phone", "guest.joinStart"]) {
             expect(koValue(key)).toBeTruthy();
             expect(koValue(key)).not.toMatch(/\d\s*초|바로 가입|즉시/);
         }
@@ -270,10 +283,19 @@ describe("비로그인 부품(GuestGate) — 문구는 다섯 언어 사전에",
         expect(src).not.toMatch(/\bbg-card\b/);
     });
 
-    it("시트에 설명(SheetDescription)이 있고, 가입은 goLogin 으로 보낸다 — 기본 confirm/alert 없음", () => {
-        expect(src).toContain("<SheetDescription");
-        expect(src).toContain("goLogin(setLocation, opts.from)");
+    it("자기 시트를 그리지 않고 가입·로그인 팝업을 연다 — 제목·설명·돌아갈 곳을 그대로 넘긴다. 기본 confirm/alert 없음", () => {
+        // 안내 한 장을 거쳐 또 로그인 화면으로 가던 두 단계가 한 단계가 됐다
+        expect(src).not.toContain("<Sheet");
+        expect(src).toContain("if (openLoginSheet({ from: o?.from, title: o?.title, desc: o?.desc })) return;");
+        // 팝업을 못 열 때(호스트가 아직 없다)만 예전처럼 로그인 화면으로
+        expect(src.indexOf("goLoginPage(setLocation, o?.from);")).toBeGreaterThan(src.indexOf("if (openLoginSheet("));
+        // 돌려주는 모양은 그대로 — 부르는 화면이 {gate.sheet} 를 그리고 있다(이제 null)
+        expect(src).toContain("return { isGuest, guard, sheet: null };");
+        // 가입 유도 한 줄의 단추도 같은 팝업(goLogin 이 연다)
         expect(src).toContain("goLogin(setLocation, from)");
+        // 설명(SheetDescription)은 팝업 쪽에 있다 — 없으면 Radix Dialog 가 콘솔에 경고를 낸다
+        expect(sheet).toContain("<SheetDescription");
+        expect(sheet).toContain("<SheetTitle");
         expect(src).not.toMatch(/\b(?:confirm|alert)\(/);
     });
 

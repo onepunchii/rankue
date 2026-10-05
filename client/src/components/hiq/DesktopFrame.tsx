@@ -183,8 +183,9 @@ function SideRight() {
                 </ul>
             </nav>
 
-            {/* 데스크탑에서 보고 있는 사람을 폰으로 넘겨주는 다리 */}
-            <section className="rk-card p-5 flex items-center gap-4">
+            {/* 데스크탑에서 보고 있는 사람을 폰으로 넘겨주는 다리.
+                data-install-surface: 앱 설치 팝업(AppInstallSheet)이 이 구역이 보이는 동안 PC 에서 스스로 뜨지 않게 찾는 표식(2026-10-06 검토) */}
+            <section data-install-surface="desktop_side_panel" className="rk-card p-5 flex items-center gap-4">
                 <span className="shrink-0 p-2 rounded-[12px] bg-white shadow-[var(--shadow-card)]">
                     <QRCodeSVG value={SITE_URL} size={76} level="M" bgColor="#ffffff" fgColor="#1E3932" />
                 </span>
@@ -371,7 +372,8 @@ function GolfSideRight() {
                 </ul>
             </nav>
 
-            <section className="rk-card p-5 flex items-center gap-4">
+            {/* data-install-surface — 위 당구 패널과 같은 표식(앱 설치 팝업이 찾는다) */}
+            <section data-install-surface="desktop_side_panel" className="rk-card p-5 flex items-center gap-4">
                 <span className="shrink-0 p-2 rounded-[12px] bg-white">
                     <QRCodeSVG value={SITE_URL} size={76} level="M" bgColor="#ffffff" fgColor="#0a0a0a" />
                 </span>

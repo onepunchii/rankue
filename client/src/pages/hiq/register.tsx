@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TermsBody } from "@/components/hiq/TermsBody";
+import { loginPagePath } from "@/components/hiq/LoginSheet";
 import { TERMS_VERSION } from "@shared/terms";
 import { TERMS_CONTENT, termsLang } from "@shared/termsContent";
 
@@ -100,7 +101,9 @@ export default function HiqRegister() {
 
     useEffect(() => {
         if (!phoneFromQuery || !storeIdFromQuery) {
-            setLocation("/");
+            // 번호 없이 이 주소를 직접 연 사람 — 첫 화면으로(비로그인이면 예시 홈이 된다). 자리를 바꿔 끼운다:
+            // '뒤로'로 이 주소에 돌아와 다시 튕기지 않게(2026-10-06 검토)
+            setLocation("/", { replace: true });
         }
     }, [phoneFromQuery, storeIdFromQuery, setLocation]);
 
@@ -115,7 +118,10 @@ export default function HiqRegister() {
         if (currentStep > 0) {
             setCurrentStep(prev => prev - 1);
         } else {
-            setLocation("/");
+            // 첫 단계의 '이전' = 번호를 넣던 로그인 화면으로(2026-10-06 검토). 예전에는 맨 '/' 가 로그인 화면이었지만, 이제 맨 '/' 는
+            // 비로그인을 예시 홈으로 보낸다(landing bareRoot) — 번호를 고치려던 새 회원이 가입 흐름 밖으로 떨어졌다.
+            // login=1 과 전화번호 카드 표시를 달고, 들고 온 돌아갈 곳(?redirect=)도 이어 준다(우리 사이트 안의 경로만).
+            setLocation(loginPagePath(safeReturnPath(queryParams.get("redirect")) ?? "/dashboard", true));
         }
     };
 

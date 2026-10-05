@@ -379,6 +379,11 @@ export const ko: Record<string, string> = {
   "err.auth.kakaoUnlinkSignup": "카카오로 가입한 계정이라 카카오 연결을 해제할 수 없어요.",
   "err.auth.phoneInvalid": "전화번호 형식이 올바르지 않습니다",
   "err.auth.socialAccountOnly": "소셜 로그인으로 가입한 계정이에요. 가입한 방법(카카오·구글·애플)으로 로그인해 주세요.",
+  // '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰(routes/modules/handoff.ts). 실패 이유는 구분해 알려 주지 않는다
+  "err.auth.handoffInvalid": "앱으로 넘어오는 링크가 만료됐거나 이미 사용됐어요. 로그인해 주세요.",
+  "err.auth.handoffBadRequest": "요청 형식이 올바르지 않습니다",
+  // 이미 로그인된 요청은 바꿔 주지 않는다(2026-10-06 검토) — 앱에서 쓰던 계정이 말없이 바뀌지 않게
+  "err.auth.handoffSignedIn": "이미 로그인돼 있어요. 다른 계정으로 바꾸려면 먼저 로그아웃해 주세요.",
   "err.umb.badCategory": "잘못된 부문입니다",
   "err.umb.badPage": "잘못된 페이지 값입니다",
   "err.umb.playerNotFound": "선수를 찾을 수 없습니다",

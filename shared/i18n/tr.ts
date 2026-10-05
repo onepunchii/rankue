@@ -379,6 +379,11 @@ export const tr: Record<string, string> = {
   "err.auth.kakaoUnlinkSignup": "Bu hesap Kakao ile oluşturulduğu için Kakao bağlantısı kaldırılamaz.",
   "err.auth.phoneInvalid": "Telefon numarası geçerli değil",
   "err.auth.socialAccountOnly": "Bu hesap sosyal girişle oluşturuldu. Lütfen kaydolduğunuz yöntemle (Kakao, Google veya Apple) giriş yapın.",
+  // '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰(routes/modules/handoff.ts). 실패 이유는 구분해 알려 주지 않는다
+  "err.auth.handoffInvalid": "Uygulamaya geçiş bağlantısının süresi dolmuş veya bağlantı zaten kullanılmış. Lütfen giriş yapın.",
+  "err.auth.handoffBadRequest": "İstek biçimi geçerli değil",
+  // 이미 로그인된 요청은 바꿔 주지 않는다(2026-10-06 검토) — 앱에서 쓰던 계정이 말없이 바뀌지 않게
+  "err.auth.handoffSignedIn": "Zaten giriş yaptınız. Hesap değiştirmek için önce çıkış yapın.",
   "err.umb.badCategory": "Geçersiz kategori",
   "err.umb.badPage": "Geçersiz sayfa değeri",
   "err.umb.playerNotFound": "Oyuncu bulunamadı",

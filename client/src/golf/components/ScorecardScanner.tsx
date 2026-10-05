@@ -61,7 +61,8 @@ export const ScorecardScanner: React.FC<RawScannerProps> = ({
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
+        // role="dialog": 열린 창이라는 표식(2026-10-06 검토) — 스스로 뜨는 앱 설치 팝업이 이 화면(z-100) 밑에 안 보이게 열리지 않게
+        <div role="dialog" aria-modal="true" className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-xl flex items-center justify-center p-4">
             <motion.div
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: 1 }}
