@@ -12,6 +12,10 @@ import { storeAreasKo } from "../shared/storeMeta.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
 import { courseWhere, weekdayFee, wonShort, type Fees } from "../shared/golfCourse.js";
 import { renderGolfFootprintsCardPng, type FootprintsCardInput } from "./services/golfFootprintsCard.js";
+import { renderGolfRoundCardPng, type GolfRoundCardInput } from "./services/golfRoundCard.js";
+import { parseRoundRef, roundDateLabel, type RoundRef } from "../shared/golfRoundShare.js";
+import { briefReason, lastTee18 } from "../shared/golfRoundBrief.js";
+import { baseLabel, type WxKind } from "../shared/golfWeather.js";
 import { getGolfFootprints } from "./storage/golfFootprints.js";
 import { parseFootprintYear } from "../shared/golfFootprints.js";
 import { verifyFootprintShare } from "./lib/footprintShare.js";
@@ -21,6 +25,7 @@ import { verifyFootprintShare } from "./lib/footprintShare.js";
 //   /og/golfer/:tour/:id.png          골프 투어 랭킹 (ko·en)
 //   /og/pba-player/:memCode.png       PBA 투어 (ko·en·vi·tr·es)
 //   /og/golf-course/:slug.png         골프장 카드 (2026-09-30)
+//   /og/golf-round/:slug.png?d=&t=    라운드 브리핑 카드 (2026-10-05) — 그 날·그 티오프의 날씨. 예보가 없으면 404
 //   /og/store/:code.png               당구장 카드 (2026-09-30)
 //   /og/golf-footprints/:memberId.png 골프 발자국 카드 (2026-09-30) — **비공개**: 서명(t)·만료가 맞아야 열린다
 // /api 아래에 두지 않는 이유: robots.txt 가 /api/ 를 막고 있어 구글이 이미지를 못 가져간다.
@@ -198,6 +203,44 @@ export async function buildGolfCourseCard(slug: string): Promise<GolfCourseCardI
   };
 }
 
+// ── 라운드 브리핑(2026-10-05) ───────────────────────────────────────
+/**
+ * 그 골프장·그 날·그 티오프의 카드 재료. 받아 둔 예보만 읽는다 — 없으면 null(404). 화면의 날씨 카드와 같은 브리핑이다.
+ * 날씨 모듈은 여기서 지연 로드한다(카드 라우트가 불릴 때만 필요하다).
+ */
+export async function buildGolfRoundCard(slug: string, ref: RoundRef, nowMs = Date.now()): Promise<GolfRoundCardInput | null> {
+  const s = await loadGolfCourseSummary();
+  const p = s.bySlug.get(slug);
+  if (!p || !p.name?.trim()) return null;
+  const { roundBriefAt } = await import("./services/golfWeather.js");
+  const r = await roundBriefAt(p, ref, nowMs);
+  if (!r) return null;
+  const b = r.brief;
+  // 해 뜨기 전·해 진 뒤의 칸은 달로 — 화면(WeatherCard nightAt)과 같은 셈
+  const edge = (hm: string) => +hm.slice(0, 2) + (+hm.slice(3) > 30 ? 1 : 0);
+  const night = (hr: number) => (r.sun ? hr < edge(r.sun.rise) || hr >= edge(r.sun.set) : hr < 6 || hr >= 19);
+  const count: Partial<Record<WxKind, number>> = {};
+  for (const x of b.hours) count[x.kind] = (count[x.kind] ?? 0) + 1;
+  const sky = b.wet ?? (["clear", "partly", "cloudy"] as WxKind[]).reduce((best, k) => ((count[k] ?? 0) > (count[best] ?? 0) ? k : best), "clear" as WxKind);
+  return {
+    name: p.name,
+    dateLabel: roundDateLabel(ref.ymd),
+    teeLabel: `${String(b.teeHour).padStart(2, "0")}시 티오프`,
+    verdict: b.verdict,
+    reason: briefReason(b),
+    tone: b.tone,
+    sky: b.tone === "good" ? "clear" : sky,
+    hours: b.hours.map((x) => {
+      const hr = +x.t.slice(8, 10);
+      return { label: `${hr}시`, kind: x.kind, night: night(hr), tmp: x.tmp != null ? `${x.tmp}°` : "–", pop: x.pop != null ? `${x.pop}%` : "–", wet: (x.pop ?? 0) >= 30 };
+    }),
+    frontCount: b.frontCount,
+    gear: b.gear,
+    sunLine: r.sun ? `해 짐 ${r.sun.set} · 18홀은 ${lastTee18(r.sun.set)} 전에 티오프` : null,
+    stamp: `기상청 ${baseLabel(r.base)} 발표${r.approx ? ` · ${r.approx} 기준` : ""}`,
+  };
+}
+
 // ── 당구장 ─────────────────────────────────────────────────────────
 export async function buildStoreCard(code: string): Promise<StoreCardInput | null> {
   const [s] = await db.select().from(storeListings).where(eq(storeListings.code, code));
@@ -284,6 +327,26 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] golf course card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  // 라운드 브리핑 카드 — 예보는 세 시간마다 바뀌니 캐시는 짧게(10분). 없는 라운드(지난 시각·닷새 뒤)는 404 이고 그건 캐시하지 않는다.
+  app.get("/og/golf-round/:slug.png", async (req, res) => {
+    const slug = String(req.params.slug ?? "").normalize("NFC");
+    const ref = parseRoundRef(req.query.d, req.query.t);
+    const notFound = () => res.status(404).setHeader("Cache-Control", "no-store").type("text/plain").send("not found");
+    if (!slug || slug.length > 80 || !ref) return notFound();
+    try {
+      const input = await buildGolfRoundCard(slug, ref);
+      if (!input) return notFound();
+      const png = await renderGolfRoundCardPng(input);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=300, s-maxage=600, stale-while-revalidate=1800");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] golf round card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });

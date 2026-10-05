@@ -12,11 +12,15 @@
  *
  * ⚠️ 비로그인(당구 테마)에서도 열리는 화면 — 색은 리터럴만(CourseShell 머리말). 글자 12px 이상.
  */
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { kstDateKey } from "@/lib/kst";
-import { LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideMoon, LucideSunHorizon, LucideWind } from "@/lib/icons";
+import { useToast } from "@/hooks/use-toast";
+import { shareImage } from "@/lib/shareImage";
+import { LucideChevronDown, LucideChevronLeft, LucideChevronRight, LucideMoon, LucideShare2, LucideSunHorizon, LucideWind } from "@/lib/icons";
+import { ORIGIN } from "@shared/golfCourse";
+import { roundCardPath, roundDeepPath, roundShareText, roundShareTitle, type RoundRef } from "@shared/golfRoundShare";
 import {
     WIND_LEVEL, baseLabel, dayPop, daySky, dowOf, kstParts, sunTimes,
     type CourseWeather, type WxDay, type WxHour, type WxKind,
@@ -130,17 +134,20 @@ function Brief({ b, sun }: { b: RoundBrief; sun: { rise: string; set: string } |
  * 늘 챙기는 것(2026-10-05, 준비물 체크리스트) — 접힌 한 줄에 몇 개 챙겼는지, 펼치면 눌러서 지워 가는 격자.
  * 날씨만 보러 온 사람에게는 한 줄이고, 내 티타임을 보고 있는 사람에게는 펼친 채로 연다.
  */
-function PackRow({ open: wantOpen }: { open: boolean }) {
+function PackRow({ open: wantOpen, right }: { open: boolean; right?: ReactNode }) {
     const [open, setOpen] = useState(wantOpen);
     useEffect(() => { if (wantOpen) setOpen(true); }, [wantOpen]);
     const { checked } = usePackChecked();
     return (
         <div className="mt-2 px-5">
-            <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="h-8 flex items-center gap-1.5 text-[12.5px] text-[#FFFFFF66] active:text-white">
-                늘 챙기는 것
-                <span className="tabular-nums text-[#FFFFFF99]">{checked.length}/{PACK_BASE.length}</span>
-                <LucideChevronDown weight="bold" className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} aria-hidden />
-            </button>
+            <div className="flex items-center justify-between gap-3">
+                <button type="button" aria-expanded={open} onClick={() => setOpen((v) => !v)} className="h-8 flex items-center gap-1.5 text-[12.5px] text-[#FFFFFF66] active:text-white">
+                    늘 챙기는 것
+                    <span className="tabular-nums text-[#FFFFFF99]">{checked.length}/{PACK_BASE.length}</span>
+                    <LucideChevronDown weight="bold" className={cn("w-3.5 h-3.5 transition-transform", open && "rotate-180")} aria-hidden />
+                </button>
+                {right}
+            </div>
             {open && (
                 <>
                     <PackList className="mt-0.5" />
@@ -151,6 +158,41 @@ function PackRow({ open: wantOpen }: { open: boolean }) {
                 </>
             )}
         </div>
+    );
+}
+
+/**
+ * 이 라운드 공유(2026-10-05, 단톡방 공유 카드) — 라운드 전에 날씨 앱 캡처를 돌리던 자리에 들어갈 카드 한 장.
+ * 서버가 그린 정사각형 그림(/og/golf-round/…)을 OS 공유 시트로 넘기고, 글 몇 줄과 그 라운드로 바로 여는 주소를 같이 싣는다.
+ * 그림을 못 받으면(예보가 막 바뀐 틈·네트워크) 글만이라도 복사해 준다.
+ */
+function ShareRound({ slug, name, round, teeLabel, brief, sunset }: { slug: string; name: string; round: RoundRef; teeLabel: string; brief: RoundBrief; sunset: string | null }) {
+    const { toast } = useToast();
+    const [busy, setBusy] = useState(false);
+    const onClick = async () => {
+        if (busy) return;
+        setBusy(true);
+        const text = roundShareText({ name, ymd: round.ymd, teeLabel, brief, sunset, url: ORIGIN + roundDeepPath(slug, round) });
+        try {
+            const outcome = await shareImage({ url: roundCardPath(slug, round), filename: `rankue-round-${round.ymd}-${round.hour}.png`, title: roundShareTitle(name), text });
+            if (outcome === "downloaded") toast({ title: "카드를 저장했어요" });
+            else if (outcome === "failed") {
+                let copied = false;
+                try { await navigator.clipboard.writeText(text); copied = true; } catch { /* 복사가 막힌 브라우저 */ }
+                toast({ title: copied ? "카드를 만들지 못해 글만 복사했어요" : "지금은 공유할 수 없어요", variant: copied ? undefined : "destructive" });
+            }
+        } finally {
+            setBusy(false);
+        }
+    };
+    return (
+        <button
+            type="button" onClick={() => { void onClick(); }} disabled={busy} aria-busy={busy}
+            className="shrink-0 h-8 pl-2.5 pr-3 rounded-full bg-[#FFFFFF0F] text-[12.5px] font-medium text-[#FFFFFFCC] inline-flex items-center gap-1.5 active:bg-[#FFFFFF1A] disabled:opacity-60"
+        >
+            <LucideShare2 weight="bold" className="w-3.5 h-3.5" aria-hidden />
+            {busy ? "만드는 중" : "이 라운드 공유"}
+        </button>
     );
 }
 
@@ -221,7 +263,13 @@ export interface MyTee { id: string; datetime: string }
 /** 지금 보고 있는 라운드 — 먹거리 구역이 같은 날·같은 티오프를 따라오게 밖으로 알린다("내일" · "07시" · 그 브리핑) */
 export interface RoundPick { dayLabel: string; teeLabel: string; brief: RoundBrief }
 
-export function WeatherCard({ wx, myTees, onRound }: { wx: CourseWeather; myTees?: MyTee[]; onRound?: (r: RoundPick | null) => void }) {
+export function WeatherCard({ wx, myTees, onRound, slug, name, initial }: {
+    wx: CourseWeather; myTees?: MyTee[]; onRound?: (r: RoundPick | null) => void;
+    /** 공유 카드·주소를 만들 골프장 — 없으면 공유 단추를 그리지 않는다 */
+    slug?: string; name?: string;
+    /** 주소에 실려 온 라운드(?d=&t= — 공유 받은 주소·전날 알림). 그 날의 예보가 있으면 그 라운드로 연다 */
+    initial?: RoundRef | null;
+}) {
     const today = kstDateKey(new Date());
     const short = useMemo(() => wx.days.filter((d) => d.src === "short"), [wx.days]);
     const hoursOf = (date: string) => { const ymd = date.replace(/-/g, ""); return wx.hours.filter((h) => h.t.startsWith(ymd)); };
@@ -240,15 +288,21 @@ export function WeatherCard({ wx, myTees, onRound }: { wx: CourseWeather; myTees
         return [PART_TEE_HOUR[1], PART_TEE_HOUR[2], PART_TEE_HOUR[3]].find((h) => avail.includes(h)) ?? avail[0];
     };
     const firstDay = short[0]?.date ?? wx.days[0].date;
-    const [picked, setPicked] = useState<string>(() => mine[0]?.date ?? firstDay);
-    const [tee, setTee] = useState<number>(() => mine[0]?.hour ?? defaultTee(mine[0]?.date ?? firstDay));
+    // 주소에 실려 온 라운드가 먼저다(공유 받은 사람은 내 티타임이 없고, 알림으로 온 사람은 바로 그 라운드를 보러 왔다)
+    const linked = useMemo(() => {
+        if (!initial) return null;
+        const date = `${initial.ymd.slice(0, 4)}-${initial.ymd.slice(4, 6)}-${initial.ymd.slice(6, 8)}`;
+        return short.some((d) => d.date === date) && teeHours(hoursOf(date)).length > 0 ? { date, hour: initial.hour } : null;
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    const [picked, setPicked] = useState<string>(() => linked?.date ?? mine[0]?.date ?? firstDay);
+    const [tee, setTee] = useState<number>(() => linked?.hour ?? mine[0]?.hour ?? defaultTee(mine[0]?.date ?? firstDay));
     // 자정을 넘기거나 새 예보에서 고른 날이 사라지면 첫 날로
     useEffect(() => { if (!short.some((d) => d.date === picked)) { setPicked(firstDay); setTee(defaultTee(firstDay)); } }, [wx.base, today]); // eslint-disable-line react-hooks/exhaustive-deps
     // 내 티타임은 상세가 온 뒤에 올 수 있다 — 아직 아무것도 고르지 않았을 때만 그리로 옮긴다
-    const [touched, setTouched] = useState(false);
+    const [touched, setTouched] = useState(() => !!linked);
     // 티오프 시각을 **직접** 골랐나. 안 골랐으면 날을 바꿀 때 그 날의 기본(1부)으로 — 저녁에 열면 오늘은 17시가 잡히는데,
     // 그걸 내일로 끌고 가면 내일이 '야간 라운드'로 열린다.
-    const [teeChosen, setTeeChosen] = useState(() => !!mine[0]);
+    const [teeChosen, setTeeChosen] = useState(() => !!linked || !!mine[0]);
     const mineKey = mine.map((m) => m.id).join(",");
     useEffect(() => { if (!touched && mine[0]) { setPicked(mine[0].date); setTee(mine[0].hour); setTeeChosen(true); } }, [mineKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -338,7 +392,15 @@ export function WeatherCard({ wx, myTees, onRound }: { wx: CourseWeather; myTees
                             </div>
                         </div>
                         <Brief b={brief} sun={sun} />
-                        <PackRow open={!!mineHere} />
+                        <PackRow
+                            open={!!mineHere}
+                            right={slug && name ? (
+                                <ShareRound
+                                    slug={slug} name={name} round={{ ymd: day.date.replace(/-/g, ""), hour: teeSel }}
+                                    teeLabel={mineHere ? mineHere.label : `${pad(teeSel)}시`} brief={brief} sunset={sun?.set ?? null}
+                                />
+                            ) : undefined}
+                        />
                     </>
                 ) : dayHours.length > 0 ? (
                     // 오늘 라운드 시간이 다 지났다(19시 넘어 열었다) — 한 줄 평 없이 남은 시간만

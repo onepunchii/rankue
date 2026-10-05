@@ -36,6 +36,8 @@ import { renderGolfChecklist } from "./seo/golfGuide.js";
 import { renderGolfTerms, type GolfTermsRender } from "./seo/golfTerms.js";
 import { GOLF_TERMS_NAV_LABEL, GOLF_TERMS_PATH } from "../shared/golfTermsMeta.js";
 import { localDishLabel, localDishLine, localDishes } from "../shared/golfLocalDish.js";
+import { parseRoundRef, roundDateLabel, type RoundRef } from "../shared/golfRoundShare.js";
+import { golfRoundCardUrl } from "./services/golfRoundCard.js";
 import { PACK_NAV_LABEL, PACK_PATH } from "../shared/golfPack.js";
 import {
   FIND_FEATURES, FIND_JOIN_LABEL, FIND_NOTE, findDescription, findFaq, findFeature, findHeading, findPath, findRegionCounts, findTitle,
@@ -600,7 +602,7 @@ function golfCardGallery(ps: GolfPageRow[]): string {
 }
 
 // ── /golf/course/:slug ────────────────────────────────────────────
-async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): Promise<GolfRender> {
+async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, round: RoundRef | null = null): Promise<GolfRender> {
   const slug = golfDecode(rawSlug);
   if (!slug) return golfGone("골프장을 찾을 수 없습니다.", "요청한 골프장 정보가 없습니다.");
   const p = s.bySlug.get(slug);
@@ -822,6 +824,17 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     near = [...same.filter((x) => p.city && x.city === p.city), ...same.filter((x) => !p.city || x.city !== p.city)].slice(0, 8).map((x) => ({ x, km: null }));
   }
   // 글 목록 밑에 가까운 6곳의 카드 줄 — 네이버가 이 골프장 결과 밑에 이웃 골프장 카드를 줄지어 보여 줄 재료(매장·선수 이웃 절과 같다)
+  // 주소에 라운드가 실려 왔고(?d=&t= — 단톡방에 붙인 공유 주소·전날 알림, 2026-10-05) 그 예보가 있으면, 미리보기 그림만
+  // 그 라운드의 브리핑 카드로 바꾼다. 정본 주소(canonical)·본문은 그대로다 — 색인되는 것은 골프장 페이지 하나.
+  let roundImage: { url: string; width: number; height: number; alt: string } | null = null;
+  if (round && wx) {
+    const dayHours = wx.hours.filter((h) => h.t.startsWith(round.ymd));
+    const tee = nearestTee(teeHours(dayHours), round.hour);
+    const key = `${round.ymd.slice(0, 4)}-${round.ymd.slice(4, 6)}-${round.ymd.slice(6, 8)}`;
+    if (tee != null && Math.abs(tee - round.hour) <= 2 && roundBrief(dayHours, tee, sunTimes(wx.at.lat, wx.at.lng, key))) {
+      roundImage = { url: golfRoundCardUrl(ORIGIN, slug, { ymd: round.ymd, hour: tee }), width: CARD_SIZE, height: CARD_SIZE, alt: `${p.name} ${roundDateLabel(round.ymd)} 라운드 브리핑 — 랭큐 골프` };
+    }
+  }
   // 이 동네 대표 메뉴(2026-10-05) — 우리가 쓴 사전(shared/golfLocalDish)이라 여기 실을 수 있다. 화면의 칩 줄과 같은 글.
   // 네이버 검색 결과(가게 목록)는 여전히 싣지 않는다 — 약관 때문이다(화면의 '근처' 구역 머리말). 이 파일은 그쪽 모듈을 부르지 않는다.
   const dishes = localDishes(p.region, p.city);
@@ -877,7 +890,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number): P
     desc,
     canonical,
     // 골프장마다 자기 카드(이름·로고·그린피·시세) — 490곳이 같은 가로 그림을 쓰던 것(잘려서 '골프 490곳'만 보였다)을 대신한다
-    image: { url: golfCourseCardUrl(ORIGIN, slug), width: CARD_SIZE, height: CARD_SIZE, alt: `${p.name} 그린피·회원권 시세 — 랭큐 골프` },
+    image: roundImage ?? { url: golfCourseCardUrl(ORIGIN, slug), width: CARD_SIZE, height: CARD_SIZE, alt: `${p.name} 그린피·회원권 시세 — 랭큐 골프` },
     jsonLd: [{ "@context": "https://schema.org", "@graph": [course, crumbs.ld] }],
     body: `<main>
   ${crumbs.html}
@@ -1184,7 +1197,7 @@ function renderGolfFind(s: GolfSummary, segs: string[], now: number): GolfRender
   return { status: 200, tag: `golf-find:${key}${region ? `:${encodeURIComponent(region)}` : ""}`, html };
 }
 
-export async function renderGolfPath(pathname: string): Promise<GolfRender | null> {
+export async function renderGolfPath(pathname: string, query: Record<string, unknown> = {}): Promise<GolfRender | null> {
   const path = pathname.replace(/\/+$/, "");
   if (!GOLF_PAGE_RE.test(path)) return null;
   const [, , kind, ...rest] = path.split("/");
@@ -1192,7 +1205,7 @@ export async function renderGolfPath(pathname: string): Promise<GolfRender | nul
   const now = Date.now();
   if (kind === "course") {
     if (rest.length !== 1) return golfGone("골프장을 찾을 수 없습니다.", "요청한 골프장 정보가 없습니다.");
-    return renderGolfCourse(s, rest[0], now);
+    return renderGolfCourse(s, rest[0], now, parseRoundRef(query.d, query.t));
   }
   if (kind === "find") return renderGolfFind(s, rest, now);
   const intent = kind === "courses" ? null : (kind as GolfIntent);
@@ -1975,7 +1988,7 @@ ${list}
     if (!isBot(req)) return next();
     let r: GolfRender | null;
     try {
-      r = await renderGolfPath(req.path);
+      r = await renderGolfPath(req.path, req.query as Record<string, unknown>);
     } catch (e) {
       console.warn("[prerender] golf course page failed:", (e as Error)?.message);
       return sendUnavailable(res);

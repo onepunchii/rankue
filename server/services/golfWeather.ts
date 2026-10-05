@@ -19,7 +19,7 @@ import {
     type CourseWeather, type KmaItem, type MidLand, type MidSaved, type MidTa, type WxGrid,
 } from "../../shared/golfWeather.js";
 import { weatherPoint } from "../../shared/golfWeatherZones.js";
-import { teeWxFromDay, teeWxFromHours, type TeeWx } from "../../shared/golfRoundBrief.js";
+import { nearestTee, roundBrief, teeHours, teeWxFromDay, teeWxFromHours, type RoundBrief, type TeeWx } from "../../shared/golfRoundBrief.js";
 
 const SHORT_URL = "https://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst";
 const MID_LAND_URL = "https://apis.data.go.kr/1360000/MidFcstInfoService/getMidLandFcst";
@@ -277,4 +277,23 @@ export async function warmWeather(pages: WeatherPage[], opts: { budgetMs?: numbe
         grids: grids.size, gridDue: due.length, gridOk: short.ok, gridFail: short.fail, gridLeft: short.left,
         mids: midIds.size, midDue: midDue.length, midOk: mid.ok, midFail: mid.fail, base: latest,
     };
+}
+
+// ── 한 라운드의 브리핑(2026-10-05, 공유 카드·전날 알림) ─────────────────
+/** 티오프 시각과 예보 칸이 이만큼(시간) 넘게 벌어지면 읽지 않는다 — 나흘째는 세 시간 간격이라 가장 가까운 칸을 쓴다 */
+const ROUND_SNAP_HOURS = 2;
+export interface RoundBriefAt { brief: RoundBrief; sun: { rise: string; set: string } | null; base: string; approx?: string }
+/**
+ * 그 골프장·그 날(ymd)·그 티오프(시)의 브리핑 — **받아 둔 예보만** 읽는다(기상청을 부르지 않는다).
+ * 예보가 없거나(닷새 뒤·지난 시각) 낡았으면 null — 지어내지 않는다. 화면의 날씨 카드와 같은 roundBrief 를 쓴다.
+ */
+export async function roundBriefAt(page: WeatherPage, ref: { ymd: string; hour: number }, nowMs = Date.now()): Promise<RoundBriefAt | null> {
+    const wx = await getCourseWeather(page, { fetch: false, nowMs });
+    if (!wx) return null;
+    const dayHours = wx.hours.filter((h) => h.t.startsWith(ref.ymd));
+    const tee = nearestTee(teeHours(dayHours), ref.hour);
+    if (tee == null || Math.abs(tee - ref.hour) > ROUND_SNAP_HOURS) return null;
+    const sun = sunTimes(wx.at.lat, wx.at.lng, `${ref.ymd.slice(0, 4)}-${ref.ymd.slice(4, 6)}-${ref.ymd.slice(6, 8)}`);
+    const brief = roundBrief(dayHours, tee, sun);
+    return brief ? { brief, sun, base: wx.base, approx: wx.approx } : null;
 }

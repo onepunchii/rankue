@@ -2886,7 +2886,7 @@ export const ko: Dict = {
   "settings.notifGolf": "골프",
   "settings.notifGolfDesc": "골프 크루·라운드·공지 알림",
   "settings.notifGolfJoin": "조인·부킹",
-  "settings.notifGolfJoinDesc": "내 글에 온 신청·취소, 내 신청의 수락·거절",
+  "settings.notifGolfJoinDesc": "내 글에 온 신청·취소, 내 신청의 수락·거절, 라운드 전날 브리핑",
   "settings.notifGolfUrgent": "긴급 조인",
   "settings.notifGolfUrgentDesc": "오늘 빈자리 조인이 올라오면(낮에만)",
   "settings.notifGolfWatch": "관심 골프장 · 지역",

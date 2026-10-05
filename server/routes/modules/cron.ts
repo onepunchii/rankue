@@ -19,7 +19,7 @@ router.post("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, result);
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly() });
 }));
 
 // Vercel Cron은 GET으로 호출한다(문서 기준). 동일 핸들러를 재사용.
@@ -30,8 +30,32 @@ router.get("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, result);
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly() });
 }));
+
+// 라운드 전날 저녁 브리핑(2026-10-05) — 매시 도는 리마인더에 얹는다(크론 항목을 늘리지 않는다: Vercel 요금제가 개수를 센다).
+// 한국 시각 19~20시대에만 일하고 나머지 시간엔 아무것도 읽지 않는다. 여기서 터져도 크루 리마인더의 응답은 깨지 않는다.
+async function golfEveQuietly(): Promise<unknown> {
+    try {
+        const { runGolfRoundEve } = await import("../../services/golfRoundEve.js");
+        return await runGolfRoundEve();
+    } catch (e) {
+        console.error("[GolfRoundEve]", e);
+        return { error: true };
+    }
+}
+// 점검용 — 지금 돌리면 누구에게 무엇이 갈지(?dry=1 은 보내지 않고 세기만, 시간 밖에서도 본다). vercel.json 크론에는 없다.
+// ?dry 없이 부르면 실제 실행과 같다(보낼 시간이 아니면 아무 일도 하지 않는다).
+async function handleGolfRoundEve(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { runGolfRoundEve } = await import("../../services/golfRoundEve.js");
+    const dry = req.query.dry === "1";
+    return sendSuccess(res, await runGolfRoundEve(Date.now(), { dry, force: dry }));
+}
+router.get("/golf-round-eve", asyncHandler(handleGolfRoundEve));
+router.post("/golf-round-eve", asyncHandler(handleGolfRoundEve));
 
 // UMB 세계랭킹 일일 동기화 — 새 회차가 있으면 부문당 최대 2개 적재
 async function handleUmbSync(req: any, res: any) {

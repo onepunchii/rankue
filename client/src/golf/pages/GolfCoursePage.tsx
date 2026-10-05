@@ -27,6 +27,7 @@ import { CourseLogo } from "@/golf/components/course/CourseLogo";
 import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/CourseHeader";
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";
 import { WeatherCard, WeatherSkeleton, type RoundPick } from "@/golf/components/course/detail/WeatherCard";
+import { parseRoundRef, type RoundRef } from "@shared/golfRoundShare";
 import { MembershipPrices, topPrice } from "@/golf/components/course/detail/MembershipPrices";
 import { GreenFees } from "@/golf/components/course/detail/GreenFees";
 import { CourseLayout } from "@/golf/components/course/detail/CourseLayout";
@@ -133,6 +134,12 @@ export default function GolfCoursePage() {
 
     // 다른 골프장으로 건너가면 맨 위에서 시작한다
     useEffect(() => { window.scrollTo(0, 0); }, [slug]);
+    // 주소에 실려 온 라운드(?d=20261006&t=7) — 이 골프장에 들어올 때 한 번 읽는다(shared/golfRoundShare)
+    const linked = useMemo(() => {
+        if (typeof window === "undefined") return null;
+        const sp = new URLSearchParams(window.location.search);
+        return parseRoundRef(sp.get("d"), sp.get("t"));
+    }, [slug]);
 
 
     const { location, ask } = useMyLocation();
@@ -242,7 +249,7 @@ export default function GolfCoursePage() {
                             </div>
                         ) : <BodySkeleton />
                     ) : (
-                        <Body d={d} ids={ids} distance={distKm != null ? formatDistance(distKm) : null} weather={wx.data ?? null} />
+                        <Body d={d} ids={ids} distance={distKm != null ? formatDistance(distKm) : null} weather={wx.data ?? null} linked={linked} />
                     )}
                 </>
             )}
@@ -250,11 +257,19 @@ export default function GolfCoursePage() {
     );
 }
 
-function Body({ d, ids, distance, weather }: { d: CourseDetail; ids: SectionId[]; distance: string | null; weather: CourseWeather | null }) {
+function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: SectionId[]; distance: string | null; weather: CourseWeather | null; linked: RoundRef | null }) {
     const city = cityShort(d.city);
     const tgm = d.prices.length > 0 || !!d.fees || !!d.intro;
     // 날씨 카드에서 보고 있는 라운드 — 먹거리 구역이 따라온다
     const [round, setRound] = useState<RoundPick | null>(null);
+    // 주소에 라운드가 실려 왔으면(?d=&t= — 공유 받은 주소·전날 알림) 날씨가 준비되는 대로 그 구역으로 한 번 내려간다
+    const jumped = useRef(false);
+    useEffect(() => {
+        if (!linked || !weather || jumped.current) return;
+        jumped.current = true;
+        const t = window.setTimeout(() => jumpTo("weather"), 250);
+        return () => window.clearTimeout(t);
+    }, [linked, weather]);
     return (
         <>
             <SectionNav ids={ids} />
@@ -262,7 +277,7 @@ function Body({ d, ids, distance, weather }: { d: CourseDetail; ids: SectionId[]
             {/* 랭큐 골프 소개(2026-10-05) — 검색으로 들어온 비로그인 방문자에게만. 티타임 바로 아래, 시세·그린피 정보는 가리지 않게 */}
             <GolfGuestIntro className="mx-4 mt-8" />
             {/* 날씨(2026-10-05) — 골프장 이름에 붙여 가장 많이 찾는 말. 티타임 다음, 시세·그린피 앞 */}
-            {ids.includes("weather") && (weather ? <WeatherCard key={d.slug} wx={weather} myTees={d.myTees} onRound={setRound} /> : <WeatherSkeleton />)}
+            {ids.includes("weather") && (weather ? <WeatherCard key={d.slug} wx={weather} myTees={d.myTees} onRound={setRound} slug={d.slug} name={d.name} initial={linked} /> : <WeatherSkeleton />)}
             {ids.includes("price") && <MembershipPrices key={d.slug} prices={d.prices} />}
             {ids.includes("fee") && d.fees && <GreenFees fees={d.fees} />}
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}
