@@ -4,10 +4,12 @@ import { ChevronDown, ChevronUp, LucideUsers, LucideZap } from "@/lib/icons";
 import { HiqMember, HiqGameHistory } from "@shared/schema";
 import { useGameCreation, PlayerType } from "@/hooks/useGameCreation";
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent, FocusEvent, KeyboardEvent, MouseEvent as ReactMouseEvent, PointerEvent as ReactPointerEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { BilliardBall, BallCluster, BallColor } from "../ui/BilliardBall";
 import { useT } from "@/lib/i18n";
+import { TARGET_INPUT_MAX, TARGET_INPUT_MIN, commitTargetText, sanitizeTargetText, stepTarget } from "@shared/targetInput";
 
 // Player slot → billiard ball color (white 수구, yellow, red, red — the 4구 set).
 const SLOT_BALL: BallColor[] = ["white", "yellow", "red", "red"];
@@ -66,6 +68,79 @@ const PlayerCard = ({
         const wins = myGames.filter(g => g.isWinner).length;
         return Math.round((wins / myGames.length) * 100);
     })() : null;
+
+    // ── 목표 점수를 숫자로 직접 치기(2026-10-06 오너: "화살표로만 내리고 올리고 하는데 숫자로 입력 가능하게") ──
+    // edit 는 치는 동안의 글자(빈 칸 허용)와 치기 시작할 때의 값·자리 주인이다. null 이면 입력 중이 아니다.
+    // 글자 → 값 규칙은 shared/targetInput 한 곳에 있다(빈 칸·0 은 치기 전 값, 범위는 1~999 — 서버 /game/start 와 같다).
+    const [edit, setEdit] = useState<{ text: string; base: number; seat: string } | null>(null);
+    const targetRef = useRef<HTMLInputElement>(null);
+    const scrollTimer = useRef<number | undefined>(undefined);
+    const seat = `${player.type}:${player.member?.id ?? ""}`;
+
+    // 치던 글자가 뜻하는 값. 칠 때마다 이 값을 players[i].target 에 바로 넣어 둔다 — blur 를 기다리지 않는다.
+    // iOS 는 단추를 눌러도 입력 칸의 포커스가 안 풀리는 일이 있어, blur 에서만 확정하면 숫자를 치고 곧장
+    // '게임 시작'을 누른 판이 치기 전 목표로 시작된다. blur·Enter 는 '입력을 닫는 것'만 한다(빈 칸은 그때 치기 전 값으로 보인다).
+    const typed = edit ? commitTargetText(edit.text, edit.base, TARGET_INPUT_MIN, TARGET_INPUT_MAX) : player.target;
+
+    // 치는 중에 밖에서 이 자리가 바뀌었다(종목 전환 재계산, 핀으로 회원이 앉음, 자리 바꾸기) → 치던 글자를 버리고 새 값을 보여 준다.
+    // 내가 친 값은 위에서 곧바로 target 이 되므로 여기 걸리지 않는다. 3초 폴링은 손대지 않은 자리의 player 를 그대로 넘겨 역시 걸리지 않는다.
+    if (edit && (player.target !== typed || seat !== edit.seat)) setEdit(null);
+
+    // 포커스가 남은 채 밖에서 값이 바뀌었으면 다시 전체 선택 — 다음에 치는 숫자가 새 값 뒤에 붙지 않고 덮어쓰게.
+    // 화살표도 이 길로 온다(포커스를 칸에 둔 채 값만 바꾼다).
+    // 치는 중(edit 있음)에는 건드리지 않는다. 여기서 선택하면 두 번째 숫자가 첫 숫자를 지운다.
+    useEffect(() => {
+        const el = targetRef.current;
+        if (!edit && el && document.activeElement === el) el.select();
+    }, [player.target, seat]);
+
+    useEffect(() => () => window.clearTimeout(scrollTimer.current), []);
+
+    const onTargetFocus = (e: FocusEvent<HTMLInputElement>) => {
+        const el = e.currentTarget;
+        // 누르면 전체 선택 — 바로 덮어쓴다. iOS 는 포커스 순간의 선택을 탭이 다시 풀어서 한 박자 뒤에 한 번 더 건다.
+        el.select();
+        window.setTimeout(() => {
+            if (document.activeElement === el) el.setSelectionRange(0, el.value.length);
+        }, 0);
+        // 키보드가 올라온 뒤 이 칸을 보이는 영역 가운데로. 전역 keyboardAvoid 의 nearest 스크롤(350ms) 다음에 돈다.
+        window.clearTimeout(scrollTimer.current);
+        scrollTimer.current = window.setTimeout(() => {
+            if (document.activeElement === el) el.scrollIntoView({ block: "center", behavior: "smooth" });
+        }, 400);
+    };
+
+    const onTargetChange = (e: ChangeEvent<HTMLInputElement>) => {
+        // 숫자 아닌 글자는 버린다(붙여넣기도 이 길로 온다).
+        const text = sanitizeTargetText(e.target.value, TARGET_INPUT_MAX);
+        const base = edit ? edit.base : player.target;
+        setEdit({ text, base, seat });
+        const next = commitTargetText(text, base, TARGET_INPUT_MIN, TARGET_INPUT_MAX);
+        if (next !== player.target) onUpdate(idx, { target: next });
+    };
+
+    const onTargetKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+        if (e.key !== "Enter" || e.nativeEvent.isComposing) return;
+        // Enter 는 이 칸의 확정일 뿐이다 — 기본 동작으로 번져 '게임 시작'이 눌리지 않게 막고, 키보드를 내린다.
+        e.preventDefault();
+        e.stopPropagation();
+        e.currentTarget.blur(); // onBlur 가 입력을 닫는다
+    };
+
+    // 화살표: 치던 글자가 있으면 먼저 확정(typed)한 뒤 ±1. 입력은 닫지 않고 포커스를 칸에 둔다 — 키보드가 떠 있었다면 그대로 떠 있다.
+    // 여기서 blur 로 키보드를 내리면 창 높이가 한 번에 돌아와(index.css 의 body.keyboard-open 규칙) 이 줄이 손가락 밑에서 내려가고,
+    // 이어 누른 탭이 화살표가 아닌 곳(회원/게스트 토글)에 떨어진다. 값이 바뀌면 위 효과가 새 값을 다시 전체 선택한다.
+    const bumpTarget = (dir: -1 | 1) => {
+        setEdit(null);
+        onUpdate(idx, { target: stepTarget(typed, dir, TARGET_INPUT_MIN, TARGET_INPUT_MAX) });
+    };
+
+    // 칸에 포커스가 있을 때만, 화살표 단추가 그 포커스를 가져가지 못하게 막는다(가져가면 키보드가 닫힌다). 클릭은 그대로 간다.
+    const keepTargetFocus = (e: ReactMouseEvent<HTMLButtonElement>) => {
+        if (document.activeElement === targetRef.current) e.preventDefault();
+    };
+
+    const seatLabel = isSelf ? t("gameCreationModal.me") : `${t("gameCreationModal.opponent")} ${idx + 1}`;
 
     return (
         <div className={`bg-white rounded-2xl p-4 flex flex-col gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.06)] relative transition-all duration-300 ${isSelf ? 'border-brand/30 bg-brand/[0.04]' : ''}`}>
@@ -158,16 +233,38 @@ const PlayerCard = ({
             {/* Score Control */}
             <div className="flex items-center gap-2">
                 <button
-                    onClick={() => onUpdate(idx, { target: Math.max(1, player.target - 1) })}
+                    type="button"
+                    onMouseDown={keepTargetFocus}
+                    onClick={() => bumpTarget(-1)}
+                    aria-label={`${seatLabel} · ${t("chat.attach.matchInviteMinus")}`}
                     className="flex-1 h-14 rounded-xl bg-black/[0.04] hover:bg-black/[0.08] active:scale-95 transition-all flex items-center justify-center "
                 >
                     <ChevronDown className="w-6 h-6 text-ink-1" />
                 </button>
-                <div className={`h-14 min-w-[90px] flex items-center justify-center bg-black/[0.04] rounded-xl font-semibold text-3xl ${textColor} tracking-tight shadow-inner`}>
-                    {player.target}
-                </div>
+                {/* 가운데 숫자 칸 — 누르면 그 자리에서 친다. 칸 크기·글자·색은 예전 그대로, 입력 중일 때만 링.
+                    type="number" 는 쓰지 않는다(휠·e·- 입력, iOS 동작 차이). 글자 30px 이라 iOS 확대도 없다. */}
+                <input
+                    ref={targetRef}
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    enterKeyHint="done"
+                    autoComplete="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    aria-label={`${seatLabel} · ${t("sim.setup.target")}`}
+                    value={edit ? edit.text : String(player.target)}
+                    onFocus={onTargetFocus}
+                    onChange={onTargetChange}
+                    onKeyDown={onTargetKeyDown}
+                    onBlur={() => setEdit(null)}
+                    className={`h-14 w-[90px] shrink-0 p-0 appearance-none text-center bg-black/[0.04] rounded-xl font-semibold text-3xl ${textColor} tracking-tight shadow-inner outline-none focus:ring-2 focus:ring-brand/40`}
+                />
                 <button
-                    onClick={() => onUpdate(idx, { target: player.target + 1 })}
+                    type="button"
+                    onMouseDown={keepTargetFocus}
+                    onClick={() => bumpTarget(1)}
+                    aria-label={`${seatLabel} · ${t("chat.attach.matchInvitePlus")}`}
                     className="flex-1 h-14 rounded-xl bg-black/[0.04] hover:bg-black/[0.08] active:scale-95 transition-all flex items-center justify-center "
                 >
                     <ChevronUp className="w-6 h-6 text-ink-1" />
@@ -185,6 +282,19 @@ const PlayerCard = ({
             )}
         </div>
     );
+};
+
+// 빈 곳을 누르면 키보드를 내린다(값은 건드리지 않는다 — 치는 순간 이미 목표에 들어가 있다).
+// 아이폰 앱의 숫자 패드에는 완료 키가 없고 키보드 위 '완료' 줄도 @capacitor/keyboard 가 지워서 Enter 길이 닿지 않는다.
+// 화살표도 이제 키보드를 닫지 않으므로, 값을 바꾸지 않고 키보드를 내리는 길이 이것이다.
+//  - pointerup 에 건다: 터치로 목록을 밀면 pointercancel 로 끝나 여기 오지 않는다(키보드를 띄운 채 다른 자리로 갈 수 있다).
+//  - onClick 으로 달지 않는다: 영역 전체가 '누를 수 있는 것'이 되어 작은 단추 근처의 탭 보정이 흐려진다.
+//  - 마우스는 건너뛴다: 빈 곳을 누르면 브라우저가 이미 포커스를 풀고, 이름을 끌어서 고르다 칸 밖에서 놓은 것을 닫으면 안 된다.
+//  - 입력 칸·단추를 누른 것은 건너뛴다(그쪽이 제 일을 한다).
+const dismissKeyboardOnEmptyTap = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse") return;
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && !(e.target as Element).closest("input,button")) active.blur();
 };
 
 export const GameCreationModal = ({ open, onOpenChange, member, history, initialMode, initialType, tournamentMatch = null, initialCode, initialGameType, initialSeats, initialTarget }: GameCreationModalProps) => {
@@ -253,7 +363,7 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
                     </div>
                 </div>
 
-                <div className="flex-1 overflow-y-auto min-h-0 scrollbar-hide p-6 pb-32">
+                <div className="flex-1 overflow-y-auto min-h-0 scrollbar-hide p-6 pb-32" onPointerUp={dismissKeyboardOnEmptyTap}>
                     <div className="max-w-md md:max-w-4xl mx-auto transition-all duration-300">
                         <div className="flex flex-col gap-1 mb-6">
                             {/* 대진 경기는 상대가 이미 확정돼 PIN 이 없다. 그대로 두면 핀 카드가
