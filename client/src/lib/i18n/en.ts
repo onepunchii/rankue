@@ -2131,6 +2131,8 @@ const en: Dict = {
   "tournament.champion.me": "That's me",
   "gameScoreboard.finishFailTitle": "Couldn't save the game",
   "gameScoreboard.finishFailDesc": "Check your connection and tap FINISH again.",
+  "gameScoreboard.exitFailTitle": "Couldn't discard the game",
+  "gameScoreboard.exitFailDesc": "Check your connection. You can reopen it with Resume on the home screen and end it again.",
   "dashboard.resumeGame": "You have a game in progress",
   "dashboard.resumeCta": "Resume",
   "gameCreation.pinCreateFail": "Couldn't create a PIN. Please try again.",

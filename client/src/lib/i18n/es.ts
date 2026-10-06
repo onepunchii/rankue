@@ -2131,6 +2131,8 @@ const es: Dict = {
   "tournament.champion.me": "¡Soy yo!",
   "gameScoreboard.finishFailTitle": "No se pudo guardar la partida",
   "gameScoreboard.finishFailDesc": "Revisa tu conexión y toca FINISH otra vez.",
+  "gameScoreboard.exitFailTitle": "No se pudo descartar la partida",
+  "gameScoreboard.exitFailDesc": "Revisa tu conexión. Puedes volver a entrar con «Continuar» en el inicio y finalizarla de nuevo.",
   "dashboard.resumeGame": "Tienes una partida en curso",
   "dashboard.resumeCta": "Continuar",
   "gameCreation.pinCreateFail": "No se pudo crear el PIN. Inténtalo de nuevo.",

@@ -2133,6 +2133,8 @@ export const ko: Dict = {
   "tournament.champion.me": "내가 우승",
   "gameScoreboard.finishFailTitle": "경기 저장 실패",
   "gameScoreboard.finishFailDesc": "네트워크를 확인하고 FINISH를 다시 눌러주세요.",
+  "gameScoreboard.exitFailTitle": "경기를 지우지 못했어요",
+  "gameScoreboard.exitFailDesc": "네트워크를 확인해 주세요. 홈의 '이어서 하기'로 들어가 다시 종료할 수 있어요.",
   "dashboard.resumeGame": "진행 중인 경기가 있어요",
   "dashboard.resumeCta": "이어서 하기",
   "gameCreation.pinCreateFail": "핀 코드를 만들지 못했습니다. 다시 시도해주세요.",

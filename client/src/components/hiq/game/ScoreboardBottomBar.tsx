@@ -6,6 +6,11 @@ import { useT } from "@/lib/i18n";
 interface Props {
     innings: number;
     onExit: () => void;
+    /**
+     * 종료(버리기)나 FINISH 요청이 가는 중 — 종료 단추를 잠그고 흐리게 한다(2026-10-06).
+     * 예전엔 눌러도 화면이 그대로라 '안 눌린다'로 보였다. 문구는 바꾸지 않는다(자리가 흔들리지 않게).
+     */
+    exiting?: boolean;
     canUndo: boolean;
     canRedo: boolean;
     onUndo: () => void;
@@ -22,7 +27,7 @@ interface Props {
     bankDisabled?: boolean;
 }
 
-export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo, onRedo, onBankShot, bankColor, bankDisabled }: Props) {
+export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo, onUndo, onRedo, onBankShot, bankColor, bankDisabled }: Props) {
     const { t } = useT();
     // Timer State moved here to prevent re-rendering of parent
     const [elapsedTime, setElapsedTime] = useState(0);
@@ -99,7 +104,9 @@ export function ScoreboardBottomBar({ innings, onExit, canUndo, canRedo, onUndo,
                 )}
                 <Button
                     onClick={onExit}
-                    className="h-12 px-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-semibold"
+                    disabled={exiting}
+                    aria-busy={exiting || undefined}
+                    className="h-12 px-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-semibold disabled:opacity-40"
                 >
                     {t("scoreboardBottomBar.exit")}
                 </Button>

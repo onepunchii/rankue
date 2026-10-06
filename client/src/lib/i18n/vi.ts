@@ -2131,6 +2131,8 @@ const vi: Dict = {
   "tournament.champion.me": "Chính là tôi",
   "gameScoreboard.finishFailTitle": "Không lưu được trận",
   "gameScoreboard.finishFailDesc": "Kiểm tra kết nối và chạm FINISH lần nữa.",
+  "gameScoreboard.exitFailTitle": "Không bỏ được trận",
+  "gameScoreboard.exitFailDesc": "Hãy kiểm tra kết nối. Bạn có thể vào lại bằng nút 'Tiếp tục' ở trang chủ rồi kết thúc lần nữa.",
   "dashboard.resumeGame": "Bạn có trận đang chơi dở",
   "dashboard.resumeCta": "Tiếp tục",
   "gameCreation.pinCreateFail": "Không tạo được mã PIN. Vui lòng thử lại.",

@@ -9,7 +9,9 @@
  *   if (await appConfirm({ message: "이 글을 내릴까요?", tone: "danger", confirmText: "내리기" })) remove();
  *   void appAlert("링크를 복사했어요");
  * 앱 뿌리(App.tsx)에 <AppDialogHost /> 가 한 번 있어야 한다. 없으면(아주 이른 시점) 기본 창으로 떨어진다 — 묻는 일 자체는 빠지지 않게.
- * 다른 모달(예: 골프 '경기에서 나갈까요?') 위에서도 떠야 해서 z-[1000] 이다.
+ * 다른 모달(예: 골프 '경기에서 나갈까요?') 위에서도 떠야 해서 맨 위 층이다 — z-[10000].
+ * 세로로 든 폰의 점수판 상자(LandscapeGuard, zIndex 9999)보다도 위여야 한다: 1000 이던 때는 확인창이 점수판 **밑에** 깔려
+ * 보이지 않는데 화면은 잠겨(Radix 가 body 를 pointer-events:none 으로), '종료하기가 안 눌린다'로 보였다(2026-10-06 오너 제보).
  */
 import { useEffect, useState } from "react";
 import * as AlertDialogPrimitive from "@radix-ui/react-alert-dialog";
@@ -83,11 +85,11 @@ export function AppDialogHost() {
     return (
         <AlertDialogPrimitive.Root open onOpenChange={(o) => { if (!o) settle(false); }}>
             <AlertDialogPrimitive.Portal>
-                <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[1000] bg-black/55 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+                <AlertDialogPrimitive.Overlay className="fixed inset-0 z-[10000] bg-black/55 data-[state=open]:animate-in data-[state=open]:fade-in-0" />
                 <AlertDialogPrimitive.Content
                     onEscapeKeyDown={() => settle(false)}
                     className={cn(
-                        "fixed left-1/2 top-1/2 z-[1000] w-[calc(100%-40px)] max-w-[340px] -translate-x-1/2 -translate-y-1/2",
+                        "fixed left-1/2 top-1/2 z-[10000] w-[calc(100%-40px)] max-w-[340px] -translate-x-1/2 -translate-y-1/2",
                         "rounded-[22px] bg-surface-1 border border-surface-line shadow-[0_18px_60px_rgba(0,0,0,0.35)] outline-none",
                         "data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
                     )}

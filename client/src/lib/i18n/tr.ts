@@ -2131,6 +2131,8 @@ const tr: Dict = {
   "tournament.champion.me": "Bu benim",
   "gameScoreboard.finishFailTitle": "Oyun kaydedilemedi",
   "gameScoreboard.finishFailDesc": "Bağlantınızı kontrol edip FINISH'e tekrar dokunun.",
+  "gameScoreboard.exitFailTitle": "Oyun silinemedi",
+  "gameScoreboard.exitFailDesc": "Bağlantınızı kontrol edin. Ana sayfadaki 'Devam et' ile girip yeniden bitirebilirsiniz.",
   "dashboard.resumeGame": "Devam eden bir oyununuz var",
   "dashboard.resumeCta": "Devam et",
   "gameCreation.pinCreateFail": "PIN oluşturulamadı. Tekrar deneyin.",

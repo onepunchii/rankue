@@ -859,7 +859,10 @@ describe("화면(AppInstallSheet) — 소스 검사", () => {
         expect(twMerge(contentBase, "z-[70] mx-auto max-w-[448px]").split(/\s+/).filter((c) => /^z-/.test(c))).toEqual(["z-[70]"]);
         // 이 팝업보다 위에 떠야 하는 것들은 여전히 위다 — 토스트 · 앱 안내창. 가입 팝업(z-50)이 올라오면 이 팝업이 물러난다(위 시험)
         expect(client("components/ui/toast.tsx")).toContain("z-[100]");
-        expect(client("components/AppDialog.tsx")).toContain("z-[1000]");
+        // 앱 안내창은 세로 점수판 상자(LandscapeGuard 9999)보다도 위다 — 밑에 깔리면 보이지 않는 창이 화면을 잠근다(2026-10-06)
+        expect(client("components/AppDialog.tsx")).toContain("z-[10000]");
+        expect(client("components/AppDialog.tsx")).not.toContain("z-[1000]");
+        expect(client("components/hiq/LandscapeGuard.tsx")).toContain("zIndex: 9999");
         expect(sheet.match(/\bz-\[\d+\]/g)).toEqual(["z-[70]", "z-[70]"]);
         // Radix Dialog 는 제목 · 설명이 없으면 경고를 낸다
         expect(sheet).toContain("<SheetTitle");

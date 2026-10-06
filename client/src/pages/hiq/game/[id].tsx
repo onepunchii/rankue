@@ -13,8 +13,7 @@ import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortabl
 import { HiqMember } from "@shared/schema";
 import { useT } from "@/lib/i18n";
 import { scoringInnings } from "@shared/averageRule";
-import { Eye } from "@/lib/icons";
-import { appConfirm } from "@/components/AppDialog";
+import { Eye, LucideX } from "@/lib/icons";
 
 /** 선수 번호 → 공 색 이름. 카드와 하단 바(뱅크 버튼)가 같은 표를 본다. */
 const THEMES = ["white", "yellow", "red", "blue"] as const;
@@ -33,13 +32,15 @@ export default function HiqScoreboard() {
         game, isLoading, error, spectating, players, totalPlayers,
         gameState, canUndo, canRedo, undo, redo,
         playerOrder, handleDragEnd, handleCardTap, handleBankShot, handleTurnChange,
-        finishMutation, discardMutation, speak
+        finishGame, discardGame, finishBusy, discardBusy, finishFailure, dismissFinishFailure, speak
     } = useGameScore(id || "");
 
     // 경기 중엔 화면이 꺼지지 않게 — 폰을 테이블에 두고 쓰는 점수판이다.
     useKeepAwake(!!id && game?.status !== "finished");
 
     const [inningModalPlayer, setInningModalPlayer] = useState<number | null>(null);
+    // 종료하기의 확인창 — 점수판 안에 그린다(아래 exitAsking 자리 참고)
+    const [exitAsking, setExitAsking] = useState(false);
 
     // Orientation & Fullscreen Control
     useEffect(() => {
@@ -81,6 +82,13 @@ export default function HiqScoreboard() {
 
     // 관전자는 자기 화면 상태가 아니라 3초마다 새로 받은 서버 행을 그린다
     const view = spectating && game ? gameStateFromRow(game) : gameState;
+
+    // 종료하기(버리기)는 저장 뒤에 줄 서지 않고 바로 나간다(2026-10-06 — 예전엔 매달린 저장 뒤에서 기다려 눌러도 아무 일이 없었다).
+    // 대신 FINISH 와 겹치지 않게 여기서 막는다 — 서버의 버리기는 대진 칸을 먼저 떼고 지우므로 끝나는 중인 경기와 함께 닿으면 안 된다.
+    // 예전에는 같은 줄(scope)이 이 순서를 지켰다. 가는 동안 단추는 흐려져 '눌렸다'는 표시가 난다(ScoreboardBottomBar exiting).
+    // 가는 중인지는 이 화면의 요청이 아니라 이 경기의 요청으로 센다(useGameScore 의 finishBusy · discardBusy) — 뒤로 나갔다가
+    // 홈의 '이어서'로 다시 들어온 화면도 앞 화면이 남긴 FINISH·버리기를 본다. 보내는 순간에도 한 번 더 본다(finishGame · discardGame).
+    const exitBusy = discardBusy || finishBusy;
 
     // 에버리지 분모는 저장 규칙(shared/averageRule)과 같아야 한다 — 화면에선 떨어지는데
     // 전적엔 안 떨어지면(또는 반대면) 유저가 둘 중 뭘 믿어야 할지 알 수 없다.
@@ -156,8 +164,8 @@ export default function HiqScoreboard() {
                                                 // raised) has NO win condition. Without `target > 0`, `0 >= 0`
                                                 // was true and the very first tap ended the match 0-0.
                                                 if (target > 0 && score >= target) {
-                                                    if (finishMutation.isPending) return;
-                                                    finishMutation.mutate({
+                                                    // 두 번 눌림과 버리는 중인 경기는 finishGame 이 막는다(위 exitBusy 참고)
+                                                    finishGame({
                                                         winnerId: (player as HiqMember)?.id || undefined,
                                                         winnerIndex: playerId
                                                     });
@@ -203,7 +211,8 @@ export default function HiqScoreboard() {
                 ) : (
                     <ScoreboardBottomBar
                         innings={view.innings}
-                        onExit={() => { if (discardMutation.isPending) return; void appConfirm({ message: t("gameScoreboard.exitConfirm"), tone: "danger" }).then((ok) => { if (ok) discardMutation.mutate(); }); }}
+                        onExit={() => { if (exitBusy) return; setExitAsking(true); }}
+                        exiting={exitBusy}
                         canUndo={canUndo}
                         canRedo={canRedo}
                         onUndo={() => { undo(); speak(t("gameScoreboard.undo")); }}
@@ -218,6 +227,63 @@ export default function HiqScoreboard() {
                             return target > 0 && score >= target;
                         })()}
                     />
+                )}
+
+                {/* FINISH 실패 알림 — 점수판 안에 그린다(2026-10-06). 세로로 든 폰에서 점수판은 화면 전체를 덮는 맨 위 상자라
+                    (LandscapeGuard — zIndex 9999) 앱 뿌리의 토스트가 그 밑에 깔려, 실패해도 아무 표시가 없었다.
+                    누르면 닫히고 FINISH 를 다시 누르면 사라진다. 점수판을 떠난 뒤의 실패는 훅이 토스트로 알린다. */}
+                {finishFailure !== null && (
+                    <div role="alert" className="absolute top-3 inset-x-0 z-[55] flex justify-center px-4 pointer-events-none">
+                        <button
+                            type="button"
+                            onClick={dismissFinishFailure}
+                            className="pointer-events-auto flex items-start gap-3 max-w-[560px] rounded-2xl bg-[#E5484D] text-[#ffffff] pl-4 pr-3 py-2.5 text-left shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:opacity-90"
+                        >
+                            <span className="min-w-0">
+                                <span className="block text-[14px] font-bold break-keep">{t("gameScoreboard.finishFailTitle")}</span>
+                                <span className="block text-[13px] leading-snug text-white/90 break-keep">{finishFailure}</span>
+                            </span>
+                            <LucideX className="w-4 h-4 mt-0.5 shrink-0 opacity-80" aria-hidden />
+                        </button>
+                    </div>
+                )}
+
+                {/* 종료하기 확인창 — 점수판 안에 그린다(2026-10-06 오너 제보: "종료하기 버튼이 안 눌러진다").
+                    앱 공용 안내창(AppDialog)은 body 에 z-1000 으로 뜨는데, 세로로 든 폰에서 점수판은 화면 전체를 덮는 맨 위 상자다
+                    (LandscapeGuard — fixed · zIndex 9999 · 불투명). 확인창이 그 밑에 깔려 눌러도 화면에 아무 변화가 없었고,
+                    보이지 않는 취소·확인 단추만 화면 가운데에서 탭을 받았다. 상자 안에 그리면 늘 점수판 위에 뜨고 점수판과 같은 방향으로 돈다.
+                    바깥을 눌러도 닫히지 않는다(지우는 일이라 공용 안내창과 같다). */}
+                {exitAsking && !spectating && (
+                    <div
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-describedby="scoreboard-exit-ask"
+                        onKeyDown={(e) => { if (e.key === "Escape") setExitAsking(false); }}
+                        className="absolute inset-0 z-[60] flex items-center justify-center bg-black/55 px-5"
+                    >
+                        <div className="w-full max-w-[340px] rounded-[22px] bg-surface-1 border border-surface-line shadow-[0_18px_60px_rgba(0,0,0,0.35)]">
+                            <p id="scoreboard-exit-ask" className="px-5 pt-6 pb-4 text-center text-[15px] leading-[1.55] font-medium text-ink-1 break-keep">
+                                {t("gameScoreboard.exitConfirm")}
+                            </p>
+                            <div className="px-4 pb-4 flex gap-2">
+                                <button
+                                    type="button"
+                                    autoFocus
+                                    onClick={() => setExitAsking(false)}
+                                    className="flex-1 h-12 rounded-2xl bg-surface-3 text-[15px] font-semibold text-ink-1 active:opacity-80"
+                                >
+                                    {t("common.cancel")}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setExitAsking(false); discardGame(); }}
+                                    className="flex-1 h-12 rounded-2xl bg-[#E5484D] text-[#ffffff] text-[15px] font-bold active:opacity-85"
+                                >
+                                    {t("common.ok")}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 )}
             </div>
         </LandscapeGuard>

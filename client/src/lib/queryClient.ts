@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
+import { neverPersistMutations } from "@shared/gameMutationQueue";
 
 // 1. 커스텀 에러 라이브러리 (타입 안전성)
 export class ApiError extends Error {
@@ -36,6 +37,8 @@ export async function apiRequest(
     body?: unknown;
     headers?: Record<string, string>;
     signal?: AbortSignal;
+    /** 이 시간 안에 답이 없으면 놓는다. 안 주면 60초(기본) — 점수판의 저장·종료만 짧게 쓴다(2026-10-06). */
+    timeoutMs?: number;
   }
 ): Promise<any> {
   const method = options?.method || "GET";
@@ -62,7 +65,7 @@ export async function apiRequest(
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 60000);
+  const timeoutId = setTimeout(() => controller.abort(), options?.timeoutMs ?? 60000);
 
   // React Query의 중단(signal) 연동
   if (options?.signal) {
@@ -263,11 +266,15 @@ if (typeof window !== "undefined") {
     // v2.5: 알림 목록 응답이 배열 → { items, nextBefore } 로 바뀌었다(2026-09-23). 옛 캐시가 남으면 첫 렌더에 '더 보기'가 없다.
     // v2.6: 진행 중(pending)·실패한 요청까지 저장하고 있었다 — 진행 중 요청의 promise 가 JSON 으로 '{}' 가 되어 다음 실행에
     //   복원하다 "t.then is not a function" 으로 터졌다(오류 수집 30일 65건, 2026-10-01). 이제 성공한 것만 저장하고 옛 캐시는 버린다.
-    buster: "RANKUE_CACHE_v2.6",
+    // v2.7: 멈춘 요청(오프라인이거나 같은 줄에서 기다리던 뮤테이션)까지 저장하고 있었다 — 다음 실행에 보낼 함수도 없이 되살아나
+    //   그 경기의 줄(scope) 맨 앞을 막아, 점수 저장도 종료하기도 나가지 않았다(오너 제보 2026-10-06). 요청은 저장하지 않고 옛 캐시는 버린다.
+    buster: "RANKUE_CACHE_v2.7",
     // 진행 중 경기 행은 절대 영속화하지 않는다. 7일짜리 localStorage 스냅샷이
     // 앱 재실행 때 점수판에 먼저 하이드레이션되고, 점수판은 그 낡은 점수를 서버에
     // 다시 PATCH 해서 실제 진행 상황을 되돌렸다(예: 8이닝 친 경기가 0:0 으로).
     dehydrateOptions: {
+      // 요청(뮤테이션)은 남기지 않는다 — 기본값은 '멈춘 것만 저장'이고, 되살아난 요청은 보낼 함수가 없어 줄만 막는다(shared/gameMutationQueue).
+      shouldDehydrateMutation: neverPersistMutations,
       shouldDehydrateQuery: (query) => {
         if (query.state.status !== "success") return false;
         const key = String(query.queryKey[0] ?? "");
