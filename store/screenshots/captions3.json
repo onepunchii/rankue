@@ -1,0 +1,26 @@
+{
+  "_": "스토어 스크린샷 1.3(2026-10-07) — 한국어. 애플 10장(1320×2868), 구글 8장(1080×2160, play:true 인 것만). 앞 세 장은 당구(검색 결과에 보이는 자리). 문구에 '1위·무료·최고'·RP 같은 말은 쓰지 않는다.",
+  "slides": [
+    { "n": 1, "raw": "01-scoreboard", "theme": "billiards", "landscape": true, "play": true,
+      "title": "손안의 당구 점수판", "sub": "누르면 기록 — 이닝·에버리지·하이런 자동",
+      "inset": { "raw": "04-history", "crop": [60, 520, 1200, 1226] } },
+    { "n": 2, "raw": "02-home", "theme": "billiards", "play": true,
+      "title": "나와 닮은 프로는 누구?", "sub": "전적·핸디·에버리지가 홈에서 한눈에" },
+    { "n": 3, "raw": "03-online-match", "theme": "billiards", "play": true,
+      "title": "폰 속 당구대에서 한 판", "sub": "3쿠션·4구 — 혼자 연습, 친구와 온라인 대전" },
+    { "n": 4, "raw": "04-history", "theme": "billiards", "play": true,
+      "title": "끝나면 전적은 자동 정리", "sub": "승률·에버리지·하이런 성장 그래프" },
+    { "n": 5, "raw": "05-crew", "theme": "billiards", "play": true,
+      "title": "우리 크루 모임을 한곳에", "sub": "정모·투표·사진첩·크루 채팅" },
+    { "n": 6, "raw": "06-golf-home", "theme": "golf", "play": true,
+      "title": "골프도 랭큐 하나로", "sub": "조인·부킹 · 라운드 기록 · 전국 골프장" },
+    { "n": 7, "raw": "07-join-booking", "theme": "golf", "play": false,
+      "title": "조인·부킹 빈자리 찾기", "sub": "날짜·지역별 티타임을 한 번에" },
+    { "n": 8, "raw": "08-courses", "theme": "golf", "play": true,
+      "title": "전국 골프장을 지도로", "sub": "지역을 눌러 골프장 찾기" },
+    { "n": 9, "raw": "09-scorecard", "theme": "golf", "play": true,
+      "title": "라운드 스코어를 간편하게", "sub": "동반자와 함께 적는 홀별 스코어" },
+    { "n": 10, "raw": "10-passport", "theme": "golf", "play": false,
+      "title": "다녀온 골프장이 지도에", "sub": "발자국 지도와 도장으로 남는 라운드" }
+  ]
+}
