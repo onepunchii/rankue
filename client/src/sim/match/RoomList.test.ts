@@ -33,6 +33,16 @@ vi.mock("@/components/ui/dialog", async () => {
     };
 });
 
+// 신고 창은 "@" 별칭 뒤의 화면이다 — 여기서는 무엇을 넘겨받았는지만 본다(차단됨 단추 = onBlocked)
+vi.mock("@/components/hiq/community/ReportDialog", async () => {
+    const React = await import("react");
+    return {
+        ReportDialog: (p: Record<string, unknown>) => React.createElement("div", {
+            "data-testid": "report", "data-type": p.targetType, "data-id": p.targetId, "data-author": p.targetAuthorId, "data-name": p.targetAuthorName, "data-path": p.reportPath,
+        }, React.createElement("button", { type: "button", "data-testid": "report-blocked", onClick: p.onBlocked as never }, "차단됨")),
+    };
+});
+
 import type { MatchApi, MatchPublic } from "../matchApi";
 
 type ReactMod = typeof import("react");
@@ -113,6 +123,41 @@ function type(input: HTMLInputElement, value: string) {
     const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, "value")!.set!;
     React.act(() => { setter.call(input, value); input.dispatchEvent(new window.Event("input", { bubbles: true })); });
 }
+
+describe("RoomList · 방제(2026-10-06)", () => {
+    it("방제가 있으면 방의 얼굴로 뜨고 방장 이름은 그대로 보인다 · 없으면 방제 줄이 없다 · 참가 창에도 방제", async () => {
+        const rows = [room({ id: "r1", hostName: "가람", title: "초보 환영" }), room({ id: "r2", hostName: "나루" })];
+        const h = mount({ rows });
+        await settle(h, () => text(h).includes("가람"));
+        const titles = Array.from(h.container.querySelectorAll("[data-testid=room-title]")).map((e) => e.textContent);
+        expect(titles).toEqual(["초보 환영"]);
+        expect(text(h)).toContain("가람");
+        expect(text(h)).toContain("나루");
+        click(buttons(h).find((b) => b.getAttribute("aria-label") === `${ko["sim.rooms.join"]} · 가람`)!);
+        expect(h.container.querySelector("[role=dialog]")!.textContent).toContain("“초보 환영”");
+    });
+
+    it("⋯ → 신고·차단: 신고는 방 id 로(서버가 방장을 찾고 방제를 남긴다), 차단 대상은 방장 · 방장 id 가 없는 줄에는 ⋯ 가 없다 · 차단하면 목록을 다시 받는다", async () => {
+        const HOST = "00000000-0000-4000-8000-0000000000aa";
+        const rows = [room({ id: "r1", hostName: "가람", title: "초보 환영", hostId: HOST }), room({ id: "r2", hostName: "나루" })];
+        const h = mount({ rows });
+        await settle(h, () => text(h).includes("가람"));
+        const label = (name: string) => ko["chat.report.of"].replace("{name}", name);
+        expect(buttons(h).some((b) => b.getAttribute("aria-label") === label("나루"))).toBe(false);
+        expect(h.container.querySelector("[data-testid=report]")).toBeNull();
+        click(buttons(h).find((b) => b.getAttribute("aria-label") === label("가람"))!);
+        const dlg = h.container.querySelector("[data-testid=report]")!;
+        expect(dlg.getAttribute("data-type")).toBe("member");
+        expect(dlg.getAttribute("data-id")).toBe(HOST);
+        expect(dlg.getAttribute("data-author")).toBe(HOST);
+        expect(dlg.getAttribute("data-name")).toBe("가람");
+        expect(dlg.getAttribute("data-path")).toBe("/api/hiq/sim/matches/r1/report");
+        const before = (h.api.listRooms as ReturnType<typeof vi.fn>).mock.calls.length;
+        click(h.container.querySelector("[data-testid=report-blocked]")!);
+        expect(h.container.querySelector("[data-testid=report]")).toBeNull();
+        await settle(h, () => (h.api.listRooms as ReturnType<typeof vi.fn>).mock.calls.length > before);
+    });
+});
 
 describe("RoomList", () => {
     it("행: 방장·종목·다마수·칩(리얼리티·비밀번호)·만든 지 n분 → 참가 다이얼로그(내 핸디가 기본) → joinRoom → onOpen", async () => {

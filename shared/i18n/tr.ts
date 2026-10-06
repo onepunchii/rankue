@@ -210,6 +210,8 @@ export const tr: Record<string, string> = {
   "err.sim.chatTooLong": "Mesaj en fazla {n} karakter olabilir",
   "err.sim.chatEmpty": "Lütfen bir mesaj yaz",
   "err.sim.chatFiltered": "Bu mesaj gönderilemez",
+  "err.sim.titleTooLong": "Oda başlığı en fazla {n} karakter olabilir",
+  "err.sim.titleFiltered": "Bu oda başlığı kullanılamaz",
   "err.sim.chatYourTurn": "Rakibinin sırasında yazabilirsin",
   "err.sim.chatCooldown": "Tekrar göndermeden önce biraz bekle",
   "err.sim.chatLimit": "Bu maçtaki mesaj hakkını doldurdun",

@@ -47,7 +47,10 @@ export function MyRoomRow({ room, onEnter, api = defaultApi, className }: {
     return (
         <div className={cn("px-4 py-2.5 flex items-center gap-2", className)}>
             <span className="flex-1 min-w-0">
-                <span className="block text-[13.5px] font-bold text-ink-1 truncate">{t("sim.rooms.mineOpen")}</span>
+                <span className="block text-[13.5px] font-bold text-ink-1 truncate">
+                    {t("sim.rooms.mineOpen")}
+                    {room.title ? <span className="font-semibold text-ink-2"> · {room.title}</span> : null}
+                </span>
                 <span className="block text-[12px] font-medium text-ink-3 truncate mt-0.5">
                     {gameLabel(room, t)}
                     {room.handicap === true

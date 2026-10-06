@@ -4,7 +4,7 @@
  * 시뮬 대전 성적(Elo)은 hiqSimMatchRatings.rating 에만 쓴다(2026-09-12 부터 대대·중대 통합).
  */
 import { db } from "../db.js";
-import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchChats, hiqSimMatchRatings, hiqMembers, profiles } from "../../shared/schema.js";
+import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchChats, hiqSimMatchRatings, hiqMembers, hiqBlocks, profiles } from "../../shared/schema.js";
 import { alias } from "drizzle-orm/pg-core";
 import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot, HiqSimMatchChat } from "../../shared/schema.js";
@@ -167,6 +167,8 @@ export class SimMatchRepository {
         const rows = await q.where(and(
             eq(hiqSimMatches.isPublic, true), eq(hiqSimMatches.status, "waiting"),
             sql`${hiqSimMatches.hostId} <> ${viewerId}`, gte(hiqSimMatches.createdAt, new Date(sinceMs)),
+            // 차단 관계(어느 쪽이 했든)인 방장의 방은 뺀다(2026-10-06 방제와 같이) — 방제·방장 이름이 누구에게나 보이는 글이라 차단이 여기에도 닿아야 한다
+            sql`NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE (${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = ${hiqSimMatches.hostId}) OR (${hiqBlocks.blockerId} = ${hiqSimMatches.hostId} AND ${hiqBlocks.blockedId} = ${viewerId}))`,
         )).orderBy(desc(hiqSimMatches.createdAt)).limit(limit);
         return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null }));
     }

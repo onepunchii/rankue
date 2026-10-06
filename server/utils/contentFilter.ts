@@ -70,6 +70,16 @@ const LISTING_PERSON_NAEGI = /(새|풋|신출|동갑|보통|여간|서울|시골
 // 한 번 부정했다고 글 전체가 풀리지도 않는다 — 지우는 것은 부정이 붙은 그 '내기'뿐이라 "내기X라더니 5만원 내기"는 그대로 걸린다.
 const LISTING_NEGATED_NAEGI = /내기\s*(?:골프|라운드|라운딩)?\s*(?:는|은|가|이|도)?\s*(?:아니|아닙|안\s*[하해합함]|않|사절|금지|없|x|×|ㄴㄴ)(?!으?면|나|냐)/gi;
 
+// 방제("room")에서만 더 보는 내기 표현 — 위 주석(FilterOptions)의 이유. 부정·사람 '-내기'·평범한 동사를 지운 글에 댄다.
+const ROOM_GAMBLING_PATTERNS: RegExp[] = [
+    /내기/,
+    /판돈|돈\s*(걸|내고\s*치)|현금\s*빵/,
+    /\b(bet|bets|betting|wager|wagers|gamble|gambling)\b/i,
+    /\b(apuesta|apuestas|apostar|apostamos|apuesto)\b/i,
+    /cá\s*cược|cá\s*độ|ăn\s*tiền/i,
+    /\b(bahis|bahisli|kumar)\b/i,
+];
+
 const ABUSE_WORDS = [
     "씨발", "시발", "병신", "지랄", "좆", "새끼야", "개새끼", "니미", "느금",
 ];
@@ -91,7 +101,11 @@ export interface FilterOptions {
     // "listing" — 골프 조인·부킹 글의 자유 입력 칸(2026-10-06). 이 글은 **티타임을 팔고 양도하는 글**이라
     // 커뮤니티에서 막는 말(팝니다·급처·네고 가능, 입금 부탁, "스크린 2게임 3만원")이 본문 그 자체다.
     // 그래서 거래·정산·금액×게임 규칙은 건너뛰고, 내기(내기·빵·점당·타당)와 욕설만 막는다.
-    context?: "community" | "crew" | "listing";
+    // "room" — 멀티방 방제(2026-10-06). 같이 칠 사람을 부르는 한 줄이라 '내기'라는 말 자체가 곧 내기 권유다
+    // ("내기 한 판"·"내기방"·"내기 3쿠션" — 공통 규칙은 띄어쓰기 하나로 빠져나간다). 그래서 남은 '내기'는 전부 막고,
+    // 다른 언어의 내기 낱말(bet·apuesta·cá cược·bahis)도 본다. 나머지(금액×게임·거래·욕설)는 커뮤니티와 같다.
+    // 안 한다는 말("내기 없음·내기X"), 사람을 가리키는 '-내기'(새내기 환영), 평범한 동사(끝내기)는 통과한다.
+    context?: "community" | "crew" | "listing" | "room";
 }
 
 export function checkContent(text: string, opts: FilterOptions = {}): FilterResult {
@@ -99,6 +113,7 @@ export function checkContent(text: string, opts: FilterOptions = {}): FilterResu
     if (!t) return { blocked: false };
     const isCrew = opts.context === "crew";
     const isListing = opts.context === "listing";
+    const isRoom = opts.context === "room";
     const gamblingReason = "금전 내기 관련 표현은 게시할 수 없습니다. 랭큐 커뮤니티는 금전 내기를 금지합니다.";
 
     // 금액×게임어 근접 규칙 — 레슨비 안내 같은 정상 사용례는 면제. 매물 글은 가격을 적는 글이라 통째로 건너뛴다.
@@ -111,7 +126,7 @@ export function checkContent(text: string, opts: FilterOptions = {}): FilterResu
     }
     // 내기 패턴은 '끝내기·보내기' 같은 평범한 동사의 '내기'를 지운 문자열로 본다 — "끝내기 가능?" 오탐 방지
     // 매물 글은 사람을 가리키는 '-내기'와 부정이 붙은 '내기'("내기 없음·내기X")도 지우고 본다.
-    const g = isListing
+    const g = isListing || isRoom
         ? neutralizeEverydayNaegi(t).replace(LISTING_PERSON_NAEGI, "$1__").replace(LISTING_NEGATED_NAEGI, "__")
         : neutralizeEverydayNaegi(t);
     for (const re of GAMBLING_PATTERNS) {
@@ -121,6 +136,13 @@ export function checkContent(text: string, opts: FilterOptions = {}): FilterResu
     }
     if (isListing) {
         for (const re of LISTING_GAMBLING_PATTERNS) {
+            if (re.test(g)) {
+                return { blocked: true, reason: gamblingReason };
+            }
+        }
+    }
+    if (isRoom) {
+        for (const re of ROOM_GAMBLING_PATTERNS) {
             if (re.test(g)) {
                 return { blocked: true, reason: gamblingReason };
             }

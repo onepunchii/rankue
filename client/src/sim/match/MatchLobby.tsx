@@ -27,7 +27,8 @@ import { gameLabel, inningCapLabel, joinErrorKey, rulesLabel, inviteLink, shareL
 import { ChevronRightIcon, MinusIcon, PlusIcon } from "../components/railIcons";
 import { ModeInfoDialog } from "../components/ModeInfoDialog";
 import { InviteDialog } from "./InviteDialog";
-import { isValidRoomPassword } from "../matchApi";
+import { isValidRoomPassword, isRoomTitleRejected } from "../matchApi";
+import { ROOM_TITLE_MAX, ROOM_TITLE_PRESETS, clampRoomTitle, roomTitleLength } from "@shared/sim/roomTitle";
 
 export type LobbyTab = "create" | "join";
 
@@ -178,6 +179,8 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
     // 멀티방(공개 방, 2026-09-08 오너): 목록에 떠서 누구나 참가. 비밀번호(선택 4~20자)는 공개 방에서만 받는다.
     const [isPublic, setIsPublic] = useState(initialPublic);
     const [password, setPassword] = useState("");
+    // 방제(2026-10-06 오너): 방 목록에 뜨는 한 줄. 선택 입력 20자, 멀티방에서만 받는다.
+    const [title, setTitle] = useState("");
     const [inviteOpen, setInviteOpen] = useState(false);
     const [creating, setCreating] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -231,11 +234,13 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
             const m = await api.createMatch(buildConfig({
                 gameType, tableId, target: targetNum, inningCap, mode, matchPreview: "short",
                 rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: false },
-            }), { isPublic, handicap, password: isPublic && password !== "" ? password : undefined });
+            }), { isPublic, handicap, password: isPublic && password !== "" ? password : undefined, title: isPublic && title.trim() !== "" ? title : undefined });
             setCreated(m);
             onCreated?.(m);
-        } catch {
-            setError(t("sim.match.createFailed"));
+        } catch (e) {
+            // 방제가 걸렸으면(금칙어·길이) 서버가 이유를 말해 준다 — 그 말을 그대로 보여 준다
+            const why = isRoomTitleRejected(e) && e instanceof Error ? e.message : "";
+            setError(why || t("sim.match.createFailed"));
         } finally {
             setCreating(false);
         }
@@ -325,6 +330,9 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                     <p className="text-[13px] font-semibold text-ink-3">{t("sim.match.codeTitle")}</p>
                     <p className="rk-num text-[40px] leading-none font-bold text-ink-1" aria-label={t("sim.match.codeTitle")}>{formatCode(created.code)}</p>
                     <p className="text-[12px] font-medium text-ink-4 leading-relaxed">{created.isPublic ? t("sim.match.publicWaiting") : t("sim.match.codeHint")}</p>
+                    {created.isPublic && created.title && (
+                        <p className="text-[15px] font-bold text-ink-1 break-words" data-testid="lobby-title">“{created.title}”</p>
+                    )}
                     {created.isPublic && (
                         <p className="flex justify-center gap-1.5">
                             <span className="rk-chip bg-surface-3 text-ink-2">{t("sim.entry.rooms")}</span>
@@ -445,6 +453,33 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
             {/* 멀티방으로 열기(공개 방) + 비밀번호(선택) */}
             <div className="space-y-2">
                 <ToggleRow id="sim-match-public" checked={isPublic} onCheckedChange={setIsPublic} title={t("sim.match.publicRoom")} desc={t("sim.match.publicRoomDesc")} />
+                {isPublic && (
+                    <div className="space-y-1.5">
+                        <div className="flex items-baseline justify-between gap-2">
+                            <Label htmlFor="sim-match-title">{t("sim.match.titleLabel")}</Label>
+                            <span className="rk-num text-[12px] font-medium text-ink-4" aria-hidden>{roomTitleLength(title)}/{ROOM_TITLE_MAX}</span>
+                        </div>
+                        <Input
+                            id="sim-match-title" type="text" autoComplete="off" enterKeyHint="done" value={title}
+                            onChange={(e) => setTitle(clampRoomTitle(e.target.value))} placeholder={t("sim.match.titlePlaceholder")}
+                            className="h-12 rounded-xl"
+                        />
+                        {/* 자주 쓰는 문구 — 누르면 지금 화면 언어의 글이 입력칸에 들어간다(고쳐 써도 된다) */}
+                        <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("sim.match.titlePresets")}>
+                            {ROOM_TITLE_PRESETS.map((p) => {
+                                const text = t(`sim.match.titlePreset.${p}`);
+                                const on = title === text;
+                                return (
+                                    <button
+                                        key={p} type="button" onClick={() => setTitle(on ? "" : clampRoomTitle(text))} aria-pressed={on}
+                                        className={cn("h-10 px-3 rounded-pill border text-[12.5px] font-semibold", on ? "border-brand bg-brand/10 text-brand" : "border-surface-line bg-surface-1 text-ink-2 active:bg-surface-3")}
+                                    >{text}</button>
+                                );
+                            })}
+                        </div>
+                        <p className="text-[12px] font-medium text-ink-4">{t("sim.match.titleHint")}</p>
+                    </div>
+                )}
                 {isPublic && (
                     <div className="space-y-1.5">
                         <Label htmlFor="sim-match-password">{t("sim.match.passwordLabel")}</Label>

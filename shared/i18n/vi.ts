@@ -210,6 +210,8 @@ export const vi: Record<string, string> = {
   "err.sim.chatTooLong": "Tin nhắn tối đa {n} ký tự",
   "err.sim.chatEmpty": "Vui lòng nhập nội dung",
   "err.sim.chatFiltered": "Không thể gửi tin nhắn này",
+  "err.sim.titleTooLong": "Tên phòng tối đa {n} ký tự",
+  "err.sim.titleFiltered": "Không thể dùng tên phòng này",
   "err.sim.chatYourTurn": "Bạn có thể nhắn khi đến lượt đối thủ",
   "err.sim.chatCooldown": "Vui lòng đợi một lát rồi gửi lại",
   "err.sim.chatLimit": "Bạn đã dùng hết số tin nhắn trong trận này",

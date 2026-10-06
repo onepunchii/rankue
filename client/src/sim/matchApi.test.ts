@@ -18,7 +18,7 @@ import {
     parseMatch, parseMatchList, parseMatchShot, parseMatchShots, parsePostShotResponse, parseResignResponse, parseClaimResponse,
     matchErrorCode, classifyMatchError,
     isMyTurn, playerNames, myName, opponentName, claimableNow, matchResult, myTarget, matchConfig,
-    createMatchApi, matchApi,
+    createMatchApi, matchApi, isRoomTitleRejected,
 } from "./matchApi";
 
 const balls = openingLayout("3c", TABLES.DAEDAE, "white");
@@ -66,6 +66,33 @@ describe("요청 매핑", () => {
             aimAssist: true, fullPreview: false, isPublic: false, handicap: true,
         });
         expect(Object.keys(body)).toHaveLength(12);
+    });
+    it("toCreateMatchBody: 방제는 멀티방에만, 정리해서 20자 안일 때만 싣는다(2026-10-06)", () => {
+        const config = buildConfig({ gameType: "3c", target: 20 });
+        expect(toCreateMatchBody(config, { isPublic: true, title: "  초보\n환영  " }).title).toBe("초보 환영");
+        expect("title" in toCreateMatchBody(config, { isPublic: true, title: "   " })).toBe(false);
+        expect("title" in toCreateMatchBody(config, { isPublic: true })).toBe(false);
+        // 비공개 방은 방제를 보내지 않는다
+        expect("title" in toCreateMatchBody(config, { isPublic: false, title: "초보 환영" })).toBe(false);
+        // 넘친 글은 싣지 않는다(입력칸이 이미 자른다 — 서버는 거부한다)
+        expect("title" in toCreateMatchBody(config, { isPublic: true, title: "가".repeat(21) })).toBe(false);
+        expect(toCreateMatchBody(config, { isPublic: true, title: "가".repeat(20) }).title).toBe("가".repeat(20));
+    });
+    it("parseMatch: 방제·방장 id 는 있을 때만(옛 응답·빈 글은 없음으로) · 방제 거절 판정", () => {
+        expect(parseMatch(rawMatch).title).toBeNull();
+        expect(parseMatch(rawMatch).hostId).toBeUndefined();
+        expect(parseMatch({ ...rawMatch, title: "초보 환영", hostId: "h-1" })).toMatchObject({ title: "초보 환영", hostId: "h-1" });
+        expect(parseMatch({ ...rawMatch, title: "", hostId: "" })).toMatchObject({ title: null, hostId: undefined });
+        expect(parseMatch({ ...rawMatch, title: 3, hostId: 7 })).toMatchObject({ title: null, hostId: undefined });
+        // 방장 접속 여부(2026-10-06): 타입에만 있고 읽지 않아 목록이 늘 '자리 비움'이었다
+        expect(parseMatch(rawMatch).hostOnline).toBeUndefined();
+        expect(parseMatch({ ...rawMatch, hostOnline: true }).hostOnline).toBe(true);
+        expect(parseMatch({ ...rawMatch, hostOnline: false }).hostOnline).toBe(false);
+        expect(isRoomTitleRejected({ data: { code: "TITLE_FILTERED" } })).toBe(true);
+        expect(isRoomTitleRejected({ data: { code: "TITLE_TOO_LONG" } })).toBe(true);
+        expect(isRoomTitleRejected({ data: { code: "BAD_PASSWORD" } })).toBe(false);
+        expect(isRoomTitleRejected(new Error("x"))).toBe(false);
+        expect(isRoomTitleRejected(null)).toBe(false);
     });
     it("toJoinBody: 유효한 정수 다마수만 싣고 아니면 빈 본문(서버가 호스트 다마수를 쓴다)", () => {
         expect(toJoinBody(15)).toEqual({ target: 15 });

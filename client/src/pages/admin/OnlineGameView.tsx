@@ -46,6 +46,8 @@ interface Overview {
     recentMatches: {
         id: string; status: string; gameType: string; tableId: string; isPublic: boolean; hasPassword: boolean; invited: boolean; reality: boolean;
         endReason: string | null; shots: number; mismatches: number; hostName: string; guestName: string | null; winnerName: string | null;
+        /** 방제(멀티방, 선택) — 운영자가 신고 들어온 방제를 여기서 대조한다 */
+        title?: string | null;
         createdAt: string; startedAt: string | null; lastShotAt: string | null;
     }[];
 }
@@ -489,6 +491,7 @@ export default function OnlineGameView({ onOpenMember }: { onOpenMember?: (membe
                                     <Pill tone={st.tone}>{st.label}</Pill>
                                     <span className="font-semibold truncate">{r.hostName} <span className="text-black/35 font-normal">vs</span> {r.guestName ?? "–"}</span>
                                     {r.winnerName && <span className="shrink-0 text-[11.5px] text-brand font-bold">🏆 {r.winnerName}</span>}
+                                    {r.title && <span className="min-w-0 truncate text-[12px] text-black/60">“{r.title}”</span>}
                                 </span>
                                 <span className="text-[12px] text-black/50 tabular-nums">
                                     {gameName(r.gameType, r.tableId)}

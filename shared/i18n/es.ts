@@ -210,6 +210,8 @@ export const es: Record<string, string> = {
   "err.sim.chatTooLong": "El mensaje debe tener máximo {n} caracteres",
   "err.sim.chatEmpty": "Escribe un mensaje",
   "err.sim.chatFiltered": "Este mensaje no se puede enviar",
+  "err.sim.titleTooLong": "El título de la sala admite hasta {n} caracteres",
+  "err.sim.titleFiltered": "Este título de sala no se puede usar",
   "err.sim.chatYourTurn": "Puedes escribir durante el turno de tu rival",
   "err.sim.chatCooldown": "Espera un momento antes de enviar otro",
   "err.sim.chatLimit": "Ya usaste todos tus mensajes en este match",

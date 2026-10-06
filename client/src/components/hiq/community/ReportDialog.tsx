@@ -25,6 +25,8 @@ interface ReportDialogProps {
     // 크루 콘텐츠(crew_*)는 크루 신고 API 로 보낸다 — 서버가 대상이 이 크루 것인지 확인한다
     crewId?: string;
     onBlocked?: () => void; // 차단 직후 상세 시트·다이얼로그를 닫을 때
+    // 신고를 받을 주소를 따로 둔 표면(멀티방 — 서버가 방에서 방장을 찾고 그때의 방제를 증거로 남긴다). 넘기면 여기로 사유만 보낸다
+    reportPath?: string;
 }
 
 const REASONS = ["abuse", "gambling", "trade", "privacy", "spam", "other"] as const;
@@ -81,7 +83,7 @@ export const blockConfirmText = (t: (k: string) => string, targetType: ReportTar
     t(usesReviewQueue(targetType) || targetType === "golf_photo" ? "community.blockConfirmCrew" : "community.blockConfirm")
         .replace("{name}", name || t("community.thisUser"));
 
-export const ReportDialog = ({ open, onOpenChange, targetType, targetId, targetAuthorId, targetAuthorName, crewId, onBlocked }: ReportDialogProps) => {
+export const ReportDialog = ({ open, onOpenChange, targetType, targetId, targetAuthorId, targetAuthorName, crewId, onBlocked, reportPath }: ReportDialogProps) => {
     const { t } = useT();
     const { toast } = useToast();
     const queryClient = useQueryClient();
@@ -89,6 +91,7 @@ export const ReportDialog = ({ open, onOpenChange, targetType, targetId, targetA
 
     const reportMutation = useMutation({
         mutationFn: async () => {
+            if (reportPath) return apiRequest(reportPath, { method: "POST", body: { reason } });
             if (isCrewTarget(targetType) && !crewId) throw new Error(t("community.error"));
             return apiRequest(isCrewTarget(targetType) ? `/api/hiq/crews/${crewId}/reports` : "/api/hiq/community/reports", {
                 method: "POST",

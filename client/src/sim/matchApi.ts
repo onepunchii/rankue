@@ -10,6 +10,7 @@
  * 실전 경기 API(/api/hiq/game/*)는 절대 부르지 않는다 — 시뮬 대전 성적은 hiqSimRatings 에만 쓰이고 RP 와 분리돼 있다.
  */
 import { CHAT_FROM_WATCHER } from "@shared/sim/chat";
+import { checkRoomTitle } from "@shared/sim/roomTitle";
 import type { BallState, ShotInput, SimEvent, Snapshot } from "@shared/sim/types";
 import type { CushionModelId, TableSpec } from "@shared/sim/params";
 import type { FinishType, GameType, Rules, SessionState, ShotOutcome } from "@shared/sim/rules";
@@ -123,6 +124,10 @@ export interface MatchPublic {
     readonly isPublic?: boolean;
     /** 비밀번호 방 — 참가할 때 password 가 필요하다. */
     readonly hasPassword?: boolean;
+    /** 방제(멀티방, 선택 — shared/sim/roomTitle). 없으면 null. 옛 응답엔 칸이 없다. */
+    readonly title?: string | null;
+    /** 방장 회원 id — **방 목록(GET /sim/rooms)에만** 온다. 신고·차단이 대상을 알아야 해서다. */
+    readonly hostId?: string;
     /** 방장이 지금 화면을 보고 있나(방 목록) */
     readonly hostOnline?: boolean;
     /** 핸디전 방(2026-09-12): 참가하는 순간 서버가 두 사람의 온라인 에버리지로 각자 목표를 정한다. 옛 응답엔 없다. */
@@ -330,12 +335,16 @@ export interface CreateMatchBody {
     readonly handicap: boolean;
     /** 방 비밀번호(4~20자). 없으면 보내지 않는다. */
     readonly password?: string;
+    /** 방제(멀티방, 20자). 없으면 보내지 않는다. */
+    readonly title?: string;
 }
 
 /** 방 옵션(로비의 "멀티방으로 열기" 토글·비밀번호). 설정(SimSetupConfig)과 별개다. */
 export interface RoomOptions {
     readonly isPublic?: boolean;
     readonly password?: string;
+    /** 방제(선택). 멀티방일 때만 보낸다. */
+    readonly title?: string;
     /** 핸디전(기본 true). 끄면 방장이 적은 다마수로 둘 다 친다(맞대결). */
     readonly handicap?: boolean;
 }
@@ -381,6 +390,9 @@ export interface OpponentLite {
 /** 설정의 알려진 필드만 옮긴다(여분 필드는 새지 않는다). 방 옵션은 따로. */
 export function toCreateMatchBody(config: SimSetupConfig, room?: RoomOptions): CreateMatchBody {
     const password = room?.isPublic && room.password && isValidRoomPassword(room.password) && room.password !== "" ? room.password : undefined;
+    // 방제는 멀티방에만, 정리해서 20자 안일 때만 싣는다(입력칸이 이미 자른다 — 넘친 글은 서버가 거부하니 싣지 않는다)
+    const titled = room?.isPublic ? checkRoomTitle(room.title) : null;
+    const title = titled && titled.ok ? titled.title : null;
     return {
         gameType: config.gameType,
         tableId: config.tableId,
@@ -395,6 +407,7 @@ export function toCreateMatchBody(config: SimSetupConfig, room?: RoomOptions): C
         isPublic: room?.isPublic === true,
         handicap: room?.handicap !== false,
         ...(password ? { password } : {}),
+        ...(title ? { title } : {}),
     };
 }
 
@@ -497,6 +510,11 @@ export function parseMatch(raw: unknown): MatchPublic {
         fullPreview: typeof raw.fullPreview === "boolean" ? raw.fullPreview : undefined,
         isPublic: typeof raw.isPublic === "boolean" ? raw.isPublic : undefined,
         hasPassword: typeof raw.hasPassword === "boolean" ? raw.hasPassword : undefined,
+        // 방장 접속 여부(방 목록) — 2026-10-06 까지 이 줄이 없어 서버가 준 값을 버렸다: 목록은 늘 '방장 자리 비움'이었고
+        // 빠른 대전(pickQuickRoom)은 들어갈 방을 한 번도 찾지 못했다. 화면 시험은 parseMatch 를 거치지 않아 놓쳤다.
+        hostOnline: typeof raw.hostOnline === "boolean" ? raw.hostOnline : undefined,
+        title: typeof raw.title === "string" && raw.title !== "" ? raw.title : null,
+        hostId: typeof raw.hostId === "string" && raw.hostId !== "" ? raw.hostId : undefined,
         handicap: typeof raw.handicap === "boolean" ? raw.handicap : undefined,
         rules: raw.rules as unknown as Rules,
         finishType: raw.finishType === "3c" || raw.finishType === "bank" ? raw.finishType : "none",
@@ -619,6 +637,16 @@ export function parseClaimResponse(raw: unknown): ClaimResponse {
 
 /** 서버 sendError 의 code. 409 응답에 실린다. */
 export type MatchErrorCode = "NOT_YOUR_TURN" | "IDX_MISMATCH" | "RECORD_CONFLICT" | "TOO_EARLY" | "BAD_PASSWORD";
+
+/**
+ * 방 만들기가 방제 때문에 거절됐나(금칙어 TITLE_FILTERED · 길이 TITLE_TOO_LONG).
+ * 그때는 서버가 이유를 말해 준다 — 화면은 그 말(err.message)을 그대로 보여 준다.
+ */
+export function isRoomTitleRejected(err: unknown): boolean {
+    if (!isRecord(err)) return false;
+    const data = isRecord(err.data) ? err.data : null;
+    return !!data && (data.code === "TITLE_FILTERED" || data.code === "TITLE_TOO_LONG");
+}
 
 export function matchErrorCode(err: unknown): MatchErrorCode | null {
     if (!isRecord(err)) return null;

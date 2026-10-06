@@ -31,6 +31,8 @@ vi.mock("@/hooks/useAuth", () => ({ useAuth: () => ({ member: nav.member, isLoad
 vi.mock("wouter", () => ({ useLocation: () => ["/online-game", nav.navigate], useSearch: () => nav.search }));
 // 길 찾기 비회원 무료 횟수·가입 안내(2026-09-27) — 이 테스트는 회원이라 쓰이지 않는다
 vi.mock("@/components/hiq/LoginGate", () => ({ goLogin: () => undefined }));
+// 멀티방 목록의 신고 창(2026-10-06) — "@" 별칭 뒤의 화면이라 여기서는 비워 둔다
+vi.mock("@/components/hiq/community/ReportDialog", () => ({ ReportDialog: () => null }));
 vi.mock("@/lib/promo", () => ({ bumpGuestPath: () => 2, guestPathRemaining: () => 3, promoEvent: () => undefined, rememberPromoSrc: () => undefined }));
 vi.mock("@/lib/icons", async () => {
     const React = await import("react");

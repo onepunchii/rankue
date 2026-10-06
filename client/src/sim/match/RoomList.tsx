@@ -16,6 +16,7 @@ import { roomSetKey, shouldRefreshWatch, WATCH_LIST_REFETCH_MS, WATCH_QUERY_KEY 
 import { isValidTarget } from "../setupPresets";
 import { TargetPicker } from "./MatchLobby";
 import { MyRoomRow, useMyOpenRoom } from "./MyRoomRow";
+import { ReportDialog } from "@/components/hiq/community/ReportDialog";
 
 export const ROOMS_QUERY_KEY = ["sim-rooms"] as const;
 export const ROOMS_REFETCH_MS = 10_000;
@@ -66,18 +67,30 @@ export function defaultJoinTarget(m: Pick<MatchPublic, "gameType" | "hostTarget"
 
 const pill = "h-10 px-3.5 inline-flex items-center rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3 shrink-0";
 
-const Row = memo(function Row({ m, age, onJoin }: { m: MatchPublic; age: string; onJoin: (m: MatchPublic) => void }) {
+/** ⋯ — sim 화면은 아이콘 묶음을 따로 쓰지 않아 여기 한 개만 그린다 */
+function DotsIcon() {
+    return (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+            <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+        </svg>
+    );
+}
+
+const Row = memo(function Row({ m, age, onJoin, onReport }: { m: MatchPublic; age: string; onJoin: (m: MatchPublic) => void; onReport?: (m: MatchPublic) => void }) {
     const { t } = useT();
     return (
         <li className="rounded-tile border border-surface-line bg-surface-1 px-4 py-3 flex items-center gap-3">
             <span className="flex-1 min-w-0 flex flex-col gap-1">
+                {/* 방제(2026-10-06): 있으면 방의 얼굴이고 방장 이름은 한 단계 작게, 없으면 예전처럼 방장 이름이 얼굴 */}
+                {m.title && <span className="text-[14.5px] font-bold text-ink-1 leading-snug line-clamp-2 break-words" data-testid="room-title">{m.title}</span>}
                 <span className="flex items-center gap-2 min-w-0">
-                    <span className="text-[14px] font-semibold text-ink-1 truncate">{m.hostName}</span>
+                    {/* 이름이 먼저 자리를 갖는다(줄의 절반까지) — 예전엔 긴 '자리 비움' 문구가 이름을 0 폭으로 밀어냈다. 줄어드는 쪽은 문구다 */}
+                    <span className={cn("truncate shrink-0 max-w-[50%]", m.title ? "text-[12.5px] font-semibold text-ink-2" : "text-[14px] font-semibold text-ink-1")} data-testid="room-host">{m.hostName}</span>
                     <span className="text-[11px] font-medium text-ink-3 shrink-0">{age}</span>
                     {/* 방장 접속(2026-09-26): 초록 점 = 들어가면 바로 친다. 없으면 방장이 알림을 받고 와야 시작 */}
                     {m.hostOnline
-                        ? <span className="shrink-0 inline-flex items-center gap-1 text-[11px] font-semibold text-brand"><span className="w-1.5 h-1.5 rounded-full bg-brand" />{t("sim.rooms.hostOnline")}</span>
-                        : <span className="shrink-0 text-[11px] font-medium text-ink-4">{t("sim.rooms.hostAway")}</span>}
+                        ? <span className="min-w-0 inline-flex items-center gap-1 text-[11px] font-semibold text-brand"><span className="w-1.5 h-1.5 shrink-0 rounded-full bg-brand" /><span className="truncate">{t("sim.rooms.hostOnline")}</span></span>
+                        : <span className="min-w-0 truncate text-[11px] font-medium text-ink-4">{t("sim.rooms.hostAway")}</span>}
                 </span>
                 <span className="text-[12px] font-medium text-ink-3 truncate">
                     {gameLabel(m, t)}
@@ -90,6 +103,14 @@ const Row = memo(function Row({ m, age, onJoin }: { m: MatchPublic; age: string;
                     </span>
                 )}
             </span>
+            {/* 신고·차단 — 방제와 방장 이름은 누구에게나 보이는 글이다. 방장 id 가 온 줄(목록)에서만 그린다 */}
+            {onReport && m.hostId && (
+                <button
+                    type="button" onClick={() => onReport(m)} aria-haspopup="dialog"
+                    aria-label={t("chat.report.of").replace("{name}", m.hostName)}
+                    className="h-10 w-9 -mx-1.5 shrink-0 inline-flex items-center justify-center rounded-full text-ink-4 active:bg-surface-3"
+                ><DotsIcon /></button>
+            )}
             <button type="button" onClick={() => onJoin(m)} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black" aria-label={`${t("sim.rooms.join")} · ${m.hostName}`}>
                 {t("sim.rooms.join")}
             </button>
@@ -172,6 +193,7 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
                 </DialogHeader>
                 {room && (
                     <div className="space-y-4" data-testid="room-join">
+                        {room.title && <p className="text-[15px] font-bold text-ink-1 break-words">“{room.title}”</p>}
                         <div className="rounded-tile border border-surface-line bg-surface-2 px-4 py-3 space-y-1">
                             <div className="flex items-baseline justify-between gap-2">
                                 <span className="text-[12px] font-medium text-ink-4">{t("sim.setup.rules")}</span>
@@ -229,6 +251,8 @@ export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api 
     // 게임 중인 공개 방 — 참가 목록에서는 빠지지만 관전으로 들어갈 수 있어 같은 목록에 이어 붙인다.
     const watch = useQuery({ queryKey: WATCH_QUERY_KEY, queryFn: () => api.getWatchable(), refetchInterval: WATCH_LIST_REFETCH_MS, enabled: !!onWatch });
     const [target, setTarget] = useState<MatchPublic | null>(null);
+    // 신고·차단할 방(⋯). 신고는 방 id 로 보낸다 — 서버가 방장을 찾고 그때의 방제를 증거로 남긴다.
+    const [reported, setReported] = useState<MatchPublic | null>(null);
     const { room: mine } = useMyOpenRoom(api, !!onEnterMine);
     const qc = useQueryClient();
     const nowMs = now();
@@ -318,12 +342,21 @@ export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api 
                         className={cn("arc-board rounded-[26px] -mt-4 pt-7 px-3 pb-3 space-y-2", q.isFetching && !q.isPending && "opacity-80")}
                         aria-label={t("sim.rooms.title")}
                     >
-                        {rows.map((m) => <Row key={m.id} m={m} age={roomAge(m.createdAt, nowMs, t)} onJoin={setTarget} />)}
+                        {rows.map((m) => <Row key={m.id} m={m} age={roomAge(m.createdAt, nowMs, t)} onJoin={setTarget} onReport={setReported} />)}
                         {onWatch && live.map((c) => <LiveRow key={c.id} c={c} onWatch={onWatch} />)}
                     </ul>
                 </div>
             )}
             <JoinDialog room={target} api={api} myHandi={myHandi} onClose={() => setTarget(null)} onOpen={(m) => { setTarget(null); onOpen(m); }} />
+            {reported?.hostId && (
+                <ReportDialog
+                    open onOpenChange={(o) => { if (!o) setReported(null); }}
+                    targetType="member" targetId={reported.hostId} targetAuthorId={reported.hostId} targetAuthorName={reported.hostName}
+                    reportPath={`/api/hiq/sim/matches/${reported.id}/report`}
+                    // 차단하면 서버가 그 방장의 방을 목록에서 뺀다 — 바로 다시 받는다
+                    onBlocked={() => { setReported(null); void qc.invalidateQueries({ queryKey: ROOMS_QUERY_KEY }); }}
+                />
+            )}
         </div>
     );
 }

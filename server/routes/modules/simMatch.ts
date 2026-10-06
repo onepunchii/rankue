@@ -29,6 +29,7 @@ import {
     chatLength, isChatCode, normalizeChatText,
 } from "../../../shared/sim/chat.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
+import { ROOM_TITLE_MAX, checkRoomTitle } from "../../../shared/sim/roomTitle.js";
 import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCHES, TARGET_INNINGS, targetFor } from "../../../shared/sim/handicap.js";
 import { countWatchers } from "../../../shared/sim/watchers.js";
 import { LOOKALIKE_MIN_MATCHES, nearestPros, nextPro, proTier, type LookalikeResponse } from "../../../shared/proCompare.js";
@@ -78,7 +79,28 @@ export const createSchema = z.object({
     isPublic: z.boolean().default(false),
     /** 방 비밀번호(선택, 4~20자). 있으면 참가할 때 맞아야 한다. */
     password: z.string().min(4).max(20).optional(),
+    /**
+     * 방제(선택, 멀티방만). 여기 상한은 원문 방어값일 뿐 — 길이(20자)·금칙어·연락처는 라우트가 정리한 뒤에 본다(roomTitleFor).
+     * createHostMatch 는 이 칸을 **읽지 않는다**: 검사를 거친 글만 셋째 인자로 받는다(채팅 카드가 만드는 방에는 방제가 없다).
+     */
+    title: z.string().max(200).optional(),
 });
+
+/**
+ * 방제 검사(2026-10-06). 멀티방이 아니면 받지 않는다(null). 정리한 뒤 비면 null, 20자를 넘으면 거부,
+ * 누구에게나 보이는 한 줄이라 금칙어(내기·욕설 — contentFilter 의 "room" 맥락: '내기'라는 말은 부정이 아니면 전부)를 막고 연락처를 가린다.
+ */
+export function roomTitleFor(b: { isPublic: boolean; title?: string }): { ok: true; title: string | null } | { ok: false; error: string | I18nText; code: string } {
+    if (!b.isPublic) return { ok: true, title: null };
+    const c = checkRoomTitle(b.title);
+    if (!c.ok) return { ok: false, error: msg("err.sim.titleTooLong", { n: ROOM_TITLE_MAX }), code: "TITLE_TOO_LONG" };
+    if (c.title === null) return { ok: true, title: null };
+    const check = checkContent(c.title, { context: "room" });
+    if (check.blocked) return { ok: false, error: check.reason ?? "err.sim.titleFiltered", code: "TITLE_FILTERED" };
+    // 가린 뒤에 다시 정리한다 — 가림 글자가 길이를 늘려도 20자를 넘기지 않게 자른다(가려진 글이라 잘려도 잃는 뜻이 없다)
+    const masked = checkRoomTitle([...maskContacts(c.title)].slice(0, ROOM_TITLE_MAX).join(""));
+    return { ok: true, title: masked.ok ? masked.title : null };
+}
 const joinSchema = z.object({ target: z.number().int().min(1).max(999).optional(), password: z.string().max(40).optional() });
 const inviteSchema = z.object({ memberId: z.string().uuid() });
 
@@ -207,6 +229,8 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         id: m.id, code: m.code, status: m.status,
         gameType: m.gameType, tableId: m.tableId, cushionModel: m.cushionModel, condition: m.condition, aimAssist: m.aimAssist, fullPreview: m.fullPreview,
         isPublic: m.isPublic, hasPassword: !!m.passwordHash, handicap: m.handicap,
+        /** 방제(선택). 멀티방 목록·대기 화면에 뜬다. 없으면 null — 화면은 방장 이름을 앞세운다. */
+        title: m.title ?? null,
         /** 방장이 지금 대기·대전 화면을 보고 있나(PRESENCE_MS 안) — 방 목록의 "접속 중" 점, 먼저 보여 줄 방 */
         hostOnline: isRecentlySeen(m.hostSeenAt),
         rules: m.rules, finishType: m.finishType, inningCap: m.inningCap,
@@ -343,7 +367,7 @@ async function notifyUrl(memberId: string | null | undefined, title: string | I1
  * (chatCards.ts 의 SIM_INVITE)가 같은 규칙으로 방을 만들도록 여기 하나로 둔다. 공개 방 방송은 라우트 몫.
  * rules 가 종목과 안 맞으면 null(라우트는 400).
  */
-export async function createHostMatch(hostId: string, b: z.infer<typeof createSchema>): Promise<{ full: MatchWithNames; closed: number } | null> {
+export async function createHostMatch(hostId: string, b: z.infer<typeof createSchema>, title: string | null = null): Promise<{ full: MatchWithNames; closed: number } | null> {
     const rules: Rules = b.rules ?? (b.gameType === "3c" ? DEFAULT_3C_RULES : DEFAULT_4C_RULES);
     if (rules.gameType !== b.gameType) return null;
     const params = paramsFor({ tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition });
@@ -351,6 +375,8 @@ export async function createHostMatch(hostId: string, b: z.infer<typeof createSc
         hostId, gameType: b.gameType, tableId: b.tableId, cushionModel: b.cushionModel, condition: b.condition,
         aimAssist: b.aimAssist, fullPreview: b.fullPreview, handicap: b.handicap, rules, finishType: b.finishType, hostTarget: b.target, inningCap: b.inningCap,
         isPublic: b.isPublic, passwordHash: b.password ? hashRoomPassword(b.password) : null,
+        // 방제는 검사를 거친 글(roomTitleFor)만 — 본문의 title 칸은 여기서 읽지 않는다
+        title: b.isPublic ? title : null,
         engineVersion: ENGINE_VERSION, paramsHash: paramsHash(params),
     });
     // 방은 한 번에 하나 — 새로 만들면 내가 열어 둔 다른 대기 방은 접는다(2026-09-08 오너: "중복방 제거").
@@ -368,7 +394,9 @@ router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, r
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, "err.sim.badInput");
     const b = parsed.data;
-    const made = await createHostMatch(req.userId!, b);
+    const titled = roomTitleFor(b);
+    if (!titled.ok) return sendError(res, 400, titled.error, titled.code);
+    const made = await createHostMatch(req.userId!, b, titled.title);
     if (!made) return sendError(res, 400, "err.sim.rulesMismatch");
     const { full, closed } = made;
     // 멀티방(공개)이면 알림을 받을 수 있는 회원에게 방이 열렸다고 알린다. 응답을 기다리게 하지 않는다.
@@ -590,9 +618,36 @@ router.post("/sim/matches/code/:code/join", requireAuth, asyncHandler(async (req
 router.get("/sim/rooms", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const rows = await storage.simMatch.listPublicWaiting(req.userId!, Date.now() - ROOM_LIST_WINDOW_MS);
     // 방장이 보고 있는 방을 먼저 — 들어가면 바로 친다. 자리 비운 방장은 알림을 받고 돌아와야 시작된다.
-    const out = rows.map((m) => ({ ...publicMatch(m, req.userId!), code: "" }));
+    // 방장 id 는 목록에서만 준다 — 신고·차단(방제와 방장 이름은 누구에게나 보이는 글이다)이 대상을 알아야 한다
+    const out = rows.map((m) => ({ ...publicMatch(m, req.userId!), code: "", hostId: m.hostId }));
     out.sort((a, b) => Number(b.hostOnline) - Number(a.hostOnline));
     return sendSuccess(res, out);
+}));
+
+/**
+ * POST /sim/matches/:id/report — 멀티방 신고(2026-10-06 방제와 같이). 화면은 방 id 로 신고한다:
+ * 서버가 방장을 찾아 회원 신고(운영자 검토 큐)로 넣고, **그때의 방제를 상세에 남긴다** — 방이 닫히거나 방제가 바뀌어도 증거가 남는다.
+ * 볼 수 있었던 방만(멀티방이거나 내가 들어간 방) 신고한다 — 남의 비공개 방을 id 로 찔러 신고하지 못하게.
+ */
+const ROOM_REPORT_REASONS = ["abuse", "gambling", "trade", "privacy", "spam", "other"];
+const ROOM_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+router.post("/sim/matches/:id/report", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const reason = (req.body ?? {}).reason;
+    if (!ROOM_REPORT_REASONS.includes(reason)) return sendError(res, 400, "err.community.reportReasonRequired");
+    if (!ROOM_ID_RE.test(String(req.params.id))) return sendError(res, 404, "err.sim.roomNotFound");
+    const m = await storage.simMatch.get(req.params.id);
+    if (!m || !(m.isPublic || m.guestId === req.userId)) return sendError(res, 404, "err.sim.roomNotFound");
+    if (m.hostId === req.userId) return sendError(res, 400, "err.community.cannotReportSelf");
+    await storage.community.report({
+        targetType: "member", targetId: m.hostId, reporterId: req.userId!, reason,
+        detail: (m.title ? `[멀티방 방제] ${m.title}` : "[멀티방] 방제 없음").slice(0, 500),
+    });
+    // 운영자 알림 — 실패해도 접수는 된 것이다. 서버리스라 기다린다(community.ts 의 신고 접수와 같다).
+    try {
+        const { notifyAdminsOfReport } = await import("../../services/moderation.js");
+        await notifyAdminsOfReport({ targetType: "member", targetId: m.hostId, reason, reporterId: req.userId! });
+    } catch (e) { console.error("[Notify] 멀티방 신고 운영자 알림:", e); }
+    return sendSuccess(res, { reported: true });
 }));
 
 // GET /sim/watch — 관전 목록. live = 지금 치고 있는 공개 대전, replays = 최근에 끝난 공개 대전(다시보기).

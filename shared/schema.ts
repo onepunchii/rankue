@@ -2143,6 +2143,8 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   handicap: boolean("handicap").default(true).notNull(),
   /** 방 비밀번호(선택) "salt:sha256(salt+pw)". 있으면 참가(코드·목록 모두)에 password 가 맞아야 한다. */
   passwordHash: text("password_hash"),
+  /** 방제(선택, 20자 — shared/sim/roomTitle). 멀티방 목록의 한 줄. 서버가 금칙어를 막고 연락처를 가린 글만 들어온다. */
+  title: text("title"),
   /** 호스트가 마지막으로 푸시 초대한 회원(친구에게 보내기). */
   invitedId: uuid("invited_id").references(() => hiqMembers.id),
   rules: jsonb("rules").notNull(),

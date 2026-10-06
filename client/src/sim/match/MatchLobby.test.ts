@@ -368,6 +368,46 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
         expect(h.container.textContent).toContain(ko["sim.match.inviteSent"].replace("{name}", "홍길동"));
     });
 
+    it("방제(2026-10-06): 멀티방에서만 받는다 · 20자에서 자른다 · 문구 칩 → 입력칸(다시 누르면 비운다) · createMatch 방 옵션 · 대기 화면에 방제", async () => {
+        const api = fakeApi({ createMatch: vi.fn(async () => match({ isPublic: true, title: "초보 환영" })) });
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000 }));
+        expect(h.container.querySelector("#sim-match-title")).toBeNull();
+        click(h.container.querySelector("#sim-match-public")!);
+        const input = () => h.container.querySelector("#sim-match-title") as HTMLInputElement;
+        expect(input()).not.toBeNull();
+        type(input(), "가".repeat(25));
+        expect(input().value).toBe("가".repeat(20));
+        expect(h.container.textContent).toContain("20/20");
+        const chip = () => byText(h, ko["sim.match.titlePreset.beginner"])!;
+        click(chip());
+        expect(input().value).toBe("초보 환영");
+        expect(chip().getAttribute("aria-pressed")).toBe("true");
+        click(chip());
+        expect(input().value).toBe("");
+        click(chip());
+        click(byText(h, ko["sim.match.create"])!);
+        await flush();
+        expect((api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual({ isPublic: true, handicap: true, password: undefined, title: "초보 환영" });
+        expect(h.container.querySelector("[data-testid=lobby-title]")!.textContent).toBe("“초보 환영”");
+    });
+
+    it("방제가 금칙어·길이에 걸리면 서버가 말한 이유를 그대로 보여 준다 — 다른 실패는 기본 문구", async () => {
+        const rejected = Object.assign(new Error("부적절한 표현이 포함되어 있습니다."), { status: 400, data: { code: "TITLE_FILTERED" } });
+        const api = fakeApi({ createMatch: vi.fn(async () => { throw rejected; }) });
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000, initialPublic: true }));
+        type(h.container.querySelector("#sim-match-title") as HTMLInputElement, "아무 말");
+        click(byText(h, ko["sim.match.create"])!);
+        await flush();
+        expect(h.container.textContent).toContain("부적절한 표현이 포함되어 있습니다.");
+        expect(h.container.textContent).not.toContain(ko["sim.match.createFailed"]);
+        const api2 = fakeApi({ createMatch: vi.fn(async () => { throw Object.assign(new Error("서버 오류"), { status: 500, data: {} }); }) });
+        const h2 = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api: api2, pollMs: 1000 }));
+        click(byText(h2, ko["sim.match.create"])!);
+        await flush();
+        expect(h2.container.textContent).toContain(ko["sim.match.createFailed"]);
+        expect(h2.container.textContent).not.toContain("서버 오류");
+    });
+
     it("멀티방 토글 없이 만들면 방 옵션은 비공개·비밀번호 없음, initialPublic 은 켜진 채 시작", async () => {
         const api = fakeApi();
         const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000 }));

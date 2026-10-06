@@ -78,10 +78,12 @@ function RoomRow({ m, onJoin }: { m: MatchPublic; onJoin: () => void }) {
         >
             <span className="flex-1 min-w-0">
                 <span className="flex items-center gap-2 min-w-0">
-                    <span className="text-[14px] font-semibold text-ink-1 truncate">{m.hostName}</span>
+                    {/* 방제가 있으면 방제가 얼굴, 방장 이름은 아랫줄로 */}
+                    <span className="text-[14px] font-semibold text-ink-1 truncate">{m.title || m.hostName}</span>
                     <span className="text-[11px] font-medium text-black/40 shrink-0">{roomAge(m.createdAt, Date.now(), t)}</span>
                 </span>
                 <span className="block text-[12px] font-medium text-black/50 truncate mt-0.5">
+                    {m.title ? <>{m.hostName} · </> : null}
                     {gameLabel(m, t)}
                     {m.handicap === true
                         ? <> · <span className="text-brand font-bold">{t("sim.match.handicapRoom")}</span></>

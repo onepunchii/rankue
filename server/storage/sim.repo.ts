@@ -308,7 +308,7 @@ export class SimRepository {
 
         const recentMatches = await rows(sql`
             select m.id, m.status, m.game_type, m.table_id, m.is_public, (m.password_hash is not null) as has_password,
-                   (m.invited_id is not null) as invited, m.aim_assist, m.end_reason, m.shots, m.mismatches,
+                   (m.invited_id is not null) as invited, m.aim_assist, m.end_reason, m.shots, m.mismatches, m.title,
                    ${ISO(sql`m.created_at`)} as created_at, ${ISO(sql`m.started_at`)} as started_at, ${ISO(sql`m.last_shot_at`)} as last_shot_at,
                    h.name as host_name, g.name as guest_name, w.name as winner_name
             from hiq_sim_matches m
@@ -366,7 +366,7 @@ export class SimRepository {
             recentMatches: recentMatches.map((r) => ({
                 id: String(r.id), status: String(r.status), gameType: String(r.game_type), tableId: String(r.table_id),
                 isPublic: r.is_public === true, hasPassword: r.has_password === true, invited: r.invited === true, reality: r.aim_assist === false,
-                endReason: str(r.end_reason), shots: n(r.shots), mismatches: n(r.mismatches),
+                endReason: str(r.end_reason), shots: n(r.shots), mismatches: n(r.mismatches), title: str(r.title),
                 hostName: String(r.host_name ?? ""), guestName: str(r.guest_name), winnerName: str(r.winner_name),
                 createdAt: String(r.created_at ?? ""), startedAt: str(r.started_at), lastShotAt: str(r.last_shot_at),
             })),

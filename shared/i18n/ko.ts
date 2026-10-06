@@ -210,6 +210,8 @@ export const ko: Record<string, string> = {
   "err.sim.chatTooLong": "{n}자 이내로 보낼 수 있어요",
   "err.sim.chatEmpty": "내용을 입력해주세요",
   "err.sim.chatFiltered": "이 말은 보낼 수 없어요",
+  "err.sim.titleTooLong": "방제는 {n}자까지 쓸 수 있어요",
+  "err.sim.titleFiltered": "이 방제는 쓸 수 없어요",
   "err.sim.chatYourTurn": "상대 차례에 쓸 수 있어요",
   "err.sim.chatCooldown": "잠시 뒤에 보낼 수 있어요",
   "err.sim.chatLimit": "이 대전에서 보낼 수 있는 횟수를 다 썼어요",
