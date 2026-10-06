@@ -136,7 +136,7 @@ describe("로그인 직후 '나'를 새로 받는다", () => {
         // (주석 줄은 빼고 본다 — 설명에는 refreshAfterLogin 이라는 낱말이 나온다)
         const sheet = src("components/hiq/LoginSheet.tsx").split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n");
         expect(sheet).not.toMatch(/\bfetch\(|apiRequest\(|refreshAfterLogin/);
-        expect(sheet).toContain("<SocialLogin hint={false} kakao={!storeEntry} tone={tone} redirect={back} onDone={done} />");
+        expect(sheet).toContain("<SocialLogin hint={false} kakao={!storeEntry} tone={tone} redirect={back} onDone={done} secondaryRow={kakaoShown ? secondaryRow : undefined} />");
     });
 
     // 2026-10-06 검토: 다른 탭에서 로그인한 뒤 먼저 열어 둔 탭으로 돌아오면 화면은 '나 = 없음'을 5분 동안 쥐고 있다. 예전에는 '로그인'을

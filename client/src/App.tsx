@@ -12,6 +12,7 @@ import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { goLoginPage } from "@/components/hiq/LoginGate";
 import { LoginSheetHost } from "@/components/hiq/LoginSheet";
+import { AttachPhoneSheetHost } from "@/components/hiq/AttachPhoneSheet";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
 import { NativePrompts } from "@/components/hiq/NativePrompts";
 import { LiveMatchBanner } from "@/sim/match/LiveMatchBanner";
@@ -474,6 +475,8 @@ function App() {
               <AppRoutes />
               {/* 가입·로그인 팝업(2026-10-06) — goLogin·가입 안내(guard)가 여기로 띄운다. 약관 동의(useTermsGate)를 쓰므로 이 Provider 안쪽이어야 한다 */}
               <LoginSheetHost />
+              {/* 전화번호 계정 잇기(2026-10-07) — 소셜로 새 계정이 만들어진 직후 "전에 전화번호로 쓰셨나요?"를 한 번 묻는다. 설정에서도 연다 */}
+              <AttachPhoneSheetHost />
             </TermsConsentProvider>
             <Toaster />
             {/* 앱 안내창 — 흰 시스템 confirm/alert 대신(2026-10-01). appConfirm·appAlert 가 여기로 띄운다 */}

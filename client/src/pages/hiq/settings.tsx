@@ -20,6 +20,8 @@ import {
     kakaoLoginAvailable, kakaoLoginOpen, kakaoNativeAvailable, kakaoNativeLink, kakaoNativeToken, useKakaoStart,
     type KakaoNativeToken,
 } from "@/lib/kakaoLogin";
+import GoogleLinkPanel, { googleLinkAvailable } from "@/components/hiq/GoogleLinkPanel";
+import { openAttachPhoneSheet } from "@/components/hiq/AttachPhoneSheet";
 
 // 설정 — 전체메뉴 톱니바퀴 진입. 1순위: 계정 연결 상태 + 언어. (형 결정: 2026-07)
 export default function HiqSettings() {
@@ -196,8 +198,15 @@ export default function HiqSettings() {
     // 네이티브 카카오 플러그인이 든 새 앱(1.3~)에서는 이 줄에 '연결' 단추가 있다 — 안내는 플러그인이 없는 앱(1.2 이하)에만 남긴다(2026-10-06).
     const kakaoLinkOnWebHint = kakaoLoginOpen() && isNativeApp() && !kakaoNative && locale === "ko" && !!member?.profileId && conn.pin === true && !!conn.phone && !conn.kakao;
 
-    const connections: { key: string; label: string; linked: boolean; onLink?: () => void; onUnlink?: () => void }[] = [
-        { key: "phone", label: t("settings.connPhone"), linked: !!conn.phone },
+    // 구글 연결·해제(2026-10-07 통합 로그인) — 카카오와 같은 조건: PIN 이 있는 계정에서만(본인 확인). 칸은 Google 줄 아래에 열린다(GoogleLinkPanel)
+    const [googlePanel, setGooglePanel] = useState<"link" | "unlink" | null>(null);
+    const canLinkGoogle = googleLinkAvailable() && !!member?.profileId && conn.pin === true && !conn.google;
+    const canUnlinkGoogle = !!conn.google && conn.pin === true && !!conn.phone;
+    // 소셜로 가입한 계정(전화번호 없음 · PIN 없음) — 전에 쓰던 전화번호 계정이 있으면 여기서 그 계정에 잇는다(AttachPhoneSheet)
+    const canAttachPhone = conn.phone === false && conn.pin !== true;
+
+    const connections: { key: string; label: string; linked: boolean; onLink?: () => void; onUnlink?: () => void; linkLabel?: string; unlinkOpen?: boolean }[] = [
+        { key: "phone", label: t("settings.connPhone"), linked: !!conn.phone, onLink: canAttachPhone ? openAttachPhoneSheet : undefined, linkLabel: t("settings.attachPhone") },
         // 카카오 줄은 한국어 화면이거나 이미 연결한 회원에게만 보인다 — 다른 언어 화면은 예전 그대로다
         // 카카오가 닫혀 있는 동안(새 앱 빌드 승인 전, 2026-10-06)에는 줄 자체를 그리지 않는다 — 이미 연결된 회원만 예외
         ...((locale === "ko" && kakaoLoginOpen()) || conn.kakao ? [{
@@ -205,8 +214,14 @@ export default function HiqSettings() {
             // 앱 안(플러그인 있음)은 화면을 떠나지 않는 네이티브 길, 웹은 카카오에 다녀오는 길(mode=link)
             onLink: canLinkKakao ? (kakaoNative ? () => { void startNativeLink(); } : () => startKakao({ mode: "link", redirect: "/settings" })) : undefined,
             onUnlink: canUnlinkKakao ? () => { setUnlinkPin(""); setUnlinkOpen((open) => !open); } : undefined,
+            unlinkOpen,
         }] : []),
-        { key: "google", label: "Google", linked: !!conn.google },
+        {
+            key: "google", label: "Google", linked: !!conn.google,
+            onLink: canLinkGoogle ? () => setGooglePanel((p) => (p === "link" ? null : "link")) : undefined,
+            onUnlink: canUnlinkGoogle ? () => setGooglePanel((p) => (p === "unlink" ? null : "unlink")) : undefined,
+            unlinkOpen: googlePanel === "unlink",
+        },
         { key: "apple", label: "Apple", linked: !!conn.apple },
     ];
 
@@ -397,7 +412,7 @@ export default function HiqSettings() {
                                                 <button
                                                     type="button"
                                                     onClick={c.onUnlink}
-                                                    aria-expanded={unlinkOpen}
+                                                    aria-expanded={!!c.unlinkOpen}
                                                     aria-label={`${c.label} ${t("settings.disconnect")}`}
                                                     className="text-[12px] font-medium text-black/45 underline underline-offset-4 active:opacity-70"
                                                 >
@@ -410,10 +425,10 @@ export default function HiqSettings() {
                                             type="button"
                                             onClick={c.onLink}
                                             disabled={kakaoLinking || nativeLinkBusy || !!nativeLink}
-                                            aria-label={`${c.label} ${t("settings.connect")}`}
+                                            aria-label={c.linkLabel ?? `${c.label} ${t("settings.connect")}`}
                                             className="h-8 px-3.5 rounded-full bg-brand/[0.1] text-[12.5px] font-bold text-brand disabled:opacity-50 active:scale-[0.97] transition-transform"
                                         >
-                                            {t("settings.connect")}
+                                            {c.linkLabel ?? t("settings.connect")}
                                         </button>
                                     ) : (
                                         <span className="text-[12px] font-medium text-black/30">{t("settings.notLinked")}</span>
@@ -460,7 +475,7 @@ export default function HiqSettings() {
                                     </form>
                                 )}
                                 {/* 해제 — 로그인 PIN 으로 본인 확인을 한 번 더 받는다(브라우저 기본 창을 쓰지 않고 줄 아래에서 바로) */}
-                                {c.onUnlink && unlinkOpen && (
+                                {c.key === "kakao" && c.onUnlink && unlinkOpen && (
                                     <form
                                         onSubmit={(e) => { e.preventDefault(); void unlinkKakao(); }}
                                         className="mt-2 px-1"
@@ -488,6 +503,10 @@ export default function HiqSettings() {
                                             </button>
                                         </div>
                                     </form>
+                                )}
+                                {/* 구글 연결·해제 — PIN 으로 본인 확인을 받고, 연결은 구글 계정을 고른다 */}
+                                {c.key === "google" && googlePanel && (
+                                    <GoogleLinkPanel key={googlePanel} mode={googlePanel} onClose={() => setGooglePanel(null)} />
                                 )}
                             </div>
                         ))}

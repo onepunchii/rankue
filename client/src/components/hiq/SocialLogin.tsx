@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
@@ -9,6 +9,7 @@ import { apiRequest, queryClient, refreshAfterLogin } from "@/lib/queryClient";
 import { kakaoLoginAvailable, kakaoNativeLogin, kakaoServerMessage, useKakaoStart } from "@/lib/kakaoLogin";
 import { isTermsAccepted } from "@shared/terms";
 import { safeReturnPath } from "@shared/promoFunnel";
+import { offerAttachPhone } from "@/components/hiq/AttachPhoneSheet";
 
 // 소셜 로그인(구글·애플) — 글로벌(비한국어) 유저의 기본 진입.
 // 웹:          구글 GIS + 애플 SIWA JS(Services ID) → id_token → 서버(/api/hiq/social) JWKS 재검증.
@@ -21,6 +22,10 @@ import { safeReturnPath } from "@shared/promoFunnel";
 //       화면을 떠나지 않으므로 약관 동의·'나' 새로 받기·화면 옮기기를 이 파일이 구글·애플과 같은 순서로 한다(nativeKakaoSignIn).
 //       여는 스위치가 꺼져 있거나 플러그인이 없는 바이너리(1.2 이하)에서는 앱 안 어디에도 카카오 단추가 없다.
 //       애플 4.8: 카카오 단추는 구글·애플 단추와 **같은 묶음 · 같은 폭 · 같은 높이**로 선다.
+// 주·보조(2026-10-07 오너: "한국은 카카오 구글이 주 가입버튼, 애플이나 핸드폰번호는 서브") — 부른 쪽이 secondaryRow 를 주면
+//   **웹**에서는 애플 단추를 큰 단추 묶음에서 빼고, 묶음 맨 아래 보조 줄(부른 쪽이 그린다 — 전화번호 링크와 나란히)로 내린다.
+//   **iOS 앱**에서는 애플 단추가 큰 단추 묶음에 그대로 남는다(App Store 4.8 — 다른 소셜 로그인과 같은 무게로). 안드로이드 앱에는 원래 없다.
+//   소셜로 **새 계정이 만들어지면**(한국어 화면) "전에 전화번호로 쓰셨나요?"를 한 번 묻는다(AttachPhoneSheet) — 기록이 갈리지 않게.
 // 팝업(2026-10-06 오너: "회원가입은 … 올라오는 간편 회원가입 팝업으로") — 가입·로그인 팝업(LoginSheet)도 이 단추 묶음을 그대로 쓴다.
 //   부른 쪽이 redirect·onDone·tone 을 준다. 셋 다 안 주면(로그인 화면) 모양도 동작도 예전 그대로다.
 
@@ -72,7 +77,7 @@ function GoogleG() {
   );
 }
 
-function AppleLogo() {
+export function AppleLogo() {
   return (
     <svg width="14" height="17" viewBox="0 0 14 17" fill="currentColor" aria-hidden>
       <path d="M13.545 12.87c-.37.855-.547 1.237-1.023 1.993-.665 1.056-1.603 2.37-2.765 2.38-1.033.01-1.298-.672-2.7-.664-1.4.007-1.693.677-2.726.667-1.162-.01-2.05-1.198-2.716-2.253C-.245 12.028-.44 8.583.83 6.75c.902-1.302 2.326-2.064 3.664-2.064 1.362 0 2.219.747 3.345.747 1.093 0 1.759-.748 3.334-.748 1.191 0 2.453.649 3.352 1.77-2.945 1.614-2.467 5.82.02 6.415zM9.905 3.44c.573-.735.999-1.771.847-2.94-.995.068-2.158.702-2.837 1.527-.617.75-1.127 1.795-.928 2.828 1.086.034 2.21-.615 2.918-1.415z" />
@@ -162,9 +167,14 @@ interface SocialLoginProps {
   onDone?: () => void;
   /** 팝업의 색. 주면 단추들이 팝업 모양(같은 폭·48px·같은 모서리)으로 선다. 안 주면 로그인 화면의 예전 모양 그대로. */
   tone?: SocialTone;
+  /**
+   * 보조 줄 — 주면 묶음 맨 아래에 이 함수가 돌려준 것을 그린다. **웹**에서는 애플 단추를 큰 묶음에서 빼고 여기로 넘긴다
+   * (apple: 누르면 애플 로그인이 열린다. 애플 키가 없으면 null). 앱 안에서는 늘 null 이다 — iOS 앱의 애플 단추는 큰 묶음에 남는다(4.8).
+   */
+  secondaryRow?: (apple: { onClick: () => void; disabled: boolean } | null) => ReactNode;
 }
 
-export default function SocialLogin({ hint = true, kakao = true, redirect, onDone, tone }: SocialLoginProps) {
+export default function SocialLogin({ hint = true, kakao = true, redirect, onDone, tone, secondaryRow }: SocialLoginProps) {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { t, locale } = useT();
@@ -318,6 +328,9 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
       const back = returnTo();
       // '나'를 새로 받은 뒤에 옮긴다 — 안 그러면 돌아간 화면이 비로그인으로 그려진다(queryClient.refreshAfterLogin)
       await refreshAfterLogin();
+      // 방금 이 로그인으로 새 계정이 만들어졌다 — 전에 전화번호로 쓰던 사람이면 그 계정에 잇게 한 번 묻는다
+      // (한국어 화면에서만 뜬다 — 그 판단은 시트의 호스트가 한다: AttachPhoneSheetHost)
+      if (j.data?.isNew === true) offerAttachPhone();
       // 팝업(부른 쪽이 돌아갈 곳을 정했다): 닫고, 가려던 곳이 따로 있을 때만 옮긴다. 새 회원도 같다
       if (given.current.redirect !== undefined) { finishInPlace(back); return; }
       given.current.onDone?.();
@@ -377,6 +390,8 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
       const back = returnTo();
       // '나'를 새로 받은 뒤에 옮긴다 — 안 그러면 돌아간 화면이 비로그인으로 그려진다(queryClient.refreshAfterLogin)
       await refreshAfterLogin();
+      // 새 계정이 만들어졌다 — 전에 전화번호로 쓰던 사람이면 그 계정에 잇게 한 번 묻는다(카카오 단추는 한국어 화면에만 있다)
+      if (data.isNew === true) offerAttachPhone();
       // 팝업(부른 쪽이 돌아갈 곳을 정했다): 닫고, 가려던 곳이 따로 있을 때만 옮긴다
       if (given.current.redirect !== undefined) { finishInPlace(back); return; }
       given.current.onDone?.();
@@ -482,6 +497,7 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
         >
           {t("login.updateApp")}
         </button>
+        {secondaryRow?.(null)}
       </div>
     );
   }
@@ -528,6 +544,8 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
           </button>
         )}
         {busy && <p className={look.busy}>{t("common.loading")}</p>}
+        {/* 보조 줄 — 앱 안에서는 애플을 넘기지 않는다(iOS 앱의 애플 단추는 위 큰 묶음에 있다 · 4.8) */}
+        {secondaryRow?.(null)}
       </div>
     );
   }
@@ -580,7 +598,8 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
         </div>
       )}
 
-      {APPLE_SERVICES_ID && (
+      {/* 보조 줄을 받은 웹 화면(한국어 · 카카오가 되는 곳)에서는 애플을 큰 묶음에서 뺀다 — 아래 보조 줄로 내려간다 */}
+      {APPLE_SERVICES_ID && !secondaryRow && (
         <button
           onClick={handleAppleWeb}
           disabled={!appleReady || busy}
@@ -593,6 +612,7 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
       )}
 
       {busy && <p className={look.busy}>{t("common.loading")}</p>}
+      {secondaryRow?.(APPLE_SERVICES_ID ? { onClick: () => { void handleAppleWeb(); }, disabled: !appleReady || busy } : null)}
     </div>
   );
 }

@@ -97,6 +97,82 @@ export class UserRepository {
         return rows.length > 0;
     }
 
+    /**
+     * 구글·애플·카카오 공통(2026-10-07 통합 로그인 — 오너: "휴대폰 로그인 사용자를 카카오나 구글 로그인으로 통합").
+     * 카카오 전용 두 함수와 같은 규칙이다: 붙이기는 **비어 있을 때만**, 떼기는 **지금 붙어 있는 그 값일 때만**.
+     */
+    async linkProfileSocialSub(provider: "google" | "apple" | "kakao", profileId: string, sub: string): Promise<boolean> {
+        const col = provider === "google" ? profiles.googleSub : provider === "apple" ? profiles.appleSub : profiles.kakaoSub;
+        const set = provider === "google" ? { googleSub: sub } : provider === "apple" ? { appleSub: sub } : { kakaoSub: sub };
+        const rows = await db.update(profiles)
+            .set({ ...set, updatedAt: new Date() })
+            .where(and(eq(profiles.id, profileId), isNull(col)))
+            .returning({ id: profiles.id });
+        return rows.length > 0;
+    }
+    async unlinkProfileSocialSub(provider: "google" | "apple" | "kakao", profileId: string, sub: string): Promise<boolean> {
+        const col = provider === "google" ? profiles.googleSub : provider === "apple" ? profiles.appleSub : profiles.kakaoSub;
+        const set = provider === "google" ? { googleSub: null } : provider === "apple" ? { appleSub: null } : { kakaoSub: null };
+        const rows = await db.update(profiles)
+            .set({ ...set, updatedAt: new Date() })
+            .where(and(eq(profiles.id, profileId), eq(col, sub)))
+            .returning({ id: profiles.id });
+        return rows.length > 0;
+    }
+
+    /**
+     * 소셜 로그인 수단을 한 프로필에서 다른 프로필로 옮긴다(소셜로 방금 만든 빈 계정 → 기존 전화번호 계정, hiqService.attachSocialToPhone).
+     * 한 트랜잭션: 옛 자리에서 **그 값일 때만** 떼고, 새 자리에 **비어 있을 때만** 붙인다. 둘 중 하나라도 0줄이면 전부 되돌린다(false).
+     * 같은 값이 두 프로필에 동시에 있을 수 없어(유니크) 떼기가 먼저다.
+     */
+    async moveProfileSocialSub(provider: "google" | "apple" | "kakao", fromProfileId: string, toProfileId: string, sub: string): Promise<boolean> {
+        const col = provider === "google" ? profiles.googleSub : provider === "apple" ? profiles.appleSub : profiles.kakaoSub;
+        const clear = provider === "google" ? { googleSub: null } : provider === "apple" ? { appleSub: null } : { kakaoSub: null };
+        const put = provider === "google" ? { googleSub: sub } : provider === "apple" ? { appleSub: sub } : { kakaoSub: sub };
+        class Abort extends Error {}
+        try {
+            await db.transaction(async (tx) => {
+                const off = await tx.update(profiles).set({ ...clear, updatedAt: new Date() })
+                    .where(and(eq(profiles.id, fromProfileId), eq(col, sub))).returning({ id: profiles.id });
+                if (off.length === 0) throw new Abort();
+                const on = await tx.update(profiles).set({ ...put, updatedAt: new Date() })
+                    .where(and(eq(profiles.id, toProfileId), isNull(col))).returning({ id: profiles.id });
+                if (on.length === 0) throw new Abort();
+            });
+            return true;
+        } catch (e) {
+            if (e instanceof Abort) return false;
+            throw e;
+        }
+    }
+
+    /**
+     * 이 회원이 남긴 것이 있는가 — 경기 기록·진행 중 경기·크루·채팅·커뮤니티 글·온라인 게임. 하나라도 있으면 true.
+     * '방금 만든 빈 계정'만 기존 계정에 이어 붙이고 지우기 위한 확인이다(attachSocialToPhone) — 기록이 있는 계정은 지우지 않는다.
+     */
+    async memberHasFootprint(memberId: string): Promise<boolean> {
+        const r = await db.execute(sql`
+            select (
+                exists (select 1 from hiq_game_history where member_id = ${memberId})
+                or exists (select 1 from hiq_games where player1_id = ${memberId} or player2_id = ${memberId} or player3_id = ${memberId} or player4_id = ${memberId})
+                or exists (select 1 from hiq_crew_members where member_id = ${memberId})
+                or exists (select 1 from hiq_chat_messages where sender_id = ${memberId})
+                or exists (select 1 from hiq_community_posts where author_id = ${memberId})
+                or exists (select 1 from hiq_sim_matches where host_id = ${memberId} or guest_id = ${memberId})
+                or exists (select 1 from hiq_sim_sessions where member_id = ${memberId})
+                or exists (select 1 from hiq_listing_chats where sender_id = ${memberId})
+                or exists (select 1 from golf_bookings where owner_id = ${memberId})
+                or exists (select 1 from golf_joins where host_id = ${memberId})
+                or exists (select 1 from golf_join_requests where member_id = ${memberId})
+                or exists (select 1 from golf_match_sessions where host_id = ${memberId})
+                or exists (select 1 from golf_players where player_id = ${memberId})
+                or exists (select 1 from golf_round_checkins where member_id = ${memberId})
+                or exists (select 1 from golf_round_photos where member_id = ${memberId})
+            ) as has`);
+        const row = ((r as any).rows ?? r)[0];
+        return row?.has === true;
+    }
+
     // 프로필에 연결된 멤버 조회 — **가장 먼저 만든 행 하나**(매장을 가리지 않는다). 운영자 알림 대상(admin.ts)이 쓰고,
     // admin.repo getStaffMemberIds 가 같은 기준에 맞춰져 있다 — 정렬을 바꾸지 말 것. 로그인은 아래 getLoginMemberByProfileId 를 쓴다.
     async getMemberByProfileId(profileId: string): Promise<HiqMember | undefined> {

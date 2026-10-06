@@ -10,7 +10,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useStore } from "@/contexts/StoreContext";
 import { PinResetDialog } from "@/components/hiq/PinResetDialog";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
-import SocialLogin, { socialLoginAvailable } from "@/components/hiq/SocialLogin";
+import SocialLogin, { AppleLogo, socialLoginAvailable } from "@/components/hiq/SocialLogin";
 import { kakaoLoginAvailable, kakaoLoginOpen, kakaoNativeAvailable } from "@/lib/kakaoLogin";
 import { isNativeApp } from "@/lib/nativeBridge";
 
@@ -82,6 +82,37 @@ export default function Landing() {
     // 웹에서 카카오로 가입한 사람이 여기서 전화번호나 구글을 누르면 **새 계정**이 만들어져 기록이 갈린다 — 누르기 전에 한 줄로 알린다(2026-10-05 검토).
     // 새 바이너리(1.3~)는 네이티브 카카오 단추가 있어 이 안내를 띄우지 않는다(2026-10-06 — kakaoNativeAvailable).
     const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();
+    // 보조 줄(2026-10-07 오너: "한국은 카카오 구글이 주 가입버튼, 애플이나 핸드폰번호는 서브") — 한국어 · 카카오가 되는 곳에서 큰 단추(카카오·구글) 아래에
+    // 전화번호와 애플(웹)을 작은 글씨로 나란히 둔다. 애플은 SocialLogin 이 넘겨준다(웹에서만) — iOS 앱에서는 큰 묶음에 남는다(App Store 4.8).
+    // 안내는 전화번호로 쓰던 사람에게 길을 알려 준다: 큰 단추로 시작해도 번호와 PIN 으로 기존 계정에 이어진다(AttachPhoneSheet).
+    const kakaoSecondaryRow = (apple: { onClick: () => void; disabled: boolean } | null) => (
+        <div className="w-full mt-3 flex flex-col items-center gap-1">
+            <p className="text-[12px] font-medium text-black/45 text-center leading-relaxed break-keep">{t("login.phoneExistingHint")}</p>
+            <div className="flex flex-wrap items-center justify-center gap-x-2">
+                <button
+                    type="button"
+                    onClick={() => setPhoneMode(true)}
+                    className="h-11 px-2 text-[13px] font-semibold text-black/60 hover:text-brand transition-colors underline underline-offset-4"
+                >
+                    {t("login.phoneLogin")}
+                </button>
+                {apple && (
+                    <>
+                        <span aria-hidden className="text-[12px] text-black/30">·</span>
+                        <button
+                            type="button"
+                            onClick={apple.onClick}
+                            disabled={apple.disabled}
+                            className="h-11 px-2 flex items-center gap-1.5 text-[13px] font-semibold text-black/60 hover:text-brand transition-colors underline underline-offset-4 disabled:opacity-50"
+                        >
+                            <AppleLogo />
+                            <span>{t("login.continueApple")}</span>
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
 
     // 이미 로그인했는지 확인. 결과가 나오기 전까지는 로그인 폼을 그리지 않는다 —
     // 예전에는 확인을 기다리지 않고 폼부터 렌더해서, 앱을 열 때마다 "휴대폰 번호 입력"
@@ -267,21 +298,20 @@ export default function Landing() {
                     <div className="px-7 py-10 flex flex-col items-center gap-6">
                         <div className="w-full max-w-[320px] flex flex-col">
                             {/* 한국어 화면은 단추만 — 안내 문구("전 세계 랭킹에 도전")는 다른 언어 방문자에게 쓰던 말이다 */}
-                            <SocialLogin hint={!kakaoFirst} kakao={!storeEntry} />
+                            {/* 한국어 · 카카오가 되는 곳(2026-10-07 오너: "카카오 구글이 주 가입버튼, 애플이나 핸드폰번호는 서브") — 큰 단추는 카카오·구글,
+                                전화번호와 애플(웹)은 아래 작은 줄. iOS 앱에서는 애플 단추가 큰 묶음에 남는다(App Store 4.8 — SocialLogin 이 정한다) */}
+                            <SocialLogin hint={!kakaoFirst} kakao={!storeEntry} secondaryRow={kakaoFirst ? kakaoSecondaryRow : undefined} />
                         </div>
-                        <div className="w-full max-w-[320px] flex flex-col items-center gap-2">
-                            {/* 전화번호로 가입한 기존 회원이 카카오를 먼저 누르면 빈 새 계정이 생기고 기록이 갈린다 —
-                                전화번호 길이 자기 길이라는 것을 알아보게 안내를 붙인다(2026-10-05 검토) */}
-                            {kakaoFirst && (
-                                <p className="text-[12px] font-medium text-black/45 text-center leading-relaxed break-keep">{t("login.phoneExistingHint")}</p>
-                            )}
-                            <button
-                                onClick={() => setPhoneMode(true)}
-                                className="text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4"
-                            >
-                                {t(kakaoFirst ? "login.phoneLogin" : "login.phoneLoginLink")}
-                            </button>
-                        </div>
+                        {!kakaoFirst && (
+                            <div className="w-full max-w-[320px] flex flex-col items-center gap-2">
+                                <button
+                                    onClick={() => setPhoneMode(true)}
+                                    className="text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4"
+                                >
+                                    {t("login.phoneLoginLink")}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 ) : (
                 /* 로그인 수단 3종(전화·구글·애플)을 **하나의 320px 열**에 담는다.

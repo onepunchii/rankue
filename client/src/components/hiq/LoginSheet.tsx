@@ -22,12 +22,15 @@
  *     카카오가 안 되는 곳(스위치 꺼짐 · 앱 안 · 매장 진입)은 **전화번호가 먼저**. 전화번호로 가입한 기존 회원이 큰 구글 단추를 먼저 눌러
  *     빈 새 계정이 생기는 일을 줄인다. 다른 언어는 구글·애플이 먼저다. 계정이 갈리기 전에 알리는 두 안내(기존 전화번호 회원 · 앱 안의
  *     카카오 가입자)도 로그인 화면과 같은 조건으로 붙는다.
+ * 주·보조(2026-10-07 오너: "한국은 카카오 구글이 주 가입버튼, 애플이나 핸드폰번호는 서브"): 한국어 · 카카오가 되는 곳의 큰 단추는
+ *     카카오·구글 둘이다. 전화번호와 애플(웹)은 '또는' 아래 작은 줄로 내려간다. iOS 앱에서는 애플 단추가 큰 묶음에 남는다(App Store 4.8).
+ *     전화번호로 쓰던 사람이 큰 단추를 눌러 새 계정이 생겨도, 바로 "전에 전화번호로 쓰셨나요?"(AttachPhoneSheet)가 기존 계정에 이어 준다.
  * 뒤로: 기기의 '뒤로'는 보던 화면이 아니라 이 팝업을 닫는다(hooks/useBackToClose).
  */
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
-import SocialLogin, { socialLoginAvailable } from "@/components/hiq/SocialLogin";
+import SocialLogin, { AppleLogo, socialLoginAvailable } from "@/components/hiq/SocialLogin";
 import { useSport } from "@/contexts/SportContext";
 import { useBackToClose } from "@/hooks/useBackToClose";
 import { useT } from "@/lib/i18n";
@@ -219,8 +222,6 @@ function LoginSheetPanel({ tone: liveTone, opts, back, go }: {
             {label}
         </a>
     );
-    // 단추 묶음은 한 번만 만든다 — 순서가 어느 쪽이든 한 팝업에 하나만 붙는다(구글 단추 GIS 는 전역 하나다)
-    const socialButtons = <SocialLogin hint={false} kakao={!storeEntry} tone={tone} redirect={back} onDone={done} />;
     const orRule = (
         <div className="my-4 flex items-center gap-3">
             <span className={cn("h-px flex-1", c.rule)} />
@@ -228,6 +229,39 @@ function LoginSheetPanel({ tone: liveTone, opts, back, go }: {
             <span className={cn("h-px flex-1", c.rule)} />
         </div>
     );
+    // 보조 줄(한국어 · 카카오가 되는 곳) — 큰 단추(카카오·구글) 아래 '또는' 밑에 전화번호와 애플(웹)을 작은 링크로 나란히 둔다.
+    // 애플은 SocialLogin 이 넘겨준다(웹에서만 · 애플 키가 있을 때). iOS 앱에서는 null 이다 — 애플 단추가 위 큰 묶음에 있다.
+    const secondaryRow = (apple: { onClick: () => void; disabled: boolean } | null) => (
+        <div>
+            {orRule}
+            <p className={cn("mb-1 text-center text-[12px] font-medium leading-relaxed break-keep", c.legal)}>{t("login.phoneExistingHint")}</p>
+            <div className="flex flex-wrap items-center justify-center gap-x-2">
+                <button
+                    type="button"
+                    onClick={toPhone}
+                    className={cn("h-11 px-2 text-[14px] font-semibold underline underline-offset-4 transition-colors", c.link)}
+                >
+                    {t("loginSheet.phone")}
+                </button>
+                {apple && (
+                    <>
+                        <span aria-hidden className={cn("text-[12px]", c.or)}>·</span>
+                        <button
+                            type="button"
+                            onClick={apple.onClick}
+                            disabled={apple.disabled}
+                            className={cn("flex h-11 items-center gap-1.5 px-2 text-[14px] font-semibold underline underline-offset-4 transition-colors disabled:opacity-50", c.link)}
+                        >
+                            <AppleLogo />
+                            <span>{t("login.continueApple")}</span>
+                        </button>
+                    </>
+                )}
+            </div>
+        </div>
+    );
+    // 단추 묶음은 한 번만 만든다 — 순서가 어느 쪽이든 한 팝업에 하나만 붙는다(구글 단추 GIS 는 전역 하나다)
+    const socialButtons = <SocialLogin hint={false} kakao={!storeEntry} tone={tone} redirect={back} onDone={done} secondaryRow={kakaoShown ? secondaryRow : undefined} />;
     // 전화번호 큰 단추 — 전화번호가 먼저일 때 · 쓸 소셜 로그인이 하나도 없을 때
     const phoneButton = (
         <button
@@ -295,15 +329,14 @@ function LoginSheetPanel({ tone: liveTone, opts, back, go }: {
                         {orRule}
                         {socialButtons}
                     </>
+                ) : kakaoShown ? (
+                    // 한국어 · 카카오가 되는 곳 — 큰 단추는 카카오·구글(iOS 앱은 애플도 · 4.8). '또는'·안내·전화번호·애플(웹)은 보조 줄이 그린다(secondaryRow)
+                    socialButtons
                 ) : (
                     <>
-                        {/* 카카오(스위치가 켜졌을 때만, 맨 위) · 구글 · 애플 — 같은 폭·같은 높이(48px)·같은 모서리. 모양은 SocialLogin 이 tone 으로 맞춘다 */}
+                        {/* 다른 언어 — 구글 · 애플이 같은 폭·같은 높이(48px)·같은 모서리. 모양은 SocialLogin 이 tone 으로 맞춘다 */}
                         {socialButtons}
                         {orRule}
-                        {/* 전화번호로 가입한 기존 회원이 카카오를 먼저 누르면 빈 새 계정이 생기고 기록이 갈린다 — 자기 길(바로 아래 단추)을 알아보게 */}
-                        {kakaoShown && (
-                            <p className={cn("mb-1 text-center text-[12px] font-medium leading-relaxed break-keep", c.legal)}>{t("login.phoneExistingHint")}</p>
-                        )}
                         <div className="flex justify-center">
                             <button
                                 type="button"

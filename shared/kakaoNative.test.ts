@@ -405,7 +405,7 @@ describe("설정의 앱 안 연결 — 카카오에 먼저 다녀오고, PIN 을
     });
 
     it("PIN 칸 — 숫자만·여덟 자까지·가려서, 네 자가 안 되면 보내지 않는다. 브라우저 기본 창을 쓰지 않는다", () => {
-        const form = settings.slice(settings.indexOf('{c.key === "kakao" && nativeLink && ('), settings.indexOf("{c.onUnlink && unlinkOpen && ("));
+        const form = settings.slice(settings.indexOf('{c.key === "kakao" && nativeLink && ('), settings.indexOf('{c.key === "kakao" && c.onUnlink && unlinkOpen && ('));
         expect(form.length).toBeGreaterThan(0);
         expect(form).toContain("onSubmit={(e) => { e.preventDefault(); void submitNativeLink(); }}");
         expect(form).toContain('type="password"');
@@ -431,7 +431,7 @@ describe("문구 — 다섯 언어 사전의 키로만", () => {
     const used = (src: string) => Array.from(src.matchAll(/\bt\("([A-Za-z]+\.[A-Za-z0-9]+)"\)/g), (m) => m[1]);
 
     it("새로 생긴 화면 조각이 쓰는 키는 전부 목록에 있고, 목록의 키는 다섯 사전에 다 있다", () => {
-        const form = settings.slice(settings.indexOf('{c.key === "kakao" && nativeLink && ('), settings.indexOf("{c.onUnlink && unlinkOpen && ("));
+        const form = settings.slice(settings.indexOf('{c.key === "kakao" && nativeLink && ('), settings.indexOf('{c.key === "kakao" && c.onUnlink && unlinkOpen && ('));
         const block = appBranch.slice(appBranch.indexOf("{showKakao && ("), appBranch.indexOf('onClick={() => nativeSignIn("google")}'));
         const keys = [...used(signIn), ...used(block), ...used(nativeLink), ...used(form)];
         // 빈 목록으로 지나가지 않았는지
@@ -447,7 +447,7 @@ describe("문구 — 다섯 언어 사전의 키로만", () => {
     });
 
     it("화면 조각에 한글 문장을 직접 적지 않았다(사전의 키만 쓴다)", () => {
-        const form = settings.slice(settings.indexOf('{c.key === "kakao" && nativeLink && ('), settings.indexOf("{c.onUnlink && unlinkOpen && ("));
+        const form = settings.slice(settings.indexOf('{c.key === "kakao" && nativeLink && ('), settings.indexOf('{c.key === "kakao" && c.onUnlink && unlinkOpen && ('));
         // 줄 끝 설명(// …)과 JSX 설명({/* … */})은 빼고, 따옴표 안의 한글만 본다
         const strip = (s: string) => s.replace(/\{\/\*[\s\S]*?\*\/\}/g, "").split("\n").map((l) => l.replace(/\/\/.*$/, "")).join("\n");
         for (const [name, src] of [["nativeKakaoSignIn", signIn], ["appBranch", appBranch], ["nativeLink", nativeLink], ["form", form]] as const) {

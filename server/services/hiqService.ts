@@ -9,9 +9,9 @@ import { generateHandle } from "../lib/handle.js";
 
 // 글로벌(비매장) 유저의 소속 스토어 — 마이그레이션에서 시드됨. 소셜 가입 유저는 여기 속한다.
 // 공유 상수 사용 — 슬러그가 여러 파일에 흩어지면 하나만 바뀌었을 때 소셜 가입이 조용히 깨진다.
-import { GLOBAL_STORE_SLUG } from "../../shared/systemStores.js";
+import { GLOBAL_STORE_SLUG, DEFAULT_STORE_SLUG } from "../../shared/systemStores.js";
 import { KAKAO_DEFAULT_NAME } from "../../shared/kakaoLogin.js";
-import { isLoginPhone, isKakaoSignupPhone, kakaoPhonePlaceholder } from "../../shared/loginPhone.js";
+import { isLoginPhone, isKakaoSignupPhone, kakaoPhonePlaceholder, SOCIAL_PHONE_PREFIX } from "../../shared/loginPhone.js";
 import { isReservedMemberName } from "../utils/crewModeration.js";
 
 // --- PIN 해싱 ---
@@ -297,6 +297,103 @@ export class HiqService {
         if (!profile.kakaoSub) return "ok";
         await storage.users.unlinkProfileKakaoSub(profile.id, profile.kakaoSub);
         return "ok";
+    }
+
+    /* ── 통합 로그인(2026-10-07 오너: "휴대폰 로그인 사용자를 카카오나 구글 로그인으로 통합") ─────────────────────────
+     * 계정은 하나, 들어오는 문이 여럿. 카카오 연결(linkKakao)과 같은 규칙을 구글에도 연다 — 그리고 반대 방향
+     * (소셜로 방금 만든 빈 계정을 기존 전화번호 계정에 잇기)을 더한다. 계정 두 개의 **기록을 합치는 일은 하지 않는다**. */
+
+    /**
+     * 로그인한 회원의 프로필에 구글을 붙인다(설정 '연결된 로그인' → Google 연결). linkKakao 와 같은 판정이다:
+     * "no-profile" · "no-pin"(PIN 으로 본인을 확인한 계정에만) · "ok"(이미 같은 구글이어도) · "taken"(그 구글이 다른 프로필에 있다) ·
+     * "other-linked"(내 프로필에 다른 구글이 이미 있다 — 덮어쓰지 않는다). PIN 대조는 라우트가 토큰 검증 **전에** checkKakaoPin 으로 한다.
+     */
+    async linkSocial(memberId: string, provider: "google", identity: SocialIdentity): Promise<"ok" | "taken" | "no-profile" | "no-pin" | "other-linked"> {
+        const member = await storage.getMemberById(memberId);
+        if (!member?.profileId) return "no-profile";
+        const profile = await storage.getProfile(member.profileId);
+        if (!profile) return "no-profile";
+
+        if (profile.googleSub) return profile.googleSub === identity.sub ? "ok" : "other-linked";
+        if (!profile.password) return "no-pin";
+
+        const owner = await storage.users.getProfileBySocialSub(provider, identity.sub);
+        if (owner) return owner.id === profile.id ? "ok" : "taken";
+
+        try {
+            if (await storage.users.linkProfileSocialSub(provider, profile.id, identity.sub)) return "ok";
+        } catch (e: any) {
+            if ((e?.code ?? e?.cause?.code) === "23505") return "taken";
+            throw e;
+        }
+        const again = await storage.getProfile(profile.id);
+        if (!again) return "no-profile";
+        return again.googleSub === identity.sub ? "ok" : "other-linked";
+    }
+
+    /**
+     * 내 프로필에서 구글을 뗀다. unlinkKakao 와 같은 규칙: 구글로 **가입한** 계정(회원 행 phone 이 `social:google:…`)은 떼면
+     * 들어올 길이 없어져 거절하고, PIN 으로 본인을 확인한다(PIN 이 있다는 것은 전화번호+PIN 이라는 다른 길이 남는다는 뜻이다).
+     */
+    async unlinkSocial(memberId: string, provider: "google", pin: unknown): Promise<"ok" | "signup-account" | "no-profile" | "no-pin" | "wrong-pin"> {
+        const member = await storage.getMemberById(memberId);
+        if (!member?.profileId) return "no-profile";
+        const profile = await storage.getProfile(member.profileId);
+        if (!profile) return "no-profile";
+        if (String(member.phone ?? "").startsWith(`${SOCIAL_PHONE_PREFIX}${provider}:`)) return "signup-account";
+        if (!profile.password) return "no-pin";
+        if (typeof pin !== "string" || !pin || !(await verifyPassword(pin, profile))) return "wrong-pin";
+        if (!profile.googleSub) return "ok";
+        await storage.users.unlinkProfileSocialSub(provider, profile.id, profile.googleSub);
+        return "ok";
+    }
+
+    /**
+     * 소셜(카카오·구글·애플)로 **방금 만든 빈 계정**을 기존 전화번호 계정에 잇는다 — "전에 전화번호로 쓰셨나요?"의 답.
+     * 전화번호 회원이 연결 없이 '카카오로 시작하기'를 누르면 빈 새 계정이 생겨 기록이 갈린다. 그 자리에서 번호와 PIN 을 받아
+     * 지금 들고 온 로그인 수단을 기존 계정으로 옮기고, 빈 계정은 지운다. 다음부터는 그 소셜로 들어와도 기존 계정이다.
+     *
+     * 지금 계정(잇는 쪽)의 조건 — 하나라도 어긋나면 옮기지 않는다:
+     *  - "not-social": 소셜로 가입한 계정이 아니다(회원 행 phone 이 `social:…` 이 아니거나 PIN 이 있다). 전화번호 계정끼리는 잇지 않는다.
+     *  - "not-empty": 남긴 것이 있다(경기·크루·채팅·글·온라인 게임). **기록이 있는 계정은 지우지 않는다** — 합치기는 하지 않으므로 거절한다.
+     * 기존 계정(받는 쪽)의 조건:
+     *  - "no-account": 그 번호의 회원이 없다(본 사이트 hiq 매장 기준 — 전화번호 로그인과 같은 자리).
+     *  - "no-pin": 프로필·PIN 이 없는 계정(매장에서 번호만으로 등록) — 본인임을 확인할 방법이 없어 잇지 않는다.
+     *  - "wrong-pin": PIN 이 틀렸다(라우트가 로그인과 같은 잠금에 센다).
+     *  - "other-linked": 그 계정에 같은 종류의 다른 소셜이 이미 붙어 있다 — 덮어쓰지 않는다.
+     * "ok" 면 받는 쪽 회원 행을 돌려준다 — 라우트가 그 회원으로 쿠키를 바꾼다.
+     */
+    async attachSocialToPhone(currentMemberId: string, phone: unknown, pin: unknown): Promise<
+        { kind: "ok"; member: HiqMember; provider: "google" | "apple" | "kakao" }
+        | { kind: "not-social" | "not-empty" | "no-account" | "no-pin" | "wrong-pin" | "other-linked" }
+    > {
+        const current = await storage.getMemberById(currentMemberId);
+        if (!current?.profileId || !String(current.phone ?? "").startsWith(SOCIAL_PHONE_PREFIX)) return { kind: "not-social" };
+        const fresh = await storage.getProfile(current.profileId);
+        if (!fresh || fresh.password) return { kind: "not-social" };
+        const held = ([["kakao", fresh.kakaoSub], ["google", fresh.googleSub], ["apple", fresh.appleSub]] as const).filter(([, sub]) => !!sub);
+        // 수단이 정확히 하나일 때만 — 둘 이상 붙은 계정은 '방금 만든 계정'이 아니다
+        if (held.length !== 1) return { kind: "not-social" };
+        const [provider, sub] = held[0] as ["google" | "apple" | "kakao", string];
+
+        if (!isLoginPhone(phone)) return { kind: "no-account" };
+        const store = await storage.getStoreBySlug(DEFAULT_STORE_SLUG);
+        const target = store ? await storage.getMemberByPhone(store.id, phone) : undefined;
+        if (!target || target.id === current.id) return { kind: "no-account" };
+        if (!target.profileId) return { kind: "no-pin" };
+        const profile = await storage.getProfile(target.profileId);
+        if (!profile || !profile.password) return { kind: "no-pin" };
+        if (typeof pin !== "string" || !pin || !(await verifyPassword(pin, profile))) return { kind: "wrong-pin" };
+
+        // PIN 이 맞은 뒤에만 아래를 말한다 — 남의 번호로 '그 계정에 무엇이 붙어 있는지' 떠보지 못하게
+        const taken = provider === "google" ? profile.googleSub : provider === "apple" ? profile.appleSub : profile.kakaoSub;
+        if (taken) return { kind: "other-linked" };
+        if (await storage.users.memberHasFootprint(current.id)) return { kind: "not-empty" };
+
+        if (!(await storage.users.moveProfileSocialSub(provider, fresh.id, profile.id, sub))) return { kind: "other-linked" };
+        // 수단은 옮겨졌다 — 빈 계정을 지운다. 지우기가 실패해도 로그인은 이미 기존 계정으로 이어진다(남은 빈 계정에는 들어올 길이 없다).
+        try { await storage.users.deleteAccount(current.id); } catch (e) { console.error("[attach] 빈 계정 지우기 실패:", e); }
+        return { kind: "ok", member: target, provider };
     }
 
     /** countryCode: 전화 가입 경로도 국가를 채운다(2026-09-17) — 예전엔 소셜 경로에만 있어 전화 가입자가 전부 비어 있었다. */

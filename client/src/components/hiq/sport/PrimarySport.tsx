@@ -10,6 +10,7 @@
  *  - 골프를 쓸 수 없는 회원(한국어가 아닌 앱)·로그인·가입·콘솔 화면에서는 묻지 않는다.
  * 종목 색은 설정 알림 탭과 같다(당구 초록·골프 라임).
  */
+import { useAttachPhonePending } from "@/components/hiq/AttachPhoneSheet";
 import { useState } from "react";
 import { useLocation } from "wouter";
 import { useQueryClient } from "@tanstack/react-query";
@@ -148,8 +149,10 @@ export function PrimarySportGate() {
     const suggested: PrimarySport = m?.suggestedSport === "GOLF" ? "GOLF" : "BILLIARDS";
     const [choice, setChoice] = useState<PrimarySport | null>(null);
     const [busy, setBusy] = useState(false);
+    // "전에 전화번호로 쓰셨나요?"(AttachPhoneSheet)가 먼저다 — 이으면 계정이 바뀌어, 빈 새 계정에 주 종목을 물을 이유가 없다
+    const attachPending = useAttachPhonePending();
 
-    const need = !!m && !m.primarySport && m.golfAccess === true && locale === "ko"
+    const need = !!m && !m.primarySport && m.golfAccess === true && locale === "ko" && !attachPending
         && !HIDDEN_PATHS.test(location) && location !== "/" && location !== "/hiq";
     if (!need) return null;
     const picked = choice ?? suggested;

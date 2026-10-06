@@ -420,8 +420,10 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         // 부른 쪽이 끌 수 있다(kakao=false) — 매장 진입의 로그인 화면
         // 2026-10-06 가입·로그인 팝업(LoginSheet): prop 이 늘었다(redirect·onDone·tone) — 예전 단언은 prop 둘뿐인 한 줄 서명이었다.
         // 카카오 쪽 기본값(kakao = true)은 그대로이고, 새 prop 은 기본값이 없다(안 주면 로그인 화면의 예전 모양·동작).
-        expect(social).toContain("export default function SocialLogin({ hint = true, kakao = true, redirect, onDone, tone }: SocialLoginProps) {");
-        expect(social).toMatch(/interface SocialLoginProps \{[\s\S]*?\n  kakao\?: boolean;[\s\S]*?\n  redirect\?: string \| null;[\s\S]*?\n  onDone\?: \(\) => void;[\s\S]*?\n  tone\?: SocialTone;\n\}/);
+        // 2026-10-07 주·보조 정리(오너: "한국은 카카오 구글이 주 가입버튼, 애플이나 핸드폰번호는 서브"): prop 이 하나 더 늘었다(secondaryRow — 보조 줄).
+        // 안 주면 예전 모양 그대로다(애플 단추가 큰 묶음에 있다).
+        expect(social).toContain("export default function SocialLogin({ hint = true, kakao = true, redirect, onDone, tone, secondaryRow }: SocialLoginProps) {");
+        expect(social).toMatch(/interface SocialLoginProps \{[\s\S]*?\n  kakao\?: boolean;[\s\S]*?\n  redirect\?: string \| null;[\s\S]*?\n  onDone\?: \(\) => void;[\s\S]*?\n  tone\?: SocialTone;[\s\S]*?\n  secondaryRow\?: \(apple: \{ onClick: \(\) => void; disabled: boolean \} \| null\) => ReactNode;\n\}/);
         expect(social).toContain('const showKakao = kakao && locale === "ko" && kakaoLoginAvailable();');
         // 소셜을 쓸 수 있는가: 카카오는 locale 이 ko 일 때만 센다 — 구글 키 없는 영어 화면에 빈 소셜 묶음이 뜨지 않는다
         expect(social).toContain('return isNativeApp() || !!GOOGLE_CLIENT_ID || (locale === "ko" && kakaoLoginAvailable());');
@@ -470,8 +472,13 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(landing).toContain('const kakaoFirst = locale === "ko" && kakaoLoginAvailable() && !storeEntry;');
         expect(landing).toContain('const showPhone = requiresPassword || (phoneMode ?? (locale === "ko" ? !kakaoFirst : !socialLoginAvailable(locale)));');
         // 전화번호 길은 없애지 않는다 — 소셜 화면 아래 작은 글씨, 전화 화면에서 돌아오는 길
-        expect(landing).toContain('{t(kakaoFirst ? "login.phoneLogin" : "login.phoneLoginLink")}');
-        expect(landing).toContain("onClick={() => setPhoneMode(true)}");
+        // 2026-10-07 주·보조 정리: 예전에는 한 단추가 문구만 바꿨다. 이제 한국어 · 카카오가 되는 곳은 보조 줄(kakaoSecondaryRow —
+        // 전화번호 · 애플(웹)이 나란히)이 그 길이고, 다른 언어는 예전의 작은 글씨 그대로다.
+        expect(landing).toContain("<SocialLogin hint={!kakaoFirst} kakao={!storeEntry} secondaryRow={kakaoFirst ? kakaoSecondaryRow : undefined} />");
+        expect(landing).toContain('{t("login.phoneLogin")}');
+        expect(landing).toContain('{t("login.phoneLoginLink")}');
+        expect(landing).toContain("{!kakaoFirst && (");
+        expect(landing.match(/onClick=\{\(\) => setPhoneMode\(true\)\}/g)).toHaveLength(2);
         expect(landing).toContain("onClick={() => setPhoneMode(false)}");
         expect(landing).toContain('{t("login.socialBackLink")}');
     });
@@ -493,11 +500,18 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
     // 스토어 앱에는 카카오 단추가 없어, 카카오로 가입한 사람이 앱에서 다른 방법으로 들어오면 역시 새 계정이 생긴다.
     it("계정이 갈리기 전에 알린다 — 카카오 우선 화면의 기존 회원 안내 · 앱 안의 '카카오 가입자는 웹에서'", () => {
         const landing = code(client("pages/hiq/landing.tsx"));
-        const hint = landing.indexOf('{t("login.phoneExistingHint")}');
+        // 카카오 우선 화면에서만(보조 줄은 kakaoFirst 일 때만 넘긴다), 전화번호 로그인 글씨 바로 위에 — 2026-10-07 부터 보조 줄 안에 있다
+        const rowAt = landing.indexOf("const kakaoSecondaryRow = (");
+        expect(rowAt).toBeGreaterThan(0);
+        const row = landing.slice(rowAt, landing.indexOf("\n    );\n", rowAt));
+        const hint = row.indexOf('{t("login.phoneExistingHint")}');
         expect(hint).toBeGreaterThan(0);
-        // 카카오 우선 화면에서만, 전화번호 로그인 글씨 바로 위에
-        expect(landing.lastIndexOf("{kakaoFirst && (", hint)).toBeGreaterThan(0);
-        expect(landing.indexOf('{t(kakaoFirst ? "login.phoneLogin" : "login.phoneLoginLink")}')).toBeGreaterThan(hint);
+        expect(row.indexOf('{t("login.phoneLogin")}')).toBeGreaterThan(hint);
+        expect(landing.match(/t\("login\.phoneExistingHint"\)/g)).toHaveLength(1);
+        expect(landing).toContain("secondaryRow={kakaoFirst ? kakaoSecondaryRow : undefined}");
+        // 애플(웹)은 그 줄의 전화번호 옆 — 큰 단추가 아니다. SocialLogin 이 넘겨줄 때만 그린다(iOS 앱에서는 null — 큰 묶음에 남는다 · 4.8)
+        expect(row.indexOf("{apple && (")).toBeGreaterThan(row.indexOf('{t("login.phoneLogin")}'));
+        expect(row).toContain('{t("login.continueApple")}');
         // 앱 안의 한국어 화면: 기존 판별(isNativeApp)로 — 전화 카드 아래, PIN 단계에서는 빼고
         // 2026-10-06 바뀐 것: 조건 끝에 `&& !kakaoNativeAvailable()` 가 붙었다 — 네이티브 카카오 단추가 있는 새 앱(1.3~)에는 "앱에는 아직
         // 카카오 로그인이 없어"가 거짓말이 된다. 플러그인이 없는 앱(1.2 이하)에는 예전과 같은 조건으로 그대로 뜬다.
@@ -507,7 +521,9 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(landing).toContain('{t("login.kakaoWebOnly")}');
         const ko = client("lib/i18n/ko.ts");
         // 두 안내 모두 무슨 일이 생기는지(새 계정)를 말한다 — "전화번호로 로그인"만으로는 왜 그래야 하는지 알 수 없다
-        expect(ko).toMatch(/"login\.phoneExistingHint": "[^"]*전화번호로 로그인[^"]*새 계정[^"]*"/);
+        // 2026-10-07 통합 로그인: 이제 큰 단추로 시작해도 번호와 PIN 으로 기존 계정에 이어진다(AttachPhoneSheet) — 안내는 그 방법을 말한다.
+        // (예전 문구는 "전화번호로 로그인해 주세요 … 새 계정이 만들어져요"였다)
+        expect(ko).toMatch(/"login\.phoneExistingHint": "[^"]*전화번호로 가입[^"]*PIN[^"]*기존 계정[^"]*"/);
         expect(ko).toMatch(/"login\.kakaoWebOnly": "[^"]*www\.rankue\.co\.kr[^"]*새 계정[^"]*"/);
     });
 
@@ -522,7 +538,10 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(sheet).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();');
         const hint = sheet.indexOf('{t("login.phoneExistingHint")}');
         expect(hint).toBeGreaterThan(0);
-        expect(sheet.lastIndexOf("{kakaoShown && (", hint)).toBeGreaterThan(0);
+        // 2026-10-07 주·보조 정리: 안내는 보조 줄(secondaryRow) 안에 있고, 보조 줄은 카카오 단추가 그려질 때만 넘긴다
+        expect(hint).toBeGreaterThan(sheet.indexOf("const secondaryRow = ("));
+        expect(hint).toBeLessThan(sheet.indexOf("const socialButtons = "));
+        expect(sheet).toContain("secondaryRow={kakaoShown ? secondaryRow : undefined}");
         // 안내가 가리키는 길(전화번호 단추)이 바로 아래다
         expect(sheet.indexOf("onClick={toPhone}", hint)).toBeGreaterThan(hint);
         const webOnly = sheet.indexOf('{t("login.kakaoWebOnly")}');

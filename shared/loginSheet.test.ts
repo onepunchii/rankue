@@ -259,7 +259,7 @@ describe("모양 — 아래에서 올라오는 시트 하나", () => {
     it("단추 묶음은 SocialLogin 재사용 — 순서는 로그인 화면과 같은 규칙: 한국어는 카카오가 되는 곳만 소셜이 먼저, 아니면 전화번호가 먼저", () => {
         // 묶음은 한 번만 만든다(순서가 어느 쪽이든 한 팝업에 하나만 붙는다 — 구글 단추 GIS 는 전역 하나다)
         expect(sheet.match(/<SocialLogin /g)).toHaveLength(1);
-        expect(sheet).toContain("const socialButtons = <SocialLogin hint={false} kakao={!storeEntry} tone={tone} redirect={back} onDone={done} />;");
+        expect(sheet).toContain("const socialButtons = <SocialLogin hint={false} kakao={!storeEntry} tone={tone} redirect={back} onDone={done} secondaryRow={kakaoShown ? secondaryRow : undefined} />;");
         // 판정: 카카오 단추가 실제로 그려지는가(SocialLogin 의 showKakao 와 같은 식) → 한국어는 그때만 소셜이 먼저
         expect(sheet).toContain('const kakaoShown = !storeEntry && locale === "ko" && kakaoLoginAvailable();');
         expect(sheet).toContain('const phoneFirst = locale === "ko" ? !kakaoShown : !social;');
@@ -324,14 +324,22 @@ describe("모양 — 아래에서 올라오는 시트 하나", () => {
         expect(lib).toMatch(/function kakaoSwitchOn\(\): boolean \{\s*return KAKAO_OPEN \|\| kakaoPreviewOn\(\);\s*\}/);
         // 기존 회원 안내: 카카오 단추가 그려질 때만, '또는' 줄 뒤 · 전화번호 단추 바로 위(안내가 가리키는 길이 바로 아래 단추다)
         const body = sheet.slice(sheet.indexOf("{!social ? ("));
-        const socialFirstBlock = body.slice(body.indexOf(") : (", body.indexOf(") : phoneFirst ? (") + 1));
-        const hint = socialFirstBlock.indexOf('{t("login.phoneExistingHint")}');
-        expect(hint).toBeGreaterThan(socialFirstBlock.indexOf("{orRule}"));
-        expect(socialFirstBlock.lastIndexOf("{kakaoShown && (", hint)).toBeGreaterThan(0);
-        expect(socialFirstBlock.indexOf("onClick={toPhone}")).toBeGreaterThan(hint);
+        // 2026-10-07 주·보조 정리(오너: "한국은 카카오 구글이 주 가입버튼, 애플이나 핸드폰번호는 서브"): 안내는 보조 줄(secondaryRow) 안으로 옮겼다 —
+        // '또는' 줄 뒤 · 전화번호 링크 바로 위는 그대로다. 보조 줄은 카카오 단추가 그려질 때만 SocialLogin 에 넘긴다.
+        const row = sheet.slice(sheet.indexOf("const secondaryRow = ("), sheet.indexOf("const socialButtons = "));
+        const hint = row.indexOf('{t("login.phoneExistingHint")}');
+        expect(hint).toBeGreaterThan(row.indexOf("{orRule}"));
+        expect(row.indexOf("onClick={toPhone}")).toBeGreaterThan(hint);
+        expect(sheet).toContain("secondaryRow={kakaoShown ? secondaryRow : undefined}");
+        // 카카오가 되는 곳의 팝업은 묶음 하나뿐이다 — '또는'·안내·전화번호·애플(웹)은 보조 줄이 그린다
+        expect(body).toMatch(/\) : kakaoShown \? \(\s*(?:\/\/[^\n]*\n\s*)*socialButtons\s*\) : \(/);
+        // 애플(웹)은 전화번호 옆의 작은 링크 — SocialLogin 이 넘겨줄 때만(iOS 앱에서는 null: 애플 단추가 큰 묶음에 남는다 · App Store 4.8)
+        expect(row.indexOf("{apple && (")).toBeGreaterThan(row.indexOf("onClick={toPhone}"));
+        expect(row).toContain("onClick={apple.onClick}");
+        expect(row).toContain("disabled={apple.disabled}");
         // 앱 안 안내: 단추 묶음 아래 · 약관 줄 위
         const webOnly = body.indexOf('{t("login.kakaoWebOnly")}');
-        expect(body.lastIndexOf("{kakaoWebOnlyHint && (", webOnly)).toBeGreaterThan(socialFirstBlock.indexOf("onClick={toPhone}"));
+        expect(body.lastIndexOf("{kakaoWebOnlyHint && (", webOnly)).toBeGreaterThan(body.lastIndexOf("onClick={toPhone}", webOnly));
         expect(body.indexOf("{legal.map(")).toBeGreaterThan(webOnly);
         // 색은 약관 줄과 같은 것(밝은 쪽 토큰 · 어두운 쪽 리터럴) — 새 클래스를 만들지 않는다. 글자 12px
         for (const key of ["login.phoneExistingHint", "login.kakaoWebOnly"]) {
@@ -438,7 +446,8 @@ describe("문구 — 다섯 언어 사전, 약관 링크", () => {
     it("팝업이 쓰는 키가 ko·en·es·tr·vi 에 전부, 한 번씩 있다", () => {
         const used = Array.from(sheet.matchAll(/t\("([A-Za-z]+\.[A-Za-z0-9]+)"\)/g), (m) => m[1]);
         // login.phoneExistingHint · login.kakaoWebOnly — 계정이 갈리기 전의 두 안내(2026-10-06 검토, 로그인 화면과 같은 키를 쓴다)
-        expect(new Set(used)).toEqual(new Set([...KEYS, "login.or", "login.phoneExistingHint", "login.kakaoWebOnly"]));
+        // login.continueApple — 보조 줄의 애플 링크(2026-10-07, 큰 애플 단추와 같은 키)
+        expect(new Set(used)).toEqual(new Set([...KEYS, "login.or", "login.phoneExistingHint", "login.kakaoWebOnly", "login.continueApple"]));
         for (const l of LOCALES) {
             const dict = client(`lib/i18n/${l}.ts`);
             for (const key of used) {
@@ -524,7 +533,7 @@ describe("팝업의 로그인 — '나'를 새로 받은 뒤에 닫고, 가려�
         // 부른 쪽 값은 ref 로 읽는다 — submitToken 이 흔들리면 구글 단추(GIS)가 다시 초기화된다
         expect(social).toContain("given.current = { redirect, onDone };");
         expect(submit).toMatch(/\}, \[setLocation, toast, t, askTerms, returnTo, finishInPlace\]\);\s*$/);
-        expect(social).toContain("export default function SocialLogin({ hint = true, kakao = true, redirect, onDone, tone }: SocialLoginProps) {");
+        expect(social).toContain("export default function SocialLogin({ hint = true, kakao = true, redirect, onDone, tone, secondaryRow }: SocialLoginProps) {");
     });
 });
 

@@ -601,6 +601,136 @@ router.post("/reset-pin/verify", asyncHandler(async (req: any, res: any) => {
     }
 }));
 
+// (자리 주의) 아래 통합 로그인 길은 웹 카카오의 세 길(로그인·연결·해제) 사이에 끼우지 않는다 — 그 구간은 인가 코드만 다루는 길로 시험이 지킨다.
+
+/* ── 통합 로그인(2026-10-07 오너: "휴대폰 로그인 사용자를 카카오나 구글 로그인으로 통합") ──────────────────────────────
+ * 계정은 하나, 들어오는 문이 여럿. 카카오 연결(위)과 같은 본인 확인(PIN)·같은 잠금을 구글에도 연다.
+ * 그리고 반대 방향 — 소셜로 방금 만든 빈 계정을 기존 전화번호 계정에 잇기(POST /social/attach-phone). */
+
+/** 구글 연결·해제의 본인 확인(PIN) 결과 → 응답. 카카오의 sendKakaoPinFailure 와 같은 갈래, 문구만 로그인 수단을 가리지 않는다. */
+function sendLinkPinFailure(res: any, key: string, checked: "ok" | "no-profile" | "no-pin" | "wrong-pin") {
+    if (checked === "no-profile") return sendError(res, 409, "err.auth.linkNoProfile", "LINK_NO_PROFILE");
+    if (checked === "no-pin") return sendError(res, 409, "err.auth.linkPinRequired", "LINK_PIN_REQUIRED");
+    if (checked === "wrong-pin") {
+        registerFailure(key);
+        return sendError(res, 401, "err.auth.linkPinWrong", "LINK_PIN_WRONG");
+    }
+    return null;
+}
+
+// POST /social/google/link — 로그인한 회원이 내 계정에 구글을 붙인다(설정 '연결된 로그인'). body: { idToken, pin }
+// 쿠키는 건드리지 않는다. PIN 을 토큰 검증보다 **먼저** 본다(틀린 PIN 으로 구글 검증을 돌리지 않는다).
+// 결과: 200 { linked: true } · 400 · 401 LINK_PIN_WRONG · 401(토큰) · 409 LINK_TAKEN · LINK_NO_PROFILE · LINK_PIN_REQUIRED · LINK_OTHER_LINKED · 429
+router.post("/social/google/link", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { idToken, pin } = req.body ?? {};
+    // 폼 본문으로는 받지 않는다 — 남의 사이트가 숨긴 폼으로 자기 구글을 내 계정에 붙이지 못하게(카카오 길과 같은 이유)
+    if (!isJsonBody(req) || typeof idToken !== "string" || !idToken) return sendError(res, 400, "err.auth.socialParamsRequired");
+
+    const key = attemptKey('social-link', 'google', req.userId);
+    const rl = checkRateLimit(key);
+    if (rl.limited) return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
+    const release = takeAttemptSlot(key);
+    if (!release) return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: SLOT_RETRY_SEC }));
+
+    let identity: Awaited<ReturnType<typeof verifyGoogleIdToken>>;
+    try {
+        const pinFailed = sendLinkPinFailure(res, key, await hiqService.checkKakaoPin(req.userId!, pin));
+        if (pinFailed) return pinFailed;
+        identity = await verifyGoogleIdToken(idToken);
+    } finally {
+        release();
+    }
+    if (!identity) {
+        registerFailure(key);
+        return sendError(res, 401, "err.auth.tokenInvalid");
+    }
+    clearAttempts(key);
+
+    const linked = await hiqService.linkSocial(req.userId!, "google", identity);
+    if (linked === "taken") return sendError(res, 409, msg("err.auth.linkTaken", { provider: "Google" }), "LINK_TAKEN");
+    if (linked === "no-profile") return sendError(res, 409, "err.auth.linkNoProfile", "LINK_NO_PROFILE");
+    if (linked === "no-pin") return sendError(res, 409, "err.auth.linkPinRequired", "LINK_PIN_REQUIRED");
+    if (linked === "other-linked") return sendError(res, 409, msg("err.auth.linkOtherLinked", { provider: "Google" }), "LINK_OTHER_LINKED");
+    return sendSuccess(res, { linked: true });
+}));
+
+// DELETE /social/google/link — 내 계정에서 구글을 뗀다. body: { pin }. 구글로 **가입한** 계정은 떼면 들어올 길이 없어져 거절한다.
+router.delete("/social/google/link", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { pin } = req.body ?? {};
+    if (typeof pin !== "string" || !pin) return sendError(res, 400, "err.auth.missingFields");
+
+    const key = attemptKey('social-link', 'google', req.userId);
+    const rl = checkRateLimit(key);
+    if (rl.limited) return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
+    const release = takeAttemptSlot(key);
+    if (!release) return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: SLOT_RETRY_SEC }));
+
+    let unlinked: Awaited<ReturnType<typeof hiqService.unlinkSocial>>;
+    try {
+        unlinked = await hiqService.unlinkSocial(req.userId!, "google", pin);
+    } finally {
+        release();
+    }
+    if (unlinked === "signup-account") return sendError(res, 409, msg("err.auth.linkUnlinkSignup", { provider: "Google" }), "LINK_SIGNUP_ACCOUNT");
+    const pinFailed = sendLinkPinFailure(res, key, unlinked);
+    if (pinFailed) return pinFailed;
+    clearAttempts(key);
+    return sendSuccess(res, { linked: false });
+}));
+
+/**
+ * POST /social/attach-phone — 소셜(카카오·구글·애플)로 **방금 만든 빈 계정**을 기존 전화번호 계정에 잇는다. body: { phone, pin }
+ * "전에 전화번호로 쓰셨나요?"의 답이다: 지금 들고 온 로그인 수단을 그 번호의 계정으로 옮기고 빈 계정은 지운 뒤, **쿠키를 그 계정으로 바꾼다**.
+ *  - 전화번호 로그인과 **같은 잠금**을 쓴다(login:<번호>:<ip>, 다섯 번·15분) — 이 길로 PIN 을 더 맞혀 볼 수 없다. 없는 번호도 로그인처럼 따로 센다.
+ *  - 폼 본문은 받지 않는다(쿠키가 바뀌는 길이다 — 로그인 CSRF).
+ *  - 지금 계정에 기록이 있으면 거절한다. 기록 합치기는 하지 않는다(hiqService.attachSocialToPhone).
+ * 결과: 200 { member, attached } · 400 · 401 ATTACH_PIN_WRONG · 404 ATTACH_NO_ACCOUNT · 409 ATTACH_NOT_SOCIAL · ATTACH_NOT_EMPTY · ATTACH_NO_PIN · ATTACH_OTHER_LINKED · 403(정지) · 429
+ */
+router.post("/social/attach-phone", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const { phone, pin } = req.body ?? {};
+    if (!isJsonBody(req) || !isLoginPhone(phone)) return sendError(res, 400, "err.auth.phoneInvalid");
+    if (typeof pin !== "string" || !pin) return sendError(res, 400, "err.auth.missingFields");
+
+    const key = attemptKey('login', phone, req.ip);
+    const rl = checkRateLimit(key);
+    if (rl.limited) return sendError(res, 429, msg("err.auth.loginTooMany", { sec: rl.retryAfterSec }));
+    const probeKey = attemptKey('login-unknown', 'any', clientIp(req));
+    const probe = checkRateLimit(probeKey);
+    if (probe.limited) return sendError(res, 429, msg("err.auth.loginTooMany", { sec: probe.retryAfterSec }));
+    const release = takeAttemptSlot(key);
+    if (!release) return sendError(res, 429, msg("err.auth.loginTooMany", { sec: SLOT_RETRY_SEC }));
+
+    let out: Awaited<ReturnType<typeof hiqService.attachSocialToPhone>>;
+    try {
+        out = await hiqService.attachSocialToPhone(req.userId!, phone, pin);
+    } finally {
+        release();
+    }
+    if (out.kind === "wrong-pin") { registerFailure(key); return sendError(res, 401, "err.auth.attachPinWrong", "ATTACH_PIN_WRONG"); }
+    if (out.kind === "no-account") { registerFailure(probeKey, LOGIN_UNKNOWN_MAX); return sendError(res, 404, "err.auth.attachNoAccount", "ATTACH_NO_ACCOUNT"); }
+    if (out.kind === "no-pin") return sendError(res, 409, "err.auth.attachNoPin", "ATTACH_NO_PIN");
+    if (out.kind === "not-social") return sendError(res, 409, "err.auth.attachNotSocial", "ATTACH_NOT_SOCIAL");
+    if (out.kind === "not-empty") return sendError(res, 409, "err.auth.attachNotEmpty", "ATTACH_NOT_EMPTY");
+    // 남은 갈래(other-linked)까지 여기서 끝낸다 — 아래는 성공뿐
+    if (out.kind !== "ok") return sendError(res, 409, "err.auth.attachOtherLinked", "ATTACH_OTHER_LINKED");
+
+    clearAttempts(key);
+    if (await isMemberSuspended(out.member.id)) {
+        res.clearCookie('hiq_user_id', { path: '/' });
+        return sendError(res, 403, SUSPENDED_TEXT, ACCOUNT_SUSPENDED_CODE);
+    }
+    await storage.incrementVisitCount(out.member.id).catch(() => undefined);
+    res.cookie('hiq_user_id', out.member.id, {
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        signed: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
+        path: '/'
+    });
+    return sendSuccess(res, { member: out.member, attached: out.provider });
+}));
+
 // --- 카카오 로그인 미리보기(2026-10-06) — 공개 스위치는 꺼 둔 채, 열쇠를 넣은 기기(브라우저·앱 웹뷰)에서만 카카오 로그인을 연다 ---
 // 1.3 을 Play 내부 테스트에 올렸는데 스위치(KAKAO_LOGIN_OPEN)가 꺼져 있어 실기기에서 시험할 길이 없었다 — 켜면 모든 사용자에게 열린다.
 // 열쇠(환경변수 KAKAO_PREVIEW_KEY)가 서버에 없으면 켜기·끄기 두 길은 **없는 주소**다: next() 로 흘려보내 없는 길과 똑같은 404 가 나간다.

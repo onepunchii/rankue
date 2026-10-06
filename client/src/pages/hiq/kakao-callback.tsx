@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { ApiError, apiRequest, queryClient, refreshAfterLogin } from "@/lib/queryClient";
+import { offerAttachPhone } from "@/components/hiq/AttachPhoneSheet";
 import { takeKakaoPending } from "@/lib/kakaoLogin";
 import { KAKAO_REDIRECT_PATH, checkKakaoReturn, kakaoRedirectUri, type KakaoMode } from "@shared/kakaoLogin";
 import { safeReturnPath } from "@shared/promoFunnel";
@@ -217,6 +218,8 @@ export default function KakaoCallback() {
                 }
                 // '나'를 새로 받은 뒤에 옮긴다 — 안 그러면 돌아간 화면이 비로그인으로 그려진다(queryClient.refreshAfterLogin)
                 await refreshAfterLogin();
+                // 방금 카카오로 새 계정이 만들어졌다 — 전에 전화번호로 쓰던 사람이면 그 계정에 잇게 한 번 묻는다(옮겨 간 화면 위에 뜬다)
+                if (out.isNew) offerAttachPhone();
                 // 로그인 화면에 실려 왔던 ?redirect= (카카오에 다녀오는 동안 꾸러미가 들고 있었다) → 서버가 준 곳 → 홈
                 const dest = safeReturnPath(out.back) ?? safeReturnPath(out.redirectTo) ?? "/dashboard";
                 go(dest);
