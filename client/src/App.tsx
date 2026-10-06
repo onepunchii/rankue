@@ -23,6 +23,7 @@ import { useToast } from "@/hooks/use-toast";
 // HiQ Pages
 import HiqLanding from "@/pages/hiq/landing";
 import KakaoCallback from "@/pages/hiq/kakao-callback";
+import KakaoPreview from "@/pages/hiq/kakao-preview";
 import HiqRegister from "@/pages/hiq/register";
 import HiqDashboard from "@/pages/hiq/dashboard";
 import HiqAdmin from "@/pages/hiq/admin";
@@ -313,6 +314,8 @@ function AppRoutes() {
       <Route path="/" component={HiqLanding} />
       {/* 카카오 로그인에서 돌아오는 주소(2026-10-05) — 공개. 경로는 카카오 콘솔에 등록한 Redirect URI 와 같아야 한다(shared/kakaoLogin KAKAO_REDIRECT_PATH) */}
       <Route path="/auth/kakao" component={KakaoCallback} />
+      {/* 카카오 로그인 미리보기(2026-10-06) — 열쇠를 넣은 기기에서만 켜진다. 로그인 불필요, 열쇠가 없으면 없는 화면과 같다(shared/kakaoLogin KAKAO_PREVIEW_PATH) */}
+      <Route path="/kakao-preview" component={KakaoPreview} />
       {/* 공개 정책 문서 — 스토어 심사용, 로그인 불필요 */}
       <Route path="/privacy" component={Privacy} />
       <Route path="/account-delete" component={AccountDelete} />

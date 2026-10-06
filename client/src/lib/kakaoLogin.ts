@@ -15,7 +15,7 @@ import { registerPlugin } from "@capacitor/core";
 import { isNativeApp } from "@/lib/nativeBridge";
 import { ApiError, apiRequest } from "@/lib/queryClient";
 import {
-    KAKAO_PENDING_KEY, KAKAO_SDK_CROSSORIGIN, KAKAO_SDK_INTEGRITY, KAKAO_SDK_URL,
+    KAKAO_PENDING_KEY, KAKAO_PREVIEW_FLAG, KAKAO_SDK_CROSSORIGIN, KAKAO_SDK_INTEGRITY, KAKAO_SDK_URL, KAKAO_STATUS_API,
     isAllowedKakaoOrigin, kakaoRedirectUri, makeKakaoPending, newKakaoState, parseKakaoPending,
     type KakaoMode, type KakaoPending,
 } from "@shared/kakaoLogin";
@@ -28,7 +28,63 @@ import { nativeSupports } from "@shared/nativeCaps";
 const KAKAO_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY as string | undefined;
 // 여는 스위치(2026-10-06 오너: "앱 빌드해서 승인받고 그때 카카오 오픈") — 키가 있어도 이 값이 "1" 이 아니면 단추가 어디에도 안 뜬다.
 // 서버의 KAKAO_LOGIN_OPEN 과 짝이다(server/lib/kakaoAuth kakaoOpen). 열 때는 Vercel 에 둘 다 1 로 넣고 다시 배포한다.
+// (예외는 미리보기 하나다 — 열쇠를 넣은 기기에서만 이 값과 무관하게 열린다. 바로 아래)
 const KAKAO_OPEN = (import.meta.env.VITE_KAKAO_LOGIN_OPEN as string | undefined) === "1";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 미리보기(2026-10-06) — 공개 스위치(KAKAO_OPEN)는 꺼 둔 채, **열쇠를 넣은 기기**에서만 카카오 단추가 보인다.
+// 새 앱 빌드(1.3)를 스토어 승인 전에 실기기로 시험하려는 것이다. 계약은 shared/kakaoLogin.ts, 서버는 server/lib/kakaoAuth.
+//  - 깃발: 기기 저장소(localStorage)의 한 칸. 미리보기 페이지(/kakao-preview)가 서버에서 열쇠를 확인받은 뒤에만 세운다.
+//    서버가 심은 쿠키는 httpOnly 라 화면이 못 읽는다 — 깃발은 그 쿠키가 있다는 것을 화면이 기억하는 표시일 뿐이다.
+//  - **깃발이 없는 기기는 예전과 한 글자도 다르지 않다**: 아래 kakaoSwitchOn 이 KAKAO_OPEN 과 같은 값이고, 서버에 묻는 요청도 없다.
+//  - 깃발은 단추를 보여 줄지만 정한다. 손으로 세워도 서버의 쿠키가 없으면 카카오 길은 전부 닫힌 답(503)을 준다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 이 기기에 미리보기 깃발이 서 있는가. 저장소를 못 읽는 환경(사생활 보호 모드 등)에서는 없는 것으로 친다. */
+export function kakaoPreviewOn(): boolean {
+    try {
+        return window.localStorage.getItem(KAKAO_PREVIEW_FLAG) === "1";
+    } catch {
+        return false;
+    }
+}
+
+// 깃발을 세우거나 내릴 때마다 오른다 — 앱이 뜰 때 보낸 확인(syncKakaoPreview)의 답이 그 뒤에 새로 세운 깃발을 지우지 못하게 한다.
+let previewEpoch = 0;
+
+/** 깃발을 세우거나 내린다 — 세우는 것은 미리보기 페이지가 서버의 확인을 받은 뒤에만 한다. */
+export function setKakaoPreview(on: boolean): void {
+    previewEpoch += 1;
+    try {
+        if (on) window.localStorage.setItem(KAKAO_PREVIEW_FLAG, "1");
+        else window.localStorage.removeItem(KAKAO_PREVIEW_FLAG);
+    } catch { /* 저장소를 못 쓰는 환경 — 깃발 없이 예전처럼 동작한다 */ }
+}
+
+/**
+ * 카카오의 스위치가 켜져 있는가 — 공개 스위치(빌드 때 박힌 값)가 켜졌거나, 이 기기에 미리보기 깃발이 서 있다.
+ * 아래 세 판정(kakaoLoginOpen · kakaoNativeAvailable · kakaoLoginAvailable)이 전부 이 함수 하나로 스위치를 본다.
+ */
+function kakaoSwitchOn(): boolean {
+    return KAKAO_OPEN || kakaoPreviewOn();
+}
+
+/**
+ * 깃발이 아직 유효한지 서버에 한 번 묻는다 — **깃발이 선 기기만**(없으면 요청을 보내지 않는다).
+ * 서버가 닫혀 있다고 답하면(열쇠를 바꿨다 · 쿠키가 만료됐다 · 공개 스위치도 꺼져 있다) 조용히 깃발을 내린다.
+ * 못 물어봤으면(오프라인 · 서버 오류 · 서비스 워커가 지어낸 가짜 404) 그대로 둔다 — '닫힘'이라는 답을 받았을 때만 내린다.
+ */
+export async function syncKakaoPreview(): Promise<void> {
+    if (!kakaoPreviewOn()) return;
+    const epoch = previewEpoch;
+    try {
+        const status = await apiRequest(KAKAO_STATUS_API);
+        if (status?.open === false && epoch === previewEpoch) setKakaoPreview(false);
+    } catch { /* 못 물어봤다 — 다음에 앱이 뜰 때 다시 묻는다 */ }
+}
+
+// 앱이 뜰 때 한 번(이 파일은 가입·로그인 팝업이 늘 싣는다 — App.tsx 의 LoginSheetHost). 깃발이 없는 기기에서는 아무 일도 없다.
+void syncKakaoPreview();
 
 /** Kakao JavaScript SDK 2.x 에서 우리가 쓰는 것만 적는다(전체 타입을 들이지 않는다). */
 type KakaoSdk = {
@@ -57,9 +113,10 @@ declare global {
 /**
  * 카카오 로그인이 **열려 있는가**(스위치 + 키) — 이 기기에서 단추를 누를 수 있는지(kakaoLoginAvailable)와 다르다.
  * 앱 안처럼 단추는 못 쓰지만 "카카오는 웹에서" 같은 안내를 보여 줄 자리에서 쓴다. 닫혀 있는 동안에는 카카오라는 말이 어디에도 나오면 안 된다.
+ * 스위치는 kakaoSwitchOn(공개 스위치 || 미리보기 깃발)이다 — 깃발이 없는 기기에서는 공개 스위치와 같은 값이다.
  */
 export function kakaoLoginOpen(): boolean {
-    return KAKAO_OPEN && !!KAKAO_JS_KEY;
+    return kakaoSwitchOn() && !!KAKAO_JS_KEY;
 }
 
 /**
@@ -68,11 +125,11 @@ export function kakaoLoginOpen(): boolean {
  * 없는 플러그인을 부르는 단추가 뜨지 않는다. 웹용 JS 키는 이 길에 쓰이지 않는다.
  */
 export function kakaoNativeAvailable(): boolean {
-    return KAKAO_OPEN && nativeSupports("nativeKakaoLogin");
+    return kakaoSwitchOn() && nativeSupports("nativeKakaoLogin");
 }
 
 export function kakaoLoginAvailable(): boolean {
-    if (!KAKAO_OPEN) return false;
+    if (!kakaoSwitchOn()) return false;
     // 앱 안: 네이티브 플러그인이 있으면 그 길로 된다. 없으면 아래에서 예전처럼 숨는다
     if (kakaoNativeAvailable()) return true;
     if (!KAKAO_JS_KEY || isNativeApp()) return false;

@@ -3521,6 +3521,12 @@ const tr: Dict = {
   "kakao.unlinkFailed": "Kakao bağlantısı kaldırılamadı. Lütfen biraz sonra tekrar deneyin.",
   "settings.disconnect": "Kaldır",
   "settings.kakaoLinkOnWeb": "Kakao'yu bağlamak için webde (www.rankue.co.kr) telefon numaranızla giriş yapın, ardından Ayarlar'ı açın.",
+  // 카카오 로그인 미리보기(2026-10-06) — 열쇠를 넣은 기기에서만 뜨는 화면(/kakao-preview). 단추는 kakao.toLogin 을 같이 쓴다
+  "kakaoPreview.onTitle": "Bu cihazda Kakao ile giriş önizlemesi açıldı",
+  "kakaoPreview.onDesc": "Kakao düğmesi artık Korece giriş ekranında görünüyor. Yalnızca bu cihazda, 30 gün boyunca.",
+  "kakaoPreview.offTitle": "Bu cihazda Kakao ile giriş önizlemesi kapatıldı",
+  "kakaoPreview.nativeMissing": "Sunucuda Kakao uygulama anahtarı henüz yok; bu uygulamadaki Kakao düğmesi giriş yapmaz.",
+  "kakaoPreview.openApp": "Bu cihazdaki RANKUE uygulamasında da aç",
   // '앱에서 열기'(2026-10-06 오너: "웹에서 로그인한 사람이 앱을 깔았을 때 다시 로그인하지 않고 그대로") — 앱이 웹의 로그인을 넘겨받은 직후 한 줄(HandoffRedeemer)
   "handoff.welcome": "Webde kullandığınız hesapla giriş yaptınız",
   // 2026-10-06 검토 — 바꾸기 전에 묻는다(남이 보낸 링크로 그 사람 계정에 들어가지 않게) · 들어온 뒤 어느 계정인지 이름을 보여 준다

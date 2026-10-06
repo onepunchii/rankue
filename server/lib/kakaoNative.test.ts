@@ -836,7 +836,8 @@ describe("라우트 규칙(server/routes/modules/auth.ts) — 순서와, 웹 카
     it("검증 길의 순서 — 스위치 → JSON·꼴 → (연결이면 로그인) → 시도 횟수 → 자리 잡기 → (연결이면 PIN) → nonce 를 쓰고 쿠키를 지운다 → 토큰 검증 → 계정", () => {
         const at = (s: string) => { const i = verify.indexOf(s); expect(i, s).toBeGreaterThan(0); return i; };
         const order = [
-            at("if (!kakaoNativeConfigured()) return sendKakaoNativeFailure(res, \"not-configured\");"),
+            // 2026-10-06 미리보기: 스위치는 이 요청 기준으로 본다(공개 스위치 또는 미리보기 쿠키) — server/lib/kakaoPreview.test.ts
+            at("if (!kakaoNativeConfigured(req)) return sendKakaoNativeFailure(res, \"not-configured\");"),
             at("if (!isJsonBody(req) || !looksLikeKakaoIdToken(idToken) || !isKakaoNonce(nonce))"),
             at("return sendError(res, 401, \"err.common.loginRequired\");"),
             at("checkRateLimit(key)"),

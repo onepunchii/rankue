@@ -3527,6 +3527,12 @@ export const ko: Dict = {
   "kakao.unlinkFailed": "카카오 연결을 해제하지 못했어요. 잠시 후 다시 시도해 주세요.",
   "settings.disconnect": "해제",
   "settings.kakaoLinkOnWeb": "카카오 연결은 웹(www.rankue.co.kr)에서 전화번호로 로그인한 뒤 설정에서 할 수 있어요.",
+  // 카카오 로그인 미리보기(2026-10-06) — 열쇠를 넣은 기기에서만 뜨는 화면(/kakao-preview). 단추는 kakao.toLogin 을 같이 쓴다
+  "kakaoPreview.onTitle": "이 기기에서 카카오 로그인 미리보기가 켜졌어요",
+  "kakaoPreview.onDesc": "한국어 화면의 로그인에 카카오 단추가 보여요. 이 기기에서만, 30일 동안입니다.",
+  "kakaoPreview.offTitle": "이 기기의 카카오 로그인 미리보기를 껐어요",
+  "kakaoPreview.nativeMissing": "서버에 앱용 카카오 키가 아직 없어, 이 앱에서는 카카오 단추를 눌러도 로그인되지 않아요.",
+  "kakaoPreview.openApp": "이 기기의 랭큐 앱에서도 켜기",
   // '앱에서 열기'(2026-10-06 오너: "웹에서 로그인한 사람이 앱을 깔았을 때 다시 로그인하지 않고 그대로") — 앱이 웹의 로그인을 넘겨받은 직후 한 줄(HandoffRedeemer)
   "handoff.welcome": "웹에서 쓰던 계정으로 들어왔어요",
   // 2026-10-06 검토 — 바꾸기 전에 묻는다(남이 보낸 링크로 그 사람 계정에 들어가지 않게) · 들어온 뒤 어느 계정인지 이름을 보여 준다

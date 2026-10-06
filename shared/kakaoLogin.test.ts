@@ -396,16 +396,20 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         const fn = lib.slice(lib.indexOf("export function kakaoLoginAvailable"), lib.indexOf("const SCRIPT_ID"));
         expect(fn).toContain("if (!KAKAO_JS_KEY || isNativeApp()) return false;");
         // 앱 안의 예외는 스위치 다음 · 예전 줄(앱이면 숨김) 앞에 있다 — 플러그인이 없으면 그대로 아래로 떨어진다
+        // (2026-10-06 미리보기: 스위치를 보는 글자가 KAKAO_OPEN → kakaoSwitchOn() 으로 바뀌었다 — 공개 스위치 || 이 기기의 미리보기 깃발.
+        //  깃발이 없는 기기에서는 KAKAO_OPEN 과 같은 값이다. 그 규칙의 시험은 shared/kakaoPreview.test.ts)
         const native = fn.indexOf("if (kakaoNativeAvailable()) return true;");
-        expect(native).toBeGreaterThan(fn.indexOf("if (!KAKAO_OPEN) return false;"));
+        expect(fn.indexOf("if (!kakaoSwitchOn()) return false;")).toBeGreaterThan(0);
+        expect(native).toBeGreaterThan(fn.indexOf("if (!kakaoSwitchOn()) return false;"));
         expect(native).toBeLessThan(fn.indexOf("if (!KAKAO_JS_KEY || isNativeApp()) return false;"));
         // 닫혀 있는 동안에는 안내 문구·설정의 줄도 안 보인다(kakaoLoginOpen) — 앱 안은 단추를 못 쓰지만 안내는 보여 주는 자리라 따로 가른다
         expect(lib).toContain("export function kakaoLoginOpen(): boolean {");
-        expect(lib).toContain("return KAKAO_OPEN && !!KAKAO_JS_KEY;");
+        expect(lib).toContain("return kakaoSwitchOn() && !!KAKAO_JS_KEY;");
         expect(code(client("pages/hiq/settings.tsx"))).toContain('...((locale === "ko" && kakaoLoginOpen()) || conn.kakao ? [{');
         // 여는 스위치(2026-10-06) — 새 앱 빌드가 승인될 때까지 꺼 둔다. 키보다 먼저 본다
-        expect(fn).toContain("if (!KAKAO_OPEN) return false;");
+        expect(fn).toContain("if (!kakaoSwitchOn()) return false;");
         expect(lib).toContain('const KAKAO_OPEN = (import.meta.env.VITE_KAKAO_LOGIN_OPEN as string | undefined) === "1";');
+        expect(lib).toMatch(/function kakaoSwitchOn\(\): boolean \{\s*return KAKAO_OPEN \|\| kakaoPreviewOn\(\);\s*\}/);
         // 개발용 localhost 는 개발 서버(vite dev)에서만 연다 — 운영 빌드는 운영 원본에서만(2026-10-05 검토)
         expect(fn).toContain("return isAllowedKakaoOrigin(window.location.origin, import.meta.env.DEV);");
         // 화면 어디에서도 허용 목록을 손으로 켜지 않는다(true 를 박아 넣으면 운영 빌드에서 localhost 가 열린다)
@@ -528,8 +532,9 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(sheet.match(/t\("login\.phoneExistingHint"\)/g)).toHaveLength(1);
         expect(sheet.match(/t\("login\.kakaoWebOnly"\)/g)).toHaveLength(1);
         // 스위치가 꺼져 있으면 두 조건 모두 false 다 — 닫혀 있는 동안 '카카오'라는 말이 팝업 어디에도 나오지 않는다
-        expect(lib).toMatch(/export function kakaoLoginAvailable\(\): boolean \{\s*if \(!KAKAO_OPEN\) return false;/);
-        expect(lib).toMatch(/export function kakaoLoginOpen\(\): boolean \{\s*return KAKAO_OPEN && !!KAKAO_JS_KEY;/);
+        // (스위치 = kakaoSwitchOn: 공개 스위치 || 미리보기 깃발. 깃발이 없는 기기에서는 공개 스위치 그대로다 — shared/kakaoPreview.test.ts)
+        expect(lib).toMatch(/export function kakaoLoginAvailable\(\): boolean \{\s*if \(!kakaoSwitchOn\(\)\) return false;/);
+        expect(lib).toMatch(/export function kakaoLoginOpen\(\): boolean \{\s*return kakaoSwitchOn\(\) && !!KAKAO_JS_KEY;/);
         // 한국어 팝업의 순서도 로그인 화면과 같다: 카카오가 되는 곳만 소셜이 먼저, 아니면(앱 안 · 스위치 꺼짐 · 매장 진입) 전화번호가 먼저
         expect(sheet).toContain('const phoneFirst = locale === "ko" ? !kakaoShown : !social;');
     });

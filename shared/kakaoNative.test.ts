@@ -144,7 +144,9 @@ describe("앱 안 노출 조건 — 플러그인 있음 && 스위치", () => {
 
     it("화면의 판정은 한 줄이다 — 스위치(VITE_KAKAO_LOGIN_OPEN) && 플러그인. 웹용 JS 키는 이 길에 쓰이지 않는다", () => {
         expect(lib).toContain('const KAKAO_OPEN = (import.meta.env.VITE_KAKAO_LOGIN_OPEN as string | undefined) === "1";');
-        expect(lib).toMatch(/export function kakaoNativeAvailable\(\): boolean \{\s*return KAKAO_OPEN && nativeSupports\("nativeKakaoLogin"\);\s*\}/);
+        // 2026-10-06 미리보기: 스위치는 kakaoSwitchOn() 으로 본다 — 공개 스위치(KAKAO_OPEN) || 이 기기의 미리보기 깃발(shared/kakaoPreview.test.ts)
+        expect(lib).toMatch(/function kakaoSwitchOn\(\): boolean \{\s*return KAKAO_OPEN \|\| kakaoPreviewOn\(\);\s*\}/);
+        expect(lib).toMatch(/export function kakaoNativeAvailable\(\): boolean \{\s*return kakaoSwitchOn\(\) && nativeSupports\("nativeKakaoLogin"\);\s*\}/);
         expect(lib).toContain('import { nativeSupports } from "@shared/nativeCaps";');
         // 플러그인 이름을 화면 코드에 다시 적지 않는다 — 계약의 상수와 기능 표만 쓴다
         for (const [name, src] of [["lib", lib], ["SocialLogin", social], ["settings", settings], ["LoginSheet", sheet], ["landing", landing]] as const) {
@@ -154,7 +156,7 @@ describe("앱 안 노출 조건 — 플러그인 있음 && 스위치", () => {
 
     it("'카카오 단추를 쓸 수 있는가'는 스위치가 먼저다 — 앱 안에서는 플러그인이 있을 때만 참, 없으면 예전처럼 숨는다", () => {
         const fn = lib.slice(lib.indexOf("export function kakaoLoginAvailable"), lib.indexOf("const SCRIPT_ID"));
-        const off = fn.indexOf("if (!KAKAO_OPEN) return false;");
+        const off = fn.indexOf("if (!kakaoSwitchOn()) return false;");
         const native = fn.indexOf("if (kakaoNativeAvailable()) return true;");
         const hide = fn.indexOf("if (!KAKAO_JS_KEY || isNativeApp()) return false;");
         expect(off).toBeGreaterThan(0);
@@ -192,7 +194,7 @@ describe("앱 안 노출 조건 — 플러그인 있음 && 스위치", () => {
         expect(landing).toContain(hint);
         expect(settings).toContain("const kakaoLinkOnWebHint = kakaoLoginOpen() && isNativeApp() && !kakaoNative && ");
         // 셋 다 스위치(kakaoLoginOpen)가 먼저다 — 닫혀 있는 동안에는 어느 앱에서도 '카카오'라는 말이 나오지 않는다
-        expect(lib).toMatch(/export function kakaoLoginOpen\(\): boolean \{\s*return KAKAO_OPEN && !!KAKAO_JS_KEY;/);
+        expect(lib).toMatch(/export function kakaoLoginOpen\(\): boolean \{\s*return kakaoSwitchOn\(\) && !!KAKAO_JS_KEY;/);
     });
 
     it("설정의 연결 — 같은 조건(kakaoLoginAvailable)이고, 새 앱에서는 네이티브 길로 간다", () => {

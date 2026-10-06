@@ -870,7 +870,8 @@ describe("카카오 라우트 규칙(server/routes/modules/auth.ts)", () => {
         for (const block of [login, link]) {
             const ex = block.indexOf("exchanged = await exchangeKakaoCode(code, redirectUri);");
             expect(ex).toBeGreaterThan(0);
-            for (const guard of ["kakaoConfigured()", "isJsonBody(req)", "kakaoRedirectAllowed(redirectUri)", "checkRateLimit(key)", "takeAttemptSlot(key)"]) {
+            // 2026-10-06 미리보기: 스위치는 **이 요청 기준**으로 본다 — kakaoConfigured(req). 공개 스위치 또는 미리보기 쿠키(server/lib/kakaoPreview.test.ts)
+            for (const guard of ["kakaoConfigured(req)", "isJsonBody(req)", "kakaoRedirectAllowed(redirectUri)", "checkRateLimit(key)", "takeAttemptSlot(key)"]) {
                 const at = block.indexOf(guard);
                 expect(at, guard).toBeGreaterThan(0);
                 expect(at, guard).toBeLessThan(ex);

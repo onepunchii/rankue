@@ -16,10 +16,13 @@
  * 앱 안(네이티브 SDK)의 길은 이 파일 아래쪽에 따로 있다(2026-10-06) — 화면이 **ID 토큰**을 들고 오고, 서버는 구글·애플처럼
  * 발급사 공개 키(JWKS)로 검증한다(이미 쓰는 jose — 새 패키지가 아니다). 계약은 shared/kakaoNative.ts.
  */
-import { randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import { createRemoteJWKSet, decodeJwt, jwtVerify } from "jose";
 import type { SocialIdentity } from "./socialAuth.js";
-import { isAllowedKakaoRedirect, cleanKakaoNickname } from "../../shared/kakaoLogin.js";
+import {
+    KAKAO_PREVIEW_COOKIE, KAKAO_PREVIEW_KEY_MAX, KAKAO_PREVIEW_KEY_MIN, KAKAO_PREVIEW_TTL_SEC,
+    isAllowedKakaoRedirect, cleanKakaoNickname,
+} from "../../shared/kakaoLogin.js";
 import {
     KAKAO_ID_TOKEN_ISSUER, KAKAO_JWKS_URL, KAKAO_NONCE_TTL_SEC, isKakaoNonce, looksLikeKakaoIdToken,
 } from "../../shared/kakaoNative.js";
@@ -80,9 +83,84 @@ export function kakaoOpen(): boolean {
     return (process.env.KAKAO_LOGIN_OPEN ?? "").trim() === "1";
 }
 
-/** 카카오 로그인을 받을 수 있는가 — 스위치가 켜져 있고 서버에 키가 둘 다 있다. 아니면 두 API 는 503 을 준다. */
-export function kakaoConfigured(): boolean {
-    return kakaoOpen() && readKeys() !== null;
+// ─────────────────────────────────────────────────────────────────────────────
+// 미리보기(2026-10-06) — 공개 스위치(위 kakaoOpen)는 꺼 둔 채, **열쇠를 넣은 기기**에서만 카카오 로그인을 연다.
+// 1.3 을 Play 내부 테스트에 올렸는데 스위치가 꺼져 있어 실기기에서 카카오 로그인을 시험할 길이 없었다. 스위치를 켜면 모든 사용자에게
+// 열린다(웹에도, 1.2 앱의 안내 문구에도) — 그래서 스위치와 무관한 길을 따로 둔다. 계약(주소·쿠키 이름·깃발)은 shared/kakaoLogin.ts.
+//
+//  - 열쇠: 환경변수 KAKAO_PREVIEW_KEY(16자 이상). **없거나 짧으면 미리보기는 없는 기능이다** — 아래 함수가 전부 false·null 을 주고
+//    라우트는 없는 주소처럼 흘려보낸다(404). 값은 어디에도 적지 않는다: 로그에도 응답에도 쿠키에도 없다.
+//  - 쿠키 hiq_kakao_preview(서명 쿠키 · 30일): `v1.<발급 시각 ms>.<꼬리표>`. 꼬리표는 **지금 열쇠**로 만든 HMAC 의 앞 32자다 —
+//    열쇠를 바꾸면 옛 쿠키가 전부 죽고, 열쇠를 지우면 미리보기 전체가 꺼진다. 서명(cookie-parser)이 있어 화면이 값을 지어낼 수 없고,
+//    꼬리표에서 열쇠를 되찾을 수도 없다. 수명은 브라우저의 쿠키 만료와 별개로 발급 시각으로도 본다.
+//  - 판정은 kakaoOpenFor(req) **하나**다: 공개 스위치가 켜졌거나, 이 요청이 유효한 미리보기 쿠키를 들고 왔다.
+//    kakaoConfigured · kakaoNativeConfigured 가 이 판정을 쓰고, 라우트는 요청(req)을 넘긴다. 요청 없이 부르면 공개 스위치만 본다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 미리보기 열쇠 — 서버에 없거나 길이가 맞지 않으면 null(= 미리보기 없음). 값을 이 함수 밖으로 내보내지 않는다. */
+function previewKey(): string | null {
+    const key = (process.env.KAKAO_PREVIEW_KEY ?? "").trim();
+    return key.length >= KAKAO_PREVIEW_KEY_MIN && key.length <= KAKAO_PREVIEW_KEY_MAX ? key : null;
+}
+
+/** 미리보기가 있는 서버인가 — 열쇠가 설정돼 있다. 아니면 미리보기 길은 없는 주소다. */
+export function kakaoPreviewEnabled(): boolean {
+    return previewKey() !== null;
+}
+
+/** 쿠키에 적는 꼬리표 — 열쇠로 만든 HMAC 의 앞 32자(192비트). 열쇠가 바뀌면 달라진다. */
+function previewTag(key: string): string {
+    return createHmac("sha256", key).update("rankue:kakao-preview:v1").digest("base64url").slice(0, 32);
+}
+
+// 열쇠 대조에 쓰는 소금 — 인스턴스마다 다르다. 두 값을 같은 길이의 요약으로 바꿔 견주면 길이도 내용도 시간 차로 새지 않는다.
+const PREVIEW_COMPARE_SALT = randomBytes(32);
+
+/** 보낸 값이 미리보기 열쇠와 같은가(시간 일정 비교). 열쇠가 없는 서버에서는 무엇을 보내도 false. */
+export function kakaoPreviewKeyMatches(input: unknown): boolean {
+    const key = previewKey();
+    if (!key || typeof input !== "string" || input.length < KAKAO_PREVIEW_KEY_MIN || input.length > KAKAO_PREVIEW_KEY_MAX) return false;
+    const digest = (s: string) => createHmac("sha256", PREVIEW_COMPARE_SALT).update(s, "utf8").digest();
+    return timingSafeEqual(digest(input), digest(key));
+}
+
+/** 미리보기 쿠키에 적을 값 — `v1.<발급 시각 ms>.<꼬리표>`. 열쇠가 없는 서버에서는 null(쿠키를 굽지 않는다). 서명은 cookie-parser 가 한다. */
+export function packKakaoPreview(nowMs: number): string | null {
+    const key = previewKey();
+    return key ? `v1.${Math.floor(nowMs)}.${previewTag(key)}` : null;
+}
+
+/**
+ * 미리보기 쿠키가 유효한가. cookieValue 는 **서명 검증을 통과한** 값(req.signedCookies)이어야 한다 — 서명이 깨진 쿠키는 false 로 온다.
+ * 지금도 열쇠가 설정돼 있고 · 꼴이 맞고 · 30일 안이고 · 꼬리표가 지금 열쇠의 것일 때만 참이다.
+ */
+export function kakaoPreviewValid(cookieValue: unknown, nowMs: number): boolean {
+    const key = previewKey();
+    if (!key || typeof cookieValue !== "string") return false;
+    const hit = /^v1\.(\d{1,16})\.([A-Za-z0-9_-]{32})$/.exec(cookieValue);
+    if (!hit) return false;
+    const age = nowMs - Number(hit[1]);
+    if (!(age >= -60_000 && age <= KAKAO_PREVIEW_TTL_SEC * 1000)) return false;
+    return sameText(hit[2], previewTag(key));
+}
+
+/** 판정에 쓰는 요청의 모양 — 서명 검증을 통과한 쿠키만 본다(서명 없는 req.cookies 는 보지 않는다). */
+export type KakaoGateRequest = { signedCookies?: Record<string, unknown> | null };
+
+/**
+ * **이 요청에** 카카오가 열려 있는가 — 공개 스위치가 켜졌거나, 이 요청이 유효한 미리보기 쿠키를 들고 왔다.
+ * 요청 없이 부르면 공개 스위치만 본다(닫힌 쪽이 기본). 열쇠가 없는 서버에서는 kakaoOpen() 과 늘 같은 값이다.
+ */
+export function kakaoOpenFor(req?: KakaoGateRequest | null): boolean {
+    return kakaoOpen() || kakaoPreviewValid(req?.signedCookies?.[KAKAO_PREVIEW_COOKIE], Date.now());
+}
+
+/**
+ * 카카오 로그인을 받을 수 있는가 — 이 요청에 열려 있고(kakaoOpenFor) 서버에 키가 둘 다 있다. 아니면 두 API 는 503 을 준다.
+ * 라우트는 요청을 넘긴다(미리보기 쿠키를 보려면 필요하다). 요청 없이 부르면 공개 스위치만 본다.
+ */
+export function kakaoConfigured(req?: KakaoGateRequest | null): boolean {
+    return kakaoOpenFor(req) && readKeys() !== null;
 }
 
 /**
@@ -235,9 +313,10 @@ export function kakaoNativeAudiences(): string[] {
  * 앱 안 카카오 로그인을 받을 수 있는가 — 여는 스위치(kakaoOpen)가 켜져 있고 **네이티브 앱 키**(KAKAO_NATIVE_APP_KEY)가 하나 이상 있다.
  * 아니면 두 API 는 503. REST 키만으로는 열지 않는다(2026-10-06 검토): 앱이 받는 토큰의 aud 는 네이티브 앱 키라, 그 키 없이 열면
  * nonce 는 나가는데 토큰은 전부 401 로 떨어지고 실패로 세어져 같은 IP 의 웹 카카오까지 15분 잠겼다. 닫혀 있으면 nonce 단계에서 끝난다.
+ * 스위치는 웹과 같은 판정(kakaoOpenFor)이다 — 미리보기 쿠키를 든 요청에도 열린다. 라우트는 요청을 넘긴다.
  */
-export function kakaoNativeConfigured(): boolean {
-    return kakaoOpen() && (process.env.KAKAO_NATIVE_APP_KEY ?? "").split(",").some((s) => s.trim() !== "");
+export function kakaoNativeConfigured(req?: KakaoGateRequest | null): boolean {
+    return kakaoOpenFor(req) && (process.env.KAKAO_NATIVE_APP_KEY ?? "").split(",").some((s) => s.trim() !== "");
 }
 
 /** 새 nonce — 난수 32바이트(base64url 43자). 추측할 수 없다. */

@@ -317,9 +317,11 @@ describe("모양 — 아래에서 올라오는 시트 하나", () => {
         // 조건은 로그인 화면과 같은 식 — 둘 다 스위치가 꺼지면 false 라, 닫혀 있는 동안 '카카오'라는 말이 어디에도 나오지 않는다
         expect(sheet).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();');
         expect(landing).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();');
+        // (2026-10-06 미리보기: 스위치 = kakaoSwitchOn — 공개 스위치 || 이 기기의 미리보기 깃발. 깃발이 없으면 공개 스위치 그대로다)
         const lib = client("lib/kakaoLogin.ts");
-        expect(lib).toMatch(/export function kakaoLoginAvailable\(\): boolean \{\s*if \(!KAKAO_OPEN\) return false;/);
-        expect(lib).toContain("return KAKAO_OPEN && !!KAKAO_JS_KEY;");
+        expect(lib).toMatch(/export function kakaoLoginAvailable\(\): boolean \{\s*if \(!kakaoSwitchOn\(\)\) return false;/);
+        expect(lib).toContain("return kakaoSwitchOn() && !!KAKAO_JS_KEY;");
+        expect(lib).toMatch(/function kakaoSwitchOn\(\): boolean \{\s*return KAKAO_OPEN \|\| kakaoPreviewOn\(\);\s*\}/);
         // 기존 회원 안내: 카카오 단추가 그려질 때만, '또는' 줄 뒤 · 전화번호 단추 바로 위(안내가 가리키는 길이 바로 아래 단추다)
         const body = sheet.slice(sheet.indexOf("{!social ? ("));
         const socialFirstBlock = body.slice(body.indexOf(") : (", body.indexOf(") : phoneFirst ? (") + 1));

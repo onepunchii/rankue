@@ -12,6 +12,8 @@ import {
     kakaoIdTokenRejected, kakaoNativeConfigured, newKakaoNonce, packKakaoNonce, takeKakaoNonce, verifyKakaoIdToken,
     type KakaoIdTokenFailReason,
 } from "../../lib/kakaoAuth.js";
+import { kakaoOpenFor, kakaoPreviewEnabled, kakaoPreviewKeyMatches, packKakaoPreview } from "../../lib/kakaoAuth.js";
+import { KAKAO_PREVIEW_COOKIE, KAKAO_PREVIEW_TTL_SEC, type KakaoStatus } from "../../../shared/kakaoLogin.js";
 import {
     KAKAO_NONCE_COOKIE, KAKAO_NONCE_COOKIE_PATH, KAKAO_NONCE_TTL_SEC, isKakaoNonce, looksLikeKakaoIdToken, type KakaoNonceIssue,
 } from "../../../shared/kakaoNative.js";
@@ -297,7 +299,8 @@ function sendKakaoFailure(res: any, reason: KakaoFailReason) {
 router.post("/social/kakao", asyncHandler(async (req: any, res: any) => {
     const { code, redirectUri } = req.body ?? {};
     // 키가 없으면 기능이 꺼진 것이다 — 화면은 단추를 숨기지만, 옛 화면이나 직접 호출에는 친절한 503 을 준다
-    if (!kakaoConfigured()) return sendKakaoFailure(res, "not-configured");
+    // 열려 있는지는 **이 요청 기준**이다(공개 스위치 또는 미리보기 쿠키 — lib/kakaoAuth kakaoOpenFor)
+    if (!kakaoConfigured(req)) return sendKakaoFailure(res, "not-configured");
     if (!isJsonBody(req) || typeof code !== "string" || !code) return sendKakaoFailure(res, "bad-code");
     if (!kakaoRedirectAllowed(redirectUri)) return sendKakaoFailure(res, "bad-redirect");
 
@@ -379,7 +382,7 @@ function sendKakaoPinFailure(res: any, key: string, checked: "ok" | "no-profile"
 // 같은 화면에서 PIN 만 다시 넣으면 된다.
 router.post("/social/kakao/link", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const { code, redirectUri, pin } = req.body ?? {};
-    if (!kakaoConfigured()) return sendKakaoFailure(res, "not-configured");
+    if (!kakaoConfigured(req)) return sendKakaoFailure(res, "not-configured");
     if (!isJsonBody(req) || typeof code !== "string" || !code) return sendKakaoFailure(res, "bad-code");
     if (!kakaoRedirectAllowed(redirectUri)) return sendKakaoFailure(res, "bad-redirect");
 
@@ -598,11 +601,82 @@ router.post("/reset-pin/verify", asyncHandler(async (req: any, res: any) => {
     }
 }));
 
+// --- 카카오 로그인 미리보기(2026-10-06) — 공개 스위치는 꺼 둔 채, 열쇠를 넣은 기기(브라우저·앱 웹뷰)에서만 카카오 로그인을 연다 ---
+// 1.3 을 Play 내부 테스트에 올렸는데 스위치(KAKAO_LOGIN_OPEN)가 꺼져 있어 실기기에서 시험할 길이 없었다 — 켜면 모든 사용자에게 열린다.
+// 열쇠(환경변수 KAKAO_PREVIEW_KEY)가 서버에 없으면 켜기·끄기 두 길은 **없는 주소**다: next() 로 흘려보내 없는 길과 똑같은 404 가 나간다.
+// 판정과 쿠키 값은 lib/kakaoAuth(kakaoOpenFor · packKakaoPreview), 주소·쿠키 이름은 shared/kakaoLogin.ts.
+// 이 쿠키는 '카카오 단추를 쓸 수 있는가'만 바꾼다 — 누구로 로그인되는지는 예전과 같이 카카오가 확인한 회원번호가 정한다.
+
+/** 미리보기 열쇠를 IP 하나가 15분 동안 틀릴 수 있는 횟수 — 넘으면 15분 동안은 맞는 열쇠도 보지 않는다(답은 같은 404). */
+const KAKAO_PREVIEW_MAX_TRIES = 10;
+
+/**
+ * 미리보기 쿠키의 속성 — 굽는 쪽과 지우는 쪽이 같은 값을 쓴다(Path 가 다르면 브라우저가 다른 쿠키로 보고 지우지 않는다).
+ * 카카오 길 전부(웹 로그인·연결·앱 nonce·검증·상태)에 실려야 해서 Path 는 '/', 링크로 들어온 첫 요청에도 실리게 Lax 다.
+ * 서명(signed)과 수명(maxAge)은 굽는 쪽만 붙인다.
+ */
+function kakaoPreviewCookieOptions() {
+    return {
+        httpOnly: true,
+        sameSite: 'lax' as const,
+        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
+        path: '/',
+    };
+}
+
+// POST /social/kakao/preview — 이 기기에서 미리보기를 켠다. body: { key }
+// 맞으면 200 { open, native } 와 서명 쿠키(30일). 틀리면 **없는 주소와 같은 답**(404) — 이 기능이 있는지조차 드러내지 않는다.
+// 열쇠가 서버에 없을 때 · 시도 횟수에 걸렸을 때 · JSON 본문이 아닐 때도 같은 답이다(구분해 알려 주지 않는다).
+router.post("/social/kakao/preview", asyncHandler(async (req: any, res: any, next: any) => {
+    if (!kakaoPreviewEnabled()) return next();
+
+    // 시도 횟수 — IP 기준, 로그인과 같은 도구. 잠긴 동안에는 맞는 열쇠도 보지 않는다(잠겼다는 것도 알리지 않는다)
+    const key = attemptKey('kakao-preview', 'any', clientIp(req));
+    if (checkRateLimit(key).limited) return next();
+    if (!isJsonBody(req) || !kakaoPreviewKeyMatches(req.body?.key)) {
+        registerFailure(key, KAKAO_PREVIEW_MAX_TRIES);
+        return next();
+    }
+    // 그 사이에 열쇠가 사라졌으면 굽지 않는다(없는 기능)
+    const value = packKakaoPreview(Date.now());
+    if (!value) return next();
+    clearAttempts(key);
+
+    res.set("Cache-Control", "no-store");
+    res.cookie(KAKAO_PREVIEW_COOKIE, value, { ...kakaoPreviewCookieOptions(), signed: true, maxAge: KAKAO_PREVIEW_TTL_SEC * 1000 });
+    // 이 쿠키를 들고 올 다음 요청이 받을 답을 미리 알려 준다 — 화면이 "서버에 앱용 키가 없다"를 그 자리에서 보여 줄 수 있게
+    const withCookie = { signedCookies: { [KAKAO_PREVIEW_COOKIE]: value } };
+    const status: KakaoStatus = { open: kakaoOpenFor(withCookie), native: kakaoNativeConfigured(withCookie) };
+    return sendSuccess(res, status);
+}));
+
+// DELETE /social/kakao/preview — 이 기기의 미리보기를 끈다(쿠키를 지운다). 쿠키가 있든 없든 200 이다.
+// 열쇠가 서버에 없으면 이 길도 없는 주소다(그때는 남은 쿠키가 있어도 이미 쓸모가 없다 — kakaoPreviewValid).
+router.delete("/social/kakao/preview", asyncHandler(async (_req: any, res: any, next: any) => {
+    if (!kakaoPreviewEnabled()) return next();
+    res.set("Cache-Control", "no-store");
+    res.clearCookie(KAKAO_PREVIEW_COOKIE, kakaoPreviewCookieOptions());
+    // 쿠키 없이 받을 답 = 공개 스위치 그대로
+    const status: KakaoStatus = { open: kakaoOpenFor(null), native: kakaoNativeConfigured(null) };
+    return sendSuccess(res, status);
+}));
+
+// GET /social/kakao/status — **이 요청에** 카카오가 열려 있는가. 결과: 200 { open, native } (캐시하지 않는다)
+// 화면이 미리보기 깃발이 아직 유효한지 확인하는 데 쓴다 — 깃발이 선 기기만 앱이 뜰 때 한 번 묻는다(client lib/kakaoLogin).
+// 미리보기 길이 아니라 상태 길이라 열쇠가 없는 서버에서도 답한다(그때는 공개 스위치 그대로): 열쇠를 지우거나 바꾼 뒤에
+// 깃발이 남은 기기가 '닫힘'을 받아야 깃발을 내린다. 쿠키가 없는 요청에 새로 알려 주는 것은 없다(닫혀 있으면 둘 다 false).
+router.get("/social/kakao/status", asyncHandler(async (req: any, res: any) => {
+    res.set("Cache-Control", "no-store");
+    const status: KakaoStatus = { open: kakaoOpenFor(req), native: kakaoNativeConfigured(req) };
+    return sendSuccess(res, status);
+}));
+
 // --- 앱 안 카카오 로그인(네이티브 SDK · ID 토큰) — 2026-10-06 오너: "카카오 로그인이 되는 앱 빌드를 만들어 올리고, 승인되면 카카오를 연다" ---
 // 앱의 웹뷰는 rankue.co.kr 밖으로 못 나가 위의 웹 길(인가 코드 + Redirect URI)을 못 쓴다. 새 바이너리(1.3~)는 네이티브 플러그인이
 // 카카오 SDK 로 **ID 토큰**을 받아 오고, 여기서 검증한다(lib/kakaoAuth verifyKakaoIdToken). 계약 전문은 shared/kakaoNative.ts.
 // 검증된 회원번호(sub)는 웹 카카오와 **같은 계정 규칙**을 탄다 — 같은 hiqService.socialLogin("kakao") · linkKakao · profiles.kakao_sub.
 // 스위치(KAKAO_LOGIN_OPEN)가 꺼져 있으면 두 길 모두 503 이다(웹 카카오와 같은 답). 액세스 토큰은 받지도 저장하지도 않는다.
+// (미리보기 쿠키를 든 요청에는 스위치가 꺼져 있어도 열린다 — 웹과 같은 판정 하나다: lib/kakaoAuth kakaoOpenFor)
 // 이 묶음은 파일 맨 끝에 둔다 — 위의 웹 카카오 세 길(로그인·연결·해제)의 답·키·문구는 그대로다.
 // (같은 날 검토에서 연결·해제·전화번호 로그인에 '자리 잡기를 PIN 대조 앞에'만 더했다 — 아래 연결 갈래와 같은 순서다.)
 
@@ -637,7 +711,7 @@ function sendKakaoNativeFailure(res: any, reason: KakaoIdTokenFailReason) {
 // DB 도 카카오도 부르지 않는다(난수 + 쿠키 한 장). 결과: 200 { nonce, expiresInSec } · 400(JSON 본문 아님) · 503(닫혀 있음)
 router.post("/social/kakao/native/nonce", asyncHandler(async (req: any, res: any) => {
     res.set("Cache-Control", "no-store");
-    if (!kakaoNativeConfigured()) return sendKakaoNativeFailure(res, "not-configured");
+    if (!kakaoNativeConfigured(req)) return sendKakaoNativeFailure(res, "not-configured");
     if (!isJsonBody(req)) return sendKakaoNativeFailure(res, "bad-token");
 
     const nonce = newKakaoNonce();
@@ -660,7 +734,7 @@ router.post("/social/kakao/native/nonce", asyncHandler(async (req: any, res: any
 router.post("/social/kakao/native", asyncHandler(async (req: any, res: any) => {
     res.set("Cache-Control", "no-store");
     const { idToken, nonce, mode, pin } = req.body ?? {};
-    if (!kakaoNativeConfigured()) return sendKakaoNativeFailure(res, "not-configured");
+    if (!kakaoNativeConfigured(req)) return sendKakaoNativeFailure(res, "not-configured");
     // JSON 본문만(로그인 CSRF — 위 isJsonBody) · 토큰과 nonce 는 꼴이 맞을 때만 · mode 는 둘 중 하나
     if (!isJsonBody(req) || !looksLikeKakaoIdToken(idToken) || !isKakaoNonce(nonce)) return sendKakaoNativeFailure(res, "bad-token");
     if (mode !== undefined && mode !== "login" && mode !== "link") return sendKakaoNativeFailure(res, "bad-token");

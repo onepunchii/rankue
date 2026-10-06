@@ -78,6 +78,63 @@ export function isKakaoOnlyAccount(conn: { phone?: unknown; google?: unknown; ap
     return !!conn && conn.kakao === true && !conn.phone && !conn.google && !conn.apple;
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// 미리보기(2026-10-06) — 공개 스위치는 꺼 둔 채, **열쇠를 넣은 기기**(브라우저·앱 웹뷰)에서만 카카오 로그인이 열린다.
+// 새 앱 빌드(1.3)를 스토어 승인 전에 실기기로 시험하려는 것이다. 스위치를 켜면 모든 사용자에게 열리기 때문에 길을 따로 뒀다.
+//  - 서버: 열쇠(서버 환경변수)가 맞으면 서명 쿠키를 심는다. 열쇠가 서버에 없으면 이 기능은 없다(server/lib/kakaoAuth).
+//  - 화면: 쿠키는 httpOnly 라 화면이 못 읽는다 — 화면은 기기 저장소의 깃발 하나로 단추를 그릴지 정하고,
+//    앱이 뜰 때 깃발이 선 기기만 서버에 "아직 열려 있나"를 한 번 묻는다(client lib/kakaoLogin).
+//  - 열쇠 값은 이 파일에 없다(화면 번들에 실리는 파일이다). 깃발은 단추를 **보여 줄지**만 정한다 — 깃발을 손으로 세워도
+//    서버의 쿠키가 없으면 카카오 길은 전부 닫힌 답을 준다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** 미리보기 켜기(POST { key }) · 끄기(DELETE). 열쇠가 틀리면 없는 주소와 같은 답(404)이 온다. */
+export const KAKAO_PREVIEW_API = "/api/hiq/social/kakao/preview";
+/** 이 요청에 카카오가 열려 있는가(GET) — 화면이 깃발이 아직 유효한지 확인하는 데 쓴다. */
+export const KAKAO_STATUS_API = "/api/hiq/social/kakao/status";
+export type KakaoStatus = { open: boolean; native: boolean };
+
+/** 미리보기 쿠키(서명 · httpOnly · 30일). 값은 서버만 만든다. */
+export const KAKAO_PREVIEW_COOKIE = "hiq_kakao_preview";
+export const KAKAO_PREVIEW_TTL_SEC = 30 * 24 * 60 * 60;
+
+/** 열쇠의 길이 — 이보다 짧은 열쇠가 서버에 들어 있으면 미리보기는 꺼진 것으로 친다(추측할 수 있는 열쇠로 열리지 않게). */
+export const KAKAO_PREVIEW_KEY_MIN = 16;
+export const KAKAO_PREVIEW_KEY_MAX = 256;
+
+/** 화면의 깃발 — localStorage 의 이 키가 "1" 이면 이 기기는 미리보기 중이다. */
+export const KAKAO_PREVIEW_FLAG = "rankue_kakao_preview";
+
+/** 미리보기 페이지 — `/kakao-preview?k=<열쇠>` 로 켜고 `/kakao-preview?off=1` 로 끈다. 앱 링크 경로 목록에는 넣지 않는다. */
+export const KAKAO_PREVIEW_PATH = "/kakao-preview";
+
+/** 미리보기 페이지가 주소에서 읽은 것. on = 열쇠를 서버에 보낸다, off = 끈다, none = 할 일이 없다(없는 화면처럼 보인다). */
+export type KakaoPreviewAsk = { kind: "on"; key: string } | { kind: "off" } | { kind: "none" };
+
+/**
+ * 미리보기 페이지의 주소 질의(`?k=…` · `?off=1`)를 읽는다. off 가 먼저다(둘 다 있으면 끈다).
+ * 길이가 맞지 않는 열쇠는 서버에 보내지도 않는다 — 어차피 거절되고 시도 횟수만 쓴다.
+ */
+export function readKakaoPreviewAsk(search: unknown): KakaoPreviewAsk {
+    if (typeof search !== "string" || !search) return { kind: "none" };
+    let query: URLSearchParams;
+    try { query = new URLSearchParams(search); } catch { return { kind: "none" }; }
+    if (query.get("off") === "1") return { kind: "off" };
+    const key = query.get("k");
+    if (typeof key !== "string" || key.length < KAKAO_PREVIEW_KEY_MIN || key.length > KAKAO_PREVIEW_KEY_MAX) return { kind: "none" };
+    return { kind: "on", key };
+}
+
+/**
+ * 앱에서 미리보기 페이지를 여는 주소 — `rankue://open?path=<경로>`(앱이 받는 딥링크의 공식 모양, shared/deepLink).
+ * 경로는 통째로 한 번 감싼다: 안 감싸면 경로 안의 '?k=' 가 바깥 쿼리와 섞여 앱이 path 만 읽고 열쇠를 버린다.
+ * 웹에서 미리보기를 켠 화면이 "이 기기의 앱에서도 켜기"에 쓴다 — 커스텀 스킴 주소는 메신저·메모에서 눌리지 않는 일이 많아
+ * 웹 화면의 단추가 앱 웹뷰에 열쇠를 넘기는 가장 쉬운 길이다.
+ */
+export function kakaoPreviewAppUrl(key: string): string {
+    return `rankue://open?path=${encodeURIComponent(`${KAKAO_PREVIEW_PATH}?k=${encodeURIComponent(key)}`)}`;
+}
+
 /** login = 로그인·가입, link = 로그인한 회원이 설정에서 내 계정에 카카오를 붙인다. */
 export type KakaoMode = "login" | "link";
 
