@@ -73,6 +73,21 @@ describe("잇기 — 소셜로 새 계정이 만들어진 직후 한 번 묻는�
         expect(kakao.indexOf("offerAttachPhone()")).toBeGreaterThan(kakao.indexOf('askTerms("signup")'));
     });
 
+    // 2026-10-07 오너: "신규 가입자한테 카카오 회원가입하고 또 휴대폰 번호 잇기 … 뎁스만 추가되는 거 같은데"
+    it("처음 온 사람에게는 묻지 않는다 — 이 기기에서 전화번호 계정을 쓴 적이 있을 때만", () => {
+        const offer = attach.slice(attach.indexOf("export function offerAttachPhone(): void {"), attach.indexOf("export function openAttachPhoneSheet"));
+        // 표시가 없으면 아무 일도 없다 — 세션 저장소에 '물어볼 차례'도 남기지 않는다(주 종목 묻기가 기다리지 않는다)
+        expect(offer.indexOf("if (!phoneSeenHere()) return;")).toBeGreaterThan(0);
+        expect(offer.indexOf("if (!phoneSeenHere()) return;")).toBeLessThan(offer.indexOf("writeOffer(true);"));
+        // 표시는 전화번호 계정으로 로그인해 있는 동안 남긴다 — 값은 "1" 뿐(번호·회원 id 를 적지 않는다)
+        expect(attach).toContain("const phoneAccount = !!member && conn?.phone === true;");
+        expect(attach).toContain("useEffect(() => { if (phoneAccount) markPhoneSeen(); }, [phoneAccount]);");
+        expect(attach).toContain('window.localStorage.setItem(PHONE_SEEN_KEY, "1");');
+        // 설정에서 직접 여는 길은 조건 없이 열린다
+        const open = attach.slice(attach.indexOf("export function openAttachPhoneSheet(): void {"), attach.indexOf("function closeSheet(): void {"));
+        expect(open).not.toContain("phoneSeenHere");
+    });
+
     it("뜨는 조건은 '나'가 정한다 — 소셜로 가입한 계정(전화번호 없음 · PIN 없음)만, 새 가입 직후의 권유는 한국어 화면만", () => {
         expect(attach).toContain("const socialOnly = !!member && !!conn && conn.phone === false && conn.pin !== true;");
         expect(attach).toContain('const show = s.open && socialOnly && (s.source === "settings" || locale === "ko");');
@@ -171,8 +186,58 @@ describe("문구 — 다섯 언어 사전", () => {
         }
     });
 
-    it("안내는 방법을 말한다 — 번호와 PIN 으로 기존 계정에 이어진다", () => {
-        expect(client("lib/i18n/ko.ts")).toMatch(/"login\.phoneExistingHint": "[^"]*번호와 PIN[^"]*기존 계정[^"]*"/);
+    it("안내는 기존 회원의 길을 말한다 — 전화번호로 로그인하고, 설정에서 연결해 두면 다음부터 한 번에", () => {
+        expect(client("lib/i18n/ko.ts")).toMatch(/"login\.phoneExistingHint": "[^"]*전화번호로 로그인[^"]*설정에서 카카오[^"]*연결[^"]*"/);
+        // 잇기 시트가 모든 사람에게 뜨지 않으므로 "바로 이어져요"라고 약속하지 않는다
+        expect(client("lib/i18n/ko.ts")).not.toMatch(/"login\.phoneExistingHint": "[^"]*바로 이어져요/);
         expect(client("lib/i18n/ko.ts")).toMatch(/"attach\.desc": "[^"]*기록은 그대로[^"]*"/);
+    });
+});
+
+// 2026-10-07 오너: "어드민에 휴대폰 번호로 진입하는 거 제거해주고 내 계정이면 들어가지게 해줘" · "가맹점 페이지도 … 바로 들어가지면 되네"
+describe("관리 화면의 입구(/admin) — 번호 폼 없이 내 계정으로", () => {
+    const entry = code(client("pages/hiq/admin.tsx"));
+
+    it("순서: 관리 쿠키 → 내 계정으로 바로(SSO) → 번호 폼으로 들어와 있던 사장님 → 그 자리에서 로그인", () => {
+        const stats = entry.indexOf('await apiRequest("/api/hiq/admin/stats")');
+        const sso = entry.indexOf('await apiRequest("/api/hiq/partner/sso", { method: "POST" })');
+        const store = entry.indexOf('await apiRequest("/api/hiq/partner/store")');
+        expect(stats).toBeGreaterThan(0);
+        expect(sso).toBeGreaterThan(stats);
+        expect(store).toBeGreaterThan(sso);
+        expect(entry).toContain('go(r.role === "super_admin" || r.role === "admin" ? "/admin/dashboard" : "/partner/dashboard")');
+        // 이 화면에는 번호·PIN 입력 칸이 없다 — 저절로 번호 폼으로 보내지도 않는다(사장님이 직접 누를 때만)
+        expect(entry).not.toMatch(/<input|<Input|type="tel"|type="password"/);
+        expect(entry).not.toContain('let to = "/partner/login"');
+        expect(entry.match(/setLocation\("\/partner\/login"\)/g)).toHaveLength(1);
+    });
+
+    it("로그인이 안 돼 있으면 그 자리에서 팝업을 연다 — 로그인 상태가 바뀌면 다시 확인한다", () => {
+        expect(entry).toContain('if (!openLoginSheet({ from: "/admin", title: "관리 화면 로그인", desc: "랭큐 계정으로 로그인하면 바로 열려요." })) setLocation(loginPagePath("/admin"));');
+        expect(entry).toContain("}, [setLocation, isLoading, memberId]);");
+        // '나'를 받는 중에는 판단하지 않는다(로그인된 사람에게 로그인 단추를 먼저 보여 주지 않는다)
+        expect(entry).toContain("if (isLoading) return;");
+    });
+
+    it("메뉴의 관리자 콘솔 · 관리 화면의 로그아웃도 입구로 간다", () => {
+        expect(code(client("pages/hiq/menu.tsx"))).toContain('label: t("menu.adminConsole"), desc: t("menu.adminConsoleDesc"), onClick: () => setLocation("/admin") }]');
+        const dash = code(client("pages/admin/dashboard.tsx"));
+        const logout = dash.slice(dash.indexOf("const handleLogout = async () => {"), dash.indexOf("const todos"));
+        expect(logout).toContain('setLocation("/admin");');
+        expect(logout).not.toContain("/partner/login");
+    });
+
+    it("서버: 번호 폼은 관리자 계정을 들이지 않는다(PIN 을 보기 전에) · 바로 들어가기는 본인 확인을 거친 계정만", () => {
+        const svc = root("server/services/hiqService.ts");
+        const fn = svc.slice(svc.indexOf("async partnerLogin("), svc.indexOf("async getPartnerStore("));
+        const refuse = fn.indexOf('if (profile && (profile.role === "admin" || profile.role === "super_admin")) {');
+        expect(refuse).toBeGreaterThan(0);
+        expect(refuse).toBeLessThan(fn.indexOf("verifyPassword(password, profile)"));
+        const partner = root("server/routes/modules/partner.ts");
+        const sso = partner.slice(partner.indexOf('router.post("/sso"'), partner.indexOf("const requirePartner"));
+        const verified = sso.indexOf("const verified = !!profile.password || !!profile.googleSub || !!profile.appleSub || !!profile.kakaoSub;");
+        expect(verified).toBeGreaterThan(0);
+        expect(sso.indexOf("res.cookie('hiq_partner_auth'")).toBeGreaterThan(sso.indexOf('"SSO_UNVERIFIED"'));
+        expect(sso.indexOf('"SSO_UNVERIFIED"')).toBeGreaterThan(verified);
     });
 });

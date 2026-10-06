@@ -7,8 +7,14 @@
  * 그 자리에서 번호와 PIN 을 받아, 방금 들고 온 로그인 수단을 기존 계정으로 옮긴다(서버 POST /api/hiq/social/attach-phone —
  * 빈 계정은 지워지고 쿠키가 기존 계정으로 바뀐다). 다음부터는 그 소셜로 들어와도 기존 계정이다.
  *
+ * 누구에게 묻는가(2026-10-07 오너: "신규 가입자한테 … 뎁스만 추가되는 거 같은데") — **이 기기에서 전화번호 계정을 쓴 적이 있을 때만.**
+ *   새로 온 사람에게는 묻지 않는다(가입에 한 단계가 더 붙을 뿐이다 — 앞으로의 가입자는 거의 다 처음 오는 사람이다).
+ *   전화번호 회원이 로그인해 있는 동안 기기 저장소에 표시를 남겨 두고(PHONE_SEEN_KEY), 그 기기에서 나중에 카카오·구글로 새 계정이
+ *   만들어졌을 때만 이 시트가 뜬다 — 로그아웃·세션 만료 뒤 큰 카카오 단추를 누른 기존 회원을 건진다.
+ *   다른 기기(새 폰·재설치)에서는 뜨지 않는다 — 그때는 설정 › 연결된 로그인의 '전화번호 계정 잇기'가 길이다.
+ *
  * 쓰는 법
- *   offerAttachPhone()       소셜로 **새 계정이 만들어진 직후** 부른다(SocialLogin · 카카오 복귀 화면). 한국어 화면에서만 뜬다.
+ *   offerAttachPhone()       소셜로 **새 계정이 만들어진 직후** 부른다(SocialLogin · 카카오 복귀 화면). 한국어 화면 + 위 조건에서만 뜬다.
  *   openAttachPhoneSheet()   설정 › 연결된 로그인의 '전화번호 계정 잇기'.
  *   useAttachPhonePending()  떠 있거나 곧 뜰 것인가 — 주 종목 묻기(PrimarySportGate)가 이 시트 뒤로 물러선다
  *                            (이으면 계정이 바뀌어, 빈 계정에 주 종목을 물을 이유가 없다).
@@ -31,6 +37,15 @@ import { cn } from "@/lib/utils";
 
 /** 세션 저장소의 표시 — 소셜로 새 계정을 만든 직후 '물어볼 차례'. 화면이 통째로 바뀌어도(카카오 복귀) 남는다. */
 export const ATTACH_OFFER_KEY = "rankue:attach-offer";
+/** 기기 저장소의 표시 — 이 기기에서 전화번호 계정으로 로그인해 있던 적이 있다. 값은 "1" 뿐이다(번호·회원 id 를 적지 않는다). */
+export const PHONE_SEEN_KEY = "rankue:phone-account-seen";
+
+function phoneSeenHere(): boolean {
+    try { return window.localStorage.getItem(PHONE_SEEN_KEY) === "1"; } catch { return false; }
+}
+function markPhoneSeen() {
+    try { window.localStorage.setItem(PHONE_SEEN_KEY, "1"); } catch { /* 저장소를 못 쓰는 환경 — 이 기기에서는 묻지 않게 될 뿐이다 */ }
+}
 
 type Source = "signup" | "settings";
 interface State { open: boolean; source: Source }
@@ -53,8 +68,12 @@ function writeOffer(on: boolean) {
     } catch { /* 저장소를 못 쓰는 환경 — 이번 화면에서만 묻는다 */ }
 }
 
-/** 소셜로 새 계정이 만들어진 직후 — 한 번 묻는다. 뜰지는 호스트가 '나'를 보고 정한다. */
+/**
+ * 소셜로 새 계정이 만들어진 직후 — **이 기기에서 전화번호 계정을 쓴 적이 있을 때만** 한 번 묻는다.
+ * 처음 온 사람에게는 아무 일도 없다. 뜰지는 호스트가 '나'를 보고 한 번 더 정한다.
+ */
 export function offerAttachPhone(): void {
+    if (!phoneSeenHere()) return;
     writeOffer(true);
     setState({ open: true, source: "signup" });
 }
@@ -219,6 +238,10 @@ export function AttachPhoneSheetHost() {
     const conn = (member as { connections?: { phone?: boolean; pin?: boolean; kakao?: boolean; google?: boolean; apple?: boolean } } | undefined)?.connections;
     // 소셜로 가입한 계정인가 — 전화번호가 없고 PIN 도 없다(서버의 조건과 같다. 틀려도 서버가 거절한다)
     const socialOnly = !!member && !!conn && conn.phone === false && conn.pin !== true;
+
+    // 전화번호 계정으로 로그인해 있다 — 이 기기에 표시를 남긴다(나중에 이 기기에서 소셜로 새 계정이 생기면 그때만 묻는다)
+    const phoneAccount = !!member && conn?.phone === true;
+    useEffect(() => { if (phoneAccount) markPhoneSeen(); }, [phoneAccount]);
 
     // 새 문서에서 시작했는데 표시가 남아 있다(카카오에서 돌아온 직후 등) — 이어서 묻는다
     useEffect(() => {

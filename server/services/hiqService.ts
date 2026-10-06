@@ -84,6 +84,12 @@ export class HiqService {
             }
         }
 
+        // 관리자 계정은 이 길(번호 + 4자리 PIN)로 들이지 않는다(2026-10-07 오너: "어드민에 휴대폰 번호로 진입하는 거 제거 — 내 계정이면 들어가지게").
+        // 관리자 콘솔은 랭큐에 로그인한 내 계정으로 연다(POST /partner/sso). **PIN 을 보기 전에** 끊는다 — 맞는 PIN 인지 알려 주지 않게.
+        if (profile && (profile.role === "admin" || profile.role === "super_admin")) {
+            return { success: false, message: "관리자 계정은 랭큐 로그인으로 들어와 주세요." };
+        }
+
         // Verify password. A partner account MUST have a password and it MUST match — a
         // missing/omitted password is a hard reject (previously an omitted password
         // short-circuited the check and logged the caller in with phone number only).

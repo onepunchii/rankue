@@ -3554,7 +3554,7 @@ const es: Dict = {
   "settings.connKakao": "Kakao",
   "settings.connect": "Conectar",
   // 2026-10-05 검토 뒤 추가 — 연결·해제의 PIN 본인 확인, 기존 전화번호 회원 안내, 앱 안(카카오 단추 없음) 안내
-  "login.phoneExistingHint": "¿Te registraste con tu número de teléfono? Empieza con Kakao o Google y luego introduce tu número y tu PIN para seguir con tu cuenta de siempre.",
+  "login.phoneExistingHint": "¿Te registraste con tu número de teléfono? Inicia sesión con él. Conecta Kakao o Google en Ajustes y la próxima vez entrarás con un toque.",
   "login.kakaoWebOnly": "Si te registraste con Kakao, inicia sesión en la web (www.rankue.co.kr). La app aún no tiene inicio de sesión con Kakao, así que entrar aquí de otra forma crea una cuenta nueva.",
   "kakao.pinTitle": "Confirma que eres tú",
   "kakao.pinDesc": "Para conectar Kakao a tu cuenta, introduce el PIN con el que inicias sesión.",

@@ -438,8 +438,9 @@ export default function HiqMenu() {
                             ? [{ icon: LucideStore, label: t("menu.myStore"), desc: t("menu.myStoreDesc"), onClick: () => setLocation("/partner/dashboard") }]
                             : []),
                         // 관리자 콘솔 — role 이 admin/super_admin 인 계정에게만 노출 (진입점 부재 문제 해결)
+                        // 입구(/admin)로 보낸다(2026-10-07) — 거기서 내 계정으로 바로 연다. 대시보드로 곧장 가면 관리 쿠키가 없는 기기에서 빈 화면이 뜬다
                         ...((member as any)?.role === "admin" || (member as any)?.role === "super_admin"
-                            ? [{ icon: LucideBriefcase, label: t("menu.adminConsole"), desc: t("menu.adminConsoleDesc"), onClick: () => setLocation("/admin/dashboard") }]
+                            ? [{ icon: LucideBriefcase, label: t("menu.adminConsole"), desc: t("menu.adminConsoleDesc"), onClick: () => setLocation("/admin") }]
                             : []),
                         // 매장 찾기 — 모바일의 유일한 상시 진입점 (하단 네비·홈에는 자리가 없다)
                         ...(isGolf ? [] : [{ icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") }]),

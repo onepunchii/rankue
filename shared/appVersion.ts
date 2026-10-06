@@ -30,8 +30,10 @@ export const APP_UPDATE_POLICY: Record<"ios" | "android", UpdatePolicy> = {
     // 1.2(7) 가 이번 통합 빌드. 옛 사용자: 1.0(2)~1.0(5), 1.1(6)
     // App Store 에 1.2 가 뜨는 순간부터 1.2(7) 미만에게 안내(자동). 지금 스토어는 1.1.
     ios: { enabled: false, autoFromStore: true, latestVersion: "1.2", latestBuild: 7, minBuild: 0 },
-    // 이번 통합 빌드는 versionCode 5 예정(현재 스토어 1.0.2 = 4). 실제 올린 번호와 맞는지 켜기 전에 확인한다.
-    android: { enabled: false, latestVersion: "1.2.0", latestBuild: 5, minBuild: 0 },
+    // 1.3.0(6) 이 Play 프로덕션에 올라갔다 — 2026-10-07 공개 스토어 페이지에서 "1.3.0 · 업데이트 날짜 2026. 10. 7." 확인하고 켰다
+    // (오너: "구글은 앱 업데이트 됐으니 구버전 들어오면 알림창이나 배너 띄워야 되나?"). 옛 사용자: 1.0.2(4) 이하 → 닫을 수 있는 안내가 하루 한 번.
+    // 1.3.0 에는 앱 안 카카오 로그인·새 딥링크가 들어 있다 — 옛 바이너리에는 카카오 단추가 없다.
+    android: { enabled: true, latestVersion: "1.3.0", latestBuild: 6, minBuild: 0 },
 };
 
 export type UpdateDecision = "none" | "suggest" | "force";

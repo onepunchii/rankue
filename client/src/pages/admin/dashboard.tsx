@@ -230,7 +230,8 @@ export default function AdminDashboard() {
         // Wipe cached PII from memory and the throttled localStorage persister.
         queryClient.clear();
         localStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
-        setLocation("/partner/login");
+        // 관리 화면의 입구로(2026-10-07) — 번호 폼(/partner/login)은 사장님용이고, 운영자는 랭큐 로그인으로 들어온다
+        setLocation("/admin");
     };
 
     const todos: { tab: Tab; label: string; n: number }[] = [

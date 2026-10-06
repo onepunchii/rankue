@@ -3560,7 +3560,7 @@ export const ko: Dict = {
   "settings.connKakao": "카카오",
   "settings.connect": "연결",
   // 2026-10-05 검토 뒤 추가 — 연결·해제의 PIN 본인 확인, 기존 전화번호 회원 안내, 앱 안(카카오 단추 없음) 안내
-  "login.phoneExistingHint": "전화번호로 가입하셨나요? 카카오·Google 로 시작한 뒤 번호와 PIN 을 넣으면 기존 계정에 바로 이어져요.",
+  "login.phoneExistingHint": "전화번호로 가입하셨다면 전화번호로 로그인해 주세요. 설정에서 카카오·Google 을 연결해 두면 다음부터 한 번에 들어와요.",
   "login.kakaoWebOnly": "카카오로 가입하셨다면 웹(www.rankue.co.kr)에서 로그인해 주세요. 앱에는 아직 카카오 로그인이 없어, 여기서 다른 방법으로 들어오면 새 계정이 만들어져요.",
   "kakao.pinTitle": "PIN 으로 본인 확인",
   "kakao.pinDesc": "내 계정에 카카오를 연결하려면 로그인할 때 쓰는 PIN 을 입력해 주세요.",

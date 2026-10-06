@@ -4,11 +4,18 @@ import { APP_UPDATE_POLICY, compareVersions, decideUpdate, isPolicyActive, isUpT
 const on = (latestBuild: number, minBuild = 0): UpdatePolicy => ({ enabled: true, latestVersion: "9.9", latestBuild, minBuild });
 
 describe("decideUpdate", () => {
-    it("enabled 는 둘 다 false 로 출고(iOS 는 스토어 확인으로 자동, 안드로이드는 출시 후 수동)", () => {
+    it("iOS 는 enabled 를 켜지 않는다(스토어 확인으로 자동) · 안드로이드는 출시를 확인하고 손으로 켠다 — 1.3.0(6) 은 2026-10-07 에 켰다", () => {
         expect(APP_UPDATE_POLICY.ios.enabled).toBe(false);
-        expect(APP_UPDATE_POLICY.android.enabled).toBe(false);
         expect(decideUpdate(APP_UPDATE_POLICY.ios, 1)).toBe("none");
-        expect(decideUpdate(APP_UPDATE_POLICY.android, null)).toBe("none");
+        // 안드로이드: Play 프로덕션에 1.3.0 이 올라간 것을 공개 스토어 페이지로 확인한 뒤 켰다
+        expect(APP_UPDATE_POLICY.android.enabled).toBe(true);
+        // 옛 바이너리(1.0.2 = 4 · 빌드를 모르는 아주 옛 앱)에는 닫을 수 있는 권유, 새 바이너리(6)에는 아무것도
+        expect(decideUpdate(APP_UPDATE_POLICY.android, 4)).toBe("suggest");
+        expect(decideUpdate(APP_UPDATE_POLICY.android, 5)).toBe("suggest");
+        expect(decideUpdate(APP_UPDATE_POLICY.android, null)).toBe("suggest");
+        expect(decideUpdate(APP_UPDATE_POLICY.android, 6)).toBe("none");
+        // 강제(닫을 수 없는 화면)는 걸지 않았다
+        expect(APP_UPDATE_POLICY.android.minBuild).toBe(0);
     });
     it("꺼져 있거나 정책이 없으면 아무것도 안 띄운다", () => {
         expect(decideUpdate({ enabled: false, latestVersion: "9.9", latestBuild: 99, minBuild: 99 }, 1)).toBe("none");
@@ -42,7 +49,7 @@ describe("iOS 자동 켜기(App Store 에 새 버전이 올라오면)", () => {
     });
     it("latestBuild 와 latestVersion 은 같은 출시의 두 이름이다 — 하나만 올리면 여기서 걸린다", () => {
         // 새 버전을 낼 때 이 표에 (빌드 → 마케팅 버전)을 추가하고 정책의 두 값을 같이 올린다.
-        const RELEASES = { ios: { 7: "1.2" } as Record<number, string>, android: { 5: "1.2.0" } as Record<number, string> };
+        const RELEASES = { ios: { 7: "1.2" } as Record<number, string>, android: { 5: "1.2.0", 6: "1.3.0" } as Record<number, string> };
         expect(RELEASES.ios[APP_UPDATE_POLICY.ios.latestBuild]).toBe(APP_UPDATE_POLICY.ios.latestVersion);
         expect(RELEASES.android[APP_UPDATE_POLICY.android.latestBuild]).toBe(APP_UPDATE_POLICY.android.latestVersion);
     });

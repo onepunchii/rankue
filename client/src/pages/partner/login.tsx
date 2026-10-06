@@ -176,6 +176,13 @@ export default function PartnerLogin() {
                 </form>
 
 
+                {/* 운영자(관리자) 계정은 이 폼으로 들어오지 않는다(2026-10-07) — 랭큐에 로그인한 내 계정으로 /admin 에서 바로 열린다 */}
+                <p className="mt-4 text-center text-[12px] text-black/45 break-keep">
+                    랭큐 앱에 로그인돼 있으면 번호 없이 바로 열려요. 운영자는{" "}
+                    <a href="/admin" onClick={(e) => { e.preventDefault(); setLocation("/admin"); }} className="font-semibold underline underline-offset-4">관리 화면</a>
+                    으로 들어와 주세요.
+                </p>
+
                 <div className="mt-8 text-center space-y-4">
                     <p className="text-xs text-black/40">
                         아직 파트너가 아니신가요?

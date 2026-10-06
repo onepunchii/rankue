@@ -40,9 +40,13 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
     return sendError(res, 401, "로그인에 실패했습니다.");
 }));
 
-// POST /partner/sso — 이미 유저로 로그인된 세션에서 파트너 자동 진입.
-// 전화번호 문자열 비교가 아니라 **계정 연결(member.profileId)** 기준: 유저 세션은 이미
-// 비밀번호 인증을 통과했으므로, 같은 profile 이 매장을 소유(또는 관리자)하면 재인증은 중복이다.
+// POST /partner/sso — 이미 유저로 로그인된 세션에서 파트너·관리자 자동 진입.
+// 전화번호 문자열 비교가 아니라 **계정 연결(member.profileId)** 기준: 유저 세션이 이미 본인 확인(PIN · 카카오 · 구글 · 애플)을
+// 통과했으므로, 같은 profile 이 매장을 소유(또는 관리자)하면 재인증은 중복이다.
+// 2026-10-07 오너: "어드민에 휴대폰 번호로 진입하는 거 제거 — 내 계정이면 들어가지게" · "가맹점 페이지도 … 바로 들어가지면 되네" →
+//   관리자 콘솔의 입구는 이 길 하나다(/admin 화면이 부른다). 번호 폼(POST /partner/login)은 사장님용으로만 남는다.
+//   단, **번호만으로 들어올 수 있는 계정**(PIN 도 소셜 연결도 없는 프로필 — 전화번호 로그인이 PIN 없이 통과시킨다)은 여기서 들이지 않는다.
+//   그런 세션은 본인 확인을 거치지 않았다. PIN 을 만들거나 카카오·구글을 연결한 뒤에 열린다.
 router.post("/sso", asyncHandler(async (req: any, res: any) => {
     const userId = req.signedCookies?.hiq_user_id;
     if (!userId) return sendError(res, 401, "로그인이 필요합니다");
@@ -55,6 +59,9 @@ router.post("/sso", asyncHandler(async (req: any, res: any) => {
     const store = await storage.getStoreByOwnerProfileId(profile.id);
     const isAdmin = profile.role === "admin" || profile.role === "super_admin";
     if (!store && !isAdmin) return sendError(res, 403, "파트너 계정이 아닙니다");
+    // 본인 확인을 거친 세션인가 — PIN 이 있거나 소셜 로그인이 붙은 계정만(그런 계정은 번호만으로는 로그인되지 않는다)
+    const verified = !!profile.password || !!profile.googleSub || !!profile.appleSub || !!profile.kakaoSub;
+    if (!verified) return sendError(res, 403, "로그인 PIN 을 만들거나 카카오·구글을 연결한 뒤에 열 수 있어요", "SSO_UNVERIFIED");
 
     res.clearCookie('hiq_admin_origin', { path: '/' });
     res.cookie('hiq_partner_auth', profile.id, {
