@@ -25,9 +25,10 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { screenCrewText } from "../../utils/crewModeration.js";
 import { notificationService } from "../../services/notificationService.js";
 import { parseRoomKey, type RoomRef } from "../../storage/chat.repo.js";
-import { msg, localeOf, type I18nText } from "../../lib/i18n.js";
+import { msg, localeOf, memberLocale, type I18nText } from "../../lib/i18n.js";
 import { memberSearchTerm, supportHidesSender, supportNotifyTitleKey } from "../../../shared/chatSupport.js";
 import { translateConfigured, translateText, TranslateError, translateCacheKey, cachedTranslation, rememberTranslation, takeTranslateSlot } from "../../lib/chatTranslate.js";
+import { polishReply, replyDraft, REPLY_DRAFT_MAX } from "../../lib/chatReply.js";
 
 const router = Router();
 const sportOf = (q: unknown): "BILLIARDS" | "GOLF" => (q === "GOLF" ? "GOLF" : "BILLIARDS");
@@ -287,6 +288,40 @@ router.post("/rooms/:key/messages/:id/translate", requireAuth, requireChatAdmin,
         if (code === "NOT_CONFIGURED") return sendError(res, 503, "err.chat.translateOff", "TRANSLATE_OFF");
         if (code === "EMPTY") return sendError(res, 400, "err.chat.translateNoText", "NO_TEXT");
         return sendError(res, 502, "err.chat.translateFailed", "TRANSLATE_FAILED");
+    }
+}));
+
+/**
+ * 문의 답변 다듬기(2026-10-06 오너: "내가 한국어로 적어서 버튼이 있으면 … 해당 언어로 정식적인 내용으로 바꿔주는 형태").
+ * POST /chat/rooms/:key/reply-polish { text } → { text, language, back }
+ *  - 운영자가 입력칸에 쓴 글을 회원 언어의 정중한 문장으로 바꿔 **돌려준다**. 보내지 않고, 저장하지 않는다 — 보내기는 운영자가 누른다.
+ *  - 운영자만, 문의 방에서만, 남의 문의 방에서만(내 문의 방에서는 내가 회원이다).
+ *  - 밖으로 나가는 것: 운영자가 쓴 글과, 회원이 이 방에 쓴 최근 글(DB 에서 읽은 것 — 언어를 알아보는 근거). 회원·방 id 는 싣지 않는다.
+ *  - 회원 글이 없으면(운영자가 먼저 건 말) 회원의 앱 언어로. 뜻풀이(back)는 운영자의 화면 언어로.
+ *  - 한 사람 1분 상한은 번역과 같이 센다.
+ */
+router.post("/rooms/:key/reply-polish", requireAuth, requireChatAdmin, asyncHandler(async (req: AuthRequest, res: any) => {
+    const ref = await openRoom(req, res); if (!ref) return;
+    if (ref.kind !== "support" || ref.id === req.userId) return sendError(res, 400, "err.chat.polishSupportOnly", "SUPPORT_ONLY");
+    if (!translateConfigured()) return sendError(res, 503, "err.chat.translateOff", "TRANSLATE_OFF");
+    const draft = replyDraft(req.body?.text);
+    if (!draft) return sendError(res, 400, "err.chat.polishEmpty", "EMPTY");
+    if ([...draft].length > REPLY_DRAFT_MAX) return sendError(res, 400, msg("err.chat.polishTooLong", { n: REPLY_DRAFT_MAX }), "TOO_LONG");
+    if (!takeTranslateSlot(req.userId!)) return sendError(res, 429, "err.chat.translateBusy", "TRANSLATE_BUSY");
+    const [rows, owner] = await Promise.all([storage.chat.messages(ref, req.userId!, { limit: 40 }), storage.getMemberById(ref.id)]);
+    const texts = rows.filter((m) => (m.type ?? "text") === "text" && !!m.senderId);
+    const customer = texts.filter((m) => m.senderId === ref.id).map((m) => String(m.message ?? ""));
+    // 운영자가 이미 답한 대화면 인사를 다시 붙이지 않는다
+    const ongoing = texts.some((m) => m.senderId !== ref.id);
+    try {
+        const out = await polishReply({ draft, customer, fallback: memberLocale(owner), operator: localeOf(res), ongoing });
+        return sendSuccess(res, { text: out.text, language: out.language, back: out.back });
+    } catch (e) {
+        const code = e instanceof TranslateError ? e.code : "UPSTREAM";
+        if (code === "NOT_CONFIGURED") return sendError(res, 503, "err.chat.translateOff", "TRANSLATE_OFF");
+        if (code === "EMPTY") return sendError(res, 400, "err.chat.polishEmpty", "EMPTY");
+        if (e instanceof TranslateError && e.message === "too-long") return sendError(res, 422, "err.chat.polishResultTooLong", "RESULT_TOO_LONG");
+        return sendError(res, 502, "err.chat.polishFailed", "POLISH_FAILED");
     }
 }));
 

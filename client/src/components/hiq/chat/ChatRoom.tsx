@@ -14,7 +14,7 @@
  *  무엇을 신고할지(방 종류별 대상)와 메뉴·신고 창은 부르는 쪽(pages/hiq/chat-room)이 정한다 — 여기서는 입구만 그린다.
  */
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
-import { LucideSend, LucideLoader2, LucidePlus, LucideMoreHorizontal } from "lucide-react";
+import { LucideSend, LucideLoader2, LucidePlus, LucideMoreHorizontal, LucideLanguages } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT, type Locale } from "@/lib/i18n";
 import { ChatCard } from "./ChatCard";
@@ -64,6 +64,11 @@ interface Props {
     onOpenCard?: (msg: ChatMsg) => void;
     /** 입력줄 왼쪽 "+"(2026-09-23 종목별 첨부). 없으면 단추를 안 그린다 — 운영자 문의 방은 안 넘긴다. */
     onAttach?: () => void;
+    /**
+     * 답변 다듬기(2026-10-06 — 운영자의 문의 방). 넘기면 입력칸 옆에 단추가 생긴다: 쓴 글을 넘기고, 바꾼 글과 안내(무슨 언어로 · 뜻)를 받는다.
+     * 실패하면 null(이유는 부르는 쪽이 말한다). 바꾼 글은 **입력칸에 들어갈 뿐**이다 — 보내기는 사람이 누르고, '되돌리기'로 쓴 글로 돌아간다.
+     */
+    onPolish?: (text: string) => Promise<{ text: string; title: string; detail?: string } | null>;
     /** 맨 위에 고정되는 카드(글 정보·지도) */
     pinned?: ReactNode;
     loading?: boolean;
@@ -123,7 +128,7 @@ const timeLabel = (iso: string, locale: Locale) => {
     return new Intl.DateTimeFormat(INTL_TAG[locale], { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(iso));
 };
 
-export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onReport, onMenu, canMenu, translationOf, onOpenCard, onAttach, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey, readLineAt, unreadBy }: Props) {
+export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onReport, onMenu, canMenu, translationOf, onOpenCard, onAttach, onPolish, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey, readLineAt, unreadBy }: Props) {
     const { t, locale } = useT();
     /** 신고·차단을 걸 수 있는 글 — 보낸 사람이 있는 **남의** 글. 내 글과 시스템 글(보낸 사람 없음)은 아니다. */
     const canReport = (m: ChatMsg) => !!onReport && !!meId && !!m.senderId && m.senderId !== meId && m.type !== "system";
@@ -180,10 +185,31 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
         return m && messages[0]?.id !== m.id ? m.id : null;
     })();
 
+    // 답변 다듬기 — 바꾼 글이 입력칸에 그대로 있는 동안만 안내(언어·뜻·되돌리기)를 보여 준다. 고쳐 쓰면 뜻이 달라지니 내린다.
+    const [polishing, setPolishing] = useState(false);
+    const [polished, setPolished] = useState<{ original: string; text: string; title: string; detail?: string } | null>(null);
+    const fitInput = () => { const el = inputRef.current; if (!el) return; el.style.height = "auto"; el.style.height = `${Math.min(120, el.scrollHeight)}px`; };
+    const polish = async () => {
+        const v = text.trim();
+        if (!v || polishing || sending || disabled || !onPolish) return;
+        setPolishing(true);
+        try {
+            const r = await onPolish(v);
+            if (r && r.text.trim()) {
+                const next = r.text.slice(0, 1000);
+                setPolished({ original: text, text: next, title: r.title, detail: r.detail });
+                setText(next);
+                requestAnimationFrame(fitInput);
+            }
+        } finally { setPolishing(false); inputRef.current?.focus(); }
+    };
+    const undoPolish = () => { if (!polished) return; setText(polished.original); setPolished(null); requestAnimationFrame(fitInput); inputRef.current?.focus(); };
+
     const send = async () => {
         const v = text.trim();
-        if (!v || sending || disabled) return;
+        if (!v || sending || disabled || polishing) return;
         setText("");
+        setPolished(null);
         setSending(true);
         atBottomRef.current = true;
         try { await onSend(v); } finally { setSending(false); inputRef.current?.focus(); }
@@ -311,6 +337,15 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                 })}
             </div>
             <div className="shrink-0 border-t border-surface-line bg-surface-1 px-3 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+                {polished && polished.text === text && (
+                    <div className="mb-2 rounded-2xl border border-surface-line bg-surface-2 px-3 py-2" data-testid="polish-note">
+                        <div className="flex items-center justify-between gap-2">
+                            <span className="min-w-0 text-[12px] font-semibold text-ink-2">{polished.title}</span>
+                            <button type="button" onClick={undoPolish} className="h-8 px-2 -mr-1 shrink-0 text-[12.5px] font-semibold text-brand">{t("chat.polish.undo")}</button>
+                        </div>
+                        {polished.detail && <p className="mt-0.5 max-h-[96px] overflow-y-auto text-[12.5px] leading-snug text-ink-3 whitespace-pre-wrap break-words">{polished.detail}</p>}
+                    </div>
+                )}
                 <div className="flex items-end gap-2">
                     {onAttach && !disabled && (
                         <button
@@ -327,14 +362,24 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                         onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }}
                         rows={1}
                         disabled={disabled}
+                        readOnly={polishing}
                         onFocus={() => { atBottomRef.current = true; setTimeout(toBottom, 60); setTimeout(toBottom, 320); }}
-                        placeholder={disabled ? t("chat.readOnly") : t("chat.placeholder")}
+                        placeholder={disabled ? t("chat.readOnly") : onPolish ? t("chat.polish.placeholder") : t("chat.placeholder")}
                         className="flex-1 min-h-[42px] max-h-[120px] px-3.5 py-2.5 rounded-2xl bg-surface-2 text-[14px] text-ink-1 placeholder:text-ink-4 outline-none resize-none focus:ring-1 focus:ring-brand disabled:opacity-50"
                         style={{ height: "auto" }}
                         onInput={(e) => { const el = e.currentTarget; el.style.height = "auto"; el.style.height = `${Math.min(120, el.scrollHeight)}px`; }}
                     />
+                    {onPolish && !disabled && (
+                        <button
+                            type="button" onClick={() => { void polish(); }} disabled={polishing || sending || !text.trim()}
+                            aria-label={t("chat.polish.button")} title={t("chat.polish.button")} aria-busy={polishing}
+                            className="w-[42px] h-[42px] rounded-full bg-surface-2 text-ink-2 flex items-center justify-center shrink-0 disabled:opacity-40 active:scale-95 transition-transform"
+                        >
+                            {polishing ? <LucideLoader2 className="w-4 h-4 animate-spin" /> : <LucideLanguages className="w-[18px] h-[18px]" />}
+                        </button>
+                    )}
                     <button
-                        type="button" onClick={() => { void send(); }} disabled={disabled || sending || !text.trim()}
+                        type="button" onClick={() => { void send(); }} disabled={disabled || sending || polishing || !text.trim()}
                         aria-label={t("chat.send")}
                         className="w-[42px] h-[42px] rounded-full bg-brand text-brand-fg flex items-center justify-center disabled:opacity-40 active:scale-95 transition-transform"
                     >

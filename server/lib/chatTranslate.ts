@@ -73,18 +73,20 @@ export class TranslateError extends Error {
 
 export interface TranslateResult { text: string; model: string; truncated: boolean }
 
-type FetchLike = (url: string, init: any) => Promise<{ ok: boolean; status: number; json: () => Promise<any> }>;
+export type FetchLike = (url: string, init: any) => Promise<{ ok: boolean; status: number; json: () => Promise<any> }>;
 
 /**
- * 한 건 옮긴다. 실패는 TranslateError 로 — 라우트가 사람에게 보일 문구로 바꾼다.
+ * OpenRouter 한 번 부르기 — 번역과 답변 다듬기(chatReply.ts)가 같이 쓴다. 모델 순서·생각 단계 끔·저장하는 사업자 제외·
+ * 시간 제한·열쇠를 기록에 남기지 않는 것은 여기서 한 번만 정한다. 돌아온 글은 다듬지 않고 그대로 준다.
  * fetchImpl 은 시험용(실제 요청을 보내지 않고 본문을 본다).
  */
-export async function translateText(raw: unknown, to: Locale, fetchImpl: FetchLike = fetch as any): Promise<TranslateResult> {
+export async function openRouterComplete(
+    messages: { role: "system" | "user"; content: string }[],
+    opts: { maxTokens: number; json?: boolean; tag: string },
+    fetchImpl: FetchLike = fetch as any,
+): Promise<{ content: string; model: string }> {
     const key = (process.env.OPENROUTER_API_KEY ?? "").trim();
     if (key.length < 20) throw new TranslateError("NOT_CONFIGURED");
-    const { text, truncated } = translateInput(raw);
-    if (!text) throw new TranslateError("EMPTY");
-
     const models = translateModels();
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), TRANSLATE_TIMEOUT_MS);
@@ -103,34 +105,47 @@ export async function translateText(raw: unknown, to: Locale, fetchImpl: FetchLi
                 model: models[0],
                 models,
                 temperature: 0,
-                max_tokens: 1200,
+                max_tokens: opts.maxTokens,
                 // 생각 단계는 끈다 — 번역 한 줄에 쓸 일이 없고 느려지고 비싸진다
                 reasoning: { enabled: false },
                 // 글을 저장·학습하는 사업자에게는 보내지 않는다
                 provider: { data_collection: "deny" },
-                messages: [
-                    { role: "system", content: translateSystemPrompt(to) },
-                    { role: "user", content: `<message>\n${text}\n</message>` },
-                ],
+                ...(opts.json ? { response_format: { type: "json_object" } } : {}),
+                messages,
             }),
         });
         const body = await res.json().catch(() => null);
         if (!res.ok) {
             // 열쇠·본문은 남기지 않는다 — 상태와 사업자가 준 짧은 사유만
-            console.warn("[ChatTranslate] upstream", res.status, String(body?.error?.message ?? "").slice(0, 120));
+            console.warn(`[${opts.tag}] upstream`, res.status, String(body?.error?.message ?? "").slice(0, 120));
             throw new TranslateError("UPSTREAM", `HTTP ${res.status}`);
         }
-        const out = cleanTranslation(body?.choices?.[0]?.message?.content);
-        if (!out) throw new TranslateError("UPSTREAM", "empty");
-        return { text: out, model: String(body?.model ?? models[0]), truncated };
+        const content = String(body?.choices?.[0]?.message?.content ?? "");
+        return { content, model: String(body?.model ?? models[0]) };
     } catch (e: any) {
         if (e instanceof TranslateError) throw e;
         if (e?.name === "AbortError") throw new TranslateError("TIMEOUT");
-        console.warn("[ChatTranslate] failed", String(e?.message ?? e).slice(0, 120));
+        console.warn(`[${opts.tag}] failed`, String(e?.message ?? e).slice(0, 120));
         throw new TranslateError("UPSTREAM");
     } finally {
         clearTimeout(timer);
     }
+}
+
+/**
+ * 한 건 옮긴다. 실패는 TranslateError 로 — 라우트가 사람에게 보일 문구로 바꾼다.
+ */
+export async function translateText(raw: unknown, to: Locale, fetchImpl: FetchLike = fetch as any): Promise<TranslateResult> {
+    if (!translateConfigured()) throw new TranslateError("NOT_CONFIGURED");
+    const { text, truncated } = translateInput(raw);
+    if (!text) throw new TranslateError("EMPTY");
+    const r = await openRouterComplete([
+        { role: "system", content: translateSystemPrompt(to) },
+        { role: "user", content: `<message>\n${text}\n</message>` },
+    ], { maxTokens: 1200, tag: "ChatTranslate" }, fetchImpl);
+    const out = cleanTranslation(r.content);
+    if (!out) throw new TranslateError("UPSTREAM", "empty");
+    return { text: out, model: r.model, truncated };
 }
 
 /* ── 인스턴스 안의 작은 기억 — 같은 글을 또 누르면 다시 묻지 않는다 ───────────────────────────── */

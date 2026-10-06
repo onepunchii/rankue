@@ -46,6 +46,7 @@ import { JoinTypeBadge, joinTypeOf, kakaoMapUrl, kakaoRouteUrl } from "@/golf/co
 import { kstDateLabel, kstTime } from "@/lib/kst";
 import { appConfirm } from "@/components/AppDialog";
 import { copyText } from "@/lib/copyText";
+import { languageLabel } from "@shared/languageLabel";
 
 const POLL_MS = 2500;
 /** 서버가 한 번에 주는 최근 메시지 수(chat.repo messages 와 같은 값) — 이만큼 꽉 차서 오면 위에 더 있다. */
@@ -85,7 +86,7 @@ export default function ChatRoomPage() {
     const id = params?.id ?? "";
     const key = `${kind}:${id}`;
     const [, setLocation] = useLocation();
-    const { t } = useT();
+    const { t, locale } = useT();
     const { toast } = useToast();
     const { member } = useAuth();
     const qc = useQueryClient();
@@ -468,6 +469,21 @@ export default function ChatRoomPage() {
         }
     };
     const deleteFromMenu = () => { const m = reportMsg; if (!m) return; setReportMenuOpen(false); void remove(m); };
+    // 답변 다듬기(2026-10-06 오너) — 운영자가 남의 문의 방에서 답할 때만. 한국어로 쓴 답을 회원 언어의 정중한 문장으로 바꿔 입력칸에 넣는다.
+    // 보내기는 내가 누른다. 바꾼 글의 언어 이름은 화면 언어로(Intl), 뜻풀이는 서버가 화면 언어로 준다(같은 언어면 없다).
+    const canPolish = isStaff && kind === "support" && !!member && id !== member.id;
+    const polishReply = async (draft: string) => {
+        const asked = key;
+        try {
+            const out = await apiRequest(`/api/hiq/chat/rooms/${asked}/reply-polish`, { method: "POST", body: { text: draft } }) as { text: string; language: string; back: string };
+            if (keyRef.current !== asked) return null; // 그사이 방을 옮겼다 — 앞 방의 답을 새 방 입력칸에 넣지 않는다
+            const lang = languageLabel(out.language, locale);
+            return { text: out.text, title: lang ? t("chat.polish.done").replace("{lang}", lang) : t("chat.polish.doneNoLang"), detail: out.back || undefined };
+        } catch (e: any) {
+            if (keyRef.current === asked) toast({ title: e?.message || t("chat.polish.failed"), variant: "destructive" });
+            return null;
+        }
+    };
 
     const pinned = useMemo(() => {
         if (!d) return null;
@@ -548,6 +564,7 @@ export default function ChatRoomPage() {
                     onMenu={openReport}
                     canMenu={(m) => { const x = menuFor(m); return x.copy || x.translate || x.report || x.del; }}
                     translationOf={(m) => translations[m.id]}
+                    onPolish={canPolish ? polishReply : undefined}
                     pinned={pinned} loading={loading || info.isPending} onSeen={markSeen}
                     hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={loadOlder} roomKey={key}
                     readLineAt={readLineAt} unreadBy={unreadBy}
