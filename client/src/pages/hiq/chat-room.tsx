@@ -45,6 +45,7 @@ import { GolfMatchCreateSheet } from "@/components/hiq/chat/attach/GolfMatchCrea
 import { JoinTypeBadge, joinTypeOf, kakaoMapUrl, kakaoRouteUrl } from "@/golf/components/join/joinUi";
 import { kstDateLabel, kstTime } from "@/lib/kst";
 import { appConfirm } from "@/components/AppDialog";
+import { copyText } from "@/lib/copyText";
 
 const POLL_MS = 2500;
 /** 서버가 한 번에 주는 최근 메시지 수(chat.repo messages 와 같은 값) — 이만큼 꽉 차서 오면 위에 더 있다. */
@@ -423,6 +424,51 @@ export default function ChatRoomPage() {
     // 방을 옮기면(같은 컴포넌트가 재사용된다) 앞 방에서 고른 메시지를 버린다 — 새 방의 종류로 엉뚱하게 신고되지 않게.
     useEffect(() => { setReportMsg(null); setReportMenuOpen(false); setReportDialogOpen(false); }, [key]);
 
+    // ── 말풍선 메뉴(2026-10-06 오너: "신고하기 버튼 위에 기능들 더 — 복사하기나 이런 거, 번역하기는 일단 관리자만") ──
+    // 고른 메시지(reportMsg)와 시트(reportMenuOpen)는 신고·차단이 쓰던 것을 그대로 쓴다 — 이제 그 시트가 메뉴 전체다.
+    // 메시지마다 할 수 있는 일이 다르다: 복사(글자 메시지) · 번역(운영자, 남의 글자 메시지) · 신고·차단(남의 글, 문의 방 아님) · 삭제(내 글·운영진).
+    const isStaff = (member as any)?.role === "admin" || (member as any)?.role === "super_admin";
+    const canDeleteMsg = (m: ChatMsg) => !!member && (m.senderId === member.id || !!d?.canManage);
+    const menuFor = (m: ChatMsg) => {
+        const text = (m.type ?? "text") === "text" && !!m.message?.trim();
+        const others = !!m.senderId && m.senderId !== member?.id;
+        return {
+            copy: text,
+            translate: text && isStaff && others,
+            report: canReport && others && !!d && !!reportTargetFor(d, m),
+            del: canDeleteMsg(m),
+        };
+    };
+    const menu = reportMsg ? menuFor(reportMsg) : { copy: false, translate: false, report: false, del: false };
+    // 번역문(운영자) — 메시지 id 별. 원문은 그대로 두고 말풍선 아래에 붙인다. 방을 옮기면 비운다.
+    const [translations, setTranslations] = useState<Record<string, { text?: string; loading?: boolean; failed?: boolean }>>({});
+    useEffect(() => { setTranslations({}); }, [key]);
+    const copyMsg = async () => {
+        const m = reportMsg; if (!m) return;
+        setReportMenuOpen(false);
+        const ok = await copyText(m.message);
+        toast(ok ? { title: t("chat.msgMenu.copied") } : { title: t("chat.msgMenu.copyFailed"), variant: "destructive" });
+    };
+    const translateMsg = async () => {
+        const m = reportMsg; if (!m) return;
+        setReportMenuOpen(false);
+        // 이미 띄운 번역이면 숨긴다(같은 줄이 '번역 숨기기'로 바뀌어 있다)
+        if (translations[m.id]?.text) { setTranslations((cur) => { const next = { ...cur }; delete next[m.id]; return next; }); return; }
+        const asked = key;
+        setTranslations((cur) => ({ ...cur, [m.id]: { loading: true } }));
+        try {
+            const out = await apiRequest(`/api/hiq/chat/rooms/${asked}/messages/${m.id}/translate`, { method: "POST" }) as { text: string };
+            if (keyRef.current !== asked) return; // 그사이 방을 옮겼다
+            setTranslations((cur) => ({ ...cur, [m.id]: { text: out.text } }));
+        } catch (e: any) {
+            if (keyRef.current !== asked) return;
+            // 실패는 한 번만 말한다 — 말풍선 아래에 실패 줄을 남기지 않는다(메뉴에서 다시 누르면 다시 묻는다)
+            setTranslations((cur) => { const next = { ...cur }; delete next[m.id]; return next; });
+            toast({ title: e?.message || t("chat.msgMenu.translateFailed"), variant: "destructive" });
+        }
+    };
+    const deleteFromMenu = () => { const m = reportMsg; if (!m) return; setReportMenuOpen(false); void remove(m); };
+
     const pinned = useMemo(() => {
         if (!d) return null;
         if (d.kind === "listing" && b) {
@@ -498,6 +544,10 @@ export default function ChatRoomPage() {
                     onAttach={canAttach ? () => setAttachOpen(true) : undefined}
                     canDelete={(m) => !!member && (m.senderId === member.id || !!d?.canManage)}
                     onReport={canReport ? openReport : undefined}
+                    // 말풍선 메뉴 — 길게 누르기·우클릭·남의 글의 ⋯ 가 한 시트를 연다. 할 일이 하나도 없는 글(남의 카드, 문의 방의 카드 등)에서는 열지 않는다.
+                    onMenu={openReport}
+                    canMenu={(m) => { const x = menuFor(m); return x.copy || x.translate || x.report || x.del; }}
+                    translationOf={(m) => translations[m.id]}
                     pinned={pinned} loading={loading || info.isPending} onSeen={markSeen}
                     hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={loadOlder} roomKey={key}
                     readLineAt={readLineAt} unreadBy={unreadBy}
@@ -518,15 +568,20 @@ export default function ChatRoomPage() {
                     reportable={canReport} onBlocked={dropSender}
                 />
             )}
-            {canReport && (
+            {d && (
                 <>
                     <ChatReportSheet
-                        open={reportMenuOpen && !!reportTarget} onOpenChange={setReportMenuOpen}
+                        open={reportMenuOpen && !!reportMsg} onOpenChange={setReportMenuOpen}
                         name={reportTarget?.authorName || t("community.thisUser")} busy={blockSender.isPending}
                         onReport={() => { setReportMenuOpen(false); setReportDialogOpen(true); }}
                         onBlock={() => void askBlock()}
+                        reportable={menu.report && !!reportTarget}
+                        onCopy={menu.copy ? () => void copyMsg() : undefined}
+                        onTranslate={menu.translate ? () => void translateMsg() : undefined}
+                        translateLabel={reportMsg && translations[reportMsg.id]?.text ? t("chat.msgMenu.hideTranslation") : undefined}
+                        onDelete={menu.del ? deleteFromMenu : undefined}
                     />
-                    {reportTarget && (
+                    {menu.report && reportTarget && (
                         // key — 고른 메시지가 바뀌면 앞에서 골라 둔 사유를 비운다.
                         <ReportDialog
                             key={`${reportTarget.targetType}:${reportTarget.targetId}`}

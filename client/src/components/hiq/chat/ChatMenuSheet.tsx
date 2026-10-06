@@ -12,9 +12,13 @@
  * 신고·차단(2026-10-06, 스토어 심사 1.2 — 9/21 채팅을 한 체계로 합치며 빠졌던 입구를 되살린다):
  *  - 참여자 줄: 내가 아닌 사람 오른쪽에 ⋯(UgcActionMenu, 회원 신고·차단). 문의 방은 상대가 운영자라 뺀다(reportable).
  *  - ChatReportSheet: 남의 **메시지**에서 여는 [신고] [차단하기] 두 줄. 무엇을 신고할지는 부르는 쪽이 정한다.
+ *
+ * 말풍선 메뉴(2026-10-06 오너: "신고하기 버튼 위에 기능들 더 — 복사하기나 이런 거, 번역하기는 일단 관리자만"):
+ *  - ChatReportSheet 가 그 메뉴다. 위에서부터 [복사] [번역] · [신고] [차단하기] · [삭제] — 부르는 쪽이 넘긴 것만 그린다.
+ *    내 글·문의 방처럼 신고할 대상이 아니면 신고·차단 묶음을 뺀다(reportable).
  */
 import { useRef, useState } from "react";
-import { LucideUsers, LucideBellOff, LucideBell, LucideLogOut, LucideLoader2, LucideChevronLeft, LucideFlag, LucideBan } from "lucide-react";
+import { LucideUsers, LucideBellOff, LucideBell, LucideLogOut, LucideLoader2, LucideChevronLeft, LucideFlag, LucideBan, LucideCopy, LucideLanguages, LucideTrash2 } from "lucide-react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
 import { useT } from "@/lib/i18n";
@@ -157,12 +161,13 @@ export function ChatMenuSheet({ open, onOpenChange, members, meId, muted, canLea
 }
 
 /**
- * 남의 메시지에서 여는 [신고] [차단하기](2026-10-06). 그 말풍선 옆 ⋯ 나 길게 누르기로 뜬다.
- * 대화방 메뉴와 같은 생김새(묶음 카드 + 한 줄에 이름 하나 + 취소)이고, 맨 위에 누구 것인지 한 줄로 알린다.
- * 차단을 신고 창 안에만 두지 않고 여기 바로 두는 까닭은 UgcActionMenu 와 같다 — 심사관이 '차단'을 한 번에 찾아야 하고,
- * 사유를 고르지 않고 그냥 안 보고 싶은 사람이 더 많다.
+ * 말풍선 메뉴 — 메시지 하나에서 할 수 있는 일을 한 시트에 모은다(이름은 처음 만든 신고·차단 시트 그대로다).
+ *  [복사] [번역]      글자 메시지일 때. 번역은 부르는 쪽이 넘길 때만(지금은 운영자)
+ *  [신고] [차단하기]  남의 글이고 신고할 수 있는 방일 때(reportable). 무엇을 신고할지는 부르는 쪽이 정한다
+ *  [삭제]            지울 수 있는 글일 때(내 글·운영진)
+ * 넘기지 않은 줄은 그리지 않는다. 묶음이 하나도 없으면 부르는 쪽이 시트를 열지 않는다.
  */
-export function ChatReportSheet({ open, onOpenChange, name, busy, onReport, onBlock }: {
+export function ChatReportSheet({ open, onOpenChange, name, busy, onReport, onBlock, reportable = true, onCopy, onTranslate, translateLabel, onDelete }: {
     open: boolean;
     onOpenChange: (o: boolean) => void;
     /** 메시지를 보낸 사람 이름 */
@@ -171,9 +176,20 @@ export function ChatReportSheet({ open, onOpenChange, name, busy, onReport, onBl
     busy?: boolean;
     onReport: () => void;
     onBlock: () => void;
+    /** 신고·차단 두 줄을 보일지 — 내 글·문의 방에서는 뺀다. 안 넘기면 보인다(예전 쓰임 그대로) */
+    reportable?: boolean;
+    /** 복사 — 글자 메시지에서만 넘긴다 */
+    onCopy?: () => void;
+    /** 번역 — 넘기면 줄이 생긴다(지금은 운영자만). 이미 번역을 띄운 글이면 translateLabel 로 '번역 숨기기' */
+    onTranslate?: () => void;
+    translateLabel?: string;
+    /** 삭제 — 지울 수 있는 글에서만 넘긴다 */
+    onDelete?: () => void;
 }) {
     const { t } = useT();
     const who = t("chat.report.of").replace("{name}", name);
+    // 복사·번역·삭제가 같이 뜨는 시트에 '신고·차단'이라는 머리말은 맞지 않는다 — 그때는 누구 글인지만 말한다
+    const heading = !reportable ? t("chat.msgMenu.title") : (onCopy || onTranslate || onDelete) ? t("chat.msgMenu.of").replace("{name}", name) : who;
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent
@@ -181,15 +197,28 @@ export function ChatReportSheet({ open, onOpenChange, name, busy, onReport, onBl
                 className="bg-surface-0 text-ink-1 border-surface-line rounded-t-2xl p-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))] focus:outline-none"
             >
                 <SheetHeader className="sr-only">
-                    <SheetTitle>{t("chat.report.title")}</SheetTitle>
+                    <SheetTitle>{reportable ? t("chat.report.title") : t("chat.msgMenu.title")}</SheetTitle>
                 </SheetHeader>
                 <div className="px-3 pt-3 space-y-2">
-                    {/* 누구 것인지 — 화면에 보이는 이 한 줄이 곧 시트 설명(읽어 주기)이다. */}
-                    <SheetDescription className="px-2 pt-1 text-[13px] font-medium text-ink-3 truncate">{who}</SheetDescription>
-                    <Group>
-                        <Row Icon={LucideFlag} label={t("community.report")} onClick={onReport} />
-                        <Row Icon={LucideBan} label={t("community.blockMenu")} danger busy={busy} onClick={onBlock} />
-                    </Group>
+                    {/* 누구 것인지 — 화면에 보이는 이 한 줄이 곧 시트 설명(읽어 주기)이다. 신고할 대상이 아니면 '메시지' 한 마디. */}
+                    <SheetDescription className="px-2 pt-1 text-[13px] font-medium text-ink-3 truncate">{heading}</SheetDescription>
+                    {(onCopy || onTranslate) && (
+                        <Group>
+                            {onCopy && <Row Icon={LucideCopy} label={t("chat.msgMenu.copy")} onClick={onCopy} />}
+                            {onTranslate && <Row Icon={LucideLanguages} label={translateLabel ?? t("chat.msgMenu.translate")} onClick={onTranslate} />}
+                        </Group>
+                    )}
+                    {reportable && (
+                        <Group>
+                            <Row Icon={LucideFlag} label={t("community.report")} onClick={onReport} />
+                            <Row Icon={LucideBan} label={t("community.blockMenu")} danger busy={busy} onClick={onBlock} />
+                        </Group>
+                    )}
+                    {onDelete && (
+                        <Group>
+                            <Row Icon={LucideTrash2} label={t("community.delete")} danger onClick={onDelete} />
+                        </Group>
+                    )}
                     <button
                         type="button" onClick={() => onOpenChange(false)}
                         className="w-full h-[54px] rounded-2xl bg-surface-2 text-[15px] font-semibold text-ink-2 active:bg-surface-3"

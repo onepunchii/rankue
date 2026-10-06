@@ -51,6 +51,15 @@ interface Props {
      * 지울 수 있는 글(canDelete — 크루 운영진이 보는 남의 글)의 길게 누르기는 예전대로 삭제이고, 그때도 ⋯ 는 신고·차단이다.
      */
     onReport?: (msg: ChatMsg) => void;
+    /**
+     * 말풍선 메뉴(2026-10-06 — 복사·번역·삭제·신고·차단을 한 시트에서). canMenu 가 true 인 글에서만 연다.
+     * 넘기면 길게 누르기·우클릭이 이 메뉴를 열고(삭제·신고를 곧바로 부르던 예전 길보다 앞선다), 남의 글의 ⋯ 도 이 메뉴를 연다.
+     * 문의 방처럼 신고할 대상이 아닌 방에서도 ⋯ 가 보인다 — 복사·번역이 있기 때문이다.
+     */
+    onMenu?: (msg: ChatMsg) => void;
+    canMenu?: (msg: ChatMsg) => boolean;
+    /** 말풍선 아래에 그릴 번역(지금은 운영자만 쓴다). 없으면 아무것도 안 그린다 */
+    translationOf?: (msg: ChatMsg) => { text?: string; loading?: boolean; failed?: boolean } | undefined;
     /** 카드형 메시지(정산·부킹 공유·+ 로 붙인 카드)를 눌렀을 때 */
     onOpenCard?: (msg: ChatMsg) => void;
     /** 입력줄 왼쪽 "+"(2026-09-23 종목별 첨부). 없으면 단추를 안 그린다 — 운영자 문의 방은 안 넘긴다. */
@@ -114,13 +123,17 @@ const timeLabel = (iso: string, locale: Locale) => {
     return new Intl.DateTimeFormat(INTL_TAG[locale], { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(iso));
 };
 
-export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onReport, onOpenCard, onAttach, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey, readLineAt, unreadBy }: Props) {
+export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onReport, onMenu, canMenu, translationOf, onOpenCard, onAttach, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey, readLineAt, unreadBy }: Props) {
     const { t, locale } = useT();
     /** 신고·차단을 걸 수 있는 글 — 보낸 사람이 있는 **남의** 글. 내 글과 시스템 글(보낸 사람 없음)은 아니다. */
     const canReport = (m: ChatMsg) => !!onReport && !!meId && !!m.senderId && m.senderId !== meId && m.type !== "system";
     // 길게 누르기(600ms): 지울 수 있는 글(내 글·운영진)은 삭제 — 예전 그대로. 그 밖의 남의 글은 신고·차단. 마우스에서는 우클릭도 같다.
     const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /** 말풍선 메뉴를 열 수 있는 글 — 보내는 중·실패한 글과 시스템 글은 아니다. 무엇을 할 수 있는지는 부르는 쪽(canMenu)이 안다. */
+    const menuable = (m: ChatMsg) => !!onMenu && m.type !== "system" && !m.pending && !m.failed && !!canMenu?.(m);
     const holdStart = (m: ChatMsg) => {
+        // 메뉴가 있으면 메뉴가 먼저다 — 삭제·신고는 그 안에 있다
+        if (menuable(m)) { holdRef.current = setTimeout(() => { holdRef.current = null; onMenu?.(m); }, 600); return; }
         const act = onDelete && canDelete?.(m) ? onDelete : canReport(m) ? onReport : undefined;
         if (!act) return;
         holdRef.current = setTimeout(() => { holdRef.current = null; act(m); }, 600);
@@ -128,6 +141,7 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
     const holdEnd = () => { if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; } };
     const onContext = (e: MouseEvent, m: ChatMsg) => {
         e.preventDefault();
+        if (menuable(m)) { onMenu?.(m); return; }
         if (canDelete?.(m)) onDelete?.(m);
         else if (canReport(m)) onReport?.(m);
     };
@@ -262,14 +276,14 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                                     const n = mine && !m.pending && !m.failed ? (unreadBy?.(m) ?? 0) : 0;
                                                     return n > 0 ? <span className="rk-num text-[10.5px] font-bold text-brand" aria-label={t("chat.unreadByN").replace("{n}", String(n))}>{n}</span> : null;
                                                 })()}
-                                                {canReport(m) && (
-                                                    // 신고·차단 입구 — 길게 누르기는 못 찾을 수 있어 늘 보이는 ⋯ 를 둔다. **말풍선마다**(이어 보낸 글에도) 시각 위에 둔다:
+                                                {(canReport(m) || (!mine && menuable(m))) && (
+                                                    // 신고·차단 입구(그리고 2026-10-06 부터는 말풍선 메뉴 — 복사·번역이 그 위에 있다) — 길게 누르기는 못 찾을 수 있어 늘 보이는 ⋯ 를 둔다. **말풍선마다**(이어 보낸 글에도) 시각 위에 둔다:
                                                     // 누른 그 글(m)이 그대로 신고 대상이 된다. 그림은 24×20 으로 작게 — 시각 한 줄과 합쳐도 한 줄 말풍선 높이(35px)를 안 넘는다.
                                                     // 누를 자리는 before 로 넓힌다: 가로 44px(왼쪽은 말풍선과의 틈 6px 까지만), 세로 40px.
                                                     // 세로를 44px 로 못 채우는 까닭 — 이어 보낸 한 줄 말풍선은 41px 간격으로 쌓여서, 더 키우면 위아래 글의 ⋯ 와 겹쳐 다시 옆 글이 잡힌다.
                                                     <button
-                                                        type="button" onClick={() => onReport?.(m)} aria-haspopup="dialog"
-                                                        aria-label={t("chat.report.of").replace("{name}", m.sender?.name || t("community.thisUser"))}
+                                                        type="button" onClick={() => (menuable(m) ? onMenu : onReport)?.(m)} aria-haspopup="dialog"
+                                                        aria-label={canReport(m) ? t("chat.report.of").replace("{name}", m.sender?.name || t("community.thisUser")) : t("chat.msgMenu.open")}
                                                         className="relative w-6 h-5 rounded-full flex items-center justify-center text-ink-3 active:bg-surface-2 before:absolute before:-left-1.5 before:-right-3.5 before:-top-1 before:-bottom-4"
                                                     >
                                                         <LucideMoreHorizontal className="w-4 h-4" />
@@ -278,6 +292,17 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                                 <span className="text-[10.5px] text-ink-4">{m.pending ? "…" : timeLabel(m.createdAt, locale)}</span>
                                             </span>
                                         </div>
+                                        {(() => {
+                                            // 번역(운영자가 메뉴에서 고른 글에만) — 원문은 그대로 두고 아래에 붙인다. 글자로만 그린다(모델의 답을 HTML 로 넣지 않는다).
+                                            const tr = translationOf?.(m);
+                                            if (!tr) return null;
+                                            return (
+                                                <span className="mt-1 max-w-full px-3 py-1.5 rounded-xl border border-surface-line bg-surface-1 text-[13px] leading-snug text-ink-2 whitespace-pre-wrap break-words">
+                                                    <span className="block mb-0.5 text-[10.5px] font-semibold text-ink-4">{t("chat.msgMenu.translate")}</span>
+                                                    {tr.loading ? t("chat.msgMenu.translating") : tr.failed ? t("chat.msgMenu.translateFailed") : tr.text}
+                                                </span>
+                                            );
+                                        })()}
                                     </div>
                                 </div>
                             )}

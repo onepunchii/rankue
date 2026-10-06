@@ -27,6 +27,7 @@ import { notificationService } from "../../services/notificationService.js";
 import { parseRoomKey, type RoomRef } from "../../storage/chat.repo.js";
 import { msg, localeOf, type I18nText } from "../../lib/i18n.js";
 import { memberSearchTerm, supportHidesSender, supportNotifyTitleKey } from "../../../shared/chatSupport.js";
+import { translateConfigured, translateText, TranslateError, translateCacheKey, cachedTranslation, rememberTranslation, takeTranslateSlot } from "../../lib/chatTranslate.js";
 
 const router = Router();
 const sportOf = (q: unknown): "BILLIARDS" | "GOLF" => (q === "GOLF" ? "GOLF" : "BILLIARDS");
@@ -256,6 +257,37 @@ router.delete("/rooms/:key/messages/:id", requireAuth, asyncHandler(async (req: 
     if (msg.senderId !== req.userId) console.warn("[ChatModDelete]", JSON.stringify({ by: req.userId, room: ref.key, messageId: msg.id, author: msg.senderId, text: String(msg.message).slice(0, 80) }));
     await storage.chat.deleteMessage(msg.id);
     return sendSuccess(res, { deleted: true });
+}));
+
+/**
+ * 번역(운영자 전용, 2026-10-06 오너: "번역하기는 일단 관리자만 — 서비스 관리에 필요") — 고른 메시지 한 건을 요청 언어(x-locale)로.
+ *  - 글은 **DB 에서 읽는다**. 화면이 보낸 글을 옮기지 않는다 — 번역기를 아무 글에나 쓰는 통로가 되지 않게.
+ *  - 그 방에 들어올 수 있는 운영자만(openRoom). 운영자도 회원끼리의 방(조인·부킹·1:1)은 못 열므로 거기 글은 못 옮긴다.
+ *  - 글자 메시지만. 카드·사진·시스템 글은 옮길 글이 없다.
+ *  - 번역은 저장하지 않는다(인스턴스 안의 작은 기억뿐). 외부로 나가는 것은 그 메시지의 글자뿐이다 — 보낸 사람·방·회원 id 는 싣지 않는다.
+ */
+router.post("/rooms/:key/messages/:id/translate", requireAuth, requireChatAdmin, asyncHandler(async (req: AuthRequest, res: any) => {
+    const ref = await openRoom(req, res); if (!ref) return;
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "err.chat.messageNotFound");
+    if (!translateConfigured()) return sendError(res, 503, "err.chat.translateOff", "TRANSLATE_OFF");
+    const row = await storage.chat.getMessage(req.params.id);
+    if (!row || row.roomKey !== ref.key) return sendError(res, 404, "err.chat.messageNotFound");
+    if ((row.type ?? "text") !== "text" || !String(row.message ?? "").trim()) return sendError(res, 400, "err.chat.translateNoText", "NO_TEXT");
+    const to = localeOf(res);
+    const ck = translateCacheKey(row.id, to);
+    const hit = cachedTranslation(ck);
+    if (hit) return sendSuccess(res, { text: hit.text, to, truncated: hit.truncated });
+    if (!takeTranslateSlot(req.userId!)) return sendError(res, 429, "err.chat.translateBusy", "TRANSLATE_BUSY");
+    try {
+        const out = await translateText(row.message, to);
+        rememberTranslation(ck, out);
+        return sendSuccess(res, { text: out.text, to, truncated: out.truncated });
+    } catch (e) {
+        const code = e instanceof TranslateError ? e.code : "UPSTREAM";
+        if (code === "NOT_CONFIGURED") return sendError(res, 503, "err.chat.translateOff", "TRANSLATE_OFF");
+        if (code === "EMPTY") return sendError(res, 400, "err.chat.translateNoText", "NO_TEXT");
+        return sendError(res, 502, "err.chat.translateFailed", "TRANSLATE_FAILED");
+    }
 }));
 
 /** 1:1·소그룹 방 — 친구(라이벌)와만. 낯선 사람에게 방을 열 수 없다(도배·스토킹 방지). */

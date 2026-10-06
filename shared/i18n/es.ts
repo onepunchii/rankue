@@ -416,6 +416,11 @@ export const es: Record<string, string> = {
   "err.chat.roundOver": "Esta ronda ya terminó, no puedes enviar más mensajes",
   "err.chat.messageNotFound": "No se encontró el mensaje",
   "err.chat.deleteForbidden": "No tienes permiso para eliminar esto",
+  // 채팅 번역(2026-10-06, 운영자 전용)
+  "err.chat.translateOff": "La traducción no está disponible ahora",
+  "err.chat.translateFailed": "No se pudo traducir. Inténtalo de nuevo en un momento",
+  "err.chat.translateBusy": "Demasiadas traducciones. Inténtalo de nuevo en un momento",
+  "err.chat.translateNoText": "No hay texto para traducir",
   "err.chat.pickMembers": "Elige de 1 a 7 personas para chatear",
   "err.chat.golfFriendsOnly": "Solo puedes abrir un chat con tus amigos de golf",
   "err.chat.friendsOnly": "Solo puedes abrir un chat con tus amigos (Rivales)",

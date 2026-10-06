@@ -61,10 +61,12 @@ describe("(가) 말풍선(ChatRoom) — 남의 글에 신고·차단 입구", ()
         const cls = /className="([^"]+)"/.exec(btn)?.[1] ?? "";
         const px = (re: RegExp) => Number(re.exec(cls)?.[1] ?? NaN) * 4;
 
-        it("신고할 수 있는 글에만 그리고, 누르면 그 메시지로 onReport", () => {
-            expect(meta).toContain("{canReport(m) && (");
+        it("신고할 수 있는 글(또는 메뉴가 있는 남의 글)에만 그리고, 누르면 그 메시지로 메뉴·신고를 연다", () => {
+            // 2026-10-06 말풍선 메뉴: ⋯ 는 신고·차단만이 아니라 메뉴 전체(복사·번역 포함)의 입구다 — 문의 방의 남의 글에도 보인다.
+            expect(meta).toContain("{(canReport(m) || (!mine && menuable(m))) && (");
             expect(btn).toContain('type="button"');
-            expect(btn).toContain("onClick={() => onReport?.(m)}");
+            // 메뉴가 있으면 메뉴, 없으면(메뉴를 안 넘긴 쓰임) 예전대로 신고
+            expect(btn).toContain("onClick={() => (menuable(m) ? onMenu : onReport)?.(m)}");
             expect(btn).toContain("LucideMoreHorizontal");
         });
 
@@ -72,7 +74,7 @@ describe("(가) 말풍선(ChatRoom) — 남의 글에 신고·차단 입구", ()
             // 이름 줄은 이름만: 거기 ⋯ 를 두면 누른 사람이 가리킨 글이 아니라 묶음의 첫 글이 넘어간다(크루 방은 그 id 가 지워진다).
             expect(src).toContain('{!mine && !grouped && <span className="mb-0.5 ml-1 text-[11.5px] font-medium text-ink-3">{m.sender?.name}</span>}');
             // ⋯ 는 소스에 하나뿐이고, 묶임(grouped)과 무관한 시각 칸 안에 있다
-            expect(src.match(/onClick=\{\(\) => onReport\?\.\(m\)\}/g)).toHaveLength(1);
+            expect(src.match(/onClick=\{\(\) => \(menuable\(m\) \? onMenu : onReport\)\?\.\(m\)\}/g)).toHaveLength(1);
             expect(src.match(/LucideMoreHorizontal className=/g)).toHaveLength(1);
             expect(meta).not.toContain("grouped");
             // 시각 칸은 글·카드 말풍선과 같은 줄(묶임 조건 밖)에 있다
@@ -82,7 +84,8 @@ describe("(가) 말풍선(ChatRoom) — 남의 글에 신고·차단 입구", ()
         });
 
         it("이름표(aria-label)는 사전 키 — 누구 것인지 읽어 준다", () => {
-            expect(btn).toMatch(/aria-label=\{t\("chat\.report\.of"\)\.replace\("\{name\}", m\.sender\?\.name \|\| t\("community\.thisUser"\)\)\}/);
+            // 신고할 수 있는 글이면 "○○님 신고·차단", 아니면(문의 방 등 — 복사·번역만) "메시지 메뉴"
+            expect(btn).toContain('aria-label={canReport(m) ? t("chat.report.of").replace("{name}", m.sender?.name || t("community.thisUser")) : t("chat.msgMenu.open")}');
             expect(btn).not.toMatch(HANGUL);
         });
 
@@ -165,7 +168,9 @@ describe("(나) 대화방(chat-room) — 방 종류별 신고 대상", () => {
     it("고른 메시지로 [신고] [차단하기] 시트를 띄우고, 신고는 신고 창으로 잇는다", () => {
         expect(src).toContain("const openReport = useCallback((m: ChatMsg) => { setReportMsg(m); setReportMenuOpen(true); }, []);");
         const sheet = /<ChatReportSheet[\s\S]*?\/>/.exec(src)?.[0] ?? "";
-        expect(sheet).toContain("open={reportMenuOpen && !!reportTarget}");
+        // 2026-10-06: 이 시트가 말풍선 메뉴 전체다 — 신고할 대상이 아닌 글(내 글·문의 방)에서도 뜨고, 신고·차단 묶음은 reportable 일 때만 그린다
+        expect(sheet).toContain("open={reportMenuOpen && !!reportMsg}");
+        expect(sheet).toContain("reportable={menu.report && !!reportTarget}");
         expect(sheet).toContain("onReport={() => { setReportMenuOpen(false); setReportDialogOpen(true); }}");
         expect(sheet).toContain("onBlock={() => void askBlock()}");
     });
@@ -376,9 +381,12 @@ describe("메시지 신고·차단 시트(ChatReportSheet) — [신고] [차단�
 
     it("누구 것인지 알리고(화면·읽어 주기 둘 다), 취소로 닫는다", () => {
         expect(sheet).toContain('const who = t("chat.report.of").replace("{name}", name);');
-        expect(sheet).toContain('<SheetTitle>{t("chat.report.title")}</SheetTitle>');
+        // 신고할 수 있는 글이면 신고·차단 제목과 "누구 것", 아니면 '메시지'(2026-10-06 말풍선 메뉴)
+        expect(sheet).toContain('<SheetTitle>{reportable ? t("chat.report.title") : t("chat.msgMenu.title")}</SheetTitle>');
         // 보이는 한 줄이 곧 시트 설명이다 — sr-only 머리줄 안에 숨기지 않는다
-        const desc = /<SheetDescription className="([^"]*)">\{who\}<\/SheetDescription>/.exec(sheet)?.[1] ?? "";
+        // 머리말: 내 글·문의 방은 '메시지', 복사·번역·삭제가 같이 뜨면 "누구의 메시지", 신고·차단만이면 예전 그대로 "누구 신고·차단"
+        expect(sheet).toContain('const heading = !reportable ? t("chat.msgMenu.title") : (onCopy || onTranslate || onDelete) ? t("chat.msgMenu.of").replace("{name}", name) : who;');
+        const desc = /<SheetDescription className="([^"]*)">\{heading\}<\/SheetDescription>/.exec(sheet)?.[1] ?? "";
         expect(desc).not.toBe("");
         expect(desc).not.toContain("sr-only");
         expect(between(sheet, '<SheetHeader className="sr-only">', "</SheetHeader>")).not.toContain("SheetDescription");

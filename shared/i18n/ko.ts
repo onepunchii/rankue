@@ -416,6 +416,11 @@ export const ko: Record<string, string> = {
   "err.chat.roundOver": "끝난 라운드의 방이라 더 보낼 수 없어요",
   "err.chat.messageNotFound": "메시지를 찾을 수 없습니다",
   "err.chat.deleteForbidden": "삭제 권한이 없습니다",
+  // 채팅 번역(2026-10-06, 운영자 전용)
+  "err.chat.translateOff": "지금은 번역을 쓸 수 없어요",
+  "err.chat.translateFailed": "번역하지 못했어요. 잠시 뒤에 다시 시도해 주세요",
+  "err.chat.translateBusy": "번역을 너무 자주 눌렀어요. 잠시 뒤에 다시 시도해 주세요",
+  "err.chat.translateNoText": "번역할 글이 없어요",
   "err.chat.pickMembers": "함께할 사람을 1~7명 골라 주세요",
   "err.chat.golfFriendsOnly": "골프 친구로 등록된 사람과만 대화방을 열 수 있어요",
   "err.chat.friendsOnly": "친구(라이벌)로 등록된 사람과만 대화방을 열 수 있어요",

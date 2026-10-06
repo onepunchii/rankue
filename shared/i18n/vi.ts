@@ -416,6 +416,11 @@ export const vi: Record<string, string> = {
   "err.chat.roundOver": "Vòng này đã kết thúc nên không thể gửi thêm tin nhắn",
   "err.chat.messageNotFound": "Không tìm thấy tin nhắn",
   "err.chat.deleteForbidden": "Bạn không có quyền xóa",
+  // 채팅 번역(2026-10-06, 운영자 전용)
+  "err.chat.translateOff": "Hiện chưa dùng được tính năng dịch",
+  "err.chat.translateFailed": "Không dịch được. Vui lòng thử lại sau giây lát",
+  "err.chat.translateBusy": "Bạn dịch quá nhiều lần. Vui lòng thử lại sau giây lát",
+  "err.chat.translateNoText": "Không có nội dung để dịch",
   "err.chat.pickMembers": "Hãy chọn 1–7 người để trò chuyện",
   "err.chat.golfFriendsOnly": "Bạn chỉ có thể mở phòng chat với bạn golf",
   "err.chat.friendsOnly": "Bạn chỉ có thể mở phòng chat với bạn bè (Đối thủ)",

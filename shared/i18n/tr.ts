@@ -416,6 +416,11 @@ export const tr: Record<string, string> = {
   "err.chat.roundOver": "Bu tur sona erdi, artık mesaj gönderemezsiniz",
   "err.chat.messageNotFound": "Mesaj bulunamadı",
   "err.chat.deleteForbidden": "Silme yetkiniz yok",
+  // 채팅 번역(2026-10-06, 운영자 전용)
+  "err.chat.translateOff": "Çeviri şu anda kullanılamıyor",
+  "err.chat.translateFailed": "Çevrilemedi. Lütfen biraz sonra tekrar deneyin",
+  "err.chat.translateBusy": "Çok fazla çeviri isteği. Lütfen biraz sonra tekrar deneyin",
+  "err.chat.translateNoText": "Çevrilecek metin yok",
   "err.chat.pickMembers": "Sohbet için 1-7 kişi seçin",
   "err.chat.golfFriendsOnly": "Yalnızca golf arkadaşlarınızla sohbet açabilirsiniz",
   "err.chat.friendsOnly": "Yalnızca arkadaşlarınızla (Rakipler) sohbet açabilirsiniz",
