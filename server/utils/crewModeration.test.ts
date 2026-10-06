@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { checkContent } from "./contentFilter";
-import { screenCrewText, screenCrewFields, screenCrewProfile, screenCrewBody, screenMemberProfile, changedCrewProfileFields, isCrewReportTarget, isReportReason } from "./crewModeration";
+import { screenCrewText, screenCrewFields, screenCrewProfile, screenCrewBody, screenMemberProfile, isReservedMemberName, changedCrewProfileFields, isCrewReportTarget, isReportReason } from "./crewModeration";
+import { render } from "../lib/i18n";
+import { ko as serverKo } from "../../shared/i18n/ko";
+import { en as serverEn } from "../../shared/i18n/en";
+import { es as serverEs } from "../../shared/i18n/es";
+import { vi as serverVi } from "../../shared/i18n/vi";
+import { tr as serverTr } from "../../shared/i18n/tr";
 
 // 크루 UGC 필터 — 커뮤니티와 같은 차단(내기·빵·점당·욕설·거래)을 걸되,
 // 모임비·정산 이야기만 오탐에서 뺀다. 공개 커뮤니티 동작은 바뀌면 안 된다.
@@ -143,6 +151,85 @@ describe("screenMemberProfile — 회원 이름·소개", () => {
     it("보낸 칸만 돌려준다", () => {
         expect(screenMemberProfile({ introduction: "안녕하세요" })).toEqual({ ok: true, value: { introduction: "안녕하세요" } });
         expect(screenMemberProfile({})).toEqual({ ok: true, value: {} });
+    });
+});
+
+/**
+ * 2026-10-06 검토 — '랭큐 운영팀' 사칭. 운영자가 회원에게 먼저 말을 걸 수 있게 되면서 "💬 랭큐 운영팀 메시지" 푸시가 정상 흐름이 됐다.
+ * 1:1 푸시의 제목은 보낸 사람 이름 그대로("💬 {name}")라, 이름을 그렇게 바꾼 회원이 글자까지 같은 푸시를 만들 수 있었다.
+ */
+describe("운영 주체로 보이는 이름 — isReservedMemberName · screenMemberProfile", () => {
+    const RESERVED = "err.member.nameReserved";
+    const DICTS = { ko: serverKo, en: serverEn, es: serverEs, vi: serverVi, tr: serverTr } as const;
+
+    it("진짜 알림·방에 쓰이는 이름을 그대로 쓸 수 없다 — 다섯 언어의 운영팀·문의 방 이름 전부", () => {
+        // 서버 사전에서 직접 읽는다 — 문구가 바뀌어도 이 시험이 따라간다
+        for (const dict of Object.values(DICTS)) {
+            for (const key of ["ui.chat.supportTeam", "ui.chat.supportTitle", "notif.chat.supportTeam.title", "notif.chat.supportReply.title"]) {
+                expect(isReservedMemberName(dict[key]), dict[key]).toBe(true);
+                // 1:1 푸시 제목은 "💬 {name}" — 이모지를 뗀 글자를 이름으로 삼아도 걸린다
+                expect(isReservedMemberName(dict[key].replace("💬 ", "")), dict[key]).toBe(true);
+            }
+        }
+        for (const s of ["랭큐 운영팀 메시지", "랭큐 운영팀", "랭큐 운영자", "랭큐", "Rankue Team", "Rankue Support", "RANKUE", "운영팀", "운영자", "관리자", "앱 관리자"]) {
+            expect(isReservedMemberName(s), s).toBe(true);
+            expect(screenMemberProfile({ name: s }), s).toEqual({ ok: false, reason: RESERVED });
+        }
+    });
+
+    it("띄어쓰기·기호·전각·발음 부호·보이지 않는 글자를 끼워도 걸린다", () => {
+        for (const s of [
+            "랭 큐 운영자", "랭.큐", "랭-큐", "운 영 팀", "관_리_자", "💬 랭큐",
+            "ＲＡＮＫＵＥ", "Ránkue", "rankue_official", "R.a.n.k.u.e", "R a n k u e", "R A N K U E Team",
+            "랭\u200B큐",   // 폭 없는 공백
+            "랭\u2060큐",   // 낱말 이음
+            "랭\u00AD큐",   // 숨은 하이픈
+            "랭\u00A0큐",   // 줄 안 바뀌는 공백
+            "랭\u3164큐",   // 한글 채움 문자(빈 닉네임에 흔히 쓰는 글자)
+            "랭\uFFA0큐", "랭\u115F큐", "랭\u1160큐",
+        ]) {
+            expect(isReservedMemberName(s), JSON.stringify(s)).toBe(true);
+        }
+    });
+
+    it("평범한 이름은 통과한다 — 낱말 일부가 겹치는 이름, 낱말 경계를 넘는 우연 포함", () => {
+        for (const s of ["김회원", "3쿠션러", "랭킹1위", "랭크업", "큐랭", "김운영", "박관리", "운영", "당구왕", "홍길동", "Player", "Nguyễn Văn A", "José Peña", "İsmail", "Frank Ueda", "Fran Kuehn"]) {
+            expect(isReservedMemberName(s), s).toBe(false);
+            expect(screenMemberProfile({ name: s }).ok, s).toBe(true);
+        }
+    });
+
+    it("소개에는 걸지 않는다 — 이름 칸만 본다", () => {
+        expect(screenMemberProfile({ name: "김회원", introduction: "랭큐 운영자님 덕분에 잘 쓰고 있어요" })).toEqual({ ok: true, value: { name: "김회원", introduction: "랭큐 운영자님 덕분에 잘 쓰고 있어요" } });
+    });
+
+    it("지금 이름을 그대로 다시 보낸 것은 넘어간다 — 설정 화면은 폼 전체를 다시 보낸다", () => {
+        // 카카오 가입의 기본 이름('랭큐회원')이나 운영자 본인 계정처럼, 이 규칙 전에 정해진 이름을 가진 사람이 소개만 바꿔도 저장이 막히면 안 된다
+        expect(isReservedMemberName("랭큐회원")).toBe(true);
+        expect(screenMemberProfile({ name: "랭큐회원", introduction: "안녕하세요" }, { currentName: "랭큐회원" })).toEqual({ ok: true, value: { name: "랭큐회원", introduction: "안녕하세요" } });
+        expect(screenMemberProfile({ name: "랭큐 운영자" }, { currentName: " 랭큐 운영자 " }).ok).toBe(true);
+        // 새로 그런 이름으로 바꾸는 것은 막는다 — 다른 예약 이름에서 옮겨 가는 것도
+        expect(screenMemberProfile({ name: "랭큐 운영팀" }, { currentName: "김회원" })).toEqual({ ok: false, reason: RESERVED });
+        expect(screenMemberProfile({ name: "랭큐 운영팀" }, { currentName: "랭큐회원" })).toEqual({ ok: false, reason: RESERVED });
+        expect(screenMemberProfile({ name: "랭큐 운영팀" }, { currentName: null })).toEqual({ ok: false, reason: RESERVED });
+        // 그대로 다시 보낸 이름이라도 다른 규칙은 예전 그대로 건다(이 예외는 예약 이름에만 있다)
+        expect(screenMemberProfile({ name: "씨발맨" }, { currentName: "씨발맨" }).ok).toBe(false);
+        expect(screenMemberProfile({ name: "open.kakao.com/o/abc" }, { currentName: "open.kakao.com/o/abc" }).ok).toBe(false);
+    });
+
+    it("거절 문구는 사전 키다 — 다섯 언어에 있고, 요청 언어로 풀린다", () => {
+        for (const [lang, dict] of Object.entries(DICTS)) {
+            expect(dict[RESERVED], lang).toBeTruthy();
+            if (lang !== "ko") expect(dict[RESERVED], lang).not.toMatch(/[가-힣]/);
+        }
+        expect(render("ko", RESERVED)).toBe("이름에는 '랭큐'·'운영팀'·'운영자'·'관리자'를 넣을 수 없습니다");
+        expect(render("en", RESERVED)).toContain("Rankue");
+    });
+
+    it("프로필 수정(PATCH /me)은 지금 이름을 넘긴다 — 바뀐 이름만 이 규칙에 건다", () => {
+        // 라우트를 띄우지 않고 소스로 본다. 소셜 가입 쪽(구글·애플의 표시 이름)은 services/hiqService.socialName.test.ts 가 실제로 돌려 본다
+        const member = readFileSync(resolve(__dirname, "..", "routes/modules/member.ts"), "utf8");
+        expect(member).toContain("screenMemberProfile({ name: rawName, introduction: rawIntro }, { currentName: member.name })");
     });
 });
 

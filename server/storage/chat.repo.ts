@@ -12,11 +12,17 @@
 import { db } from "../db.js";
 import { isSuperAdmin } from "../lib/superAdmin.js";
 import {
-    hiqChatMessages, hiqChatRooms, hiqChatRoomMembers, hiqChatReads, hiqCrewMembers, hiqCrews, hiqMembers, profiles,
+    hiqChatMessages, hiqChatRooms, hiqChatRoomMembers, hiqChatReads, hiqCrewMembers, hiqCrews, hiqMembers, hiqStores, profiles,
     golfBookings, golfJoinRequests, hiqBlocks,
 } from "../../shared/schema.js";
-import { eq, and, or, asc, desc, gt, gte, lt, sql, inArray } from "drizzle-orm";
+import { eq, and, or, asc, desc, gt, gte, lt, ne, ilike, notLike, sql, inArray } from "drizzle-orm";
 import { tr, type Locale } from "../lib/i18n.js";
+import {
+    MEMBER_SEARCH_LIMIT, collapseSupportReads, escapeLike, isWithdrawnMember,
+    maskSupportMembers, maskSupportMessages, supportPreviewSender, toAdminMemberHit, type AdminMemberHit,
+} from "../../shared/chatSupport.js";
+import { DELETED_PHONE_PREFIX } from "../../shared/loginPhone.js";
+import { DEFAULT_STORE_SLUG, GLOBAL_STORE_SLUG } from "../../shared/systemStores.js";
 
 export type RoomKind = "crew" | "listing" | "dm" | "support";
 export interface RoomRef { kind: RoomKind; id: string; key: string }
@@ -81,8 +87,90 @@ export class ChatRepository {
         return [ref.id, ...(await this.adminMemberIds())];
     }
 
+    /* ── 문의 방: 운영자가 먼저 말 걸기(2026-10-06) ─────────────────
+     * 규칙은 shared/chatSupport.ts. 여기는 DB 에 묻는 것만 둔다.
+     */
+
+    /**
+     * 문의 방 주인(회원)의 상태. 운영자는 어떤 uuid 로든 방 열쇠를 만들 수 있으므로 열기 전에 본다 —
+     * 없는 회원의 방은 열리지 않고, 탈퇴회원에게는 새로 말을 걸 수 없다(행은 '탈퇴회원'으로 남아 있을 뿐 받을 사람이 없다).
+     * 탈퇴는 번호 자리표시자(del-…)로만 본다 — 이름은 회원이 바꿀 수 있는 값이다(shared/chatSupport isWithdrawnMember).
+     */
+    async supportOwnerState(ownerId: string): Promise<"ok" | "withdrawn" | "missing"> {
+        const [row] = await db.select({ phone: hiqMembers.phone }).from(hiqMembers).where(eq(hiqMembers.id, ownerId)).limit(1);
+        if (!row) return "missing";
+        return isWithdrawnMember(row) ? "withdrawn" : "ok";
+    }
+
+    /** 이 방에 메시지가 한 건이라도 있나. */
+    async hasMessages(key: string): Promise<boolean> {
+        const [row] = await db.select({ id: hiqChatMessages.id }).from(hiqChatMessages).where(eq(hiqChatMessages.roomKey, key)).limit(1);
+        return !!row;
+    }
+
+    /** 이 사람이 이 방에 쓴 적이 있나 — 문의 방 알림 제목이 '답변'인지 '운영팀 메시지'인지 가른다. */
+    async hasMessageFrom(key: string, senderId: string): Promise<boolean> {
+        const [row] = await db.select({ id: hiqChatMessages.id }).from(hiqChatMessages)
+            .where(and(eq(hiqChatMessages.roomKey, key), eq(hiqChatMessages.senderId, senderId))).limit(1);
+        return !!row;
+    }
+
+    /**
+     * 이 사람에게 운영자 개인 정보(이름·사진·회원 id·읽은 시각)를 가려야 하나 — 문의 방을 **운영자가 아닌 사람**이 볼 때.
+     * 방 주인인지로 가르지 않는다: 운영자가 아니면 무조건 가린다(나중에 다른 길로 이 방을 읽게 돼도 새지 않게).
+     */
+    async hidesStaffFrom(ref: RoomRef, viewerId: string): Promise<boolean> {
+        return ref.kind === "support" && !(await this.isAdmin(viewerId));
+    }
+
+    /**
+     * 회원 찾기(운영자 전용 — 라우트가 권한을 본다). 이름·닉네임에 검색어가 들어간 회원, 최대 20명.
+     * 검색어는 **파라미터로만** 들어간다(문장에 이어 붙이지 않는다). %·_ 는 글자 그대로 찾는다.
+     * 탈퇴회원(번호 자리표시자 del-…)과 나 자신은 뺀다 — 이름이 '탈퇴회원'일 뿐인 살아 있는 회원은 나온다(이름은 회원이 바꿀 수 있다).
+     * 정지 계정은 빼지 않고 표시한다(왜 답이 없는지 운영자가 알아야 한다).
+     * 번호는 끝 4자리만 내보낸다(toAdminMemberHit) — 같은 이름을 가려내는 데만 쓴다.
+     *
+     * 찾는 것은 '사람'이 아니라 **회원 행**이다(2026-10-06 검토). 회원 행은 매장별이라(unique(store_id, phone)) 같은 번호로 제휴 매장과
+     * 본 사이트에 따로 가입한 사람은 두 줄로 나오고, 문의 방 열쇠가 회원 행 id 라 매장 행을 고르면 푸시는 그 사람 폰에 가는데(토큰은 프로필에 있다)
+     * 앱은 본 사이트 행으로 로그인돼 있어 방이 열리지 않는다. 그래서 가입한 매장과 로그인 계정 유무를 같이 내보내고(운영자가 줄을 가린다),
+     * 앱이 로그인하는 행을 위에 둔다 — 순서는 lib/loginMember 와 같다(본 사이트 → 글로벌 → 그 밖). 프로필 id 원문은 응답에 싣지 않는다.
+     */
+    async searchMembersForAdmin(term: string, selfId: string): Promise<AdminMemberHit[]> {
+        const exact = escapeLike(term);
+        const rows = await db.select({
+            id: hiqMembers.id, name: hiqMembers.name, phone: hiqMembers.phone, createdAt: hiqMembers.createdAt, primarySport: hiqMembers.primarySport,
+            nickname: profiles.nickname, profileImageUrl: profiles.profileImageUrl, status: profiles.status, role: profiles.role,
+            profileId: hiqMembers.profileId, storeName: hiqStores.name, storeSlug: hiqStores.slug,
+        }).from(hiqMembers)
+            .leftJoin(profiles, eq(profiles.id, hiqMembers.profileId))
+            .leftJoin(hiqStores, eq(hiqStores.id, hiqMembers.storeId))
+            .where(and(
+                ne(hiqMembers.id, selfId),
+                notLike(hiqMembers.phone, `${DELETED_PHONE_PREFIX}%`),
+                or(ilike(hiqMembers.name, `%${exact}%`), ilike(profiles.nickname, `%${exact}%`)),
+            ))
+            // 이름이 똑같은 사람 → 그 글자로 시작하는 사람 → 나머지, 그 안에서는 앱이 로그인하는 행(본 사이트 → 글로벌) 먼저, 그다음 최근 가입순
+            .orderBy(
+                sql`(${hiqMembers.name} ilike ${exact}) desc`,
+                sql`(${hiqMembers.name} ilike ${`${exact}%`}) desc`,
+                sql`case when ${hiqStores.slug} = ${DEFAULT_STORE_SLUG} then 0 when ${hiqStores.slug} = ${GLOBAL_STORE_SLUG} then 1 else 2 end`,
+                desc(hiqMembers.createdAt),
+            )
+            .limit(MEMBER_SEARCH_LIMIT);
+        return rows.map(toAdminMemberHit);
+    }
+
     async canAccess(ref: RoomRef, memberId: string): Promise<boolean> {
-        if (ref.kind === "support") return ref.id === memberId || (await this.isAdmin(memberId));
+        if (ref.kind === "support") {
+            if (ref.id === memberId) return true;
+            if (!(await this.isAdmin(memberId))) return false;
+            // 운영자는 어떤 회원의 문의 방이든 연다(먼저 말 걸기) — 단 받을 사람이 있어야 한다.
+            const owner = await this.supportOwnerState(ref.id);
+            if (owner === "ok") return true;
+            if (owner === "missing") return false;
+            // 탈퇴회원: 남아 있는 문의 기록은 읽을 수 있다(목록에 그 방이 나온다). 빈 방을 새로 열지는 않는다.
+            return this.hasMessages(ref.key);
+        }
         if ((await this.roomMembers(ref)).includes(memberId)) return true;
         // 슈퍼 관리자는 가입하지 않아도 크루 방을 본다 — 신고를 확인하려면 원문이 필요하다(2026-09-23 오너).
         // 가입 행이 없으니 messages() 의 joinedAt 컷도 안 걸려 **처음부터의 대화**가 보인다.
@@ -97,9 +185,16 @@ export class ChatRepository {
      *    이관된 크루 방은 몇 달 전 대화가 뜨고 그 상태로 읽음 처리돼 방금 온 메시지를 놓쳤다.
      *  - after: 그 뒤에 온 것만(2.5초 폴링).
      *  - before: 그 앞의 PAGE 건(위로 올려 더 읽기).
-     * 크루는 가입 뒤 메시지만, 차단한 사람의 글은 어느 방이든 안 보인다.
+     * 크루는 가입 뒤 메시지만, 차단한 사람의 글은 안 보인다 — **문의 방만 예외**다(아래).
+     * 문의 방을 회원이 보면 운영자의 글은 보낸 사람이 '랭큐 운영팀'으로 나간다(2026-10-06 — 이름·사진·회원 id 를 여기서 바꾼다.
+     * 화면에서만 가리면 응답에 운영자 개인 이름이 남는다). locale 은 그 이름의 언어다.
+     *
+     * 문의 방에는 개인 차단을 걸지 않는다(2026-10-06 검토). 회원에게 운영자는 '랭큐 운영팀' 한 사람인데, 차단한 사람의 글만 빠지면
+     * 회원이 아무 회원이나 차단→새로고침→해제 해 보는 것으로 "누가 운영자이고 어느 글을 누가 썼는지"가 드러난다(가리기를 푸는 길).
+     * 반대쪽도 같다 — 운영자가 회원을 개인적으로 차단해 두었어도 그 회원의 문의는 보여야 한다. 운영 연락은 개인 사이의 일이 아니다.
+     * 방 목록(myRooms)·알림(routes/chat notifyRoom)도 같은 규칙이다.
      */
-    async messages(ref: RoomRef, viewerId: string, opts: { after?: Date; before?: Date; limit?: number } = {}) {
+    async messages(ref: RoomRef, viewerId: string, opts: { after?: Date; before?: Date; limit?: number; locale?: Locale } = {}) {
         const { after, before } = opts;
         const limit = Math.max(1, Math.min(opts.limit ?? (after ? 200 : 60), 200));
         let since: Date | undefined;
@@ -119,12 +214,15 @@ export class ChatRepository {
                 since ? gte(hiqChatMessages.createdAt, since) : undefined,
                 after ? gt(hiqChatMessages.createdAt, after) : undefined,
                 before ? lt(hiqChatMessages.createdAt, before) : undefined,
-                sql`NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE ${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = ${hiqChatMessages.senderId})`,
+                ref.kind === "support" ? undefined
+                    : sql`NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE ${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = ${hiqChatMessages.senderId})`,
             ))
             .orderBy(after ? asc(hiqChatMessages.createdAt) : desc(hiqChatMessages.createdAt))
             .limit(limit);
         if (!after) rows.reverse();
-        return rows.map((r) => ({ ...r.chat, sender: r.senderName ? { name: r.senderName, profileImageUrl: r.senderProfileImage } : null }));
+        const out = rows.map((r) => ({ ...r.chat, sender: r.senderName ? { name: r.senderName, profileImageUrl: r.senderProfileImage } : null }));
+        if (await this.hidesStaffFrom(ref, viewerId)) return maskSupportMessages(out, ref.id, tr(opts.locale ?? "ko", "ui.chat.supportTeam"));
+        return out;
     }
 
     /** 이 방에서 이 사람이 최근 n초 동안 보낸 수 — 도배(=방 전원에게 푸시 도배)를 막는 데 쓴다. */
@@ -181,6 +279,15 @@ export class ChatRepository {
         const rows = await db.select({ id: hiqChatReads.memberId, at: hiqChatReads.lastReadAt })
             .from(hiqChatReads).where(eq(hiqChatReads.roomKey, key));
         return rows.map((r) => ({ id: String(r.id), at: (r.at as Date).toISOString() }));
+    }
+
+    /**
+     * 보는 사람에게 줄 읽은 시각. 문의 방을 회원이 보면 운영자들의 커서를 '운영팀' 하나로 접는다 —
+     * 그대로 주면 운영자의 회원 id 와 각자 읽은 시각이 응답에 실린다(shared/chatSupport collapseSupportReads).
+     */
+    async readCursorsFor(ref: RoomRef, viewerId: string): Promise<{ id: string; at: string }[]> {
+        const reads = await this.readCursors(ref.key);
+        return (await this.hidesStaffFrom(ref, viewerId)) ? collapseSupportReads(reads, ref.id) : reads;
     }
 
     /** 이 방 알림을 끈 사람들 — 푸시 보내기 전에 한 번에 뺀다(사람마다 묻지 않는다). */
@@ -268,7 +375,10 @@ export class ChatRepository {
         }
         const isAdmin = await this.isAdmin(viewerId);
         const owner = members.find((m) => m.id === ref.id);
-        return { title: isAdmin ? tr(locale, "ui.chat.supportOf", { name: owner?.name ?? tr(locale, "ui.chat.member") }) : tr(locale, "ui.chat.supportTitle"), subtitle: isAdmin ? tr(locale, "ui.chat.supportAdminSubtitle") : tr(locale, "ui.chat.supportSubtitle"), members, canManage };
+        // 회원에게는 참여자가 [본인, 랭큐 운영팀] 둘이다 — 운영자 명단(이름·사진·회원 id·몇 명인지)을 내보내지 않는다(2026-10-06).
+        // 예전엔 운영자 전원이 그대로 실려 ⋯ 메뉴 '참여자 보기'에 개인 이름이 떴다.
+        const shown = isAdmin ? members : maskSupportMembers(members, ref.id, tr(locale, "ui.chat.supportTeam"));
+        return { title: isAdmin ? tr(locale, "ui.chat.supportOf", { name: owner?.name ?? tr(locale, "ui.chat.member") }) : tr(locale, "ui.chat.supportTitle"), subtitle: isAdmin ? tr(locale, "ui.chat.supportAdminSubtitle") : tr(locale, "ui.chat.supportSubtitle"), members: shown, canManage };
     }
 
     /* ── 내 방 목록 ─────────────────────────────────────── */
@@ -335,8 +445,13 @@ export class ChatRepository {
             const nameBy = new Map<string, { id: string; name: string; img: string | null }>(owners.map((o) => [String(o.id), { id: String(o.id), name: o.name, img: o.img ?? null }] as [string, { id: string; name: string; img: string | null }]));
             for (const k of keys) { const oid = k.slice("support:".length); const o = nameBy.get(oid); rooms.push({ key: k, kind: "support", id: oid, title: tr(locale, "ui.chat.supportOf", { name: o?.name ?? tr(locale, "ui.chat.member") }), subtitle: tr(locale, "ui.chat.adminInquiry"), imageUrl: o?.img ?? null, lastMessage: null, unread: 0, memberCount: 2 }); }
         } else {
-            const [has] = await db.select({ n: sql<number>`count(*)::int` }).from(hiqChatMessages).where(eq(hiqChatMessages.roomKey, `support:${memberId}`));
-            if (Number(has?.n ?? 0) > 0) rooms.push({ key: `support:${memberId}`, kind: "support", id: memberId, title: tr(locale, "ui.chat.supportTitle"), subtitle: tr(locale, "ui.chat.adminInquiry"), imageUrl: null, lastMessage: null, unread: 0, memberCount: 2 });
+            const [has] = await db.select({
+                n: sql<number>`count(*)::int`,
+                mine: sql<number>`count(*) filter (where ${hiqChatMessages.senderId} = ${memberId})::int`,
+            }).from(hiqChatMessages).where(eq(hiqChatMessages.roomKey, `support:${memberId}`));
+            // 내가 쓴 적이 없는 방 = 운영팀이 먼저 말을 건 방(2026-10-06). 문의한 적이 없는데 '관리자 문의'라고 뜨면 어색하다.
+            const supportSubtitle = Number(has?.mine ?? 0) > 0 ? "ui.chat.adminInquiry" : "ui.chat.supportTeamMessage";
+            if (Number(has?.n ?? 0) > 0) rooms.push({ key: `support:${memberId}`, kind: "support", id: memberId, title: tr(locale, "ui.chat.supportTitle"), subtitle: tr(locale, supportSubtitle), imageUrl: null, lastMessage: null, unread: 0, memberCount: 2 });
         }
 
         if (rooms.length === 0) return rooms;
@@ -344,12 +459,14 @@ export class ChatRepository {
         // 마지막 메시지 · 안 읽은 수 — 방 열쇠 배열로 한 번에
         const keys = rooms.map((r) => r.key);
         // 방 안(messages)과 같은 눈으로 본다: 차단한 사람의 글과 가입 전 크루 대화는 미리보기에도 안 나온다(2026-09-22 리뷰).
+        // 문의 방은 방 안과 똑같이 차단을 보지 않는다(2026-10-06 검토) — 안 그러면 차단해 둔 운영자가 먼저 말을 건 방이
+        // 마지막 글도 안 읽은 수도 없는 빈 방으로만 뜨고(방 자체는 글 수로 생긴다), 미리보기가 차단 여부에 따라 달라져 누가 썼는지 샌다.
         const visible = sql`
-              AND NOT EXISTS (SELECT 1 FROM hiq_blocks b WHERE b.blocker_id = ${memberId}::uuid AND b.blocked_id = c.sender_id)
+              AND (c.room_key LIKE 'support:%' OR NOT EXISTS (SELECT 1 FROM hiq_blocks b WHERE b.blocker_id = ${memberId}::uuid AND b.blocked_id = c.sender_id))
               AND (cm.joined_at IS NULL OR c.created_at >= cm.joined_at)`;
         const crewJoin = sql`LEFT JOIN hiq_crew_members cm ON c.room_key = 'crew:' || cm.crew_id::text AND cm.member_id = ${memberId}::uuid`;
         const last = await db.execute(sql`
-            SELECT DISTINCT ON (c.room_key) c.room_key, c.message, c.type, c.created_at, c.metadata->'i18n' AS i18n, m.name AS sender_name
+            SELECT DISTINCT ON (c.room_key) c.room_key, c.message, c.type, c.created_at, c.metadata->'i18n' AS i18n, c.sender_id, m.name AS sender_name
             FROM hiq_chat_messages c LEFT JOIN hiq_members m ON m.id = c.sender_id ${crewJoin}
             WHERE c.room_key IN (${sql.join(keys.map((k) => sql`${k}`), sql`, `)}) ${visible}
             ORDER BY c.room_key, c.created_at DESC`);
@@ -364,9 +481,14 @@ export class ChatRepository {
               AND c.created_at > COALESCE(r.last_read_at, CASE WHEN c.room_key LIKE 'crew:%' THEN GREATEST(COALESCE(cm.joined_at, to_timestamp(0)), ${CHAT_UNIFIED_AT}::timestamp) ELSE to_timestamp(0) END)
             GROUP BY c.room_key`);
         const unreadBy = new Map<string, number>((unread.rows as any[]).map((r) => [String(r.room_key), Number(r.n)] as [string, number]));
+        // 문의 방의 미리보기: 회원에게는 운영자 이름 대신 '랭큐 운영팀'(방 안과 같은 규칙 — 목록 응답에도 개인 이름을 싣지 않는다).
+        const teamName = isAdmin ? null : tr(locale, "ui.chat.supportTeam");
+        const senderLabel = (r: ChatRoomSummary, l: any): string | null => (r.kind === "support" && teamName !== null
+            ? supportPreviewSender(l.sender_id ? String(l.sender_id) : null, r.id, l.sender_name ?? null, teamName)
+            : (l.sender_name ?? null));
         for (const r of rooms) {
             const l = lastBy.get(r.key);
-            r.lastMessage = l ? { text: l.type === "text" || l.type === "system" ? String(l.message) : tr(locale, "ui.chat.sharedCard"), at: new Date(l.created_at), senderName: l.type === "system" ? null : (l.sender_name ?? null), i18n: l.type === "system" && l.i18n ? l.i18n : (l.type !== "text" && l.type !== "system" ? { key: "chat.sharedCard" } : null) } : null;
+            r.lastMessage = l ? { text: l.type === "text" || l.type === "system" ? String(l.message) : tr(locale, "ui.chat.sharedCard"), at: new Date(l.created_at), senderName: l.type === "system" ? null : senderLabel(r, l), i18n: l.type === "system" && l.i18n ? l.i18n : (l.type !== "text" && l.type !== "system" ? { key: "chat.sharedCard" } : null) } : null;
             r.unread = unreadBy.get(r.key) ?? 0;
         }
         rooms.sort((a, b) => {

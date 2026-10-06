@@ -10,7 +10,11 @@
  *   POST   /chat/rooms/:key/mute { muted }    이 방 알림 끄기/켜기(크루는 크루 알림 설정으로 간다)
  *   POST   /chat/rooms/:key/leave             1:1·소그룹 방 나가기(크루·조인/부킹 방은 안 된다)
  *   POST   /chat/dm { memberIds }             1:1(같은 둘이면 기존 방)·소그룹 방 만들기
+ *   GET    /chat/admin/members?q=             (운영자만) 회원 찾기 — 고른 회원의 문의 방(support:<id>)에 먼저 쓴다
  * key = "crew:<id>" | "listing:<id>" | "dm:<id>" | "support:<memberId>"
+ *
+ * 문의 방을 거꾸로도 쓴다(2026-10-06 오너: "관리자는 누구와도 다 채팅을 할 수 있게") — 운영자가 회원의 문의 방에 먼저 쓴다.
+ * 회원에게 운영자는 '랭큐 운영팀' 한 사람이다(이름·사진·회원 id·읽은 시각·알림 본문). 규칙은 shared/chatSupport.ts.
  */
 import { Router } from "express";
 import { storage } from "../../storage/index.js";
@@ -22,6 +26,7 @@ import { screenCrewText } from "../../utils/crewModeration.js";
 import { notificationService } from "../../services/notificationService.js";
 import { parseRoomKey, type RoomRef } from "../../storage/chat.repo.js";
 import { msg, localeOf, type I18nText } from "../../lib/i18n.js";
+import { memberSearchTerm, supportHidesSender, supportNotifyTitleKey } from "../../../shared/chatSupport.js";
 
 const router = Router();
 const sportOf = (q: unknown): "BILLIARDS" | "GOLF" => (q === "GOLF" ? "GOLF" : "BILLIARDS");
@@ -36,6 +41,27 @@ router.get("/rooms", requireAuth, asyncHandler(async (req: AuthRequest, res: any
 router.get("/unread", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const rooms = await storage.chat.myRooms(req.userId!, sportOf(req.query.sport), localeOf(res));
     return sendSuccess(res, { unread: rooms.reduce((n, r) => n + r.unread, 0) });
+}));
+
+/**
+ * 운영자만. 채팅은 **회원 쿠키**(hiq_user_id)로 들어오므로 그 회원의 profiles.role 을 본다 — 문의 방을 여는 검사(canAccess)와 같은 눈이다.
+ * 어드민 콘솔 가드(middleware/adminAuth)는 파트너 쿠키(hiq_partner_auth)를 읽는데, 폰 앱의 채팅 탭에는 그 쿠키가 없다.
+ * 역할의 출처는 같다(profiles.role 의 admin·super_admin) — 전화번호·이메일로 가르지 않는다.
+ */
+const requireChatAdmin = asyncHandler(async (req: AuthRequest, res: any, next: any) => {
+    if (!(await storage.chat.isAdmin(req.userId!))) return sendError(res, 403, "err.common.forbidden", "ADMIN_ONLY");
+    next();
+});
+
+/**
+ * 회원 찾기(운영자 전용) — 채팅 탭의 '회원에게 메시지'. 이름·닉네임, 2글자부터, 최대 20명.
+ * 방을 여기서 만들지 않는다: 문의 방은 행이 없는 방이라(열쇠가 곧 방) 고른 회원의 /chat/support/<id> 로 가면 된다.
+ * 2글자 미만·글자가 아닌 q 는 DB 를 부르지 않고 빈 목록.
+ */
+router.get("/admin/members", requireAuth, requireChatAdmin, asyncHandler(async (req: AuthRequest, res: any) => {
+    const term = memberSearchTerm(req.query.q);
+    if (!term) return sendSuccess(res, []);
+    return sendSuccess(res, await storage.chat.searchMembersForAdmin(term, req.userId!));
 }));
 
 router.post("/read", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -117,25 +143,33 @@ router.post("/rooms/:key/leave", requireAuth, asyncHandler(async (req: AuthReque
 router.get("/rooms/:key/messages", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const ref = await openRoom(req, res); if (!ref) return;
     const at = (v: unknown) => { const d = typeof v === "string" && v ? new Date(v) : undefined; return d && Number.isFinite(d.getTime()) ? d : undefined; };
-    const messages = await storage.chat.messages(ref, req.userId!, { after: at(req.query.after), before: at(req.query.before) });
+    // locale — 문의 방을 회원이 볼 때 운영자 글의 보낸 사람('랭큐 운영팀')을 이 언어로 만든다.
+    const messages = await storage.chat.messages(ref, req.userId!, { after: at(req.query.after), before: at(req.query.before), locale: localeOf(res) });
     // reads=1 이면 방 사람들의 읽은 시각을 같이 준다 — 내 말풍선 옆 '안 읽은 사람 수'용.
     // 응답 모양이 바뀌므로 **물어본 요청만** 객체로 준다(안 물어보면 예전처럼 배열).
     // 요청을 따로 만들지 않은 이유: 2.5초 폴링이 둘이 되면 서버리스 호출이 그대로 두 배가 된다.
     if (req.query.reads !== "1") return sendSuccess(res, messages);
-    return sendSuccess(res, { messages, reads: await storage.chat.readCursors(ref.key) });
+    // 문의 방의 회원에게는 운영자들의 커서가 '운영팀' 하나로 접혀 간다(운영자 회원 id·각자 읽은 시각을 싣지 않는다).
+    return sendSuccess(res, { messages, reads: await storage.chat.readCursorsFor(ref, req.userId!) });
 }));
 
 /**
  * 같은 방 사람들에게 푸시. 크루는 크루별 채팅 알림 설정과 차단을 따르고(기존 notifyCrewChat 과 같은 규칙),
  * 나머지 방은 방 사람 전원(보낸 사람 제외). 서버리스라 응답 전에 기다린다.
+ * heading 은 받는 사람마다 다를 수 있다(함수) — 문의 방은 회원과 다른 운영자에게 가는 제목이 다르다.
+ * 문의 방에서 운영자가 쓴 글이 **그 방의 회원에게** 갈 때는 본문에 보낸 사람 이름을 붙이지 않는다(운영자 개인 이름이 알림으로 샌다 —
+ * 누가 보냈는지는 제목이 말한다). 이 규칙은 부르는 쪽이 아니라 여기서 지킨다.
  */
-export async function notifyRoom(ref: RoomRef, senderId: string, preview: string | I18nText, heading: I18nText, sport?: "BILLIARDS" | "GOLF", urlOverride?: string): Promise<void> {
+export async function notifyRoom(ref: RoomRef, senderId: string, preview: string | I18nText, heading: I18nText | ((memberId: string) => I18nText), sport?: "BILLIARDS" | "GOLF", urlOverride?: string): Promise<void> {
     const members = (await storage.chat.roomMembers(ref)).filter((m) => m !== senderId);
     // 이 방 알림을 끈 사람(채팅 ⋯ 메뉴). 크루 방은 아래에서 크루 설정을 따로 보므로 여기서는 빈 집합이다.
     const muted = ref.kind === "crew" ? new Set<string>() : await storage.chat.mutedMemberIds(ref.key);
     const sender = await storage.getMemberById(senderId);
     const senderName = sender?.name;
-    const blockers = await storage.crews.getBlockerIds(senderId);
+    // 보낸 사람을 차단한 사람에게는 알리지 않는다 — **문의 방만 예외**다(2026-10-06 검토, chat.repo messages 와 같은 규칙).
+    // 회원이 예전에 운영자의 개인 계정을 차단해 두었으면 운영팀이 먼저 건 연락이 푸시도 알림함도 없이 사라졌고(운영자 화면에는 정상 전송),
+    // 운영자가 회원을 개인적으로 차단해 두었으면 그 회원의 문의 알림을 못 받았다. 운영 연락은 개인 사이의 차단과 무관하게 닿는다.
+    const blockers = ref.kind === "support" ? new Set<string>() : await storage.crews.getBlockerIds(senderId);
     // 보통은 방으로 — 카드처럼 "누르면 바로 그 일을 하는" 알림만 딥링크를 덮어쓴다(온라인 대전 카드 → 참가 화면).
     const url = urlOverride ?? `/chat/${ref.kind}/${ref.id}`;
     // 알림함은 종목으로 갈린다 — 방의 종목을 따라야 한다. 예전엔 listing 만 골프로 쳐서 골프 크루·골프 친구 방 알림이
@@ -152,7 +186,8 @@ export async function notifyRoom(ref: RoomRef, senderId: string, preview: string
             if (!setting.chatEnabled) return;
         }
         await notificationService.sendAndSaveNotification({
-            memberId, title: heading, body,
+            memberId, title: typeof heading === "function" ? heading(memberId) : heading,
+            body: supportHidesSender(ref, senderId, memberId) ? preview : body,
             // 문의 답변은 '크루' 알림을 꺼 둔 사람에게도 가야 한다 → notice.
             category: isGolf ? "GOLF" : "BILLIARDS", type: "CHAT", ...(isGolf ? { pref: "golf" as const } : ref.kind === "support" ? { pref: "notice" as const } : {}),
             params: { url },
@@ -180,13 +215,27 @@ router.post("/rooms/:key/messages", requireAuth, requireTermsAccepted, asyncHand
     if (ref.kind === "listing" && info.booking && new Date(info.booking.datetime).getTime() < Date.now() - LISTING_ROOM_GRACE_MS) {
         return sendError(res, 403, "err.chat.roundOver", "ROOM_CLOSED");
     }
+    // 운영자가 남의 문의 방에 쓴다(먼저 말 걸기 포함) — 탈퇴회원의 방은 읽기만. 받을 사람이 없는데 보내면 떠난 사람의 알림함에 행만 쌓인다.
+    const senderIsOwner = ref.kind === "support" && ref.id === req.userId;
+    if (ref.kind === "support" && !senderIsOwner && (await storage.chat.supportOwnerState(ref.id)) !== "ok") {
+        return sendError(res, 403, "err.chat.supportMemberGone", "MEMBER_GONE");
+    }
     const row = await storage.chat.addMessage({ key: ref.key, senderId: req.userId!, message: text, type: "text" });
-    // 문의 방: 회원이 쓰면 운영자에게 "문의", 운영자가 쓰면 회원에게 "운영자 답변"
+    // 문의 방: 회원이 쓰면 운영자에게 "문의", 운영자가 쓰면 회원에게 "운영자 답변" —
+    // 단 회원이 이 방에 **쓴 적이 없으면**(운영자가 먼저 말을 건 것) 회원에게는 "랭큐 운영팀 메시지"(2026-10-06). 문의한 적도 없는데 '답변'이 오면 이상하다.
+    // 다른 운영자에게는 예전 그대로 "답변" 제목 + 보낸 운영자 이름이 간다(누가 답했는지 알아야 이어받는다).
     // 1:1 은 제목이 곧 보낸 사람이다 — 방 제목(info.title)은 **보는 사람 기준 상대 이름**이라 그대로 쓰면 받는 사람 폰에 자기 이름이 떴다.
-    const heading: I18nText = ref.kind === "support"
-        ? (ref.id === req.userId ? msg("notif.chat.supportInquiry.title", { name: me?.name ?? "" }) : msg("notif.chat.supportReply.title"))
-        : ref.kind === "dm" ? (me?.name ? msg("notif.chat.dm.title", { name: me.name }) : msg("notif.chat.dmAnon.title"))
-        : msg("notif.chat.newMessage.title", { room: info.title });
+    let heading: I18nText | ((memberId: string) => I18nText);
+    if (ref.kind === "support") {
+        const ownerHasWritten = senderIsOwner || (await storage.chat.hasMessageFrom(ref.key, ref.id));
+        heading = (memberId) => {
+            const key = supportNotifyTitleKey({ senderIsOwner, recipientIsOwner: memberId === ref.id, ownerHasWritten });
+            return key === "notif.chat.supportInquiry.title" ? msg(key, { name: me?.name ?? "" }) : msg(key);
+        };
+    } else {
+        heading = ref.kind === "dm" ? (me?.name ? msg("notif.chat.dm.title", { name: me.name }) : msg("notif.chat.dmAnon.title"))
+            : msg("notif.chat.newMessage.title", { room: info.title });
+    }
     await notifyRoom(ref, req.userId!, text.slice(0, 80), heading, info.sport);
     return sendSuccess(res, { ...row, sender: { name: me?.name ?? "", profileImageUrl: null } });
 }));

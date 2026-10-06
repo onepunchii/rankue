@@ -15,8 +15,9 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { JOIN_TYPE_LABEL } from "@shared/golfJoin";
 import { FriendPicker } from "@/components/hiq/chat/FriendPicker";
+import { AdminMemberPicker } from "@/components/hiq/chat/AdminMemberPicker";
 import { INTL_TAG } from "@/components/hiq/chat/ChatRoom";
-import { LucidePlus, LucideHeadset } from "lucide-react";
+import { LucidePlus, LucideHeadset, LucideUserSearch } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export interface ChatRoomRow {
@@ -76,6 +77,9 @@ export default function ChatHub() {
     const golf = currentSport === "GOLF";
     const [pickerOpen, setPickerOpen] = useState(false);
     const isAdmin = (member as any)?.role === "admin" || (member as any)?.role === "super_admin";
+    // 운영자 전용: 회원을 찾아 그 회원의 문의 방에 먼저 쓴다(2026-10-06 오너: "관리자는 누구와도 다 채팅을 할 수 있게").
+    // 역할은 /me 가 주는 profiles.role 이다. 여기서 가리는 것은 편의일 뿐 — 회원 찾기 API 와 방 열기는 서버가 운영자만 받는다.
+    const [memberPickerOpen, setMemberPickerOpen] = useState(false);
     // 종류 칩(2026-09-21 오너: "종목에 맞는 채팅 카테고리") — 골프는 조인·부킹/크루/친구, 당구는 크루/친구.
     // 방이 있는 종류만 칩이 되고, 두 종류 이상일 때만 줄이 보인다(방 두세 개인 사람에게 칩은 소음).
     const [kindFilter, setKindFilter] = useState<"all" | ChatRoomRow["kind"]>("all");
@@ -96,6 +100,12 @@ export default function ChatHub() {
                 <h1 className="text-[18px] font-semibold">{t("chat.title")}</h1>
                 {member && (
                     <div className="flex items-center gap-1.5">
+                        {/* 운영자에게는 '운영자 문의' 자리에 '회원에게 메시지'가 온다 — 당구·골프 어느 화면에서든 */}
+                        {isAdmin && (
+                            <button type="button" onClick={() => setMemberPickerOpen(true)} className="h-9 px-3 rounded-full bg-surface-2 text-[12.5px] font-medium text-ink-2 inline-flex items-center gap-1.5 whitespace-nowrap" title={t("chat.adminMessage")}>
+                                <LucideUserSearch className="w-4 h-4" /> {t("chat.adminMessage")}
+                            </button>
+                        )}
                         {!isAdmin && (
                             <button type="button" onClick={() => setLocation(`/chat/support/${member.id}`)} className="h-9 px-3 rounded-full bg-surface-2 text-[12.5px] font-medium text-ink-2 inline-flex items-center gap-1.5" title={t("chat.support")}>
                                 <LucideHeadset className="w-4 h-4" /> {t("chat.support")}
@@ -186,6 +196,7 @@ export default function ChatHub() {
                 )}
             </main>
             <FriendPicker open={pickerOpen} onOpenChange={setPickerOpen} sport={currentSport} />
+            {isAdmin && <AdminMemberPicker open={memberPickerOpen} onOpenChange={setMemberPickerOpen} />}
             <HiqNavigation />
         </div>
     );

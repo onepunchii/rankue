@@ -503,7 +503,8 @@ export default function ChatRoomPage() {
                     readLineAt={readLineAt} unreadBy={unreadBy}
                     // 티타임 이틀 뒤 조인·부킹 방은 읽기만(서버도 같은 기준으로 막는다) — 목록에서 빠진 방에서 푸시만 오지 않게
                     disabled={d?.kind === "listing" && !!b && new Date(b.datetime).getTime() < Date.now() - 2 * 86_400_000}
-                    emptyText={d?.kind === "support" ? t("chat.emptySupport") : d?.kind === "listing" ? t("chat.emptyRoom") : t("chat.empty")}
+                    // 문의 방의 빈 화면: 회원에게는 "적어 주세요", 운영자가 남의 방을 열었으면(먼저 말 걸기) "먼저 보내 보세요 — 운영팀으로 보여요"
+                    emptyText={d?.kind === "support" ? (d.id === member?.id ? t("chat.emptySupport") : t("chat.emptySupportAdmin")) : d?.kind === "listing" ? t("chat.emptyRoom") : t("chat.empty")}
                 />
             )}
             {d && (

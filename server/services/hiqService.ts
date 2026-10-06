@@ -12,6 +12,7 @@ import { generateHandle } from "../lib/handle.js";
 import { GLOBAL_STORE_SLUG } from "../../shared/systemStores.js";
 import { KAKAO_DEFAULT_NAME } from "../../shared/kakaoLogin.js";
 import { isLoginPhone, isKakaoSignupPhone, kakaoPhonePlaceholder } from "../../shared/loginPhone.js";
+import { isReservedMemberName } from "../utils/crewModeration.js";
 
 // --- PIN 해싱 ---
 // PIN은 예전에 평문으로 저장·비교됐다. DB가 새면 전 회원 PIN이 그대로 털리므로 bcrypt로 전환한다.
@@ -179,7 +180,11 @@ export class HiqService {
         let isNew = false;
         if (!profile) {
             isNew = true;
-            const nickname = displayName || identity.name || identity.email?.split("@")[0] || fallbackName;
+            // 운영 주체로 보이는 이름('랭큐'·'운영팀'·'운영자'·'관리자')은 후보에서 뺀다(2026-10-06 검토 — '랭큐 운영팀' 사칭).
+            // 구글·애플의 표시 이름은 **화면이 보내는 글자**라 가입(POST /register)·프로필 수정(PATCH /me)의 이름 필터를 거치지 않는다 —
+            // 여기서 안 막으면 그 규칙을 소셜 가입으로 돌아간다. 가입은 막지 않는다: 다음 후보로 넘어가고, 다 걸리면 기본 이름으로 시작한다.
+            const usable = (s: string | null | undefined) => (s && !isReservedMemberName(s) ? s : undefined);
+            const nickname = usable(displayName) || usable(identity.name) || usable(identity.email?.split("@")[0]) || fallbackName;
             profile = await storage.createProfile({
                 nickname,
                 email: identity.email ?? undefined,

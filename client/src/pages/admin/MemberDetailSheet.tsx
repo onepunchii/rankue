@@ -12,6 +12,7 @@
  *    (규칙과 이유는 shared/adminMemberGolf.ts 머리말).
  */
 import { useEffect, useState } from "react";
+import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -21,12 +22,14 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore } from "@/lib/icons";
+import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle } from "@/lib/icons";
 import MemberGamesDialog from "./MemberGamesDialog";
 import { PlatformIcon, CountryFlag, Pill, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday } from "./adminUtils";
 import { TODAY_ACTIVE_KEY } from "./TodayActiveView";
-import { appConfirm } from "@/components/AppDialog";
+import { appConfirm, appAlert } from "@/components/AppDialog";
+import { useT } from "@/lib/i18n";
 import { bookingManagerState, type AdminMemberGolf, type BookingManagerState } from "@shared/adminMemberGolf";
+import { isWithdrawnMember } from "@shared/chatSupport";
 
 export type AdminMember = {
     id: string;
@@ -316,6 +319,27 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
     });
 
     const m = member;
+    // 메시지(2026-10-06 오너: "관리자는 누구와도 다 채팅을 할 수 있게") — 이 회원의 문의 방(/chat/support/<id>)을 연다.
+    // 운영자 개인 1:1 이 아니다: 회원에게는 '랭큐 운영팀'으로 보이고 다른 운영자도 이어받는다. 탈퇴회원에게는 단추를 숨긴다(받을 사람이 없다).
+    const { t } = useT();
+    const [, setLocation] = useLocation();
+    const [chatOpening, setChatOpening] = useState(false);
+    const canMessage = !!m && !isWithdrawnMember(m);
+    const openChat = async () => {
+        if (!m || chatOpening) return;
+        setChatOpening(true);
+        try {
+            // 어드민 콘솔은 파트너 쿠키로, 채팅은 회원 쿠키로 들어온다 — 이 브라우저에 운영자 회원 로그인이 없으면 방이 열리지 않는다.
+            // 가기 전에 방 정보를 한 번 물어 본다: 열리면 그대로 가고, 안 열리면 왜인지 여기서 알린다(끝없이 도는 빈 방으로 보내지 않는다).
+            await apiRequest(`/api/hiq/chat/rooms/support:${m.id}/info`);
+            onClose();
+            setLocation(`/chat/support/${m.id}`);
+        } catch (e: any) {
+            void appAlert(e?.status === 401 || e?.status === 403 ? t("chat.adminNeedAppLogin") : e?.message || t("chat.dmFailed"));
+        } finally {
+            setChatOpening(false);
+        }
+    };
     const dirty = !!(m && form && JSON.stringify(form) !== JSON.stringify(toForm(m)));
     const banned = m?.status === "banned";
     // 역할은 방금 받은 골프 칸 값을 먼저 본다 — 회원 목록은 기기에 저장된 캐시라 늦을 수 있다
@@ -357,14 +381,25 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                         </SheetDescription>
                                     </div>
                                 </div>
-                                {isRealPhone(m.phone) && (
+                                {(isRealPhone(m.phone) || canMessage) && (
                                     <div className="mt-3 flex gap-2">
-                                        <a href={`tel:${m.phone}`} className="flex-1 h-9 rounded-lg border border-black/10 flex items-center justify-center gap-1.5 text-[13px] font-bold text-black/65">
-                                            <LucidePhone className="w-3.5 h-3.5" /> 전화
-                                        </a>
-                                        <a href={`sms:${m.phone}`} className="flex-1 h-9 rounded-lg border border-black/10 flex items-center justify-center text-[13px] font-bold text-black/65">
-                                            문자
-                                        </a>
+                                        {isRealPhone(m.phone) && (
+                                            <>
+                                                <a href={`tel:${m.phone}`} className="flex-1 h-9 rounded-lg border border-black/10 flex items-center justify-center gap-1.5 text-[13px] font-bold text-black/65">
+                                                    <LucidePhone className="w-3.5 h-3.5" /> 전화
+                                                </a>
+                                                <a href={`sms:${m.phone}`} className="flex-1 h-9 rounded-lg border border-black/10 flex items-center justify-center text-[13px] font-bold text-black/65">
+                                                    문자
+                                                </a>
+                                            </>
+                                        )}
+                                        {/* 앱 안 채팅 — 이 회원의 문의 방. 소셜 가입(전화 없음) 회원에게도 보인다. 탈퇴회원에게는 없다. */}
+                                        {canMessage && (
+                                            <button type="button" disabled={chatOpening} onClick={() => void openChat()}
+                                                className="flex-1 h-9 rounded-lg border border-brand/30 bg-brand/[0.06] flex items-center justify-center gap-1.5 text-[13px] font-bold text-brand disabled:opacity-50">
+                                                <LucideMessageCircle className="w-3.5 h-3.5" /> {t("chat.adminMessageShort")}
+                                            </button>
+                                        )}
                                     </div>
                                 )}
                             </div>

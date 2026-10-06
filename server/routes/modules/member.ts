@@ -227,7 +227,8 @@ router.patch("/me", requireAuth, gateProfileUgc, asyncHandler(async (req: AuthRe
 
     const { profileImageUrl, name: rawName, introduction: rawIntro } = req.body;
     // 이름·소개 필터 — 욕설·금전 내기·거래는 거부, 이름의 연락처는 거부, 소개의 연락처는 가린다(crewModeration).
-    const screenedProfile = screenMemberProfile({ name: rawName, introduction: rawIntro });
+    // 운영 주체로 보이는 이름('랭큐'·'운영팀'…)도 거부한다(2026-10-06) — 지금 이름을 그대로 다시 보낸 것은 넘어간다(이 화면은 폼 전체를 다시 보낸다).
+    const screenedProfile = screenMemberProfile({ name: rawName, introduction: rawIntro }, { currentName: member.name });
     if (!screenedProfile.ok) return sendError(res, 400, screenedProfile.reason);
     const name = typeof rawName === "string" ? screenedProfile.value.name : rawName;
     const introduction = typeof rawIntro === "string" ? screenedProfile.value.introduction : rawIntro;
