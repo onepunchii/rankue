@@ -175,7 +175,8 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
 
                         <div className="flex-1 min-w-0">
                             <p className="text-[12px] font-medium text-black/55 mb-1">{t("statsOverview.cumulativeAvg")}</p>
-                            <p className="text-[36px] leading-none font-bold tabular-nums tracking-tight mb-3.5" style={{ color: currentTier.color }}>
+                            {/* 숫자는 본문 색으로 — 등급 색(useGameStats 의 SILVER #E0E0E0 · 옛 어두운 테마용)을 입히면 밝은 카드에서 안 보였다(2026-10-07 스토어 스크린샷을 찍다 발견) */}
+                            <p className="text-[36px] leading-none font-bold tabular-nums tracking-tight mb-3.5 text-ink-1">
                                 {cumulativeAverage}
                             </p>
                             <div className="flex items-center gap-4">
