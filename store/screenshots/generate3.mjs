@@ -2,6 +2,7 @@
 //   node store/screenshots/generate3.mjs                 애플 1320×2868 → out3/ko/  +  구글 1080×2160 → out3-play/ko/
 //   ONLY=1,2 node store/screenshots/generate3.mjs        몇 장만
 //   TARGET=apple|play node ...                           한쪽만
+//   TARGET=apple63,apple65 node ...                      애플의 다른 기기 칸(1206×2622 · 1284×2778) → out3-63/ · out3-65/
 // 화면은 capture3-*.mts 가 찍는다(로컬 Vite + 가짜 응답). 여기서는 그림만 짠다 — 화면 안의 글자·숫자는 건드리지 않는다.
 //  - 당구 다섯 장은 밝은 바탕 + 초록 판, 골프 다섯 장은 어두운 바탕 + 라임 판(종목이 한눈에 갈린다).
 //  - 점수판은 가로 화면이라(세로로 세우면 글자가 눕는다) 가로 기기 + 아래에 '자동으로 쌓이는 기록' 조각을 붙인다.
@@ -15,7 +16,11 @@ const require = createRequire(resolve(DIR, "../../package.json"));
 const { chromium } = require("playwright");
 
 const TARGETS = {
-    apple: { W: 1320, H: 2868, out: "out3", all: true },
+    apple: { W: 1320, H: 2868, out: "out3", all: true },          // 6.9형(Dynamic Island 대형)
+    // App Store Connect 의 칸은 기기 크기별이다(2026-10 화면): 필수 = Dynamic Island 중형(1206×2622), 선택 = 대형(1320×2868)·Face ID 대형(1284×2778).
+    // 비율이 거의 같아(0.460~0.462) 같은 짜임을 크기만 바꿔 뽑는다. TARGET=apple63,apple65 로 따로 만든다.
+    apple63: { W: 1206, H: 2622, out: "out3-63", all: true },
+    apple65: { W: 1284, H: 2778, out: "out3-65", all: true },
     play: { W: 1080, H: 2160, out: "out3-play", all: false },
 };
 const ONLY = (process.env.ONLY || "").split(",").filter(Boolean).map(Number);
