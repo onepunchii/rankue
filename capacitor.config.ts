@@ -47,6 +47,8 @@ const config: CapacitorConfig = {
       "@capawesome/capacitor-app-update",
       "@capawesome/capacitor-badge",
       "@capgo/capacitor-social-login",
+      // 앱 안 카카오 로그인 — 저장소 안 로컬 플러그인(native-plugins/rankue-kakao, package.json 의 file: 의존). 네이티브 앱 키는 여기 없다(README).
+      "rankue-kakao",
     ],
   },
   android: {

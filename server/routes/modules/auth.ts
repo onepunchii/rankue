@@ -8,6 +8,13 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { msg } from "../../lib/i18n.js";
 import { verifyGoogleIdToken, verifyAppleIdToken } from "../../lib/socialAuth.js";
 import { exchangeKakaoCode, kakaoConfigured, kakaoRedirectAllowed, kakaoRejected, type KakaoFailReason } from "../../lib/kakaoAuth.js";
+import {
+    kakaoIdTokenRejected, kakaoNativeConfigured, newKakaoNonce, packKakaoNonce, takeKakaoNonce, verifyKakaoIdToken,
+    type KakaoIdTokenFailReason,
+} from "../../lib/kakaoAuth.js";
+import {
+    KAKAO_NONCE_COOKIE, KAKAO_NONCE_COOKIE_PATH, KAKAO_NONCE_TTL_SEC, isKakaoNonce, looksLikeKakaoIdToken, type KakaoNonceIssue,
+} from "../../../shared/kakaoNative.js";
 import { isLoginPhone } from "../../../shared/loginPhone.js";
 import { recordTermsAcceptance, isMemberSuspended, SUSPENDED_TEXT } from "../../middleware/terms.js";
 import { isTermsAccepted, ACCOUNT_SUSPENDED_CODE } from "../../../shared/terms.js";
@@ -94,6 +101,8 @@ export function clearAttempts(key: string): void {
 // 확인(checkRateLimit)과 기록(registerFailure) 사이에 await 가 끼어, 한꺼번에 몰려온 요청이 전부 통과해 카카오를 두드렸다.
 // 그래서 부르기 전에 자리를 **동기적으로** 잡는다: 창 안의 실패 수 + 지금 진행 중인 수가 MAX_ATTEMPTS 에 닿으면 받지 않는다.
 // 카카오가 느린 날에도 키 하나당 대기 중인 호출이 다섯으로 묶이고, 느린 것을 실패로 세지 않으므로 15분 잠금도 생기지 않는다.
+// PIN 대조(DB · bcrypt)도 같은 꼴이다(2026-10-06 검토) — 전화번호 로그인과 카카오 연결·해제는 PIN 을 보기 **전에** 자리를 잡는다.
+// 뒤에 잡으면 몰려온 요청이 전부 PIN 답을 받아, 다섯 번 틀리면 잠기는 규칙이 묶음 한 번에 수백 번이 된다.
 // 이것도 인스턴스 안에서만 통하는 최선 노력이다(메모리 Map) — 인스턴스를 넘는 한도는 플랫폼 방화벽 규칙이나 공유 저장소가 있어야 한다.
 const inFlight = new Map<string, number>();
 /** 자리가 없을 때 화면에 알려 줄 '다시 해 볼 때까지'(초). 진행 중인 호출은 길어야 카카오 제한 시간 안에 끝난다. */
@@ -151,6 +160,14 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
         return sendError(res, 429, msg("err.auth.loginTooMany", { sec: probe.retryAfterSec }));
     }
 
+    // PIN 대조(DB · bcrypt)는 기다리는 일이고 실패는 답이 나온 뒤에야 세어진다 — 그 사이에 한꺼번에 몰려온 요청이 위의 '안 잠김'을
+    // 전부 통과해 PIN 답을 받았다(2026-10-06 검토). 부르기 전에 자리를 잡는다: 창 안 실패 수 + 진행 중 수가 다섯이면 받지 않는다.
+    // 한 건씩 오는 로그인은 예전과 같다(네 번 틀린 뒤의 다섯 번째도 받는다).
+    const release = takeAttemptSlot(key);
+    if (!release) {
+        return sendError(res, 429, msg("err.auth.loginTooMany", { sec: SLOT_RETRY_SEC }));
+    }
+
     let result: Awaited<ReturnType<typeof hiqService.login>>;
     try {
         result = await hiqService.login(phone, storeSlug, password);
@@ -158,6 +175,8 @@ router.post("/login", asyncHandler(async (req: any, res: any) => {
         // Only a genuine credential mismatch counts toward the brute-force limit.
         if (err?.message === "INVALID_PASSWORD") registerFailure(key);
         throw err;
+    } finally {
+        release();
     }
     // 없는 번호였다 — 가입하려는 사람의 정상 답이지만 훑는 쪽도 이 답으로 구분하므로 센다(넉넉한 한도, 성공해도 지우지 않는다).
     if (result.isNew) registerFailure(probeKey, LOGIN_UNKNOWN_MAX);
@@ -371,11 +390,9 @@ router.post("/social/kakao/link", requireAuth, asyncHandler(async (req: AuthRequ
         return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
     }
 
-    // 본인 확인 — 카카오를 부르기 전에
-    const pinFailed = sendKakaoPinFailure(res, key, await hiqService.checkKakaoPin(req.userId!, pin));
-    if (pinFailed) return pinFailed;
-
-    // 로그인 길과 같은 자리 잡기 — 실패가 세어지기 전에 몰려온 요청을 막는다
+    // 로그인 길과 같은 자리 잡기 — 실패가 세어지기 전에 몰려온 요청을 막는다.
+    // PIN 보다 **먼저** 잡는다(2026-10-06 검토): PIN 대조(DB · bcrypt)도 기다리는 일이라, 뒤에 두면 한꺼번에 온 요청이
+    // 위의 '안 잠김'을 전부 통과해 PIN 답을 받았다 — 다섯 번 틀리면 잠기는 규칙이 묶음 한 번에 수백 번이 됐다.
     const release = takeAttemptSlot(key);
     if (!release) {
         return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: SLOT_RETRY_SEC }));
@@ -383,6 +400,10 @@ router.post("/social/kakao/link", requireAuth, asyncHandler(async (req: AuthRequ
 
     let exchanged: Awaited<ReturnType<typeof exchangeKakaoCode>>;
     try {
+        // 본인 확인 — 카카오를 부르기 전에
+        const pinFailed = sendKakaoPinFailure(res, key, await hiqService.checkKakaoPin(req.userId!, pin));
+        if (pinFailed) return pinFailed;
+
         exchanged = await exchangeKakaoCode(code, redirectUri);
     } finally {
         release();
@@ -416,7 +437,19 @@ router.delete("/social/kakao/link", requireAuth, asyncHandler(async (req: AuthRe
         return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
     }
 
-    const unlinked = await hiqService.unlinkKakao(req.userId!, pin);
+    // 연결과 같은 자리 잡기(2026-10-06 검토) — 해제의 PIN 대조도 기다리는 일이라, 자리 없이는 한꺼번에 온 요청이 전부 PIN 답을 받았다.
+    // 연결(웹·앱)과 같은 키를 쓰므로 이 길 하나만 열려 있어도 PIN 이 드러난다.
+    const release = takeAttemptSlot(key);
+    if (!release) {
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: SLOT_RETRY_SEC }));
+    }
+
+    let unlinked: Awaited<ReturnType<typeof hiqService.unlinkKakao>>;
+    try {
+        unlinked = await hiqService.unlinkKakao(req.userId!, pin);
+    } finally {
+        release();
+    }
     if (unlinked === "signup-account") return sendError(res, 409, "err.auth.kakaoUnlinkSignup", "KAKAO_SIGNUP_ACCOUNT");
     const pinFailed = sendKakaoPinFailure(res, key, unlinked);
     if (pinFailed) return pinFailed;
@@ -563,6 +596,154 @@ router.post("/reset-pin/verify", asyncHandler(async (req: any, res: any) => {
         }
         return sendError(res, 500, err.message);
     }
+}));
+
+// --- 앱 안 카카오 로그인(네이티브 SDK · ID 토큰) — 2026-10-06 오너: "카카오 로그인이 되는 앱 빌드를 만들어 올리고, 승인되면 카카오를 연다" ---
+// 앱의 웹뷰는 rankue.co.kr 밖으로 못 나가 위의 웹 길(인가 코드 + Redirect URI)을 못 쓴다. 새 바이너리(1.3~)는 네이티브 플러그인이
+// 카카오 SDK 로 **ID 토큰**을 받아 오고, 여기서 검증한다(lib/kakaoAuth verifyKakaoIdToken). 계약 전문은 shared/kakaoNative.ts.
+// 검증된 회원번호(sub)는 웹 카카오와 **같은 계정 규칙**을 탄다 — 같은 hiqService.socialLogin("kakao") · linkKakao · profiles.kakao_sub.
+// 스위치(KAKAO_LOGIN_OPEN)가 꺼져 있으면 두 길 모두 503 이다(웹 카카오와 같은 답). 액세스 토큰은 받지도 저장하지도 않는다.
+// 이 묶음은 파일 맨 끝에 둔다 — 위의 웹 카카오 세 길(로그인·연결·해제)의 답·키·문구는 그대로다.
+// (같은 날 검토에서 연결·해제·전화번호 로그인에 '자리 잡기를 PIN 대조 앞에'만 더했다 — 아래 연결 갈래와 같은 순서다.)
+
+/**
+ * nonce 쿠키의 속성 — 굽는 쪽과 지우는 쪽이 같은 값을 쓴다(Path 가 다르면 브라우저가 다른 쿠키로 보고 지우지 않는다).
+ * 이 두 길에만 실리고(Path), 다른 사이트에서 온 요청에는 실리지 않는다(Strict). 서명(signed)과 수명(maxAge)은 굽는 쪽만 붙인다.
+ */
+function kakaoNonceCookieOptions() {
+    return {
+        httpOnly: true,
+        sameSite: 'strict' as const,
+        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
+        path: KAKAO_NONCE_COOKIE_PATH,
+    };
+}
+
+/**
+ * ID 토큰 검증 실패 → 응답. 화면에는 **종류만** 준다(무엇이 틀렸는지는 서버 로그에만 있다).
+ *   503 KAKAO_NOT_CONFIGURED · 400 KAKAO_BAD_REQUEST · 401 KAKAO_TOKEN_INVALID · 401 KAKAO_UNREACHABLE
+ */
+function sendKakaoNativeFailure(res: any, reason: KakaoIdTokenFailReason) {
+    switch (reason) {
+        case "not-configured": return sendError(res, 503, "err.auth.kakaoUnavailable", "KAKAO_NOT_CONFIGURED");
+        case "bad-token": return sendError(res, 400, "err.auth.kakaoParamsRequired", "KAKAO_BAD_REQUEST");
+        case "unreachable": return sendError(res, 401, "err.auth.kakaoUnreachable", "KAKAO_UNREACHABLE");
+        default: return sendError(res, 401, "err.auth.kakaoFailed", "KAKAO_TOKEN_INVALID");
+    }
+}
+
+// POST /social/kakao/native/nonce — 앱이 카카오 SDK 를 부르기 전에 받는 1회용 nonce. 본문은 빈 JSON `{}` 면 된다.
+// 같은 값을 서명 쿠키에도 넣는다 — 검증할 때 본문의 nonce 와 쿠키의 nonce 가 같아야 한다(이 브라우저에 묶인다).
+// DB 도 카카오도 부르지 않는다(난수 + 쿠키 한 장). 결과: 200 { nonce, expiresInSec } · 400(JSON 본문 아님) · 503(닫혀 있음)
+router.post("/social/kakao/native/nonce", asyncHandler(async (req: any, res: any) => {
+    res.set("Cache-Control", "no-store");
+    if (!kakaoNativeConfigured()) return sendKakaoNativeFailure(res, "not-configured");
+    if (!isJsonBody(req)) return sendKakaoNativeFailure(res, "bad-token");
+
+    const nonce = newKakaoNonce();
+    res.cookie(KAKAO_NONCE_COOKIE, packKakaoNonce(nonce, Date.now()), { ...kakaoNonceCookieOptions(), signed: true, maxAge: KAKAO_NONCE_TTL_SEC * 1000 });
+    const issued: KakaoNonceIssue = { nonce, expiresInSec: KAKAO_NONCE_TTL_SEC };
+    return sendSuccess(res, issued);
+}));
+
+// POST /social/kakao/native — 앱이 받은 카카오 ID 토큰으로 로그인·가입(mode 없음 또는 "login")하거나 내 계정에 붙인다("link").
+// body: { idToken, nonce, mode?: "login" | "link", pin? }
+// 결과(login): 200 { member, isNew, redirectTo } (/social 과 같은 모양) · 403 ACCOUNT_SUSPENDED
+// 결과(link):  200 { linked: true } · 401(비로그인) · 409 KAKAO_TAKEN · KAKAO_NO_PROFILE · KAKAO_OTHER_LINKED · KAKAO_PIN_REQUIRED · 401 KAKAO_PIN_WRONG
+// 공통: 400 KAKAO_BAD_REQUEST · 401 KAKAO_NONCE_INVALID(쿠키 없음·다름·만료·이미 씀 — 구분해 알려 주지 않는다) · 401 KAKAO_TOKEN_INVALID
+//       · 401 KAKAO_UNREACHABLE · 429 · 503 KAKAO_NOT_CONFIGURED
+//
+// 순서가 규칙이다: 꼴 검사 → 시도 횟수 → 자리 잡기 → (연결이면 PIN) → nonce 를 쓰고 쿠키를 지운다 → 토큰 검증 → 계정.
+//  - 자리는 PIN 보다 먼저 잡는다 — 한꺼번에 몰려온 요청이 PIN 대조를 다섯 건 넘게 받지 못한다(창 안 실패 수 + 진행 중 수 < 5).
+//  - 연결의 PIN 은 nonce 보다 먼저 본다 — 틀려도 nonce 가 쓰이지 않아, 화면이 같은 토큰으로 PIN 만 다시 보낼 수 있다(웹의 인가 코드와 같은 이치).
+//  - nonce 는 토큰 검증의 결과와 무관하게 한 번으로 끝난다(실패했으면 화면이 nonce 부터 다시 받는다).
+router.post("/social/kakao/native", asyncHandler(async (req: any, res: any) => {
+    res.set("Cache-Control", "no-store");
+    const { idToken, nonce, mode, pin } = req.body ?? {};
+    if (!kakaoNativeConfigured()) return sendKakaoNativeFailure(res, "not-configured");
+    // JSON 본문만(로그인 CSRF — 위 isJsonBody) · 토큰과 nonce 는 꼴이 맞을 때만 · mode 는 둘 중 하나
+    if (!isJsonBody(req) || !looksLikeKakaoIdToken(idToken) || !isKakaoNonce(nonce)) return sendKakaoNativeFailure(res, "bad-token");
+    if (mode !== undefined && mode !== "login" && mode !== "link") return sendKakaoNativeFailure(res, "bad-token");
+    const linking = mode === "link";
+
+    // 연결은 로그인한 회원만 — requireAuth 와 같은 규칙이다(서명 쿠키만 믿는다). 한 길에 두 모드가 있어 미들웨어 대신 여기서 본다.
+    const userId: unknown = linking ? req.signedCookies?.hiq_user_id : undefined;
+    if (linking && (typeof userId !== "string" || !userId)) return sendError(res, 401, "err.common.loginRequired");
+
+    // 시도 횟수 — 웹 카카오와 **같은 키**를 쓴다(로그인은 IP, 연결은 회원). 길을 바꿔 가며 한도를 두 배로 쓰지 못한다.
+    const key = linking ? attemptKey('social-link', 'kakao', userId) : attemptKey('social', 'kakao', clientIp(req));
+    const rl = checkRateLimit(key);
+    if (rl.limited) {
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: rl.retryAfterSec }));
+    }
+
+    // 웹 카카오와 같은 자리 잡기 — 검증은 카카오 공개 키를 받아 올 수 있는 바깥 호출이다.
+    // PIN 보다 **먼저** 잡는다(2026-10-06 검토): PIN 대조(DB · bcrypt)도 기다리는 일이라, 뒤에 두면 한꺼번에 온 요청이
+    // 위의 '안 잠김'을 전부 통과해 PIN 답을 받았다 — 다섯 번 틀리면 잠기는 규칙이 묶음 한 번에 수백 번이 됐다.
+    // nonce 를 쓰기 **전에** 잡는다: 자리가 없어 429 로 돌아간 요청은 nonce 가 그대로라 잠시 뒤 같은 토큰으로 다시 보낼 수 있다.
+    const release = takeAttemptSlot(key);
+    if (!release) {
+        return sendError(res, 429, msg("err.auth.tooManyAttempts", { sec: SLOT_RETRY_SEC }));
+    }
+
+    let verified: Awaited<ReturnType<typeof verifyKakaoIdToken>>;
+    try {
+        // 연결: 본인 확인(PIN) — nonce 를 쓰기 전에(틀려도 nonce 쿠키가 남아 PIN 만 다시 보낼 수 있다)
+        if (linking) {
+            const pinFailed = sendKakaoPinFailure(res, key, await hiqService.checkKakaoPin(userId as string, pin));
+            if (pinFailed) return pinFailed;
+        }
+
+        // nonce — 이 브라우저에 내준 그 값인가. 결과와 무관하게 쿠키를 지운다(한 번만 쓴다).
+        // 틀린 nonce 는 실패 횟수에 세지 않는다: 맞혀 볼 수 있는 값이 아니고(256비트 난수 + 서명 쿠키), 카카오톡에서 10분 넘게 머문 사람이 잠기면 안 된다.
+        const nonceOk = takeKakaoNonce(req.signedCookies?.[KAKAO_NONCE_COOKIE], nonce, Date.now()) === "ok";
+        res.clearCookie(KAKAO_NONCE_COOKIE, kakaoNonceCookieOptions());
+        if (!nonceOk) return sendError(res, 401, "err.auth.kakaoFailed", "KAKAO_NONCE_INVALID");
+
+        verified = await verifyKakaoIdToken(idToken, nonce);
+    } finally {
+        release();
+    }
+    if (!verified.ok) {
+        // 카카오가 느리거나 죽은 것은 세지 않는다 — 보낸 토큰이 거절됐을 때만(위조·다른 앱·만료·nonce 불일치)
+        if (kakaoIdTokenRejected(verified.reason)) registerFailure(key);
+        return sendKakaoNativeFailure(res, verified.reason);
+    }
+
+    if (linking) {
+        clearAttempts(key);
+        // 쿠키는 건드리지 않는다(누구로 로그인했는지는 그대로) — 답은 웹의 연결과 같다
+        const linked = await hiqService.linkKakao(userId as string, verified.identity);
+        if (linked === "taken") return sendError(res, 409, "err.auth.kakaoTaken", "KAKAO_TAKEN");
+        if (linked === "no-profile") return sendError(res, 409, "err.auth.kakaoNoProfile", "KAKAO_NO_PROFILE");
+        if (linked === "no-pin") return sendError(res, 409, "err.auth.kakaoPinRequired", "KAKAO_PIN_REQUIRED");
+        if (linked === "other-linked") return sendError(res, 409, "err.auth.kakaoOtherLinked", "KAKAO_OTHER_LINKED");
+        return sendSuccess(res, { linked: true });
+    }
+
+    // 여기부터는 웹 카카오 로그인(POST /social/kakao)의 뒤쪽과 같은 규칙이다 — 이름 필터 · 같은 계정 규칙 · 국가 · 정지 확인 · 쿠키
+    const identity = verified.identity.name && !screenMemberProfile({ name: verified.identity.name }).ok
+        ? { ...verified.identity, name: null }
+        : verified.identity;
+
+    const result = await hiqService.socialLogin("kakao", identity, undefined, ipCountry(req) ?? "KR");
+    await fillCountry(result.member.profileId, req);
+    clearAttempts(key);
+    if (await isMemberSuspended(result.member.id)) {
+        res.clearCookie('hiq_user_id', { path: '/' });
+        return sendError(res, 403, SUSPENDED_TEXT, ACCOUNT_SUSPENDED_CODE);
+    }
+
+    res.cookie('hiq_user_id', result.member.id, {
+        maxAge: 30 * 24 * 60 * 60 * 1000,
+        httpOnly: true,
+        signed: true,
+        sameSite: 'lax',
+        secure: process.env.NODE_ENV === 'production' || !!process.env.VERCEL,
+        path: '/'
+    });
+
+    return sendSuccess(res, result);
 }));
 
 export default router;

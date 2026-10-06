@@ -5,8 +5,8 @@ import { useT } from "@/lib/i18n";
 import { isNativeApp, nativePlatform, openStorePage } from "@/lib/nativeBridge";
 import { nativeSocialAvailable, nativeSocialIdToken } from "@/lib/nativeSignIn";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
-import { queryClient, refreshAfterLogin } from "@/lib/queryClient";
-import { kakaoLoginAvailable, useKakaoStart } from "@/lib/kakaoLogin";
+import { apiRequest, queryClient, refreshAfterLogin } from "@/lib/queryClient";
+import { kakaoLoginAvailable, kakaoNativeLogin, kakaoServerMessage, useKakaoStart } from "@/lib/kakaoLogin";
 import { isTermsAccepted } from "@shared/terms";
 import { safeReturnPath } from "@shared/promoFunnel";
 
@@ -14,9 +14,13 @@ import { safeReturnPath } from "@shared/promoFunnel";
 // 웹:          구글 GIS + 애플 SIWA JS(Services ID) → id_token → 서버(/api/hiq/social) JWKS 재검증.
 // 앱(Capacitor): @capgo/capacitor-social-login 네이티브 플러그인으로 id_token 획득 → 같은 /api/hiq/social.
 //   (웹뷰에서 구글 OAuth 리다이렉트는 정책상 차단되므로 네이티브 플러그인 사용 — mapix 표준)
-// 카카오(2026-10-05 오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플"): **한국어 화면 + 웹**에서만, 맨 위.
-//   id_token 이 아니라 전체 화면 이동이다 — 카카오에 다녀와 /auth/kakao(pages/hiq/kakao-callback.tsx)가 서버에 인가 코드를 넘긴다.
-//   약관 동의·'나' 새로 받기도 그 화면이 한다(이 파일의 submitToken 과 같은 규칙).
+// 카카오(2026-10-05 오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플"): **한국어 화면**에서만, 맨 위.
+//   웹: id_token 이 아니라 전체 화면 이동이다 — 카카오에 다녀와 /auth/kakao(pages/hiq/kakao-callback.tsx)가 서버에 인가 코드를 넘긴다.
+//       약관 동의·'나' 새로 받기도 그 화면이 한다(이 파일의 submitToken 과 같은 규칙).
+//   앱(2026-10-06 — 새 바이너리 1.3~): 네이티브 플러그인 "RankueKakao" 가 ID 토큰을 받아 오고 서버가 검증한다(lib/kakaoLogin kakaoNativeLogin).
+//       화면을 떠나지 않으므로 약관 동의·'나' 새로 받기·화면 옮기기를 이 파일이 구글·애플과 같은 순서로 한다(nativeKakaoSignIn).
+//       여는 스위치가 꺼져 있거나 플러그인이 없는 바이너리(1.2 이하)에서는 앱 안 어디에도 카카오 단추가 없다.
+//       애플 4.8: 카카오 단추는 구글·애플 단추와 **같은 묶음 · 같은 폭 · 같은 높이**로 선다.
 // 팝업(2026-10-06 오너: "회원가입은 … 올라오는 간편 회원가입 팝업으로") — 가입·로그인 팝업(LoginSheet)도 이 단추 묶음을 그대로 쓴다.
 //   부른 쪽이 redirect·onDone·tone 을 준다. 셋 다 안 주면(로그인 화면) 모양도 동작도 예전 그대로다.
 
@@ -204,7 +208,8 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
     setLocation(dest, { replace: dest.split(/[?#]/)[0] === window.location.pathname });
   }, [setLocation]);
 
-  // 카카오 — 한국어 화면에서만 보인다(앱 안·키 없음·등록 안 된 주소는 kakaoLoginAvailable 이 끈다). 매장 진입은 부른 쪽이 끈다(kakao).
+  // 카카오 — 한국어 화면에서만 보인다(키 없음·등록 안 된 주소·플러그인 없는 앱은 kakaoLoginAvailable 이 끈다). 매장 진입은 부른 쪽이 끈다(kakao).
+  // 앱 안에서는 네이티브 플러그인이 든 바이너리에서만 참이다 — 그때는 아래 '앱' 갈래가 nativeKakaoSignIn 으로 받는다(웹 SDK 는 앱에서 싣지 않는다).
   const showKakao = kakao && locale === "ko" && kakaoLoginAvailable();
   // 카카오로 보냈던 이 화면이 되살아났다(뒤로 가기 · 새 탭에서 끝내고 이 탭으로 돌아옴) — 그 사이 로그인이 끝났는지 서버에 묻고,
   // 끝났으면 로그인 화면이 처음 뜰 때(landing 의 로그인 확인)와 같은 규칙으로 넘긴다: '나'를 새로 받은 **뒤에** 보던 곳이나 홈으로.
@@ -344,6 +349,47 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
     }
   }, [busy, submitToken, toast, t]);
 
+  // 앱(Capacitor): 카카오 — 네이티브 플러그인이 ID 토큰을 받아 오고 서버가 검증한다(lib/kakaoLogin kakaoNativeLogin: nonce → 플러그인 → 서버).
+  // 화면을 떠나지 않는 로그인이라 뒤쪽은 구글·애플(submitToken)과 같은 순서다: 약관 동의 → '나'를 새로 받는다 → 닫거나 옮긴다.
+  // 취소는 조용히 끝낸다. 실패는 기존 소셜 로그인과 같은 문구 — 서버가 만든 문구가 있으면 그것을, 없으면 우리 문구를 쓴다
+  // (플러그인·플랫폼의 원문은 화면에 싣지 않는다).
+  const nativeKakaoSignIn = useCallback(async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const data = await kakaoNativeLogin();
+      if (!data) return; // 사용자가 취소했다
+      // 약관 동의 — 카카오에서 돌아온 웹 화면(kakao-callback)과 같은 규칙: 들어가기 전에 받고, 거절하면 동의 없이 쓰는 상태를 남기지 않는다.
+      // 방금 이 로그인으로 **새로 만들어진** 계정이면 지운다 — 남겨 두면 이 카카오 계정을 쥔 빈 계정이 되어, 전화번호 회원이 나중에
+      // 설정에서 카카오를 연결할 때 "이미 다른 계정에 연결됨"으로 막힌다. 원래 있던 계정이거나 삭제에 실패하면 로그아웃만 한다.
+      if (!isTermsAccepted(data.member?.termsVersion)) {
+        const agreed = await askTerms("signup");
+        if (!agreed) {
+          const removed = data.isNew === true
+            ? await apiRequest("/api/hiq/me", { method: "DELETE" }).then(() => true).catch(() => false)
+            : false;
+          if (!removed) await apiRequest("/api/hiq/logout", { method: "POST" }).catch(() => undefined);
+          queryClient.removeQueries({ queryKey: ["/api/hiq/me"] });
+          toast({ title: t("terms.declinedTitle"), description: t("terms.declinedDesc") });
+          return;
+        }
+      }
+      const back = returnTo();
+      // '나'를 새로 받은 뒤에 옮긴다 — 안 그러면 돌아간 화면이 비로그인으로 그려진다(queryClient.refreshAfterLogin)
+      await refreshAfterLogin();
+      // 팝업(부른 쪽이 돌아갈 곳을 정했다): 닫고, 가려던 곳이 따로 있을 때만 옮긴다
+      if (given.current.redirect !== undefined) { finishInPlace(back); return; }
+      given.current.onDone?.();
+      // 로그인 화면: 실려 온 ?redirect= → 서버가 준 곳 → 홈(웹 카카오의 돌아온 화면과 같은 순서 · 우리 사이트 안의 경로만)
+      setLocation(safeReturnPath(back) ?? safeReturnPath(data.redirectTo) ?? "/dashboard");
+    } catch (err) {
+      console.error("[kakao] native login failed:", err);
+      toast({ title: t("login.failedTitle"), description: kakaoServerMessage(err) ?? t("login.socialFailed"), variant: "destructive" });
+    } finally {
+      setBusy(false);
+    }
+  }, [busy, askTerms, toast, t, returnTo, finishInPlace, setLocation]);
+
   // GIS 버튼은 폭을 **픽셀 숫자로만** 받는다(% 불가). 고정 320 으로 두면 좁은 화면에서
   // 전화 입력·애플 버튼(부모 폭)보다 넓어져 혼자 튀어나온다 — 실제로 그랬다(2026-08-16).
   // 그래서 부모 폭을 재서 넘긴다. GIS 허용 범위는 200~400.
@@ -445,6 +491,20 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
     return (
       <div className={stackClass}>
         {hint && <p className={look.hint}>{t("login.socialHint")}</p>}
+        {/* 카카오 — 맨 위(웹과 같은 자리). showKakao 는 앱 안에서 **스위치가 켜져 있고 플러그인 "RankueKakao" 가 있을 때만** 참이다
+            (lib/kakaoLogin kakaoLoginAvailable → kakaoNativeAvailable) — 1.2 이하 바이너리에서는 이 단추가 그려지지 않는다.
+            애플 4.8: 아래 구글·애플 단추와 같은 묶음 · 같은 폭 · 같은 높이(로그인 화면 320×44 · 팝업 48px). 색·심볼은 카카오 가이드 그대로. */}
+        {showKakao && (
+          <button
+            type="button"
+            onClick={nativeKakaoSignIn}
+            disabled={busy}
+            className={`w-full ${sheet ? "h-12" : "max-w-[320px] h-[44px]"} rounded-[12px] bg-[#FEE500] text-[#191919] flex items-center justify-center gap-2 text-[15px] font-medium disabled:opacity-40 active:scale-[0.98] transition-transform`}
+          >
+            <KakaoSymbol />
+            <span>{t("login.kakao")}</span>
+          </button>
+        )}
         <button
           onClick={() => nativeSignIn("google")}
           disabled={busy}

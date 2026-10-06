@@ -1,0 +1,125 @@
+// 랭큐 로컬 Capacitor 플러그인 — 네이티브 카카오 SDK 로그인(안드로이드).
+// 구조는 node_modules/@capacitor/geolocation/android/build.gradle(코틀린 플러그인)을 따랐다.
+
+ext {
+    junitVersion = project.hasProperty('junitVersion') ? rootProject.ext.junitVersion : '4.13.2'
+    androidxAppCompatVersion = project.hasProperty('androidxAppCompatVersion') ? rootProject.ext.androidxAppCompatVersion : '1.7.1'
+    // 카카오 SDK 는 버전을 못 박는다 — 스토어에 낸 바이너리와 같은 SDK 로 다시 빌드할 수 있어야 한다(올릴 때는 README '버전 올리기').
+    kakaoSdkVersion = '2.25.1'
+}
+
+buildscript {
+    ext.kotlin_version = project.hasProperty("kotlin_version") ? rootProject.ext.kotlin_version : '2.2.20'
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:8.13.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+apply plugin: 'com.android.library'
+if (project.extensions.findByName('kotlin') == null) {
+    apply plugin: 'kotlin-android'
+}
+
+// ── 네이티브 앱 키 ────────────────────────────────────────────────────────────
+// 키가 들어가는 곳은 한 군데: 앱 프로젝트의 android/kakao.properties (android/ 는 gitignore 라 저장소에 안 올라간다)
+//     KAKAO_NATIVE_APP_KEY=<카카오 콘솔의 네이티브 앱 키>
+// 여기서 읽어 ① 코드가 쓰는 BuildConfig.KAKAO_NATIVE_APP_KEY ② 매니페스트의 콜백 스킴 kakao{키} 두 곳에 넣는다.
+// 파일이 없거나 값이 비면 자리표시자로 빌드된다 — 그 빌드에서 login() 은 code "NOT_CONFIGURED" 로 거절된다.
+def kakaoKeyPlaceholder = 'KAKAO_NATIVE_APP_KEY_HERE'
+def kakaoPropsFile = rootProject.file('kakao.properties')
+def kakaoProps = new Properties()
+if (kakaoPropsFile.exists()) {
+    kakaoPropsFile.withInputStream { kakaoProps.load(it) }
+}
+def kakaoNativeAppKey = (kakaoProps.getProperty('KAKAO_NATIVE_APP_KEY') ?: '').trim()
+if (kakaoNativeAppKey.isEmpty()) {
+    kakaoNativeAppKey = kakaoKeyPlaceholder
+}
+def kakaoKeyMissing = (kakaoNativeAppKey == kakaoKeyPlaceholder)
+if (kakaoKeyMissing) {
+    logger.warn("[rankue-kakao] 네이티브 앱 키가 없다(${kakaoPropsFile}) — 자리표시자로 빌드한다. 이 빌드에서는 카카오 로그인이 되지 않는다.")
+} else if (!(kakaoNativeAppKey ==~ /[0-9a-zA-Z]+/)) {
+    throw new GradleException("[rankue-kakao] KAKAO_NATIVE_APP_KEY 에 영문·숫자 아닌 글자가 있다 — ${kakaoPropsFile} 를 확인한다(따옴표·공백 없이 키만).")
+}
+
+android {
+    namespace = "com.rankue.kakao"
+    compileSdk = project.hasProperty('compileSdkVersion') ? rootProject.ext.compileSdkVersion : 36
+    defaultConfig {
+        minSdkVersion project.hasProperty('minSdkVersion') ? rootProject.ext.minSdkVersion : 24
+        targetSdkVersion project.hasProperty('targetSdkVersion') ? rootProject.ext.targetSdkVersion : 36
+        versionCode 1
+        versionName "1.0"
+        buildConfigField "String", "KAKAO_NATIVE_APP_KEY", "\"${kakaoNativeAppKey}\""
+        // src/main/AndroidManifest.xml 의 ${kakaoScheme} — 카카오계정 로그인(브라우저)에서 돌아오는 주소 kakao{키}://oauth
+        manifestPlaceholders = [kakaoScheme: "kakao${kakaoNativeAppKey}"]
+    }
+    buildFeatures {
+        buildConfig = true
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+        }
+    }
+    lintOptions {
+        abortOnError = false
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_21
+        targetCompatibility JavaVersion.VERSION_21
+    }
+}
+
+kotlin {
+    jvmToolchain(21)
+}
+
+// 스토어에 올릴 빌드(release)가 자리표시자 키로 만들어지는 것을 막는다 — 그런 바이너리는 심사를 통과해도 카카오 로그인이
+// 영영 안 되고, 고치려면 새 빌드·새 심사가 든다. 키 없이 release 빌드만 확인하려면 -PkakaoAllowPlaceholder=true 를 준다.
+afterEvaluate {
+    tasks.matching { it.name == 'preReleaseBuild' }.configureEach {
+        doFirst {
+            if (kakaoKeyMissing && !project.hasProperty('kakaoAllowPlaceholder')) {
+                throw new GradleException(
+                    "[rankue-kakao] 카카오 네이티브 앱 키가 없는 채로 release 빌드를 만들려고 했다.\n" +
+                    "  android/kakao.properties 에 KAKAO_NATIVE_APP_KEY=<네이티브 앱 키> 를 넣는다(native-plugins/rankue-kakao/README.md).\n" +
+                    "  키 없이 빌드만 확인하려면: -PkakaoAllowPlaceholder=true"
+                )
+            }
+        }
+    }
+}
+
+repositories {
+    google()
+    mavenCentral()
+}
+
+// 카카오 SDK 는 Maven Central 에 없고 카카오 저장소에만 있다. 앱 모듈(:app)이 이 플러그인의 의존(카카오 SDK)을 풀 때는
+// 앱 쪽 저장소 목록을 쓰므로, 이 플러그인만의 repositories 로는 모자란다 — 그래서 모든 프로젝트에 더한다.
+// (android/build.gradle 은 gitignore 라 거기에 적으면 이 맥에서만 살아 있다. 여기 두면 저장소와 함께 간다.)
+// com.kakao.sdk 묶음만 이 저장소에서 받게 좁혀 둔다 — 다른 라이브러리가 여기서 받아지는 일은 없다.
+rootProject.allprojects {
+    repositories {
+        maven {
+            url = uri('https://devrepo.kakao.com/nexus/content/groups/public/')
+            content {
+                includeGroup 'com.kakao.sdk'
+            }
+        }
+    }
+}
+
+dependencies {
+    implementation project(':capacitor-android')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "com.kakao.sdk:v2-user:$kakaoSdkVersion"
+
+    testImplementation "junit:junit:$junitVersion"
+}

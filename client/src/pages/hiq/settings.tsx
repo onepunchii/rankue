@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
@@ -16,7 +16,10 @@ import {
     canOpenNotificationSettings, forgetPushToken, isNativeApp, openNotificationSettings, pushPermission, requestPushPermission,
     storedPushToken, type PushPermission,
 } from "@/lib/nativeBridge";
-import { kakaoLoginAvailable, kakaoLoginOpen, useKakaoStart } from "@/lib/kakaoLogin";
+import {
+    kakaoLoginAvailable, kakaoLoginOpen, kakaoNativeAvailable, kakaoNativeLink, kakaoNativeToken, useKakaoStart,
+    type KakaoNativeToken,
+} from "@/lib/kakaoLogin";
 
 // 설정 — 전체메뉴 톱니바퀴 진입. 1순위: 계정 연결 상태 + 언어. (형 결정: 2026-07)
 export default function HiqSettings() {
@@ -94,7 +97,8 @@ export default function HiqSettings() {
     const conn = member?.connections ?? {};
     // 카카오 연결(2026-10-05 오너: "카카오도 오픈") — 전화번호로 가입한 회원이 카카오로 들어오면 계정이 둘로 갈린다.
     // 그래서 로그인한 채로 여기서 내 계정에 카카오를 붙인다: 로그인과 같은 길로 카카오에 다녀오고(/auth/kakao), 서버가 내 프로필에 적는다.
-    // 단추는 한국어 화면 + 웹(kakaoLoginAvailable — 앱 안에서는 카카오로 못 넘어간다) + 프로필이 있는 회원에게만.
+    // 단추는 한국어 화면 + 카카오 단추를 쓸 수 있는 곳(kakaoLoginAvailable — 웹, 그리고 네이티브 카카오 플러그인이 든 새 앱 1.3~.
+    // 플러그인이 없는 앱에서는 카카오로 못 넘어가 숨긴다) + 프로필이 있는 회원에게만.
     // 매장에서 전화번호만으로 등록된 회원(profileId 없음)은 붙일 곳이 없어 서버가 409 로 거절한다 — 누를 수 없게 처음부터 숨긴다.
     // **로그인 PIN 이 있는 계정만**(conn.pin, 2026-10-05 검토): 연결은 쿠키만으로 해 주지 않고 PIN 으로 본인을 확인한다(돌아온 화면이 묻는다).
     // PIN 없는 계정(번호만으로 등록 · 구글·애플 전용)은 확인할 방법이 없어 서버가 거절하므로 단추도 보여 주지 않는다.
@@ -106,6 +110,60 @@ export default function HiqSettings() {
         // 카카오에 보냈던 이 화면이 되살아났다 — 새 탭·새 문서에서 연결이 끝났을 수 있으니 '나'를 다시 받아 '연결됨'으로 바뀌게 한다
         void queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
     });
+
+    // 앱 안의 연결(2026-10-06 — 네이티브 카카오 플러그인이 든 새 앱 1.3~). 웹과 같은 순서다: 카카오에 먼저 다녀오고 → 로그인 PIN 을 받아 →
+    // 서버에 같이 보낸다. 화면을 떠나지 않으므로 PIN 은 이 줄 바로 아래에서 받는다(웹은 돌아온 화면 /auth/kakao 가 받는다).
+    // 받아 온 ID 토큰은 화면 메모리에만 있다. 서버는 PIN 을 토큰보다 먼저 보므로, PIN 이 틀렸을 때만 같은 토큰으로 다시 보낼 수 있다 —
+    // 그 밖의 답(성공·다른 실패)이 오면 토큰은 끝난 것으로 보고 PIN 칸을 닫는다. 쿠키는 바뀌지 않는다('나'만 다시 받는다).
+    const kakaoNative = kakaoNativeAvailable();
+    const [nativeLink, setNativeLink] = useState<KakaoNativeToken | null>(null);
+    const [nativeLinkBusy, setNativeLinkBusy] = useState(false);
+    const [linkPin, setLinkPin] = useState("");
+    const [linkPinError, setLinkPinError] = useState<string | null>(null);
+    const nativeLinkLock = useRef(false);
+    const startNativeLink = async () => {
+        if (nativeLinkLock.current) return;
+        nativeLinkLock.current = true;
+        setNativeLinkBusy(true);
+        try {
+            const token = await kakaoNativeToken();
+            // 취소했으면(null) 조용히 끝낸다
+            if (token) {
+                setLinkPin("");
+                setLinkPinError(null);
+                setNativeLink(token);
+            }
+        } catch (e) {
+            console.error("[kakao] native link start failed:", e);
+            toast({ title: t("login.kakaoStartFailed"), variant: "destructive" });
+        } finally {
+            nativeLinkLock.current = false;
+            setNativeLinkBusy(false);
+        }
+    };
+    const submitNativeLink = async () => {
+        if (!nativeLink || nativeLinkLock.current || linkPin.length < 4) return;
+        nativeLinkLock.current = true;
+        setNativeLinkBusy(true);
+        setLinkPinError(null);
+        const result = await kakaoNativeLink(nativeLink, linkPin);
+        nativeLinkLock.current = false;
+        setNativeLinkBusy(false);
+        setLinkPin("");
+        if (result.kind === "wrong-pin") {
+            // 토큰은 아직 쓰이지 않았다 — 같은 자리에서 PIN 만 다시 받는다
+            setLinkPinError(result.message ?? t("kakao.pinWrong"));
+            return;
+        }
+        setNativeLink(null);
+        if (result.kind === "linked") {
+            toast({ title: t("kakao.linked") });
+            await queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
+            return;
+        }
+        // 서버가 만든 문구(이미 다른 계정에 연결됨 등)가 있으면 그대로, 없으면 제목만
+        toast({ title: t("kakao.linkFailTitle"), description: result.message ?? undefined, variant: "destructive" });
+    };
 
     // 카카오 해제(2026-10-05 검토) — 연결만 있고 되돌릴 길이 없으면 잘못 붙은 카카오(가족 것·남이 붙여 둔 것)를 주인이 못 뗀다.
     // 연결과 같은 PIN 확인을 거친다. 전화번호로 가입한 계정에서만: 카카오로 가입한 계정은 떼면 들어올 길이 없어 서버가 거절한다.
@@ -135,7 +193,8 @@ export default function HiqSettings() {
     // 앱 안의 한국어 화면: 카카오 줄이 '미연결'로만 보이고 왜 못 누르는지 설명이 없었다(2026-10-05 검토).
     // "웹에서 연결"만 적으면 웹에 가서 첫 단추인 '카카오로 시작하기'를 누르게 되고 그러면 빈 새 계정이 생긴다 —
     // 그래서 "전화번호로 로그인한 뒤"를 꼭 넣는다. 웹에서도 연결할 수 없는 회원(프로필·PIN 없음)에게는 거짓말이 되므로 보여 주지 않는다.
-    const kakaoLinkOnWebHint = kakaoLoginOpen() && isNativeApp() && locale === "ko" && !!member?.profileId && conn.pin === true && !!conn.phone && !conn.kakao;
+    // 네이티브 카카오 플러그인이 든 새 앱(1.3~)에서는 이 줄에 '연결' 단추가 있다 — 안내는 플러그인이 없는 앱(1.2 이하)에만 남긴다(2026-10-06).
+    const kakaoLinkOnWebHint = kakaoLoginOpen() && isNativeApp() && !kakaoNative && locale === "ko" && !!member?.profileId && conn.pin === true && !!conn.phone && !conn.kakao;
 
     const connections: { key: string; label: string; linked: boolean; onLink?: () => void; onUnlink?: () => void }[] = [
         { key: "phone", label: t("settings.connPhone"), linked: !!conn.phone },
@@ -143,7 +202,8 @@ export default function HiqSettings() {
         // 카카오가 닫혀 있는 동안(새 앱 빌드 승인 전, 2026-10-06)에는 줄 자체를 그리지 않는다 — 이미 연결된 회원만 예외
         ...((locale === "ko" && kakaoLoginOpen()) || conn.kakao ? [{
             key: "kakao", label: t("settings.connKakao"), linked: !!conn.kakao,
-            onLink: canLinkKakao ? () => startKakao({ mode: "link", redirect: "/settings" }) : undefined,
+            // 앱 안(플러그인 있음)은 화면을 떠나지 않는 네이티브 길, 웹은 카카오에 다녀오는 길(mode=link)
+            onLink: canLinkKakao ? (kakaoNative ? () => { void startNativeLink(); } : () => startKakao({ mode: "link", redirect: "/settings" })) : undefined,
             onUnlink: canUnlinkKakao ? () => { setUnlinkPin(""); setUnlinkOpen((open) => !open); } : undefined,
         }] : []),
         { key: "google", label: "Google", linked: !!conn.google },
@@ -349,7 +409,7 @@ export default function HiqSettings() {
                                         <button
                                             type="button"
                                             onClick={c.onLink}
-                                            disabled={kakaoLinking}
+                                            disabled={kakaoLinking || nativeLinkBusy || !!nativeLink}
                                             aria-label={`${c.label} ${t("settings.connect")}`}
                                             className="h-8 px-3.5 rounded-full bg-brand/[0.1] text-[12.5px] font-bold text-brand disabled:opacity-50 active:scale-[0.97] transition-transform"
                                         >
@@ -359,6 +419,46 @@ export default function HiqSettings() {
                                         <span className="text-[12px] font-medium text-black/30">{t("settings.notLinked")}</span>
                                     )}
                                 </div>
+                                {/* 앱 안의 연결 — 카카오에 다녀온 뒤 로그인 PIN 으로 본인 확인을 받는다(해제와 같은 모양으로 줄 아래에서 바로).
+                                    PIN 은 화면 상태에만 있고 보낸 뒤 지운다. */}
+                                {c.key === "kakao" && nativeLink && (
+                                    <form
+                                        onSubmit={(e) => { e.preventDefault(); void submitNativeLink(); }}
+                                        className="mt-2 px-1"
+                                    >
+                                        <p className="text-[12px] text-black/55 mb-2 break-keep">{t("kakao.pinDesc")}</p>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="password"
+                                                inputMode="numeric"
+                                                pattern="[0-9]*"
+                                                autoComplete="current-password"
+                                                autoFocus
+                                                aria-label={t("login.pinPlaceholder")}
+                                                placeholder={t("login.pinPlaceholder")}
+                                                value={linkPin}
+                                                onChange={(e) => { setLinkPin(e.target.value.replace(/[^0-9]/g, "").slice(0, 8)); setLinkPinError(null); }}
+                                                className="flex-1 min-w-0 h-12 px-4 bg-black/[0.04] rounded-tile outline-none text-[15px] font-semibold tabular-nums"
+                                            />
+                                            <button
+                                                type="submit"
+                                                disabled={nativeLinkBusy || linkPin.length < 4}
+                                                aria-busy={nativeLinkBusy}
+                                                className="h-12 px-4 shrink-0 rounded-tile bg-brand text-brand-fg text-[13.5px] font-bold disabled:opacity-40 active:scale-[0.98] transition-transform"
+                                            >
+                                                {nativeLinkBusy ? <LucideLoader2 className="w-5 h-5 animate-spin" /> : t("settings.connect")}
+                                            </button>
+                                        </div>
+                                        {linkPinError && <p role="alert" className="text-[12.5px] font-medium text-red-500 mt-2 break-keep">{linkPinError}</p>}
+                                        <button
+                                            type="button"
+                                            onClick={() => { setNativeLink(null); setLinkPin(""); setLinkPinError(null); }}
+                                            className="mt-1 h-11 text-[12.5px] font-medium text-black/45 underline underline-offset-4 active:opacity-70"
+                                        >
+                                            {t("common.cancel")}
+                                        </button>
+                                    </form>
+                                )}
                                 {/* 해제 — 로그인 PIN 으로 본인 확인을 한 번 더 받는다(브라우저 기본 창을 쓰지 않고 줄 아래에서 바로) */}
                                 {c.onUnlink && unlinkOpen && (
                                     <form

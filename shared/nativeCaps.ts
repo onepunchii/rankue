@@ -91,6 +91,12 @@ export const NATIVE_FEATURES = {
     nativeSocialLogin: { plugin: "SocialLogin" },
     /** 앱 설정·알림 설정 화면 열기(안드로이드). iOS 는 플러그인 없이 'app-settings:' 이동으로 연다 — lib/nativeBridge.ts. */
     openSettings: { plugin: "NativeSettings" },
+    /**
+     * 앱 안 카카오 로그인(네이티브 SDK 를 감싼 로컬 플러그인 — 계약은 shared/kakaoNative.ts). 1.2 이하 바이너리에는 없다.
+     * 이름은 kakaoNative 의 KAKAO_NATIVE_PLUGIN 과 같은 글자다(시험이 지킨다). 플러그인이 있다고 단추가 뜨는 것은 아니다 —
+     * 여는 스위치(VITE_KAKAO_LOGIN_OPEN)까지 켜져야 한다(client lib/kakaoLogin kakaoNativeAvailable).
+     */
+    nativeKakaoLogin: { plugin: "RankueKakao" },
 } as const satisfies Record<string, FeatureRequirement>;
 
 export type FeatureRequirement = { minGeneration?: number; plugin?: string };

@@ -1,0 +1,16 @@
+# 주의: 저장소 맨 위 .gitignore 가 'android/'·'ios/' 를 어느 깊이에서든 무시한다(Capacitor 가 만드는 네이티브 폴더용).
+# 이 플러그인의 android/·ios/ 는 손으로 쓴 소스라 버전 관리에 들어가야 한다 — 아래 두 줄이 그 규칙을 여기서만 되돌린다.
+# 이 두 줄을 지우면 플러그인 소스가 조용히 git 에서 빠진다. 확인: git check-ignore -v native-plugins/rankue-kakao/android/build.gradle (아무것도 안 나와야 한다)
+!/android/
+!/ios/
+
+# 빌드 산출물 — gradle·Xcode 가 이 폴더 안에 만든다(저장소에 넣지 않는다)
+/android/build/
+/android/.gradle/
+/android/.kotlin/
+/android/local.properties
+/.build/
+/.swiftpm/
+/Package.resolved
+*.xcuserdatad/
+.DS_Store

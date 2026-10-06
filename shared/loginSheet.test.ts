@@ -309,11 +309,14 @@ describe("모양 — 아래에서 올라오는 시트 하나", () => {
     // 2026-10-05 검토에서 로그인 화면에 넣은 두 안내가 팝업에는 없었다 — '로그인'을 누르면 이제 팝업이 먼저 뜨므로, 소셜 단추를 누르는 사람은
     // 그 화면을 거치지 않는다. 카카오 스위치가 켜지는 순간 코드 변경 없이 드러날 구멍이었다.
     it("계정이 갈리기 전에 알린다 — 카카오가 먼저인 팝업의 기존 전화번호 회원 안내 · 앱 안의 '카카오 가입자는 웹에서'", () => {
-        expect(sheet).toContain('import { kakaoLoginAvailable, kakaoLoginOpen } from "@/lib/kakaoLogin";');
+        // 2026-10-06 바뀐 것(앱 안 카카오 로그인 — 새 바이너리의 네이티브 플러그인): import 에 kakaoNativeAvailable 이 늘고, 앱 안 안내의 조건 끝에
+        // `&& !kakaoNativeAvailable()` 가 붙었다. 카카오 단추가 있는 새 앱에는 "앱에는 아직 카카오 로그인이 없어"가 거짓말이라 띄우지 않는다 —
+        // 플러그인이 없는 앱(1.2 이하)에는 예전 조건 그대로 뜬다(shared/kakaoNative.test.ts 가 그 판별을 지킨다).
+        expect(sheet).toContain('import { kakaoLoginAvailable, kakaoLoginOpen, kakaoNativeAvailable } from "@/lib/kakaoLogin";');
         expect(sheet).toContain('import { isNativeApp } from "@/lib/nativeBridge";');
         // 조건은 로그인 화면과 같은 식 — 둘 다 스위치가 꺼지면 false 라, 닫혀 있는 동안 '카카오'라는 말이 어디에도 나오지 않는다
-        expect(sheet).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp();');
-        expect(landing).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp();');
+        expect(sheet).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();');
+        expect(landing).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();');
         const lib = client("lib/kakaoLogin.ts");
         expect(lib).toMatch(/export function kakaoLoginAvailable\(\): boolean \{\s*if \(!KAKAO_OPEN\) return false;/);
         expect(lib).toContain("return KAKAO_OPEN && !!KAKAO_JS_KEY;");

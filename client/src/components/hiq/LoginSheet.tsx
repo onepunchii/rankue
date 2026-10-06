@@ -32,7 +32,7 @@ import { useSport } from "@/contexts/SportContext";
 import { useBackToClose } from "@/hooks/useBackToClose";
 import { useT } from "@/lib/i18n";
 import { X } from "@/lib/icons";
-import { kakaoLoginAvailable, kakaoLoginOpen } from "@/lib/kakaoLogin";
+import { kakaoLoginAvailable, kakaoLoginOpen, kakaoNativeAvailable } from "@/lib/kakaoLogin";
 import { isNativeApp } from "@/lib/nativeBridge";
 import { rebindAuthWatchers } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
@@ -199,11 +199,12 @@ function LoginSheetPanel({ tone: liveTone, opts, back, go }: {
     // 스위치가 꺼져 있으면 늘 false 라, 닫혀 있는 동안 '카카오'라는 말이 어디에도 나오지 않는다.
     const kakaoShown = !storeEntry && locale === "ko" && kakaoLoginAvailable();
     // 무엇을 먼저 보일까 — 로그인 화면(landing 의 showPhone)과 같은 규칙(2026-10-06 검토): 한국어는 카카오가 되는 곳만 소셜이 먼저,
-    // 아니면(스위치 꺼짐 · 앱 안 · 매장 진입) 전화번호가 먼저다. 다른 언어는 소셜이 먼저(소셜이 없으면 아래에서 전화번호 단추 하나만).
+    // 아니면(스위치 꺼짐 · 카카오 플러그인이 없는 앱 · 매장 진입) 전화번호가 먼저다. 다른 언어는 소셜이 먼저(소셜이 없으면 아래에서 전화번호 단추 하나만).
     const phoneFirst = locale === "ko" ? !kakaoShown : !social;
-    // 스토어 앱 안의 한국어 화면: 앱에는 카카오 단추가 없다 — 웹에서 카카오로 가입한 사람이 여기서 다른 방법으로 들어오면 새 계정이 생긴다.
-    // 로그인 화면과 같은 조건으로 누르기 전에 알린다(2026-10-05 검토의 안내가 팝업에는 빠져 있었다).
-    const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp();
+    // 스토어 앱 안의 한국어 화면인데 **이 바이너리에 카카오 단추가 없다**(플러그인이 없는 1.2 이하) — 웹에서 카카오로 가입한 사람이 여기서
+    // 다른 방법으로 들어오면 새 계정이 생긴다. 로그인 화면과 같은 조건으로 누르기 전에 알린다(2026-10-05 검토의 안내가 팝업에는 빠져 있었다).
+    // 새 바이너리(1.3~)는 위 단추 묶음에 카카오가 있어 이 안내를 띄우지 않는다(2026-10-06 — kakaoNativeAvailable).
+    const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();
     const toPhone = () => go(loginPagePath(back, true));
     // "계속하면 {terms}과 {privacy}에 동의하게 됩니다" — 두 낱말 자리를 링크로 바꿔 끼운다(언어마다 어순이 달라 문장을 통째로 사전에 둔다)
     const legal = t("loginSheet.legal").split(/(\{terms\}|\{privacy\})/);

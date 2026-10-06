@@ -1,0 +1,22 @@
+{
+  "name": "rankue-kakao",
+  "version": "1.0.0",
+  "private": true,
+  "description": "랭큐 앱 전용 로컬 Capacitor 플러그인 — 네이티브 카카오 SDK 로그인(RankueKakao). 웹 번들은 이 패키지를 import 하지 않는다.",
+  "license": "UNLICENSED",
+  "files": [
+    "android/src/main/",
+    "android/build.gradle",
+    "ios/Sources",
+    "Package.swift",
+    "README.md"
+  ],
+  "capacitor": {
+    "ios": {
+      "src": "ios"
+    },
+    "android": {
+      "src": "android"
+    }
+  }
+}

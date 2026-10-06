@@ -1,17 +1,29 @@
 /**
- * 카카오 로그인(웹 전용)의 화면 쪽 일 — SDK 를 필요할 때만 싣고, 카카오로 보내기 전에 '다녀오는 중' 꾸러미를 남긴다.
+ * 카카오 로그인의 화면 쪽 일.
  * (2026-10-05 오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플")
  *
- * 규칙(허용 원본·Redirect URI·state 검사·꾸러미 모양)은 shared/kakaoLogin.ts 에 있고 서버와 같이 쓴다.
+ * 길이 둘이다.
+ *  - 웹: SDK 를 필요할 때만 싣고, 카카오로 보내기 전에 '다녀오는 중' 꾸러미를 남긴다(전체 화면 이동 → /auth/kakao).
+ *    규칙(허용 원본·Redirect URI·state 검사·꾸러미 모양)은 shared/kakaoLogin.ts 에 있고 서버와 같이 쓴다.
+ *  - 앱 안(2026-10-06 — 새 바이너리 1.3~): 네이티브 플러그인 "RankueKakao" 가 카카오 SDK 로 ID 토큰을 받아 오고 서버가 검증한다.
+ *    화면을 떠나지 않는다. 계약은 shared/kakaoNative.ts, 이 파일 맨 아래에 있다. 플러그인이 없는 바이너리(1.2 이하)에서는 어디에도 안 뜬다.
+ *
  * 여기에는 브라우저에서만 되는 것만 둔다. 키는 환경변수 이름(VITE_KAKAO_JS_KEY)으로만 부른다 — 값을 적지 않는다.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
+import { registerPlugin } from "@capacitor/core";
 import { isNativeApp } from "@/lib/nativeBridge";
+import { ApiError, apiRequest } from "@/lib/queryClient";
 import {
     KAKAO_PENDING_KEY, KAKAO_SDK_CROSSORIGIN, KAKAO_SDK_INTEGRITY, KAKAO_SDK_URL,
     isAllowedKakaoOrigin, kakaoRedirectUri, makeKakaoPending, newKakaoState, parseKakaoPending,
     type KakaoMode, type KakaoPending,
 } from "@shared/kakaoLogin";
+import {
+    KAKAO_NATIVE_NONCE_API, KAKAO_NATIVE_PLUGIN, KAKAO_NATIVE_VERIFY_API,
+    isKakaoNativeCanceled, isKakaoNonce, looksLikeKakaoIdToken, type RankueKakaoPlugin,
+} from "@shared/kakaoNative";
+import { nativeSupports } from "@shared/nativeCaps";
 
 const KAKAO_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY as string | undefined;
 // 여는 스위치(2026-10-06 오너: "앱 빌드해서 승인받고 그때 카카오 오픈") — 키가 있어도 이 값이 "1" 이 아니면 단추가 어디에도 안 뜬다.
@@ -32,10 +44,11 @@ declare global {
 }
 
 /**
- * 카카오 단추를 보여도 되는가.
+ * 카카오 단추를 보여도 되는가(= 이 기기에서 카카오 단추를 눌러 끝까지 갈 수 있는가).
  *  - 키가 없으면(로컬·시험·미배포) 꺼진다 — 단추가 안 보일 뿐 아무것도 깨지지 않는다.
- *  - 스토어 앱 안에서는 숨긴다: 앱의 웹뷰는 rankue.co.kr 밖으로 못 넘어가게 바이너리에 고정돼 있어(capacitor.config.ts allowNavigation)
- *    카카오로 넘어가면 바깥 브라우저가 열리고 로그인이 앱으로 돌아오지 않는다.
+ *  - 스토어 앱 안에서는 **네이티브 카카오 플러그인이 든 바이너리에서만** 보인다(kakaoNativeAvailable — 1.3~).
+ *    앱의 웹뷰는 rankue.co.kr 밖으로 못 넘어가게 바이너리에 고정돼 있어(capacitor.config.ts allowNavigation) 웹 방식으로는
+ *    카카오로 넘어가면 바깥 브라우저가 열리고 로그인이 앱으로 돌아오지 않는다 — 플러그인이 없는 앱(1.2 이하)에서는 계속 숨긴다.
  *  - 카카오에 등록된 주소(운영 www)에서만: 미리보기 배포 주소에서는 카카오가 Redirect URI 불일치로 막고
  *    서버도 400 으로 거절한다. 못 끝낼 길은 처음부터 열지 않는다.
  *    개발용 localhost 는 개발 서버(vite dev — import.meta.env.DEV)에서만 연다: 운영 빌드를 localhost 에서 띄워도 단추가 안 뜨고,
@@ -49,8 +62,19 @@ export function kakaoLoginOpen(): boolean {
     return KAKAO_OPEN && !!KAKAO_JS_KEY;
 }
 
+/**
+ * 앱 안에서 카카오 단추를 쓸 수 있는가(2026-10-06) — **여는 스위치가 켜져 있고, 이 바이너리에 플러그인 "RankueKakao" 가 있을 때만.**
+ * 웹에서는 늘 false 다(nativeSupports 가 네이티브 여부부터 본다). 지금 스토어 앱(1.2)에는 플러그인이 없어 스위치를 켜도 false —
+ * 없는 플러그인을 부르는 단추가 뜨지 않는다. 웹용 JS 키는 이 길에 쓰이지 않는다.
+ */
+export function kakaoNativeAvailable(): boolean {
+    return KAKAO_OPEN && nativeSupports("nativeKakaoLogin");
+}
+
 export function kakaoLoginAvailable(): boolean {
     if (!KAKAO_OPEN) return false;
+    // 앱 안: 네이티브 플러그인이 있으면 그 길로 된다. 없으면 아래에서 예전처럼 숨는다
+    if (kakaoNativeAvailable()) return true;
     if (!KAKAO_JS_KEY || isNativeApp()) return false;
     try {
         return isAllowedKakaoOrigin(window.location.origin, import.meta.env.DEV);
@@ -74,6 +98,9 @@ let sdkLoading: Promise<KakaoSdk> | null = null;
 export function loadKakaoSdk(): Promise<KakaoSdk> {
     if (readySdk) return Promise.resolve(readySdk);
     if (sdkLoading) return sdkLoading;
+    // 앱 안에서는 웹 SDK 를 싣지 않는다 — 앱의 카카오 로그인은 네이티브 플러그인이 한다(아래 kakaoNativeToken).
+    // 단추가 보이는 화면이 미리 싣기(useKakaoStart 의 shown)를 걸어도 여기서 끝난다.
+    if (isNativeApp()) return Promise.reject(new Error("kakao: web sdk is not used in the app"));
     const jsKey = KAKAO_JS_KEY;
     if (!jsKey) return Promise.reject(new Error("kakao: not configured"));
 
@@ -216,4 +243,96 @@ export function useKakaoStart(shown: boolean, onFail: () => void, onReturn?: () 
     }, []);
 
     return { busy, start };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 앱 안(네이티브 SDK) — 2026-10-06. 계약 전문은 shared/kakaoNative.ts.
+//   nonce 받기(서버) → RankueKakao.login({ nonce })(카카오톡 또는 카카오계정) → ID 토큰을 서버가 검증 → 쿠키.
+// 화면을 떠나지 않는 로그인이다(웹처럼 /auth/kakao 로 돌아오지 않는다). 그래서 약관 동의·'나' 새로 받기·화면 옮기기는
+// 부른 화면이 구글·애플과 같은 순서로 한다(components/hiq/SocialLogin · pages/hiq/settings).
+// ─────────────────────────────────────────────────────────────────────────────
+
+let nativePlugin: RankueKakaoPlugin | null = null;
+
+/**
+ * 플러그인 대리 객체 — **쓸 때** 한 번만 등록한다(패키지를 import 하지 않는다: 웹 번들에 네이티브 패키지가 끌려오지 않게).
+ * 같은 이름을 두 번 등록하면 Capacitor 가 경고를 내므로 기억해 둔다.
+ * ★ 이 객체를 async 함수의 반환값으로 쓰거나 await 하지 말 것: Capacitor 의 대리 객체는 모르는 속성을 전부 네이티브 메서드로
+ *   만들어 주어서, Promise 가 then 을 찾는 순간 네이티브의 "then" 을 부르고 끝나지 않는다.
+ */
+function kakaoPlugin(): RankueKakaoPlugin {
+    nativePlugin ??= registerPlugin<RankueKakaoPlugin>(KAKAO_NATIVE_PLUGIN);
+    return nativePlugin;
+}
+
+/** 카카오에서 받아 온 것 — 화면 메모리에만 둔다(저장소·주소에 남기지 않는다). 서버가 한 번 쓰면 끝난다. */
+export type KakaoNativeToken = { idToken: string; nonce: string };
+
+/**
+ * 서버가 **만든** 오류 문구만 꺼낸다 — 우리 서버의 오류는 전부 { success:false, message } 꼴이다.
+ * 플랫폼의 시간 초과 원문·"HTTP 500" 같은 대체 글자는 문구로 믿지 않는다(pages/hiq/kakao-callback 의 serverMessageOf 와 같은 규칙).
+ */
+export function kakaoServerMessage(err: unknown): string | null {
+    const data = err instanceof ApiError ? err.data : null;
+    return data?.success === false && typeof data.message === "string" && data.message ? data.message : null;
+}
+
+/**
+ * 카카오에 다녀와 ID 토큰을 받는다. 사용자가 취소했으면 **null**(조용히 끝낸다), 그 밖의 실패는 던진다.
+ *  1) 서버에서 1회용 nonce 를 받는다 — 같은 값이 서명 쿠키로도 이 웹뷰에 심긴다(서버가 둘을 견준다).
+ *  2) 플러그인에 nonce 를 그대로 넘긴다. 카카오톡이 있으면 카카오톡으로, 없으면 카카오계정 로그인으로 간다(플러그인이 고른다).
+ *  3) 받은 직후 SDK 가 기기에 남긴 카카오 토큰을 지운다 — 우리는 카카오 API 를 쓰지 않는다. ID 토큰은 이미 손에 있다.
+ * 플러그인이 없는 바이너리에서는 부르지 않는다(화면이 단추를 안 그린다) — 그래도 여기서 한 번 더 막는다.
+ */
+export async function kakaoNativeToken(): Promise<KakaoNativeToken | null> {
+    if (!kakaoNativeAvailable()) throw new Error("kakao: native login unavailable");
+    const issued = await apiRequest(KAKAO_NATIVE_NONCE_API, { method: "POST", body: {} });
+    const nonce: unknown = issued?.nonce;
+    if (!isKakaoNonce(nonce)) throw new Error("kakao: bad nonce");
+
+    let idToken: unknown;
+    try {
+        idToken = (await kakaoPlugin().login({ nonce }))?.idToken;
+    } catch (err) {
+        if (isKakaoNativeCanceled(err)) return null;
+        throw err;
+    }
+    void kakaoPlugin().logout().catch(() => undefined);
+    if (!looksLikeKakaoIdToken(idToken)) throw new Error("kakao: no id token");
+    return { idToken, nonce };
+}
+
+/** POST …/native(login)의 답 — /social 과 같은 모양이다. */
+export type KakaoNativeSignedIn = { member?: { termsVersion?: unknown } | null; isNew?: boolean; redirectTo?: unknown };
+
+/**
+ * 앱 안 카카오 로그인 한 번: 카카오에 다녀와 서버 검증까지. 취소면 null, 성공이면 서버의 답(쿠키는 이미 심겼다).
+ * **이 함수는 '나'를 새로 받지 않는다** — 부른 화면이 약관 동의를 받은 뒤 refreshAfterLogin 을 부르고 나서 화면을 옮긴다.
+ */
+export async function kakaoNativeLogin(): Promise<KakaoNativeSignedIn | null> {
+    const token = await kakaoNativeToken();
+    if (!token) return null;
+    return await apiRequest(KAKAO_NATIVE_VERIFY_API, { method: "POST", body: { idToken: token.idToken, nonce: token.nonce, mode: "login" } });
+}
+
+/** 연결 요청 한 번의 결과. wrong-pin 만 같은 토큰으로 다시 보낼 수 있다(서버가 nonce 를 쓰기 전에 거절했다). */
+export type KakaoNativeLinkResult =
+    | { kind: "linked" }
+    | { kind: "wrong-pin"; message: string | null }
+    | { kind: "failed"; message: string | null };
+
+/**
+ * 내 계정에 카카오를 붙인다(설정 '연결된 로그인') — 받아 둔 ID 토큰과 로그인 PIN 을 같이 보낸다. 쿠키는 바뀌지 않는다.
+ * PIN 은 이 요청에만 쓰고 어디에도 남기지 않는다. PIN 만 틀렸으면 토큰이 아직 살아 있다 — 화면이 PIN 만 다시 받는다.
+ */
+export async function kakaoNativeLink(token: KakaoNativeToken, pin: string): Promise<KakaoNativeLinkResult> {
+    try {
+        await apiRequest(KAKAO_NATIVE_VERIFY_API, { method: "POST", body: { idToken: token.idToken, nonce: token.nonce, mode: "link", pin } });
+        return { kind: "linked" };
+    } catch (err) {
+        console.error("[kakao] native link failed:", err);
+        const message = kakaoServerMessage(err);
+        if (err instanceof ApiError && err.status === 401 && err.data?.code === "KAKAO_PIN_WRONG") return { kind: "wrong-pin", message };
+        return { kind: "failed", message };
+    }
 }

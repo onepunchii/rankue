@@ -388,10 +388,17 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         for (const f of SCREEN_FILES) expect(client(f), f).not.toMatch(/KAKAO_LOGIN_REST_KEY|KAKAO_LOGIN_CLIENT_SECRET|client_secret/);
     });
 
-    it("단추를 보일 조건 — 키가 있고, 스토어 앱 안이 아니고, 카카오에 등록된 주소일 때만", () => {
+    // 2026-10-06 바뀐 것(오너: "카카오 로그인이 되는 앱 빌드를 만들어 올리고, 승인되면 카카오를 연다"): 예전 제목은 "스토어 앱 안이 아니고"였다.
+    // 이제 앱 안에서도 **네이티브 카카오 플러그인이 든 바이너리**에서는 단추가 뜬다(한 줄이 늘었다 — 아래 native). 플러그인이 없는 앱(1.2 이하)은
+    // 예전 줄(isNativeApp)에 그대로 걸려 숨는다. 네이티브 쪽 규칙의 시험은 shared/kakaoNative.test.ts.
+    it("단추를 보일 조건 — 키가 있고 카카오에 등록된 주소일 때만. 스토어 앱 안에서는 네이티브 플러그인이 든 바이너리에서만", () => {
         expect(lib).toContain('import { isNativeApp } from "@/lib/nativeBridge";');
         const fn = lib.slice(lib.indexOf("export function kakaoLoginAvailable"), lib.indexOf("const SCRIPT_ID"));
         expect(fn).toContain("if (!KAKAO_JS_KEY || isNativeApp()) return false;");
+        // 앱 안의 예외는 스위치 다음 · 예전 줄(앱이면 숨김) 앞에 있다 — 플러그인이 없으면 그대로 아래로 떨어진다
+        const native = fn.indexOf("if (kakaoNativeAvailable()) return true;");
+        expect(native).toBeGreaterThan(fn.indexOf("if (!KAKAO_OPEN) return false;"));
+        expect(native).toBeLessThan(fn.indexOf("if (!KAKAO_JS_KEY || isNativeApp()) return false;"));
         // 닫혀 있는 동안에는 안내 문구·설정의 줄도 안 보인다(kakaoLoginOpen) — 앱 안은 단추를 못 쓰지만 안내는 보여 주는 자리라 따로 가른다
         expect(lib).toContain("export function kakaoLoginOpen(): boolean {");
         expect(lib).toContain("return KAKAO_OPEN && !!KAKAO_JS_KEY;");
@@ -421,8 +428,23 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(kakaoAt).toBeGreaterThan(0);
         expect(kakaoAt).toBeLessThan(web.indexOf("ref={googleBtnRef}"));
         expect(kakaoAt).toBeLessThan(web.indexOf("onClick={handleAppleWeb}"));
-        // 앱 안 단추 묶음(위쪽 두 갈래)에는 카카오가 없다
-        expect(social.slice(social.indexOf("if (inApp && !nativeSocial) {"), social.indexOf("if (!GOOGLE_CLIENT_ID && !showKakao) return null;"))).not.toMatch(/kakao/i);
+        // 앱 안 단추 묶음(위쪽 두 갈래).
+        // 2026-10-06 바뀐 것: 예전 단언은 "두 갈래 어디에도 카카오가 없다"였다. 새 앱(네이티브 카카오 플러그인)에는 카카오 단추가 생겼다 —
+        //  - 옛 앱 안내 갈래(소셜 플러그인조차 없는 바이너리)에는 여전히 카카오가 없다.
+        //  - 앱 갈래의 카카오는 showKakao 안에만 있고(앱 안에서는 플러그인 + 스위치일 때만 참 — shared/kakaoNative.test.ts), 웹의 길(handleKakao)이 아니라
+        //    네이티브 길(nativeKakaoSignIn)로 간다. 구글 단추보다 위다.
+        const appAt = social.indexOf("if (inApp) {");
+        const oldApp = social.slice(social.indexOf("if (inApp && !nativeSocial) {"), appAt);
+        const appBranch = social.slice(appAt, social.indexOf("if (!GOOGLE_CLIENT_ID && !showKakao) return null;"));
+        expect(appAt).toBeGreaterThan(0);
+        expect(oldApp).not.toMatch(/kakao/i);
+        const appKakao = appBranch.indexOf("{showKakao && (");
+        expect(appKakao).toBeGreaterThan(0);
+        expect(appBranch.match(/\{showKakao && \(/g)).toHaveLength(1);
+        expect(appBranch.indexOf("onClick={nativeKakaoSignIn}")).toBeGreaterThan(appKakao);
+        expect(appBranch.indexOf('onClick={() => nativeSignIn("google")}')).toBeGreaterThan(appBranch.indexOf("onClick={nativeKakaoSignIn}"));
+        expect(appBranch).not.toContain("handleKakao");
+        expect(appBranch).not.toContain("startKakao(");
         // 카카오 디자인 가이드 색
         expect(web).toContain("bg-[#FEE500]");
         expect(web).toContain("text-[#191919]");
@@ -473,8 +495,10 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(landing.lastIndexOf("{kakaoFirst && (", hint)).toBeGreaterThan(0);
         expect(landing.indexOf('{t(kakaoFirst ? "login.phoneLogin" : "login.phoneLoginLink")}')).toBeGreaterThan(hint);
         // 앱 안의 한국어 화면: 기존 판별(isNativeApp)로 — 전화 카드 아래, PIN 단계에서는 빼고
+        // 2026-10-06 바뀐 것: 조건 끝에 `&& !kakaoNativeAvailable()` 가 붙었다 — 네이티브 카카오 단추가 있는 새 앱(1.3~)에는 "앱에는 아직
+        // 카카오 로그인이 없어"가 거짓말이 된다. 플러그인이 없는 앱(1.2 이하)에는 예전과 같은 조건으로 그대로 뜬다.
         expect(landing).toContain('import { isNativeApp } from "@/lib/nativeBridge";');
-        expect(landing).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp();');
+        expect(landing).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();');
         expect(landing).toContain("{!requiresPassword && kakaoWebOnlyHint && (");
         expect(landing).toContain('{t("login.kakaoWebOnly")}');
         const ko = client("lib/i18n/ko.ts");
@@ -490,7 +514,8 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         // 카카오 단추가 팝업에 실제로 그려질 때만 기존 회원 안내 — SocialLogin 에 넘기는 kakao={!storeEntry} 와 같은 값으로 묶는다
         expect(sheet).toContain('const kakaoShown = !storeEntry && locale === "ko" && kakaoLoginAvailable();');
         expect(sheet).toContain("<SocialLogin hint={false} kakao={!storeEntry} ");
-        expect(sheet).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp();');
+        // 2026-10-06: 로그인 화면과 같이 `&& !kakaoNativeAvailable()` 가 붙었다(네이티브 카카오 단추가 있는 새 앱에는 띄우지 않는다)
+        expect(sheet).toContain('const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();');
         const hint = sheet.indexOf('{t("login.phoneExistingHint")}');
         expect(hint).toBeGreaterThan(0);
         expect(sheet.lastIndexOf("{kakaoShown && (", hint)).toBeGreaterThan(0);
@@ -509,11 +534,14 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(sheet).toContain('const phoneFirst = locale === "ko" ? !kakaoShown : !social;');
     });
 
-    it("설정의 '연결' — 한국어 + 웹 + 프로필과 PIN 이 있는 회원에게만, 같은 길로(mode=link) 다녀온다", () => {
+    // 2026-10-06 바뀐 것: 예전 제목은 "한국어 + 웹 + …"이었고 onLink 는 웹의 길 하나였다. 네이티브 카카오 플러그인이 든 새 앱에서도 연결할 수 있게
+    // 되어(kakaoLoginAvailable 이 그 앱에서 참) onLink 가 둘로 갈린다 — 앱은 화면을 떠나지 않는 길(startNativeLink), 웹은 예전 그대로다.
+    it("설정의 '연결' — 한국어 + 카카오 단추를 쓸 수 있는 곳 + 프로필과 PIN 이 있는 회원에게만. 웹은 같은 길로(mode=link) 다녀오고, 새 앱은 네이티브 길로", () => {
         const settings = code(client("pages/hiq/settings.tsx"));
         // PIN 이 있는 계정만(2026-10-05 검토): 연결은 PIN 으로 본인을 확인한다. 옛 '나' 답에는 pin 칸이 없어 === true 로 본다
         expect(settings).toContain('const canLinkKakao = locale === "ko" && kakaoLoginAvailable() && !!member?.profileId && conn.pin === true && !conn.kakao;');
-        expect(settings).toContain('onLink: canLinkKakao ? () => startKakao({ mode: "link", redirect: "/settings" }) : undefined,');
+        expect(settings).toContain('onLink: canLinkKakao ? (kakaoNative ? () => { void startNativeLink(); } : () => startKakao({ mode: "link", redirect: "/settings" })) : undefined,');
+        expect(settings).toContain("const kakaoNative = kakaoNativeAvailable();");
         expect(settings).toContain("linked: !!conn.kakao");
         expect(client("hooks/useAuth.ts")).toMatch(/connections\?: \{[^}]*kakao\?: boolean[^}]*pin\?: boolean[^}]*\}/);
     });
@@ -540,7 +568,9 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
     // '카카오로 시작하기'를 누르게 되고 그러면 빈 새 계정이 생긴다 — 문구에 "전화번호로 로그인한 뒤"가 들어 있어야 한다.
     it("앱 안의 설정 — 카카오 연결은 '웹에서 전화번호로 로그인한 뒤'라고 알린다(연결할 수 있는 회원에게만)", () => {
         const settings = code(client("pages/hiq/settings.tsx"));
-        expect(settings).toContain('const kakaoLinkOnWebHint = kakaoLoginOpen() && isNativeApp() && locale === "ko" && !!member?.profileId && conn.pin === true && !!conn.phone && !conn.kakao;');
+        // 2026-10-06 바뀐 것: `!kakaoNative` 가 끼었다 — 새 앱(네이티브 카카오 플러그인)은 이 줄에 '연결' 단추가 있어 "웹에서"라고 말하지 않는다.
+        // 플러그인이 없는 앱(1.2 이하)에는 예전 조건 그대로 뜬다.
+        expect(settings).toContain('const kakaoLinkOnWebHint = kakaoLoginOpen() && isNativeApp() && !kakaoNative && locale === "ko" && !!member?.profileId && conn.pin === true && !!conn.phone && !conn.kakao;');
         expect(settings).toContain('{t("settings.kakaoLinkOnWeb")}');
         expect(client("lib/i18n/ko.ts")).toMatch(/"settings\.kakaoLinkOnWeb": "[^"]*www\.rankue\.co\.kr[^"]*전화번호로 로그인한 뒤[^"]*"/);
     });

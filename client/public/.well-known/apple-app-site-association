@@ -5,6 +5,8 @@
         "appIDs": ["29U5FPY2FG.com.rankue.app"],
         "components": [
           { "/": "/api/*", "exclude": true, "comment": "API is never opened in the app" },
+          { "/": "/auth/*", "exclude": true, "comment": "Web sign-in callbacks (e.g. /auth/kakao) must finish in the browser that started them" },
+          { "/": "/club" },
           { "/": "/club/*" },
           { "/": "/crew*" },
           { "/": "/join*" },
@@ -18,11 +20,18 @@
           { "/": "/online-game*" },
           { "/": "/world-ranking*" },
           { "/": "/ranking*" },
+          { "/": "/briefing" },
           { "/": "/briefing/*" },
           { "/": "/game/*" },
           { "/": "/dashboard*" },
           { "/": "/history*" },
-          { "/": "/friends*" }
+          { "/": "/friends*" },
+          { "/": "/golf/*" },
+          { "/": "/golf-ranking*" },
+          { "/": "/golfer/*" },
+          { "/": "/chat*" },
+          { "/": "/tournaments*" },
+          { "/": "/billiards/terms*" }
         ]
       }
     ]

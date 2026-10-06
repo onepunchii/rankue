@@ -887,10 +887,12 @@ describe("카카오 라우트 규칙(server/routes/modules/auth.ts)", () => {
         expect(root("server/lib/kakaoAuth.ts")).toContain("return isAllowedKakaoRedirect(uri, kakaoLocalAllowed());");
     });
 
-    it("연결·해제: 본인 확인(PIN)이 먼저다 — 연결은 카카오를 부르기 전에 본다(틀려도 인가 코드가 쓰이지 않는다)", () => {
+    it("연결·해제: 본인 확인(PIN)이 먼저다 — 연결은 카카오를 부르기 전에 본다(틀려도 인가 코드가 쓰이지 않는다). 자리는 PIN 보다 먼저 잡는다", () => {
         const check = link.indexOf("sendKakaoPinFailure(res, key, await hiqService.checkKakaoPin(req.userId!, pin))");
         expect(check).toBeGreaterThan(link.indexOf("checkRateLimit(key)"));
-        expect(check).toBeLessThan(link.indexOf("takeAttemptSlot(key)"));
+        // 자리 잡기가 PIN 대조보다 앞이다(2026-10-06 검토) — 뒤에 있으면 한꺼번에 온 요청이 전부 PIN 답을 받는다
+        expect(link.indexOf("takeAttemptSlot(key)")).toBeGreaterThan(link.indexOf("checkRateLimit(key)"));
+        expect(check).toBeGreaterThan(link.indexOf("takeAttemptSlot(key)"));
         expect(check).toBeLessThan(link.indexOf("exchanged = await exchangeKakaoCode(code, redirectUri);"));
         // 틀린 PIN 은 실패 횟수에 센다 — 쿠키를 쥔 사람이 이 길로 PIN 을 맞혀 보지 못하게
         const fn = auth.slice(auth.indexOf("function sendKakaoPinFailure"), linkAt);
@@ -904,6 +906,20 @@ describe("카카오 라우트 규칙(server/routes/modules/auth.ts)", () => {
         expect(unlink).toContain('sendError(res, 409, "err.auth.kakaoUnlinkSignup", "KAKAO_SIGNUP_ACCOUNT")');
         expect(unlink).not.toContain("res.cookie(");
         expect(unlink).not.toContain("exchangeKakaoCode");
+        // 해제도 PIN 대조 전에 자리를 잡고, 끝나면(성공·실패·예외) 놓는다(2026-10-06 검토)
+        const unlinkCall = unlink.indexOf("unlinked = await hiqService.unlinkKakao(req.userId!, pin);");
+        expect(unlink.indexOf("takeAttemptSlot(key)")).toBeGreaterThan(unlink.indexOf("checkRateLimit(key)"));
+        expect(unlinkCall).toBeGreaterThan(unlink.indexOf("takeAttemptSlot(key)"));
+        expect(unlink.slice(unlinkCall)).toMatch(/\} finally \{\s+release\(\);/);
+    });
+
+    it("로그인: PIN 대조 전에 자리를 잡고, 끝나면(성공·실패·예외) 놓는다", () => {
+        const block = auth.slice(auth.indexOf('router.post("/login"'), auth.indexOf('router.post("/social",'));
+        const slot = block.indexOf("takeAttemptSlot(key)");
+        const call = block.indexOf("result = await hiqService.login(phone, storeSlug, password);");
+        expect(slot).toBeGreaterThan(block.indexOf("checkRateLimit(probeKey)"));
+        expect(call).toBeGreaterThan(slot);
+        expect(block.slice(call)).toMatch(/\} finally \{\s+release\(\);/);
     });
 
     it("전화번호 입구 네 곳이 같은 검사로 자리표시자를 끊는다 — 로그인·가입·PIN 재설정(질문·확인)", () => {
@@ -1188,6 +1204,48 @@ describe("라우트 동작 — POST /login (전화번호 입구)", () => {
         expect((await callRoute("post", "/login", { body: { phone: "01055508888", storeSlug: "hiq" }, ip: "198.51.100.4" })).statusCode).toBe(200);
     });
 
+    // 2026-10-06 검토: 로그인의 PIN 대조도 기다리는 일이다 — 자리 잡기가 없을 때는 한꺼번에 온 요청이 '다섯 번 틀리면 15분 잠금'을 전부 통과했다
+    it("한꺼번에 몰려온 로그인도 PIN 대조는 다섯 건까지만 받는다 — 묶음으로 PIN 을 맞혀 볼 수 없다", async () => {
+        mem.state.profiles.push({ id: "pp", nickname: "핀", phone: "01000000008", password: PIN });
+        mem.state.members.push({ id: "pinned", profileId: "pp", storeId: "hiq-store", phone: "01000000008", name: "핀" });
+        const ip = "198.51.100.6";
+        // 서른 건을 한꺼번에 — 스물한 번째에 맞는 PIN 을 섞는다
+        const pins = Array.from({ length: 30 }, (_, i) => (i === 20 ? PIN : String(1000 + i)));
+        vi.spyOn(console, "error").mockImplementation(() => {});   // 틀린 PIN 은 asyncHandler 가 오류로 적는다 — 시험 로그를 어지럽히지 않게
+        const burst = await Promise.all(pins.map((password) => callRoute("post", "/login", { body: { phone: "01000000008", storeSlug: "hiq", password }, ip })));
+        // 앞의 다섯 건만 PIN 대조를 받았다(틀린 PIN 은 401)
+        for (const r of burst.slice(0, 5)) {
+            expect(r.statusCode).toBe(401);
+            expect(r.body).toMatchObject({ success: false, message: "INVALID_PASSWORD" });
+        }
+        // 나머지는 PIN 을 보지도 않았다 — 맞는 PIN 을 보낸 요청도 쿠키 없이 같은 429 다
+        for (const r of burst.slice(5)) {
+            expect(r.statusCode).toBe(429);
+            expect(r.cookies).toEqual({});
+            expect(r.body).toEqual(burst[5].body);
+        }
+        // 다섯 번 틀렸으니 잠겼다 — 맞는 PIN 도 받지 않는다
+        const locked = await callRoute("post", "/login", { body: { phone: "01000000008", storeSlug: "hiq", password: PIN }, ip });
+        expect(locked.statusCode).toBe(429);
+        expect(locked.cookies).toEqual({});
+    });
+
+    it("한 건씩 오는 로그인은 예전과 같다 — 네 번 틀린 뒤 다섯 번째에 맞히면 들어온다", async () => {
+        mem.state.profiles.push({ id: "pq", nickname: "큐", phone: "01000000009", password: PIN });
+        mem.state.members.push({ id: "pinned-ok", profileId: "pq", storeId: "hiq-store", phone: "01000000009", name: "큐" });
+        const ip = "198.51.100.7";
+        // PIN 없이 번호만 — PIN 을 묻는다(자리를 잡았다 놓는다)
+        const ask = await callRoute("post", "/login", { body: { phone: "01000000009", storeSlug: "hiq" }, ip });
+        expect(ask.body.data).toMatchObject({ isNew: false, requiresPassword: true });
+        vi.spyOn(console, "error").mockImplementation(() => {});
+        for (let n = 0; n < 4; n++) {
+            expect((await callRoute("post", "/login", { body: { phone: "01000000009", storeSlug: "hiq", password: `000${n}` }, ip })).statusCode, String(n)).toBe(401);
+        }
+        const ok = await callRoute("post", "/login", { body: { phone: "01000000009", storeSlug: "hiq", password: PIN }, ip });
+        expect(ok.statusCode).toBe(200);
+        expect(ok.cookies.hiq_user_id).toBe("pinned-ok");
+    });
+
     it("가입·PIN 재설정 입구도 자리표시자를 400 으로 끊는다", async () => {
         const register = await callRoute("post", "/register", { body: { phone: "social:kakao:5555555555", name: "선점", storeId: "global-store" } });
         expect(register.statusCode).toBe(400);
@@ -1424,6 +1482,38 @@ describe("라우트 동작 — POST·DELETE /social/kakao/link (연결·해제)"
         expect(r.statusCode).toBe(409);
         expect(r.body.code).toBe("KAKAO_SIGNUP_ACCOUNT");
         expect(mem.state.profiles[2].kakaoSub).toBe("900");
+    });
+
+    // 2026-10-06 검토: PIN 대조(DB · bcrypt)는 기다리는 일이다 — 자리 잡기가 그 뒤에 있거나(연결) 아예 없을 때(해제)는
+    // 한꺼번에 온 요청이 전부 '안 잠김'으로 통과해 PIN 답을 받았다. 세 길(웹 연결·해제·앱 안 연결)이 같은 키를 쓰므로 하나라도 열려 있으면 PIN 이 드러난다.
+    it("한꺼번에 몰려온 연결·해제 요청도 PIN 대조는 다섯 건까지만 받는다 — 묶음으로 PIN 을 맞혀 볼 수 없다", async () => {
+        mem.state.members.push(
+            { id: "link-burst", profileId: "pa", storeId: "hiq-store", phone: "01000000001" },
+            { id: "unlink-burst", profileId: "pl", storeId: "hiq-store", phone: "01000000004" },
+        );
+        const f = fakeFetch({ me: () => json(200, { id: 100 }) });
+        // 서른 건을 한꺼번에 — 스물한 번째에 맞는 PIN 을 섞는다
+        const pins = Array.from({ length: 30 }, (_, i) => (i === 20 ? PIN : String(1000 + i)));
+        const bursts = {
+            link: await Promise.all(pins.map((pin) => callRoute("post", "/social/kakao/link", { body: { code: CODE, redirectUri: REDIRECT, pin }, userId: "link-burst" }))),
+            unlink: await Promise.all(pins.map((pin) => callRoute("delete", "/social/kakao/link", { body: { pin }, userId: "unlink-burst" }))),
+        };
+        for (const [name, burst] of Object.entries(bursts)) {
+            expect(burst.slice(0, 5).map((r) => r.body.code), name).toEqual(Array(5).fill("KAKAO_PIN_WRONG"));
+            // 나머지는 PIN 을 보지도 않았다 — 맞는 PIN 을 보낸 요청도 틀린 요청과 답이 같아 구분되지 않는다
+            for (const r of burst.slice(5)) {
+                expect(r.statusCode, name).toBe(429);
+                expect(r.body, name).toEqual(burst[5].body);
+            }
+        }
+        // 카카오를 부르지 않았고, 붙지도 떼어지지도 않았다
+        expect(f).not.toHaveBeenCalled();
+        expect(mem.state.profiles[0].kakaoSub).toBeNull();
+        expect(mem.state.profiles[3].kakaoSub).toBe("400");
+        // 다섯 번 틀렸으니 잠겼다 — 맞는 PIN 도 받지 않는다
+        expect((await callRoute("post", "/social/kakao/link", { body: { code: CODE, redirectUri: REDIRECT, pin: PIN }, userId: "link-burst" })).statusCode).toBe(429);
+        expect((await callRoute("delete", "/social/kakao/link", { body: { pin: PIN }, userId: "unlink-burst" })).statusCode).toBe(429);
+        expect(mem.state.profiles[3].kakaoSub).toBe("400");
     });
 
     it("해제는 카카오 키가 없어도 된다(카카오를 부르지 않는다) — 연결은 503", async () => {

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <!-- 카카오계정 로그인(커스텀 탭)에서 앱으로 돌아오는 주소 kakao{네이티브 앱 키}://oauth 를 받는 SDK 화면.
+             ${kakaoScheme} 은 이 플러그인의 build.gradle 이 android/kakao.properties 의 키로 채운다(앱 매니페스트는 안 고친다).
+             카카오톡 간편로그인은 이 필터를 타지 않는다(SDK 가 카카오톡을 결과 받는 화면으로 직접 띄운다).
+             카카오톡 설치 여부 확인용 <queries>(com.kakao.talk)는 SDK(v2-common) 매니페스트가 넣는다. -->
+        <activity
+            android:name="com.kakao.sdk.auth.AuthCodeHandlerActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:host="oauth" android:scheme="${kakaoScheme}" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

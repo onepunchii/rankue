@@ -11,7 +11,7 @@ import { useStore } from "@/contexts/StoreContext";
 import { PinResetDialog } from "@/components/hiq/PinResetDialog";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import SocialLogin, { socialLoginAvailable } from "@/components/hiq/SocialLogin";
-import { kakaoLoginAvailable, kakaoLoginOpen } from "@/lib/kakaoLogin";
+import { kakaoLoginAvailable, kakaoLoginOpen, kakaoNativeAvailable } from "@/lib/kakaoLogin";
 import { isNativeApp } from "@/lib/nativeBridge";
 
 export default function Landing() {
@@ -65,9 +65,9 @@ export default function Landing() {
     });
 
     // 첫 화면에 무엇을 먼저 보여 줄까(2026-10-05 오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플").
-    //  - 한국어 + 웹 + 카카오 가능(kakaoFirst): 소셜 묶음(카카오·구글·애플)이 먼저, 그 아래 작은 글씨 "전화번호로 로그인".
-    //    전화번호 길은 기존 회원·매장에서 등록한 회원이 쓰므로 없애지 않는다.
-    //  - 한국어인데 카카오가 안 되는 곳(앱 안·키 없음)과 매장 화이트라벨(?store=·매장 주소) 진입: 예전 그대로 전화번호가 먼저.
+    //  - 한국어 + 카카오 가능(kakaoFirst — 웹, 그리고 네이티브 카카오 플러그인이 든 새 앱 1.3~): 소셜 묶음(카카오·구글·애플)이 먼저,
+    //    그 아래 작은 글씨 "전화번호로 로그인". 전화번호 길은 기존 회원·매장에서 등록한 회원이 쓰므로 없애지 않는다.
+    //  - 한국어인데 카카오가 안 되는 곳(플러그인 없는 앱 1.2 이하·키 없음)과 매장 화이트라벨(?store=·매장 주소) 진입: 예전 그대로 전화번호가 먼저.
     //  - 그 외 언어: 예전 그대로 구글·애플이 먼저, 소셜을 못 쓰면(키 미배포) 전화로.
     //  PIN 확인 단계는 항상 전화 카드.
     // 매장 진입에서는 카카오 단추 자체를 두지 않는다(2026-10-05 검토): 카카오에 다녀오면 매장 표시(?store=)가 사라져
@@ -78,9 +78,10 @@ export default function Landing() {
     // 전화 카드 아래에 소셜 묶음을 둘 수 있는가 — 매장 진입은 카카오를 세지 않는다(구글 키 없이 카카오만 있는 배포에서
     // '또는' 줄만 그려지고 아래가 비는 것을 막는다).
     const socialBelowPhone = socialLoginAvailable(storeEntry ? undefined : locale);
-    // 스토어 앱 안의 한국어 화면: 앱에는 카카오 단추가 없다(웹뷰가 카카오로 못 넘어간다). 웹에서 카카오로 가입한 사람이
-    // 여기서 전화번호나 구글을 누르면 **새 계정**이 만들어져 기록이 갈린다 — 누르기 전에 한 줄로 알린다(2026-10-05 검토).
-    const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp();
+    // 스토어 앱 안의 한국어 화면인데 **이 바이너리에 카카오 단추가 없다**(플러그인이 없는 1.2 이하 — 웹뷰가 카카오로 못 넘어간다).
+    // 웹에서 카카오로 가입한 사람이 여기서 전화번호나 구글을 누르면 **새 계정**이 만들어져 기록이 갈린다 — 누르기 전에 한 줄로 알린다(2026-10-05 검토).
+    // 새 바이너리(1.3~)는 네이티브 카카오 단추가 있어 이 안내를 띄우지 않는다(2026-10-06 — kakaoNativeAvailable).
+    const kakaoWebOnlyHint = kakaoLoginOpen() && locale === "ko" && isNativeApp() && !kakaoNativeAvailable();
 
     // 이미 로그인했는지 확인. 결과가 나오기 전까지는 로그인 폼을 그리지 않는다 —
     // 예전에는 확인을 기다리지 않고 폼부터 렌더해서, 앱을 열 때마다 "휴대폰 번호 입력"
@@ -261,7 +262,7 @@ export default function Landing() {
                     </motion.div>
                 </div>
 
-                {/* Input Area — 한국어 웹: 카카오·구글·애플 / 한국어 앱·매장 진입: 전화번호 / 그 외 언어: 구글·애플 */}
+                {/* Input Area — 한국어 웹·새 앱(카카오 플러그인 있음): 카카오·구글·애플 / 카카오가 안 되는 앱·매장 진입: 전화번호 / 그 외 언어: 구글·애플 */}
                 {!showPhone ? (
                     <div className="px-7 py-10 flex flex-col items-center gap-6">
                         <div className="w-full max-w-[320px] flex flex-col">
