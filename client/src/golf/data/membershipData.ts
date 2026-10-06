@@ -107,22 +107,29 @@ export const getPriceRange = (variants: MembershipItem[]): string => {
     return `${formatPrice(min)} ~`;
 };
 
-// 시세 변동 상태 계산 (모의 데이터 - 실제로는 API에서 가져와야 함)
-export const calculateTrend = (id: string) => {
-    const seed = parseInt(id) || 1;
-    const isUp = seed % 3 !== 0;
-    const isFlat = seed % 7 === 0;
+/**
+ * 등락(▲▼·%·'전일대비')은 이 자료로 말할 수 없다 — 한 번 모은 정적 자료라 전일 값이 없다.
+ * 예전엔 종목 id 로 방향과 %를 지어내는 함수가 여기 있었고 목록·상세·'급상승' 칩이 그걸 그렸다. 2026-10-06 에 뺐다.
+ * 실제 전일 대비가 필요하면 서버의 TGM 시세(golf_membership_prices.change — 골프장 페이지가 쓰는 값)를 받아 온다.
+ */
 
-    const status = isFlat ? "FLAT" : (isUp ? "UP" : "DOWN");
-    const rate = isFlat ? 0 : (0.3 + (seed % 20) / 10);
-    const change = isFlat ? "0.0%" : `${rate.toFixed(2)}%`;
+/**
+ * 이 시세 자료(crawledMembershipData.ts)를 만든 날 — 그 파일 머리말 `// Date:` 를 한국 날짜로 옮긴 값이다.
+ * 종목별 기준일은 원본에 없다. 그래서 화면에는 "○○ 자료 기준"으로만 적는다.
+ * 자료를 다시 만들면 이 값도 같이 바꾼다(머리말과 다르면 membershipScreens.test.ts 가 실패한다).
+ * 모르면 null — 화면은 날짜를 그리지 않는다(지어내지 않는다).
+ */
+export const MEMBERSHIP_DATA_DATE: string | null = "2026-02-15";
 
-    return {
-        status,
-        change: status === "UP" ? `+${change}` : (status === "DOWN" ? `-${change}` : change),
-        changeRate: rate
-    };
+/** "2026-02-15" → "2026.02.15 자료 기준". 값이 없거나 날짜 모양이 아니면 null(그리지 않는다). */
+export const membershipAsOfLabel = (date: string | null | undefined = MEMBERSHIP_DATA_DATE): string | null => {
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+    return `${date.replace(/-/g, '.')} 자료 기준`;
 };
+
+/** 자료에 실제로 있는 금액만 — 0·빈 값·이상한 값은 '없다'(null)로 본다. 화면은 null 인 칸을 그리지 않는다. */
+export const realPrice = (value: unknown): number | null =>
+    typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : null;
 
 // 신규 분양 목록 (기존 유지)
 export const PRESALE_LIST = [

@@ -7,13 +7,14 @@ import { insertGolfBookingSchema, GolfBooking, insertGolfJoinSchema, GolfJoin, i
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { requireTermsAccepted } from "../../middleware/terms.js";
+import { checkContent } from "../../utils/contentFilter.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { notifyCrewChat } from "../../services/crewChatNotify.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { z } from "zod";
 import { notificationService } from "../../services/notificationService.js";
 import { notifyListingAlerts } from "../../services/golfCourseWatch.js";
-import { JOIN_TYPES, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, convertibleSeats, conversionSlots, recruitCondition, listingCapacity, type JoinType, type SlotGender } from "../../../shared/golfJoin.js";
+import { JOIN_TYPES, JOIN_OPTIONS, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, convertibleSeats, conversionSlots, recruitCondition, listingCapacity, type JoinType, type SlotGender } from "../../../shared/golfJoin.js";
 import { msg } from "../../lib/i18n.js";
 import { getGolfFootprints } from "../../storage/golfFootprints.js";
 import { parseFootprintYear } from "../../../shared/golfFootprints.js";
@@ -43,9 +44,11 @@ router.get("/bookings", asyncHandler(async (req: AuthRequest, res: any) => {
     }
     const date = req.query.date as string | undefined;
     if (!validDate(date) || !validDate(req.query.startDate) || !validDate(req.query.endDate)) return sendError(res, 400, "날짜가 올바르지 않아요");
-    // 화면 질의를 그대로 필터로 넘기되, 서버 전용 키(ownerId·includeBlinded·limit)는 지운다 — 남의 글 목록이나 가려진 글을 못 꺼내게.
-    const { ownerId: _o, includeBlinded: _b, limit: _l, sinceDays: _s, ...filters } = req.query as Record<string, unknown>;
-    const bookings = await storage.getGolfBookings(date, filters);
+    // 화면 질의를 그대로 필터로 넘기되, 서버 전용 키(ownerId·includeBlinded·limit·viewerId)는 지운다 — 남의 글 목록이나 가려진 글을 못 꺼내게.
+    const { ownerId: _o, includeBlinded: _b, limit: _l, sinceDays: _s, viewerId: _v, ...filters } = req.query as Record<string, unknown>;
+    // 보는 사람(viewerId)은 **로그인 id 로만** 넣는다 — 나와 차단 관계인 사람(내가 차단했든, 나를 차단했든)의 글을 목록에서 뺀다(2026-10-06, Apple 1.2 · Play UGC).
+    // 질의 문자열의 viewerId 는 위에서 버렸고, 여기서 뒤에 적어 한 번 더 덮는다(남의 차단 목록으로 걸러 보지 못하게).
+    const bookings = await storage.getGolfBookings(date, { ...filters, viewerId: req.userId });
     return sendSuccess(res, await withTeeWeather(await withJoinCounts(bookings as any[], req.userId)));
 }));
 
@@ -56,7 +59,9 @@ router.get("/bookings/counts", asyncHandler(async (req: any, res: any) => {
     }
     if (!validDate(startDate) || !validDate(endDate)) return sendError(res, 400, "날짜가 올바르지 않아요");
     // 필터를 그대로 넘긴다 — 예전엔 안 넘겨서 날짜 칩이 "12개" 라고 하는데 목록엔 2개만 있었다(2026-09-09 검토).
-    const counts = await storage.getGolfBookingCounts(startDate as string, endDate as string, viewType as string, req.query);
+    // 차단도 목록과 **같이** 건다 — 목록에서는 빠지는데 날짜 칩 숫자에는 남으면 "3건"을 열어 2건을 본다.
+    // viewerId 는 질의 뒤에 적는다: 질의 문자열로 덮어쓸 수 없다.
+    const counts = await storage.getGolfBookingCounts(startDate as string, endDate as string, viewType as string, { ...req.query, viewerId: req.userId });
     return sendSuccess(res, counts);
 }));
 
@@ -112,7 +117,14 @@ async function urgentTargets(ownerId: string): Promise<string[]> {
     const hour = kstHour(Date.now());
     if (hour < URGENT_PUSH_FROM_HOUR || hour >= URGENT_PUSH_UNTIL_HOUR) return [];
     if (await storage.notifs.hasRecentGolfUrgent(ownerId, URGENT_QUIET_HOURS)) return [];
-    return storage.notifs.listGolfPushMembers([ownerId], URGENT_BROADCAST_LIMIT);
+    // 올린 사람과 차단 관계(어느 쪽이 걸었든)인 회원은 뺀다(2026-10-06). 그 사람 목록에서는 이 글이 빠지므로(notBlockedByViewer)
+    // 푸시가 가면 눌러도 글이 없다 — 차단한 사람의 글이 푸시로 다시 찾아오는 것이기도 하다.
+    // 여기서 빠진 사람은 관심·지역 알림에서도 빠진다(golfCourseWatch.notBlocked) — 어느 길로도 받지 않는다.
+    const [ids, blocked] = await Promise.all([
+        storage.notifs.listGolfPushMembers([ownerId], URGENT_BROADCAST_LIMIT),
+        storage.golf.blockPeerIds(ownerId),
+    ]);
+    return blocked.size ? ids.filter((id) => !blocked.has(id)) : ids;
 }
 
 async function broadcastUrgentJoin(ownerId: string, b: any, pre?: string[]): Promise<number> {
@@ -139,7 +151,41 @@ async function broadcastUrgentJoin(ownerId: string, b: any, pre?: string[]): Pro
     return targets.length;
 }
 
-router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+/**
+ * 조인·부킹 글에서 남에게 그대로 보이는 자유 입력 칸(2026-10-06). 길이만 자르고 내용은 보지 않아
+ * 욕설·내기 권유가 걸러지지 않고 올라갔다 — 약관 5조("금전 내기·욕설 … 표현은 올리기 전에 자동으로 걸러지고")와 실제가 달랐다.
+ * 한 칸씩 따로 본다: 이어 붙여 보면 칸 경계가 붙어("…시" + "발렛…") 멀쩡한 글이 걸린다.
+ * region·courseType 도 본다 — 화면은 골프장 원장의 값을 보내지만 API 로는 아무 글자나 실을 수 있고,
+ * 카드·채팅방 고정 카드·긴급 조인 푸시 제목에 그대로 나온다(이 두 칸에 실으면 필터를 건너뛸 수 있었다).
+ */
+const LISTING_TEXT_FIELDS = ["comment", "policyCustomText", "blindName", "venueName", "joinCondition", "courseName", "region", "courseType"] as const;
+
+/**
+ * 글에 달 수 있는 옵션 id — 부킹 시트의 여섯(client/src/golf/constants/booking.ts SPECIAL_OPTIONS)과 조인 시트의 JOIN_OPTIONS.
+ * 카드는 모르는 id 를 **글자 그대로** 칩으로 그린다. 그래서 목록에 없는 값은 저장하지 않는다 — 아무 문장이나 칩으로 올릴 수 없게.
+ * 화면에 옵션을 더하면 여기도 더한다(shared/golfListingSafety.test 가 두 목록이 맞는지 본다).
+ */
+const LISTING_OPTION_IDS: ReadonlySet<string> = new Set(["couple_2", "player_3", "no_caddie", "marshal", "meal_inc", "cart_free", ...JOIN_OPTIONS.map((o) => o.id)]);
+function listingOptions(v: unknown): string[] {
+    if (!Array.isArray(v)) return [];
+    return Array.from(new Set(v.filter((o): o is string => typeof o === "string" && LISTING_OPTION_IDS.has(o))));
+}
+
+/** 걸리면 그 이유(서버 문구), 통과하면 null. 규칙은 contentFilter 의 "listing" 맥락 — 거래·가격 말은 통과, 내기·욕설만 막는다. */
+function listingTextBlock(fields: Record<string, unknown>): string | null {
+    for (const k of LISTING_TEXT_FIELDS) {
+        const v = fields[k];
+        if (typeof v !== "string" || !v) continue;
+        const f = checkContent(v, { context: "listing" });
+        if (f.blocked) return f.reason ?? "부적절한 표현이 포함되어 있습니다.";
+    }
+    return null;
+}
+
+// requireTermsAccepted: 약관에 동의하지 않은 회원과 **정지된 계정**을 함께 막는다(server/middleware/terms.ts).
+// 예전엔 requireAuth 뿐이라, 운영자가 정지시킨 사람도 30일짜리 쿠키로 조인·부킹 글을 계속 올렸다(2026-10-06).
+// 화면은 따로 안 고쳐도 된다 — TERMS_REQUIRED 로 거절되면 전역 안전망(TermsConsent)이 동의 시트를 띄운다.
+router.post("/bookings", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     // 신원은 **서버가 정한다**. 예전엔 managerPhone 을 클라이언트가 보냈고 회원 id 컬럼도 없어서,
     // 남의 번호를 매니저로 박아 매물을 올릴 수 있었다 — 문의 전화는 그 사람에게 가고, 그 사람 목록에
     // 자기가 올린 적 없는 매물이 서고, 지울 수 있는 것도 그 사람뿐이었다(2026-09-09 검토).
@@ -198,11 +244,21 @@ router.post("/bookings", requireAuth, asyncHandler(async (req: AuthRequest, res:
             blindName: cut(rest.blindName, 30),
             joinCondition: cut(rest.joinCondition, 200),
             courseName: cut(rest.courseName, 60),
+            // 지역·코스 종류도 자른다(원장 값은 '경기'처럼 짧다). 옵션은 아는 id 만 남긴다 — 위 LISTING_OPTION_IDS.
+            region: cut(rest.region, 40),
+            courseType: cut(rest.courseType, 20),
+            options: listingOptions(rest.options),
             datetime: new Date(item.datetime),
             ownerId: req.userId,
             managerPhone: phone ?? "",
             sellerType: rest.listingType === "JOIN" ? null : sellerType,
         };
+
+        // 내용 필터(2026-10-06) — 잘라 낸 **저장될 글자 그대로** 본다. 걸리면 한 건도 넣지 않는다(위 '먼저 전부 검증' 규칙 그대로).
+        // 전화번호·링크 가리기(maskContacts)는 여기서 하지 않는다: 조인 글도 지금까지 하지 않았고,
+        // 매장·매니저 글의 연락처 공개는 정책으로 정해 둔 것이라 이 고침에서 바꾸지 않는다.
+        const blockedReason = listingTextBlock(data);
+        if (blockedReason) return sendError(res, 400, blockedReason);
 
         const validation = insertGolfBookingSchema.safeParse(data);
         if (!validation.success) {
@@ -318,14 +374,7 @@ router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest
     // 글과 함께 그 방도 닫는다 — 안 지우면 아무도 못 들어가는 방의 메시지만 남는다(명단이 글에서 나오므로 전원 403).
     await storage.chat.deleteRoom(`listing:${req.params.id}`).catch((e) => console.error("[ListingRoomCleanup]", e));
     // 확정·대기 중이던 사람에게 알린다(2026-09-21) — 예전엔 글이 사라진 것을 아무도 몰랐다.
-    if (before && requesters.length > 0) {
-        const isJoin = before.listingType === "JOIN";
-        await Promise.allSettled(requesters.map((r) => notificationService.sendAndSaveNotification({
-            memberId: r.memberId, title: isJoin ? "조인 글이 내려갔어요" : "부킹 글이 내려갔어요",
-            body: `${r.status === "accepted" ? before.courseName : listingName(before)} ${teeText(before)} 글을 올린 분이 내렸어요.${r.status === "accepted" ? " 확정됐던 자리라 다시 찾아보셔야 해요." : ""}`,
-            category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list?view=${isJoin ? "JOIN" : "BOOKING"}` },
-        }).catch((e) => console.error("[GolfJoinNotify]", e))));
-    }
+    await notifyListingTakenDown(before, requesters);
     return sendSuccess(res, { success: true });
 }));
 
@@ -339,6 +388,9 @@ router.get("/bookings/:id", asyncHandler(async (req: AuthRequest, res: any) => {
     if (!UUID.test(req.params.id)) return sendError(res, 404, "티타임을 찾을 수 없어요");
     const booking: any = await storage.getGolfBooking(req.params.id);
     if (!booking || booking.isBlinded) return sendError(res, 404, "티타임을 찾을 수 없어요");
+    // 올린 사람이 나를 차단했으면 가려진 글과 **같은 답**(2026-10-06). 목록·개수(notBlockedByViewer)와 신청(apply)이 이미 그렇게 답한다 —
+    // 상세만 200 이면 "글은 보이는데 신청만 안 된다"로 차단당한 사실이 드러난다. 내 글은 해당 없다.
+    if (req.userId && booking.ownerId && booking.ownerId !== req.userId && await storage.crews.hasBlocked(booking.ownerId, req.userId)) return sendError(res, 404, "티타임을 찾을 수 없어요");
     const [withCounts] = await withJoinCounts([booking], req.userId);
     return sendSuccess(res, withCounts);
 }));
@@ -356,6 +408,12 @@ router.post("/bookings/:id/apply", requireAuth, asyncHandler(async (req: AuthReq
     const isJoin = booking.listingType === "JOIN";
     if (booking.ownerId && booking.ownerId === req.userId) return sendError(res, 400, isJoin ? "내가 올린 조인이에요" : "내가 올린 부킹이에요");
     if (new Date(booking.datetime).getTime() <= Date.now()) return sendError(res, 400, "이미 지난 티타임이에요");
+    // 올린 사람이 나를 차단했으면 신청을 받지 않는다(2026-10-06) — 차단한 사람의 이름이 신청자 목록과 푸시("○○님이 신청했어요")로
+    // 다시 찾아오면 차단이 반쪽이다. 답은 가려진 글과 **똑같이** 준다: "차단당했다"는 사실이 드러나면 안 된다.
+    // 그러려면 이 답 하나만 같아서는 안 된다 — 그 글은 차단당한 사람의 목록·날짜 칩 숫자(notBlockedByViewer, 양방향)와
+    // 상세(GET /bookings/:id)에서도 같이 빠진다. 여기는 주소를 직접 부른 경우의 마지막 문이다.
+    // 신청 행도 만들지 않고(아래 applyToJoin 전에 끊는다) 알림도 가지 않는다.
+    if (booking.ownerId && await storage.crews.hasBlocked(booking.ownerId, req.userId!)) return sendError(res, 404, "글을 찾을 수 없어요");
     // 부킹 예약 신청(2026-09-21 오너: "푸시로 승부") — 문자 대신 앱 안에서 신청→승인→확정. 인원 1~4.
     const headcount = isJoin ? 1 : Math.max(1, Math.min(4, Math.floor(Number(req.body?.headcount)) || 1));
 
@@ -393,6 +451,31 @@ function teeText(booking: { datetime: Date | string }): string {
     const d = new Date(booking.datetime);
     const k = new Date(d.getTime() + 9 * 3_600_000);
     return `${k.getUTCMonth() + 1}/${k.getUTCDate()} ${String(k.getUTCHours()).padStart(2, "0")}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+/**
+ * '글이 내려갔어요' — 그 글에 대기·확정 중이던 신청자에게 알린다(2026-09-21). 예전엔 글이 사라진 것을 아무도 몰랐다.
+ *
+ * 두 곳이 **같은 문구로** 쓴다(2026-10-06):
+ *  - 글 내리기(DELETE /bookings/:id) — 글이 지워진다.
+ *  - 탈퇴(member.ts DELETE /me) — 그 회원의 글이 가려진다(user.repo deleteAccount). 신청자에게는 같은 일이다:
+ *    글이 없어졌고, 확정이었다면 다시 찾아야 한다. **탈퇴했다는 사실은 싣지 않는다**(떠난 사람의 일을 알리지 않는다).
+ *
+ * 확정자에게는 실명(확정 때 이미 알려 준 이름), 대기자에게는 비공개 글이면 가명(listingName).
+ * 글이 없거나 알릴 사람이 없으면 아무 일도 하지 않는다. **던지지 않는다** — 알림 실패가 내리기·탈퇴를 실패로 만들면 안 된다.
+ * ⚠️ 부르는 쪽은 응답 **전에** await 한다 — 서버리스는 응답을 보내면 얼어붙어 기다리지 않은 푸시는 한 통도 안 나간다.
+ */
+export async function notifyListingTakenDown(
+    before: { listingType?: string | null; courseName: string; isBlind?: boolean | null; blindName?: string | null; datetime: Date | string } | null | undefined,
+    requesters: { memberId: string; status: string }[],
+): Promise<void> {
+    if (!before || requesters.length === 0) return;
+    const isJoin = before.listingType === "JOIN";
+    await Promise.allSettled(requesters.map((r) => notificationService.sendAndSaveNotification({
+        memberId: r.memberId, title: isJoin ? "조인 글이 내려갔어요" : "부킹 글이 내려갔어요",
+        body: `${r.status === "accepted" ? before.courseName : listingName(before)} ${teeText(before)} 글을 올린 분이 내렸어요.${r.status === "accepted" ? " 확정됐던 자리라 다시 찾아보셔야 해요." : ""}`,
+        category: "GOLF", type: "JOIN", pref: "golf", params: { url: `/golf/booking-list?view=${isJoin ? "JOIN" : "BOOKING"}` },
+    }).catch((e) => console.error("[GolfJoinNotify]", e))));
 }
 
 /**
@@ -716,7 +799,8 @@ async function withJoinCounts(rows: any[], userId?: string) {
 router.get("/joins", asyncHandler(async (req: AuthRequest, res: any) => {
     const date = req.query.date as string | undefined;
     if (!validDate(date)) return sendError(res, 400, "날짜가 올바르지 않아요");
-    const joins = await storage.getGolfJoins({ date, ...req.query });
+    // viewerId 는 질의 **뒤에** 적는다 — 내가 차단한 사람의 조인 글을 빼는 값이라 질의 문자열로 덮어쓸 수 없어야 한다(2026-10-06).
+    const joins = await storage.getGolfJoins({ date, ...req.query, viewerId: req.userId });
     return sendSuccess(res, await withTeeWeather(await withJoinCounts(joins as any[], req.userId)));
 }));
 

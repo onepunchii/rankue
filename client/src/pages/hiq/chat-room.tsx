@@ -11,6 +11,9 @@
  * 크루 방(2026-09-26 크루 채팅 1단계): + 에 "우리 크루" 줄(정모 만들기·투표·정산 요청·공지) — 크루 기능의 만들기 창을 그대로 열고,
  *   만든 정모·투표·공지를 카드로 붙인다(정산은 서버가 원래 카드를 올린다). 윗줄은 다가오는 정모 띠(없으면 예전 한 줄).
  *   정모·투표 카드는 크루 API 로 살아 있다 — 카드 안에서 참석·투표.
+ * 신고·차단(2026-10-06, 스토어 심사 1.2 — 9/21 채팅을 한 체계로 합치며 빠졌던 입구): 남의 말풍선 옆 ⋯(말풍선마다) · 길게 누르기 →
+ *   [신고] [차단하기]. 크루 방은 그 메시지를(crew_chat), 조인/부킹·1:1 방은 보낸 사람을(member) 신고한다. 문의 방은 뺀다.
+ *   차단하면 그 사람 글을 바로 걷는다. ⋯ 메뉴의 참여자 줄에서도 회원 신고·차단이 된다.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
@@ -23,7 +26,8 @@ import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { ChatRoom, type ChatMsg } from "@/components/hiq/chat/ChatRoom";
 import { cardKind } from "@/components/hiq/chat/ChatCard";
-import { ChatMenuSheet } from "@/components/hiq/chat/ChatMenuSheet";
+import { ChatMenuSheet, ChatReportSheet } from "@/components/hiq/chat/ChatMenuSheet";
+import { ReportDialog, useBlockMember, blockConfirmText, type ReportTargetType } from "@/components/hiq/community/ReportDialog";
 import { AttachSheet, type AttachItem, type CrewAttachItem } from "@/components/hiq/chat/attach/AttachSheet";
 import { MeetupBanner } from "@/components/hiq/chat/crew/MeetupBanner";
 import { NoticeComposeSheet } from "@/components/hiq/chat/crew/NoticeComposeSheet";
@@ -55,6 +59,23 @@ interface RoomInfo {
     lastReadAt?: string | null;
     /** 이 방 알림 꺼짐(크루는 크루 알림 설정의 채팅 스위치). */
     muted?: boolean;
+}
+
+/** 신고 창·차단에 넘길 대상. authorId 는 차단할 사람(= 메시지를 보낸 사람). */
+interface ChatReportTarget { targetType: ReportTargetType; targetId: string; crewId?: string; authorId: string; authorName?: string }
+
+/**
+ * 고른 메시지를 방 종류에 맞는 신고 대상으로 바꾼다(서버가 받는 타입에 맞춘다).
+ *  - 크루 방: **그 메시지**(crew_chat). 크루 신고 주소(POST /crews/:id/reports)가 이 크루의 메시지인지 확인한다.
+ *  - 조인/부킹·1:1 방: **보낸 사람**(member). 메시지 단위 신고 타입은 서버에 아직 없다 — 커뮤니티 신고 주소가 회원 신고를 받는다.
+ *  - 문의 방: 없음(null). 상대가 운영자라 신고·차단할 대상이 아니다.
+ * 보낸 사람이 없는 글(시스템 메시지)도 대상이 아니다.
+ */
+function reportTargetFor(room: Pick<RoomInfo, "kind" | "id" | "crewId">, msg: ChatMsg): ChatReportTarget | null {
+    if (room.kind === "support" || !msg.senderId) return null;
+    const author = { authorId: msg.senderId, authorName: msg.sender?.name };
+    if (room.kind === "crew") return { targetType: "crew_chat", targetId: msg.id, crewId: room.crewId ?? room.id, ...author };
+    return { targetType: "member", targetId: msg.senderId, ...author };
 }
 
 export default function ChatRoomPage() {
@@ -381,6 +402,27 @@ export default function ChatRoomPage() {
     // 방 종목: 서버가 준 sport, 없으면 조인·부킹 방은 골프, 그 밖은 지금 앱 모드.
     const attachSport: "BILLIARDS" | "GOLF" = d?.sport ?? (d?.kind === "listing" ? "GOLF" : currentSport === "GOLF" ? "GOLF" : "BILLIARDS");
     const canAttach = !!d && d.kind !== "support" && !!member;
+
+    // 신고·차단 — 문의 방은 뺀다(상대가 운영자다). 고른 남의 메시지 한 건을 잡아 두고 [신고] [차단하기] 시트를 띄운다.
+    // 시트·신고 창이 닫혀도 대상은 남겨 둔다 — 닫히는 동안에도 그려야 하고, 신고 창은 시트가 닫힌 뒤에 뜬다.
+    const canReport = !!d && d.kind !== "support" && !!member;
+    const [reportMsg, setReportMsg] = useState<ChatMsg | null>(null);
+    const [reportMenuOpen, setReportMenuOpen] = useState(false);
+    const [reportDialogOpen, setReportDialogOpen] = useState(false);
+    const reportTarget = canReport && reportMsg ? reportTargetFor(d, reportMsg) : null;
+    const openReport = useCallback((m: ChatMsg) => { setReportMsg(m); setReportMenuOpen(true); }, []);
+    // 차단 직후 그 사람 글을 바로 걷는다 — 서버도 차단한 사람 글은 안 주지만, 안 걷으면 다음 통째 동기화(최대 30초)까지 화면에 남는다.
+    const dropSender = useCallback((senderId: string) => setMessages((cur) => cur.filter((x) => x.senderId !== senderId)), []);
+    const blockSender = useBlockMember();
+    const askBlock = async () => {
+        if (!reportTarget) return;
+        const { authorId } = reportTarget; // 응답이 오는 사이 다른 메시지를 골라도 **차단한 그 사람** 글만 걷는다
+        if (!(await appConfirm({ message: blockConfirmText(t, reportTarget.targetType, reportTarget.authorName), tone: "danger", confirmText: t("community.blockMenu") }))) return;
+        blockSender.mutate(authorId, { onSuccess: () => { dropSender(authorId); setReportMenuOpen(false); } });
+    };
+    // 방을 옮기면(같은 컴포넌트가 재사용된다) 앞 방에서 고른 메시지를 버린다 — 새 방의 종류로 엉뚱하게 신고되지 않게.
+    useEffect(() => { setReportMsg(null); setReportMenuOpen(false); setReportDialogOpen(false); }, [key]);
+
     const pinned = useMemo(() => {
         if (!d) return null;
         if (d.kind === "listing" && b) {
@@ -455,6 +497,7 @@ export default function ChatRoomPage() {
                     messages={messages} meId={member?.id} onSend={send} onRetry={retry} onDelete={remove} onOpenCard={openCard}
                     onAttach={canAttach ? () => setAttachOpen(true) : undefined}
                     canDelete={(m) => !!member && (m.senderId === member.id || !!d?.canManage)}
+                    onReport={canReport ? openReport : undefined}
                     pinned={pinned} loading={loading || info.isPending} onSeen={markSeen}
                     hasOlder={hasOlder} loadingOlder={loadingOlder} onLoadOlder={loadOlder} roomKey={key}
                     readLineAt={readLineAt} unreadBy={unreadBy}
@@ -470,7 +513,29 @@ export default function ChatRoomPage() {
                     // 나가기는 1:1·소그룹만 — 크루는 탈퇴, 조인/부킹은 신청 취소라서 채팅 메뉴가 할 일이 아니다.
                     canLeave={d.kind === "dm"}
                     onToggleMute={(next) => void toggleMute(next)} onLeave={() => void leaveRoom()}
+                    // 참여자 줄의 회원 신고·차단 — 차단하면 그 사람 글을 이 방에서 바로 걷는다.
+                    reportable={canReport} onBlocked={dropSender}
                 />
+            )}
+            {canReport && (
+                <>
+                    <ChatReportSheet
+                        open={reportMenuOpen && !!reportTarget} onOpenChange={setReportMenuOpen}
+                        name={reportTarget?.authorName || t("community.thisUser")} busy={blockSender.isPending}
+                        onReport={() => { setReportMenuOpen(false); setReportDialogOpen(true); }}
+                        onBlock={() => void askBlock()}
+                    />
+                    {reportTarget && (
+                        // key — 고른 메시지가 바뀌면 앞에서 골라 둔 사유를 비운다.
+                        <ReportDialog
+                            key={`${reportTarget.targetType}:${reportTarget.targetId}`}
+                            open={reportDialogOpen} onOpenChange={setReportDialogOpen}
+                            targetType={reportTarget.targetType} targetId={reportTarget.targetId} crewId={reportTarget.crewId}
+                            targetAuthorId={reportTarget.authorId} targetAuthorName={reportTarget.authorName}
+                            onBlocked={() => dropSender(reportTarget.authorId)}
+                        />
+                    )}
+                </>
             )}
             {canAttach && (
                 <>

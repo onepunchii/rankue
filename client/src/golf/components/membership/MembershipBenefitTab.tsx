@@ -1,4 +1,4 @@
-import { LucideInfo, LucideCalendarDays, LucidePhone } from "lucide-react";
+import { LucideInfo } from "lucide-react";
 import { FAQSection } from "./FAQSection";
 import { formatMoney } from "@/lib/membershipUtils";
 
@@ -297,43 +297,9 @@ export function MembershipBenefitTab({ data }: MembershipBenefitTabProps) {
                 ))}
             </div>
 
-            {/* Reservation Guide */}
-            <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-white/5 space-y-4">
-                <div className="flex items-center gap-2 mb-2">
-                    <LucideCalendarDays className="w-5 h-5 text-[#64DD17]" />
-                    <h3 className="text-lg font-bold text-white">예약 방법 및 안내</h3>
-                </div>
-
-                <div className="space-y-4">
-                    <div className="flex items-start gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#64DD17] mt-2 shrink-0" />
-                        <div>
-                            <div className="text-sm font-bold text-white mb-1">예약 오픈 (Booking Open)</div>
-                            <div className="text-xs text-white/50 space-y-1">
-                                <p>• 주말 : 3주 전 화요일 09:00 오픈</p>
-                                <p>• 주중 : 4주 전 월요일 09:00 오픈</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-start gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
-                        <div className="w-1.5 h-1.5 rounded-full bg-amber-400 mt-2 shrink-0" />
-                        <div>
-                            <div className="text-sm font-bold text-white mb-1">위약 규정 (Cancellation)</div>
-                            <div className="text-xs text-white/50">
-                                <p>• 이용일 7일 전 17:00까지 취소 및 변경 가능</p>
-                                <p className="text-red-400/80 mt-1">* 이후 취소 시 위약금 발생 및 예약 정지</p>
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex items-center justify-between p-4 bg-white/5 rounded-xl border border-white/5">
-                        <div className="text-sm font-bold text-white">회원 예약실 문의</div>
-                        <a href={`tel:${data.phone}`} className="px-4 py-2 bg-[#64DD17]/10 text-[#64DD17] rounded-lg text-xs font-bold hover:bg-[#64DD17]/20 transition-colors flex items-center gap-2">
-                            <LucidePhone className="w-3 h-3" />
-                            {data.phone}
-                        </a>
-                    </div>
-                </div>
-            </div>
+            {/* 예약 안내 카드는 두지 않는다(2026-10-06) — 자료에 클럽별 예약·취소 규정이 없는데, 같은 요일·시각·취소 기한을
+                모든 골프·콘도 종목에 박아 그 클럽의 규정처럼 보여 주고 있었다. 자료에 클럽별 예약 조건 글이 있는 종목은 위 '이용 안내'·'요금 특이사항'에 그 글이 그대로 나온다.
+                같이 있던 예약실 전화 칩도 뺐다 — 이 분기(골프·콘도)는 자료에 전화번호가 없다. 연락 길은 화면 맨 아래 단추(MembershipActionFooter)가 맡는다. */}
 
             <FAQSection />
         </div>

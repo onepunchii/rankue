@@ -48,9 +48,20 @@ export default function AccountDelete() {
           <li>당구 경기 기록·RP 레이팅·랭킹 데이터 — 즉시 삭제</li>
           <li>업로드한 사진 — 즉시 삭제</li>
           <li>푸시 토큰 — 즉시 삭제</li>
+          {/* 골프(2026-10-06) — 아래 두 줄은 탈퇴 코드가 실제로 하는 일만 적는다.
+              글: server/storage/user.repo.ts deleteAccount(가리고 번호를 비운다), 사진: server/routes/modules/member.ts DELETE /me(행·파일 삭제).
+              코드를 바꾸면 이 문구도 같이 고친다(shared/golfListingSafety.test.ts 가 둘을 함께 본다). */}
+          <li>골프 조인·부킹 글 — 즉시 가려져 다른 회원에게 보이지 않고, 글에 표시되던 연락처는 즉시 삭제</li>
+          <li>골프 라운드 사진(골프장 페이지에 공개한 사진 포함) — 즉시 삭제</li>
         </ul>
 
         <h2 className="mt-8 text-lg font-bold">보관되는 데이터(예외)</h2>
+        {/* 라운드 기록은 지우지 않는다 — 회원 행이 '탈퇴회원'으로 남고(user.repo deleteAccount), 함께 친 라운드의 스코어카드
+            (golf_match_sessions.players)는 그때 이름을 그대로 담고 있다. 실제와 다르게 "삭제"라고 적지 않는다. */}
+        <p className="mt-2 text-sm text-gray-700">
+          골프 라운드 기록(타수)은 함께 친 사람의 스코어카드를 지키기 위해 삭제하지 않습니다. 계정
+          이름은 '탈퇴회원'으로 바뀌지만, 함께 친 라운드의 스코어카드에는 당시 이름이 남습니다.
+        </p>
         <p className="mt-2 text-sm text-gray-700">
           관계 법령에 따라 보존 의무가 있는 기록(예: 전자상거래 관련 거래 기록)은 해당
           법령이 정한 기간(최대 5년) 동안 다른 데이터와 분리하여 보관한 뒤 파기합니다. 그

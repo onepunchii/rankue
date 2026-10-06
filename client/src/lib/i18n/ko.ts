@@ -3270,6 +3270,8 @@ export const ko: Dict = {
   "chat.menu.leave": "나가기",
   "chat.menu.leaveDesc": "목록에서 사라지고 새 메시지도 오지 않아요",
   "chat.menu.leaveConfirm": "이 대화방에서 나갈까요? 목록에서 사라지고 새 메시지도 오지 않아요.",
+  "chat.report.title": "신고·차단",
+  "chat.report.of": "{name}님 신고·차단",
   "chat.actionFailed": "처리하지 못했어요",
   "common.cancel": "취소",
   "common.ok": "확인",

@@ -1,4 +1,4 @@
-import { LucideStar, LucideCamera, LucideCrown } from "lucide-react";
+import { LucideStar, LucideCamera } from "lucide-react";
 import { GolfBackButton } from "@/golf/components/common/GolfBackButton";
 
 interface MembershipHeroProps {
@@ -27,11 +27,9 @@ export function MembershipHero({ data, onBack }: MembershipHeroProps) {
             </div>
 
             <div className="absolute bottom-6 left-0 right-0 px-6 z-30 flex flex-col items-start gap-2">
+                {/* 선정 배지는 두지 않는다(2026-10-06) — 회원권 자료엔 선정 여부 값이 없는데 금색 배지가 조건 없이 붙어,
+                    콘도·휘트니스까지 모든 종목이 선정된 곳처럼 보였다. 골프장 페이지의 배지(CourseHero)는 실제 값으로 붙는다 — 그쪽은 그대로다. */}
                 <div className="flex items-center gap-2 opacity-90">
-                    <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-gradient-to-r from-amber-400 to-amber-600 shadow-[0_0_15px_rgba(251,191,36,0.3)]">
-                        <LucideCrown className="w-2.5 h-2.5 text-amber-950 fill-amber-950" />
-                        <span className="text-[8px] font-black text-amber-950 uppercase tracking-widest">RANKUE 60</span>
-                    </div>
                     <span className="text-[10px] font-bold text-white/50 uppercase tracking-[0.2em] border border-white/10 px-2 py-0.5 rounded backdrop-blur-md">{data.region}</span>
                 </div>
                 <h1 className="text-4xl font-black tracking-tighter drop-shadow-2xl text-white">

@@ -337,7 +337,8 @@ export const BookingCard = ({ item, expandedBookingId, onExpand, onReserve, onAp
             targetType="golf_booking"
             targetId={item.id}
             targetAuthorId={item.ownerId ?? undefined}
-            targetAuthorName={item.courseName}
+            // 작성자 이름은 넘기지 않는다 — 목록 응답에 올린 사람 이름이 없다. 예전엔 골프장 이름을 넘겨
+            // 차단 확인이 "남서울CC님을 차단할까요?"로 나왔다(2026-10-06). 비우면 '이 사용자'로 묻는다.
         />
         </>
     );

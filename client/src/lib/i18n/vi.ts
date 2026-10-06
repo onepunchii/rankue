@@ -3268,6 +3268,8 @@ const vi: Dict = {
   "chat.menu.leave": "Rời cuộc trò chuyện",
   "chat.menu.leaveDesc": "Rời khỏi danh sách và ngừng nhận tin",
   "chat.menu.leaveConfirm": "Rời phòng này? Phòng biến mất khỏi danh sách và không nhận tin mới.",
+  "chat.report.title": "Báo cáo hoặc chặn",
+  "chat.report.of": "Báo cáo hoặc chặn {name}",
   "chat.actionFailed": "Không thực hiện được",
   "common.cancel": "Hủy",
   "common.ok": "OK",

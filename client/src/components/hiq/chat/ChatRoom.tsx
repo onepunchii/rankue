@@ -6,9 +6,15 @@
  *  2) 폴링은 부르는 쪽이 `after`(마지막 메시지 시각)로 새 것만 받는다 — 여기서는 받은 목록을 그리기만 한다.
  *  3) 새 메시지가 오면 **아래를 보고 있을 때만** 내려간다. 위로 올려 옛 대화를 읽는 중에 끌어내리지 않는다.
  * 날짜가 바뀌면 사이에 날짜 줄, 같은 사람이 1분 안에 이어 보내면 이름·아바타를 생략한다. 시스템 메시지는 가운데 작은 글.
+ *
+ * 신고·차단 입구(2026-10-06, 스토어 심사 1.2 — 9/21 채팅을 한 체계로 합치며 빠졌던 것):
+ *  남의 글(내 글·시스템 글이 아닌 것)은 **그 말풍선 옆** ⋯ 로, 또는 길게 누르기·우클릭으로 onReport 를 부른다.
+ *  ⋯ 는 말풍선마다 있다 — 이름 줄에 하나만 두면 그 줄의 글은 묶음의 첫 글이라, 이어 보낸 글을 신고하려던 사람이
+ *  첫 글("안녕하세요")을 신고하게 된다(크루 방은 메시지 id 가 신고 대상이라 엉뚱한 글이 지워진다).
+ *  무엇을 신고할지(방 종류별 대상)와 메뉴·신고 창은 부르는 쪽(pages/hiq/chat-room)이 정한다 — 여기서는 입구만 그린다.
  */
-import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
-import { LucideSend, LucideLoader2, LucidePlus } from "lucide-react";
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { LucideSend, LucideLoader2, LucidePlus, LucideMoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT, type Locale } from "@/lib/i18n";
 import { ChatCard } from "./ChatCard";
@@ -39,6 +45,12 @@ interface Props {
     /** 길게 눌러 삭제(내 메시지·운영진). canDelete 가 true 인 메시지만 */
     onDelete?: (msg: ChatMsg) => void;
     canDelete?: (msg: ChatMsg) => boolean;
+    /**
+     * 남의 글에서 신고·차단을 연다(그 말풍선 옆 ⋯ · 길게 누르기 · 우클릭). 없으면 입구를 안 그린다 — 운영자 문의 방은 안 넘긴다.
+     * 넘어오는 msg 는 **누른 그 글**이다(묶음의 첫 글이 아니다).
+     * 지울 수 있는 글(canDelete — 크루 운영진이 보는 남의 글)의 길게 누르기는 예전대로 삭제이고, 그때도 ⋯ 는 신고·차단이다.
+     */
+    onReport?: (msg: ChatMsg) => void;
     /** 카드형 메시지(정산·부킹 공유·+ 로 붙인 카드)를 눌렀을 때 */
     onOpenCard?: (msg: ChatMsg) => void;
     /** 입력줄 왼쪽 "+"(2026-09-23 종목별 첨부). 없으면 단추를 안 그린다 — 운영자 문의 방은 안 넘긴다. */
@@ -102,12 +114,23 @@ const timeLabel = (iso: string, locale: Locale) => {
     return new Intl.DateTimeFormat(INTL_TAG[locale], { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(iso));
 };
 
-export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onOpenCard, onAttach, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey, readLineAt, unreadBy }: Props) {
+export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onReport, onOpenCard, onAttach, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey, readLineAt, unreadBy }: Props) {
     const { t, locale } = useT();
-    // 길게 누르기(600ms) → 삭제. 마우스에서는 우클릭도 같다.
+    /** 신고·차단을 걸 수 있는 글 — 보낸 사람이 있는 **남의** 글. 내 글과 시스템 글(보낸 사람 없음)은 아니다. */
+    const canReport = (m: ChatMsg) => !!onReport && !!meId && !!m.senderId && m.senderId !== meId && m.type !== "system";
+    // 길게 누르기(600ms): 지울 수 있는 글(내 글·운영진)은 삭제 — 예전 그대로. 그 밖의 남의 글은 신고·차단. 마우스에서는 우클릭도 같다.
     const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const holdStart = (m: ChatMsg) => { if (!onDelete || !canDelete?.(m)) return; holdRef.current = setTimeout(() => { holdRef.current = null; onDelete(m); }, 600); };
+    const holdStart = (m: ChatMsg) => {
+        const act = onDelete && canDelete?.(m) ? onDelete : canReport(m) ? onReport : undefined;
+        if (!act) return;
+        holdRef.current = setTimeout(() => { holdRef.current = null; act(m); }, 600);
+    };
     const holdEnd = () => { if (holdRef.current) { clearTimeout(holdRef.current); holdRef.current = null; } };
+    const onContext = (e: MouseEvent, m: ChatMsg) => {
+        e.preventDefault();
+        if (canDelete?.(m)) onDelete?.(m);
+        else if (canReport(m)) onReport?.(m);
+    };
     const [text, setText] = useState("");
     const [sending, setSending] = useState(false);
     const listRef = useRef<HTMLDivElement>(null);
@@ -210,10 +233,10 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                         {!mine && !grouped && <span className="mb-0.5 ml-1 text-[11.5px] font-medium text-ink-3">{m.sender?.name}</span>}
                                         <div className={cn("flex items-end gap-1.5", mine ? "flex-row-reverse" : "flex-row")}>
                                             {isCard(m) ? (
-                                                // 길게 누르기(삭제)는 카드 바깥 층이 받는다 — 카드 자체는 종류별 그림과 "열기" 만 안다.
+                                                // 길게 누르기(삭제·신고)는 카드 바깥 층이 받는다 — 카드 자체는 종류별 그림과 "열기" 만 안다.
                                                 <div
                                                     className="max-w-full"
-                                                    onPointerDown={() => holdStart(m)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => { e.preventDefault(); if (canDelete?.(m)) onDelete?.(m); }}
+                                                    onPointerDown={() => holdStart(m)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => onContext(e, m)}
                                                 >
                                                     {/* meId 는 매칭 대결 카드가 "내가 방장인가"를 가리는 데 쓴다 */}
                                                     <ChatCard msg={m} meId={meId} onOpen={onOpenCard ? () => onOpenCard(m) : undefined} />
@@ -221,7 +244,7 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                             ) : (
                                                 <span
                                                     onClick={() => { if (m.failed && onRetry) onRetry(m); }}
-                                                    onPointerDown={() => holdStart(m)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => { e.preventDefault(); if (canDelete?.(m)) onDelete?.(m); }}
+                                                    onPointerDown={() => holdStart(m)} onPointerUp={holdEnd} onPointerLeave={holdEnd} onContextMenu={(e) => onContext(e, m)}
                                                     className={cn(
                                                         "px-3 py-2 rounded-2xl text-[14px] leading-snug whitespace-pre-wrap break-words select-none",
                                                         mine ? "bg-brand text-brand-fg rounded-br-md" : "bg-surface-2 text-ink-1 rounded-bl-md",
@@ -234,11 +257,24 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                                 </span>
                                             )}
                                             {/* 내 말풍선에만, 아직 안 읽은 사람이 있을 때만 — 카카오톡의 그 숫자다. 시각 위에 작게 얹는다. */}
-                                            <span className="shrink-0 mb-0.5 flex flex-col items-end gap-0.5 leading-none">
+                                            <span className={cn("shrink-0 mb-0.5 flex flex-col gap-0.5 leading-none", mine ? "items-end" : "items-start")}>
                                                 {(() => {
                                                     const n = mine && !m.pending && !m.failed ? (unreadBy?.(m) ?? 0) : 0;
                                                     return n > 0 ? <span className="rk-num text-[10.5px] font-bold text-brand" aria-label={t("chat.unreadByN").replace("{n}", String(n))}>{n}</span> : null;
                                                 })()}
+                                                {canReport(m) && (
+                                                    // 신고·차단 입구 — 길게 누르기는 못 찾을 수 있어 늘 보이는 ⋯ 를 둔다. **말풍선마다**(이어 보낸 글에도) 시각 위에 둔다:
+                                                    // 누른 그 글(m)이 그대로 신고 대상이 된다. 그림은 24×20 으로 작게 — 시각 한 줄과 합쳐도 한 줄 말풍선 높이(35px)를 안 넘는다.
+                                                    // 누를 자리는 before 로 넓힌다: 가로 44px(왼쪽은 말풍선과의 틈 6px 까지만), 세로 40px.
+                                                    // 세로를 44px 로 못 채우는 까닭 — 이어 보낸 한 줄 말풍선은 41px 간격으로 쌓여서, 더 키우면 위아래 글의 ⋯ 와 겹쳐 다시 옆 글이 잡힌다.
+                                                    <button
+                                                        type="button" onClick={() => onReport?.(m)} aria-haspopup="dialog"
+                                                        aria-label={t("chat.report.of").replace("{name}", m.sender?.name || t("community.thisUser"))}
+                                                        className="relative w-6 h-5 rounded-full flex items-center justify-center text-ink-3 active:bg-surface-2 before:absolute before:-left-1.5 before:-right-3.5 before:-top-1 before:-bottom-4"
+                                                    >
+                                                        <LucideMoreHorizontal className="w-4 h-4" />
+                                                    </button>
+                                                )}
                                                 <span className="text-[10.5px] text-ink-4">{m.pending ? "…" : timeLabel(m.createdAt, locale)}</span>
                                             </span>
                                         </div>

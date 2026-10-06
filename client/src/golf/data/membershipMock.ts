@@ -1,31 +1,3 @@
-// Mock Reviews for "Course Info" tab - Synced with CourseDetail structure
-export const REVIEWS = [
-    {
-        id: 1,
-        user: "최정환",
-        tier: "싱글 골퍼",
-        date: "2026.01.24",
-        score: 82,
-        verified: true,
-        content: "역시 명불허전입니다. 페어웨이 관리 상태가 양탄자 수준이고, 그린도 잘 받아줍니다.",
-        ratings: { course: 5, green: 4, service: 5 },
-        specs: { speed: 2.8, fee: 250000, difficulty: "상" },
-        tags: ["#그린스피드빠름", "#페어웨이양탄자", "#그늘집맛집"]
-    },
-    {
-        id: 2,
-        user: "김프로",
-        tier: "세미프로",
-        date: "2026.01.10",
-        score: 75,
-        verified: true,
-        content: "그린 스피드가 2.8 이상 나와주네요. 난이도도 적당하고 코스 레이아웃이 정말 훌륭합니다.",
-        ratings: { course: 5, green: 5, service: 4 },
-        specs: { speed: 2.9, fee: 220000, difficulty: "중" },
-        tags: ["#전장김", "#벙커지옥"]
-    }
-];
-
 // FAQ 데이터 (관리자가 수정 가능)
 export const FAQ_LIST = [
     {

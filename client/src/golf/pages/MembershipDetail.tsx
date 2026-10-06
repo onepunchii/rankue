@@ -1,8 +1,7 @@
 import React, { useState } from 'react';
 import {
     LucideChevronDown,
-    LucideChevronRight,
-    LucideTrendingUp
+    LucideChevronRight
 } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { useRoute, useLocation } from 'wouter';
@@ -46,10 +45,6 @@ export default function MembershipDetail() {
     const commission = hybridData.currentPrice * hybridData.fees.commissionRate;
     const tax = hybridData.currentPrice * hybridData.fees.taxRate;
     const totalCost = hybridData.currentPrice + commission + tax + hybridData.fees.transfer;
-
-    // Trend UI Logic
-    const trendColor = hybridData.status === 'UP' ? 'text-red-500' : (hybridData.status === 'DOWN' ? 'text-blue-500' : 'text-white/40');
-    const trendBg = hybridData.status === 'UP' ? 'bg-red-500/10 border-red-500/20' : (hybridData.status === 'DOWN' ? 'bg-blue-500/10 border-blue-500/20' : 'bg-white/5 border-white/10');
 
     return (
         <div className="min-h-screen bg-[#050505] text-white font-sans pb-32 relative overflow-x-hidden">
@@ -151,18 +146,13 @@ export default function MembershipDetail() {
                         <LucideChevronRight className="text-white/20 group-hover:text-white/60 transition-colors" />
                     </div>
 
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                            <div className={cn("flex items-center gap-1.5 px-2 py-0.5 rounded-full border", trendBg)}>
-                                <LucideTrendingUp className={cn("w-3 h-3", trendColor, hybridData.status === 'DOWN' && "rotate-180")} />
-                                <span className={cn("text-xs font-bold", trendColor)}>
-                                    {hybridData.status === 'UP' ? '+' : (hybridData.status === 'DOWN' ? '-' : '')}
-                                    {formatSimple(hybridData.changeAmount)} ({hybridData.changeRate}%)
-                                </span>
-                            </div>
-                            <span className="text-[10px] text-white/30">전일대비</span>
-                        </div>
-                        <span className="text-[10px] font-bold text-[#64DD17]">실시간 시세 보기</span>
+                    {/* 등락 배지는 두지 않는다(2026-10-06) — 이 자료엔 전일 값이 없어 방향과 %를 지어내고 있었다.
+                        날짜는 자료 날짜를 알 때만 적는다. */}
+                    <div className="flex items-center justify-between gap-2">
+                        {hybridData.priceAsOfLabel && (
+                            <span className="text-[12px] text-[#FFFFFF66]">{hybridData.priceAsOfLabel}</span>
+                        )}
+                        <span className="ml-auto text-[12px] font-bold text-[#64DD17]">시세 보기</span>
                     </div>
                 </button>
 
@@ -181,7 +171,10 @@ export default function MembershipDetail() {
             </main>
 
             {/* 거래(매수/매도 주문)는 2026-09-09 오너 결정으로 뺐다 — 시세·코스 정보만 남긴다 */}
-            <MembershipActionFooter phone={hybridData.phone} />
+            {/* 하단 단추는 자료에 있는 연락 길 하나만 그린다(2026-10-06) — 번호가 있으면 전화, 없으면 홈페이지(새 창), 둘 다 없으면 그리지 않는다.
+                예전엔 번호 자리에 홈페이지 주소가 들어가 tel:http://… 로 걸렸다. 골프·콘도 종목은 자료에 번호가 없어 홈페이지로 나간다.
+                무엇을 그릴지는 MembershipActionFooter 가 정한다. */}
+            <MembershipActionFooter phone={hybridData.phone} homepage={hybridData.clubInfo.website} />
         </div>
     );
 }

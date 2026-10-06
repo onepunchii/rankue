@@ -15,6 +15,10 @@ import {
     golfRoundPhotos,
 } from "../../shared/schema.js";
 import { eq, and, desc, sql, lt, gte, inArray, isNull } from "drizzle-orm";
+import { reasonLabel } from "../lib/reportQueue.js";
+
+/** 신고 한 건의 상세(detail) 길이 상한 — 검토 중인 회원 신고에 다른 사유를 덧붙일 때 끝없이 자라지 않게 묶는다(한 번의 상세는 라우트가 500자로 자른다) */
+const REPORT_DETAIL_MAX = 1000;
 
 // 커뮤니티 리포지토리.
 // 원칙 1 — DTO에 phone 등 식별자를 절대 싣지 않는다: SELECT 컬럼을 항상 명시한다.
@@ -274,10 +278,51 @@ export class CommunityRepository {
     // 서로 다른 3인 신고 시 자동 블라인드 — 1인 운영이라 24시간 내 조치를 사람 기억으로
     // 못 지키니 시스템이 보장한다. 반환값의 autoBlinded로 라우트가 작성자에게
     // 즉시 알림 + 이의제기 안내를 보낸다 (담합·보복 신고 대응 세트).
+    //
+    // 회원 신고(member)만 **닫힌 신고를 다시 연다**(2026-10-06). 대상이 글이 아니라 '사람'이라, 같은 사람이 같은 회원을
+    // 다른 일로 다시 신고할 수 있다 — 채팅(조인/부킹·1:1 방)의 메시지 신고가 모두 회원 신고로 들어온다.
+    // 예전엔 (대상, 신고자) 한 줄이 이미 있으면 무시해서, 운영자가 앞 신고를 기각·조치한 뒤 다시 신고하면
+    // 화면은 "접수됐어요"인데 큐(pending 만 센다)에도 운영자 알림에도 아무것도 없었다.
+    //  - 옛 행이 닫힌 상태(actioned·dismissed)일 때만 pending 으로 되돌리고 사유·상세·시각을 새 값으로 바꾼다.
+    //    시각(created_at)이 지금이 되므로 큐의 '가장 오래 기다린 신고'와 운영자 알림의 '방금 들어온 신고'(2분 창)가 그대로 맞는다.
+    //  - 아직 pending 이면 상태·사유·시각은 **그대로 둔다** — 다시 누를 때마다 시각을 밀면 24시간 기한 시계가 뒤로 간다.
+    //    다만 사유가 다르면 그 줄의 상세(detail)에만 "[추가 신고] 사유" 한 줄을 덧붙인다(2차 검토). 채팅 신고는 운영자가 볼 원문이 없어
+    //    사유가 사실상 유일한 단서인데, 예전엔 두 번째 사유('욕설')가 통째로 버려져 운영자가 첫 사유('스팸')만 보고 닫을 수 있었다.
+    //    같은 사유를 다시 누르거나 이미 덧붙인 줄이면 아무것도 바꾸지 않는다. 운영자 알림은 예전처럼 없다(첫 신고 때 갔고 큐에 열려 있다).
+    //  - 앞선 판단(누가·언제·무엇으로 닫았나)은 hiq_moderation_actions 에 따로 쌓여 있어 덮이지 않는다.
+    //  - 글·댓글·사진 같은 콘텐츠 신고는 예전 그대로 동일인 중복을 무시한다(대상이 그 콘텐츠 하나라 다시 신고할 '다른 일'이 없다).
+    //  - 충돌 대상은 유일 제약 (target_type, target_id, reporter_id) 이다(shared/schema hiqReports, 운영 DB 에도 걸려 있다).
     async report(opts: { targetType: string; targetId: string; reporterId: string; reason: string; detail?: string }) {
-        await db.insert(hiqReports)
-            .values(opts as any)
-            .onConflictDoNothing(); // 동일인 중복 신고는 무시
+        if (opts.targetType === "member") {
+            // returning 은 새로 쓴 줄·다시 연 줄만 돌려준다 — 있는 줄이 pending 이면(setWhere 가 거짓) 0줄이다.
+            const written = await db.insert(hiqReports)
+                .values(opts as any)
+                .onConflictDoUpdate({
+                    target: [hiqReports.targetType, hiqReports.targetId, hiqReports.reporterId],
+                    set: { status: "pending", reason: opts.reason, detail: opts.detail ?? null, createdAt: sql`now()` },
+                    setWhere: sql`${hiqReports.status} <> 'pending'`,
+                })
+                .returning({ id: hiqReports.id });
+            if (!written.length) {
+                // 검토 중인 줄에 다른 사유로 다시 들어온 신고 — 상세에만 덧붙인다(상태·시각은 그대로, 운영자 화면은 줄바꿈 그대로 보여 준다).
+                // 길이는 묶어 둔다: 한 번의 상세는 라우트가 500자로 자르고, 덧붙인 줄까지 합쳐 REPORT_DETAIL_MAX 자.
+                const note = `[추가 신고] ${reasonLabel(opts.reason)}${opts.detail ? `: ${opts.detail}` : ""}`;
+                await db.update(hiqReports)
+                    .set({ detail: sql`left(concat_ws(chr(10), ${hiqReports.detail}, ${note}::text), ${sql.raw(String(REPORT_DETAIL_MAX))})` })
+                    .where(and(
+                        eq(hiqReports.targetType, "member"),
+                        eq(hiqReports.targetId, opts.targetId),
+                        eq(hiqReports.reporterId, opts.reporterId),
+                        eq(hiqReports.status, "pending"),
+                        sql`${hiqReports.reason} <> ${opts.reason}`,                           // 사유가 다를 때만
+                        sql`position(${note}::text in coalesce(${hiqReports.detail}, '')) = 0`, // 같은 덧붙임을 되풀이하지 않는다
+                    ));
+            }
+        } else {
+            await db.insert(hiqReports)
+                .values(opts as any)
+                .onConflictDoNothing(); // 동일인 중복 신고는 무시
+        }
 
         const [{ count }] = await db.select({ count: sql<number>`count(DISTINCT ${hiqReports.reporterId})::int` })
             .from(hiqReports)

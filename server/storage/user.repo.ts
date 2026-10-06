@@ -11,7 +11,8 @@ import {
     hiqCrews,
     hiqCrewMembers,
     hiqStores,
-    suggestions
+    suggestions,
+    golfBookings
 } from "../../shared/schema.js";
 import type {
     Profile,
@@ -21,6 +22,10 @@ import type {
 import { eq, desc, asc, and, or, ne, sql, gt, gte, inArray, isNull } from "drizzle-orm";
 import { pushTokenVariants } from "../services/pushNative.js";
 import { pickLoginMember } from "../lib/loginMember.js";
+import { isLoginPhone } from "../../shared/loginPhone.js";
+
+/** 탈퇴로 가려진 조인·부킹 글에 남기는 사유(blind_reason) — 어드민 '가린 이유' 칸에만 보인다. */
+const WITHDRAWN_LISTING_REASON = "탈퇴한 회원의 글";
 
 // SECURITY: 남에게 보이는 응답(랭킹·상대목록·검색·타인 프로필)은 반드시 이 화이트리스트로만 셀렉트한다.
 // hiqMembers를 통째로 select하면 phone과 정산 계좌(defaultAccount*)까지 API로 새어 나간다.
@@ -648,6 +653,27 @@ export class UserRepository {
             // 골프 관심 골프장·지역 알림 — 회원 행이 '탈퇴회원'으로 남아 FK cascade 가 돌지 않는다. 남겨 두면 떠난 사람에게 알림 행이 계속 쌓인다.
             await tx.execute(sql`delete from golf_course_watches where member_id = ${memberId}::uuid`);
             await tx.execute(sql`delete from golf_area_alerts where member_id = ${memberId}::uuid`);
+
+            // 골프 조인·부킹 글(2026-10-06) — **가리고**(is_blinded) 글에 복사돼 있던 **내 번호를 비운다**(manager_phone).
+            // 부킹 글을 올리면 계정 휴대폰이 글 행에 복사된다(golf.ts POST /bookings). 탈퇴는 회원 행의 번호만 `del-…` 로 바꿨고
+            // 글은 그대로 남아, 떠난 사람의 번호가 목록(매장 글)·확정자 화면·채팅방 정보로 계속 나갔다 —
+            // 탈퇴 안내(개인정보는 즉시 영구 삭제된다)와 실제가 달랐다.
+            //  - 지우지 않고 가린다: 신청 행·채팅방 열쇠(listing:<id>)가 이 id 에 걸려 있고, 가린 글은 목록·상세·내 신청에서 이미 빠진다.
+            //  - manager_phone 은 NOT NULL 이라 빈 문자열로 둔다(조인 글이 원래 "" 를 쓴다).
+            //  - 옛 글(2026-09-09 이전, owner_id 가 비어 있다)은 번호로 되짚는다 — 아래에서 회원 행을 익명화하기 **전에 읽은** 번호다.
+            //    소셜·탈퇴 자리표시자나 빈 값으로는 되짚지 않는다(빈 번호의 남의 옛 글까지 가려진다).
+            //  - 신고·운영자 조치로 이미 가려져 사유가 적힌 글은 그 사유를 남긴다(되짚을 기록이다).
+            const legacyPhone = isLoginPhone(member.phone) ? member.phone : null;
+            await tx.update(golfBookings)
+                .set({
+                    managerPhone: "",
+                    isBlinded: true,
+                    blindReason: sql`case when ${golfBookings.isBlinded} and ${golfBookings.blindReason} is not null then ${golfBookings.blindReason} else ${WITHDRAWN_LISTING_REASON} end`,
+                })
+                .where(or(
+                    eq(golfBookings.ownerId, memberId),
+                    legacyPhone ? and(isNull(golfBookings.ownerId), eq(golfBookings.managerPhone, legacyPhone)) : undefined,
+                ));
 
             // 2. 회원 행 익명화 — phone은 notNull+unique(storeId,phone)이라 고유 placeholder로 대체.
             //    레이팅/평균/방문 0 초기화로 랭킹·상대 검색에서 실질적으로 사라진다.

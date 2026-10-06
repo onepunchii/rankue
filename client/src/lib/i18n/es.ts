@@ -3268,6 +3268,8 @@ const es: Dict = {
   "chat.menu.leave": "Salir del chat",
   "chat.menu.leaveDesc": "Sale de tu lista y deja de llegar",
   "chat.menu.leaveConfirm": "¿Salir de este chat? Sale de tu lista y dejan de llegar mensajes.",
+  "chat.report.title": "Denunciar o bloquear",
+  "chat.report.of": "Denunciar o bloquear a {name}",
   "chat.actionFailed": "No se pudo completar",
   "common.cancel": "Cancelar",
   "common.ok": "Aceptar",

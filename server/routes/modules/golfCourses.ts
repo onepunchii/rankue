@@ -14,6 +14,11 @@
  *
  * 공개 글에는 연락처·글쓴이가 없다. **비공개(isBlind) 글은 아예 싣지 않는다** — 골프장 페이지에
  * 올리는 순간 가려 둔 골프장 이름이 드러난다.
+ *
+ * 차단(2026-10-06): **로그인한 사람**에게는 나와 차단 관계(내가 걸었든, 나를 걸었든)인 회원의 조인·부킹 글을 뺀다 —
+ * 글 목록·티타임 줄과 거기서 세는 숫자(글 수·다음 티타임) 모두. 회원용 목록(/golf/bookings·/joins)이 이미 그 글을 빼므로,
+ * 여기 남아 있으면 줄을 눌러 들어가도 목록에 글이 없다. 공용 캐시(loadSummary)는 건드리지 않고 **꺼낸 뒤에** 거른다(summaryFor).
+ * 비로그인·검색 로봇의 응답은 예전 그대로다.
  */
 import { Router } from "express";
 import { sql } from "drizzle-orm";
@@ -28,6 +33,7 @@ import { COURSE_GALLERY_LIMIT } from "../../../shared/golfPhoto.js";
 import { isNearbyKind, nearbySearchNames } from "../../../shared/golfAround.js";
 import { weatherPoint } from "../../../shared/golfWeatherZones.js";
 import { findLocalDish } from "../../../shared/golfLocalDish.js";
+import { summaryForViewer } from "../../lib/golfListingBlock.js";
 
 const router = Router();
 
@@ -53,7 +59,15 @@ type PageRow = {
     logo: string | null; grass: string[]; play: string[]; phone: string | null; website: string | null;
     feeFrom: number | null; popularity: number; aliases: string[];
 };
-type Summary = { pages: PageRow[]; bySlug: Map<string, PageRow>; byCourseId: Map<number, PageRow>; listings: (PublicListing & { slug: string })[]; top: Map<string, { price: number; change: number | null; label: string; asOf: string | null }>; watchers: Map<string, number>; at: number };
+type Summary = {
+    pages: PageRow[]; bySlug: Map<string, PageRow>; byCourseId: Map<number, PageRow>; listings: (PublicListing & { slug: string })[];
+    /**
+     * 글 id → 올린 회원 id. **서버 안에서만** 쓴다(차단 관계인 사람의 글을 보는 사람별로 빼는 데 — summaryFor).
+     * 글 객체(listings)에는 싣지 않는다: 그 객체가 그대로 공개 응답이 되어, 넣는 순간 글쓴이 id 가 비로그인 응답으로 나간다.
+     */
+    ownerOf: Map<string, string>;
+    top: Map<string, { price: number; change: number | null; label: string; asOf: string | null }>; watchers: Map<string, number>; at: number;
+};
 let cache: Summary | null = null;
 let inflight: Promise<Summary> | null = null;
 
@@ -68,7 +82,8 @@ async function loadSummary(): Promise<Summary> {
                          logo, grass, play, phone, website, fee_from, popularity, aliases
                   from golf_course_pages where slug <> '' and btrim(name) <> ''`),
             // 앞으로의 글만. 비공개·가려진 글은 뺀다. course_id 는 text 라 숫자만 캐스팅한다.
-            q(sql`select id, course_id, listing_type, join_type, datetime, green_fee, cost_mode, slots, options, seller_type, join_headcount, join_condition
+            // owner_id 는 차단 거르기용이다 — 아래에서 ownerOf 로만 옮기고 글 객체에는 싣지 않는다.
+            q(sql`select id, course_id, listing_type, join_type, datetime, green_fee, cost_mode, slots, options, seller_type, join_headcount, join_condition, owner_id
                   from golf_bookings
                   where datetime > now() and is_blinded = false and coalesce(is_blind, false) = false and course_id ~ '^[0-9]+$'
                   order by datetime asc limit 5000`),
@@ -99,6 +114,9 @@ async function loadSummary(): Promise<Summary> {
             l.isUrgent = isUrgentJoin(l, now);
             return l;
         }).filter(Boolean) as (PublicListing & { slug: string })[];
+        // 글 주인은 따로 둔다(글 객체에 넣지 않는다 — Summary.ownerOf 주석). owner_id 가 빈 옛 글은 주인을 몰라 빠진다.
+        const ownerOf = new Map<string, string>();
+        for (const b of bookings) if (b.owner_id) ownerOf.set(String(b.id), String(b.owner_id).toLowerCase());
         // 글마다 그 티타임의 날씨(2026-10-05) — 받아 둔 예보만 읽는다(기상청을 부르지 않는다). 못 읽어도 목록은 그대로 나간다.
         try {
             const { teeWeatherFor } = await import("../../services/golfWeather.js");
@@ -117,7 +135,7 @@ async function loadSummary(): Promise<Summary> {
             }
         }
         const watchers = new Map(watch.map((w) => [w.slug, w.n]));
-        cache = { pages, bySlug, byCourseId, listings, top, watchers, at: Date.now() };
+        cache = { pages, bySlug, byCourseId, listings, ownerOf, top, watchers, at: Date.now() };
         return cache;
     })().finally(() => { inflight = null; });
     return inflight;
@@ -125,6 +143,37 @@ async function loadSummary(): Promise<Summary> {
 /** 관심 등록·해제 뒤엔 숫자가 바로 보여야 한다. */
 function dropCache() { cache = null; }
 export { loadSummary as loadGolfCourseSummary };
+
+/**
+ * 보는 사람과 차단 관계인 회원 id(내가 차단한 사람 + 나를 차단한 사람) — 뺄 것이 있을 수 없으면 null(2026-10-06).
+ *
+ *  - 비로그인·검색 로봇(me 없음)은 **묻지 않는다**. 주인을 아는 글이 한 건도 없을 때도 묻지 않는다(뺄 글이 없다).
+ *    로그인한 사람에게만 hiq_blocks 를 한 번 읽는다 — 차단이 없으면 빈 집합이 오고 요약은 그대로 나간다.
+ *  - 못 읽으면 거르지 않고 내보낸다(로그만). 이 화면은 캐시로 뜨는 공개 자료라, 차단 조회 하나가 실패했다고
+ *    골프장 페이지 전체를 오류로 만들지 않는다. 이 줄에는 글쓴이 이름·자유 글이 없고(시각·그린피·자리 수),
+ *    눌러 들어간 회원용 목록·상세·신청은 각자 차단을 다시 본다(golf.repo notBlockedByViewer).
+ */
+async function blockedPeersOf(me: string | null, s: Summary): Promise<Set<string> | null> {
+    if (!me || s.ownerOf.size === 0) return null;
+    try {
+        const peers = await storage.golf.blockPeerIds(me);
+        return peers.size ? peers : null;
+    } catch (e) {
+        console.error("[GolfCourseBlocks]", e);
+        return null;
+    }
+}
+
+/**
+ * 이 요청에 내보낼 요약 — 공용 캐시에서 꺼낸 것을 **보는 사람에게 맞춰** 돌려준다(차단 관계인 회원의 글 제외).
+ * 캐시 객체는 고치지 않는다(lib/golfListingBlock 이 새 객체를 만든다). 뺄 글이 없으면 캐시 객체 그대로다 —
+ * 비로그인과 차단 관계가 없는 회원의 응답은 예전과 같다. 글이 붙은 숫자를 내보내는 라우트는 모두 이것을 쓴다:
+ * 한 곳만 거르면 목록에는 "조인 1" 인데 골프장 페이지를 열면 글이 없다.
+ */
+async function summaryFor(req: any): Promise<Summary> {
+    const s = await loadSummary();
+    return summaryForViewer(s, await blockedPeersOf(viewerId(req), s));
+}
 
 /** "이천" · "이천시" 둘 다 받는다(주소엔 짧은 꼴이 들어간다). */
 const cityMatch = (p: { city: string | null }, city?: string) => !city || p.city === city || cityShort(p.city) === city;
@@ -153,7 +202,7 @@ function listItem(s: Summary, p: PageRow, now: number) {
 
 // ── 목록 ───────────────────────────────────────────────────────────
 router.get("/", asyncHandler(async (req: any, res: any) => {
-    const s = await loadSummary(); const now = Date.now();
+    const s = await summaryFor(req); const now = Date.now();
     const region = typeof req.query.region === "string" ? req.query.region : undefined;
     const city = typeof req.query.city === "string" ? req.query.city : undefined;
     const intent = intentOf(req.query.intent);
@@ -168,8 +217,8 @@ router.get("/", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, items);
 }));
 
-router.get("/regions", asyncHandler(async (_req: any, res: any) => {
-    const s = await loadSummary(); const now = Date.now();
+router.get("/regions", asyncHandler(async (req: any, res: any) => {
+    const s = await summaryFor(req); const now = Date.now();
     const tree = new Map<string, { region: string; courses: number; counts: Record<GolfIntent, number>; cities: Map<string, { city: string; short: string; courses: number; counts: Record<GolfIntent, number> }> }>();
     for (const p of s.pages) {
         if (!tree.has(p.region)) tree.set(p.region, { region: p.region, courses: 0, counts: { booking: 0, join: 0, urgent: 0 }, cities: new Map() });
@@ -186,7 +235,8 @@ router.get("/regions", asyncHandler(async (_req: any, res: any) => {
 }));
 
 router.get("/listings", asyncHandler(async (req: any, res: any) => {
-    const s = await loadSummary(); const now = Date.now();
+    // 보는 사람에게 맞춘 요약 — 차단 관계인 회원의 글은 limit 로 자르기 **전에** 빠진다(빠진 글이 자리를 먹지 않게).
+    const s = await summaryFor(req); const now = Date.now();
     const region = typeof req.query.region === "string" ? req.query.region : undefined;
     const city = typeof req.query.city === "string" ? req.query.city : undefined;
     const intent = intentOf(req.query.intent);
@@ -213,7 +263,7 @@ router.get("/watches/mine", requireAuth, asyncHandler(async (req: AuthRequest, r
         select w.slug, w.filters, w.created_at, p.name, p.region, p.city
         from golf_course_watches w join golf_course_pages p on p.slug = w.slug
         where w.member_id = ${req.userId}::uuid order by w.created_at desc`);
-    const s = await loadSummary(); const now = Date.now();
+    const s = await summaryFor(req); const now = Date.now();
     return sendSuccess(res, ((r.rows ?? r) as any[]).map((w) => ({
         slug: w.slug, name: w.name, region: w.region, city: w.city, filters: w.filters ?? {},
         counts: countFor(s.listings.filter((l) => l.slug === w.slug), now),
@@ -258,13 +308,13 @@ router.delete("/alerts/:region", requireAuth, asyncHandler(async (req: AuthReque
 
 // ── 한 곳 ──────────────────────────────────────────────────────────
 router.get("/:slug", asyncHandler(async (req: any, res: any) => {
-    const s = await loadSummary(); const now = Date.now();
+    const shared = await loadSummary(); const now = Date.now();
     const slug = String(req.params.slug).normalize("NFC");
-    const p = s.bySlug.get(slug);
+    const p = shared.bySlug.get(slug);
     if (!p) return sendError(res, 404, "골프장을 찾을 수 없어요");
     const q = async (x: any) => { const r: any = await db.execute(x); return (r.rows ?? r) as any[]; };
     const me = viewerId(req);
-    const [prices, hist, rounds, mine, myTeeRows] = await Promise.all([
+    const [prices, hist, rounds, mine, myTeeRows, blocked] = await Promise.all([
         q(sql`select item_id, label, price, change, year_high, year_low, as_of from golf_membership_prices where slug = ${slug} order by price desc`),
         q(sql`select h.item_id, h.d, h.price from golf_membership_price_history h
               join golf_membership_prices m on m.item_id = h.item_id
@@ -281,7 +331,12 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
               and ((b.owner_id = ${me}::uuid and b.listing_type = 'JOIN')
                 or exists (select 1 from golf_join_requests r where r.booking_id = b.id and r.member_id = ${me}::uuid and r.status = 'accepted'))
             order by b.datetime asc limit 5`) : Promise.resolve([]),
+        // 나와 차단 관계인 회원(2026-10-06) — 로그인했을 때만 묻고, 위 질의들과 함께 읽는다. 비로그인은 null 이라 질의가 없다.
+        blockedPeersOf(me, shared),
     ]);
+    // 보는 사람에게 맞춘 요약(summaryFor 와 같은 일). 아래의 티타임 줄(listings)·그 수(counts)·가까운 골프장의 수(nearby)가
+    // 모두 이 s 에서 나온다 — 차단 관계인 회원의 글이 줄에서도 숫자에서도 같이 빠진다. 뺄 글이 없으면 s 는 공용 캐시 그대로다.
+    const s = summaryForViewer(shared, blocked);
     // 이력 — 1년치 일간이면 점이 300개를 넘는다. 차트에는 120점이면 충분하다(마지막 점은 반드시 남긴다).
     const byItem = new Map<string, { d: string; p: number }[]>();
     for (const h of hist) { const k = h.item_id; if (!byItem.has(k)) byItem.set(k, []); byItem.get(k)!.push({ d: String(h.d).slice(0, 10), p: h.price }); }

@@ -3268,6 +3268,8 @@ const tr: Dict = {
   "chat.menu.leave": "Sohbetten ayrıl",
   "chat.menu.leaveDesc": "Listenden çıkar, mesaj gelmez",
   "chat.menu.leaveConfirm": "Bu sohbetten ayrılsın mı? Listenden çıkar ve yeni mesaj gelmez.",
+  "chat.report.title": "Şikayet et veya engelle",
+  "chat.report.of": "{name} adlı kullanıcıyı şikayet et veya engelle",
   "chat.actionFailed": "İşlem tamamlanamadı",
   "common.cancel": "Vazgeç",
   "common.ok": "Tamam",

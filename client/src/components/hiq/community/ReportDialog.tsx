@@ -44,6 +44,17 @@ export const invalidateAfterBlock = (queryClient: QueryClient) => {
     queryClient.invalidateQueries({ queryKey: ["/api/hiq/community/blocks"] });
     // 라운드 사진(골프장 페이지·경기 앨범·사진첩) — 키 앞자리 "golf-photos" 하나로(golf/lib/photoApi.ts)
     queryClient.invalidateQueries({ queryKey: ["golf-photos"] });
+    // 골프 조인·부킹 목록과 날짜 칩 숫자(2026-10-06) — 서버가 차단한 사람의 글을 빼므로, 다시 받아야 카드가 바로 사라진다.
+    // 키 앞자리가 셋으로 갈린다(golf/hooks/useBookingData.ts): 부킹 목록·조인 목록·날짜별 개수. 개수 키는 부킹 키의 접두가 아니다.
+    queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/joins"] });
+    queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings/counts"] });
+    // 골프장 페이지의 티타임 줄·글 수(2026-10-06) — 서버가 차단 관계인 사람의 글을 빼므로 같이 다시 받는다.
+    // 날씨·근처(외부 검색)는 차단과 무관해 건드리지 않는다(golf/lib/courseApi.ts 의 키 둘째 칸).
+    const COURSE_KEYS_WITH_LISTINGS = ["list", "regions", "listings", "detail", "watches"];
+    queryClient.invalidateQueries({
+        predicate: (q) => q.queryKey?.[0] === "/api/hiq/golf-courses" && COURSE_KEYS_WITH_LISTINGS.includes(q.queryKey[1] as string),
+    });
 };
 
 // 차단 한 동작 — 신고 다이얼로그와 ⋯ 메뉴(UgcActionMenu)가 같이 쓴다

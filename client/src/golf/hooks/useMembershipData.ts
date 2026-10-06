@@ -4,8 +4,9 @@
 import { useMemo } from 'react';
 import {
     CRAWLED_MEMBERSHIPS,
-    calculateTrend,
     formatPrice,
+    realPrice,
+    membershipAsOfLabel,
     extractClubName,
     getClubVariants,
     extractVariantType,
@@ -14,6 +15,20 @@ import {
     CondoMembership,
     FitnessMembership
 } from '../data/membershipData';
+
+/**
+ * 홈페이지 주소 — 자료에 적힌 값 가운데 http(s) 로 시작하는 주소만 내보낸다(2026-10-06).
+ * 이 값은 링크의 href 로 나간다(클럽 정보의 웹사이트 줄, 전화번호가 없는 종목의 하단 '홈페이지 보기').
+ * 앞뒤 공백은 걷는다(자료에 끝 공백이 붙은 값이 있다). 다른 스킴·스킴 없는 글자·'-' 같은 빈 표시는 빈 값으로 돌려 링크를 그리지 않게 한다 —
+ * 주소를 짐작해 고쳐 쓰지 않는다.
+ * 호스트 끝이 최상위 도메인 꼴(영문 2~6자)이 아니면 빈 값이다 — 자료에 점이 빠진 값("http://www.seoseoulcokr")이 한 건 있어,
+ * 점 하나만 보던 예전 거름을 통과해 '홈페이지 보기'가 없는 호스트로 열렸다. IP 주소·user@ 꼴 호스트도 같이 걸러진다(자료에는 없다).
+ */
+export const membershipHomepage = (raw: unknown): string => {
+    if (typeof raw !== 'string') return '';
+    const url = raw.trim();
+    return /^https?:\/\/(?:[^\s/?#.:@]+\.)+[a-z]{2,6}(?::\d+)?(?:[/?#]\S*)?$/i.test(url) ? url : '';
+};
 
 
 export function useMembershipData(membershipId: string) {
@@ -26,10 +41,11 @@ export function useMembershipData(membershipId: string) {
     const currentVariantType = useMemo(() => extractVariantType(membership.name), [membership.name]);
 
     const hybridData = useMemo(() => {
-        const trend = calculateTrend(membership.id);
+        // 시세는 자료에 실제로 있는 값만 넘긴다: 현재가 · 연간 최고 · 연간 최저.
+        // 전일 대비·호가·추이는 이 자료에 없다 — 예전엔 여기서 지어냈고(id 로 만든 등락, 현재가 ±500만 '호가', 고정 추이 배열) 2026-10-06 에 뺐다.
         const currentPrice = membership.price.current;
-        const changeRate = typeof trend.changeRate === 'string' ? parseFloat(trend.changeRate) : trend.changeRate;
-        const changeAmount = Math.floor(currentPrice * (changeRate / 100));
+        const yearHigh = realPrice(membership.price.highYear);
+        const yearLow = realPrice(membership.price.lowYear);
 
         // 주소 정보 추출 (카테고리별 다를 수 있음, 공통 info.Address가 기본)
         const rawAddress = membership.info.Address || '-';
@@ -99,20 +115,21 @@ export function useMembershipData(membershipId: string) {
                 : membership.category === 'Condo'
                     ? "https://images.unsplash.com/photo-1566073771259-6a8506099945?auto=format&fit=crop&q=80&w=2070"
                     : "https://images.unsplash.com/photo-1534438327276-14e5300c3a48?auto=format&fit=crop&q=80&w=2070",
-            phone: membership.info.homepage || "-",
-            tags: membership.tags.length > 0 ? membership.tags.map(t => `#${t}`) : ["#프리미엄"],
+            // 전화는 자료에 실제로 있는 번호만(2026-10-06). 예전엔 여기에 홈페이지 주소를 넣어, 전화 단추가 tel:http://… 로 걸리고
+            // 번호 자리에 주소가 찍혔다. 번호가 없으면 빈 값 — 하단 단추는 번호가 있으면 전화, 없으면 홈페이지(clubInfo.website),
+            // 둘 다 없으면 그리지 않는다(MembershipActionFooter).
+            // 자료의 번호는 "02-559-7531~2"·"02-450-4605/02-2022-0048"처럼 여럿이 붙어 있기도 해서, 걸 수 있게 첫 번호 하나만 넘긴다.
+            // 홈페이지는 clubInfo.website 로, 적힌 그대로의 번호는 clubInfo.phone 으로 따로 나간다.
+            phone: (membership.info.phone || "").split(/[/~,]/)[0].trim(),
+            // 태그도 자료에 있는 것만 — 비어 있으면 빈 채로 둔다(예전엔 빈 자리를 같은 태그 하나로 채워 모든 골프장에 붙었다).
+            tags: membership.tags.map(t => `#${t}`),
             difficulty: "-",
             difficultyDesc: "코스 상세 분석은 회원 가입 후 확인하실 수 있습니다.",
             specs: { speed: 0, fee: 0 },
             currentPrice: currentPrice,
-            changeAmount: changeAmount,
-            changeRate: changeRate.toFixed(2),
-            status: trend.status,
-            trendData: [160, 162, 158, 165, 170, 172, 168, 175, 180, 182, 185],
-            buyPrice: formatPrice(currentPrice - 5000000), // 매수 호가 (추정)
-            sellPrice: formatPrice(currentPrice + 5000000), // 매도 호가 (추정)
-            highPrice: formatPrice(membership.price.highYear || 0), // 연간 최고가
-            lowPrice: formatPrice(membership.price.lowYear || 0),   // 연간 최저가
+            highPrice: yearHigh != null ? formatPrice(yearHigh) : null, // 연간 최고가 — 자료에 없으면 null(화면은 칸을 그리지 않는다)
+            lowPrice: yearLow != null ? formatPrice(yearLow) : null,    // 연간 최저가 — 위와 같다
+            priceAsOfLabel: membershipAsOfLabel(), // "2026.02.15 자료 기준" — 자료 날짜를 모르면 null
 
             conditions: ["상세 조건은 문의 바랍니다."],
             greenFee: greenFee,
@@ -137,7 +154,7 @@ export function useMembershipData(membershipId: string) {
             clubInfo: {
                 // 기존 컴포넌트 호환용 객체 재구성
                 memberCount: memberCount,
-                website: membership.info.homepage || '',
+                website: membershipHomepage(membership.info.homepage), // http(s) 주소만 — 아니면 빈 값(링크를 그리지 않는다)
                 address: rawAddress,
                 openDate: openDate,
                 vendor: membership.info.vendor,

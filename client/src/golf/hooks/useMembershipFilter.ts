@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { MembershipItem, calculateTrend, getRepresentativeMemberships, GolfMembership, CondoMembership, FitnessMembership } from '../data/membershipData';
+import { MembershipItem, getRepresentativeMemberships, GolfMembership, CondoMembership, FitnessMembership } from '../data/membershipData';
 
 // Helper to safely get the 'type' or equivalent
 const getMembershipType = (item: MembershipItem): string => {
@@ -50,13 +50,8 @@ export function useMembershipFilter(resaleList: MembershipItem[], useGrouping: b
         }
 
         // 2. Chip Logic Filter (Quick Filters)
+        // 오름세 칩은 없다(2026-10-06) — 전일 값이 없는 자료라 종목 id 로 지어낸 방향으로 거르고 있었다.
         switch (activeCategory) {
-            case '🔥 급상승':
-                result = result.filter(item => {
-                    const trend = calculateTrend(item.id);
-                    return trend.status === 'UP';
-                });
-                break;
             case '수도권':
                 result = result.filter(item => {
                     const addr = getMembershipAddress(item);

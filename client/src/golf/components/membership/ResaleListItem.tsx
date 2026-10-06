@@ -7,15 +7,14 @@ import {
     CondoMembership,
     FitnessMembership,
     formatPrice,
-    calculateTrend,
     extractClubName,
     getClubVariants,
     getPriceRange,
     CRAWLED_MEMBERSHIPS
 } from '../../data/membershipData';
 
+// 등락(화살표 동그라미·% 줄)은 그리지 않는다(2026-10-06) — 이 자료엔 전일 값이 없어 종목 id 로 지어내고 있었다.
 export const ResaleListItem = ({ item, useGrouping = true }: { item: MembershipItem, useGrouping?: boolean }) => {
-    const trend = calculateTrend(item.id);
     const priceFormatted = formatPrice(item.price.current);
 
     // Extract region from address (first part before space)
@@ -39,14 +38,6 @@ export const ResaleListItem = ({ item, useGrouping = true }: { item: MembershipI
         <Link href={`/golf/membership/${item.id}`} className="block">
             <div className="p-5 rounded-3xl bg-[#18181b] border border-white/5 flex items-center justify-between active:scale-[0.98] transition-transform cursor-pointer hover:border-white/10 group">
                 <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <div className={cn(
-                        "w-12 h-12 rounded-full flex items-center justify-center text-sm font-black border backdrop-blur-sm transition-colors shrink-0",
-                        trend.status === 'UP' ? "bg-red-500/10 border-red-500/20 text-red-500" :
-                            trend.status === 'DOWN' ? "bg-blue-500/10 border-blue-500/20 text-blue-500" :
-                                "bg-white/5 border-white/10 text-white/30"
-                    )}>
-                        {trend.status === 'UP' ? '▲' : trend.status === 'DOWN' ? '▼' : '-'}
-                    </div>
                     <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-lg leading-none text-white group-hover:text-[#64DD17] transition-colors mb-1.5 truncate">
                             {useGrouping ? clubName : item.name}
@@ -89,14 +80,6 @@ export const ResaleListItem = ({ item, useGrouping = true }: { item: MembershipI
                     <div>
                         <div className="text-base sm:text-lg font-black tracking-tight text-white whitespace-nowrap">
                             {useGrouping && hasMultipleVariants ? priceRange : priceFormatted}
-                        </div>
-                        <div className={cn(
-                            "text-xs font-bold mt-1",
-                            trend.status === 'UP' ? "text-red-500" :
-                                trend.status === 'DOWN' ? "text-blue-500" :
-                                    "text-white/30"
-                        )}>
-                            {trend.change}
                         </div>
                     </div>
                     {useGrouping && hasMultipleVariants && (

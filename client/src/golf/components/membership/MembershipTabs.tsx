@@ -12,7 +12,7 @@ export function MembershipTabs({ activeTab, onChange, category = 'Golf' }: Membe
     const tabs = [
         { id: 'COURSE', label: courseLabel },
         { id: 'BENEFIT', label: '회원권 혜택' },
-        { id: 'MARKET', label: '실시간 시세' },
+        { id: 'MARKET', label: '시세' },
         { id: 'CALC', label: '비용 계산' }
     ] as const;
 

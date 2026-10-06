@@ -8,6 +8,7 @@ import {
     hiqGameHistory,
     hiqCourseHoleInfo,
     hiqMembers,
+    hiqBlocks,
     profiles,
     golfClubs,
     golfClubCourses,
@@ -93,6 +94,45 @@ export const GOLF_GRADES = [
     { id: 'BOGEY', label: 'Bogey', minHandi: 28, maxHandi: 36, icon: '⬜', color: '#94a3b8' },
     { id: 'ROOKIE', label: 'Rookie', minHandi: 37, maxHandi: Infinity, icon: '🐣', color: '#CD7F32' },
 ];
+
+/**
+ * 보는 사람과 **차단 관계인 회원의 글**을 조인·부킹 목록과 날짜 칩 숫자에서 뺀다(2026-10-06, Apple 1.2 · Play UGC).
+ *
+ * 왜 필요했나: 카드의 깃발 → "이 사용자 차단"을 눌러도 그 사람의 조인·부킹 글이 목록에 그대로 남았다.
+ * 커뮤니티·크루·채팅·라운드 사진은 차단을 반영하는데 이 표면만 빠져 있었다(community.repo 의 notBlockedBy 와 같은 꼴).
+ *
+ *  - **양방향**이다: 내가 차단한 사람의 글도, **나를 차단한 사람의 글**도 뺀다(글 알림의 golfCourseWatch.notBlocked 와 같다).
+ *    한 방향만 걸면, 나를 차단한 사람의 글이 목록·상세에는 멀쩡히 보이는데 신청만 404 가 나서(라우트의 apply)
+ *    글마다 신청해 보는 것으로 차단당한 사실을 알아낼 수 있다. 목록·개수·상세·신청이 같은 답이어야 한다.
+ *  - viewerId 는 **라우트가 로그인 id 로만** 넣는다(질의 문자열로는 못 준다). 값이 없거나 uuid 꼴이 아니면 조건을 안 건다.
+ *  - 목록과 개수가 **같은 조건**을 써야 한다 — 한쪽만 걸면 날짜 칩은 3건인데 열면 2건이다.
+ *  - owner_id 가 빈 옛 글(2026-09-09 이전)은 누구 글인지 몰라 빠지지 않는다(NULL 은 어떤 차단과도 같지 않다).
+ *  - '내가 올린 글'(ownerId 필터)·'내가 신청한 글'(listMyRequests)에는 쓰지 않는다 — 내 내역은 차단과 무관하게 그대로다.
+ */
+function notBlockedByViewer(filters: any): any | undefined {
+    const viewerId = filters?.viewerId;
+    if (typeof viewerId !== "string" || !UUID_RE.test(viewerId)) return undefined;
+    return sql`NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE (${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = ${golfBookings.ownerId}) OR (${hiqBlocks.blockerId} = ${golfBookings.ownerId} AND ${hiqBlocks.blockedId} = ${viewerId}))`;
+}
+
+/**
+ * (글 × 신청자) 줄을 글별로 묶고 **티타임이 지난 글은 버린다** — upcomingListingsWithRequesters 의 순수한 절반(2026-10-06).
+ * DB 를 물지 않아 표로 시험한다. 못 읽는 시각(Invalid Date)도 버린다 — 언제인지 모르는 글로 알림을 보내지 않는다.
+ * 받은 순서(티타임 → 신청 시각)를 지킨다.
+ */
+export function groupUpcomingRequesters<B extends { id: string; datetime: Date | string }>(
+    rows: { booking: B; memberId: unknown; status: string }[],
+    now: number,
+): { booking: B; requesters: { memberId: string; status: string }[] }[] {
+    const byId = new Map<string, { booking: B; requesters: { memberId: string; status: string }[] }>();
+    for (const r of rows) {
+        if (!(new Date(r.booking.datetime).getTime() > now)) continue;
+        let group = byId.get(r.booking.id);
+        if (!group) { group = { booking: r.booking, requesters: [] }; byId.set(r.booking.id, group); }
+        group.requesters.push({ memberId: String(r.memberId), status: r.status });
+    }
+    return Array.from(byId.values());
+}
 
 /**
  * 목록·날짜 배지가 **같은 조건**을 쓰게 만드는 한 곳.
@@ -431,6 +471,8 @@ export class GolfRepository {
         const conditions: any[] = filters?.includeBlinded ? [] : [eq(golfBookings.isBlinded, false)];
         // 내가 올린 글만(2026-09-21 '내역'). 화면 질의 문자열로는 못 준다 — 라우트가 로그인 id 로만 넣는다.
         if (typeof filters?.ownerId === "string" && filters.ownerId) conditions.push(eq(golfBookings.ownerId, filters.ownerId));
+        // 나와 차단 관계(어느 쪽이 걸었든)인 사람의 글은 뺀다. '내 글'(ownerId) 질의에는 걸지 않는다 — 내 내역은 차단과 무관하다.
+        else conditions.push(notBlockedByViewer(filters));
         if (date) {
             const targetDate = new Date(date);
             const start = new Date(targetDate);
@@ -517,6 +559,9 @@ export class GolfRepository {
         }
 
         if (filters) parts.push(...buildGolfFilterConditions(filters));
+        // 목록(getGolfBookings·getGolfJoins)과 같은 차단 조건 — 숫자와 목록이 어긋나지 않게.
+        const notBlocked = notBlockedByViewer(filters);
+        if (notBlocked) parts.push(notBlocked);
 
         const whereCondition = and(...parts);
 
@@ -812,6 +857,52 @@ export class GolfRepository {
     }
 
     /**
+     * 이 회원이 올린 **앞으로의** 글 가운데 대기·확정 신청자가 있는 글과 그 신청자(2026-10-06) — 읽기만 한다.
+     *
+     * 왜 필요했나: 탈퇴하면 그 회원의 조인·부킹 글이 가려지는데(user.repo deleteAccount), 글 내리기와 달리 신청자에게
+     * 아무 말도 가지 않았다. 확정자는 '내 신청'에서 글이 조용히 사라지고 연락처도 비워진 것을 티타임까지 모른다.
+     * 탈퇴 라우트(member.ts DELETE /me)가 **가려지기 전에** 이것으로 읽어 두었다가, 탈퇴가 끝난 뒤 글 내리기와 같은 알림을 보낸다.
+     *
+     *  - 앞으로의 글만: 지난 티타임은 알릴 일이 없다. SQL 은 하루 여유를 두고 넓게 읽고 **정확한 판정은 JS 로** 한다 —
+     *    datetime 은 시간대 없는 칸에 UTC 가 들어 있어, now() 와의 비교가 세션 시간대에 기대지 않게.
+     *  - 이미 가려진 글은 뺀다: 신청자에게는 그때 이미 없어진 글이다(내 신청·목록에서 빠져 있다).
+     *  - 신청자 없는 글은 애초에 안 나온다(inner join). 대기(applied)·확정(accepted)만 — 거절·취소·노쇼는 알릴 사람이 아니다.
+     *  - 글쓴이 본인 줄은 뺀다(자기 글에는 신청할 수 없지만, 떠나는 사람에게 알림이 되돌아가지 않게).
+     *  - owner_id 로만 찾는다. owner_id 가 빈 옛 글(2026-09-09 이전)은 티타임이 이미 지났다.
+     *  - 한 번의 질의다 — 글이 수백 건인 매니저가 탈퇴해도 글마다 묻지 않는다.
+     */
+    async upcomingListingsWithRequesters(ownerId: string, now: number = Date.now()): Promise<{ booking: GolfBooking; requesters: { memberId: string; status: string }[] }[]> {
+        if (!UUID_RE.test(ownerId)) return [];
+        const rows = await db.select({ booking: golfBookings, memberId: golfJoinRequests.memberId, status: golfJoinRequests.status })
+            .from(golfBookings)
+            .innerJoin(golfJoinRequests, eq(golfJoinRequests.bookingId, golfBookings.id))
+            .where(and(
+                eq(golfBookings.ownerId, ownerId),
+                eq(golfBookings.isBlinded, false),
+                sql`${golfBookings.datetime} > now() - interval '1 day'`,
+                inArray(golfJoinRequests.status, ["applied", "accepted"]),
+                ne(golfJoinRequests.memberId, ownerId),
+            ))
+            .orderBy(asc(golfBookings.datetime), asc(golfJoinRequests.createdAt))
+            .limit(3000);
+        return groupUpcomingRequesters(rows, now);
+    }
+
+    /**
+     * memberId 와 차단 관계인 회원 id — **어느 쪽이 걸었든**(2026-10-06). 그 사람 글을 알리는 방송(긴급 조인)에서 뺀다.
+     * 목록의 notBlockedByViewer 와 같은 양방향이다: 목록에서 그 글이 빠지는 사람에게 푸시가 가면 눌러도 글이 없다.
+     */
+    async blockPeerIds(memberId: string): Promise<Set<string>> {
+        if (!UUID_RE.test(memberId)) return new Set();
+        const rows = await db.select({ blockerId: hiqBlocks.blockerId, blockedId: hiqBlocks.blockedId }).from(hiqBlocks)
+            .where(or(eq(hiqBlocks.blockerId, memberId), eq(hiqBlocks.blockedId, memberId)));
+        const me = memberId.toLowerCase();
+        const peers = new Set<string>();
+        for (const r of rows) for (const id of [String(r.blockerId), String(r.blockedId)]) if (id.toLowerCase() !== me) peers.add(id);
+        return peers;
+    }
+
+    /**
      * 조인 글에 누가 신청했는지 — 글쓴이에게만 보여 준다.
      *
      * 왜 필요했나: 신청은 쌓이는데 그걸 볼 화면이 없으면 글쓴이는 여전히 누가 오는지 모른다.
@@ -923,6 +1014,8 @@ export class GolfRepository {
         }
 
         conditions.push(...buildGolfFilterConditions(filters ?? {}));
+        // 나와 차단 관계(어느 쪽이 걸었든)인 사람의 조인 글은 뺀다(값이 없으면 undefined — 아래에서 걸러진다).
+        conditions.push(notBlockedByViewer(filters));
 
         const filteredConditions = conditions.filter((c): c is NonNullable<typeof c> => c !== undefined);
 

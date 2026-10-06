@@ -1,6 +1,4 @@
-import { LucideMapPin, LucideFlag, LucideLeaf, LucideCalendarDays, LucideUsers, LucideGlobe, LucideBuilding, LucideUserCheck } from "lucide-react";
-import { ReviewCard } from "./ReviewCard";
-import { REVIEWS } from "../../data/membershipMock";
+import { LucideMapPin, LucideFlag, LucideCalendarDays, LucideUsers, LucideGlobe, LucideBuilding, LucideUserCheck } from "lucide-react";
 
 interface MembershipCourseTabProps {
     data: any;
@@ -11,26 +9,29 @@ export function MembershipCourseTab({ data }: MembershipCourseTabProps) {
         <div className="space-y-10">
             {/* Spec Bar */}
             <div className="flex justify-between items-center py-4 relative bg-[#1A1A1A] rounded-2xl px-2 border border-white/5">
-                <div className="absolute left-1/3 top-1/2 -translate-y-1/2 w-px h-8 bg-white/10" />
-                <div className="absolute right-1/3 top-1/2 -translate-y-1/2 w-px h-8 bg-white/10" />
+                {/* 칸 사이 세로줄 — 골프는 두 칸(위치 · 홀수)이라 가운데 한 줄, 그 밖은 세 칸 기준 두 줄 */}
+                {data.category === 'Golf' ? (
+                    <div className="absolute left-1/2 top-1/2 -translate-y-1/2 w-px h-8 bg-[#FFFFFF1A]" />
+                ) : (
+                    <>
+                        <div className="absolute left-1/3 top-1/2 -translate-y-1/2 w-px h-8 bg-white/10" />
+                        <div className="absolute right-1/3 top-1/2 -translate-y-1/2 w-px h-8 bg-white/10" />
+                    </>
+                )}
 
                 <div className="flex-1 flex flex-col items-center gap-1">
                     <span className="text-[10px] text-white/40 font-bold flex items-center gap-1"><LucideMapPin className="w-3 h-3 text-[#64DD17]" /> 위치</span>
                     <span className="text-sm font-bold text-white">{data.originalRegion}</span>
                 </div>
                 {data.category === 'Golf' ? (
-                    <>
-                        <div className="flex-1 flex flex-col items-center gap-1">
-                            <span className="text-[10px] text-white/40 font-bold flex items-center gap-1"><LucideFlag className="w-3 h-3 text-[#64DD17]" /> 홀수</span>
-                            <span className="text-sm font-bold text-white">
-                                {String(data.holes).endsWith('홀') ? data.holes : `${data.holes}홀`}
-                            </span>
-                        </div>
-                        <div className="flex-1 flex flex-col items-center gap-1">
-                            <span className="text-[10px] text-white/40 font-bold flex items-center gap-1"><LucideLeaf className="w-3 h-3 text-[#64DD17]" /> 잔디</span>
-                            <span className="text-sm font-bold text-center leading-tight text-white">중지</span>
-                        </div>
-                    </>
+                    // 잔디 칸은 두지 않는다(2026-10-06) — 자료에 잔디 값이 없는데 골프장마다 같은 잔디 이름을 박아 두었다
+                    // (소개 글에 양잔디라고 적힌 골프장도 다른 잔디로 나왔다). 값이 생기면 그때 자료에서 받아 그린다.
+                    <div className="flex-1 flex flex-col items-center gap-1">
+                        <span className="text-[10px] text-white/40 font-bold flex items-center gap-1"><LucideFlag className="w-3 h-3 text-[#64DD17]" /> 홀수</span>
+                        <span className="text-sm font-bold text-white">
+                            {String(data.holes).endsWith('홀') ? data.holes : `${data.holes}홀`}
+                        </span>
+                    </div>
                 ) : data.category === 'Condo' ? (
                     <>
                         <div className="flex-1 flex flex-col items-center gap-1">
@@ -147,53 +148,11 @@ export function MembershipCourseTab({ data }: MembershipCourseTabProps) {
                 </div>
             </div>
 
-            {/* Analysis Chart - Golf Only */}
-            {data.category === 'Golf' && (
-                <div>
-                    <div className="flex items-center justify-between mb-3">
-                        <h3 className="text-lg font-black italic tracking-widest uppercase flex items-center gap-2">
-                            <div className="w-1 h-4 bg-amber-400" />
-                            코스 분석
-                        </h3>
-                    </div>
-                    <div className="bg-[#1A1A1A] p-5 rounded-2xl border border-white/5">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-xs font-bold text-white/40">DIFFICULTY</span>
-                            <span className="text-xs font-black text-white/50">정보 준비중</span>
-                        </div>
-                        <div className="h-1.5 bg-white/10 rounded-full relative flex items-center">
-                            <div className="h-full w-[50%] bg-white/20 rounded-full" />
-                        </div>
+            {/* '코스 분석' 구역은 두지 않는다(2026-10-06) — 난이도 자료가 없는데 반쯤 찬 막대를 그렸고(보통 난이도로 읽힌다),
+                골프 회원권은 태그가 전부 비어 있어 훅이 채워 넣은 같은 태그 하나가 모든 골프장에 붙어 있었다. */}
 
-                        <div className="flex flex-wrap gap-2 mt-4">
-                            {data.tags.map((tag: string) => (
-                                <span key={tag} className="px-2 py-1 rounded bg-white/5 text-[10px] font-bold text-white/50 border border-white/10">
-                                    {tag}
-                                </span>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* Reviews Check - Rich Insight Cards */}
-            <div className="space-y-6">
-                <div className="flex items-center justify-between mb-2">
-                    <div>
-                        <h3 className="text-lg font-black italic tracking-widest uppercase flex items-center gap-2">
-                            ⭐ 멤버 인사이트
-                        </h3>
-                    </div>
-                    <div className="text-right">
-                        <div className="text-3xl font-black text-amber-400 tracking-tighter">4.9</div>
-                        <div className="text-[10px] font-bold text-white/20 uppercase tracking-tighter">전체 평점</div>
-                    </div>
-                </div>
-
-                {REVIEWS.map(review => (
-                    <ReviewCard key={review.id} review={review} category={data.category} />
-                ))}
-            </div>
+            {/* 회원 평가 구역은 두지 않는다(2026-10-06) — 받은 평가가 없는데 고정 점수와 예시 글을 실제처럼 보여 주고 있었다.
+                실제로 받은 글이 생기면 그때 서버에서 받아 그린다. */}
         </div>
     );
 }

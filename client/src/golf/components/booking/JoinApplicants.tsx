@@ -5,6 +5,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { kstDateLabel, kstTime } from "@/lib/kst";
 import { seatsTaken } from "@shared/golfJoin";
+import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
 
 /**
  * 내가 올린 조인 글에 **누가 신청했는지**, 그리고 안 나타난 사람 표시.
@@ -150,6 +151,20 @@ export function JoinApplicants({ bookingId, enabled }: { bookingId: string; enab
                                         <span className={cn("px-1.5 py-0.5 rounded border text-[9px] font-black shrink-0", STATUS_STYLE[a.status])}>
                                             {STATUS_LABEL[a.status]}
                                         </span>
+                                        {/* 신청자 신고·차단(2026-10-06) — 이름과 사진이 보이는 자리라 그 자리에서 신고·차단할 수 있어야 한다.
+                                            차단하면 이 사람은 내 글에 더 신청하지 못하고(서버), 이미 온 신청은 아래 '거절'로 정리한다.
+                                            이름 줄의 줄 높이를 늘리지 않게 위아래로 당긴다. 색은 리터럴(골프 화면).
+                                            메뉴는 **위로** 연다 — 이 명단은 카드(overflow-hidden) 안에 있고, 내 예약 화면에서는 마지막 줄 아래가
+                                            단추 한 줄뿐이라 아래로 열면 '차단' 줄이 잘린다. 위쪽은 두 화면 모두 메뉴 높이(약 94px)보다 넉넉하다. */}
+                                        <UgcActionMenu
+                                            targetType="member"
+                                            targetId={a.memberId}
+                                            authorId={a.memberId}
+                                            authorName={a.name}
+                                            side="top"
+                                            wrapperClassName="-my-1.5"
+                                            className="w-8 h-8 rounded-full text-[#FFFFFF80] hover:text-[#FFFFFFCC] active:bg-[#FFFFFF1A]"
+                                        />
                                     </div>
                                     <div className="text-[10px] font-bold text-white/30 truncate">
                                         {lead ?? `${kstDateLabel(a.appliedAt)} ${kstTime(a.appliedAt)} 신청`}

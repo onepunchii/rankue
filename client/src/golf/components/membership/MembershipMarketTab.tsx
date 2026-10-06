@@ -1,96 +1,58 @@
-import { LucideTrendingUp } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { formatMoney } from "@/lib/membershipUtils";
+import { formatPrice } from "../../data/membershipData";
 
 interface MembershipMarketTabProps {
     data: any;
 }
 
+/**
+ * 시세 탭 — 자료에 실제로 있는 값만 그린다: 현재 시세 · 연간 최고 · 연간 최저(useMembershipData 가 주는 것).
+ *
+ * 2026-10-06 에 뺀 것: 고정 그림 추이 그래프와 그 위의 평, 현재가에서 일정액을 더하고 빼 만든 양쪽 가격 카드와 대기 인원,
+ * 난수로 만든 거래 내역. 전부 자료에 없는 값이었다.
+ * 값이 없는 칸은 그리지 않는다 — 0 이나 '-' 로 채우지 않는다. 날짜도 자료 날짜를 알 때만 적는다.
+ */
 export function MembershipMarketTab({ data }: MembershipMarketTabProps) {
+    const current: number | null = typeof data.currentPrice === "number" && data.currentPrice > 0 ? data.currentPrice : null;
+    const yearRange = [
+        { key: "high", label: "연간 최고", text: data.highPrice as string | null },
+        { key: "low", label: "연간 최저", text: data.lowPrice as string | null },
+    ].filter((cell) => !!cell.text);
+
+    if (current == null && yearRange.length === 0) {
+        return <p className="py-10 text-center text-[14px] text-[#FFFFFF66]">시세 자료가 없습니다.</p>;
+    }
+
     return (
-        <div className="space-y-6">
-            {/* Chart Card */}
-            <div className="h-64 rounded-2xl p-4 relative overflow-hidden flex flex-col justify-between border border-white/5 bg-[#1A1A1A]">
-                <div className="absolute inset-0 bg-gradient-to-r from-[#1A1A1A] via-transparent to-[#1A1A1A] z-10 pointer-events-none" />
-                <div className="flex justify-between items-start z-10 w-full mb-4">
-                    <div>
-                        <span className="text-xs font-bold text-white/40 block mb-1">시세추이</span>
-                        <div className="flex items-center gap-2">
-                            <span className="text-xl font-black text-white tracking-tight">상승세 지속</span>
-                            <LucideTrendingUp className="w-4 h-4 text-red-500" />
-                        </div>
+        <div className="space-y-3">
+            {current != null && (
+                <div className="bg-[#1A1A1A] rounded-2xl p-5 border border-[#FFFFFF0D]">
+                    <div className="flex items-center justify-between gap-3">
+                        <span className="text-[12px] font-bold text-[#FFFFFF66]">현재 시세</span>
+                        {data.priceAsOfLabel && (
+                            <span className="text-[12px] text-[#FFFFFF66]">{data.priceAsOfLabel}</span>
+                        )}
                     </div>
-
-                    <div className="flex bg-black/40 rounded-lg p-0.5 border border-white/5">
-                        {['1년', '2년', '전체'].map((range, i) => (
-                            <button
-                                key={range}
-                                className={cn(
-                                    "px-2 py-1 text-[10px] font-bold rounded-md transition-all",
-                                    i === 0 ? "bg-[#64DD17] text-[#09090b]" : "text-white/40 hover:text-white"
-                                )}
-                            >
-                                {range}
-                            </button>
-                        ))}
+                    <div className="mt-2 flex items-baseline gap-1">
+                        <span className="text-[28px] leading-none font-bold tracking-tight text-[#FFFFFF] tabular-nums">{formatPrice(current)}</span>
+                        <span className="text-[14px] font-bold text-[#FFFFFF66]">원</span>
                     </div>
                 </div>
+            )}
 
-                <div className="absolute bottom-0 left-0 right-0 h-40">
-                    <svg viewBox="0 0 100 50" className="w-full h-full transform scale-x-125 origin-bottom" preserveAspectRatio="none">
-                        <defs>
-                            <linearGradient id="waveGrad" x1="0" x2="0" y1="0" y2="1">
-                                <stop offset="0%" stopColor="#ef4444" stopOpacity="0.4" />
-                                <stop offset="100%" stopColor="#ef4444" stopOpacity="0" />
-                            </linearGradient>
-                        </defs>
-                        <path d="M0,40 C10,35 20,45 30,30 C40,20 50,25 60,15 C70,10 80,12 90,5 L100,0 L100,50 L0,50 Z" fill="url(#waveGrad)" />
-                        <path d="M0,40 C10,35 20,45 30,30 C40,20 50,25 60,15 C70,10 80,12 90,5 L100,0" fill="none" stroke="#ef4444" strokeWidth="2" vectorEffect="non-scaling-stroke" />
-                    </svg>
-                </div>
-            </div>
-
-            {/* Order Book Cards */}
-            <div className="grid grid-cols-2 gap-3">
-                <div className="bg-[#1A1A1A] p-5 rounded-2xl border border-blue-500/20 flex flex-col items-center text-center hover:bg-[#1A1A1A]/80 transition-colors">
-                    <span className="text-xs text-blue-400 font-bold mb-1">즉시 판매가</span>
-                    <span className="text-2xl font-black text-white tracking-tight">{data.buyPrice}</span>
-                    <span className="text-[10px] text-white/30 mt-1">대기 3명</span>
-                </div>
-                <div className="bg-[#1A1A1A] p-5 rounded-2xl border border-red-500/20 flex flex-col items-center text-center hover:bg-[#1A1A1A]/80 transition-colors">
-                    <span className="text-xs text-red-400 font-bold mb-1">즉시 구매가</span>
-                    <span className="text-2xl font-black text-white tracking-tight">{data.sellPrice}</span>
-                    <span className="text-[10px] text-white/30 mt-1">대기 1명</span>
-                </div>
-            </div>
-
-            {/* Transaction History (New Section) */}
-            <div className="bg-[#1A1A1A] rounded-2xl p-6 border border-white/5 space-y-4">
-                <h3 className="text-white/40 text-xs font-bold uppercase mb-2 relative z-10 font-mono tracking-wider">Recent Transactions</h3>
-
-                <div className="space-y-3">
-                    {[1, 2, 3, 4, 5].map((_, i) => {
-                        const date = new Date();
-                        date.setDate(date.getDate() - i * 3 - 1);
-                        const priceVariation = (Math.random() - 0.5) * 5000000;
-                        const txPrice = data.currentPrice + priceVariation;
-
-                        return (
-                            <div key={i} className="flex justify-between items-center py-2 border-b border-white/5 last:border-0 hover:bg-white/5 px-2 -mx-2 rounded transition-colors">
-                                <div className="flex flex-col">
-                                    <span className="text-xs font-bold text-white/40">
-                                        {date.getFullYear()}.{String(date.getMonth() + 1).padStart(2, '0')}.{String(date.getDate()).padStart(2, '0')}
-                                    </span>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-sm font-black text-white">{formatMoney(Math.floor(txPrice / 10000) * 10000)}원</div>
-                                    <div className="text-[10px] font-bold text-[#64DD17]">거래완료</div>
-                                </div>
+            {yearRange.length > 0 && (
+                <div className={cn("grid gap-3", yearRange.length === 2 ? "grid-cols-2" : "grid-cols-1")}>
+                    {yearRange.map((cell) => (
+                        <div key={cell.key} className="bg-[#1A1A1A] rounded-2xl p-5 border border-[#FFFFFF0D]">
+                            <div className="text-[12px] font-bold text-[#FFFFFF66]">{cell.label}</div>
+                            <div className="mt-1.5 flex items-baseline gap-1">
+                                <span className="text-[20px] leading-none font-bold tracking-tight text-[#FFFFFF] tabular-nums">{cell.text}</span>
+                                <span className="text-[12px] font-bold text-[#FFFFFF66]">원</span>
                             </div>
-                        );
-                    })}
+                        </div>
+                    ))}
                 </div>
-            </div>
+            )}
         </div>
     );
 }
