@@ -10,6 +10,7 @@ import { storeListings, hiqMembers } from "../shared/schema.js";
 import { eq } from "drizzle-orm";
 import { storeAreasKo } from "../shared/storeMeta.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
+import { isUploadedLogo } from "../shared/golfLogo.js";
 import { hereMapSvg } from "../shared/golfHereMap.js";
 import { weatherPoint } from "../shared/golfWeatherZones.js";
 import { courseWhere, weekdayFee, wonShort, type Fees } from "../shared/golfCourse.js";
@@ -173,13 +174,17 @@ export async function buildPbaPlayerCard(memCode: string, lang: string): Promise
 const ORIGIN = "https://www.rankue.co.kr";
 /** 회원권 시세(만원) → 카드 칸에 들어갈 짧은 꼴: 10억 8,000만 → 10.8억, 9,100만 그대로 */
 const shortManwon = (n: number) => (n >= 10000 ? `${(n / 10000).toFixed(n % 10000 ? 1 : 0).replace(/\.0$/, "")}억` : `${n.toLocaleString("ko-KR")}만`);
-/** 로고는 정적 파일(/img/golf-logos/…)이라 함수 번들에 없다 — 사이트에서 받아 data URI 로. 못 받으면 이름 글자. */
+/**
+ * 로고는 정적 파일(/img/golf-logos/…)이라 함수 번들에 없다 — 사이트에서 받아 data URI 로. 못 받으면 이름 글자.
+ * 어드민에서 올린 로고(2026-10-07)는 우리 저장소의 주소 그대로 받는다. 그 밖의 주소는 받지 않는다.
+ */
 async function logoDataUri(path: string | null | undefined): Promise<string | null> {
-  if (!path || !/^\/img\/golf-logos\/[\w.-]+\.png$/.test(path)) return null;
+  const uploaded = isUploadedLogo(path);
+  if (!path || (!uploaded && !/^\/img\/golf-logos\/[\w.-]+\.png$/.test(path))) return null;
   // 흰색뿐인 로고(-light.png)는 카드의 흰 판에서 안 보인다 — 이름 글자로(2026-10-01)
   if (/-light\.png$/i.test(path)) return null;
   try {
-    const r = await fetch(`${ORIGIN}${path}`, { signal: AbortSignal.timeout(3000) });
+    const r = await fetch(uploaded ? path : `${ORIGIN}${path}`, { signal: AbortSignal.timeout(3000) });
     if (!r.ok) return null;
     return `data:image/png;base64,${Buffer.from(await r.arrayBuffer()).toString("base64")}`;
   } catch { return null; }

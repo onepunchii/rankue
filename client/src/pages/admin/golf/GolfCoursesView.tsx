@@ -5,12 +5,13 @@
  * 운영자가 손으로 채울 길이 없었다. 공식 사이트에서 파를 자동으로 채우는 작업이 따로 돌지만 이미지·차단 사이트는 사람이 넣어야 한다.
  *  - 빈칸 칩(파 미확인·코스 없음·로고·홈페이지·전화·좌표·원장 연결·요금, 숫자) + 검색 + 정렬(인기·관심·최근 라운드)
  *  - 줄을 누르면 시트: 골프장 페이지·홈페이지 링크 / 코스별 9칸 파(홀마다 3·4·5 빠른 단추, 합 경고) / 코스 추가 /
- *    홈페이지·전화 고치기 / 로고 내리기 / 원장 좌표(현장 인증이 이 점을 본다)
+ *    홈페이지·전화 고치기 / 로고 올리기·내리기 / 원장 좌표(현장 인증이 이 점을 본다)
+ *  - 로고 올리기(2026-10-07): 골프장 홈페이지의 로고를 로고 칸에 끌어다 놓거나 · 복사해 붙여넣거나 · 파일을 고른다(shared/golfLogo.ts)
  *  - 파 저장은 묻고 저장한다 — 이 골프장으로 치는 경기 화면에 바로 쓰인다. 서버는 '고치기 전 값'이 그대로일 때만 쓴다
  *    (그 사이 다른 작업이 먼저 채웠으면 덮지 않고, 새 값을 불러와 보여 준다).
  * 규칙(9칸·3~6·합 34~37·전화·홈페이지·좌표 범위)은 shared/golfParEdit.ts 하나 — 서버도 같은 함수로 막는다.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { apiRequest } from "@/lib/queryClient";
@@ -18,7 +19,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useDebounce } from "@/hooks/use-debounce";
 import { appConfirm } from "@/components/AppDialog";
 import { cn } from "@/lib/utils";
-import { LucideChevronRight, LucideExternalLink, LucidePlus, LucideRotateCcw, LucideSave, LucideMapPin } from "@/lib/icons";
+import { LucideChevronRight, LucideExternalLink, LucidePlus, LucideRotateCcw, LucideSave, LucideMapPin, LucideUpload } from "@/lib/icons";
 import { coursePath } from "@shared/golfCourse";
 import { distanceKm } from "@shared/golfJoin";
 import { ONSITE_RADIUS_KM } from "@shared/golfOnSite";
@@ -28,7 +29,9 @@ import {
     checkKoreaCoords, parseLatLngText, parseParsText,
     type MissingKey, type PageCourse, type LogoOrigin,
 } from "@shared/golfParEdit";
+import { imageUrlFromDrop } from "@shared/golfLogo";
 import { FilterChips, SearchBox, EmptyState, Panel, Pill, KpiTile, kstDateTime } from "../adminUtils";
+import { rasterizeLogo, blobFromBase64, type LogoDraft } from "./logoUpload";
 
 export const GOLF_COURSES_KEY = ["/api/hiq/admin/golf/courses"] as const;
 const API = GOLF_COURSES_KEY[0];
@@ -712,12 +715,14 @@ function ContactEditor({ d }: { d: Detail }) {
 const ORIGIN_LABEL: Record<LogoOrigin, string> = {
     official: "골프장 공식 홈페이지 로고",
     dbegl: "더블이글 자료 로고",
+    upload: "어드민에서 올린 로고",
     other: "기타 주소",
 };
 
 /** 적재 스크립트를 다시 돌리면 로고가 어디서 다시 붙는지 — 내리기 전·후에 같은 말을 한다 */
 function reAddNotes(origin: LogoOrigin | null, official: Official, slug: string): string[] {
     const notes: string[] = [];
+    if (origin === "upload") notes.push("어드민에서 올린 로고입니다 — 자료를 다시 적재해도 남습니다. 내리면 저장소의 파일도 지웁니다.");
     if (origin === "dbegl") notes.push("더블이글 자료 로고입니다 — 적재 스크립트를 --dbegl 로 다시 돌리면 다시 붙습니다(golf-course-dbegl.ts 에서 막아야 합니다).");
     if (official.checked && official.entry?.logo) {
         notes.push(`공식 로고 자료(server/scripts/data/golf-logos-official.json)에 '${slug}' 항목이 있습니다 — 적재 스크립트(golf-course-pages.ts)나 golf-logos-official.ts --write 를 다시 돌리면 로고가 다시 붙습니다. 계속 내려 두려면 그 표에서도 빼야 합니다.`);
@@ -747,6 +752,75 @@ function LogoEditor({ d }: { d: Detail }) {
         },
     });
 
+    // ── 올리기: 끌어다 놓기 · 붙여넣기 · 파일 고르기 ──
+    const [draft, setDraft] = useState<LogoDraft | null>(null);
+    const [busy, setBusy] = useState<"reading" | "fetching" | null>(null);
+    const [over, setOver] = useState(false);
+    const fileRef = useRef<HTMLInputElement>(null);
+    useEffect(() => { setDraft(null); setBusy(null); setOver(false); }, [d.slug]);
+
+    const fail = (e: unknown) => toast({ title: "로고를 가져오지 못했습니다", description: errMsg(e), variant: "destructive" });
+    const takeBlob = async (blob: Blob) => {
+        setBusy("reading");
+        try { setDraft(await rasterizeLogo(blob)); } catch (e) { fail(e); } finally { setBusy(null); }
+    };
+    // 다른 사이트에서 끌어온 그림은 주소만 온다 — 서버가 대신 받아 준다(화면은 다른 사이트의 그림을 읽지 못한다)
+    const takeUrl = async (url: string) => {
+        setBusy("fetching");
+        try {
+            const r = await apiRequest(`${API}/logo/fetch`, { method: "POST", body: { url } });
+            setDraft(await rasterizeLogo(blobFromBase64(r.base64, r.mime)));
+        } catch (e) { fail(e); } finally { setBusy(null); }
+    };
+    const working = busy !== null;
+
+    const onDrop = (e: DragEvent) => {
+        e.preventDefault();
+        setOver(false);
+        if (working) return;
+        const file = Array.from(e.dataTransfer.files ?? []).find((f) => f.type.startsWith("image/"));
+        if (file) return void takeBlob(file);
+        const url = imageUrlFromDrop(e.dataTransfer.getData("text/html"), e.dataTransfer.getData("text/uri-list"), e.dataTransfer.getData("text/plain"));
+        if (url) return void takeUrl(url);
+        toast({ title: "그림을 찾지 못했습니다", description: "로고 그림 자체를 끌어다 놓거나, 그림을 복사해 붙여넣어 주세요", variant: "destructive" });
+    };
+
+    // 붙여넣기 — 이 시트가 열려 있는 동안. 글자 칸(홈페이지·전화·파)에 붙여넣는 것은 건드리지 않는다
+    const live = useRef({ working, takeBlob });
+    live.current = { working, takeBlob };
+    useEffect(() => {
+        const onPaste = (e: ClipboardEvent) => {
+            const t = e.target as HTMLElement | null;
+            if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+            const item = Array.from(e.clipboardData?.items ?? []).find((i) => i.kind === "file" && i.type.startsWith("image/"));
+            const file = item?.getAsFile();
+            if (!file || live.current.working) return;
+            e.preventDefault();
+            void live.current.takeBlob(file);
+        };
+        document.addEventListener("paste", onPaste);
+        return () => document.removeEventListener("paste", onPaste);
+    }, []);
+
+    const upload = useMutation({
+        mutationFn: (x: LogoDraft) => apiRequest(`${API}/${encodeURIComponent(d.slug)}/logo`, { method: "POST", body: { png: x.png, light: x.light, expected: { logo: d.logo } } }),
+        onSuccess: () => {
+            toast({ title: "로고를 올렸습니다" });
+            setDraft(null);
+            setAfter(null);
+            void qc.invalidateQueries({ queryKey: GOLF_COURSES_KEY });
+        },
+        onError: (e) => {
+            toast({ title: "로고 올리기 실패", description: errMsg(e), variant: "destructive" });
+            if (errCode(e) === "PAGE_CHANGED") void qc.invalidateQueries({ queryKey: GOLF_COURSES_KEY });
+        },
+    });
+    const onUpload = async () => {
+        if (!draft || upload.isPending) return;
+        if (d.logo && !(await appConfirm({ message: "지금 로고를 이 그림으로 바꿀까요? 골프장 페이지·경기 목록에 바로 보입니다.", confirmText: "바꾸기" }))) return;
+        upload.mutate(draft);
+    };
+
     const onClear = async () => {
         if (!d.logo || clear.isPending) return;
         const lines = ["로고를 내릴까요? 골프장 페이지·경기 목록에 이름 글자판이 대신 보입니다.", ...before];
@@ -755,21 +829,61 @@ function LogoEditor({ d }: { d: Detail }) {
     };
 
     return (
-        <Panel className="p-3">
-            <div className="flex items-center gap-3">
+        <Panel className={cn("p-3 transition-colors", over && "ring-2 ring-brand bg-brand/[0.04]")}>
+            <div
+                data-logo-drop
+                onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; if (!over) setOver(true); }}
+                onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setOver(false); }}
+                onDrop={onDrop}
+                className="flex items-center gap-3">
                 {d.logo ? <LogoThumb logo={d.logo} name={d.name} size="lg" /> : (
                     <span className="w-14 h-14 shrink-0 rounded-xl border border-dashed border-black/15 flex items-center justify-center text-[11.5px] text-black/35">없음</span>
                 )}
                 <div className="min-w-0 flex-1">
                     <p className="text-[13px] font-bold text-[rgba(0,0,0,0.87)]">{d.logo ? ORIGIN_LABEL[d.logoOrigin ?? "other"] : "로고 없음 — 이름 글자판"}</p>
                     {d.logo && <p className="text-[11.5px] text-black/40 truncate">{d.logo}</p>}
-                    {!d.logo && <p className="text-[11.5px] text-black/40">로고 올리기는 아직 없습니다.</p>}
+                    <p className="mt-0.5 text-[11.5px] leading-relaxed text-black/45">
+                        {over ? "여기에 놓으세요" : busy === "fetching" ? "그 사이트에서 그림을 받아 오는 중…" : busy === "reading" ? "그림을 읽는 중…"
+                            : "골프장 홈페이지의 로고를 여기로 끌어다 놓거나, 그림을 복사해 붙여넣으세요(⌘V)."}
+                    </p>
                 </div>
+                <input ref={fileRef} type="file" accept="image/*" className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f && !working) void takeBlob(f); }} />
+                <button onClick={() => fileRef.current?.click()} disabled={working || upload.isPending}
+                    className="shrink-0 h-9 px-3 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/70 hover:bg-black/[0.03] disabled:opacity-40 inline-flex items-center gap-1.5">
+                    <LucideUpload className="w-4 h-4" />파일
+                </button>
                 <button onClick={() => void onClear()} disabled={!d.logo || clear.isPending}
                     className="shrink-0 h-9 px-3 rounded-lg border border-red-500/30 text-[13px] font-bold text-red-600 hover:bg-red-500/[0.05] disabled:opacity-35 disabled:hover:bg-transparent">
                     {clear.isPending ? "내리는 중…" : "로고 내리기"}
                 </button>
             </div>
+            {draft && (
+                <div data-logo-draft className="mt-3 rounded-xl border border-black/[0.08] bg-black/[0.02] p-3">
+                    <div className="flex items-center gap-3">
+                        {/* 골프장 페이지의 로고판과 같은 모양으로 미리 본다 — 흰 판, 흰색뿐인 로고면 어두운 판 */}
+                        <span className={cn("shrink-0 h-16 min-w-[64px] max-w-[176px] rounded-2xl px-3 py-2 inline-flex items-center justify-center border border-black/[0.08]", draft.light ? "bg-[#1C1F1D]" : "bg-white")}>
+                            <img src={draft.png} alt="올릴 로고 미리 보기" className="max-w-full max-h-full object-contain" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-bold text-[rgba(0,0,0,0.87)]">올릴 로고</p>
+                            <p className="text-[11.5px] text-black/45 tabular-nums">{draft.width}×{draft.height}px · {Math.max(1, Math.round(draft.bytes / 1024))}KB</p>
+                            <label className="mt-1 inline-flex items-center gap-1.5 text-[12px] text-black/60 cursor-pointer">
+                                <input type="checkbox" checked={draft.light} onChange={(e) => setDraft({ ...draft, light: e.target.checked })} className="accent-brand" />
+                                흰색 로고 — 어두운 판에 얹기
+                            </label>
+                        </div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                        <button onClick={() => setDraft(null)} disabled={upload.isPending}
+                            className="flex-1 h-9 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/60 disabled:opacity-50">취소</button>
+                        <button onClick={() => void onUpload()} disabled={upload.isPending}
+                            className="flex-1 h-9 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-strong disabled:opacity-40">
+                            {upload.isPending ? "올리는 중…" : d.logo ? "이 로고로 바꾸기" : "이 로고 올리기"}
+                        </button>
+                    </div>
+                </div>
+            )}
             {d.logo && before.length > 0 && (
                 <ul className="mt-2.5 space-y-1 text-[11.5px] leading-relaxed text-black/50">{before.map((n) => <li key={n}>{n}</li>)}</ul>
             )}

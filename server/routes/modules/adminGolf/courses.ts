@@ -12,13 +12,17 @@
  *   POST   /nines                   코스 추가 { clubId, name, pars?: number[9] | [], force? }
  *   PATCH  /clubs/:clubId/coords    원장 좌표 { lat, lng } — 현장 인증(2km)이 이 점을 본다. 한국 안(33~39N, 124~132E)만
  *   GET    /:slug                   한 곳 — 페이지 칸 + 원장 코스·파 + 원장 좌표 + 공식 로고 자료 여부
- *   PATCH  /:slug                   { website?, phone?, logo?: null, expected? } — 로고는 내리기만(올리기는 아직 없다)
+ *   PATCH  /:slug                   { website?, phone?, logo?: null, expected? } — 여기서 로고는 내리기만(올린 로고면 저장소의 파일도 지운다)
+ *   POST   /logo/fetch              { url } — 다른 사이트의 그림을 대신 받아 화면에 넘긴다(끌어다 놓으면 주소만 온다). 저장하지 않는다
+ *   POST   /:slug/logo              { png: base64, light?, expected? } — 로고 올리기(2026-10-07). 화면이 다시 그린 PNG 만 받는다
  *
  * 쓰기는 전부 adminLog 로 남긴다(전·후 값 — 되돌릴 때 이걸 본다).
  * ⚠️ 홈페이지·전화·로고는 golf_course_pages 칸이라 적재 스크립트(golf-course-pages.ts --write)를 다시 돌리면 원본 자료 값으로 덮인다.
  *    파·코스(rankue_golf_courses)와 원장 좌표(rankue_golf_clubs)는 적재 스크립트가 읽기만 해서 남는다.
  */
 import { Router } from "express";
+import { createHash, randomBytes } from "node:crypto";
+import { put } from "@vercel/blob";
 import { asyncHandler } from "../../../utils/asyncHandler.js";
 import { sendError, sendSuccess } from "../../../utils/response.js";
 import { adminLog } from "../../../middleware/adminAuth.js";
@@ -30,6 +34,10 @@ import {
     MISSING_KEYS, NINES_PER_CLUB_MAX, NINE_SUM_MIN, NINE_SUM_MAX, type MissingKey,
     checkNinePars, isExpectedParsShape, cleanNineName, cleanWebsite, cleanPhone, checkKoreaCoords, logoOrigin,
 } from "../../../../shared/golfParEdit.js";
+import { GOLF_LOGO_MAX_BYTES, GOLF_LOGO_MAX_PX, cleanRemoteImageUrl, golfLogoBlobPath, isUploadedLogo } from "../../../../shared/golfLogo.js";
+import { fetchRemoteImage, type RemoteImageResult } from "../../../lib/remoteImage.js";
+import { stripImageMetadata } from "../../../utils/imageMeta.js";
+import { deleteBlobs } from "../../../utils/blob.js";
 
 const router = Router();
 
@@ -167,7 +175,7 @@ router.patch("/:slug", asyncHandler(async (req: any, res: any) => {
         changes.phone = p.value;
     }
     if ("logo" in body) {
-        if (body.logo !== null) return sendError(res, 400, "로고는 내리기만 할 수 있습니다(올리기는 아직 없습니다)");
+        if (body.logo !== null) return sendError(res, 400, "여기서는 로고를 내리기만 합니다 — 올리기는 POST /:slug/logo");
         changes.logo = null;
     }
     if (!Object.keys(changes).length) return sendError(res, 400, "고칠 칸이 없습니다");
@@ -187,6 +195,8 @@ router.patch("/:slug", asyncHandler(async (req: any, res: any) => {
     if (!r.ok) return sendError(res, 409, "다른 곳에서 먼저 바뀌었습니다 — 새로 불러온 값을 확인하고 다시 저장하세요", "PAGE_CHANGED");
 
     const logoCleared = r.changed.includes("logo") && !!r.before.logo;
+    // 올린 로고를 내렸으면 저장소의 파일도 지운다(남겨 두면 주소를 아는 사람에게 계속 열린다). 정적 파일 로고는 건드리지 않는다
+    if (logoCleared && isUploadedLogo(r.before.logo)) await deleteBlobs(r.before.logo);
     adminLog(req, "golf.course.page", {
         slug,
         before: Object.fromEntries(r.changed.map((k) => [k, r.before[k]])),
@@ -198,6 +208,84 @@ router.patch("/:slug", asyncHandler(async (req: any, res: any) => {
         removedLogo: logoCleared ? { path: r.before.logo, origin: logoOrigin(r.before.logo) } : null,
         official: officialLogoFor(slug),
     });
+}));
+
+// ── 로고 올리기 ────────────────────────────────────────────────────
+const FETCH_ERROR: Record<Exclude<RemoteImageResult, { ok: true }>["reason"], string> = {
+    "bad-url": "그림 주소를 알아볼 수 없습니다",
+    private: "받아 올 수 없는 주소입니다",
+    dns: "그 사이트를 찾을 수 없습니다",
+    http: "그 사이트가 그림을 내주지 않았습니다 — 그림을 저장하거나 복사해서 붙여넣어 주세요",
+    "too-big": "그림이 너무 큽니다(2MB까지) — 로고 그림만 골라 주세요",
+    "not-image": "그림이 아닙니다 — 로고 그림 자체를 끌어다 놓거나, 복사해서 붙여넣어 주세요",
+    timeout: "그 사이트의 응답이 늦습니다 — 그림을 저장하거나 복사해서 붙여넣어 주세요",
+    redirects: "주소가 계속 다른 곳으로 넘어갑니다",
+    network: "그 사이트에 연결하지 못했습니다 — 그림을 저장하거나 복사해서 붙여넣어 주세요",
+};
+
+// 다른 사이트에서 로고를 끌어다 놓으면 파일이 아니라 주소만 온다. 화면은 다른 사이트의 그림을 읽지 못해(CORS) 서버가 대신 받아 넘긴다.
+// 받은 것은 저장하지 않는다 — 화면이 PNG 로 다시 그려 아래 POST /:slug/logo 로 올린다.
+router.post("/logo/fetch", asyncHandler(async (req: any, res: any) => {
+    const body = isPlainObject(req.body) ? req.body : {};
+    const url = cleanRemoteImageUrl(body.url);
+    if (!url) return sendError(res, 400, FETCH_ERROR["bad-url"]);
+    const r = await fetchRemoteImage(url);
+    if (!r.ok) return sendError(res, r.reason === "bad-url" || r.reason === "private" ? 400 : 422, FETCH_ERROR[r.reason], `LOGO_FETCH_${r.reason.replace(/-/g, "_").toUpperCase()}`);
+    res.set("Cache-Control", "no-store");
+    return sendSuccess(res, { type: r.type, mime: r.mime, bytes: r.buffer.length, base64: r.buffer.toString("base64") });
+}));
+
+router.post("/:slug/logo", asyncHandler(async (req: any, res: any) => {
+    const slug = String(req.params.slug).normalize("NFC");
+    const body = isPlainObject(req.body) ? req.body : {};
+    if (typeof body.png !== "string" || !body.png) return sendError(res, 400, "올릴 그림이 없습니다");
+    if (body.light !== undefined && typeof body.light !== "boolean") return sendError(res, 400, "light 는 true/false 입니다");
+    let expectedLogo: string | null | undefined;
+    if (body.expected !== undefined) {
+        if (!isPlainObject(body.expected) || !("logo" in body.expected) || (body.expected.logo !== null && typeof body.expected.logo !== "string")) {
+            return sendError(res, 400, "고치기 전 값(expected)의 모양이 잘못됐습니다");
+        }
+        expectedLogo = body.expected.logo as string | null;
+    }
+    // 화면이 캔버스로 다시 그린 PNG 만 받는다 — 남의 사이트에서 온 원본(SVG·GIF·메타 정보가 든 파일)을 그대로 저장하지 않는다
+    const b64 = body.png.replace(/^data:image\/png;base64,/, "");
+    if (b64.length > Math.ceil(GOLF_LOGO_MAX_BYTES / 3) * 4 + 4) return sendError(res, 413, "로고 그림이 너무 큽니다");
+    const raw = Buffer.from(b64, "base64");
+    const clean = stripImageMetadata(raw);
+    if (clean.type !== "png" || clean.buffer.length < 33) return sendError(res, 400, "PNG 그림만 올릴 수 있습니다");
+    if (clean.buffer.length > GOLF_LOGO_MAX_BYTES) return sendError(res, 413, "로고 그림이 너무 큽니다");
+    const width = clean.buffer.readUInt32BE(16), height = clean.buffer.readUInt32BE(20);
+    if (width < 16 || height < 16 || width > GOLF_LOGO_MAX_PX || height > GOLF_LOGO_MAX_PX) {
+        return sendError(res, 400, `로고 크기가 맞지 않습니다(한 변 16~${GOLF_LOGO_MAX_PX}px)`);
+    }
+    const token = process.env.BLOB_READ_WRITE_TOKEN;
+    if (!token) return sendError(res, 503, "그림 저장소가 설정되지 않았습니다");
+
+    const cur = await getCourseData(slug);
+    if (!cur) return sendError(res, 404, "골프장을 찾을 수 없습니다");
+    const before: string | null = cur.logo ?? null;
+    if (expectedLogo !== undefined && expectedLogo !== before) {
+        return sendError(res, 409, "다른 곳에서 먼저 바뀌었습니다 — 새로 불러온 값을 확인하고 다시 올리세요", "PAGE_CHANGED");
+    }
+
+    const light = body.light === true;
+    const path = golfLogoBlobPath(createHash("sha1").update(slug).digest("hex"), randomBytes(6).toString("hex"), light);
+    const saved = await put(path, clean.buffer, { access: "public", contentType: "image/png", addRandomSuffix: false, token });
+    // 저장소가 준 주소가 '올린 로고' 꼴이 아니면 쓰지 않는다 — 그 꼴이어야 다시 적재해도 남고, 내릴 때 파일도 지운다
+    if (!isUploadedLogo(saved.url)) {
+        await deleteBlobs(saved.url);
+        return sendError(res, 500, "로고를 저장하지 못했습니다");
+    }
+    const r = await patchCoursePage(slug, { logo: saved.url }, { logo: before });
+    if (!r.ok) {
+        await deleteBlobs(saved.url);
+        if (r.reason === "gone") return sendError(res, 404, "골프장을 찾을 수 없습니다");
+        return sendError(res, 409, "다른 곳에서 먼저 바뀌었습니다 — 새로 불러온 값을 확인하고 다시 올리세요", "PAGE_CHANGED");
+    }
+    // 바꿔 올렸으면 앞의 올린 파일은 지운다(정적 파일 로고는 건드리지 않는다)
+    if (isUploadedLogo(before)) await deleteBlobs(before);
+    adminLog(req, "golf.course.logo.upload", { slug, before, after: r.after.logo, bytes: clean.buffer.length, width, height, light });
+    return sendSuccess(res, { slug, ...r.after, changed: r.changed, logoOrigin: logoOrigin(r.after.logo) }, 201);
 }));
 
 export default router;

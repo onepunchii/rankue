@@ -5,6 +5,7 @@ import { storeListings } from "../shared/schema.js";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../shared/aboutContent.js";
 import { DOC_META } from "../shared/docMeta.js";
+import { absoluteLogoUrl } from "../shared/golfLogo.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo } from "../shared/storeMeta.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
@@ -865,7 +866,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
     ...(distinctAliases(p.name, p.aliases).length ? { alternateName: distinctAliases(p.name, p.aliases) } : {}),
     url: canonical,
     description: desc,
-    ...(p.logo ? { logo: `${ORIGIN}${p.logo}` } : {}),
+    ...(absoluteLogoUrl(ORIGIN, p.logo) ? { logo: absoluteLogoUrl(ORIGIN, p.logo) } : {}),
     // 대표 이미지는 골프장 카드(정사각형) — 네이버·구글 썸네일이 가운데를 정사각형으로 자른다(2026-09-30)
     image: golfCourseCardUrl(ORIGIN, slug),
     ...(p.phone ? { telephone: p.phone } : {}),

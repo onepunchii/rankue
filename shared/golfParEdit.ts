@@ -12,8 +12,9 @@
  * rankue_golf_courses 에서 베껴 만든다. 어드민이 파를 고치면 그 골프장 페이지만 **같은 식으로** 다시 만든다(pageCoursesFromNines).
  * 식이 갈라지면 다음 적재 때 페이지가 조용히 바뀐다.
  *
- * ⚠️ shared 상대 임포트는 반드시 ./x.js(서버리스 규칙, 2026-08-16·09-14 사고). 지금은 임포트가 없다.
+ * ⚠️ shared 상대 임포트는 반드시 ./x.js(서버리스 규칙, 2026-08-16·09-14 사고).
  */
+import { isUploadedLogo } from "./golfLogo.js";
 
 /** 코스 한 줄 = 9홀 */
 export const NINE = 9;
@@ -242,11 +243,13 @@ export function missingFields(f: CourseDataFacts): MissingKey[] {
  * 로고 파일 이름으로 출처를 안다 — 적재 스크립트를 다시 돌리면 어디서 다시 붙는지.
  *  official: 골프장 공식 홈페이지 로고 `/img/golf-logos/g-<sha1(slug) 10자>[-light].png` (server/scripts/data/golf-logos-official.json)
  *  dbegl:    오너가 준 더블이글 자료 `/img/golf-logos/<자료 id>.png` (golf-course-dbegl.ts, --dbegl)
+ *  upload:   어드민에서 올린 로고(2026-10-07, shared/golfLogo.ts) — 우리 저장소에 있고, 다시 적재해도 남는다
  */
-export type LogoOrigin = "official" | "dbegl" | "other";
+export type LogoOrigin = "official" | "dbegl" | "upload" | "other";
 export function logoOrigin(logo: string | null | undefined): LogoOrigin | null {
     if (!logo || !logo.trim()) return null;
     if (/^\/img\/golf-logos\/g-[0-9a-f]{10}(-light)?\.png$/i.test(logo)) return "official";
     if (/^\/img\/golf-logos\/\d+\.png$/.test(logo)) return "dbegl";
+    if (isUploadedLogo(logo)) return "upload";
     return "other";
 }

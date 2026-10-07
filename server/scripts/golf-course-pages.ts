@@ -27,6 +27,7 @@ import { COURSES } from "../../client/src/golf/data/golfCourses";
 import { COURSE_COORDS } from "../../client/src/golf/data/courseCoords";
 import { applyDbegl, readDbegl } from "./golf-course-dbegl";
 import { applyOfficialLogos } from "./golf-logos-official";
+import { UPLOADED_LOGO_SQL_RE } from "../../shared/golfLogo";
 // 라벨·이름 다듬기·시세 쓰기는 서버(매일 동기화 크론)도 쓴다 — 이 파일은 client 목록을 끌고 와서 서버가 못 임포트한다.
 import { normName, itemLabel, manText, writePrices, parseFeed, pricesFromFeed, syncMembershipPrices } from "../services/golfPriceSync.js";
 export { normName, itemLabel, manText, writePrices, parseFeed, pricesFromFeed, syncMembershipPrices };
@@ -317,7 +318,10 @@ export async function writePages(built: Awaited<ReturnType<typeof buildPages>>) 
                 address = excluded.address, lat = excluded.lat, lng = excluded.lng, course_ids = excluded.course_ids,
                 club_id = excluded.club_id, kind = excluded.kind, holes = excluded.holes, parts = excluded.parts,
                 courses = excluded.courses, intro = excluded.intro, info = excluded.info, fees = excluded.fees,
-                tgm_items = excluded.tgm_items, logo = excluded.logo, grass = excluded.grass, play = excluded.play,
+                tgm_items = excluded.tgm_items,
+                -- 어드민에서 올린 로고(우리 저장소의 hiq/golf-logo/)는 다시 적재해도 남긴다(2026-10-07, shared/golfLogo.ts)
+                logo = case when golf_course_pages.logo ~ ${UPLOADED_LOGO_SQL_RE} then golf_course_pages.logo else excluded.logo end,
+                grass = excluded.grass, play = excluded.play,
                 phone = excluded.phone, website = excluded.website, fee_from = excluded.fee_from, popularity = excluded.popularity,
                 aliases = excluded.aliases, ext_ids = excluded.ext_ids, updated_at = now()`);
     }
