@@ -132,6 +132,37 @@ export function cleanNineName(input: unknown): { ok: true; name: string } | { ok
     return { ok: true, name };
 }
 
+// ── 목록 ───────────────────────────────────────────────────────────
+/**
+ * 어드민 골프장 목록이 한 번에 주는 줄 수의 상한. 화면의 '더 보기'는 limit 를 50씩 키워 **처음부터 다시** 받는다 —
+ * 상한이 골프장 페이지 수보다 작으면 거기서 더 내려가지 않는다(상한이 200 이던 때 200/490 에서 멈췄다, 2026-10-07 오너: "200 이상 더 안 내려감").
+ * 목록은 어차피 서버가 전부 읽어 메모리에서 거르므로, 상한은 응답 크기만 지킨다.
+ */
+export const COURSE_LIST_MAX = 2000;
+
+// ── 어드민이 고친 칸 ───────────────────────────────────────────────
+/**
+ * 어드민에서 고친 골프장 페이지 칸(golf_course_pages.admin_keep 에 적는 이름).
+ * 적재 스크립트가 원본 자료로 페이지를 다시 쓸 때 이 칸들은 건드리지 않는다 — 고친 값이 다음 적재에 조용히 되돌아가지 않게(2026-10-07).
+ */
+export const ADMIN_KEEP_KEYS = ["name", "coords", "website", "phone"] as const;
+export type AdminKeepKey = (typeof ADMIN_KEEP_KEYS)[number];
+
+// ── 골프장 이름 ────────────────────────────────────────────────────
+export const COURSE_NAME_MAX = 40;
+/**
+ * 골프장 이름(페이지 제목 · 검색 · 공유 카드에 그대로 쓰인다) — 앞뒤 공백을 떼고 공백 여러 칸은 한 칸으로.
+ * 주소(슬러그)는 바꾸지 않는다: 이미 퍼진 링크와 검색 결과가 그 주소를 가리킨다.
+ */
+export function cleanCourseName(input: unknown): { ok: true; name: string } | { ok: false; error: string } {
+    if (typeof input !== "string") return { ok: false, error: "골프장 이름을 적어 주세요" };
+    const name = input.normalize("NFC").replace(/\s+/g, " ").trim();
+    if (name.length < 2) return { ok: false, error: "골프장 이름을 두 글자 이상 적어 주세요" };
+    if (name.length > COURSE_NAME_MAX) return { ok: false, error: `골프장 이름은 ${COURSE_NAME_MAX}자까지입니다` };
+    if (/[\u0000-\u001f\u007f<>]/.test(name)) return { ok: false, error: "골프장 이름에 쓸 수 없는 글자가 있습니다" };
+    return { ok: true, name };
+}
+
 // ── 홈페이지·전화 ──────────────────────────────────────────────────
 export const WEBSITE_MAX = 300;
 type Cleaned = { ok: true; value: string | null } | { ok: false; error: string };

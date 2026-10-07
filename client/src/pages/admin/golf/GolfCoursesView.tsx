@@ -6,6 +6,8 @@
  *  - 빈칸 칩(파 미확인·코스 없음·로고·홈페이지·전화·좌표·원장 연결·요금, 숫자) + 검색 + 정렬(인기·관심·최근 라운드)
  *  - 줄을 누르면 시트: 골프장 페이지·홈페이지 링크 / 코스별 9칸 파(홀마다 3·4·5 빠른 단추, 합 경고) / 코스 추가 /
  *    홈페이지·전화 고치기 / 로고 올리기·내리기 / 원장 좌표(현장 인증이 이 점을 본다)
+ *  - 골프장 이름 고치기 · 원장 좌표를 저장하면 골프장 페이지 좌표도 같이(2026-10-07 오너: "잘못된 정보라 수정가능하게").
+ *    어드민에서 고친 이름·좌표·홈페이지·전화는 자료를 다시 적재해도 남는다(golf_course_pages.admin_keep)
  *  - 로고 올리기(2026-10-07): 골프장 홈페이지의 로고를 로고 칸에 끌어다 놓거나 · 복사해 붙여넣거나 · 파일을 고른다(shared/golfLogo.ts)
  *  - 파 저장은 묻고 저장한다 — 이 골프장으로 치는 경기 화면에 바로 쓰인다. 서버는 '고치기 전 값'이 그대로일 때만 쓴다
  *    (그 사이 다른 작업이 먼저 채웠으면 덮지 않고, 새 값을 불러와 보여 준다).
@@ -26,7 +28,7 @@ import { ONSITE_RADIUS_KM } from "@shared/golfOnSite";
 import {
     MISSING_KEYS, MISSING_LABEL, NINE, NINE_SUM_MIN, NINE_SUM_MAX, NINE_NAME_MAX,
     isParValue, isUnusualNineSum, cleanNineName, nineNameKey, cleanWebsite, cleanPhone,
-    checkKoreaCoords, parseLatLngText, parseParsText,
+    checkKoreaCoords, parseLatLngText, parseParsText, cleanCourseName, COURSE_NAME_MAX,
     type MissingKey, type PageCourse, type LogoOrigin,
 } from "@shared/golfParEdit";
 import { imageUrlFromDrop } from "@shared/golfLogo";
@@ -64,6 +66,8 @@ type Detail = {
     sharedClubPages: { slug: string; name: string }[];
     official: Official;
     logoOrigin: LogoOrigin | null;
+    /** 어드민에서 고친 칸(name · coords · website · phone) — 다시 적재해도 남는다 */
+    adminKeep?: string[];
 };
 
 type Sort = "popularity" | "watchers" | "rounds";
@@ -349,12 +353,13 @@ function CourseSheet({ slug, onClose }: { slug: string | null; onClose: () => vo
 
                         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
                             <NinesSection d={d} />
+                            <Section title="골프장 이름"><NameEditor d={d} /></Section>
                             <Section title="홈페이지 · 전화"><ContactEditor d={d} /></Section>
                             <Section title="로고"><LogoEditor d={d} /></Section>
-                            <Section title="원장 좌표" meta={d.club ? `현장 인증 반경 ${ONSITE_RADIUS_KM}km` : undefined}><CoordsEditor d={d} /></Section>
+                            <Section title={d.club ? "좌표" : "골프장 페이지 좌표"} meta={d.club ? `현장 인증 반경 ${ONSITE_RADIUS_KM}km` : undefined}><CoordsEditor d={d} /></Section>
                             <p className="text-[11.5px] leading-relaxed text-black/40">
-                                파·코스·원장 좌표는 라운드 원장에 저장돼 그대로 남습니다. 홈페이지·전화·로고는 골프장 페이지 칸이라
-                                적재 스크립트(golf-course-pages.ts --write)를 다시 돌리면 원본 자료 값으로 돌아갑니다.
+                                파·코스·원장 좌표는 라운드 원장에 저장돼 그대로 남습니다. 여기서 고친 이름·좌표·홈페이지·전화와 올린 로고도
+                                자료를 다시 적재할 때 덮이지 않습니다(내린 로고는 자료에 있으면 다시 붙습니다).
                                 공개 골프장 페이지에는 1분 안에 반영됩니다.{d.hasFees ? "" : " 그린피는 자료에서 오는 값이라 여기서 고치지 않습니다."}
                             </p>
                         </div>
@@ -382,8 +387,8 @@ function NinesSection({ d }: { d: Detail }) {
             <Section title="코스 · 파">
                 <div className="rounded-2xl border border-dashed border-black/15 bg-white p-4 text-[13px] leading-relaxed text-black/55">
                     {d.clubMissing
-                        ? "이 페이지가 가리키는 라운드 원장 줄이 없습니다(지워진 원장). 코스·파·좌표를 넣을 수 없습니다."
-                        : "라운드 원장(경기 화면이 쓰는 골프장 목록)에 짝이 없는 골프장입니다. 코스·파·좌표를 넣을 데가 없습니다 — 적재 스크립트가 이름·좌표로 짝을 짓습니다."}
+                        ? "이 페이지가 가리키는 라운드 원장 줄이 없습니다(지워진 원장). 코스·파를 넣을 수 없습니다 — 좌표는 아래에서 골프장 페이지 좌표를 고칩니다."
+                        : "라운드 원장(경기 화면이 쓰는 골프장 목록)에 짝이 없는 골프장입니다. 코스·파를 넣을 데가 없습니다 — 적재 스크립트가 이름·좌표로 짝을 짓습니다. 좌표는 아래에서 골프장 페이지 좌표를 바로 고칩니다."}
                 </div>
             </Section>
         );
@@ -633,6 +638,92 @@ function AddNineForm({ clubId, existing, onClose }: { clubId: string; existing: 
 }
 
 // ── 홈페이지·전화 ──────────────────────────────────────────────────
+// ── 골프장 이름 ────────────────────────────────────────────────────
+function NameEditor({ d }: { d: Detail }) {
+    const { toast } = useToast();
+    const qc = useQueryClient();
+    const [name, setName] = useState(d.name);
+    // 경기 시작 화면에는 원장 골프장 이름이 뜬다 — 그 원장을 이 페이지만 쓰고 진행 중 경기가 없을 때만 같이 바꿀 수 있다
+    const clubRenamable = !!d.club && d.sharedClubPages.length === 0 && d.liveMatches === 0;
+    // 원장 이름이 지금 페이지 이름과 같았으면(같이 틀렸다) 같이 바꾸는 쪽이 기본. 원래 달랐으면 건드리지 않는 쪽이 기본
+    const clubDefault = clubRenamable && d.club!.name === d.name;
+    const [alsoClub, setAlsoClub] = useState(clubDefault);
+    useEffect(() => { setName(d.name); setAlsoClub(clubDefault); }, [d.slug, d.name, clubDefault]);
+    const c = cleanCourseName(name);
+    const next = c.ok ? c.name : name;
+    const clubDiffers = !!d.club && d.club.name !== next;
+    const dirty = next !== d.name;
+
+    const save = useMutation({
+        mutationFn: (body: { name: string; expected: string; alsoClub: boolean }) => apiRequest(`${API}/${encodeURIComponent(d.slug)}/name`, { method: "PUT", body }),
+        onSuccess: (r: any) => {
+            toast({ title: "이름을 바꿨습니다", description: r?.club ? "경기 시작 화면의 이름도 같이 바꿨습니다" : undefined });
+            void qc.invalidateQueries({ queryKey: GOLF_COURSES_KEY });
+        },
+        onError: (e) => {
+            toast({ title: "이름 저장 실패", description: errMsg(e), variant: "destructive" });
+            if (errCode(e) === "PAGE_CHANGED") void qc.invalidateQueries({ queryKey: GOLF_COURSES_KEY });
+        },
+    });
+
+    // 페이지 이름은 맞는데 경기 시작 화면의 이름(원장)만 다를 때 — 원장 이름을 이 이름으로 맞춘다
+    const onMatchClub = async () => {
+        if (!clubRenamable || dirty || save.isPending || d.club!.name === d.name) return;
+        if (!(await appConfirm({ message: `경기 시작 화면의 이름을 '${d.club!.name}'에서 '${d.name}'(으)로 바꿀까요?`, confirmText: "바꾸기" }))) return;
+        save.mutate({ name: d.name, expected: d.name, alsoClub: true });
+    };
+
+    const onSave = async () => {
+        if (!c.ok || !dirty || save.isPending) return;
+        const withClub = clubRenamable && alsoClub && clubDiffers;
+        const lines = [`골프장 이름을 '${c.name}'(으)로 바꿀까요?`, "골프장 페이지 제목·검색·공유 카드에 바로 쓰입니다. 주소는 그대로이고, 옛 이름으로도 계속 검색됩니다."];
+        if (withClub) lines.push(`경기 시작 화면의 이름(원장 '${d.club!.name}')도 같이 바꿉니다.`);
+        if (!(await appConfirm({ message: lines.join("\n"), confirmText: "바꾸기" }))) return;
+        save.mutate({ name: c.name, expected: d.name, alsoClub: withClub });
+    };
+
+    return (
+        <Panel className="p-3 space-y-2.5">
+            <label className="block">
+                <span className="text-[12px] font-bold text-black/50">이름</span>
+                <input data-course-name value={name} onChange={(e) => setName(e.target.value)} maxLength={COURSE_NAME_MAX + 10} autoComplete="off"
+                    className={cn("mt-1 w-full h-10 px-3 rounded-lg border bg-white text-[16px] md:text-sm outline-none focus:border-brand/50", !c.ok ? "border-red-400" : "border-black/10")} />
+                <span className={cn("mt-1 block text-[11.5px] leading-relaxed", !c.ok ? "text-red-600 font-bold" : "text-black/40")}>
+                    {!c.ok ? c.error : "주소(링크)는 바뀌지 않고, 옛 이름은 별칭으로 남아 그 이름으로도 검색됩니다."}
+                </span>
+            </label>
+            {d.club && dirty && (
+                <label className={cn("flex items-start gap-2 text-[12px] leading-relaxed", clubRenamable ? "text-black/60 cursor-pointer" : "text-black/40")}>
+                    <input type="checkbox" className="mt-0.5 accent-brand" checked={clubRenamable && alsoClub} disabled={!clubRenamable} onChange={(e) => setAlsoClub(e.target.checked)} />
+                    <span>
+                        경기 시작 화면의 이름(원장 '{d.club.name}')도 같이 바꾸기
+                        {!clubRenamable && <span className="block text-[11.5px]">{d.liveMatches > 0 ? "진행 중인 경기가 있어 지금은 원장 이름을 바꾸지 않습니다." : "이 원장을 다른 골프장 페이지도 같이 쓰고 있어 원장 이름은 바꾸지 않습니다."}</span>}
+                    </span>
+                </label>
+            )}
+            {d.club && !dirty && d.club.name !== d.name && (
+                <div data-club-name className="rounded-xl bg-black/[0.03] px-3 py-2 flex items-center gap-2">
+                    <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-black/55">경기 시작 화면에는 원장 이름 <b className="text-black/75">'{d.club.name}'</b>(으)로 뜹니다.</p>
+                    {clubRenamable && (
+                        <button type="button" onClick={() => void onMatchClub()} disabled={save.isPending}
+                            className="shrink-0 h-8 px-3 rounded-lg bg-white border border-black/10 text-[12.5px] font-bold text-black/65 disabled:opacity-50">이 이름으로 맞추기</button>
+                    )}
+                </div>
+            )}
+            {dirty && (
+                <div className="flex gap-2">
+                    <button onClick={() => { setName(d.name); setAlsoClub(clubDefault); }} disabled={save.isPending}
+                        className="flex-1 h-9 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/60 disabled:opacity-50">되돌리기</button>
+                    <button onClick={() => void onSave()} disabled={!c.ok || save.isPending}
+                        className="flex-1 h-9 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-strong disabled:opacity-40">
+                        {save.isPending ? "저장 중…" : "이름 저장"}
+                    </button>
+                </div>
+            )}
+        </Panel>
+    );
+}
+
 function ContactEditor({ d }: { d: Detail }) {
     const { toast } = useToast();
     const qc = useQueryClient();
@@ -673,8 +764,6 @@ function ContactEditor({ d }: { d: Detail }) {
         const clearing = [clearingSite ? "홈페이지 주소" : null, pDirty && p.ok && !p.value && d.phone ? "전화번호" : null].filter(Boolean);
         if (clearing.length) {
             const lines = [`${clearing.join("·")}를 지울까요? 골프장 페이지에서 그 단추가 빠집니다.`];
-            // 공식 로고 자료에 홈페이지가 있으면 그 스크립트가 빈 칸을 다시 채운다
-            if (clearingSite && d.official.entry?.website) lines.push("공식 로고 자료(golf-logos-official.json)에 이 골프장 홈페이지가 있어, 스크립트를 다시 돌리면 다시 채워집니다.");
             if (!(await appConfirm({ message: lines.join("\n"), tone: "danger", confirmText: "지우기" }))) return;
         }
         save.mutate(body);
@@ -905,53 +994,87 @@ function CoordsEditor({ d }: { d: Detail }) {
     const { toast } = useToast();
     const qc = useQueryClient();
     const club = d.club;
-    const cur = club && club.lat != null && club.lng != null ? fmtLL(club.lat, club.lng) : "";
+    const page = d.pageLat != null && d.pageLng != null ? { lat: d.pageLat, lng: d.pageLng } : null;
+    // 원장에 짝이 있으면 원장 좌표를 고친다(저장하면 페이지 좌표도 같은 값으로). 짝이 없으면 페이지 좌표를 바로 고친다
+    const cur = club ? (club.lat != null && club.lng != null ? fmtLL(club.lat, club.lng) : "") : page ? fmtLL(page.lat, page.lng) : "";
     const [text, setText] = useState(cur);
     useEffect(() => setText(cur), [d.slug, cur]);
-    const page = d.pageLat != null && d.pageLng != null ? { lat: d.pageLat, lng: d.pageLng } : null;
     const parsed = text.trim() ? parseLatLngText(text) : null;
     const check = parsed ? checkKoreaCoords(parsed.lat, parsed.lng) : null;
     const dirty = text.trim() !== cur;
     const far = check?.ok && page ? distanceKm(check.lat, check.lng, page.lat, page.lng) : null;
 
     const save = useMutation({
-        mutationFn: (body: { lat: number; lng: number }) => apiRequest(`${API}/clubs/${club!.id}/coords`, { method: "PATCH", body }),
+        // 원장 좌표를 저장할 때 이 페이지(slug)를 같이 보낸다 — 서버가 골프장 페이지 좌표도 같은 값으로 맞춘다
+        mutationFn: (body: { lat: number; lng: number }) => club
+            ? apiRequest(`${API}/clubs/${club.id}/coords`, { method: "PATCH", body: { ...body, slug: d.slug } })
+            : apiRequest(`${API}/${encodeURIComponent(d.slug)}/coords`, { method: "PATCH", body }),
         onSuccess: () => {
-            toast({ title: "좌표를 저장했습니다" });
+            toast({ title: "좌표를 저장했습니다", description: club ? "골프장 페이지 좌표도 같은 값으로 맞췄습니다" : undefined });
             void qc.invalidateQueries({ queryKey: GOLF_COURSES_KEY });
         },
-        onError: (e) => toast({ title: "좌표 저장 실패", description: errMsg(e), variant: "destructive" }),
+        onError: (e) => {
+            toast({ title: "좌표 저장 실패", description: errMsg(e), variant: "destructive" });
+            if (errCode(e) === "PAGE_CHANGED" || errCode(e) === "PAGE_HAS_CLUB") void qc.invalidateQueries({ queryKey: GOLF_COURSES_KEY });
+        },
     });
 
-    if (!club) {
-        return <Panel className="p-3 text-[13px] text-black/50">라운드 원장에 짝이 없어 좌표를 넣을 데가 없습니다.</Panel>;
-    }
+    // 원장 좌표는 그대로 두고 페이지 좌표만 어긋나 있는 경우 — 원장 좌표로 맞춘다
+    const pageOff = !!club && club.lat != null && club.lng != null && (!page || page.lat !== club.lat || page.lng !== club.lng);
+    const pageOffKm = pageOff && page ? distanceKm(club!.lat!, club!.lng!, page.lat, page.lng) : null;
 
     const onSave = async () => {
         if (!check?.ok || save.isPending) return;
-        const lines = [`원장 좌표를 저장할까요? 현장 인증은 이 점에서 ${ONSITE_RADIUS_KM}km 안인지로 판정합니다.`, `위도 ${check.lat} · 경도 ${check.lng}`];
-        if (far != null && far > FAR_KM) lines.push(`골프장 페이지 좌표와 ${far.toFixed(1)}km 떨어져 있습니다 — 다른 골프장을 찍지 않았는지 보세요.`);
+        const lines = club
+            ? [`좌표를 저장할까요? 현장 인증은 이 점에서 ${ONSITE_RADIUS_KM}km 안인지로 판정하고, 골프장 페이지 좌표(지도·가까운 골프장·날씨)도 같은 값으로 바뀝니다.`, `위도 ${check.lat} · 경도 ${check.lng}`]
+            : [`골프장 페이지 좌표를 저장할까요? 지도·가까운 골프장·날씨가 이 점을 씁니다.`, `위도 ${check.lat} · 경도 ${check.lng}`];
+        if (far != null && far > FAR_KM) lines.push(`지금 골프장 페이지 좌표와 ${far.toFixed(1)}km 떨어져 있습니다 — 다른 골프장을 찍지 않았는지 보세요.`);
         if (!(await appConfirm({ message: lines.join("\n"), confirmText: "저장" }))) return;
         save.mutate({ lat: check.lat, lng: check.lng });
+    };
+    const onSyncPage = async () => {
+        if (!pageOff || save.isPending) return;
+        const lines = [`골프장 페이지 좌표를 원장 좌표(${cur})로 맞출까요? 지도·가까운 골프장·날씨가 이 점을 씁니다.`];
+        if (page) lines.push(`지금 페이지 좌표: ${fmtLL(page.lat, page.lng)}${pageOffKm != null ? ` (${pageOffKm.toFixed(1)}km 차이)` : ""}`);
+        if (!(await appConfirm({ message: lines.join("\n"), confirmText: "맞추기" }))) return;
+        save.mutate({ lat: club!.lat!, lng: club!.lng! });
     };
 
     // 원장 좌표가 없을 때 현장 인증이 무엇을 쓰는지(golf.repo.ts courseCoordsFor): 그 원장을 쓰는 페이지가 하나뿐이면 페이지 좌표
     const fallback = !cur && page && d.sharedClubPages.length === 0;
-    const mapAt = check?.ok ? check : club.lat != null && club.lng != null ? { lat: club.lat, lng: club.lng } : page;
+    const mapAt = check?.ok ? check : club && club.lat != null && club.lng != null ? { lat: club.lat, lng: club.lng } : page;
     const link = "h-9 px-3 rounded-lg border border-black/10 bg-white inline-flex items-center gap-1.5 text-[12.5px] font-bold text-black/60 hover:border-brand/40 hover:text-brand";
     return (
         <Panel className="p-3 space-y-2.5">
-            <div className="grid grid-cols-2 gap-2 text-[12px]">
-                <div className="rounded-xl bg-black/[0.03] px-2.5 py-2 min-w-0">
-                    <p className="font-bold text-black/45">원장 좌표</p>
-                    <p className={cn("mt-0.5 tabular-nums truncate", cur ? "text-[rgba(0,0,0,0.87)] font-bold" : "text-red-600 font-bold")}>{cur || "없음"}</p>
+            {club ? (
+                <div className="grid grid-cols-2 gap-2 text-[12px]">
+                    <div className="rounded-xl bg-black/[0.03] px-2.5 py-2 min-w-0">
+                        <p className="font-bold text-black/45">원장 좌표</p>
+                        <p className={cn("mt-0.5 tabular-nums truncate", cur ? "text-[rgba(0,0,0,0.87)] font-bold" : "text-red-600 font-bold")}>{cur || "없음"}</p>
+                    </div>
+                    <div className="rounded-xl bg-black/[0.03] px-2.5 py-2 min-w-0">
+                        <p className="font-bold text-black/45">골프장 페이지 좌표</p>
+                        <p className={cn("mt-0.5 tabular-nums truncate", pageOff ? "text-amber-700 font-bold" : "text-black/60")}>{page ? fmtLL(page.lat, page.lng) : "없음"}</p>
+                    </div>
                 </div>
-                <div className="rounded-xl bg-black/[0.03] px-2.5 py-2 min-w-0">
-                    <p className="font-bold text-black/45">골프장 페이지 좌표</p>
-                    <p className="mt-0.5 tabular-nums truncate text-black/60">{page ? fmtLL(page.lat, page.lng) : "없음"}</p>
+            ) : (
+                <p className="text-[12px] leading-relaxed text-black/50">라운드 원장에 짝이 없는 골프장입니다 — 여기서는 골프장 페이지 좌표(지도·가까운 골프장·날씨)를 바로 고칩니다.</p>
+            )}
+            {club && (
+                <p className="text-[12px] leading-relaxed text-black/50">원장 좌표를 저장하면 골프장 페이지 좌표도 같은 값으로 바뀝니다.</p>
+            )}
+            {pageOff && !dirty && (
+                <div data-coords-sync className="rounded-xl bg-amber-500/[0.1] px-3 py-2 flex items-center gap-2">
+                    <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-amber-900">
+                        골프장 페이지 좌표가 원장 좌표와 다릅니다{pageOffKm != null ? ` (${pageOffKm.toFixed(1)}km)` : ""}.
+                    </p>
+                    <button type="button" onClick={() => void onSyncPage()} disabled={save.isPending}
+                        className="shrink-0 h-8 px-3 rounded-lg bg-white border border-amber-600/30 text-[12.5px] font-bold text-amber-900 disabled:opacity-50">
+                        원장 좌표로 맞추기
+                    </button>
                 </div>
-            </div>
-            {!cur && (
+            )}
+            {club && !cur && (
                 <p className={cn("text-[12px] leading-relaxed", fallback ? "text-black/50" : "text-red-600 font-bold")}>
                     {fallback ? "지금은 현장 인증이 골프장 페이지 좌표로 대신합니다 — 원장에도 넣어 두면 확실합니다."
                         : "이 골프장 라운드는 지금 현장 인증을 할 수 없습니다 — 좌표를 넣어 주세요."}

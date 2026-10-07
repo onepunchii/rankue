@@ -829,6 +829,11 @@ export const golfCoursePages = pgTable("golf_course_pages", {
   popularity: integer("popularity").default(0).notNull(),
   aliases: text("aliases").array().default([]).notNull(),
   extIds: integer("ext_ids").array().default([]).notNull(),
+  /**
+   * 어드민에서 고친 칸의 이름(2026-10-07) — name · coords · website · phone (shared/golfParEdit.ts ADMIN_KEEP_KEYS).
+   * 적재 스크립트(golf-course-pages.ts --write)는 여기 적힌 칸을 원본 자료 값으로 덮지 않는다.
+   */
+  adminKeep: text("admin_keep").array().default([]).notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [index("golf_course_pages_region_idx").on(t.region, t.city)]);
 

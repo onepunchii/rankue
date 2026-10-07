@@ -314,16 +314,29 @@ export async function writePages(built: Awaited<ReturnType<typeof buildPages>>) 
                     ${pgTextArray(r.tgmItems)}::text[],
                     ${r.logo ?? null}, ${pgTextArray(r.grass)}::text[], ${pgTextArray(r.play)}::text[], ${r.phone ?? null}, ${r.website ?? null},
                     ${r.feeFrom ?? null}, ${r.popularity ?? 0}, ${pgTextArray(r.aliases)}::text[], ${`{${(r.extIds ?? []).join(",")}}`}::int[], now())
-            on conflict (slug) do update set name = excluded.name, region = excluded.region, city = excluded.city,
-                address = excluded.address, lat = excluded.lat, lng = excluded.lng, course_ids = excluded.course_ids,
-                club_id = excluded.club_id, kind = excluded.kind, holes = excluded.holes, parts = excluded.parts,
+            on conflict (slug) do update set
+                -- 어드민에서 고친 칸(admin_keep, 2026-10-07)은 원본 자료로 덮지 않는다 — 이름 · 좌표 · 홈페이지 · 전화
+                name = case when 'name' = any(golf_course_pages.admin_keep) then golf_course_pages.name else excluded.name end,
+                region = excluded.region, city = excluded.city, address = excluded.address,
+                lat = case when 'coords' = any(golf_course_pages.admin_keep) then golf_course_pages.lat else excluded.lat end,
+                lng = case when 'coords' = any(golf_course_pages.admin_keep) then golf_course_pages.lng else excluded.lng end,
+                course_ids = excluded.course_ids,
+                -- 원장 짝은 이름으로 찾는다. 어드민에서 이름을 고친 뒤 짝을 못 찾았다고 있던 짝을 끊지 않는다(새 짝을 찾았으면 그것으로)
+                club_id = coalesce(excluded.club_id, golf_course_pages.club_id),
+                kind = excluded.kind, holes = excluded.holes, parts = excluded.parts,
                 courses = excluded.courses, intro = excluded.intro, info = excluded.info, fees = excluded.fees,
                 tgm_items = excluded.tgm_items,
                 -- 어드민에서 올린 로고(우리 저장소의 hiq/golf-logo/)는 다시 적재해도 남긴다(2026-10-07, shared/golfLogo.ts)
                 logo = case when golf_course_pages.logo ~ ${UPLOADED_LOGO_SQL_RE} then golf_course_pages.logo else excluded.logo end,
                 grass = excluded.grass, play = excluded.play,
-                phone = excluded.phone, website = excluded.website, fee_from = excluded.fee_from, popularity = excluded.popularity,
-                aliases = excluded.aliases, ext_ids = excluded.ext_ids, updated_at = now()`);
+                phone = case when 'phone' = any(golf_course_pages.admin_keep) then golf_course_pages.phone else excluded.phone end,
+                website = case when 'website' = any(golf_course_pages.admin_keep) then golf_course_pages.website else excluded.website end,
+                fee_from = excluded.fee_from, popularity = excluded.popularity,
+                -- 이름을 고친 페이지는 옛 이름이 별칭에 들어 있다(옛 이름으로 검색 · 원장과의 짝) — 그 별칭을 버리지 않는다
+                aliases = case when 'name' = any(golf_course_pages.admin_keep)
+                               then array(select distinct unnest(golf_course_pages.aliases || excluded.aliases))
+                               else excluded.aliases end,
+                ext_ids = excluded.ext_ids, updated_at = now()`);
     }
     await writePrices(prices, history);
 }

@@ -8,7 +8,7 @@ const m = vi.hoisted(() => ({
     get: vi.fn(), patch: vi.fn(), official: vi.fn(), put: vi.fn(), del: vi.fn(), fetchRemote: vi.fn(), log: vi.fn(),
 }));
 vi.mock("../../../storage/adminGolfCourses.js", () => ({
-    listCourseData: vi.fn(), getCourseData: m.get, saveNinePars: vi.fn(), addNine: vi.fn(), patchCoursePage: m.patch, setClubCoords: vi.fn(), officialLogoFor: m.official,
+    listCourseData: vi.fn(), getCourseData: m.get, saveNinePars: vi.fn(), addNine: vi.fn(), patchCoursePage: m.patch, setClubCoords: vi.fn(), setPageCoords: vi.fn(), renameCourse: vi.fn(), officialLogoFor: m.official,
 }));
 vi.mock("@vercel/blob", () => ({ put: m.put }));
 vi.mock("../../../utils/blob.js", () => ({ deleteBlobs: m.del }));

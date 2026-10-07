@@ -17,6 +17,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "../db.js";
+import type { AdminKeepKey } from "../../shared/golfParEdit.js";
 import {
     isKnownPars, missingFields, nineNameKey, pageCoursesFromNines, NINES_PER_CLUB_MAX,
     type MissingKey, type PageCourse,
@@ -179,7 +180,7 @@ export interface AdminNine {
 
 export async function getCourseData(slug: string) {
     const [p] = await q(sql`select slug, name, region, city, address, lat, lng, logo, website, phone, club_id, course_ids, kind, holes,
-                                   courses, fee_from, popularity, aliases, updated_at,
+                                   courses, fee_from, popularity, aliases, admin_keep, updated_at,
                                    coalesce(jsonb_typeof(fees) = 'object', false) as has_fee_table
                             from golf_course_pages where slug = ${slug}`);
     if (!p) return null;
@@ -231,6 +232,8 @@ export async function getCourseData(slug: string) {
         feeFrom: num(p.fee_from),
         popularity: Number(p.popularity) || 0,
         aliases: (Array.isArray(p.aliases) ? p.aliases : []) as string[],
+        /** 어드민에서 고친 칸 — 다시 적재해도 남는다(shared/golfParEdit.ts ADMIN_KEEP_KEYS) */
+        adminKeep: (Array.isArray(p.admin_keep) ? p.admin_keep : []) as string[],
         bookable: courseIds.length > 0,
         updatedAt: utcIso(p.updated_at),
         club: club
@@ -352,6 +355,9 @@ export async function patchCoursePage(slug: string, changes: Partial<PageFields>
         changed.push(k);
     }
     if (!sets.length) return { ok: true, before: pick(cur), after: pick(cur), changed: [] };
+    // 홈페이지·전화를 고쳤으면(지운 것 포함) 다시 적재해도 그 값이 남게 적어 둔다. 로고는 따로다(올린 로고는 주소 꼴로 남긴다 — shared/golfLogo.ts)
+    const keep = changed.filter((k) => k !== "logo");
+    if (keep.length) sets.push(keepSql(keep as AdminKeepKey[]));
     sets.push(sql`updated_at = now()`);
     const [row] = await q(sql`update golf_course_pages set ${sql.join(sets, sql`, `)} where ${sql.join(conds, sql` and `)}
                               returning website, phone, logo`);
@@ -362,16 +368,103 @@ export async function patchCoursePage(slug: string, changes: Partial<PageFields>
     return { ok: true, before: pick(cur), after: pick(row), changed };
 }
 
-export type CoordsResult =
-    | { ok: true; name: string; before: { lat: number | null; lng: number | null }; after: { lat: number; lng: number } }
-    | Fail<"gone">;
+/** admin_keep 에 칸 이름을 더한다(겹치지 않게) — UPDATE 의 set 절 한 조각 */
+function keepSql(keys: readonly AdminKeepKey[]): SQL {
+    const lit = `{${keys.map((k) => `"${k}"`).join(",")}}`;
+    return sql`admin_keep = array(select distinct unnest(admin_keep || ${lit}::text[]) order by 1)`;
+}
 
-/** 원장 골프장 좌표 — 현장 인증(골프장 2km 안)이 이 점부터 본다(golf.repo.ts courseCoordsFor). */
-export async function setClubCoords(clubId: string, lat: number, lng: number): Promise<CoordsResult> {
-    const [cur] = await q(sql`select name, latitude, longitude from rankue_golf_clubs where id = ${clubId}::uuid`);
+type LatLng = { lat: number | null; lng: number | null };
+export type CoordsResult =
+    | { ok: true; name: string; before: LatLng; after: { lat: number; lng: number }; page: { slug: string; before: LatLng } | null }
+    | Fail<"gone" | "page-mismatch">;
+
+/**
+ * 원장 골프장 좌표 — 현장 인증(골프장 2km 안)이 이 점부터 본다(golf.repo.ts courseCoordsFor).
+ * slug 를 주면 **그 골프장 페이지의 좌표도 같은 값으로 맞춘다**(2026-10-07 오너: "원장좌표 수정시 골프장 좌표가 자동 반영되게") —
+ * 페이지 좌표는 지도·가까운 골프장·날씨가 쓴다. 그 페이지가 이 원장에 붙어 있을 때만. 같은 원장을 쓰는 다른 페이지는 건드리지 않는다
+ * (원장을 잘못 같이 가리키는 페이지가 있다 — 그쪽까지 옮기면 틀린 좌표가 퍼진다).
+ */
+export async function setClubCoords(clubId: string, lat: number, lng: number, slug?: string): Promise<CoordsResult> {
+    return db.transaction(async (tx: Exec) => {
+        const [cur] = await q(sql`select name, latitude, longitude from rankue_golf_clubs where id = ${clubId}::uuid for update`, tx);
+        if (!cur) return { ok: false, reason: "gone" } as const;
+        let pageBefore: LatLng | null = null;
+        if (slug !== undefined) {
+            const [pg] = await q(sql`select lat, lng, club_id from golf_course_pages where slug = ${slug} for update`, tx);
+            if (!pg || String(pg.club_id ?? "") !== clubId) return { ok: false, reason: "page-mismatch" } as const;
+            pageBefore = { lat: num(pg.lat), lng: num(pg.lng) };
+        }
+        const [row] = await q(sql`update rankue_golf_clubs set latitude = ${lat}, longitude = ${lng}, updated_at = now()
+                                  where id = ${clubId}::uuid returning latitude, longitude`, tx);
+        if (!row) return { ok: false, reason: "gone" } as const;
+        if (slug !== undefined) {
+            await tx.execute(sql`update golf_course_pages set lat = ${lat}, lng = ${lng}, ${keepSql(["coords"])}, updated_at = now() where slug = ${slug}`);
+        }
+        return {
+            ok: true, name: String(cur.name), before: { lat: num(cur.latitude), lng: num(cur.longitude) }, after: { lat: Number(row.latitude), lng: Number(row.longitude) },
+            page: slug !== undefined && pageBefore ? { slug, before: pageBefore } : null,
+        } as const;
+    });
+}
+
+export type PageCoordsResult = { ok: true; name: string; before: LatLng; after: { lat: number; lng: number } } | Fail<"gone" | "has-club">;
+/** 원장에 짝이 없는 골프장 페이지의 좌표 — 짝이 있으면 원장 좌표를 고친다(위 setClubCoords 가 페이지까지 맞춘다) */
+export async function setPageCoords(slug: string, lat: number, lng: number): Promise<PageCoordsResult> {
+    const [cur] = await q(sql`select p.name, p.lat, p.lng, (c.id is not null) as has_club
+                              from golf_course_pages p left join rankue_golf_clubs c on c.id = p.club_id where p.slug = ${slug}`);
     if (!cur) return { ok: false, reason: "gone" };
-    const [row] = await q(sql`update rankue_golf_clubs set latitude = ${lat}, longitude = ${lng}, updated_at = now()
-                              where id = ${clubId}::uuid returning latitude, longitude`);
+    // 짝이 '있다' = 원장 줄이 실제로 있다. 원장 줄이 지워진 페이지(club_id 만 남음)는 짝이 없는 것으로 본다
+    if (cur.has_club) return { ok: false, reason: "has-club" };
+    const [row] = await q(sql`update golf_course_pages set lat = ${lat}, lng = ${lng}, ${keepSql(["coords"])}, updated_at = now()
+                              where slug = ${slug} and not exists (select 1 from rankue_golf_clubs c where c.id = golf_course_pages.club_id) returning lat, lng`);
     if (!row) return { ok: false, reason: "gone" };
-    return { ok: true, name: String(cur.name), before: { lat: num(cur.latitude), lng: num(cur.longitude) }, after: { lat: Number(row.latitude), lng: Number(row.longitude) } };
+    return { ok: true, name: String(cur.name), before: { lat: num(cur.lat), lng: num(cur.lng) }, after: { lat: Number(row.lat), lng: Number(row.lng) } };
+}
+
+export type RenameResult =
+    | { ok: true; before: string; after: string; aliases: string[]; club: { id: string; before: string; after: string } | null; unchanged: boolean }
+    | Fail<"gone" | "taken" | "club-live" | "club-shared">
+    | { ok: false; reason: "changed"; current: string };
+
+/**
+ * 골프장 이름 고치기(2026-10-07 오너: "골프장 명 수정 가능하게").
+ *  - 페이지 이름만 바꾼다. **주소(슬러그)는 그대로** — 이미 퍼진 링크·검색 결과가 그 주소를 가리킨다.
+ *  - 옛 이름은 aliases 에 남긴다: 옛 이름으로도 검색되고, 원장 골프장(이름으로 페이지를 찾는다 — golf.repo.ts)과의 짝도 끊기지 않는다.
+ *  - alsoClub: 경기 시작 화면에 뜨는 원장 골프장 이름도 같이 바꾼다. 그 원장에 진행 중 경기가 있거나 다른 페이지가 같이 쓰면 하지 않는다.
+ *  - 같은 이름의 다른 골프장 페이지가 있으면 막는다(검색·경기 화면에서 둘을 가를 수 없다).
+ */
+export async function renameCourse(slug: string, name: string, expectedOld: string | undefined, alsoClub: boolean): Promise<RenameResult> {
+    return db.transaction(async (tx: Exec) => {
+        const [cur] = await q(sql`select name, aliases, club_id from golf_course_pages where slug = ${slug} for update`, tx);
+        if (!cur) return { ok: false, reason: "gone" } as const;
+        const before = String(cur.name);
+        if (expectedOld !== undefined && expectedOld !== before) return { ok: false, reason: "changed", current: before } as const;
+        const key = (s: string) => s.normalize("NFC").replace(/\s+/g, "").toLowerCase();
+        const [dup] = await q(sql`select slug from golf_course_pages where slug <> ${slug} and lower(regexp_replace(name, '\\s+', '', 'g')) = ${key(name)} limit 1`, tx);
+        if (dup) return { ok: false, reason: "taken" } as const;
+
+        const clubId: string | null = cur.club_id ? String(cur.club_id) : null;
+        let club: { id: string; before: string; after: string } | null = null;
+        if (alsoClub && clubId) {
+            const [c] = await q(sql`select name from rankue_golf_clubs where id = ${clubId}::uuid for update`, tx);
+            if (c && String(c.name) !== name) {
+                const [sib] = await q(sql`select 1 as x from golf_course_pages where club_id = ${clubId}::uuid and slug <> ${slug} limit 1`, tx);
+                if (sib) return { ok: false, reason: "club-shared" } as const;
+                const [live] = await q(sql`select 1 as x from golf_match_sessions
+                                           where course_id = ${clubId} and ((status = 'waiting' and created_at > now() - interval '6 hours')
+                                                                         or (status = 'playing' and updated_at > now() - interval '12 hours')) limit 1`, tx);
+                if (live) return { ok: false, reason: "club-live" } as const;
+                await tx.execute(sql`update rankue_golf_clubs set name = ${name}, updated_at = now() where id = ${clubId}::uuid`);
+                club = { id: clubId, before: String(c.name), after: name };
+            }
+        }
+        const old: string[] = Array.isArray(cur.aliases) ? cur.aliases.map(String) : [];
+        if (before === name) return { ok: true, before, after: name, aliases: old, club, unchanged: !club } as const;
+        // 옛 이름을 남기고, 새 이름과 같은 별칭은 뺀다(이름이 별칭에 또 있으면 화면에 두 번 나온다)
+        const aliases = [...old.filter((a) => key(a) !== key(name)), ...(old.some((a) => key(a) === key(before)) ? [] : [before])];
+        const lit = `{${aliases.map((x) => `"${x.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`).join(",")}}`;
+        await tx.execute(sql`update golf_course_pages set name = ${name}, aliases = ${lit}::text[], ${keepSql(["name"])}, updated_at = now() where slug = ${slug}`);
+        return { ok: true, before, after: name, aliases, club, unchanged: false } as const;
+    });
 }

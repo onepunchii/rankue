@@ -10,15 +10,19 @@
  *   GET    /                        목록 + 빈칸 칩 숫자  ?missing=pars|logo|website|phone|coords|club|fees &q= &sort=popularity|watchers|rounds &limit= &offset=
  *   PUT    /nines/:rowId/pars       한 코스 파 { pars: number[9], expectedOld?, force? } — 합이 34~37 밖이면 force 가 있어야
  *   POST   /nines                   코스 추가 { clubId, name, pars?: number[9] | [], force? }
- *   PATCH  /clubs/:clubId/coords    원장 좌표 { lat, lng } — 현장 인증(2km)이 이 점을 본다. 한국 안(33~39N, 124~132E)만
+ *   PATCH  /clubs/:clubId/coords    원장 좌표 { lat, lng, slug? } — 현장 인증(2km)이 이 점을 본다. 한국 안(33~39N, 124~132E)만.
+ *                                   slug 를 주면 그 골프장 페이지의 좌표도 같은 값으로 맞춘다(2026-10-07)
+ *   PATCH  /:slug/coords            { lat, lng } — 원장에 짝이 없는 페이지의 좌표(짝이 있으면 원장 좌표를 고친다)
+ *   PUT    /:slug/name              { name, expected?, alsoClub? } — 골프장 이름(2026-10-07). 주소(슬러그)는 그대로, 옛 이름은 별칭으로 남는다
  *   GET    /:slug                   한 곳 — 페이지 칸 + 원장 코스·파 + 원장 좌표 + 공식 로고 자료 여부
  *   PATCH  /:slug                   { website?, phone?, logo?: null, expected? } — 여기서 로고는 내리기만(올린 로고면 저장소의 파일도 지운다)
  *   POST   /logo/fetch              { url } — 다른 사이트의 그림을 대신 받아 화면에 넘긴다(끌어다 놓으면 주소만 온다). 저장하지 않는다
  *   POST   /:slug/logo              { png: base64, light?, expected? } — 로고 올리기(2026-10-07). 화면이 다시 그린 PNG 만 받는다
  *
  * 쓰기는 전부 adminLog 로 남긴다(전·후 값 — 되돌릴 때 이걸 본다).
- * ⚠️ 홈페이지·전화·로고는 golf_course_pages 칸이라 적재 스크립트(golf-course-pages.ts --write)를 다시 돌리면 원본 자료 값으로 덮인다.
- *    파·코스(rankue_golf_courses)와 원장 좌표(rankue_golf_clubs)는 적재 스크립트가 읽기만 해서 남는다.
+ * 어드민에서 고친 이름·좌표·홈페이지·전화는 golf_course_pages.admin_keep 에 칸 이름이 적혀, 적재 스크립트(golf-course-pages.ts --write)를
+ *    다시 돌려도 남는다(2026-10-07). 올린 로고도 남는다(shared/golfLogo.ts). ⚠️ '내린' 로고는 자료에 있으면 다시 붙는다.
+ *    파·코스(rankue_golf_courses)와 원장 좌표·이름(rankue_golf_clubs)은 적재 스크립트가 읽기만 해서 남는다.
  */
 import { Router } from "express";
 import { createHash, randomBytes } from "node:crypto";
@@ -27,12 +31,12 @@ import { asyncHandler } from "../../../utils/asyncHandler.js";
 import { sendError, sendSuccess } from "../../../utils/response.js";
 import { adminLog } from "../../../middleware/adminAuth.js";
 import {
-    listCourseData, getCourseData, saveNinePars, addNine, patchCoursePage, setClubCoords, officialLogoFor,
+    listCourseData, getCourseData, saveNinePars, addNine, patchCoursePage, setClubCoords, setPageCoords, renameCourse, officialLogoFor,
     type AdminCourseRow, type PageField,
 } from "../../../storage/adminGolfCourses.js";
 import {
-    MISSING_KEYS, NINES_PER_CLUB_MAX, NINE_SUM_MIN, NINE_SUM_MAX, type MissingKey,
-    checkNinePars, isExpectedParsShape, cleanNineName, cleanWebsite, cleanPhone, checkKoreaCoords, logoOrigin,
+    MISSING_KEYS, NINES_PER_CLUB_MAX, NINE_SUM_MIN, NINE_SUM_MAX, COURSE_LIST_MAX, type MissingKey,
+    checkNinePars, isExpectedParsShape, cleanNineName, cleanWebsite, cleanPhone, checkKoreaCoords, cleanCourseName, logoOrigin,
 } from "../../../../shared/golfParEdit.js";
 import { GOLF_LOGO_MAX_BYTES, GOLF_LOGO_MAX_PX, cleanRemoteImageUrl, golfLogoBlobPath, isUploadedLogo } from "../../../../shared/golfLogo.js";
 import { fetchRemoteImage, type RemoteImageResult } from "../../../lib/remoteImage.js";
@@ -66,7 +70,8 @@ router.get("/", asyncHandler(async (req: any, res: any) => {
     const missing = MISSING_KEYS.includes(req.query.missing) ? (req.query.missing as MissingKey) : null;
     const sort: Sort = SORTS.includes(req.query.sort) ? req.query.sort : "popularity";
     const qs = typeof req.query.q === "string" ? searchKey(req.query.q.slice(0, 40)) : "";
-    const limit = Math.min(200, Math.max(1, Math.floor(Number(req.query.limit)) || 50));
+    // 화면의 '더 보기'가 limit 를 키워 다시 받는다 — 상한은 골프장 페이지 수보다 넉넉해야 끝까지 내려간다(COURSE_LIST_MAX)
+    const limit = Math.min(COURSE_LIST_MAX, Math.max(1, Math.floor(Number(req.query.limit)) || 50));
     const offset = Math.max(0, Math.floor(Number(req.query.offset)) || 0);
 
     const { rows, ledger } = await listCourseData();
@@ -142,10 +147,14 @@ router.patch("/clubs/:clubId/coords", asyncHandler(async (req: any, res: any) =>
     const body = isPlainObject(req.body) ? req.body : {};
     const c = checkKoreaCoords(body.lat, body.lng);
     if (!c.ok) return sendError(res, 400, c.error);
-    const r = await setClubCoords(clubId, c.lat, c.lng);
+    // slug: 지금 보고 있는 골프장 페이지 — 그 페이지의 좌표(지도·가까운 골프장·날씨가 쓴다)도 같은 값으로 맞춘다
+    if (body.slug !== undefined && (typeof body.slug !== "string" || !body.slug.trim())) return sendError(res, 400, "골프장 페이지(slug)가 잘못됐습니다");
+    const slug = typeof body.slug === "string" ? body.slug.normalize("NFC") : undefined;
+    const r = await setClubCoords(clubId, c.lat, c.lng, slug);
+    if (!r.ok && r.reason === "page-mismatch") return sendError(res, 409, "그 골프장 페이지는 이 원장에 붙어 있지 않습니다 — 새로 불러와 확인하세요", "PAGE_CHANGED");
     if (!r.ok) return sendError(res, 404, "원장 골프장을 찾을 수 없습니다");
-    adminLog(req, "golf.club.coords", { clubId, name: r.name, before: r.before, after: r.after });
-    return sendSuccess(res, { clubId, lat: r.after.lat, lng: r.after.lng });
+    adminLog(req, "golf.club.coords", { clubId, name: r.name, before: r.before, after: r.after, page: r.page });
+    return sendSuccess(res, { clubId, lat: r.after.lat, lng: r.after.lng, pageSynced: r.page?.slug ?? null });
 }));
 
 // ── 한 곳 ──────────────────────────────────────────────────────────
@@ -154,6 +163,38 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
     const d = await getCourseData(slug);
     if (!d) return sendError(res, 404, "골프장을 찾을 수 없습니다");
     return sendSuccess(res, { ...d, logoOrigin: logoOrigin(d.logo) });
+}));
+
+// 원장에 짝이 없는 페이지의 좌표 — 짝이 있으면 원장 좌표(위)를 고친다: 두 좌표가 따로 놀지 않게
+router.patch("/:slug/coords", asyncHandler(async (req: any, res: any) => {
+    const slug = String(req.params.slug).normalize("NFC");
+    const body = isPlainObject(req.body) ? req.body : {};
+    const c = checkKoreaCoords(body.lat, body.lng);
+    if (!c.ok) return sendError(res, 400, c.error);
+    const r = await setPageCoords(slug, c.lat, c.lng);
+    if (!r.ok && r.reason === "has-club") return sendError(res, 409, "원장에 짝이 있는 골프장입니다 — 원장 좌표를 고치면 페이지 좌표도 같이 바뀝니다", "PAGE_HAS_CLUB");
+    if (!r.ok) return sendError(res, 404, "골프장을 찾을 수 없습니다");
+    adminLog(req, "golf.course.coords", { slug, name: r.name, before: r.before, after: r.after });
+    return sendSuccess(res, { slug, lat: r.after.lat, lng: r.after.lng });
+}));
+
+router.put("/:slug/name", asyncHandler(async (req: any, res: any) => {
+    const slug = String(req.params.slug).normalize("NFC");
+    const body = isPlainObject(req.body) ? req.body : {};
+    const n = cleanCourseName(body.name);
+    if (!n.ok) return sendError(res, 400, n.error);
+    if (body.expected !== undefined && typeof body.expected !== "string") return sendError(res, 400, "고치기 전 이름(expected)의 모양이 잘못됐습니다");
+    if (body.alsoClub !== undefined && typeof body.alsoClub !== "boolean") return sendError(res, 400, "alsoClub 은 true/false 입니다");
+    const r = await renameCourse(slug, n.name, body.expected as string | undefined, body.alsoClub === true);
+    if (!r.ok) {
+        if (r.reason === "gone") return sendError(res, 404, "골프장을 찾을 수 없습니다");
+        if (r.reason === "changed") return sendError(res, 409, "다른 곳에서 먼저 바뀌었습니다 — 새로 불러온 이름을 확인하고 다시 저장하세요", "PAGE_CHANGED");
+        if (r.reason === "taken") return sendError(res, 409, "같은 이름의 골프장 페이지가 이미 있습니다(띄어쓰기·대소문자만 달라도 같은 이름으로 봅니다)", "NAME_TAKEN");
+        if (r.reason === "club-shared") return sendError(res, 409, "이 원장을 다른 골프장 페이지도 같이 쓰고 있어 원장 이름은 바꾸지 않습니다 — '경기 시작 화면의 이름' 체크를 풀고 저장하세요", "CLUB_SHARED");
+        return sendError(res, 409, "이 골프장에서 진행 중인 경기가 있어 원장 이름은 지금 바꾸지 않습니다 — 체크를 풀고 저장하거나 경기가 끝난 뒤에 하세요", "CLUB_LIVE");
+    }
+    if (!r.unchanged) adminLog(req, "golf.course.name", { slug, before: r.before, after: r.after, club: r.club });
+    return sendSuccess(res, { slug, name: r.after, aliases: r.aliases, club: r.club, unchanged: r.unchanged });
 }));
 
 const PAGE_FIELDS: PageField[] = ["website", "phone", "logo"];

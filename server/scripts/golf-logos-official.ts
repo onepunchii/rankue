@@ -64,7 +64,7 @@ async function main() {
         if (write) {
             await db.execute(sql`update golf_course_pages
                 set logo = case when coalesce(logo, '') = '' then ${o.logo ?? null} else logo end,
-                    website = case when coalesce(website, '') = '' then ${o.website ?? null} else website end,
+                    website = case when coalesce(website, '') = '' and not ('website' = any(admin_keep)) then ${o.website ?? null} else website end,
                     updated_at = now()
                 where slug = ${slug}`);
         }
