@@ -1194,7 +1194,7 @@ const es: Dict = {
   "menu.namePlaceholder": "Nombre",
   "menu.notifications": "Notificaciones",
   "menu.partnerProgram": "Programa de socios",
-  "menu.partnerPromoDesc": "Reclama tu página, gestiona tu local, organiza torneos",
+  "menu.partnerPromoDesc": "Gestiona la página de tu local y consulta tus miembros",
   "menu.permanentDelete": "Eliminar definitivamente",
   "menu.polliChip": "Encuestas · Quiz",
   "menu.polliDesc": "Demuestra tu gusto en Polli y mira los resultados",

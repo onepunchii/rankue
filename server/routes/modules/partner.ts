@@ -5,6 +5,7 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { hasSocialLogin, isAdminRole } from "../../lib/adminRole.js";
+import { applicantOf, toMyApplications } from "../../lib/partnerApply.js";
 
 const router = Router();
 
@@ -79,6 +80,43 @@ router.post("/sso", asyncHandler(async (req: any, res: any) => {
         path: '/'
     });
     return sendSuccess(res, { success: true, storeName: store?.name ?? "관리자", role: profile.role });
+}));
+
+// GET /partner/applications — 내 신청(클레임 · 새 매장 등록)과 그 상태. 랭큐에 로그인한 계정 기준이다(파트너 쿠키가 아니다).
+// 2026-10-07: 예전에는 신청하고 나면 토스트 한 줄뿐이었고, 승인·거절을 볼 화면이 없었다. 신청자에게 보일 것만 내려 보낸다
+// (연락처·운영자 메모·PIN 은 싣지 않는다 — lib/partnerApply toMyApplications). 사람마다 답이 달라 캐시하지 않는다.
+router.get("/applications", asyncHandler(async (req: any, res: any) => {
+    const userId = req.signedCookies?.hiq_user_id;
+    const who = applicantOf(userId ? await storage.getMemberById(userId) : null);
+    res.set("Cache-Control", "private, no-store");
+    if (!who.ok) return who.status === 401 ? sendError(res, 401, "로그인이 필요합니다") : sendSuccess(res, { applications: [], ownsStore: false });
+
+    const { db } = await import("../../db.js");
+    const { storeListingClaims, storeRegistrations, storeListings } = await import("../../../shared/schema.js");
+    const { and, desc, eq } = await import("drizzle-orm");
+    const claims = await db.select({
+        id: storeListingClaims.id, listingCode: storeListingClaims.listingCode, listingName: storeListings.name,
+        status: storeListingClaims.status, rejectReason: storeListingClaims.rejectReason, createdAt: storeListingClaims.createdAt,
+    }).from(storeListingClaims)
+        .leftJoin(storeListings, eq(storeListings.code, storeListingClaims.listingCode))
+        .where(eq(storeListingClaims.applicantProfileId, who.profileId))
+        .orderBy(desc(storeListingClaims.createdAt)).limit(20);
+    const regs = await db.select({
+        id: storeRegistrations.id, name: storeRegistrations.name, listingCode: storeRegistrations.listingCode,
+        status: storeRegistrations.status, rejectReason: storeRegistrations.rejectReason, createdAt: storeRegistrations.createdAt,
+    }).from(storeRegistrations)
+        .where(and(eq(storeRegistrations.applicantProfileId, who.profileId), eq(storeRegistrations.kind, "owner")))
+        .orderBy(desc(storeRegistrations.createdAt)).limit(20);
+    const store = await storage.getStoreByOwnerProfileId(who.profileId);
+    return sendSuccess(res, { applications: toMyApplications(claims, regs), ownsStore: !!store });
+}));
+
+// POST /partner/logout — **매장 관리에서만** 나간다(2026-10-07). 파트너 쿠키와 대리 접속 표시만 지우고 앱 로그인(hiq_user_id)은 그대로 둔다.
+// 예전에는 사장님 화면의 로그아웃이 /api/hiq/logout 을 불러 앱 로그인까지 끊었다 — 매장 화면을 닫으려던 사장님이 앱에서도 로그아웃됐다.
+router.post("/logout", asyncHandler(async (_req: any, res: any) => {
+    res.clearCookie('hiq_partner_auth', { path: '/' });
+    res.clearCookie('hiq_admin_origin', { path: '/' });
+    return sendSuccess(res, { success: true });
 }));
 
 // Helper for protected partner routes — trust only the SIGNED partner cookie.

@@ -6,6 +6,7 @@ import { SUGGESTION_REPLY_TYPE } from "../../lib/suggestionBox.js";
 import { randomInt } from "crypto";
 import { hashPassword } from "../../services/hiqService.js";
 import { checkSuperAdmin, adminLog } from "../../middleware/adminAuth.js";
+import { cleanRejectReason } from "../../lib/partnerApply.js";
 import adminGolfRouter from "./adminGolf/index.js";
 import { getMemberGolfForAdmin, setBookingManagerRole } from "../../storage/adminMemberGolf.js";
 import { getGolfPushHistory } from "../../storage/adminGolfPush.js";
@@ -563,7 +564,7 @@ router.patch("/membership/orders/:id/status", checkSuperAdmin, asyncHandler(asyn
 router.get("/listing-claims", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
     const { db } = await import("../../db.js");
     const { storeListingClaims, storeListings } = await import("../../../shared/schema.js");
-    const { eq, desc } = await import("drizzle-orm");
+    const { eq, desc, sql: dsql } = await import("drizzle-orm");
     const claims = await db.select({
         id: storeListingClaims.id,
         listingCode: storeListingClaims.listingCode,
@@ -573,6 +574,9 @@ router.get("/listing-claims", checkSuperAdmin, asyncHandler(async (_req: any, re
         status: storeListingClaims.status,
         // 초기 PIN — 승인 후에도 관리자가 전화로 알려줄 수 있게(어드민 전용 표면)
         issuedPin: storeListingClaims.issuedPin,
+        // 랭큐 계정으로 받은 신청인가(2026-10-07) — 그렇다면 승인이 그 계정에 권한을 연다(PIN 없음). id 자체는 내려 보내지 않는다
+        accountLinked: dsql<boolean>`${storeListingClaims.applicantProfileId} is not null`,
+        rejectReason: storeListingClaims.rejectReason,
         createdAt: storeListingClaims.createdAt,
         listingName: storeListings.name,
         listingRegion: storeListings.region,
@@ -587,6 +591,11 @@ router.get("/listing-claims", checkSuperAdmin, asyncHandler(async (_req: any, re
 // 클레임 승인(기존 매장)과 신규 등록 승인(새 매장)이 같은 파이프라인을 쓴다:
 // 프로필 find-or-create(+PIN)·이중 매장 가드·파트너 매장 생성·리스팅 인증 마킹·앱 알림.
 // PIN 발급·이중 소유 가드는 보안 로직이라 두 라우트에 복제하지 않는다 — 반드시 여기만 수정.
+//
+// 2026-10-07 오너 "앞으로 사장님들이 신청·승인했을 때를 생각해서": 신청은 이제 **랭큐 계정으로** 들어온다(server/lib/partnerApply).
+//   - 신청에 계정(applicantProfileId)이 붙어 있으면 **그 프로필**이 매장의 주인이 된다 — 번호로 프로필을 찾지 않고, PIN 을 만들지 않는다.
+//     승인 알림은 신청한 그 회원에게 간다. 그 사람은 평소 쓰는 계정의 메뉴 → 내 매장 관리로 바로 들어온다(POST /partner/sso).
+//   - 계정이 붙지 않은 옛 신청만 예전 방식(연락처와 같은 번호의 프로필 find-or-create + 4자리 PIN)으로 간다.
 type ListingLike = {
     code: string; name: string; region: string; address: string;
     phone: string | null; rate10Large: number | null; rate10Medium: number | null;
@@ -595,6 +604,9 @@ type ListingLike = {
 async function issueOwnership(opts: {
     applicantName: string;
     applicantPhone: string;
+    /** 신청한 랭큐 계정 — 있으면 이 프로필이 주인이 된다(PIN 없음). 없으면(옛 신청) 연락처로 프로필을 찾거나 만든다 */
+    applicantProfileId?: string | null;
+    applicantMemberId?: string | null;
     /** tx 안에서 대상 리스팅을 확보 — 클레임은 기존 행을 그대로, 신규 등록은 insert 후 반환 */
     prepareListing: (tx: any) => Promise<ListingLike>;
     /** tx 마지막 단계 — 신청/클레임 행의 상태 갱신 */
@@ -609,9 +621,18 @@ async function issueOwnership(opts: {
     const { hashPassword } = await import("../../services/hiqService.js");
     const crypto = await import("node:crypto");
 
-    // 사장님 계정 — 같은 전화번호 프로필이 있으면 재사용(기존 비밀번호 유지), 없으면 새 PIN 발급
     const phone = opts.applicantPhone.replace(/[^\d]/g, "");
-    let [profile] = await db.select().from(profiles).where(eq(profiles.phone, phone));
+    // 사장님 계정 —
+    //  · 계정으로 받은 신청: 신청한 그 프로필. 그새 계정이 지워졌으면 발급하지 않는다(연락처로 다른 프로필을 찾아 붙이지 않는다 —
+    //    신청한 사람이 아닌 계정에 권한이 열릴 수 있다).
+    //  · 옛 신청: 같은 전화번호 프로필이 있으면 재사용(기존 비밀번호 유지), 없으면 새 PIN 발급
+    let profile: typeof profiles.$inferSelect | undefined;
+    if (opts.applicantProfileId) {
+        [profile] = await db.select().from(profiles).where(eq(profiles.id, opts.applicantProfileId));
+        if (!profile) return { ok: false, status: 409, message: "신청한 랭큐 계정을 찾을 수 없습니다(탈퇴했을 수 있어요). 신청자에게 다시 신청을 부탁해 주세요" };
+    } else {
+        [profile] = await db.select().from(profiles).where(eq(profiles.phone, phone));
+    }
 
     // 이중 매장 가드 — 이 프로필이 이미 파트너 매장을 소유하면 새 매장을 또 만들지 않는다.
     // getPartnerStore 가 소유 매장 중 임의의 첫 행을 집기 때문에(비결정) 이중 소유는 사고다.
@@ -619,7 +640,7 @@ async function issueOwnership(opts: {
         const [owned] = await db.select({ id: hiqStores.id, name: hiqStores.name })
             .from(hiqStores).where(eq(hiqStores.ownerId, profile.id));
         if (owned) {
-            return { ok: false, status: 409, message: `이 전화번호는 이미 파트너 매장(${owned.name})을 보유 중입니다. 한 계정 1매장 원칙 — 별도 처리 필요` };
+            return { ok: false, status: 409, message: `${opts.applicantProfileId ? "이 계정은" : "이 전화번호는"} 이미 파트너 매장(${owned.name})을 보유 중입니다. 한 계정 1매장 원칙 — 별도 처리 필요` };
         }
     }
     let issuedPin: string | null = null;
@@ -646,7 +667,7 @@ async function issueOwnership(opts: {
         const [store] = await tx.insert(hiqStores).values({
             slug,
             name: listing.name,
-            ownerId: profile.id,
+            ownerId: profile!.id, // 위에서 찾았거나 방금 만들었다
             region: listing.region,
             address: listing.address,
             phone: listing.phone,
@@ -665,7 +686,9 @@ async function issueOwnership(opts: {
     // 파트너로 자동 진입시키므로(POST /partner/sso), 알림만 보내면 통화가 사라진다.
     let notified = false;
     try {
-        const member = await storage.getMemberByProfileId(profile!.id);
+        // 신청한 그 회원에게(계정으로 받은 신청) — 그 행이 없어졌으면 프로필의 회원 행으로
+        const applicant = opts.applicantMemberId ? await storage.getMemberById(opts.applicantMemberId) : undefined;
+        const member = applicant?.profileId === profile!.id ? applicant : await storage.getMemberByProfileId(profile!.id);
         if (member) {
             const { notificationService } = await import("../../services/notificationService.js");
             await notificationService.sendAndSaveNotification({
@@ -686,6 +709,33 @@ async function issueOwnership(opts: {
     return { ok: true, storeSlug: result.slug, partnerPhone: phone, issuedPin, notified, listing: result.listing };
 }
 
+/**
+ * 거절 통보(2026-10-07) — 계정으로 받은 신청이면 그 회원의 알림함(+푸시)에 결과를 남긴다. 예전에는 거절이 누구에게도 가지 않았다.
+ * 사유가 있으면 그대로 싣는다. 알림 실패가 거절 처리를 되돌리면 안 된다 — 신청자는 '내 신청'(GET /partner/applications)에서도 본다.
+ */
+async function notifyApplicantRejected(memberId: string | null | undefined, storeName: string, reason: string | null): Promise<boolean> {
+    if (!memberId) return false;
+    try {
+        const member = await storage.getMemberById(memberId);
+        if (!member) return false;
+        const { notificationService } = await import("../../services/notificationService.js");
+        await notificationService.sendAndSaveNotification({
+            memberId: member.id,
+            title: "매장 관리 신청 결과를 알려 드려요",
+            body: reason
+                ? `${storeName} 신청이 이번에는 승인되지 않았어요. 사유: ${reason}`
+                : `${storeName} 신청이 이번에는 승인되지 않았어요. 내용을 확인한 뒤 다시 신청하실 수 있어요.`,
+            category: "admin",
+            type: "partner_rejected",
+            params: { url: "/partner/login" },
+        });
+        return true;
+    } catch (e) {
+        console.warn("[partner reject] 알림 실패:", (e as Error)?.message);
+        return false;
+    }
+}
+
 // POST /admin/listing-claims/:id/approve
 router.post("/listing-claims/:id/approve", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const { db } = await import("../../db.js");
@@ -702,10 +752,12 @@ router.post("/listing-claims/:id/approve", checkSuperAdmin, asyncHandler(async (
     const out = await issueOwnership({
         applicantName: claim.applicantName,
         applicantPhone: claim.applicantPhone,
+        applicantProfileId: claim.applicantProfileId,
+        applicantMemberId: claim.applicantMemberId,
         prepareListing: async () => listing, // 존재·미클레임 확인 완료된 기존 행
         finalizeTx: async (tx) => {
             await tx.update(storeListingClaims)
-                .set({ status: "approved" })
+                .set({ status: "approved", processedAt: new Date() })
                 .where(eq(storeListingClaims.id, claim.id));
         },
     });
@@ -728,6 +780,8 @@ router.post("/listing-claims/:id/approve", checkSuperAdmin, asyncHandler(async (
         issuedPin: out.issuedPin,
         // true 면 앱 알림으로 통보 완료 — 관리자가 전화할 필요 없다
         notified: out.notified,
+        // 랭큐 계정으로 받은 신청이었다 — 그 계정에 권한이 열렸다(PIN 없음)
+        accountLinked: !!claim.applicantProfileId,
     });
 }));
 
@@ -821,6 +875,8 @@ router.post("/store-registrations/:id/approve", checkSuperAdmin, asyncHandler(as
     const out = await issueOwnership({
         applicantName: reg.applicantName,
         applicantPhone: reg.applicantPhone,
+        applicantProfileId: reg.applicantProfileId,
+        applicantMemberId: reg.applicantMemberId,
         prepareListing,
         finalizeTx,
     });
@@ -841,6 +897,7 @@ router.post("/store-registrations/:id/approve", checkSuperAdmin, asyncHandler(as
         partnerPhone: out.partnerPhone,
         issuedPin: out.issuedPin,
         notified: out.notified,
+        accountLinked: !!reg.applicantProfileId,
     });
 }));
 
@@ -852,22 +909,30 @@ router.post("/store-registrations/:id/reject", checkSuperAdmin, asyncHandler(asy
     const [reg] = await db.select().from(storeRegistrations).where(eq(storeRegistrations.id, req.params.id));
     if (!reg) return sendError(res, 404, "신청을 찾을 수 없습니다");
     if (reg.status !== "pending") return sendError(res, 409, "이미 처리된 신청입니다");
+    const reason = cleanRejectReason(req.body?.reason);
     await db.update(storeRegistrations)
-        .set({ status: "rejected", processedAt: new Date() })
+        .set({ status: "rejected", processedAt: new Date(), rejectReason: reason })
         .where(eq(storeRegistrations.id, req.params.id));
-    return sendSuccess(res, { rejected: true });
+    // 사장님 신청이었고 계정으로 받았으면 결과를 알린다(이용자 제보에는 보내지 않는다)
+    const notified = reg.kind === "owner" ? await notifyApplicantRejected(reg.applicantMemberId, reg.name, reason) : false;
+    return sendSuccess(res, { rejected: true, notified });
 }));
 
 // POST /admin/listing-claims/:id/reject
 router.post("/listing-claims/:id/reject", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     const { db } = await import("../../db.js");
-    const { storeListingClaims } = await import("../../../shared/schema.js");
+    const { storeListingClaims, storeListings } = await import("../../../shared/schema.js");
     const { eq } = await import("drizzle-orm");
     const [claim] = await db.select().from(storeListingClaims).where(eq(storeListingClaims.id, req.params.id));
     if (!claim) return sendError(res, 404, "클레임을 찾을 수 없습니다");
     if (claim.status !== "pending") return sendError(res, 409, "이미 처리된 클레임입니다");
-    await db.update(storeListingClaims).set({ status: "rejected" }).where(eq(storeListingClaims.id, req.params.id));
-    return sendSuccess(res, { rejected: true });
+    const reason = cleanRejectReason(req.body?.reason);
+    await db.update(storeListingClaims)
+        .set({ status: "rejected", processedAt: new Date(), rejectReason: reason })
+        .where(eq(storeListingClaims.id, req.params.id));
+    const [listing] = await db.select({ name: storeListings.name }).from(storeListings).where(eq(storeListings.code, claim.listingCode));
+    const notified = await notifyApplicantRejected(claim.applicantMemberId, listing?.name ?? claim.listingCode, reason);
+    return sendSuccess(res, { rejected: true, notified });
 }));
 
 export default router;

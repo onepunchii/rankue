@@ -1027,12 +1027,19 @@ export const storeRegistrations = pgTable("store_registrations", {
   listingCode: text("listing_code"),
   /** 승인 시 발급된 초기 PIN(신규 계정일 때만). 관리자가 나중에 사장님께 전화로 알려줄 수
    *  있도록 평문 보관(오너 결정 2026-08-28) — 어드민 전용 표면에서만 노출한다.
-   *  사장님이 이후 비밀번호를 바꾸면 이 값은 낡은 값이 된다(라벨에 '초기'를 명시). */
+   *  사장님이 이후 비밀번호를 바꾸면 이 값은 낡은 값이 된다(라벨에 '초기'를 명시).
+   *  2026-10-07 부터 계정으로 받은 신청(applicantProfileId)은 PIN 을 발급하지 않아 이 칸이 비어 있다. */
   issuedPin: text("issued_pin"),
+  /** 신청한 랭큐 계정(2026-10-07 — server/lib/partnerApply). 승인하면 이 프로필이 매장의 주인이 된다. 옛 신청·이용자 제보는 NULL. */
+  applicantMemberId: uuid("applicant_member_id"),
+  applicantProfileId: uuid("applicant_profile_id"),
+  /** 거절 사유 — 신청자에게 그대로 보인다(GET /partner/applications) */
+  rejectReason: text("reject_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   processedAt: timestamp("processed_at"),
 }, (table) => [
   index("store_registrations_status_idx").on(table.status, table.createdAt),
+  index("store_registrations_applicant_idx").on(table.applicantProfileId),
 ]);
 
 export type StoreRegistration = typeof storeRegistrations.$inferSelect;
@@ -1798,8 +1805,15 @@ export const storeListingClaims = pgTable("store_listing_claims", {
   status: text("status", { enum: ["pending", "approved", "rejected"] }).default("pending").notNull(),
   /** 승인 시 발급된 초기 PIN(신규 계정일 때만) — 위 storeRegistrations 와 동일 정책 */
   issuedPin: text("issued_pin"),
+  /** 신청한 랭큐 계정(2026-10-07) — 위 storeRegistrations 와 같다. 승인하면 이 프로필이 매장의 주인이 된다. 옛 신청은 NULL. */
+  applicantMemberId: uuid("applicant_member_id"),
+  applicantProfileId: uuid("applicant_profile_id"),
+  rejectReason: text("reject_reason"),
+  processedAt: timestamp("processed_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
-});
+}, (table) => [
+  index("store_listing_claims_applicant_idx").on(table.applicantProfileId),
+]);
 
 // 정보 수정 제안 — 폐업·이전·오기 신고 (방문자 누구나)
 export const storeListingSuggestions = pgTable("store_listing_suggestions", {

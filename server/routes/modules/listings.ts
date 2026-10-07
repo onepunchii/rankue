@@ -1,14 +1,40 @@
 import { Router } from "express";
 import { Response } from "express";
 import { db } from "../../db.js";
-import { storeListings, storeListingClaims, storeListingSuggestions, storeRegistrations, hiqCrews } from "../../../shared/schema.js";
+import { storeListings, storeListingClaims, storeListingSuggestions, storeRegistrations, hiqCrews, hiqStores } from "../../../shared/schema.js";
+import { storage } from "../../storage/index.js";
+import { applicantOf, isContactPhone, type Applicant } from "../../lib/partnerApply.js";
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 
 // 매장 디렉터리 공개 API — 지역 검색("김해 당구장") SEO 대상이라 비로그인 읽기.
-// 클레임·수정 제안은 사장님·방문자가 앱 계정 없이도 보낼 수 있어야 해서 비로그인 허용.
+// 수정 제안·이용자 제보는 방문자가 앱 계정 없이도 보낼 수 있어야 해서 비로그인 허용.
+// **사장님 신청(클레임 · 새 매장 등록의 '사장님입니다')은 로그인한 계정으로만 받는다**(2026-10-07 — server/lib/partnerApply):
+// 승인하면 그 계정이 사장님이 된다. 이 라우터의 GET 은 CDN 에 공개로 캐시되므로(아래 router.use) 사람마다 다른 답은 여기 두지 않는다 —
+// '내 신청' 조회는 GET /partner/applications 다.
 const router = Router();
+
+/** 지금 로그인한 사람을 신청자로 — 서명 쿠키의 회원. 로그인하지 않았거나 프로필이 없으면 그 사유를 돌려준다. */
+async function currentApplicant(req: any): Promise<Applicant> {
+    const userId = req.signedCookies?.hiq_user_id;
+    return applicantOf(userId ? await storage.getMemberById(userId) : null);
+}
+
+/**
+ * 이 계정이 지금 신청할 수 있는가 — 한 계정에 매장 하나(승인 쪽의 이중 매장 가드와 같은 원칙).
+ * 이미 매장을 가진 계정, 결과를 기다리는 신청이 있는 계정은 받지 않는다. 문제가 없으면 null.
+ */
+async function applyBlocker(profileId: string): Promise<{ message: string; code: string } | null> {
+    const [owned] = await db.select({ id: hiqStores.id }).from(hiqStores).where(eq(hiqStores.ownerId, profileId)).limit(1);
+    if (owned) return { message: "이미 관리 중인 매장이 있는 계정이에요. 한 계정에 매장 하나만 연결할 수 있어요", code: "APPLY_ALREADY_OWNER" };
+    const [claim] = await db.select({ id: storeListingClaims.id }).from(storeListingClaims)
+        .where(and(eq(storeListingClaims.applicantProfileId, profileId), eq(storeListingClaims.status, "pending"))).limit(1);
+    const [reg] = claim ? [claim] : await db.select({ id: storeRegistrations.id }).from(storeRegistrations)
+        .where(and(eq(storeRegistrations.applicantProfileId, profileId), eq(storeRegistrations.status, "pending"), eq(storeRegistrations.kind, "owner"))).limit(1);
+    if (reg) return { message: "이미 접수된 신청이 있어요. 결과가 나오면 알림으로 알려 드릴게요", code: "APPLY_PENDING" };
+    return null;
+}
 
 // 비로그인 POST 남용 방어 — IP당 시간창 내 제출 횟수 제한.
 // 서버리스 인스턴스별 메모리라 best-effort 지만, 단일 IP 루프 스팸(대기열 오염·스토리지
@@ -140,8 +166,12 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
 }));
 
 // POST /listings/:code/claim — 사장님 클레임 신청 (수동 승인 대기열)
+// 2026-10-07: **로그인한 계정으로만** 받는다 — 신청에 계정을 적어 두고, 승인하면 그 계정이 사장님이 된다(PIN 발급·전화 전달 없음).
+// 연락처는 운영자의 확인 전화용으로 그대로 받는다(계정을 찾는 열쇠가 아니다).
 router.post("/:code/claim", asyncHandler(async (req: any, res: Response) => {
     if (!CODE_RE.test(req.params.code)) return sendError(res, 404, "매장을 찾을 수 없습니다");
+    const who = await currentApplicant(req);
+    if (!who.ok) return sendError(res, who.status, who.message, who.code);
     const [listing] = await db.select({ code: storeListings.code, claimed: storeListings.claimed })
         .from(storeListings).where(eq(storeListings.code, req.params.code));
     if (!listing) return sendError(res, 404, "매장을 찾을 수 없습니다");
@@ -149,10 +179,12 @@ router.post("/:code/claim", asyncHandler(async (req: any, res: Response) => {
 
     const name = String(req.body?.applicantName || "").trim().slice(0, 30);
     const phone = String(req.body?.applicantPhone || "").trim().slice(0, 20);
-    if (!name || !/^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(phone.replace(/\s/g, ""))) {
+    if (!name || !isContactPhone(phone)) {
         return sendError(res, 400, "이름과 올바른 연락처를 입력해주세요");
     }
     if (isSubmitLimited(req.ip || "?")) return sendError(res, 429, "잠시 후 다시 시도해주세요");
+    const blocked = await applyBlocker(who.profileId);
+    if (blocked) return sendError(res, 409, blocked.message, blocked.code);
     // 같은 매장에 이미 대기 중인 클레임이 있으면 중복 접수 방지
     const [pending] = await db.select({ id: storeListingClaims.id }).from(storeListingClaims)
         .where(and(eq(storeListingClaims.listingCode, req.params.code), eq(storeListingClaims.status, "pending")))
@@ -163,6 +195,8 @@ router.post("/:code/claim", asyncHandler(async (req: any, res: Response) => {
         applicantName: name,
         applicantPhone: phone,
         message: String(req.body?.message || "").slice(0, 500) || null,
+        applicantMemberId: who.memberId,
+        applicantProfileId: who.profileId,
     });
     return sendSuccess(res, { submitted: true });
 }));
@@ -184,11 +218,19 @@ router.post("/register", asyncHandler(async (req: any, res: Response) => {
     // owner = 사장님 신청(승인 시 권한·PIN 발급) / report = 이용자 제보(디렉토리 추가만).
     // 유저 건의(2026-09-03): 사장님이 아닌 이용자도 검색에 없는 당구장을 올릴 수 있어야 한다.
     const kind: "owner" | "report" = req.body?.kind === "report" ? "report" : "owner";
+    // 사장님 신청은 로그인한 계정으로만(2026-10-07 — 위 클레임과 같은 이유). 이용자 제보는 계정 없이도 받는다 —
+    // 로그인돼 있으면 누가 알려 줬는지만 같이 적는다(권한은 생기지 않는다).
+    const who = await currentApplicant(req);
+    if (kind === "owner" && !who.ok) return sendError(res, who.status, who.message, who.code);
     if (name.length < 2) return sendError(res, 400, "매장 이름을 입력해주세요");
     if (!REGIONS.has(region)) return sendError(res, 400, "지역(시/도)을 선택해주세요");
     if (address.length < 5) return sendError(res, 400, "주소를 입력해주세요");
-    if (!applicantName || !/^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(applicantPhone.replace(/\s/g, ""))) {
+    if (!applicantName || !isContactPhone(applicantPhone)) {
         return sendError(res, 400, "성함과 올바른 연락처를 입력해주세요");
+    }
+    if (kind === "owner" && who.ok) {
+        const blocked = await applyBlocker(who.profileId);
+        if (blocked) return sendError(res, 409, blocked.message, blocked.code);
     }
     const phone = String(req.body?.phone || "").trim().slice(0, 20) || null;
     const openHours = String(req.body?.openHours || "").trim().slice(0, 40) || null;
@@ -223,6 +265,8 @@ router.post("/register", asyncHandler(async (req: any, res: Response) => {
         flatMedium: intOr(req.body?.flatMedium, 1_000_000),
         flatPocket: intOr(req.body?.flatPocket, 1_000_000),
         applicantName, applicantPhone, kind,
+        applicantMemberId: who.ok ? who.memberId : null,
+        applicantProfileId: who.ok ? who.profileId : null,
     });
     return sendSuccess(res, { submitted: true, kind });
 }));

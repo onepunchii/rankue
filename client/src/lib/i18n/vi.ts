@@ -1194,7 +1194,7 @@ const vi: Dict = {
   "menu.namePlaceholder": "Tên",
   "menu.notifications": "Thông báo",
   "menu.partnerProgram": "Chương trình đối tác",
-  "menu.partnerPromoDesc": "Nhận quản lý trang quán, tổ chức giải đấu",
+  "menu.partnerPromoDesc": "Tự quản lý trang quán và xem hội viên của bạn",
   "menu.permanentDelete": "Xóa vĩnh viễn",
   "menu.polliChip": "Bình chọn · Đố vui",
   "menu.polliDesc": "Chứng minh gu của bạn trên Polli và xem kết quả",

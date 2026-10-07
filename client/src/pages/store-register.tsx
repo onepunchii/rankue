@@ -6,6 +6,7 @@ import { useSeo } from "@/hooks/useSeo";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { goLogin } from "@/components/hiq/LoginGate";
 import { LucideCheckCircle } from "@/lib/icons";
 
 // 신규 매장 등록 신청 — 디렉토리(1,195곳)에 없는 매장의 사장님용.
@@ -42,6 +43,7 @@ const L: Record<Locale, Record<string, string>> = {
     applicantPhonePh: "예: 010-1234-5678",
     notice: "확인 후 등록해 드려요. 승인되면 매장 페이지가 열리고, 영업시간·요금·소개를 직접 관리할 수 있는 사장님 권한이 함께 발급됩니다.",
     kindOwner: "사장님입니다", kindReport: "이용자 제보입니다",
+    ownerLogin: "사장님 신청은 로그인한 계정으로 받아요. 승인되면 그 계정에 '내 매장 관리'가 열려요.", ownerLoginCta: "로그인하고 신청하기", ownerAccount: "로그인한 계정({name})으로 신청돼요. 승인되면 이 계정의 메뉴에 '내 매장 관리'가 열려요.",
     noticeReport: "확인 후 매장 찾기 목록에 올려 드려요. 제보는 사장님 권한이 발급되지 않고, 나중에 사장님이 직접 \"사장님이신가요?\"로 가져갈 수 있어요.",
     doneDescReport: "확인 후 매장 찾기에 올려 드릴게요. 제보 감사합니다!",
     submit: "등록 신청하기", submitting: "접수 중...",
@@ -62,6 +64,7 @@ const L: Record<Locale, Record<string, string>> = {
     applicantPhonePh: "e.g. 010-1234-5678",
     notice: "We'll review and publish your venue. Once approved, you get an owner account to manage hours, rates and the intro yourself.",
     kindOwner: "I'm the owner", kindReport: "I'm a customer (report)",
+    ownerLogin: "Owner requests are filed under your signed-in account. Once approved, 'My venue' opens in that account.", ownerLoginCta: "Sign in to apply", ownerAccount: "This request is filed under your signed-in account ({name}). Once approved, 'My venue' appears in this account's menu.",
     noticeReport: "We'll review and add the venue to the directory. Reports don't create an owner account; the owner can claim it later.",
     doneDescReport: "We'll review and list it. Thanks for the report!",
     submit: "Submit", submitting: "Submitting...",
@@ -82,6 +85,7 @@ const L: Record<Locale, Record<string, string>> = {
     applicantPhonePh: "VD: 010-1234-5678",
     notice: "Chúng tôi sẽ duyệt và đăng quán của bạn. Sau khi duyệt, bạn nhận tài khoản chủ quán để tự quản lý thông tin.",
     kindOwner: "Tôi là chủ quán", kindReport: "Tôi là khách (báo tin)",
+    ownerLogin: "Yêu cầu của chủ quán được gửi bằng tài khoản đang đăng nhập. Sau khi duyệt, mục 'Quán của tôi' sẽ mở trong tài khoản đó.", ownerLoginCta: "Đăng nhập để đăng ký", ownerAccount: "Yêu cầu được gửi bằng tài khoản đang đăng nhập ({name}). Sau khi duyệt, mục 'Quán của tôi' sẽ mở trong menu của tài khoản này.",
     noticeReport: "Chúng tôi sẽ xem xét và thêm quán vào danh mục. Báo tin không tạo tài khoản chủ quán; chủ quán có thể nhận sau.",
     doneDescReport: "Chúng tôi sẽ xem xét và đăng. Cảm ơn bạn đã báo!",
     submit: "Gửi đăng ký", submitting: "Đang gửi...",
@@ -102,6 +106,7 @@ const L: Record<Locale, Record<string, string>> = {
     applicantPhonePh: "örn. 010-1234-5678",
     notice: "İnceleyip yayınlayacağız. Onaylanınca bilgileri kendiniz yönetebileceğiniz sahip hesabı verilir.",
     kindOwner: "Sahibiyim", kindReport: "Müşteriyim (bildirim)",
+    ownerLogin: "Sahip başvuruları giriş yaptığınız hesapla alınır. Onaylanınca o hesapta 'Salonum' açılır.", ownerLoginCta: "Giriş yapıp başvur", ownerAccount: "Bu başvuru giriş yaptığınız hesapla ({name}) yapılır. Onaylanınca bu hesabın menüsünde 'Salonum' açılır.",
     noticeReport: "İnceleyip mekânı rehbere ekleyeceğiz. Bildirimler sahip hesabı oluşturmaz; sahibi daha sonra talep edebilir.",
     doneDescReport: "İnceleyip listeleyeceğiz. Bildirim için teşekkürler!",
     submit: "Başvur", submitting: "Gönderiliyor...",
@@ -122,6 +127,7 @@ const L: Record<Locale, Record<string, string>> = {
     applicantPhonePh: "ej. 010-1234-5678",
     notice: "Revisaremos y publicaremos tu local. Al aprobarse recibirás una cuenta de propietario para gestionarlo.",
     kindOwner: "Soy el dueño", kindReport: "Soy cliente (aviso)",
+    ownerLogin: "Las solicitudes de dueños se envían con la cuenta con la que has iniciado sesión. Al aprobarse, 'Mi local' se abre en esa cuenta.", ownerLoginCta: "Inicia sesión para solicitar", ownerAccount: "La solicitud se envía con la cuenta con la que has iniciado sesión ({name}). Al aprobarse, 'Mi local' aparece en el menú de esta cuenta.",
     noticeReport: "Revisaremos y añadiremos el local al directorio. Los avisos no crean cuenta de dueño; el dueño podrá reclamarlo después.",
     doneDescReport: "Lo revisaremos y lo publicaremos. ¡Gracias por el aviso!",
     submit: "Enviar", submitting: "Enviando...",
@@ -139,7 +145,7 @@ export default function StoreRegister() {
   const { locale } = useT();
   const t = L[locale] ?? L.ko;
   const { toast } = useToast();
-  const { member } = useAuth();
+  const { member, isGuest } = useAuth();
 
   const [form, setForm] = useState<Record<string, string>>({
     name: "", region: "", address: "", phone: "", openHours: "",
@@ -321,6 +327,21 @@ export default function StoreRegister() {
 
         <p className="text-[12px] text-black/45 leading-relaxed px-1 mb-5">{kind === "report" ? t.noticeReport : t.notice}</p>
 
+        {/* 사장님 신청은 로그인한 계정으로 받는다(2026-10-07) — 승인되면 그 계정이 사장님이 된다. 이용자 제보는 로그인 없이도 된다 */}
+        {kind === "owner" && (
+          <p className="text-[12.5px] font-semibold text-brand bg-brand/[0.08] rounded-xl px-3 py-2.5 mb-3 break-keep">
+            {member ? t.ownerAccount.replace("{name}", member.name || "RANKUE") : t.ownerLogin}
+          </p>
+        )}
+        {kind === "owner" && isGuest ? (
+          <button
+            // 가입·로그인 팝업을 그 자리에서 연다 — 끝나면 이 화면에 그대로 남는다(적은 내용이 지워지지 않는다)
+            onClick={() => goLogin(setLocation)}
+            className="w-full h-[54px] rounded-tile bg-brand text-white text-[16px] font-bold active:scale-[0.98] transition-transform"
+          >
+            {t.ownerLoginCta}
+          </button>
+        ) : (
         <button
           disabled={!canSubmit}
           onClick={() => submit.mutate()}
@@ -328,6 +349,7 @@ export default function StoreRegister() {
         >
           {submit.isPending ? t.submitting : t.submit}
         </button>
+        )}
       </div>
     </div>
   );

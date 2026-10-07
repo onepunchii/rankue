@@ -217,17 +217,18 @@ export default function PartnerDashboard() {
         onError: (e: any) => toast({ title: e?.message || "돌아가기 실패 — 다시 로그인해 주세요", variant: "destructive" }),
     });
 
+    // 매장 관리에서만 나간다(2026-10-07) — 예전에는 /api/hiq/logout 을 불러 **앱 로그인까지** 끊었다. 매장 화면을 닫으려던 사장님이 앱에서도
+    // 로그아웃됐다. 이제는 파트너 쿠키만 지우고(POST /partner/logout) 앱의 전체 메뉴로 돌아간다. 앱에서 로그아웃하려면 메뉴의 로그아웃을 쓴다.
     const handleLogout = async () => {
         // The session cookie is httpOnly, so client JS cannot clear it — the server must.
         try {
-            await apiRequest("/api/hiq/logout", { method: "POST" });
+            await apiRequest("/api/hiq/partner/logout", { method: "POST" });
         } catch {
             /* proceed even if offline */
         }
-        // Wipe cached member PII from memory and the throttled localStorage persister.
-        queryClient.clear();
-        localStorage.removeItem("REACT_QUERY_OFFLINE_CACHE");
-        setLocation("/partner/login");
+        // 이 화면이 받아 둔 매장 회원 목록(개인정보)만 지운다 — 앱의 다른 캐시('나' 등)는 그대로 둔다
+        queryClient.removeQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && q.queryKey[0].startsWith("/api/hiq/partner/") });
+        setLocation("/menu");
     };
 
     const isBasic = store?.subscriptionTier !== "PREMIUM";
@@ -382,7 +383,7 @@ export default function PartnerDashboard() {
                     <button onClick={() => setLocation("/partner/settings")} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/[0.05]" aria-label="매장 정보 수정">
                         <LucideSettings className="w-5 h-5 text-black/50" />
                     </button>
-                    <button onClick={handleLogout} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/[0.05]" aria-label="로그아웃">
+                    <button onClick={handleLogout} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/[0.05]" aria-label="매장 관리 나가기">
                         <LucideLogOut className="w-5 h-5 text-black/50" />
                     </button>
                 </div>

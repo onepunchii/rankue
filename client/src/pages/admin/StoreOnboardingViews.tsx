@@ -4,6 +4,10 @@
  *  - 위: 대기/처리됨/전체 거르기 + 검색
  *  - 카드: 무엇(매장) · 누가(신청자·전화) · 언제 · 할 일(버튼) 순서
  *  - 거절은 되돌릴 수 없으니 한 번 묻는다. 승인 결과(임시 PIN)는 닫기 전까지 맨 위에 남긴다.
+ *
+ * 2026-10-07 오너 "앞으로 사장님들이 신청·승인했을 때를 생각해서": 사장님 신청은 이제 **랭큐 계정으로** 들어온다.
+ *  - 그런 신청('랭큐 계정으로 신청' 표시)은 승인하면 그 계정에 권한이 열린다 — PIN 도, 전화로 불러 줄 것도 없다.
+ *  - 거절할 때 사유를 적을 수 있다(선택) — 신청자의 알림과 '내 신청'에 그대로 보인다.
  */
 import { useMemo, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -11,10 +15,34 @@ import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { FilterChips, SearchBox, EmptyState, Panel, Pill, CallButton, kstDateTime, agoLabel } from "./adminUtils";
-import { appConfirm } from "@/components/AppDialog";
 
 // --- 공용: 승인 결과 상자 ---
-type IssueResult = { listingCode?: string; storeSlug?: string; partnerPhone?: string; issuedPin?: string | null; notified?: boolean; kind?: "owner" | "report" };
+type IssueResult = { listingCode?: string; storeSlug?: string; partnerPhone?: string; issuedPin?: string | null; notified?: boolean; kind?: "owner" | "report"; accountLinked?: boolean };
+
+/** 거절 — 사유(선택)를 받아 확정한다. 사유는 신청자에게 그대로 보인다(알림 · 내 신청). 브라우저 기본 창을 쓰지 않고 카드 안에서 받는다 */
+function RejectBox({ pending, onConfirm, onCancel }: { pending: boolean; onConfirm: (reason: string) => void; onCancel: () => void }) {
+    const [reason, setReason] = useState("");
+    return (
+        <form
+            onSubmit={(e) => { e.preventDefault(); onConfirm(reason.trim()); }}
+            className="mt-3 rounded-xl bg-red-500/[0.05] border border-red-500/20 p-3"
+        >
+            <p className="text-[12.5px] font-semibold text-black/70 mb-2">거절 사유 <span className="font-medium text-black/45">(선택 — 신청자에게 그대로 보입니다)</span></p>
+            <input
+                value={reason}
+                onChange={(e) => setReason(e.target.value.slice(0, 200))}
+                autoFocus
+                placeholder="예: 통화로 사장님 확인이 되지 않았어요"
+                aria-label="거절 사유"
+                className="w-full h-10 px-3 rounded-lg bg-white border border-black/10 text-[13.5px] outline-none focus:border-red-400"
+            />
+            <div className="mt-2 flex justify-end gap-2">
+                <Button type="button" size="sm" variant="ghost" className="h-9" onClick={onCancel}>취소</Button>
+                <Button type="submit" size="sm" className="h-9 bg-red-500 hover:bg-red-600 text-white" disabled={pending}>{pending ? "처리 중…" : "거절 확정"}</Button>
+            </div>
+        </form>
+    );
+}
 
 function IssueResultBox({ r, onClose }: { r: IssueResult; onClose: () => void }) {
     if (r.kind === "report") {
@@ -23,6 +51,23 @@ function IssueResultBox({ r, onClose }: { r: IssueResult; onClose: () => void })
                 <p className="font-bold text-brand mb-2">✓ 디렉토리에 추가했습니다 — 권한·PIN 은 발급하지 않았습니다(이용자 제보)</p>
                 {r.listingCode && <p className="text-[14px]">매장 페이지: <a className="text-brand font-bold underline" href={`/stores/${r.listingCode}`} target="_blank" rel="noreferrer">/stores/{r.listingCode}</a></p>}
                 <p className="text-[13px] text-black/55 mt-1">사장님이 나중에 "사장님이신가요?"로 클레임하면 그때 권한이 나갑니다.</p>
+                <Button variant="ghost" size="sm" className="mt-2" onClick={onClose}>닫기</Button>
+            </div>
+        );
+    }
+    // 랭큐 계정으로 받은 신청 — 그 계정에 권한이 열렸다. PIN 도, 전화로 전할 것도 없다
+    if (r.accountLinked) {
+        return (
+            <div className="bg-brand/[0.06] border border-brand/30 p-5 rounded-2xl">
+                <p className="font-bold text-brand mb-2">✓ 승인 완료 — 신청한 랭큐 계정에 '내 매장 관리'가 열렸습니다</p>
+                <div className="text-[14px] space-y-1">
+                    {r.listingCode && <p>매장 페이지: <a className="text-brand font-bold underline" href={`/stores/${r.listingCode}`} target="_blank" rel="noreferrer">/stores/{r.listingCode}</a></p>}
+                    <p className="text-black/60">
+                        {r.notified
+                            ? "앱 알림을 보냈습니다. 따로 연락하지 않으셔도 됩니다 — 사장님이 평소 쓰는 계정의 전체 메뉴 → 내 매장 관리로 들어옵니다."
+                            : "앱 알림은 가지 못했습니다(알림이 꺼져 있을 수 있어요). 그래도 사장님이 평소 쓰는 계정의 전체 메뉴 → 내 매장 관리로 바로 들어옵니다."}
+                    </p>
+                </div>
                 <Button variant="ghost" size="sm" className="mt-2" onClick={onClose}>닫기</Button>
             </div>
         );
@@ -64,6 +109,8 @@ export type Claim = {
     id: string; listingCode: string; applicantName: string; applicantPhone: string;
     message: string | null; status: string; issuedPin: string | null; createdAt: string;
     listingName: string | null; listingRegion: string | null; listingAddress: string | null;
+    /** 랭큐 계정으로 받은 신청 — 승인하면 그 계정에 권한이 열린다 */
+    accountLinked?: boolean; rejectReason?: string | null;
 };
 export const CLAIMS_KEY = ["/api/hiq/admin/listing-claims"] as const;
 
@@ -80,9 +127,10 @@ export function ClaimsView() {
         onSuccess: (r: any) => { setResult(r); qc.invalidateQueries({ queryKey: CLAIMS_KEY }); window.scrollTo({ top: 0, behavior: "smooth" }); },
         onError: (e: any) => toast({ title: e?.message || "승인 실패", variant: "destructive" }),
     });
+    const [rejecting, setRejecting] = useState<string | null>(null);
     const reject = useMutation({
-        mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/listing-claims/${id}/reject`, { method: "POST" }),
-        onSuccess: () => { toast({ title: "거절했습니다" }); qc.invalidateQueries({ queryKey: CLAIMS_KEY }); },
+        mutationFn: async ({ id, reason }: { id: string; reason: string }) => apiRequest(`/api/hiq/admin/listing-claims/${id}/reject`, { method: "POST", body: { reason } }),
+        onSuccess: (r: any) => { toast({ title: r?.notified ? "거절했습니다 — 신청자에게 알렸어요" : "거절했습니다" }); setRejecting(null); qc.invalidateQueries({ queryKey: CLAIMS_KEY }); },
         onError: (e: any) => toast({ title: e?.message || "거절 실패", variant: "destructive" }),
     });
 
@@ -97,7 +145,7 @@ export function ClaimsView() {
     return (
         <div className="space-y-3">
             {result && <IssueResultBox r={result} onClose={() => setResult(null)} />}
-            <p className="text-[13px] text-black/50">사장님이 매장 페이지에서 '내 매장 정보 관리 신청'을 하면 들어옵니다. 승인하면 사장님 계정과 파트너 매장이 한 번에 만들어집니다.</p>
+            <p className="text-[13px] text-black/50">사장님이 매장 페이지에서 '내 매장 정보 관리 신청'을 하면 들어옵니다. 신청은 랭큐 계정으로 받습니다 — 승인하면 그 계정에 '내 매장 관리'가 열리고 파트너 매장이 만들어집니다(PIN 없음). 통화로 사장님이 맞는지 확인한 뒤 승인해 주세요.</p>
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                 <FilterChips value={filter} onChange={setFilter} options={statusOptions(pendingN, claims.length - pendingN)} />
                 <SearchBox value={q} onChange={setQ} placeholder="매장·신청자·전화" className="sm:ml-auto sm:w-64" />
@@ -108,6 +156,7 @@ export function ClaimsView() {
                 <Panel key={c.id} className={`p-4 ${c.status !== "pending" ? "opacity-70" : ""}`}>
                     <div className="flex items-center gap-1.5 flex-wrap mb-1">
                         {c.status === "pending" ? <Pill tone="alert">대기</Pill> : c.status === "approved" ? <Pill tone="brand">승인됨</Pill> : <Pill>거절됨</Pill>}
+                        {c.accountLinked && <span title="승인하면 신청한 그 계정에 권한이 열립니다 — PIN 을 만들지 않습니다"><Pill tone="info">랭큐 계정으로 신청</Pill></span>}
                         {c.issuedPin && <span title="발급 당시 초기 PIN — 사장님이 바꿨다면 낡은 값일 수 있습니다"><Pill tone="neutral">초기 PIN {c.issuedPin}</Pill></span>}
                         <span className="ml-auto text-[12px] text-black/40 tabular-nums" title={kstDateTime(c.createdAt)}>{agoLabel(c.createdAt)}</span>
                     </div>
@@ -118,13 +167,17 @@ export function ClaimsView() {
                     <p className="text-[12.5px] text-black/45 truncate">{[c.listingRegion, c.listingAddress].filter(Boolean).join(" · ")}</p>
                     <p className="mt-1.5 text-[13.5px] font-semibold text-black/75">{c.applicantName} 사장님 · <span className="tabular-nums">{c.applicantPhone}</span></p>
                     {c.message && <p className="mt-1 text-[13px] text-black/60 bg-black/[0.03] rounded-lg px-3 py-2 whitespace-pre-wrap">"{c.message}"</p>}
-                    {c.status === "pending" && (
+                    {c.status === "rejected" && c.rejectReason && <p className="mt-1 text-[12.5px] text-black/55">거절 사유: {c.rejectReason}</p>}
+                    {c.status === "pending" && rejecting === c.id && (
+                        <RejectBox pending={reject.isPending} onCancel={() => setRejecting(null)} onConfirm={(reason) => reject.mutate({ id: c.id, reason })} />
+                    )}
+                    {c.status === "pending" && rejecting !== c.id && (
                         <div className="mt-3 flex gap-2">
                             <CallButton phone={c.applicantPhone} />
                             <Button size="sm" variant="ghost" className="h-9 text-red-500 ml-auto" disabled={reject.isPending}
-                                onClick={() => { void appConfirm({ message: `'${c.listingName ?? c.listingCode}' 클레임을 거절할까요?`, tone: "danger", confirmText: "거절" }).then((ok) => { if (ok) reject.mutate(c.id); }); }}>거절</Button>
+                                onClick={() => setRejecting(c.id)}>거절</Button>
                             <Button size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={approve.isPending} onClick={() => approve.mutate(c.id)}>
-                                {approve.isPending ? "처리 중…" : "승인·계정 발급"}
+                                {approve.isPending ? "처리 중…" : c.accountLinked ? "승인·권한 열기" : "승인·계정 발급"}
                             </Button>
                         </div>
                     )}
@@ -144,6 +197,8 @@ export type Registration = {
     applicantName: string; applicantPhone: string;
     status: "pending" | "approved" | "rejected"; listingCode: string | null; issuedPin: string | null; createdAt: string;
     kind?: "owner" | "report";
+    /** 신청한 랭큐 계정(사장님 신청) — 있으면 승인이 그 계정에 권한을 연다 */
+    applicantProfileId?: string | null; rejectReason?: string | null;
 };
 export const REGISTRATIONS_KEY = ["/api/hiq/admin/store-registrations"] as const;
 
@@ -161,9 +216,10 @@ export function RegistrationsView() {
         onSuccess: (r: any) => { setResult(r); qc.invalidateQueries({ queryKey: REGISTRATIONS_KEY }); window.scrollTo({ top: 0, behavior: "smooth" }); },
         onError: (e: any) => toast({ title: e?.message || "승인 실패", variant: "destructive" }),
     });
+    const [rejecting, setRejecting] = useState<string | null>(null);
     const reject = useMutation({
-        mutationFn: async (id: string) => apiRequest(`/api/hiq/admin/store-registrations/${id}/reject`, { method: "POST" }),
-        onSuccess: () => { toast({ title: "거절했습니다" }); qc.invalidateQueries({ queryKey: REGISTRATIONS_KEY }); },
+        mutationFn: async ({ id, reason }: { id: string; reason: string }) => apiRequest(`/api/hiq/admin/store-registrations/${id}/reject`, { method: "POST", body: { reason } }),
+        onSuccess: (r: any) => { toast({ title: r?.notified ? "거절했습니다 — 신청자에게 알렸어요" : "거절했습니다" }); setRejecting(null); qc.invalidateQueries({ queryKey: REGISTRATIONS_KEY }); },
         onError: (e: any) => toast({ title: e?.message || "거절 실패", variant: "destructive" }),
     });
 
@@ -197,6 +253,7 @@ export function RegistrationsView() {
                         <div className="flex items-center gap-1.5 flex-wrap mb-1">
                             {r.status === "pending" ? <Pill tone="alert">대기</Pill> : r.status === "approved" ? <Pill tone="brand">등록됨{r.listingCode ? ` · ${r.listingCode}` : ""}</Pill> : <Pill>거절됨</Pill>}
                             {r.kind === "report" ? <Pill tone="warn">이용자 제보 · 권한 없음</Pill> : <Pill tone="info">사장님 신청</Pill>}
+                            {r.kind !== "report" && r.applicantProfileId && <span title="승인하면 신청한 그 계정에 권한이 열립니다 — PIN 을 만들지 않습니다"><Pill tone="info">랭큐 계정으로 신청</Pill></span>}
                             {r.issuedPin && <Pill>초기 PIN {r.issuedPin}</Pill>}
                             <span className="ml-auto text-[12px] text-black/40 tabular-nums" title={kstDateTime(r.createdAt)}>{agoLabel(r.createdAt)}</span>
                         </div>
@@ -207,13 +264,17 @@ export function RegistrationsView() {
                             <div className="rounded-lg bg-black/[0.03] px-3 py-2"><p className="font-bold text-black/45 text-[11px]">요금</p><p className="tabular-nums">{rates || "미입력"}</p></div>
                         </div>
                         <p className="mt-2 text-[13.5px] font-semibold text-black/75">신청자 {r.applicantName} · <span className="tabular-nums">{r.applicantPhone}</span></p>
-                        {r.status === "pending" && (
+                        {r.status === "rejected" && r.rejectReason && <p className="mt-1 text-[12.5px] text-black/55">거절 사유: {r.rejectReason}</p>}
+                        {r.status === "pending" && rejecting === r.id && (
+                            <RejectBox pending={reject.isPending} onCancel={() => setRejecting(null)} onConfirm={(reason) => reject.mutate({ id: r.id, reason })} />
+                        )}
+                        {r.status === "pending" && rejecting !== r.id && (
                             <div className="mt-3 flex gap-2">
                                 <CallButton phone={r.applicantPhone} />
                                 <Button size="sm" variant="ghost" className="h-9 text-red-500 ml-auto" disabled={reject.isPending}
-                                    onClick={() => { void appConfirm({ message: `'${r.name}' 등록 신청을 거절할까요?`, tone: "danger", confirmText: "거절" }).then((ok) => { if (ok) reject.mutate(r.id); }); }}>거절</Button>
+                                    onClick={() => setRejecting(r.id)}>거절</Button>
                                 <Button size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={approve.isPending} onClick={() => approve.mutate(r.id)}>
-                                    {approve.isPending ? "처리 중…" : r.kind === "report" ? "승인·디렉토리 추가" : "승인·페이지 생성"}
+                                    {approve.isPending ? "처리 중…" : r.kind === "report" ? "승인·디렉토리 추가" : r.applicantProfileId ? "승인·페이지 생성·권한 열기" : "승인·페이지 생성"}
                                 </Button>
                             </div>
                         )}

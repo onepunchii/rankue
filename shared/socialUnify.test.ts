@@ -333,3 +333,79 @@ describe("관리자 계정은 번호 + PIN 으로 들이지 않는다 — PIN �
         expect(root("shared/i18n/ko.ts")).toMatch(/"err\.auth\.socialAccountOnly": "[^"]*전화번호로 로그인할 수 없어요[^"]*카카오·구글·애플[^"]*"/);
     });
 });
+
+// 2026-10-07 오너: "지금 사장님이 없잖아 — 앞으로 사장님들이 신청·승인했을 때를 생각해서 진행하자"
+describe("파트너(사장님) 신청 — 화면은 랭큐 계정으로 신청하게 이끈다", () => {
+    const listing = code(client("pages/store-listing.tsx"));
+    const reg = code(client("pages/store-register.tsx"));
+    const entry = code(client("pages/partner/login.tsx"));
+
+    it("매장 페이지: 비로그인이 '사장님이신가요?'를 누르면 로그인(팝업)부터 — 끝나면 신청 창이 이어서 열린다", () => {
+        const open = listing.slice(listing.indexOf("const openClaim = () => {"), listing.indexOf("const search = useSearch();"));
+        expect(open).toContain("if (isGuest) { goLogin(setLocation, `${window.location.pathname}?claim=1`); return; }");
+        expect(listing).toContain("onClick={openClaim}");
+        expect(listing).not.toContain("onClick={() => setClaimOpen(true)}");
+        // ?claim=1 은 로그인한 뒤에만 읽고, 주소에서 지운다
+        const eff = listing.slice(listing.indexOf("const search = useSearch();"), listing.indexOf("}, [member, search, setLocation]);"));
+        expect(eff.indexOf("if (!member) return;")).toBeLessThan(eff.indexOf('if (!p.has("claim")) return;'));
+        expect(eff).toContain('p.delete("claim");');
+        expect(eff).toContain("setClaimOpen(true);");
+    });
+
+    it("매장 페이지: 내 신청이 확인 중이면 단추 대신 상태를 보여 준다 — 승인되지 않았으면 사유와 함께 다시 신청할 수 있다", () => {
+        expect(listing).toContain('const myClaim = myApps?.applications.find((a) => a.kind === "claim" && a.listingCode === code);');
+        expect(listing).toContain('{!s.claimed && myClaim?.status === "pending" && (');
+        expect(listing).toContain('{!s.claimed && myClaim?.status === "rejected" && (');
+        expect(listing).toContain('{!s.claimed && myClaim?.status !== "pending" && (');
+        // 내 신청은 로그인했을 때만 묻는다
+        expect(listing).toMatch(/queryKey: MY_APPS,[\s\S]{0,160}enabled: !!member,/);
+        // 어느 계정으로 신청되는지 창 안에서 말한다
+        expect(listing).toContain('{t.claimAccount.replace("{name}", member.name || "RANKUE")}');
+    });
+
+    it("새 매장 등록: '사장님입니다'는 로그인한 계정으로 — 비로그인에게는 제출 단추 대신 로그인 단추", () => {
+        expect(reg).toContain('{kind === "owner" && isGuest ? (');
+        expect(reg).toContain("onClick={() => goLogin(setLocation)}");
+        expect(reg).toContain("{t.ownerLoginCta}");
+        expect(reg).toContain('{member ? t.ownerAccount.replace("{name}", member.name || "RANKUE") : t.ownerLogin}');
+    });
+
+    it("두 화면의 새 문구는 다섯 언어 전부", () => {
+        for (const [src, keys] of [[listing, ["claimAccount", "claimLoginTitle", "claimLoginDesc", "claimPending", "claimPendingDesc", "claimRejected", "claimRejectedWhy"]], [reg, ["ownerLogin", "ownerLoginCta", "ownerAccount"]]] as const) {
+            for (const k of keys) expect(src.match(new RegExp(`\\b${k}: "`, "g")), k).toHaveLength(5);
+        }
+    });
+
+    it("파트너 입구: 내 신청의 상태가 먼저, 번호·PIN 폼은 접어 둔다 — 로그인 상태가 바뀌면 다시 확인한다", () => {
+        expect(entry).toContain('queryKey: ["/api/hiq/partner/applications"],');
+        expect(entry).toContain("{apps.length > 0 && (");
+        expect(entry).toContain("const [legacyOpen, setLegacyOpen] = useState(false);");
+        const form = entry.indexOf("<form onSubmit={handleSubmit(onSubmit)}");
+        expect(entry.lastIndexOf("{legacyOpen && (", form)).toBeGreaterThan(0);
+        expect(entry.match(/<form /g)).toHaveLength(1);
+        // '나'를 받는 중에는 기다렸다가 한 번만 묻는다
+        expect(entry).toContain("if (authLoading) return;");
+        expect(entry).toContain("}, [setLocation, toast, authLoading, memberId]);");
+        // 비로그인은 그 자리에서 로그인(팝업) · 신청 결과를 기다리는 동안에는 새 신청을 앞세우지 않는다
+        expect(entry).toContain("onClick={() => goLogin(setLocation)}");
+        expect(entry).toContain("{!waiting && (");
+    });
+
+    it("사장님 화면의 나가기는 앱 로그인을 끊지 않는다 — 매장 관리에서만 나간다", () => {
+        const dash = code(client("pages/partner/dashboard.tsx"));
+        const out = dash.slice(dash.indexOf("const handleLogout = async () => {"), dash.indexOf("const todos") > 0 ? dash.indexOf("const todos") : dash.indexOf("const handleLogout = async () => {") + 900);
+        expect(out).toContain('await apiRequest("/api/hiq/partner/logout", { method: "POST" });');
+        expect(out).not.toContain('"/api/hiq/logout"');
+        expect(out).not.toContain("queryClient.clear()");
+        expect(out).toContain('setLocation("/menu");');
+    });
+
+    it("메뉴의 파트너 카드는 실제로 되는 것만 말한다 — '대회 개최'를 약속하지 않는다", () => {
+        expect(client("lib/i18n/ko.ts")).toMatch(/"menu\.partnerPromoDesc": "[^"]*매장 페이지[^"]*회원[^"]*"/);
+        for (const [l, word] of [["ko", /대회/], ["en", /event|tournament/i], ["es", /torneo/i], ["vi", /giải/i], ["tr", /turnuva/i]] as const) {
+            const m = /"menu\.partnerPromoDesc": "([^"\n]*)"/.exec(client(`lib/i18n/${l}.ts`));
+            expect(m, l).not.toBeNull();
+            expect(m![1], l).not.toMatch(word);
+        }
+    });
+});

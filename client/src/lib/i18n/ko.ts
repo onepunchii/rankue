@@ -1196,7 +1196,7 @@ export const ko: Dict = {
   "menu.namePlaceholder": "이름",
   "menu.notifications": "알림",
   "menu.partnerProgram": "파트너 프로그램",
-  "menu.partnerPromoDesc": "내 매장 페이지 관리 신청부터 대회 개최까지",
+  "menu.partnerPromoDesc": "내 매장 페이지를 직접 관리하고 회원을 한눈에",
   "menu.permanentDelete": "영구 삭제",
   "menu.polliChip": "대국민 투표 · 퀴즈",
   "menu.polliDesc": "폴리에서 내 취향 증명하고 결과 보기",

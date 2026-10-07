@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useLocation, useRoute } from "wouter";
+import { useEffect, useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useLocation, useRoute, useSearch } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
 import { LucidePhone, LucideMapPin, LucideShare2 } from "@/lib/icons";
 import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
+import { useAuth } from "@/hooks/useAuth";
+import { goLogin } from "@/components/hiq/LoginGate";
 
 interface Listing {
   code: string; name: string; region: string; address: string; phone: string | null;
@@ -38,6 +40,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "확인 후 연락드리고, 승인되면 영업시간·소개 등을 직접 수정할 수 있습니다.",
     claimName: "성함", claimPhone: "연락처 (예: 010-1234-5678)", claimMsg: "메시지 (선택)",
     claimSubmit: "신청하기", claimDone: "신청이 접수되었습니다. 확인 후 연락드릴게요!",
+    claimAccount: "로그인한 계정({name})으로 신청돼요. 승인되면 이 계정의 메뉴에 '내 매장 관리'가 열려요.", claimLoginTitle: "사장님 신청은 로그인이 필요해요", claimLoginDesc: "로그인한 계정으로 신청하고, 승인되면 그 계정에 '내 매장 관리'가 열려요.", claimPending: "신청을 받았어요 — 확인 중이에요", claimPendingDesc: "확인이 끝나면 알림으로 알려 드릴게요.", claimRejected: "지난 신청은 승인되지 않았어요", claimRejectedWhy: "사유: {reason}",
     suggestCta: "정보가 다른가요? 수정 제안",
     suggestTitle: "정보 수정 제안",
     suggestDesc: "폐업·이전·영업시간 변경 등 다른 정보를 알려주세요.",
@@ -61,6 +64,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "We'll contact you to verify. Once approved you can edit hours, intro and more.",
     claimName: "Name", claimPhone: "Contact number", claimMsg: "Message (optional)",
     claimSubmit: "Submit", claimDone: "Received! We'll be in touch.",
+    claimAccount: "This request is filed under your signed-in account ({name}). Once approved, 'My venue' appears in this account's menu.", claimLoginTitle: "Sign in to claim this listing", claimLoginDesc: "Requests are tied to your account. Once approved, 'My venue' opens in that account.", claimPending: "Request received — under review", claimPendingDesc: "We'll notify you when the review is done.", claimRejected: "Your last request wasn't approved", claimRejectedWhy: "Reason: {reason}",
     suggestCta: "Something wrong? Suggest an edit",
     suggestTitle: "Suggest an edit",
     suggestDesc: "Closed, moved, or different hours? Let us know.",
@@ -84,6 +88,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "Chúng tôi sẽ liên hệ xác minh. Sau khi duyệt, bạn có thể tự sửa thông tin.",
     claimName: "Họ tên", claimPhone: "Số liên lạc", claimMsg: "Lời nhắn (tùy chọn)",
     claimSubmit: "Gửi", claimDone: "Đã nhận! Chúng tôi sẽ liên hệ.",
+    claimAccount: "Yêu cầu được gửi bằng tài khoản đang đăng nhập ({name}). Sau khi duyệt, mục 'Quán của tôi' sẽ mở trong menu của tài khoản này.", claimLoginTitle: "Đăng nhập để nhận quản lý trang", claimLoginDesc: "Yêu cầu gắn với tài khoản của bạn. Sau khi duyệt, mục 'Quán của tôi' sẽ mở trong tài khoản đó.", claimPending: "Đã nhận yêu cầu — đang xem xét", claimPendingDesc: "Chúng tôi sẽ thông báo khi có kết quả.", claimRejected: "Yêu cầu trước chưa được duyệt", claimRejectedWhy: "Lý do: {reason}",
     suggestCta: "Thông tin sai? Đề xuất sửa",
     suggestTitle: "Đề xuất chỉnh sửa",
     suggestDesc: "Đóng cửa, chuyển địa điểm hay đổi giờ? Hãy cho chúng tôi biết.",
@@ -107,6 +112,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "Doğrulama için sizinle iletişime geçeceğiz. Onay sonrası bilgileri düzenleyebilirsiniz.",
     claimName: "Ad", claimPhone: "İletişim numarası", claimMsg: "Mesaj (isteğe bağlı)",
     claimSubmit: "Gönder", claimDone: "Alındı! Sizinle iletişime geçeceğiz.",
+    claimAccount: "Bu başvuru giriş yaptığınız hesapla ({name}) yapılır. Onaylanınca bu hesabın menüsünde 'Salonum' açılır.", claimLoginTitle: "Kaydı sahiplenmek için giriş yapın", claimLoginDesc: "Başvuru hesabınıza bağlanır. Onaylanınca o hesapta 'Salonum' açılır.", claimPending: "Başvuru alındı — inceleniyor", claimPendingDesc: "İnceleme bitince bildirim göndereceğiz.", claimRejected: "Önceki başvurunuz onaylanmadı", claimRejectedWhy: "Sebep: {reason}",
     suggestCta: "Bilgi yanlış mı? Düzeltme öner",
     suggestTitle: "Düzeltme öner",
     suggestDesc: "Kapandı, taşındı veya saatler mi değişti? Bize bildirin.",
@@ -130,6 +136,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "Te contactaremos para verificar. Tras la aprobación podrás editar la información.",
     claimName: "Nombre", claimPhone: "Número de contacto", claimMsg: "Mensaje (opcional)",
     claimSubmit: "Enviar", claimDone: "¡Recibido! Te contactaremos.",
+    claimAccount: "La solicitud se envía con la cuenta con la que has iniciado sesión ({name}). Al aprobarse, 'Mi local' aparece en el menú de esta cuenta.", claimLoginTitle: "Inicia sesión para reclamar la ficha", claimLoginDesc: "La solicitud queda ligada a tu cuenta. Al aprobarse, 'Mi local' se abre en esa cuenta.", claimPending: "Solicitud recibida — en revisión", claimPendingDesc: "Te avisaremos cuando termine la revisión.", claimRejected: "Tu última solicitud no fue aprobada", claimRejectedWhy: "Motivo: {reason}",
     suggestCta: "¿Información incorrecta? Sugerir cambio",
     suggestTitle: "Sugerir cambio",
     suggestDesc: "¿Cerró, se mudó o cambió el horario? Cuéntanos.",
@@ -151,6 +158,42 @@ export default function StoreListingPage() {
 
   const [claimOpen, setClaimOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  // 사장님 신청은 로그인한 계정으로 받는다(2026-10-07 오너: "앞으로 사장님들이 신청·승인했을 때를 생각해서") — 승인되면 그 계정이 사장님이 된다.
+  const { member, isGuest } = useAuth();
+  const qc = useQueryClient();
+  const MY_APPS = ["/api/hiq/partner/applications"] as const;
+  // 내 신청 — 이 매장에 낸 신청이 있으면 단추 대신 상태를 보여 준다(확인 중 · 승인되지 않음). 로그인했을 때만 묻는다
+  const { data: myApps } = useQuery<{ applications: { kind: string; listingCode: string | null; status: string; rejectReason: string | null }[] }>({
+    queryKey: MY_APPS,
+    queryFn: async () => apiRequest("/api/hiq/partner/applications"),
+    enabled: !!member,
+    staleTime: 60 * 1000,
+    retry: false,
+  });
+  const myClaim = myApps?.applications.find((a) => a.kind === "claim" && a.listingCode === code);
+  /** 신청 창을 연다 — 비로그인은 가입·로그인 팝업부터. 로그인이 끝나면 이 주소에 ?claim=1 이 붙어 돌아와 창이 이어서 열린다 */
+  const openClaim = () => {
+    if (isGuest) { goLogin(setLocation, `${window.location.pathname}?claim=1`); return; }
+    setClaimOpen(true);
+  };
+  // 질의(?claim=1)만 바뀌어도 다시 본다 — 팝업 로그인은 화면을 옮기지 않고 주소에 표시만 붙인다
+  const search = useSearch();
+  useEffect(() => {
+    if (!member) return;
+    const p = new URLSearchParams(search);
+    if (!p.has("claim")) return;
+    p.delete("claim");
+    const rest = p.toString();
+    setLocation(window.location.pathname + (rest ? `?${rest}` : ""), { replace: true });
+    setClaimOpen(true);
+  }, [member, search, setLocation]);
+  // 로그인한 사람의 이름·번호를 미리 채운다(소셜 가입자의 자리표시자 번호는 빼고) — 고칠 수 있다
+  useEffect(() => {
+    if (!claimOpen || !member) return;
+    setCName((v) => v || member.name || "");
+    const phone = typeof member.phone === "string" && /^0\d{9,10}$/.test(member.phone) ? member.phone : "";
+    setCPhone((v) => v || phone);
+  }, [claimOpen, member]);
   const [cName, setCName] = useState("");
   const [cPhone, setCPhone] = useState("");
   const [cMsg, setCMsg] = useState("");
@@ -183,7 +226,7 @@ export default function StoreListingPage() {
       method: "POST",
       body: { applicantName: cName, applicantPhone: cPhone, message: cMsg },
     }),
-    onSuccess: () => { toast({ title: t.claimDone }); setClaimOpen(false); setCName(""); setCPhone(""); setCMsg(""); },
+    onSuccess: () => { toast({ title: t.claimDone }); setClaimOpen(false); setCName(""); setCPhone(""); setCMsg(""); void qc.invalidateQueries({ queryKey: MY_APPS }); },
     onError: (e: any) => toast({ title: e?.message || t.error, variant: "destructive" }),
   });
 
@@ -408,9 +451,22 @@ export default function StoreListingPage() {
             </div>
 
             {/* 이미 인증된 매장에는 신청 버튼을 숨긴다 — 서버도 409 로 이중 방어 */}
-            {!s.claimed && (
+            {/* 이 매장에 낸 내 신청이 확인 중이면 단추 대신 상태를 보여 준다. 거절됐으면 사유와 함께 다시 신청할 수 있다 */}
+            {!s.claimed && myClaim?.status === "pending" && (
+              <div className="w-full rounded-2xl bg-brand/[0.08] px-4 py-3.5 mb-2">
+                <p className="text-[14px] font-bold text-brand">{t.claimPending}</p>
+                <p className="text-[12.5px] font-medium text-black/55 mt-0.5">{t.claimPendingDesc}</p>
+              </div>
+            )}
+            {!s.claimed && myClaim?.status === "rejected" && (
+              <div className="w-full rounded-2xl bg-black/[0.04] px-4 py-3 mb-2">
+                <p className="text-[13.5px] font-bold text-black/70">{t.claimRejected}</p>
+                {myClaim.rejectReason && <p className="text-[12.5px] font-medium text-black/55 mt-0.5 break-keep">{t.claimRejectedWhy.replace("{reason}", myClaim.rejectReason)}</p>}
+              </div>
+            )}
+            {!s.claimed && myClaim?.status !== "pending" && (
               <button
-                onClick={() => setClaimOpen(true)}
+                onClick={openClaim}
                 className="w-full h-13 py-3.5 rounded-2xl bg-brand text-white text-[15px] font-bold active:scale-[0.99] transition-transform mb-2"
               >
                 {t.claimCta}
@@ -430,6 +486,10 @@ export default function StoreListingPage() {
           <DialogContent className="bg-white text-ink-1 max-w-md w-[92%] rounded-[28px] p-6">
             <DialogTitle className="text-[19px] font-bold">{t.claimTitle}</DialogTitle>
             <DialogDescription className="text-[12.5px] font-medium text-black/55">{t.claimDesc}</DialogDescription>
+            {/* 어느 계정으로 신청되는지 — 승인되면 그 계정에 '내 매장 관리'가 열린다 */}
+            {member && (
+              <p className="text-[12.5px] font-semibold text-brand bg-brand/[0.08] rounded-xl px-3 py-2 break-keep">{t.claimAccount.replace("{name}", member.name || "RANKUE")}</p>
+            )}
             <div className="flex flex-col gap-2.5 mt-2">
               <input value={cName} onChange={e => setCName(e.target.value)} maxLength={30} placeholder={t.claimName}
                 className="h-12 px-4 rounded-2xl bg-black/[0.03] text-[14.5px] font-medium outline-none focus:bg-black/[0.05]" />
