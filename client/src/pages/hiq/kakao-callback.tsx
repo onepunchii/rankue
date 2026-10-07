@@ -7,6 +7,7 @@ import { useT } from "@/lib/i18n";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { ApiError, apiRequest, queryClient, refreshAfterLogin } from "@/lib/queryClient";
 import { offerAttachPhone } from "@/components/hiq/AttachPhoneSheet";
+import { loginPagePath } from "@/components/hiq/LoginSheet";
 import { takeKakaoPending } from "@/lib/kakaoLogin";
 import { KAKAO_REDIRECT_PATH, checkKakaoReturn, kakaoRedirectUri, type KakaoMode } from "@shared/kakaoLogin";
 import { safeReturnPath } from "@shared/promoFunnel";
@@ -124,10 +125,12 @@ async function linkWithPin(code: string, pin: string, back: string | null): Prom
     }
 }
 
-/** 로그인 화면 주소. login=1 은 소개 화면을 건너뛰는 신호, redirect 는 끝나고 돌아갈 곳(landing.tsx 가 다시 거른다). */
+/**
+ * 다시 로그인하러 보낼 주소 — 전체 로그인 화면이 아니라 **예시 홈 위의 가입·로그인 팝업**(2026-10-07 오너: "팝업이 기본이 되게").
+ * 끝나면 back 으로 돌아간다(우리 사이트 안의 경로만 — 호스트가 다시 거른다). 없으면 홈.
+ */
 function loginPath(back: string | null): string {
-    const safe = safeReturnPath(back);
-    return safe ? `/?login=1&redirect=${encodeURIComponent(safe)}` : "/?login=1";
+    return loginPagePath(safeReturnPath(back) ?? "/dashboard");
 }
 
 /** 못 끝냈을 때 그리는 것. 문구는 키로 들고 있다가 그릴 때 옮긴다 — 언어 사전이 늦게 실려도 그 언어로 바뀐다. */

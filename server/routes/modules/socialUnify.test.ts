@@ -346,6 +346,22 @@ describe("POST /social/attach-phone — 소셜로 방금 만든 빈 계정을 �
         expect(mem.state.deleted).toEqual([]);
     });
 
+    // 2026-10-07 오너: "관리자 계정 핀번호 막자" — 번호 + PIN 만 알면 자기 소셜을 관리자 계정에 붙일 수 있으면 PIN 이 다시 뿌리가 된다
+    it("받는 쪽이 관리자 계정이면 409 ATTACH_NOT_ALLOWED — 맞는 PIN 이든 틀린 PIN 이든 같은 답이고, 아무것도 바뀌지 않는다", async () => {
+        profile("pa").role = "super_admin";
+        const right = await callRoute("post", "/social/attach-phone", { body: { phone: "01000000001", pin: PIN }, userId: "u-k", ip: "198.51.100.20" });
+        const wrong = await callRoute("post", "/social/attach-phone", { body: { phone: "01000000001", pin: "0000" }, userId: "u-k", ip: "198.51.100.21" });
+        for (const r of [right, wrong]) {
+            expect(r.statusCode).toBe(409);
+            expect(r.body.code).toBe("ATTACH_NOT_ALLOWED");
+            expect(r.cookies).toEqual({});
+        }
+        expect(right.body).toEqual(wrong.body);
+        expect(profile("pa").kakaoSub).toBeNull();
+        expect(profile("pk").kakaoSub).toBe("900");
+        expect(mem.state.deleted).toEqual([]);
+    });
+
     it("폼 본문은 받지 않는다(쿠키가 바뀌는 길 — 로그인 CSRF) · 로그인하지 않았으면 401", async () => {
         const form = await callRoute("post", "/social/attach-phone", { body: { phone: "01000000001", pin: PIN }, userId: "u-k", ip: "198.51.100.9", json: false });
         expect(form.statusCode).toBe(400);

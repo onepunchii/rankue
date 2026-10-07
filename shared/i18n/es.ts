@@ -380,7 +380,7 @@ export const es: Record<string, string> = {
   "err.auth.kakaoPinWrong": "El PIN no coincide, así que no se cambió la vinculación con Kakao. Inténtalo de nuevo.",
   "err.auth.kakaoUnlinkSignup": "Esta cuenta se creó con Kakao, por lo que no se puede desvincular Kakao.",
   "err.auth.phoneInvalid": "El número de teléfono no es válido",
-  "err.auth.socialAccountOnly": "Esta cuenta se creó con un inicio de sesión social. Inicia sesión como te registraste (Kakao, Google o Apple).",
+  "err.auth.socialAccountOnly": "Esta cuenta no puede iniciar sesión con un número de teléfono. Inicia sesión con Kakao, Google o Apple, el que tenga conectado.",
   "err.auth.linkNoProfile": "No se puede vincular un método de inicio de sesión a esta cuenta.",
   "err.auth.linkPinRequired": "Solo se puede vincular o desvincular en una cuenta que tenga PIN de inicio de sesión.",
   "err.auth.linkPinWrong": "El PIN no coincide, así que la vinculación no cambió. Inténtalo de nuevo.",
@@ -393,6 +393,7 @@ export const es: Record<string, string> = {
   "err.auth.attachNotSocial": "Solo está disponible en una cuenta que acabas de empezar con Kakao, Google o Apple.",
   "err.auth.attachNotEmpty": "Esta cuenta ya tiene registros, así que no se puede mover. Escríbenos por el chat de soporte.",
   "err.auth.attachOtherLinked": "Esa cuenta ya tiene vinculado otro inicio de sesión del mismo tipo.",
+  "err.auth.attachNotAllowed": "Esa cuenta no se puede conectar aquí. Inicia sesión en ella primero y conéctala en Ajustes › Inicios de sesión conectados.",
   // '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰(routes/modules/handoff.ts). 실패 이유는 구분해 알려 주지 않는다
   "err.auth.handoffInvalid": "Este enlace a la app caducó o ya se usó. Inicia sesión.",
   "err.auth.handoffBadRequest": "El formato de la solicitud no es válido",

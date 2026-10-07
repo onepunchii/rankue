@@ -230,14 +230,106 @@ describe("관리 화면의 입구(/admin) — 번호 폼 없이 내 계정으로
     it("서버: 번호 폼은 관리자 계정을 들이지 않는다(PIN 을 보기 전에) · 바로 들어가기는 본인 확인을 거친 계정만", () => {
         const svc = root("server/services/hiqService.ts");
         const fn = svc.slice(svc.indexOf("async partnerLogin("), svc.indexOf("async getPartnerStore("));
-        const refuse = fn.indexOf('if (profile && (profile.role === "admin" || profile.role === "super_admin")) {');
+        const refuse = fn.indexOf("if (profile && isAdminRole(profile.role)) {");
         expect(refuse).toBeGreaterThan(0);
         expect(refuse).toBeLessThan(fn.indexOf("verifyPassword(password, profile)"));
         const partner = root("server/routes/modules/partner.ts");
         const sso = partner.slice(partner.indexOf('router.post("/sso"'), partner.indexOf("const requirePartner"));
-        const verified = sso.indexOf("const verified = !!profile.password || !!profile.googleSub || !!profile.appleSub || !!profile.kakaoSub;");
+        const verified = sso.indexOf("const verified = !!profile.password || hasSocialLogin(profile);");
         expect(verified).toBeGreaterThan(0);
-        expect(sso.indexOf("res.cookie('hiq_partner_auth'")).toBeGreaterThan(sso.indexOf('"SSO_UNVERIFIED"'));
-        expect(sso.indexOf('"SSO_UNVERIFIED"')).toBeGreaterThan(verified);
+        // 두 거절(관리자인데 소셜 연결 없음 · 본인 확인 없는 계정) 모두 쿠키를 주기 전이다
+        expect(sso.indexOf("res.cookie('hiq_partner_auth'")).toBeGreaterThan(sso.lastIndexOf('"SSO_UNVERIFIED"'));
+        expect(sso.lastIndexOf('"SSO_UNVERIFIED"')).toBeGreaterThan(verified);
+        expect(sso.match(/"SSO_UNVERIFIED"/g)).toHaveLength(2);
+    });
+});
+
+// 2026-10-07 오너: "응 전체 로그인화면을 팝업이 기본이 되게 설정 잘해줘"
+describe("팝업이 기본 — 로그인하러 보내는 길도 예시 홈 위의 팝업이다", () => {
+    const sheet = code(client("components/hiq/LoginSheet.tsx"));
+    const landing = code(client("pages/hiq/landing.tsx"));
+
+    it("호스트가 ?login=1 을 읽어 팝업을 열고 주소에서 지운다 — '경로가 바뀌면 닫는다'보다 뒤에서", () => {
+        const host = sheet.slice(sheet.indexOf("export function LoginSheetHost()"));
+        const close = host.indexOf("useEffect(() => { closeLoginSheet(); }, [location]);");
+        const open = host.indexOf('if (!p.has("login")) return;');
+        expect(close).toBeGreaterThan(0);
+        expect(open).toBeGreaterThan(close);
+        // '나'를 받는 중에는 기다리고, 로그인 화면(/ · /hiq …)에서는 손대지 않는다
+        expect(host).toContain("if (authLoading || LOGIN_SCREEN.test(location)) return;");
+        // 돌아갈 곳은 거른 값만(열린 리다이렉트 방지) · 표시는 주소에서 지운다(새로 고침·뒤로 가기에 다시 뜨지 않게)
+        expect(host).toContain('const from = safeReturnPath(p.get("redirect")) ?? undefined;');
+        expect(host).toContain('p.delete("login");');
+        expect(host).toContain('p.delete("redirect");');
+        // 이미 로그인돼 있으면 팝업 없이 가려던 곳으로
+        const signedIn = host.indexOf("if (isLoggedIn) { setLocation(from ?? here, { replace: true }); return; }");
+        const openAt = host.indexOf("setState({ open: true, opts: { from } });");
+        expect(signedIn).toBeGreaterThan(open);
+        expect(openAt).toBeGreaterThan(signedIn);
+        expect(host).toContain("}, [search, location, authLoading, isLoggedIn, setLocation]);");
+    });
+
+    it("전체 로그인 화면이 남는 곳은 전화번호 길(?phone)과 매장 전용 주소뿐 — 나머지는 팝업으로 넘긴다", () => {
+        const first = landing.slice(landing.indexOf("const [popupFirst] = useState(() => {"), landing.indexOf("const storeEntry ="));
+        expect(first.length).toBeGreaterThan(0);
+        expect(first).toContain('if (p.has("phone") || p.has("store")) return false;');
+        expect(first).toContain('return resolveStoreSlug() === "hiq";');
+        // 팝업의 '전화번호로 계속하기' · 가입 첫 단계의 '이전'은 전화번호 카드로 간다(phone = true)
+        expect(sheet).toContain("const toPhone = () => go(loginPagePath(back, true));");
+        // 카카오에서 못 끝내고 돌아온 사람도 팝업으로
+        expect(code(client("pages/hiq/kakao-callback.tsx"))).toContain('return loginPagePath(safeReturnPath(back) ?? "/dashboard");');
+    });
+
+    it("자동으로 보내는 곳(골프 전용 문 · 크루 만들기)은 그 자리에 팝업을 띄우지 않고 보낸다 — 가는 곳이 예시 홈 + 팝업", () => {
+        const gate = code(client("components/hiq/LoginGate.tsx"));
+        const page = gate.slice(gate.indexOf("export function goLoginPage"), gate.indexOf("export function goLogin("));
+        expect(page).toContain("setLocation(loginPagePath(back));");
+        expect(page).not.toContain("openLoginSheet");
+        expect(code(client("App.tsx"))).toContain("goLoginPage((to) => setLocation(to, { replace: true }), window.location.pathname + window.location.search);");
+        expect(code(client("pages/hiq/create-club.tsx"))).toContain('if (isGuest) goLoginPage(setLocation, "/club/create");');
+    });
+});
+
+// 2026-10-07 오너: "관리자 계정 핀번호 막자"
+describe("관리자 계정은 번호 + PIN 으로 들이지 않는다 — PIN 이 닿는 길을 전부 같은 규칙으로", () => {
+    const svc = root("server/services/hiqService.ts");
+
+    it("전화번호 로그인: 소셜 로그인이 연결된 관리자 계정이면 PIN 을 보기 전에 거절한다", () => {
+        const fn = svc.slice(svc.indexOf("    async login(phone: string, storeSlug: string, password?: string) {"), svc.indexOf("    async socialLogin("));
+        const refuse = fn.indexOf("if (profile && isAdminRole(profile.role) && hasSocialLogin(profile)) {");
+        expect(refuse).toBeGreaterThan(0);
+        // PIN 단계(requiresPassword)로 넘기기 전 · PIN 대조 전
+        expect(refuse).toBeLessThan(fn.indexOf("requiresPassword: true"));
+        expect(refuse).toBeLessThan(fn.indexOf("verifyPassword(password, profile)"));
+    });
+
+    it("가입으로 프로필에 붙기: 관리자 프로필은 거절 — 'PIN 없는 프로필 채우기'보다 먼저 본다", () => {
+        const fn = svc.slice(svc.indexOf("    async register("), svc.indexOf("    async getProfile") > 0 ? svc.indexOf("    async getProfile") : undefined);
+        const admin = fn.indexOf("} else if (isAdminRole(profile.role)) {");
+        const backfill = fn.indexOf("} else if (!profile.password) {");
+        expect(admin).toBeGreaterThan(0);
+        expect(backfill).toBeGreaterThan(admin);
+        expect(fn.indexOf("verifyPassword(data.password, profile)")).toBeGreaterThan(backfill);
+    });
+
+    it("전화번호 계정 잇기: 관리자 계정이 받는 쪽이면 PIN 을 보지 않고 거절한다", () => {
+        const fn = svc.slice(svc.indexOf("    async attachSocialToPhone("), svc.indexOf("    async register("));
+        const refuse = fn.indexOf('if (profile && isAdminRole(profile.role)) return { kind: "not-allowed" };');
+        expect(refuse).toBeGreaterThan(0);
+        expect(refuse).toBeLessThan(fn.indexOf("verifyPassword(pin, profile)"));
+        expect(root("server/routes/modules/auth.ts")).toContain('if (out.kind === "not-allowed") return sendError(res, 409, "err.auth.attachNotAllowed", "ATTACH_NOT_ALLOWED");');
+        for (const l of LOCALES) expect(root(`shared/i18n/${l}.ts`), l).toMatch(/"err\.auth\.attachNotAllowed": "[^"\n]+"/);
+    });
+
+    it("바로 들어가기(SSO): 관리자는 소셜 로그인이 연결돼 있어야 관리 쿠키를 받는다", () => {
+        const partner = root("server/routes/modules/partner.ts");
+        const sso = partner.slice(partner.indexOf('router.post("/sso"'), partner.indexOf("const requirePartner"));
+        const need = sso.indexOf("if (isAdmin && !hasSocialLogin(profile)) {");
+        expect(need).toBeGreaterThan(0);
+        expect(sso.indexOf("res.cookie('hiq_partner_auth'")).toBeGreaterThan(need);
+    });
+
+    it("문구는 왜 안 되는지와 어떻게 들어오는지를 말한다 — 소셜로 가입한 계정에도 맞는 말이다", () => {
+        expect(root("shared/i18n/ko.ts")).toMatch(/"err\.auth\.socialAccountOnly": "[^"]*전화번호로 로그인할 수 없어요[^"]*카카오·구글·애플[^"]*"/);
     });
 });

@@ -684,7 +684,7 @@ router.delete("/social/google/link", requireAuth, asyncHandler(async (req: AuthR
  *  - 전화번호 로그인과 **같은 잠금**을 쓴다(login:<번호>:<ip>, 다섯 번·15분) — 이 길로 PIN 을 더 맞혀 볼 수 없다. 없는 번호도 로그인처럼 따로 센다.
  *  - 폼 본문은 받지 않는다(쿠키가 바뀌는 길이다 — 로그인 CSRF).
  *  - 지금 계정에 기록이 있으면 거절한다. 기록 합치기는 하지 않는다(hiqService.attachSocialToPhone).
- * 결과: 200 { member, attached } · 400 · 401 ATTACH_PIN_WRONG · 404 ATTACH_NO_ACCOUNT · 409 ATTACH_NOT_SOCIAL · ATTACH_NOT_EMPTY · ATTACH_NO_PIN · ATTACH_OTHER_LINKED · 403(정지) · 429
+ * 결과: 200 { member, attached } · 400 · 401 ATTACH_PIN_WRONG · 404 ATTACH_NO_ACCOUNT · 409 ATTACH_NOT_SOCIAL · ATTACH_NOT_EMPTY · ATTACH_NO_PIN · ATTACH_OTHER_LINKED · ATTACH_NOT_ALLOWED(관리자 계정) · 403(정지) · 429
  */
 router.post("/social/attach-phone", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const { phone, pin } = req.body ?? {};
@@ -710,6 +710,7 @@ router.post("/social/attach-phone", requireAuth, asyncHandler(async (req: AuthRe
     if (out.kind === "no-account") { registerFailure(probeKey, LOGIN_UNKNOWN_MAX); return sendError(res, 404, "err.auth.attachNoAccount", "ATTACH_NO_ACCOUNT"); }
     if (out.kind === "no-pin") return sendError(res, 409, "err.auth.attachNoPin", "ATTACH_NO_PIN");
     if (out.kind === "not-social") return sendError(res, 409, "err.auth.attachNotSocial", "ATTACH_NOT_SOCIAL");
+    if (out.kind === "not-allowed") return sendError(res, 409, "err.auth.attachNotAllowed", "ATTACH_NOT_ALLOWED");
     if (out.kind === "not-empty") return sendError(res, 409, "err.auth.attachNotEmpty", "ATTACH_NOT_EMPTY");
     // 남은 갈래(other-linked)까지 여기서 끝낸다 — 아래는 성공뿐
     if (out.kind !== "ok") return sendError(res, 409, "err.auth.attachOtherLinked", "ATTACH_OTHER_LINKED");

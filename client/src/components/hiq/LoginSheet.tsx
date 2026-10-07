@@ -6,6 +6,9 @@
  * 예전에는 '로그인'을 누르면 보던 화면을 떠나 로그인 화면(/?login=1&redirect=…)으로 갔다. 이제는 그 자리에서 시트가 올라오고,
  * 로그인이 끝나면 닫히기만 한다 — 보던 골프장·선수 페이지에 그대로 남는다(가려던 곳이 따로 있을 때만 옮긴다).
  *
+ * 팝업이 기본이다(2026-10-07 오너: "전체 로그인화면을 팝업이 기본이 되게"): 로그인하러 **보내는** 길(loginPagePath)도 전체 로그인 화면이 아니라
+ *   예시 홈 위의 이 팝업이다 — 주소의 ?login=1 을 호스트가 읽어 연다. 전체 화면(landing)은 전화번호 입력과 매장 전용 주소에만 남는다.
+ *
  * 쓰는 법
  *   openLoginSheet({ from?, title?, desc? })  열었으면 true. 못 열면 false(호스트가 아직 없다 · 지금 화면이 곧 로그인 화면이다) —
  *                                             그때는 부른 쪽이 로그인 화면으로 보낸다(goLogin 이 그렇게 한다).
@@ -32,6 +35,7 @@ import { useLocation, useSearch } from "wouter";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import SocialLogin, { AppleLogo, socialLoginAvailable } from "@/components/hiq/SocialLogin";
 import { useSport } from "@/contexts/SportContext";
+import { useAuth } from "@/hooks/useAuth";
 import { useBackToClose } from "@/hooks/useBackToClose";
 import { useT } from "@/lib/i18n";
 import { X } from "@/lib/icons";
@@ -83,10 +87,21 @@ export function useLoginSheetOpen(): boolean {
  */
 const LOGIN_SCREEN = /^\/(?:$|hiq$|register$|auth\/)/;
 
-/** 로그인 화면 주소 — 끝나면 back 으로 돌아온다(landing 이 ?redirect= 를 safeReturnPath 로 거른다). phone: 전화번호 카드부터 연다 */
+/** 팝업을 얹을 화면 — 비로그인에게도 열려 있는 예시 홈. */
+export const LOGIN_SHEET_HOME = "/dashboard";
+
+/**
+ * 로그인하러 보내는 주소 — 끝나면 back 으로 돌아온다.
+ *  - 기본(2026-10-07 오너: "전체 로그인화면을 팝업이 기본이 되게"): **예시 홈 위에 가입·로그인 팝업**이 열린다(/dashboard?login=1&redirect=…).
+ *    호스트(LoginSheetHost)가 ?login=1 을 읽어 팝업을 열고 주소에서 지운다. 팝업을 닫아도 예시 홈에 남는다 — 막다른 화면이 없다.
+ *    화면이 뜨자마자 자동으로 보내는 곳(골프 전용 문 · 크루 만들기 · 관리 화면 · 카카오 취소 뒤)도 이 길이다.
+ *  - phone: 전화번호 입력은 팝업에 없다 — 로그인 화면의 전화번호 카드로 간다(/?login=1&phone=1&redirect=…). PIN 확인 · PIN 찾기가 거기 있다.
+ * 전체 로그인 화면(pages/hiq/landing)이 남는 곳은 그 전화번호 카드와 매장 전용 주소(?store= · 매장 주소)뿐이다.
+ */
 export function loginPagePath(back: string, phone = false): string {
-    // login=1 은 '로그인하러 온 사람'이라는 신호다 — 이게 없는 맨 '/' 는 비로그인을 예시 홈으로 보낸다(landing.tsx)
-    return `/?login=1${phone ? "&phone=1" : ""}&redirect=${encodeURIComponent(back)}`;
+    return phone
+        ? `/?login=1&phone=1&redirect=${encodeURIComponent(back)}`
+        : `${LOGIN_SHEET_HOME}?login=1&redirect=${encodeURIComponent(back)}`;
 }
 
 /**
@@ -369,7 +384,8 @@ export function LoginSheetHost() {
     const s = useSyncExternalStore(subscribeLoginSheet, getState, getState);
     const [location, setLocation] = useLocation();
     // 질의(?…)만 바뀌어도 다시 그린다 — 아래 '지금 주소'가 낡지 않게
-    useSearch();
+    const search = useSearch();
+    const { isLoading: authLoading, isLoggedIn } = useAuth();
     const { currentSport } = useSport();
     const tone: SheetTone = currentSport === "GOLF" ? "dark" : "light";
 
@@ -386,6 +402,26 @@ export function LoginSheetHost() {
 
     // 화면(경로)이 바뀌면 닫는다 — 뒤로 가기 · 로그인 뒤 이동 · '전화번호로 계속하기'. 로그인 화면으로 옮겨 갔을 때도 여기서 닫힌다
     useEffect(() => { closeLoginSheet(); }, [location]);
+
+    // 로그인하러 온 주소(?login=1 — loginPagePath)면 팝업을 연다(2026-10-07 오너: "전체 로그인화면을 팝업이 기본이 되게").
+    // 위의 '경로가 바뀌면 닫는다'보다 **뒤에** 둔다 — 같은 그리기에서 닫힌 다음 열려야 한다. 표시(?login · ?redirect)는 주소에서 지운다:
+    // 남겨 두면 새로 고침·뒤로 가기 때마다 팝업이 다시 올라온다. 질의만 바뀌는 것이라 위의 닫기는 다시 돌지 않는다.
+    //  - '나'를 받는 중에는 기다린다(로그인된 사람에게 팝업을 띄우지 않는다)
+    //  - 이미 로그인돼 있으면 팝업 없이 가려던 곳으로 보낸다
+    //  - 로그인 화면(/ · /hiq …)에서는 손대지 않는다 — 그 화면이 스스로 판단한다(landing)
+    useEffect(() => {
+        if (authLoading || LOGIN_SCREEN.test(location)) return;
+        const p = new URLSearchParams(search);
+        if (!p.has("login")) return;
+        const from = safeReturnPath(p.get("redirect")) ?? undefined;
+        p.delete("login");
+        p.delete("redirect");
+        const rest = p.toString();
+        const here = location + (rest ? `?${rest}` : "");
+        if (isLoggedIn) { setLocation(from ?? here, { replace: true }); return; }
+        setLocation(here, { replace: true });
+        setState({ open: true, opts: { from } });
+    }, [search, location, authLoading, isLoggedIn, setLocation]);
 
     const go = useCallback((to: string) => {
         closeLoginSheet();

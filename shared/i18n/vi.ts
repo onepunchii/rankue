@@ -380,7 +380,7 @@ export const vi: Record<string, string> = {
   "err.auth.kakaoPinWrong": "Mã PIN không khớp nên chưa thay đổi liên kết Kakao. Vui lòng thử lại.",
   "err.auth.kakaoUnlinkSignup": "Tài khoản này được tạo bằng Kakao nên không thể hủy liên kết Kakao.",
   "err.auth.phoneInvalid": "Số điện thoại không hợp lệ",
-  "err.auth.socialAccountOnly": "Tài khoản này được tạo bằng đăng nhập mạng xã hội. Vui lòng đăng nhập bằng cách bạn đã đăng ký (Kakao, Google hoặc Apple).",
+  "err.auth.socialAccountOnly": "Tài khoản này không thể đăng nhập bằng số điện thoại. Vui lòng đăng nhập bằng Kakao, Google hoặc Apple đã liên kết.",
   "err.auth.linkNoProfile": "Không thể liên kết phương thức đăng nhập với tài khoản này.",
   "err.auth.linkPinRequired": "Chỉ có thể liên kết hoặc hủy liên kết trên tài khoản có mã PIN đăng nhập.",
   "err.auth.linkPinWrong": "Mã PIN không khớp nên liên kết chưa được thay đổi. Vui lòng thử lại.",
@@ -393,6 +393,7 @@ export const vi: Record<string, string> = {
   "err.auth.attachNotSocial": "Chỉ dùng được trên tài khoản bạn vừa bắt đầu bằng Kakao, Google hoặc Apple.",
   "err.auth.attachNotEmpty": "Tài khoản này đã có dữ liệu nên không thể chuyển. Vui lòng nhắn hỗ trợ trong mục trò chuyện.",
   "err.auth.attachOtherLinked": "Tài khoản đó đã liên kết một phương thức đăng nhập khác cùng loại.",
+  "err.auth.attachNotAllowed": "Không thể nối tài khoản đó ở đây. Hãy đăng nhập vào tài khoản đó trước, rồi liên kết trong Cài đặt › Đăng nhập đã liên kết.",
   // '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰(routes/modules/handoff.ts). 실패 이유는 구분해 알려 주지 않는다
   "err.auth.handoffInvalid": "Liên kết mở ứng dụng này đã hết hạn hoặc đã được dùng. Vui lòng đăng nhập.",
   "err.auth.handoffBadRequest": "Định dạng yêu cầu không hợp lệ",

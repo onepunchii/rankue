@@ -380,7 +380,7 @@ export const ko: Record<string, string> = {
   "err.auth.kakaoPinWrong": "PIN 이 맞지 않아 카카오 연결을 바꾸지 못했어요. 다시 입력해 주세요.",
   "err.auth.kakaoUnlinkSignup": "카카오로 가입한 계정이라 카카오 연결을 해제할 수 없어요.",
   "err.auth.phoneInvalid": "전화번호 형식이 올바르지 않습니다",
-  "err.auth.socialAccountOnly": "소셜 로그인으로 가입한 계정이에요. 가입한 방법(카카오·구글·애플)으로 로그인해 주세요.",
+  "err.auth.socialAccountOnly": "이 계정은 전화번호로 로그인할 수 없어요. 연결된 카카오·구글·애플로 로그인해 주세요.",
   "err.auth.linkNoProfile": "이 계정에는 로그인 수단을 연결할 수 없어요.",
   "err.auth.linkPinRequired": "연결·해제는 로그인 PIN 이 있는 계정에서만 할 수 있어요.",
   "err.auth.linkPinWrong": "PIN 이 맞지 않아 연결을 바꾸지 못했어요. 다시 입력해 주세요.",
@@ -393,6 +393,7 @@ export const ko: Record<string, string> = {
   "err.auth.attachNotSocial": "카카오·구글·애플로 새로 시작한 계정에서만 쓸 수 있어요.",
   "err.auth.attachNotEmpty": "지금 계정에 기록이 있어 옮길 수 없어요. 채팅의 운영자 문의로 알려 주세요.",
   "err.auth.attachOtherLinked": "그 계정에는 같은 종류의 다른 로그인이 이미 연결되어 있어요.",
+  "err.auth.attachNotAllowed": "그 계정은 여기서 이을 수 없어요. 그 계정으로 로그인한 뒤 설정 › 연결된 로그인에서 연결해 주세요.",
   // '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰(routes/modules/handoff.ts). 실패 이유는 구분해 알려 주지 않는다
   "err.auth.handoffInvalid": "앱으로 넘어오는 링크가 만료됐거나 이미 사용됐어요. 로그인해 주세요.",
   "err.auth.handoffBadRequest": "요청 형식이 올바르지 않습니다",

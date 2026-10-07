@@ -8,6 +8,7 @@
  *   3) 번호 폼으로 들어와 있던 사장님(앱 계정 없이 파트너 쿠키만)은 /partner/dashboard
  *   4) 로그인이 안 돼 있으면 이 자리에서 가입·로그인 팝업을 연다(카카오·구글). 로그인이 끝나면 1)부터 다시 본다.
  * 번호 폼(/partner/login)은 사장님용으로만 남는다 — 서버가 관리자 계정을 그 폼으로 들이지 않는다(hiqService.partnerLogin).
+ * 관리자 계정은 번호 + PIN 로그인 자체가 막혀 있다("관리자 계정 핀번호 막자" — server/lib/adminRole): 카카오·구글·애플로 로그인한 세션만 여기를 지난다.
  *
  * (2026-09-26) 예전 이 주소에는 '랭큐 관리자 콘솔'이라는 이름의 매장 단위 화면이 따로 있었다 — 지금은 입구일 뿐이다.
  */
@@ -23,6 +24,8 @@ export default function HiqAdmin() {
     const [, setLocation] = useLocation();
     const { member, isLoading } = useAuth();
     const [gate, setGate] = useState<Gate>("checking");
+    // 본인 확인이 모자란 사유는 서버가 말해 준다(번호만으로 로그인된 계정 · 소셜 로그인이 연결되지 않은 관리자 계정)
+    const [reason, setReason] = useState<string | null>(null);
     const memberId = member?.id ?? null;
 
     useEffect(() => {
@@ -42,6 +45,7 @@ export default function HiqAdmin() {
             } catch (e) {
                 const status = e instanceof ApiError ? e.status : 0;
                 why = status === 401 ? "guest" : e instanceof ApiError && e.data?.code === "SSO_UNVERIFIED" ? "unverified" : "denied";
+                if (alive) setReason(why === "unverified" && e instanceof ApiError && e.message ? e.message : null);
             }
             // 3) 번호 폼으로 들어와 있던 사장님
             try { await apiRequest("/api/hiq/partner/store"); go("/partner/dashboard"); return; } catch { /* 권한 없음 */ }
@@ -63,7 +67,7 @@ export default function HiqAdmin() {
     const copy = gate === "guest"
         ? { title: "관리 화면", desc: "랭큐 계정으로 로그인하면 바로 열려요. 번호를 따로 넣지 않아도 됩니다." }
         : gate === "unverified"
-            ? { title: "본인 확인이 필요해요", desc: "이 계정은 번호만으로 로그인돼 있어요. 설정에서 로그인 PIN 을 만들거나 카카오·구글을 연결한 뒤 다시 열어 주세요." }
+            ? { title: "본인 확인이 필요해요", desc: reason ?? "설정에서 로그인 PIN 을 만들거나 카카오·구글을 연결한 뒤 다시 열어 주세요." }
             : { title: "관리 권한이 없는 계정이에요", desc: "지금 로그인한 계정으로는 관리 화면을 열 수 없어요. 매장 사장님은 아래에서 들어와 주세요." };
 
     return (

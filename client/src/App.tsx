@@ -234,7 +234,8 @@ function GolfOnly({ children }: { children: ReactNode }) {
     if (isGuest && locale === "ko") {
       // 한국어로 보는 비로그인(확인 끝) — 로그인으로. 끝나면 가려던 골프 화면(지금 주소)으로 돌아온다.
       // 자리를 바꿔 끼운다(replace): 로그인 화면에서 '뒤로'를 누르면 이 문으로 돌아와 다시 로그인으로 튕기는 걸 막는다.
-      // 팝업(goLogin)이 아니라 로그인 **화면**으로 보낸다(goLoginPage, 2026-10-06) — 이 문은 아무것도 그리지 않아서, 빈 화면 위에 팝업이 뜨고 닫으면 갇힌다.
+      // 이 자리에 팝업을 띄우지 않고 **보낸다**(goLoginPage) — 이 문은 아무것도 그리지 않아서, 빈 화면 위에 팝업이 뜨고 닫으면 갇힌다.
+      // 가는 곳은 예시 홈 위의 가입·로그인 팝업이다(2026-10-07 — 전체 로그인 화면이 아니다). 닫아도 예시 홈에 남는다.
       goLoginPage((to) => setLocation(to, { replace: true }), window.location.pathname + window.location.search);
       return;
     }

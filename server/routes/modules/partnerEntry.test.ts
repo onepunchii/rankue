@@ -116,6 +116,22 @@ describe("POST /partner/sso — 랭큐에 로그인한 내 계정으로 바로",
         expect((await callRoute("/sso", { userId: "m-owner-bare" })).statusCode).toBe(200);
     });
 
+    // 2026-10-07 오너: "관리자 계정 핀번호 막자" — 소셜 로그인이 연결된 관리자 계정은 전화번호 로그인이 닫힌다(hiqService.login).
+    // 연결이 없는 관리자 계정의 세션은 PIN 으로 만든 것일 수 있어 관리 쿠키를 주지 않는다. 사장님(관리자 아님)은 PIN 만 있어도 된다.
+    it("관리자는 PIN 만으로는 안 된다 — 카카오·구글·애플이 연결돼 있어야 관리 쿠키를 받는다", async () => {
+        const admin = mem.state.profiles.find((p) => p.id === "p-admin");
+        admin.kakaoSub = null;
+        const pinOnly = await callRoute("/sso", { userId: "m-admin" });
+        expect(pinOnly.statusCode).toBe(403);
+        expect(pinOnly.body.code).toBe("SSO_UNVERIFIED");
+        expect(pinOnly.body.message).toContain("카카오·구글");
+        expect(pinOnly.cookies).toEqual({});
+        admin.googleSub = "g-1";
+        const linked = await callRoute("/sso", { userId: "m-admin" });
+        expect(linked.statusCode).toBe(200);
+        expect(linked.cookies.hiq_partner_auth).toBe("p-admin");
+    });
+
     it("로그인하지 않았으면 401 · 매장도 관리 권한도 없는 계정은 403 — 쿠키를 주지 않는다", async () => {
         const guest = await callRoute("/sso", {});
         expect(guest.statusCode).toBe(401);

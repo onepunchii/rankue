@@ -206,7 +206,8 @@ describe("카카오 로그인 — 돌아온 화면(/auth/kakao)", () => {
         expect(before.indexOf('apiRequest("/api/hiq/logout"')).toBeLessThan(before.indexOf("go(loginPath(out.back));"));
         // 로그인 화면 주소에 싣는 redirect 도 거른 값만
         const loginPath = s.slice(s.indexOf("function loginPath"), s.indexOf("type FailView"));
-        expect(loginPath).toContain("const safe = safeReturnPath(back);");
+        // 2026-10-07: 가는 곳은 전체 로그인 화면이 아니라 예시 홈 위의 팝업(loginPagePath) — 싣는 값은 여전히 거른 것만
+        expect(loginPath).toContain('return loginPagePath(safeReturnPath(back) ?? "/dashboard");');
         // 이동은 전부 자리 바꿔 끼우기 — '뒤로'로 이 주소에 돌아와 같은 코드를 다시 보내지 않게
         expect(s).toContain("const go = (to: string) => live.current.setLocation(to, { replace: true });");
         expect(s.match(/setLocation\(/g)).toHaveLength(2);

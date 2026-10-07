@@ -11,6 +11,7 @@ import { useStore } from "@/contexts/StoreContext";
 import { PinResetDialog } from "@/components/hiq/PinResetDialog";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import SocialLogin, { AppleLogo, socialLoginAvailable } from "@/components/hiq/SocialLogin";
+import { loginPagePath } from "@/components/hiq/LoginSheet";
 import { kakaoLoginAvailable, kakaoLoginOpen, kakaoNativeAvailable } from "@/lib/kakaoLogin";
 import { isNativeApp } from "@/lib/nativeBridge";
 
@@ -58,6 +59,20 @@ export default function Landing() {
             if (window.location.pathname !== "/") return false;
             const p = new URLSearchParams(window.location.search);
             if (p.has("login") || p.has("redirect") || p.has("store")) return false;
+            return resolveStoreSlug() === "hiq";
+        } catch {
+            return false;
+        }
+    });
+
+    // 팝업이 기본이다(2026-10-07 오너: "전체 로그인화면을 팝업이 기본이 되게"). 로그인하러 이 주소로 온 사람(?login · ?redirect · /hiq)도
+    // 전화번호 길을 고른 것(?phone)이나 매장 전용 주소가 아니면 이 화면을 그리지 않고 **예시 홈 위의 가입·로그인 팝업**으로 넘긴다
+    // (loginPagePath — 옛 링크·북마크·카카오 콘솔에 적힌 주소가 여기로 온다). 이 화면이 남는 곳: 전화번호 입력·PIN·PIN 찾기, 매장 로그인.
+    // 화면이 붙을 때 한 번만 판단한다(bareRoot 와 같은 이유).
+    const [popupFirst] = useState(() => {
+        try {
+            const p = new URLSearchParams(window.location.search);
+            if (p.has("phone") || p.has("store")) return false;
             return resolveStoreSlug() === "hiq";
         } catch {
             return false;
@@ -139,10 +154,15 @@ export default function Landing() {
             // 비로그인이 맨 '/' 를 열었다 — 예시 홈으로. 로그인 폼을 그리지 않고(확인 중 화면을 유지한 채) 자리를 바꿔 끼운다:
             // '뒤로'를 눌러 이 주소로 돌아와 다시 튕기지 않게, 그리고 앱의 '뒤로 = 종료' 판단이 그대로 통하게.
             if (bareRoot) { setLocation("/dashboard", { replace: true }); return; }
+            // 로그인하러 왔지만 전화번호 길도 매장 주소도 아니다 — 전체 화면 대신 예시 홈 위의 팝업으로(끝나면 ?redirect= 로 돌아간다)
+            if (popupFirst) {
+                setLocation(loginPagePath(safeReturnPath(new URLSearchParams(window.location.search).get("redirect")) ?? "/dashboard"), { replace: true });
+                return;
+            }
             setAuthState("out");
         })();
         return () => { alive = false; };
-    }, [setLocation, bareRoot]);
+    }, [setLocation, bareRoot, popupFirst]);
 
     const { store: brand, isLoading: isBrandLoading, error: brandError } = useStore();
 
@@ -380,7 +400,8 @@ export default function Landing() {
                             한국어 웹(kakaoFirst)은 소셜 묶음이 첫 화면이라 여기서 또 늘어놓지 않고 돌아가는 길만 둔다(2026-10-05). */}
                         {!requiresPassword && (kakaoFirst ? (
                             <button
-                                onClick={() => setPhoneMode(false)}
+                                // 카카오·구글은 팝업에 있다(2026-10-07) — 예시 홈 위의 가입·로그인 팝업으로 돌아간다(끝나면 ?redirect= 로)
+                                onClick={() => setLocation(loginPagePath(safeReturnPath(new URLSearchParams(window.location.search).get("redirect")) ?? "/dashboard"))}
                                 className="mt-5 self-center text-[12px] font-medium text-black/45 hover:text-brand transition-colors underline underline-offset-4"
                             >
                                 {t("login.socialBackLink")}

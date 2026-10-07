@@ -59,8 +59,8 @@ export default function CreateClub() {
     const coverInput = useRef<HTMLInputElement>(null);
 
     // 만들기는 계정이 필요하다 — 게스트가 주소로 바로 들어오면 로그인으로 보내고 여기로 되돌아온다.
-    // 화면이 뜨자마자 자동으로 보내는 곳이라 팝업(goLogin)이 아니라 로그인 화면으로 보낸다(goLoginPage, 2026-10-06) —
-    // 누르지도 않았는데 팝업이 올라오면 안 된다. 아래 '제출'처럼 사람이 눌러서 여는 곳은 팝업이다.
+    // 화면이 뜨자마자 자동으로 보내는 곳이라 이 자리에 팝업을 띄우지 않고 보낸다(goLoginPage) — 가는 곳은 예시 홈 위의 가입·로그인 팝업
+    // (2026-10-07 오너: "전체 로그인화면을 팝업이 기본이 되게"). 닫으면 예시 홈에 남는다. 아래 '제출'처럼 사람이 눌러서 여는 곳은 그 자리에서 팝업이다.
     useEffect(() => {
         if (isGuest) goLoginPage(setLocation, "/club/create");
     }, [isGuest]);

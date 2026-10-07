@@ -55,13 +55,15 @@ describe("goLogin — 로그인 화면으로 옮기지 않고 팝업을 연다",
         expect(gate).toContain('import { loginPagePath, openLoginSheet } from "./LoginSheet";');
     });
 
-    it("goLoginPage 는 예전 goLogin 그대로 — /?login=1&redirect=<돌아올 곳>, 돌아올 곳이 없으면 지금 주소", () => {
+    it("goLoginPage 는 보낸다 — 예시 홈 위의 팝업으로(/dashboard?login=1&redirect=<돌아올 곳>), 돌아올 곳이 없으면 지금 주소", () => {
         expect(goLoginPage).toContain('const back = from ?? (typeof window !== "undefined" ? window.location.pathname + window.location.search : "/");');
         expect(goLoginPage).toContain("setLocation(loginPagePath(back));");
         expect(goLoginPage).not.toContain("openLoginSheet");
         const path = sheet.slice(sheet.indexOf("export function loginPagePath"), sheet.indexOf("export function openLoginSheet"));
-        expect(path).toContain('return `/?login=1${phone ? "&phone=1" : ""}&redirect=${encodeURIComponent(back)}`;');
-        // 기본은 phone 표시 없이 — 예전 주소와 글자까지 같다
+        // 2026-10-07 오너 "전체 로그인화면을 팝업이 기본이 되게": 기본은 예시 홈 위의 팝업(/dashboard?login=1…), 전화번호 길만 로그인 화면(/?login=1&phone=1…)
+        expect(path).toContain("? `/?login=1&phone=1&redirect=${encodeURIComponent(back)}`");
+        expect(path).toContain(": `${LOGIN_SHEET_HOME}?login=1&redirect=${encodeURIComponent(back)}`;");
+        expect(sheet).toContain('export const LOGIN_SHEET_HOME = "/dashboard";');
         expect(path).toContain("export function loginPagePath(back: string, phone = false): string {");
     });
 
@@ -698,8 +700,9 @@ describe("랭큐 첫 주소(/) — 비로그인에게 로그인 폼 대신 예�
         expect(bare).toContain('return resolveStoreSlug() === "hiq";');
         // 상태로 한 번만(그릴 때마다 보면 PIN 확인 단계 같은 폼 상태가 날아간다)
         expect(landing.match(/const \[bareRoot\] = useState\(/g)).toHaveLength(1);
-        // goLoginPage·'전화번호로 계속하기'가 만드는 주소에는 늘 login=1 이 실린다 — 로그인하러 온 사람은 예시 홈으로 튕기지 않는다
-        expect(sheet).toContain("return `/?login=1${phone");
+        // goLoginPage·'전화번호로 계속하기'가 만드는 주소에는 늘 login=1 이 실린다 — 호스트(팝업)와 로그인 화면(전화번호 카드)이 그것으로 알아본다
+        expect(sheet).toContain("? `/?login=1&phone=1&redirect=");
+        expect(sheet).toContain(": `${LOGIN_SHEET_HOME}?login=1&redirect=");
     });
 
     it("비로그인이 확인되면 /dashboard 로 자리를 바꿔 끼운다 — 로그인 폼을 그리기 전에", () => {
@@ -713,7 +716,13 @@ describe("랭큐 첫 주소(/) — 비로그인에게 로그인 폼 대신 예�
         // "out" 이 되기 전에 떠난다 — 폼은 authState 가 "out" 일 때만 그려진다
         expect(out).toBeGreaterThan(guestHome);
         expect(landing).toContain('if (authState !== "out" || isBrandLoading || !brand) {');
-        expect(effect).toContain("}, [setLocation, bareRoot]);");
+        expect(effect).toContain("}, [setLocation, bareRoot, popupFirst]);");
+        // 2026-10-07 오너 "전체 로그인화면을 팝업이 기본이 되게": 로그인하러 왔어도 전화번호 길(?phone)·매장 주소가 아니면 폼을 그리지 않고
+        // 예시 홈 위의 팝업으로 넘긴다 — 맨 '/' 갈래 다음, "out" 이 되기 전
+        const popup = effect.indexOf("if (popupFirst) {");
+        expect(popup).toBeGreaterThan(guestHome);
+        expect(out).toBeGreaterThan(popup);
+        expect(effect).toContain('setLocation(loginPagePath(safeReturnPath(new URLSearchParams(window.location.search).get("redirect")) ?? "/dashboard"), { replace: true });');
     });
 
     it("소개 화면(MarketingLanding)은 '/' 에서 더는 뜨지 않는다 — 컴포넌트와 /about 은 그대로", () => {

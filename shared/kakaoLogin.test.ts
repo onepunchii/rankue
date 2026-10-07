@@ -479,7 +479,9 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(landing).toContain('{t("login.phoneLoginLink")}');
         expect(landing).toContain("{!kakaoFirst && (");
         expect(landing.match(/onClick=\{\(\) => setPhoneMode\(true\)\}/g)).toHaveLength(2);
-        expect(landing).toContain("onClick={() => setPhoneMode(false)}");
+        // 2026-10-07 오너 "전체 로그인화면을 팝업이 기본이 되게": 전화 화면에서 돌아가는 길은 이 화면의 소셜 묶음이 아니라 예시 홈 위의 팝업이다
+        expect(landing).not.toContain("setPhoneMode(false)");
+        expect(landing).toContain('onClick={() => setLocation(loginPagePath(safeReturnPath(new URLSearchParams(window.location.search).get("redirect")) ?? "/dashboard"))}');
         expect(landing).toContain('{t("login.socialBackLink")}');
     });
 

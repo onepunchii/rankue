@@ -15,14 +15,15 @@ import { LucideLock, LucideChevronRight, type LucideIcon } from "@/lib/icons";
 // 공개 콘텐츠(크루·커뮤니티·세계랭킹)로 계속 걸어갈 수 있어야 한다.
 
 /**
- * 로그인 **화면**으로 보내되, 끝나면 원래 있던 곳으로 되돌아오게 한다(예전 goLogin 의 동작 그대로).
- * 화면이 뜨자마자 자동으로 보내는 곳(골프 전용 문 GolfOnly · 크루 만들기)이 쓴다 — 빈 화면 위에 팝업이 뜨면 안 되고,
- * 닫으면 빈 화면에 갇힌다. 사람이 눌러서 여는 곳은 goLogin 을 쓴다.
+ * 로그인하러 **보낸다** — 끝나면 원래 있던 곳으로 되돌아온다.
+ * 화면이 뜨자마자 자동으로 보내는 곳(골프 전용 문 GolfOnly · 크루 만들기)이 쓴다: 그 화면들은 비로그인에게 그릴 것이 없어서,
+ * 그 자리에 팝업을 띄우면 닫았을 때 빈 화면에 갇힌다. 사람이 눌러서 여는 곳은 goLogin 을 쓴다(그 자리에서 팝업).
+ * 2026-10-07 오너 "전체 로그인화면을 팝업이 기본이 되게": 가는 곳이 전체 로그인 화면에서 **예시 홈 위의 가입·로그인 팝업**으로 바뀌었다
+ * (loginPagePath → /dashboard?login=1&redirect=…). 팝업을 닫아도 예시 홈에 남는다.
  */
 export function goLoginPage(setLocation: (to: string) => void, from?: string) {
     const back = from ?? (typeof window !== "undefined" ? window.location.pathname + window.location.search : "/");
-    // 주소는 loginPagePath 한 곳에서 만든다(/?login=1&redirect=…) — login=1 은 '로그인하러 온 사람'이라는 신호(landing.tsx):
-    // 이게 없는 맨 '/' 는 비로그인을 예시 홈으로 보낸다. redirect 는 landing 이 이미 지원하는 복귀 파라미터를 그대로 쓴다.
+    // 주소는 loginPagePath 한 곳에서 만든다 — ?login=1 을 가입·로그인 팝업의 호스트가 읽어 팝업을 연다(LoginSheetHost)
     setLocation(loginPagePath(back));
 }
 

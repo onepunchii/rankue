@@ -364,7 +364,10 @@ describe("골프 홈", () => {
             expect(page).toContain("setLocation(loginPagePath(back));");
             const sheet = client("components/hiq/LoginSheet.tsx");
             const path = sheet.slice(sheet.indexOf("export function loginPagePath"), sheet.indexOf("export function openLoginSheet"));
-            expect(path).toContain('return `/?login=1${phone ? "&phone=1" : ""}&redirect=${encodeURIComponent(back)}`;');
+            // 2026-10-07 오너 "전체 로그인화면을 팝업이 기본이 되게": 기본은 예시 홈 위의 팝업(/dashboard?login=1…), 전화번호 길만 로그인 화면(/?login=1&phone=1…)
+            expect(path).toContain("? `/?login=1&phone=1&redirect=${encodeURIComponent(back)}`");
+            expect(path).toContain(": `${LOGIN_SHEET_HOME}?login=1&redirect=${encodeURIComponent(back)}`;");
+            expect(sheet).toContain('export const LOGIN_SHEET_HOME = "/dashboard";');
             // login=1 이 빠진 주소를 만드는 곳이 없다 — 맨 '/' 는 비로그인을 예시 홈으로 보낸다(landing)
             for (const src of [gate, sheet]) expect(src).not.toContain("`/?redirect=");
         });

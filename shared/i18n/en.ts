@@ -380,7 +380,7 @@ export const en: Record<string, string> = {
   "err.auth.kakaoPinWrong": "That PIN doesn't match, so the Kakao connection wasn't changed. Please try again.",
   "err.auth.kakaoUnlinkSignup": "This account was created with Kakao, so Kakao can't be disconnected.",
   "err.auth.phoneInvalid": "That phone number isn't valid",
-  "err.auth.socialAccountOnly": "This account was created with a social login. Please sign in the way you signed up (Kakao, Google or Apple).",
+  "err.auth.socialAccountOnly": "This account can't sign in with a phone number. Please sign in with the Kakao, Google or Apple login connected to it.",
   "err.auth.linkNoProfile": "A sign-in method can't be linked to this account.",
   "err.auth.linkPinRequired": "Sign-in methods can only be connected or disconnected on an account that has a login PIN.",
   "err.auth.linkPinWrong": "That PIN doesn't match, so the connection wasn't changed. Please try again.",
@@ -393,6 +393,7 @@ export const en: Record<string, string> = {
   "err.auth.attachNotSocial": "This is only available on an account you just started with Kakao, Google or Apple.",
   "err.auth.attachNotEmpty": "This account already has records, so it can't be moved. Please contact support in chat.",
   "err.auth.attachOtherLinked": "That account already has another sign-in of the same kind linked.",
+  "err.auth.attachNotAllowed": "That account can't be connected here. Sign in to it first, then connect in Settings › Connected sign-in.",
   // '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰(routes/modules/handoff.ts). 실패 이유는 구분해 알려 주지 않는다
   "err.auth.handoffInvalid": "This link to the app has expired or was already used. Please sign in.",
   "err.auth.handoffBadRequest": "The request format isn't valid",

@@ -380,7 +380,7 @@ export const tr: Record<string, string> = {
   "err.auth.kakaoPinWrong": "PIN eşleşmedi, bu yüzden Kakao bağlantısı değiştirilmedi. Lütfen tekrar deneyin.",
   "err.auth.kakaoUnlinkSignup": "Bu hesap Kakao ile oluşturulduğu için Kakao bağlantısı kaldırılamaz.",
   "err.auth.phoneInvalid": "Telefon numarası geçerli değil",
-  "err.auth.socialAccountOnly": "Bu hesap sosyal girişle oluşturuldu. Lütfen kaydolduğunuz yöntemle (Kakao, Google veya Apple) giriş yapın.",
+  "err.auth.socialAccountOnly": "Bu hesap telefon numarasıyla giriş yapamaz. Lütfen bağlı olan Kakao, Google veya Apple ile giriş yapın.",
   "err.auth.linkNoProfile": "Bu hesaba bir giriş yöntemi bağlanamaz.",
   "err.auth.linkPinRequired": "Bağlama ve kaldırma yalnızca giriş PIN'i olan hesaplarda yapılabilir.",
   "err.auth.linkPinWrong": "PIN eşleşmedi, bağlantı değiştirilmedi. Lütfen tekrar deneyin.",
@@ -393,6 +393,7 @@ export const tr: Record<string, string> = {
   "err.auth.attachNotSocial": "Yalnızca Kakao, Google veya Apple ile yeni başlattığınız hesapta kullanılabilir.",
   "err.auth.attachNotEmpty": "Bu hesapta kayıt olduğu için taşınamaz. Lütfen sohbetten destek ekibine yazın.",
   "err.auth.attachOtherLinked": "O hesapta aynı türden başka bir giriş zaten bağlı.",
+  "err.auth.attachNotAllowed": "O hesap buradan bağlanamaz. Önce o hesaba giriş yapın, ardından Ayarlar › Bağlı girişler bölümünden bağlayın.",
   // '앱에서 열기'(2026-10-06) — 웹의 로그인을 앱으로 넘겨주는 한 번짜리 토큰(routes/modules/handoff.ts). 실패 이유는 구분해 알려 주지 않는다
   "err.auth.handoffInvalid": "Uygulamaya geçiş bağlantısının süresi dolmuş veya bağlantı zaten kullanılmış. Lütfen giriş yapın.",
   "err.auth.handoffBadRequest": "İstek biçimi geçerli değil",

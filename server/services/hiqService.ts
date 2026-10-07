@@ -12,6 +12,7 @@ import { generateHandle } from "../lib/handle.js";
 import { GLOBAL_STORE_SLUG, DEFAULT_STORE_SLUG } from "../../shared/systemStores.js";
 import { KAKAO_DEFAULT_NAME } from "../../shared/kakaoLogin.js";
 import { isLoginPhone, isKakaoSignupPhone, kakaoPhonePlaceholder, SOCIAL_PHONE_PREFIX } from "../../shared/loginPhone.js";
+import { hasSocialLogin, isAdminRole } from "../lib/adminRole.js";
 import { isReservedMemberName } from "../utils/crewModeration.js";
 
 // --- PIN 해싱 ---
@@ -86,7 +87,7 @@ export class HiqService {
 
         // 관리자 계정은 이 길(번호 + 4자리 PIN)로 들이지 않는다(2026-10-07 오너: "어드민에 휴대폰 번호로 진입하는 거 제거 — 내 계정이면 들어가지게").
         // 관리자 콘솔은 랭큐에 로그인한 내 계정으로 연다(POST /partner/sso). **PIN 을 보기 전에** 끊는다 — 맞는 PIN 인지 알려 주지 않게.
-        if (profile && (profile.role === "admin" || profile.role === "super_admin")) {
+        if (profile && isAdminRole(profile.role)) {
             return { success: false, message: "관리자 계정은 랭큐 로그인으로 들어와 주세요." };
         }
 
@@ -150,6 +151,12 @@ export class HiqService {
             // Check if this member has a linked profile with a password
             if (member.profileId) {
                 const profile = await storage.getProfile(member.profileId);
+                // 관리자 계정은 번호 + PIN 으로 들이지 않는다(2026-10-07 오너: "관리자 계정 핀번호 막자" — lib/adminRole).
+                // **PIN 을 보기 전에** 끊는다(맞는 PIN 인지 알려 주지 않는다) — PIN 단계(requiresPassword)로도 넘기지 않는다.
+                // 소셜 로그인이 연결돼 있을 때만: 하나도 없으면 이 길이 유일한 입구라 막지 않는다(그런 계정은 관리 화면이 열리지 않는다 — /partner/sso).
+                if (profile && isAdminRole(profile.role) && hasSocialLogin(profile)) {
+                    throw unauthorized(msg("err.auth.socialAccountOnly"));
+                }
                 if (profile && profile.password) {
                     // Password required but not provided
                     if (!password) {
@@ -367,11 +374,12 @@ export class HiqService {
      *  - "no-pin": 프로필·PIN 이 없는 계정(매장에서 번호만으로 등록) — 본인임을 확인할 방법이 없어 잇지 않는다.
      *  - "wrong-pin": PIN 이 틀렸다(라우트가 로그인과 같은 잠금에 센다).
      *  - "other-linked": 그 계정에 같은 종류의 다른 소셜이 이미 붙어 있다 — 덮어쓰지 않는다.
+     *  - "not-allowed": 관리자 계정이다 — PIN 을 보지 않고 거절한다(lib/adminRole).
      * "ok" 면 받는 쪽 회원 행을 돌려준다 — 라우트가 그 회원으로 쿠키를 바꾼다.
      */
     async attachSocialToPhone(currentMemberId: string, phone: unknown, pin: unknown): Promise<
         { kind: "ok"; member: HiqMember; provider: "google" | "apple" | "kakao" }
-        | { kind: "not-social" | "not-empty" | "no-account" | "no-pin" | "wrong-pin" | "other-linked" }
+        | { kind: "not-social" | "not-empty" | "no-account" | "no-pin" | "wrong-pin" | "other-linked" | "not-allowed" }
     > {
         const current = await storage.getMemberById(currentMemberId);
         if (!current?.profileId || !String(current.phone ?? "").startsWith(SOCIAL_PHONE_PREFIX)) return { kind: "not-social" };
@@ -388,6 +396,9 @@ export class HiqService {
         if (!target || target.id === current.id) return { kind: "no-account" };
         if (!target.profileId) return { kind: "no-pin" };
         const profile = await storage.getProfile(target.profileId);
+        // 관리자 계정에는 이 길로 잇지 않는다(2026-10-07 — lib/adminRole): 번호 + PIN 만 알면 자기 소셜을 관리자 계정에 붙일 수 있게 된다.
+        // PIN 을 보기 전에 끊는다. 관리자는 그 계정으로 로그인한 뒤 설정 › 연결된 로그인에서 붙인다.
+        if (profile && isAdminRole(profile.role)) return { kind: "not-allowed" };
         if (!profile || !profile.password) return { kind: "no-pin" };
         if (typeof pin !== "string" || !pin || !(await verifyPassword(pin, profile))) return { kind: "wrong-pin" };
 
@@ -432,6 +443,11 @@ export class HiqService {
                     securityQuestion: data.securityQuestion,
                     securityAnswer: normalizedAnswer
                 });
+            } else if (isAdminRole(profile.role)) {
+                // 관리자 프로필에는 번호 + PIN 으로 새 회원 행을 붙이지 않는다(2026-10-07 — lib/adminRole). 붙여 주면 다른 매장에 가입하는 것만으로
+                // 관리자 프로필의 세션이 생기고, 거기서 관리 화면으로 바로 들어간다(POST /partner/sso). PIN 을 보기 전에 끊는다.
+                // 아래 'PIN 없는 프로필 채우기'보다 **먼저** 본다 — PIN 없는 관리자 프로필에 남이 PIN 을 새로 박는 길도 같이 닫힌다.
+                throw unauthorized(msg("err.auth.socialAccountOnly"));
             } else if (!profile.password) {
                 // SECURITY: /register is unauthenticated. Only backfill credentials for a legacy
                 // passwordless profile. NEVER overwrite an existing account's password/security

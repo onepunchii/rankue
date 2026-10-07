@@ -4,6 +4,7 @@ import { storage } from "../../storage/index.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
+import { hasSocialLogin, isAdminRole } from "../../lib/adminRole.js";
 
 const router = Router();
 
@@ -57,10 +58,15 @@ router.post("/sso", asyncHandler(async (req: any, res: any) => {
     if (!profile) return sendError(res, 403, "파트너 계정이 아닙니다");
 
     const store = await storage.getStoreByOwnerProfileId(profile.id);
-    const isAdmin = profile.role === "admin" || profile.role === "super_admin";
+    const isAdmin = isAdminRole(profile.role);
     if (!store && !isAdmin) return sendError(res, 403, "파트너 계정이 아닙니다");
+    // 관리자는 소셜 로그인이 연결돼 있어야 한다(2026-10-07 오너: "관리자 계정 핀번호 막자" — lib/adminRole).
+    // 연결돼 있으면 전화번호 로그인이 닫히므로, 이 세션은 카카오·구글·애플로 만든 것이다. 연결이 없으면 PIN 으로 만든 세션일 수 있어 들이지 않는다.
+    if (isAdmin && !hasSocialLogin(profile)) {
+        return sendError(res, 403, "관리자 계정은 카카오·구글 로그인을 연결한 뒤에 열 수 있어요. 설정 › 연결된 로그인에서 연결해 주세요.", "SSO_UNVERIFIED");
+    }
     // 본인 확인을 거친 세션인가 — PIN 이 있거나 소셜 로그인이 붙은 계정만(그런 계정은 번호만으로는 로그인되지 않는다)
-    const verified = !!profile.password || !!profile.googleSub || !!profile.appleSub || !!profile.kakaoSub;
+    const verified = !!profile.password || hasSocialLogin(profile);
     if (!verified) return sendError(res, 403, "로그인 PIN 을 만들거나 카카오·구글을 연결한 뒤에 열 수 있어요", "SSO_UNVERIFIED");
 
     res.clearCookie('hiq_admin_origin', { path: '/' });
