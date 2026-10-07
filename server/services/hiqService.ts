@@ -14,6 +14,7 @@ import { KAKAO_DEFAULT_NAME } from "../../shared/kakaoLogin.js";
 import { isLoginPhone, isKakaoSignupPhone, kakaoPhonePlaceholder, SOCIAL_PHONE_PREFIX } from "../../shared/loginPhone.js";
 import { hasSocialLogin, isAdminRole } from "../lib/adminRole.js";
 import { resolveJoinStore } from "../lib/joinStore.js";
+import { copyProviderAvatar, providerAvatarUrl } from "../lib/providerAvatar.js";
 import { isReservedMemberName } from "../utils/crewModeration.js";
 
 // --- PIN 해싱 ---
@@ -243,7 +244,31 @@ export class HiqService {
         }
 
         await storage.incrementVisitCount(member.id);
+        // 그 계정의 프로필 사진 — 직접 올린 사진이 없을 때만(2026-10-07). 가입할 때뿐 아니라 사진 없이 쓰던 기존 회원이 다시 로그인할 때도 채운다
+        await this.adoptProviderAvatar(member.id, identity.picture);
         return { member, isNew, redirectTo: "/dashboard" };
+    }
+
+    /**
+     * 카카오·구글 계정의 프로필 사진을 내 프로필 사진으로 — **지금 사진이 없을 때만**.
+     * 2026-10-07 오너: "내가 수동 프로필 사진 업로드 전까지 프로필 사진 쓰면 좋고".
+     *  - 사진이 이미 있으면(직접 올렸든, 전에 가져왔든) 건드리지 않는다. 제공자 쪽 사진이 바뀌어도 따라가지 않는다.
+     *  - 주소를 그대로 적지 않고 우리 저장소에 사본을 넣는다(lib/providerAvatar — 두 제공자의 사진 서버에서만, 2.5초 · 2MB).
+     *  - 로그인·연결을 막지 않는다: 어떤 실패도 삼킨다(사진이 없을 뿐이다).
+     * 소셜 로그인(위)과 설정의 카카오·구글 연결(라우트)이 부른다.
+     */
+    async adoptProviderAvatar(memberId: string, picture: unknown): Promise<void> {
+        try {
+            if (!providerAvatarUrl(picture)) return;
+            const member = await storage.getMemberById(memberId);
+            if (!member?.profileId) return;
+            const profile = await storage.getProfile(member.profileId);
+            if (!profile || profile.profileImageUrl) return;
+            const saved = await copyProviderAvatar(member.id, picture);
+            if (saved) await storage.updateProfile(profile.id, { profileImageUrl: saved });
+        } catch (e) {
+            console.warn("[avatar] 프로필 사진 채우기 실패:", (e as Error)?.message);
+        }
     }
 
     /**

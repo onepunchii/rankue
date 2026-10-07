@@ -12,6 +12,11 @@ export type SocialIdentity = {
   sub: string;
   email: string | null;
   name: string | null;
+  /**
+   * 그 계정의 프로필 사진 주소(2026-10-07 오너: "카카오 가입이나 구글 가입 시 프로필 사진 … 수동 업로드 전까지 쓰면 좋고").
+   * 구글은 ID 토큰의 picture, 카카오는 사진 동의를 했을 때만. 애플은 주지 않는다. 직접 올린 사진이 없는 프로필에만 사본을 넣는다(lib/providerAvatar).
+   */
+  picture?: string | null;
 };
 
 function allowedAudiences(env: string | undefined): string[] {
@@ -45,6 +50,7 @@ export async function verifyGoogleIdToken(idToken: string): Promise<SocialIdenti
       sub: payload.sub,
       email: typeof payload.email === "string" ? payload.email : null,
       name: typeof payload.name === "string" ? payload.name : null,
+      picture: typeof payload.picture === "string" ? payload.picture : null,
     };
   } catch (err) {
     logVerifyFailure("google", idToken, err, audience);

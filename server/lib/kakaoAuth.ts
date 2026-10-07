@@ -259,7 +259,8 @@ export async function exchangeKakaoCode(code: unknown, redirectUri: unknown): Pr
         console.warn("[kakao] 사용자 조회 시간 초과(토큰 요청이 시간을 다 썼다)");
         return { ok: false, reason: "timeout" };
     }
-    const me = await callJson(USER_URL, { method: "GET", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": FORM_TYPE } }, Math.min(KAKAO_TIMEOUT_MS, left));
+    // secure_resource=true — 프로필 사진 주소를 https 로 받는다(기본은 http 다)
+    const me = await callJson(`${USER_URL}?secure_resource=true`, { method: "GET", headers: { Authorization: `Bearer ${accessToken}`, "Content-Type": FORM_TYPE } }, Math.min(KAKAO_TIMEOUT_MS, left));
     if (typeof me === "string") {
         console.warn(`[kakao] 사용자 조회 ${me === "timeout" ? "시간 초과" : "연결 실패"}`);
         return { ok: false, reason: me };
@@ -278,7 +279,11 @@ export async function exchangeKakaoCode(code: unknown, redirectUri: unknown): Pr
 
     // 닉네임은 동의 항목이다 — 동의하지 않았으면 없다(null). 이메일은 받지 않는다.
     const name = cleanKakaoNickname(me.body?.kakao_account?.profile?.nickname) ?? cleanKakaoNickname(me.body?.properties?.nickname);
-    return { ok: true, identity: { sub, email: null, name } };
+    // 프로필 사진도 동의 항목이다(2026-10-07) — 카카오 콘솔의 동의항목에 '프로필 사진'이 켜져 있고 본인이 동의했을 때만 온다.
+    // 카카오 기본 그림(사진을 안 올린 계정)은 쓰지 않는다 — 랭큐의 이름 첫 글자가 낫다.
+    const kp = me.body?.kakao_account?.profile;
+    const picture = kp && kp.is_default_image !== true && typeof kp.profile_image_url === "string" ? kp.profile_image_url : null;
+    return { ok: true, identity: { sub, email: null, name, picture } };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -461,6 +466,7 @@ export async function verifyKakaoIdToken(idToken: unknown, nonce: unknown): Prom
         return { ok: false, reason: "token-invalid" };
     }
 
-    // 닉네임은 동의 항목이다 — 동의하지 않았으면 클레임이 없다(null). 이메일·프로필 사진은 읽지 않는다.
-    return { ok: true, identity: { sub, email: null, name: cleanKakaoNickname(payload.nickname) } };
+    // 닉네임·프로필 사진은 동의 항목이다 — 동의하지 않았으면 클레임이 없다(null). 이메일은 읽지 않는다.
+    // (사진은 2026-10-07 부터 읽는다 — 직접 올린 사진이 없는 프로필에만 사본을 넣는다: lib/providerAvatar)
+    return { ok: true, identity: { sub, email: null, name: cleanKakaoNickname(payload.nickname), picture: typeof payload.picture === "string" ? payload.picture : null } };
 }

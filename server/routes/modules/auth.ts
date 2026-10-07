@@ -425,6 +425,8 @@ router.post("/social/kakao/link", requireAuth, asyncHandler(async (req: AuthRequ
     if (linked === "no-profile") return sendError(res, 409, "err.auth.kakaoNoProfile", "KAKAO_NO_PROFILE");
     if (linked === "no-pin") return sendError(res, 409, "err.auth.kakaoPinRequired", "KAKAO_PIN_REQUIRED");
     if (linked === "other-linked") return sendError(res, 409, "err.auth.kakaoOtherLinked", "KAKAO_OTHER_LINKED");
+    // 프로필 사진이 없는 계정이면 카카오 사진을 쓴다(2026-10-07 — hiqService.adoptProviderAvatar. 실패해도 연결은 끝났다)
+    await hiqService.adoptProviderAvatar(req.userId!, exchanged.identity.picture);
     return sendSuccess(res, { linked: true });
 }));
 
@@ -660,6 +662,8 @@ router.post("/social/google/link", requireAuth, asyncHandler(async (req: AuthReq
     if (linked === "no-profile") return sendError(res, 409, "err.auth.linkNoProfile", "LINK_NO_PROFILE");
     if (linked === "no-pin") return sendError(res, 409, "err.auth.linkPinRequired", "LINK_PIN_REQUIRED");
     if (linked === "other-linked") return sendError(res, 409, msg("err.auth.linkOtherLinked", { provider: "Google" }), "LINK_OTHER_LINKED");
+    // 프로필 사진이 없는 계정이면 구글 사진을 쓴다(2026-10-07 — hiqService.adoptProviderAvatar. 실패해도 연결은 끝났다)
+    await hiqService.adoptProviderAvatar(req.userId!, identity.picture);
     return sendSuccess(res, { linked: true });
 }));
 
@@ -932,6 +936,8 @@ router.post("/social/kakao/native", asyncHandler(async (req: any, res: any) => {
         if (linked === "no-profile") return sendError(res, 409, "err.auth.kakaoNoProfile", "KAKAO_NO_PROFILE");
         if (linked === "no-pin") return sendError(res, 409, "err.auth.kakaoPinRequired", "KAKAO_PIN_REQUIRED");
         if (linked === "other-linked") return sendError(res, 409, "err.auth.kakaoOtherLinked", "KAKAO_OTHER_LINKED");
+        // 프로필 사진이 없는 계정이면 카카오 사진을 쓴다(2026-10-07 — 웹의 연결과 같다)
+        await hiqService.adoptProviderAvatar(userId as string, verified.identity.picture);
         return sendSuccess(res, { linked: true });
     }
 

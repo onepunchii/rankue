@@ -72,6 +72,30 @@ export function phoneLabel(phone: string | null | undefined): string {
     return phone;
 }
 
+/**
+ * 회원 얼굴 — 프로필 사진이 있으면 사진, 없거나 안 열리면 이름 첫 글자.
+ * 사진은 직접 올린 것이거나, 올리기 전까지 쓰는 카카오·구글 계정의 사진이다(server/lib/providerAvatar.ts).
+ * 글자를 밑에 깔고 사진을 그 위에 얹는다 — 사진이 깨지면 사진만 치워서 글자가 그대로 보인다.
+ */
+export function MemberAvatar({ name, src, className = "" }: { name: string | null | undefined; src: string | null | undefined; className?: string }) {
+    return (
+        <span className={`relative shrink-0 rounded-full overflow-hidden flex items-center justify-center ${className}`}>
+            {name?.slice(0, 1) || "?"}
+            {src && (
+                <img
+                    src={src}
+                    alt=""
+                    loading="lazy"
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    className="absolute inset-0 w-full h-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+            )}
+        </span>
+    );
+}
+
 export function PlatformIcon({ platform, className }: { platform: string | null | undefined; className?: string }) {
     if (platform === "ios") return <span className={className} title="iOS(애플)">🍎</span>;
     if (platform === "android") return <span className={className} title="Android(안드로이드)">🤖</span>;

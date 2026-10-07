@@ -148,7 +148,7 @@ describe("exchangeKakaoCode — 성공", () => {
     it("토큰 요청: POST · form-urlencoded · 다섯 값이 다 실린다", async () => {
         fakeFetch({});
         const r = await exchangeKakaoCode(CODE, REDIRECT);
-        expect(r).toEqual({ ok: true, identity: { sub: "1234567890", email: null, name: "홍길동" } });
+        expect(r).toEqual({ ok: true, identity: { sub: "1234567890", email: null, name: "홍길동", picture: null } });
 
         expect(calls).toHaveLength(2);
         const t = calls[0];
@@ -171,7 +171,8 @@ describe("exchangeKakaoCode — 성공", () => {
         fakeFetch({});
         await exchangeKakaoCode(CODE, REDIRECT);
         const m = calls[1];
-        expect(m.url).toBe("https://kapi.kakao.com/v2/user/me");
+        // secure_resource=true — 프로필 사진 주소를 https 로 받는다(2026-10-07)
+        expect(m.url).toBe("https://kapi.kakao.com/v2/user/me?secure_resource=true");
         expect(m.init.method).toBe("GET");
         expect(new Headers(m.init.headers).get("authorization")).toBe(`Bearer ${ACCESS}`);
         expect(m.init.body).toBeUndefined();
@@ -221,17 +222,41 @@ describe("exchangeKakaoCode — 성공", () => {
 
     it("닉네임: kakao_account.profile 이 먼저, 없으면 properties, 동의하지 않았으면 null", async () => {
         fakeFetch({ me: () => json(200, { id: 7, kakao_account: { profile: { nickname: "  계정  닉네임 " } }, properties: { nickname: "옛 닉네임" } }) });
-        expect(await exchangeKakaoCode(CODE, REDIRECT)).toEqual({ ok: true, identity: { sub: "7", email: null, name: "계정 닉네임" } });
+        expect(await exchangeKakaoCode(CODE, REDIRECT)).toEqual({ ok: true, identity: { sub: "7", email: null, name: "계정 닉네임", picture: null } });
 
         fakeFetch({ me: () => json(200, { id: 7, properties: { nickname: "옛 닉네임" } }) });
         expect(await exchangeKakaoCode(CODE, REDIRECT)).toMatchObject({ identity: { name: "옛 닉네임" } });
 
         fakeFetch({ me: () => json(200, { id: 7, kakao_account: { profile_nickname_needs_agreement: true } }) });
-        expect(await exchangeKakaoCode(CODE, REDIRECT)).toEqual({ ok: true, identity: { sub: "7", email: null, name: null } });
+        expect(await exchangeKakaoCode(CODE, REDIRECT)).toEqual({ ok: true, identity: { sub: "7", email: null, name: null, picture: null } });
 
         fakeFetch({ me: () => json(200, { id: 7, kakao_account: { profile: { nickname: "가".repeat(80) }, email: "someone@example.com" } }) });
         const long = await exchangeKakaoCode(CODE, REDIRECT);
-        expect(long).toEqual({ ok: true, identity: { sub: "7", email: null, name: "가".repeat(40) } });
+        expect(long).toEqual({ ok: true, identity: { sub: "7", email: null, name: "가".repeat(40), picture: null } });
+    });
+
+    // 2026-10-07 오너: "카카오 가입이나 구글 가입 시 프로필 사진 가지고 오지? … 내가 수동 프로필 사진 업로드 전까지 프로필 사진 쓰면 좋고"
+    it("프로필 사진: 동의했으면 주소를 그대로 넘긴다 — 카카오 기본 그림 · 동의 안 함 · 글자가 아닌 값은 null", async () => {
+        const pic = "https://k.kakaocdn.net/dn/example/img_640x640.jpg";
+        fakeFetch({ me: () => json(200, { id: 7, kakao_account: { profile: { nickname: "닉", profile_image_url: pic, is_default_image: false } } }) });
+        expect(await exchangeKakaoCode(CODE, REDIRECT)).toEqual({ ok: true, identity: { sub: "7", email: null, name: "닉", picture: pic } });
+
+        // is_default_image 가 안 와도(옛 응답) 주소가 있으면 넘긴다 — 기본 그림 주소는 받는 쪽(lib/providerAvatar)이 한 번 더 거른다
+        fakeFetch({ me: () => json(200, { id: 7, kakao_account: { profile: { profile_image_url: pic } } }) });
+        expect(await exchangeKakaoCode(CODE, REDIRECT)).toMatchObject({ identity: { picture: pic } });
+
+        for (const profile of [
+            { nickname: "닉", profile_image_url: "https://t1.kakaocdn.net/account_images/default_profile.jpeg", is_default_image: true },
+            { nickname: "닉" },
+            { nickname: "닉", profile_image_url: 12 },
+            { nickname: "닉", profile_image_url: null },
+        ]) {
+            fakeFetch({ me: () => json(200, { id: 7, kakao_account: { profile_image_needs_agreement: true, profile } }) });
+            expect(await exchangeKakaoCode(CODE, REDIRECT), JSON.stringify(profile)).toMatchObject({ ok: true, identity: { picture: null } });
+        }
+        // 옛 칸(properties.profile_image)은 읽지 않는다 — 기본 그림인지 알 길이 없다
+        fakeFetch({ me: () => json(200, { id: 7, properties: { nickname: "닉", profile_image: pic } }) });
+        expect(await exchangeKakaoCode(CODE, REDIRECT)).toMatchObject({ identity: { picture: null } });
     });
 });
 
@@ -359,7 +384,7 @@ describe("exchangeKakaoCode — 사용자 조회 실패", () => {
 
     it("id 가 숫자 글자로 와도 받는다", async () => {
         fakeFetch({ me: () => json(200, { id: "4000000001" }) });
-        expect(await exchangeKakaoCode(CODE, REDIRECT)).toEqual({ ok: true, identity: { sub: "4000000001", email: null, name: null } });
+        expect(await exchangeKakaoCode(CODE, REDIRECT)).toEqual({ ok: true, identity: { sub: "4000000001", email: null, name: null, picture: null } });
     });
 
     it("200 이 아니면 id 가 있어도 믿지 않는다 / 본문이 JSON 이 아니다", async () => {
@@ -459,7 +484,7 @@ describe("exchangeKakaoCode — 시간 초과(6초)", () => {
         vi.stubGlobal("fetch", f);
         const p = exchangeKakaoCode(CODE, REDIRECT);
         await vi.advanceTimersByTimeAsync(600);
-        expect(await p).toEqual({ ok: true, identity: { sub: "42", email: null, name: null } });
+        expect(await p).toEqual({ ok: true, identity: { sub: "42", email: null, name: null, picture: null } });
         expect(f).toHaveBeenCalledTimes(2);
     });
 

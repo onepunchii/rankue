@@ -13,7 +13,7 @@ import { LucideSearch, LucideChevronDown, LucideChevronRight, LucideDownload } f
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
-import { PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, daysSince, isKstToday, phoneLabel, KpiTile } from "./adminUtils";
+import { MemberAvatar, PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, daysSince, isKstToday, phoneLabel, KpiTile } from "./adminUtils";
 
 type Activity = {
     today: number; yesterday: number;
@@ -198,7 +198,7 @@ export default function MembersView({ onOpenId }: {
                         {shown.map((m) => (
                             <li key={m.id}>
                                 <button onClick={() => onOpenId(m.id)} className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-black/[0.04]">
-                                    <span className="shrink-0 w-9 h-9 rounded-full bg-black/[0.05] flex items-center justify-center text-[13px] font-bold text-black/60">{m.name?.slice(0, 1) || "?"}</span>
+                                    <MemberAvatar name={m.name} src={m.profileImageUrl} className="w-9 h-9 bg-black/[0.05] text-[13px] font-bold text-black/60" />
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-center gap-1.5">
                                             <span className="font-bold text-[14px] truncate">{m.name}</span>
@@ -239,12 +239,17 @@ export default function MembersView({ onOpenId }: {
                                 {shown.map((m) => (
                                     <tr key={m.id} onClick={() => onOpenId(m.id)} className="border-b border-black/[0.05] hover:bg-brand/[0.03] cursor-pointer">
                                         <td className="px-4 py-3">
-                                            <div className="flex items-center gap-1.5">
-                                                <span className="font-bold text-[rgba(0,0,0,0.87)]">{m.name}</span>
-                                                {m.status === "banned" && <span className="rounded-full bg-red-500/10 px-1.5 text-[10.5px] font-bold text-red-600">정지</span>}
-                                                {(m.role === "admin" || m.role === "super_admin") && <span className="rounded-full bg-black/[0.06] px-1.5 text-[10.5px] font-bold text-black/55">관리자</span>}
+                                            <div className="flex items-center gap-3">
+                                                <MemberAvatar name={m.name} src={m.profileImageUrl} className="w-9 h-9 bg-black/[0.05] text-[13px] font-bold text-black/60" />
+                                                <div className="min-w-0">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="font-bold text-[rgba(0,0,0,0.87)]">{m.name}</span>
+                                                        {m.status === "banned" && <span className="rounded-full bg-red-500/10 px-1.5 text-[10.5px] font-bold text-red-600">정지</span>}
+                                                        {(m.role === "admin" || m.role === "super_admin") && <span className="rounded-full bg-black/[0.06] px-1.5 text-[10.5px] font-bold text-black/55">관리자</span>}
+                                                    </div>
+                                                    <div className="text-[12px] text-black/45 font-mono">{phoneLabel(m.phone)}</div>
+                                                </div>
                                             </div>
-                                            <div className="text-[12px] text-black/45 font-mono">{phoneLabel(m.phone)}</div>
                                         </td>
                                         <td className="px-3 py-3 text-center whitespace-nowrap"><PlatformIcon platform={m.platform} /> <CountryFlag code={m.countryCode} /></td>
                                         <td className="px-3 py-3 text-right font-mono font-bold text-brand whitespace-nowrap">{m.rating3c ?? 0} <span className="text-black/25">/</span> {m.rating4c ?? 0}</td>

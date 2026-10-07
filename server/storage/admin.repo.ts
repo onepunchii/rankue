@@ -295,6 +295,8 @@ export class AdminRepository {
             // 계정 상태·권한(정지 여부를 회원 관리에서 바로 보이게) — 프로필이 없으면 null
             status: profiles.status,
             role: profiles.role,
+            // 프로필 사진(2026-10-07 오너: "어드민 회원관리에 프로필 사진이 같이 보이면") — 직접 올린 것 또는 카카오·구글에서 가져온 사본
+            profileImageUrl: profiles.profileImageUrl,
             // 가입 경로 매장 이름(시스템 매장이면 slug 로 구분)
             storeName: sql<string | null>`(select st.name from hiq_stores st where st.id = ${hiqMembers.storeId})`,
             storeSlug: sql<string | null>`(select st.slug from hiq_stores st where st.id = ${hiqMembers.storeId})`,

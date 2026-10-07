@@ -24,7 +24,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle } from "@/lib/icons";
 import MemberGamesDialog from "./MemberGamesDialog";
-import { PlatformIcon, CountryFlag, Pill, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday } from "./adminUtils";
+import { MemberAvatar, PlatformIcon, CountryFlag, Pill, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday } from "./adminUtils";
 import { TODAY_ACTIVE_KEY } from "./TodayActiveView";
 import { appConfirm, appAlert } from "@/components/AppDialog";
 import { useT } from "@/lib/i18n";
@@ -50,6 +50,8 @@ export type AdminMember = {
     lastVisitedAt: string | null;
     createdAt: string;
     profileId: string | null;
+    /** 프로필 사진 — 직접 올린 것, 또는 올리기 전까지 쓰는 카카오·구글 계정의 사진 */
+    profileImageUrl?: string | null;
     status: "active" | "banned" | null;
     role: string | null;
     marketingAgree: boolean | null;
@@ -364,9 +366,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                         <>
                             <div className="shrink-0 bg-white border-b border-black/[0.07] px-5 pt-6 pb-4">
                                 <div className="flex items-center gap-3 pr-8">
-                                    <div className="w-12 h-12 shrink-0 rounded-full bg-brand/10 flex items-center justify-center text-[18px] font-black text-brand">
-                                        {m.name?.slice(0, 1) || "?"}
-                                    </div>
+                                    <MemberAvatar name={m.name} src={m.profileImageUrl} className="w-12 h-12 bg-brand/10 text-[18px] font-black text-brand" />
                                     <div className="min-w-0">
                                         <SheetTitle className="flex items-center gap-1.5 text-[18px] font-black text-[rgba(0,0,0,0.87)]">
                                             <span className="truncate">{m.name}</span>

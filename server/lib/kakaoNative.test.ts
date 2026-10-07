@@ -100,7 +100,7 @@ async function makeKey(kid: string): Promise<Keys> {
     return { privateKey: privateKey as CryptoKey, publicJwk: { ...(await exportJWK(publicKey)), kid, alg: "RS256", use: "sig" } };
 }
 
-type Claims = { iss?: string; aud?: string | string[]; sub?: string; nonce?: string; nickname?: string; expInSec?: number; drop?: ("sub" | "nonce" | "exp")[] };
+type Claims = { iss?: string; aud?: string | string[]; sub?: string; nonce?: string; nickname?: string; picture?: unknown; expInSec?: number; drop?: ("sub" | "nonce" | "exp")[] };
 
 /** 카카오 ID 토큰과 같은 꼴(iss·aud·sub·iat·exp·auth_time·nonce·nickname)의 토큰을 만든다. */
 async function idToken(nonce: string, over: Claims = {}, key: Keys = kakaoKey, kid: string = KID): Promise<string> {
@@ -114,6 +114,7 @@ async function idToken(nonce: string, over: Claims = {}, key: Keys = kakaoKey, k
         exp: now + (over.expInSec ?? 6 * 60 * 60),
         nonce: over.nonce ?? nonce,
         ...(over.nickname !== undefined ? { nickname: over.nickname } : {}),
+        ...(over.picture !== undefined ? { picture: over.picture } : {}),
     };
     for (const k of over.drop ?? []) delete payload[k];
     return new SignJWT(payload).setProtectedHeader({ alg: "RS256", typ: "JWT", kid }).sign(key.privateKey);
@@ -245,13 +246,19 @@ describe("nonce — 서버가 내주고, 이 브라우저의 서명 쿠키와 �
 });
 
 describe("verifyKakaoIdToken — ID 토큰 검증 표", () => {
-    it("진짜 토큰 — 회원번호(sub)와 닉네임만 돌려준다. 웹의 교환과 같은 꼴의 sub(숫자 글자)다", async () => {
+    it("진짜 토큰 — 회원번호(sub)·닉네임·프로필 사진 주소를 돌려준다. 웹의 교환과 같은 꼴의 sub(숫자 글자)다", async () => {
         const n = newKakaoNonce();
         const r = await verifyKakaoIdToken(await idToken(n, { nickname: "  홍길동  " }), n);
-        expect(r).toEqual({ ok: true, identity: { sub: "1234567890", email: null, name: "홍길동" } });
+        expect(r).toEqual({ ok: true, identity: { sub: "1234567890", email: null, name: "홍길동", picture: null } });
         // 닉네임 제공에 동의하지 않았으면 null
         const n2 = newKakaoNonce();
-        expect(await verifyKakaoIdToken(await idToken(n2), n2)).toEqual({ ok: true, identity: { sub: "1234567890", email: null, name: null } });
+        expect(await verifyKakaoIdToken(await idToken(n2), n2)).toEqual({ ok: true, identity: { sub: "1234567890", email: null, name: null, picture: null } });
+        // 프로필 사진(2026-10-07) — 사진 제공에 동의했을 때만 picture 클레임이 온다. 글자가 아니면 null
+        const pic = "https://k.kakaocdn.net/dn/example/img_640x640.jpg";
+        const n3 = newKakaoNonce();
+        expect(await verifyKakaoIdToken(await idToken(n3, { nickname: "홍길동", picture: pic }), n3)).toEqual({ ok: true, identity: { sub: "1234567890", email: null, name: "홍길동", picture: pic } });
+        const n4 = newKakaoNonce();
+        expect(await verifyKakaoIdToken(await idToken(n4, { picture: 12 }), n4)).toMatchObject({ ok: true, identity: { picture: null } });
     });
 
     it("aud 는 허용 목록 — 네이티브 앱 키도, REST 키도 받는다. 목록에 없는 앱의 토큰은 안 받는다", async () => {
