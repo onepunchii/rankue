@@ -1,6 +1,8 @@
 import { useMemo } from "react";
 import { useT } from "@/lib/i18n";
 import { isNativeApp } from "@/lib/nativeBridge";
+import { useSport } from "@/contexts/SportContext";
+import { LucideArrowUpRight } from "@/lib/icons";
 import {
     familyOthers,
     familyTarget,
@@ -21,14 +23,17 @@ import {
 
 const SELF: FamilyId = "rankue";
 
-// 서비스별 강조색 — 카드가 한 덩어리로 안 보이게 구분해 준다.
-const ACCENT: Record<FamilyId, { chip: string; hover: string }> = {
-    mapix: { chip: "bg-emerald-500/[0.10] text-emerald-700", hover: "group-hover:text-emerald-700/80" },
-    rankue: { chip: "bg-brand/[0.12] text-brand", hover: "group-hover:text-brand/80" },
-    xong: { chip: "bg-pink-500/[0.10] text-pink-700", hover: "group-hover:text-pink-700/80" },
-    onp: { chip: "bg-amber-500/[0.12] text-amber-700", hover: "group-hover:text-amber-700/80" },
-    tohk: { chip: "bg-purple-500/[0.10] text-purple-700", hover: "group-hover:text-purple-700/80" },
-    mudangk: { chip: "bg-indigo-500/[0.10] text-indigo-700", hover: "group-hover:text-indigo-700/80" },
+// 모양(2026-10-07 오너: "패밀리 서비스 디자인도 변경 — 깔끔하지만 눈에 띄게"): 서비스마다 큰 카드 한 장씩(다섯 장이 화면 두 쪽을 차지했다)이던 것을
+// **한 상자 안의 줄 목록**으로 바꿨다 — 줄마다 색 타일(이모지) · 분류(서비스 색) · 제목 · 설명, 줄 사이는 가는 선.
+// 서비스별 강조색 — 줄이 한 덩어리로 안 보이게 구분해 준다. 색은 리터럴로 둔다: 골프 테마(어두운 화면)는 유틸리티 색을 바꿔 끼우고,
+// 어두운 상자 위에서는 700 단계 글자가 안 읽힌다 → 밝은 화면용(ink) · 어두운 화면용(inkDark) 두 벌. tile 은 같은 색의 옅은 바탕이다.
+const ACCENT: Record<FamilyId, { emoji: string; ink: string; inkDark: string; tile: string; tileDark: string }> = {
+    mapix: { emoji: "📍", ink: "#047857", inkDark: "#6EE7B7", tile: "#10B9811F", tileDark: "#10B98133" },
+    rankue: { emoji: "🎱", ink: "#006241", inkDark: "#64DD17", tile: "#0062411F", tileDark: "#64DD1733" },
+    xong: { emoji: "🎤", ink: "#BE185D", inkDark: "#F9A8D4", tile: "#EC48991F", tileDark: "#EC489933" },
+    onp: { emoji: "🌱", ink: "#B45309", inkDark: "#FCD34D", tile: "#F59E0B24", tileDark: "#F59E0B33" },
+    tohk: { emoji: "💌", ink: "#7E22CE", inkDark: "#D8B4FE", tile: "#A855F71F", tileDark: "#A855F733" },
+    mudangk: { emoji: "🔮", ink: "#4338CA", inkDark: "#A5B4FC", tile: "#6366F11F", tileDark: "#6366F133" },
 };
 
 // 훅과 착지점이 어긋나는 서비스가 있으면 여기서 웹 URL 로 고정한다. 지금은 비어 있다.
@@ -52,6 +57,9 @@ function detectPlatform(): FamilyPlatform {
 
 export function FamilyServices() {
     const { t } = useT();
+    const { currentSport } = useSport();
+    // 골프 모드는 어두운 화면이다 — 서비스 색을 밝은 쪽으로 쓴다
+    const dark = currentSport === "GOLF";
 
     // 네이티브 앱 안에서도 형제 서비스는 보여준다(자기 앱 설치 배너와 달리 홍보 대상이
     // 다른 앱이므로 "이미 쓰는 사람에게 받으라고 한다"는 사고가 아니다).
@@ -70,7 +78,7 @@ export function FamilyServices() {
     return (
         <div className="relative z-10 mb-12">
             <h3 className="text-[15px] font-semibold text-black/55 mb-3 px-1">{t("menu.familyServices")}</h3>
-            <div className="flex flex-col gap-2.5">
+            <div className="rk-card overflow-hidden divide-y divide-surface-line">
                 {items.map((s) => {
                     const a = ACCENT[s.id];
                     const override = WEB_ONLY[s.id];
@@ -82,18 +90,26 @@ export function FamilyServices() {
                             href={href}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block rk-card p-5 hover:bg-surface-2 transition-colors group"
+                            className="flex items-center gap-3.5 px-4 py-3.5 hover:bg-surface-2 active:bg-surface-2 transition-colors"
                         >
-                            <span className={`rk-chip mb-2.5 ${a.chip}`}>{t(`menu.${s.id}Chip`)}</span>
-                            <h3 className="text-[16px] font-semibold text-ink-1 leading-tight mt-1.5">
-                                {t(`menu.${s.id}Title`)}
-                            </h3>
-                            <p className={`text-[12.5px] text-black/40 font-medium mt-1 transition-colors ${a.hover}`}>
-                                {t(`menu.${s.id}Desc`)}
-                                {/* 착지점이 스토어면 그렇다고 알린다. 스토어인 줄 모르고 눌렀다가
-                                    스토어가 뜨면 배신감이 들고, 반대로 "설치"라 써놓고 웹이 뜨면 더 나쁘다. */}
-                                <span className="text-black/30"> · {isStore ? t("menu.familyGetApp") : t("menu.familyOpenWeb")}</span>
-                            </p>
+                            <span
+                                aria-hidden
+                                className="w-11 h-11 rounded-tile flex items-center justify-center shrink-0 text-[21px] leading-none"
+                                style={{ backgroundColor: dark ? a.tileDark : a.tile }}
+                            >
+                                {a.emoji}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-[12px] font-semibold" style={{ color: dark ? a.inkDark : a.ink }}>{t(`menu.${s.id}Chip`)}</span>
+                                <span className="block text-[15px] font-semibold text-ink-1 leading-snug mt-0.5 break-keep">{t(`menu.${s.id}Title`)}</span>
+                                <span className="block text-[12.5px] text-black/45 font-medium mt-0.5 break-keep">
+                                    {t(`menu.${s.id}Desc`)}
+                                    {/* 착지점이 스토어면 그렇다고 알린다. 스토어인 줄 모르고 눌렀다가
+                                        스토어가 뜨면 배신감이 들고, 반대로 "설치"라 써놓고 웹이 뜨면 더 나쁘다. */}
+                                    <span className="text-black/35"> · {isStore ? t("menu.familyGetApp") : t("menu.familyOpenWeb")}</span>
+                                </span>
+                            </span>
+                            <LucideArrowUpRight aria-hidden className="w-4 h-4 shrink-0 text-black/30" />
                         </a>
                     );
                 })}

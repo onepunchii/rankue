@@ -520,21 +520,25 @@ export default function HiqMenu() {
                 이미 가맹점인 사장님에겐 숨긴다 — 위에 '내 매장 관리'가 이미 있어 중복이고,
                 가입 권유를 계속 보는 건 이상하다. */}
             {(member as any)?.role !== "store_owner" && !isGolf && (
+            // 2026-10-07 오너: "디자인 변경해줘 깔끔하지만 눈에 띄게 — 파트너 프로그램은 홈에 그린 버튼으로".
+            // 옅은 초록 그라디언트 카드(주변 흰 카드에 묻혔다)를 홈의 초록 단추와 같은 꽉 찬 초록 한 줄로 바꿨다: 왼쪽 아이콘 · 가운데 글 · 오른쪽 흰 동그라미 화살표.
+            // 골프 모드에서는 이 카드를 그리지 않으므로(!isGolf) 안쪽 흰색은 리터럴로 둔다.
             <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setLocation("/partner/login")}
-                className="relative z-10 w-full p-6 rounded-card overflow-hidden border border-brand/20 bg-gradient-to-br from-brand/[0.08] to-white mb-10 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
+                className="relative z-10 w-full mb-10 px-5 py-5 rounded-card bg-brand text-brand-fg text-left flex items-center gap-4 shadow-[0_1px_2px_rgba(0,0,0,0.08)] active:bg-brand-strong transition-colors"
             >
-                <div className="flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                        <span className="rk-chip bg-brand/[0.12] text-brand mb-3">{t("menu.partnerProgram")}</span>
-                        <h3 className="text-[20px] font-bold text-ink-1 mt-2 leading-tight">{t("menu.areYouOwner")}</h3>
-                        <p className="text-[13px] font-medium text-black/55 mt-1">{t("menu.partnerPromoDesc")}</p>
-                    </div>
-                    <div className="w-14 h-14 rounded-tile bg-brand/[0.12] flex items-center justify-center shrink-0">
-                        <LucideBriefcase className="w-7 h-7 text-brand" />
-                    </div>
-                </div>
+                <span className="w-12 h-12 rounded-tile bg-[#FFFFFF24] flex items-center justify-center shrink-0">
+                    <LucideStore className="w-6 h-6" />
+                </span>
+                <span className="min-w-0 flex-1">
+                    <span className="block text-[12px] font-semibold text-[#FFFFFFCC]">{t("menu.partnerProgram")}</span>
+                    <span className="block text-[18px] font-bold leading-tight mt-0.5 break-keep">{t("menu.areYouOwner")}</span>
+                    <span className="block text-[13px] font-medium text-[#FFFFFFCC] mt-1 break-keep">{t("menu.partnerPromoDesc")}</span>
+                </span>
+                <span className="w-9 h-9 rounded-full bg-[#FFFFFF] text-[#006241] flex items-center justify-center shrink-0">
+                    <LucideChevronRight className="w-5 h-5" />
+                </span>
             </motion.button>
             )}
 
