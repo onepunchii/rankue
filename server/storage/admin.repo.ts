@@ -951,14 +951,15 @@ export class AdminRepository {
     }
 
     /**
-     * 신고 알림을 받을 운영자 회원 id — 프로필 role 이 admin/super_admin 인 계정마다 하나.
+     * 신고·건의 알림을 받을 운영자 회원 id — 프로필 role 이 super_admin 인 계정마다 하나.
+     * 관리자(admin · 보기 전용)는 조치할 수 없어서 알림을 받지 않는다(2026-10-07, shared/adminRole.ts).
      * 한 프로필에 회원 행이 여럿이면 가장 오래된 것(로그인이 고르는 행, user.repo getMemberByProfileId 와 같은 기준).
      */
     async getStaffMemberIds(): Promise<string[]> {
         const rows = await db.selectDistinctOn([hiqMembers.profileId], { id: hiqMembers.id })
             .from(hiqMembers)
             .innerJoin(profiles, eq(hiqMembers.profileId, profiles.id))
-            .where(inArray(profiles.role, ["admin", "super_admin"]))
+            .where(inArray(profiles.role, ["super_admin"]))
             .orderBy(hiqMembers.profileId, asc(hiqMembers.createdAt));
         return rows.map((r) => r.id);
     }

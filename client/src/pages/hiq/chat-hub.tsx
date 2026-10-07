@@ -76,7 +76,8 @@ export default function ChatHub() {
     const allRooms = q.data ?? [];
     const golf = currentSport === "GOLF";
     const [pickerOpen, setPickerOpen] = useState(false);
-    const isAdmin = (member as any)?.role === "admin" || (member as any)?.role === "super_admin";
+    // 운영자 = 슈퍼관리자만(2026-10-07). 관리자(admin · 보기 전용)는 문의에 답하지 않는다 — shared/adminRole.ts
+    const isAdmin = (member as any)?.role === "super_admin";
     // 운영자 전용: 회원을 찾아 그 회원의 문의 방에 먼저 쓴다(2026-10-06 오너: "관리자는 누구와도 다 채팅을 할 수 있게").
     // 역할은 /me 가 주는 profiles.role 이다. 여기서 가리는 것은 편의일 뿐 — 회원 찾기 API 와 방 열기는 서버가 운영자만 받는다.
     const [memberPickerOpen, setMemberPickerOpen] = useState(false);

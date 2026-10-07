@@ -53,6 +53,9 @@ function isOdd(g: AdminGameRow): boolean {
     return g.status === "finished" && g.innings > 0 && g.innings <= 2 && g.score >= 5;
 }
 
+/** 한 번에 받는 판 수 — 서버 상한과 같다(admin.ts GET /members/:id/games). 예전엔 안 보내서 30판에서 끊겼다(2026-10-07 목록 점검) */
+const GAMES_LIMIT = 100;
+
 export default function MemberGamesDialog({ member, onClose }: { member: { id: string; name: string } | null; onClose: () => void }) {
     const [confirmId, setConfirmId] = useState<string | null>(null);
     const [result, setResult] = useState<DeleteResult | null>(null);
@@ -60,7 +63,7 @@ export default function MemberGamesDialog({ member, onClose }: { member: { id: s
     const { toast } = useToast();
 
     const { data: games = [], isLoading } = useQuery<AdminGameRow[]>({
-        queryKey: [`/api/hiq/admin/members/${member?.id}/games`],
+        queryKey: [`/api/hiq/admin/members/${member?.id}/games?limit=${GAMES_LIMIT}`],
         enabled: !!member,
     });
 
@@ -69,7 +72,7 @@ export default function MemberGamesDialog({ member, onClose }: { member: { id: s
         onSuccess: (r) => {
             setResult(r);
             setConfirmId(null);
-            queryClient.invalidateQueries({ queryKey: [`/api/hiq/admin/members/${member?.id}/games`] });
+            queryClient.invalidateQueries({ queryKey: [`/api/hiq/admin/members/${member?.id}/games?limit=${GAMES_LIMIT}`] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/admin/members"] });
             toast({ title: "기록을 지웠습니다", description: "RP·에버리지도 함께 되돌렸습니다." });
         },
@@ -82,6 +85,7 @@ export default function MemberGamesDialog({ member, onClose }: { member: { id: s
                 <h2 className="text-lg font-black text-[rgba(0,0,0,0.87)]">{member?.name} 님의 경기 기록</h2>
                 <p className="text-xs text-black/50 -mt-2">
                     끝난 경기를 지우면 전적·RP·에버리지가 함께 되돌아갑니다. 되돌린 값은 아래에 보여드립니다.
+                    {games.length >= GAMES_LIMIT && <span className="block mt-0.5 text-amber-700">최근 {GAMES_LIMIT}판까지만 보입니다.</span>}
                 </p>
 
                 {result && (

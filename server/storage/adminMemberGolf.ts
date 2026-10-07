@@ -11,6 +11,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { profiles } from "../../shared/schema.js";
 import { bookingManagerSwitch, type AdminMemberGolf } from "../../shared/adminMemberGolf.js";
+import { subAdminSwitch } from "../../shared/adminRole.js";
 
 const ISO = (col: string) => sql.raw(`to_char(${col}, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`);
 const num = (v: unknown): number => Number(v ?? 0) || 0;
@@ -136,6 +137,22 @@ export type BookingManagerResult =
  */
 export async function setBookingManagerRole(profileId: string, on: boolean): Promise<BookingManagerResult> {
     const { from, to } = bookingManagerSwitch(on);
+    const changed = await db.update(profiles)
+        .set({ role: to, updatedAt: new Date() })
+        .where(and(eq(profiles.id, profileId), eq(profiles.role, from)))
+        .returning({ role: profiles.role });
+    if (changed.length > 0) return { status: "changed", from, role: to };
+    const [cur] = await db.select({ role: profiles.role }).from(profiles).where(eq(profiles.id, profileId));
+    if (!cur) return { status: "missing" };
+    return cur.role === to ? { status: "same", role: to } : { status: "blocked", role: cur.role };
+}
+
+/**
+ * 관리자(보기 전용) 임명·해제(2026-10-07) — user ↔ admin 사이만, "지금 값이 from 일 때만" 한 문장으로 바꾼다.
+ * 사장님·부킹매니저·슈퍼관리자는 건드리지 않는다(blocked). 결과 꼴은 부킹매니저 스위치와 같다.
+ */
+export async function setSubAdminRole(profileId: string, on: boolean): Promise<BookingManagerResult> {
+    const { from, to } = subAdminSwitch(on);
     const changed = await db.update(profiles)
         .set({ role: to, updatedAt: new Date() })
         .where(and(eq(profiles.id, profileId), eq(profiles.role, from)))

@@ -30,6 +30,8 @@ import { appConfirm, appAlert } from "@/components/AppDialog";
 import { useT } from "@/lib/i18n";
 import { bookingManagerState, type AdminMemberGolf, type BookingManagerState } from "@shared/adminMemberGolf";
 import { isWithdrawnMember } from "@shared/chatSupport";
+import { adminRoleLabel } from "@shared/adminRole";
+import { useAdminAccess } from "./adminAccess";
 
 export type AdminMember = {
     id: string;
@@ -233,7 +235,7 @@ function managerNote(s: BookingManagerState, role: string | null): string {
         case "manager": return "부킹을 매장 글로 올립니다 — 번호 공개 · 시간당 400건 · 핫딜 리본";
         case "user": return "켜면 부킹이 매장 글로 올라갑니다(번호 공개 · 시간당 400건 · 핫딜 리본)";
         case "store_owner": return "매장 사장님 계정이라 이미 매장 글로 올립니다";
-        case "staff": return "관리자 계정이라 이미 매장 글로 올립니다";
+        case "staff": return s.isStoreSeller ? "슈퍼관리자 계정이라 이미 매장 글로 올립니다" : "관리자(보기 전용) 계정입니다 — 부킹매니저로 바꾸려면 관리자 임명을 먼저 풀어 주세요";
         case "no_account": return "로그인 계정이 없어 바꿀 수 없습니다";
         default: return `역할(${role ?? "-"})이 달라 여기서 바꾸지 않습니다`;
     }
@@ -320,6 +322,21 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
         },
     });
 
+    // 관리자(보기 전용) 임명·해제(2026-10-07 오너: "회원관리에 부관리자 설정할 수 있는 버튼") — 슈퍼관리자에게만 보인다(서버도 슈퍼관리자만 받는다)
+    const access = useAdminAccess();
+    const toggleSubAdmin = useMutation({
+        mutationFn: async (on: boolean) =>
+            apiRequest(`/api/hiq/admin/members/${member!.id}/sub-admin`, { method: "POST", body: { on } }) as Promise<{ role: string; changed: boolean }>,
+        onSuccess: (r, on) => {
+            toast({ title: !r?.changed ? "이미 그렇게 되어 있습니다" : on ? "관리자(보기 전용)로 임명했습니다" : "관리자 임명을 풀었습니다" });
+            refresh();
+        },
+        onError: (e: any) => {
+            toast({ title: "관리자 임명 변경 실패", description: e?.message ?? "", variant: "destructive" });
+            refresh();
+        },
+    });
+
     const m = member;
     // 메시지(2026-10-06 오너: "관리자는 누구와도 다 채팅을 할 수 있게") — 이 회원의 문의 방(/chat/support/<id>)을 연다.
     // 운영자 개인 1:1 이 아니다: 회원에게는 '랭큐 운영팀'으로 보이고 다른 운영자도 이어받는다. 탈퇴회원에게는 단추를 숨긴다(받을 사람이 없다).
@@ -349,6 +366,15 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
     const isStaff = role === "admin" || role === "super_admin";
     const manager = bookingManagerState(m?.profileId ? role : null);
 
+    const onToggleSubAdmin = async (on: boolean) => {
+        if (!m) return;
+        const message = on
+            ? `${m.name}님을 관리자(보기 전용)로 임명할까요?\n\n· 그분의 전체 메뉴에 '관리자 콘솔'이 열립니다\n· 콘솔의 모든 화면을 볼 수 있습니다(회원 연락처·신고·건의 포함)\n· 저장·삭제·발송 같은 고치는 일은 할 수 없습니다\n· 카카오·Google·Apple 로그인이 연결된 계정만 임명됩니다`
+            : `${m.name}님의 관리자(보기 전용) 임명을 풀까요?\n\n바로 관리자 콘솔이 닫히고 일반 회원으로 돌아갑니다.`;
+        if (!(await appConfirm({ title: on ? "관리자 임명" : "관리자 해제", message, tone: on ? "danger" : "default", confirmText: on ? "임명" : "풀기" }))) return;
+        toggleSubAdmin.mutate(on);
+    };
+
     const onToggleManager = async (on: boolean) => {
         if (!m) return;
         const message = on
@@ -371,7 +397,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                         <SheetTitle className="flex items-center gap-1.5 text-[18px] font-black text-[rgba(0,0,0,0.87)]">
                                             <span className="truncate">{m.name}</span>
                                             {banned && <span className="shrink-0 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-600">정지됨</span>}
-                                            {isStaff && <span className="shrink-0 rounded-full bg-black/[0.06] px-2 py-0.5 text-[11px] font-bold text-black/60">관리자</span>}
+                                            {isStaff && <span className="shrink-0 rounded-full bg-black/[0.06] px-2 py-0.5 text-[11px] font-bold text-black/60">{adminRoleLabel(role)}</span>}
                                             {role === "store_owner" && <span className="shrink-0 rounded-full bg-black/[0.06] px-2 py-0.5 text-[11px] font-bold text-black/60">사장님</span>}
                                             {role === "booking_manager" && <span className="shrink-0 rounded-full bg-blue-500/10 px-2 py-0.5 text-[11px] font-bold text-blue-700">부킹매니저</span>}
                                             {isKstToday(m.createdAt) && <span className="shrink-0 rounded-full bg-brand/10 px-2 py-0.5 text-[11px] font-bold text-brand">오늘 가입</span>}
@@ -506,6 +532,28 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                                     disabled={!manager.canToggle || toggleManager.isPending || golfQ.isFetching}
                                                     onCheckedChange={(v) => void onToggleManager(v)}
                                                     aria-label="골프 부킹매니저"
+                                                    className="mt-0.5 data-[state=checked]:bg-brand data-[state=unchecked]:bg-black/15"
+                                                />
+                                            </div>
+                                        )}
+                                        {m.profileId && access.canWrite && role !== "super_admin" && (
+                                            <div data-sub-admin className="flex items-start gap-3 px-4 py-3.5">
+                                                <LucideShieldAlert className="mt-0.5 w-4 h-4 shrink-0 text-black/50" />
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-[14px] font-bold">관리자 · 보기 전용</p>
+                                                    <p className="mt-0.5 text-[12px] leading-snug break-keep text-black/45">
+                                                        {role === "admin" ? "관리자 콘솔을 볼 수 있습니다. 고치는 일은 할 수 없습니다."
+                                                            : role === "user" ? "임명하면 그분의 전체 메뉴에 관리자 콘솔이 열립니다 — 볼 수만 있고 고칠 수 없습니다."
+                                                            : role === "store_owner" ? "매장 사장님 계정은 임명하지 않습니다(사장님 권한이 지워집니다)."
+                                                            : role === "booking_manager" ? "부킹매니저를 먼저 풀어야 임명할 수 있습니다."
+                                                            : "이 계정은 여기서 바꾸지 않습니다."}
+                                                    </p>
+                                                </div>
+                                                <Switch
+                                                    checked={role === "admin"}
+                                                    disabled={!(role === "user" || role === "admin") || toggleSubAdmin.isPending || golfQ.isFetching}
+                                                    onCheckedChange={(v) => void onToggleSubAdmin(v)}
+                                                    aria-label="관리자(보기 전용)"
                                                     className="mt-0.5 data-[state=checked]:bg-brand data-[state=unchecked]:bg-black/15"
                                                 />
                                             </div>

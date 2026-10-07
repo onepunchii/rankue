@@ -234,13 +234,18 @@ router.get("/regions", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, [...tree.values()].map((r) => ({ ...r, cities: [...r.cities.values()].sort((a, b) => b.courses - a.courses || a.short.localeCompare(b.short, "ko")) })));
 }));
 
+/** 허브 글 목록이 한 번에 주는 상한 — 화면이 20건씩 펼친다. 30초마다 다시 받으니 너무 크게 잡지 않는다 */
+const HUB_LISTINGS_MAX = 300;
+
 router.get("/listings", asyncHandler(async (req: any, res: any) => {
     // 보는 사람에게 맞춘 요약 — 차단 관계인 회원의 글은 limit 로 자르기 **전에** 빠진다(빠진 글이 자리를 먹지 않게).
     const s = await summaryFor(req); const now = Date.now();
     const region = typeof req.query.region === "string" ? req.query.region : undefined;
     const city = typeof req.query.city === "string" ? req.query.city : undefined;
     const intent = intentOf(req.query.intent);
-    const limit = Math.min(200, Math.max(1, Number(req.query.limit) || 60));
+    // 화면(GolfCourseHub)은 limit 를 보내지 않고, 받은 목록을 20건씩 펼친다 — 기본값이 곧 '볼 수 있는 끝'이다.
+    // 60 이던 때 머리 숫자(진짜 총수)는 더 큰데 '더 보기'가 60에서 끝났다(2026-10-07 목록 점검). 넘는 만큼은 화면이 '외 N건'으로 밝힌다
+    const limit = Math.min(HUB_LISTINGS_MAX, Math.max(1, Number(req.query.limit) || HUB_LISTINGS_MAX));
     const out = s.listings.filter((l) => {
         const p = s.bySlug.get(l.slug)!;
         if (region && p.region !== region) return false;

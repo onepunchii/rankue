@@ -18,7 +18,7 @@
  */
 
 /** golf.ts BOOKING_WRITER_ROLES 와 같은 목록(adminMemberGolf.test.ts 가 지킨다) — 이 역할이면 부킹이 STORE 로 올라간다 */
-export const STORE_SELLER_ROLES: readonly string[] = ["admin", "super_admin", "store_owner", "booking_manager"];
+export const STORE_SELLER_ROLES: readonly string[] = ["super_admin", "store_owner", "booking_manager"];
 
 export type BookingManagerKind =
     /** 부킹매니저로 지정됨 — 끌 수 있다 */
@@ -48,7 +48,9 @@ export function bookingManagerState(role: string | null | undefined): BookingMan
     if (role === "booking_manager") return { kind: "manager", isStoreSeller: true, canToggle: true };
     if (role === "user") return { kind: "user", isStoreSeller: false, canToggle: true };
     if (role === "store_owner") return { kind: "store_owner", isStoreSeller: true, canToggle: false };
-    if (role === "admin" || role === "super_admin") return { kind: "staff", isStoreSeller: true, canToggle: false };
+    // 슈퍼관리자는 매장 판매자다. 관리자(admin · 보기 전용, 2026-10-07)는 판매자가 아니다 — 역할 칸을 쓰고 있어 부킹매니저로 바꿀 수는 없다
+    if (role === "super_admin") return { kind: "staff", isStoreSeller: true, canToggle: false };
+    if (role === "admin") return { kind: "staff", isStoreSeller: false, canToggle: false };
     return { kind: "other", isStoreSeller: STORE_SELLER_ROLES.includes(role), canToggle: false };
 }
 

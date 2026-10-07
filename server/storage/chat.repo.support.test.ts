@@ -54,7 +54,8 @@ const world = {
     searchRows: [] as unknown[][],
 };
 
-const isStaff = (id: string) => world.roles[id] === "admin" || world.roles[id] === "super_admin";
+// 운영자 = 슈퍼관리자만(2026-10-07). 관리자(admin · 보기 전용)는 문의 방에서 일반 회원이다
+const isStaff = (id: string) => world.roles[id] === "super_admin";
 /** viewer 가 이 글의 보낸 사람을 차단했나 */
 const blockedBy = (viewer: string, m: Msg) => !!m.senderId && world.blocks.some((b) => b.blocker === viewer && b.blocked === m.senderId);
 /**
@@ -145,7 +146,7 @@ const callsWith = (part: string) => cap.calls.filter((c) => flat(c.sql).includes
 beforeEach(() => {
     cap.calls = [];
     cap.respond = respond;
-    world.roles = { [OWNER]: "user", [ADMIN_A]: "super_admin", [ADMIN_B]: "admin", [STRANGER]: "user" };
+    world.roles = { [OWNER]: "user", [ADMIN_A]: "super_admin", [ADMIN_B]: "super_admin", [STRANGER]: "user" };
     world.members = {
         [OWNER]: { name: "김회원", phone: "01012345678", img: "https://blob.test/owner.webp" },
         [ADMIN_A]: { name: "최운영", phone: "01099990000", img: "https://blob.test/admin-a.webp" },
@@ -234,7 +235,7 @@ describe("(가) searchMembersForAdmin — 회원 찾기", () => {
         world.searchRows = [
             [OWNER, "김회원", "010-1234-5678", "2026-09-01 03:00:00", "GOLF", "버디킴", "https://blob.test/owner.webp", "active", "user", PROFILE_1, "랭큐", "hiq"],
             [STRANGER, "김회장", "social:kakao:abcdef", "2026-08-01 00:00:00", null, "김회장", null, "banned", "user", PROFILE_2, "글로벌", "global"],
-            [ADMIN_B, "김회계", "01099998888", "2026-07-01 00:00:00", "BILLIARDS", null, null, "active", "admin", PROFILE_2, "랭큐", "hiq"],
+            [ADMIN_B, "김회계", "01099998888", "2026-07-01 00:00:00", "BILLIARDS", null, null, "active", "super_admin", PROFILE_2, "랭큐", "hiq"],
         ];
         const hits = await repo.searchMembersForAdmin("김회", ADMIN_A);
         expect(hits).toEqual([
@@ -404,6 +405,15 @@ describe("(라) canAccess — 문의 방 열기", () => {
         expect(await repo.canAccess(support(OWNER), STRANGER)).toBe(false);
         expect(await repo.canAccess(support(OWNER), ADMIN_A)).toBe(true);
         expect(await repo.canAccess(support(OWNER), ADMIN_B)).toBe(true);
+    });
+
+    // 2026-10-07 오너: "해당 부관리자는 볼 수만 있어 … 슈퍼관리자(나) 수정 모든 권한 > 관리자(보기만 가능)"
+    it("관리자(admin · 보기 전용)는 운영자가 아니다 — 남의 문의 방을 열지 못하고, 자기 문의 방은 회원처럼 연다", async () => {
+        world.roles[ADMIN_B] = "admin";
+        expect(await repo.isAdmin(ADMIN_B)).toBe(false);
+        expect(await repo.canAccess(support(OWNER), ADMIN_B)).toBe(false);
+        expect(await repo.canAccess(support(ADMIN_B), ADMIN_B)).toBe(true);
+        expect(await repo.isAdmin(ADMIN_A)).toBe(true);
     });
 
     it("메시지가 없어도 운영자는 연다 — 먼저 말 걸기", async () => {

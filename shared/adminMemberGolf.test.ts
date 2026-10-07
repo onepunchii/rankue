@@ -14,10 +14,14 @@ describe("부킹매니저 스위치 상태 — 역할 칸이 하나라 user ↔ 
         expect(bookingManagerState("booking_manager")).toEqual({ kind: "manager", isStoreSeller: true, canToggle: true });
     });
 
-    it("매장 사장님·관리자는 이미 매장 판매자 — 바꾸면 그 권한을 덮어쓰므로 손대지 않는다", () => {
+    it("매장 사장님·슈퍼관리자는 이미 매장 판매자 — 바꾸면 그 권한을 덮어쓰므로 손대지 않는다", () => {
         expect(bookingManagerState("store_owner")).toEqual({ kind: "store_owner", isStoreSeller: true, canToggle: false });
-        expect(bookingManagerState("admin")).toEqual({ kind: "staff", isStoreSeller: true, canToggle: false });
         expect(bookingManagerState("super_admin")).toEqual({ kind: "staff", isStoreSeller: true, canToggle: false });
+    });
+
+    // 2026-10-07 오너: "해당 부관리자는 볼 수만 있어" — 관리자(admin)는 관리자 콘솔을 보기만 하는 역할이다. 매장 판매자가 아니다
+    it("관리자(보기 전용)는 매장 판매자가 아니다 — 역할 칸을 쓰고 있어 부킹매니저로 바꿀 수도 없다", () => {
+        expect(bookingManagerState("admin")).toEqual({ kind: "staff", isStoreSeller: false, canToggle: false });
     });
 
     it("로그인 계정이 없거나 모르는 역할이면 바꾸지 않는다", () => {

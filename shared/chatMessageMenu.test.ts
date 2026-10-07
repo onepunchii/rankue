@@ -94,8 +94,9 @@ describe("(다) 대화방(chat-room) — 메시지마다 할 수 있는 일", ()
         expect(menuFor).toContain("const others = !!m.senderId && m.senderId !== member?.id;");
         expect(menuFor).toContain("copy: text,");
         expect(menuFor).toContain("translate: text && isStaff && others,");
-        // 운영자 = profiles.role 의 admin·super_admin(/me 가 준다). 전화번호·이메일로 가르지 않는다. 가리는 것은 편의일 뿐 — 서버가 운영자만 받는다
-        expect(src).toContain('const isStaff = (member as any)?.role === "admin" || (member as any)?.role === "super_admin";');
+        // 운영자 = profiles.role 의 super_admin(/me 가 준다). 관리자(admin · 보기 전용, 2026-10-07)는 운영자가 아니다.
+        // 전화번호·이메일로 가르지 않는다. 가리는 것은 편의일 뿐 — 서버가 운영자만 받는다
+        expect(src).toContain('const isStaff = (member as any)?.role === "super_admin";');
     });
 
     it("신고·차단은 남의 글에만(내 글에는 안 뜬다), 문의 방에는 없다", () => {

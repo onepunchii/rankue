@@ -167,7 +167,8 @@ export function toAdminMemberHit(r: {
         phoneLast4: phoneLast4(r.phone),
         sport: r.primarySport === "GOLF" ? "GOLF" : r.primarySport === "BILLIARDS" ? "BILLIARDS" : null,
         banned: r.status === "banned",
-        staff: r.role === "admin" || r.role === "super_admin",
+        // 운영자 = 슈퍼관리자만(2026-10-07). 관리자(admin · 보기 전용)는 문의 방에서 일반 회원이다 — shared/adminRole.ts
+        staff: r.role === "super_admin",
         // 매장을 모르는 행(슬러그 없음)은 표시하지 않는다 — 없는 사실을 지어내지 않는다.
         store: r.storeSlug && !isSystemStore(r.storeSlug) ? (storeName || r.storeSlug) : null,
         noAccount: !r.profileId,

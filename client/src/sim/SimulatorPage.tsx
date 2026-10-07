@@ -32,6 +32,7 @@ import { setBackHandler } from "@/lib/nativeBridge";
 import { loadResume, fetchResumable, clearResume, type Resumable } from "./simResume";
 import { apiRequest } from "@/lib/queryClient";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { isSuperAdminRole } from "@shared/adminRole";
 import { useQueryClient } from "@tanstack/react-query";
 import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
@@ -1427,7 +1428,7 @@ export function SimulatorPage() {
     // 연습·드릴(채점 뒤)에서만. 기록 세션·대전엔 넘기지 않는다.
     const solverAllowed = sim.mode === "solo" && !sim.record && !drillLocked;
     /**
-     * 대전 중 길 찾기 — **관리자 전용**(2026-09-16 오너). 오른쪽 바에 성공 확률이 가장 높은 길 하나만 띄우고,
+     * 대전 중 길 찾기 — **슈퍼관리자 전용**(2026-09-16 오너 · 2026-10-07 슈퍼관리자만으로). 오른쪽 바에 성공 확률이 가장 높은 길 하나만 띄우고,
      * 그 버튼을 누르면 큐대가 그 길을 향한다(입력을 그대로 넣는다). 샷은 평소처럼 치면 그 길로 이어진다.
      *
      * 왜 관리자만인가: 조준 보조라 상대는 알 수 없다. 테스트·시연용이라 한 사람에게만 연다.
@@ -1435,8 +1436,9 @@ export function SimulatorPage() {
      * 마음먹으면 누구나 밖에서 같은 계산을 할 수 있고, 샷 자체는 서버가 다시 시뮬레이션해 검증한다.
      * 즉 '기록을 속이는 길' 이 아니라 '조준을 도와주는 화면' 이다.
      */
-    const isAdmin = member?.role === "super_admin" || member?.role === "admin";
-    const matchSolverAllowed = isAdmin && isMatch && !pathView;
+    // 슈퍼관리자만(2026-10-07 오너: "온라인 게임 관리자는 길찾기 모드 — 이건 슈퍼관리자만"). 관리자(admin)는 관리자 콘솔을 보기만 하는 역할이다
+    const isSuperAdmin = isSuperAdminRole(member?.role);
+    const matchSolverAllowed = isSuperAdmin && isMatch && !pathView;
     // 대전에선 1등 길 하나만 쓴다. 공이 움직이면(pathStale) 비어 다시 '찾기' 로 돌아간다.
     const matchPath = matchSolverAllowed ? (rankedAll[0] ?? null) : null;
 

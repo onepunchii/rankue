@@ -5,7 +5,7 @@
  *   crew:<crewId>       크루원(승인 대기 제외). 가입 전 메시지는 안 보인다(joinedAt 컷).
  *   listing:<bookingId> 올린 사람 + 확정된 신청자.
  *   dm:<roomId>         hiq_chat_room_members.
- *   support:<memberId>  그 회원 + 운영자(admin·super_admin). 운영자는 모든 문의 방을 본다.
+ *   support:<memberId>  그 회원 + 운영자(super_admin). 운영자는 모든 문의 방을 본다. 관리자(admin · 보기 전용)는 운영자가 아니다.
  *
  * 속도: 메시지는 afterAt 뒤만(폴링), 방 목록의 마지막 메시지는 DISTINCT ON 한 문장, 안 읽은 수는 방 열쇠 배열로 한 문장.
  */
@@ -45,7 +45,8 @@ export function parseRoomKey(key: string): RoomRef | null {
     return m ? { kind: m[1] as RoomKind, id: m[2], key: `${m[1]}:${m[2]}` } : null;
 }
 
-const ADMIN_ROLES: ("admin" | "super_admin")[] = ["admin", "super_admin"];
+// 문의 방의 운영자 = 슈퍼관리자만(2026-10-07). 관리자(admin)는 관리자 콘솔을 보기만 하는 역할이라 문의에 답하지 않는다 — shared/adminRole.ts
+const ADMIN_ROLES: ("super_admin")[] = ["super_admin"];
 /** 옛 크루 채팅을 이 표로 옮긴 때(UTC). 그 전 대화는 크루 방의 '안 읽음'으로 세지 않는다. */
 const CHAT_UNIFIED_AT = "2026-09-21 12:00:00";
 

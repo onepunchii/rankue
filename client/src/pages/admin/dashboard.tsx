@@ -19,6 +19,7 @@ import {
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
 import MembersView from "./MembersView";
+import { useAdminAccess } from "./adminAccess";
 import TodayActiveView from "./TodayActiveView";
 import PushView from "./PushView";
 import SuggestionsView, { type Suggestion, SUGGESTIONS_KEY } from "./SuggestionsView";
@@ -98,6 +99,7 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu, badges }: 
     tab: Tab; setTab: (t: Tab) => void; handleLogout: () => void; closeMobileMenu?: () => void;
     badges: Partial<Record<Tab, number>>;
 }) {
+    const { viewOnly } = useAdminAccess();
     return (
         // 모바일 서랍에서도 메뉴가 다 보이게: 가운데 목록만 스크롤(머리글·로그아웃은 고정), min-h-0 이 없으면 flex 자식이 안 줄어 스크롤이 안 생긴다
         <div className="flex flex-col h-full min-h-0 bg-white border-r border-black/10">
@@ -108,7 +110,7 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu, badges }: 
                     </div>
                     <div>
                         <h1 className="text-lg font-black tracking-tight text-brand">랭큐 관리자</h1>
-                        <span className="text-[11px] text-black/40 font-bold block">운영 콘솔</span>
+                        <span className="text-[11px] text-black/40 font-bold block">운영 콘솔{viewOnly && <span data-admin-viewonly className="ml-1.5 rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10.5px] font-black text-amber-800">보기 전용</span>}</span>
                     </div>
                 </div>
             </div>
@@ -190,6 +192,7 @@ export default function AdminDashboard() {
     // 회원 상세 시트 — '오늘 접속'·'회원 관리'·대시보드 어디서 눌러도 같은 시트가 열린다.
     const [openMemberId, setOpenMemberId] = useState<string | null>(null);
 
+    const access = useAdminAccess();
     const { data: stats } = useQuery<GlobalStats>({ queryKey: ["/api/hiq/admin/stats"] });
     // 응답이 배열이 아닐 때(세션 만료 응답·옛 캐시) .filter·.find 에서 대시보드 전체가 흰 화면이 됐다(오류 수집 10건, 2026-10-01) — 받는 자리에서 배열로
     const members = asList<AdminMember>(useQuery<AdminMember[]>({ queryKey: ADMIN_MEMBERS_KEY }).data);
@@ -272,6 +275,12 @@ export default function AdminDashboard() {
             </aside>
 
             <main className="flex-1 min-w-0 md:ml-64 p-4 md:p-8">
+                {/* 관리자(보기 전용) — 내용은 다 보이고, 고치는 요청은 서버가 거절한다(2026-10-07) */}
+                {access.viewOnly && (
+                    <div data-admin-viewonly-banner className="mb-4 rounded-2xl bg-amber-500/[0.12] px-4 py-3 text-[13px] leading-relaxed text-amber-900">
+                        <b className="font-black">보기 전용 계정입니다.</b> 모든 화면을 볼 수 있지만, 저장·삭제·발송 같은 단추는 눌러도 반영되지 않습니다.
+                    </div>
+                )}
                 {/* 제목 — 폰에선 위 머리줄이 제목을 보여 주므로 숨긴다 */}
                 <header className="hidden md:block mb-6">
                     <h2 className="text-3xl font-black text-[rgba(0,0,0,0.87)]">{getTabTitle(tab)}</h2>

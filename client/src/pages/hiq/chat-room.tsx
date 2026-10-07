@@ -428,7 +428,8 @@ export default function ChatRoomPage() {
     // ── 말풍선 메뉴(2026-10-06 오너: "신고하기 버튼 위에 기능들 더 — 복사하기나 이런 거, 번역하기는 일단 관리자만") ──
     // 고른 메시지(reportMsg)와 시트(reportMenuOpen)는 신고·차단이 쓰던 것을 그대로 쓴다 — 이제 그 시트가 메뉴 전체다.
     // 메시지마다 할 수 있는 일이 다르다: 복사(글자 메시지) · 번역(운영자, 남의 글자 메시지) · 신고·차단(남의 글, 문의 방 아님) · 삭제(내 글·운영진).
-    const isStaff = (member as any)?.role === "admin" || (member as any)?.role === "super_admin";
+    // 운영자 = 슈퍼관리자만(2026-10-07) — 번역·다듬기는 서버도 슈퍼관리자만 받는다(chat.repo isAdmin)
+    const isStaff = (member as any)?.role === "super_admin";
     const canDeleteMsg = (m: ChatMsg) => !!member && (m.senderId === member.id || !!d?.canManage);
     const menuFor = (m: ChatMsg) => {
         const text = (m.type ?? "text") === "text" && !!m.message?.trim();

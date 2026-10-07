@@ -395,6 +395,12 @@ export default function GolfCourseHub() {
                             {hubRows.length > listingLimit && (
                                 <MoreButton onClick={() => setListingLimit((n) => n + 20)} rest={hubRows.length - listingLimit} unit="건" />
                             )}
+                            {/* 서버는 한 번에 300건까지 준다 — 다 펼쳤는데 총수가 더 크면 숨기지 않고 밝힌다(지역·종류로 좁히면 다 보인다) */}
+                            {hubRows.length <= listingLimit && listingCount > hubRows.length && (
+                                <p data-hub-more-note className="mx-5 mt-2 text-[12px] leading-relaxed text-[#FFFFFF66]">
+                                    외 {(listingCount - hubRows.length).toLocaleString()}건이 더 있어요 — 지역이나 종류를 고르면 모두 볼 수 있어요.
+                                </p>
+                            )}
                         </>
                     )}
                 </section>

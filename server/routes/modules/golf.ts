@@ -72,7 +72,8 @@ function validDate(v: unknown): boolean {
 }
 
 /** 매물을 올릴 수 있는 역할. 화면(BookingList.tsx)과 같은 목록을 서버에서도 검사한다 — 화면만 가리면 주소로 뚫린다. */
-const BOOKING_WRITER_ROLES = ["admin", "super_admin", "store_owner", "booking_manager"];
+// 관리자(admin)는 관리자 콘솔을 보기만 하는 역할이다(2026-10-07) — 매장 판매자가 아니다. 임명 전처럼 개인(PERSONAL)으로 올린다
+const BOOKING_WRITER_ROLES = ["super_admin", "store_owner", "booking_manager"];
 const MAX_ITEMS_PER_POST = 40;   // 부킹 시트는 티오프 시간을 여러 개 담아 한 번에 보낸다
 /** 한 시간에 올릴 수 있는 글 — 매장·매니저는 재고를 몰아 올리므로 넉넉히, 개인은 도배를 막을 만큼만. */
 const postsPerHour = (sellerType: string) => (sellerType === "STORE" ? 400 : 40);
@@ -365,7 +366,8 @@ router.delete("/bookings/:id", requireAuth, asyncHandler(async (req: AuthRequest
     if (!member?.phone) return sendError(res, 403, "권한이 없습니다");
     // 운영자는 아무 매물이나 내릴 수 있다 — 사기 글을 내릴 방법이 없으면 신고가 무의미하다(2026-09-09).
     const role = (member as any).role ?? (member.profileId ? (await storage.getProfile(member.profileId) as any)?.role : null);
-    const isAdmin = role === "admin" || role === "super_admin";
+    // 운영자 = 슈퍼관리자만(2026-10-07). 관리자(admin)는 관리자 콘솔을 보기만 하는 역할이라 남의 글을 내리지 못한다 — shared/adminRole.ts
+    const isAdmin = role === "super_admin";
     // 그 외에는 등록자 본인만. 옛 행(owner_id 가 빈 행)은 번호로 되짚는다.
     const deleted = isAdmin
         ? await storage.deleteGolfBooking(req.params.id)
@@ -632,7 +634,8 @@ async function canManageBooking(req: AuthRequest, booking: any): Promise<boolean
     const member = await storage.getMemberById(req.userId!);
     if (!member) return false;
     const role = (member as any).role ?? (member.profileId ? (await storage.getProfile(member.profileId) as any)?.role : null);
-    return role === "admin" || role === "super_admin";
+    // 남의 글을 대신 관리하는 것은 슈퍼관리자만(관리자 admin 은 보기 전용 — shared/adminRole.ts)
+    return role === "super_admin";
 }
 
 /** 주소로 들어온 id 가 uuid 꼴인가. 아니면 Postgres 가 던져 500 이 난다 — 없는 것으로 보고 404 를 준다. */

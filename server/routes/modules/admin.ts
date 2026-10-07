@@ -8,7 +8,9 @@ import { hashPassword } from "../../services/hiqService.js";
 import { checkSuperAdmin, adminLog } from "../../middleware/adminAuth.js";
 import { cleanRejectReason } from "../../lib/partnerApply.js";
 import adminGolfRouter from "./adminGolf/index.js";
-import { getMemberGolfForAdmin, setBookingManagerRole } from "../../storage/adminMemberGolf.js";
+import { getMemberGolfForAdmin, setBookingManagerRole, setSubAdminRole } from "../../storage/adminMemberGolf.js";
+import { isSuperAdminRole } from "../../../shared/adminRole.js";
+import { checkSubAdminRequest, subAdminBlockedMessage } from "../../lib/subAdmin.js";
 import { getGolfPushHistory } from "../../storage/adminGolfPush.js";
 import { isGolfQuietHour } from "../../../shared/golfPushQuiet.js";
 
@@ -44,6 +46,12 @@ router.post("/search-trend", checkSuperAdmin, asyncHandler(async (req: any, res:
             r.reason === "nokey" ? "네이버 API 키가 없습니다" : r.reason === "quota" ? "네이버 API 호출 한도를 넘었습니다" : `네이버 응답 오류${r.detail ? ` — ${r.detail}` : ""}`);
     }
     return sendSuccess(res, r.result);
+}));
+
+// GET /admin/whoami — 지금 콘솔에 들어온 사람의 역할. 화면이 '보기 전용' 표시와 임명 단추를 이걸로 가른다(가리는 것은 편의 — 막는 것은 가드다)
+router.get("/whoami", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, { role: req.adminRole, canWrite: isSuperAdminRole(req.adminRole) });
 }));
 
 router.get("/stats", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
@@ -211,13 +219,40 @@ router.post("/members/:id/booking-manager", checkSuperAdmin, asyncHandler(async 
     if (r.status === "blocked") {
         const why = r.role === "store_owner"
             ? "매장 사장님 계정은 이미 매장 판매자입니다 — 바꾸면 사장님 권한이 지워져서 여기서는 바꾸지 않습니다"
-            : r.role === "admin" || r.role === "super_admin"
-                ? "관리자 계정은 이미 매장 판매자입니다 — 바꾸면 관리자 권한이 지워져서 여기서는 바꾸지 않습니다"
+            : r.role === "super_admin"
+                ? "슈퍼관리자 계정은 이미 매장 판매자입니다 — 바꾸면 관리자 권한이 지워져서 여기서는 바꾸지 않습니다"
+                : r.role === "admin"
+                ? "관리자(보기 전용) 계정입니다 — 부킹매니저로 바꾸려면 관리자 임명을 먼저 풀어 주세요"
                 : `지금 역할(${r.role})이 일반 회원도 부킹매니저도 아니라 바꾸지 않습니다`;
         return sendError(res, 409, why);
     }
     if (r.status === "changed") {
         adminLog(req, on ? "부킹매니저 지정" : "부킹매니저 해제", { memberId: member.id, profileId: member.profileId, from: r.from, to: r.role });
+    }
+    return sendSuccess(res, { role: r.role, changed: r.status === "changed" });
+}));
+
+/**
+ * POST /admin/members/:id/sub-admin { on: boolean } — 관리자(보기 전용) 임명·해제(2026-10-07 오너: "회원관리에 부관리자 설정할 수 있는 버튼").
+ * 슈퍼관리자만 부른다(가드가 보기 전용 관리자의 POST 를 막지만, 여기서도 한 번 더 본다).
+ *  - user ↔ admin 사이만 바꾼다. 사장님·부킹매니저는 그 권한이 지워져서, 슈퍼관리자는 내릴 수 없어서 거절한다.
+ *  - 임명은 **카카오·구글·애플이 연결된 계정만**: 관리자 계정은 번호 + PIN 으로 로그인할 수 없다(lib/adminRole) — 연결이 없으면 그 사람이 못 들어온다.
+ *  - 정지된 계정 · 자기 자신은 안 된다.
+ * 임명하면 그 회원의 전체 메뉴에 '관리자 콘솔'이 열리고(/me 의 role), 콘솔은 보기만 된다(가드). 해제하면 다음 요청부터 닫힌다.
+ */
+router.post("/members/:id/sub-admin", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const idOk = MEMBER_ID_RE.test(req.params.id);
+    const member = idOk ? await storage.getMemberById(req.params.id) : null;
+    const profile = member?.profileId ? await storage.getProfile(member.profileId) : null;
+    // 받아도 되는 요청인가 — 슈퍼관리자만 · 자기 자신 아님 · 임명은 소셜 로그인이 연결된 계정만(lib/subAdmin.ts)
+    const check = checkSubAdminRequest({ actorRole: req.adminRole, actorProfileId: req.adminProfileId, on: req.body?.on, member, profile: profile as any });
+    if (!check.ok) return sendError(res, check.status, check.message, check.code);
+    const on: boolean = req.body.on;
+    const r = await setSubAdminRole(member!.profileId!, on);
+    if (r.status === "missing") return sendError(res, 404, "계정을 찾을 수 없습니다");
+    if (r.status === "blocked") return sendError(res, 409, subAdminBlockedMessage(r.role));
+    if (r.status === "changed") {
+        adminLog(req, on ? "관리자(보기 전용) 임명" : "관리자(보기 전용) 해제", { memberId: member!.id, profileId: member!.profileId, from: r.from, to: r.role });
     }
     return sendSuccess(res, { role: r.role, changed: r.status === "changed" });
 }));
@@ -439,7 +474,8 @@ router.post("/impersonate/exit", asyncHandler(async (req: any, res: any) => {
     if (!originId) return sendError(res, 400, "대리 접속 중이 아닙니다");
     const profile = await storage.getProfile(originId);
     res.clearCookie('hiq_admin_origin', { path: '/' });
-    if (!profile || (profile.role !== "super_admin" && profile.role !== "admin")) {
+    // 매장 대리 접속은 슈퍼관리자만 시작할 수 있다(POST — 가드가 보기 전용 관리자를 막는다). 돌아오는 길도 같은 사람에게만
+    if (!profile || !isSuperAdminRole(profile.role)) {
         return sendError(res, 403, "관리자 권한이 없습니다.");
     }
     res.cookie('hiq_partner_auth', profile.id, PARTNER_COOKIE_OPTS);
@@ -583,7 +619,8 @@ router.get("/listing-claims", checkSuperAdmin, asyncHandler(async (_req: any, re
         listingAddress: storeListings.address,
     }).from(storeListingClaims)
         .leftJoin(storeListings, eq(storeListings.code, storeListingClaims.listingCode))
-        .orderBy(desc(storeListingClaims.createdAt)).limit(100);
+        // 대기 건을 먼저(2026-10-07 목록 점검) — 최신순 100건만 주면 신청이 쌓였을 때 오래된 '대기' 건이 목록·배지에서 밀려 빠진다
+        .orderBy(dsql`CASE WHEN ${storeListingClaims.status} = 'pending' THEN 0 ELSE 1 END`, desc(storeListingClaims.createdAt)).limit(100);
     return sendSuccess(res, claims);
 }));
 

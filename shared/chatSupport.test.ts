@@ -202,7 +202,8 @@ describe("(가-3) 회원 찾기 — 검색어·이스케이프·탈퇴·전화 �
         const bare = toAdminMemberHit({ id: OWNER, name: "김회원", phone: "social:kakao:x", createdAt: null, primarySport: null, nickname: null, profileImageUrl: null, status: null, role: null });
         expect(bare).toEqual({ id: OWNER, name: "김회원", nickname: null, profileImageUrl: null, joinedAt: null, phoneLast4: null, sport: null, banned: false, staff: false, store: null, noAccount: true });
         expect(toAdminMemberHit({ id: ADMIN_A, name: "최운영", role: "super_admin" }).staff).toBe(true);
-        expect(toAdminMemberHit({ id: ADMIN_A, name: "최운영", role: "admin" }).staff).toBe(true);
+        // 관리자(admin · 보기 전용, 2026-10-07)는 문의 방에서 운영자가 아니다
+        expect(toAdminMemberHit({ id: ADMIN_A, name: "최운영", role: "admin" }).staff).toBe(false);
         expect(toAdminMemberHit({ id: ADMIN_A, name: "최운영", role: "store_owner" }).staff).toBe(false);
     });
     it("어느 행인지 — 매장에서 가입한 행에는 매장 이름, 본 사이트·글로벌 행에는 없다", () => {
@@ -230,7 +231,7 @@ describe("(나-1) 채팅 탭 — '회원에게 메시지'는 운영자에게만"
     const src = code(client("pages/hiq/chat-hub.tsx"));
 
     it("운영자 판정은 /me 의 role(profiles.role) — 전화번호·이메일을 적지 않는다", () => {
-        expect(src).toContain('const isAdmin = (member as any)?.role === "admin" || (member as any)?.role === "super_admin";');
+        expect(src).toContain('const isAdmin = (member as any)?.role === "super_admin";');
         expect(src).not.toMatch(/01[016789][-\s]?\d{3,4}[-\s]?\d{4}/);
         expect(src).not.toMatch(/[\w.+-]+@[\w-]+\.[a-z]{2,}/i);
     });

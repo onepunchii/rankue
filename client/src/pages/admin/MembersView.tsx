@@ -13,6 +13,7 @@ import { LucideSearch, LucideChevronDown, LucideChevronRight, LucideDownload } f
 import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
+import { adminRoleLabel } from "@shared/adminRole";
 import { MemberAvatar, PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, daysSince, isKstToday, phoneLabel, KpiTile } from "./adminUtils";
 
 type Activity = {
@@ -245,7 +246,7 @@ export default function MembersView({ onOpenId }: {
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="font-bold text-[rgba(0,0,0,0.87)]">{m.name}</span>
                                                         {m.status === "banned" && <span className="rounded-full bg-red-500/10 px-1.5 text-[10.5px] font-bold text-red-600">정지</span>}
-                                                        {(m.role === "admin" || m.role === "super_admin") && <span className="rounded-full bg-black/[0.06] px-1.5 text-[10.5px] font-bold text-black/55">관리자</span>}
+                                                        {adminRoleLabel(m.role) && <span className="rounded-full bg-black/[0.06] px-1.5 text-[10.5px] font-bold text-black/55">{adminRoleLabel(m.role)}</span>}
                                                     </div>
                                                     <div className="text-[12px] text-black/45 font-mono">{phoneLabel(m.phone)}</div>
                                                 </div>
