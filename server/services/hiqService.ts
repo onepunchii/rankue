@@ -13,6 +13,7 @@ import { GLOBAL_STORE_SLUG, DEFAULT_STORE_SLUG } from "../../shared/systemStores
 import { KAKAO_DEFAULT_NAME } from "../../shared/kakaoLogin.js";
 import { isLoginPhone, isKakaoSignupPhone, kakaoPhonePlaceholder, SOCIAL_PHONE_PREFIX } from "../../shared/loginPhone.js";
 import { hasSocialLogin, isAdminRole } from "../lib/adminRole.js";
+import { resolveJoinStore } from "../lib/joinStore.js";
 import { isReservedMemberName } from "../utils/crewModeration.js";
 
 // --- PIN 해싱 ---
@@ -146,7 +147,15 @@ export class HiqService {
         const store = await storage.getStoreBySlug(storeSlug);
         if (!store) throw notFound(msg("err.hiq.storeNotFound"));
 
-        const member = await storage.getMemberByPhone(store.id, phone);
+        let member = await storage.getMemberByPhone(store.id, phone);
+        // 기본 입구(hiq)에서 못 찾았다 — 이 번호의 계정이 **다른 매장 소속**일 수 있다(2026-10-07: 매장 QR 로 가입한 회원은 그 매장 소속이다 —
+        // shared/joinStore). 그런 사람을 '새 회원'으로 판정하면 가입 화면으로 보내 기본 매장에 회원 행이 하나 더 생기고 기록이 갈린다
+        // (2026-10-05 검토에서 적어 둔 그 사고다). 번호의 프로필이 있으면 그 계정이 들어갈 회원 행으로 이어 준다 — 본인 확인(PIN)은 아래 그대로다.
+        // 매장 전용 입구(?store=)로 온 로그인은 건드리지 않는다: 거기서는 그 매장 회원인지가 질문이다.
+        if (!member && storeSlug === DEFAULT_STORE_SLUG) {
+            const byPhone = await storage.getProfileByPhone(phone);
+            if (byPhone) member = await storage.users.getLoginMemberByProfileId(byPhone.id);
+        }
         if (member) {
             // Check if this member has a linked profile with a password
             if (member.profileId) {
@@ -185,7 +194,9 @@ export class HiqService {
     // 2026-10-05 카카오 추가(오너: "카카오도 오픈 — 한국은 카카오·구글, 다른 나라는 구글·애플"). 구글·애플의 동작은 그대로다.
     //  - 카카오의 sub 는 회원번호, 닉네임은 동의 항목이라 없을 수 있다 → 기본 이름은 "Player" 대신 "랭큐회원".
     //  - 전화번호 회원이 설정에서 카카오를 **연결**해 뒀으면(linkKakao) 여기서 그 프로필이 잡혀 같은 계정으로 들어온다.
-    async socialLogin(provider: "google" | "apple" | "kakao", identity: SocialIdentity, displayName?: string, countryCode?: string) {
+    //  - joinStoreSlug(2026-10-07): 매장 QR 로 온 기기가 보낸 가입 매장. **새 회원 행을 만들 때만** 쓴다 — 실제 파트너 매장이면 그 매장 소속으로,
+    //    아니면 예전처럼 글로벌. 이미 계정이 있는 사람의 소속은 바꾸지 않는다(shared/joinStore · lib/joinStore).
+    async socialLogin(provider: "google" | "apple" | "kakao", identity: SocialIdentity, displayName?: string, countryCode?: string, joinStoreSlug?: unknown) {
         const fallbackName = provider === "kakao" ? KAKAO_DEFAULT_NAME : "Player";
         // 1) 프로필(신원) find-or-create — sub가 유일키
         // (storage.users 를 바로 부른다 — storage/index.ts 의 얇은 대리 함수는 아직 "google" | "apple" 만 받는다)
@@ -216,10 +227,11 @@ export class HiqService {
         // 소셜로 가입한 프로필은 글로벌 행 하나뿐이라 예전과 같은 행이 잡힌다.
         let member = await storage.users.getLoginMemberByProfileId(profile.id);
         if (!member) {
-            const globalStore = await storage.getStoreBySlug(GLOBAL_STORE_SLUG);
-            if (!globalStore) throw notFound("GLOBAL_STORE_NOT_SEEDED");
+            // 매장 QR 로 가입하는 사람은 그 매장 소속으로(사장님 화면의 회원 목록 · 매장 랭킹 · 상대 목록이 이 값을 본다). 아니면 글로벌
+            const home = (await resolveJoinStore(joinStoreSlug)) ?? await storage.getStoreBySlug(GLOBAL_STORE_SLUG);
+            if (!home) throw notFound("GLOBAL_STORE_NOT_SEEDED");
             member = await storage.createMember({
-                storeId: globalStore.id,
+                storeId: home.id,
                 // phone은 notNull+unique(storeId,phone) — 소셜 유저는 플레이스홀더(실전화 아님).
                 // 구글·애플은 예전 그대로 sub 를 붙인다(길고 추측하기 어렵다). 카카오는 **난수**를 붙인다(2026-10-05 검토):
                 // 카카오 회원번호는 짧은 숫자라 훑을 수 있고, 이 칸은 로그인 응답과 /me 에 그대로 실린다.

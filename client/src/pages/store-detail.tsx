@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { rememberJoinStore } from "@/lib/joinStore";
 import { useQuery } from "@tanstack/react-query";
 import { useRoute, useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
@@ -36,6 +37,13 @@ export default function StoreDetail() {
     queryKey: ["/api/hiq/public-stores", slug],
     enabled: !!slug,
   });
+
+  // 이 주소(/store/<slug>)가 **매장 QR 이 가리키는 곳**이다(사장님 화면의 홍보 탭 · 포스터). 여기로 들어온 기기에 '가입 매장' 표시를 남긴다 —
+  // 이 기기에서 새 계정이 만들어지면 이 매장의 회원이 된다(2026-10-07 오너: "매장 QR 을 통해 유저가 가입하면 해당 매장 고객으로" — shared/joinStore).
+  // 아래에서 정본 페이지(/stores/:code)로 넘기기 **전에** 남긴다. 매장 찾기 목록에서 들어온 사람(/stores/:code 직접)에게는 남기지 않는다.
+  useEffect(() => {
+    if (store?.slug) rememberJoinStore(store.slug, store.listingCode ?? null);
+  }, [store?.slug, store?.listingCode]);
 
   // 디렉토리에 연결된 매장은 /stores/:code 가 정본(요금표·명예의전당·클레임까지 있는 페이지).
   // 이 구형 페이지는 주소만 있어서 같은 매장이 두 얼굴로 보였다(2026-08-28 오너 제보).

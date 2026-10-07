@@ -736,7 +736,8 @@ describe("화면 쪽 규칙 — 소스를 읽어 지킨다", () => {
         expect(toPin).toBeGreaterThan(stop);
         expect(fn.indexOf("apiRequest(", stop)).toBeGreaterThan(toPin);
         // 서버에 보내는 Redirect URI 는 인가 요청 때와 같은 함수로 만든다(글자가 다르면 카카오가 거절한다)
-        expect(fn).toContain('apiRequest("/api/hiq/social/kakao", { method: "POST", body: { code, redirectUri: kakaoRedirectUri(window.location.origin) } })');
+        // 2026-10-07: 본문에 joinStore 가 늘었다 — 매장 QR 로 온 기기의 가입 매장(shared/joinStore). 새 계정이 만들어질 때만 쓰인다
+        expect(fn).toContain('apiRequest("/api/hiq/social/kakao", { method: "POST", body: { code, redirectUri: kakaoRedirectUri(window.location.origin), joinStore: joinStoreSlug() } })');
         expect(callback).toContain('apiRequest("/api/hiq/social/kakao/link", { method: "POST", body: { code, redirectUri: kakaoRedirectUri(window.location.origin), pin } })');
         // 동의 화면에서 취소한 것은 실패가 아니다 — 왔던 곳으로 조용히
         expect(fn).toContain('return error === "access_denied" ? { kind: "cancelled", mode, back } : fail("kakao");');

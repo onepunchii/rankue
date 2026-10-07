@@ -585,7 +585,9 @@ describe("앱에서 열기 — 눌렀을 때 받아 바로 연다", () => {
         expect(first).toBeGreaterThan(0);
         expect(sheet.indexOf("{openButton(true)}")).toBeGreaterThan(first);
         // 로그인 확인이 끝나기 전에는 띄우지 않는다 — 뜬 뒤에 단추가 생기거나 사라지지 않게
-        expect(sheet).toContain("busy: live.current.authLoading || screenBusy(),");
+        // 2026-10-07: 조건이 하나 늘었다 — 매장 QR 로 온 비로그인(가입 매장 표시가 남아 있다)에게는 가입이 끝날 때까지 띄우지 않는다
+        // (앱부터 깔면 '어느 매장에서 왔는지'가 사라진다 — shared/joinStore.test.ts). 로그인 확인을 기다리는 것은 그대로다
+        expect(sheet).toContain("busy: live.current.authLoading || screenBusy() || (!live.current.loggedIn && !!joinStoreSlug()),");
     });
 });
 

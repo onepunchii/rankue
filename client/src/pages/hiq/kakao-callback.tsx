@@ -8,6 +8,7 @@ import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { ApiError, apiRequest, queryClient, refreshAfterLogin } from "@/lib/queryClient";
 import { offerAttachPhone } from "@/components/hiq/AttachPhoneSheet";
 import { loginPagePath } from "@/components/hiq/LoginSheet";
+import { joinStoreSlug } from "@/lib/joinStore";
 import { takeKakaoPending } from "@/lib/kakaoLogin";
 import { KAKAO_REDIRECT_PATH, checkKakaoReturn, kakaoRedirectUri, type KakaoMode } from "@shared/kakaoLogin";
 import { safeReturnPath } from "@shared/promoFunnel";
@@ -105,7 +106,8 @@ async function readAndExchange(): Promise<Outcome> {
 
     try {
         // 인가 요청 때와 **같은 글자**의 Redirect URI 를 보낸다(다르면 카카오가 KOE006 으로 거절한다)
-        const data = await apiRequest("/api/hiq/social/kakao", { method: "POST", body: { code, redirectUri: kakaoRedirectUri(window.location.origin) } });
+        // joinStore — 매장 QR 로 온 기기면 그 매장(shared/joinStore). 표시는 기기 저장소에 있어 카카오에 다녀와도 남아 있다
+        const data = await apiRequest("/api/hiq/social/kakao", { method: "POST", body: { code, redirectUri: kakaoRedirectUri(window.location.origin), joinStore: joinStoreSlug() } });
         return { kind: "signed-in", back: check.redirect, termsVersion: data?.member?.termsVersion, redirectTo: data?.redirectTo, isNew: data?.isNew === true };
     } catch (err) {
         return failedFrom(err, "login", check.redirect);

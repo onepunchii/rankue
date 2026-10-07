@@ -10,6 +10,7 @@ import { kakaoLoginAvailable, kakaoNativeLogin, kakaoServerMessage, useKakaoStar
 import { isTermsAccepted } from "@shared/terms";
 import { safeReturnPath } from "@shared/promoFunnel";
 import { offerAttachPhone } from "@/components/hiq/AttachPhoneSheet";
+import { joinStoreSlug } from "@/lib/joinStore";
 
 // 소셜 로그인(구글·애플) — 글로벌(비한국어) 유저의 기본 진입.
 // 웹:          구글 GIS + 애플 SIWA JS(Services ID) → id_token → 서버(/api/hiq/social) JWKS 재검증.
@@ -306,7 +307,8 @@ export default function SocialLogin({ hint = true, kakao = true, redirect, onDon
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ provider, idToken, name }),
+        // joinStore — 매장 QR 로 온 기기면 그 매장(shared/joinStore). 새 계정이 만들어질 때만 쓰인다
+        body: JSON.stringify({ provider, idToken, name, joinStore: joinStoreSlug() }),
       });
       const j = await res.json();
       if (!res.ok || !j?.success) throw new Error(j?.message || "social login failed");

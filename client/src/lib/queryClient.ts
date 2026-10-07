@@ -1,4 +1,5 @@
 import { getLocale } from "./i18n";
+import { clearJoinStore } from "@/lib/joinStore";
 import {
   QueryClient,
   QueryFunction,
@@ -203,6 +204,9 @@ export const queryClient = new QueryClient({
  * ③ '나'를 먼저 받아 둔다 — 다음 화면이 처음부터 로그인된 채로 그려지게.
  */
 export async function refreshAfterLogin(): Promise<void> {
+  // 매장 QR 로 온 기기의 '가입 매장' 표시는 여기까지다(shared/joinStore) — 가입 요청에 이미 실려 갔다. 남겨 두면 이 기기에서 다음에
+  // 만들어지는 다른 계정이 그 매장에 붙는다. 로그인되는 길은 전부 이 함수를 지나므로 여기 한 곳에서 지운다.
+  clearJoinStore();
   queryClient.removeQueries({ queryKey: ["/api/hiq/me"] });
   void queryClient.invalidateQueries();
   try {

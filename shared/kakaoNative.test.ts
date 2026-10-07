@@ -269,7 +269,8 @@ describe("화면은 registerPlugin 으로만 부른다", () => {
 
     it("받은 토큰은 화면 메모리에만 — 저장소·주소에 남기지 않고, 서버에는 정해진 두 길로만 보낸다", () => {
         expect(nativeLib).not.toMatch(/sessionStorage|localStorage|document\.cookie|history\.|location\./);
-        expect(nativeLib).toContain('apiRequest(KAKAO_NATIVE_VERIFY_API, { method: "POST", body: { idToken: token.idToken, nonce: token.nonce, mode: "login" } })');
+        // 2026-10-07: 로그인 본문에 joinStore 가 늘었다 — 매장 QR 로 온 기기의 가입 매장(shared/joinStore · 저장소는 lib/joinStore 가 읽는다). 연결에는 싣지 않는다
+        expect(nativeLib).toContain('apiRequest(KAKAO_NATIVE_VERIFY_API, { method: "POST", body: { idToken: token.idToken, nonce: token.nonce, mode: "login", joinStore: joinStoreSlug() } })');
         expect(nativeLib).toContain('apiRequest(KAKAO_NATIVE_VERIFY_API, { method: "POST", body: { idToken: token.idToken, nonce: token.nonce, mode: "link", pin } })');
         expect(nativeLib.match(/apiRequest\(/g)).toHaveLength(3);
         // 로그에 토큰을 적지 않는다(오류 객체만)

@@ -12,6 +12,7 @@ import { LucidePhone, LucideMapPin, LucideShare2 } from "@/lib/icons";
 import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
 import { useAuth } from "@/hooks/useAuth";
 import { goLogin } from "@/components/hiq/LoginGate";
+import { joinStoreFor } from "@/lib/joinStore";
 
 interface Listing {
   code: string; name: string; region: string; address: string; phone: string | null;
@@ -40,6 +41,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "확인 후 연락드리고, 승인되면 영업시간·소개 등을 직접 수정할 수 있습니다.",
     claimName: "성함", claimPhone: "연락처 (예: 010-1234-5678)", claimMsg: "메시지 (선택)",
     claimSubmit: "신청하기", claimDone: "신청이 접수되었습니다. 확인 후 연락드릴게요!",
+    joinTitle: "{name} 회원으로 시작하기", joinDesc: "가입하면 이 매장의 랭킹과 기록에 바로 참여해요.", joinCta: "가입하고 시작하기",
     claimAccount: "로그인한 계정({name})으로 신청돼요. 승인되면 이 계정의 메뉴에 '내 매장 관리'가 열려요.", claimLoginTitle: "사장님 신청은 로그인이 필요해요", claimLoginDesc: "로그인한 계정으로 신청하고, 승인되면 그 계정에 '내 매장 관리'가 열려요.", claimPending: "신청을 받았어요 — 확인 중이에요", claimPendingDesc: "확인이 끝나면 알림으로 알려 드릴게요.", claimRejected: "지난 신청은 승인되지 않았어요", claimRejectedWhy: "사유: {reason}",
     suggestCta: "정보가 다른가요? 수정 제안",
     suggestTitle: "정보 수정 제안",
@@ -64,6 +66,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "We'll contact you to verify. Once approved you can edit hours, intro and more.",
     claimName: "Name", claimPhone: "Contact number", claimMsg: "Message (optional)",
     claimSubmit: "Submit", claimDone: "Received! We'll be in touch.",
+    joinTitle: "Start as a member of {name}", joinDesc: "Sign up and you're in this venue's ranking and records right away.", joinCta: "Sign up and start",
     claimAccount: "This request is filed under your signed-in account ({name}). Once approved, 'My venue' appears in this account's menu.", claimLoginTitle: "Sign in to claim this listing", claimLoginDesc: "Requests are tied to your account. Once approved, 'My venue' opens in that account.", claimPending: "Request received — under review", claimPendingDesc: "We'll notify you when the review is done.", claimRejected: "Your last request wasn't approved", claimRejectedWhy: "Reason: {reason}",
     suggestCta: "Something wrong? Suggest an edit",
     suggestTitle: "Suggest an edit",
@@ -88,6 +91,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "Chúng tôi sẽ liên hệ xác minh. Sau khi duyệt, bạn có thể tự sửa thông tin.",
     claimName: "Họ tên", claimPhone: "Số liên lạc", claimMsg: "Lời nhắn (tùy chọn)",
     claimSubmit: "Gửi", claimDone: "Đã nhận! Chúng tôi sẽ liên hệ.",
+    joinTitle: "Bắt đầu với tư cách hội viên {name}", joinDesc: "Đăng ký là bạn tham gia ngay bảng xếp hạng và thành tích của quán này.", joinCta: "Đăng ký và bắt đầu",
     claimAccount: "Yêu cầu được gửi bằng tài khoản đang đăng nhập ({name}). Sau khi duyệt, mục 'Quán của tôi' sẽ mở trong menu của tài khoản này.", claimLoginTitle: "Đăng nhập để nhận quản lý trang", claimLoginDesc: "Yêu cầu gắn với tài khoản của bạn. Sau khi duyệt, mục 'Quán của tôi' sẽ mở trong tài khoản đó.", claimPending: "Đã nhận yêu cầu — đang xem xét", claimPendingDesc: "Chúng tôi sẽ thông báo khi có kết quả.", claimRejected: "Yêu cầu trước chưa được duyệt", claimRejectedWhy: "Lý do: {reason}",
     suggestCta: "Thông tin sai? Đề xuất sửa",
     suggestTitle: "Đề xuất chỉnh sửa",
@@ -112,6 +116,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "Doğrulama için sizinle iletişime geçeceğiz. Onay sonrası bilgileri düzenleyebilirsiniz.",
     claimName: "Ad", claimPhone: "İletişim numarası", claimMsg: "Mesaj (isteğe bağlı)",
     claimSubmit: "Gönder", claimDone: "Alındı! Sizinle iletişime geçeceğiz.",
+    joinTitle: "{name} üyesi olarak başla", joinDesc: "Kaydolunca bu salonun sıralamasına ve kayıtlarına hemen katılırsın.", joinCta: "Kaydol ve başla",
     claimAccount: "Bu başvuru giriş yaptığınız hesapla ({name}) yapılır. Onaylanınca bu hesabın menüsünde 'Salonum' açılır.", claimLoginTitle: "Kaydı sahiplenmek için giriş yapın", claimLoginDesc: "Başvuru hesabınıza bağlanır. Onaylanınca o hesapta 'Salonum' açılır.", claimPending: "Başvuru alındı — inceleniyor", claimPendingDesc: "İnceleme bitince bildirim göndereceğiz.", claimRejected: "Önceki başvurunuz onaylanmadı", claimRejectedWhy: "Sebep: {reason}",
     suggestCta: "Bilgi yanlış mı? Düzeltme öner",
     suggestTitle: "Düzeltme öner",
@@ -136,6 +141,7 @@ const L: Record<Locale, Record<string, string>> = {
     claimDesc: "Te contactaremos para verificar. Tras la aprobación podrás editar la información.",
     claimName: "Nombre", claimPhone: "Número de contacto", claimMsg: "Mensaje (opcional)",
     claimSubmit: "Enviar", claimDone: "¡Recibido! Te contactaremos.",
+    joinTitle: "Empieza como miembro de {name}", joinDesc: "Regístrate y entras al instante en el ranking y los registros de este local.", joinCta: "Regístrate y empieza",
     claimAccount: "La solicitud se envía con la cuenta con la que has iniciado sesión ({name}). Al aprobarse, 'Mi local' aparece en el menú de esta cuenta.", claimLoginTitle: "Inicia sesión para reclamar la ficha", claimLoginDesc: "La solicitud queda ligada a tu cuenta. Al aprobarse, 'Mi local' se abre en esa cuenta.", claimPending: "Solicitud recibida — en revisión", claimPendingDesc: "Te avisaremos cuando termine la revisión.", claimRejected: "Tu última solicitud no fue aprobada", claimRejectedWhy: "Motivo: {reason}",
     suggestCta: "¿Información incorrecta? Sugerir cambio",
     suggestTitle: "Sugerir cambio",
@@ -170,7 +176,8 @@ export default function StoreListingPage() {
     staleTime: 60 * 1000,
     retry: false,
   });
-  const myClaim = myApps?.applications.find((a) => a.kind === "claim" && a.listingCode === code);
+  // 답의 모양이 어긋나도(목록이 아닌 값) 화면이 죽지 않게 — 그때는 신청이 없는 것으로 본다(흰 화면의 흔한 원인이다)
+  const myClaim = (Array.isArray(myApps?.applications) ? myApps.applications : []).find((a) => a.kind === "claim" && a.listingCode === code);
   /** 신청 창을 연다 — 비로그인은 가입·로그인 팝업부터. 로그인이 끝나면 이 주소에 ?claim=1 이 붙어 돌아와 창이 이어서 열린다 */
   const openClaim = () => {
     if (isGuest) { goLogin(setLocation, `${window.location.pathname}?claim=1`); return; }
@@ -286,6 +293,23 @@ export default function StoreListingPage() {
               </div>
               <p className="text-[14px] text-brand font-semibold mt-1">{s.region}</p>
             </header>
+
+            {/* 매장 QR 로 온 비로그인(2026-10-07 오너: "매장 QR 을 통해 유저가 가입하면 해당 매장 고객으로") — 맨 위에 가입 한 줄.
+                QR 주소(/store/<slug>)가 이 기기에 남긴 표시가 이 매장을 가리킬 때만 뜬다(lib/joinStore). 매장 찾기에서 들어온 사람에게는 뜨지 않는다.
+                가입·로그인 팝업이 그 자리에서 열리고, 새 계정은 이 매장 소속으로 만들어진다. 메뉴의 파트너 카드와 같은 꽉 찬 초록 */}
+            {isGuest && s.claimed && joinStoreFor(s.code) && (
+              <button
+                type="button"
+                onClick={() => goLogin(setLocation)}
+                className="w-full mb-4 px-5 py-4 rounded-2xl bg-brand text-white text-left flex items-center gap-3 active:bg-brand/90 transition-colors"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[16px] font-bold leading-tight break-keep">{t.joinTitle.replace("{name}", s.name)}</span>
+                  <span className="block text-[12.5px] font-medium text-[#FFFFFFCC] mt-1 break-keep">{t.joinDesc}</span>
+                </span>
+                <span className="shrink-0 h-9 px-3.5 rounded-full bg-[#FFFFFF] text-[#006241] text-[12.5px] font-bold flex items-center">{t.joinCta}</span>
+              </button>
+            )}
 
             {/* 액션 바 — 매장 페이지에 온 사람이 실제로 하려는 것은 '전화'와 '길찾기'다.
                 예전에는 전화번호가 링크로만 있고 길찾기는 아예 없어서, 주소를 복사해

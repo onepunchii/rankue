@@ -87,7 +87,8 @@ export default function PartnerLogin() {
         staleTime: 30 * 1000,
         retry: false,
     });
-    const apps = mine?.applications ?? [];
+    // 답의 모양이 어긋나도(목록이 아닌 값) 화면이 죽지 않게
+    const apps = Array.isArray(mine?.applications) ? mine.applications : [];
     const waiting = apps.some((a) => a.status === "pending");
 
     const onSubmit = async (data: LoginForm) => {

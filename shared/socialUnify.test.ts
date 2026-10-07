@@ -353,7 +353,9 @@ describe("파트너(사장님) 신청 — 화면은 랭큐 계정으로 신청�
     });
 
     it("매장 페이지: 내 신청이 확인 중이면 단추 대신 상태를 보여 준다 — 승인되지 않았으면 사유와 함께 다시 신청할 수 있다", () => {
-        expect(listing).toContain('const myClaim = myApps?.applications.find((a) => a.kind === "claim" && a.listingCode === code);');
+        // 답의 모양이 어긋나도 화면이 죽지 않는다(하니스에서 목록이 아닌 답으로 흰 화면이 났다)
+        expect(listing).toContain('const myClaim = (Array.isArray(myApps?.applications) ? myApps.applications : []).find((a) => a.kind === "claim" && a.listingCode === code);');
+        expect(entry).toContain("const apps = Array.isArray(mine?.applications) ? mine.applications : [];");
         expect(listing).toContain('{!s.claimed && myClaim?.status === "pending" && (');
         expect(listing).toContain('{!s.claimed && myClaim?.status === "rejected" && (');
         expect(listing).toContain('{!s.claimed && myClaim?.status !== "pending" && (');

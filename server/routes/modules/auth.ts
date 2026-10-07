@@ -18,6 +18,8 @@ import {
     KAKAO_NONCE_COOKIE, KAKAO_NONCE_COOKIE_PATH, KAKAO_NONCE_TTL_SEC, isKakaoNonce, looksLikeKakaoIdToken, type KakaoNonceIssue,
 } from "../../../shared/kakaoNative.js";
 import { isLoginPhone } from "../../../shared/loginPhone.js";
+import { isSystemStore } from "../../../shared/systemStores.js";
+import { resolveJoinStore } from "../../lib/joinStore.js";
 import { recordTermsAcceptance, isMemberSuspended, SUSPENDED_TEXT } from "../../middleware/terms.js";
 import { isTermsAccepted, ACCOUNT_SUSPENDED_CODE } from "../../../shared/terms.js";
 import { screenMemberProfile } from "../../utils/crewModeration.js";
@@ -230,7 +232,8 @@ router.post("/social", asyncHandler(async (req: any, res: any) => {
 
     const countryCode = ipCountry(req);
 
-    const result = await hiqService.socialLogin(provider, identity, typeof name === "string" ? name.slice(0, 40) : undefined, countryCode);
+    // joinStore — 매장 QR 로 온 기기가 보내는 가입 매장(shared/joinStore). 새 계정을 만들 때만 쓰이고, 서비스가 실제 파트너 매장인지 확인한다
+    const result = await hiqService.socialLogin(provider, identity, typeof name === "string" ? name.slice(0, 40) : undefined, countryCode, req.body?.joinStore);
     // 가입 때만 넣던 값이라 그 전에 만든 계정은 비어 있다 — 로그인할 때 한 번 채운다(이미 있으면 그대로).
     await fillCountry(result.member.profileId, req);
     clearAttempts(key);
@@ -336,7 +339,7 @@ router.post("/social/kakao", asyncHandler(async (req: any, res: any) => {
         : exchanged.identity;
 
     // 카카오는 한국 서비스다 — 헤더가 없는 곳(로컬·서버리스 밖)에서만 KR 로 둔다(전화 가입과 같은 규칙).
-    const result = await hiqService.socialLogin("kakao", identity, undefined, ipCountry(req) ?? "KR");
+    const result = await hiqService.socialLogin("kakao", identity, undefined, ipCountry(req) ?? "KR", req.body?.joinStore);
     // 연결해 둔 옛 계정으로 들어온 경우 국가가 비어 있을 수 있다 — 한 번 채운다(이미 있으면 그대로).
     await fillCountry(result.member.profileId, req);
     clearAttempts(key);
@@ -476,9 +479,15 @@ router.post("/register", asyncHandler(async (req: any, res: any) => {
     const screenedName = screenMemberProfile({ name: validation.data.name });
     if (!screenedName.ok) return sendError(res, 400, screenedName.reason);
 
+    // 매장 QR 로 온 기기의 가입(2026-10-07 — shared/joinStore): 기본 매장으로 가입하려는 사람을 그 매장 소속으로 만든다.
+    //  - 실제 파트너 매장일 때만(resolveJoinStore) · 화면이 고른 매장이 시스템 매장(hiq·global)일 때만(매장 전용 입구로 온 가입은 그 매장 그대로)
+    //  - PIN 을 정한 가입만: 프로필이 생겨야 다음 로그인이 그 번호의 계정을 다른 매장에서도 찾는다(hiqService.login)
+    const joinStore = validation.data.password ? await resolveJoinStore(req.body?.joinStore) : null;
+    const requested = joinStore ? await storage.getStoreById(validation.data.storeId) : null;
+    const signup = joinStore && isSystemStore(requested?.slug) ? { ...validation.data, storeId: joinStore.id } : validation.data;
     // 전화번호 가입은 한국 번호 흐름이다(2026-09-17 오너: "전화번호는 다 한국이야").
     // 헤더가 오면 그 값을 쓰고, 서버리스 밖·로컬처럼 헤더가 없을 때만 KR 로 둔다.
-    const result = await hiqService.register(validation.data, ipCountry(req) ?? "KR");
+    const result = await hiqService.register(signup, ipCountry(req) ?? "KR");
     // 번호로 이미 정지된 프로필에 매장 회원 행만 새로 붙이는 우회를 막는다 — 가입 경로도 로그인과 같이 확인한다.
     if (await isMemberSuspended(result.member.id)) {
         return sendError(res, 403, SUSPENDED_TEXT, ACCOUNT_SUSPENDED_CODE);
@@ -931,7 +940,7 @@ router.post("/social/kakao/native", asyncHandler(async (req: any, res: any) => {
         ? { ...verified.identity, name: null }
         : verified.identity;
 
-    const result = await hiqService.socialLogin("kakao", identity, undefined, ipCountry(req) ?? "KR");
+    const result = await hiqService.socialLogin("kakao", identity, undefined, ipCountry(req) ?? "KR", req.body?.joinStore);
     await fillCountry(result.member.profileId, req);
     clearAttempts(key);
     if (await isMemberSuspended(result.member.id)) {

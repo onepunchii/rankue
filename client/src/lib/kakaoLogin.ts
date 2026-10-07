@@ -24,6 +24,7 @@ import {
     isKakaoNativeCanceled, isKakaoNonce, looksLikeKakaoIdToken, type RankueKakaoPlugin,
 } from "@shared/kakaoNative";
 import { nativeSupports } from "@shared/nativeCaps";
+import { joinStoreSlug } from "@/lib/joinStore";
 
 const KAKAO_JS_KEY = import.meta.env.VITE_KAKAO_JS_KEY as string | undefined;
 // 여는 스위치(2026-10-06 오너: "앱 빌드해서 승인받고 그때 카카오 오픈") — 키가 있어도 이 값이 "1" 이 아니면 단추가 어디에도 안 뜬다.
@@ -369,7 +370,8 @@ export type KakaoNativeSignedIn = { member?: { termsVersion?: unknown } | null; 
 export async function kakaoNativeLogin(): Promise<KakaoNativeSignedIn | null> {
     const token = await kakaoNativeToken();
     if (!token) return null;
-    return await apiRequest(KAKAO_NATIVE_VERIFY_API, { method: "POST", body: { idToken: token.idToken, nonce: token.nonce, mode: "login" } });
+    // joinStore — 매장 QR 로 온 기기면 그 매장(shared/joinStore). 새 계정이 만들어질 때만 쓰인다
+    return await apiRequest(KAKAO_NATIVE_VERIFY_API, { method: "POST", body: { idToken: token.idToken, nonce: token.nonce, mode: "login", joinStore: joinStoreSlug() } });
 }
 
 /** 연결 요청 한 번의 결과. wrong-pin 만 같은 토큰으로 다시 보낼 수 있다(서버가 nonce 를 쓰기 전에 거절했다). */

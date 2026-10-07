@@ -19,6 +19,7 @@ import { useT } from "@/lib/i18n";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { TermsBody } from "@/components/hiq/TermsBody";
 import { loginPagePath } from "@/components/hiq/LoginSheet";
+import { joinStoreSlug } from "@/lib/joinStore";
 import { TERMS_VERSION } from "@shared/terms";
 import { TERMS_CONTENT, termsLang } from "@shared/termsContent";
 
@@ -137,7 +138,8 @@ export default function HiqRegister() {
             await apiRequest("/api/hiq/register", {
                 method: "POST",
                 // 본 약관 버전을 함께 보낸다 — 서버가 검증한 뒤 동의 시각과 함께 기록한다(auth.ts /register)
-                body: { ...data, termsVersion: TERMS_VERSION },
+                // joinStore — 매장 QR 로 온 기기면 그 매장(shared/joinStore). 서버가 실제 파트너 매장인지 확인하고, 맞으면 그 매장 소속으로 가입시킨다
+                body: { ...data, termsVersion: TERMS_VERSION, joinStore: joinStoreSlug() },
             });
             setIsCompleted(true);
             // 가입과 함께 로그인된다 — 환영 화면이 떠 있는 동안 '나'를 새로 받아 둔다(돌아간 화면이 비로그인으로 그려지지 않게)
