@@ -65,10 +65,16 @@ export function trailFirstLine(text: unknown): string | null {
     return null;
 }
 
-/** 주소에서 쿼리·해시를 떼고 300자로. 우리 화면 주소("/…")가 아니면 null */
+/** %EC%84%B8… 를 한글로 푼다. 깨진 인코딩이면 그대로 */
+const plain = (s: string): string => { try { return decodeURI(s); } catch { return s; } };
+
+/**
+ * 주소에서 쿼리·해시를 떼고, 한글을 풀고, 300자로. 우리 화면 주소("/…")가 아니면 null.
+ * 한 가지 꼴로 맞춘다 — 화면 이동(라우터)은 풀린 주소를, 누름·스크롤(window.location)은 %EC… 를 준다. 그대로 두면 같은 화면이 두 꼴로 쌓인다.
+ */
 export function trailPath(raw: unknown): string | null {
     if (typeof raw !== "string" || !raw.startsWith("/") || raw.startsWith("//")) return null;
-    return raw.split(/[?#]/)[0].slice(0, 300);
+    return plain(raw.split(/[?#]/)[0]).slice(0, 300);
 }
 
 /** 누른 링크의 주소 — 안쪽 주소는 경로만, 바깥 주소는 "↗호스트"만 */
@@ -76,7 +82,7 @@ export function trailHref(raw: unknown, origin: string): string | null {
     if (typeof raw !== "string" || !raw || raw.startsWith("#") || /^(javascript|mailto|tel|sms|data|blob):/i.test(raw)) return null;
     try {
         const u = new URL(raw, origin);
-        if (u.origin === origin) return u.pathname.slice(0, 200);
+        if (u.origin === origin) return plain(u.pathname).slice(0, 200);
         return /^https?:$/.test(u.protocol) && u.host ? `↗${u.host.slice(0, 80)}` : null;
     } catch { return null; }
 }

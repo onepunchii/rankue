@@ -20,6 +20,8 @@ const ID_KEY = "rankue-visitor";      // VisitBeacon 과 같은 방문자 ID
 const SID_KEY = "rankue-session";     // 탭을 닫으면 끝나는 방문 한 번
 const FLUSH_MS = 20_000;
 const DWELL_MS = 5000;
+/** 화면을 옮긴 뒤 이만큼은 스크롤 깊이를 재지 않는다 — 앞 화면의 스크롤 자리가 남아 있고 새 화면은 아직 짧다(곧바로 90% 로 찍혔다) */
+const SETTLE_MS = 1200;
 const ENDPOINT = "/api/ui-event/batch";
 /** 로컬 화면 하니스에서만 — 이 값을 "1"로 두면 localhost 에서도 모은다(하니스는 /api 를 가짜로 답한다. 진짜 개발 서버에서는 쓰지 말 것) */
 const TEST_KEY = "rankue-trail-test";
@@ -55,6 +57,7 @@ export function Tracker() {
     const human = useRef(false);
     const depth = useRef<Set<number>>(new Set());
     const first = useRef(true);
+    const pageAt = useRef(0);
     const disabled = useRef(off());
 
     // 보내기 — 화면을 떠나는 순간에도 끊기지 않게 sendBeacon 을 먼저 쓴다
@@ -80,6 +83,7 @@ export function Tracker() {
         const path = trailPath(location);
         if (!path) return;
         depth.current = new Set();
+        pageAt.current = Date.now();
         const m: Record<string, unknown> = {};
         if (first.current) {
             first.current = false;
@@ -96,7 +100,7 @@ export function Tracker() {
 
         const onClick = (ev: MouseEvent) => {
             markHuman();
-            const path = window.location.pathname;
+            const path = trailPath(window.location.pathname) ?? "/";
             if (TRAIL_NO_CLICK_PATH.test(path)) return;
             const el = (ev.target as Element | null)?.closest?.(CLICKABLE);
             if (!el || el.closest("[data-notrack], input, textarea, select, [contenteditable=true]")) return;
@@ -114,16 +118,17 @@ export function Tracker() {
         };
         const onScroll = () => {
             markHuman();
+            if (Date.now() - pageAt.current < SETTLE_MS) return;
             const max = document.documentElement.scrollHeight - window.innerHeight;
             if (max < 200) return;
             const pct = (window.scrollY / max) * 100;
             for (const d of [50, 90]) {
-                if (pct >= d && !depth.current.has(d)) { depth.current.add(d); push.current({ n: "scroll", p: window.location.pathname, m: { d }, t: Date.now() }); }
+                if (pct >= d && !depth.current.has(d)) { depth.current.add(d); push.current({ n: "scroll", p: trailPath(window.location.pathname) ?? "/", m: { d }, t: Date.now() }); }
             }
         };
         const onOpen = (ev: Event) => {
             const l = trailLabel((ev as CustomEvent<{ l?: unknown }>).detail?.l);
-            if (l) push.current({ n: "open", p: window.location.pathname, m: { l }, t: Date.now() });
+            if (l) push.current({ n: "open", p: trailPath(window.location.pathname) ?? "/", m: { l }, t: Date.now() });
         };
         const onHide = () => { if (document.visibilityState === "hidden") flush.current(); };
         const onLeave = () => flush.current();

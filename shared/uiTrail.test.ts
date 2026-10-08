@@ -46,11 +46,15 @@ describe("trailPath · trailHref — 주소", () => {
         expect(trailPath("/kakao-preview?key=secret")).toBe("/kakao-preview");
         for (const s of ["https://evil.example/x", "//evil.example", "javascript:alert(1)", "", null, 3]) expect(trailPath(s), String(s)).toBeNull();
         expect(trailPath(`/${"a".repeat(400)}`)).toHaveLength(300);
+        // 한 가지 꼴로 — 누름·스크롤은 %EC… 로 온다(운영 첫 확인에서 같은 화면이 두 꼴로 쌓였다)
+        expect(trailPath(`/golf/course/${encodeURIComponent("세레니티CC")}`)).toBe("/golf/course/세레니티CC");
+        expect(trailPath("/golf/course/%E0%A4%A")).toBe("/golf/course/%E0%A4%A");
     });
 
     it("누른 링크 — 안쪽은 경로만(쿼리 없음), 바깥은 호스트만. 전화·메일·스크립트 주소는 남기지 않는다", () => {
         const o = "https://www.rankue.co.kr";
-        expect(trailHref("/golf/join/충청?alert=1", o)).toBe(`/golf/join/${encodeURIComponent("충청")}`);
+        expect(trailHref("/golf/join/충청?alert=1", o)).toBe("/golf/join/충청");
+        expect(trailHref(`/golf/course/${encodeURIComponent("세레니티CC")}`, o)).toBe("/golf/course/세레니티CC");
         expect(trailHref("https://www.rankue.co.kr/stores?x=1", o)).toBe("/stores");
         expect(trailHref("https://map.kakao.com/link/to/어딘가,37.1,127.1", o)).toBe("↗map.kakao.com");
         for (const s of ["tel:031-000-0000", "mailto:a@b.c", "sms:010", "javascript:void(0)", "#top", "", null, undefined]) expect(trailHref(s, o), String(s)).toBeNull();
@@ -177,6 +181,14 @@ describe("수집기(Tracker)와 표시해 둔 구역", () => {
         expect(tracker).toContain("if (!label) return;");
         // 입력값을 읽는 코드가 없다
         expect(tracker).not.toMatch(/\.value\b|FormData|keyCode|\.key\b|inputType/);
+    });
+
+    it("주소는 한 가지 꼴로(한글을 풀어서) · 화면을 옮긴 직후의 스크롤은 재지 않는다", () => {
+        expect(tracker.match(/trailPath\(window\.location\.pathname\) \?\? "\/"/g)).toHaveLength(3);
+        expect(tracker).not.toMatch(/p: window\.location\.pathname/);
+        expect(tracker).toContain("if (Date.now() - pageAt.current < SETTLE_MS) return;");
+        expect(cleanTrailEvent({ n: "click", p: `/golf/course/${encodeURIComponent("세레니티CC")}`, m: { l: "길찾기", h: `/golf/courses/${encodeURIComponent("충청")}` } }))
+            .toEqual({ name: "click", path: "/golf/course/세레니티CC", meta: { l: "길찾기", h: "/golf/courses/충청" } });
     });
 
     it("사람인지 확인되기 전(첫 조작·5초 체류)에는 보내지 않고, 모아서 한 번에 보낸다", () => {
