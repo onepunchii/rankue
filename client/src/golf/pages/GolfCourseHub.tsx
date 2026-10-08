@@ -205,6 +205,8 @@ export default function GolfCourseHub() {
     };
     const toCourseList = () => document.getElementById("golf-course-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
     const whereShort = city ? cityShort(city) : region ?? "전국";
+    // 지도의 가로 칸 수 — 많을수록 점이 잘다. 전국 화면만 잘게(의도 허브는 지도가 낮고 넓어 나라가 좁게 잡힌다 → 칸을 더 준다)
+    const mapCols = region ? (intent ? 40 : 30) : (intent ? 60 : 46);
     const alertScope = { region, city, intent, regions: regions.data };
     const guidePrimary = (tab: GuideTab) => {
         if (!member) return { label: "로그인하고 시작하기", onClick: () => goLogin(setLocation, tab === "post" ? POST_TO : undefined) };
@@ -328,7 +330,9 @@ export default function GolfCourseHub() {
             {/* ── 지도 ── 점 지도가 이 화면의 얼굴이다(2026-10-05 넷째 판 — 오너: "이 점들이 우리만의 시그니처, 더 살리자").
                 카드 반쪽(158×148)이던 것을 화면 폭 전체로 키우고, 시도 윤곽선을 옅게 깔았다. 윤곽선의 지역 면을 누르면 그 지역으로 간다.
                 점 하나 = 골프장(격자 한 칸), 색 = 지금 올라온 글(조인 주황 · 부킹 라임 · 긴급 빨강) · 내 관심(호박색). 아래 범례가 그 뜻을 말한다.
-                의도 허브(조인·부킹·긴급)는 글 목록이 바로 밑이라 지도를 낮게 둔다. */}
+                의도 허브(조인·부킹·긴급)는 글 목록이 바로 밑이라 지도를 낮게 둔다.
+                점 크기(mapCols, 2026-10-08 오너: "요기도 점을 더 축소해서 더 직관적인 느낌으로") — 전국은 잘게 찍어 골프장 하나가 점 하나에 가깝게
+                (30칸일 때는 한 점이 12km 라 이웃 골프장이 뭉쳐 굵은 알갱이로 보였다). 지역·시군으로 당기면 점이 드물어지니 예전 굵기 그대로 */}
             <section aria-label="지도" className="mx-5 mt-4 rounded-2xl bg-[#FFFFFF06] overflow-hidden">
                 <div className="px-4 pt-4 flex items-end justify-between gap-3">
                     <div className="min-w-0">
@@ -340,7 +344,7 @@ export default function GolfCourseHub() {
                     <span className="shrink-0 pb-0.5 text-[12.5px] text-[#FFFFFF73]">{region ? "한 번 더 누르면 넓게" : "지도를 눌러 지역 고르기"}</span>
                 </div>
                 <CourseDotMap
-                    dots={dots} focus={focus} aspect={intent ? 1.3 : 0.95} cols={intent ? 40 : 30} bg="#0F0F0F" pulse
+                    dots={dots} focus={focus} aspect={intent ? 1.3 : 0.95} cols={mapCols} bg="#0F0F0F" pulse
                     className={cn("block w-full", intent ? "aspect-[1.3]" : "aspect-[0.95]")}
                     under={<KoreaOutline active={region} onPick={pickRegion} />}
                 />
