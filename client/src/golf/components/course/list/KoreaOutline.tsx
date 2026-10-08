@@ -48,3 +48,35 @@ export function KoreaOutline({ active, onPick, stroke = "#FFFFFF33", activeStrok
         </g>
     );
 }
+
+/**
+ * 지역 묶음 하나를 **한 덩어리 면**으로(2026-10-08 오너: "점과 지역 구역 선이 지저분해 보이지 않아? 두께 때문인가?").
+ *
+ * 작은 지도(골프장 상세 '이 근처' 카드, 124px)에서 KoreaOutline 의 선이 지저분했던 이유:
+ *  · 충청은 충북·충남·대전·세종 네 조각이라 맞닿는 선이 **두 번** 겹쳐 그려진다(반투명이라 더 밝고 굵어 보인다).
+ *  · 선이 굵으면 들쭉날쭉한 해안·섬이 뭉개진다.
+ * 그래서 두 겹으로 그린다 — 밑에 테두리 색으로 조각들을(선 + 면), 그 위에 면 색으로 조각들을 다시 덮는다.
+ * 조각이 맞닿는 안쪽 선은 양쪽 면이 덮어 사라지고 **바깥 테두리만** 가늘게 남는다. 색은 불투명이어야 한다(반투명이면 겹친 데가 비친다).
+ * 위의 면에 건 가는 선(seam)은 조각 사이 실금(가장자리 다듬기 틈)을 메운다.
+ *
+ * ⚠️ 리터럴 색만(CourseShell 머리말).
+ */
+export function RegionShape({ group, face, edge, edgeWidth = 0.75 }: {
+    /** 지역 묶음("충청") */
+    group: string;
+    /** 면 색 — 불투명 */
+    face: string;
+    /** 바깥 테두리 색 — 불투명 */
+    edge: string;
+    /** 바깥 테두리 굵기(화면 px) */
+    edgeWidth?: number;
+}) {
+    const ids = useMemo(() => Object.keys(KOREA_MAP_PATHS).filter((id) => OUTLINE_GROUP[id] === group), [group]);
+    const seam = 0.5;
+    return (
+        <g transform={OUTLINE_TO_DOT} strokeLinejoin="round" strokeLinecap="round" pointerEvents="none">
+            {ids.map((id) => <path key={`e:${id}`} d={KOREA_MAP_PATHS[id]} fill={edge} stroke={edge} strokeWidth={edgeWidth * 2 + seam} vectorEffect="non-scaling-stroke" />)}
+            {ids.map((id) => <path key={`f:${id}`} d={KOREA_MAP_PATHS[id]} fill={face} stroke={face} strokeWidth={seam} vectorEffect="non-scaling-stroke" />)}
+        </g>
+    );
+}

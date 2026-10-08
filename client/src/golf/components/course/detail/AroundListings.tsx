@@ -4,6 +4,7 @@
  *
  * 전국 카드를 그대로 붙이지 않고 이 골프장에 맞춘다:
  *  · 지도는 **이 골프장이 속한 지역**을 당겨 보여 주고, 이 골프장을 흰 고리('여기')로 켠다. 점 색은 허브와 같은 뜻(긴급 빨강·조인 주황·부킹 라임).
+ *    지역은 한 덩어리 면 + 가는 테두리, 지역 밖의 점은 흐리게 — 작은 지도에 시도 선을 다 그으면 지저분하다.
  *  · 숫자는 같은 지역의 다른 골프장 것. 누르면 그 지역 조인(없으면 부킹) 목록으로 간다. 셈·상태·주소는 shared/golfAroundListings.
  *  · 올라온 글이 없으면 0 을 늘어놓지 않는다 — [조인 올리기] [알림 받기]로 이끈다. 위의 '지금 올라온 티타임이 없어요'를 되풀이하지 않는다.
  *  · 세 상태와 받기 전 뼈대의 높이가 같다(지도가 높이를 정한다) — 검색에서 바로 들어오는 화면이라 밑의 구역이 밀리지 않게.
@@ -22,7 +23,7 @@ import { goLogin } from "@/components/hiq/LoginGate";
 import { cn } from "@/lib/utils";
 import { useCourseList } from "../../../lib/courseApi";
 import { CourseDotMap, DOT_COLOR } from "../list/CourseDotMap";
-import { KoreaOutline } from "../list/KoreaOutline";
+import { RegionShape } from "../list/KoreaOutline";
 import { AreaAlertButton } from "../AreaAlert";
 import { GOLF_POST_PATH } from "../GolfGuide";
 import { Card } from "./ui";
@@ -40,6 +41,12 @@ const ASPECT = 0.92;
 const FACE = "p-3.5 flex items-center gap-3.5 min-h-[163px]";
 /** 제목 글자 — 360 폭에서 15px, 390 부터 16px(한 줄에 화살표까지 들어가게) */
 const TITLE_SIZE = { fontSize: "clamp(15px, 4.1vw, 16px)" } as const;
+/**
+ * 지역의 면과 가는 테두리(2026-10-08 오너: "점과 지역 구역 선이 지저분해 보이지 않아? 두께 때문인가?") — 시도 선을 다 긋지 않고
+ * 이 지역만 한 덩어리로 살짝 밝힌다(RegionShape). 지역 밖의 점은 한 단계 흐리게(shared aroundData) — 눈이 이 지역에 머문다.
+ */
+const REGION_FACE = "#171717";
+const REGION_EDGE = "#3D3D3D";
 /** 좌표가 하나도 없을 때 당겨 볼 자리(나라 가운데) — 실제로는 지역의 골프장들이 틀을 정한다 */
 const CENTER = [{ lat: 36.3, lng: 127.8 }] as const;
 
@@ -100,7 +107,7 @@ export function AroundListings({ slug, lat, lng, region, className }: {
     const map = (
         <div aria-hidden="true" className={mapBox} style={mapStyle}>
             <CourseDotMap dots={dots} focus={null} box={box} aspect={ASPECT} cols={17} bg={BG} pulse className="absolute inset-0 w-full h-full"
-                under={<KoreaOutline active={region} stroke="#FFFFFF1F" activeStroke="#FFFFFF73" activeFill="#FFFFFF0A" width={1.5} />}>
+                under={<RegionShape group={region} face={REGION_FACE} edge={REGION_EDGE} />}>
                 {hasHere && (
                     <g pointerEvents="none">
                         <circle cx={mapX(lng!)} cy={mapY(lat!)} r={7.5 * u} fill="none" stroke="#FFFFFF" strokeOpacity={0.9} strokeWidth={1.4 * u} />

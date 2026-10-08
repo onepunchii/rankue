@@ -26,11 +26,11 @@ describe("aroundData — 무엇을 세는가", () => {
         expect(far).toEqual({ join: 5, booking: 5, urgent: 2 });
     });
 
-    it("점은 전국을 다 찍고 색은 허브와 같은 뜻(긴급 > 조인 > 부킹, 아니면 흰 점) — 내 관심(호박색)은 여기 없다", () => {
+    it("점은 전국을 다 찍고 색은 허브와 같은 뜻(긴급 > 조인 > 부킹) — 글이 없으면 이 지역은 흰 점, 지역 밖은 흐린 점. 내 관심(호박색)은 여기 없다", () => {
         const { dots } = aroundData([
             row("here", "충청"), row("a", "충청", { urgent: 1, join: 1, booking: 1 }), row("b", "경기", { join: 1, booking: 1 }), row("c", "전라", { booking: 1 }), row("d", "제주"),
         ], HERE);
-        expect(dots.map((d) => [d.key, d.tone])).toEqual([["here", "on"], ["a", "urgent"], ["b", "join"], ["c", "booking"], ["d", "on"]]);
+        expect(dots.map((d) => [d.key, d.tone])).toEqual([["here", "on"], ["a", "urgent"], ["b", "join"], ["c", "booking"], ["d", "dim"]]);
     });
 
     it("좌표가 없는 골프장 — 점도 틀도 없지만 글 수에는 들어간다 · 당겨 볼 범위는 같은 지역만", () => {
@@ -130,6 +130,19 @@ describe("화면 — AroundListings 와 상세 페이지", () => {
         expect(live.match(/<Link/g)).toHaveLength(1);
         expect(live).not.toMatch(/<button|<a /);
         expect(live).toContain("style={{ background: DOT_COLOR[s.key] }}");
+    });
+
+    it("지도 — 시도 선을 다 긋지 않고 이 지역만 한 덩어리 면으로(안쪽 경계 없음). 색은 불투명(겹친 데가 비치지 않게)", () => {
+        expect(card).toContain("under={<RegionShape group={region} face={REGION_FACE} edge={REGION_EDGE} />}>");
+        expect(card).not.toContain("<KoreaOutline");
+        expect(card).toMatch(/const REGION_FACE = "#[0-9A-F]{6}";/);
+        expect(card).toMatch(/const REGION_EDGE = "#[0-9A-F]{6}";/);
+        const shape = code(root("client/src/golf/components/course/list/KoreaOutline.tsx"));
+        const body = shape.slice(shape.indexOf("export function RegionShape("));
+        // 밑에 테두리 색(선 + 면), 위에 면 색으로 다시 — 조각이 맞닿는 안쪽 선은 덮여 사라진다
+        expect(body.indexOf("fill={edge} stroke={edge}")).toBeGreaterThan(0);
+        expect(body.indexOf("fill={face} stroke={face}")).toBeGreaterThan(body.indexOf("fill={edge} stroke={edge}"));
+        expect(body).toContain("OUTLINE_GROUP[id] === group");
     });
 
     it("골프 화면 규칙 — 글자 12px 이상 · 굵기는 semibold 까지 · 새 색을 지어내지 않는다", () => {

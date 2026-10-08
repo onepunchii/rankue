@@ -28,7 +28,7 @@ export const aroundTotal = (c: AroundCounts): number => c.join + c.booking;
 /**
  * 지도의 점 · 당겨 볼 범위 · 글 수.
  *  near = 같은 지역의 다른 골프장, far = 다른 지역, own = 이 골프장(문구를 고를 때만 쓴다).
- *  점은 전국을 다 찍는다(틀 밖은 안 보일 뿐) — 색은 허브 지도와 같은 뜻(긴급 > 조인 > 부킹, 아니면 흰 점).
+ *  점은 전국을 다 찍는다(틀 밖은 안 보일 뿐) — 색은 허브 지도와 같은 뜻(긴급 > 조인 > 부킹, 아니면 흰 점). 지역 밖의 글 없는 점은 흐리게.
  */
 export function aroundData(rows: readonly AroundRow[], here: { slug: string; region: string }) {
     const dots: MapDot[] = [];
@@ -39,7 +39,8 @@ export function aroundData(rows: readonly AroundRow[], here: { slug: string; reg
         else if (r.region === here.region) near = add(near, r.counts);
         else far = add(far, r.counts);
         if (r.lat == null || r.lng == null) continue;
-        dots.push({ key: r.slug, lat: r.lat, lng: r.lng, tone: hereTone(r.counts, false) ?? "on" });
+        // 글이 없는 점: 이 지역은 흰 점, 지역 밖은 흐린 점(2026-10-08 — 작은 지도에서 눈이 이 지역에 머물게). 글이 있으면 어디든 그 색
+        dots.push({ key: r.slug, lat: r.lat, lng: r.lng, tone: hereTone(r.counts, false) ?? (r.region === here.region ? "on" : "dim") });
         if (r.region === here.region) focus.push({ lat: r.lat, lng: r.lng });
     }
     return { dots, focus, near, far, own };
