@@ -4,6 +4,7 @@ import hiqRouter from "./routes/index.js";
 import superRouter from "./routes/modules/super.js";
 import errorsRouter from "./routes/modules/errors.js";
 import visitsRouter from "./routes/modules/visits.js";
+import uiEventsRouter from "./routes/modules/uiEvents.js";
 import cronRouter from "./routes/modules/cron.js";
 import { registerSitemap } from "./sitemap.js";
 import { registerRss } from "./rss.js";
@@ -37,6 +38,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // 일별 유니크 접속자 비콘 (/api/visit) — 익명 허용(가입 안 한 방문자를 세는 것이 목적)
   app.use("/api", visitsRouter);
+
+  // 방문자 발자국 수집 (/api/ui-event/batch) — 익명 허용. 화면 이동·누른 단추·스크롤 깊이를 묶어서 받는다(shared/uiTrail)
+  app.use("/api", uiEventsRouter);
 
   // Vercel Cron (/api/cron/reminders) — CRON_SECRET 헤더로 자체 인증
   app.use("/api/cron", cronRouter);

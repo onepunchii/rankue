@@ -8,6 +8,7 @@ import { hashPassword } from "../../services/hiqService.js";
 import { checkSuperAdmin, adminLog } from "../../middleware/adminAuth.js";
 import { cleanRejectReason } from "../../lib/partnerApply.js";
 import adminGolfRouter from "./adminGolf/index.js";
+import adminVisitorsRouter from "./adminVisitors.js";
 import { getMemberGolfForAdmin, setBookingManagerRole, setSubAdminRole } from "../../storage/adminMemberGolf.js";
 import { isSuperAdminRole } from "../../../shared/adminRole.js";
 import { checkSubAdminRequest, subAdminBlockedMessage } from "../../lib/subAdmin.js";
@@ -20,6 +21,8 @@ const router = Router();
 
 // 골프 관리 콘솔(2026-10-01) — 화면별 라우터, 가드는 adminGolf/index.ts 가 건다
 router.use("/golf", adminGolfRouter);
+// 방문자 발자국(2026-10-08) — 전부 조회(GET). 가드는 adminVisitors.ts 가 건다
+router.use("/visitors", adminVisitorsRouter);
 
 // /partner/login 과 같은 쿠키 옵션 — 모든 가드가 signedCookies 로 읽으므로 서명이 빠지면 안 된다.
 const PARTNER_COOKIE_OPTS = {

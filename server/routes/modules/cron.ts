@@ -3,6 +3,9 @@ import { runReminders } from "../../services/notificationScheduler.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { storage } from "../../storage/index.js";
+import { sql } from "drizzle-orm";
+import { db } from "../../db.js";
+import { TRAIL_KEEP_DAYS } from "../../../shared/uiTrail.js";
 
 const router = Router();
 
@@ -205,6 +208,7 @@ const NOTIFICATION_KEEP_DAYS = 7;
 //  · 시뮬레이터: 방치된 playing 세션(6시간) → abandoned, 상대가 안 들어온 waiting 대전(24시간) → canceled,
 //    둘 다 떠난 playing 대전(7일) → canceled(stale, 레이팅 무관).
 //    실전 경기·성적과 무관한 시뮬 테이블만 건드린다.
+//  · 방문자 발자국: 60일 지난 줄 삭제(2026-10-08).
 //  · 알림함: 7일 지난 알림 삭제. **안 읽은 것도 지운다**(오너 결정 2026-09-23) — 안 읽은 걸 남기면
 //    546건 중 388건이 안 읽음인 계정은 알림함이 영원히 줄지 않는다.
 async function handleSimCleanup(req: any, res: any) {
@@ -216,7 +220,10 @@ async function handleSimCleanup(req: any, res: any) {
     const stalePlaying = await storage.simMatch.cleanupStalePlaying(7);
     // 몇 건이 걷혔는지 응답에 싣는다 — 크론 결과 화면만 보고도 청소가 도는지 알 수 있어야 한다.
     const notifications = await storage.notifs.deleteOlderThan(NOTIFICATION_KEEP_DAYS);
-    return sendSuccess(res, { sessions, matches, stalePlaying, notifications });
+    // 방문자 발자국(2026-10-08) — 60일 지난 줄을 지운다(shared/uiTrail TRAIL_KEEP_DAYS). 표가 없거나 실패해도 다른 청소 결과는 그대로 보낸다
+    const trail = await db.execute(sql`delete from ui_events where created_at < now() - make_interval(days => ${TRAIL_KEEP_DAYS})`)
+        .then((r: any) => Number(r?.rowCount ?? 0)).catch((e: unknown) => { console.error("[trail purge]", e); return -1; });
+    return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail });
 }
 router.get("/sim-cleanup", asyncHandler(handleSimCleanup));
 router.post("/sim-cleanup", asyncHandler(handleSimCleanup));

@@ -77,8 +77,8 @@ export const PinCodeModal = ({ open, onOpenChange }: PinCodeModalProps) => {
                         {joinCode}
                     </div>
 
-                    {/* Keypad */}
-                    <div className="grid grid-cols-3 gap-4 w-full px-2">
+                    {/* Keypad — 방문자 발자국은 이 안의 누름을 남기지 않는다(data-notrack: 누른 순서가 곧 코드다) */}
+                    <div data-notrack className="grid grid-cols-3 gap-4 w-full px-2">
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((num) => (
                             <button
                                 key={num}

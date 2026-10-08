@@ -30,6 +30,7 @@
  *     전화번호로 쓰던 사람이 큰 단추를 눌러 새 계정이 생겨도, 바로 "전에 전화번호로 쓰셨나요?"(AttachPhoneSheet)가 기존 계정에 이어 준다.
  * 뒤로: 기기의 '뒤로'는 보던 화면이 아니라 이 팝업을 닫는다(hooks/useBackToClose).
  */
+import { trailOpen } from "@/lib/trail";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useSearch } from "wouter";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
@@ -112,6 +113,7 @@ export function openLoginSheet(opts: LoginSheetOptions = {}): boolean {
     if (!hostMounted || typeof window === "undefined") return false;
     if (LOGIN_SCREEN.test(window.location.pathname)) return false;
     setState({ open: true, opts });
+    trailOpen("가입 창");   // 방문자 발자국 — '가입까지'의 한 칸(관리자 콘솔)
     return true;
 }
 

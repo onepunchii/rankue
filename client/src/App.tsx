@@ -14,6 +14,7 @@ import { goLoginPage } from "@/components/hiq/LoginGate";
 import { LoginSheetHost } from "@/components/hiq/LoginSheet";
 import { AttachPhoneSheetHost } from "@/components/hiq/AttachPhoneSheet";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
+import { Tracker } from "@/components/hiq/Tracker";
 import { NativePrompts } from "@/components/hiq/NativePrompts";
 import { LiveMatchBanner } from "@/sim/match/LiveMatchBanner";
 import { syncPushToken } from "@/lib/nativeBridge";
@@ -496,6 +497,8 @@ function App() {
             <InstallBannerGate />
             {/* 일별 유니크 접속자 비콘 — 하루 1회만 전송 */}
             <VisitBeacon />
+            {/* 방문자 발자국(2026-10-08) — 화면 이동·누른 단추·스크롤 깊이를 모아 20초마다 한 번에. 남기지 않는 것은 shared/uiTrail */}
+            <Tracker />
           </SportProvider>
         </StoreProvider>
       </I18nProvider>

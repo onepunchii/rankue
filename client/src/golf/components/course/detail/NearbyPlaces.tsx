@@ -130,7 +130,8 @@ export function NearbyPlaces({ slug, name, region, city, round }: { slug: string
                         ))}
                     </ul>
                 ) : items.length > 0 ? (
-                    <ul className="divide-y divide-[#FFFFFF0A]">
+                    // data-track-as: 방문자 발자국은 이 구역에서 누른 것을 '근처 검색 결과'로만 남긴다 — 네이버 결과의 글자·주소는 저장하지 않는다
+                    <ul data-track-as="근처 검색 결과" className="divide-y divide-[#FFFFFF0A]">
                         {items.map((p, i) => (
                             <li key={`${p.name}-${i}`}>
                                 <a href={placeUrl(p)} target="_blank" rel="noopener noreferrer nofollow" className={ROW}>

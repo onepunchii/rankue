@@ -1107,6 +1107,24 @@ export const promoEvents = pgTable("promo_events", {
   index("promo_events_day_idx").on(table.day),
 ]);
 
+/**
+ * 방문자 발자국(2026-10-08, migrations/ui_events.sql) — 화면 이동·누른 단추·스크롤 깊이·열린 창을 한 줄씩. 규칙은 shared/uiTrail.ts.
+ * 조회·삽입은 raw SQL(server/routes/modules/uiEvents.ts · adminVisitors.ts)이다. created_at 은 **이 표만 timestamptz**.
+ * member_id 에 FK 를 걸지 않는다 — 회원을 지우는 쪽이 이 표 때문에 막히지 않게(60일 뒤 저절로 지워진다).
+ */
+export const uiEvents = pgTable("ui_events", {
+  id: bigint("id", { mode: "number" }).primaryKey().generatedAlwaysAsIdentity(),
+  name: varchar("name", { length: 16 }).notNull(),
+  visitor: varchar("visitor", { length: 64 }).notNull(),
+  memberId: uuid("member_id"),
+  path: varchar("path", { length: 300 }).notNull(),
+  meta: jsonb("meta").notNull().default({}),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("ui_events_time_idx").on(table.createdAt),
+  index("ui_events_visitor_time_idx").on(table.visitor, table.createdAt),
+]);
+
 export const dailyVisits = pgTable("daily_visits", {
   day: date("day").notNull(),
   visitor: text("visitor").notNull(),

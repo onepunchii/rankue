@@ -56,7 +56,8 @@ export function TourNews({ topic, className }: { topic: TourNewsTopic; className
                 <h2 className="text-[15px] font-bold tracking-tight text-ink-1">{TOUR_NEWS[topic].label}</h2>
                 <span className="shrink-0 text-[11.5px] font-medium text-ink-4">네이버 뉴스 검색 결과</span>
             </div>
-            <ul className="flex flex-col gap-1.5">
+            {/* data-track-as: 방문자 발자국은 이 구역에서 누른 것을 '투어 소식'으로만 남긴다 — 네이버 결과의 글자·주소는 저장하지 않는다 */}
+            <ul data-track-as="투어 소식" className="flex flex-col gap-1.5">
                 {items.map((it, i) => (
                     <li key={`${it.url}-${i}`}>
                         <a
