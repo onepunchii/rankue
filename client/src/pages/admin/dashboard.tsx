@@ -13,13 +13,15 @@ import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/s
 import { apiRequest } from "@/lib/queryClient";
 import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
-    LucideGlobe, LucideCheckCircle, LucideLogOut,
+    LucideGlobe, LucideCheckCircle, LucideLogOut, LucideArrowLeft,
     LucideBell, LucideCreditCard, LucideShieldAlert, LucideMenu, LucideUsersRound, LucideMail, LucideFlag, GameController,
     LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin, LucideTrendingUp, LucideFootprints } from "@/lib/icons";
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
 import MembersView from "./MembersView";
 import { useAdminAccess } from "./adminAccess";
+import { useAdminBack } from "./adminBack";
+import { appConfirm } from "@/components/AppDialog";
 import TodayActiveView from "./TodayActiveView";
 import PushView from "./PushView";
 import SuggestionsView, { type Suggestion, SUGGESTIONS_KEY } from "./SuggestionsView";
@@ -98,8 +100,11 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
     ] },
 ];
 
-function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu, badges }: {
-    tab: Tab; setTab: (t: Tab) => void; handleLogout: () => void; closeMobileMenu?: () => void;
+const ALL_TABS: ReadonlySet<string> = new Set(MENU_GROUPS.flatMap((g) => g.items.map((i) => i.id)));
+const isTab = (v: string): v is Tab => ALL_TABS.has(v);
+
+function SidebarContent({ tab, setTab, handleLogout, onLeave, closeMobileMenu, badges }: {
+    tab: Tab; setTab: (t: Tab) => void; handleLogout: () => void; onLeave: () => void; closeMobileMenu?: () => void;
     badges: Partial<Record<Tab, number>>;
 }) {
     const { viewOnly } = useAdminAccess();
@@ -154,6 +159,11 @@ function SidebarContent({ tab, setTab, handleLogout, closeMobileMenu, badges }: 
             </nav>
 
             <div className="shrink-0 p-3 border-t border-black/10" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+                {/* 나가는 길(2026-10-08) — '뒤로'가 이제 콘솔 안에서 돈다. 여기는 묻지 않고 들어오기 전 화면으로 */}
+                <button data-admin-leave onClick={onLeave} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-black/60 hover:bg-black/[0.04] hover:text-[rgba(0,0,0,0.87)] transition">
+                    <LucideArrowLeft size={18} />
+                    랭큐로 돌아가기
+                </button>
                 <button onClick={handleLogout} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-bold text-red-600 hover:bg-red-500/10 transition">
                     <LucideLogOut size={18} />
                     로그아웃
@@ -186,12 +196,23 @@ export default function AdminDashboard() {
         // 새 건의 알림으로 왔다 — 5분 캐시를 기다리지 않고 건의함을 다시 읽어 방금 온 건의가 보이게 한다.
         if (t === "suggestions") queryClient.invalidateQueries({ queryKey: SUGGESTIONS_KEY });
         setLocation(window.location.pathname, { replace: true });
+        // 라우터의 replace 는 그 칸에 적힌 것을 비운다 — '뒤로'가 이 칸을 알아보게 다시 적는다(처음 들어올 때는 아래 useAdminBack 이 쌓는다)
+        back.adopt(t);
     }, [search]); // eslint-disable-line react-hooks/exhaustive-deps
     // 탭을 바꾸면 화면 맨 위로 — 폰에서 긴 목록 아래에서 메뉴를 고르면 새 화면 중간부터 보였다.
-    const setTab = (t: Tab) => {
+    const showTab = (t: Tab) => {
         setTabState(t);
         window.scrollTo({ top: 0 });
     };
+    // '뒤로'(2026-10-08 오너: "뒤로가기 시 자꾸 랭큐 페이지로 넘어가서 … 어드민 나갈 때 나가겠냐고 창 띄워주면") — 메뉴를 고를 때마다 히스토리에
+    // 한 칸 쌓아 '뒤로'가 앞 메뉴로 가게 하고, 떠 있는 창이 있으면 그것부터 닫고, 첫 화면에서 '뒤로'면 나갈지 묻는다(adminBack.ts).
+    // ⚠️ 위의 ?tab= effect 보다 **뒤에** 불러야 한다 — 처음 들어올 때 주소를 정리한 다음에 칸을 쌓는다.
+    const back = useAdminBack<Tab>({
+        tab, isTab, show: showTab,
+        askLeave: () => appConfirm({ title: "관리자 콘솔을 나갈까요?", message: "랭큐 화면으로 돌아갑니다.", confirmText: "나가기", cancelText: "계속 보기" }),
+        fallback: () => setLocation("/menu", { replace: true }),
+    });
+    const setTab = back.go;
     // 회원 상세 시트 — '오늘 접속'·'회원 관리'·대시보드 어디서 눌러도 같은 시트가 열린다.
     const [openMemberId, setOpenMemberId] = useState<string | null>(null);
 
@@ -263,7 +284,7 @@ export default function AdminDashboard() {
                     {/* 서랍도 화면 높이에 맞춰 세로 flex — 안의 메뉴가 스크롤된다. 고르면 닫힌다. */}
                     <SheetContent side="left" className="p-0 border-r border-black/10 w-72 max-w-[85vw] bg-white flex flex-col h-full">
                         <SheetTitle className="sr-only">관리자 메뉴</SheetTitle>
-                        <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} closeMobileMenu={() => setMenuOpen(false)} badges={badges} />
+                        <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} onLeave={back.leave} closeMobileMenu={() => setMenuOpen(false)} badges={badges} />
                     </SheetContent>
                 </Sheet>
                 <span className="flex-1 truncate font-black text-[16px]">{getTabTitle(tab)}</span>
@@ -274,7 +295,7 @@ export default function AdminDashboard() {
 
             {/* Desktop Sidebar */}
             <aside className="hidden md:flex w-64 flex-col fixed h-full z-20">
-                <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} badges={badges} />
+                <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} onLeave={back.leave} badges={badges} />
             </aside>
 
             <main className="flex-1 min-w-0 md:ml-64 p-4 md:p-8">
@@ -406,6 +427,8 @@ function getTabTitle(tab: string) {
     switch (tab) {
         case "dashboard": return "대시보드";
         case "today": return "오늘 접속";
+        case "visitors": return "방문자 발자국";
+        case "search-trend": return "검색 수요";
         case "members": return "회원 관리";
         case "leads": return "입점 문의";
         case "stores": return "가맹점 리스트";
@@ -432,6 +455,7 @@ function getTabTitle(tab: string) {
 const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     dashboard: "밀린 일과 오늘 접속을 먼저 봅니다.",
     today: "한국 시간 0시부터 앱을 연 회원 — 1분마다 새로 읽습니다.",
+    visitors: "웹으로 온 사람이 어디로 들어와 무엇을 보고 누르는지 — 1분마다 새로 읽습니다.",
     members: "누르면 상세 — 정보 수정·경기 기록·알림·PIN·정지.",
     push: "받는 사람을 고르고, 미리보기로 확인한 뒤 보냅니다.",
     moderation: "신고는 접수 후 24시간 안에 처리해 주세요.",
