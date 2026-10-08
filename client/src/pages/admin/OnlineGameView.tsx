@@ -206,12 +206,12 @@ function RatingRecomputeCard() {
                 끝난 대전을 핸디전만 골라 처음부터 다시 쌓을 수 있습니다.
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
-                <button type="button" disabled={run.isPending} onClick={() => run.mutate(false)}
+                <button data-admin-write type="button" disabled={run.isPending} onClick={() => run.mutate(false)}
                     className="h-9 px-3 rounded-lg border border-black/10 text-[13px] font-bold text-black/70 disabled:opacity-50">
                     {run.isPending && !preview ? "계산 중…" : "미리보기"}
                 </button>
                 {preview?.dryRun && (
-                    <button type="button" disabled={run.isPending}
+                    <button data-admin-write type="button" disabled={run.isPending}
                         onClick={() => { void appConfirm({ message: `온라인 대전 레이팅을 다시 씁니다.\n${fmt(preview.players)}명 · 핸디전 ${fmt(preview.ratedMatches)}판 반영\n(지금 ${fmt(preview.rowsBefore)}줄은 지워집니다)\n\n진행할까요?`, tone: "danger", confirmText: "적용" }).then((ok) => { if (ok) run.mutate(true); }); }}
                         className="h-9 px-3 rounded-lg bg-brand text-white text-[13px] font-bold disabled:opacity-50">
                         {run.isPending ? "적용 중…" : "이대로 적용"}

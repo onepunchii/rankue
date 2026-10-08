@@ -19,7 +19,7 @@ import { appConfirm } from "@/components/AppDialog";
 import { LucideChevronRight, LucideRefreshCw, LucideZap } from "@/lib/icons";
 import { JOIN_OPTIONS, JOIN_TYPE_LABEL, URGENT_MAX_FEE, URGENT_MIN_LEAD_MS, type JoinType } from "@shared/golfJoin";
 import { SPECIAL_OPTIONS } from "@/golf/constants/booking";
-import { EmptyState, FilterChips, KpiTile, Pill, SearchBox, agoLabel, kstDateTime } from "../adminUtils";
+import { EmptyState, FilterChips, KpiTile, Pill, SearchBox, agoLabel, kstDateTime, SHEET_SAFE_TOP } from "../adminUtils";
 
 export const GOLF_LISTINGS_KEY = ["/api/hiq/admin/golf/listings"] as const;
 const BASE = GOLF_LISTINGS_KEY[0];
@@ -650,7 +650,7 @@ function ListingSheet({ row, onClose, onOpenMember }: { row: GolfListingRow | nu
 
     return (
         <Sheet open={!!row} onOpenChange={(o) => { if (!o) onClose(); }}>
-            <SheetContent side="right" ref={contentRef} className="w-full sm:max-w-md p-0 flex flex-col bg-surface-0 break-keep outline-none"
+            <SheetContent side="right" style={SHEET_SAFE_TOP} ref={contentRef} className="w-full sm:max-w-md p-0 flex flex-col bg-surface-0 break-keep outline-none"
                 // 열릴 때 첫 단추(글쓴이 이름)에 초점 테두리가 생기지 않게 시트 자체에 초점을 둔다 — 키보드는 Tab 으로 그대로 들어간다
                 onOpenAutoFocus={(e) => { e.preventDefault(); contentRef.current?.focus({ preventScroll: true }); }}>
                 {r && (
@@ -808,17 +808,17 @@ function ListingSheet({ row, onClose, onOpenMember }: { row: GolfListingRow | nu
                                 )}
                                 <div className="flex gap-2">
                                     {r.hidden ? (
-                                        <button disabled={busy} onClick={doShow}
+                                        <button data-admin-write disabled={busy} onClick={doShow}
                                             className="flex-1 h-10 rounded-xl bg-brand text-white text-[14px] font-bold disabled:opacity-50">
                                             {hide.isPending ? "처리 중…" : "다시 보이기"}
                                         </button>
                                     ) : (
-                                        <button disabled={busy} onClick={doHide}
+                                        <button data-admin-write disabled={busy} onClick={doHide}
                                             className="flex-1 h-10 rounded-xl bg-[rgba(0,0,0,0.87)] text-white text-[14px] font-bold disabled:opacity-50">
                                             {hide.isPending ? "처리 중…" : "가리기"}
                                         </button>
                                     )}
-                                    <button disabled={busy} onClick={doDelete}
+                                    <button data-admin-write disabled={busy} onClick={doDelete}
                                         className="h-10 px-5 rounded-xl bg-white border border-red-500/30 text-red-600 text-[14px] font-bold hover:bg-red-500/[0.06] disabled:opacity-50">
                                         {remove.isPending ? "지우는 중…" : "지우기"}
                                     </button>

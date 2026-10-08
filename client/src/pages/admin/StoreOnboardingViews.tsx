@@ -174,9 +174,9 @@ export function ClaimsView() {
                     {c.status === "pending" && rejecting !== c.id && (
                         <div className="mt-3 flex gap-2">
                             <CallButton phone={c.applicantPhone} />
-                            <Button size="sm" variant="ghost" className="h-9 text-red-500 ml-auto" disabled={reject.isPending}
+                            <Button data-admin-write size="sm" variant="ghost" className="h-9 text-red-500 ml-auto" disabled={reject.isPending}
                                 onClick={() => setRejecting(c.id)}>거절</Button>
-                            <Button size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={approve.isPending} onClick={() => approve.mutate(c.id)}>
+                            <Button data-admin-write size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={approve.isPending} onClick={() => approve.mutate(c.id)}>
                                 {approve.isPending ? "처리 중…" : c.accountLinked ? "승인·권한 열기" : "승인·계정 발급"}
                             </Button>
                         </div>
@@ -271,9 +271,9 @@ export function RegistrationsView() {
                         {r.status === "pending" && rejecting !== r.id && (
                             <div className="mt-3 flex gap-2">
                                 <CallButton phone={r.applicantPhone} />
-                                <Button size="sm" variant="ghost" className="h-9 text-red-500 ml-auto" disabled={reject.isPending}
+                                <Button data-admin-write size="sm" variant="ghost" className="h-9 text-red-500 ml-auto" disabled={reject.isPending}
                                     onClick={() => setRejecting(r.id)}>거절</Button>
-                                <Button size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={approve.isPending} onClick={() => approve.mutate(r.id)}>
+                                <Button data-admin-write size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={approve.isPending} onClick={() => approve.mutate(r.id)}>
                                     {approve.isPending ? "처리 중…" : r.kind === "report" ? "승인·디렉토리 추가" : r.applicantProfileId ? "승인·페이지 생성·권한 열기" : "승인·페이지 생성"}
                                 </Button>
                             </div>
@@ -345,9 +345,9 @@ export function LeadsView() {
                     <div className="mt-3 flex gap-2 flex-wrap">
                         <CallButton phone={l.phoneNumber} />
                         <div className="ml-auto flex gap-1.5">
-                            {l.status !== "CONTACTED" && <Button size="sm" variant="outline" className="h-9" disabled={update.isPending} onClick={() => update.mutate({ id: l.id, status: "CONTACTED" })}>연락함</Button>}
-                            {l.status !== "REGISTERED" && <Button size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={update.isPending} onClick={() => update.mutate({ id: l.id, status: "REGISTERED" })}>등록 완료</Button>}
-                            {l.status !== "NEW" && <Button size="sm" variant="ghost" className="h-9 text-black/50" disabled={update.isPending} onClick={() => update.mutate({ id: l.id, status: "NEW" })}>신규로</Button>}
+                            {l.status !== "CONTACTED" && <Button data-admin-write size="sm" variant="outline" className="h-9" disabled={update.isPending} onClick={() => update.mutate({ id: l.id, status: "CONTACTED" })}>연락함</Button>}
+                            {l.status !== "REGISTERED" && <Button data-admin-write size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={update.isPending} onClick={() => update.mutate({ id: l.id, status: "REGISTERED" })}>등록 완료</Button>}
+                            {l.status !== "NEW" && <Button data-admin-write size="sm" variant="ghost" className="h-9 text-black/50" disabled={update.isPending} onClick={() => update.mutate({ id: l.id, status: "NEW" })}>신규로</Button>}
                         </div>
                     </div>
                 </Panel>

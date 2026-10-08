@@ -663,13 +663,16 @@ describe("닫히는 동안 · 뒤로", () => {
         expect(push).not.toContain("backHandler =");
         expect(client("sim/SimulatorPage.tsx")).toContain("return () => setBackHandler(null);");
         // 뒤로가기: 맨 나중에 얹은 팝업 → 화면이 건 핸들러 → 뒤로 가거나 종료
-        const listener = bridge.slice(bridge.indexOf('App.addListener("backButton", (e) => {'), bridge.indexOf("initRouteMemory();"));
-        const layers = listener.indexOf("for (let i = backLayers.length - 1; i >= 0; i--) {");
-        const screen = listener.indexOf("if (backHandler && backHandler()) return;");
+        // (2026-10-08) 그 순서는 runBackHandlers 한 곳에 있다 — 아이폰의 '밀어서 뒤로'가 같은 길을 타려고 떼어 냈다
+        const chain = bridge.slice(bridge.indexOf("function runBackHandlers(): boolean {"), bridge.indexOf("function initEdgeSwipeBack(): void {"));
+        const layers = chain.indexOf("for (let i = backLayers.length - 1; i >= 0; i--) {");
         expect(layers).toBeGreaterThan(0);
-        expect(listener.indexOf("if (backLayers[i]()) return;")).toBeGreaterThan(layers);
-        expect(screen).toBeGreaterThan(layers);
-        expect(listener.indexOf("window.history.back();")).toBeGreaterThan(screen);
+        expect(chain.indexOf("if (backLayers[i]()) return true;")).toBeGreaterThan(layers);
+        expect(chain.indexOf("return !!backHandler && backHandler();")).toBeGreaterThan(layers);
+        const listener = bridge.slice(bridge.indexOf('App.addListener("backButton", (e) => {'), bridge.indexOf("initRouteMemory();"));
+        const first = listener.indexOf("if (runBackHandlers()) return;");
+        expect(first).toBeGreaterThan(0);
+        expect(listener.indexOf("window.history.back();")).toBeGreaterThan(first);
     });
 
     // 2026-10-06 검토: 비로그인은 이제 예시 홈에서 시작해 로그인 화면(/?login=1…)으로 **들어온다**(팝업의 '전화번호로 계속하기' 등).

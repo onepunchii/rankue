@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
 import { adminRoleLabel } from "@shared/adminRole";
-import { MemberAvatar, PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, daysSince, isKstToday, phoneLabel, KpiTile } from "./adminUtils";
+import { MemberAvatar, PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, daysSince, isKstToday, phoneLabel, KpiTile, ADMIN_STICKY_TOP } from "./adminUtils";
 
 type Activity = {
     today: number; yesterday: number;
@@ -157,7 +157,7 @@ export default function MembersView({ onOpenId }: {
             )}
 
             {/* 도구 줄: 거르기 칩(가로로 밀림) · 검색 · 정렬 · 엑셀 */}
-            <div className="sticky top-14 md:top-0 z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-surface-0/95 backdrop-blur space-y-2">
+            <div className={`${ADMIN_STICKY_TOP} z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-surface-0/95 backdrop-blur space-y-2`}>
                 <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-0.5">
                     {FILTERS.map((f) => (
                         <button key={f.id} onClick={() => { setFilter(f.id); setLimit(PAGE); }}

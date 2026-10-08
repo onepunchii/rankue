@@ -86,7 +86,7 @@ export default function GolfOrdersView() {
                                 {isPhone(o.contact) && (
                                     <a href={`tel:${o.contact.replace(/\s/g, "")}`} className="h-9 px-3 rounded-lg border border-black/10 inline-flex items-center text-[13px] font-bold text-black/65">전화</a>
                                 )}
-                                <select value={o.status} disabled={update.isPending} onChange={(e) => update.mutate({ id: o.id, status: e.target.value as Status })}
+                                <select data-admin-lock value={o.status} disabled={update.isPending} onChange={(e) => update.mutate({ id: o.id, status: e.target.value as Status })}
                                     aria-label="상태 변경" className="h-9 px-2 rounded-lg bg-white border border-black/10 text-[13px] font-bold text-black/70 outline-none">
                                     {(Object.keys(STATUS) as Status[]).map((st) => <option key={st} value={st}>{STATUS[st].label}</option>)}
                                 </select>

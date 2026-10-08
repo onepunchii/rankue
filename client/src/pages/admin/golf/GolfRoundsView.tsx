@@ -19,7 +19,7 @@ import { appConfirm } from "@/components/AppDialog";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { LucideRefreshCw, LucideChevronRight, LucideTimer } from "@/lib/icons";
 import { formatRelative } from "@shared/golfMatch";
-import { FilterChips, SearchBox, EmptyState, Panel, Pill, kstDateTime, kstDate, agoLabel } from "../adminUtils";
+import { FilterChips, SearchBox, EmptyState, Panel, Pill, kstDateTime, kstDate, agoLabel, ADMIN_STICKY_TOP, SHEET_SAFE_TOP } from "../adminUtils";
 
 export const GOLF_ROUNDS_KEY = ["/api/hiq/admin/golf/rounds"] as const;
 const BASE = GOLF_ROUNDS_KEY[0];
@@ -231,7 +231,7 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
     return (
         <div className="space-y-3">
             {/* 도구 줄: 상태 칩 · 검색 · 기간 · 새로고침 */}
-            <div className="sticky top-14 md:top-0 z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-surface-0/95 backdrop-blur space-y-2">
+            <div className={`${ADMIN_STICKY_TOP} z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-surface-0/95 backdrop-blur space-y-2`}>
                 <FilterChips value={chip} onChange={setChip} options={CHIPS.map((c) => ({ id: c.id, label: c.label, count: countOf(c.id), alert: c.id === "stale" }))} />
                 <div className="flex gap-2">
                     <SearchBox value={search} onChange={setSearch} placeholder="골프장·방장·참가자 이름" className="flex-1 min-w-0" />
@@ -256,7 +256,7 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
                     </p>
                     <p className="text-[12.5px] text-black/45 leading-snug">{HINT[chip]}</p>
                 </div>
-                <button onClick={runCleanup} disabled={cleaning}
+                <button data-admin-write onClick={runCleanup} disabled={cleaning}
                     className="shrink-0 h-9 px-3 rounded-xl bg-white border border-black/10 inline-flex items-center gap-1.5 text-[13px] font-bold text-black/65 hover:border-red-500/30 hover:text-red-600 disabled:opacity-50">
                     <LucideTimer className={`w-4 h-4 ${cleaning ? "animate-pulse" : ""}`} />
                     오래된 대기방 정리
@@ -541,7 +541,7 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
 
     return (
         <Sheet open={!!id} onOpenChange={(o) => { if (!o) onClose(); }}>
-            <SheetContent side="right" className="w-full sm:max-w-xl p-0 flex flex-col bg-surface-0">
+            <SheetContent side="right" style={SHEET_SAFE_TOP} className="w-full sm:max-w-xl p-0 flex flex-col bg-surface-0">
                 {!d ? (
                     <div className="p-6">
                         <SheetTitle className="text-[17px] font-bold text-[rgba(0,0,0,0.87)]">라운드</SheetTitle>
@@ -698,7 +698,7 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
                             <div className="shrink-0 bg-white border-t border-black/[0.07] px-4 pt-3 pb-[max(12px,env(safe-area-inset-bottom))] space-y-2">
                                 {d.actions.finish && (
                                     <div className="flex items-center gap-3">
-                                        <button disabled={busy} onClick={() => askFinish(d)}
+                                        <button data-admin-write disabled={busy} onClick={() => askFinish(d)}
                                             className="h-10 px-5 shrink-0 rounded-xl text-[13.5px] font-bold bg-brand text-white hover:bg-brand-strong transition-colors active:scale-[0.99] disabled:opacity-40">
                                             기록으로 끝내기
                                         </button>
@@ -707,7 +707,7 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
                                 )}
                                 {d.actions.abandon && (
                                     <div className="flex items-center gap-3">
-                                        <button disabled={busy} onClick={() => askAbandon(d)}
+                                        <button data-admin-write disabled={busy} onClick={() => askAbandon(d)}
                                             className={`h-10 px-5 shrink-0 rounded-xl text-[13.5px] font-bold transition-colors active:scale-[0.99] disabled:opacity-40 ${DANGER_BTN}`}>
                                             접기
                                         </button>
@@ -718,7 +718,7 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
                                 )}
                                 {d.actions.void && (
                                     <div className="flex items-center gap-3">
-                                        <button disabled={busy} onClick={() => askVoid(d)}
+                                        <button data-admin-write disabled={busy} onClick={() => askVoid(d)}
                                             className={`h-10 px-5 shrink-0 rounded-xl text-[13.5px] font-bold transition-colors active:scale-[0.99] disabled:opacity-40 ${DANGER_BTN}`}>
                                             기록 무효화
                                         </button>

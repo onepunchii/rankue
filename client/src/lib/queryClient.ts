@@ -30,6 +30,15 @@ export class ApiError extends Error {
 //    서명 쿠키 hiq_user_id 만 믿는다(server/middleware/auth.ts). 매 요청마다 죽은 SDK 세션을 2초 타임아웃으로
 //    기다리며 Authorization 헤더를 붙이던 흔적이라 걷어냈다.
 
+/**
+ * 보내기 전에 막을 요청인가(2026-10-08) — 막으려면 사유(오류 글)를 돌려준다. 관리자 콘솔이 보기 전용 계정일 때 건다(pages/admin/dashboard).
+ * 서버가 어차피 거절하지만(403), 보내지 않고 그 자리에서 알리는 편이 분명하다. 한 번에 하나만(마지막에 건 것), 화면이 떠날 때 null 로 푼다.
+ */
+let requestGate: ((method: string, url: string) => string | null) | null = null;
+export function setRequestGate(fn: ((method: string, url: string) => string | null) | null): void {
+  requestGate = fn;
+}
+
 // 3. 통합 API 요청 함수 (DRY 원칙 적용)
 export async function apiRequest(
   url: string,
@@ -43,6 +52,8 @@ export async function apiRequest(
   }
 ): Promise<any> {
   const method = options?.method || "GET";
+  const refused = requestGate?.(method.toUpperCase(), url);
+  if (refused) throw new ApiError(refused, 403, { code: "ADMIN_VIEW_ONLY" });
 
   const headers: Record<string, string> = {
     ...options?.headers,

@@ -1587,3 +1587,18 @@ html.sim-no-select [contenteditable] * {
   user-select: text;
   -webkit-touch-callout: default;
 }
+
+/*
+ * 관리자 콘솔 — 보기 전용 계정(2026-10-08 오너: "일반 관리자는 보기만 가능하게 해야 돼").
+ * 콘솔이 보기 전용 계정으로 열려 있는 동안 html 에 admin-viewonly 가 붙는다(pages/admin/dashboard).
+ *   data-admin-write  고치는 단추(저장·삭제·정지·승인·발송…) — 숨긴다
+ *   data-admin-lock   값을 보여 주는 고르기·스위치 — 보이되 못 누른다
+ * 시트·대화상자는 body 밑에 그려지므로 html 에서부터 건다. 막는 것은 서버다(middleware/adminAuth) — 여기는 '안 되는 것을 되는 것처럼 보이지 않게'.
+ */
+html.admin-viewonly [data-admin-write] {
+  display: none !important;
+}
+html.admin-viewonly [data-admin-lock] {
+  pointer-events: none !important;
+  opacity: 0.55;
+}

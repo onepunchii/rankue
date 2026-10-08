@@ -235,7 +235,7 @@ export default function PushView() {
                     </div>
                 </Panel>
 
-                <Button disabled={!canSend} onClick={send} className="w-full h-12 bg-brand hover:bg-brand-strong text-white font-bold text-[15px]">
+                <Button data-admin-write disabled={!canSend} onClick={send} className="w-full h-12 bg-brand hover:bg-brand-strong text-white font-bold text-[15px]">
                     {sending
                         ? `보내는 중… ${sending.done.toLocaleString()}/${sending.total.toLocaleString()}`
                         : inboxOnly ? `${targetCount.toLocaleString()}명 알림함에만 넣기` : `${targetCount.toLocaleString()}명에게 보내기`}

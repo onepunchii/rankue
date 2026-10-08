@@ -17,7 +17,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { apiRequest } from "@/lib/queryClient";
 import { LucideRefreshCw } from "@/lib/icons";
 import { TRAIL_KEEP_DAYS, pageKind } from "@shared/uiTrail";
-import { EmptyState, FilterChips, KpiTile, Panel, Pill } from "./adminUtils";
+import { EmptyState, FilterChips, KpiTile, Panel, Pill, SHEET_SAFE_TOP } from "./adminUtils";
 
 type Who = "guest" | "member" | "all";
 type Days = "1" | "7" | "30";
@@ -228,8 +228,8 @@ export default function VisitorsView({ onOpenMember }: { onOpenMember?: (id: str
             )}
 
             <Sheet open={!!open} onOpenChange={(o) => { if (!o) setOpen(null); }}>
-                <SheetContent side="right" className="w-full sm:max-w-lg overflow-y-auto bg-[#F7F7F5] p-0">
-                    <div className="sticky top-0 z-10 bg-white border-b border-black/[0.08] px-4 py-3.5 pr-12">
+                <SheetContent side="right" style={SHEET_SAFE_TOP} className="w-full sm:max-w-lg overflow-y-auto bg-[#F7F7F5] p-0">
+                    <div className="rk-no-safe sticky top-0 z-10 bg-white border-b border-black/[0.08] px-4 py-3.5 pr-12">
                         <SheetTitle className="text-[15px] font-black text-black/85">한 사람의 발자국</SheetTitle>
                         <SheetDescription className="mt-0.5 text-[12px] text-black/45">
                             {open ? `${open.slice(0, 8)}…` : ""}{trail.data?.firstDay ? ` · 처음 온 날 ${trail.data.firstDay}` : ""} · 최근 30일 {events.length}줄

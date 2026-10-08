@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { appConfirm } from "@/components/AppDialog";
 import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { LucideRefreshCw, LucideChevronRight, LucideExternalLink, LucideImage } from "@/lib/icons";
-import { FilterChips, SearchBox, EmptyState, Panel, Pill, kstDateTime, kstDate, agoLabel, daysSince } from "../adminUtils";
+import { FilterChips, SearchBox, EmptyState, Panel, Pill, kstDateTime, kstDate, agoLabel, daysSince, ADMIN_STICKY_TOP, SHEET_SAFE_TOP } from "../adminUtils";
 
 export const GOLF_PHOTOS_KEY = ["/api/hiq/admin/golf/photos"] as const;
 /** 신고 큐 — 이 화면의 조치가 큐의 신고를 닫으므로 함께 새로 읽는다(사이드바 숫자 포함) */
@@ -203,7 +203,7 @@ export default function GolfPhotosView({ onOpenMember }: { onOpenMember?: (id: s
     return (
         <div className="space-y-3">
             {/* 도구 줄: 거르기 칩 · 골프장 검색 · 기간 · 새로고침 */}
-            <div className="sticky top-14 md:top-0 z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-surface-0/95 backdrop-blur space-y-2 md:space-y-0 md:flex md:items-center md:gap-3">
+            <div className={`${ADMIN_STICKY_TOP} z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-surface-0/95 backdrop-blur space-y-2 md:space-y-0 md:flex md:items-center md:gap-3`}>
                 <div className="min-w-0 md:flex-1">
                     <FilterChips value={filter} onChange={setFilter} options={FILTERS.map((f) => ({
                         id: f.id, label: f.label, count: counts?.[f.id], alert: f.id === "appealed",
@@ -344,7 +344,7 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
 
     return (
         <Sheet open={!!p} onOpenChange={(o) => { if (!o) onClose(); }}>
-            <SheetContent side="right" className="w-full sm:max-w-lg p-0 flex flex-col bg-surface-0">
+            <SheetContent side="right" style={SHEET_SAFE_TOP} className="w-full sm:max-w-lg p-0 flex flex-col bg-surface-0">
                 {p && st && (
                     <>
                         <div className="shrink-0 bg-white border-b border-black/[0.07] px-5 pt-5 pb-4 pr-12">
@@ -446,7 +446,7 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
                                 {[...decide, ...content].length > 0 && (
                                     <div className="grid grid-cols-2 gap-2">
                                         {[...decide, ...content].map((a, i, all) => (
-                                            <button key={a} disabled={busy} onClick={() => onAction(a)}
+                                            <button data-admin-write key={a} disabled={busy} onClick={() => onAction(a)}
                                                 className={`h-10 rounded-xl text-[13.5px] font-bold transition-colors active:scale-[0.99] disabled:opacity-40 ${all.length === 1 ? "col-span-2" : ""} ${TONE_CLS[ACTION_UI[a].tone]}`}>
                                                 {ACTION_UI[a].label}
                                             </button>
@@ -455,7 +455,7 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
                                 )}
                                 {canDelete && (
                                     <div className="flex items-center gap-3">
-                                        <button disabled={busy} onClick={() => onAction("delete")}
+                                        <button data-admin-write disabled={busy} onClick={() => onAction("delete")}
                                             className={`h-10 px-5 rounded-xl text-[13.5px] font-bold transition-colors active:scale-[0.99] disabled:opacity-40 ${TONE_CLS.danger}`}>
                                             {ACTION_UI.delete.label}
                                         </button>

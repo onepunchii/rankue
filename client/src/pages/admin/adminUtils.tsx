@@ -203,3 +203,18 @@ export function kstDateTime(iso: string | null | undefined): string {
     const d = new Date(iso);
     return Number.isNaN(d.getTime()) ? "-" : d.toLocaleString("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 }
+
+// --- 아이폰 앱의 상태바(2026-10-08 오너: "어드민도 애플일 때 헤더 쪽이랑 사이즈가 안 맞고") ---
+// 앱은 웹 화면이 상태바 밑까지 깔린다(capacitor contentInset: never). 웹·안드로이드에서는 env(safe-area-inset-top) 이 0 이라 아래 값들이 예전과 같다.
+
+/**
+ * 폰 머리줄(56px) 바로 밑에 붙는 거르기 줄의 자리 — 머리줄이 상태바만큼 길어지므로 그만큼 더 내린다. 넓은 화면은 맨 위(md:top-0).
+ * 예전의 `sticky top-14` 는 아이폰 앱에서 머리줄에 가려졌다.
+ */
+export const ADMIN_STICKY_TOP = "sticky top-[calc(3.5rem+env(safe-area-inset-top))] md:top-0";
+
+/**
+ * 옆에서 나오는 전체 높이 시트(SheetContent side="right"·"left")의 윗여백 — 안 주면 시트의 머리가 상태바·다이내믹 아일랜드 밑으로 들어간다.
+ * className 의 p-0 이 지우지 못하게 style 로 준다. 닫기(X) 단추의 자리는 ui/sheet 가 같은 만큼 내린다.
+ */
+export const SHEET_SAFE_TOP = { paddingTop: "env(safe-area-inset-top)" } as const;

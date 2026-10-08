@@ -71,7 +71,8 @@ const SheetContent = React.forwardRef<
     >
       {children}
       {!hideClose && (
-        <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+        // 옆에서 나오는 전체 높이 시트는 아이폰 앱에서 상태바 밑까지 올라간다 — 닫기 단추가 그 밑에 깔려 안 눌렸다(2026-10-08). 웹에서는 그 값이 0
+        <SheetPrimitive.Close style={side === "left" || side === "right" ? { top: "calc(1rem + env(safe-area-inset-top))" } : undefined} className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
           <X className="h-4 w-4" />
           <span className="sr-only">Close</span>
         </SheetPrimitive.Close>

@@ -13,7 +13,7 @@ import { Sheet, SheetContent, SheetTitle, SheetDescription } from "@/components/
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucidePlus } from "@/lib/icons";
-import { FilterChips, EmptyState, Panel, Pill, kstDateTime } from "./adminUtils";
+import { FilterChips, EmptyState, Panel, Pill, kstDateTime, SHEET_SAFE_TOP } from "./adminUtils";
 import { appConfirm } from "@/components/AppDialog";
 
 type Notice = { id: string; title: string; content: string; target: "all" | "owners"; hidden: boolean; createdAt: string };
@@ -64,7 +64,7 @@ export default function NoticesView() {
                 <FilterChips value={target} onChange={setTarget} options={[
                     { id: "any", label: "모든 대상" }, { id: "all", label: "전체 사용자" }, { id: "owners", label: "사장님 전용" },
                 ]} />
-                <Button onClick={() => setDraft(EMPTY_DRAFT)} className="sm:ml-auto h-10 bg-brand hover:bg-brand-strong text-white font-bold">
+                <Button data-admin-write onClick={() => setDraft(EMPTY_DRAFT)} className="sm:ml-auto h-10 bg-brand hover:bg-brand-strong text-white font-bold">
                     <LucidePlus className="w-4 h-4 mr-1" /> 새 공지
                 </Button>
             </div>
@@ -79,11 +79,11 @@ export default function NoticesView() {
                     <h3 className="font-bold text-[16px]">{n.title}</h3>
                     <p className="mt-1 text-black/65 text-[13.5px] whitespace-pre-wrap line-clamp-6">{n.content}</p>
                     <div className="mt-3 flex gap-1.5 justify-end">
-                        <Button size="sm" variant="outline" className="h-8" onClick={() => setDraft({ id: n.id, title: n.title, content: n.content, target: n.target })}>고치기</Button>
-                        <Button size="sm" variant="outline" className="h-8" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: n.id, hidden: !n.hidden })}>
+                        <Button data-admin-write size="sm" variant="outline" className="h-8" onClick={() => setDraft({ id: n.id, title: n.title, content: n.content, target: n.target })}>고치기</Button>
+                        <Button data-admin-write size="sm" variant="outline" className="h-8" disabled={toggle.isPending} onClick={() => toggle.mutate({ id: n.id, hidden: !n.hidden })}>
                             {n.hidden ? "보이기" : "가리기"}
                         </Button>
-                        <Button size="sm" variant="ghost" className="h-8 text-red-500" disabled={remove.isPending}
+                        <Button data-admin-write size="sm" variant="ghost" className="h-8 text-red-500" disabled={remove.isPending}
                             onClick={() => { void appConfirm({ message: `'${n.title}' 공지를 삭제할까요? 되돌릴 수 없습니다. 잠시 내리려면 '가리기'를 쓰세요.`, tone: "danger", confirmText: "삭제" }).then((ok) => { if (ok) remove.mutate(n.id); }); }}>
                             삭제
                         </Button>
@@ -92,7 +92,7 @@ export default function NoticesView() {
             ))}
 
             <Sheet open={!!draft} onOpenChange={(o) => { if (!o) setDraft(null); }}>
-                <SheetContent side="right" className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
+                <SheetContent side="right" style={SHEET_SAFE_TOP} className="w-full sm:max-w-lg flex flex-col gap-0 p-0">
                     {draft && (
                         <>
                             <div className="px-5 pt-6 pb-3 border-b border-black/[0.06]">
@@ -121,7 +121,7 @@ export default function NoticesView() {
                             </div>
                             <div className="px-5 py-3 border-t border-black/[0.06] flex gap-2" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
                                 <Button variant="ghost" className="flex-1 h-11" onClick={() => setDraft(null)}>취소</Button>
-                                <Button className="flex-1 h-11 bg-brand hover:bg-brand-strong text-white font-bold"
+                                <Button data-admin-write className="flex-1 h-11 bg-brand hover:bg-brand-strong text-white font-bold"
                                     disabled={!draft.title.trim() || !draft.content.trim() || save.isPending} onClick={() => save.mutate(draft)}>
                                     {save.isPending ? "저장 중…" : draft.id ? "고친 내용 저장" : "올리기"}
                                 </Button>

@@ -113,7 +113,7 @@ export function StoresView() {
                                 <Button variant="outline" className="h-9 text-[13px]" onClick={() => window.open(st.listingCode ? `/stores/${st.listingCode}` : `/store/${st.slug}`, "_blank")}>
                                     매장 페이지
                                 </Button>
-                                <Button className="ml-auto h-9 text-[13px] bg-black/[0.06] text-[rgba(0,0,0,0.8)] hover:bg-brand hover:text-white" disabled={impersonate.isPending}
+                                <Button data-admin-write className="ml-auto h-9 text-[13px] bg-black/[0.06] text-[rgba(0,0,0,0.8)] hover:bg-brand hover:text-white" disabled={impersonate.isPending}
                                     onClick={() => { void appConfirm({ message: `'${st.name}' 사장님 화면으로 들어갑니다.\n돌아올 땐 사장님 화면 맨 위 '관리자로 돌아가기'를 누르세요.`, confirmText: "들어가기" }).then((ok) => { if (ok) impersonate.mutate(st.id); }); }}>
                                     사장님 화면 <LucideArrowRight className="w-4 h-4 ml-1" />
                                 </Button>

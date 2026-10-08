@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
+import { DocBack } from "@/components/hiq/DocBack";
 
 // RANKUE 소개(About) — 공개·다국어 페이지. SEO/AEO/GEO 대상 마케팅 콘텐츠.
 // 핵심 메시지 = "손안의 당구 점수판"(스마트폰으로 간편 점수 기록). RP 레이팅 같은 용어는 헤드라인에서 배제.
@@ -63,6 +64,7 @@ export default function About() {
   return (
     <div className="min-h-screen w-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans">
       <div className="mx-auto max-w-2xl px-5 py-12">
+        <DocBack className="text-black/45" />
         {/* 언어 선택 */}
         <div className="flex items-center gap-2 flex-wrap mb-8" aria-label={c.langLabel}>
           {ABOUT_LOCALES.map((l) => (

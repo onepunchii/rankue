@@ -24,7 +24,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle } from "@/lib/icons";
 import MemberGamesDialog from "./MemberGamesDialog";
-import { MemberAvatar, PlatformIcon, CountryFlag, Pill, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday } from "./adminUtils";
+import { MemberAvatar, PlatformIcon, CountryFlag, Pill, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday, SHEET_SAFE_TOP } from "./adminUtils";
 import { TODAY_ACTIVE_KEY } from "./TodayActiveView";
 import { appConfirm, appAlert } from "@/components/AppDialog";
 import { useT } from "@/lib/i18n";
@@ -387,7 +387,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
     return (
         <>
             <Sheet open={!!m} onOpenChange={(o) => { if (!o) onClose(); }}>
-                <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col bg-surface-0">
+                <SheetContent side="right" style={SHEET_SAFE_TOP} className="w-full sm:max-w-md p-0 flex flex-col bg-surface-0">
                     {m && form && (
                         <>
                             <div className="shrink-0 bg-white border-b border-black/[0.07] px-5 pt-6 pb-4">
@@ -452,8 +452,9 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                 <GolfSection golf={golfQ.data} isLoading={golfQ.isLoading} isError={golfQ.isError} onRetry={() => void golfQ.refetch()} />
 
                                 <section>
-                                    <h3 className="text-[12px] font-black text-black/45 mb-2">정보 수정</h3>
-                                    <div className="space-y-2.5 rounded-2xl bg-white border border-black/[0.07] p-4">
+                                    <h3 className="text-[12px] font-black text-black/45 mb-2">{access.canWrite ? "정보 수정" : "정보"}</h3>
+                                    {/* 보기 전용 관리자 — 값은 보이고 고칠 수는 없다(fieldset 이 안의 칸을 한꺼번에 잠근다). 저장 단추는 CSS 가 숨긴다 */}
+                                    <fieldset disabled={!access.canWrite} className="min-w-0 space-y-2.5 rounded-2xl bg-white border border-black/[0.07] p-4">
                                         <label className="block">
                                             <span className="text-[12px] font-bold text-black/50">이름</span>
                                             <Input value={form.name} maxLength={30} onChange={(e) => setForm({ ...form, name: e.target.value })} className="mt-1 h-10" />
@@ -486,11 +487,11 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                         <p className="text-[11.5px] text-black/40">전화번호는 로그인 정보라 여기서 바꾸지 않습니다. RP 는 경기 기록으로 계산됩니다 — 잘못된 경기는 '경기 기록 정리'에서 지우세요.</p>
                                         <div className="flex gap-2 pt-1">
                                             <Button variant="ghost" className="flex-1 h-10" disabled={!dirty || save.isPending} onClick={() => setForm(toForm(m))}>되돌리기</Button>
-                                            <Button className="flex-1 h-10 bg-brand hover:bg-brand-strong text-white font-bold" disabled={!dirty || !form.name.trim() || save.isPending} onClick={() => save.mutate()}>
+                                            <Button data-admin-write className="flex-1 h-10 bg-brand hover:bg-brand-strong text-white font-bold" disabled={!dirty || !form.name.trim() || save.isPending} onClick={() => save.mutate()}>
                                                 <LucideSave className="w-4 h-4 mr-1.5" />{save.isPending ? "저장 중…" : "저장"}
                                             </Button>
                                         </div>
-                                    </div>
+                                    </fieldset>
                                 </section>
 
                                 <section>
@@ -500,7 +501,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                             <LucideHistory className="w-4 h-4 text-black/50" />
                                             <span className="flex-1 text-[14px] font-bold">경기 기록 정리</span>
                                         </button>
-                                        <div>
+                                        <div data-admin-write>
                                             <button onClick={() => setPushOpen((v) => !v)} className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-black/[0.02]">
                                                 <LucideBell className="w-4 h-4 text-black/50" />
                                                 <span className="flex-1 text-[14px] font-bold">이 회원에게 알림 보내기</span>
@@ -509,7 +510,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                                 <div className="px-4 pb-4 space-y-2">
                                                     <Input value={push.title} maxLength={60} placeholder="제목" onChange={(e) => setPush({ ...push, title: e.target.value })} className="h-10" />
                                                     <Textarea value={push.body} maxLength={200} placeholder="내용 (200자 이내)" onChange={(e) => setPush({ ...push, body: e.target.value })} className="h-20 text-sm" />
-                                                    <Button className="w-full h-10 bg-brand hover:bg-brand-strong text-white font-bold"
+                                                    <Button data-admin-write className="w-full h-10 bg-brand hover:bg-brand-strong text-white font-bold"
                                                         disabled={!push.title.trim() || !push.body.trim() || sendPush.isPending} onClick={() => sendPush.mutate()}>
                                                         {sendPush.isPending ? "보내는 중…" : "보내기"}
                                                     </Button>
@@ -527,7 +528,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                                         {(manager.isStoreSeller || manager.canToggle) && !isRealPhone(m.phone) && <span className="text-amber-700"> · 휴대폰 번호가 없어 부킹은 못 올립니다(조인만)</span>}
                                                     </p>
                                                 </div>
-                                                <Switch
+                                                <Switch data-admin-lock
                                                     checked={manager.isStoreSeller}
                                                     disabled={!manager.canToggle || toggleManager.isPending || golfQ.isFetching}
                                                     onCheckedChange={(v) => void onToggleManager(v)}
@@ -549,7 +550,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                                             : "이 계정은 여기서 바꾸지 않습니다."}
                                                     </p>
                                                 </div>
-                                                <Switch
+                                                <Switch data-admin-lock
                                                     checked={role === "admin"}
                                                     disabled={!(role === "user" || role === "admin") || toggleSubAdmin.isPending || golfQ.isFetching}
                                                     onCheckedChange={(v) => void onToggleSubAdmin(v)}
@@ -559,7 +560,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                             </div>
                                         )}
                                         {isRealPhone(m.phone) && (
-                                            <button
+                                            <button data-admin-write
                                                 disabled={resetPin.isPending}
                                                 onClick={() => {
                                                     void appConfirm({ message: `${m.name}(${m.phone}) 님의 PIN 을 임시 PIN 으로 바꿉니다.\n본인 확인을 마쳤나요? 지금 PIN 은 더 이상 쓸 수 없습니다.`, tone: "danger", confirmText: "초기화" }).then((ok) => { if (ok) resetPin.mutate(m.id); });
@@ -572,7 +573,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                             </button>
                                         )}
                                         {m.profileId && !isStaff && (
-                                            <button
+                                            <button data-admin-write
                                                 disabled={setStatus.isPending}
                                                 onClick={() => {
                                                     const msg = banned ? `${m.name}님의 정지를 풀까요?` : `${m.name}님의 계정을 정지할까요?\n정지되면 로그인과 활동이 막힙니다.`;
@@ -583,6 +584,9 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                                 <LucideShieldAlert className={`w-4 h-4 ${banned ? "text-brand" : "text-red-500"}`} />
                                                 <span className={`flex-1 text-[14px] font-bold ${banned ? "text-brand" : "text-red-600"}`}>{banned ? "정지 해제" : "계정 정지"}</span>
                                             </button>
+                                        )}
+                                        {!access.canWrite && (
+                                            <p data-admin-viewonly-note className="px-4 py-3 text-[12.5px] leading-relaxed text-black/45 break-keep">보기 전용 계정이라 정지 · PIN 초기화 · 알림 보내기 같은 조치는 할 수 없습니다.</p>
                                         )}
                                     </div>
                                 </section>

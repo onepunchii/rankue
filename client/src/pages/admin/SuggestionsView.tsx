@@ -108,7 +108,7 @@ export default function SuggestionsView() {
             {unread > 0 && (
                 <div className="flex items-center justify-between bg-white px-4 py-2.5 rounded-2xl border border-black/[0.07]">
                     <span className="text-[13px] text-black/60">안 읽은 건의 <b className="text-[rgba(0,0,0,0.87)] tabular-nums">{unread}</b>건</span>
-                    <Button size="sm" variant="outline" className="h-8 text-xs" disabled={readAll.isPending} onClick={() => readAll.mutate()}>
+                    <Button data-admin-write size="sm" variant="outline" className="h-8 text-xs" disabled={readAll.isPending} onClick={() => readAll.mutate()}>
                         <LucideCheckCircle className="w-3 h-3 mr-1" /> 모두 읽음
                     </Button>
                 </div>
@@ -149,7 +149,7 @@ export default function SuggestionsView() {
                                     {s.contact.includes("@") ? "메일" : "전화"}
                                 </a>
                             )}
-                            <Button size="sm" variant="ghost" className="h-8 text-xs text-black/55" disabled={toggleRead.isPending}
+                            <Button data-admin-write size="sm" variant="ghost" className="h-8 text-xs text-black/55" disabled={toggleRead.isPending}
                                 onClick={() => toggleRead.mutate({ id: s.id, isRead: !s.isRead })}>
                                 {s.isRead ? "안 읽음으로" : "읽음 처리"}
                             </Button>
@@ -169,7 +169,7 @@ export default function SuggestionsView() {
                                 <Textarea value={replyText} onChange={(e) => setReplyText(e.target.value)} maxLength={500} placeholder="답장 내용 (500자 이내)" className="bg-white h-24 text-sm" />
                                 <div className="flex justify-end gap-2">
                                     <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setReplyingId(null)}>취소</Button>
-                                    <Button size="sm" className="h-8 text-xs bg-brand hover:bg-brand-strong text-white" disabled={!replyText.trim() || reply.isPending}
+                                    <Button data-admin-write size="sm" className="h-8 text-xs bg-brand hover:bg-brand-strong text-white" disabled={!replyText.trim() || reply.isPending}
                                         onClick={() => reply.mutate({ id: s.id, message: replyText.trim() })}>
                                         {reply.isPending ? "보내는 중..." : "답장 보내기"}
                                     </Button>

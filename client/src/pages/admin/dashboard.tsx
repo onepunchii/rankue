@@ -10,10 +10,11 @@ import { useLocation, useSearch } from "wouter";
 import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTrigger, SheetTitle } from "@/components/ui/sheet";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, setRequestGate } from "@/lib/queryClient";
+import { ADMIN_VIEW_ONLY_MESSAGE, viewOnlyAllows } from "@shared/adminRole";
 import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
-    LucideGlobe, LucideCheckCircle, LucideLogOut, LucideArrowLeft,
+    LucideGlobe, LucideCheckCircle, LucideLogOut, LucideArrowLeft, LucideChevronLeft,
     LucideBell, LucideCreditCard, LucideShieldAlert, LucideMenu, LucideUsersRound, LucideMail, LucideFlag, GameController,
     LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin, LucideTrendingUp, LucideFootprints } from "@/lib/icons";
 import OnlineGameView from "./OnlineGameView";
@@ -21,7 +22,7 @@ import ModerationView from "./ModerationView";
 import MembersView from "./MembersView";
 import { useAdminAccess } from "./adminAccess";
 import { useAdminBack } from "./adminBack";
-import { appConfirm } from "@/components/AppDialog";
+import { appAlert, appConfirm } from "@/components/AppDialog";
 import TodayActiveView from "./TodayActiveView";
 import PushView from "./PushView";
 import SuggestionsView, { type Suggestion, SUGGESTIONS_KEY } from "./SuggestionsView";
@@ -41,7 +42,7 @@ import GolfListingsView from "./golf/GolfListingsView";
 import GolfRoundsView from "./golf/GolfRoundsView";
 import GolfPhotosView from "./golf/GolfPhotosView";
 import GolfCoursesView from "./golf/GolfCoursesView";
-import { KpiTile, Panel, Pill, agoLabel } from "./adminUtils";
+import { KpiTile, Panel, Pill, SHEET_SAFE_TOP, agoLabel } from "./adminUtils";
 
 /** 배열이 아닌 응답에도 화면이 죽지 않게(빈 목록으로) */
 const asList = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
@@ -217,6 +218,22 @@ export default function AdminDashboard() {
     const [openMemberId, setOpenMemberId] = useState<string | null>(null);
 
     const access = useAdminAccess();
+    // 보기 전용 관리자(2026-10-08 오너: "일반 관리자에 계정 정지나 이런 거 되던 거 같은데 … 일반 관리자는 보기만 가능하게 해야 돼"):
+    //  서버는 이미 고치는 요청을 전부 거절한다(middleware/adminAuth — 운영의 관리자 계정으로 15가지 요청 전부 403 확인). 다만 화면에 단추가
+    //  그대로 보여 되는 것처럼 보였다. 그래서 ① 고치는 단추(data-admin-write)를 숨기고 고르기·스위치(data-admin-lock)를 잠그고(index.css)
+    //  ② 그래도 나가려는 고치는 요청은 보내기 전에 막고 분명한 창으로 알린다(시트·대화상자는 body 밑에 그려져 클래스를 html 에 건다).
+    useEffect(() => {
+        if (!access.viewOnly) return;
+        document.documentElement.classList.add("admin-viewonly");
+        let told = 0;
+        setRequestGate((method, url) => {
+            const path = url.startsWith("http") ? new URL(url).pathname : url.split("?")[0];
+            if (!path.startsWith("/api/hiq/admin/") || viewOnlyAllows(method, path)) return null;
+            if (Date.now() - told > 1500) { told = Date.now(); void appAlert({ title: "보기 전용 계정입니다", message: "볼 수만 있고 바꿀 수는 없습니다. 바꿔야 할 것이 있으면 슈퍼관리자에게 알려 주세요." }); }
+            return ADMIN_VIEW_ONLY_MESSAGE;
+        });
+        return () => { document.documentElement.classList.remove("admin-viewonly"); setRequestGate(null); };
+    }, [access.viewOnly]);
     const { data: stats } = useQuery<GlobalStats>({ queryKey: ["/api/hiq/admin/stats"] });
     // 응답이 배열이 아닐 때(세션 만료 응답·옛 캐시) .filter·.find 에서 대시보드 전체가 흰 화면이 됐다(오류 수집 10건, 2026-10-01) — 받는 자리에서 배열로
     const members = asList<AdminMember>(useQuery<AdminMember[]>({ queryKey: ADMIN_MEMBERS_KEY }).data);
@@ -271,9 +288,18 @@ export default function AdminDashboard() {
     ];
 
     return (
-        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans flex flex-col md:flex-row">
-            {/* Mobile Header — 높이 고정(h-14): 회원 관리의 거르기 줄이 이 아래(top-14)에 붙는다 */}
-            <div className="md:hidden h-14 bg-white border-b border-black/10 px-2 sticky top-0 z-30 flex items-center gap-1">
+        // 아이폰 앱(2026-10-08 오너: "어드민도 애플일 때 헤더 쪽이랑 사이즈가 안 맞고 뒤로가기 및 불편하던데"):
+        //  전역 규칙(index.css)이 #root 를 상태바만큼 내리고, sticky top-0 인 것에는 상태바만큼의 윗여백을 또 건다. 머리줄이 높이 고정(h-14)이라
+        //  그 여백이 56px 상자 안으로 밀고 들어와 글자가 상자 밖으로 흘렀다. 그래서 ① 이 화면은 #root 의 내림을 되돌리고(-mt) ② 머리줄은 전역 규칙에서
+        //  빼고(rk-no-safe) 상태바만큼의 윗여백을 직접 준다 — 흰 머리줄이 상태바 밑까지 이어진다. 웹·안드로이드는 그 값이 0 이라 달라지는 게 없다.
+        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans flex flex-col md:flex-row" style={{ marginTop: "calc(-1 * env(safe-area-inset-top))" }}>
+            {/* Mobile Header — 줄 높이 고정(h-14): 회원 관리의 거르기 줄이 이 아래(ADMIN_STICKY_TOP)에 붙는다 */}
+            <div className="rk-no-safe md:hidden bg-white border-b border-black/10 sticky top-0 z-30" style={{ paddingTop: "env(safe-area-inset-top)" }}>
+              <div className="h-14 px-1 flex items-center gap-0.5">
+                {/* 뒤로 — 아이폰에는 시스템 뒤로가기가 없다. 앞 메뉴로 가고, 첫 화면에서는 나갈지 묻는다(adminBack) */}
+                <Button variant="ghost" size="icon" aria-label="뒤로" data-admin-back onClick={() => window.history.back()} className="text-[rgba(0,0,0,0.87)]">
+                    <LucideChevronLeft />
+                </Button>
                 <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
                     <SheetTrigger asChild>
                         <Button variant="ghost" size="icon" aria-label="메뉴" className="relative text-[rgba(0,0,0,0.87)]">
@@ -282,15 +308,16 @@ export default function AdminDashboard() {
                         </Button>
                     </SheetTrigger>
                     {/* 서랍도 화면 높이에 맞춰 세로 flex — 안의 메뉴가 스크롤된다. 고르면 닫힌다. */}
-                    <SheetContent side="left" className="p-0 border-r border-black/10 w-72 max-w-[85vw] bg-white flex flex-col h-full">
+                    <SheetContent side="left" style={SHEET_SAFE_TOP} className="p-0 border-r border-black/10 w-72 max-w-[85vw] bg-white flex flex-col h-full">
                         <SheetTitle className="sr-only">관리자 메뉴</SheetTitle>
                         <SidebarContent tab={tab} setTab={setTab} handleLogout={handleLogout} onLeave={back.leave} closeMobileMenu={() => setMenuOpen(false)} badges={badges} />
                     </SheetContent>
                 </Sheet>
-                <span className="flex-1 truncate font-black text-[16px]">{getTabTitle(tab)}</span>
+                <span className="flex-1 truncate pl-1 font-black text-[16px]">{getTabTitle(tab)}</span>
                 {tab !== "dashboard" && (
                     <button onClick={() => setTab("dashboard")} className="px-3 h-9 rounded-lg text-[13px] font-bold text-brand">홈</button>
                 )}
+              </div>
             </div>
 
             {/* Desktop Sidebar */}
@@ -302,7 +329,7 @@ export default function AdminDashboard() {
                 {/* 관리자(보기 전용) — 내용은 다 보이고, 고치는 요청은 서버가 거절한다(2026-10-07) */}
                 {access.viewOnly && (
                     <div data-admin-viewonly-banner className="mb-4 rounded-2xl bg-amber-500/[0.12] px-4 py-3 text-[13px] leading-relaxed text-amber-900">
-                        <b className="font-black">보기 전용 계정입니다.</b> 모든 화면을 볼 수 있지만, 저장·삭제·발송 같은 단추는 눌러도 반영되지 않습니다.
+                        <b className="font-black">보기 전용 계정입니다.</b> 모든 화면을 볼 수 있고, 저장·삭제·정지·발송 같은 고치는 단추는 나오지 않습니다.
                     </div>
                 )}
                 {/* 제목 — 폰에선 위 머리줄이 제목을 보여 주므로 숨긴다 */}

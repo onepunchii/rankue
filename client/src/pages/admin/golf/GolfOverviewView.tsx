@@ -418,7 +418,7 @@ export default function GolfOverviewView({ onOpenTab }: { onOpenTab?: (tab: stri
                         </ul>
                         <div className="border-t border-black/[0.06] bg-black/[0.015] p-4">
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-                                <button type="button" disabled={run.isPending} onClick={() => run.mutate()}
+                                <button data-admin-write type="button" disabled={run.isPending} onClick={() => run.mutate()}
                                     className="h-10 px-4 rounded-lg bg-white border border-black/10 text-[13px] font-bold text-[rgba(0,0,0,0.8)] hover:border-brand/40 hover:text-brand disabled:opacity-50">
                                     {run.isPending ? "피드 받아 보는 중…" : "시세 동기화 미리 보기"}
                                 </button>

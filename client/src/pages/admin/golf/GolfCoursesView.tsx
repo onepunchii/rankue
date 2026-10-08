@@ -32,7 +32,7 @@ import {
     type MissingKey, type PageCourse, type LogoOrigin,
 } from "@shared/golfParEdit";
 import { imageUrlFromDrop } from "@shared/golfLogo";
-import { FilterChips, SearchBox, EmptyState, Panel, Pill, KpiTile, kstDateTime } from "../adminUtils";
+import { FilterChips, SearchBox, EmptyState, Panel, Pill, KpiTile, kstDateTime, ADMIN_STICKY_TOP, SHEET_SAFE_TOP } from "../adminUtils";
 import { rasterizeLogo, blobFromBase64, type LogoDraft } from "./logoUpload";
 
 export const GOLF_COURSES_KEY = ["/api/hiq/admin/golf/courses"] as const;
@@ -153,7 +153,7 @@ export default function GolfCoursesView() {
             </div>
 
             {/* 도구 줄: 빈칸 칩(가로로 밀림) · 검색 · 정렬 */}
-            <div className="sticky top-14 md:top-0 z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-surface-0 space-y-2">
+            <div className={`${ADMIN_STICKY_TOP} z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-surface-0 space-y-2`}>
                 <FilterChips value={missing} onChange={setMissing} options={[
                     { id: "all" as const, label: "전체", count: counts?.all },
                     ...MISSING_KEYS.map((k) => ({ id: k, label: MISSING_LABEL[k], count: counts?.[k], alert: k === "pars" || k === "nines" || k === "coords" })),
@@ -308,7 +308,7 @@ function CourseSheet({ slug, onClose }: { slug: string | null; onClose: () => vo
     const d = detail.data && detail.data.slug === shown ? detail.data : null;
     return (
         <Sheet open={!!slug} onOpenChange={(o) => { if (!o) onClose(); }}>
-            <SheetContent side="right" className="w-full sm:max-w-lg p-0 gap-0 flex flex-col bg-surface-0">
+            <SheetContent side="right" style={SHEET_SAFE_TOP} className="w-full sm:max-w-lg p-0 gap-0 flex flex-col bg-surface-0">
                 {!d ? (
                     <div className="p-6">
                         <SheetTitle className="text-[16px] font-bold text-black/60">{detail.isError ? "골프장을 불러오지 못했습니다" : "불러오는 중…"}</SheetTitle>
@@ -572,7 +572,7 @@ function NineEditor({ nine, sharedPages }: { nine: Nine; sharedPages: number }) 
                         className="flex-1 h-9 rounded-lg border border-black/10 bg-white flex items-center justify-center gap-1.5 text-[13px] font-bold text-black/60 disabled:opacity-50">
                         <LucideRotateCcw className="w-3.5 h-3.5" /> 되돌리기
                     </button>
-                    <button onClick={() => void onSave()} disabled={!complete || save.isPending}
+                    <button data-admin-write onClick={() => void onSave()} disabled={!complete || save.isPending}
                         className="flex-1 h-9 rounded-lg bg-brand text-white flex items-center justify-center gap-1.5 text-[13px] font-bold hover:bg-brand-strong disabled:opacity-40">
                         <LucideSave className="w-3.5 h-3.5" /> {save.isPending ? "저장 중…" : complete ? "파 저장" : "9칸을 다 채우세요"}
                     </button>
@@ -628,7 +628,7 @@ function AddNineForm({ clubId, existing, onClose }: { clubId: string; existing: 
             <div className="mt-2.5 flex gap-2">
                 <button onClick={onClose} disabled={add.isPending}
                     className="flex-1 h-9 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/60 disabled:opacity-50">닫기</button>
-                <button onClick={() => void onAdd()} disabled={!ready || add.isPending}
+                <button data-admin-write onClick={() => void onAdd()} disabled={!ready || add.isPending}
                     className="flex-1 h-9 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-strong disabled:opacity-40">
                     {add.isPending ? "추가 중…" : filled > 0 && filled < NINE ? "9칸을 다 채우거나 비우세요" : "추가"}
                 </button>
@@ -705,7 +705,7 @@ function NameEditor({ d }: { d: Detail }) {
                 <div data-club-name className="rounded-xl bg-black/[0.03] px-3 py-2 flex items-center gap-2">
                     <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-black/55">경기 시작 화면에는 원장 이름 <b className="text-black/75">'{d.club.name}'</b>(으)로 뜹니다.</p>
                     {clubRenamable && (
-                        <button type="button" onClick={() => void onMatchClub()} disabled={save.isPending}
+                        <button data-admin-write type="button" onClick={() => void onMatchClub()} disabled={save.isPending}
                             className="shrink-0 h-8 px-3 rounded-lg bg-white border border-black/10 text-[12.5px] font-bold text-black/65 disabled:opacity-50">이 이름으로 맞추기</button>
                     )}
                 </div>
@@ -714,7 +714,7 @@ function NameEditor({ d }: { d: Detail }) {
                 <div className="flex gap-2">
                     <button onClick={() => { setName(d.name); setAlsoClub(clubDefault); }} disabled={save.isPending}
                         className="flex-1 h-9 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/60 disabled:opacity-50">되돌리기</button>
-                    <button onClick={() => void onSave()} disabled={!c.ok || save.isPending}
+                    <button data-admin-write onClick={() => void onSave()} disabled={!c.ok || save.isPending}
                         className="flex-1 h-9 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-strong disabled:opacity-40">
                         {save.isPending ? "저장 중…" : "이름 저장"}
                     </button>
@@ -790,7 +790,7 @@ function ContactEditor({ d }: { d: Detail }) {
                 <div className="flex gap-2 pt-0.5">
                     <button onClick={() => { setWebsite(d.website ?? ""); setPhone(d.phone ?? ""); }} disabled={save.isPending}
                         className="flex-1 h-9 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/60 disabled:opacity-50">되돌리기</button>
-                    <button onClick={() => void onSave()} disabled={!valid || save.isPending}
+                    <button data-admin-write onClick={() => void onSave()} disabled={!valid || save.isPending}
                         className="flex-1 h-9 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-strong disabled:opacity-40">
                         {save.isPending ? "저장 중…" : "저장"}
                     </button>
@@ -942,7 +942,7 @@ function LogoEditor({ d }: { d: Detail }) {
                     className="shrink-0 h-9 px-3 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/70 hover:bg-black/[0.03] disabled:opacity-40 inline-flex items-center gap-1.5">
                     <LucideUpload className="w-4 h-4" />파일
                 </button>
-                <button onClick={() => void onClear()} disabled={!d.logo || clear.isPending}
+                <button data-admin-write onClick={() => void onClear()} disabled={!d.logo || clear.isPending}
                     className="shrink-0 h-9 px-3 rounded-lg border border-red-500/30 text-[13px] font-bold text-red-600 hover:bg-red-500/[0.05] disabled:opacity-35 disabled:hover:bg-transparent">
                     {clear.isPending ? "내리는 중…" : "로고 내리기"}
                 </button>
@@ -966,7 +966,7 @@ function LogoEditor({ d }: { d: Detail }) {
                     <div className="mt-3 flex gap-2">
                         <button onClick={() => setDraft(null)} disabled={upload.isPending}
                             className="flex-1 h-9 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/60 disabled:opacity-50">취소</button>
-                        <button onClick={() => void onUpload()} disabled={upload.isPending}
+                        <button data-admin-write onClick={() => void onUpload()} disabled={upload.isPending}
                             className="flex-1 h-9 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-strong disabled:opacity-40">
                             {upload.isPending ? "올리는 중…" : d.logo ? "이 로고로 바꾸기" : "이 로고 올리기"}
                         </button>
@@ -1068,7 +1068,7 @@ function CoordsEditor({ d }: { d: Detail }) {
                     <p className="min-w-0 flex-1 text-[12px] leading-relaxed text-amber-900">
                         골프장 페이지 좌표가 원장 좌표와 다릅니다{pageOffKm != null ? ` (${pageOffKm.toFixed(1)}km)` : ""}.
                     </p>
-                    <button type="button" onClick={() => void onSyncPage()} disabled={save.isPending}
+                    <button data-admin-write type="button" onClick={() => void onSyncPage()} disabled={save.isPending}
                         className="shrink-0 h-8 px-3 rounded-lg bg-white border border-amber-600/30 text-[12.5px] font-bold text-amber-900 disabled:opacity-50">
                         원장 좌표로 맞추기
                     </button>
@@ -1110,7 +1110,7 @@ function CoordsEditor({ d }: { d: Detail }) {
                 <div className="flex gap-2">
                     <button onClick={() => setText(cur)} disabled={save.isPending}
                         className="flex-1 h-9 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/60 disabled:opacity-50">되돌리기</button>
-                    <button onClick={() => void onSave()} disabled={!check?.ok || save.isPending}
+                    <button data-admin-write onClick={() => void onSave()} disabled={!check?.ok || save.isPending}
                         className="flex-1 h-9 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-strong disabled:opacity-40">
                         {save.isPending ? "저장 중…" : "좌표 저장"}
                     </button>

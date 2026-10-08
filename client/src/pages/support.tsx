@@ -1,5 +1,6 @@
 import { useSeo } from "@/hooks/useSeo";
 import { DOC_META } from "@shared/docMeta";
+import { DocBack } from "@/components/hiq/DocBack";
 // 고객지원 — App Store 심사 가이드라인 1.5(Support URL) 요건 페이지.
 // 로그인 없이 접근 가능해야 하며, 사용자가 질문하고 지원을 요청할 수 있는 수단을 제공한다.
 export default function Support() {
@@ -9,6 +10,7 @@ export default function Support() {
   return (
     <div className="min-h-screen w-full bg-white text-gray-900">
       <div className="mx-auto max-w-2xl px-5 py-10 leading-relaxed">
+        <DocBack label="뒤로" />
         <h1 className="text-2xl font-bold">랭큐 고객지원</h1>
         <p className="mt-2 text-sm text-gray-500">
           랭큐(RANKUE) · 개발자: 제이에이치스퀘어

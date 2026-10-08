@@ -145,7 +145,7 @@ export default function MemberGamesDialog({ member, onClose }: { member: { id: s
                                     <td className="p-3 text-right">
                                         {confirmId === g.id ? (
                                             <span className="inline-flex gap-2">
-                                                <button
+                                                <button data-admin-write
                                                     onClick={() => del.mutate(g.id)}
                                                     disabled={del.isPending}
                                                     className="h-8 px-3 rounded-lg bg-red-600 text-white text-xs font-bold disabled:opacity-50"

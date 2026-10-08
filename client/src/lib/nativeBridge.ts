@@ -17,6 +17,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { hasPlugin, isNative, nativeSupports, platform } from "@shared/nativeCaps";
 import { handledLinkKey, LAST_PATH_KEY, openedAppLink, resumeTarget, sanitizeInternalPath, type SavedPath } from "@shared/deepLink";
 import { androidStoreUrl, iosStoreUrl } from "@shared/appLinks";
+import { EDGE_SWIPE_OFF_PATH, isEdgeSwipeBack, startsAtEdge, type TouchPoint } from "@shared/edgeSwipe";
 
 export function isNativeApp(): boolean {
     return isNative();
@@ -423,6 +424,61 @@ export function pushBackHandler(fn: () => boolean): () => void {
     };
 }
 
+/** '뒤로'를 먼저 받는 것들 — 떠 있는 팝업(맨 나중에 건 것부터) → 화면이 건 핸들러. 누가 처리했으면 true */
+function runBackHandlers(): boolean {
+    for (let i = backLayers.length - 1; i >= 0; i--) {
+        if (backLayers[i]()) return true;
+    }
+    return !!backHandler && backHandler();
+}
+
+/**
+ * 아이폰 — 왼쪽 가장자리를 오른쪽으로 밀면 '뒤로'(2026-10-08, shared/edgeSwipe 머리말).
+ * 아이폰에는 하드웨어 뒤로가기가 없고 웹뷰의 가장자리 밀기도 꺼져 있다 — 뒤로 단추가 없는 화면에서는 갇혔다.
+ * 안드로이드 하드웨어 뒤로가기와 같은 길을 탄다: 팝업·화면 핸들러가 먼저, 아니면 히스토리 한 칸. 뒤로 갈 곳이 없으면 첫 화면으로.
+ * 받지 않는 곳: 게임 화면(가장자리에서 시작하는 조작) · 캔버스·슬라이더 · 가로로 밀려 있는 목록(그건 목록을 되감는 손짓이다) · data-noswipe.
+ */
+/**
+ * 히스토리 한 칸 뒤로. 아무 일도 없으면(이 화면이 앱의 첫 화면이다 — 링크로 바로 들어왔거나, 껐다 켜며 이 화면으로 돌아왔다)
+ * 첫 화면으로 보낸다. 밀어서 뒤로와, 탭도 헤더도 없는 문서 화면의 뒤로 단추(components/hiq/DocBack)가 같이 쓴다.
+ */
+export function backOrHome(): void {
+    const before = window.location.href;
+    let moved = false;
+    const onPop = () => { moved = true; };
+    window.addEventListener("popstate", onPop, { once: true });
+    window.history.back();
+    window.setTimeout(() => {
+        window.removeEventListener("popstate", onPop);
+        if (!moved && window.location.href === before && window.location.pathname !== "/") navigate("/", { replace: true });
+    }, 450);
+}
+
+function initEdgeSwipeBack(): void {
+    let start: TouchPoint | null = null;
+    const blocked = (target: EventTarget | null): boolean => {
+        if (EDGE_SWIPE_OFF_PATH.test(window.location.pathname)) return true;
+        let el = target instanceof Element ? target : null;
+        if (el?.closest("[data-noswipe], canvas, input[type=range], [role=slider]")) return true;
+        for (; el && el !== document.body; el = el.parentElement) {
+            if (el.scrollLeft > 0 && el.scrollWidth > el.clientWidth + 4) return true;
+        }
+        return false;
+    };
+    window.addEventListener("touchstart", (e) => {
+        const t = e.touches.length === 1 ? e.touches[0] : null;
+        start = t && startsAtEdge(t.clientX) && !blocked(e.target) ? { x: t.clientX, y: t.clientY, t: Date.now() } : null;
+    }, { passive: true });
+    window.addEventListener("touchcancel", () => { start = null; }, { passive: true });
+    window.addEventListener("touchend", (e) => {
+        const from = start; start = null;
+        const t = e.changedTouches[0];
+        if (!from || !t || !isEdgeSwipeBack(from, { x: t.clientX, y: t.clientY, t: Date.now() })) return;
+        if (runBackHandlers()) return;
+        backOrHome();
+    }, { passive: true });
+}
+
 export function initNativeBridge(): void {
     if (!isNative()) return;
     if (platform() === "android") document.documentElement.classList.add("native-android");
@@ -430,10 +486,7 @@ export function initNativeBridge(): void {
     // 안드로이드 하드웨어 뒤로가기: 떠 있는 팝업 → 화면이 건 핸들러 → 뒤로 갈 곳이 있으면 back, 없으면 앱 종료 (wouter는 history API 기반)
     if (hasPlugin("App")) {
         App.addListener("backButton", (e) => {
-            for (let i = backLayers.length - 1; i >= 0; i--) {
-                if (backLayers[i]()) return;
-            }
-            if (backHandler && backHandler()) return;
+            if (runBackHandlers()) return;
             // '뒤로 갈 곳이 있는가'는 웹뷰가 알려 준 값(canGoBack = WebView.canGoBack)으로 본다(2026-10-06 검토).
             // 예전에는 주소가 '/' 이면 무조건 종료였다 — 로그인 화면이 앱의 첫 화면(뿌리)일 때의 규칙이다. 이제 비로그인은 예시 홈에서
             // 시작해 로그인 화면(/?login=1…)으로 **들어오므로**, 거기서 '뒤로'는 종료가 아니라 예시 홈으로 돌아가야 한다.
@@ -446,6 +499,7 @@ export function initNativeBridge(): void {
         }).catch(() => { /* 무시 */ });
     }
 
+    if (platform() === "ios") initEdgeSwipeBack();
     initRouteMemory();
     initDeepLinks();
     initNativePush();

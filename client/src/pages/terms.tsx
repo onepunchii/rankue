@@ -3,6 +3,8 @@ import { useSeo } from "@/hooks/useSeo";
 import { useT } from "@/lib/i18n";
 import { TERMS_CONTENT, termsLang, type TermsLang } from "@shared/termsContent";
 import { TermsBody } from "@/components/hiq/TermsBody";
+import { hasBackTarget } from "@/components/hiq/DocBack";
+import { backOrHome } from "@/lib/nativeBridge";
 
 // 이용약관(EULA) — App Store 1.2 · Play UGC 심사용 공개 문서 페이지(감사 S4).
 // /privacy 와 같은 틀: 로그인 게이트 없는 완전 공개 라우트, 흰 배경의 읽기용 문서.
@@ -19,15 +21,15 @@ export default function Terms() {
     const doc = TERMS_CONTENT[lang];
     useSeo({ title: doc.seoTitle, description: doc.seoDescription, path: "/terms", locale: lang });
 
-    // 설정·가입 화면에서 들어온 경우 돌아갈 곳이 있다. 주소창으로 바로 연 경우엔 버튼을 숨긴다.
-    const canGoBack = typeof window !== "undefined" && window.history.length > 1;
+    // 설정·가입 화면에서 들어온 경우 돌아갈 곳이 있다. 주소창으로 바로 연 경우엔 버튼을 숨긴다(앱에서는 늘 보인다 — components/hiq/DocBack).
+    const canGoBack = hasBackTarget();
 
     return (
         <div className="min-h-screen w-full bg-white text-gray-900">
             <div className="mx-auto max-w-2xl px-5 py-10 leading-relaxed">
                 <div className="flex items-center justify-between gap-3">
                     {canGoBack ? (
-                        <button onClick={() => window.history.back()} className="text-sm font-medium text-gray-500 underline-offset-2 hover:underline">
+                        <button onClick={backOrHome} className="text-sm font-medium text-gray-500 underline-offset-2 hover:underline">
                             ← {doc.back}
                         </button>
                     ) : <span />}

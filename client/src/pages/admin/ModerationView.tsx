@@ -304,7 +304,7 @@ function ReportCard({ item, busy, onAction }: { item: QueueItem; busy: boolean; 
             {item.actions.length > 0 && (
                 <div className="flex flex-wrap gap-2">
                     {item.actions.map((a) => (
-                        <button
+                        <button data-admin-write
                             key={a}
                             disabled={busy}
                             onClick={() => onAction(a)}

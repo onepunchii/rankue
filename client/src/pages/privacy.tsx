@@ -1,5 +1,6 @@
 import { useSeo } from "@/hooks/useSeo";
 import { DOC_META } from "@shared/docMeta";
+import { DocBack } from "@/components/hiq/DocBack";
 // 개인정보처리방침 — 스토어(Play/App Store) 심사용 공개 문서 페이지.
 // 로그인 게이트를 타지 않는 완전 공개 라우트여야 한다.
 export default function Privacy() {
@@ -9,6 +10,7 @@ export default function Privacy() {
   return (
     <div className="min-h-screen w-full bg-white text-gray-900">
       <div className="mx-auto max-w-2xl px-5 py-10 leading-relaxed">
+        <DocBack label="뒤로" />
         <h1 className="text-2xl font-bold">개인정보처리방침</h1>
         <p className="mt-2 text-sm text-gray-500">
           랭큐(RANKUE) · 운영: 제이에이치스퀘어 · 문의:{" "}
