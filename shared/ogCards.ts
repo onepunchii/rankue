@@ -14,3 +14,9 @@ export const CARD_VERSION = 2;
 export const golfCourseCardUrl = (origin: string, slug: string) => `${origin}/og/golf-course/${encodeURIComponent(slug)}.png?v=${CARD_VERSION}`;
 /** 당구장 카드 — 매장 코드는 영숫자 */
 export const storeCardUrl = (origin: string, code: string) => `${origin}/og/store/${encodeURIComponent(code)}.png?v=${CARD_VERSION}`;
+
+/**
+ * 카드 그림의 설명(alt) — 카드에 있는 것만 말한다. 이름에 이미 그 말이 있으면 되풀이하지 않는다
+ * ("허슬러1 당구장 당구장 카드" — 매장 이름의 절반쯤이 '당구장'으로 끝난다).
+ */
+export const cardAlt = (name: string, kind: "골프장" | "당구장") => (name.includes(kind) ? `${name} 카드` : `${name} ${kind} 카드`);

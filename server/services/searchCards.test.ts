@@ -6,7 +6,7 @@ import { emOf, fitSize, nameLines, splitName } from "./cardText";
 import { renderGolfCourseCardPng, golfCourseCardUrl } from "./golfCourseCard";
 import { renderStoreCardPng, storeCardUrl, storeFactsLine, tableSvg } from "./storeCard";
 import { inkBounds, pngSize, trimLogo } from "../lib/logoTrim";
-import { CARD_VERSION } from "../../shared/ogCards";
+import { CARD_VERSION, cardAlt } from "../../shared/ogCards";
 
 /**
  * 검색 썸네일 둘째 판(2026-10-08 오너: "이미지 너무 별로인데 … 썸네일 시안 몇 개 만들어 줘 봐" → "골프는 시안 C, 당구장은 시안 B").
@@ -180,7 +180,12 @@ describe("카드 주소와 재료", () => {
     it("그림 설명(alt)은 카드에 있는 것만 말한다 — 그린피·시세·영업시간 칸은 뺐다", () => {
         const pre = root("server/prerender.ts");
         expect(pre).not.toMatch(/그린피·회원권 시세 카드|요금·영업시간 카드/);
-        expect(pre.match(/골프장 카드`/g)!.length).toBeGreaterThanOrEqual(3);
-        expect(pre.match(/당구장 카드`/g)!.length).toBeGreaterThanOrEqual(3);
+        expect(pre.match(/cardAlt\(\w+\.name, "골프장"\)/g)!.length).toBeGreaterThanOrEqual(3);
+        expect(pre.match(/cardAlt\(\w+\.name, "당구장"\)/g)!.length).toBeGreaterThanOrEqual(3);
+        // 이름에 이미 그 말이 있으면 되풀이하지 않는다
+        expect(cardAlt("허슬러1 당구장", "당구장")).toBe("허슬러1 당구장 카드");
+        expect(cardAlt("김포마송 당구클럽", "당구장")).toBe("김포마송 당구클럽 당구장 카드");
+        expect(cardAlt("강화 선두리 골프장", "골프장")).toBe("강화 선두리 골프장 카드");
+        expect(cardAlt("설해원CC", "골프장")).toBe("설해원CC 골프장 카드");
     });
 });
