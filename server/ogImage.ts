@@ -13,7 +13,8 @@ import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
 import { isUploadedLogo } from "../shared/golfLogo.js";
 import { hereMapSvg } from "../shared/golfHereMap.js";
 import { weatherPoint } from "../shared/golfWeatherZones.js";
-import { courseWhere, weekdayFee, wonShort, type Fees } from "../shared/golfCourse.js";
+import { courseWhere } from "../shared/golfCourse.js";
+import { trimLogo } from "./lib/logoTrim.js";
 import { renderGolfFootprintsCardPng, type FootprintsCardInput } from "./services/golfFootprintsCard.js";
 import { renderGolfRoundCardPng, type GolfRoundCardInput } from "./services/golfRoundCard.js";
 import { parseRoundRef, roundDateLabel, type RoundRef } from "../shared/golfRoundShare.js";
@@ -172,41 +173,53 @@ export async function buildPbaPlayerCard(memCode: string, lang: string): Promise
 
 // ── 골프장 ─────────────────────────────────────────────────────────
 const ORIGIN = "https://www.rankue.co.kr";
-/** 회원권 시세(만원) → 카드 칸에 들어갈 짧은 꼴: 10억 8,000만 → 10.8억, 9,100만 그대로 */
-const shortManwon = (n: number) => (n >= 10000 ? `${(n / 10000).toFixed(n % 10000 ? 1 : 0).replace(/\.0$/, "")}억` : `${n.toLocaleString("ko-KR")}만`);
 /**
  * 로고는 정적 파일(/img/golf-logos/…)이라 함수 번들에 없다 — 사이트에서 받아 data URI 로. 못 받으면 이름 글자.
  * 어드민에서 올린 로고(2026-10-07)는 우리 저장소의 주소 그대로 받는다. 그 밖의 주소는 받지 않는다.
  */
-async function logoDataUri(path: string | null | undefined): Promise<string | null> {
+/**
+ * 카드에 올릴 로고 — 받아서 여백을 잘라 낸다(lib/logoTrim). 흰색뿐인 로고(-light.png)는 light 로 표시해 어두운 판에 놓게 한다
+ * (예전에는 흰 판에서 안 보여 버렸다). 같은 로고를 다시 받지 않게 이 함수 인스턴스가 사는 동안 쥐고 있는다.
+ */
+const logoCache = new Map<string, GolfCourseCardInput["logo"]>();
+async function cardLogo(path: string | null | undefined): Promise<GolfCourseCardInput["logo"]> {
   const uploaded = isUploadedLogo(path);
   if (!path || (!uploaded && !/^\/img\/golf-logos\/[\w.-]+\.png$/.test(path))) return null;
-  // 흰색뿐인 로고(-light.png)는 카드의 흰 판에서 안 보인다 — 이름 글자로(2026-10-01)
-  if (/-light\.png$/i.test(path)) return null;
+  if (logoCache.has(path)) return logoCache.get(path) ?? null;
+  const light = /-light\.png$/i.test(path);
+  let logo: GolfCourseCardInput["logo"] = null;
   try {
     const r = await fetch(uploaded ? path : `${ORIGIN}${path}`, { signal: AbortSignal.timeout(3000) });
-    if (!r.ok) return null;
-    return `data:image/png;base64,${Buffer.from(await r.arrayBuffer()).toString("base64")}`;
-  } catch { return null; }
+    if (r.ok) {
+      const cut = await trimLogo(new Uint8Array(await r.arrayBuffer()), light);
+      if (cut) logo = { ...cut, light };
+    }
+  } catch { /* 못 받으면 로고 없이 그린다 */ }
+  if (logoCache.size > 600) logoCache.clear();
+  logoCache.set(path, logo);
+  return logo;
+}
+/** 로고가 없는 골프장의 판에 서는 점 지도 — 전국 골프장 점에 이 골프장을 라임으로 켠다. **점만**(시도 윤곽선 자료는 싣지 않는다) */
+function courseCardMap(pages: readonly { lat?: unknown; lng?: unknown }[], p: { region?: string | null; city?: string | null; lat?: unknown; lng?: unknown }): GolfCourseCardInput["map"] {
+  const num = (v: unknown) => (v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v));
+  const w = weatherPoint({ region: p.region, city: p.city, lat: num(p.lat), lng: num(p.lng) });
+  if (!w) return null;
+  const dots = pages.map((x) => ({ lat: num(x.lat), lng: num(x.lng) })).filter((x): x is { lat: number; lng: number } => x.lat != null && x.lng != null);
+  const m = hereMapSvg(dots, w, { width: 372, cols: 24, color: "#64DD17", bg: "#101010", mark: 13, fills: ["rgba(255,255,255,0.42)", "rgba(255,255,255,0.62)", "rgba(255,255,255,0.85)"] });
+  return m ? { uri: `data:image/svg+xml;base64,${Buffer.from(m.svg).toString("base64")}`, width: m.width, height: m.height } : null;
 }
 export async function buildGolfCourseCard(slug: string): Promise<GolfCourseCardInput | null> {
   const s = await loadGolfCourseSummary();
   const p = s.bySlug.get(slug);
   if (!p || !p.name?.trim()) return null;
-  const fees = p.fees && Array.isArray(p.fees.rows) ? (p.fees as Fees) : null;
-  const fee = weekdayFee(fees);
-  const top = s.top.get(slug);
-  const tiles: GolfCourseCardInput["tiles"] = [];
-  if (fee) tiles.push({ label: "주중 그린피", value: wonShort(fee), accent: "lime" });
-  else if (p.feeFrom) tiles.push({ label: "그린피", value: `${wonShort(p.feeFrom)}~`, accent: "lime" });
-  if (top?.price) tiles.push({ label: "회원권 시세", value: shortManwon(top.price), accent: "orange" });
-  if (p.holes) tiles.push({ label: "코스", value: `${p.holes}홀` });
+  const logo = await cardLogo(p.logo);
   return {
     name: p.name,
     where: courseWhere(p.region, p.city),
-    shape: [p.kind, ...(p.grass ?? []).slice(0, 1)].filter(Boolean).join(" · "),
-    logo: await logoDataUri(p.logo),
-    tiles,
+    facts: [p.holes ? `${p.holes}홀` : null, p.kind || null].filter(Boolean).join(" · "),
+    logo,
+    // 지도는 로고가 없을 때만 쓴다
+    map: logo ? null : courseCardMap(s.pages, p),
   };
 }
 
@@ -270,13 +283,15 @@ export async function buildStoreCard(code: string): Promise<StoreCardInput | nul
   const areas = storeAreasKo(s.address, s.region);
   const tables = ([["대대", s.tableLarge], ["중대", s.tableMedium], ["포켓", s.tablePocket]] as const)
     .filter(([, n]) => n != null && n > 0).map(([label, n]) => ({ label, n: n as number }));
-  const r10 = ([["대대", s.rate10Large], ["중대", s.rate10Medium], ["포켓", s.rate10Pocket]] as const).filter(([, v]) => v != null);
-  const rates = r10.length ? [`10분당 ${r10.map(([l, v]) => `${l} ${won(v as number)}`).join(" · ")}`] : [];
+  // 10분 요금 — 테이블마다 다르면 가장 싼 값에 "~"(한 줄에 다 적으면 작은 크기에서 읽히지 않는다)
+  const r10 = [s.rate10Large, s.rate10Medium, s.rate10Pocket].filter((v): v is number => v != null && v > 0);
+  const rate = r10.length ? `10분 ${won(Math.min(...r10))}${new Set(r10).size > 1 ? "~" : ""}` : null;
   return {
+    code: s.code,
     name: s.name,
     // 두 번째로 긴 동네(시·구) — 가장 긴 것(동까지)은 카드 머리에 길다
     area: areas.length > 1 ? areas[areas.length > 2 ? 1 : 0] : areas[0] ?? s.region,
-    tables, rates, hours: s.openHours,
+    tables, rate,
   };
 }
 

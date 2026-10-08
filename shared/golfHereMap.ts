@@ -52,6 +52,8 @@ export function hereMapSvg(dots: readonly { lat: number; lng: number }[], at: { 
     bg?: string;
     /** 켜진 점의 반지름(그림 px) */
     mark?: number;
+    /** 한 칸의 골프장 수(1·2·3곳 이상)별 점 색 — 기본은 작은 지도용의 옅은 흰색. 지도가 주인공인 큰 카드는 더 밝게 준다 */
+    fills?: readonly [string, string, string];
 }): { svg: string; width: number; height: number } | null {
     const here = herePoint(at.lat, at.lng);
     if (!here || dots.length < 20) return null;
@@ -59,7 +61,7 @@ export function hereMapSvg(dots: readonly { lat: number; lng: number }[], at: { 
     const u = HERE_BOX[2] / width; // 그림 1px = 지도 칸 u
     const g = HERE_BOX[2] / (o.cols ?? 20);
     const cells = toCells(dots.map((d, i): MapDot => ({ key: String(i), lat: d.lat, lng: d.lng, tone: "on" })), g);
-    const fill = ["rgba(255,255,255,0.22)", "rgba(255,255,255,0.34)", "rgba(255,255,255,0.48)"];
+    const fill = o.fills ?? ["rgba(255,255,255,0.22)", "rgba(255,255,255,0.34)", "rgba(255,255,255,0.48)"];
     const body = cells.map((c) => `<circle cx="${f(c.x)}" cy="${f(c.y)}" r="${f(g * 0.3)}" fill="${fill[Math.min(c.n, 3) - 1]}"/>`).join("");
     const color = o.color ?? "#64DD17", bg = o.bg ?? "#0A0A0A";
     const r = (o.mark ?? 5) * u;

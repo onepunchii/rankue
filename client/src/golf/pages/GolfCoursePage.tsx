@@ -35,6 +35,7 @@ import { CourseLayout } from "@/golf/components/course/detail/CourseLayout";
 import { AboutInfo } from "@/golf/components/course/detail/AboutInfo";
 import { LocationCard } from "@/golf/components/course/detail/LocationCard";
 import { hereTone } from "@shared/golfHereMap";
+import { golfCourseCardUrl } from "@shared/ogCards";
 import { NearbyCourses } from "@/golf/components/course/detail/NearbyCourses";
 import { NearbyPlaces } from "@/golf/components/course/detail/NearbyPlaces";
 import { SectionNav, jumpTo } from "@/golf/components/course/detail/SectionNav";
@@ -166,7 +167,7 @@ export default function GolfCoursePage() {
             ...(distinctAliases(d.name, d.aliases).length ? { alternateName: distinctAliases(d.name, d.aliases) } : {}),
             ...(d.logo ? { logo: ORIGIN + d.logo } : {}),
             // 대표 이미지 = 골프장 카드 — 프리렌더(renderGolfCourse)와 같은 주소
-            image: `${ORIGIN}/og/golf-course/${encodeURIComponent(d.slug)}.png`,
+            image: golfCourseCardUrl(ORIGIN, d.slug),
             ...(d.phone ? { telephone: d.phone } : {}),
             ...(d.website ? { sameAs: [d.website] } : {}),
             address: {
@@ -175,7 +176,7 @@ export default function GolfCoursePage() {
             },
             ...(d.lat != null && d.lng != null ? { geo: { "@type": "GeoCoordinates", latitude: d.lat, longitude: d.lng } } : {}),
         };
-        return { title: courseTitle(facts), description: courseDescription(facts), path: coursePath(d.slug), image: `${ORIGIN}/og/golf-course/${encodeURIComponent(d.slug)}.png`, jsonLd };
+        return { title: courseTitle(facts), description: courseDescription(facts), path: coursePath(d.slug), image: golfCourseCardUrl(ORIGIN, d.slug), jsonLd };
     }, [d, top?.price]);
     useSeo(seo);
 

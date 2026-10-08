@@ -598,7 +598,7 @@ function cardGallery(label: string, items: { href: string; img: string; name: st
 }
 function golfCardGallery(ps: GolfPageRow[]): string {
   return cardGallery("대표 골프장", ps.slice(0, 12).map((p) => ({
-    href: coursePath(p.slug), img: golfCourseCardUrl(ORIGIN, p.slug), name: p.name, alt: `${p.name} 그린피·회원권 시세 카드`,
+    href: coursePath(p.slug), img: golfCourseCardUrl(ORIGIN, p.slug), name: p.name, alt: `${p.name} 골프장 카드`,
   })));
 }
 
@@ -843,7 +843,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
   const nearHtml = near.length
     ? `\n  <h2>${esc(p.name)} 가까운 골프장</h2>\n  <ul>\n  ${near.map(({ x, km }) => golfCourseLi(s, x, byListing, { where: true, km })).join("\n  ")}\n  </ul>` +
       `\n  ${cardGallery(`${p.name} 가까운 골프장`, near.slice(0, 6).map(({ x }) => ({
-        href: coursePath(x.slug), img: golfCourseCardUrl(ORIGIN, x.slug), name: x.name, alt: `${x.name} 그린피·회원권 시세 카드`,
+        href: coursePath(x.slug), img: golfCourseCardUrl(ORIGIN, x.slug), name: x.name, alt: `${x.name} 골프장 카드`,
       })))}`
     : "";
 
@@ -891,11 +891,11 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
     desc,
     canonical,
     // 골프장마다 자기 카드(이름·로고·그린피·시세) — 490곳이 같은 가로 그림을 쓰던 것(잘려서 '골프 490곳'만 보였다)을 대신한다
-    image: roundImage ?? { url: golfCourseCardUrl(ORIGIN, slug), width: CARD_SIZE, height: CARD_SIZE, alt: `${p.name} 그린피·회원권 시세 — 랭큐 골프` },
+    image: roundImage ?? { url: golfCourseCardUrl(ORIGIN, slug), width: CARD_SIZE, height: CARD_SIZE, alt: `${p.name} — 랭큐 골프` },
     jsonLd: [{ "@context": "https://schema.org", "@graph": [course, crumbs.ld] }],
     body: `<main>
   ${crumbs.html}
-  <img src="${esc(golfCourseCardUrl(ORIGIN, slug))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(`${p.name} 그린피·회원권 시세 카드`)}" loading="eager">
+  <img src="${esc(golfCourseCardUrl(ORIGIN, slug))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(`${p.name} 골프장 카드`)}" loading="eager">
   ${p.logo ? `<img src="${esc(p.logo)}" alt="${esc(`${p.name} 로고`)}" width="160" height="56" loading="lazy">` : ""}
   <h1>${esc(p.name)}</h1>
   <p>${esc(desc)}</p>
@@ -2468,7 +2468,7 @@ ${list}
   <nav><a href="/stores">← 매장 찾기</a></nav>
   <h1>${esc(regionQ)} 당구장 ${hit.n.toLocaleString("ko-KR")}곳</h1>
   <p>${esc(regionQ)} 지역 당구장의 주소·영업시간·테이블 구성·요금을 확인하세요.</p>
-  ${cardGallery(`${regionQ} 당구장`, dirRows.slice(0, 12).map((x) => ({ href: `/stores/${x.code}`, img: storeCardUrl(ORIGIN, x.code), name: x.name, alt: `${x.name} 요금·영업시간 카드` })))}
+  ${cardGallery(`${regionQ} 당구장`, dirRows.slice(0, 12).map((x) => ({ href: `/stores/${x.code}`, img: storeCardUrl(ORIGIN, x.code), name: x.name, alt: `${x.name} 당구장 카드` })))}
   <h2>${esc(regionQ)} 당구장 목록</h2>
   ${dirRows.map((s) => `<section><h3><a href="/stores/${esc(s.code)}">${esc(s.name)}</a></h3><p>${esc(s.address)}</p></section>`).join("\n  ")}
   <h2>다른 지역 당구장</h2>
@@ -2593,7 +2593,7 @@ ${list}
         desc: storeDescKo(s.name, s.address, s as any, s.openHours),
         canonical: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
         // 매장 카드(요금·테이블·영업시간) — 1,199곳 대표 이미지가 하나도 없었다(2026-09-30)
-        image: { url: storeCardUrl(ORIGIN, s.code), width: CARD_SIZE, height: CARD_SIZE, alt: `${s.name} 요금·영업시간 카드` },
+        image: { url: storeCardUrl(ORIGIN, s.code), width: CARD_SIZE, height: CARD_SIZE, alt: `${s.name} 당구장 카드` },
         jsonLd: [
           { ...storeJsonLd(s as any, ORIGIN), image: storeCardUrl(ORIGIN, s.code) },
           {
@@ -2608,7 +2608,7 @@ ${list}
         ],
         body: `<main>
   <nav><a href="/stores">← 매장 찾기</a> › <a href="${esc(regionHref)}">${esc(s.region)} 당구장</a></nav>
-  <img src="${esc(storeCardUrl(ORIGIN, s.code))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(`${s.name} 요금·영업시간 카드`)}" loading="eager">
+  <img src="${esc(storeCardUrl(ORIGIN, s.code))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(`${s.name} 당구장 카드`)}" loading="eager">
   <h1>${esc(s.name)}</h1>
   <p>${esc(s.region)}</p>
   <p><a href="${esc(mapLink(s as any))}" rel="noopener">길찾기 · 지도에서 보기</a>${s.phone ? ` · <a href="tel:${esc(s.phone)}">전화 걸기</a>` : ""}</p>
@@ -2621,7 +2621,7 @@ ${list}
     ${rates.length ? `<dt>요금</dt><dd>${esc(rates.join(", "))}</dd>` : ""}
   </dl>
   ${crews.length ? `<h2>이 매장에서 활동하는 크루</h2><ul>${crews.map((c) => `<li><a href="/club/${esc(c.id)}">${esc(c.name)}</a></li>`).join("")}</ul>` : ""}
-  ${nearby.length ? `<h2>${esc(s.region)}의 다른 당구장</h2><ul>${nearby.map((n) => `<li><a href="/stores/${esc(n.code)}">${esc(n.name)}</a> — ${esc(n.address)}</li>`).join("")}</ul>${cardGallery(`${s.region}의 다른 당구장`, nearby.map((n) => ({ href: `/stores/${n.code}`, img: storeCardUrl(ORIGIN, n.code), name: n.name, alt: `${n.name} 요금·영업시간 카드` })))}<p><a href="${esc(regionHref)}">${esc(s.region)} 당구장 전체 보기</a></p>` : ""}
+  ${nearby.length ? `<h2>${esc(s.region)}의 다른 당구장</h2><ul>${nearby.map((n) => `<li><a href="/stores/${esc(n.code)}">${esc(n.name)}</a> — ${esc(n.address)}</li>`).join("")}</ul>${cardGallery(`${s.region}의 다른 당구장`, nearby.map((n) => ({ href: `/stores/${n.code}`, img: storeCardUrl(ORIGIN, n.code), name: n.name, alt: `${n.name} 당구장 카드` })))}<p><a href="${esc(regionHref)}">${esc(s.region)} 당구장 전체 보기</a></p>` : ""}
   ${hubNav("ko")}
 </main>`,
       }),

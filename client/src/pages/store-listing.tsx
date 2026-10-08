@@ -8,6 +8,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
+import { storeCardUrl } from "@shared/ogCards";
 import { LucidePhone, LucideMapPin, LucideShare2 } from "@/lib/icons";
 import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
 import { useAuth } from "@/hooks/useAuth";
@@ -254,8 +255,8 @@ export default function StoreListingPage() {
     path: `/stores/${code}`,
     locale,
     // 매장 카드 — 프리렌더(/stores/:code)와 같은 주소(2026-09-30)
-    image: s ? `https://www.rankue.co.kr/og/store/${encodeURIComponent(s.code ?? code)}.png` : undefined,
-    jsonLd: s ? { ...storeJsonLd(s), image: `https://www.rankue.co.kr/og/store/${encodeURIComponent(s.code ?? code)}.png` } : null,
+    image: s ? storeCardUrl("https://www.rankue.co.kr", s.code ?? code) : undefined,
+    jsonLd: s ? { ...storeJsonLd(s), image: storeCardUrl("https://www.rankue.co.kr", s.code ?? code) } : null,
   });
 
   const tableRows = s ? [
