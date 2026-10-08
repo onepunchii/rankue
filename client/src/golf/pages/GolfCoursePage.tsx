@@ -26,6 +26,7 @@ import { CourseShell } from "@/golf/components/course/CourseShell";
 import { CourseLogo } from "@/golf/components/course/CourseLogo";
 import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/CourseHeader";
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";
+import { AroundListings } from "@/golf/components/course/detail/AroundListings";
 import { WeatherCard, WeatherSkeleton, type RoundPick } from "@/golf/components/course/detail/WeatherCard";
 import { parseRoundRef, type RoundRef } from "@shared/golfRoundShare";
 import { MembershipPrices, topPrice } from "@/golf/components/course/detail/MembershipPrices";
@@ -261,6 +262,8 @@ export default function GolfCoursePage() {
 function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: SectionId[]; distance: string | null; weather: CourseWeather | null; linked: RoundRef | null }) {
     const city = cityShort(d.city);
     const tgm = d.prices.length > 0 || !!d.fees || !!d.intro;
+    // 지도에 '여기'로 켤 자리 — 좌표가 엉뚱한 골프장은 서버가 바로잡은 자리(spot)를 준다. 작은 지도 둘(이 근처 · 위치)이 같은 자리를 쓴다
+    const here = d.spot ?? (d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null);
     // 날씨 카드에서 보고 있는 라운드 — 먹거리 구역이 따라온다
     const [round, setRound] = useState<RoundPick | null>(null);
     // 주소에 라운드가 실려 왔으면(?d=&t= — 공유 받은 주소·전날 알림) 날씨가 준비되는 대로 그 구역으로 한 번 내려간다
@@ -278,6 +281,9 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
                 남은 형제를 key 로 찾다가 같은 key 끼리 덮어써서 옛 '시세'·'소개' 구역을 지우지 못했다 — 화면에 구역이 두 번 떴다. */}
             <SectionNav ids={ids} />
             {ids.includes("tee") && <TeeTimes slug={d.slug} name={d.name} listings={d.listings} counts={d.counts} myWatch={d.myWatch} watchers={d.watchers} />}
+            {/* 이 근처 조인·부킹(2026-10-08 오너: "각 개별 CC 페이지에 이 카드 들어가면 어때? … 조인 활성화" → "시안 1 이 좋네") — 이 골프장에 글이
+                없어도 같은 지역의 자리로 이어 준다. 티타임 바로 밑, 소개 띠 앞 */}
+            <AroundListings key={`around:${d.slug}`} slug={d.slug} lat={here?.lat ?? null} lng={here?.lng ?? null} region={d.region} className="px-5 mt-3" />
             {/* 랭큐 골프 소개(2026-10-05) — 검색으로 들어온 비로그인 방문자에게만. 티타임 바로 아래, 시세·그린피 정보는 가리지 않게 */}
             <GolfGuestIntro className="mx-4 mt-8" />
             {/* 날씨(2026-10-05) — 골프장 이름에 붙여 가장 많이 찾는 말. 티타임 다음, 시세·그린피 앞 */}
@@ -287,7 +293,7 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}
             {ids.includes("about") && <AboutInfo key={`about:${d.slug}`} intro={d.intro} info={d.info} grass={d.grass} />}
             <LocationCard name={d.name} address={d.address} lat={d.lat} lng={d.lng} distance={distance} phone={d.phone} website={d.website || d.info?.homepage || null} region={d.region} tone={hereTone(d.counts, !!d.myWatch)}
-                here={d.spot ?? (d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null)} />
+                here={here} />
             {/* 근처 먹거리·카페·숙소(2026-10-05) — 네이버 지역 검색을 그 자리에서. 위치 바로 아래(라운드 끝나고 어디서 먹을지).
                 날씨에서 보고 있는 라운드(round)가 첫 메뉴 칩을 고른다 */}
             {ids.includes("food") && <NearbyPlaces key={`food:${d.slug}`} slug={d.slug} name={d.name} region={d.region} city={d.city} round={round} />}
