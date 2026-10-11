@@ -441,7 +441,7 @@ export class ThreeRenderer implements Renderer {
         const L = computeLayout({ width: w, height: h }, this.table, insets);
         this.layout = L;
         if (this.opts.dpr === undefined) this.dpr = defaultDpr();
-        this.palette = readPalette(this.el.ownerDocument);
+        this.palette = readPalette(this.el);
         this.applyPalette(this.palette);
         this.applyClearColor(this.el);
 

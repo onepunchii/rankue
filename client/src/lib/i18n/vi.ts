@@ -2791,6 +2791,7 @@ const vi: Dict = {
   "sim.watch.host": "Chủ phòng",
   "sim.watch.guest": "Khách",
   "sim.watch.toRooms": "Phòng",
+  "sim.watch.exit": "Thoát",
   "sim.rooms.joinTitle": "Vào phòng",
   "sim.rooms.password": "Mật khẩu",
   "sim.rooms.passwordHint": "Nhập mật khẩu do chủ phòng đặt",

@@ -216,7 +216,7 @@ export class Overlay {
         this.h = h;
         this.canvas.width = Math.max(1, Math.round(w * this.dpr));
         this.canvas.height = Math.max(1, Math.round(h * this.dpr));
-        this.palette = readPalette(this.mount.ownerDocument);
+        this.palette = readPalette(this.mount);
         this.col = buildColours(this.palette);
         if (this.last) this.draw(this.last);
     }

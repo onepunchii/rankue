@@ -2791,6 +2791,7 @@ const tr: Dict = {
   "sim.watch.host": "Kurucu",
   "sim.watch.guest": "Konuk",
   "sim.watch.toRooms": "Odalar",
+  "sim.watch.exit": "Çık",
   "sim.rooms.joinTitle": "Odaya katıl",
   "sim.rooms.password": "Şifre",
   "sim.rooms.passwordHint": "Ev sahibinin belirlediği şifreyi gir",

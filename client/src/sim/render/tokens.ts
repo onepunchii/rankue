@@ -79,11 +79,18 @@ export const DEFAULT_PALETTE: Palette = {
     ballRed: [200, 68, 46, 1],
 };
 
-/** :root 에서 토큰을 읽는다. doc 이 없거나 getComputedStyle 이 없으면 기본값. */
-export function readPalette(doc: Document | null | undefined): Palette {
-    if (!doc || typeof getComputedStyle !== "function" || !doc.documentElement) return DEFAULT_PALETTE;
+/**
+ * 토큰을 읽는다 — **요소를 주면 그 요소에서**(CSS 변수는 상속되므로 .sim-dark 안이면 검은 배색 값이 나온다), 문서를 주면 :root 에서.
+ * 2026-10-11 문의("다시보기 바탕이 흰색이라 3D 버튼이 안 보여 강제 종료"): 렌더러가 늘 :root(밝은 테마)의 --surface-1(흰색)을
+ * 읽어 3D 바탕·바닥을 흰색으로 지웠다 — 온라인게임 구역은 .sim-dark(검정)인데. 그래서 렌더러는 마운트 요소를 넘긴다.
+ * 읽을 수 없으면 기본값.
+ */
+export function readPalette(src: Document | Element | null | undefined): Palette {
+    if (!src || typeof getComputedStyle !== "function") return DEFAULT_PALETTE;
+    const target = "documentElement" in src ? src.documentElement : src;
+    if (!target) return DEFAULT_PALETTE;
     let cs: CSSStyleDeclaration;
-    try { cs = getComputedStyle(doc.documentElement); } catch { return DEFAULT_PALETTE; }
+    try { cs = getComputedStyle(target); } catch { return DEFAULT_PALETTE; }
     const pick = (name: string, fallback: RGBA): RGBA => {
         try { return parseColor(cs.getPropertyValue(name)) ?? fallback; } catch { return fallback; }
     };

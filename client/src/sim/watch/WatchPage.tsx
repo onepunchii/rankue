@@ -447,11 +447,20 @@ export default function WatchPage({ matchId }: { matchId: string }) {
 
             <div ref={tableRef} className="flex-1 min-h-[45vh] relative">
                 {/* 3D 보기 토글 — 선수 화면과 같은 시점으로 볼 수 있다(되는 기기에서만) */}
+                {/* 2026-10-11 문의: 'bg-surface-1/90' 은 색이 CSS 변수라 투명이 됐고(불투명도 수식어가 안 먹는다) 바탕까지 흰색이라
+                    흰 글씨 버튼이 안 보였다 — 불투명 바탕·진한 테두리·그림자로 어떤 바탕에서도 보이게 */}
                 {viewSupported && (
                     <button
                         type="button" onClick={toggleView}
-                        className="absolute top-2 right-2 z-[3] h-9 px-3 rounded-pill bg-surface-1/90 border border-surface-line text-[12px] font-bold text-ink-2"
+                        className="absolute top-2 right-2 z-[3] h-9 px-3.5 rounded-pill bg-surface-1 border border-surface-line-strong shadow-[0_2px_8px_rgba(0,0,0,.45)] text-[12.5px] font-bold text-ink-1"
                     >{view === "top" ? t("sim.watch.view3d") : t("sim.watch.viewTop")}</button>
+                )}
+                {/* 머리줄의 나가기는 대전 정보(state)가 있을 때만 그려진다 — 없어도 늘 나갈 길이 있게 */}
+                {!headerPlayers && (
+                    <button
+                        type="button" onClick={() => navigate("/online-game?rooms=1")}
+                        className="absolute top-2 left-2 z-[3] h-9 px-3.5 rounded-pill bg-surface-1 border border-surface-line-strong shadow-[0_2px_8px_rgba(0,0,0,.45)] text-[12.5px] font-bold text-ink-1"
+                    >{t("sim.watch.exit")}</button>
                 )}
             </div>
 

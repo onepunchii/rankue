@@ -2791,6 +2791,7 @@ const en: Dict = {
   "sim.watch.host": "Host",
   "sim.watch.guest": "Guest",
   "sim.watch.toRooms": "Rooms",
+  "sim.watch.exit": "Leave",
   "sim.rooms.joinTitle": "Join room",
   "sim.rooms.password": "Password",
   "sim.rooms.passwordHint": "Enter the password set by the host",

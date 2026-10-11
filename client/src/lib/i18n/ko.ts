@@ -2793,6 +2793,7 @@ export const ko: Dict = {
   "sim.watch.host": "방장",
   "sim.watch.guest": "상대",
   "sim.watch.toRooms": "멀티방으로",
+  "sim.watch.exit": "나가기",
   "sim.rooms.joinTitle": "방 참가",
   "sim.rooms.password": "비밀번호",
   "sim.rooms.passwordHint": "방장이 정한 비밀번호를 입력하세요",

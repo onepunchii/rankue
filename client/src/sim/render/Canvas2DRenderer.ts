@@ -178,7 +178,7 @@ export class Canvas2DRenderer implements Renderer {
         const insets = this.readInsets();
         this.layout = computeLayout({ width: w, height: h }, this.table, insets);
         if (this.opts.dpr === undefined) this.dpr = defaultDpr();
-        this.palette = readPalette(this.el.ownerDocument);
+        this.palette = readPalette(this.el);
         this.ringHalo = rgba(this.palette.surface1, RING_HALO_ALPHA);
         this.ringBrand = rgba(this.palette.brand);
 
