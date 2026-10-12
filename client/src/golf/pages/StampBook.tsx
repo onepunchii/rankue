@@ -8,12 +8,13 @@
  */
 import { useState } from "react";
 import { Link, useRoute } from "wouter";
-import { LucideChevronRight } from "@/lib/icons";
+import { LucideChevronRight, LucideShare2 } from "@/lib/icons";
 import { CourseShell } from "@/golf/components/course/CourseShell";
 import { Skel } from "@/golf/components/course/detail/ui";
 import { BOOK_ART, coverSrc } from "@/golf/stamps/bookArt";
 import { InkStamp } from "@/golf/stamps/InkStamp";
 import { StampHelpButton, StampHelpSheet } from "@/golf/stamps/StampHelp";
+import { StampShareSheet } from "@/golf/stamps/StampShareSheet";
 import { awardWhen, useStampAwards } from "@/golf/stamps/useStampAwards";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
 import { MarkerArt, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampPaper, StampSection, bookPath } from "@/golf/stamps/StampParts";
@@ -27,6 +28,7 @@ export default function StampBookPage() {
     const col = useStampCollection();
     const state = col.states.find((s) => s.book.id === params?.book);
     const [help, setHelp] = useState(false);
+    const [share, setShare] = useState(false);
     // 받은 기록(몇 번째 · 받은 날) — 회원의 것만. 예시에는 붙이지 않는다
     const awards = useStampAwards();
 
@@ -53,6 +55,8 @@ export default function StampBookPage() {
     return (
         <CourseShell title={`${book.name} 도장첩`} backTo={STAMPS_PATH} hideBottomCta right={<StampHelpButton onClick={() => setHelp(true)} />}>
             <StampHelpSheet open={help} onOpenChange={setHelp} />
+            {/* 완성 카드 — 내가 다 채운 권에서만 열린다(예시 · 채우는 중에는 단추가 없다) */}
+            {done && !col.sample && <StampShareSheet open={share} onClose={() => setShare(false)} bookId={book.id} bookName={book.name} />}
             <div className="pb-10" data-testid="stamp-book" data-book={book.id} data-sample={col.sample ? "1" : "0"}>
                 {/* 표지 — 위쪽 하늘에 제목 */}
                 <div className="relative h-[232px] overflow-hidden">
@@ -87,6 +91,16 @@ export default function StampBookPage() {
                                 <div className="text-[17px] font-semibold tabular-nums text-[#FFFFFF]">{got}<span className="text-[13px] font-normal text-[#FFFFFF99]">/{total}</span></div>
                             </div>
                         </div>
+
+                        {/* 다 채운 권 — 완성 카드를 내보낸다(서명된 주소 · 30일). 예시에는 없다 */}
+                        {done && !col.sample && (
+                            <div className="px-5 pt-2.5">
+                                <button type="button" onClick={() => setShare(true)} className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#E9B94924] text-[15px] font-semibold text-[#FFD36B] ring-1 ring-inset ring-[#E9B94959] active:bg-[#E9B9493D]" data-testid="stamp-share">
+                                    <LucideShare2 weight="bold" className="h-[18px] w-[18px]" aria-hidden />
+                                    완성 카드 공유
+                                </button>
+                            </div>
+                        )}
 
                         {/* 한 곳 남음 — 마지막 골프장으로 가는 줄. 조인 · 날씨 · 관심 알림은 그 골프장 화면에 있다 */}
                         {last && (

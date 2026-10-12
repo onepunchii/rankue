@@ -20,6 +20,8 @@ import { getGolfFootprints } from "../../storage/golfFootprints.js";
 import { listStampAwards } from "../../storage/golfStampAwards.js";
 import { parseFootprintYear } from "../../../shared/golfFootprints.js";
 import { signFootprintShare, footprintCardPath } from "../../lib/footprintShare.js";
+import { signStampShare, stampCardPath } from "../../lib/stampShare.js";
+import { bookStates, stampBook } from "../../../shared/golfStampBooks.js";
 import { parseLatLng } from "../../../shared/golfNearby.js";
 import { ONSITE_SOURCES, type OnSiteSource } from "../../../shared/golfOnSite.js";
 import { sanitizeHolePatches, withoutHoleStats } from "../../../shared/golfHoleStats.js";
@@ -821,6 +823,23 @@ router.get("/joins", asyncHandler(async (req: AuthRequest, res: any) => {
  */
 router.get("/stamp-awards", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     return sendSuccess(res, { awards: await listStampAwards(req.userId!) });
+}));
+
+/**
+ * 도장첩 완성 카드의 공유 주소(2026-10-12) — **본인의, 다 채운 권만**. 서명된 주소를 만들어 줄 뿐 아무것도 저장하지 않는다
+ * (그래서 GET 이다 — 발자국 카드의 /passport/footprints/share 와 같다). 주소는 30일 뒤 닫힌다(server/lib/stampShare).
+ */
+router.get("/stamp-share", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const book = stampBook(String(req.query.book ?? ""));
+    if (!book) return sendError(res, 404, "없는 도장첩이에요");
+    const stats = await storage.getGolfPassportStats(req.userId!);
+    const state = bookStates((stats?.stamps ?? []) as { clubId: string | null; name: string }[]).find((s) => s.book.id === book.id);
+    if (!state?.done) return sendError(res, 404, "다 채운 도장첩만 카드로 만들 수 있어요");
+    const signed = signStampShare(req.userId!, book.id);
+    if (!signed) return sendError(res, 503, "지금은 공유 링크를 만들 수 없어요");
+    // 주소 자체가 열쇠다 — 어디에도 캐시되지 않게
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, { url: stampCardPath(req.userId!, book.id, signed.token), expiresAt: new Date(signed.exp * 1000).toISOString() });
 }));
 
 router.get("/passport-stats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {

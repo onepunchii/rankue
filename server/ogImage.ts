@@ -23,6 +23,10 @@ import { baseLabel, type WxKind } from "../shared/golfWeather.js";
 import { getGolfFootprints } from "./storage/golfFootprints.js";
 import { parseFootprintYear } from "../shared/golfFootprints.js";
 import { verifyFootprintShare } from "./lib/footprintShare.js";
+import { renderGolfStampCardPng, type StampCardInput } from "./services/golfStampCard.js";
+import { verifyStampShare } from "./lib/stampShare.js";
+import { listStampAwards } from "./storage/golfStampAwards.js";
+import { bookStates, stampBook } from "../shared/golfStampBooks.js";
 
 // 공개 이미지 라우트 — 선수 카드 PNG (2026-09-14).
 //   /og/player/:category/:umbId.png   UMB 세계랭킹 (ko·en·tr·vi·es)
@@ -32,6 +36,7 @@ import { verifyFootprintShare } from "./lib/footprintShare.js";
 //   /og/golf-round/:slug.png?d=&t=    라운드 브리핑 카드 (2026-10-05) — 그 날·그 티오프의 날씨. 예보가 없으면 404
 //   /og/store/:code.png               당구장 카드 (2026-09-30)
 //   /og/golf-footprints/:memberId.png 골프 발자국 카드 (2026-09-30) — **비공개**: 서명(t)·만료가 맞아야 열린다
+//   /og/golf-stamp/:memberId/:book.png 도장첩 완성 카드 (2026-10-12) — **비공개**: 서명(t)·만료가 맞아야 열린다. 다 채운 권만
 // /api 아래에 두지 않는 이유: robots.txt 가 /api/ 를 막고 있어 구글이 이미지를 못 가져간다.
 // vercel.json 의 /og/(.*) 라우트가 이 함수로 보낸다. 캐시는 하루(회차가 주간이라 충분).
 
@@ -295,6 +300,34 @@ export async function buildStoreCard(code: string): Promise<StoreCardInput | nul
   };
 }
 
+// ── 도장첩 완성 ────────────────────────────────────────────────────
+const dateMs = (v: unknown): number => (v instanceof Date ? v.getTime() : new Date(v as string).getTime());
+/**
+ * 다 채운 권만 카드가 된다(인증 도장으로 센다 — 화면의 도장첩과 같은 셈). 탈퇴한 회원의 카드는 닫는다.
+ * '몇 번째 완성'은 받은 기록(golf_stamp_awards)에 있을 때만 적는다. 없으면 날짜만(마지막 칸을 찍은 날).
+ */
+export async function buildGolfStampCard(memberId: string, bookId: string): Promise<StampCardInput | null> {
+  const book = stampBook(bookId);
+  if (!book) return null;
+  const [stats, members, awards] = await Promise.all([
+    storage.getGolfPassportStats(memberId),
+    db.select({ name: hiqMembers.name, phone: hiqMembers.phone }).from(hiqMembers).where(eq(hiqMembers.id, memberId)).limit(1),
+    listStampAwards(memberId),
+  ]);
+  const m = members[0];
+  if (!m || m.phone?.startsWith("del-")) return null;
+  const state = bookStates((stats?.stamps ?? []) as { clubId: string | null; name: string; firstDate: unknown }[]).find((s) => s.book.id === bookId);
+  if (!state || !state.done) return null;
+  const award = awards.find((a) => a.kind === "book" && a.key === bookId);
+  return {
+    bookId, bookName: book.name, invite: book.kind === "invite",
+    nickname: m.name ?? "",
+    slots: state.slots.map((s) => s.slot.name),
+    serial: award?.serial ?? null,
+    earnedAt: award ? award.earnedAt.getTime() : Math.max(...state.slots.map((s) => dateMs(s.stamp!.firstDate))),
+  };
+}
+
 // ── 골프 발자국 ────────────────────────────────────────────────────
 /** 탈퇴하면 발자국 카드도 닫는다 — 예전에 보낸 링크가 남아 있어도(탈퇴 회원 행은 del- 전화번호로 익명화된다). */
 export async function buildGolfFootprintsCard(memberId: string, year: number | null): Promise<FootprintsCardInput | null> {
@@ -423,6 +456,27 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] golf footprints card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  // 도장첩 완성 — 어느 골프장을 다녔는지라 공개 카드가 아니다(발자국 카드와 같은 규칙). 서명 · 만료가 틀리거나 다 채우지 않은 권이면 404.
+  app.get("/og/golf-stamp/:memberId/:book.png", async (req, res) => {
+    const memberId = String(req.params.memberId ?? "").toLowerCase();
+    const bookId = String(req.params.book ?? "");
+    const notFound = () => res.status(404).setHeader("Cache-Control", "no-store").type("text/plain").send("not found");
+    if (!verifyStampShare(memberId, bookId, req.query.t)) return notFound();
+    try {
+      const input = await buildGolfStampCard(memberId, bookId);
+      if (!input) return notFound();
+      const png = await renderGolfStampCardPng(input);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "private, max-age=600");
+      res.setHeader("X-Robots-Tag", "noindex, nofollow, noimageindex");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] golf stamp card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });
