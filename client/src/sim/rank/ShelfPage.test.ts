@@ -54,7 +54,7 @@ const shelf = (over: Partial<Shelf> = {}): Shelf => ({
     current: { month: "2026-12", daysLeft: 17, minMatches: 5, boards: [{ gameType: "3c", points: 36, matches: 6, wins: 5, rank: 2, total: 4, medal: 2, tier: "gold" }, { gameType: "4c", points: 12, matches: 1, wins: 1, rank: null, total: 0, medal: null, tier: null }] },
     since: "2026-10", closedThrough: "2026-11", ...over,
 });
-function mount(data: Shelf | Error, opts: { memberId?: string; seenAt?: string; noNav?: boolean } = {}) {
+function mount(data: Shelf | Error, opts: { memberId?: string; seenAt?: string; noNav?: boolean; onCup?: () => void } = {}) {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -65,7 +65,7 @@ function mount(data: Shelf | Error, opts: { memberId?: string; seenAt?: string; 
     const seen = { read: () => opts.seenAt ?? "", write };
     React.act(() => {
         root.render(React.createElement(rq.QueryClientProvider, { client: qc },
-            React.createElement(ShelfPage, { onClose: () => undefined, api, memberId: opts.memberId, seen, ...(opts.noNav ? {} : { onRank, onPlay }) })));
+            React.createElement(ShelfPage, { onClose: () => undefined, api, memberId: opts.memberId, seen, onCup: opts.onCup, ...(opts.noNav ? {} : { onRank, onPlay }) })));
     });
     const h: Harness = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); }, get, write, onRank, onPlay };
     live.push(h);
@@ -171,13 +171,37 @@ describe("ShelfPage: 내 장식장", () => {
         expect(seenAll.container.querySelector("[data-testid=shelf-new]")).toBeNull();
     });
 
-    it("월대회 메달 자리는 '아직'이라고 적는다 — 없는 대회의 메달을 그려 두지 않는다", async () => {
+    it("월대회 메달 선반: 다섯 가지(우승 · 준우승 · 3위 · 4위 · 8강) — 받은 것은 개수와 함께, 아직은 어둡게 · 어떻게 받는지 적는다", async () => {
         const h = mount(shelf());
         await ready(h);
-        const cup = q(h, "[data-testid=shelf-cup]")!;
-        expect(cup.textContent).toContain(ko["sim.shelf.cupSoon"]);
-        expect(cup.querySelector("img")!.className).toContain("grayscale");
-        expect(cup.querySelector("button")).toBeNull();
+        const cups = Array.from(h.container.querySelectorAll("[data-cup]"));
+        expect(cups.map((e) => e.getAttribute("data-cup"))).toEqual(["1", "2", "3", "4", "5"]);
+        expect(cups.map((e) => e.getAttribute("data-count"))).toEqual(["0", "0", "0", "0", "0"]);
+        expect(q(h, '[data-cup="1"] img')!.getAttribute("src")).toBe("/sim/rank/cup-1.webp");
+        expect(q(h, '[data-cup="1"] img')!.getAttribute("style")).toContain("grayscale(1)");
+        expect(q(h, '[data-cup="1"] button')).toBeNull();
+        expect(q(h, "[data-testid=shelf-cup-soon]")!.textContent).toBe(ko["sim.shelf.cupSoon"]);
+        // 월대회로 가는 길은 onCup 을 줬을 때만
+        expect(q(h, "[data-testid=shelf-to-cup]")).toBeNull();
+    });
+
+    it("월대회 메달을 받았으면: 선반에 밝게 놓이고, 모은 메달 수에 들어가고, 그 달의 줄에 적힌다", async () => {
+        const onCup = vi.fn();
+        const h = mount(shelf({ awards: [award("2026-11", { kind: "cup", rank: 3, tier: null }), ...shelf().awards] }), { seenAt: "2026-10", onCup });
+        await ready(h);
+        expect(q(h, '[data-cup="3"]')!.getAttribute("data-count")).toBe("1");
+        expect(q(h, '[data-cup="3"] img')!.getAttribute("style")).not.toContain("grayscale");
+        expect(q(h, '[data-cup="3"] [data-testid=shelf-new]')).not.toBeNull();
+        expect(q(h, "[data-testid=shelf-cup-soon]")).toBeNull();
+        // 메달 = 이달의 랭킹 메달 2 + 월대회 메달 1
+        expect(q(h, "[data-testid=shelf-counts]")!.textContent).toBe(ko["sim.shelf.counts"].replace("{m}", "3").replace("{b}", "2"));
+        const nov = q(h, '[data-month="2026-11"]')!;
+        expect(nov.textContent).toContain(ko["sim.cup.rowMedal"].replace("{place}", ko["sim.cup.place3"]));
+        expect(srcs(nov)).toEqual(["/sim/rank/cup-3.webp", "/sim/rank/medal-1.webp", "/sim/rank/tier-gold.webp"]);
+        click(q(h, '[data-cup="3"] button')!);
+        expect(q(h, "[data-testid=shelf-detail]")!.textContent).toContain("2026년 11월");
+        click(q(h, "[data-testid=shelf-to-cup]")!);
+        expect(onCup).toHaveBeenCalledTimes(1);
     });
 });
 

@@ -172,11 +172,13 @@ router.get("/sim/rank/monthly", requireAuth, asyncHandler(async (req: AuthReques
 // GET /sim/rank/me — 네 판의 내 대전 순위(진입 화면 '랭킹' 줄). 랭킹 화면을 네 번 부르지 않으려고 따로 둔다.
 router.get("/sim/rank/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     // shelf: 장식장에 모은 개수(2026-10-12 — 홈 배너의 장식장 칸). 표가 없거나 실패해도 순위는 그대로 보낸다
-    const [boards, shelf] = await Promise.all([
+    // cup: 치르는 중인 월대회에서 내가 칠 판(2026-10-12 — 홈 배너의 한 줄). 없으면 null
+    const [boards, shelf, cup] = await Promise.all([
         storage.sim.myMatchRanks(req.userId!, PLACEMENT_MATCHES),
         storage.simShelf.summary(req.userId!).catch((e: unknown) => { console.error("[shelf summary]", e); return null; }),
+        storage.simCup.summary(req.userId!).catch((e: unknown) => { console.error("[cup summary]", e); return null; }),
     ]);
-    return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards, shelf });
+    return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards, shelf, cup });
 }));
 
 /**

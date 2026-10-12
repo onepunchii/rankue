@@ -2,15 +2,17 @@
 import { apiRequest } from "@/lib/queryClient";
 import { TIERS, type TierId } from "@shared/sim/rank";
 import type { MedalRank, ShelfKind } from "@shared/simShelf";
+import type { CupMedal } from "@shared/simCup";
 import type { DashGameType } from "../dash/dashApi";
 
 export interface ShelfAwardRow {
     /** "2026-10" */
     readonly month: string;
-    readonly kind: ShelfKind;
+    /** cup = 월대회 메달(2026-10-12) — rank 가 1~5(우승 · 준우승 · 3위 · 4위 · 8강) */
+    readonly kind: ShelfKind | "cup";
     readonly gameType: DashGameType;
-    /** month_rank 일 때 1~3 */
-    readonly rank: MedalRank | null;
+    /** month_rank 일 때 1~3 · cup 일 때 1~5 */
+    readonly rank: MedalRank | CupMedal | null;
     /** month_tier 일 때 등급 */
     readonly tier: TierId | null;
     readonly points: number;
@@ -54,6 +56,7 @@ const rec = (v: unknown): Record<string, unknown> => (v && typeof v === "object"
 const cc = (v: unknown): string | null => (typeof v === "string" && /^[A-Z]{2}$/.test(v) ? v : null);
 const tierOrNull = (v: unknown): TierId | null => (typeof v === "string" && TIERS.some((t) => t.id === v) ? (v as TierId) : null);
 const medalOrNull = (v: unknown): MedalRank | null => (v === 1 || v === 2 || v === 3 ? v : null);
+const cupOrNull = (v: unknown): CupMedal | null => (v === 1 || v === 2 || v === 3 || v === 4 || v === 5 ? v : null);
 const monthOr = (v: unknown, d: string): string => (typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v) ? v : d);
 const game = (v: unknown): DashGameType => (v === "4c" ? "4c" : "3c");
 
@@ -69,10 +72,10 @@ export function parseShelf(raw: unknown): Shelf {
         // 종류와 값이 맞지 않는 줄(메달인데 등수가 없다 등)은 버린다 — 빈 그림을 그리지 않는다
         awards: (Array.isArray(o.awards) ? o.awards.map(rec) : []).map((a): ShelfAwardRow | null => {
             const month = monthOr(a.month, "");
-            const kind = a.kind === "month_rank" ? "month_rank" : a.kind === "month_tier" ? "month_tier" : null;
-            const rank = medalOrNull(a.rank), t = tierOrNull(a.tier);
-            if (!month || !kind || (kind === "month_rank" && !rank) || (kind === "month_tier" && !t)) return null;
-            return { month, kind, gameType: game(a.gameType), rank: kind === "month_rank" ? rank : null, tier: kind === "month_tier" ? t : null, points: num(a.points), matches: num(a.matches), wins: num(a.wins), rating: num(a.rating, 1000) };
+            const kind = a.kind === "month_rank" ? "month_rank" : a.kind === "month_tier" ? "month_tier" : a.kind === "cup" ? "cup" : null;
+            const rank = kind === "cup" ? cupOrNull(a.rank) : medalOrNull(a.rank), t = tierOrNull(a.tier);
+            if (!month || !kind || (kind !== "month_tier" && !rank) || (kind === "month_tier" && !t)) return null;
+            return { month, kind, gameType: game(a.gameType), rank: kind === "month_tier" ? null : rank, tier: kind === "month_tier" ? t : null, points: num(a.points), matches: num(a.matches), wins: num(a.wins), rating: num(a.rating, 1000) };
         }).filter((a): a is ShelfAwardRow => a !== null),
         current: {
             month: monthOr(cur.month, ""), daysLeft: num(cur.daysLeft), minMatches: num(cur.minMatches, 5),

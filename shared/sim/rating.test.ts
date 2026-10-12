@@ -92,7 +92,8 @@ describe("그 판의 레이팅 변화(ratingChangeOf)", () => {
         expect(repo.match(/ratingResult: rated \}/g)).toHaveLength(3);
         const route = read("server/routes/modules/simMatch.ts");
         expect(route).toContain('const rating = m.status === "finished" ? ratingChangeOf(parseRatingResult(m.ratingResult), myIndex, PLACEMENT_MATCHES) : null;');
-        expect(route).toContain("return sendSuccess(res, { opponentId: otherId, opponentName: otherName, headToHead, isRival, rating });");
+        // cup: 월대회 판인가(2026-10-12) — 끝난 화면이 대진표로 가는 길을 낸다
+        expect(route).toContain("return sendSuccess(res, { opponentId: otherId, opponentName: otherName, headToHead, isRival, rating, cup: !!m.cupGameId });");
         expect(read("shared/schema.ts")).toContain('ratingResult: jsonb("rating_result"),');
         expect(read("migrations/sim_match_rating_result.sql")).toContain("ALTER TABLE hiq_sim_matches ADD COLUMN IF NOT EXISTS rating_result jsonb;");
     });

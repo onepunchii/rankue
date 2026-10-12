@@ -22,7 +22,7 @@ router.post("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly() });
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), cup: await cupQuietly() });
 }));
 
 // Vercel Cron은 GET으로 호출한다(문서 기준). 동일 핸들러를 재사용.
@@ -33,11 +33,24 @@ router.get("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly() });
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), cup: await cupQuietly() });
 }));
 
 // 라운드 전날 저녁 브리핑(2026-10-05) — 매시 도는 리마인더에 얹는다(크론 항목을 늘리지 않는다: Vercel 요금제가 개수를 센다).
 // 한국 시각 19~20시대에만 일하고 나머지 시간엔 아무것도 읽지 않는다. 여기서 터져도 크루 리마인더의 응답은 깨지 않는다.
+// 월대회 굴리기(2026-10-12) — 기한이 지난 판의 기권을 가리고, 기한 하루 전인 판을 알린다. 매시 도는 리마인더에 얹는다(크론 항목을 늘리지 않는다).
+// 치르는 중인 대회가 없으면 표 하나를 읽고 끝난다. 여기서 터져도 리마인더의 응답은 깨지 않는다.
+async function cupQuietly(): Promise<unknown> {
+    try {
+        const { rollCups, remindDue } = await import("../../services/simCupService.js");
+        const rolled = await rollCups(Date.now());
+        return { ...rolled, reminded: await remindDue(Date.now()) };
+    } catch (e) {
+        console.error("[CupRoll]", e);
+        return { error: true };
+    }
+}
+
 async function golfEveQuietly(): Promise<unknown> {
     try {
         const { runGolfRoundEve } = await import("../../services/golfRoundEve.js");
@@ -210,6 +223,7 @@ const NOTIFICATION_KEEP_DAYS = 7;
 //    실전 경기·성적과 무관한 시뮬 테이블만 건드린다.
 //  · 방문자 발자국: 60일 지난 줄 삭제(2026-10-08).
 //  · 장식장: 끝난 달 마감(2026-10-12) — 이달의 랭킹 메달 · 그 달의 등급 배지를 한 번 준다.
+//  · 월대회: 달 마감 뒤 대회 열기(2026-10-12) — 굴리기(기한 · 기권)는 매시 도는 /reminders 에 얹었다.
 //  · 알림함: 7일 지난 알림 삭제. **안 읽은 것도 지운다**(오너 결정 2026-09-23) — 안 읽은 걸 남기면
 //    546건 중 388건이 안 읽음인 계정은 알림함이 영원히 줄지 않는다.
 async function handleSimCleanup(req: any, res: any) {
@@ -228,7 +242,11 @@ async function handleSimCleanup(req: any, res: any) {
     // 매일 03:15(한국 시각)에 도니 1일 새벽에 지난달이 마감된다. 실패해도 다른 청소 결과는 그대로 보낸다 — 다음 날 다시 마감한다.
     const shelf = await storage.simShelf.closeMonths(Date.now())
         .then((r) => r.closed).catch((e: unknown) => { console.error("[shelf close]", e); return null; });
-    return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, shelf });
+    // 월대회(2026-10-12) — 달이 마감됐으면 그 달의 성적으로 대회를 열고 출전자에게 알린다(shared/simCup). 종목마다 달에 한 번뿐이다.
+    // 마감 바로 뒤에 둔다 — 메달 · 배지와 같은 자료로 출전자를 정한다. 실패해도 다른 결과는 그대로 보낸다(다음 날 다시 연다).
+    const cups = await import("../../services/simCupService.js").then((m) => m.openAndAnnounce(Date.now()))
+        .catch((e: unknown) => { console.error("[cup open]", e); return null; });
+    return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, shelf, cups });
 }
 router.get("/sim-cleanup", asyncHandler(handleSimCleanup));
 router.post("/sim-cleanup", asyncHandler(handleSimCleanup));

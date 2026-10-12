@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { existsSync, readFileSync, statSync } from "node:fs";
+import { resolve } from "node:path";
 import { kstMonthRange, type MatchDelta } from "./simMonthly";
 import {
     CUP_FIRST_MONTH, CUP_GAMES, CUP_MATCH, CUP_MAX_ENTRANTS, CUP_MIN_MATCHES, CUP_MIN_RATING, CUP_MIN_WINDOW_MS, CUP_PLAY_GRACE_MS,
@@ -280,5 +282,132 @@ describe("순위와 메달(cupPlaces)", () => {
             { memberId: "s4", place: 3, medal: 3, forfeit: false },
             { memberId: "s3", place: 4, medal: null, forfeit: true },
         ]);
+    });
+});
+
+/** 서버 · 화면이 그 규칙대로 도는가 — 소스를 읽어 지킨다(한 바퀴는 메모리형 DB 로 따로 돌려 봤다 — 열기 → 기다리기 → 기권 → 결승 → 메달) */
+describe("서버: 대회 판은 대진표에서만 열리고 그 칸의 상대만 들어온다", () => {
+    const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
+    const code = (s: string) => s.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*|--)/.test(l)).join("\n");
+
+    it("참가하는 길(방 id · 코드 모두)에 가드 — 대회 방은 초대된 상대가 아니면 '없는 방'", () => {
+        const route = read("server/routes/modules/simMatch.ts");
+        const fn = route.slice(route.indexOf("async function joinAndStart("), route.indexOf("function pointUnitOf("));
+        expect(fn).toContain('if (m.cupGameId && m.invitedId !== req.userId && m.guestId !== req.userId) return sendError(res, 404, "err.sim.roomNotFound");');
+        // 가드는 비밀번호 · 시작 처리보다 앞에 있다
+        expect(fn.indexOf("m.cupGameId")).toBeLessThan(fn.indexOf("checkRoomPassword"));
+    });
+
+    it("기다리기: 남의 판은 '없는 판' · 들어온 것을 적은 뒤에 방을 연다 · 상대가 먼저 열었으면 내 방은 접는다", () => {
+        const route = read("server/routes/modules/simCup.ts");
+        expect(route).toContain('router.post("/sim/cup/games/:id/ready", requireAuth,');
+        expect(route).toContain('if (!side) return sendError(res, 404, "err.sim.cupGameNotFound");');
+        const a = route.indexOf("await storage.simCup.markReady(game.id, side, now);");
+        const b = route.indexOf("const made = await createHostMatch(me, {");
+        expect(a).toBeGreaterThan(0);
+        expect(b).toBeGreaterThan(a);
+        expect(route).toContain("const bound = await storage.simMatch.bindCup(roomId, me, game.id, opponentId);");
+        expect(route).toContain("await storage.simMatch.cancel(roomId, me).catch(() => false);");
+        // 대회 판의 조건은 한 곳(CUP_MATCH)에서 — 공개 방이 아니다
+        expect(route).toContain("handicap: CUP_MATCH.handicap, isPublic: false,");
+    });
+
+    it("굴리기: 대진 화면을 열 때 · 대회 판이 끝난 화면 · 매시 크론 — 달 마감 뒤에 대회를 연다", () => {
+        expect(read("server/routes/modules/simCup.ts")).toContain("await rollCups(Date.now()).catch(");
+        expect(read("server/routes/modules/simMatch.ts")).toContain('if (m.cupGameId && m.status === "finished") await rollCups().catch(');
+        const cron = read("server/routes/modules/cron.ts");
+        expect(cron).toContain("const rolled = await rollCups(Date.now());");
+        expect(cron.match(/cup: await cupQuietly\(\)/g)).toHaveLength(2);   // /reminders 의 GET · POST
+        expect(cron).toContain("m.openAndAnnounce(Date.now())");
+    });
+
+    it("칸을 고칠 때는 '아직 안 가려졌을 때만' — 같은 때 두 번 굴려도 알림은 한 번", () => {
+        const repo = read("server/storage/simCup.repo.ts");
+        const fn = repo.slice(repo.indexOf("async sync("), repo.indexOf("/** 대진 칸 하나와 그 대회 */"));
+        expect(fn).toContain(".where(and(eq(hiqSimCupGames.id, g.id), isNull(hiqSimCupGames.outcome),");
+        expect(fn).toContain("if (done.length === 0) continue;");
+        expect(fn).toContain('.where(and(eq(hiqSimCups.id, cupId), eq(hiqSimCups.status, "running"))).returning({ id: hiqSimCups.id });');
+        // 메달은 장식장 표에 — 한 번 준 것은 고치지 않는다
+        expect(fn).toContain('kind: "cup" as const');
+        expect(fn).toContain("}))).onConflictDoNothing();");
+        // 시각을 맨 SQL 에 넘길 때는 ISO 글자로(서버의 시간대에 따라 어긋나지 않게)
+        expect(repo).toContain("${new Date(nowMs).toISOString()}");
+        expect(code(repo)).not.toMatch(/sql`[^`]*\$\{new Date\([^)]*\)\}/);
+    });
+
+    it("표: 더하기만 — 새 표 셋과 대전 표의 칸 하나, 정의와 적용 문장이 같은 이름", () => {
+        const sql = read("migrations/sim_cups.sql");
+        for (const t of ["hiq_sim_cups", "hiq_sim_cup_entries", "hiq_sim_cup_games"]) expect(sql).toContain(`CREATE TABLE IF NOT EXISTS ${t} (`);
+        expect(sql).toContain("ALTER TABLE hiq_sim_matches ADD COLUMN IF NOT EXISTS cup_game_id uuid;");
+        expect(code(sql)).not.toMatch(/\b(DROP|DELETE|UPDATE|TRUNCATE)\b/i);
+        expect(code(sql).match(/\bALTER\b/gi)).toHaveLength(1);
+        const schema = read("shared/schema.ts");
+        expect(schema).toContain('export const hiqSimCups = pgTable("hiq_sim_cups", {');
+        expect(schema).toContain('export const hiqSimCupGames = pgTable("hiq_sim_cup_games", {');
+        expect(schema).toContain('cupGameId: uuid("cup_game_id"),');
+        expect(schema).toContain('kind: text("kind", { enum: ["month_rank", "month_tier", "cup"] }).notNull(),');
+    });
+
+    it("알림 · 오류 문구가 다섯 언어에 있다", () => {
+        const need: Record<string, string[]> = {
+            "notif.cup.open.title": [], "notif.cup.open.body": ["{n}"], "notif.cup.paired.title": [], "notif.cup.paired.body": ["{name}"], "notif.cup.waiting.title": [], "notif.cup.waiting.body": ["{name}"],
+            "notif.cup.remind.title": [], "notif.cup.remind.body": ["{name}"], "notif.cup.out.title": [], "notif.cup.out.body": [], "notif.cup.done.title": [], "notif.cup.done.medal": ["{place}"], "notif.cup.done.body": ["{place}"],
+            "err.sim.cupGameNotFound": [], "err.sim.cupGameClosed": [], "err.sim.cupNoOpponent": [],
+        };
+        for (const l of ["ko", "en", "vi", "tr", "es"]) {
+            const d = read(`shared/i18n/${l}.ts`);
+            for (const [k, ph] of Object.entries(need)) {
+                const v = d.match(new RegExp(`^  "${k.replace(/\./g, "\\.")}": "(.*)",$`, "m"))?.[1];
+                expect(v, `${l} ${k}`).toBeTruthy();
+                for (const p of ph) expect(v, `${l} ${k}`).toContain(p);
+            }
+        }
+    });
+});
+
+describe("화면: 월대회", () => {
+    const client = (p: string) => readFileSync(resolve(__dirname, "../client/src", p), "utf8");
+
+    it("들어가는 길: /online-game?cup=1 — 홈 배너 · 이달의 랭킹 · 장식장 · 대회 판이 끝난 화면", () => {
+        const page = client("sim/SimulatorPage.tsx");
+        expect(page).toContain('const cupView = params.get("cup") === "1";');
+        expect(page).toContain("onOpenMatch={(id) => navigate(`/online-game?match=${id}`)}");
+        expect(client("sim/rank/MonthlyRank.tsx")).toContain('{onCup && <CupLink onClick={onCup} className="mt-2" testId="rank-monthly-cup" />}');
+        expect(client("sim/match/MatchEndRapport.tsx")).toContain("{info.cup === true && (");
+        expect(client("sim/cup/cupApi.ts")).toContain('export const CUP_PATH = "/online-game?cup=1";');
+    });
+
+    it("그림: 대회 아이콘과 메달 다섯 장 — webp, 가볍다(한 장 40KB · 합쳐 100KB)", () => {
+        let total = 0;
+        for (const f of ["icon-cup", "cup-1", "cup-2", "cup-3", "cup-4", "cup-5"]) {
+            const p = resolve(__dirname, `../client/public/sim/rank/${f}.webp`);
+            expect(existsSync(p), f).toBe(true);
+            const b = readFileSync(p);
+            expect(b.subarray(0, 4).toString("ascii") === "RIFF" && b.subarray(8, 12).toString("ascii") === "WEBP", f).toBe(true);
+            const n = statSync(p).size; total += n;
+            expect(n, f).toBeLessThan(40 * 1024);
+        }
+        expect(total).toBeLessThan(100 * 1024);
+    });
+
+    it("문구가 다섯 언어에 있고 자리 표시를 지킨다", () => {
+        const need: Record<string, string[]> = {
+            "sim.cup.title": [], "sim.cup.sub": [], "sim.cup.cupOf": ["{month}"], "sim.cup.roundOf": ["{n}"], "sim.cup.semi": [], "sim.cup.final": [], "sim.cup.third": [],
+            "sim.cup.deadline": ["{date}"], "sim.cup.leftDays": ["{d}", "{h}"], "sim.cup.leftHours": ["{h}", "{m}"], "sim.cup.leftMin": ["{m}"], "sim.cup.leftNone": [],
+            "sim.cup.btnWait": [], "sim.cup.btnEnter": [], "sim.cup.btnBack": [], "sim.cup.btnRoom": [], "sim.cup.readyHint": [], "sim.cup.readyFailed": [],
+            "sim.cup.bye": [], "sim.cup.walkover": [], "sim.cup.void": [], "sim.cup.bySeed": [], "sim.cup.tbd": [], "sim.cup.win": [],
+            "sim.cup.place1": [], "sim.cup.place2": [], "sim.cup.place3": [], "sim.cup.place4": [], "sim.cup.place5": [],
+            "sim.cup.nextTitle": ["{month}"], "sim.cup.qualYes": ["{n}"], "sim.cup.qualNo": [], "sim.cup.qualRating": ["{n}"], "sim.cup.qualNow": ["{n}"], "sim.cup.qualMatches": ["{n}"], "sim.cup.qualMatchesNow": ["{n}"],
+            "sim.cup.entrantsSize": ["{n}", "{size}"], "sim.cup.entrantsFew": ["{n}"], "sim.cup.rule1": ["{n}"], "sim.cup.rule2": ["{n}"], "sim.cup.rule3": [], "sim.cup.rule4": [], "sim.cup.rule5": [],
+            "sim.cup.linkSub": [], "sim.cup.shelfMedals": [], "sim.cup.rowMedal": ["{place}"], "sim.cup.toBracket": [],
+        };
+        for (const l of ["ko", "en", "vi", "tr", "es"]) {
+            const d = client(`lib/i18n/${l}.ts`);
+            for (const [k, ph] of Object.entries(need)) {
+                const v = d.match(new RegExp(`^  "${k.replace(/\./g, "\\.")}": "(.*)",$`, "m"))?.[1];
+                expect(v, `${l} ${k}`).toBeTruthy();
+                for (const p of ph) expect(v, `${l} ${k}`).toContain(p);
+            }
+        }
     });
 });

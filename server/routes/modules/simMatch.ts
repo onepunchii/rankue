@@ -36,6 +36,7 @@ import { countWatchers } from "../../../shared/sim/watchers.js";
 import { LOOKALIKE_MIN_MATCHES, nearestPros, nextPro, proTier, type LookalikeResponse } from "../../../shared/proCompare.js";
 import type { MatchWithNames } from "../../storage/simMatch.repo.js";
 import { startTurnSeenAt } from "../../storage/simMatch.repo.js";
+import { rollCups } from "../../services/simCupService.js";
 
 const router = Router();
 
@@ -436,6 +437,8 @@ router.get("/sim/matches/code/:code", requireAuth, asyncHandler(async (req: Auth
 /** 게스트 참가 → 시작. 코드 참가와 멀티방(id) 참가가 같은 길을 쓴다. 비밀번호 방이면 맞아야 한다(403 BAD_PASSWORD). */
 async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body: z.infer<typeof joinSchema>) {
     if (m.hostId === req.userId) return sendError(res, 400, "err.sim.joinOwn");
+    // 월대회 판(2026-10-12)은 그 대진 칸의 상대만 들어온다 — 코드를 알아도 다른 사람은 '없는 방'이다(routes/modules/simCup 이 상대를 invitedId 에 적어 둔다)
+    if (m.cupGameId && m.invitedId !== req.userId && m.guestId !== req.userId) return sendError(res, 404, "err.sim.roomNotFound");
     if (m.status === "playing") {
         if (m.guestId === req.userId) return sendSuccess(res, publicMatch(m, req.userId!));
         return sendError(res, 409, "err.sim.alreadyStarted");
@@ -1067,9 +1070,11 @@ router.get("/sim/matches/:id/rapport", requireAuth, asyncHandler(async (req: Aut
         storage.isFriend(req.userId!, otherId, "BILLIARDS").catch(() => false),
         storage.simMatch.headToHead(req.userId!, otherId),
     ]);
+    // 월대회 판이 끝났으면 대진을 바로 굴린다(2026-10-12) — 끝난 화면을 보는 동안 승자가 다음 칸에 앉고 상대에게 알림이 간다. 실패해도 이 답은 그대로다.
+    if (m.cupGameId && m.status === "finished") await rollCups().catch((e: unknown) => console.error("[cup roll]", e));
     // 이 판이 끝나며 반영된 내 레이팅(2026-10-12) — 끝난 화면의 "레이팅 +12" · "등급이 올랐어요". 반영하지 않은 판 · 그 전에 끝난 판은 null.
     const rating = m.status === "finished" ? ratingChangeOf(parseRatingResult(m.ratingResult), myIndex, PLACEMENT_MATCHES) : null;
-    return sendSuccess(res, { opponentId: otherId, opponentName: otherName, headToHead, isRival, rating });
+    return sendSuccess(res, { opponentId: otherId, opponentName: otherName, headToHead, isRival, rating, cup: !!m.cupGameId });
 }));
 
 /**

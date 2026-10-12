@@ -8,6 +8,8 @@ import { CHAT_END_CODES } from "@shared/sim/chat";
 import { matchApi, type ChatLine } from "../matchApi";
 import type { RatingChange } from "@shared/sim/rating";
 import { MatchRatingCard } from "./MatchRatingCard";
+import { useLocation } from "wouter";
+import { CUP_PATH } from "../cup/cupApi";
 
 /**
  * 끝난 대전 화면에 붙는 "상대가 누구였나" 묶음(2026-09-15 오너: "라포를 느낄 방안").
@@ -35,6 +37,8 @@ interface RapportInfo {
     isRival: boolean;
     /** 이 판이 끝나며 반영된 내 레이팅(2026-10-12). 반영하지 않은 판(친선전 · 너무 짧은 판)과 옛 서버 응답에는 없다. */
     rating?: RatingChange | null;
+    /** 월대회 판이었나(2026-10-12) — 대진표로 가는 길을 낸다. 옛 서버 응답에는 없다 */
+    cup?: boolean;
 }
 interface RematchState {
     rematch: { mine: boolean; theirs: boolean; matchId: string | null } | null;
@@ -43,6 +47,7 @@ interface RematchState {
 export function MatchEndRapport({ matchId, myIndex, onRematch }: { matchId: string; myIndex: number; onRematch: (newMatchId: string) => void }) {
     const { t } = useT();
     const { toast } = useToast();
+    const [, setLocation] = useLocation();
     const [added, setAdded] = useState(false);
 
     // 마무리 인사(2026-09-18 오너: "끝나면 바로 결과 창이 나와서 인사할 시간이 없네"). 서버는 끝난 뒤 30분까지 받는다.
@@ -105,6 +110,13 @@ export function MatchEndRapport({ matchId, myIndex, onRematch }: { matchId: stri
 
     return (
         <>
+        {/* 월대회 판이었으면 대진표로 가는 길(2026-10-12) — 이 화면을 여는 동안 서버가 대진을 굴려 승자가 다음 칸에 앉아 있다 */}
+        {info.cup === true && (
+            <button type="button" onClick={() => setLocation(CUP_PATH)} data-testid="match-cup-link" data-track-as="대전 끝 대진표로"
+                className="w-full h-11 rounded-tile border border-brand/40 bg-brand/10 text-[13.5px] font-bold text-brand active:opacity-80">
+                {t("sim.cup.toBracket")}
+            </button>
+        )}
         {info.rating && <MatchRatingCard rating={info.rating} />}
         <div className="rounded-tile border border-surface-line px-4 py-3">
             <div className="flex items-baseline justify-between gap-2">

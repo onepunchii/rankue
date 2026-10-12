@@ -2255,6 +2255,11 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
    * 끝난 화면의 "레이팅 +12" · "등급이 올랐어요"가 이 값으로 그린다. 반영하지 않은 판(친선전 · 너무 짧은 판)과 그 전에 끝난 판은 null.
    */
   ratingResult: jsonb("rating_result"),
+  /**
+   * 월대회 판(2026-10-12): 이 대전이 치르는 대진 칸(hiq_sim_cup_games.id). 대회 판은 대진표에서만 열리고 그 칸의 상대만 들어온다
+   * (routes/modules/simMatch joinAndStart 가 막는다). 평소 대전은 null. '한 판 더'로 만든 새 대전은 대회 판이 아니다 — 이 칸을 물려받지 않는다.
+   */
+  cupGameId: uuid("cup_game_id"),
   finishedAt: timestamp("finished_at"),
 }, (t) => ({
   idxCode: index("idx_sim_matches_code").on(t.code, t.status),
@@ -2357,7 +2362,8 @@ export const hiqSimAwards = pgTable("hiq_sim_awards", {
   memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
   /** 한국 시각의 달 — "2026-10" */
   month: text("month").notNull(),
-  kind: text("kind", { enum: ["month_rank", "month_tier"] }).notNull(),
+  /** cup = 월대회 메달(rank 1 우승 · 2 준우승 · 3 · 4 · 5 = 8강) — month 는 성적의 달(대회는 다음 달 초에 치른다) */
+  kind: text("kind", { enum: ["month_rank", "month_tier", "cup"] }).notNull(),
   gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
   rank: integer("rank"),
   tier: text("tier"),
@@ -2377,6 +2383,72 @@ export const hiqSimMonthCloses = pgTable("hiq_sim_month_closes", {
 });
 
 export type HiqSimAward = typeof hiqSimAwards.$inferSelect;
+
+/**
+ * 월대회(2026-10-12 오너 "추천대로") — 규칙은 shared/simCup. 그 달(month)의 성적으로 다음 달 1일에 연다.
+ *  - status: running(치르는 중) · finished · skipped(출전자가 3명이 안 돼 열지 않았다 — 줄은 남겨 다시 열지 않는다).
+ *  - rules: 열 때 쓴 조건({ minRating, minMatches, roundDays, match }) — 규칙이 나중에 바뀌어도 그 대회가 무엇으로 열렸는지 남는다.
+ */
+export const hiqSimCups = pgTable("hiq_sim_cups", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  month: text("month").notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  status: text("status", { enum: ["running", "finished", "skipped"] }).notNull(),
+  /** 대진판 크기 4 · 8 · 16(열지 않았으면 0) */
+  size: integer("size").default(0).notNull(),
+  startsAt: timestamp("starts_at").notNull(),
+  finishedAt: timestamp("finished_at"),
+  rules: jsonb("rules"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.month, t.gameType),
+}));
+
+/** 출전자 — 확정 때의 시드 · 레이팅 · 그 달 성적. 끝나면 순위(place) · 메달(medal 1~5, 없으면 null) · 기권 여부 */
+export const hiqSimCupEntries = pgTable("hiq_sim_cup_entries", {
+  cupId: uuid("cup_id").references(() => hiqSimCups.id).notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  seed: integer("seed").notNull(),
+  rating: integer("rating").notNull(),
+  matches: integer("matches").notNull(),
+  points: integer("points").notNull(),
+  place: integer("place"),
+  medal: integer("medal"),
+  forfeit: boolean("forfeit"),
+}, (t) => ({
+  pk: primaryKey({ columns: [t.cupId, t.memberId] }),
+  idxMember: index("idx_sim_cup_entries_member").on(t.memberId),
+}));
+
+/**
+ * 대진 칸 — (kind, round, slot). round 1 = 첫 라운드, 가장 큰 round = 결승. 3·4위전은 kind 'third' 로 결승과 같은 round.
+ * p1/p2 는 정해지는 대로 채워지고, 들어온 적이 있는지(ready)는 기권 판정의 근거다. outcome: played · walkover · seed · bye · void(shared/simCup).
+ */
+export const hiqSimCupGames = pgTable("hiq_sim_cup_games", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  cupId: uuid("cup_id").references(() => hiqSimCups.id).notNull(),
+  kind: text("kind", { enum: ["main", "third"] }).notNull(),
+  round: integer("round").notNull(),
+  slot: integer("slot").notNull(),
+  p1Id: uuid("p1_id"),
+  p2Id: uuid("p2_id"),
+  deadlineAt: timestamp("deadline_at").notNull(),
+  p1ReadyAt: timestamp("p1_ready_at"),
+  p2ReadyAt: timestamp("p2_ready_at"),
+  /** 이 칸을 치는(친) 대전(hiq_sim_matches.id) */
+  matchId: uuid("match_id"),
+  winnerId: uuid("winner_id"),
+  outcome: text("outcome"),
+  decidedAt: timestamp("decided_at"),
+  /** 기한 하루 전 알림을 보낸 때(한 번만) */
+  remindedAt: timestamp("reminded_at"),
+}, (t) => ({
+  uniq: unique().on(t.cupId, t.kind, t.round, t.slot),
+}));
+
+export type HiqSimCup = typeof hiqSimCups.$inferSelect;
+export type HiqSimCupEntry = typeof hiqSimCupEntries.$inferSelect;
+export type HiqSimCupGame = typeof hiqSimCupGames.$inferSelect;
 
 /* ── 골프 랭킹(2026-09-13 오너: PGA·LPGA·KPGA·KLPGA 를 당구 세계랭킹처럼) — shared/golfTours.ts 가 투어 목록의 정본 ── */
 

@@ -427,6 +427,33 @@ export class SimMatchRepository {
         });
     }
 
+    /* ── 월대회 판(2026-10-12, storage/simCup.repo · routes/modules/simCup) ── */
+
+    /** 이 방을 대진 칸에 묶는다 — 그 칸의 상대만 들어올 수 있게 초대 대상도 같이 적는다. 대기 중인 내 방일 때만 */
+    async bindCup(id: string, hostId: string, cupGameId: string, opponentId: string): Promise<boolean> {
+        const res = await db.update(hiqSimMatches).set({ cupGameId, invitedId: opponentId })
+            .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.hostId, hostId), eq(hiqSimMatches.status, "waiting"))).returning({ id: hiqSimMatches.id });
+        return res.length > 0;
+    }
+
+    /** 대진을 굴릴 때 보는 대전들의 지금 상태(shared/simCup CupMatchInfo) — 차례는 자리 번호(0 방장 · 1 게스트)를 회원으로 바꿔 준다 */
+    async cupMatchInfo(ids: readonly string[]): Promise<Map<string, { status: "waiting" | "playing" | "finished" | "canceled"; winnerId: string | null; turnId: string | null; hostId: string; guestId: string | null }>> {
+        const out = new Map<string, { status: "waiting" | "playing" | "finished" | "canceled"; winnerId: string | null; turnId: string | null; hostId: string; guestId: string | null }>();
+        if (ids.length === 0) return out;
+        const rows = await db.select({ id: hiqSimMatches.id, status: hiqSimMatches.status, winnerId: hiqSimMatches.winnerId, hostId: hiqSimMatches.hostId, guestId: hiqSimMatches.guestId, turn: hiqSimMatches.turn })
+            .from(hiqSimMatches).where(inArray(hiqSimMatches.id, [...ids]));
+        for (const r of rows) out.set(r.id, { status: r.status, winnerId: r.winnerId ?? null, hostId: r.hostId, guestId: r.guestId ?? null, turnId: r.status === "playing" ? (r.turn === 0 ? r.hostId : r.guestId ?? null) : null });
+        return out;
+    }
+
+    /** 기한이 지나 결과를 정한 대회 판의 방을 닫는다(대기 방 · 치던 판). 무효라 레이팅과 무관하다 — 끝난 판은 건드리지 않는다 */
+    async cancelForCup(ids: readonly string[]): Promise<number> {
+        if (ids.length === 0) return 0;
+        const rows = await db.update(hiqSimMatches).set({ status: "canceled", endReason: "cup", finishedAt: new Date(), turnSeenAt: null })
+            .where(and(inArray(hiqSimMatches.id, [...ids]), inArray(hiqSimMatches.status, [...LIVE]))).returning({ id: hiqSimMatches.id });
+        return rows.length;
+    }
+
     async cancel(id: string, hostId: string): Promise<boolean> {
         const res = await db.update(hiqSimMatches).set({ status: "canceled", finishedAt: new Date() })
             .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.hostId, hostId), eq(hiqSimMatches.status, "waiting"))).returning({ id: hiqSimMatches.id });

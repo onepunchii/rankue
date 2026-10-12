@@ -15,6 +15,7 @@ import gameRouter from "./modules/game.js";
 import notificationRouter from "./modules/notification.js";
 import simRouter from "./modules/sim.js";
 import simMatchRouter from "./modules/simMatch.js";
+import simCupRouter from "./modules/simCup.js";
 import simDrillRouter from "./modules/simDrill.js";
 import regionRouter from "./modules/region.js";
 import communityRouter from "./modules/community.js";
@@ -81,6 +82,7 @@ router.use("/", gameRouter);
 // 시뮬레이터 v2: /sim/sessions, /sim/ladder — 서버가 shared/sim 으로 재시뮬해 정본을 만든다
 router.use("/", simRouter);
 router.use("/", simMatchRouter);
+router.use("/", simCupRouter);   // 월대회(2026-10-12) — /sim/cup
 router.use("/", simDrillRouter);
 
 

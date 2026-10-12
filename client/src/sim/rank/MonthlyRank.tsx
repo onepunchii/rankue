@@ -23,6 +23,7 @@ import { rankFlag } from "./flag";
 import { RANK_QUERY_KEY, type MonthlyRankRow, type RankApi } from "./rankApi";
 import { RankMedal, TierEmblem } from "./TierEmblem";
 import { ShelfLink } from "./ShelfLink";
+import { CupLink } from "../cup/CupArt";
 
 /** +36 · −12 · 0 — 이달 점수는 늘 부호를 붙여 적는다(통산 레이팅과 헷갈리지 않게) */
 export const signedPoints = (n: number): string => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0");
@@ -63,7 +64,7 @@ const Row = memo(function Row({ r, mine, locale, onOpen }: { r: MonthlyRankRow; 
     );
 });
 
-export function MonthlyRank({ gameType, api, myMemberId, locale, now = Date.now, onShelf }: {
+export function MonthlyRank({ gameType, api, myMemberId, locale, now = Date.now, onShelf, onCup }: {
     gameType: DashGameType;
     api: RankApi;
     myMemberId?: string;
@@ -71,6 +72,8 @@ export function MonthlyRank({ gameType, api, myMemberId, locale, now = Date.now,
     now?: () => number;
     /** 장식장으로 — id 없이 부르면 내 것, 줄을 누르면 그 사람의 것 */
     onShelf?: (memberId?: string) => void;
+    /** 월대회로 — 이달의 성적(레이팅 · 판 수)이 다음 달 초 대회의 출전권이다 */
+    onCup?: () => void;
 }) {
     const { t } = useT();
     const thisMonth = kstMonthOf(now());
@@ -136,6 +139,7 @@ export function MonthlyRank({ gameType, api, myMemberId, locale, now = Date.now,
                         {!closed && <p className="text-[11.5px] font-medium text-white/55 mt-3 leading-relaxed break-keep">{t("sim.rank.monthHint")}</p>}
                         {/* 달이 끝나면 여기서 받은 메달 · 등급 배지가 장식장에 놓인다 */}
                         {onShelf && <ShelfLink onClick={() => onShelf()} sub={t("sim.shelf.linkSub")} className="mt-3" testId="rank-monthly-shelf" />}
+                        {onCup && <CupLink onClick={onCup} className="mt-2" testId="rank-monthly-cup" />}
                     </section>
 
                     {d.rows.length === 0 ? (

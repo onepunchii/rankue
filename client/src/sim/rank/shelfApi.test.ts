@@ -36,10 +36,20 @@ describe("장식장 응답 읽기", () => {
             { month: "2026-10", kind: "month_rank", gameType: "3c", rank: 4 },          // 메달인데 4등
             { month: "2026-10", kind: "month_tier", gameType: "3c", tier: "legend" },   // 없는 등급
             { month: "10월", kind: "month_tier", gameType: "3c", tier: "gold" },         // 달 표기가 틀렸다
-            { month: "2026-10", kind: "cup", gameType: "3c", rank: 1 },                 // 모르는 종류(월대회가 생기기 전의 화면)
+            { month: "2026-10", kind: "trophy", gameType: "3c", rank: 1 },              // 모르는 종류(나중에 생길 것 — 옛 화면이 깨지지 않게 버린다)
+            { month: "2026-10", kind: "cup", gameType: "3c", rank: 6 },                 // 월대회 메달인데 6등(메달은 1~5)
             { month: "2026-09", kind: "month_tier", gameType: "4c", tier: "iron" },
         ] });
         expect(s.awards.map((a) => `${a.month}:${a.tier}`)).toEqual(["2026-09:iron"]);
+    });
+
+    it("월대회 메달(cup)은 1~5 — 우승 · 준우승 · 3위 · 4위 · 8강", () => {
+        const s = parseShelf({ ...raw, awards: [
+            { month: "2026-10", kind: "cup", gameType: "3c", rank: 1, tier: null },
+            { month: "2026-10", kind: "cup", gameType: "3c", rank: 5 },
+            { month: "2026-10", kind: "month_rank", gameType: "3c", rank: 5 },   // 이달의 랭킹 메달은 1~3 뿐이다
+        ] });
+        expect(s.awards.map((a) => `${a.kind}:${a.rank}`)).toEqual(["cup:1", "cup:5"]);
     });
 
     it("빈 답 · 깨진 답에도 화면이 그릴 모양을 준다 — 배치 전이면 등급이 없다", () => {

@@ -16,7 +16,9 @@ import { matchRecord, type EntryMatchRow, type MatchRecord } from "./entryStats"
 export interface RankBoard { gameType: "3c" | "4c"; rating?: number; matches: number; wins?: number; rank: number | null; total: number }
 /** 장식장에 모은 개수와 가장 최근에 받은 달(2026-10-12 — 홈 배너의 장식장 칸). 옛 응답에는 없다 */
 export interface ShelfSummary { medals: number; badges: number; latest: string | null }
-export interface RankMe { placement: number; boards: RankBoard[]; shelf?: ShelfSummary | null }
+/** 치르는 중인 월대회에서 내가 칠 판(2026-10-12 — 홈 배너의 한 줄). 없으면 null */
+export interface CupSummary { month: string; gameType: "3c" | "4c"; deadlineAt: string; waiting: boolean }
+export interface RankMe { placement: number; boards: RankBoard[]; shelf?: ShelfSummary | null; cup?: CupSummary | null }
 
 export interface OnlineRecord {
     record: MatchRecord;
@@ -31,6 +33,8 @@ export interface OnlineRecord {
     ready: boolean;
     /** 장식장에 모은 것 — 못 받았으면 null */
     shelf: ShelfSummary | null;
+    /** 월대회에서 내가 칠 판 — 없으면 null */
+    cup: { deadlineMs: number; waiting: boolean } | null;
 }
 
 export function useOnlineRecord(): OnlineRecord {
@@ -59,9 +63,12 @@ export function useOnlineRecord(): OnlineRecord {
         .filter((b) => b.rank !== null)
         .sort((a, b) => (a.rank! - b.rank!) || (b.total - a.total))[0] ?? null;
     const placingMatches = Math.max(0, ...boards.map((b) => b.matches));
+    const cp = myRank.data?.cup;
+    const cupMs = cp && typeof cp.deadlineAt === "string" ? new Date(cp.deadlineAt).getTime() : Number.NaN;
+    const cup = cp && Number.isFinite(cupMs) ? { deadlineMs: cupMs, waiting: cp.waiting === true } : null;
     const sh = myRank.data?.shelf;
     const shelf: ShelfSummary | null = sh && typeof sh === "object"
         ? { medals: Number(sh.medals) || 0, badges: Number(sh.badges) || 0, latest: typeof sh.latest === "string" ? sh.latest : null }
         : null;
-    return { record, bestBoard, placingMatches, placement: myRank.data?.placement ?? 3, boards, ready: myRank.data !== undefined || myRank.isError, shelf };
+    return { record, bestBoard, placingMatches, placement: myRank.data?.placement ?? 3, boards, ready: myRank.data !== undefined || myRank.isError, shelf, cup };
 }

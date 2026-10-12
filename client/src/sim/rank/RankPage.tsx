@@ -40,6 +40,8 @@ export interface RankPageProps {
     initialScope?: RankScope;
     /** 장식장으로 — id 없이 부르면 내 것, 순위표의 줄을 누르면 그 사람의 것. 안 주면 입구를 그리지 않는다 */
     onShelf?: (memberId?: string) => void;
+    /** 월대회로(2026-10-12) — 이달의 랭킹의 내 카드 아래 한 줄. 이달의 성적이 다음 달 초 대회의 출전권이다 */
+    onCup?: () => void;
 }
 
 export type RankScope = "month" | "all";
@@ -50,7 +52,7 @@ const pill = "h-10 px-3.5 shrink-0 inline-flex items-center rounded-pill border 
 const chipOn = "border-transparent bg-[color:var(--hall-lime)] text-[#0B1A03]";
 const chipOff = "border-white/15 bg-white/[0.08] text-white/85 active:bg-white/15";
 
-export function RankPage({ onClose, api = defaultApi, initial, initialScope, onShelf }: RankPageProps) {
+export function RankPage({ onClose, api = defaultApi, initial, initialScope, onShelf, onCup }: RankPageProps) {
     const { t, locale } = useT();
     const { member } = useAuth();
     const qc = useQueryClient();
@@ -155,7 +157,7 @@ export function RankPage({ onClose, api = defaultApi, initial, initialScope, onS
                 )}
 
                 {scope === "month" && hasMonthly && (
-                    <MonthlyRank gameType={combo.gameType} api={api} myMemberId={member?.id} locale={locale} onShelf={onShelf} />
+                    <MonthlyRank gameType={combo.gameType} api={api} myMemberId={member?.id} locale={locale} onShelf={onShelf} onCup={onCup} />
                 )}
 
                 {scope === "all" && q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.rank.loading")}</p>}

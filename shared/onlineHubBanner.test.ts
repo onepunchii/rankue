@@ -8,7 +8,7 @@ import { resolve } from "node:path";
  *
  * 화면 코드를 읽어 지킨다(vitest 가 client/src 에서는 sim·golf 만 읽어 shared 에 둔다). 상태 계산의 시험은 client/src/sim/rank/hubState.test.ts.
  *  - 자리: 혼자 치기 카드 위.
- *  - 없는 것을 있는 것처럼 보이지 않는다 — 입구는 셋(랭킹 · 장식장 · 대시보드, 장식장은 2026-10-12 에 생겼다). 월대회는 만들어지면 더한다.
+ *  - 없는 것을 있는 것처럼 보이지 않는다 — 입구는 넷(랭킹 · 장식장 · 월대회 · 대시보드, 장식장 · 월대회는 2026-10-12 에 생겼다).
  *  - 비로그인에게 예시 숫자를 만들어 보이지 않는다. 회원의 화면으로 가는 길은 전부 가입 안내를 거친다.
  *  - 같은 숫자를 한 화면에 두 번 적지 않는다 — '내 온라인 실력' 카드의 전적 · 랭킹 칸은 뺐다.
  */
@@ -33,27 +33,38 @@ describe("홈 온라인 대전 배너", () => {
         expect(b).toBeLessThan(c);
     });
 
-    it("입구는 셋 — 랭킹 · 장식장 · 대시보드. 아직 없는 월대회 칸은 그리지 않는다", () => {
-        expect(banner.match(/<Tile /g)).toHaveLength(3);
-        expect(banner).toContain('<div className="grid grid-cols-3 border-t border-white/10 divide-x divide-white/10">');
+    it("입구는 넷 — 랭킹 · 장식장 · 월대회 · 대시보드, 두 줄에 둘씩", () => {
+        expect(banner.match(/<Tile /g)).toHaveLength(4);
+        expect(banner).toContain('<div className="grid grid-cols-2">');
         expect(banner).toContain('const RANK_URL = "/online-game?rank=1";');
         expect(banner).toContain('const DASH_URL = "/online-game?dash=1";');
-        // 장식장(2026-10-12) — 가입 안내를 거쳐 내 장식장으로. 주소는 장식장 쪽 한 곳에서 만든다
+        // 장식장 · 월대회(2026-10-12) — 가입 안내를 거쳐 들어간다. 주소는 그 화면 쪽 한 곳에서 만든다
         expect(banner).toContain('onClick={() => go(shelfPath())} trackAs="홈 배너 장식장"');
-        expect(banner).not.toMatch(/tournament|월대회 칸|cup/i);
+        expect(banner).toContain('onClick={() => go(CUP_PATH)} trackAs="홈 배너 월대회"');
+    });
+
+    it("월대회 칸: 내 경기가 있으면 남은 시간과 점 · 없으면 무엇을 하는 곳인지 — 비로그인에게는 내 경기가 없다", () => {
+        expect(banner).toContain("const myCup = member ? cup : null;");
+        expect(banner).toContain('const cupSub = !myCup ? t("home.hubCupSub")');
+        // 칸이 좁아(글자 자리 80px 쯤) 이 칸만의 짧은 말을 쓴다 — 다섯 언어에 다 있다
+        for (const l of LOCALES) for (const k of ["home.hubShelf", "home.hubCup", "home.hubCupSub", "home.hubCupWait", "home.hubCupDays", "home.hubCupHours", "home.hubCupMin", "home.hubCupOver"]) expect(valueOf(l, k), `${l} ${k}`).toBeTruthy();
+        expect(banner).toContain("dot={!!myCup && !myCup.waiting}");
+        // 내 경기는 내 순위 응답에 같이 온다(홈에서 요청을 하나 더 하지 않는다)
+        expect(client("sim/entry/useOnlineRecord.ts")).toContain("const cp = myRank.data?.cup;");
+        expect(root("server/routes/modules/sim.ts")).toContain("return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards, shelf, cup });");
     });
 
     it("장식장 칸: 모은 개수를 적고, 이 기기에서 아직 못 본 것이 있으면 점을 띄운다 — 비로그인에게는 개수도 점도 없다", () => {
         expect(banner).toContain("const shelfTotal = member && shelf ? shelf.medals + shelf.badges : 0;");
         expect(banner).toContain('const shelfSub = shelfTotal > 0 ? t("home.hubShelfCount").replace("{n}", String(shelfTotal)) : t("home.hubShelfSub");');
         expect(banner).toContain("const shelfNew = !!member && isShelfNew(shelf?.latest, readShelfSeen());");
-        expect(banner).toContain('data-testid="hub-shelf-new"');
+        expect(banner).toContain("data-testid={testId ? `${testId}-new` : undefined}");
         // 개수는 내 순위 응답에 같이 온다(홈에서 요청을 하나 더 하지 않는다)
         const hook = client("sim/entry/useOnlineRecord.ts");
         expect(hook).toContain("const sh = myRank.data?.shelf;");
         const route = root("server/routes/modules/sim.ts");
         expect(route).toContain("storage.simShelf.summary(req.userId!).catch(");
-        expect(route).toContain("return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards, shelf });");
+        expect(route).toContain("return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards, shelf, cup });");
         for (const l of ["ko", "en", "vi", "tr", "es"]) {
             const d = dict(l);
             expect(d, l).toMatch(/^  "home\.hubShelfCount": ".*\{n\}.*",$/m);

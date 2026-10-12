@@ -3,9 +3,10 @@
  * 대회 및 진열장 대시보드 랭킹 들어가게 만들면 어때?" → 검토 뒤 "응 순서대로 진행하자").
  * 랭킹 화면과 한 벌인 어두운 '진열장' 카드: 왼쪽에 내 등급 배지 그림, 레이팅, 다음 등급까지 — 아래에 입구 칸.
  *
- * 입구는 **셋**(랭킹 · 장식장 · 대시보드)이다(장식장은 2026-10-12 에 생겼다 — 달마다 받은 메달 · 등급 배지). 월대회는 아직 없다 —
- * 없는 것을 있는 것처럼 보이지 않게, 만들어지면 칸을 더한다(기획: docs/01-plan/features/online-game-monthly-tournament-badges.md 12-3).
- * 장식장 칸의 한 줄은 내가 모은 개수다. 이 기기에서 아직 못 본 것이 있으면(달이 마감돼 새로 받았으면) 그림 위에 연두 점이 뜬다.
+ * 입구는 **넷**(랭킹 · 장식장 · 월대회 · 대시보드), 두 줄에 둘씩이다(장식장 · 월대회는 2026-10-12 에 생겼다 —
+ * 기획: docs/01-plan/features/online-game-monthly-tournament-badges.md 12-3).
+ *  - 장식장 칸의 한 줄은 내가 모은 개수다. 이 기기에서 아직 못 본 것이 있으면(달이 마감돼 새로 받았으면) 그림 위에 연두 점이 뜬다.
+ *  - 월대회 칸: 치르는 중인 대회에 내 경기가 있으면 남은 시간과 연두 점, 아니면 "출전 조건 · 대진표".
  *
  * 상태(무엇을 그릴지는 sim/rank/hubState 가 정한다)
  *  - 등급이 있다: 배지 · 레이팅 · 등급 이름 · 다음 등급까지 막대. 누르면 랭킹.
@@ -29,6 +30,8 @@ import { hubStateOf, otherGame, type HubGame, type HubState } from "@/sim/rank/h
 import { RANK_TROPHY_SRC, TIER_GLOW, TierEmblem } from "@/sim/rank/TierEmblem";
 import { SHELF_ICON_SRC } from "@/sim/rank/ShelfLink";
 import { isShelfNew, readShelfSeen, shelfPath } from "@/sim/rank/shelfApi";
+import { CUP_ICON_SRC } from "@/sim/cup/CupArt";
+import { CUP_PATH, timeLeft } from "@/sim/cup/cupApi";
 import { useGuestGate } from "@/components/hiq/GuestGate";
 import { LucideArrowLeftRight, LucideChevronRight } from "@/lib/icons";
 
@@ -49,19 +52,23 @@ function CtaPill({ children }: { children: ReactNode }) {
 }
 
 /**
- * 입구 칸 — 그림 위 · 이름 · 한 줄. 칸이 셋이라 360px 폰에서 하나가 109px 다: 그림을 위에 두고 글자를 가운데로 쌓는다
- * (옆으로 놓으면 글자 자리가 50px 뿐이라 영어 Dashboard · 베트남어 전적이 잘린다).
- * dot: 새로 받은 것이 있다는 연두 점(장식장 칸).
+ * 입구 칸 — 그림 · 이름 · 한 줄. 두 줄에 둘씩이라 360px 폰에서 칸 하나가 164px 다(영어 Dashboard · 베트남어 전적이 들어간다).
+ * 화살표는 오른쪽 끝이 아니라 이름 옆에 작게 붙인다 — 글자 자리를 아끼려고. dot: 새로 볼 것이 있다는 연두 점.
  */
-function Tile({ icon, title, sub, onClick, trackAs, dot = false, testId }: { icon: string; title: string; sub: string; onClick: () => void; trackAs: string; dot?: boolean; testId?: string }) {
+function Tile({ icon, title, sub, onClick, trackAs, dot = false, testId, className }: { icon: string; title: string; sub: string; onClick: () => void; trackAs: string; dot?: boolean; testId?: string; className?: string }) {
     return (
-        <button type="button" onClick={onClick} data-track-as={trackAs} data-testid={testId} className="min-w-0 px-1.5 pt-2.5 pb-2.5 flex flex-col items-center text-center transition-colors active:bg-white/[0.07]">
-            <span className="relative">
+        <button type="button" onClick={onClick} data-track-as={trackAs} data-testid={testId} className={cn("min-w-0 px-3 py-2.5 flex items-center gap-2 text-left border-t border-white/10 transition-colors active:bg-white/[0.07]", className)}>
+            <span className="relative shrink-0">
                 <img src={icon} width={40} height={40} alt="" aria-hidden="true" decoding="async" draggable={false} className="w-10 h-10 object-contain" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.5))" }} />
-                {dot && <span className="absolute -right-1 -top-0.5 w-2.5 h-2.5 rounded-full bg-[color:var(--hall-lime)] ring-2 ring-[#1e1812]" data-testid="hub-shelf-new" aria-hidden="true" />}
+                {dot && <span className="absolute -right-0.5 -top-0.5 w-2.5 h-2.5 rounded-full bg-[color:var(--hall-lime)] ring-2 ring-[#1e1812]" data-testid={testId ? `${testId}-new` : undefined} aria-hidden="true" />}
             </span>
-            <span className="block w-full text-[13px] font-black text-white truncate mt-1">{title}</span>
-            <span className="block w-full rk-num text-[11.5px] font-bold text-white/60 truncate mt-0.5">{sub}</span>
+            <span className="flex-1 min-w-0">
+                <span className="flex items-center gap-0.5 min-w-0">
+                    <span className="text-[13.5px] font-black text-white truncate">{title}</span>
+                    <LucideChevronRight className="w-3 h-3 shrink-0 text-white/45" weight="bold" aria-hidden="true" />
+                </span>
+                <span className="block rk-num text-[11.5px] font-bold text-white/60 truncate mt-0.5">{sub}</span>
+            </span>
         </button>
     );
 }
@@ -71,7 +78,7 @@ export function OnlineHubBanner() {
     const { member } = useAuth();
     const gate = useGuestGate("dark");
     const [, setLocation] = useLocation();
-    const { boards, placement, ready, shelf } = useOnlineRecord();
+    const { boards, placement, ready, shelf, cup } = useOnlineRecord();
     const [pick, setPick] = useState<HubGame | null>(null);
 
     // 회원의 화면(랭킹 · 대시보드 · 멀티방)으로 가는 길은 전부 여기로 — 비로그인은 가입 안내, 가입 뒤 가려던 곳으로 돌아온다
@@ -101,6 +108,16 @@ export function OnlineHubBanner() {
     const shelfTotal = member && shelf ? shelf.medals + shelf.badges : 0;
     const shelfSub = shelfTotal > 0 ? t("home.hubShelfCount").replace("{n}", String(shelfTotal)) : t("home.hubShelfSub");
     const shelfNew = !!member && isShelfNew(shelf?.latest, readShelfSeen());
+    // 월대회 — 내 경기가 있으면 남은 시간(상대가 아직이면 그 말), 없으면 무엇을 하는 곳인지
+    const myCup = member ? cup : null;
+    const cupLeft = myCup && !myCup.waiting ? timeLeft(myCup.deadlineMs, Date.now()) : null;
+    // 칸의 글자 자리는 80px 쯤이다 — 대회 화면의 긴 문구 대신 이 칸만의 짧은 말을 쓴다(home.hubCup*)
+    const cupSub = !myCup ? t("home.hubCupSub")
+        : myCup.waiting ? t("home.hubCupWait")
+            : !cupLeft ? t("home.hubCupOver")
+                : cupLeft.days > 0 ? t("home.hubCupDays").replace("{d}", String(cupLeft.days)).replace("{h}", String(cupLeft.hours))
+                    : cupLeft.hours > 0 ? t("home.hubCupHours").replace("{h}", String(cupLeft.hours)).replace("{m}", String(cupLeft.minutes))
+                        : t("home.hubCupMin").replace("{m}", String(cupLeft.minutes));
 
     let hero: ReactNode;
     if (loading || s.kind === "waiting") {
@@ -191,9 +208,10 @@ export function OnlineHubBanner() {
                     </button>
                 )}
                 {hero}
-                <div className="grid grid-cols-3 border-t border-white/10 divide-x divide-white/10">
-                    <Tile icon={RANK_TROPHY_SRC} title={t("sim.rank.title")} sub={loading ? " " : rankSub} onClick={() => go(rankUrl)} trackAs="홈 배너 랭킹" />
-                    <Tile icon={SHELF_ICON_SRC} title={t("sim.shelf.title")} sub={loading ? " " : shelfSub} onClick={() => go(shelfPath())} trackAs="홈 배너 장식장" dot={shelfNew} testId="hub-shelf" />
+                <div className="grid grid-cols-2">
+                    <Tile icon={RANK_TROPHY_SRC} title={t("sim.rank.title")} sub={loading ? " " : rankSub} onClick={() => go(rankUrl)} trackAs="홈 배너 랭킹" className="border-r" />
+                    <Tile icon={SHELF_ICON_SRC} title={t("home.hubShelf")} sub={loading ? " " : shelfSub} onClick={() => go(shelfPath())} trackAs="홈 배너 장식장" dot={shelfNew} testId="hub-shelf" />
+                    <Tile icon={CUP_ICON_SRC} title={t("home.hubCup")} sub={loading ? " " : cupSub} onClick={() => go(CUP_PATH)} trackAs="홈 배너 월대회" dot={!!myCup && !myCup.waiting} testId="hub-cup" className="border-r" />
                     <Tile icon={HUB_DASH_ICON_SRC} title={t("home.hubDash")} sub={loading ? " " : dashSub} onClick={() => go(DASH_URL)} trackAs="홈 배너 대시보드" />
                 </div>
             </div>

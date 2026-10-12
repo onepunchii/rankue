@@ -168,7 +168,9 @@ describe("서버: 달마다 한 번만 주고, 준 것은 고치지 않는다", 
         const fn = cron.slice(cron.indexOf("async function handleSimCleanup("), cron.indexOf('router.get("/sim-cleanup"'));
         expect(fn).toContain("const shelf = await storage.simShelf.closeMonths(Date.now())");
         expect(fn).toContain('.catch((e: unknown) => { console.error("[shelf close]", e); return null; });');
-        expect(fn).toContain("return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, shelf });");
+        // 마감 바로 뒤에 월대회를 연다(2026-10-12) — 메달 · 배지와 같은 자료로 출전자를 정한다
+        expect(fn.indexOf("storage.simShelf.closeMonths(Date.now())")).toBeLessThan(fn.indexOf("m.openAndAnnounce(Date.now())"));
+        expect(fn).toContain("return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, shelf, cups });");
         expect(read("server/storage/index.ts")).toContain("public simShelf = new SimShelfRepository((fresh) => this.simMatch.ratedDeltas(fresh));");
     });
 
@@ -205,7 +207,7 @@ describe("화면: 장식장", () => {
         expect(page).toContain("if (shelfFromInside.current) { shelfFromInside.current = false; window.history.back(); } else navigate(ENTRY_PATH, { replace: true });");
         // 다른 사람의 장식장으로 넘어가면 화면을 새로 그린다(고른 것 · 새로 받음 표시가 남지 않게)
         expect(page).toContain('key={shelfMember ?? "me"}');
-        expect(page).toContain("initialScope={rankScope} onShelf={openShelf} />");
+        expect(page).toContain("initialScope={rankScope} onShelf={openShelf} onCup={openCup} />");
         expect(page).toContain("onShelf={() => openShelf()}");
     });
 

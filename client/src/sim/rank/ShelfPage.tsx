@@ -3,7 +3,7 @@
  * 달이 끝날 때마다 받은 것을 놓아 두는 곳 — 이달의 랭킹 메달(1~3등)과 그 달의 등급 배지. 남의 장식장도 볼 수 있다(랭킹의 줄을 누르면).
  *
  * 위에서부터: 머리(장식장 그림) → 주인 카드(지금 등급 · 모은 개수) → **이번 달**(지금 끝난다면 받는 것 — 아직 받은 것이 아니라 흐리게)
- * → 선반 둘(메달 셋 · 등급 일곱: 받은 것은 밝게 ×개수, 아직은 어둡게) → 월대회 자리(아직 없다고 적는다) → 달마다.
+ * → 선반 셋(이달의 랭킹 메달 셋 · 등급 일곱 · 월대회 메달 다섯: 받은 것은 밝게 ×개수, 아직은 어둡게) → 달마다.
  * 선반의 것을 누르면 언제 받았는지가 아래에 나온다. 이 기기에서 처음 보는 것은 '새로 받음' 표시.
  *
  * 숫자와 글자는 그림에 없다 — 전부 여기서 그린다. 색 · 광택은 .rank-hall(index.css)의 .hall-shelf · .hall-plank.
@@ -20,7 +20,9 @@ import { rankFlag } from "./flag";
 import { monthLabel, signedPoints } from "./MonthlyRank";
 import { SHELF_QUERY_KEY, isShelfNew, readShelfSeen, shelfApi as defaultApi, writeShelfSeen, type Shelf, type ShelfApi, type ShelfAwardRow } from "./shelfApi";
 import { SHELF_ICON_SRC } from "./ShelfLink";
-import { RANK_TROPHY_SRC, RankMedal, TIER_GLOW, TierEmblem } from "./TierEmblem";
+import type { CupMedal } from "@shared/simCup";
+import { CUP_MEDALS, CupMedalArt } from "../cup/CupArt";
+import { RankMedal, TIER_GLOW, TierEmblem } from "./TierEmblem";
 
 
 export interface ShelfPageProps {
@@ -32,12 +34,15 @@ export interface ShelfPageProps {
     onRank?: () => void;
     /** 한 판 하기(내 장식장에서 이달 대전이 없을 때) */
     onPlay?: () => void;
+    /** 월대회로(월대회 메달 선반) */
+    onCup?: () => void;
     /** 이 기기에서 마지막으로 본 달을 읽고 적는 곳(시험에서 바꿔 끼운다) */
     seen?: { read: () => string; write: (month: string) => void };
 }
 
-type Pick = { kind: "medal"; rank: MedalRank } | { kind: "tier"; tier: TierId };
-const samePick = (a: Pick | null, b: Pick): boolean => !!a && a.kind === b.kind && (a.kind === "medal" ? a.rank === (b as { rank: MedalRank }).rank : a.tier === (b as { tier: TierId }).tier);
+type Pick = { kind: "medal"; rank: MedalRank } | { kind: "tier"; tier: TierId } | { kind: "cup"; medal: CupMedal };
+const pickKey = (p: Pick): string => (p.kind === "medal" ? `m${p.rank}` : p.kind === "tier" ? `t${p.tier}` : `c${p.medal}`);
+const samePick = (a: Pick | null, b: Pick): boolean => !!a && pickKey(a) === pickKey(b);
 const deviceSeen = { read: () => readShelfSeen(), write: (m: string) => writeShelfSeen(m) };
 
 /** 새로 받은 것 — 작은 연두 알약 */
@@ -59,7 +64,7 @@ function ShelfRow({ title, count, children, foot }: { title: string; count?: str
     );
 }
 
-export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay, seen = deviceSeen }: ShelfPageProps) {
+export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay, onCup, seen = deviceSeen }: ShelfPageProps) {
     const { t, locale } = useT();
     const q = useQuery({ queryKey: [...SHELF_QUERY_KEY, memberId ?? "me"], queryFn: () => api.get(memberId), staleTime: 15_000, retry: false });
     const d: Shelf | undefined = q.data;
@@ -69,7 +74,13 @@ export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay,
     const latest = d?.awards[0]?.month ?? null;
     useEffect(() => { if (d?.member.mine && latest) seen.write(latest); }, [d?.member.mine, latest, seen]);
 
-    const counts = useMemo(() => shelfCounts(d?.awards ?? []), [d]);
+    // 달마다 받는 것(이달의 랭킹 메달 · 등급 배지)과 월대회 메달은 선반이 다르다
+    const counts = useMemo(() => shelfCounts((d?.awards ?? []).filter((a) => a.kind !== "cup") as { kind: "month_rank" | "month_tier"; rank: MedalRank | null; tier: TierId | null }[]), [d]);
+    const cups = useMemo(() => {
+        const by: Record<CupMedal, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+        for (const a of d?.awards ?? []) if (a.kind === "cup" && a.rank) by[a.rank as CupMedal] += 1;
+        return { by, total: by[1] + by[2] + by[3] + by[4] + by[5] };
+    }, [d]);
     const months = useMemo(() => {
         const by = new Map<string, ShelfAwardRow[]>();
         for (const a of d?.awards ?? []) by.set(a.month, [...(by.get(a.month) ?? []), a]);
@@ -81,14 +92,15 @@ export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay,
     const times = (c: number) => t("sim.shelf.times").replace("{n}", n(c));
     const medalText = (a: ShelfAwardRow) => t("sim.shelf.rowMedal").replace("{game}", gameName(a.gameType)).replace("{r}", n(a.rank ?? 0)).replace("{p}", signedPoints(a.points));
     const badgeText = (a: ShelfAwardRow) => t("sim.shelf.rowBadge").replace("{tier}", a.tier ? t(`sim.rank.tier.${a.tier}`) : "");
-    const picked = pick && d ? d.awards.filter((a) => (pick.kind === "medal" ? a.kind === "month_rank" && a.rank === pick.rank : a.kind === "month_tier" && a.tier === pick.tier)) : [];
+    const cupText = (a: ShelfAwardRow) => t("sim.cup.rowMedal").replace("{place}", t(`sim.cup.place${a.rank ?? 5}`));
+    const picked = pick && d ? d.awards.filter((a) => (pick.kind === "medal" ? a.kind === "month_rank" && a.rank === pick.rank : pick.kind === "tier" ? a.kind === "month_tier" && a.tier === pick.tier : a.kind === "cup" && a.rank === pick.medal)) : [];
     // 고른 것의 내력 — 선반 바로 아래에 편다
     const detail = (kind: Pick["kind"]) => pick?.kind === kind && picked.length > 0 && (
         <ul className="mt-2.5 mx-1 pt-2.5 border-t border-white/10 space-y-1" data-testid="shelf-detail" aria-label={t("sim.shelf.gotIn")}>
             {picked.map((a) => (
                 <li key={`${a.month}-${a.gameType}`} className="rk-num flex items-baseline justify-between gap-2 text-[12.5px] font-bold text-white/85">
                     <span className="truncate">{monthLabel(a.month, locale)}</span>
-                    <span className="shrink-0 text-white/60">{a.kind === "month_rank" ? medalText(a) : `${gameName(a.gameType)} · ${a.rating}`}</span>
+                    <span className="shrink-0 text-white/60">{a.kind === "month_rank" ? medalText(a) : a.kind === "cup" ? gameName(a.gameType) : `${gameName(a.gameType)} · ${a.rating}`}</span>
                 </li>
             ))}
         </ul>
@@ -136,7 +148,7 @@ export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay,
                                     {d.tier && <span className="font-bold text-white/75">{" · "}{d.tier.rating}</span>}
                                 </p>
                                 <p className="rk-num text-[12.5px] font-bold text-white/75 mt-1.5 truncate" data-testid="shelf-counts">
-                                    {t("sim.shelf.counts").replace("{m}", n(counts.medalTotal)).replace("{b}", n(counts.tierTotal))}
+                                    {t("sim.shelf.counts").replace("{m}", n(counts.medalTotal + cups.total)).replace("{b}", n(counts.tierTotal))}
                                 </p>
                             </div>
                         </section>
@@ -252,14 +264,44 @@ export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay,
                             </div>
                         </ShelfRow>
 
-                        {/* 월대회 메달 — 아직 대회가 없다. 있는 것처럼 보이지 않게 자리만 적어 둔다 */}
-                        <section className="hall-shelf px-4 py-3 flex items-center gap-3" aria-label={t("sim.shelf.cup")} data-testid="shelf-cup">
-                            <img src={RANK_TROPHY_SRC} width={48} height={48} alt="" aria-hidden="true" decoding="async" draggable={false} className="w-12 h-12 shrink-0 object-contain opacity-35 grayscale" />
-                            <div className="min-w-0">
-                                <h2 className="text-[13px] font-black text-white/85">{t("sim.shelf.cup")}</h2>
-                                <p className="text-[12px] font-medium text-white/55 mt-0.5 break-keep">{t("sim.shelf.cupSoon")}</p>
+                        {/* 선반 3 — 월대회 메달(우승 · 준우승 · 3위 · 4위 · 8강). 가운데에 트로피가 새겨진 메달이라 이달의 랭킹 메달과 갈린다 */}
+                        <ShelfRow title={t("sim.cup.shelfMedals")} count={times(cups.total)} foot={<>
+                            {detail("cup")}
+                            {/* 아직 받은 것이 없으면 어떻게 받는지를 적는다 — 대회는 달마다 다음 달 초에 열린다 */}
+                            {cups.total === 0 && <p className="mx-1 mt-2.5 text-[12px] font-medium text-white/55 break-keep" data-testid="shelf-cup-soon">{t("sim.shelf.cupSoon")}</p>}
+                            {onCup && (
+                                <button type="button" onClick={onCup} data-testid="shelf-to-cup" data-track-as="장식장 월대회로"
+                                    className="mt-2.5 mx-1 h-10 px-3.5 inline-flex items-center rounded-pill border border-white/15 bg-white/[0.08] text-[13px] font-bold text-white/90 active:bg-white/15">
+                                    {t("sim.cup.title")}
+                                </button>
+                            )}
+                        </>}>
+                            <div className="flex items-end pt-3" data-testid="shelf-cup">
+                                {CUP_MEDALS.map((m) => {
+                                    const c = cups.by[m];
+                                    const fresh = !!d.awards.find((a) => a.kind === "cup" && a.rank === m && isNew(a.month));
+                                    const body = <CupMedalArt medal={m} size={54} locked={c === 0} />;
+                                    return (
+                                        <span key={m} className={slot} data-cup={m} data-count={c}>
+                                            {fresh && <NewMark label={t("sim.shelf.new")} />}
+                                            {c > 0
+                                                ? <button type="button" onClick={() => setPick(samePick(pick, { kind: "cup", medal: m }) ? null : { kind: "cup", medal: m })} aria-pressed={samePick(pick, { kind: "cup", medal: m })}
+                                                    aria-label={`${t(`sim.cup.place${m}`)} ${times(c)}`} className="active:opacity-80">{body}</button>
+                                                : <span title={t(`sim.cup.place${m}`)}>{body}</span>}
+                                        </span>
+                                    );
+                                })}
                             </div>
-                        </section>
+                            <div className="hall-plank mx-1" aria-hidden="true" />
+                            <div className="flex pt-2">
+                                {CUP_MEDALS.map((m) => (
+                                    <span key={m} className="flex-1 min-w-0 text-center">
+                                        <span className="block text-[11.5px] font-bold text-white/75 truncate">{t(`sim.cup.place${m}`)}</span>
+                                        <span className={cn("block rk-num text-[12.5px] font-black", cups.by[m] > 0 ? "text-[color:var(--hall-gold)]" : "text-white/30")}>{times(cups.by[m])}</span>
+                                    </span>
+                                ))}
+                            </div>
+                        </ShelfRow>
 
                         {/* 달마다 — 최근 달부터 */}
                         <section aria-label={t("sim.shelf.months")} data-testid="shelf-months">
@@ -274,18 +316,20 @@ export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay,
                                     {months.map(([month, list]) => {
                                         const medals = list.filter((a) => a.kind === "month_rank");
                                         const badges = list.filter((a) => a.kind === "month_tier");
+                                        const cupWon = list.filter((a) => a.kind === "cup");
                                         return (
-                                            <li key={month} className={cn("hall-row px-3.5 py-3 flex items-center gap-2", medals.length > 0 && "hall-row-top")} data-month={month}>
+                                            <li key={month} className={cn("hall-row px-3.5 py-3 flex items-center gap-2", (medals.length > 0 || cupWon.length > 0) && "hall-row-top")} data-month={month}>
                                                 <div className="flex-1 min-w-0">
                                                     <p className="flex items-center gap-1.5 min-w-0">
                                                         <span className="text-[14px] font-black text-white truncate">{monthLabel(month, locale)}</span>
                                                         {isNew(month) && <NewMark label={t("sim.shelf.new")} />}
                                                     </p>
                                                     <p className="rk-num text-[12px] font-bold text-white/65 mt-0.5 break-keep">
-                                                        {[...medals.map(medalText), ...badges.map(badgeText)].join(" · ")}
+                                                        {[...cupWon.map(cupText), ...medals.map(medalText), ...badges.map(badgeText)].join(" · ")}
                                                     </p>
                                                 </div>
                                                 <span className="shrink-0 flex items-center gap-1">
+                                                    {cupWon.map((a) => <CupMedalArt key={`c-${a.gameType}`} medal={a.rank as CupMedal} size={38} />)}
                                                     {medals.map((a) => <RankMedal key={`m-${a.gameType}`} rank={a.rank as MedalRank} size={38} />)}
                                                     {badges.map((a) => <TierEmblem key={`t-${a.gameType}`} tier={a.tier as TierId} size={40} />)}
                                                 </span>

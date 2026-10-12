@@ -13,6 +13,8 @@ import { SHELF_FIRST_MONTH, monthAwards, monthsToClose, shelfCounts, shelfPrevie
 const num = (v: unknown, d = 0): number => (typeof v === "number" && Number.isFinite(v) ? v : d);
 const tierId = (v: unknown): TierId | null => (typeof v === "string" && TIERS.some((t) => t.id === v) ? (v as TierId) : null);
 const medalRank = (v: unknown): MedalRank | null => (v === 1 || v === 2 || v === 3 ? v : null);
+/** 월대회 메달은 1~5(우승 · 준우승 · 3위 · 4위 · 8강) */
+const cupRank = (v: unknown): 1 | 2 | 3 | 4 | 5 | null => (v === 1 || v === 2 || v === 3 || v === 4 || v === 5 ? v : null);
 
 export class SimShelfRepository {
     /** deltas: 레이팅에 반영된 판과 그 변화(storage.simMatch.ratedDeltas) */
@@ -52,7 +54,8 @@ export class SimShelfRepository {
             select kind, count(*)::int as n, max(month) as latest from hiq_sim_awards where member_id = ${memberId} group by kind`)).rows as Record<string, unknown>[];
         let medals = 0, badges = 0, latest: string | null = null;
         for (const r of rows) {
-            if (r.kind === "month_rank") medals = Number(r.n ?? 0); else if (r.kind === "month_tier") badges = Number(r.n ?? 0);
+            // 메달 = 이달의 랭킹 메달 + 월대회 메달
+            if (r.kind === "month_rank" || r.kind === "cup") medals += Number(r.n ?? 0); else if (r.kind === "month_tier") badges = Number(r.n ?? 0);
             if (typeof r.latest === "string" && (latest === null || r.latest > latest)) latest = r.latest;
         }
         return { medals, badges, latest };
@@ -86,10 +89,12 @@ export class SimShelfRepository {
             tier: best ? { gameType: best.gameType, tier: tierFor(best.rating).id, rating: best.rating } : null,
             awards: (rows as Record<string, any>[]).map((a) => {
                 const d = (a.detail && typeof a.detail === "object" ? a.detail : {}) as Record<string, unknown>;
+                const kind = a.kind === "cup" ? "cup" as const : a.kind === "month_rank" ? "month_rank" as const : "month_tier" as const;
                 return {
-                    month: String(a.month), kind: a.kind === "month_rank" ? "month_rank" as const : "month_tier" as const,
+                    month: String(a.month), kind,
                     gameType: a.gameType === "4c" ? "4c" as const : "3c" as const,
-                    rank: medalRank(a.rank), tier: tierId(a.tier),
+                    // 월대회 메달은 rank 가 1~5 다(shared/simCup CupMedal)
+                    rank: kind === "cup" ? cupRank(a.rank) : medalRank(a.rank), tier: tierId(a.tier),
                     points: num(d.points), matches: num(d.matches), wins: num(d.wins), rating: num(d.rating, 1000),
                 };
             }),
