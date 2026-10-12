@@ -5,6 +5,7 @@ import {
     golfJoinRequests,
     golfJoins,
     golfMatchSessions,
+    golfRoundPhotos,
     hiqGameHistory,
     hiqCourseHoleInfo,
     hiqMembers,
@@ -41,7 +42,7 @@ import { collectStamps, makeStampResolver, type StampAgg } from "./golfStamps.js
 import { syncStampAwards, type StampAwardRow } from "./golfStampAwards.js";
 import type { DatedStamp } from "../../shared/golfStampAwards.js";
 import { stampOneLeft } from "../../shared/golfStampOneLeft.js";
-import { PIN_BREAK_MAX, pinsDue, type PinRound } from "../../shared/golfPins.js";
+import { pinsDue, type PinRound } from "../../shared/golfPins.js";
 import { insertCheckin, listCheckins, listCheckinsInTx, readCheckins, realMemberIds, withCheckinTable } from "./golfCheckins.js";
 import { parseLatLng, sortByDistance } from "../../shared/golfNearby.js";
 import {
@@ -1055,31 +1056,74 @@ export class GolfRepository {
         const stats = await this.getGolfPassportStats(memberId);
         const stamps = stats.stamps.map((s) => ({ clubId: s.clubId, name: s.name, firstDate: s.firstDate }));
         // 업적 핀 — 인증 라운드(횟수 · 타수)와 도장으로 판정한다. 읽다 실패해도 도장첩의 기록은 적는다
-        const pins = pinsDue(await this.getGolfPinRounds(memberId).catch((e) => { console.error("[golf] pinRounds", e); return [] as PinRound[]; }), stamps);
+        const [rounds, shots] = await Promise.all([
+            this.getGolfPinRounds(memberId).catch((e) => { console.error("[golf] pinRounds", e); return [] as PinRound[]; }),
+            this.getGolfPinPhotoTimes(memberId).catch((e) => { console.error("[golf] pinPhotos", e); return [] as Date[]; }),
+        ]);
+        const pins = pinsDue(rounds, stamps, shots);
         const fresh = await syncStampAwards(memberId, stamps, pins);
         await this.nudgeStampOneLeft(memberId, stamps);
         return fresh;
     }
 
     /**
-     * 업적 핀 판정에 쓰는 **인증 라운드**(오래된 순) — 끝낸 때 · 타수 · 그 라운드의 총 파(shared/golfPins).
-     * 총 파는 타수 핀의 후보(99타 이하)에만 찾는다 — 그 밖의 라운드에는 쓸 일이 없다. 18홀의 파를 다 알 때만 값이 있다.
+     * 업적 핀 판정에 쓰는 **인증 라운드**(오래된 순) — shared/golfPins 의 PinRound.
+     *   끝낸 때 · 타수 · 홀 타수(기록의 score_json) · 시작한 때(경기의 started_at) · 홀의 파와 총 파(코스 자료) · 같은 라운드의 다른 인증 회원.
+     * 경기 번호가 없는 옛 기록은 끝낸 때와 타수만 있다(파 · 시작한 때 · 동반자를 모른다 — 그런 핀은 붙지 않는다).
+     * 읽기 세 번: 내 기록 → 그 경기들 → 그 경기들의 기록(동반자). 코스의 파는 parsForMany 가 한 번에 읽는다.
      */
     async getGolfPinRounds(memberId: string): Promise<PinRound[]> {
-        const rows = await db.select({ score: hiqGameHistory.score, createdAt: hiqGameHistory.createdAt, onSite: hiqGameHistory.onSite, sessionId: hiqGameHistory.golfSessionId })
+        const rows = await db.select({ score: hiqGameHistory.score, createdAt: hiqGameHistory.createdAt, onSite: hiqGameHistory.onSite, sessionId: hiqGameHistory.golfSessionId, scoreJson: hiqGameHistory.scoreJson })
             .from(hiqGameHistory)
             .where(and(eq(hiqGameHistory.memberId, memberId), eq(hiqGameHistory.sportCategory, 'GOLF' as any)))
             .orderBy(asc(hiqGameHistory.createdAt));
         const verified = rows.filter((r) => countsOnSite(r.onSite));
-        const ids = Array.from(new Set<string>(verified.filter((r) => r.score > 0 && r.score <= PIN_BREAK_MAX && r.sessionId).map((r) => String(r.sessionId))));
-        const parOf = new Map<string, number | null>();
+        const ids = Array.from(new Set<string>(verified.filter((r) => r.sessionId).map((r) => String(r.sessionId))));
+        const info = new Map<string, { par: number | null; pars: (number | null)[]; startAt: Date | null; mates: string[] }>();
         if (ids.length > 0) {
-            const sessions = await db.select({ id: golfMatchSessions.id, courseId: golfMatchSessions.courseId, frontCourseName: golfMatchSessions.frontCourseName, backCourseName: golfMatchSessions.backCourseName })
+            const sessions = await db.select({ id: golfMatchSessions.id, courseId: golfMatchSessions.courseId, frontCourseName: golfMatchSessions.frontCourseName, backCourseName: golfMatchSessions.backCourseName, startedAt: golfMatchSessions.startedAt })
                 .from(golfMatchSessions).where(inArray(golfMatchSessions.id, ids));
             const pars = await this.parsForMany(sessions);
-            sessions.forEach((s, i) => parOf.set(s.id, pars[i].known.length === 18 && pars[i].known.every(Boolean) ? pars[i].pars.reduce((a, b) => a + b, 0) : null));
+            // 같은 라운드에서 인증 기록을 받은 회원들(나 빼고) — 풀조 · 새 동반자
+            const others = await db.select({ sessionId: hiqGameHistory.golfSessionId, memberId: hiqGameHistory.memberId, onSite: hiqGameHistory.onSite })
+                .from(hiqGameHistory)
+                .where(and(inArray(hiqGameHistory.golfSessionId, ids), eq(hiqGameHistory.sportCategory, 'GOLF' as any)));
+            const matesOf = new Map<string, Set<string>>();
+            for (const o of others) {
+                if (!o.sessionId || o.memberId === memberId || !countsOnSite(o.onSite)) continue;
+                const set = matesOf.get(o.sessionId) ?? new Set<string>();
+                set.add(o.memberId); matesOf.set(o.sessionId, set);
+            }
+            sessions.forEach((s, i) => {
+                const cp = pars[i];
+                const all = cp.known.length === 18 && cp.known.every(Boolean);
+                info.set(s.id, {
+                    par: all ? cp.pars.reduce((a, b) => a + b, 0) : null,
+                    // 모르는 홀의 파는 null — 기본값(파 4)으로 버디를 판정하지 않는다
+                    pars: cp.pars.map((v, k) => (cp.known[k] ? v : null)),
+                    startAt: s.startedAt ?? null,
+                    mates: [...(matesOf.get(s.id) ?? [])],
+                });
+            });
         }
-        return verified.map((r) => ({ at: r.createdAt, score: r.score, par: r.sessionId ? parOf.get(r.sessionId) ?? null : null }));
+        return verified.map((r) => {
+            const x = r.sessionId ? info.get(r.sessionId) : undefined;
+            const strokes = Array.isArray(r.scoreJson) && r.scoreJson.length === 18 ? (r.scoreJson as unknown[]).map((v) => (typeof v === "number" ? v : null)) : null;
+            return { at: r.createdAt, score: r.score, par: x?.par ?? null, startAt: x?.startAt ?? null, strokes, pars: x?.pars ?? null, mates: x?.mates ?? [] };
+        });
+    }
+
+    /** 업적 핀(라운드 사진) — 내가 올린 사진의 때(오래된 순, 가려진 사진은 빼고). 사진 표가 아직 없으면 빈 목록 */
+    async getGolfPinPhotoTimes(memberId: string): Promise<Date[]> {
+        try {
+            const rows = await db.select({ createdAt: golfRoundPhotos.createdAt }).from(golfRoundPhotos)
+                .where(and(eq(golfRoundPhotos.memberId, memberId), isNull(golfRoundPhotos.hiddenAt)))
+                .orderBy(asc(golfRoundPhotos.createdAt));
+            return rows.map((r) => r.createdAt);
+        } catch (e: any) {
+            if ((e?.code ?? e?.cause?.code) === "42P01" || /relation "golf_round_photos" does not exist/.test(String(e?.message ?? ""))) return [];
+            throw e;
+        }
     }
 
     /**

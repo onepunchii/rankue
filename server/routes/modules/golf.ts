@@ -22,6 +22,7 @@ import { parseFootprintYear } from "../../../shared/golfFootprints.js";
 import { signFootprintShare, footprintCardPath } from "../../lib/footprintShare.js";
 import { signStampShare, stampCardPath } from "../../lib/stampShare.js";
 import { bookStates, stampBook } from "../../../shared/golfStampBooks.js";
+import { PIN_PHOTOS } from "../../../shared/golfPins.js";
 import { parseLatLng } from "../../../shared/golfNearby.js";
 import { ONSITE_SOURCES, type OnSiteSource } from "../../../shared/golfOnSite.js";
 import { sanitizeHolePatches, withoutHoleStats } from "../../../shared/golfHoleStats.js";
@@ -1126,6 +1127,12 @@ router.post("/match/:id/photos", requireAuth, requireTermsAccepted, asyncHandler
         courseSlug,
     });
     if (!row) { await drop(); return sendError(res, 409, `한 라운드에 ${GOLF_PHOTO_MAX_PER_ROUND}장까지 올릴 수 있어요`); }
+    // 업적 핀 '라운드 사진'(shared/golfPins) — 열 번째 사진을 올린 순간에만 받은 기록을 맞춘다(그 밖에는 라운드를 끝낼 때 맞춰진다).
+    // 실패하거나 늦어져도 올리기는 끝났다.
+    try {
+        const shots = await storage.golf.getGolfPinPhotoTimes(req.userId!);
+        if (shots.length === PIN_PHOTOS) await Promise.race([storage.golf.syncStampAwards(req.userId!), new Promise((r) => setTimeout(r, 2000))]);
+    } catch (e) { console.error("[golf] photo pin", e); }
     return sendSuccess(res, { id: row.id, courseSlug });
 }));
 

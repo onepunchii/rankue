@@ -93,7 +93,7 @@ export default function GolfShelf() {
                     {/* 업적 핀 — 골프장을 새로 가지 않아도 라운드를 쌓으면 붙는다(shared/golfPins). 못 받은 핀은 조건이 보인다 */}
                     <StampSection title="업적 핀" sample={sample} aside="라운드를 쌓으면 붙어요">
                         <PinCase earned={pinGot} when={sample ? undefined : (id) => { const a = awards.of("pin", id); return a ? awardWhen(a) : undefined; }} />
-                        <p className="mt-2.5 text-[12.5px] leading-snug text-[#FFFFFF73] break-keep">골프장에서 끝낸 라운드만 세요. 타수 핀은 정규 18홀(총 파 68 이상)에서 붙어요.</p>
+                        <p className="mt-2.5 text-[12.5px] leading-snug text-[#FFFFFF73] break-keep">골프장에서 끝낸 라운드만 세요. 타수 핀은 정규 18홀(총 파 68 이상)에서, 버디 · 이글은 파를 아는 홀에서 붙어요.</p>
                     </StampSection>
 
                     {!sample && awards.list.length > 0 && (
