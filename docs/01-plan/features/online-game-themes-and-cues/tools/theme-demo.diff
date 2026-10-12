@@ -1,0 +1,159 @@
+diff --git a/client/src/sim/render/Canvas2DRenderer.ts b/client/src/sim/render/Canvas2DRenderer.ts
+index 95601ab0..2efe54a9 100644
+--- a/client/src/sim/render/Canvas2DRenderer.ts
++++ b/client/src/sim/render/Canvas2DRenderer.ts
+@@ -137,6 +137,7 @@ export class Canvas2DRenderer implements Renderer {
+     mount(el: HTMLElement, table: TableSpec): void {
+         if (this.el) this.dispose();
+         this.el = el;
++        this.applyThemeDemo2d(el); // THEME-DEMO
+         this.table = table;
+ 
+         const canvas = this.createCanvas();
+@@ -374,7 +375,7 @@ export class Canvas2DRenderer implements Renderer {
+         ctx.lineTo(mx - nx * midW / 2, my - ny * midW / 2);
+         ctx.lineTo(t0x - nx * tipW / 2, t0y - ny * tipW / 2);
+         ctx.closePath();
+-        ctx.fillStyle = CUE_SHAFT;
++        ctx.fillStyle = (((globalThis as any).__simTheme?.cue?.shaft) != null ? "#" + Number((globalThis as any).__simTheme.cue.shaft).toString(16).padStart(6, "0") : CUE_SHAFT); // THEME-DEMO
+         ctx.fill();
+         ctx.lineWidth = 1;
+         ctx.strokeStyle = CUE_EDGE;
+@@ -386,7 +387,7 @@ export class Canvas2DRenderer implements Renderer {
+         ctx.lineTo(ex - nx * buttW / 2, ey - ny * buttW / 2);
+         ctx.lineTo(mx - nx * midW / 2, my - ny * midW / 2);
+         ctx.closePath();
+-        ctx.fillStyle = CUE_BUTT;
++        ctx.fillStyle = (((globalThis as any).__simTheme?.cue?.butt) != null ? "#" + Number((globalThis as any).__simTheme.cue.butt).toString(16).padStart(6, "0") : CUE_BUTT); // THEME-DEMO
+         ctx.fill();
+         ctx.strokeStyle = CUE_EDGE;
+         ctx.stroke();
+@@ -399,7 +400,7 @@ export class Canvas2DRenderer implements Renderer {
+         ctx.lineTo(f1x - nx * tipW / 2, f1y - ny * tipW / 2);
+         ctx.lineTo(t0x - nx * tipW / 2, t0y - ny * tipW / 2);
+         ctx.closePath();
+-        ctx.fillStyle = CUE_FERRULE;
++        ctx.fillStyle = (((globalThis as any).__simTheme?.cue?.ferrule) != null ? "#" + Number((globalThis as any).__simTheme.cue.ferrule).toString(16).padStart(6, "0") : CUE_FERRULE); // THEME-DEMO
+         ctx.fill();
+ 
+         // 팁(가죽)
+@@ -410,11 +411,31 @@ export class Canvas2DRenderer implements Renderer {
+         ctx.lineTo(t0x - nx * tipW / 2, t0y - ny * tipW / 2);
+         ctx.lineTo(p0x - nx * tipW / 2, p0y - ny * tipW / 2);
+         ctx.closePath();
+-        ctx.fillStyle = CUE_TIP;
++        ctx.fillStyle = (((globalThis as any).__simTheme?.cue?.tip) != null ? "#" + Number((globalThis as any).__simTheme.cue.tip).toString(16).padStart(6, "0") : CUE_TIP); // THEME-DEMO
+         ctx.fill();
+     }
+ 
+     // ── 정적 층 ───────────────────────────────────────────────────────────
++    // THEME-DEMO — 시안용: 테두리 나무 무늬 · 바탕(대전방) · 큐대 색
++    private demoPattern: CanvasPattern | null = null;
++    private applyThemeDemo2d(el: HTMLElement): void {
++        const t = (globalThis as any).__simTheme;
++        if (!t) return;
++        if (t.bg) { el.style.backgroundImage = `linear-gradient(rgba(0,0,0,.25), rgba(0,0,0,.25)), url(${t.bg})`; el.style.backgroundSize = "cover"; el.style.backgroundPosition = "center"; }
++        if (t.wood) {
++            const img = new Image();
++            img.onload = () => {
++                const p = document.createElement("canvas").getContext("2d")?.createPattern(img, "repeat");
++                if (!p) return;
++                p.setTransform(new DOMMatrix().scale(0.42));
++                this.demoPattern = p;
++                (globalThis as any).__simThemeLoaded = ((globalThis as any).__simThemeLoaded ?? 0) + 1;
++                this.resize();
++            };
++            img.src = t.wood;
++        }
++    }
++
+     private drawStatic(): void {
+         const L = this.layout;
+         const sc = this.staticCanvas;
+@@ -430,7 +451,7 @@ export class Canvas2DRenderer implements Renderer {
+ 
+         // 레일: 나무 띠 + 바깥 테두리
+         roundedRect(ctx, outer.x, outer.y, outer.w, outer.h, cornerR);
+-        ctx.fillStyle = RAIL_WOOD;
++        ctx.fillStyle = this.demoPattern ?? RAIL_WOOD; // THEME-DEMO
+         ctx.fill();
+         ctx.lineWidth = 1;
+         ctx.strokeStyle = RAIL_WOOD_EDGE;
+diff --git a/client/src/sim/render/ThreeRenderer.ts b/client/src/sim/render/ThreeRenderer.ts
+index b15664af..2d232c15 100644
+--- a/client/src/sim/render/ThreeRenderer.ts
++++ b/client/src/sim/render/ThreeRenderer.ts
+@@ -35,7 +35,7 @@ import {
+     BufferGeometry, CanvasTexture, CircleGeometry, Color, CylinderGeometry, DirectionalLight, ExtrudeGeometry,
+     Float32BufferAttribute, Group, HemisphereLight, InstancedMesh, Matrix4, Mesh, MeshBasicMaterial,
+     MeshStandardMaterial, OrthographicCamera, Path, PCFSoftShadowMap, PerspectiveCamera, PlaneGeometry, Quaternion, RingGeometry,
+-    Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, BoxGeometry } from "three";
++    Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, BoxGeometry, TextureLoader, RepeatWrapping } from "three"; // THEME-DEMO
+ import type { BallState } from "@shared/sim/types";
+ import type { TableSpec } from "@shared/sim/params";
+ import { feltColors } from "./felt";
+@@ -559,7 +559,7 @@ export class ThreeRenderer implements Renderer {
+         this.view = view;
+         this.sun.intensity = view === "player" ? SUN_INTENSITY_PLAYER : SUN_INTENSITY;
+         // 바닥은 player 뷰에서만(탑다운의 테이블 둘레는 레터박스 색 = Canvas2DRenderer 와 같게)
+-        if (this.floor) this.floor.visible = view === "player";
++        if (this.floor) this.floor.visible = view === "player" && !(globalThis as any).__simTheme?.bg; // THEME-DEMO
+         if (view === "player" && this.table) {
+             const frame = this.lastFrame;
+             if (!frame || !this.retarget(frame)) {
+@@ -924,10 +924,11 @@ export class ThreeRenderer implements Renderer {
+         const floor = new Mesh(new PlaneGeometry(FLOOR_SIZE, FLOOR_SIZE), this.floorMat);
+         floor.position.set(cx, cy, -PLINTH_DEPTH - 0.002 - APRON_H - 0.001);
+         floor.frustumCulled = false;
+-        floor.visible = this.view === "player";
++        floor.visible = this.view === "player" && !(globalThis as any).__simTheme?.bg; // THEME-DEMO
+         this.floor = floor;
+ 
+         this.tableGroup.add(floor, apron, plinth, rail, cloth);
++        this.applyThemeDemo(); // THEME-DEMO
+ 
+         // 램프: 테이블 중심 기준
+         this.sun.position.set(cx + SUN_OFFSET[0], cy + SUN_OFFSET[1], SUN_OFFSET[2]);
+@@ -1094,6 +1095,30 @@ export class ThreeRenderer implements Renderer {
+         this.floorMat.color.copy(this.clearColor);
+     }
+ 
++    // THEME-DEMO — 시안용: window.__simTheme = { felt, wood, bg, floor, cue } 를 읽어 나무 질감·배경·큐대 색을 입힌다
++    private applyThemeDemo(): void {
++        const t = (globalThis as any).__simTheme;
++        if (!t) return;
++        const loader = new TextureLoader();
++        const done = () => { (globalThis as any).__simThemeLoaded = ((globalThis as any).__simThemeLoaded ?? 0) + 1; try { this.render(); } catch { /* 아직 배치 전 */ } };
++        if (t.wood) {
++            const set = (mat: MeshStandardMaterial, rx: number, ry: number, tint: number, rough: number) => {
++                loader.load(t.wood, (tex) => {
++                    tex.colorSpace = SRGBColorSpace; tex.wrapS = tex.wrapT = RepeatWrapping; tex.repeat.set(rx, ry);
++                    mat.map = tex; mat.color.set(tint); mat.roughness = rough; mat.needsUpdate = true; done();
++                });
++            };
++            set(this.railMat, 0.34, 0.34, t.gloss ? 0x8c8c8c : 0xffffff, t.gloss ? 0.6 : 0.8);
++            set(this.plinthMat, 0.34, 0.34, 0xb8b8b8, 0.85);
++            set(this.apronMat, 1, 1, 0x9a9a9a, 0.9);
++        }
++        if (t.bg) loader.load(t.bg, (tex) => { tex.colorSpace = SRGBColorSpace; this.scene.background = tex; if (this.floor) this.floor.visible = false; done(); });
++        if (t.cue) {
++            const order = [t.cue.tip, t.cue.ferrule, t.cue.shaft, t.cue.butt];
++            this.cueMats.forEach((m, i) => { if (order[i] != null) m.color.set(order[i]); });
++        }
++    }
++
+     private buildShadowTexture(): void {
+         const canvas = this.createCanvas();
+         const ctx = context2d(canvas, SHADOW_TEX, SHADOW_TEX);
+diff --git a/client/src/sim/render/felt.ts b/client/src/sim/render/felt.ts
+index a61e6a37..8531039d 100644
+--- a/client/src/sim/render/felt.ts
++++ b/client/src/sim/render/felt.ts
+@@ -14,5 +14,7 @@ const GREEN: FeltColors = { centre: "#1A7A48", edge: "#0B5D3B" };
+ const BLUE: FeltColors = { centre: "#2A69B8", edge: "#174479" };
+ 
+ export function feltColors(table: Pick<TableSpec, "id"> | null | undefined): FeltColors {
++    const demo = (globalThis as any).__simTheme?.felt as FeltColors | undefined; // THEME-DEMO
++    if (demo) return demo; // THEME-DEMO
+     return table?.id === "DAEDAE" ? BLUE : GREEN;
+ }
