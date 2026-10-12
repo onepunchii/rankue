@@ -32,6 +32,7 @@ import { SHELF_ICON_SRC } from "@/sim/rank/ShelfLink";
 import { isShelfNew, readShelfSeen, shelfPath } from "@/sim/rank/shelfApi";
 import { CUP_ICON_SRC } from "@/sim/cup/CupArt";
 import { CUP_PATH, timeLeft } from "@/sim/cup/cupApi";
+import { BadgeTap } from "@/components/hiq/BadgeGuideSheet";
 import { useGuestGate } from "@/components/hiq/GuestGate";
 import { LucideArrowLeftRight, LucideChevronRight } from "@/lib/icons";
 
@@ -136,7 +137,8 @@ export function OnlineHubBanner() {
         hero = (
             <button type="button" onClick={() => go(tierUrl)} data-track-as="홈 배너 내 등급" data-testid="hub-hero"
                 className="w-full px-4 pt-4 pb-3.5 flex items-center gap-2 text-left min-h-[124px] transition-colors active:bg-white/[0.05]">
-                <span className="hall-emblem shrink-0 -ml-1.5"><TierEmblem tier={s.tier.id} size={96} glow /></span>
+                {/* 배지를 누르면 배지 안내 — 겉의 단추(랭킹으로)와 따로다 */}
+                <BadgeTap guide={{ kind: "online", tier: s.tier.id, rating: s.rating }} className="hall-emblem -ml-1.5"><TierEmblem tier={s.tier.id} size={96} glow /></BadgeTap>
                 <span className="flex-1 min-w-0">
                     <span className={cn("block text-[11.5px] font-bold text-white/60 truncate", s.canSwap && "pr-[92px]")}>{caption}</span>
                     <span className="flex items-baseline gap-2 mt-1 min-w-0">
@@ -162,7 +164,7 @@ export function OnlineHubBanner() {
             <button type="button" onClick={() => go(ROOMS_URL)} data-track-as="홈 배너 배치 중" data-testid="hub-hero"
                 className="w-full px-4 pt-4 pb-3.5 flex items-center gap-2 text-left min-h-[124px] transition-colors active:bg-white/[0.05]">
                 {/* 배치 전에는 아직 얻은 배지가 없다 — 가장 아래 등급의 실루엣 */}
-                <span className="shrink-0 -ml-1.5"><TierEmblem tier="iron" size={96} locked /></span>
+                <BadgeTap guide={{ kind: "online", tier: null }} className="-ml-1.5"><TierEmblem tier="iron" size={96} locked /></BadgeTap>
                 <span className="flex-1 min-w-0">
                     <span className={cn("block text-[11.5px] font-bold text-white/60 truncate", s.canSwap && "pr-[92px]")}>{caption}</span>
                     <span className="block rk-num text-[21px] font-black text-white leading-tight mt-1">

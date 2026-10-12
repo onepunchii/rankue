@@ -30,6 +30,7 @@ import { BadgeAvatar, CardActions, CompareTable, MeAvatar, NeedMore, NextCell, P
 import { useOnlineRecord } from "@/sim/entry/useOnlineRecord";
 import { HANDICAP_QUERY_KEY } from "@/sim/entry/HandicapCard";
 import { OnlineDamaBadge } from "@/sim/entry/OnlineDamaBadge";
+import { BadgeTap } from "@/components/hiq/BadgeGuideSheet";
 import { matchApi } from "@/sim/matchApi";
 
 export function LookalikeProCard() {
@@ -66,10 +67,13 @@ export function LookalikeProCard() {
     // 2026-10-12 오너: "이것도 배지로" — 숫자를 온라인 다마 배지(육각 초록 판) 가운데에 얹는다. 실전의 다마 메달과는 다른 그림이다(눈금이 다르다 — sim/entry/OnlineDamaBadge).
     const strip = (
         <div className="mt-3 rounded-tile border border-surface-line px-3 py-2 flex items-center gap-3" data-testid="online-handi">
-            <OnlineDamaBadge
-                target={handi?.target ?? null} size={46}
-                label={handi ? `${t("sim.entry.handicapTitle")} ${handi.target}${t("sim.entry.handicapUnit")}` : undefined}
-            />
+            {/* 누르면 배지 안내(온라인 쪽) */}
+            <BadgeTap guide={{ kind: "online", dama: handi?.target ?? null }}>
+                <OnlineDamaBadge
+                    target={handi?.target ?? null} size={46}
+                    label={handi ? `${t("sim.entry.handicapTitle")} ${handi.target}${t("sim.entry.handicapUnit")}` : undefined}
+                />
+            </BadgeTap>
             <span className="flex-1 min-w-0">
                 <span className="block text-[13px] font-bold text-ink-1 truncate">
                     {t("sim.entry.handicapTitle")}

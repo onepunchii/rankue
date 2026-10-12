@@ -28,6 +28,7 @@ import { Target, LogIn, LucideMessageCircle, LucideStore, LucideInfo, LucideChev
 import { useT } from "@/lib/i18n";
 import { BallCluster } from "@/components/hiq/ui/BilliardBall";
 import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
+import { BadgeTap } from "@/components/hiq/BadgeGuideSheet";
 import { realTierFor } from "@shared/realTier";
 
 /** 구역 머리 — 제목·한 줄 설명, 오른쪽에 '설명' 단추(또는 다른 조작) */
@@ -79,7 +80,10 @@ function MyDamaPanel({ sample }: { sample?: GuestSampleBilliards | null }) {
                 </div>
                 {/* 내 다마 = 다마 메달(2026-10-12). 공식 5판 전에는 빈 메달 — 아래 줄이 "n판 더 치면 나와요"를 말한다 */}
                 <span className="mt-1.5 flex items-center gap-2 min-w-0" data-testid={`home-dama-${type}`}>
-                    <RealMedal game={type} handi={ready ? s!.handi : null} size={54} />
+                    {/* 메달을 누르면 배지 안내 — 이 카드는 통째로 '경기 시작' 단추라, 눌림이 바깥으로 번지지 않게 BadgeTap 이 막는다 */}
+                    <BadgeTap guide={{ kind: "real", game: type, handi: ready ? s!.handi : null }}>
+                        <RealMedal game={type} handi={ready ? s!.handi : null} size={54} />
+                    </BadgeTap>
                     {damaTier && (
                         <span className="min-w-0 text-[13.5px] font-black truncate" style={{ color: REAL_TIER_INK[damaTier.id] }}>{t(damaTier.nameKey)}</span>
                     )}

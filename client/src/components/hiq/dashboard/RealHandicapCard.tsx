@@ -41,6 +41,7 @@ import { CrewAvatar } from "@/components/hiq/crew-ui";
 import type { GuestSampleBilliards } from "@shared/guestSample";
 import { BadgeAvatar, CardActions, CompareTable, FormDots, GOLD_TEXT, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, RecordStrip, RecordValue, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
 import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
+import { BadgeTap } from "@/components/hiq/BadgeGuideSheet";
 import { realTierFor } from "@shared/realTier";
 
 type HistoryRow = { sportCategory?: string | null; gameMode?: string | null; isRanked?: boolean | null; gameType?: string | null; isWinner?: boolean | null };
@@ -139,7 +140,10 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     const sideTier = sideReady ? realTierFor(side!.handi, cur) : null;
     const medalRow = side ? (
         <div className="mt-3 flex items-center gap-3" data-testid="real-tier-row">
-            <RealMedal game={cur} handi={sideReady ? side.handi : null} size={56} />
+            {/* 메달을 누르면 배지 안내(2026-10-12 오너: "이거 누르면 팝업창으로 … 무슨 배지가 있고") */}
+            <BadgeTap guide={{ kind: "real", game: cur, handi: sideReady ? side.handi : null }}>
+                <RealMedal game={cur} handi={sideReady ? side.handi : null} size={56} />
+            </BadgeTap>
             <div className="min-w-0">
                 <p className="text-[16px] font-black leading-tight truncate" style={sideTier ? { color: REAL_TIER_INK[sideTier.id] } : undefined}>
                     {sideTier ? fill(t("real.tierOf"), { tier: t(sideTier.nameKey) }) : t("real.tierNone")}
