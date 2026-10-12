@@ -158,15 +158,15 @@ describe("③ 관리자 콘솔 — 아이폰 앱의 상태바와 뒤로 단추",
             expect(s, f).toContain("${ADMIN_STICKY_TOP} z-10");
             expect(s, f).not.toContain("sticky top-14");
         }
-        // 옆에서 나오는 시트 여덟(메뉴 서랍 포함) — 전부 윗여백을 받는다
+        // 옆에서 나오는 시트 아홉(메뉴 서랍 포함 · 2026-10-12 회원 활동 기록) — 전부 윗여백을 받는다
         let sheets = 0, safe = 0;
-        for (const f of ["dashboard.tsx", "NoticesView.tsx", "VisitorsView.tsx", "MemberDetailSheet.tsx", "golf/GolfCoursesView.tsx", "golf/GolfRoundsView.tsx", "golf/GolfPhotosView.tsx", "golf/GolfListingsView.tsx"]) {
+        for (const f of ["dashboard.tsx", "NoticesView.tsx", "VisitorsView.tsx", "MemberDetailSheet.tsx", "MemberActivitySheet.tsx", "golf/GolfCoursesView.tsx", "golf/GolfRoundsView.tsx", "golf/GolfPhotosView.tsx", "golf/GolfListingsView.tsx"]) {
             const s = code(root(A + f));
             sheets += (s.match(/<SheetContent side="(right|left)"/g) ?? []).length;
             safe += (s.match(/<SheetContent side="(right|left)" style=\{SHEET_SAFE_TOP\}/g) ?? []).length;
         }
-        expect(sheets).toBe(8);
-        expect(safe).toBe(8);
+        expect(sheets).toBe(9);
+        expect(safe).toBe(9);
         // 닫기(X) 단추도 그만큼 내려간다(공용 시트)
         expect(root("client/src/components/ui/sheet.tsx")).toContain('style={side === "left" || side === "right" ? { top: "calc(1rem + env(safe-area-inset-top))" } : undefined}');
     });

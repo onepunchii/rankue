@@ -13,7 +13,7 @@ import {
   index,
   primaryKey,
   bigint, type AnyPgColumn } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -1123,6 +1123,7 @@ export const uiEvents = pgTable("ui_events", {
 }, (table) => [
   index("ui_events_time_idx").on(table.createdAt),
   index("ui_events_visitor_time_idx").on(table.visitor, table.createdAt),
+  index("ui_events_member_time_idx").on(table.memberId, table.createdAt).where(sql`member_id is not null`),
 ]);
 
 export const dailyVisits = pgTable("daily_visits", {

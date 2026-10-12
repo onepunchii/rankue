@@ -228,8 +228,9 @@ export default function VisitorsView({ onOpenMember }: { onOpenMember?: (id: str
             )}
 
             <Sheet open={!!open} onOpenChange={(o) => { if (!o) setOpen(null); }}>
-                <SheetContent side="right" style={SHEET_SAFE_TOP} className="w-full sm:max-w-lg overflow-y-auto bg-[#F7F7F5] p-0">
-                    <div className="rk-no-safe sticky top-0 z-10 bg-white border-b border-black/[0.08] px-4 py-3.5 pr-12">
+                {/* 창은 스크롤하지 않고 아래 목록만 스크롤한다 — 붙는 머리줄(z-10)이 닫기(X) 단추를 덮고 있었다(2026-10-12, 회원 활동 기록 창을 만들다 발견) */}
+                <SheetContent side="right" style={SHEET_SAFE_TOP} className="w-full sm:max-w-lg p-0 flex flex-col gap-0 bg-white">
+                    <div className="shrink-0 border-b border-black/[0.08] px-4 py-3.5 pr-12">
                         <SheetTitle className="text-[15px] font-black text-black/85">한 사람의 발자국</SheetTitle>
                         <SheetDescription className="mt-0.5 text-[12px] text-black/45">
                             {open ? `${open.slice(0, 8)}…` : ""}{trail.data?.firstDay ? ` · 처음 온 날 ${trail.data.firstDay}` : ""} · 최근 30일 {events.length}줄
@@ -240,7 +241,7 @@ export default function VisitorsView({ onOpenMember }: { onOpenMember?: (id: str
                             </button>
                         )}
                     </div>
-                    <div className="p-3">
+                    <div className="flex-1 min-h-0 overflow-y-auto bg-[#F7F7F5] p-3">
                         {trail.isLoading && <p className="p-6 text-center text-[13px] text-black/40">불러오는 중…</p>}
                         {trail.isError && <p className="p-6 text-center text-[13px] text-black/40">불러오지 못했습니다.</p>}
                         {events.length > 0 && (

@@ -24,3 +24,7 @@ create table if not exists ui_events (
 );
 create index if not exists ui_events_time_idx on ui_events (created_at);
 create index if not exists ui_events_visitor_time_idx on ui_events (visitor, created_at);
+
+-- 2026-10-12 회원 한 명의 '활동 기록'(관리자 콘솔 → 회원 상세 → 관리)이 회원 id 로 읽는다. 로그인한 줄만 담는 부분 인덱스(전체의 5%쯤).
+-- 운영 DB 적용: 2026-10-12 (코드 배포 전에 먼저)
+create index if not exists ui_events_member_time_idx on ui_events (member_id, created_at) where member_id is not null;

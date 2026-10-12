@@ -10,6 +10,8 @@ import { cleanRejectReason } from "../../lib/partnerApply.js";
 import adminGolfRouter from "./adminGolf/index.js";
 import adminVisitorsRouter from "./adminVisitors.js";
 import { getMemberGolfForAdmin, setBookingManagerRole, setSubAdminRole } from "../../storage/adminMemberGolf.js";
+import { getMemberActivityForAdmin } from "../../storage/adminMemberActivity.js";
+import { activityDaysOf } from "../../../shared/memberActivity.js";
 import { isSuperAdminRole } from "../../../shared/adminRole.js";
 import { checkSubAdminRequest, subAdminBlockedMessage } from "../../lib/subAdmin.js";
 import { getGolfPushHistory } from "../../storage/adminGolfPush.js";
@@ -202,6 +204,18 @@ router.get("/members/:id/golf", checkSuperAdmin, asyncHandler(async (req: any, r
     const golf = await getMemberGolfForAdmin(req.params.id);
     if (!golf) return sendError(res, 404, "회원을 찾을 수 없습니다");
     return sendSuccess(res, golf);
+}));
+
+/**
+ * GET /admin/members/:id/activity?days=7|30|90 — 회원 상세 창 → 관리 → '활동 기록'(2026-10-12 오너: "일자별로 어떠한 클릭을 했고 활동을 했는지").
+ * 접속 · 웹에서 본 화면과 누른 것 · 경기 · 온라인게임 · 골프 · 글·채팅(건수만)을 날짜별로. 새로 모으는 것은 없다(storage/adminMemberActivity 머리말).
+ * 조회라 보기 전용 관리자도 본다. 고치는 일을 이 주소에 붙이지 말 것(GET 은 가드가 통과시킨다).
+ */
+router.get("/members/:id/activity", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    if (!MEMBER_ID_RE.test(req.params.id)) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    const activity = await getMemberActivityForAdmin(req.params.id, activityDaysOf(req.query.days));
+    if (!activity) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    return sendSuccess(res, activity);
 }));
 
 /**

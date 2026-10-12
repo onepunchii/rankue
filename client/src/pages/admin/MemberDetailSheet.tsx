@@ -22,8 +22,9 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
-import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle } from "@/lib/icons";
+import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle, LucideFootprints } from "@/lib/icons";
 import MemberGamesDialog from "./MemberGamesDialog";
+import MemberActivitySheet from "./MemberActivitySheet";
 import { MemberAvatar, PlatformIcon, CountryFlag, Pill, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday, SHEET_SAFE_TOP } from "./adminUtils";
 import { TODAY_ACTIVE_KEY } from "./TodayActiveView";
 import { appConfirm, appAlert } from "@/components/AppDialog";
@@ -246,12 +247,15 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
     const queryClient = useQueryClient();
     const [form, setForm] = useState<Form | null>(null);
     const [gamesFor, setGamesFor] = useState<{ id: string; name: string } | null>(null);
+    // 활동 기록(2026-10-12 오너: "관리에 탭 하나 더 — 일자별로 어떠한 클릭을 했고 활동을 했는지") — 이 창 위에 한 장 더 뜬다
+    const [activityFor, setActivityFor] = useState<{ id: string; name: string } | null>(null);
     const [pinResult, setPinResult] = useState<{ pin: string; name: string; phone: string } | null>(null);
     const [pushOpen, setPushOpen] = useState(false);
     const [push, setPush] = useState({ title: "", body: "" });
 
     useEffect(() => {
         setForm(member ? toForm(member) : null);
+        setActivityFor(null);
         setPushOpen(false);
         setPush({ title: "", body: "" });
     }, [member?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -497,6 +501,12 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                 <section>
                                     <h3 className="text-[12px] font-black text-black/45 mb-2">관리</h3>
                                     <div className="rounded-2xl bg-white border border-black/[0.07] divide-y divide-black/[0.05] overflow-hidden">
+                                        {/* 보기만 하는 줄 — 보기 전용 관리자에게도 나온다 */}
+                                        <button data-member-activity onClick={() => setActivityFor({ id: m.id, name: m.name })} className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-black/[0.02]">
+                                            <LucideFootprints className="w-4 h-4 text-black/50" />
+                                            <span className="flex-1 text-[14px] font-bold">활동 기록</span>
+                                            <span className="text-[12px] text-black/40">날짜별 접속 · 누른 것 · 한 일</span>
+                                        </button>
                                         <button onClick={() => setGamesFor({ id: m.id, name: m.name })} className="w-full flex items-center gap-3 px-4 py-3.5 text-left hover:bg-black/[0.02]">
                                             <LucideHistory className="w-4 h-4 text-black/50" />
                                             <span className="flex-1 text-[14px] font-bold">경기 기록 정리</span>
@@ -597,6 +607,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
             </Sheet>
 
             <MemberGamesDialog member={gamesFor} onClose={() => setGamesFor(null)} />
+            <MemberActivitySheet member={activityFor} onClose={() => setActivityFor(null)} />
             <Dialog open={pinResult !== null} onOpenChange={(o) => { if (!o) setPinResult(null); }}>
                 <DialogContent className="max-w-sm">
                     <h2 className="text-lg font-black text-[rgba(0,0,0,0.87)]">임시 PIN 발급 완료</h2>
