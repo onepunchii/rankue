@@ -214,6 +214,10 @@ const HikingMountainPage = lazy(() => import("@/hiking/pages/MountainPage"));
 const HikingStampShelf = lazy(() => import("@/hiking/pages/StampShelf"));
 const HikingStampBook = lazy(() => import("@/hiking/pages/StampBookPage"));
 const HikingPack = lazy(() => import("@/hiking/pages/PackPage"));
+const HikingTerms = lazy(() => import("@/hiking/pages/TermsPage"));
+const HikingChecklist = lazy(() => import("@/hiking/pages/ChecklistPage"));
+function HikingTermsRoute() { return <Suspense fallback={hikingFallback}><HikingTerms /></Suspense>; }
+function HikingChecklistRoute() { return <Suspense fallback={hikingFallback}><HikingChecklist /></Suspense>; }
 const HikingTrail = lazy(() => import("@/hiking/pages/TrailPage"));
 function HikingTrailRoute() { return <Suspense fallback={hikingFallback}><HikingTrail /></Suspense>; }
 function HikingStampShelfRoute() { return <Suspense fallback={hikingFallback}><HikingStampShelf /></Suspense>; }
@@ -421,6 +425,10 @@ function AppRoutes() {
       <Route path="/hiking/stamps" component={HikingStampShelfRoute} />
       <Route path="/hiking/stamps/:book" component={HikingStampBookRoute} />
       <Route path="/hiking/pack" component={HikingPackRoute} />
+      {/* 읽을거리 — 용어 사전 · 준비물(검색용 화면 있음) */}
+      <Route path="/hiking/terms" component={HikingTermsRoute} />
+      <Route path="/hiking/terms/:id" component={HikingTermsRoute} />
+      <Route path="/hiking/checklist" component={HikingChecklistRoute} />
       {/* 산행 중 '길 띠' — 회원 화면(검색용 화면 없음) */}
       <Route path="/hiking/trail/:slug" component={HikingTrailRoute} />
       {/* 골프장 페이지(2026-09-24) — 검색 유입용 공개 페이지라 GolfOnly 를 타지 않는다(GolfOnly 는 비로그인을 /dashboard 로 쫓아낸다).

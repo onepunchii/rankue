@@ -12,6 +12,7 @@ import { LucideChevronRight } from "@/lib/icons";
 import { useSeo } from "@/hooks/useSeo";
 import { HIKING_REGIONS, hikingListPath, hikingRegionPath } from "@shared/hikingMountains";
 import { HIKING_H1, HIKING_TAGLINE, OSM_NOTE, hikingHubSeo } from "@shared/hikingPage";
+import { HIKING_CHECKLIST_H1, HIKING_CHECKLIST_PATH, HIKING_TERMS, HIKING_TERMS_H1, HIKING_TERMS_PATH } from "@shared/hikingTerms";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { MountainMap } from "../components/MountainMap";
 import { HikingCta, MountainRow } from "../components/MountainParts";
@@ -112,6 +113,24 @@ export default function HikingHub() {
                             <Link href={hikingListPath("kfs100")} className="mt-3 flex h-12 items-center justify-center gap-1 rounded-xl bg-[#FFFFFF14] text-[15px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24]">
                                 100곳 다 보기<LucideChevronRight weight="bold" className="h-4 w-4" aria-hidden />
                             </Link>
+                        </HkSection>
+
+                        <HkSection title="산행 길잡이" aside="읽을거리">
+                            <ul className="grid grid-cols-2 gap-2.5" data-testid="hub-guides">
+                                {[{ href: HIKING_CHECKLIST_PATH, name: HIKING_CHECKLIST_H1, sub: "철마다 배낭에 넣을 것", art: "/hiking/art/cover-checklist.webp", pos: "50% 80%" },
+                                    { href: HIKING_TERMS_PATH, name: HIKING_TERMS_H1, sub: `들머리 · 안부 · 알바 … ${HIKING_TERMS.length}가지`, art: "/hiking/art/cover-terms.webp", pos: "30% 62%" }].map((c) => (
+                                    <li key={c.href}>
+                                        <Link href={c.href} className="relative block h-[104px] overflow-hidden rounded-2xl bg-[#0E2A33] active:opacity-80">
+                                            <img src={c.art} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: c.pos }} loading="lazy" decoding="async" draggable={false} />
+                                            <span className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2626,#0B1F26E6)" }} aria-hidden />
+                                            <span className="absolute inset-x-3 bottom-2.5">
+                                                <span className="block text-[16px] font-semibold text-[#F4EFE3]">{c.name}</span>
+                                                <span className="block truncate text-[12.5px] text-[#F4EFE3B3]">{c.sub}</span>
+                                            </span>
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
                         </HkSection>
 
                         {!my.mine && <div className="px-5 pt-8"><HikingCta /></div>}

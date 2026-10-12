@@ -1,4 +1,5 @@
-// 등산 프리렌더(2026-10-13) — /hiking(허브) · /hiking/regions/<권역> · /hiking/lists/<목록> · /hiking/mountains/<산> · /hiking/stamps(도장첩) · /hiking/pack(등급 · 와펜 · 핀).
+// 등산 프리렌더(2026-10-13) — /hiking(허브) · /hiking/regions/<권역> · /hiking/lists/<목록> · /hiking/mountains/<산> · /hiking/stamps(도장첩) · /hiking/pack(등급 · 와펜 · 핀)
+// · /hiking/terms(용어 사전) · /hiking/terms/<말> · /hiking/checklist(준비물).
 //
 // 본문은 shared/hikingPage · hikingMountains · hikingGuide · hikingPois 로 화면(client/src/hiking)과 같은 글을 쓴다.
 // prerender.ts 와 서로 import 하는 모양이 되지만, 이 파일은 page·esc·hubNav 를 함수 안에서만 부른다(최상위에서 호출하지 말 것).
@@ -14,12 +15,16 @@ import {
     courseFacts, courseShape, hikingHubSeo, hikingListPath, hikingListSeo, hikingMountainPath, hikingRegionPath, hikingRegionSeo, kmRange, listNames, mountainSeo,
 } from "../../shared/hikingPage.js";
 import { HIKING_GRADES } from "../../shared/hikingGrade.js";
+import {
+    HIKING_CHECKLIST, HIKING_CHECKLIST_H1, HIKING_CHECKLIST_LEAD, HIKING_CHECKLIST_NOTE, HIKING_CHECKLIST_PATH, HIKING_CHECKLIST_SEO, HIKING_TERMS, HIKING_TERMS_H1, HIKING_TERMS_LEAD, HIKING_TERMS_PATH,
+    HIKING_TERMS_SEO, HIKING_TERM_GROUPS, hikingTerm, hikingTermPath, hikingTermSeo, type HikingTerm,
+} from "../../shared/hikingTerms.js";
 import { HIKING_GRANDS, HIKING_PINS, HIKING_SERIES, hikingBooks, type HikingBookKind } from "../../shared/hikingStamps.js";
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface HikingRender { status: 200; tag: string; html: string }
 /** 등산의 주소인가 — 라우트의 정규식. vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
-export const HIKING_RE = /^\/hiking(?:\/(?:regions|lists|mountains)\/[^/]+|\/stamps|\/pack)?\/?$/;
+export const HIKING_RE = /^\/hiking(?:\/(?:regions|lists|mountains)\/[^/]+|\/stamps|\/pack|\/terms(?:\/[^/]+)?|\/checklist)?\/?$/;
 
 const crumbs = (...tail: [string, string][]) => ({
     "@context": "https://schema.org", "@type": "BreadcrumbList",
@@ -38,6 +43,8 @@ const nav = () => `  <nav aria-label="등산">
     <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a>
     <a href="${HIKING_STAMPS_PATH}">등산 도장첩</a>
     <a href="${HIKING_PACK_PATH}">산행 등급 · 와펜</a>
+    <a href="${HIKING_TERMS_PATH}">${esc(HIKING_TERMS_H1)}</a>
+    <a href="${HIKING_CHECKLIST_PATH}">${esc(HIKING_CHECKLIST_H1)}</a>
 ${HIKING_REGIONS.map((r) => `    <a href="${hikingRegionPath(r.id)}">${esc(`${r.name}의 산`)}</a>`).join("\n")}
 ${HIKING_GROUPS.map((l) => `    <a href="${hikingListPath(l.id)}">${esc(l.name)}</a>`).join("\n")}
   </nav>`;
@@ -234,6 +241,72 @@ ${hubNav("ko")}`;
     return { status: 200, tag: "hiking:pack", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [crumbs(["배낭", seo.path])] }) };
 }
 
+/** 용어 사전 — 묶음별로 말과 한 줄 뜻. 화면(TermsPage)과 같은 글(shared/hikingTerms) */
+function terms(): HikingRender {
+    const seo = HIKING_TERMS_SEO;
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a> › ${esc(HIKING_TERMS_H1)}</nav>
+  <h1>${esc(HIKING_TERMS_H1)}</h1>
+  <p>${esc(HIKING_TERMS_LEAD)}</p>
+${HIKING_TERM_GROUPS.map((g) => `  <section>
+    <h2>${esc(g.name)}</h2>
+    <dl>
+${HIKING_TERMS.filter((t) => t.group === g.id).map((t) => `      <dt><a href="${hikingTermPath(t.id)}">${esc(t.term)}</a></dt><dd>${esc(t.short)}</dd>`).join("\n")}
+    </dl>
+  </section>`).join("\n")}
+  <p><a href="${HIKING_CHECKLIST_PATH}">${esc(HIKING_CHECKLIST_H1)} 보기</a></p>
+${cta()}
+${nav()}
+</main>
+${hubNav("ko")}`;
+    const set = { "@context": "https://schema.org", "@type": "DefinedTermSet", name: HIKING_TERMS_H1, url: `${ORIGIN}${seo.path}`, hasDefinedTerm: HIKING_TERMS.map((t) => ({ "@type": "DefinedTerm", name: t.term, description: t.short, url: `${ORIGIN}${hikingTermPath(t.id)}` })) };
+    return { status: 200, tag: "hiking:terms", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [set, crumbs([HIKING_TERMS_H1, seo.path])] }) };
+}
+function term(t: HikingTerm): HikingRender {
+    const seo = hikingTermSeo(t);
+    const see = (t.see ?? []).map((id) => hikingTerm(id)).filter((x): x is HikingTerm => !!x);
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a> › <a href="${HIKING_TERMS_PATH}">${esc(HIKING_TERMS_H1)}</a> › ${esc(t.term)}</nav>
+  <h1>${esc(t.term)}</h1>${t.also?.length ? `\n  <p>${esc(t.also.join(" · "))}</p>` : ""}
+  <p><strong>${esc(t.short)}</strong></p>
+  <p>${esc(t.body)}</p>${see.length ? `
+  <section>
+    <h2>함께 보면 좋은 말</h2>
+    <ul>
+${see.map((x) => `      <li><a href="${hikingTermPath(x.id)}">${esc(x.term)}</a> — ${esc(x.short)}</li>`).join("\n")}
+    </ul>
+  </section>` : ""}
+  <p><a href="${HIKING_TERMS_PATH}">${esc(`용어 ${HIKING_TERMS.length}가지 다 보기`)}</a></p>
+${cta()}
+${nav()}
+</main>
+${hubNav("ko")}`;
+    const ld = { "@context": "https://schema.org", "@type": "DefinedTerm", name: t.term, ...(t.also?.length ? { alternateName: t.also } : {}), description: `${t.short} ${t.body}`, url: `${ORIGIN}${seo.path}`, inDefinedTermSet: `${ORIGIN}${HIKING_TERMS_PATH}` };
+    return { status: 200, tag: `hiking:term:${t.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [ld, crumbs([HIKING_TERMS_H1, HIKING_TERMS_PATH], [t.term, seo.path])] }) };
+}
+/** 준비물 — 묶음별로 무엇을 · 왜. 화면(ChecklistPage)과 같은 글 */
+function checklist(): HikingRender {
+    const seo = HIKING_CHECKLIST_SEO;
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a> › ${esc(HIKING_CHECKLIST_H1)}</nav>
+  <h1>${esc(HIKING_CHECKLIST_H1)}</h1>
+  <p>${esc(HIKING_CHECKLIST_LEAD)}</p>
+${HIKING_CHECKLIST.map((g) => `  <section>
+    <h2>${esc(`${g.name} — ${g.note}`)}</h2>
+    <ul>
+${g.items.map((it) => `      <li><strong>${esc(it.name)}</strong> — ${esc(it.why)}</li>`).join("\n")}
+    </ul>
+  </section>`).join("\n")}
+  <p>${esc(HIKING_CHECKLIST_NOTE)}</p>
+  <p><a href="${HIKING_TERMS_PATH}">${esc(HIKING_TERMS_H1)} 보기</a></p>
+${cta()}
+${nav()}
+</main>
+${hubNav("ko")}`;
+    const list = { "@context": "https://schema.org", "@type": "ItemList", name: HIKING_CHECKLIST_H1, itemListElement: HIKING_CHECKLIST[0].items.map((it, i) => ({ "@type": "ListItem", position: i + 1, name: it.name })) };
+    return { status: 200, tag: "hiking:checklist", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [list, crumbs([HIKING_CHECKLIST_H1, seo.path])] }) };
+}
+
 /**
  * 주소 → 검색용 화면. 등산의 주소가 아니거나 없는 권역 · 목록 · 산이면 null(다음 라우트로 — 화면이 '없는 산이에요'를 그린다).
  * detail 은 산 화면일 때만 부른다(산 한 곳의 글 · 코스 · 지점).
@@ -243,6 +316,11 @@ export async function renderHiking(path: string, all: readonly MountainSummary[]
     if (p === HIKING_HUB_PATH) return all.length ? hub(all) : null;
     if (p === HIKING_STAMPS_PATH) return all.length ? stamps(all) : null;
     if (p === HIKING_PACK_PATH) return all.length ? pack(all) : null;
+    // 글만으로 서는 화면 — 산 자료가 없어도 낸다
+    if (p === HIKING_TERMS_PATH) return terms();
+    if (p === HIKING_CHECKLIST_PATH) return checklist();
+    const tm = /^\/hiking\/terms\/([^/]+)$/.exec(p);
+    if (tm) { const t = hikingTerm(decodeURIComponent(tm[1])); return t ? term(t) : null; }
     const m = /^\/hiking\/(regions|lists|mountains)\/([^/]+)$/.exec(p);
     if (!m) return null;
     const key = decodeURIComponent(m[2]);
@@ -270,6 +348,9 @@ export function hikingSitemapParts(all: readonly MountainSummary[]): string[] {
         entry(`${ORIGIN}${HIKING_HUB_PATH}`, { changefreq: "weekly", priority: "0.8" }),
         entry(`${ORIGIN}${HIKING_STAMPS_PATH}`, { changefreq: "monthly", priority: "0.6" }),
         entry(`${ORIGIN}${HIKING_PACK_PATH}`, { changefreq: "monthly", priority: "0.6" }),
+        entry(`${ORIGIN}${HIKING_TERMS_PATH}`, { changefreq: "monthly", priority: "0.6" }),
+        entry(`${ORIGIN}${HIKING_CHECKLIST_PATH}`, { changefreq: "monthly", priority: "0.6" }),
+        ...HIKING_TERMS.map((t) => entry(`${ORIGIN}${hikingTermPath(t.id)}`, { changefreq: "monthly", priority: "0.5" })),
         ...HIKING_REGIONS.map((r) => entry(`${ORIGIN}${hikingRegionPath(r.id)}`, { changefreq: "weekly", priority: "0.6" })),
         ...HIKING_GROUPS.map((l) => entry(`${ORIGIN}${hikingListPath(l.id)}`, { changefreq: "weekly", priority: l.kind === "list" ? "0.7" : "0.5" })),
         ...all.filter((m) => m.courses > 0 || m.hasGuide).map((m) => entry(`${ORIGIN}${hikingMountainPath(m.slug)}`, { changefreq: "monthly", priority: m.tier === 1 ? "0.7" : m.tier === 2 ? "0.5" : "0.4" })),
