@@ -17,6 +17,7 @@ import { StampHelpButton, StampHelpSheet } from "@/golf/stamps/StampHelp";
 import { awardWhen, useStampAwards } from "@/golf/stamps/useStampAwards";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
 import { MarkerArt, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampPaper, StampSection, bookPath } from "@/golf/stamps/StampParts";
+import { lastEmptySlot } from "@shared/golfStampOneLeft";
 
 /** 손으로 찍은 것처럼 칸마다 조금씩 다른 기울기(도) */
 const TILT = [-5, 4, -2, 6, -4, 3, -6, 5, -3, 2, -5];
@@ -46,6 +47,8 @@ export default function StampBookPage() {
     const left = total - got;
     const records = slots.filter((s) => s.record).length;
     const award = col.sample ? undefined : awards.of("book", book.id);
+    // '한 곳 남음' — 내 도장첩에서 빈 칸이 딱 하나일 때(누구나 권만). 알림(서버)과 같은 셈이다. 예시에는 붙이지 않는다
+    const last = col.sample ? null : lastEmptySlot(state);
 
     return (
         <CourseShell title={`${book.name} 도장첩`} backTo={STAMPS_PATH} hideBottomCta right={<StampHelpButton onClick={() => setHelp(true)} />}>
@@ -84,6 +87,23 @@ export default function StampBookPage() {
                                 <div className="text-[17px] font-semibold tabular-nums text-[#FFFFFF]">{got}<span className="text-[13px] font-normal text-[#FFFFFF99]">/{total}</span></div>
                             </div>
                         </div>
+
+                        {/* 한 곳 남음 — 마지막 골프장으로 가는 줄. 조인 · 날씨 · 관심 알림은 그 골프장 화면에 있다 */}
+                        {last && (
+                            <div className="px-5 pt-2.5">
+                                <Link href={`/golf/course/${last.slot.courseId}`} className="flex items-center gap-3 rounded-2xl bg-[#E9B94914] px-3.5 py-3 ring-1 ring-inset ring-[#E9B94940] active:bg-[#E9B94926]" data-testid="stamp-one-left" data-slot={last.slot.key}>
+                                    <span className="shrink-0 rounded-[10px] bg-[#F4EFE3] p-1" aria-hidden>
+                                        <InkStamp name={last.slot.name} ink={art?.ink ?? "#2F6BD6"} glyph={art?.glyph ?? "tree"} size={46} state="empty" tilt={0} />
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-[13px] text-[#FFD36B]">한 곳 남았어요</span>
+                                        <span className="mt-0.5 block text-[16px] font-semibold text-[#FFFFFF] break-keep">{last.slot.name}</span>
+                                        <span className="mt-0.5 block text-[13px] leading-snug text-[#FFFFFFB3] break-keep">조인 · 날씨를 보고, 관심을 켜 두면 자리가 날 때 알려 드려요</span>
+                                    </span>
+                                    <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#FFD36B]" aria-hidden />
+                                </Link>
+                            </div>
+                        )}
 
                         <StampSection title={`도장 ${total}칸`} sample={col.sample} aside={invite ? "회원제 골프장" : "골프장에서 18홀을 끝내면 찍혀요"}>
                             <StampPaper className="px-2.5 pt-4 pb-3.5">

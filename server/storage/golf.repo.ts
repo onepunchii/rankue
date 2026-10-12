@@ -39,6 +39,8 @@ import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
 import { courseNameKey } from "../../shared/golfCourse.js";
 import { collectStamps, makeStampResolver, type StampAgg } from "./golfStamps.js";
 import { syncStampAwards, type StampAwardRow } from "./golfStampAwards.js";
+import type { DatedStamp } from "../../shared/golfStampAwards.js";
+import { stampOneLeft } from "../../shared/golfStampOneLeft.js";
 import { insertCheckin, listCheckins, listCheckinsInTx, readCheckins, realMemberIds, withCheckinTable } from "./golfCheckins.js";
 import { parseLatLng, sortByDistance } from "../../shared/golfNearby.js";
 import {
@@ -56,6 +58,8 @@ import {
 
 /** 대기방 핀이 살아 있는 시간. 지나면 그 핀으로는 못 들어온다(방장은 홈의 '진행 중 라운드' 로 돌아온다). */
 const PIN_TTL_MS = 6 * 3600_000;
+/** '한 곳 남음' 알림을 기다리는 뚜껑 — 푸시 서버가 늘어져도 라운드 끝내기는 이만큼만 늦어진다 */
+const ONE_LEFT_WAIT_MS = 2500;
 /** 진행 중 경기를 이어하기·재입장 대상으로 보는 시간(마지막으로 손댄 때부터). */
 const ACTIVE_TTL_MS = 12 * 3600_000;
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -1048,7 +1052,29 @@ export class GolfRepository {
      */
     async syncStampAwards(memberId: string): Promise<StampAwardRow[]> {
         const stats = await this.getGolfPassportStats(memberId);
-        return syncStampAwards(memberId, stats.stamps.map((s) => ({ clubId: s.clubId, name: s.name, firstDate: s.firstDate })));
+        const stamps = stats.stamps.map((s) => ({ clubId: s.clubId, name: s.name, firstDate: s.firstDate }));
+        const fresh = await syncStampAwards(memberId, stamps);
+        await this.nudgeStampOneLeft(memberId, stamps);
+        return fresh;
+    }
+
+    /**
+     * '한 곳 남음' 알림(2026-10-12) — 이 도장으로 어느 권이 한 칸 남게 됐으면 알린다(shared/golfStampOneLeft).
+     * 한 칸 남은 권이 없으면(거의 늘 그렇다) 아무것도 부르지 않는다.
+     * 알림 서비스는 저장소를 임포트한다 — 여기서 정적으로 임포트하면 서로를 물어서, 필요할 때만 불러온다.
+     * 끝내기를 붙잡지 않게 ONE_LEFT_WAIT_MS 만 기다리고, 실패해도 기록 · 평균 계산은 막지 않는다.
+     */
+    private async nudgeStampOneLeft(memberId: string, stamps: readonly DatedStamp[]): Promise<void> {
+        if (stampOneLeft(stamps).length === 0) return;
+        try {
+            const { notifyStampOneLeft } = await import("../services/golfStampOneLeft.js");
+            await Promise.race([
+                notifyStampOneLeft(memberId, stamps).catch((e) => console.error("[golf] stampOneLeft", e)),
+                new Promise((r) => setTimeout(r, ONE_LEFT_WAIT_MS)),
+            ]);
+        } catch (e) {
+            console.error("[golf] stampOneLeft", e);
+        }
     }
 
     async updateGolfStats(userId: string): Promise<any> {
