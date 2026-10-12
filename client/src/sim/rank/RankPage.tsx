@@ -1,6 +1,12 @@
 /**
  * 온라인 대전 랭킹(2026-09-08 오너: "랭킹제 · 국가별 · 랭커 게임처럼"). `/online-game?rank=1`.
- * 위: 종목 칩 → 내 카드(티어 배지·레이팅·순위·전적, 배치 전엔 "배치 중 n/3") → 순위 목록.
+ * 위: 트로피 머리 → 종목 칩 → 내 카드(등급 배지 그림·레이팅·순위·전적·다음 등급까지·일곱 등급 사다리, 배치 전엔 "배치 중 n/3") → 순위 목록.
+ *
+ * 모양은 '진열장'(2026-10-12 오너: 시안 A·B 가운데 "B 로 가고 이미지 제작 잘해서 게임 느낌도 나고 진짜 소유욕이 들게끔").
+ *  - 등급 배지·메달·트로피는 그림이다(./TierEmblem, public/sim/rank). 숫자·글자는 그림에 넣지 않고 여기서 그린다.
+ *  - 내 카드의 사다리는 일곱 배지를 한 줄로: 지나온 등급은 밝게, 지금 등급은 크게 빛나고, 아직 못 얻은 등급은 어둡게 —
+ *    다음에 얻을 것이 보이게 한다(갖고 싶게).
+ *  - 색·광택은 .rank-hall 아래에만(index.css). 예전의 보라 판(.rank-arcade, 2026-09-09)은 이 화면에서 뺐다.
  * 순위표는 나라 구분 없이 하나다(2026-10-12 오너: "국가별인데 통합하는 건 어때?") — 예전의 범위 칩(전체 / 내 나라 / 나라 고르기)과 국가 순위 줄을 뺐다. 국기는 이름 옆에 남는다.
  * 내 나라가 없으면 기기 언어의 지역으로 한 번 저장하고(PATCH /me), 카드의 "내 나라 바꾸기"로 고친다. 값은 온라인 대전 Elo 뿐 — 실전 RP 와 무관.
  */
@@ -9,14 +15,14 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { rankStatus, tierFor, TIERS, PLACEMENT_MATCHES, type Tier } from "@shared/sim/rank";
+import { rankStatus, tierFor, nextTier, TIERS, PLACEMENT_MATCHES } from "@shared/sim/rank";
 import { RankBoard } from "./RankBoard";
 import { GameBalls } from "./GameBalls";
-import type { DashGameType, DashTableId } from "../dash/dashApi";
-import { gameLabel } from "../match/matchView";
+import type { DashGameType } from "../dash/dashApi";
 import { COUNTRY_OPTIONS, countryName, guessCountry, isCountryCode } from "./country";
 import { rankFlag } from "./flag";
-import { rankApi as defaultApi, RANK_QUERY_KEY, type RankApi, type RankRow } from "./rankApi";
+import { rankApi as defaultApi, RANK_QUERY_KEY, type RankApi } from "./rankApi";
+import { RANK_TROPHY_SRC, TIER_GLOW, TierEmblem } from "./TierEmblem";
 
 export interface RankPageProps {
     onClose: () => void;
@@ -28,42 +34,20 @@ export interface RankPageProps {
 /** 2026-09-12 오너: "대대 중대 통합해줘" — 사다리는 종목 둘뿐이다(인원이 적어 넷으로 쪼개면 한 판에 서너 명이었다). */
 const COMBOS: readonly { gameType: DashGameType }[] = [{ gameType: "3c" }, { gameType: "4c" }];
 const pill = "h-10 px-3.5 shrink-0 inline-flex items-center rounded-pill border text-[13px] font-bold";
-const chipOn = "border-transparent bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)]";
+const chipOn = "border-transparent bg-[color:var(--hall-lime)] text-[#0B1A03]";
 const chipOff = "border-white/15 bg-white/[0.08] text-white/85 active:bg-white/15";
 
-/** 티어 배지: 방패 모양(단색) + 이름. 마스터만 gold, 골드~다이아는 brand, 그 아래는 잉크. */
-export function TierBadge({ tier, size = "md" }: { tier: Tier | null; size?: "sm" | "md" }) {
-    const { t } = useT();
-    const tone = !tier ? "bg-surface-3 text-ink-3" : tier.id === "master" ? "text-gold" : tier.id === "gold" || tier.id === "platinum" || tier.id === "diamond" ? "bg-brand/[0.1] text-brand" : "bg-surface-3 text-ink-2";
-    const style = tier?.id === "master" ? { backgroundColor: "var(--gold-soft)" } : undefined;
-    return (
-        <span className={cn("inline-flex items-center gap-1 rounded-pill font-bold", size === "sm" ? "h-6 px-2 text-[11px]" : "h-8 px-3 text-[13px]", tone)} style={style}>
-            <svg width={size === "sm" ? 11 : 14} height={size === "sm" ? 12 : 16} viewBox="0 0 14 16" aria-hidden="true">
-                <path d="M7 1 12.5 3v5c0 3.4-2.3 5.9-5.5 7C3.8 13.9 1.5 11.4 1.5 8V3Z" fill="currentColor" opacity={tier ? 1 : 0.35} />
-            </svg>
-            {tier ? t(tier.nameKey) : t("sim.rank.unrankedShort")}
-        </span>
-    );
-}
-
-function Row({ r, me, locale }: { r: RankRow; me: boolean; locale: string }) {
-    const { t } = useT();
-    return (
-        <li className={cn("rounded-tile border bg-surface-1 px-4 py-3 flex items-center gap-3", me ? "border-brand" : "border-surface-line")} aria-current={me ? "true" : undefined}>
-            <span className="rk-num w-8 shrink-0 text-[16px] font-bold text-ink-1 text-center">{r.rank}</span>
-            <span className="flex-1 min-w-0 flex flex-col gap-0.5">
-                <span className="flex items-center gap-1.5 min-w-0">
-                    <span className="text-[14px] font-semibold text-ink-1 truncate">{r.name}</span>
-                    {r.country && <span className="rk-chip bg-surface-3 text-ink-3 text-[10px]" title={countryName(r.country, locale)}>{r.country}</span>}
-                </span>
-                <span className="flex items-center gap-1.5">
-                    <TierBadge tier={tierFor(r.rating)} size="sm" />
-                    <span className="rk-num text-[11px] font-medium text-ink-3">{t("sim.entry.record").replace("{w}", String(r.wins)).replace("{l}", String(r.matches - r.wins))}</span>
-                </span>
-            </span>
-            <span className="rk-num text-[18px] font-bold text-ink-1 shrink-0">{r.rating}</span>
-        </li>
-    );
+/**
+ * 지금 등급 안에서 다음 등급까지 얼마나 왔나(0~1). 아이언은 아래 끝이 없어(−∞) 브론즈 문턱에서 100점 아래를 바닥으로 본다.
+ * 막대의 길이일 뿐이다 — 점수는 글자로 따로 적는다.
+ */
+export function tierProgress(rating: number): number {
+    const next = nextTier(rating);
+    if (!next) return 1;
+    const cur = tierFor(rating);
+    const floor = Number.isFinite(cur.min) ? cur.min : next.min - 100;
+    const p = (rating - floor) / (next.min - floor);
+    return p < 0 ? 0 : p > 1 ? 1 : p;
 }
 
 export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) {
@@ -121,117 +105,125 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
     const n = (v: number) => String(v);
 
     return (
-        <div className="rank-arcade w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
-            <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="min-w-0">
-                    <h1 className="text-[20px] font-black text-white leading-tight">{t("sim.rank.title")}</h1>
-                    <p className="text-[12.5px] font-medium text-white/60 mt-0.5">{t("sim.rank.sub").replace("{n}", n(PLACEMENT_MATCHES))}</p>
-                </div>
-                <button type="button" onClick={onClose} className="h-11 px-4 shrink-0 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2 active:bg-surface-3">
+        <div className="rank-hall w-full max-w-[420px] mx-auto pb-8">
+            {/* 머리 — 당구장 불빛 아래 트로피 */}
+            <header className="hall-top relative px-5 pt-4">
+                <button type="button" onClick={onClose} className="absolute right-5 top-4 h-11 px-4 rounded-pill border border-white/25 bg-black/40 text-[13px] font-semibold text-white/90 active:bg-black/60">
                     {t("sim.common.close")}
                 </button>
-            </div>
-
-            <div role="group" aria-label={t("sim.dash.filterAria")} className="flex gap-1.5 overflow-x-auto -mx-5 px-5 pb-1 mb-3">
-                {(["3c", "4c"] as const).map((g) => {
-                    const sel = combo.gameType === g;
-                    const ranked = (data?.combos ?? []).filter((c) => c.gameType === g).reduce((a, c) => a + c.ranked, 0);
-                    return (
-                        <button
-                            key={g} type="button" aria-pressed={sel} onClick={() => { pickedRef.current = true; setCombo({ ...combo, gameType: g }); }}
-                            aria-label={t(g === "3c" ? "sim.setup.type3c" : "sim.setup.type4c")}
-                            className={cn(pill, "gap-2", sel ? chipOn : chipOff)}
-                        >
-                            <GameBalls gameType={g} />
-                            {ranked > 0 && <span className="rk-num text-[11px] font-bold opacity-70">{t("sim.rank.rankedCount").replace("{n}", String(ranked))}</span>}
-                        </button>
-                    );
-                })}
-            </div>
-
-            {q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.rank.loading")}</p>}
-            {q.isError && (
-                <div className="flex items-center justify-between gap-3 min-h-11">
-                    <p className="text-[13px] font-medium text-ink-2">{t("sim.rank.failed")}</p>
-                    <button type="button" onClick={() => { void q.refetch(); }} className={cn(pill, chipOff)}>{t("sim.match.retry")}</button>
+                <div className="flex items-end gap-1 pt-9">
+                    <img src={RANK_TROPHY_SRC} width={108} height={108} alt="" aria-hidden="true" decoding="async" draggable={false} className="hall-trophy shrink-0 -ml-3" />
+                    <div className="min-w-0 pb-4">
+                        <h1 className="text-[23px] font-black text-white leading-tight">{t("sim.rank.title")}</h1>
+                        <p className="text-[12.5px] font-medium text-white/70 mt-0.5">{t("sim.rank.sub").replace("{n}", n(PLACEMENT_MATCHES))}</p>
+                    </div>
                 </div>
-            )}
+            </header>
 
-            {data && status && (
-                <div className={cn("flex flex-col gap-3", q.isFetching && "opacity-80")}>
-                    <section className="arc-board rounded-[22px] p-4" aria-label={t("sim.rank.myTitle")} data-testid="rank-me">
-                        <div className="flex items-center justify-between gap-2">
-                            <TierBadge tier={status.tier} />
-                            <span className="rk-num text-[12px] font-bold text-white/80">{t("sim.entry.record").replace("{w}", n(data.me.wins)).replace("{l}", n(data.me.matches - data.me.wins))}</span>
-                        </div>
-                        <div className="flex items-baseline gap-3 mt-2 flex-wrap">
-                            <span className="text-[44px] font-black text-white leading-none tracking-tight" data-rating>{data.me.rating}</span>
-                            <span className="rk-num text-[13px] font-bold text-white/85">
-                                {status.placed && data.me.rank !== null
-                                    ? t("sim.rank.rankOf").replace("{r}", n(data.me.rank)).replace("{n}", n(data.total))
-                                    : t("sim.rank.unranked").replace("{n}", n(data.me.matches)).replace("{m}", n(PLACEMENT_MATCHES))}
-                            </span>
-                        </div>
-                        <p className="rk-num text-[12.5px] font-bold text-white/75 mt-2">
-                            {!status.placed
-                                ? t("sim.rank.placementHint").replace("{n}", n(status.placementLeft))
-                                : status.toNext !== null
-                                    ? t("sim.rank.nextTier").replace("{tier}", t(tierFor(data.me.rating + status.toNext).nameKey)).replace("{n}", n(status.toNext))
-                                    : t("sim.rank.topTier")}
-                        </p>
-                        {/* 티어 사다리(2026-09-09 오너: 재미 = 다음 목표가 보이는 것). 지금 티어에 표시, 다음 티어까지 몇 점인지 막대로. */}
-                        {status.placed && (
-                            <div className="mt-3" aria-label={t("sim.rank.ladder")}>
-                                <div className="flex items-center gap-1">
-                                    {TIERS.map((tier) => {
-                                        const cur = status.tier?.id === tier.id;
-                                        const passed = data.me.rating >= tier.min;
-                                        return (
-                                            <span
-                                                key={tier.id} title={t(tier.nameKey)}
-                                                className={cn(
-                                                    "flex-1 h-1.5 rounded-pill",
-                                                    cur ? "bg-[color:var(--arc-frame)]" : passed ? "bg-white/70" : "bg-white/20",
-                                                )}
-                                            />
-                                        );
-                                    })}
-                                </div>
-                                <div className="flex items-center justify-between mt-1.5">
-                                    <span className="text-[11px] font-black text-white">{status.tier ? t(status.tier.nameKey) : ""}</span>
-                                    {status.toNext !== null && (
-                                        <span className="rk-num text-[11px] font-bold text-white/75">
-                                            {t("sim.rank.toNext")
-                                                .replace("{tier}", t(tierFor(data.me.rating + status.toNext).nameKey))
-                                                .replace("{n}", n(status.toNext))}
-                                        </span>
-                                    )}
+            <div className="px-5">
+                <div role="group" aria-label={t("sim.dash.filterAria")} className="flex gap-1.5 overflow-x-auto -mx-5 px-5 pt-1 pb-1 mb-3">
+                    {(["3c", "4c"] as const).map((g) => {
+                        const sel = combo.gameType === g;
+                        const ranked = (data?.combos ?? []).filter((c) => c.gameType === g).reduce((a, c) => a + c.ranked, 0);
+                        return (
+                            <button
+                                key={g} type="button" aria-pressed={sel} onClick={() => { pickedRef.current = true; setCombo({ ...combo, gameType: g }); }}
+                                aria-label={t(g === "3c" ? "sim.setup.type3c" : "sim.setup.type4c")}
+                                className={cn(pill, "gap-2", sel ? chipOn : chipOff)}
+                            >
+                                <GameBalls gameType={g} />
+                                {ranked > 0 && <span className="rk-num text-[11px] font-bold opacity-70">{t("sim.rank.rankedCount").replace("{n}", String(ranked))}</span>}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                {q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.rank.loading")}</p>}
+                {q.isError && (
+                    <div className="flex items-center justify-between gap-3 min-h-11">
+                        <p className="text-[13px] font-medium text-ink-2">{t("sim.rank.failed")}</p>
+                        <button type="button" onClick={() => { void q.refetch(); }} className={cn(pill, chipOff)}>{t("sim.match.retry")}</button>
+                    </div>
+                )}
+
+                {data && status && (
+                    <div className={cn("flex flex-col gap-4", q.isFetching && "opacity-80")}>
+                        <section className="hall-me rounded-[22px] px-4 pt-3 pb-4" aria-label={t("sim.rank.myTitle")} data-testid="rank-me">
+                            <div className="flex items-center gap-2">
+                                {/* 배치 전에는 아직 얻은 배지가 없다 — 가장 아래 등급의 실루엣 */}
+                                <span className="hall-emblem shrink-0 -ml-2">
+                                    {status.tier
+                                        ? <TierEmblem tier={status.tier.id} size={124} glow />
+                                        : <TierEmblem tier="iron" size={124} locked />}
+                                </span>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-[13px] font-black" style={{ color: status.tier ? TIER_GLOW[status.tier.id] : "rgba(255,255,255,0.6)" }}>
+                                        {status.tier ? t(status.tier.nameKey) : t("sim.rank.unrankedShort")}
+                                        <span className="rk-num font-bold text-white/75">{" · "}{t("sim.entry.record").replace("{w}", n(data.me.wins)).replace("{l}", n(data.me.matches - data.me.wins))}</span>
+                                    </p>
+                                    <p className="text-[46px] font-black text-white leading-none tracking-tight mt-1" data-rating>{data.me.rating}</p>
+                                    <p className="rk-num text-[12.5px] font-bold text-white/80 mt-1.5">
+                                        {status.placed && data.me.rank !== null
+                                            ? t("sim.rank.rankOf").replace("{r}", n(data.me.rank)).replace("{n}", n(data.total))
+                                            : t("sim.rank.unranked").replace("{n}", n(data.me.matches)).replace("{m}", n(PLACEMENT_MATCHES))}
+                                    </p>
                                 </div>
                             </div>
-                        )}
-                        <label className="mt-3 flex items-center justify-between gap-2 text-[12px] font-bold text-white/75">
-                            <span>{myCountry ? `${rankFlag(myCountry) || ""} ${countryName(myCountry, locale)}` : t("sim.rank.countryChange")}</span>
-                            <select
-                                aria-label={t("sim.rank.countryChange")} value={myCountry ?? ""} onChange={(e) => { void changeCountry(e.target.value); }}
-                                className="h-9 rounded-lg border border-white/25 bg-white/15 px-2 text-[12px] font-bold text-white max-w-[150px]"
-                            >
-                                <option value="">–</option>
-                                {options.map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}
-                            </select>
-                        </label>
-                    </section>
 
-                    {/* 순위 목록은 게임 리더보드 형태(2026-09-09 오너: 랭킹 페이지만 디자인 규칙 해제) */}
-                    {data.rows.length === 0 ? (
-                        <section className="rounded-card bg-surface-1 border border-surface-line rk-shadow p-4">
-                            <p className="text-[15px] font-bold text-ink-1">{t("sim.rank.empty")}</p>
-                            <p className="text-[13px] font-medium text-ink-3 mt-1">{t("sim.rank.emptyDesc").replace("{n}", n(PLACEMENT_MATCHES))}</p>
+                            {/* 다음 등급까지 — 막대는 지금 등급 색에서 다음 등급 색으로 이어진다 */}
+                            <div className="mt-2">
+                                {status.placed && status.tier && status.toNext !== null && (
+                                    <div className="h-1.5 rounded-pill bg-white/15 overflow-hidden" aria-hidden="true">
+                                        <div className="h-full rounded-pill" style={{ width: `${Math.max(4, Math.round(tierProgress(data.me.rating) * 100))}%`, background: `linear-gradient(90deg, ${TIER_GLOW[status.tier.id]}, ${TIER_GLOW[tierFor(data.me.rating + status.toNext).id]})` }} />
+                                    </div>
+                                )}
+                                <p className="rk-num text-[12.5px] font-bold text-white/80 mt-1.5">
+                                    {!status.placed
+                                        ? t("sim.rank.placementHint").replace("{n}", n(status.placementLeft))
+                                        : status.toNext !== null
+                                            ? t("sim.rank.nextTier").replace("{tier}", t(tierFor(data.me.rating + status.toNext).nameKey)).replace("{n}", n(status.toNext))
+                                            : t("sim.rank.topTier")}
+                                </p>
+                            </div>
+
+                            {/* 등급 사다리(2026-09-09 오너: 재미 = 다음 목표가 보이는 것) — 일곱 배지. 지나온 등급은 밝게, 지금은 크게, 아직은 어둡게 */}
+                            <div className="hall-ladder mt-3 px-1 flex items-end justify-between" role="list" aria-label={t("sim.rank.ladder")}>
+                                {TIERS.map((tier) => {
+                                    const cur = status.placed && status.tier?.id === tier.id;
+                                    const passed = status.placed && data.me.rating >= tier.min;
+                                    // 바로 다음 등급은 덜 어둡게 — 손에 닿을 듯이
+                                    const upNext = status.placed && status.toNext !== null && tierFor(data.me.rating + status.toNext).id === tier.id;
+                                    return (
+                                        <span key={tier.id} role="listitem" title={t(tier.nameKey)} className={cn("flex flex-col items-center", cur && "hall-step-cur")} aria-current={cur ? "true" : undefined}>
+                                            <TierEmblem tier={tier.id} size={cur ? 46 : upNext ? 38 : 34} locked={!passed} next={upNext} glow={cur} label={t(tier.nameKey)} />
+                                        </span>
+                                    );
+                                })}
+                            </div>
+
+                            <label className="mt-4 flex items-center justify-between gap-2 text-[12px] font-bold text-white/75">
+                                <span>{myCountry ? `${rankFlag(myCountry) || ""} ${countryName(myCountry, locale)}` : t("sim.rank.countryChange")}</span>
+                                <select
+                                    aria-label={t("sim.rank.countryChange")} value={myCountry ?? ""} onChange={(e) => { void changeCountry(e.target.value); }}
+                                    className="h-9 rounded-lg border border-white/20 bg-white/10 px-2 text-[12px] font-bold text-white max-w-[150px]"
+                                >
+                                    <option value="">–</option>
+                                    {options.map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}
+                                </select>
+                            </label>
                         </section>
-                    ) : (
-                        <RankBoard rows={data.rows} myMemberId={member?.id} locale={locale} />
-                    )}
-                </div>
-            )}
+
+                        {data.rows.length === 0 ? (
+                            <section className="rounded-card bg-surface-1 border border-surface-line rk-shadow p-4">
+                                <p className="text-[15px] font-bold text-ink-1">{t("sim.rank.empty")}</p>
+                                <p className="text-[13px] font-medium text-ink-3 mt-1">{t("sim.rank.emptyDesc").replace("{n}", n(PLACEMENT_MATCHES))}</p>
+                            </section>
+                        ) : (
+                            <RankBoard rows={data.rows} myMemberId={member?.id} locale={locale} />
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

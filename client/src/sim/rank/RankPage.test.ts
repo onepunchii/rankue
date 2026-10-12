@@ -69,7 +69,7 @@ const click = (el: Element) => React.act(() => { el.dispatchEvent(new window.Mou
 const text = (h: Harness) => h.container.textContent ?? "";
 
 describe("RankPage", () => {
-    it("내 카드: 골드 · 1160 · #2 전체 3명 · 플래티넘까지 90점, 리더보드 줄(1 금 · 2 하늘 · 3 산호)", async () => {
+    it("내 카드: 골드 배지 그림 · 1160 · #2 전체 3명 · 플래티넘까지 90점 · 일곱 등급 사다리, 목록 줄(1~3등 메달 · 등급 배지 그림)", async () => {
         const h = mount(ladder());
         await settle(h, () => text(h).includes("고수"));
         const me = h.container.querySelector("[data-testid=rank-me]")!;
@@ -79,16 +79,33 @@ describe("RankPage", () => {
         expect(me.textContent).toContain("플래티넘까지 90점");
         expect(me.textContent).not.toContain("KR #2");   // 나라 순위는 보이지 않는다(2026-10-12 통합)
         expect(me.textContent).toContain("4승 2패");
-        // 리더보드: 순위마다 색이 다른 알약 줄(1 금 · 2 하늘 · 3 산호), 내 줄에 "나" 표시
+        // 2026-10-12 진열장 모양(오너: "B 로 가고 … 게임 느낌도 나고 진짜 소유욕이 들게끔") — 내 등급은 그림이다
+        const srcs = (el: Element) => Array.from(el.querySelectorAll("img")).map((i) => i.getAttribute("src"));
+        expect(srcs(me.querySelector(".hall-emblem")!)).toEqual(["/sim/rank/tier-gold.webp"]);
+        // 사다리: 일곱 배지 — 지나온 등급(아이언~골드)은 밝고, 지금(골드)은 표시되고, 아직 못 얻은 등급은 어둡다(갖고 싶게)
+        const steps = Array.from(me.querySelectorAll("[role=list] [role=listitem]"));
+        expect(steps.map((x) => x.querySelector("img")!.getAttribute("src"))).toEqual(["iron", "bronze", "silver", "gold", "platinum", "diamond", "master"].map((t) => `/sim/rank/tier-${t}.webp`));
+        const filt = steps.map((x) => (/filter:\s*([^;]+)/.exec(x.querySelector("img")!.getAttribute("style") ?? "")?.[1] ?? ""));
+        expect(filt.map((f) => /grayscale/.test(f))).toEqual([false, false, false, false, true, true, true]);
+        // 바로 다음 등급(플래티넘)은 덜 어둡다 — 손에 닿을 듯이. 그 뒤는 실루엣
+        expect(filt[4]).toContain("grayscale(0.55)");
+        expect(filt[5]).toContain("grayscale(1)");
+        expect(steps.map((x) => x.getAttribute("aria-current"))).toEqual([null, null, null, "true", null, null, null]);
+        expect(steps[3].querySelector("img")!.getAttribute("alt")).toBe(ko["sim.rank.tier.gold"]);
+        // 목록: 1~3등은 메달(등수는 그림 위에 글자로), 줄마다 등급 배지 그림, 내 줄에 "나" 표시
         const rows = h.container.querySelectorAll("ol li");
         expect(rows).toHaveLength(3);
         expect(rows[0].textContent).toContain("고수");
-        expect(rows[0].className).toContain("arc-row-1");
-        expect(rows[1].className).toContain("arc-row-2");
+        for (const r of Array.from(rows)) expect(r.className).toContain("hall-row-top");
+        expect(srcs(rows[0])).toEqual(["/sim/rank/medal-1.webp", "/sim/rank/tier-master.webp"]);
+        expect(srcs(rows[1])).toEqual(["/sim/rank/medal-2.webp", "/sim/rank/tier-gold.webp"]);
+        expect(srcs(rows[2])).toEqual(["/sim/rank/medal-3.webp", "/sim/rank/tier-silver.webp"]);
+        expect(rows[1].className).toContain("hall-row-mine");
         expect(rows[1].getAttribute("aria-current")).toBe("true");
         expect(rows[1].textContent).toContain(ko["sim.rank.meMark"]);
-        expect(rows[2].className).toContain("arc-row-3");
         expect(rows[0].textContent).toContain(ko["sim.rank.tier.master"]);
+        // 머리의 트로피
+        expect(h.container.querySelector("header img")!.getAttribute("src")).toBe("/sim/rank/trophy.webp");
         expect(rows[2].textContent).toContain("🇲🇽");            // 국가는 국기로(콤팩트)
         expect(h.api.setCountry).not.toHaveBeenCalled(); // 내 나라가 이미 있다
     });
@@ -120,6 +137,11 @@ describe("RankPage", () => {
         expect(text(h)).toContain("배치 중 1/3");
         expect(text(h)).toContain("대전 2판을 더 마치면 랭킹에 올라요");
         expect(text(h)).toContain(ko["sim.rank.unrankedShort"]);
+        // 배치 전에는 얻은 배지가 없다 — 내 카드는 어두운 실루엣, 사다리도 전부 어둡다
+        const meImg = h.container.querySelector("[data-testid=rank-me] .hall-emblem img")!;
+        expect(meImg.getAttribute("src")).toBe("/sim/rank/tier-iron.webp");
+        expect(meImg.getAttribute("style")).toMatch(/grayscale/);
+        expect(Array.from(h.container.querySelectorAll("[data-testid=rank-me] [role=listitem] img")).every((i) => /grayscale/.test(i.getAttribute("style") ?? ""))).toBe(true);
         expect(h.api.setCountry).toHaveBeenCalledWith("MX");
         // '내 나라' 고르기는 남아 있다(이름 옆 국기에 쓴다)
         expect(h.container.querySelector(`select[aria-label="${ko["sim.rank.countryChange"]}"]`)).not.toBeNull();
