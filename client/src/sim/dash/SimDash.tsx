@@ -4,13 +4,20 @@
  * 에버리지 추이(선) → 세션별 하이런(막대) → 친구와 대전(전적·연승·최근 흐름 + 내 대전 목록: 열기·기권·취소) → 드릴(이번 주 + 주별 성공 막대) → 최근 세션 표(차트의 표 버전).
  * 칩을 고르면 연습 숫자·차트·대전 전적이 모두 그 조합 기준으로 바뀐다(드릴은 3쿠션 대대 고정). 값은 hiq_sim_* 만 — 실전 RP 와 무관.
  * 화면의 초록 버튼은 기록이 없을 때의 "연습 시작" 하나뿐이다.
+ *
+ * 2026-10-12 — 순서의 3번: 랭킹 · 멀티방과 같은 '진열장' 톤(.rank-hall)으로.
+ *  - 머리에 당구장 불빛과 그림. 맨 위에 **내 등급 카드**(등급 배지 · 레이팅 · 순위 · 전적 · 다음 등급까지) — 누르면 랭킹.
+ *    예전 지표 여섯 칸 가운데 대전 랭킹 · 온라인 레이팅 · 전적은 이 카드가 가져갔다(같은 숫자를 두 번 적지 않는다). 남은 칸은 대전 수 · 최고 에버 · 하이런.
+ *  - 그 아래 그림 칸 셋(대전 · 드릴 · 연습) — 이 화면의 세 구역으로 가는 길이자 한눈에 보는 요약.
+ *  - 장식장 띠는 아직 없다(장식장이 만들어진 뒤에 — 없는 것을 있는 것처럼 보이지 않는다).
  */
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { drillsForWeek } from "@shared/sim/drills";
-import { rankStatus, PLACEMENT_MATCHES } from "@shared/sim/rank";
+import { rankStatus, tierFor, tierProgress, PLACEMENT_MATCHES } from "@shared/sim/rank";
+import { TIER_GLOW, TierEmblem } from "../rank/TierEmblem";
 import { matchApi as defaultMatchApi, type MatchApi, type MatchPublic } from "../matchApi";
 import { MATCH_LIST_QUERY_KEY, MATCH_LIST_REFETCH_MS } from "../match/queryKeys";
 import { MatchList, hasLiveMatch } from "../match/MatchList";
@@ -42,6 +49,9 @@ const pill = "h-11 px-4 inline-flex items-center rounded-pill border border-surf
 const pillSm = "h-10 px-3.5 inline-flex items-center rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3 shrink-0";
 const primary = "h-11 px-5 inline-flex items-center rounded-pill bg-brand text-brand-fg text-[14px] font-semibold active:bg-brand-strong";
 const card = "rounded-card bg-surface-1 border border-surface-line rk-shadow p-4";
+/** 머리 그림 · 그림 칸 — 등급 배지와 같은 화풍(public/sim/rank) */
+// 대전 그림은 멀티방 머리와 같은 것이다(match/RoomList 의 ROOMS_ART_SRC) — 그 파일을 끌어오면 방 목록 화면 전체가 딸려 와 주소만 적는다.
+export const DASH_ART = { head: "/sim/rank/icon-stats.webp", match: "/sim/rank/rooms.webp", drill: "/sim/rank/icon-drill.webp", practice: "/sim/rank/icon-practice.webp" } as const;
 const TREND_N = 30;
 const FORM_N = 10;
 
@@ -53,6 +63,17 @@ function Tile({ label, value, sub, tone }: { label: string; value: string; sub?:
             <span className={cn("rk-num text-[18px] font-bold leading-tight mt-0.5 truncate", tone === "best" ? "text-gold" : tone === "warn" ? "text-ink-3" : "text-ink-1")}>{value}</span>
             {sub && <span className="rk-num text-[11px] font-medium text-ink-4 truncate">{sub}</span>}
         </div>
+    );
+}
+
+/** 그림 칸 — 그림 · 이름 · 한 줄. 누르면 그 구역으로 간다 */
+function ArtTile({ art, title, sub, onClick, testId }: { art: string; title: string; sub: string; onClick: () => void; testId: string }) {
+    return (
+        <button type="button" onClick={onClick} data-testid={testId} className="hall-row min-w-0 px-1.5 pt-2 pb-2.5 flex flex-col items-center text-center active:opacity-80">
+            <img src={art} width={56} height={56} alt="" aria-hidden="true" decoding="async" draggable={false} className="w-14 h-14 object-contain" style={{ filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.5))" }} />
+            <span className="block w-full text-[13px] font-black text-ink-1 truncate mt-1">{title}</span>
+            <span className="block w-full rk-num text-[11.5px] font-bold text-ink-3 truncate mt-0.5">{sub}</span>
+        </button>
     );
 }
 
@@ -114,11 +135,20 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
     const tip = (score: number, innings: number) => t("sim.dash.tipScore").replace("{s}", n(score)).replace("{i}", n(innings));
 
     return (
-        <div className="w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
-            <div className="flex items-center justify-between gap-3 mb-3">
-                <h1 className="text-[20px] font-bold text-ink-1 leading-tight">{t("sim.dash.title")}</h1>
-                <button type="button" onClick={onClose} className={pill}>{t("sim.common.close")}</button>
-            </div>
+        <div className="rank-hall w-full max-w-[420px] mx-auto pb-8">
+            {/* 머리 — 랭킹 · 멀티방과 같은 당구장 불빛 아래 */}
+            <header className="hall-top relative px-5 pt-4">
+                <button type="button" onClick={onClose} className="absolute right-5 top-4 h-11 px-4 rounded-pill border border-white/25 bg-black/40 text-[13px] font-semibold text-white/90 active:bg-black/60">
+                    {t("sim.common.close")}
+                </button>
+                <div className="flex items-end gap-2 pt-9">
+                    <img src={DASH_ART.head} width={84} height={84} alt="" aria-hidden="true" decoding="async" draggable={false} className="hall-trophy shrink-0" style={{ width: 84, height: 84 }} />
+                    <div className="min-w-0 pb-3">
+                        <h1 className="text-[21px] font-black text-white leading-tight">{t("sim.dash.title")}</h1>
+                    </div>
+                </div>
+            </header>
+            <div className="px-5 pt-1">
 
             {stats.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.dash.loading")}</p>}
             {stats.isError && (
@@ -137,7 +167,7 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                                 return (
                                     <button
                                         key={comboKey(c)} type="button" aria-pressed={sel} onClick={() => setPick(comboKey(c))}
-                                        className={cn("h-10 px-3.5 shrink-0 rounded-pill border text-[13px] font-semibold", sel ? "border-ink-1 bg-ink-1 text-surface-1" : "border-surface-line bg-surface-1 text-ink-2 active:bg-surface-3")}
+                                        className={cn("h-10 px-3.5 shrink-0 rounded-pill border text-[13px] font-semibold", sel ? "border-transparent bg-[color:var(--hall-lime)] text-[#0B1A03]" : "border-white/15 bg-white/[0.08] text-white/85 active:bg-white/15")}
                                     >
                                         {gameLabel(c, t)}
                                     </button>
@@ -145,6 +175,54 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                             })}
                         </div>
                     )}
+
+                    {/* 내 등급 카드 — 이 종목의 온라인 대전 레이팅. 배치 전에는 배지가 없다(실루엣). 누르면 랭킹 */}
+                    {(() => {
+                        const myRating = mr?.rating ?? 1000;
+                        const st = rankStatus(myRating, mr?.matches ?? 0);
+                        const glow = st.tier ? TIER_GLOW[st.tier.id] : "rgba(255,255,255,0.6)";
+                        return (
+                            <button type="button" onClick={onRank} disabled={!onRank} aria-label={t("sim.rank.title")} data-testid="dash-tier"
+                                className="hall-me rounded-[22px] px-4 py-3.5 flex items-center gap-2 text-left active:opacity-90">
+                                <span className={cn("shrink-0 -ml-2", st.tier && "hall-emblem")}>
+                                    {st.tier ? <TierEmblem tier={st.tier.id} size={104} glow /> : <TierEmblem tier="iron" size={104} locked />}
+                                </span>
+                                <span className="flex-1 min-w-0">
+                                    <span className="block text-[13px] font-black truncate" style={{ color: glow }}>
+                                        {st.tier ? t(st.tier.nameKey) : t("sim.rank.unrankedShort")}
+                                        <span className="font-bold text-white/60"> · {t("sim.dash.kRating")}</span>
+                                    </span>
+                                    <span className="block rk-num text-[38px] font-black text-white leading-none tracking-tight mt-1" data-rating>{myRating}</span>
+                                    <span className="block rk-num text-[12.5px] font-bold text-white/80 mt-1.5 truncate">
+                                        {st.placed && rank?.rank != null
+                                            ? t("sim.rank.rankOf").replace("{r}", n(rank.rank)).replace("{n}", n(rank.total))
+                                            : t("sim.rank.unranked").replace("{n}", n(mr?.matches ?? 0)).replace("{m}", n(PLACEMENT_MATCHES))}
+                                        {" · "}{t("sim.entry.record").replace("{w}", n(record.wins)).replace("{l}", n(record.losses))}
+                                    </span>
+                                    {st.placed && st.tier && st.toNext !== null && (
+                                        <span className="block h-1.5 rounded-pill bg-white/15 overflow-hidden mt-2" aria-hidden="true">
+                                            <span className="block h-full rounded-pill" style={{ width: `${Math.max(4, Math.round(tierProgress(myRating) * 100))}%`, background: `linear-gradient(90deg, ${TIER_GLOW[st.tier.id]}, ${TIER_GLOW[tierFor(myRating + st.toNext).id]})` }} />
+                                        </span>
+                                    )}
+                                    <span className="block rk-num text-[12px] font-bold text-white/70 mt-1.5 truncate">
+                                        {!st.placed
+                                            ? t("sim.rank.placementHint").replace("{n}", n(st.placementLeft))
+                                            : st.toNext !== null
+                                                ? t("sim.rank.nextTier").replace("{tier}", t(tierFor(myRating + st.toNext).nameKey)).replace("{n}", n(st.toNext))
+                                                : t("sim.rank.topTier")}
+                                    </span>
+                                </span>
+                            </button>
+                        );
+                    })()}
+
+                    {/* 그림 칸 셋 — 이 화면의 세 구역으로 가는 길 */}
+                    <div className="grid grid-cols-3 gap-2">
+                        <ArtTile art={DASH_ART.match} title={t("sim.dash.navMatch")} sub={`${t("sim.dash.kMyTurn")} ${n(ms.myTurn)}`} testId="dash-nav-match"
+                            onClick={() => { const el = matchesRef.current; if (el && typeof el.scrollIntoView === "function") el.scrollIntoView({ block: "start", behavior: "smooth" }); }} />
+                        <ArtTile art={DASH_ART.drill} title={t("sim.dash.drillTitle")} sub={t("sim.dash.drillWeek").replace("{s}", n(thisWeek?.successes ?? 0)).replace("{n}", n(weekTotal))} testId="dash-nav-drill" onClick={onDrills} />
+                        <ArtTile art={DASH_ART.practice} title={t("sim.dash.navPractice")} sub={practice.length > 0 ? t("sim.dash.practiceN").replace("{n}", n(practice.length)) : t("sim.dash.startPractice")} testId="dash-nav-practice" onClick={onPractice} />
+                    </div>
 
                     {series.length > 0 ? (
                         <>
@@ -170,20 +248,6 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                                 <Tile label={t("sim.dash.kMatches")} value={n(record.total || series.length)} />
                                 <Tile label={t("sim.dash.kBestAvg")} value={formatAvg(Math.max(0, ...series.map((p) => p.avg)))} tone="best" />
                                 <Tile label={t("sim.dash.kHighRun")} value={n(Math.max(0, ...series.map((p) => p.highRun)))} tone="best" />
-                                <button type="button" onClick={onRank} aria-label={t("sim.rank.title")} className="text-left rounded-tile active:opacity-80" disabled={!onRank}>
-                                    <Tile
-                                        label={t("sim.dash.kRank")}
-                                        value={rank?.rank != null ? t("sim.dash.rankValue").replace("{r}", n(rank.rank)) : "–"}
-                                        sub={rank?.rank != null ? t("sim.dash.rankOf").replace("{n}", n(rank.total)) : t("sim.rank.unranked").replace("{n}", n(rank?.matches ?? 0)).replace("{m}", n(PLACEMENT_MATCHES))}
-                                    />
-                                </button>
-                                <button type="button" onClick={onRank} aria-label={t("sim.rank.title")} className="text-left rounded-tile active:opacity-80" disabled={!onRank}>
-                                    <Tile
-                                        label={t("sim.dash.kRating")} value={n(mr?.rating ?? 1000)}
-                                        sub={(() => { const st = rankStatus(mr?.rating ?? 1000, mr?.matches ?? 0); return st.tier ? t(st.tier.nameKey) : t("sim.rank.unranked").replace("{n}", n(mr?.matches ?? 0)).replace("{m}", n(PLACEMENT_MATCHES)); })()}
-                                    />
-                                </button>
-                                <Tile label={t("sim.dash.kRecord")} value={t("sim.entry.record").replace("{w}", n(record.wins)).replace("{l}", n(record.losses))} />
                             </div>
 
                             <section className={card}>
@@ -326,6 +390,7 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                     )}
                 </div>
             )}
+            </div>
         </div>
     );
 }

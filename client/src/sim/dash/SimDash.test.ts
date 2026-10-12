@@ -161,11 +161,21 @@ describe("SimDash", () => {
         // 2026-09-12: 숫자는 공식 대전만 본다(연습 제외). 내 세 대전 = (5+2+6)점 / 30이닝 = 0.43
         expect(hero(h)).toBe("0.43");
         expect(text(h)).toContain("공식 대전 3판 기준");
-        // 지표 여섯 칸
-        expect(text(h)).toContain("3위");
-        expect(text(h)).toContain("12명 중");
-        expect(text(h)).toContain("1024");
-        expect(text(h)).toContain("2승 1패");
+        // 내 등급 카드(2026-10-12): 등급 · 레이팅 · 순위 · 전적 · 다음 등급까지 — 예전 지표 여섯 칸의 대전 랭킹 · 온라인 레이팅 · 전적을 가져왔다
+        const tier = h.container.querySelector("[data-testid=dash-tier]")!;
+        expect(tier.textContent).toContain(ko["sim.rank.tier.bronze"]);
+        expect(tier.querySelector("[data-rating]")!.textContent).toBe("1024");
+        expect(tier.textContent).toContain(ko["sim.rank.rankOf"].replace("{r}", "3").replace("{n}", "12"));
+        expect(tier.textContent).toContain("2승 1패");
+        expect(tier.textContent).toContain(ko["sim.rank.nextTier"].replace("{tier}", ko["sim.rank.tier.silver"]).replace("{n}", "26"));
+        expect(tier.querySelector("img")!.getAttribute("src")).toBe("/sim/rank/tier-bronze.webp");
+        // 남은 지표는 셋 — 같은 숫자를 두 번 적지 않는다
+        expect(text(h)).not.toContain(ko["sim.dash.kRank"]);
+        expect(text(h)).toContain(ko["sim.dash.kBestAvg"]);
+        // 그림 칸 셋(대전 · 드릴 · 연습)
+        expect(h.container.querySelector("[data-testid=dash-nav-match]")!.textContent).toContain(`${ko["sim.dash.kMyTurn"]} 1`);
+        expect(h.container.querySelector("[data-testid=dash-nav-drill]")!.textContent).toContain("이번 주 2/5");
+        expect(h.container.querySelector("[data-testid=dash-nav-practice]")).not.toBeNull();
         // 차트 셋
         const trend = h.container.querySelector(`svg[aria-label="${ko["sim.dash.chartTrendAria"]}"]`);
         const runs = h.container.querySelector(`svg[aria-label="${ko["sim.dash.chartRunAria"]}"]`);
@@ -272,5 +282,36 @@ describe("SimDash", () => {
         const h = mount({ statsApi: async () => { throw new Error("boom"); } });
         await settle(h, () => text(h).includes(ko["sim.dash.failed"]));
         expect(buttons(h).some((b) => b.textContent === ko["sim.match.retry"])).toBe(true);
+    });
+});
+
+/**
+ * 진열장 톤(2026-10-12 — 순서의 3번): 등급 카드 · 그림 칸 · 배색.
+ */
+describe("SimDash: 등급 카드와 그림 칸(2026-10-12)", () => {
+    it("등급 카드를 누르면 랭킹, 그림 칸은 드릴 · 연습으로", async () => {
+        const onRank = vi.fn(); const onDrills = vi.fn();
+        const h = mount({ onRank, onDrills });
+        await settle(h, () => h.container.querySelector("[data-testid=dash-tier]") !== null);
+        click(h.container.querySelector("[data-testid=dash-tier]")!);
+        expect(onRank).toHaveBeenCalledTimes(1);
+        click(h.container.querySelector("[data-testid=dash-nav-drill]")!);
+        expect(onDrills).toHaveBeenCalledTimes(1);
+        click(h.container.querySelector("[data-testid=dash-nav-practice]")!);
+        expect(h.onPractice).toHaveBeenCalledTimes(1);
+    });
+
+    it("배색 · 그림: 진열장(.rank-hall), 그림 파일이 있다, 장식장 띠는 아직 없다", async () => {
+        const fs = await import("node:fs");
+        const path = await import("node:path");
+        const { DASH_ART } = await import("./SimDash");
+        for (const src of Object.values(DASH_ART)) expect(fs.existsSync(path.resolve(__dirname, "../../../public", `.${src}`)), src).toBe(true);
+        const src = fs.readFileSync(path.resolve(__dirname, "SimDash.tsx"), "utf8");
+        expect(src).toContain('<div className="rank-hall w-full max-w-[420px] mx-auto pb-8">');
+        expect(src.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n")).not.toMatch(/cabinet|장식장/);
+        for (const l of ["ko", "en", "vi", "tr", "es"]) {
+            const d = fs.readFileSync(path.resolve(__dirname, `../../lib/i18n/${l}.ts`), "utf8");
+            for (const k of ["sim.dash.navMatch", "sim.dash.navPractice", "sim.dash.practiceN"]) expect(d, `${l} ${k}`).toContain(`"${k}":`);
+        }
     });
 });
