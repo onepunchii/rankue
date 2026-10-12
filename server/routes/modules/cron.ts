@@ -209,6 +209,7 @@ const NOTIFICATION_KEEP_DAYS = 7;
 //    둘 다 떠난 playing 대전(7일) → canceled(stale, 레이팅 무관).
 //    실전 경기·성적과 무관한 시뮬 테이블만 건드린다.
 //  · 방문자 발자국: 60일 지난 줄 삭제(2026-10-08).
+//  · 장식장: 끝난 달 마감(2026-10-12) — 이달의 랭킹 메달 · 그 달의 등급 배지를 한 번 준다.
 //  · 알림함: 7일 지난 알림 삭제. **안 읽은 것도 지운다**(오너 결정 2026-09-23) — 안 읽은 걸 남기면
 //    546건 중 388건이 안 읽음인 계정은 알림함이 영원히 줄지 않는다.
 async function handleSimCleanup(req: any, res: any) {
@@ -223,7 +224,11 @@ async function handleSimCleanup(req: any, res: any) {
     // 방문자 발자국(2026-10-08) — 60일 지난 줄을 지운다(shared/uiTrail TRAIL_KEEP_DAYS). 표가 없거나 실패해도 다른 청소 결과는 그대로 보낸다
     const trail = await db.execute(sql`delete from ui_events where created_at < now() - make_interval(days => ${TRAIL_KEEP_DAYS})`)
         .then((r: any) => Number(r?.rowCount ?? 0)).catch((e: unknown) => { console.error("[trail purge]", e); return -1; });
-    return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail });
+    // 장식장(2026-10-12) — 끝난 달을 마감해 그 달의 메달 · 등급 배지를 준다(shared/simShelf). 달마다 한 번뿐이고, 밀린 달이 있으면 같이 마감한다.
+    // 매일 03:15(한국 시각)에 도니 1일 새벽에 지난달이 마감된다. 실패해도 다른 청소 결과는 그대로 보낸다 — 다음 날 다시 마감한다.
+    const shelf = await storage.simShelf.closeMonths(Date.now())
+        .then((r) => r.closed).catch((e: unknown) => { console.error("[shelf close]", e); return null; });
+    return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, shelf });
 }
 router.get("/sim-cleanup", asyncHandler(handleSimCleanup));
 router.post("/sim-cleanup", asyncHandler(handleSimCleanup));

@@ -18,6 +18,7 @@ import { TournamentRepository } from "./tournament.repo.js";
 import { SimRepository } from "./sim.repo.js";
 import { SimMatchRepository } from "./simMatch.repo.js";
 import { SimDrillRepository } from "./simDrill.repo.js";
+import { SimShelfRepository } from "./simShelf.repo.js";
 
 class Storage {
     public users = new UserRepository();
@@ -39,6 +40,8 @@ class Storage {
     public sim = new SimRepository();
     public simMatch = new SimMatchRepository();
     public simDrill = new SimDrillRepository();
+    // 장식장(2026-10-12) — 달마다 받은 메달 · 등급 배지. 재료(레이팅에 반영된 판)는 simMatch 가 준다
+    public simShelf = new SimShelfRepository((fresh) => this.simMatch.ratedDeltas(fresh));
 
     // --- Backward Compatibility Wrappers ---
     // User / Member

@@ -301,14 +301,15 @@ describe("SimDash: 등급 카드와 그림 칸(2026-10-12)", () => {
         expect(h.onPractice).toHaveBeenCalledTimes(1);
     });
 
-    it("배색 · 그림: 진열장(.rank-hall), 그림 파일이 있다, 장식장 띠는 아직 없다", async () => {
+    it("배색 · 그림: 진열장(.rank-hall), 그림 파일이 있다, 장식장으로 가는 줄은 onShelf 를 줬을 때만", async () => {
         const fs = await import("node:fs");
         const path = await import("node:path");
         const { DASH_ART } = await import("./SimDash");
         for (const src of Object.values(DASH_ART)) expect(fs.existsSync(path.resolve(__dirname, "../../../public", `.${src}`)), src).toBe(true);
         const src = fs.readFileSync(path.resolve(__dirname, "SimDash.tsx"), "utf8");
         expect(src).toContain('<div className="rank-hall w-full max-w-[420px] mx-auto pb-8">');
-        expect(src.split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n")).not.toMatch(/cabinet|장식장/);
+        // 장식장(2026-10-12) — 등급 카드 아래의 한 줄. 그림 · 글자는 장식장 쪽(rank/ShelfLink)의 것을 쓴다
+        expect(src).toContain('{onShelf && <ShelfLink onClick={onShelf} sub={t("sim.shelf.linkSub")} testId="dash-shelf" />}');
         for (const l of ["ko", "en", "vi", "tr", "es"]) {
             const d = fs.readFileSync(path.resolve(__dirname, `../../lib/i18n/${l}.ts`), "utf8");
             for (const k of ["sim.dash.navMatch", "sim.dash.navPractice", "sim.dash.practiceN"]) expect(d, `${l} ${k}`).toContain(`"${k}":`);

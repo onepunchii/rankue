@@ -12,7 +12,7 @@ import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS, START_ABSENT_GRACE_MS, R
 import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
 import { CHAT_PAGE_MAX, chatReject, type ChatReject } from "../../shared/sim/chat.js";
 import { ratingEligibility, ratingDelta, START_RATING, SAME_PAIR_WINDOW_MS, MIN_SHOTS_EACH, AT_FAULT_END_REASONS, type RatingResult } from "../../shared/sim/rating.js";
-import { MONTHLY_MIN_MATCHES, monthlyBoard, monthsWithMatches, replayDeltas, type FinishedMatchRow } from "../../shared/simMonthly.js";
+import { MONTHLY_MIN_MATCHES, monthlyBoard, monthsWithMatches, replayDeltas, type FinishedMatchRow, type MatchDelta } from "../../shared/simMonthly.js";
 import { tierFor } from "../../shared/sim/rank.js";
 
 /** 이달의 랭킹 재료(끝난 대전 전부)를 잠깐 간직한다 — 서버리스 인스턴스마다 따로이고 1분이면 버린다 */
@@ -747,14 +747,22 @@ export class SimMatchRepository {
     }
 
     /**
+     * 레이팅에 반영된 판과 그 변화(끝난 순서대로) — 이달의 랭킹과 장식장(storage/simShelf.repo)이 같이 쓴다.
+     * 재료는 1분 간직한다. fresh 면 간직한 것을 쓰지 않고 새로 읽는다(달 마감 — 한 번 주면 못 고치니 가장 새 자료로).
+     */
+    async ratedDeltas(fresh = false): Promise<MatchDelta[]> {
+        const now = Date.now();
+        if (fresh || !replayCache || now - replayCache.at > REPLAY_CACHE_MS) replayCache = { at: now, rows: await this.finishedForReplay() };
+        return replayDeltas(replayCache.rows);
+    }
+
+    /**
      * 이달의 랭킹(2026-10-12 오너: "랭킹을 달로 … 매월초가 되면 리셋" → 통산 등급은 두고 '이달의 랭킹'을 따로).
      * 그 달(한국 시각)에 끝난 대전의 레이팅 변화를 더한 점수. 순위는 그 달 MONTHLY_MIN_MATCHES 판을 친 사람만.
      * 규칙은 shared/simMonthly — 여기는 재료를 읽고 이름 · 국기 · 지금 등급을 붙일 뿐이다. 아무것도 쓰지 않는다.
      */
     async monthlyLadder(memberId: string, gameType: "3c" | "4c", month: string, limit = 100, placement = 3) {
-        const now = Date.now();
-        if (!replayCache || now - replayCache.at > REPLAY_CACHE_MS) replayCache = { at: now, rows: await this.finishedForReplay() };
-        const deltas = replayDeltas(replayCache.rows);
+        const deltas = await this.ratedDeltas();
         const board = monthlyBoard(deltas, month, gameType);
         const ranked = board.filter((r) => r.rank !== null);
         const top = ranked.slice(0, limit);

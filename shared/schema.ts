@@ -2346,6 +2346,38 @@ export const hiqSimDrillAttempts = pgTable("hiq_sim_drill_attempts", {
 
 export type HiqSimDrillAttempt = typeof hiqSimDrillAttempts.$inferSelect;
 
+/**
+ * 장식장 — 달마다 받은 것(2026-10-12 오너: "장식장에 보관이 되도록 매월초가 되면 …"). 규칙은 shared/simShelf.
+ *  - month_rank: 이달의 랭킹 1~3등 메달(rank) · month_tier: 그 달이 끝날 때의 등급 배지(tier).
+ *  - detail: { points, matches, wins, rating } — 받을 때의 근거. **한 번 준 것은 고치지 않는다**(규칙이 바뀌어도, 레이팅을 다시 계산해도).
+ * 회원이 탈퇴해도 회원 행은 남으므로(이름만 지워진다) 참조는 그대로 둔다 — 화면이 탈퇴한 회원의 장식장을 열지 않는다.
+ */
+export const hiqSimAwards = pgTable("hiq_sim_awards", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id).notNull(),
+  /** 한국 시각의 달 — "2026-10" */
+  month: text("month").notNull(),
+  kind: text("kind", { enum: ["month_rank", "month_tier"] }).notNull(),
+  gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
+  rank: integer("rank"),
+  tier: text("tier"),
+  detail: jsonb("detail"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique().on(t.memberId, t.month, t.kind, t.gameType),
+  idxMember: index("idx_sim_awards_member").on(t.memberId),
+}));
+
+/** 마감한 달 — 한 줄이 있으면 그 달은 다시 마감하지 않는다(받은 사람이 없는 달도 줄은 남는다). */
+export const hiqSimMonthCloses = pgTable("hiq_sim_month_closes", {
+  month: text("month").primaryKey().notNull(),
+  closedAt: timestamp("closed_at").defaultNow().notNull(),
+  /** { medals, tiers } — 몇 개를 줬는지(정리 작업의 결과를 나중에 볼 수 있게) */
+  summary: jsonb("summary"),
+});
+
+export type HiqSimAward = typeof hiqSimAwards.$inferSelect;
+
 /* ── 골프 랭킹(2026-09-13 오너: PGA·LPGA·KPGA·KLPGA 를 당구 세계랭킹처럼) — shared/golfTours.ts 가 투어 목록의 정본 ── */
 
 // 회차별 순위 스냅샷. 세계 랭킹(owgr·rolex)은 주 1회 회차, 투어 랭킹(kpga·klpga)은 바뀐 날에만 새 회차(서명이 같으면 건너뛴다).

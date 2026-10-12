@@ -169,7 +169,7 @@ describe("RankPage: 이달 · 통산", () => {
             ],
             me: { points: -12, matches: 6, wins: 2, rank: 2, tier: "gold" },
         };
-    function mountM(opts: { initialScope?: "month" | "all"; me?: import("./rankApi").MonthlyRank["me"] } = {}) {
+    function mountM(opts: { initialScope?: "month" | "all"; me?: import("./rankApi").MonthlyRank["me"]; onShelf?: (memberId?: string) => void } = {}) {
         const container = document.createElement("div");
         document.body.appendChild(container);
         const root = createRoot(container);
@@ -178,7 +178,7 @@ describe("RankPage: 이달 · 통산", () => {
         const api: RankApi = { getLadder: vi.fn(async () => ladder()), setCountry: vi.fn(async () => undefined), getMonthly };
         const realNow = Date.now;
         Date.now = () => NOW;
-        React.act(() => { root.render(React.createElement(rq.QueryClientProvider, { client: qc }, React.createElement(RankPage, { onClose: () => undefined, api, initialScope: opts.initialScope }))); });
+        React.act(() => { root.render(React.createElement(rq.QueryClientProvider, { client: qc }, React.createElement(RankPage, { onClose: () => undefined, api, initialScope: opts.initialScope, onShelf: opts.onShelf }))); });
         const h = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); Date.now = realNow; }, api, getMonthly };
         live.push(h);
         return h;
@@ -244,6 +244,45 @@ describe("RankPage: 이달 · 통산", () => {
         // 대전이 있었던 가장 옛 달이라 더 앞으로는 못 간다
         expect(btn(ko["sim.rank.monthPrev"]).disabled).toBe(true);
         expect(btn(ko["sim.rank.monthNext"]).disabled).toBe(false);
+    });
+
+    it("메달 그림은 장식장에 놓이는 메달과 같은 규칙 — 점수를 잃은 2등은 메달 대신 숫자", async () => {
+        const h = mountM();
+        await settle(h, () => h.container.querySelector("[data-testid=rank-monthly-me]") !== null);
+        const rows = h.container.querySelectorAll("[data-testid=rank-monthly] ol li");
+        // 2등이지만 −12 — 메달이 없다(등급 배지 그림만) · 줄의 금빛 강조도 없다
+        expect(Array.from(rows[1].querySelectorAll("img")).map((i) => i.getAttribute("src"))).toEqual(["/sim/rank/tier-gold.webp"]);
+        expect(rows[0].className).toContain("hall-row-top");
+        expect(rows[1].className).not.toContain("hall-row-top");
+        // 내 카드도 메달이 아니라 내 등급 배지
+        expect(h.container.querySelector("[data-testid=rank-monthly-me] img")!.getAttribute("src")).toBe("/sim/rank/tier-gold.webp");
+    });
+
+    it("장식장으로: 내 카드의 줄은 내 장식장 · 순위표의 줄은 그 사람의 장식장 — onShelf 를 안 주면 입구가 없다", async () => {
+        const onShelf = vi.fn();
+        const h = mountM({ onShelf });
+        await settle(h, () => h.container.querySelector("[data-testid=rank-monthly-me]") !== null);
+        click(h.container.querySelector("[data-testid=rank-monthly-shelf]")!);
+        expect(onShelf).toHaveBeenLastCalledWith();
+        const rowBtn = h.container.querySelector("[data-testid=rank-monthly] ol li button")!;
+        expect(rowBtn.getAttribute("aria-label")).toBe(ko["sim.shelf.open"].replace("{name}", "고수"));
+        click(rowBtn);
+        expect(onShelf).toHaveBeenLastCalledWith("a");
+        // 통산 탭도 같다
+        click(tab(h, "all"));
+        await settle(h, () => h.container.querySelector("[data-testid=rank-me]") !== null);
+        click(h.container.querySelector("[data-testid=rank-shelf]")!);
+        expect(onShelf).toHaveBeenLastCalledWith();
+        const allRows = h.container.querySelectorAll("ol li");
+        // 줄의 강조(1~3등 · 내 줄)는 그대로 li 에 있다
+        expect(allRows[1].className).toContain("hall-row-mine");
+        click(allRows[2].querySelector("button")!);
+        expect(onShelf).toHaveBeenLastCalledWith("c");
+
+        const plain = mountM();
+        await settle(plain, () => plain.container.querySelector("[data-testid=rank-monthly-me]") !== null);
+        expect(plain.container.querySelector("[data-testid=rank-monthly-shelf]")).toBeNull();
+        expect(plain.container.querySelector("[data-testid=rank-monthly] ol li button")).toBeNull();
     });
 
     it("이달의 랭킹을 주지 않는 api(옛 주입)면 탭 없이 통산만", async () => {

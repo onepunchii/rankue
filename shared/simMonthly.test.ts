@@ -131,7 +131,9 @@ describe("서버: 이달의 랭킹은 읽기만 한다 — 통산 레이팅을 �
         const fn = repo.slice(repo.indexOf("private async finishedForReplay()"), repo.indexOf("async recomputeRatings(dryRun: boolean)"));
         expect(fn).toContain("order by coalesce(m.finished_at, m.last_shot_at, m.created_at) asc, m.id asc");
         expect(fn).toContain("(m.rating_result->>'delta') as stored_delta");
-        expect(fn).toContain("const deltas = replayDeltas(replayCache.rows);");
+        // 재료는 한 곳(ratedDeltas)에서 읽는다 — 장식장(storage/simShelf.repo)도 같은 것을 쓴다
+        expect(fn).toContain("return replayDeltas(replayCache.rows);");
+        expect(fn).toContain("const deltas = await this.ratedDeltas();");
         expect(fn).toContain("const board = monthlyBoard(deltas, month, gameType);");
         // 쓰는 문장이 없다
         expect(fn).not.toMatch(/\.update\(|\.insert\(|delete from|\.delete\(/);

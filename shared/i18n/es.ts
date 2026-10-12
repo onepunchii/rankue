@@ -179,6 +179,7 @@ export const es: Record<string, string> = {
   "err.sim.badLayout": "La posición de las bolas no es válida",
   "err.sim.badBallSet": "El conjunto de bolas no es válido",
   "err.sim.sessionNotFound": "No se encontró la sesión",
+  "err.sim.shelfNotFound": "No se encontró la vitrina",
   "err.sim.badShot": "El tiro no es válido",
   "err.sim.miscue": "Eso es un miscue (fuera del rango)",
   "err.sim.sessionEnded": "Esta sesión ya terminó",

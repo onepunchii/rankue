@@ -13,15 +13,12 @@ import { RankMedal, TierEmblem } from "./TierEmblem";
  * 예전의 보라 판(.rank-arcade, 2026-09-09)은 이 화면에서 뺐다 — 방 목록·드릴·관전 목록도 같은 날 옮겨 그 배색은 지웠다.
  * 여기 색·광택은 .rank-hall 아래에만 둔다(index.css). 랭킹 화면은 디자인 규칙을 풀어 둔 곳이다(2026-09-09 오너).
  */
-const Row = memo(function Row({ r, mine, locale }: { r: RankRow; mine: boolean; locale: string }) {
+const Row = memo(function Row({ r, mine, locale, onOpen }: { r: RankRow; mine: boolean; locale: string; onOpen?: (memberId: string) => void }) {
     const { t } = useT();
     const tier = tierFor(r.rating);
     const top3 = r.rank >= 1 && r.rank <= 3;
-    return (
-        <li
-            className={cn("hall-row h-[62px] pl-2 pr-3 flex items-center gap-2", top3 && "hall-row-top", mine && "hall-row-mine")}
-            aria-current={mine ? "true" : undefined}
-        >
+    const body = (
+        <>
             <span className="w-11 shrink-0 flex items-center justify-center">
                 {top3
                     ? <RankMedal rank={r.rank as 1 | 2 | 3} size={42} />
@@ -40,6 +37,18 @@ const Row = memo(function Row({ r, mine, locale }: { r: RankRow; mine: boolean; 
                 </span>
             </span>
             <span className="hall-rating rk-num shrink-0 h-8 px-3 inline-flex items-center rounded-pill text-[14px] font-black text-white">{r.rating}</span>
+        </>
+    );
+    const inner = "pl-2 pr-3 flex items-center gap-2";
+    return (
+        <li
+            className={cn("hall-row h-[62px]", !onOpen && inner, top3 && "hall-row-top", mine && "hall-row-mine")}
+            aria-current={mine ? "true" : undefined}
+        >
+            {/* 줄을 누르면 그 사람의 장식장(2026-10-12) */}
+            {onOpen
+                ? <button type="button" onClick={() => onOpen(r.memberId)} aria-label={t("sim.shelf.open").replace("{name}", r.name)} data-track-as="랭킹 줄 장식장" className={cn("w-full h-full text-left rounded-[18px] active:bg-white/[0.06]", inner)}>{body}</button>
+                : body}
         </li>
     );
 });
@@ -49,9 +58,11 @@ export interface RankBoardProps {
     myMemberId?: string;
     locale: string;
     className?: string;
+    /** 줄을 누르면 그 사람의 장식장으로 */
+    onOpen?: (memberId: string) => void;
 }
 
-export const RankBoard = memo(function RankBoard({ rows, myMemberId, locale, className }: RankBoardProps) {
+export const RankBoard = memo(function RankBoard({ rows, myMemberId, locale, className, onOpen }: RankBoardProps) {
     const { t } = useT();
     if (rows.length === 0) return null;
     return (
@@ -59,7 +70,7 @@ export const RankBoard = memo(function RankBoard({ rows, myMemberId, locale, cla
             <h2 className="px-1 mb-2 text-[12px] font-black tracking-wide text-white/55">{t("sim.rank.board")}</h2>
             <ol className="space-y-2" aria-label={t("sim.rank.listAria")}>
                 {rows.map((r) => (
-                    <Row key={r.memberId} r={r} mine={!!myMemberId && r.memberId === myMemberId} locale={locale} />
+                    <Row key={r.memberId} r={r} mine={!!myMemberId && r.memberId === myMemberId} locale={locale} onOpen={onOpen} />
                 ))}
             </ol>
         </div>

@@ -12,6 +12,7 @@
  *  - 이달: 그 달에 올린 점수로 겨루는 판(./MonthlyRank). 매월 1일 0 에서 시작한다. 처음 열면 이 탭이다.
  *  - 통산: 예전 그대로의 레이팅 · 등급 사다리. 등급은 달이 바뀌어도 지워지지 않는다.
  *  `?rank=1&s=all` 로 통산을 바로 연다(홈 배너 · 대시보드의 '내 등급'에서 들어올 때).
+ *  - 장식장(./ShelfPage): 내 카드 아래의 '내 장식장' 줄, 그리고 순위표의 줄을 누르면 그 사람의 장식장(onShelf 를 줬을 때).
  * 내 나라가 없으면 기기 언어의 지역으로 한 번 저장하고(PATCH /me), 카드의 "내 나라 바꾸기"로 고친다. 값은 온라인 대전 Elo 뿐 — 실전 RP 와 무관.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -28,6 +29,7 @@ import { rankFlag } from "./flag";
 import { rankApi as defaultApi, RANK_QUERY_KEY, type RankApi } from "./rankApi";
 import { RANK_TROPHY_SRC, TIER_GLOW, TierEmblem } from "./TierEmblem";
 import { MonthlyRank } from "./MonthlyRank";
+import { ShelfLink } from "./ShelfLink";
 
 export interface RankPageProps {
     onClose: () => void;
@@ -36,6 +38,8 @@ export interface RankPageProps {
     initial?: { gameType: DashGameType };
     /** 처음 보여줄 탭 — 안 주면 이달(이달의 랭킹을 주는 api 일 때). */
     initialScope?: RankScope;
+    /** 장식장으로 — id 없이 부르면 내 것, 순위표의 줄을 누르면 그 사람의 것. 안 주면 입구를 그리지 않는다 */
+    onShelf?: (memberId?: string) => void;
 }
 
 export type RankScope = "month" | "all";
@@ -46,7 +50,7 @@ const pill = "h-10 px-3.5 shrink-0 inline-flex items-center rounded-pill border 
 const chipOn = "border-transparent bg-[color:var(--hall-lime)] text-[#0B1A03]";
 const chipOff = "border-white/15 bg-white/[0.08] text-white/85 active:bg-white/15";
 
-export function RankPage({ onClose, api = defaultApi, initial, initialScope }: RankPageProps) {
+export function RankPage({ onClose, api = defaultApi, initial, initialScope, onShelf }: RankPageProps) {
     const { t, locale } = useT();
     const { member } = useAuth();
     const qc = useQueryClient();
@@ -151,7 +155,7 @@ export function RankPage({ onClose, api = defaultApi, initial, initialScope }: R
                 )}
 
                 {scope === "month" && hasMonthly && (
-                    <MonthlyRank gameType={combo.gameType} api={api} myMemberId={member?.id} locale={locale} />
+                    <MonthlyRank gameType={combo.gameType} api={api} myMemberId={member?.id} locale={locale} onShelf={onShelf} />
                 )}
 
                 {scope === "all" && q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.rank.loading")}</p>}
@@ -227,6 +231,7 @@ export function RankPage({ onClose, api = defaultApi, initial, initialScope }: R
                                     {options.map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}
                                 </select>
                             </label>
+                            {onShelf && <ShelfLink onClick={() => onShelf()} sub={t("sim.shelf.linkSub")} className="mt-3" testId="rank-shelf" />}
                         </section>
 
                         {data.rows.length === 0 ? (
@@ -235,7 +240,7 @@ export function RankPage({ onClose, api = defaultApi, initial, initialScope }: R
                                 <p className="text-[13px] font-medium text-ink-3 mt-1">{t("sim.rank.emptyDesc").replace("{n}", n(PLACEMENT_MATCHES))}</p>
                             </section>
                         ) : (
-                            <RankBoard rows={data.rows} myMemberId={member?.id} locale={locale} />
+                            <RankBoard rows={data.rows} myMemberId={member?.id} locale={locale} onOpen={onShelf} />
                         )}
                     </div>
                 )}

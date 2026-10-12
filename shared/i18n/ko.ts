@@ -179,6 +179,7 @@ export const ko: Record<string, string> = {
   "err.sim.badLayout": "공 배치가 올바르지 않습니다",
   "err.sim.badBallSet": "공 구성이 올바르지 않습니다",
   "err.sim.sessionNotFound": "세션이 없습니다",
+  "err.sim.shelfNotFound": "장식장을 찾을 수 없어요",
   "err.sim.badShot": "샷 입력이 올바르지 않습니다",
   "err.sim.miscue": "미스큐 범위입니다",
   "err.sim.sessionEnded": "끝난 세션입니다",

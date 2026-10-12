@@ -6,17 +6,23 @@
  * 순위는 그 달에 minMatches(5)판을 친 사람만 — 그 전에는 "이달 3/5판 · 2판 더 치면 순위에 올라요".
  * 이름 옆 배지는 그 사람의 **통산 등급**이다(이달 점수로 등급이 바뀌지 않는다는 것이 보이게).
  * 색 · 광택은 랭킹과 같은 .rank-hall(index.css). 규칙은 shared/simMonthly, 값은 GET /sim/rank/monthly.
+ *
+ * 메달 그림은 **장식장에 놓이는 메달과 같은 규칙**이다(shared/simShelf monthlyMedal): 1~3등이면서 그 달에 점수를 올린 사람만.
+ * 사람이 적은 달에는 점수를 잃고도 3등이 된다 — 그 줄은 메달 대신 숫자 3 이다(장식장에도 메달이 놓이지 않는다).
+ * 줄을 누르면 그 사람의 장식장, 내 카드 아래에는 내 장식장으로 가는 줄(onShelf 를 줬을 때).
  */
 import { memo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { daysLeftInMonth, kstMonthOf, shiftMonth } from "@shared/simMonthly";
+import { monthlyMedal } from "@shared/simShelf";
 import type { DashGameType } from "../dash/dashApi";
 import { countryName } from "./country";
 import { rankFlag } from "./flag";
 import { RANK_QUERY_KEY, type MonthlyRankRow, type RankApi } from "./rankApi";
 import { RankMedal, TierEmblem } from "./TierEmblem";
+import { ShelfLink } from "./ShelfLink";
 
 /** +36 · −12 · 0 — 이달 점수는 늘 부호를 붙여 적는다(통산 레이팅과 헷갈리지 않게) */
 export const signedPoints = (n: number): string => (n > 0 ? `+${n}` : n < 0 ? `−${Math.abs(n)}` : "0");
@@ -27,13 +33,13 @@ export function monthLabel(month: string, locale: string): string {
     try { return new Intl.DateTimeFormat(locale, { year: "numeric", month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(y, m - 1, 15))); } catch { return month; }
 }
 
-const Row = memo(function Row({ r, mine, locale }: { r: MonthlyRankRow; mine: boolean; locale: string }) {
+const Row = memo(function Row({ r, mine, locale, onOpen }: { r: MonthlyRankRow; mine: boolean; locale: string; onOpen?: (memberId: string) => void }) {
     const { t } = useT();
-    const top3 = r.rank >= 1 && r.rank <= 3;
-    return (
-        <li className={cn("hall-row h-[62px] pl-2 pr-3 flex items-center gap-2", top3 && "hall-row-top", mine && "hall-row-mine")} aria-current={mine ? "true" : undefined}>
+    const medal = monthlyMedal(r.rank, r.points);
+    const body = (
+        <>
             <span className="w-11 shrink-0 flex items-center justify-center">
-                {top3 ? <RankMedal rank={r.rank as 1 | 2 | 3} size={42} /> : <span className="rk-num text-[19px] font-black text-white/90">{r.rank}</span>}
+                {medal ? <RankMedal rank={medal} size={42} /> : <span className="rk-num text-[19px] font-black text-white/90">{r.rank}</span>}
             </span>
             {/* 통산 등급 — 배치 전이면 실루엣 */}
             {r.tier ? <TierEmblem tier={r.tier} size={40} /> : <TierEmblem tier="iron" size={40} locked />}
@@ -45,16 +51,26 @@ const Row = memo(function Row({ r, mine, locale }: { r: MonthlyRankRow; mine: bo
                 </span>
             </span>
             <span className={cn("hall-rating rk-num shrink-0 h-8 px-3 inline-flex items-center rounded-pill text-[14px] font-black", r.points > 0 ? "text-[color:var(--hall-lime)]" : "text-white/80")}>{signedPoints(r.points)}</span>
+        </>
+    );
+    const inner = "pl-2 pr-3 flex items-center gap-2";
+    return (
+        <li className={cn("hall-row h-[62px]", !onOpen && inner, medal && "hall-row-top", mine && "hall-row-mine")} aria-current={mine ? "true" : undefined}>
+            {onOpen
+                ? <button type="button" onClick={() => onOpen(r.memberId)} aria-label={t("sim.shelf.open").replace("{name}", r.name)} data-track-as="랭킹 줄 장식장" className={cn("w-full h-full text-left rounded-[18px] active:bg-white/[0.06]", inner)}>{body}</button>
+                : body}
         </li>
     );
 });
 
-export function MonthlyRank({ gameType, api, myMemberId, locale, now = Date.now }: {
+export function MonthlyRank({ gameType, api, myMemberId, locale, now = Date.now, onShelf }: {
     gameType: DashGameType;
     api: RankApi;
     myMemberId?: string;
     locale: string;
     now?: () => number;
+    /** 장식장으로 — id 없이 부르면 내 것, 줄을 누르면 그 사람의 것 */
+    onShelf?: (memberId?: string) => void;
 }) {
     const { t } = useT();
     const thisMonth = kstMonthOf(now());
@@ -101,8 +117,8 @@ export function MonthlyRank({ gameType, api, myMemberId, locale, now = Date.now 
                     <section className="hall-me rounded-[22px] px-4 py-3.5" aria-label={t("sim.rank.monthMine")} data-testid="rank-monthly-me">
                         <div className="flex items-center gap-3">
                             <span className="shrink-0 w-[84px] flex items-center justify-center">
-                                {d.me.rank !== null && d.me.rank <= 3
-                                    ? <RankMedal rank={d.me.rank as 1 | 2 | 3} size={78} />
+                                {monthlyMedal(d.me.rank, d.me.points)
+                                    ? <RankMedal rank={monthlyMedal(d.me.rank, d.me.points)!} size={78} />
                                     : d.me.tier ? <TierEmblem tier={d.me.tier} size={78} /> : <TierEmblem tier="iron" size={78} locked />}
                             </span>
                             <div className="flex-1 min-w-0">
@@ -118,6 +134,8 @@ export function MonthlyRank({ gameType, api, myMemberId, locale, now = Date.now 
                         </div>
                         {/* 통산 등급은 그대로라는 것을 한 줄로 — '매달 지워진다'로 읽히지 않게 */}
                         {!closed && <p className="text-[11.5px] font-medium text-white/55 mt-3 leading-relaxed break-keep">{t("sim.rank.monthHint")}</p>}
+                        {/* 달이 끝나면 여기서 받은 메달 · 등급 배지가 장식장에 놓인다 */}
+                        {onShelf && <ShelfLink onClick={() => onShelf()} sub={t("sim.shelf.linkSub")} className="mt-3" testId="rank-monthly-shelf" />}
                     </section>
 
                     {d.rows.length === 0 ? (
@@ -130,7 +148,7 @@ export function MonthlyRank({ gameType, api, myMemberId, locale, now = Date.now 
                             {/* 지난 달은 '이달의 순위'가 아니다 — 그 달의 이름으로 적는다 */}
                             <h2 className="px-1 mb-2 text-[12px] font-black tracking-wide text-white/55">{closed ? monthLabel(month, locale) : t("sim.rank.monthBoard")}</h2>
                             <ol className="space-y-2" aria-label={closed ? monthLabel(month, locale) : t("sim.rank.monthBoard")}>
-                                {d.rows.map((r) => <Row key={r.memberId} r={r} mine={!!myMemberId && r.memberId === myMemberId} locale={locale} />)}
+                                {d.rows.map((r) => <Row key={r.memberId} r={r} mine={!!myMemberId && r.memberId === myMemberId} locale={locale} onOpen={onShelf} />)}
                             </ol>
                         </div>
                     )}

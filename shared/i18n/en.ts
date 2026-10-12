@@ -179,6 +179,7 @@ export const en: Record<string, string> = {
   "err.sim.badLayout": "Invalid ball layout",
   "err.sim.badBallSet": "Invalid set of balls",
   "err.sim.sessionNotFound": "Session not found",
+  "err.sim.shelfNotFound": "Trophy shelf not found",
   "err.sim.badShot": "Invalid shot input",
   "err.sim.miscue": "That's a miscue",
   "err.sim.sessionEnded": "This session has ended",

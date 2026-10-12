@@ -171,8 +171,26 @@ router.get("/sim/rank/monthly", requireAuth, asyncHandler(async (req: AuthReques
 
 // GET /sim/rank/me — 네 판의 내 대전 순위(진입 화면 '랭킹' 줄). 랭킹 화면을 네 번 부르지 않으려고 따로 둔다.
 router.get("/sim/rank/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const boards = await storage.sim.myMatchRanks(req.userId!, PLACEMENT_MATCHES);
-    return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards });
+    // shelf: 장식장에 모은 개수(2026-10-12 — 홈 배너의 장식장 칸). 표가 없거나 실패해도 순위는 그대로 보낸다
+    const [boards, shelf] = await Promise.all([
+        storage.sim.myMatchRanks(req.userId!, PLACEMENT_MATCHES),
+        storage.simShelf.summary(req.userId!).catch((e: unknown) => { console.error("[shelf summary]", e); return null; }),
+    ]);
+    return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards, shelf });
+}));
+
+/**
+ * GET /sim/shelf?memberId= — 장식장(2026-10-12 오너: "장식장에 보관이 되도록 매월초가 되면 …"). memberId 를 안 주면 내 것.
+ * 달마다 받은 이달의 랭킹 메달 · 등급 배지와, 이번 달이 지금 끝난다면 받는 것. 남의 것도 볼 수 있다 —
+ * 순위표(GET /sim/rank · /sim/rank/monthly)가 이미 회원에게 보여 주는 이름 · 등급 · 그 달의 성적이다.
+ * 온라인 대전을 안 둔 회원 · 탈퇴한 회원의 것은 없다(404).
+ */
+router.get("/sim/shelf", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const raw = typeof req.query.memberId === "string" ? req.query.memberId : "";
+    if (raw !== "" && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(raw)) return sendError(res, 404, "err.sim.shelfNotFound");
+    const shelf = await storage.simShelf.shelf(req.userId!, raw || req.userId!, Date.now(), PLACEMENT_MATCHES);
+    if (!shelf) return sendError(res, 404, "err.sim.shelfNotFound");
+    return sendSuccess(res, shelf);
 }));
 
 /**

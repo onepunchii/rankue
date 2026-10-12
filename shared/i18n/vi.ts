@@ -179,6 +179,7 @@ export const vi: Record<string, string> = {
   "err.sim.badLayout": "Vị trí bi không hợp lệ",
   "err.sim.badBallSet": "Bộ bi không hợp lệ",
   "err.sim.sessionNotFound": "Không tìm thấy phiên chơi",
+  "err.sim.shelfNotFound": "Không tìm thấy tủ trưng bày",
   "err.sim.badShot": "Dữ liệu cú đánh không hợp lệ",
   "err.sim.miscue": "Điểm đánh ngoài phạm vi (miscue)",
   "err.sim.sessionEnded": "Phiên chơi này đã kết thúc",

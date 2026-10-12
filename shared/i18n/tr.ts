@@ -179,6 +179,7 @@ export const tr: Record<string, string> = {
   "err.sim.badLayout": "Top yerleşimi geçersiz",
   "err.sim.badBallSet": "Top seti geçersiz",
   "err.sim.sessionNotFound": "Oturum bulunamadı",
+  "err.sim.shelfNotFound": "Vitrin bulunamadı",
   "err.sim.badShot": "Vuruş girişi geçersiz",
   "err.sim.miscue": "Bu bir miscue (vuruş aralığı dışı)",
   "err.sim.sessionEnded": "Bu oturum sona erdi",

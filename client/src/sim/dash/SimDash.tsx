@@ -28,6 +28,7 @@ import {
     availableCombos, bestAvgOf, bestHighRunOf, comboKey, drillSeries, drillTotals, matchSummary, overallAvg, ratingFor, recentForm, recordFor, sameCombo,
     sessionSeries, shortDate, signedAvg, type Combo, matchSeries} from "./dashStats";
 import { Columns, FormStrip, TrendLine } from "./charts";
+import { ShelfLink } from "../rank/ShelfLink";
 
 export interface SimDashProps {
     onClose: () => void;
@@ -37,6 +38,8 @@ export interface SimDashProps {
     onLobby: () => void;
     /** 온라인 레이팅 칸을 누르면 랭킹 화면 */
     onRank?: () => void;
+    /** 내 장식장으로(2026-10-12) — 등급 카드 아래의 한 줄. 안 주면 그리지 않는다 */
+    onShelf?: () => void;
     /** "matches" 면 마운트 때 대전 섹션으로 스크롤(진입 화면의 "내 대전") */
     initialSection?: "matches";
     /** 테스트 주입 */
@@ -89,7 +92,7 @@ function CardHeader({ title, sub, action }: { title: string; sub?: string; actio
     );
 }
 
-export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, onRank, initialSection, statsApi = fetchSimStats, matchApi = defaultMatchApi, now }: SimDashProps) {
+export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, onRank, onShelf, initialSection, statsApi = fetchSimStats, matchApi = defaultMatchApi, now }: SimDashProps) {
     const { t } = useT();
     const stats = useQuery({ queryKey: SIM_STATS_QUERY_KEY, queryFn: statsApi, staleTime: 15_000 });
     const matches = useQuery({
@@ -215,6 +218,9 @@ export function SimDash({ onClose, onOpenMatch, onPractice, onDrills, onLobby, o
                             </button>
                         );
                     })()}
+
+                    {/* 달마다 받은 메달 · 등급 배지 — 장식장으로 */}
+                    {onShelf && <ShelfLink onClick={onShelf} sub={t("sim.shelf.linkSub")} testId="dash-shelf" />}
 
                     {/* 그림 칸 셋 — 이 화면의 세 구역으로 가는 길 */}
                     <div className="grid grid-cols-3 gap-2">

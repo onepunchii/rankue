@@ -68,6 +68,8 @@ import { RoomList } from "./match/RoomList";
 import { WatchList } from "./watch/WatchList";
 import WatchPage from "./watch/WatchPage";
 import { RankPage } from "./rank/RankPage";
+import { ShelfPage } from "./rank/ShelfPage";
+import { shelfPath } from "./rank/shelfApi";
 import { sanitizeCode, parseJoinParams } from "./matchApi";
 import { matchApi, type MatchPublic } from "./matchApi";
 import { MatchLobby } from "./match/MatchLobby";
@@ -236,6 +238,12 @@ export function SimulatorPage() {
     const rankGame = params.get("g") === "4c" ? "4c" as const : params.get("g") === "3c" ? "3c" as const : undefined;
     // ?rank=1&s=all: 통산 탭으로 바로(홈 배너 · 대시보드의 '내 등급'에서). 없으면 이달 탭(2026-10-12 이달의 랭킹).
     const rankScope = params.get("s") === "all" ? "all" as const : params.get("s") === "month" ? "month" as const : undefined;
+    // ?shelf=1[&m=<회원 id>]: 장식장(2026-10-12) — 달마다 받은 메달 · 등급 배지. m 이 없으면 내 것.
+    const shelfView = params.get("shelf") === "1";
+    const shelfMember = params.get("m");
+    // 이 화면 안에서(랭킹 · 대시보드) 장식장으로 갔는가 — 닫을 때 온 곳으로 돌아간다. 홈 배너 · 링크로 바로 열었으면 입구로 나간다.
+    const shelfFromInside = useRef(false);
+    const openShelf = (memberId?: string) => { shelfFromInside.current = true; navigate(shelfPath(memberId)); };
     // ?watch=<대전 id> 관전·다시보기(2026-09-12 오너). 읽기 전용 화면이라 시뮬레이터 세션을 열지 않는다.
     const watchId = params.get("watch");
     // ?join=<code>[&auto=1]: 푸시 초대 딥링크. auto 면 비밀번호 없는 대기 방에 바로 참가, 아니면 코드가 채워진 참가 화면
@@ -251,7 +259,7 @@ export function SimulatorPage() {
     useEffect(() => { if (!member && isPromoSrc(promoFrom)) rememberPromoSrc(promoFrom); }, [member, promoFrom]);
     const [guestGate, setGuestGate] = useState(false);
     // 리플레이 링크(?replay=): 대전·로비·드릴·대시보드가 아닐 때만. cfg 보다 우선하고, 깨진 링크는 cfg 처럼 설정 창으로 떨어진다
-    const overlayParam = !!matchId || !!watchId || lobby || drillsView || dashView || roomsView || rankView || joinCode !== "" || pathView;
+    const overlayParam = !!matchId || !!watchId || lobby || drillsView || dashView || roomsView || rankView || shelfView || joinCode !== "" || pathView;
     const [replay] = useState<ReplayPayload | null>(() => (overlayParam ? null : decodeReplay(params.get(REPLAY_PARAM))));
     const [initial] = useState(() => (overlayParam || replay ? null : decodePageConfig(readCfgParam(search))));
     // 파라미터가 하나도 없으면 진입 화면(싱글 / 친구와 대전 / 멀티방)부터. cfg 가 있는데 깨졌으면 예전처럼 설정 창을 바로 연다.
@@ -1494,6 +1502,7 @@ export function SimulatorPage() {
     const showDash = dashView && sim.phase === "setup";
     const showRooms = roomsView && sim.phase === "setup";
     const showRank = rankView && sim.phase === "setup";
+    const showShelf = shelfView && sim.phase === "setup";
     const showEntry = entryView && sim.phase === "setup" && !setupOpen;
     // 회원은 입구 화면 대신 홈 당구 게임 구역으로(2026-10-04 오너: "온라인게임 페이지로 안 가게, 홈에서 다").
     // 로그인 전 방문자는 홈 카드가 없으니 입구를 그대로 둔다. 로그인 확인 중·이어서 치기 중에는 아무것도 그리지 않는다(입구가 번쩍이지 않게).
@@ -1902,7 +1911,18 @@ export function SimulatorPage() {
             )}
             {showRank && (
                 <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    <RankPage onClose={() => navigate(ENTRY_PATH, { replace: true })} initial={rankGame ? { gameType: rankGame } : undefined} initialScope={rankScope} />
+                    <RankPage onClose={() => navigate(ENTRY_PATH, { replace: true })} initial={rankGame ? { gameType: rankGame } : undefined} initialScope={rankScope} onShelf={openShelf} />
+                </div>
+            )}
+            {showShelf && (
+                <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
+                    <ShelfPage
+                        key={shelfMember ?? "me"}
+                        memberId={shelfMember}
+                        onClose={() => { if (shelfFromInside.current) { shelfFromInside.current = false; window.history.back(); } else navigate(ENTRY_PATH, { replace: true }); }}
+                        onRank={() => navigate("/online-game?rank=1")}
+                        onPlay={() => navigate("/online-game?rooms=1")}
+                    />
                 </div>
             )}
             {/* 관전·다시보기: 읽기 전용 화면을 위에 덮는다(대전 화면·시뮬 세션과 완전히 분리) */}
@@ -1931,6 +1951,7 @@ export function SimulatorPage() {
                         onDrills={() => navigate("/online-game?drills=1")}
                         onLobby={() => navigate("/online-game?lobby=1")}
                         onRank={() => navigate("/online-game?rank=1&s=all")}
+                        onShelf={() => openShelf()}
                     />
                 </div>
             )}
