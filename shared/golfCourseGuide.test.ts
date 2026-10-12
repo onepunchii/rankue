@@ -143,6 +143,17 @@ describe("화면 · 검색용 화면 · 저장", () => {
         expect(store).toContain("return hasGuide(g) ? g : null;");
     });
 
+    it("가이드 적재 스크립트 — 규칙은 shared 것만 쓰고 guide 칸만 쓴다. --apply 가 없으면 세기만", () => {
+        const s = read("server/scripts/golf-course-guides.ts");
+        expect(s).toContain('from "../../shared/golfCourseGuide"');
+        expect(s).toContain("guideHoldReason(v, p.holes)");
+        expect(s).toContain("cleanGuide(v, today)");
+        expect(s).toContain('const apply = args.includes("--apply");');
+        expect(s).toContain("if (!apply) { wrote++; continue; }");
+        expect([...s.matchAll(/update golf_course_pages set ([^\n]+)/g)].map((m) => m[1].trim())).toEqual(["guide = $2::jsonb, updated_at = now()"]);
+        expect(s).not.toMatch(/delete from|set guide = null/);
+    });
+
     it("다시 적재해도 남는다 — 적재 스크립트는 이 칸을 건드리지 않는다. 칸은 더하기만", () => {
         expect(read("server/scripts/golf-course-pages.ts")).not.toMatch(/\bguide\b/);
         const sql = read("migrations/golf_course_guide.sql").split("\n").filter((l) => !l.startsWith("--")).join("\n");
