@@ -2866,6 +2866,7 @@ const tr: Dict = {
   "sim.rank.firstTier": "İlk kademeni kazandın",
   "sim.rank.promotedFrom": "{tier} kademesinden yükseldin",
   "sim.rank.ratingNow": "Reyting {n}",
+  "sim.rank.badgeAria": "Çevrimiçi maç {tier}",
   "sim.rank.empty": "Henüz sıralanan oyuncu yok",
   "sim.rank.emptyDesc": "{n} maç bitirince burada görünürsün",
   "sim.rank.loading": "Sıralama yükleniyor…",

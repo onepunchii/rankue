@@ -8,6 +8,8 @@ import { Button } from "@/components/ui/button";
 import { RadialGauge } from "@/components/hiq/ui/RadialGauge";
 import { getRivalryLabel } from "./HeadToHeadCard";
 import { useT } from "@/lib/i18n";
+import { TierAvatarBadge } from "@/components/hiq/TierAvatarBadge";
+import { useSimTiers } from "@/sim/rank/simTiers";
 
 interface FriendListProps {
     friends: HiqMemberWithH2H[];
@@ -19,6 +21,8 @@ interface FriendListProps {
 
 export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSearchOpen }: FriendListProps) => {
     const { t } = useT();
+    // 친구들의 온라인 대전 등급(있는 사람만) — 사진 모서리의 배지
+    const simTiers = useSimTiers();
     return (
         <div className="space-y-4 relative z-10">
             <div className="flex items-center justify-between px-1">
@@ -102,9 +106,14 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                             tier.icon
                                                         )}
                                                     </div>
-                                                    <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-surface-0 flex items-center justify-center p-0.5">
-                                                        <div className="w-full h-full rounded-full bg-brand" />
-                                                    </div>
+                                                    {/* 온라인 대전 등급이 있는 친구는 점 대신 등급 배지(2026-10-12). 골프 화면에서는 예전 그대로 점 */}
+                                                    {currentSport !== "GOLF" && simTiers[friend.id] ? (
+                                                        <TierAvatarBadge memberId={friend.id} size={26} className="-bottom-2 -right-2" />
+                                                    ) : (
+                                                        <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-surface-0 flex items-center justify-center p-0.5">
+                                                            <div className="w-full h-full rounded-full bg-brand" />
+                                                        </div>
+                                                    )}
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1.5">

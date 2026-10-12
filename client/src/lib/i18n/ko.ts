@@ -2868,6 +2868,7 @@ export const ko: Dict = {
   "sim.rank.firstTier": "첫 등급을 얻었어요",
   "sim.rank.promotedFrom": "{tier}에서 올라왔어요",
   "sim.rank.ratingNow": "레이팅 {n}",
+  "sim.rank.badgeAria": "온라인 대전 {tier}",
   "sim.rank.empty": "아직 랭킹에 오른 선수가 없어요",
   "sim.rank.emptyDesc": "대전 {n}판을 마치면 여기 올라요",
   "sim.rank.loading": "랭킹을 불러오는 중…",

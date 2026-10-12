@@ -2866,6 +2866,7 @@ const vi: Dict = {
   "sim.rank.firstTier": "Bạn đã có hạng đầu tiên",
   "sim.rank.promotedFrom": "Lên từ {tier}",
   "sim.rank.ratingNow": "Điểm {n}",
+  "sim.rank.badgeAria": "Trận trực tuyến {tier}",
   "sim.rank.empty": "Chưa có người chơi được xếp hạng",
   "sim.rank.emptyDesc": "Hoàn thành {n} trận để xuất hiện ở đây",
   "sim.rank.loading": "Đang tải xếp hạng…",

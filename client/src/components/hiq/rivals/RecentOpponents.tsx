@@ -6,6 +6,7 @@ import { RecentOpponent, SportConfig } from "./types";
 import { getTier } from "@/lib/hiqUtils";
 import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
 import { useT } from "@/lib/i18n";
+import { TierAvatarBadge } from "@/components/hiq/TierAvatarBadge";
 
 interface RecentOpponentsSliderProps {
     opponents: RecentOpponent[];
@@ -50,16 +51,20 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                                                     <span className="text-[12px] font-semibold">{t(tier.label)}</span>
                                                 </div>
                                             </div>
-                                            <div className="w-10 h-10 rounded-tile bg-black/[0.04] flex items-center justify-center overflow-hidden text-black/40">
-                                                {(opponent as any).profileImageUrl ? (
-                                                    <img
-                                                        src={(opponent as any).profileImageUrl}
-                                                        className="w-full h-full object-cover"
-                                                        alt={opponent.name}
-                                                    />
-                                                ) : (
-                                                    <LucideZap className="w-5 h-5 opacity-40" />
-                                                )}
+                                            {/* 사진 상자는 넘치는 것을 자른다 — 등급 배지는 그 바깥 상자에 둔다(2026-10-12) */}
+                                            <div className="relative shrink-0">
+                                                <div className="w-10 h-10 rounded-tile bg-black/[0.04] flex items-center justify-center overflow-hidden text-black/40">
+                                                    {(opponent as any).profileImageUrl ? (
+                                                        <img
+                                                            src={(opponent as any).profileImageUrl}
+                                                            className="w-full h-full object-cover"
+                                                            alt={opponent.name}
+                                                        />
+                                                    ) : (
+                                                        <LucideZap className="w-5 h-5 opacity-40" />
+                                                    )}
+                                                </div>
+                                                <TierAvatarBadge memberId={opponent.id} size={20} className="-bottom-1.5 -right-1.5" />
                                             </div>
                                         </div>
 

@@ -2866,6 +2866,7 @@ const en: Dict = {
   "sim.rank.firstTier": "You earned your first tier",
   "sim.rank.promotedFrom": "Up from {tier}",
   "sim.rank.ratingNow": "Rating {n}",
+  "sim.rank.badgeAria": "Online match {tier}",
   "sim.rank.empty": "No ranked players yet",
   "sim.rank.emptyDesc": "Finish {n} matches and you'll appear here",
   "sim.rank.loading": "Loading ranking…",

@@ -22,6 +22,7 @@ import {
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout, isValidLayout } from "../../../shared/sim/layouts.js";
+import { tierFor } from "../../../shared/sim/rank.js";
 
 const router = Router();
 
@@ -160,6 +161,18 @@ router.get("/sim/rank", requireAuth, asyncHandler(async (req: AuthRequest, res: 
 router.get("/sim/rank/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const boards = await storage.sim.myMatchRanks(req.userId!, PLACEMENT_MATCHES);
     return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards });
+}));
+
+/**
+ * GET /sim/tiers — 등급이 있는 회원의 등급 표 { "<회원 id>": "<등급>" }(2026-10-12 — 프로필 사진 옆 등급 배지).
+ * 배치를 마친 사람만 들어 있다(없는 사람 = 배지 없음). 두 종목 중 높은 쪽. 순위표(GET /sim/rank)가 이미 회원에게 보여 주는 정보의 줄임이다.
+ * 화면은 이 답을 몇 분 간직하고 친구 목록 · 채팅 등에서 같이 쓴다.
+ */
+router.get("/sim/tiers", requireAuth, asyncHandler(async (_req: AuthRequest, res: any) => {
+    const rows = await storage.sim.placedRatings(PLACEMENT_MATCHES);
+    const tiers: Record<string, string> = {};
+    for (const r of rows) tiers[r.memberId] = tierFor(r.rating).id;
+    return sendSuccess(res, { tiers });
 }));
 
 // GET /sim/sessions/:id — 상세(샷 로그 포함, 리플레이용)

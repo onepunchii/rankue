@@ -474,6 +474,22 @@ export class SimRepository {
         }));
     }
 
+    /**
+     * 등급이 있는 회원 모두의 레이팅(2026-10-12 — 프로필 사진 옆 등급 배지). 배치(placement 판)를 마친 사람만,
+     * 두 종목을 다 둔 사람은 **높은 쪽 하나**. 친구 목록 · 채팅처럼 사람이 나오는 화면이 화면마다 응답을 고치지 않고 이 표 하나를 받아 쓴다.
+     * 지금은 열 명 안팎이라 통째로 준다. 사다리가 커지면(limit 에 닿으면) 필요한 id 만 묻는 꼴로 바꿀 것.
+     */
+    async placedRatings(placement = 3, limit = 3000): Promise<{ memberId: string; rating: number }[]> {
+        const res = await db.execute(sql`
+            select r.member_id, max(r.rating) as rating
+            from hiq_sim_match_ratings r join hiq_members mem on mem.id = r.member_id
+            where r.matches >= ${placement}
+            group by r.member_id
+            order by max(r.rating) desc
+            limit ${limit}`);
+        return (res.rows as Record<string, unknown>[]).map((r) => ({ memberId: String(r.member_id), rating: Number(r.rating ?? 1000) }));
+    }
+
     async getShots(sessionId: string): Promise<HiqSimShot[]> {
         return db.select().from(hiqSimShots)
             .where(eq(hiqSimShots.sessionId, sessionId))

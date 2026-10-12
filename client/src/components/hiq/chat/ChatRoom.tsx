@@ -18,6 +18,7 @@ import { LucideSend, LucideLoader2, LucidePlus, LucideMoreHorizontal, LucideLang
 import { cn } from "@/lib/utils";
 import { useT, type Locale } from "@/lib/i18n";
 import { ChatCard } from "./ChatCard";
+import { TierAvatarBadge } from "@/components/hiq/TierAvatarBadge";
 
 /** 앱 언어 → Intl 태그. 시각·날짜는 사전 키 대신 Intl 로 그 언어답게 그린다(표시 시간대는 KST 고정 — 서버·방 정보와 같은 기준). */
 export const INTL_TAG: Record<Locale, string> = { ko: "ko-KR", en: "en-US", es: "es-419", tr: "tr-TR", vi: "vi-VN" };
@@ -265,8 +266,12 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                             ) : (
                                 <div className={cn("flex items-end gap-2", mine ? "justify-end" : "justify-start", grouped ? "mt-0.5" : "mt-2")}>
                                     {!mine && (
-                                        <span className={cn("w-8 h-8 rounded-full bg-surface-3 overflow-hidden shrink-0 flex items-center justify-center text-[12px] font-semibold text-ink-2", grouped && "invisible")}>
-                                            {m.sender?.profileImageUrl ? <img src={m.sender.profileImageUrl} alt="" className="w-full h-full object-cover" /> : (m.sender?.name?.charAt(0) ?? "?")}
+                                        // 사진 상자는 넘치는 것을 자른다 — 온라인 대전 등급 배지는 그 바깥 상자에 둔다(2026-10-12, 골프 채팅에서는 안 그린다)
+                                        <span className={cn("relative shrink-0", grouped && "invisible")}>
+                                            <span className="w-8 h-8 rounded-full bg-surface-3 overflow-hidden flex items-center justify-center text-[12px] font-semibold text-ink-2">
+                                                {m.sender?.profileImageUrl ? <img src={m.sender.profileImageUrl} alt="" className="w-full h-full object-cover" /> : (m.sender?.name?.charAt(0) ?? "?")}
+                                            </span>
+                                            <TierAvatarBadge memberId={m.senderId} size={16} className="-bottom-1 -right-1.5" />
                                         </span>
                                     )}
                                     <div className={cn("max-w-[78%] flex flex-col", mine ? "items-end" : "items-start")}>
