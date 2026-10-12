@@ -2389,7 +2389,7 @@ const vi: Dict = {
   "sim.match.finalInning": "Lượt gỡ hòa",
   "sim.match.finalInningHint": "Khi người đi trước đạt mục tiêu, người sau được một lượt cuối. Gỡ kịp thì hòa",
   "sim.match.handicapOn": "Trận chấp",
-  "sim.match.handicapOnDesc": "Mỗi người có mục tiêu riêng, tính từ thành tích gần đây. Được tính vào xếp hạng",
+  "sim.match.handicapShort": "Mục tiêu tự động · tính vào xếp hạng",
   "sim.match.friendly": "Giao hữu",
   "sim.match.friendlyDesc": "Trận giao hữu với mục tiêu tự đặt — không tính vào điểm xếp hạng",
   "sim.rooms.hostAway": "Chủ phòng vắng · đồng hồ chạy sau 2 phút",

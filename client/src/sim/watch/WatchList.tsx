@@ -28,7 +28,7 @@ const SORTS: readonly { key: WatchSort; label: string }[] = [
 ];
 
 const chip = "h-9 px-3 shrink-0 inline-flex items-center gap-1.5 rounded-pill border text-[12.5px] font-bold";
-const chipOn = "border-transparent bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)]";
+const chipOn = "border-transparent bg-[color:var(--hall-lime)] text-[#0B1A03]";
 const chipOff = "border-white/15 bg-white/[0.08] text-white/85 active:bg-white/15";
 
 function Row({ card, onOpen }: { card: WatchCard; onOpen: (id: string) => void }) {
@@ -37,7 +37,7 @@ function Row({ card, onOpen }: { card: WatchCard; onOpen: (id: string) => void }
     const h = highlightsOf({ ...card, gameType: card.gameType as GameType });
     const scores = [caromsOf(card.scores[0] ?? 0, card.gameType), caromsOf(card.scores[1] ?? 0, card.gameType)];
     return (
-        <li className="rounded-tile border border-surface-line bg-surface-1 px-4 py-3 flex items-center gap-3">
+        <li className="hall-row px-4 py-3 flex items-center gap-3">
             <span className="flex-1 min-w-0 flex flex-col gap-1">
                 <span className="text-[14px] font-semibold text-ink-1 truncate">
                     {names[0]} <span className="text-ink-3">vs</span> {names[1]}
@@ -59,7 +59,7 @@ function Row({ card, onOpen }: { card: WatchCard; onOpen: (id: string) => void }
             </span>
             <button
                 type="button" onClick={() => onOpen(card.id)}
-                className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black"
+                className="hall-rating h-10 px-4 shrink-0 rounded-pill border border-white/15 text-white text-[13px] font-black active:bg-white/20"
             >{t("sim.watch.replay")}</button>
         </li>
     );
@@ -85,10 +85,11 @@ export function WatchList({ onOpen, api = matchApi }: { onOpen: (id: string) => 
     if (all.length === 0) return null;
 
     return (
-        // 아케이드 배색은 .rank-arcade 안에서만 산다(--arc-frame 등). 멀티방 화면의 연장이라 같은 배색을 쓰되,
-        // 변수가 이 안에서 정의되도록 클래스를 여기 직접 붙인다 — 안 붙이면 고른 칩이 안 칠해진다(2026-09-13 오너 지적).
-        <section className="rank-arcade space-y-2">
-            <h3 className="text-[13px] font-bold text-ink-2">{t("sim.watch.replays")}</h3>
+        // 멀티방 화면의 연장이라 같은 '진열장' 배색을 쓴다(2026-10-12 — 예전에는 보라 · 노랑의 .rank-arcade).
+        // 색 변수(--hall-lime)가 이 안에서 정의되도록 클래스를 여기 직접 붙인다 — 안 붙이면 고른 칩이 안 칠해진다(2026-09-13 오너 지적).
+        // 다시보기는 줄마다 있는 버금 동작이라 연두로 칠하지 않는다 — 연두는 화면에서 '방 만들기' 하나를 가리킨다.
+        <section className="rank-hall space-y-2">
+            <h3 className="px-1 text-[12px] font-black tracking-wide text-white/55">{t("sim.watch.replays")}</h3>
             <div className="flex gap-1.5 overflow-x-auto -mx-1 px-1 pb-0.5">
                 {games.length > 1 && (
                     <>

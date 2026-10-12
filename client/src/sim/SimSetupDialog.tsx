@@ -57,7 +57,7 @@ function Segment({ selected, onClick, children, className }: {
             type="button" onClick={onClick} aria-pressed={selected}
             className={cn(
                 "flex-1 h-11 rounded-xl border flex items-center justify-center gap-2 text-[13px] font-semibold transition-colors",
-                selected ? "border-brand bg-brand/[0.06] text-ink-1" : "border-surface-line text-ink-3",
+                selected ? "border-brand bg-brand/[0.10] text-ink-1" : "border-surface-line text-ink-3",
                 className,
             )}
         >
@@ -75,7 +75,7 @@ function SegmentTwoLine({ selected, onClick, title, desc }: {
             type="button" onClick={onClick} aria-pressed={selected}
             className={cn(
                 "flex-1 min-h-11 py-2 rounded-xl border flex flex-col items-center justify-center leading-tight transition-colors",
-                selected ? "border-brand bg-brand/[0.06] text-ink-1" : "border-surface-line text-ink-3",
+                selected ? "border-brand bg-brand/[0.10] text-ink-1" : "border-surface-line text-ink-3",
             )}
         >
             <span className="text-[13px] font-semibold">{title}</span>
@@ -228,7 +228,9 @@ export function SimSetupDialog({ open, onOpenChange, onStart }: Props) {
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-[420px] max-h-[88dvh] rounded-card flex flex-col gap-0 p-0">
+            {/* 2026-10-12 오너: 온라인게임 화면들과 같은 어두운 배색으로 — 어두운 테이블 화면 위에 이 창만 흰색이었다.
+                다른 창(끝 · 나가기 · 기권 · 모드 설명)과 같은 클래스를 준다: sim-dark = 색 토큰, sim-table = 초록을 밝은 연두로. */}
+            <DialogContent className="sim-dark sim-table bg-[var(--surface-1)] text-ink-1 max-w-[420px] max-h-[88dvh] rounded-card flex flex-col gap-0 p-0">
                 <DialogHeader className="shrink-0 px-6 pt-6 pb-3 text-left">
                     <div className="flex items-center gap-3">
                         <BallMotif kind="single" size={44} />

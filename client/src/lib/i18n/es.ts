@@ -2389,7 +2389,7 @@ const es: Dict = {
   "sim.match.finalInning": "Entrada de empate",
   "sim.match.finalInningHint": "Cuando el primero llega a la meta, el segundo tiene una última entrada. Si empata, hay tablas",
   "sim.match.handicapOn": "Partida con hándicap",
-  "sim.match.handicapOnDesc": "Cada jugador recibe su propia meta según su registro reciente. Cuenta para el rating y el ranking",
+  "sim.match.handicapShort": "Metas automáticas · cuenta para el rating",
   "sim.match.friendly": "Amistoso",
   "sim.match.friendlyDesc": "Amistoso con meta manual: no cuenta para el rating ni el ranking",
   "sim.rooms.hostAway": "Anfitrión ausente · el reloj empieza en 2 min",

@@ -293,3 +293,54 @@ describe("빠른 대전(pickQuickRoom)", () => {
         expect(pickQuickRoom([])).toBeNull();
     });
 });
+
+/**
+ * 진열장 톤 · 빈 화면(2026-10-12 오너: "지금 디자인 느낌 좋으니 해당 디자인도 변경하고 방 만드는 거 조금 더 쉽게").
+ */
+describe("RoomList: 진열장 톤과 빈 화면(2026-10-12)", () => {
+    it("방이 없으면 '방 만들기'는 카드 안의 큰 단추 하나 — 위의 빠른 대전 · 방 만들기는 그리지 않는다(셋 다 같은 곳으로 간다)", async () => {
+        const h = mount({ rows: [] });
+        await settle(h, () => text(h).includes(ko["sim.rooms.empty"]));
+        const create = buttons(h).filter((b) => b.textContent === ko["sim.entry.roomCreate"]);
+        expect(create).toHaveLength(1);
+        expect(create[0].getAttribute("data-testid")).toBe("rooms-empty-create");
+        expect(h.container.querySelector("[data-testid=rooms-empty]")!.contains(create[0])).toBe(true);
+        expect(buttons(h).some((b) => b.textContent === ko["sim.rooms.quick"])).toBe(false);
+        click(create[0]);
+        expect(h.onCreate).toHaveBeenCalledTimes(1);
+    });
+
+    it("방이 있으면 위에 빠른 대전 · 방 만들기가 있고 빈 화면 카드는 없다", async () => {
+        const h = mount({ rows: [room({ id: "r1", hostName: "파란초크" })] });
+        await settle(h, () => text(h).includes("파란초크"));
+        expect(h.container.querySelector("[data-testid=rooms-empty]")).toBeNull();
+        expect(buttons(h).filter((b) => b.textContent === ko["sim.entry.roomCreate"])).toHaveLength(1);
+        expect(buttons(h).some((b) => b.textContent === ko["sim.rooms.quick"])).toBe(true);
+    });
+
+    it("받는 동안에는 단추를 숨기지 않는다 — '없다'는 것은 받은 뒤에만 안다", () => {
+        const h = mount({ rows: [] });
+        expect(text(h)).toContain(ko["sim.rooms.loading"]);
+        expect(buttons(h).some((b) => b.textContent === ko["sim.entry.roomCreate"])).toBe(true);
+    });
+
+    it("예전의 보라 판 · 노란 알약을 쓰지 않는다 — 랭킹과 같은 배색", async () => {
+        const fs = await import("node:fs");
+        const path = await import("node:path");
+        const read = (f: string) => fs.readFileSync(path.resolve(__dirname, f), "utf8");
+        for (const f of ["RoomList.tsx", "../watch/WatchList.tsx"]) {
+            const src = read(f).split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(l)).join("\n");
+            expect(src, f).not.toMatch(/rank-arcade|arc-board|arc-ribbon|--arc-/);
+            expect(src, f).toContain("rank-hall");
+        }
+        const list = read("RoomList.tsx");
+        // 참가 창도 어두운 배색(어두운 화면 위에 흰 창이 뜨지 않게)
+        expect(list).toContain('<DialogContent className="sim-dark sim-table bg-[var(--surface-1)]');
+        // 머리 그림이 있다
+        expect(list).toContain('export const ROOMS_ART_SRC = "/sim/rank/rooms.webp";');
+        expect(fs.existsSync(path.resolve(__dirname, "../../../public/sim/rank/rooms.webp"))).toBe(true);
+        // 어두운 화면 안의 진열장은 브랜드 초록을 밝은 연두로 쓴다(글자 · 테두리가 묻히지 않게)
+        const css = read("../../index.css");
+        expect(css).toMatch(/\.sim-dark \.rank-hall,\s*\.sim-dark\.rank-hall \{\s*--brand: 100 221 23;/);
+    });
+});

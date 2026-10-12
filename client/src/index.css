@@ -772,6 +772,14 @@ body {
     --hall-gold: #e8c46a;
     --hall-lime: #64dd17;
   }
+  /* 어두운 온라인게임 화면(.sim-dark) 안의 진열장 — 랭킹 · 멀티방 · 방 만들기 — 에서는 브랜드 초록을 밝은 연두로 쓴다.
+     당구 초록(#006241)은 검은 바탕에서 대비가 2:1 도 안 돼 '핸디전' · '방장 접속 중' 같은 글자와 고른 칸의 테두리가 묻힌다
+     (.sim-table 과 같은 값 · 같은 까닭). 밝은 홈 위의 배너(.rank-hall 만 있고 .sim-dark 밖)는 건드리지 않는다. */
+  .sim-dark .rank-hall,
+  .sim-dark.rank-hall {
+    --brand: 100 221 23;
+    --brand-fg: 10 10 10;
+  }
   .rank-hall .hall-top {
     /* 당구장 불빛(흐린 그림) 위에 아래로 갈수록 바탕색으로 잠긴다 */
     background:

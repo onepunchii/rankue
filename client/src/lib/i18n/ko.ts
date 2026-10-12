@@ -2391,7 +2391,7 @@ export const ko: Dict = {
   "sim.match.finalInning": "후구",
   "sim.match.finalInningHint": "선공이 목표에 닿아도 후공에게 마지막 한 이닝을 줍니다. 따라붙으면 무승부예요",
   "sim.match.handicapOn": "핸디전",
-  "sim.match.handicapOnDesc": "각자 다마수가 다르게 잡혀요. 서로의 최근 온라인 기록으로 자동이고, 레이팅·랭킹에 반영돼요",
+  "sim.match.handicapShort": "다마수는 자동 · 레이팅에 반영돼요",
   "sim.match.friendly": "친선전",
   "sim.match.friendlyDesc": "다마수를 직접 정하는 친선전이에요 — 레이팅·랭킹에는 반영되지 않아요",
   "sim.rooms.hostAway": "방장 자리 비움 · 2분 뒤 시계 시작",

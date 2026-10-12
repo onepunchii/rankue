@@ -2389,7 +2389,7 @@ const en: Dict = {
   "sim.match.finalInning": "Equalizing inning",
   "sim.match.finalInningHint": "When the first player reaches the target, the second gets one last inning. Catching up means a draw",
   "sim.match.handicapOn": "Handicap match",
-  "sim.match.handicapOnDesc": "Each player gets their own target from recent online records. Counts toward rating and ranking",
+  "sim.match.handicapShort": "Auto targets · counts toward rating",
   "sim.match.friendly": "Friendly",
   "sim.match.friendlyDesc": "A friendly with a hand-set target — it does not count toward rating or ranking",
   "sim.rooms.hostAway": "Host away · clock starts in 2 min",

@@ -3,6 +3,13 @@
  * 화면은 SimulatorPage 가 `?lobby=1` 일 때 이걸 띄우고, onStarted(match) 를 받으면 actions.startMatch(match) 로 대전에 들어간다.
  * 서버 호출은 matchApi 만(실전 경기 API 금지). 폼의 시각 언어는 SimSetupDialog 와 같다(h-11 rounded-xl 세그먼트, 토큰만).
  * 문구는 전부 sim.match.* / sim.setup.* 키.
+ *
+ * 2026-10-12 오너: "지금 디자인 느낌 좋으니 해당 디자인도 변경하고 방 만드는 거 조금 더 쉽게" — 만들기 폼을 짧게 했다.
+ *  - **지난번 설정을 기억한다**(./lobbyPrefs — 종목 · 테이블 · 핸디전 · 모드 · 규칙). 대부분 같은 방을 다시 연다: 열고 → '대전 만들기' 한 번.
+ *  - **만드는 단추는 화면 아래에 붙어 있다** — 예전에는 고를 것 여섯 가지 밑, 스크롤 끝에 있었다. 단추 위에 지금 고른 것을 한 줄로 적는다.
+ *  - 핸디전은 스위치 한 칸에 내 다마수까지(예전에는 상자 둘). 방제의 문구 칩은 한 줄로 옆으로 민다.
+ *  - 드물게 쓰는 것은 '세부 설정'으로 접었다: 비밀번호 · 규칙 · 이닝 제한. 비밀번호가 틀린 동안에는 펼쳐 둔다(단추가 왜 잠겼는지 보이게).
+ *  - 배색은 랭킹 · 멀티방과 같은 '진열장'(.rank-hall — 어두운 바탕에 연두).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -29,6 +36,7 @@ import { ModeInfoDialog } from "../components/ModeInfoDialog";
 import { InviteDialog } from "./InviteDialog";
 import { isValidRoomPassword, isRoomTitleRejected } from "../matchApi";
 import { ROOM_TITLE_MAX, ROOM_TITLE_PRESETS, clampRoomTitle, roomTitleLength } from "@shared/sim/roomTitle";
+import { deviceLobbyPrefs, type LobbyPrefsStore } from "./lobbyPrefs";
 
 export type LobbyTab = "create" | "join";
 
@@ -54,6 +62,8 @@ export interface MatchLobbyProps {
     initialPublic?: boolean;
     /** 참가 탭의 코드 초기값(푸시 초대 딥링크·비밀번호 방) */
     initialCode?: string;
+    /** 지난번 설정을 읽고 적는 곳. 기본은 이 기기의 저장소(./lobbyPrefs). 시험은 가짜를 넣는다. */
+    prefsStore?: LobbyPrefsStore;
 }
 
 const TABLE_IDS: readonly TableId[] = ["DAEDAE", "JUNGDAE_KR"];
@@ -70,7 +80,7 @@ function Segment({ selected, onClick, children, className, disabled }: {
             type="button" onClick={onClick} aria-pressed={selected} disabled={disabled}
             className={cn(
                 "flex-1 h-11 rounded-xl border flex items-center justify-center gap-2 text-[13px] font-semibold transition-colors disabled:opacity-40",
-                selected ? "border-brand bg-brand/[0.06] text-ink-1" : "border-surface-line text-ink-3",
+                selected ? "border-brand bg-brand/[0.10] text-ink-1" : "border-surface-line text-ink-3",
                 className,
             )}
         >
@@ -87,7 +97,7 @@ function SegmentTwoLine({ selected, onClick, title, desc }: {
             type="button" onClick={onClick} aria-pressed={selected}
             className={cn(
                 "flex-1 min-h-11 py-2 rounded-xl border flex flex-col items-center justify-center leading-tight transition-colors",
-                selected ? "border-brand bg-brand/[0.06] text-ink-1" : "border-surface-line text-ink-3",
+                selected ? "border-brand bg-brand/[0.10] text-ink-1" : "border-surface-line text-ink-3",
             )}
         >
             <span className="text-[13px] font-semibold">{title}</span>
@@ -96,20 +106,24 @@ function SegmentTwoLine({ selected, onClick, title, desc }: {
     );
 }
 
-function ToggleRow({ id, checked, onCheckedChange, title, desc }: {
-    id: string; checked: boolean; onCheckedChange: (v: boolean) => void; title: string; desc: string;
+/** 스위치 한 칸. children 은 같은 칸 아래에 붙는 한 줄(핸디전의 '내 다마수') — 상자를 따로 두지 않는다. */
+function ToggleRow({ id, checked, onCheckedChange, title, desc, children }: {
+    id: string; checked: boolean; onCheckedChange: (v: boolean) => void; title: string; desc: string; children?: React.ReactNode;
 }) {
     return (
-        <label htmlFor={id} className="flex items-center justify-between gap-4 min-h-11 px-4 py-2.5 rounded-xl border border-surface-line cursor-pointer">
-            <span className="flex flex-col leading-tight">
-                <span className="text-[13px] font-semibold text-ink-1">{title}</span>
-                <span className="text-[12px] font-medium text-ink-4 mt-0.5">{desc}</span>
-            </span>
-            <Switch
-                id={id} checked={checked} onCheckedChange={onCheckedChange}
-                className="shrink-0 data-[state=checked]:bg-brand data-[state=unchecked]:bg-surface-3"
-            />
-        </label>
+        <div className="rounded-xl border border-surface-line">
+            <label htmlFor={id} className="flex items-center justify-between gap-4 min-h-11 px-4 py-2.5 cursor-pointer">
+                <span className="flex flex-col leading-tight min-w-0">
+                    <span className="text-[13px] font-semibold text-ink-1">{title}</span>
+                    <span className="text-[12px] font-medium text-ink-4 mt-0.5">{desc}</span>
+                </span>
+                <Switch
+                    id={id} checked={checked} onCheckedChange={onCheckedChange}
+                    className="shrink-0 data-[state=checked]:bg-brand data-[state=unchecked]:bg-surface-3"
+                />
+            </label>
+            {children}
+        </div>
     );
 }
 
@@ -154,24 +168,27 @@ export function TargetPicker({ id, gameType, text, onText, label }: {
 
 /* ------------------------------------------------------------------ 만들기 */
 
-function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, initialRoomId }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void; initialPublic?: boolean; initialRoomId?: string }) {
+function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, initialRoomId, prefsStore = deviceLobbyPrefs }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void; initialPublic?: boolean; initialRoomId?: string; prefsStore?: LobbyPrefsStore }) {
     const { t } = useT();
-    const [gameType, setGameType] = useState<GameType>("3c");
-    const [tableId, setTableId] = useState<TableId>(defaultTableFor("3c"));
-    const [targetText, setTargetText] = useState<string>(String(defaultTarget("3c")));
+    // 지난번에 만든 설정(이 기기) — 처음 한 번만 읽는다. 없는 칸은 예전 기본값 그대로.
+    const [saved] = useState(() => prefsStore.load());
+    const firstGame: GameType = saved.gameType ?? "3c";
+    const [gameType, setGameType] = useState<GameType>(firstGame);
+    const [tableId, setTableId] = useState<TableId>(saved.tableId ?? defaultTableFor(firstGame));
+    const [targetText, setTargetText] = useState<string>(String(saved.target ?? defaultTarget(firstGame)));
     // 핸디전(2026-09-12 오너: "다마수에 따른 경기"). 켜면 참가하는 순간 서버가 두 사람의 온라인 에버리지로
     // 각자 목표를 정한다 — 방장이 숫자를 적지 않는다. 끄면 예전처럼 방장 다마수로 둘 다 친다(맞대결).
-    const [handicap, setHandicap] = useState(true);
+    const [handicap, setHandicap] = useState(saved.handicap ?? true);
     const myHandi = useQuery({ queryKey: ["/api/hiq/sim/handicap"], queryFn: () => api.getMyHandicap(), staleTime: 60_000 });
     const myBoard = myHandi.data?.boards.find((b) => b.gameType === gameType);
-    const [ruleSet, setRuleSet] = useState<ThreeCushionRuleSet>("umb");
-    const [threeCushionDouble, setThreeCushionDouble] = useState(false);
+    const [ruleSet, setRuleSet] = useState<ThreeCushionRuleSet>(saved.ruleSet ?? "umb");
+    const [threeCushionDouble, setThreeCushionDouble] = useState(saved.threeCushionDouble ?? false);
     // 플레이 모드: 방장이 고르면 게스트도 같은 모드(서버 aimAssist). 물리 기본값은 buildConfig 의 모드 프리셋이 채운다.
-    const [mode, setMode] = useState<SimMode>("normal");
+    const [mode, setMode] = useState<SimMode>(saved.mode ?? "normal");
     const [modeInfo, setModeInfo] = useState<SimMode | null>(null);
     // 세부 설정(규칙 · 이닝 제한)은 접어 둔다 — 대전 만들기는 종목·테이블·다마수·모드면 충분하다(2026-09-07 오너)
     const [advancedOpen, setAdvancedOpen] = useState(false);
-    const [inningCap, setInningCap] = useState<number>(0);
+    const [inningCap, setInningCap] = useState<number>(saved.inningCap ?? 0);
     // 대전 미리보기는 언제나 짧다(첫 접촉 + 꺾임 꼬리). 2026-09-12 오너: "대전인데 미리보기 전체 있으면 안 되는 거 아닌가".
     // 방장이 켜고 끌 수 있던 '미리보기 전체' 를 뺐다 — 양쪽에 똑같이 적용되긴 했지만, 쿠션 뒤까지 선이 보이는 방과
     // 안 보이는 방이 **같은 레이팅(hiqSimRatings)** 에 쌓여 사다리가 섞였다. 연습·드릴·길 찾기는 그대로 전체 경로다.
@@ -235,6 +252,8 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                 gameType, tableId, target: targetNum, inningCap, mode, matchPreview: "short",
                 rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: false },
             }), { isPublic, handicap, password: isPublic && password !== "" ? password : undefined, title: isPublic && title.trim() !== "" ? title : undefined });
+            // 만든 설정을 적어 둔다 — 다음에 그대로 열린다. 방제 · 비밀번호 · 공개 여부는 적지 않는다(./lobbyPrefs).
+            prefsStore.save({ gameType, tableId, handicap, target: isValidTarget(targetNum) ? targetNum : defaultTarget(gameType), mode, ruleSet, threeCushionDouble, inningCap });
             setCreated(m);
             onCreated?.(m);
         } catch (e) {
@@ -326,7 +345,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
     if (created) {
         return (
             <div className="space-y-4" data-testid="lobby-waiting">
-                <div className="rounded-card border border-surface-line bg-surface-2 px-5 py-6 text-center space-y-2">
+                <div className="hall-me rounded-[22px] px-5 py-6 text-center space-y-2">
                     <p className="text-[13px] font-semibold text-ink-3">{t("sim.match.codeTitle")}</p>
                     <p className="rk-num text-[40px] leading-none font-bold text-ink-1" aria-label={t("sim.match.codeTitle")}>{formatCode(created.code)}</p>
                     <p className="text-[12px] font-medium text-ink-4 leading-relaxed">{created.isPublic ? t("sim.match.publicWaiting") : t("sim.match.codeHint")}</p>
@@ -385,6 +404,18 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
         );
     }
 
+    // 비밀번호가 틀린 동안에는 세부 설정을 펼쳐 둔다 — 접혀 있으면 만들기 단추가 왜 잠겼는지 알 수 없다
+    const advOpen = advancedOpen || !passwordOk;
+    const modeName = (m: SimMode) => (m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality"));
+    // 단추 위 한 줄 — 지금 무엇을 만드는가(스크롤해 올라가 확인하지 않게)
+    const summary = [
+        gameType === "3c" ? t("sim.setup.type3c") : t("sim.setup.type4c"),
+        tableName(tableId),
+        handicap ? t("sim.match.handicapOn") : `${t("sim.match.friendly")}${targetOk ? ` ${targetNum}` : ""}`,
+        modeName(mode),
+        isPublic ? t("sim.entry.rooms") : t("sim.rooms.minePrivate"),
+    ].join(" · ");
+
     return (
         <div className="space-y-4">
             <div className="space-y-1.5">
@@ -409,22 +440,22 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
             </div>
 
             <div className="space-y-2">
+                {/* 핸디전 — 스위치 한 칸 안에 내 다마수까지. 끄면(친선전) 다마수를 직접 적는다 */}
                 <ToggleRow
                     id="sim-match-handicap" checked={handicap} onCheckedChange={setHandicap}
-                    title={t("sim.match.handicapOn")} desc={t("sim.match.handicapOnDesc")}
-                />
-                {handicap ? (
-                    <div className="rounded-tile border border-surface-line bg-surface-2 px-4 py-3">
-                        <p className="text-[13px] font-semibold text-ink-1">
-                            {t("sim.match.myHandicap")} <span className="rk-num text-brand">{myBoard ? myBoard.target : "—"}</span>
-                        </p>
-                        <p className="text-[12px] font-medium text-ink-3 mt-0.5">
+                    title={t("sim.match.handicapOn")} desc={t("sim.match.handicapShort")}
+                >
+                    {handicap && (
+                        <p className="px-4 pb-3 -mt-0.5 text-[12.5px] font-medium text-ink-3" data-testid="lobby-my-handicap">
+                            <span className="font-semibold text-ink-1">{t("sim.match.myHandicap")} <span className="rk-num text-brand">{myBoard ? myBoard.target : "—"}</span></span>
+                            {" · "}
                             {myBoard && myBoard.fromRecord
                                 ? t("sim.match.myHandicapFrom").replace("{avg}", myBoard.avg.toFixed(3)).replace("{n}", String(myBoard.matches))
                                 : t("sim.match.myHandicapNew")}
                         </p>
-                    </div>
-                ) : (
+                    )}
+                </ToggleRow>
+                {!handicap && (
                     <>
                         <TargetPicker id="sim-match-target" gameType={gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
                         {/* 2026-09-26 오너: 다마수를 손으로 넣는 방은 레이팅에 넣지 않는다(shared/sim/rating.ts) */}
@@ -438,7 +469,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                 <div className="flex gap-2">
                     {SIM_MODES.map((m) => (
                         <Segment key={m} selected={mode === m} onClick={() => setModeInfo(m)}>
-                            {m === "normal" ? t("sim.setup.modeNormal") : t("sim.setup.modeReality")}
+                            {modeName(m)}
                         </Segment>
                     ))}
                 </div>
@@ -450,7 +481,7 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                 />
             </div>
 
-            {/* 멀티방으로 열기(공개 방) + 비밀번호(선택) */}
+            {/* 멀티방으로 열기(공개 방) + 방제(선택). 비밀번호는 세부 설정으로 */}
             <div className="space-y-2">
                 <ToggleRow id="sim-match-public" checked={isPublic} onCheckedChange={setIsPublic} title={t("sim.match.publicRoom")} desc={t("sim.match.publicRoomDesc")} />
                 {isPublic && (
@@ -464,15 +495,15 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                             onChange={(e) => setTitle(clampRoomTitle(e.target.value))} placeholder={t("sim.match.titlePlaceholder")}
                             className="h-12 rounded-xl"
                         />
-                        {/* 자주 쓰는 문구 — 누르면 지금 화면 언어의 글이 입력칸에 들어간다(고쳐 써도 된다) */}
-                        <div className="flex flex-wrap gap-1.5" role="group" aria-label={t("sim.match.titlePresets")}>
+                        {/* 자주 쓰는 문구 — 누르면 지금 화면 언어의 글이 입력칸에 들어간다(고쳐 써도 된다). 한 줄로 두고 옆으로 민다(두 줄로 접히면 폼이 길어진다) */}
+                        <div className="flex gap-1.5 overflow-x-auto -mx-5 px-5 pb-0.5" role="group" aria-label={t("sim.match.titlePresets")}>
                             {ROOM_TITLE_PRESETS.map((p) => {
                                 const text = t(`sim.match.titlePreset.${p}`);
                                 const on = title === text;
                                 return (
                                     <button
                                         key={p} type="button" onClick={() => setTitle(on ? "" : clampRoomTitle(text))} aria-pressed={on}
-                                        className={cn("h-10 px-3 rounded-pill border text-[12.5px] font-semibold", on ? "border-brand bg-brand/10 text-brand" : "border-surface-line bg-surface-1 text-ink-2 active:bg-surface-3")}
+                                        className={cn("h-10 px-3 shrink-0 rounded-pill border text-[12.5px] font-semibold whitespace-nowrap", on ? "border-brand bg-brand/10 text-brand" : "border-surface-line bg-surface-1 text-ink-2 active:bg-surface-3")}
                                     >{text}</button>
                                 );
                             })}
@@ -480,25 +511,15 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                         <p className="text-[12px] font-medium text-ink-4">{t("sim.match.titleHint")}</p>
                     </div>
                 )}
-                {isPublic && (
-                    <div className="space-y-1.5">
-                        <Label htmlFor="sim-match-password">{t("sim.match.passwordLabel")}</Label>
-                        <Input
-                            id="sim-match-password" type="password" autoComplete="off" value={password}
-                            onChange={(e) => setPassword(e.target.value)} placeholder={t("sim.match.passwordPlaceholder")}
-                            aria-invalid={!passwordOk} className="h-12 rounded-xl"
-                        />
-                        {!passwordOk && <p className="text-[12px] font-medium text-ink-2">{t("sim.match.passwordInvalid")}</p>}
-                    </div>
-                )}
             </div>
 
-            {/* 세부 설정 — 규칙 · 이닝 제한. 요약 한 줄이 접힌 상태를 말한다. */}
+            {/* 세부 설정 — 비밀번호(멀티방) · 규칙 · 이닝 제한. 요약 한 줄이 접힌 상태를 말한다. */}
             <div>
-                <button type="button" onClick={() => setAdvancedOpen((o) => !o)} aria-expanded={advancedOpen} className="w-full min-h-11 py-2 flex items-center justify-between gap-3 text-left">
+                <button type="button" onClick={() => setAdvancedOpen((o) => !o)} aria-expanded={advOpen} className="w-full min-h-11 py-2 flex items-center justify-between gap-3 text-left">
                     <span className="min-w-0">
                         <span className="block text-[13px] font-semibold text-ink-2">{t("sim.setup.advanced")}</span>
                         <span className="block text-[12px] font-medium text-ink-4 truncate">
+                            {isPublic && password !== "" ? `${t("sim.rooms.locked")} · ` : ""}
                             {(gameType === "3c"
                                 ? (ruleSet === "umb" ? t("sim.setup.ruleUmb") : t("sim.setup.rulePba"))
                                 : ((threeCushionDouble ? t("sim.setup.opt3cDouble") : "") || t("sim.setup.ruleBasic4c")))}
@@ -506,10 +527,22 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                             {inningCap === 0 ? `${t("sim.setup.inningCap")} ${t("sim.setup.inningNone")}` : t("sim.setup.inningN").replace("{n}", String(inningCap))}
                         </span>
                     </span>
-                    <span className={cn("text-ink-3 shrink-0 transition-transform", advancedOpen ? "rotate-90" : "")}><ChevronRightIcon /></span>
+                    <span className={cn("text-ink-3 shrink-0 transition-transform", advOpen ? "rotate-90" : "")}><ChevronRightIcon /></span>
                 </button>
-                {advancedOpen && (
+                {advOpen && (
                     <div className="space-y-4 pt-1">
+                        {isPublic && (
+                            <div className="space-y-1.5">
+                                <Label htmlFor="sim-match-password">{t("sim.match.passwordLabel")}</Label>
+                                <Input
+                                    id="sim-match-password" type="password" autoComplete="off" value={password}
+                                    onChange={(e) => setPassword(e.target.value)} placeholder={t("sim.match.passwordPlaceholder")}
+                                    aria-invalid={!passwordOk} className="h-12 rounded-xl"
+                                />
+                                {!passwordOk && <p className="text-[12px] font-medium text-ink-2">{t("sim.match.passwordInvalid")}</p>}
+                            </div>
+                        )}
+
                         <div className="space-y-1.5">
                             <Label>{t("sim.setup.rules")}</Label>
                             {gameType === "3c" ? (
@@ -547,13 +580,17 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                 )}
             </div>
 
-            {error && <p className="text-[12px] font-medium text-ink-2">{error}</p>}
-            <Button
-                type="button" onClick={() => { void create(); }} disabled={!targetOk || !passwordOk || creating}
-                className="w-full h-12 bg-brand hover:bg-brand/90 text-brand-fg font-semibold rounded-xl"
-            >
-                {creating ? t("sim.match.creating") : t("sim.match.create")}
-            </Button>
+            {/* 만드는 단추 — 화면 아래에 붙어 있다. 띠는 바탕색으로 꽉 채우고(요약 글자가 밑의 내용과 겹쳐 읽히지 않게), 위쪽 가장자리만 같은 색 그림자로 흐린다. */}
+            <div className="sticky bottom-0 z-[2] -mx-5 px-5 pt-2 pb-3 bg-[var(--surface-0)] shadow-[0_-14px_14px_-2px_var(--surface-0)]" data-testid="lobby-create-bar">
+                {error && <p className="text-[12px] font-medium text-ink-2 mb-2" role="alert">{error}</p>}
+                <p className="text-[12px] font-semibold text-ink-3 truncate mb-2 text-center" data-testid="lobby-summary">{summary}</p>
+                <Button
+                    type="button" onClick={() => { void create(); }} disabled={!targetOk || !passwordOk || creating}
+                    className="w-full h-[52px] bg-brand hover:bg-brand/90 text-brand-fg text-[15px] font-black rounded-pill"
+                >
+                    {creating ? t("sim.match.creating") : t("sim.match.create")}
+                </Button>
+            </div>
         </div>
     );
 }
@@ -700,20 +737,20 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
 
 /* ------------------------------------------------------------------ 로비 */
 
-export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", showTabs = false, pollMs = 2000, initialPublic = false, initialCode, initialRoomId }: MatchLobbyProps) {
+export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", showTabs = false, pollMs = 2000, initialPublic = false, initialCode, initialRoomId, prefsStore }: MatchLobbyProps) {
     const { t } = useT();
     const [tab, setTab] = useState<LobbyTab>(initialTab);
     const title = showTabs ? t("sim.match.title") : tab === "create" ? (initialPublic ? t("sim.entry.roomCreate") : t("sim.entry.create")) : t("sim.entry.join");
 
     return (
-        <div className="flex flex-col gap-4 w-full max-w-[420px] mx-auto px-5 pt-4 pb-6">
-            <div className="flex items-start justify-between gap-3">
+        <div className="rank-hall flex flex-col gap-4 w-full max-w-[420px] mx-auto px-5 pt-4 pb-2">
+            <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                    <h2 className="text-[18px] font-semibold text-ink-1 leading-tight">{title}</h2>
+                    <h2 className="text-[21px] font-black text-ink-1 leading-tight">{title}</h2>
                 </div>
                 <button
                     type="button" onClick={onClose}
-                    className="shrink-0 h-11 px-3 rounded-pill border border-surface-line text-[13px] font-semibold text-ink-2"
+                    className="shrink-0 h-11 px-4 rounded-pill border border-white/25 bg-black/40 text-[13px] font-semibold text-white/90 active:bg-black/60"
                 >
                     {t("sim.common.close")}
                 </button>
@@ -736,7 +773,7 @@ export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, in
             )}
 
             {tab === "create"
-                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} initialPublic={initialPublic} initialRoomId={initialRoomId} />
+                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} initialPublic={initialPublic} initialRoomId={initialRoomId} prefsStore={prefsStore} />
                 : <JoinTab api={api} onStarted={onStarted} onCreated={onCreated} initialCode={initialCode} />}
         </div>
     );

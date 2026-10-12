@@ -2,6 +2,11 @@
  * 멀티방 목록(2026-09-08 오너: "멀티방은 다른 카드로"). GET /sim/rooms — 공개·대기 중·내 방 아님·24시간 이내, 10 s 폴링.
  * 행: 방장 · 종목/테이블 · 다마수 · 리얼리티 칩 · 비밀번호 칩 · 만든 지 n분 · "참가". 참가 → 다이얼로그(내 다마수 · 비밀번호) → POST /sim/matches/:id/join → onOpen(playing).
  * 화면의 초록은 다이얼로그의 "참가" 하나. 목록의 참가 버튼은 테두리 알약.
+ *
+ * 2026-10-12 오너: "지금 디자인 느낌 좋으니 해당 디자인도 변경하고 방 만드는 거 조금 더 쉽게" — 랭킹과 같은 '진열장' 톤(.rank-hall)으로 바꿨다.
+ * 예전의 보라 판 · 노란 알약(.rank-arcade, 2026-09-09)은 이 화면에서 뺐다. 머리에 당구장 불빛과 그림, 줄은 어두운 카드, 누를 것은 연두.
+ * 빈 화면에는 안내만 두지 않고 **방 만들기 단추를 그 자리에** 둔다(방이 없는 것이 보통이다).
+ * 참가 창도 어두운 배색으로(sim-dark sim-table) — 어두운 화면 위에 흰 창이 뜨던 것을 맞췄다.
  */
 import { memo, useEffect, useMemo, useState, useRef} from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -66,6 +71,10 @@ export function defaultJoinTarget(m: Pick<MatchPublic, "gameType" | "hostTarget"
 }
 
 const pill = "h-10 px-3.5 inline-flex items-center rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3 shrink-0";
+/** 누를 것 하나 — 연두(랭킹 화면의 고른 칩과 같은 색) */
+const lime = "bg-[color:var(--hall-lime)] text-[#0B1A03] active:brightness-95";
+/** 머리 그림 — 등급 배지와 같은 화풍(public/sim/rank) */
+export const ROOMS_ART_SRC = "/sim/rank/rooms.webp";
 
 /** ⋯ — sim 화면은 아이콘 묶음을 따로 쓰지 않아 여기 한 개만 그린다 */
 function DotsIcon() {
@@ -79,7 +88,7 @@ function DotsIcon() {
 const Row = memo(function Row({ m, age, onJoin, onReport }: { m: MatchPublic; age: string; onJoin: (m: MatchPublic) => void; onReport?: (m: MatchPublic) => void }) {
     const { t } = useT();
     return (
-        <li className="rounded-tile border border-surface-line bg-surface-1 px-4 py-3 flex items-center gap-3">
+        <li className="hall-row px-4 py-3 flex items-center gap-3">
             <span className="flex-1 min-w-0 flex flex-col gap-1">
                 {/* 방제(2026-10-06): 있으면 방의 얼굴이고 방장 이름은 한 단계 작게, 없으면 예전처럼 방장 이름이 얼굴 */}
                 {m.title && <span className="text-[14.5px] font-bold text-ink-1 leading-snug line-clamp-2 break-words" data-testid="room-title">{m.title}</span>}
@@ -111,7 +120,7 @@ const Row = memo(function Row({ m, age, onJoin, onReport }: { m: MatchPublic; ag
                     className="h-10 w-9 -mx-1.5 shrink-0 inline-flex items-center justify-center rounded-full text-ink-4 active:bg-surface-3"
                 ><DotsIcon /></button>
             )}
-            <button type="button" onClick={() => onJoin(m)} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black" aria-label={`${t("sim.rooms.join")} · ${m.hostName}`}>
+            <button type="button" onClick={() => onJoin(m)} className={cn("h-10 px-4 shrink-0 rounded-pill text-[13px] font-black", lime)} aria-label={`${t("sim.rooms.join")} · ${m.hostName}`}>
                 {t("sim.rooms.join")}
             </button>
         </li>
@@ -126,7 +135,7 @@ const LiveRow = memo(function LiveRow({ c, onWatch }: { c: WatchCard; onWatch: (
     const { t } = useT();
     const guest = c.guestName ?? "-";
     return (
-        <li className="rounded-tile border border-surface-line bg-surface-1 px-4 py-3 flex items-center gap-3">
+        <li className="hall-row px-4 py-3 flex items-center gap-3">
             <span className="flex-1 min-w-0 flex flex-col gap-1">
                 <span className="flex items-center gap-2 min-w-0">
                     <span className="text-[14px] font-semibold text-ink-1 truncate">{c.hostName} <span className="text-ink-3">vs</span> {guest}</span>
@@ -186,7 +195,7 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
     };
     return (
         <Dialog open={room !== null} onOpenChange={(o) => { if (!o) onClose(); }}>
-            <DialogContent className="bg-surface-1 text-ink-1 max-w-md w-[92%] rounded-card p-5">
+            <DialogContent className="sim-dark sim-table bg-[var(--surface-1)] text-ink-1 max-w-md w-[92%] rounded-card p-5">
                 <DialogHeader className="text-left">
                     <DialogTitle className="text-[18px] font-bold text-ink-1">{t("sim.rooms.joinTitle")}</DialogTitle>
                     <DialogDescription className="text-[13px] font-medium text-ink-3">{room ? `${room.hostName} · ${gameLabel(room, t)}` : ""}</DialogDescription>
@@ -283,37 +292,44 @@ export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api 
         autoOpenedRef.current = autoJoinId;
         setTarget(room);
     }, [autoJoinId, rows, q.isSuccess]);
+    // 방도 게임 중인 방도 없다 — 이때는 아래 카드의 큰 '방 만들기' 하나만 둔다(위의 두 단추도 같은 곳으로 가서 같은 단추가 셋이 된다)
+    const nothing = q.isSuccess && rows.length === 0 && live.length === 0;
     return (
-        <div className="rank-arcade w-full max-w-[420px] mx-auto px-5 pt-4 pb-8">
-            <div className="flex items-start justify-between gap-3 mb-3">
-                <div className="min-w-0">
-                    <h1 className="text-[20px] font-black text-white leading-tight">{t("sim.rooms.title")}</h1>
-                    <p className="text-[12.5px] font-medium text-white/60 mt-0.5">{t("sim.rooms.sub")}</p>
-                </div>
-                <button type="button" onClick={onClose} className="h-11 px-4 shrink-0 rounded-pill border border-white/25 text-[13px] font-bold text-white/85">
+        <div className="rank-hall w-full max-w-[420px] mx-auto pb-8">
+            {/* 머리 — 랭킹과 같은 당구장 불빛 아래 */}
+            <header className="hall-top relative px-5 pt-4">
+                <button type="button" onClick={onClose} className="absolute right-5 top-4 h-11 px-4 rounded-pill border border-white/25 bg-black/40 text-[13px] font-semibold text-white/90 active:bg-black/60">
                     {t("sim.common.close")}
                 </button>
-            </div>
-            <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-end gap-1 pt-9">
+                    <img src={ROOMS_ART_SRC} width={96} height={96} alt="" aria-hidden="true" decoding="async" draggable={false} className="hall-trophy shrink-0 -ml-2" style={{ width: 96, height: 96 }} />
+                    <div className="min-w-0 pb-3.5">
+                        <h1 className="text-[23px] font-black text-white leading-tight">{t("sim.rooms.title")}</h1>
+                        <p className="text-[12.5px] font-medium text-white/70 mt-0.5">{t("sim.rooms.sub")}</p>
+                    </div>
+                </div>
+            </header>
+            <div className="px-5">
+            <div className="flex items-center justify-between gap-2 pt-1 mb-3 min-h-10">
                 <span className="rk-num text-[13px] font-bold text-white/85">
                     {t("sim.entry.roomsOpen")} {rows.length}
                     {live.length > 0 && <span className="text-brand"> · {t("sim.watch.badge")} {live.length}</span>}
                 </span>
-                <span className="flex gap-2 shrink-0">
+                {!nothing && <span className="flex gap-2 shrink-0">
                     {/* 빠른 대전: 바로 칠 수 있는 방의 참가 창을 연다(확인 한 번). 없으면 방 만들기로 */}
                     <button
                         type="button" disabled={!q.isSuccess}
                         onClick={() => { const r = pickQuickRoom(rows); if (r) setTarget(r); else onCreate(); }}
-                        className="h-10 px-4 shrink-0 rounded-pill border border-white/30 text-white text-[13px] font-black disabled:opacity-50"
+                        className="h-10 px-4 shrink-0 rounded-pill border border-white/25 bg-white/[0.06] text-white text-[13px] font-black active:bg-white/15 disabled:opacity-50"
                     >
                         {t("sim.rooms.quick")}
                     </button>
-                    <button type="button" onClick={onCreate} className="h-10 px-4 shrink-0 rounded-pill bg-[color:var(--arc-frame)] text-[color:var(--arc-ink)] text-[13px] font-black">{t("sim.entry.roomCreate")}</button>
-                </span>
+                    <button type="button" onClick={onCreate} className={cn("h-10 px-4 shrink-0 rounded-pill text-[13px] font-black", lime)}>{t("sim.entry.roomCreate")}</button>
+                </span>}
             </div>
             {/* 내가 연 방 — 참가 목록에는 안 들어간다(내 방엔 내가 못 들어간다). 들어가기·닫기만 준다. */}
             {mine && onEnterMine && (
-                <div className="mb-3 rounded-tile border border-surface-line bg-surface-1">
+                <div className="hall-row mb-3">
                     <MyRoomRow room={mine} onEnter={onEnterMine} api={api} />
                 </div>
             )}
@@ -324,29 +340,26 @@ export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api 
                     <button type="button" onClick={() => { void q.refetch(); }} className={pill}>{t("sim.match.retry")}</button>
                 </div>
             )}
-            {q.isSuccess && rows.length === 0 && live.length === 0 && (
-                <div className="arc-board rounded-[22px] p-5">
-                    <p className="text-[16px] font-black text-white">{t("sim.rooms.empty")}</p>
+            {nothing && (
+                // 방이 없는 것이 보통이다 — 안내에서 끝내지 않고 여는 단추를 그 자리에 둔다
+                <div className="hall-me rounded-[22px] px-5 py-5" data-testid="rooms-empty">
+                    <p className="text-[17px] font-black text-white">{t("sim.rooms.empty")}</p>
                     <p className="text-[13px] font-medium text-white/70 mt-1">{t("sim.rooms.emptyDesc")}</p>
+                    <button type="button" onClick={onCreate} data-testid="rooms-empty-create" className={cn("mt-4 w-full h-12 rounded-pill text-[14.5px] font-black", lime)}>
+                        {t("sim.entry.roomCreate")}
+                    </button>
                 </div>
             )}
             {(rows.length > 0 || live.length > 0) && (
-                <div>
-                    {/* 판과 리본만 아케이드로 — 방 줄은 정보가 많아 담백하게 둔다(2026-09-09 오너: "멀티방은 절반만") */}
-                    <div className="relative flex justify-center">
-                        <span className="arc-ribbon relative z-[1] inline-flex items-center h-9 px-5 rounded-lg text-white text-[14px] font-black">
-                            {t("sim.rooms.title")}
-                        </span>
-                    </div>
-                    <ul
-                        className={cn("arc-board rounded-[26px] -mt-4 pt-7 px-3 pb-3 space-y-2", q.isFetching && !q.isPending && "opacity-80")}
-                        aria-label={t("sim.rooms.title")}
-                    >
-                        {rows.map((m) => <Row key={m.id} m={m} age={roomAge(m.createdAt, nowMs, t)} onJoin={setTarget} onReport={setReported} />)}
-                        {onWatch && live.map((c) => <LiveRow key={c.id} c={c} onWatch={onWatch} />)}
-                    </ul>
-                </div>
+                <ul
+                    className={cn("space-y-2", q.isFetching && !q.isPending && "opacity-80")}
+                    aria-label={t("sim.rooms.title")}
+                >
+                    {rows.map((m) => <Row key={m.id} m={m} age={roomAge(m.createdAt, nowMs, t)} onJoin={setTarget} onReport={setReported} />)}
+                    {onWatch && live.map((c) => <LiveRow key={c.id} c={c} onWatch={onWatch} />)}
+                </ul>
             )}
+            </div>
             <JoinDialog room={target} api={api} myHandi={myHandi} onClose={() => setTarget(null)} onOpen={(m) => { setTarget(null); onOpen(m); }} />
             {reported?.hostId && (
                 <ReportDialog

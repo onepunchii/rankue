@@ -146,6 +146,8 @@ const byText = (h: Harness, text: string) => buttons(h).find((b) => b.textConten
  * 매크로태스크를 **여러 번** 비운다. 한 틱만 기다리면 147개 파일이 병렬로 도는 부하에서
  * react-query 응답이 늦어 "내 다마수"가 아직 — 인 채로 단언에 걸렸다(단독 실행은 늘 통과). 2026-09-24.
  */
+/** '세부 설정' 접는 단추 */
+const advancedToggle = (h: Harness) => buttons(h).find((b) => b.textContent?.startsWith(ko["sim.setup.advanced"]))!;
 const flush = (ticks = 4) => React.act(async () => { for (let i = 0; i < ticks; i++) await new Promise((r) => setTimeout(r, 0)); });
 const wait = (ms: number) => React.act(async () => { await new Promise((r) => setTimeout(r, ms)); });
 function type(input: HTMLInputElement, value: string) {
@@ -337,9 +339,16 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
         const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000 }));
         expect(h.container.querySelector("#sim-match-password")).toBeNull();
         click(h.container.querySelector("#sim-match-public")!);
+        // 2026-10-12: 비밀번호는 세부 설정 안(접힘) — 멀티방을 켜도 바로 보이지 않고, 펼쳐야 나온다
+        expect(h.container.querySelector("#sim-match-password")).toBeNull();
+        click(advancedToggle(h));
         const pw = h.container.querySelector("#sim-match-password") as HTMLInputElement;
         expect(pw).not.toBeNull();
         type(pw, "12");
+        // 비밀번호가 틀린 동안에는 접어도 펼쳐져 있다 — 만들기 단추가 왜 잠겼는지 보여야 한다
+        click(advancedToggle(h));
+        expect(h.container.querySelector("#sim-match-password")).not.toBeNull();
+        expect(advancedToggle(h).getAttribute("aria-expanded")).toBe("true");
         expect(h.container.textContent).toContain(ko["sim.match.passwordInvalid"]);
         expect((byText(h, ko["sim.match.create"]) as HTMLButtonElement).disabled).toBe(true);
         type(pw, "1234");
@@ -415,7 +424,17 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
         await flush();
         expect((api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0][1]).toEqual({ isPublic: false, handicap: true, password: undefined });
         const h2 = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api: fakeApi(), pollMs: 1000, initialPublic: true }));
+        // 켜진 채 시작 — 방제 칸이 바로 보이고(멀티방에서만 받는다), 비밀번호는 세부 설정을 펼치면 나온다
+        expect(h2.container.querySelector("#sim-match-public")!.getAttribute("aria-checked")).toBe("true");
+        expect(h2.container.querySelector("#sim-match-title")).not.toBeNull();
+        expect(h2.container.querySelector("#sim-match-password")).toBeNull();
+        click(advancedToggle(h2));
         expect(h2.container.querySelector("#sim-match-password")).not.toBeNull();
+        // 비공개 방은 세부 설정을 펼쳐도 비밀번호 칸이 없다
+        const h3 = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api: fakeApi(), pollMs: 1000 }));
+        click(advancedToggle(h3));
+        expect(advancedToggle(h3).getAttribute("aria-expanded")).toBe("true");
+        expect(h3.container.querySelector("#sim-match-password")).toBeNull();
     });
 
     it("코드가 채워진 참가 화면(initialCode): 비밀번호 방이면 비밀번호를 넣어야 참가 → joinMatch(code, 다마수, 비밀번호)", async () => {
@@ -456,5 +475,105 @@ describe("MatchLobby · 방 열쇠로 바로 열기(2026-09-23 '온라인 대전
         await flush();
         expect(h.container.querySelector("[data-testid=lobby-waiting]")).toBeNull();
         expect(h.container.textContent).toContain(ko["sim.match.create"]);
+    });
+});
+
+
+/**
+ * 방 만들기를 쉽게(2026-10-12 오너: "방 만드는 거 조금 더 쉽게") — 지난번 설정 기억 · 아래에 붙은 만들기 단추 · 한 줄 요약.
+ */
+describe("MatchLobby · 방 만들기를 쉽게(2026-10-12)", () => {
+    const store = (first: Record<string, unknown> = {}) => {
+        const box = { saved: null as Record<string, unknown> | null };
+        return { box, prefsStore: { load: () => first, save: (p: Record<string, unknown>) => { box.saved = p; } } };
+    };
+
+    it("만들면 설정을 적어 둔다 — 방제 · 비밀번호 · 공개 여부는 적지 않는다", async () => {
+        const api = fakeApi({ createMatch: vi.fn(async () => match({ isPublic: true })) });
+        const { box, prefsStore } = store();
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000, initialPublic: true, prefsStore } as never));
+        expect(box.saved).toBeNull();                       // 열기만 해서는 적지 않는다
+        click(byText(h, ko["sim.setup.type4c"])!);
+        type(h.container.querySelector("#sim-match-title") as HTMLInputElement, "초보 환영");
+        click(byText(h, ko["sim.match.create"])!);
+        await flush();
+        expect(box.saved).toEqual({ gameType: "4c", tableId: "JUNGDAE_KR", handicap: true, target: 80, mode: "normal", ruleSet: "umb", threeCushionDouble: false, inningCap: 0 });
+    });
+
+    it("만들기에 실패하면 적지 않는다", async () => {
+        const api = fakeApi({ createMatch: vi.fn(async () => { throw new Error("x"); }) });
+        const { box, prefsStore } = store();
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000, prefsStore } as never));
+        click(byText(h, ko["sim.match.create"])!);
+        await flush();
+        expect(box.saved).toBeNull();
+    });
+
+    it("다음에 열면 지난번 설정 그대로 — 고르지 않고 만들기 한 번", async () => {
+        const api = fakeApi();
+        const { prefsStore } = store({ gameType: "4c", tableId: "DAEDAE", handicap: false, target: 120, mode: "reality", inningCap: 30, threeCushionDouble: true });
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api, pollMs: 1000, prefsStore } as never));
+        await flush();
+        expect((h.container.querySelector("#sim-match-target") as HTMLInputElement).value).toBe("120");   // 친선전 + 그때의 다마수
+        expect(byText(h, ko["sim.setup.modeReality"])!.getAttribute("aria-pressed")).toBe("true");
+        click(byText(h, ko["sim.match.create"])!);
+        await flush();
+        const [cfg, opt] = (api.createMatch as ReturnType<typeof vi.fn>).mock.calls[0];
+        expect(cfg).toMatchObject({ gameType: "4c", tableId: "DAEDAE", target: 120, inningCap: 30 });
+        expect(cfg.rules).toMatchObject({ threeCushionDouble: true });
+        expect(opt).toMatchObject({ isPublic: false, handicap: false });
+    });
+
+    it("저장된 것이 없으면 예전 기본값 — 3쿠션 · 대대 · 핸디전 · 일반", () => {
+        const { prefsStore } = store();
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api: fakeApi(), prefsStore } as never));
+        expect(byText(h, ko["sim.setup.modeNormal"])!.getAttribute("aria-pressed")).toBe("true");
+        expect(h.container.querySelector("#sim-match-handicap")!.getAttribute("aria-checked")).toBe("true");
+        expect(h.container.querySelector("[data-testid=lobby-summary]")!.textContent)
+            .toBe([ko["sim.setup.type3c"], ko["sim.setup.tableDaedae"], ko["sim.match.handicapOn"], ko["sim.setup.modeNormal"], ko["sim.rooms.minePrivate"]].join(" · "));
+    });
+
+    it("만들기 단추는 폼 맨 아래 붙는 띠 안에 있고, 그 위 한 줄이 지금 고른 것을 따라 바뀐다", () => {
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api: fakeApi(), initialPublic: true, prefsStore: store().prefsStore } as never));
+        const bar = h.container.querySelector("[data-testid=lobby-create-bar]")!;
+        expect(bar.className).toContain("sticky");
+        expect(bar.className).toContain("bottom-0");
+        expect(Array.from(bar.querySelectorAll("button")).map((b) => b.textContent)).toEqual([ko["sim.match.create"]]);
+        const summary = () => h.container.querySelector("[data-testid=lobby-summary]")!.textContent!;
+        expect(summary()).toContain(ko["sim.entry.rooms"]);                 // 멀티방으로 열린다
+        click(byText(h, ko["sim.setup.type4c"])!);
+        expect(summary()).toContain(ko["sim.setup.type4c"]);
+        expect(summary()).toContain(ko["sim.setup.tableJungdae"]);
+        click(h.container.querySelector("#sim-match-handicap")!);           // 친선전으로 — 다마수가 요약에 붙는다
+        expect(summary()).toContain(`${ko["sim.match.friendly"]} 80`);
+        click(h.container.querySelector("#sim-match-public")!);
+        expect(summary()).toContain(ko["sim.rooms.minePrivate"]);
+    });
+
+    it("배색 — 로비는 진열장(.rank-hall), 싱글 연습 설정 창도 어두운 배색(sim-dark sim-table)", async () => {
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api: fakeApi(), prefsStore: store().prefsStore } as never));
+        expect((h.container.firstElementChild as HTMLElement).className).toContain("rank-hall");
+        const fs = await import("node:fs");
+        const path = await import("node:path");
+        const setup = fs.readFileSync(path.resolve(__dirname, "../SimSetupDialog.tsx"), "utf8");
+        expect(setup).toContain('<DialogContent className="sim-dark sim-table bg-[var(--surface-1)] text-ink-1 ');
+        // 다섯 언어에 짧은 핸디전 설명이 있다
+        for (const l of ["ko", "en", "vi", "tr", "es"]) {
+            expect(fs.readFileSync(path.resolve(__dirname, `../../lib/i18n/${l}.ts`), "utf8"), l).toContain('"sim.match.handicapShort":');
+        }
+    });
+
+    it("핸디전 칸 하나에 내 다마수까지 — 끄면 그 줄이 사라지고 다마수 입력이 나온다", async () => {
+        const h = mountEl(React.createElement(MatchLobby, { onStarted: () => undefined, onClose: () => undefined, api: fakeApi(), prefsStore: store().prefsStore } as never));
+        await flush();
+        const mine = h.container.querySelector("[data-testid=lobby-my-handicap]")!;
+        expect(mine.textContent).toContain(ko["sim.match.myHandicap"]);
+        expect(mine.textContent).toContain("7");
+        expect(mine.textContent).toContain("0.400");
+        // 스위치와 같은 칸(상자를 따로 두지 않는다)
+        expect(mine.parentElement!.querySelector("#sim-match-handicap")).not.toBeNull();
+        click(h.container.querySelector("#sim-match-handicap")!);
+        expect(h.container.querySelector("[data-testid=lobby-my-handicap]")).toBeNull();
+        expect(h.container.querySelector("#sim-match-target")).not.toBeNull();
     });
 });
