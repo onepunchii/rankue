@@ -12,6 +12,7 @@ import { stampNameSize, stampSeed } from "./InkStamp";
 import { stampDate } from "./stampDate";
 import { stampMoment } from "./stampMoment";
 import { STAMP_LABEL_MAX, stampLabel } from "./stampLabel";
+import { regionBookId } from "./regionBook";
 import { bookStates } from "@shared/golfStampBooks";
 
 const ROOT = resolve(__dirname, "../../../..");
@@ -24,6 +25,7 @@ const SCREENS = [
     "client/src/golf/pages/StampBooks.tsx", "client/src/golf/pages/StampBook.tsx", "client/src/golf/pages/GolfShelf.tsx",
     "client/src/golf/components/passport/StampBooksBanner.tsx", "client/src/golf/stamps/StampResultCard.tsx",
     "client/src/golf/stamps/CourseStampBlock.tsx", "client/src/golf/stamps/HomeTileArt.tsx", "client/src/golf/components/passport/StampList.tsx",
+    "client/src/golf/stamps/StampHelp.tsx",
 ];
 
 describe("그림", () => {
@@ -89,20 +91,60 @@ describe("잉크 도장", () => {
     });
 });
 
-describe("예시(처음 오는 사람)", () => {
+describe("예시와 내 도장첩", () => {
     const hook = code(read("client/src/golf/stamps/useStampCollection.ts"));
 
     it("방문자는 내 도장을 부르지 않는다(401 만 돌아온다) — 예시만 그린다", () => {
         expect(hook).toContain("enabled: !!member,");
-        expect(hook).toContain("const sample = isGuest || (empty && (choice ?? true));");
+        expect(hook).toContain("sample: isGuest, isGuest,");
     });
 
-    it("도장이 아직 없는 회원은 예시부터 보고 '내 도장첩'으로 바꿀 수 있다. 도장이 있으면 예시가 없다", () => {
-        expect(hook).toContain("const empty = !!member && !loading && mine.summary.stamped === 0;");
-        expect(hook).toContain("canSwitch: empty,");
+    it("회원은 늘 내 도장첩이다(비어 있어도) — 예시로 바꾸는 전환은 없다(2026-10-12 오너: \"내 도장첩이 우선이 되게, 예시 토글이 아니라 그냥 ? 버튼\")", () => {
+        expect(hook).toContain("states: isGuest ? (full ? FULL_SAMPLE_STATES : SAMPLE_STATES) : mine.states,");
+        expect(hook).not.toMatch(/canSwitch|showSample|useState/);
         const parts = code(read("client/src/golf/stamps/StampParts.tsx"));
-        expect(parts).toContain('data-testid={on ? "stamp-view-sample" : "stamp-view-mine"}');
-        expect(parts).toContain("if (!col.canSwitch) return null;");
+        expect(parts).not.toMatch(/stamp-view-sample|stamp-view-mine|role="tab"/);
+        expect(parts).toContain("if (!col.isGuest) return null;");
+    });
+
+    it("'?' 단추가 안내 시트를 연다 — 책장 · 한 권 · 장식장의 머리줄에 다 있다", () => {
+        for (const p of ["client/src/golf/pages/StampBooks.tsx", "client/src/golf/pages/StampBook.tsx", "client/src/golf/pages/GolfShelf.tsx"]) {
+            const s = code(read(p));
+            expect(s, p).toContain("right={<StampHelpButton onClick={() => setHelp(true)} />}");
+            expect(s, p).toContain("<StampHelpSheet open={help} onOpenChange={setHelp} />");
+        }
+        const help = code(read("client/src/golf/stamps/StampHelp.tsx"));
+        expect(help).toContain('aria-label="도장깨기 안내"');
+        // 기기의 '뒤로'가 시트부터 닫는다
+        expect(help).toContain("useBackToClose(open, () => onOpenChange(false));");
+        // 시트의 기본 닫기 단추(테마 색)는 숨기고 보이는 닫기 단추를 따로 둔다
+        expect(help).toContain("[&>button]:hidden");
+        expect(help).toContain('data-testid="stamp-help-close"');
+    });
+
+    it("안내 시트: 세 단계 + 다 채운 한 권 + 다 모은 장식장 — 예시에는 \"예시\" 표시", () => {
+        const help = code(read("client/src/golf/stamps/StampHelp.tsx"));
+        expect(help).toContain("<StampGuide />");
+        expect(help).toContain('{head("다 채운 도장첩 한 권", true)}');
+        expect(help).toContain('{head("다 모은 장식장", true)}');
+        expect(help).toContain("{sample && <SampleBadge tone=\"dark\" />}");
+        expect(help).toContain("<MarkerCase states={FULL_SAMPLE_STATES} summary={FULL_SAMPLE_SUMMARY} />");
+        expect(help).toContain("<TrophyShelf stamped={FULL_SAMPLE_SUMMARY.stamped} />");
+    });
+
+    it("도장이 아직 없는 회원에게는 맨 위에 안내로 가는 한 줄 — 내 도장첩(빈 칸)은 그대로 보인다", () => {
+        const s = code(read("client/src/golf/pages/StampBooks.tsx"));
+        expect(s).toContain("const fresh = !col.isGuest && !col.isLoading && summary.stamped === 0;");
+        expect(s).toContain('data-testid="stamp-first-hint"');
+    });
+
+    it("장식장의 예시는 다 모았을 때의 모습이다(2026-10-12 오너: \"볼마커 장식장 예시는 다 획득했다라는 예시가 좋을 거 같은데\") — 방문자에게만", () => {
+        const shelf = code(read("client/src/golf/pages/GolfShelf.tsx"));
+        expect(shelf).toContain('const col = useStampCollection({ guest: "full" });');
+        expect(shelf).toContain("다 모았을 때의 장식장을 예시로 보여 드려요.");
+        // 책장 · 한 권은 예시 인물의 진행 중인 모습 그대로
+        expect(code(read("client/src/golf/pages/StampBooks.tsx"))).toContain("const col = useStampCollection();");
+        expect(code(read("client/src/golf/pages/StampBook.tsx"))).toContain("const col = useStampCollection();");
     });
 
     it("예시를 그리는 구역에는 \"예시\" 표시가 붙는다 — 책장 · 한 권 · 장식장의 숫자 구역 전부", () => {
@@ -118,7 +160,7 @@ describe("예시(처음 오는 사람)", () => {
         // 방문자에게는 맨 위에 한 줄 + 그림 아래에 가입으로 가는 길
         for (const p of ["client/src/golf/pages/StampBooks.tsx", "client/src/golf/pages/StampBook.tsx", "client/src/golf/pages/GolfShelf.tsx"]) {
             const s = code(read(p));
-            expect(s, p).toContain("<SampleNotice col={col} />");
+            expect(s, p).toContain("<SampleNotice col={col}");
             expect(s, p).toContain("<SampleJoin col={col} from=");
         }
     });
@@ -128,10 +170,10 @@ describe("예시(처음 오는 사람)", () => {
         expect(s).toContain('{sample && (\n                        <StampSection title="한 권을 다 채우면 받는 볼마커"');
     });
 
-    it("홈의 카드는 회원에게 예시 숫자를 보이지 않는다 — 도장이 없으면 0 그대로, 방문자에게만 \"예시\"", () => {
+    it("홈의 카드: 회원에게는 늘 내 숫자(도장이 없으면 0), 방문자에게만 \"예시\"", () => {
         const s = code(read("client/src/golf/stamps/StampHomeEntry.tsx"));
         expect(s).toContain("const guestSample = col.isGuest;");
-        expect(s).toContain("const stamped = guestSample || !col.canSwitch ? col.summary.stamped : 0;");
+        expect(s).toContain("const stamped = summary.stamped;");
         expect(s).toContain('{guestSample && <SampleBadge tone="dark" />}');
     });
 });
@@ -190,8 +232,9 @@ describe("우리가 만든 그림이 들어가는 곳(2026-10-12 오너: \"랭�
         expect([...art.matchAll(/<InkStamp name="([^"]+)"/g)].map((m) => m[1])).toEqual(["골프 여권", "도장깨기"]);
     });
 
-    it("도장깨기 가이드의 세 단계에 그림이 붙는다 — 표지 · 종이에 찍힌 도장 · 볼마커", () => {
-        const s = code(read("client/src/golf/pages/StampBooks.tsx"));
+    it("도장깨기 가이드의 세 단계에 그림이 붙는다 — 표지 · 종이에 찍힌 도장 · 볼마커. 책장 화면과 '?' 시트가 같은 조각을 쓴다", () => {
+        expect(code(read("client/src/golf/pages/StampBooks.tsx"))).toContain("<StampGuide />");
+        const s = code(read("client/src/golf/stamps/StampHelp.tsx"));
         const guide = s.slice(s.indexOf('data-testid="stamp-guide"'), s.indexOf("</ol>", s.indexOf('data-testid="stamp-guide"')));
         expect(guide).toContain("coverSrc(GUIDE_BOOK)");
         expect(guide).toContain('<InkStamp name="도장깨기"');
@@ -199,14 +242,30 @@ describe("우리가 만든 그림이 들어가는 곳(2026-10-12 오너: \"랭�
         expect(guide.match(/<li /g)?.length).toBe(3);
     });
 
-    it("골프장 공개 페이지: 도장첩의 골프장이면 그 권의 표지와 내 도장을 보여 준다. 방문자는 내 것을 부르지 않는다", () => {
+    it("골프장 공개 페이지: 모든 골프장에 그 권역의 표지 · 도장 · 볼마커(2026-10-12 오너: \"골프장 상세에도 해당 지역에 이미지와 도장 볼마커 등등\"). 방문자는 내 것을 부르지 않는다", () => {
         const page = code(read("client/src/golf/pages/GolfCoursePage.tsx"));
-        expect(page).toContain("<CourseStampBlock key={`stamp:${d.slug}`} courseIds={d.courseIds}");
+        expect(page).toContain("<CourseStampBlock key={`stamp:${d.slug}`} courseIds={d.courseIds} name={d.name} region={d.region} city={d.city}");
         const block = code(read("client/src/golf/stamps/CourseStampBlock.tsx"));
         expect(block).toContain("slotForCourseIds(courseIds)");
-        expect(block).toContain("enabled: !!member && !!at,");
-        expect(block).toContain("if (!at) return null;");
-        expect(block).toContain("coverSrc(book.id)");
+        expect(block).toContain("enabled: !!member,");
+        // 도장첩의 골프장은 그 권으로, 그 밖은 먹색 깃대 도장(골프 여권)
+        expect(block).toContain("const art = (at && BOOK_ART[at.book.id]) || PLAIN_STAMP;");
+        expect(block).toContain("<MarkerArt bookId={book.id} size={60} earned={member ? done : true}");
+        // 그 밖의 골프장에서 내 도장을 못 찾았다고 빈 칸으로 그리지 않는다(이름이 달라 못 찾은 것일 수 있다) — 받는 도장의 모습으로 옅게
+        expect(block).toContain('const state = stamp ? "on" : record ? "faded" : at && member ? "empty" : "on";');
+        expect(block).toContain("const preview = !stamp && !record && state === \"on\";");
+    });
+
+    it("골프장의 권역 → 그 권역의 도장첩(인천 · 안산은 서해)", () => {
+        expect(regionBookId("강원", "춘천시")).toBe("gangwon");
+        expect(regionBookId("경기", "파주시")).toBe("gyeonggi");
+        expect(regionBookId("경기", "인천시 중구")).toBe("seohae");
+        expect(regionBookId("경기", "안산시")).toBe("seohae");
+        expect([regionBookId("충청", null), regionBookId("전라", ""), regionBookId("경상", "경주시"), regionBookId("제주", "서귀포시")]).toEqual(["chungcheong", "honam", "yeongnam", "jeju"]);
+        expect(regionBookId("", null)).toBeNull();
+        expect(regionBookId(undefined, undefined)).toBeNull();
+        // 돌려주는 값은 다 있는 권이다
+        for (const r of ["경기", "강원", "충청", "전라", "경상", "제주"]) expect(STAMP_BOOKS.some((b) => b.id === regionBookId(r, "")), r).toBe(true);
     });
 
     it("여권의 도장도 종이 위 잉크 도장 — 도장첩의 골프장은 그 권의 색 · 칸 이름, 밖의 골프장은 먹색 깃대 도장", () => {

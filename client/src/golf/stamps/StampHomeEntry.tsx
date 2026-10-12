@@ -3,7 +3,7 @@
  *
  * 도장첩 일곱 권의 표지를 한 줄로 보여 주고(표지는 자료가 아니라 목록이라 누구에게나 같은 그림이다), 그 아래에 한 줄:
  *   방문자            예시 인물의 진행("예시" 표시) — 홈의 다른 예시 카드와 같은 사람(shared/golfStampSample)
- *   도장 없는 회원     0 / 56 그대로 + 첫 도장을 찍는 법. 가짜 숫자를 내 것처럼 보여 주지 않는다(예시는 도장첩 화면 안에서)
+ *   도장 없는 회원     0 / 56 그대로 + 첫 도장을 찍는 법. 가짜 숫자를 내 것처럼 보여 주지 않는다(예시는 도장첩 화면의 '?' 가 연다)
  *   도장 있는 회원     내 진행 + 지금 가장 가까운 권
  * 카드 전체가 /golf/stamps 로 가는 링크다.
  *
@@ -18,16 +18,16 @@ import { useStampCollection } from "./useStampCollection";
 
 export function StampHomeEntry() {
     const col = useStampCollection();
-    // 홈에서는 회원에게 예시 숫자를 보이지 않는다 — 도장이 없으면 0 그대로(예시 전환은 도장첩 화면에 있다)
+    // 회원에게는 늘 내 숫자다(도장이 없으면 0 그대로). 방문자에게만 예시 인물의 진행을 "예시" 표시와 함께 보여 준다
     const guestSample = col.isGuest;
     const open = col.states.filter((s) => s.book.kind === "open");
-    const stamped = guestSample || !col.canSwitch ? col.summary.stamped : 0;
-    const summary = guestSample || !col.canSwitch ? col.summary : null;
-    const lastDone = summary?.doneBooks.length ? summary.doneBooks[summary.doneBooks.length - 1] : null;
+    const summary = col.summary;
+    const stamped = summary.stamped;
+    const lastDone = summary.doneBooks.length ? summary.doneBooks[summary.doneBooks.length - 1] : null;
 
     let line: string;
     if (col.isLoading) line = "도장첩을 불러오는 중이에요";
-    else if (!summary || summary.stamped === 0) line = "골프장에서 18홀을 끝내면 첫 도장이 찍혀요";
+    else if (summary.stamped === 0) line = "골프장에서 18홀을 끝내면 첫 도장이 찍혀요";
     else if (summary.nearest) line = `${bookName(summary.nearest.bookId)} 도장첩, ${summary.nearest.left}곳 남았어요`;
     else if (summary.nextTrophy) line = `다음 트로피까지 ${summary.nextTrophy.left}곳`;
     else line = "엘리트 골프장을 전부 찍었어요";
@@ -56,7 +56,7 @@ export function StampHomeEntry() {
             {/* 누구나 도장첩 일곱 권 — 다 채운 권은 금테, 시작 안 한 권도 표지는 그대로 보인다 */}
             <div className="mt-4 grid grid-cols-7 gap-1.5" aria-hidden>
                 {open.map((s) => {
-                    const done = !!summary && s.done;
+                    const done = s.done;
                     return (
                         <div key={s.book.id} className="relative aspect-[3/4] overflow-hidden rounded-[6px] bg-[#1F1F1F]" style={done ? { boxShadow: `0 0 0 1.5px ${GOLD}` } : undefined}>
                             <img src={coverSrc(s.book.id)} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" draggable={false} />

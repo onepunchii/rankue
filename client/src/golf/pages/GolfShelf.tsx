@@ -5,31 +5,37 @@
  * 못 받은 것도 윤곽이 보인다 — 무엇이 남았는지 알아야 모으고 싶어진다.
  * 당구의 장식장(온라인게임의 메달 · 등급 배지)과는 다른 물건이다 — 당구 배지를 여기에 섞지 않는다.
  *
- * 로그인 없이 열린다(예시 장식장). ⚠️ 리터럴 색만(StampParts 머리말).
+ * 로그인 없이 열린다. 방문자에게는 **다 모았을 때의 장식장**을 예시로 보여 준다(2026-10-12 오너: "볼마커 장식장 예시는 다 획득했다라는
+ * 예시가 좋을 거 같은데") — 볼마커 열 개 · 트로피 다섯 개가 다 놓인 모습. 회원은 늘 내 장식장이고, 그 예시는 '?' 단추가 연다(StampHelp).
+ * ⚠️ 리터럴 색만(StampParts 머리말).
  */
+import { useState } from "react";
 import { Link } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
 import { STAMP_BOOKS, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
 import { CourseShell } from "@/golf/components/course/CourseShell";
 import { Skel } from "@/golf/components/course/detail/ui";
+import { StampHelpButton, StampHelpSheet } from "@/golf/stamps/StampHelp";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
 import { MarkerCase, SHELF_PATH, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampSection, TrophyShelf, bookName, bookPath } from "@/golf/stamps/StampParts";
 
 export default function GolfShelf() {
-    const col = useStampCollection();
+    const col = useStampCollection({ guest: "full" });
     const { states, summary, sample } = col;
+    const [help, setHelp] = useState(false);
     const lastStep = STAMP_TROPHY_STEPS[STAMP_TROPHY_STEPS.length - 1];
     // 볼마커는 권마다 하나 + 누구나 일곱 권 전부
     const markerTotal = STAMP_BOOKS.length + 1;
 
     return (
-        <CourseShell title="골프 장식장" backTo={STAMPS_PATH} hideBottomCta>
+        <CourseShell title="골프 장식장" backTo={STAMPS_PATH} hideBottomCta right={<StampHelpButton onClick={() => setHelp(true)} />}>
+            <StampHelpSheet open={help} onOpenChange={setHelp} />
             {col.isLoading ? (
                 <div className="px-5 pt-6 space-y-4" aria-busy="true"><Skel className="h-16" /><Skel className="h-56" /><Skel className="h-40" /></div>
             ) : (
                 <div className="pb-10" data-testid="golf-shelf" data-sample={sample ? "1" : "0"}>
                     <div className="px-5 pt-5">
-                        <SampleNotice col={col} />
+                        <SampleNotice col={col} text="다 모았을 때의 장식장을 예시로 보여 드려요. 도장첩 한 권을 다 채울 때마다 볼마커가 하나씩 놓여요." />
                     </div>
 
                     <div className="px-5 pt-4">

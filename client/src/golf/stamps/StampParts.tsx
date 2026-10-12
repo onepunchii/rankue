@@ -190,40 +190,16 @@ export function TrophyShelf({ stamped }: { stamped: number }) {
 }
 
 /**
- * 예시 안내 — 예시 도장첩을 그리는 화면의 맨 위에 둔다.
- * 방문자에게는 한 줄(가입으로 가는 길은 그림 아래의 SampleJoin), 도장이 아직 없는 회원에게는 '예시 | 내 도장첩' 전환.
+ * 예시 안내 — 방문자에게 예시를 그리는 화면의 맨 위에 한 줄(가입으로 가는 길은 그림 아래의 SampleJoin).
+ * 회원에게는 아무것도 그리지 않는다 — 회원의 화면은 늘 내 도장첩이고, 예시는 '?' 단추가 연다(StampHelp).
  */
-export function SampleNotice({ col }: { col: StampCollection }) {
-    if (col.isGuest) {
-        return (
-            <p className="flex items-start gap-2 text-[13.5px] leading-snug text-[#FFFFFFB3] break-keep" data-testid="stamp-sample-notice">
-                <SampleBadge tone="dark" className="mt-px" />
-                <span>한 사람의 도장첩을 예시로 보여 드려요. 골프장에서 18홀을 끝내면 내 도장이 찍혀요.</span>
-            </p>
-        );
-    }
-    if (!col.canSwitch) return null;
+export function SampleNotice({ col, text = "한 사람의 도장첩을 예시로 보여 드려요. 골프장에서 18홀을 끝내면 내 도장이 찍혀요." }: { col: StampCollection; text?: string }) {
+    if (!col.isGuest) return null;
     return (
-        <div className="rounded-2xl bg-[#FFFFFF0F] border border-[#FFFFFF1F] px-3.5 py-3" data-testid="stamp-sample-notice">
-            <div className="flex items-center gap-2.5">
-                <div className="flex h-9 flex-1 rounded-full bg-[#00000059] p-0.5" role="tablist" aria-label="도장첩 보기">
-                    {([[true, "예시"], [false, "내 도장첩"]] as const).map(([on, label]) => (
-                        <button
-                            key={label} type="button" role="tab" aria-selected={col.sample === on} onClick={() => col.showSample(on)}
-                            data-testid={on ? "stamp-view-sample" : "stamp-view-mine"}
-                            className={cn("flex-1 rounded-full text-[13px] font-semibold transition-colors", col.sample === on ? "bg-[#FFFFFF] text-[#0A0A0A]" : "text-[#FFFFFFB3]")}
-                        >
-                            {label}
-                        </button>
-                    ))}
-                </div>
-            </div>
-            <p className="mt-2.5 text-[13px] leading-snug text-[#FFFFFFB3] break-keep">
-                {col.sample
-                    ? "아직 도장이 없어서 예시를 먼저 보여 드려요. 골프장에서 18홀을 끝내면 내 도장첩이 시작돼요."
-                    : "내 도장첩은 아직 비어 있어요. 랭큐매치로 라운드를 적고 골프장에서 끝내면 첫 도장이 찍혀요."}
-            </p>
-        </div>
+        <p className="flex items-start gap-2 text-[13.5px] leading-snug text-[#FFFFFFB3] break-keep" data-testid="stamp-sample-notice">
+            <SampleBadge tone="dark" className="mt-px" />
+            <span>{text}</span>
+        </p>
     );
 }
 

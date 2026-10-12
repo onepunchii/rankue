@@ -40,3 +40,19 @@ export const GOLF_STAMP_SAMPLE: readonly SampleStamp[] = WHERE.map(([key, date],
     const slot = slotByKey.get(key)!;
     return { sample: true, clubId: slot.clubIds[0], name: slot.ledgerNames[0], date, score: GUEST_SAMPLE.golf.recentScores[i].score, rounds: 1 };
 });
+
+/**
+ * 다 모았을 때의 예시(2026-10-12 오너: "볼마커 장식장 예시는 다 획득했다라는 예시가 좋을 거 같은데").
+ * 장식장과 '?' 안내가 '다 모으면 이렇게 된다'를 보여 줄 때 쓴다 — 볼마커 열 개 · 트로피 다섯 개가 다 놓인 모습.
+ * 위의 예시 인물(여덟 번 친 사람)과는 **다른 예시**다: 화면은 "다 모았을 때"라고 적는다(그 사람이 다 모았다고 하지 않는다).
+ * 날짜 · 타수는 칸의 순서에서 만든 값이다(2024.03.02 부터 17일 간격, 84~96타).
+ */
+const FULL_START = Date.UTC(2024, 2, 2), FULL_STEP_DAYS = 17;
+const fullDate = (i: number): string => {
+    const d = new Date(FULL_START + i * FULL_STEP_DAYS * 86_400_000);
+    const two = (n: number) => String(n).padStart(2, "0");
+    return `${d.getUTCFullYear()}.${two(d.getUTCMonth() + 1)}.${two(d.getUTCDate())}`;
+};
+export const GOLF_STAMP_FULL_SAMPLE: readonly SampleStamp[] = STAMP_BOOKS.flatMap((b) => b.slots).map((slot, i): SampleStamp => ({
+    sample: true, clubId: slot.clubIds[0], name: slot.ledgerNames[0], date: fullDate(i), score: 84 + ((i * 7) % 13), rounds: 1,
+}));

@@ -5,7 +5,7 @@ import {
     STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_INVITE_TOTAL, STAMP_OPEN_TOTAL, STAMP_TOTAL, STAMP_TROPHY_STEPS,
     bookStates, slotForCourseIds, slotForStamp, stampBook, stampSummary, type StampLike,
 } from "./golfStampBooks";
-import { GOLF_STAMP_SAMPLE } from "./golfStampSample";
+import { GOLF_STAMP_FULL_SAMPLE, GOLF_STAMP_SAMPLE } from "./golfStampSample";
 
 /**
  * 골프 도장첩(2026-10-12 오너: "엘리트 코스 60개를 세분화해서 … 장식장 및 수집욕구" → "추천대로 진행").
@@ -208,5 +208,23 @@ describe("예시 도장첩(처음 오는 사람에게 보여 주는 것)", () =>
             ["seohae", 4], ["gyeonggi", 1], ["gangwon", 3], ["chungcheong", 0], ["honam", 0], ["yeongnam", 0], ["jeju", 0], ["invite-capital", 0], ["invite-regional", 0],
         ]);
         expect(stampSummary(st)).toMatchObject({ stamped: 8, doneBooks: ["seohae"], markers: 1, trophies: 0, nextTrophy: { at: 10, left: 2 }, nearest: { bookId: "gangwon", left: 4 } });
+    });
+
+    it("다 모았을 때의 예시(장식장 · '?' 안내) — 쉰여섯 칸이 다 찍혀 볼마커 열 · 트로피 다섯. 예시 인물과는 다른 예시다", () => {
+        expect(GOLF_STAMP_FULL_SAMPLE.length).toBe(STAMP_TOTAL);
+        const st = bookStates(GOLF_STAMP_FULL_SAMPLE);
+        expect(st.every((s) => s.done)).toBe(true);
+        expect(stampSummary(st)).toMatchObject({ stamped: 56, markers: 10, trophies: 5, nextTrophy: null, nearest: null, allOpenDone: true });
+        for (const s of GOLF_STAMP_FULL_SAMPLE) {
+            expect(s.sample).toBe(true);
+            expect(s.date).toMatch(/^202[4-6]\.\d{2}\.\d{2}$/);
+            expect(s.score).toBeGreaterThanOrEqual(84); expect(s.score).toBeLessThanOrEqual(96);
+        }
+        // 얻은 순서 = 날짜 순서, 날짜가 겹치지 않는다
+        const dates = GOLF_STAMP_FULL_SAMPLE.map((s) => s.date);
+        expect([...dates].sort()).toEqual(dates);
+        expect(new Set(dates).size).toBe(dates.length);
+        // 예시 인물의 도장(여덟 개)은 그대로다
+        expect(GOLF_STAMP_SAMPLE.length).toBe(8);
     });
 });

@@ -6,12 +6,14 @@
  *
  * 로그인 없이 열린다(예시 도장첩). ⚠️ 리터럴 색만(StampParts 머리말) — 종이 위의 글자도 hex.
  */
+import { useState } from "react";
 import { Link, useRoute } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
 import { CourseShell } from "@/golf/components/course/CourseShell";
 import { Skel } from "@/golf/components/course/detail/ui";
 import { BOOK_ART, coverSrc } from "@/golf/stamps/bookArt";
 import { InkStamp } from "@/golf/stamps/InkStamp";
+import { StampHelpButton, StampHelpSheet } from "@/golf/stamps/StampHelp";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
 import { MarkerArt, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampPaper, StampSection, bookPath } from "@/golf/stamps/StampParts";
 
@@ -22,6 +24,7 @@ export default function StampBookPage() {
     const [, params] = useRoute("/golf/stamps/:book");
     const col = useStampCollection();
     const state = col.states.find((s) => s.book.id === params?.book);
+    const [help, setHelp] = useState(false);
 
     if (!state) {
         return (
@@ -41,7 +44,8 @@ export default function StampBookPage() {
     const records = slots.filter((s) => s.record).length;
 
     return (
-        <CourseShell title={`${book.name} 도장첩`} backTo={STAMPS_PATH} hideBottomCta>
+        <CourseShell title={`${book.name} 도장첩`} backTo={STAMPS_PATH} hideBottomCta right={<StampHelpButton onClick={() => setHelp(true)} />}>
+            <StampHelpSheet open={help} onOpenChange={setHelp} />
             <div className="pb-10" data-testid="stamp-book" data-book={book.id} data-sample={col.sample ? "1" : "0"}>
                 {/* 표지 — 위쪽 하늘에 제목 */}
                 <div className="relative h-[232px] overflow-hidden">
