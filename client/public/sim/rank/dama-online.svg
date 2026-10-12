@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <!-- 온라인 다마 배지(2026-10-12) — 금테 육각 판에 당구대 초록 에나멜. 가운데는 비워 둔다: 다마수는 화면이 얹는다(sim/entry/OnlineDamaBadge). -->
+  <defs>
+    <linearGradient id="gold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#fbe391"/>
+      <stop offset="0.38" stop-color="#e8bd4c"/>
+      <stop offset="0.72" stop-color="#bf8a2a"/>
+      <stop offset="1" stop-color="#8a5f17"/>
+    </linearGradient>
+    <linearGradient id="goldSoft" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fff3bf"/>
+      <stop offset="1" stop-color="#d9a53a"/>
+    </linearGradient>
+    <radialGradient id="green" cx="0.38" cy="0.28" r="0.95">
+      <stop offset="0" stop-color="#12845a"/>
+      <stop offset="0.5" stop-color="#086143"/>
+      <stop offset="1" stop-color="#03382a"/>
+    </radialGradient>
+    <clipPath id="panel"><path d="M128 42 202 85v86l-74 43-74-43V85z"/></clipPath>
+  </defs>
+  <!-- 바깥 금테 -->
+  <path d="M128 14 226.7 71v114L128 242 29.3 185V71z" fill="url(#gold)" stroke="#6f4f12" stroke-width="4" stroke-linejoin="round"/>
+  <path d="M128 24 218 76v104l-90 52-90-52V76z" fill="none" stroke="#fff6cf" stroke-opacity="0.75" stroke-width="2.5" stroke-linejoin="round"/>
+  <!-- 초록 에나멜 판 -->
+  <path d="M128 42 202 85v86l-74 43-74-43V85z" fill="url(#green)" stroke="#4a3409" stroke-width="5" stroke-linejoin="round"/>
+  <g clip-path="url(#panel)">
+    <ellipse cx="98" cy="86" rx="62" ry="30" fill="#ffffff" fill-opacity="0.11" transform="rotate(-18 98 86)"/>
+    <path d="M54 171 128 214l74-43v14l-74 43-74-43z" fill="#000000" fill-opacity="0.18"/>
+  </g>
+  <path d="M128 49 196 88.500v79L128 207 60 167.500v-79z" fill="none" stroke="#7fe0b4" stroke-opacity="0.22" stroke-width="1.5" stroke-linejoin="round"/>
+  <!-- 위의 별 -->
+  <path d="M128 52.500l4.300 9.100 10 1.300-7.300 7 1.800 9.900-8.800-4.800-8.800 4.800 1.800-9.900-7.300-7 10-1.300z" fill="url(#goldSoft)" stroke="#6f4f12" stroke-width="1.6" stroke-linejoin="round"/>
+  <!-- 아래의 잎 둘 -->
+  <g fill="url(#goldSoft)" stroke="#6f4f12" stroke-width="1.4">
+    <ellipse cx="113" cy="191" rx="11" ry="4.600" transform="rotate(28 113 191)"/>
+    <ellipse cx="143" cy="191" rx="11" ry="4.600" transform="rotate(-28 143 191)"/>
+  </g>
+</svg>

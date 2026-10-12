@@ -29,6 +29,7 @@ import { drawCompareCard } from "@/components/hiq/compare/compareCard";
 import { BadgeAvatar, CardActions, CompareTable, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, fill, proName } from "@/components/hiq/compare/lookalikeUi";
 import { useOnlineRecord } from "@/sim/entry/useOnlineRecord";
 import { HANDICAP_QUERY_KEY } from "@/sim/entry/HandicapCard";
+import { OnlineDamaBadge } from "@/sim/entry/OnlineDamaBadge";
 import { matchApi } from "@/sim/matchApi";
 
 export function LookalikeProCard() {
@@ -61,16 +62,21 @@ export function LookalikeProCard() {
             ))}
         </div>
     );
-    // 내 다마수(온라인 핸디) 한 줄 — 예전 기록 띠의 세 칸 가운데 이것만 남았다(전적 · 랭킹은 배너로)
+    // 내 다마수(온라인 핸디) 한 줄 — 예전 기록 띠의 세 칸 가운데 이것만 남았다(전적 · 랭킹은 배너로).
+    // 2026-10-12 오너: "이것도 배지로" — 숫자를 온라인 다마 배지(육각 초록 판) 가운데에 얹는다. 실전의 다마 메달과는 다른 그림이다(눈금이 다르다 — sim/entry/OnlineDamaBadge).
     const strip = (
-        <div className="mt-3 rounded-tile border border-surface-line px-3 py-2.5 flex items-center justify-between gap-3" data-testid="online-handi">
-            <span className="text-[12px] font-semibold text-ink-3 shrink-0">{t("sim.entry.handicapTitle")}</span>
-            <span className="flex items-baseline gap-2 min-w-0">
-                <span className="text-[11px] font-semibold text-ink-4 rk-num truncate">
-                    {handi?.fromRecord ? fill(t("home.handiAvgShort"), { avg: handi.avg.toFixed(3) }) : t("home.handiDefault")}
+        <div className="mt-3 rounded-tile border border-surface-line px-3 py-2 flex items-center gap-3" data-testid="online-handi">
+            <OnlineDamaBadge
+                target={handi?.target ?? null} size={46}
+                label={handi ? `${t("sim.entry.handicapTitle")} ${handi.target}${t("sim.entry.handicapUnit")}` : undefined}
+            />
+            <span className="flex-1 min-w-0">
+                <span className="block text-[13px] font-bold text-ink-1 truncate">
+                    {t("sim.entry.handicapTitle")}
+                    {handi && <span className="ml-1.5 rk-num text-ink-3 font-semibold">{handi.target}{t("sim.entry.handicapUnit")}</span>}
                 </span>
-                <span className="text-[16px] leading-[18px] font-bold text-ink-1 rk-num shrink-0">
-                    {handi ? <>{handi.target}<span className="ml-0.5 text-[11px] font-semibold text-ink-3">{t("sim.entry.handicapUnit")}</span></> : "—"}
+                <span className="block mt-0.5 text-[11.5px] font-semibold text-ink-4 rk-num truncate">
+                    {handi?.fromRecord ? fill(t("home.handiAvgShort"), { avg: handi.avg.toFixed(3) }) : t("home.handiDefault")}
                 </span>
             </span>
         </div>

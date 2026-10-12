@@ -167,6 +167,24 @@ describe("'내 온라인 실력' 카드 — 전적 · 랭킹은 배너로 옮겼
         expect(card).toContain("queryKey: HANDICAP_QUERY_KEY");
     });
 
+    it("내 다마수는 배지로 — 온라인 다마 배지(육각 초록 판)에 숫자를 얹는다. 실전의 다마 메달을 쓰지 않는다(눈금이 다르다)", () => {
+        // 2026-10-12 오너: 이 줄을 가리키며 "이것도 배지로"
+        expect(card).toContain("target={handi?.target ?? null} size={46}");
+        expect(card).toContain('import { OnlineDamaBadge } from "@/sim/entry/OnlineDamaBadge";');
+        expect(card).not.toMatch(/RealMedal|realTierFor/);
+        // 온라인게임 입구의 '내 다마수' 카드도 같은 배지
+        expect(code(client("sim/entry/HandicapCard.tsx"))).toContain("<OnlineDamaBadge target={known ? board!.target : null} size={44} />");
+        const badge = code(client("sim/entry/OnlineDamaBadge.tsx"));
+        expect(badge).toContain('export const ONLINE_DAMA_SRC = "/sim/rank/dama-online.svg";');
+        // 숫자는 그림에 없다 — 화면이 얹는다. 다마수를 모르면 흐린 판만
+        expect(badge).toContain("{has && (");
+        expect(badge).toContain('"grayscale(1) opacity(0.4)"');
+        const svg = root("client/public/sim/rank/dama-online.svg");
+        expect(svg.startsWith("<svg ")).toBe(true);
+        expect(svg).not.toMatch(/<text|<image|<script|href=/);
+        expect(svg.length).toBeLessThan(4000);
+    });
+
     it("쓰지 않게 된 문구는 사전에서 뺐다", () => {
         for (const l of LOCALES) {
             expect(dict(l)).not.toContain('"home.stripMatchRecord"');

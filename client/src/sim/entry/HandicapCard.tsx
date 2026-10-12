@@ -14,6 +14,7 @@ import { cn } from "@/lib/utils";
 import { matchApi, type MatchApi, type MyHandicap } from "../matchApi";
 import { GameBalls } from "../rank/GameBalls";
 import { ENTRY_STYLE as st } from "./entryTheme";
+import { OnlineDamaBadge } from "./OnlineDamaBadge";
 
 export const HANDICAP_QUERY_KEY = ["/api/hiq/sim/handicap"] as const;
 
@@ -28,11 +29,15 @@ function Cell({ board, gameType }: { board: MyHandicap | undefined; gameType: "3
                     {t(gameType === "3c" ? "sim.setup.type3c" : "sim.setup.type4c")}
                 </span>
             </div>
-            <p className="mt-1.5 flex items-baseline gap-1">
-                <span className={cn("rk-num text-[26px] font-bold leading-none", known ? "text-white" : "text-white/35")}>
-                    {known ? board!.target : "—"}
+            {/* 숫자는 온라인 다마 배지 가운데에(2026-10-12 오너: "이것도 배지로") — 옆에 단위와 함께 한 번 더 적는다(배지를 못 읽는 화면 낭독용이 아니라 한눈에 읽히게) */}
+            <p className="mt-1.5 flex items-center gap-2">
+                <OnlineDamaBadge target={known ? board!.target : null} size={44} />
+                <span className="flex items-baseline gap-1">
+                    <span className={cn("rk-num text-[22px] font-bold leading-none", known ? "text-white" : "text-white/35")}>
+                        {known ? board!.target : "—"}
+                    </span>
+                    <span className="text-[12px] font-medium text-white/45">{t("sim.entry.handicapUnit")}</span>
                 </span>
-                <span className="text-[12px] font-medium text-white/45">{t("sim.entry.handicapUnit")}</span>
             </p>
             <p className="mt-1 text-[11px] font-medium text-white/45 truncate">
                 {board && board.fromRecord
