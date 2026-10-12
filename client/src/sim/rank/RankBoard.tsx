@@ -10,7 +10,7 @@ import { RankMedal, TierEmblem } from "./TierEmblem";
 /**
  * 랭킹 목록 — '진열장' 모양(2026-10-12 오너: 시안 A·B 가운데 "B 로 가고 … 게임 느낌도 나고 진짜 소유욕이 들게끔").
  * 어두운 카드 줄: 1~3등은 메달, 그 아래는 숫자 · 등급 배지 그림 · 이름(국기·등급·전적) · 레이팅.
- * 예전의 보라 판(.rank-arcade, 2026-09-09)은 이 화면에서 뺐다 — 그 배색은 방 목록·드릴·관전 목록이 아직 쓴다(index.css).
+ * 예전의 보라 판(.rank-arcade, 2026-09-09)은 이 화면에서 뺐다 — 방 목록·드릴·관전 목록도 같은 날 옮겨 그 배색은 지웠다.
  * 여기 색·광택은 .rank-hall 아래에만 둔다(index.css). 랭킹 화면은 디자인 규칙을 풀어 둔 곳이다(2026-09-09 오너).
  */
 const Row = memo(function Row({ r, mine, locale }: { r: RankRow; mine: boolean; locale: string }) {

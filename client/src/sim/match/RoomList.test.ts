@@ -338,7 +338,7 @@ describe("RoomList: 진열장 톤과 빈 화면(2026-10-12)", () => {
         const fs = await import("node:fs");
         const path = await import("node:path");
         const read = (f: string) => fs.readFileSync(path.resolve(__dirname, f), "utf8");
-        for (const f of ["RoomList.tsx", "../watch/WatchList.tsx"]) {
+        for (const f of ["RoomList.tsx", "../watch/WatchList.tsx", "../drill/DrillPanel.tsx"]) {
             const src = read(f).split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*|\{\/\*)/.test(l)).join("\n");
             expect(src, f).not.toMatch(/rank-arcade|arc-board|arc-ribbon|--arc-/);
             expect(src, f).toContain("rank-hall");
@@ -351,6 +351,9 @@ describe("RoomList: 진열장 톤과 빈 화면(2026-10-12)", () => {
         expect(fs.existsSync(path.resolve(__dirname, "../../../public/sim/rank/rooms.webp"))).toBe(true);
         // 어두운 화면 안의 진열장은 브랜드 초록을 밝은 연두로 쓴다(글자 · 테두리가 묻히지 않게)
         const css = read("../../index.css");
+        // 옛 배색은 쓰는 화면이 없어져 스타일도 지웠다(드릴이 마지막이었다)
+        expect(css).not.toMatch(/\.rank-arcade \{|\.arc-board|\.arc-ribbon|--arc-frame/);
+        expect(read("../drill/DrillPanel.tsx")).toContain('export const DRILL_ART_SRC = "/sim/rank/icon-drill.webp";');
         expect(css).toMatch(/\.sim-dark \.rank-hall,\s*\.sim-dark\.rank-hall \{\s*--brand: 100 221 23;/);
     });
 });

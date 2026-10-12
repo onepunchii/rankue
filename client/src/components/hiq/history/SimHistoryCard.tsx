@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { GameController } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { useT } from "@/lib/i18n";
 import type { FilterType } from "./types";
@@ -11,6 +10,10 @@ import type { FilterType } from "./types";
  * (2) 같은 내용을 온라인게임 대시보드가 더 잘 보여 준다. 그래서 대시보드로 가는 줄 하나만 남긴다.
  * 기록이 하나도 없으면 이 줄도 그리지 않는다(처음 온 사람에게 빈 안내를 늘리지 않는다).
  * 2026-09-09 오너: 부제("연습·대전 기록은 대시보드에…")는 제목이 이미 말하고 있어 뺐다. 아래 매치 리스트와 붙어 보여 mb-6.
+ *
+ * 2026-10-12 — 순서의 4번: 줄의 모양만 바꿨다. 온라인게임 화면들과 같은 어두운 '진열장' 띠 + 그림(트로피).
+ * **숫자는 여전히 없다**(레이팅 · 순위 · 전적 · 내 등급 배지도 넣지 않는다 — 위 원칙 그대로). 그림은 내 등급이 아니라 누구에게나 같은 트로피다.
+ * 부제도 다시 넣지 않았다(9/9 결정). 색 · 광택은 index.css 의 .rank-hall .hall-banner(홈 배너와 같은 판).
  */
 interface SimRating { sessions: number }
 interface SimMatchRow { status: string }
@@ -43,14 +46,15 @@ export function SimHistoryCard({ filter }: Props) {
         <button
             type="button"
             onClick={() => setLocation("/online-game?dash=1")}
-            className="w-full min-h-[60px] mb-6 rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] px-4 py-3 flex items-center gap-3 text-left active:bg-black/[0.02]"
+            data-testid="sim-history-link" data-track-as="기록 온라인게임 입구"
+            className="rank-hall w-full mb-6 block text-left active:opacity-90"
         >
-            <span className="w-10 h-10 shrink-0 rounded-xl bg-brand/10 flex items-center justify-center">
-                <GameController className="w-5 h-5 text-brand" strokeWidth={2} />
-            </span>
-            <span className="flex-1 min-w-0 text-[15px] font-bold text-ink-1">{t("sim.history.linkRow")}</span>
-            <span className="shrink-0 text-black/30" aria-hidden="true">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+            <span className="hall-banner min-h-[64px] rounded-2xl pl-2.5 pr-4 py-2 flex items-center gap-2.5">
+                <img src="/sim/rank/trophy.webp" width={48} height={48} alt="" aria-hidden="true" decoding="async" draggable={false} className="w-12 h-12 shrink-0 object-contain" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.5))" }} />
+                <span className="flex-1 min-w-0 text-[15px] font-black text-white truncate">{t("sim.history.linkRow")}</span>
+                <span className="shrink-0 text-white/45" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m9 5 7 7-7 7" /></svg>
+                </span>
             </span>
         </button>
     );

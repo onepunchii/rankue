@@ -137,3 +137,31 @@ describe("'내 온라인 실력' 카드 — 전적 · 랭킹은 배너로 옮겼
         }
     });
 });
+
+/**
+ * 기록 페이지의 온라인게임 입구(2026-10-12 — 순서의 4번). 기록 페이지는 실전 기록의 자리다(2026-09-09 오너 결정):
+ * 온라인게임 숫자를 넣지 않는다. 모양만 진열장 띠로 바꿨다.
+ */
+describe("기록 페이지의 온라인게임 입구 띠", () => {
+    const card = code(client("components/hiq/history/SimHistoryCard.tsx"));
+
+    it("어두운 띠 + 그림 — 홈 배너와 같은 판(.rank-hall .hall-banner)", () => {
+        expect(card).toContain('className="rank-hall w-full mb-6 block text-left active:opacity-90"');
+        expect(card).toContain('<span className="hall-banner ');
+        expect(card).toContain('src="/sim/rank/trophy.webp"');
+        expect(card).toContain('onClick={() => setLocation("/online-game?dash=1")}');
+    });
+
+    it("숫자를 넣지 않는다 — 레이팅 · 순위 · 전적 · 내 등급 배지 모두", () => {
+        // 기록이 있는지 보려고 목록을 받기는 한다(있다/없다만) — 그리는 부분에는 그 값이 하나도 없다
+        const drawn = card.slice(card.indexOf("<button"));
+        expect(drawn).not.toMatch(/rating|matches|TierEmblem|tierFor|wins|\{[a-z]+\.length\}/i);
+        expect(card).not.toMatch(/rank\/me|TierEmblem|tierFor|hubStateOf|useOnlineRecord/);
+        // 그리는 글자는 제목 하나
+        expect(card.match(/\{t\("[^"]+"\)\}/g)).toEqual(['{t("sim.history.linkRow")}']);
+    });
+
+    it("기록이 하나도 없으면 그리지 않는다(처음 온 사람에게 빈 안내를 늘리지 않는다)", () => {
+        expect(card).toContain("if (!hasRecord) return null;");
+    });
+});
