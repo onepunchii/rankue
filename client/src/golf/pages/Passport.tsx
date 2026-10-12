@@ -12,13 +12,11 @@ import { PassportStatsCard } from "../components/passport/PassportStatsCard";
 import { StampList } from "../components/passport/StampList";
 import { RegionSheet } from "../components/passport/RegionSheet";
 import { ViewSwitcher } from "../components/passport/ViewSwitcher";
-import { Elite60Banner } from "../components/passport/Elite60Banner";
+import { StampBooksBanner } from "../components/passport/StampBooksBanner";
 import { PassportMapTabs, usePassportMapMode } from "../components/passport/PassportMapTabs";
 import { FootprintsPanel } from "../components/passport/FootprintsPanel";
 import { PassportAlbum } from "../components/passport/PassportAlbum";
 import { useMyPhotos } from "../lib/photoApi";
-import { COURSES } from "@/golf/data/golfCourses";
-import { countEliteConquered } from "../lib/elite60";
 
 // Hooks
 import { usePassportData } from "../hooks/usePassportData";
@@ -52,8 +50,6 @@ export default function Passport() {
 
     // Derived state for props — 인증 도장만(현장 인증 + 옛 기록). 기록 도장은 정복·Elite 60 에 안 센다(2026-09-30)
     const conqueredCourses = stamps.map(s => s.name);
-    // Elite 60 화면과 같은 판정(lib/elite60) — 예전엔 여기만 이름이 글자 그대로 같을 때 세서 두 숫자가 달랐다
-    const rankue60ConqueredCount = countEliteConquered(COURSES, stamps);
 
     const handleRegionSheetGoToGuide = (regionName: string) => {
         setIsRegionalPopupOpen(false);
@@ -93,7 +89,7 @@ export default function Passport() {
                                     }}
                                 />
                             )}
-                            <Elite60Banner conqueredCount={rankue60ConqueredCount} />
+                            <StampBooksBanner stamps={stamps} />
                         </motion.div>
                     )}
 
@@ -105,7 +101,7 @@ export default function Passport() {
                             exit={{ opacity: 0, y: -20 }}
                         >
                             <StampList stamps={stamps} records={recordStamps} />
-                            <Elite60Banner conqueredCount={rankue60ConqueredCount} />
+                            <StampBooksBanner stamps={stamps} />
                         </motion.div>
                     )}
 

@@ -1,4 +1,4 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route, Redirect, useLocation } from "wouter";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
@@ -62,7 +62,6 @@ import GolfScorecard from "@/golf/pages/GamePage";
 import GameResult from "@/golf/pages/GameResult";
 import GolfPassport from "@/golf/pages/Passport";
 import GolfCourseRanking from "@/golf/pages/CourseRanking";
-import GolfElite60 from "@/golf/pages/Elite60";
 import GolfCoursePage from "@/golf/pages/GolfCoursePage";
 import GolfCourseHub from "@/golf/pages/GolfCourseHub";
 import GolfBookingList from "@/golf/pages/BookingList";
@@ -191,6 +190,20 @@ function GolfChecklistRoute() {
 const GolfFind = lazy(() => import("@/golf/pages/GolfFind"));
 function GolfFindRoute() {
   return <Suspense fallback={golfReadFallback}><GolfFind /></Suspense>;
+}
+// 골프 도장첩 · 장식장(2026-10-12 오너 "추천대로 진행" — docs/01-plan/features/golf-stamp-collection.md). 로그인 없이 열린다:
+// 방문자와 도장이 아직 없는 회원에게는 예시 도장첩을 보여 준다("처음 오는 사람도 예시를 보여줘서 와 하게"). 그림이 많아 메인 청크에서 뺀다.
+const GolfStampBooks = lazy(() => import("@/golf/pages/StampBooks"));
+const GolfStampBook = lazy(() => import("@/golf/pages/StampBook"));
+const GolfShelf = lazy(() => import("@/golf/pages/GolfShelf"));
+function GolfStampBooksRoute() {
+  return <Suspense fallback={golfReadFallback}><GolfStampBooks /></Suspense>;
+}
+function GolfStampBookRoute() {
+  return <Suspense fallback={golfReadFallback}><GolfStampBook /></Suspense>;
+}
+function GolfShelfRoute() {
+  return <Suspense fallback={golfReadFallback}><GolfShelf /></Suspense>;
 }
 // 골프 용어 사전(2026-10-05) — 본문(shared/golfTerms.ts)이 길어 메인 청크에서 뺀다. 허브와 용어 한 개가 같은 화면 파일.
 const GolfTerms = lazy(() => import("@/golf/pages/GolfTerms"));
@@ -370,7 +383,11 @@ function AppRoutes() {
       <Route path="/golf/membership/:id"><GolfOnly><MembershipDetail /></GolfOnly></Route>
       <Route path="/golf/membership"><GolfOnly><MembershipExchange /></GolfOnly></Route>
       <Route path="/golf/ranking"><GolfOnly><GolfCourseRanking /></GolfOnly></Route>
-      <Route path="/golf/elite60"><GolfOnly><GolfElite60 /></GolfOnly></Route>
+      {/* 옛 엘리트 화면('0 / 60' 한 줄)은 도장첩 책장으로 바뀌었다(2026-10-12) — 옛 주소로 온 사람을 그리로 */}
+      <Route path="/golf/elite60"><Redirect to="/golf/stamps" replace /></Route>
+      <Route path="/golf/stamps" component={GolfStampBooksRoute} />
+      <Route path="/golf/stamps/:book" component={GolfStampBookRoute} />
+      <Route path="/golf/shelf" component={GolfShelfRoute} />
       {/* 골프장 페이지(2026-09-24) — 검색 유입용 공개 페이지라 GolfOnly 를 타지 않는다(GolfOnly 는 비로그인을 /dashboard 로 쫓아낸다).
           슬러그는 한글(정본). 옛 숫자 주소(/golf/course/74)는 GolfCoursePage 가 슬러그로 바꿔 준다.
           wouter 는 기본이 정확 일치라(regexparam, loose 아님) /golf/booking 이 /golf/booking-list 를 먹지 않는다. */}

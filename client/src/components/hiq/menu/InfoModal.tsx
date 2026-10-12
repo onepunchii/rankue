@@ -147,7 +147,7 @@ export function InfoModal({ type, open, onOpenChange, sport = "BILLIARDS" }: Inf
             </div>
 
             <div className="rk-card p-4 rounded-tile">
-                <h3 className="font-bold text-ink-1 text-sm mb-2">RANKUE ELITE 60</h3>
+                <h3 className="font-bold text-ink-1 text-sm mb-2">{t("infoModal.elite60Title")}</h3>
                 <ul className="text-xs text-black/55 space-y-1.5 list-disc pl-4">
                     <li>{t("infoModal.elite60Line1")}</li>
                     <li>{t("infoModal.elite60Line2")}</li>
