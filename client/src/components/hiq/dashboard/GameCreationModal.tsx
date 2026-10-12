@@ -10,6 +10,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { BilliardBall, BallCluster, BallColor } from "../ui/BilliardBall";
 import { useT } from "@/lib/i18n";
 import { TARGET_INPUT_MAX, TARGET_INPUT_MIN, commitTargetText, sanitizeTargetText, stepTarget } from "@shared/targetInput";
+import { scoreboardTarget } from "@shared/realHandicap";
+import { RealMedal } from "@/components/hiq/RealMedal";
 
 // Player slot → billiard ball color (white 수구, yellow, red, red — the 4구 set).
 const SLOT_BALL: BallColor[] = ["white", "yellow", "red", "red"];
@@ -68,6 +70,11 @@ const PlayerCard = ({
         const wins = myGames.filter(g => g.isWinner).length;
         return Math.round((wins / myGames.length) * 100);
     })() : null;
+
+    // 자리에 미리 적힌 목표가 어디서 왔나(2026-10-12 오너: "이 다마대로 점수판 자동 입력으로 하고") — 회원의 다마(없으면 에버리지를 같은 표에 넣은 값).
+    // 게스트 · 아직 안 들어온 자리에는 없다. 방장이 고치면 '되돌리기'를 보여 준다.
+    const auto = player.member ? scoreboardTarget(player.member, gameType) : null;
+    const memberHandi = player.member ? (gameType === "3c" ? player.member.handi3c : player.member.handi4c) : null;
 
     // ── 목표 점수를 숫자로 직접 치기(2026-10-06 오너: "화살표로만 내리고 올리고 하는데 숫자로 입력 가능하게") ──
     // edit 는 치는 동안의 글자(빈 칸 허용)와 치기 시작할 때의 값·자리 주인이다. null 이면 입력 중이 아니다.
@@ -218,8 +225,12 @@ const PlayerCard = ({
                             <span className="font-semibold text-ink-1 text-lg truncate">
                                 {player.member.name}
                             </span>
-                            <span className="text-xs font-bold text-black/60 bg-black/[0.06] px-2 py-1 rounded-lg">
-                                AVG {player.member.average}
+                            <span className="shrink-0 flex items-center gap-1.5">
+                                {/* 이 종목의 실전 다마 메달 — 다마가 아직 없으면(공식 5판 전) 그리지 않는다 */}
+                                {typeof memberHandi === "number" && memberHandi > 0 && <RealMedal game={gameType} handi={memberHandi} size={32} />}
+                                <span className="text-xs font-bold text-black/60 bg-black/[0.06] px-2 py-1 rounded-lg">
+                                    AVG {player.member.average}
+                                </span>
                             </span>
                         </>
                     ) : (
@@ -270,6 +281,20 @@ const PlayerCard = ({
                     <ChevronUp className="w-6 h-6 text-ink-1" />
                 </button>
             </div>
+
+            {/* 미리 적힌 목표의 근거 — 고쳤으면 한 번에 되돌린다 */}
+            {auto && auto.from !== "default" && (
+                typed === auto.target ? (
+                    <p className="-mt-2 px-1 text-[12px] font-medium text-black/50 break-keep" data-testid="auto-target">
+                        {t(auto.from === "handi" ? "gameCreationModal.autoHandi" : "gameCreationModal.autoAvg").replace("{n}", String(auto.target))}
+                    </p>
+                ) : (
+                    <button type="button" onClick={() => onUpdate(idx, { target: auto.target })} data-testid="auto-target-reset" data-track-as="경기 만들기 다마 되돌리기"
+                        className="-mt-2 self-start px-1 min-h-8 text-[12px] font-bold text-brand underline underline-offset-2 active:opacity-70">
+                        {t("gameCreationModal.autoReset").replace("{n}", String(auto.target))}
+                    </button>
+                )
+            )}
 
             {/* Simple Stats Display (Optional, kept minimal) */}
             {player.member && winRate !== null && (

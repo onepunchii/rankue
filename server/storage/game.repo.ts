@@ -18,7 +18,7 @@ import { eq, ne, desc, asc, and, or, sql, gt, inArray } from "drizzle-orm";
 import { notFound } from "../utils/errors.js";
 import { msg } from "../lib/i18n.js";
 import { scoringInnings } from "../../shared/averageRule.js";
-import { HANDICAP_MAP_3C, HANDICAP_MAP_4C } from "../../shared/realHandicap.js";
+import { HANDI_MIN_GAMES, HANDI_RECENT_GAMES, handiBasis, handicapFor, type HandiGame } from "../../shared/realHandicap.js";
 
 // 실전 핸디 기준표 — 홈 '내 실전 핸디' 카드와 같은 표(shared/realHandicap)
 /** 어드민 기록 삭제 결과 — 지운 것과, 되돌린 값의 전후 대조. 실패 사유도 같은 타입으로 돌려준다. */
@@ -45,13 +45,29 @@ export function rpDeltaFor(gameType: string, isWinner: boolean, handi: number): 
     if (isWinner) return 30;
     const h = handi || 0;
     if (gameType === "3c") {
-        if (h < 16) return 0;
-        if (h < 22) return -5;
+        if (h < 20) return 0;
+        if (h < 25) return -5;
         return -15;
     }
-    if (h < 12) return 0;
-    if (h < 25) return -5;
+    if (h < 8) return 0;
+    if (h < 15) return -5;
     return -15;
+}
+
+/**
+ * 다마를 매길 때 보는 판들 — 그 종목의 최근 공식 HANDI_RECENT_GAMES 판(최근 것부터)의 에버리지와, 그 판에서 그 사람이 적은 목표.
+ * 목표는 4구에서 다마 눈금 밖(50 초과)으로 적은 판을 가려내는 데 쓴다(shared/realHandicap handiGameAverage). 경기 끝의 산정과 홈 '다음 다마까지'가 같이 쓴다.
+ */
+export async function recentHandiGames(memberId: string, gameType: "3c" | "4c"): Promise<HandiGame[]> {
+    const res = await db.execute(sql`
+        select h.average,
+               case when g.player1_id = h.member_id then g.player1_target when g.player2_id = h.member_id then g.player2_target
+                    when g.player3_id = h.member_id then g.player3_target when g.player4_id = h.member_id then g.player4_target end as target
+        from hiq_game_history h left join hiq_games g on g.id = h.game_id
+        where h.member_id = ${memberId} and h.game_type = ${gameType} and h.is_ranked
+        order by h.created_at desc
+        limit ${HANDI_RECENT_GAMES}`);
+    return (res.rows as Record<string, unknown>[]).map((r) => ({ average: String(r.average ?? ""), target: r.target == null ? null : Number(r.target) }));
 }
 
 export class GameRepository {
@@ -184,11 +200,14 @@ export class GameRepository {
 
             // 패배 감점 구간. handi 값은 HANDICAP_MAP_3C / HANDICAP_MAP_4C가 내놓는 값이므로
             // 임계값은 그 맵의 스케일과 한 몸이다 — 맵의 handi 범위를 바꾸면 여기도 같이 고쳐야 한다.
-            //   3구 맵: 12~30 → 12·15 면제 / 18·20 -5 / 23·25·30 -15
-            //   4구 맵: 3~50  → 3·5·8·10 면제 / 12·15·20 -5 / 25·30·40·50 -15
+            //   3구 맵: 12~40 → 12·15·17·18 면제 / 20~24 -5 / 25 이상 -15
+            //   4구 맵: 3~50  → 3·5 면제 / 8·10·12 -5 / 15 이상 -15
             // 4구 임계값이 예전엔 80·150이었는데 4구 맵의 최댓값이 50이라 항상 h<80,
             // 즉 패배 감점이 언제나 0이었다(4구 랭킹이 사실상 '승 횟수 랭킹'이 됐다).
-            // 새 값은 두 맵의 avg 축에서도 대응된다: 면제 구간 상한이 3구·4구 모두 avg 0.3이다.
+            // 2026-10-12 다마 표를 바꾸며(shared/realHandicap) 구간을 **에버리지 축에서 그대로** 옮겼다 — 같은 실력의 사람이 지면 예전과 같은 만큼 깎인다:
+            //   3구 면제 에버 0.4 미만(예전 12·15 → 지금 12~18) · -15 는 에버 0.6 이상(예전 23~ → 지금 25~)
+            //   4구 면제 에버 0.35~0.4 미만(예전 3~10 → 지금 3·5) · -15 는 에버 0.75 이상(예전 25~ → 지금 15~)
+            // 다마 숫자를 그대로 두었다면 4구는 모두가 덜 깎이고(다마가 3분의 1쯤 내려갔다) 3구는 더 깎였을 것이다.
             const calculateRpDelta = (isWinner: boolean, handi: number) => rpDeltaFor(game.gameType, isWinner, handi);
 
             if (game.isRanked) {
@@ -240,26 +259,16 @@ export class GameRepository {
     }
 
     async checkAndUpdateHandicap(memberId: string, gameType: "3c" | "4c") {
-        const history = await this.getMemberGameHistory(memberId);
-        const filtered = history.filter(h => h.gameType === gameType && h.isRanked).slice(0, 10);
-
-        if (filtered.length < 5) return { oldHandi: 0, newHandi: 0, message: null };
-
-        const totalAvg = filtered.reduce((acc, h) => acc + parseFloat(h.average), 0) / filtered.length;
+        // 판별 에버리지의 평균 — 4구에서 목표를 다마 눈금 밖(50 초과)으로 적은 판은 세지 않는다(shared/realHandicap)
+        const basis = handiBasis(await recentHandiGames(memberId, gameType), gameType);
+        if (!basis || basis.games < HANDI_MIN_GAMES) return { oldHandi: 0, newHandi: 0, message: null };
+        const totalAvg = basis.avg;
         const [currentMember] = await db.select().from(hiqMembers).where(eq(hiqMembers.id, memberId));
         if (!currentMember) return { oldHandi: 0, newHandi: 0, message: null };
 
         const handiField = gameType === "3c" ? "handi3c" : "handi4c";
         const oldHandi = currentMember[handiField] || 0;
-
-        const map = gameType === "4c" ? HANDICAP_MAP_4C : HANDICAP_MAP_3C;
-        let newHandi = map[map.length - 1].handi;
-        for (const tier of map) {
-            if (totalAvg >= tier.avg) {
-                newHandi = tier.handi;
-                break;
-            }
-        }
+        const newHandi = handicapFor(totalAvg, gameType);
 
         if (newHandi !== oldHandi) {
             await db.update(hiqMembers)
@@ -270,9 +279,9 @@ export class GameRepository {
                 oldHandi,
                 newHandi,
                 // 근거를 숫자로도 준다(2026-10-12) — 결과 화면의 "다마가 올랐어요"가 다섯 언어로 적는다. message 는 한국어뿐이라 옛 화면만 쓴다.
-                games: filtered.length,
+                games: basis.games,
                 avg: Number(totalAvg.toFixed(3)),
-                message: `최근 ${filtered.length}게임 에버리지(${totalAvg.toFixed(2)}) 기준 핸디가 ${newHandi}로 조정되었습니다.`
+                message: `최근 ${basis.games}게임 에버리지(${totalAvg.toFixed(2)}) 기준 핸디가 ${newHandi}로 조정되었습니다.`
             };
         }
 

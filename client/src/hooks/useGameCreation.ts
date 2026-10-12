@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { apiRequest, ApiError } from "@/lib/queryClient";
 import { HiqMember, HiqGameHistory } from "@shared/schema";
+import { SCOREBOARD_DEFAULT_TARGET, scoreboardTarget } from "@shared/realHandicap";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
 
@@ -46,47 +47,15 @@ const MAX_PLAYERS = 4;
 // 떠 있었다. 실측(2026-08-31): 게스트 상대 경기 종료율 14% vs 회원 상대 80%,
 // 외국 유저 19경기 전원 미종료. 한국 유저는 게스트에게도 다마수를 손으로 넣는 문화라
 // 살아남았을 뿐이다.
-const DEFAULT_GUEST_TARGET = 15;
+const DEFAULT_GUEST_TARGET = SCOREBOARD_DEFAULT_TARGET;
 
-// Helper to calculate target score based on average and game type
-const calculateTargetScore = (avg: string | number | null | undefined, type: '3c' | '4c'): number => {
-    const average = typeof avg === 'string' ? parseFloat(avg) : (avg || 0);
-    if (isNaN(average) || average === 0) return type === '3c' ? 15 : 15; // Minimum defaults
-
-    if (type === '3c') {
-        const calculated = Math.round(average * 35);
-        return Math.max(1, calculated);
-    } else {
-        const calculated = Math.round(average * 20);
-        return Math.max(1, calculated);
-    }
-};
-
-// 3쿠션과 4구의 평균은 완전히 다른 스케일이다. 범용 `average` 컬럼은 "마지막으로 끝낸 종목"의
-// 평균이 덮어써지므로, 종목별 핸디를 뽑을 때 절대 폴백으로 쓰면 안 된다 (4구 평균 1.2가
-// 3쿠션 목표 42점으로 둔갑한다). 해당 종목 기록이 없으면 undefined → 기본 목표(15)로 간다.
-const memberAvgForType = (m: any, type: '3c' | '4c'): number | undefined => {
-    const typed = type === '3c' ? m?.avg3c : m?.avg4c;
-    return typeof typed === 'number' && typed > 0 ? typed : undefined;
-};
-
-// Helper to calculate Record Average from history
-const calculateRecordAverage = (history: HiqGameHistory[] | undefined, type: '3c' | '4c', defaultAvg: string | number | undefined | null) => {
-    if (!history) return defaultAvg || "0.000";
-
-    const validGames = history.filter(g =>
-        g.gameType === type &&
-        g.gameMode === "match" &&
-        (g as any).isRanked
-    );
-
-    if (validGames.length === 0) return defaultAvg || "0.000";
-
-    const totalScore = validGames.reduce((acc, g) => acc + g.score, 0);
-    const totalInnings = validGames.reduce((acc, g) => acc + g.innings, 0);
-
-    return totalInnings > 0 ? (totalScore / totalInnings).toFixed(3) : (defaultAvg || "0.000");
-};
+/**
+ * 자리에 미리 적는 목표 = 그 사람의 다마(2026-10-12 오너: "이 다마대로 점수판 자동 입력으로 하고").
+ * 다마(최근 공식 경기로 서버가 매긴 값) → 없으면 그 종목 에버리지를 같은 표에 넣은 값 → 없으면 기본(15). 규칙은 shared/realHandicap scoreboardTarget.
+ * 예전에는 여기서 표와 다른 셈(3쿠션 에버 × 35 · 4구 에버 × 20)을 따로 했다 — '내 다마'와 점수판의 목표가 달랐다.
+ * 3쿠션과 4구의 에버리지는 스케일이 달라, 범용 `average` 칸(마지막으로 끝낸 종목의 값)은 읽지 않는다.
+ */
+const targetFor = (m: any, type: '3c' | '4c'): number => scoreboardTarget(m, type).target;
 
 export const useGameCreation = ({
     member,
@@ -151,9 +120,8 @@ export const useGameCreation = ({
             const seats = initialSeats ? Math.min(MAX_PLAYERS, Math.max(1, initialSeats)) : numberOfPlayers;
             if (seats !== numberOfPlayers) setNumberOfPlayersInternal(seats);
 
-            const recordAvg = calculateRecordAverage(history, type, memberAvgForType(member, type));
-            // 카드에 적어 보낸 목표가 있으면 그것이 방장의 목표다(핸디를 카드에서 이미 맞췄다).
-            const hostTarget = initialTarget && initialTarget > 0 ? initialTarget : calculateTargetScore(recordAvg, type);
+            // 카드에 적어 보낸 목표가 있으면 그것이 방장의 목표다(핸디를 카드에서 이미 맞췄다). 없으면 내 다마.
+            const hostTarget = initialTarget && initialTarget > 0 ? initialTarget : targetFor(member, type);
 
             // 대진 경기는 상대가 정해져 있다 — 2인 고정으로 앉히고 상대 목표는 그 사람 기록으로.
             setPlayers(tournamentMatch
@@ -163,7 +131,7 @@ export const useGameCreation = ({
                         type: 'member',
                         member: tournamentMatch.opponent,
                         name: tournamentMatch.opponent.name,
-                        target: calculateTargetScore(memberAvgForType(tournamentMatch.opponent, type), type),
+                        target: targetFor(tournamentMatch.opponent, type),
                     },
                 ]
                 : [
@@ -259,13 +227,8 @@ export const useGameCreation = ({
         // Recalculate targets for member players
         setPlayers(prev => prev.map(p => {
             if (p.type === 'member' && p.member) {
-                // For Host (Me)
-                if (p.isHost && member) {
-                    const recordAvg = calculateRecordAverage(history, newType, memberAvgForType(member, newType));
-                    return { ...p, target: calculateTargetScore(recordAvg, newType) };
-                }
-                // For other members (polling guests) use their average
-                return { ...p, target: calculateTargetScore(memberAvgForType(p.member, newType), newType) };
+                // 종목을 바꾸면 그 종목의 다마로 다시 적는다(나도, 들어온 회원도)
+                return { ...p, target: targetFor(p.isHost && member ? member : p.member, newType) };
             }
             return p;
         }));
@@ -340,7 +303,7 @@ export const useGameCreation = ({
                                 ...currentPlayers[emptySlotIdx],
                                 type: 'member',
                                 member: guest,
-                                target: calculateTargetScore(memberAvgForType(guest, gameType), gameType),
+                                target: targetFor(guest, gameType),
                                 name: guest.name
                             };
                             existingIds.add(guest.id);

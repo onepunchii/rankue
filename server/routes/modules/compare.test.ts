@@ -128,9 +128,9 @@ describe("GET /compare/real", () => {
         const c3 = data["3c"];
         expect(c3.ready).toBe(true);
         expect(c3.handi).toBe(23);
-        // 0.66 → 핸디 23(0.6 이상), 다음 칸은 25(0.7) — 남은 차이 0.04
-        expect(c3.nextHandi.handi).toBe(25);
-        expect(c3.nextHandi.gap).toBeCloseTo(0.04, 5);
+        // 0.66 → 표의 25점 칸(0.605 이상), 다음 칸은 27(0.710) — 남은 차이 0.05. 2026-10-12 표를 바꾸기 전에는 다음 칸이 25(0.7) · 0.04 였다
+        expect(c3.nextHandi.handi).toBe(27);
+        expect(c3.nextHandi.gap).toBeCloseTo(0.05, 5);
         expect(c3.pro.memCode).toBe("A");
         expect(data["4c"].ready).toBe(false);
         expect(data["4c"].games).toBe(2);

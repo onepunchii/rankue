@@ -147,8 +147,9 @@ const gameAverage = (g: Played) => (g.score / (g.innings || 1)).toFixed(2);
  */
 function rpDelta(type: GT, win: boolean, handi: number): number {
     if (win) return 30;
-    if (type === "3c") return handi < 16 ? 0 : handi < 22 ? -5 : -15;
-    return handi < 12 ? 0 : handi < 25 ? -5 : -15;
+    // 2026-10-12 다마 표가 바뀌며 구간도 옮겼다(서버 rpDeltaFor 와 같은 숫자)
+    if (type === "3c") return handi < 20 ? 0 : handi < 25 ? -5 : -15;
+    return handi < 8 ? 0 : handi < 15 ? -5 : -15;
 }
 
 interface Side { wins: number; losses: number; games: number; avg: number; handiAvg: number; handi: number; highRun: number; rp: number }

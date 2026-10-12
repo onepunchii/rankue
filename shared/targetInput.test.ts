@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import ts from "typescript";
 import { TARGET_INPUT_MAX, TARGET_INPUT_MIN, commitTargetText, sanitizeTargetText, stepTarget } from "./targetInput.js";
+import { SCOREBOARD_DEFAULT_TARGET, scoreboardTarget } from "./realHandicap.js";
 
 /**
  * 점수판 열기 — 목표 점수(다마수)를 숫자로 직접 치기(2026-10-06).
@@ -745,71 +746,68 @@ describe("점수판 열기 화면 — 렌더 중 되돌림은 밖에서 바뀐 �
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// (라) "숫자 입력만" — 목표 기본값·계산식은 그대로
+// (라) 자리에 미리 적는 목표 — 그 사람의 다마
+// 2026-10-06 에는 "숫자로 변경만 가능하게"라 예전 식(3쿠션 에버 × 35 · 4구 에버 × 20)을 그대로 두었다.
+// 2026-10-12 오너: "이 다마대로 점수판 자동 입력으로 하고" → 미리 적는 값을 **다마 표(shared/realHandicap)** 로 바꿨다.
+//   다마(서버가 최근 공식 경기로 매긴 값) → 없으면 그 종목 에버리지를 같은 표에 넣은 값 → 없으면 15.
+// 손으로 치는 칸 · 화살표 · 범위(1~999)는 그대로다.
 // ─────────────────────────────────────────────────────────────────────────────
-describe("목표 기본값·계산식은 손대지 않았다(오너 2026-10-06: \"숫자로 변경만 가능하게\")", () => {
-    const calcDecl = decl(hook, "calculateTargetScore");
-    const calcCode = bare(calcDecl, hook);
-    // 훅 전체를 불러오면 화면 모듈('@/…')이 딸려 오므로, 식 하나만 떼어 실제로 돌려 본다
-    const calcJs = ts.transpileModule(calcDecl.parent.parent.getText(hook), {
-        compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.ESNext },
-    }).outputText;
-    const calc = new Function(`${calcJs}\n;return calculateTargetScore;`)() as (
-        avg: string | number | null | undefined,
-        type: "3c" | "4c",
-    ) => number;
-
-    it("식의 글자 — 3쿠션 ×35 · 4구 ×20 · 기록 없으면 15 · 최소 1", () => {
-        expect(calcCode).toMatch(/if \(isNaN\(average\) \|\| average === 0\) return type === ['"]3c['"] \? 15 : 15;/);
-        expect(calcCode).toMatch(/if \(type === ['"]3c['"]\) \{ const calculated = Math\.round\(average \* 35\); return Math\.max\(1, calculated\); \}/);
-        expect(calcCode).toMatch(/else \{ const calculated = Math\.round\(average \* 20\); return Math\.max\(1, calculated\); \}/);
-        // 식 안의 수는 이것뿐이다 — 상한(999) 같은 것을 식에 끼워 넣지 않았다
-        expect((calcCode.match(/\b\d+(?:\.\d+)?\b/g) ?? []).sort()).toEqual(["0", "0", "1", "1", "15", "15", "20", "35"].sort());
-    });
-
-    it("식의 값 — 3쿠션은 에버리지 × 35", () => {
-        expect(calc(1, "3c")).toBe(35);
-        expect(calc(0.8, "3c")).toBe(28);
-        expect(calc("0.800", "3c")).toBe(28);
-        expect(calc(0.5, "3c")).toBe(18); // 17.5 → 반올림
-        expect(calc(1.234, "3c")).toBe(43);
-    });
-
-    it("식의 값 — 4구는 에버리지 × 20", () => {
-        expect(calc(1, "4c")).toBe(20);
-        expect(calc(1.2, "4c")).toBe(24);
-        expect(calc("7.5", "4c")).toBe(150);
-        expect(calc(0.33, "4c")).toBe(7);
-    });
-
-    it("식의 값 — 기록이 없으면 종목과 상관없이 15, 아무리 낮아도 1", () => {
-        for (const type of ["3c", "4c"] as const) {
-            expect(calc(0, type)).toBe(15);
-            expect(calc(null, type)).toBe(15);
-            expect(calc(undefined, type)).toBe(15);
-            expect(calc("0.000", type)).toBe(15);
-            expect(calc("abc", type)).toBe(15);
-            expect(calc(0.01, type)).toBe(1);
-        }
-    });
-
-    it("식에는 상한이 없다 — 999 는 손으로 치는 칸과 화살표의 범위일 뿐이다", () => {
-        expect(calc(40, "3c")).toBe(1400);
-        expect(calc(60, "4c")).toBe(1200);
+describe("자리에 미리 적는 목표는 그 사람의 다마다(오너 2026-10-12: \"이 다마대로 점수판 자동 입력으로 하고\")", () => {
+    it("훅은 셈을 따로 하지 않는다 — 다마 표 한 곳(scoreboardTarget)에서 받는다", () => {
+        expect(bare(decl(hook, "targetFor"), hook)).toBe("targetFor = (m: any, type: '3c' | '4c'): number => scoreboardTarget(m, type).target");
+        // 예전 식(× 35 · × 20)과 누적 에버리지 셈은 없다
+        expect(hookCode).not.toMatch(/calculateTargetScore|calculateRecordAverage|memberAvgForType/);
+        expect(hookCode).not.toMatch(/\* 35|\* 20/);
         expect(hookCode).not.toMatch(/targetInput|TARGET_INPUT_/);
     });
 
+    it("값 — 다마가 있으면 그 다마, 없으면 그 종목 에버리지를 다마 표에 넣은 값, 둘 다 없으면 15", () => {
+        // 다마가 있다: 에버리지가 무엇이든 다마가 이긴다
+        expect(scoreboardTarget({ handi3c: 21, avg3c: 0.9 }, "3c")).toEqual({ target: 21, from: "handi" });
+        expect(scoreboardTarget({ handi4c: 20, avg4c: 0.2 }, "4c")).toEqual({ target: 20, from: "handi" });
+        // 다마가 없다(공식 5판 전): 에버리지 → 표. 예전 식이면 0.4 × 35 = 14 · 1.0 × 20 = 20 이었다
+        expect(scoreboardTarget({ handi3c: null, avg3c: 0.4 }, "3c")).toEqual({ target: 18, from: "avg" });
+        expect(scoreboardTarget({ handi3c: 0, avg3c: 0.869 }, "3c")).toEqual({ target: 30, from: "avg" });
+        expect(scoreboardTarget({ avg4c: 1.0 }, "4c")).toEqual({ target: 20, from: "avg" });
+        expect(scoreboardTarget({ avg4c: 0.62 }, "4c")).toEqual({ target: 12, from: "avg" });
+        // 종목은 섞지 않는다 — 4구 에버리지로 3쿠션 목표를 만들지 않는다
+        expect(scoreboardTarget({ avg4c: 1.2, handi4c: 25 }, "3c")).toEqual({ target: 15, from: "default" });
+        for (const none of [null, undefined, {}, { handi3c: null, avg3c: 0 }, { avg3c: Number.NaN }]) {
+            expect(scoreboardTarget(none, "3c")).toEqual({ target: SCOREBOARD_DEFAULT_TARGET, from: "default" });
+        }
+        expect(SCOREBOARD_DEFAULT_TARGET).toBe(15);
+    });
+
     it("게스트 자리 기본 목표는 15 — 처음 앉힐 때·인원을 늘릴 때·핀으로 늘어날 때 모두", () => {
-        expect(bare(decl(hook, "DEFAULT_GUEST_TARGET"), hook)).toBe("DEFAULT_GUEST_TARGET = 15");
+        expect(bare(decl(hook, "DEFAULT_GUEST_TARGET"), hook)).toBe("DEFAULT_GUEST_TARGET = SCOREBOARD_DEFAULT_TARGET");
         expect(hookCode.match(/target: DEFAULT_GUEST_TARGET\b/g)?.length).toBe(3);
     });
 
-    it("방장·회원 자리 목표는 여전히 그 식에서 나온다(카드가 정해 온 목표가 있으면 그것)", () => {
-        expect(hookCode).toContain("const hostTarget = initialTarget && initialTarget > 0 ? initialTarget : calculateTargetScore(recordAvg, type);");
-        expect(hookCode).toContain("return { ...p, target: calculateTargetScore(recordAvg, newType) };");
-        expect(hookCode).toContain("return { ...p, target: calculateTargetScore(memberAvgForType(p.member, newType), newType) };");
-        expect(hookCode).toContain("target: calculateTargetScore(memberAvgForType(guest, gameType), gameType)");
-        expect(hookCode).toContain("target: calculateTargetScore(memberAvgForType(tournamentMatch.opponent, type), type)");
+    it("방장 · 들어온 회원 · 대진 상대 · 종목을 바꿀 때 모두 같은 길(카드가 정해 온 목표가 있으면 그것)", () => {
+        expect(hookCode).toContain("const hostTarget = initialTarget && initialTarget > 0 ? initialTarget : targetFor(member, type);");
+        expect(hookCode).toContain("return { ...p, target: targetFor(p.isHost && member ? member : p.member, newType) };");
+        expect(hookCode).toContain("target: targetFor(guest, gameType)");
+        expect(hookCode).toContain("target: targetFor(tournamentMatch.opponent, type)");
+    });
+
+    it("화면: 미리 적힌 값의 근거를 적고, 고쳤으면 한 번에 되돌린다 — 이 종목의 다마 메달도 같이", () => {
+        const src = read("client/src/components/hiq/dashboard/GameCreationModal.tsx");
+        expect(src).toContain("const auto = player.member ? scoreboardTarget(player.member, gameType) : null;");
+        expect(src).toContain('{auto && auto.from !== "default" && (');
+        expect(src).toContain("typed === auto.target ? (");
+        expect(src).toContain("onClick={() => onUpdate(idx, { target: auto.target })}");
+        expect(src).toContain("<RealMedal game={gameType} handi={memberHandi} size={32} />");
+        // 채팅의 매칭 대결 카드도 같은 규칙 — 예전 기본값(3쿠션 15 · 4구 80)의 80 은 온라인게임 눈금이었다
+        const sheet = read("client/src/components/hiq/chat/attach/MatchInviteSheet.tsx");
+        expect(sheet).toContain('const myTarget = (g: "3c" | "4c") => scoreboardTarget(member, g).target;');
+        expect(sheet).toContain("const pickGame = (g: \"3c\" | \"4c\") => { setGameType(g); setTarget(myTarget(g)); };");
+        expect(sheet).not.toMatch(/DEFAULT_TARGET|"4c": 80/);
+        for (const l of ["ko", "en", "vi", "tr", "es"]) {
+            const d = read(`client/src/lib/i18n/${l}.ts`);
+            for (const k of ["gameCreationModal.autoHandi", "gameCreationModal.autoAvg", "gameCreationModal.autoReset"]) {
+                expect(d, `${l} ${k}`).toMatch(new RegExp(`^  "${k.replace(/\./g, "\\.")}": ".*\\{n\\}.*",$`, "m"));
+            }
+        }
     });
 
     it("회원/게스트 토글의 기본값도 그대로 — 회원 자리 0(핀 대기), 게스트 15", () => {

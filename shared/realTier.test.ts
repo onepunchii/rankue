@@ -9,9 +9,13 @@ import { REAL_TIERS, REAL_TIER_IDS, bestRealTier, handiChangeKind, realHandiStep
  * 실전 등급 = 그 종목의 내 다마. 화면마다 식이 달라 같은 사람이 다른 등급으로 나오던 것을 막는다.
  */
 describe("실전 등급 구간", () => {
-    it("3쿠션: 12·15 브론즈 / 18 실버 / 20 골드 / 23 플래티넘 / 25 다이아 / 30 마스터(오너 결정)", () => {
+    it("3쿠션: 12~17 브론즈 / 18 실버 / 20~22 골드 / 23·24 플래티넘 / 25~28 다이아 / 30 이상 마스터(오너 결정 — 구간의 시작 다마는 그대로)", () => {
+        // 2026-10-12 다마 표가 16칸(12~40)으로 늘었다 — 새로 생긴 칸은 그 사이의 등급에 들어간다
         const got = Object.fromEntries(realHandiSteps("3c").map((h) => [h, realTierFor(h, "3c")!.id]));
-        expect(got).toEqual({ 12: "bronze", 15: "bronze", 18: "silver", 20: "gold", 23: "platinum", 25: "diamond", 30: "master" });
+        expect(got).toEqual({
+            12: "bronze", 15: "bronze", 17: "bronze", 18: "silver", 20: "gold", 21: "gold", 22: "gold", 23: "platinum", 24: "platinum",
+            25: "diamond", 27: "diamond", 28: "diamond", 30: "master", 32: "master", 35: "master", 40: "master",
+        });
     });
 
     it("4구: 3~10 브론즈 / 12·15 실버 / 20·25 골드 / 30 플래티넘 / 40 다이아 / 50 마스터(예전 구간 그대로)", () => {
@@ -20,6 +24,9 @@ describe("실전 등급 구간", () => {
     });
 
     it("다마 표의 맨 위가 마스터다 — 예전에는 3쿠션 최고 30 으로 다이아(35) · 마스터(45)에 닿을 수 없었다", () => {
+        // 4구 마스터(500)는 에버리지 2.5, 3쿠션 마스터(30점)는 0.869 부터다(예전 표는 4구 1.5 · 3쿠션 1.0)
+        expect(HANDICAP_MAP_4C.find((x) => x.handi === 50)!.avg).toBe(2.5);
+        expect(HANDICAP_MAP_3C.find((x) => x.handi === 30)!.avg).toBe(0.869);
         expect(realTierFor(Math.max(...HANDICAP_MAP_3C.map((s) => s.handi)), "3c")!.id).toBe("master");
         expect(realTierFor(Math.max(...HANDICAP_MAP_4C.map((s) => s.handi)), "4c")!.id).toBe("master");
         // 여섯 등급이 두 종목 모두에서 실제로 나온다(나올 수 없는 등급이 없다)
@@ -128,7 +135,7 @@ describe("화면: 실전 등급은 어디서나 같은 식 · 다마 메달", ()
         expect(code(page)).not.toContain('t("gameResult.handicapUp")');
         expect(code(page)).not.toContain("{handicapUpdate.message}");
         // 근거는 서버가 숫자로 준다
-        expect(root("server/storage/game.repo.ts")).toContain("games: filtered.length,");
+        expect(root("server/storage/game.repo.ts")).toContain("games: basis.games,");
     });
 
     it("그림: 여섯 장 · webp · 가볍다(한 장 40KB, 합쳐 150KB)", () => {

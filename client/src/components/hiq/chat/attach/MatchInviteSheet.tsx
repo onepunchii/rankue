@@ -14,11 +14,16 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { BallDot } from "@/components/hiq/BallDot";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { scoreboardTarget } from "@shared/realHandicap";
 
 export interface MatchInvitePick { gameType: "3c" | "4c"; seats: 2 | 3 | 4; target: number }
 
-/** 종목별 기본 목표 — 3쿠션 15점, 4구 80점(앱 어디서나 같은 기본값). */
-const DEFAULT_TARGET: Record<"3c" | "4c", number> = { "3c": 15, "4c": 80 };
+/**
+ * 처음 적히는 목표 = **내 다마**(2026-10-12 오너: "이 다마대로 점수판 자동 입력으로 하고") — 점수판 '경기 만들기'와 같은 규칙이다(shared/realHandicap scoreboardTarget):
+ * 다마 → 없으면 그 종목 에버리지를 다마 표에 넣은 값 → 없으면 15.
+ * 예전 기본값은 3쿠션 15 · 4구 80 이었다. 80 은 온라인게임(1득점 = 10점)의 기본값을 옮겨 온 것이라 점수판의 다마 눈금(4구 3~50)과 맞지 않았다.
+ */
 const MIN_TARGET = 1;
 const MAX_TARGET = 999;
 
@@ -53,14 +58,17 @@ export function MatchInviteSheet({ open, onOpenChange, busy, seatsFixed, onPick 
     onPick: (pick: MatchInvitePick) => void;
 }) {
     const { t } = useT();
+    const { member } = useAuth();
+    const myTarget = (g: "3c" | "4c") => scoreboardTarget(member, g).target;
     const [gameType, setGameType] = useState<"3c" | "4c">("3c");
     const [seats, setSeats] = useState<2 | 3 | 4>(2);
-    const [target, setTarget] = useState(DEFAULT_TARGET["3c"]);
-    // 종목을 바꾸면 목표도 그 종목의 기본으로 — 3쿠션 15를 들고 4구로 가면 30초 만에 끝난다.
-    const pickGame = (g: "3c" | "4c") => { setGameType(g); setTarget(DEFAULT_TARGET[g]); };
+    const [target, setTarget] = useState(() => myTarget("3c"));
+    // 종목을 바꾸면 목표도 그 종목의 내 다마로 — 3쿠션 다마를 들고 4구로 가면 엉뚱한 판이 된다.
+    const pickGame = (g: "3c" | "4c") => { setGameType(g); setTarget(myTarget(g)); };
     const bump = (d: number) => setTarget((n) => Math.min(MAX_TARGET, Math.max(MIN_TARGET, n + d)));
     // 열 때마다 기본값으로 돌린다 — 앞서 고른 값이 남아 있으면 다음 대결을 엉뚱하게 연다(SimInviteSheet 와 같은 규칙).
-    useEffect(() => { if (open) { setGameType("3c"); setSeats(seatsFixed ?? 2); setTarget(DEFAULT_TARGET["3c"]); } }, [open, seatsFixed]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 열릴 때의 내 다마로 한 번만 채운다(치는 동안 값이 바뀌어 덮이지 않게)
+    useEffect(() => { if (open) { setGameType("3c"); setSeats(seatsFixed ?? 2); setTarget(myTarget("3c")); } }, [open, seatsFixed]);
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>

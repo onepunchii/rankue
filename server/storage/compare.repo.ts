@@ -7,7 +7,8 @@ import { db } from "../db.js";
 import { hiqGameHistory, hiqMembers } from "../../shared/schema.js";
 import { and, desc, eq, gt, gte, sql } from "drizzle-orm";
 import { COMPARE_MIN_GAMES, rankAmong, type CompareMembers, type CompareMyStats } from "../../shared/proCompare.js";
-import { HANDI_RECENT_GAMES } from "../../shared/realHandicap.js";
+import { handiBasisAverage } from "../../shared/realHandicap.js";
+import { recentHandiGames } from "./game.repo.js";
 
 const TTL = 10 * 60 * 1000;
 type GT = "3c" | "4c";
@@ -80,12 +81,8 @@ export class CompareRepository {
     async handiBasis(memberId: string, type: GT): Promise<{ ranked: number; avg: number | null }> {
         const [cnt] = await db.select({ n: sql<number>`count(*)::int` }).from(hiqGameHistory)
             .where(and(eq(hiqGameHistory.memberId, memberId), eq(hiqGameHistory.gameType, type), eq(hiqGameHistory.isRanked, true)));
-        const rows = await db.select({ average: hiqGameHistory.average }).from(hiqGameHistory)
-            .where(and(eq(hiqGameHistory.memberId, memberId), eq(hiqGameHistory.gameType, type), eq(hiqGameHistory.isRanked, true)))
-            .orderBy(desc(hiqGameHistory.createdAt))
-            .limit(HANDI_RECENT_GAMES);
-        const vals = rows.map((r) => parseFloat(r.average)).filter((v) => Number.isFinite(v));
-        return { ranked: Number(cnt?.n ?? 0), avg: vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null };
+        // 경기 끝의 다마 산정(game.repo checkAndUpdateHandicap)과 **같은 판 · 같은 셈** — 4구에서 눈금 밖의 목표로 적은 판을 빼는 것까지
+        return { ranked: Number(cnt?.n ?? 0), avg: handiBasisAverage(await recentHandiGames(memberId, type), type) };
     }
 
     /** 같은 핸디 회원 — 인원·평균 에버·평균 최고 하이런(그 종목). 나도 포함한다. */
