@@ -1,0 +1,4 @@
+import { gen } from "./genb.mjs";
+export const TIER_BASE = (spec) => `A single competitive game rank emblem, strict front view, perfectly centered and left-right symmetrical, isolated on a pure solid black background. Polished metal with hard enamel inlays, crisp beveled edges, fine engraved lines, soft studio lighting with a gentle highlight from above. Motif: a heraldic shield with two crossed billiard cues behind it, and in the middle of the shield three glossy billiard balls (one white, one yellow, one red) arranged in a small triangle. ${spec} The emblem fills about 78% of the frame with empty black margin all around. No text, no letters, no numbers, no watermark, no extra objects.`;
+const r = await gen({ name: "tier-gold", model: "openai/gpt-5-image-mini", prompt: TIER_BASE("Material and ornament: rich warm gold metal, deep green enamel on the shield face, a full laurel wreath curving up both sides.") });
+console.log(JSON.stringify(r));
