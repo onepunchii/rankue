@@ -282,21 +282,23 @@ describe("골프 홈", () => {
         const quick = code(client("golf/components/dashboard/QuickActions.tsx"));
         const sheet = code(client("golf/components/dashboard/GameModeSheet.tsx"));
 
-        it("홈 타일 넷(RANKUE MATCH · ENTER CODE · PASSPORT · PRO-AM)이 guard 를 거친다", () => {
+        it("기록이 쌓이는 홈 타일 셋(RANKUE MATCH · ENTER CODE · PASSPORT)이 guard 를 거친다 — 넷째(볼마커 장식장)는 방문자에게도 열려 있다", () => {
             expect(quick).toContain('const gate = useGuestGate("dark");');
             expect(quick).toContain("gate.guard(onOpenGameMode, {");
             expect(quick).toContain("gate.guard(onOpenJoin, {");
             expect(quick).toContain("gate.guard(() => setLocation('/golf/passport'), {");
-            expect(quick).toContain("gate.guard(() => setLocation('/golf/proam'), {");
+            // 프로암 타일은 뺐다(2026-10-12 오너: "랭큐 프로암 빼주고") — 화면(/golf/proam)은 남아 있지만 홈에서 가는 길은 없다
+            expect(quick).not.toContain("proam");
+            // 그 자리의 장식장은 예시 장식장을 보여 주는 열린 화면이라 가입 안내를 거치지 않는다
+            expect(quick).toContain("onClick={() => setLocation('/golf/shelf')}");
             // guard 없이 바로 여는 길이 남아 있지 않다
             expect(quick).not.toContain("onClick={onOpenGameMode}");
             expect(quick).not.toContain("onClick={onOpenJoin}");
             expect(quick).not.toContain("onClick={() => setLocation('/golf/passport')}");
-            expect(quick).not.toContain("onClick={() => setLocation('/golf/proam')}");
         });
 
         it("가입 뒤 돌아올 곳(from)은 가려던 주소", () => {
-            for (const from of ["/golf/game/new?mode=match", "/golf/game/new?mode=join", "/golf/passport", "/golf/proam"]) {
+            for (const from of ["/golf/game/new?mode=match", "/golf/game/new?mode=join", "/golf/passport"]) {
                 expect(quick, from).toContain(`from: "${from}"`);
             }
         });
@@ -315,23 +317,19 @@ describe("골프 홈", () => {
             expect(sheet.indexOf("{gate.sheet}")).toBeGreaterThan(sheet.indexOf("</Sheet>"));
         });
 
-        it("안내 문구가 사실과 맞다 — 핸디캡·그래프는 '골프장에서' 적은 라운드, 프로암은 '준비 중'", () => {
+        it("안내 문구가 사실과 맞다 — 핸디캡·그래프는 '골프장에서' 적은 라운드", () => {
             // 홈의 평균·그래프는 현장 인증된 라운드만 센다(countsOnSite) — 조건 없이 '스코어를 적으면 쌓인다'고 하지 않는다
             for (const s of [quick, sheet]) {
                 expect(s).toContain('desc: "골프장에서 스코어를 적으면 핸디캡과 그래프가 쌓여요.');
                 expect(s).not.toMatch(/desc: "스코어를 적으면/);
             }
-            // 프로암은 아직 응모를 열지 않았다(pages/ProAm.tsx) — 열려 있다고도, 소식·알림을 보내 준다고도 하지 않는다
-            const proam = quick.slice(quick.indexOf("gate.guard(() => setLocation('/golf/proam'), {"), quick.indexOf('from: "/golf/proam"'));
-            expect(proam).toContain("준비 중");
-            expect(proam).not.toMatch(/열려 있어요|소식|알림/);
         });
 
         it("안내 문구에 가입 수단·걸리는 시간, 술·돈·내기 말이 없다", () => {
             const home = code(client("golf/pages/Dashboard.tsx"));
             const copy = [quick, sheet, home].flatMap((s) => Array.from(s.matchAll(/\b(?:title|desc)(?::\s*|=)"([^"]+)"/g), (m) => m[1]));
-            // 타일 넷 + 시트 둘은 제목·설명 둘씩, 홈의 한 줄도 둘
-            expect(copy.length).toBeGreaterThanOrEqual(14);
+            // 가입 안내를 거치는 타일 셋 + 시트 둘은 제목·설명 둘씩, 홈의 한 줄도 둘(프로암 타일을 뺀 2026-10-12 뒤로 열둘)
+            expect(copy.length).toBeGreaterThanOrEqual(12);
             for (const line of copy) {
                 expect(line, line).not.toMatch(/\d\s*초|바로 가입|즉시|카카오|구글|애플|전화번호/);
                 expect(line, line).not.toMatch(/술|맥주|소주|내기|판돈|\d\s*원|만\s*원/);

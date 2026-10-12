@@ -12,12 +12,16 @@
  */
 import { Link } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
-import { STAMP_ALL_OPEN, STAMP_INVITE_TOTAL, STAMP_OPEN_TOTAL } from "@shared/golfStampBooks";
+import { STAMP_ALL_OPEN, STAMP_INVITE_TOTAL, STAMP_OPEN_TOTAL, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
 import { CourseShell } from "@/golf/components/course/CourseShell";
 import { Skel } from "@/golf/components/course/detail/ui";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
-import { TROPHIES } from "@/golf/stamps/bookArt";
+import { BOOK_ART, TROPHIES, coverSrc } from "@/golf/stamps/bookArt";
+import { InkStamp } from "@/golf/stamps/InkStamp";
 import { BookCover, BookWide, MarkerArt, MarkerCatalog, SHELF_PATH, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampSection, bookName, bookPath } from "@/golf/stamps/StampParts";
+
+/** 가이드의 설명 그림에 쓰는 권 — 표지 · 도장 색 · 볼마커를 한 권으로 맞춘다 */
+const GUIDE_BOOK = "gangwon";
 
 export default function StampBooks() {
     const col = useStampCollection();
@@ -116,10 +120,34 @@ export default function StampBooks() {
                     </StampSection>
 
                     <StampSection title="도장은 이렇게 찍혀요">
-                        <ol className="space-y-2 rounded-2xl bg-[#FFFFFF08] px-4 py-3.5 text-[14px] leading-snug text-[#FFFFFFCC]">
-                            <li className="flex gap-2.5 break-keep"><span className="tabular-nums text-[#64DD17]">1</span>골프장에서 랭큐매치로 라운드를 시작해요.</li>
-                            <li className="flex gap-2.5 break-keep"><span className="tabular-nums text-[#64DD17]">2</span>18홀을 다 적고 그 골프장에서 끝내면 현장 인증이 돼요.</li>
-                            <li className="flex gap-2.5 break-keep"><span className="tabular-nums text-[#64DD17]">3</span>그 골프장의 칸에 도장이 찍히고, 한 권이 다 차면 볼마커를 받아요.</li>
+                        {/* 가이드 — 글만 있던 세 줄에 우리가 만든 그림을 붙였다(2026-10-12 오너: "도장깨기 가이드 … 우리가 만든 이미지 같이 들어가면").
+                            그림은 설명용이다(누가 가진 것이 아니다): 표지 → 종이에 찍힌 도장 → 볼마커 */}
+                        <ol className="space-y-2.5" data-testid="stamp-guide">
+                            <li className="flex items-center gap-3.5 rounded-2xl bg-[#FFFFFF08] p-3">
+                                <span className="relative block w-[54px] shrink-0 aspect-[3/4] overflow-hidden rounded-[8px] bg-[#1A1A1A]" aria-hidden>
+                                    <img src={coverSrc(GUIDE_BOOK)} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" draggable={false} />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-[12px] text-[#64DD17]">1 · 도장첩을 고른다</span>
+                                    <span className="mt-0.5 block text-[14px] leading-snug text-[#FFFFFFCC] break-keep">가고 싶은 권역의 도장첩을 열어 보세요. 빈 칸이 앞으로 갈 곳이에요.</span>
+                                </span>
+                            </li>
+                            <li className="flex items-center gap-3.5 rounded-2xl bg-[#FFFFFF08] p-3">
+                                <span className="block shrink-0 rounded-[10px] bg-[#F4EFE3] p-1" aria-hidden>
+                                    <InkStamp name="도장깨기" ink={BOOK_ART[GUIDE_BOOK].ink} glyph={BOOK_ART[GUIDE_BOOK].glyph} size={46} tilt={-6} />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-[12px] text-[#64DD17]">2 · 골프장에서 18홀을 끝낸다</span>
+                                    <span className="mt-0.5 block text-[14px] leading-snug text-[#FFFFFFCC] break-keep">랭큐매치로 라운드를 적고 그 골프장에서 끝내면 현장 인증이 되고, 그 칸에 도장이 찍혀요.</span>
+                                </span>
+                            </li>
+                            <li className="flex items-center gap-3.5 rounded-2xl bg-[#FFFFFF08] p-3">
+                                <span className="flex w-[54px] shrink-0 justify-center" aria-hidden><MarkerArt bookId={GUIDE_BOOK} size={54} earned /></span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-[12px] text-[#64DD17]">3 · 한 권을 다 채우면 볼마커</span>
+                                    <span className="mt-0.5 block text-[14px] leading-snug text-[#FFFFFFCC] break-keep">볼마커는 장식장에 놓여요. 찍은 골프장이 {STAMP_TROPHY_STEPS.slice(0, 3).join(" · ")}곳이 되면 트로피도 받아요.</span>
+                                </span>
+                            </li>
                         </ol>
                         <Link href="/golf/passport" className="mt-3 flex items-center gap-1 text-[14px] text-[#FFFFFFB3] active:text-[#FFFFFF]">
                             <span className="flex-1 break-keep">도장첩 밖의 골프장 도장은 골프 여권에 모여요</span>

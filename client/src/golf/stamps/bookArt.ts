@@ -10,7 +10,7 @@
  */
 import { STAMP_ALL_OPEN, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
 
-export type StampGlyph = "sunsea" | "tree" | "peaks" | "lake" | "flower" | "sunrise" | "volcano" | "gate";
+export type StampGlyph = "sunsea" | "tree" | "peaks" | "lake" | "flower" | "sunrise" | "volcano" | "gate" | "flag";
 
 export interface BookArt {
     /** 종이 위 잉크 색 — 도장은 늘 종이(도장첩 속지) 위에 찍힌다 */
@@ -48,7 +48,12 @@ export const GLYPH_PATHS: Readonly<Record<StampGlyph, readonly string[]>> = {
     sunrise: ["M3 16.5h18", "M7 16.5a5 5 0 0 1 10 0", "M12 5.5V8M5.5 9l1.7 1.7M18.5 9l-1.7 1.7", "M6 20.5h12"],
     volcano: ["M2 16c4-.5 6-6 8-6h4c2 0 4 5.5 8 6z", "M4 20h3m2 0h3m2 0h3m2 0h1"],
     gate: ["M5 21V8l7-4 7 4v13", "M9 21v-8h6v8M12 13v8"],
+    // 도장첩 밖의 골프장(여권의 도장) — 깃대 하나
+    flag: ["M8.5 21V4", "M8.5 5l9.5 3-9.5 3.5", "M5.5 21h6"],
 };
+
+/** 도장첩 밖 골프장의 도장(여권) — 권의 색이 없어 먹색, 무늬는 깃대 */
+export const PLAIN_STAMP: BookArt = { ink: "#4A4A4A", glyph: "flag" };
 
 export interface TrophyArt {
     /** 이 수만큼 찍으면 받는다 */

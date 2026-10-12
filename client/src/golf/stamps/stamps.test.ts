@@ -7,10 +7,11 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
-import { ALL_OPEN_MARKER, BOOK_ART, GLYPH_PATHS, TROPHIES, coverSrc, markerSrc } from "./bookArt";
+import { ALL_OPEN_MARKER, BOOK_ART, GLYPH_PATHS, PLAIN_STAMP, TROPHIES, coverSrc, markerSrc } from "./bookArt";
 import { stampNameSize, stampSeed } from "./InkStamp";
 import { stampDate } from "./stampDate";
 import { stampMoment } from "./stampMoment";
+import { STAMP_LABEL_MAX, stampLabel } from "./stampLabel";
 import { bookStates } from "@shared/golfStampBooks";
 
 const ROOT = resolve(__dirname, "../../../..");
@@ -22,6 +23,7 @@ const SCREENS = [
     "client/src/golf/stamps/StampParts.tsx", "client/src/golf/stamps/InkStamp.tsx", "client/src/golf/stamps/StampHomeEntry.tsx",
     "client/src/golf/pages/StampBooks.tsx", "client/src/golf/pages/StampBook.tsx", "client/src/golf/pages/GolfShelf.tsx",
     "client/src/golf/components/passport/StampBooksBanner.tsx", "client/src/golf/stamps/StampResultCard.tsx",
+    "client/src/golf/stamps/CourseStampBlock.tsx", "client/src/golf/stamps/HomeTileArt.tsx", "client/src/golf/components/passport/StampList.tsx",
 ];
 
 describe("그림", () => {
@@ -172,6 +174,59 @@ describe("찍히는 순간(라운드 결과 화면)", () => {
         // 방금 찍힌 도장 = 도장을 얻은 날이 라운드를 끝낸 날. 볼마커를 '받았어요'는 그 라운드로 다 찼을 때만
         expect(card).toContain("const fresh = !!finishedAt && mine.stamp.date === stampDate(finishedAt);");
         expect(card).toContain("const justDone = fresh && state.done;");
+    });
+});
+
+describe("우리가 만든 그림이 들어가는 곳(2026-10-12 오너: \"랭큐 프로암 빼주고 도장깨기 가이드나 골프 코스도 해당 우리가 만든 이미지 같이 들어가면\")", () => {
+    it("홈 아래 줄: 프로암 타일은 없고, 여권 타일과 장식장 타일이 우리 그림을 쓴다", () => {
+        const quick = code(read("client/src/golf/components/dashboard/QuickActions.tsx"));
+        expect(quick).not.toMatch(/proam|PRO-AM|프로암/);
+        expect(quick).toContain("<PassportTileArt />");
+        expect(quick).toContain("<ShelfTileArt />");
+        // 여권 타일의 옛 꼬리말('도장깨기 & 가이드')은 맞지 않는다 — 가이드 탭은 없어졌고 도장깨기는 따로 생겼다
+        expect(quick).not.toContain("도장깨기 & 가이드");
+        // 두 타일의 그림은 장식이다 — 도장에 골프장 이름을 적지 않는다(누가 다녀온 것처럼 보이지 않게)
+        const art = code(read("client/src/golf/stamps/HomeTileArt.tsx"));
+        expect([...art.matchAll(/<InkStamp name="([^"]+)"/g)].map((m) => m[1])).toEqual(["골프 여권", "도장깨기"]);
+    });
+
+    it("도장깨기 가이드의 세 단계에 그림이 붙는다 — 표지 · 종이에 찍힌 도장 · 볼마커", () => {
+        const s = code(read("client/src/golf/pages/StampBooks.tsx"));
+        const guide = s.slice(s.indexOf('data-testid="stamp-guide"'), s.indexOf("</ol>", s.indexOf('data-testid="stamp-guide"')));
+        expect(guide).toContain("coverSrc(GUIDE_BOOK)");
+        expect(guide).toContain('<InkStamp name="도장깨기"');
+        expect(guide).toContain("<MarkerArt bookId={GUIDE_BOOK} size={54} earned />");
+        expect(guide.match(/<li /g)?.length).toBe(3);
+    });
+
+    it("골프장 공개 페이지: 도장첩의 골프장이면 그 권의 표지와 내 도장을 보여 준다. 방문자는 내 것을 부르지 않는다", () => {
+        const page = code(read("client/src/golf/pages/GolfCoursePage.tsx"));
+        expect(page).toContain("<CourseStampBlock key={`stamp:${d.slug}`} courseIds={d.courseIds}");
+        const block = code(read("client/src/golf/stamps/CourseStampBlock.tsx"));
+        expect(block).toContain("slotForCourseIds(courseIds)");
+        expect(block).toContain("enabled: !!member && !!at,");
+        expect(block).toContain("if (!at) return null;");
+        expect(block).toContain("coverSrc(book.id)");
+    });
+
+    it("여권의 도장도 종이 위 잉크 도장 — 도장첩의 골프장은 그 권의 색 · 칸 이름, 밖의 골프장은 먹색 깃대 도장", () => {
+        const list = code(read("client/src/golf/components/passport/StampList.tsx"));
+        expect(list).toContain("const at = slotForStamp(stamp);");
+        expect(list).toContain("const art = (at && BOOK_ART[at.book.id]) || PLAIN_STAMP;");
+        expect(list).toContain("const name = at ? at.slot.name : stampLabel(stamp.name);");
+        expect(list.match(/<StampPaper /g)?.length).toBe(2);
+        expect(PLAIN_STAMP).toEqual({ ink: "#4A4A4A", glyph: "flag" });
+        expect(GLYPH_PATHS.flag.length).toBeGreaterThan(0);
+    });
+
+    it("도장첩 밖 골프장의 도장 이름 — 꼬리를 떼고 열 자까지", () => {
+        expect(stampLabel("써닝포인트컨트리클럽")).toBe("써닝포인트");
+        expect(stampLabel("천안상록 CC")).toBe("천안상록");
+        expect(stampLabel("㈜보문골프클럽")).toBe("보문");
+        expect(stampLabel("골프존카운티 선산")).toBe("골프존카운티 선산");
+        expect(stampLabel("CC")).toBe("CC");
+        const long = stampLabel("아주아주아주 긴 이름을 가진 어느 골프장");
+        expect([...long].length).toBeLessThanOrEqual(STAMP_LABEL_MAX);
     });
 });
 

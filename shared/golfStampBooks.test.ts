@@ -3,7 +3,7 @@ import { COURSES } from "../client/src/golf/data/golfCourses";
 import { GUEST_SAMPLE } from "./guestSample";
 import {
     STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_INVITE_TOTAL, STAMP_OPEN_TOTAL, STAMP_TOTAL, STAMP_TROPHY_STEPS,
-    bookStates, slotForStamp, stampBook, stampSummary, type StampLike,
+    bookStates, slotForCourseIds, slotForStamp, stampBook, stampSummary, type StampLike,
 } from "./golfStampBooks";
 import { GOLF_STAMP_SAMPLE } from "./golfStampSample";
 
@@ -59,7 +59,23 @@ describe("도장첩의 모양", () => {
             const row = COURSES.find((c) => c.id === x.slot.courseId)!;
             expect(row?.isRankue60, x.slot.key).toBe(true);
             expect(x.slot.ledgerNames.map(squash), x.slot.key).toContain(squash(row.name));
+            expect(x.slot.courseIds, x.slot.key).toContain(x.slot.courseId);
         }
+        // 칸마다의 줄 번호를 다 모으면 엘리트 명단의 줄 전부다(겹침 없이)
+        const all = slots.flatMap((x) => [...x.slot.courseIds]);
+        expect(new Set(all).size).toBe(all.length);
+        expect([...all].sort((a, b) => a - b)).toEqual(elite.map((c) => c.id).sort((a, b) => a - b));
+    });
+
+    it("골프장 공개 페이지가 어느 칸인가 — 그 페이지의 줄 번호 가운데 하나라도 칸에 있으면 그 칸", () => {
+        expect(slotForCourseIds([173])!.slot.key).toBe("sky72");
+        expect(slotForCourseIds([174])!.slot.key).toBe("sky72");
+        expect(slotForCourseIds([999999, 57])!.slot.key).toBe("seowon");
+        expect(slotForCourseIds([57, 58])!.book.id).toBe("gyeonggi");
+        const outside = COURSES.find((c) => !c.isRankue60)!;
+        expect(slotForCourseIds([outside.id])).toBeNull();
+        expect(slotForCourseIds([])).toBeNull();
+        expect(slotForCourseIds(null)).toBeNull();
     });
 
     it("초대장 두 권은 명단에 회원제 줄만 있는 골프장이고, 누구나 일곱 권은 대중제 줄이 하나는 있다", () => {

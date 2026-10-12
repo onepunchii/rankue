@@ -7,6 +7,7 @@ import {
     LucideFlag,
 } from "lucide-react";
 import { useGuestGate } from "@/components/hiq/GuestGate";
+import { PassportTileArt, ShelfTileArt } from "../../stamps/HomeTileArt";
 
 interface QuickActionsProps {
     onOpenGameMode: () => void;
@@ -29,7 +30,7 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
      * 비로그인 방문자의 문(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다" —
      * 내 기록을 쌓으려 할 때 가입을 권한다).
      *
-     * 네 타일은 전부 회원 전용 화면의 입구다 — 셋(라운드 기록·매치 입장·골프 여권)은 내 기록이 쌓이는 곳이고, 프로암은 아직 '준비 중' 안내 화면이다.
+     * 세 타일(라운드 기록·매치 입장·골프 여권)은 회원 전용 화면의 입구다 — 내 기록이 쌓이는 곳. 넷째(볼마커 장식장)는 방문자에게도 열려 있어 문을 거치지 않는다.
      * 방문자가 누르면 **입구에서** 가입 안내 시트를 연다 —
      * 번호 네 자리를 다 누른 뒤에, 또는 다음 화면으로 넘어간 뒤에 '로그인이 필요합니다'를 보는 일이 없게.
      * from 은 가려던 주소라 가입을 마치면 그 화면에서 바로 이어진다. 회원이면 guard 가 예전 동작을 그대로 실행한다.
@@ -131,7 +132,10 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
             {/* GOLF BOOKING 배너는 2026-09-10 뺐다. 홈 맨 위 긴급티 티커가 그 자리를 맡고,
                 부킹 목록은 하단 네비 '조인' 탭으로 들어간다(오너). */}
 
-            {/* Secondary Actions (Bottom Row) */}
+            {/* Secondary Actions (Bottom Row).
+                2026-10-12 오너: "랭큐 프로암 빼주고 도장깨기 가이드나 골프 코스도 해당 우리가 만든 이미지 같이 들어가면 너무 좋을 거 같은데".
+                프로암 타일을 뺐다(화면은 남아 있다 — '준비 중' 안내라 홈의 한 칸을 줄 만하지 않다). 그 자리는 볼마커 장식장.
+                두 타일의 그림은 우리가 만든 것으로 바꿨다 — 여권은 종이에 찍힌 잉크 도장, 장식장은 볼마커(stamps/HomeTileArt). */}
             <div className="grid grid-cols-2 gap-4 mb-4 relative z-10">
                 {/* 3. Golf Passport */}
                 <motion.button
@@ -144,67 +148,26 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                     className="aspect-[4/5] rounded-[2rem] bg-white/[0.03] border border-white/10 p-6 flex flex-col justify-between items-start text-left hover:bg-white/[0.05] transition-colors group relative overflow-hidden backdrop-blur-sm shadow-xl"
                 >
                     <div className="w-full h-32 flex items-center justify-center -mt-2">
-                        <DotLottieReact
-                            src="https://lottie.host/87b0804a-dfd0-402b-b2ec-185d8bb6f380/f0WSfFYjeY.lottie"
-                            loop
-                            autoplay
-                            className="w-full h-full opacity-80 group-hover:opacity-100 transition-opacity"
-                        />
+                        <PassportTileArt />
                     </div>
                     <div className="relative z-10 w-full">
                         <h3 className="text-2xl font-extrabold text-white leading-none mb-1">GOLF<br />PASSPORT</h3>
-                        <p className="text-[10px] font-bold text-white/40 group-hover:text-[#64DD17] transition-colors">도장깨기 & 가이드</p>
+                        <p className="text-[12px] font-bold text-white/40 group-hover:text-[#64DD17] transition-colors">발자국 지도 · 도장 · 앨범</p>
                     </div>
                 </motion.button>
 
-                {/* 4. 랭큐 프로암 — 예전엔 회원권 거래소였다. 거래는 랭큐가 할 일이 아니고(에스크로·본인확인·분쟁),
-                    프로암은 크루 성적에 이유를 준다(2026-09-09 오너). 회원권 시세 정보 자체는 남아 있다. */}
+                {/* 4. 볼마커 장식장 — 방문자에게도 열려 있다(예시 장식장을 보여 준다). 그래서 가입 안내를 거치지 않는다 */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
-                    onClick={() => gate.guard(() => setLocation('/golf/proam'), {
-                        // 프로암은 아직 응모를 열지 않았다(pages/ProAm.tsx '준비 중') — 열려 있다고도, 소식을 보내 준다고도 하지 않는다(알림 장치가 없다)
-                        title: "가입하고 프로암 안내를 보세요",
-                        desc: "랭큐 프로암은 준비 중이에요. 아직 응모는 열리지 않았어요. 가입하면 안내 화면에서 바로 이어집니다.",
-                        from: "/golf/proam",
-                    })}
+                    onClick={() => setLocation('/golf/shelf')}
                     className="aspect-[4/5] rounded-[2rem] bg-white/[0.03] border border-white/10 p-6 flex flex-col justify-between items-start text-left hover:bg-white/[0.05] transition-colors group relative overflow-hidden backdrop-blur-sm shadow-xl"
                 >
-                    <div className="absolute inset-0 bg-gradient-to-br from-[#64DD17]/10 to-transparent opacity-0 group-hover:opacity-30 transition-opacity" />
-
-                    <div className="w-full h-32 flex items-center justify-center -mt-2 relative z-10 px-2">
-                        <svg viewBox="0 0 100 50" className="w-full h-full overflow-visible opacity-90 group-hover:scale-110 transition-transform duration-500">
-                            <defs>
-                                <linearGradient id="marketGradient" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#64DD17" stopOpacity="0.4" />
-                                    <stop offset="100%" stopColor="#64DD17" stopOpacity="0" />
-                                </linearGradient>
-                            </defs>
-
-                            <motion.path
-                                d="M0 50 L0 30 Q25 40 50 20 T100 10 L100 50 Z"
-                                fill="url(#marketGradient)"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                transition={{ duration: 1.5 }}
-                            />
-
-                            <motion.path
-                                d="M0 30 Q25 40 50 20 T100 10"
-                                fill="none"
-                                stroke="#64DD17"
-                                strokeWidth="3"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: 1 }}
-                                transition={{ duration: 2, ease: "easeInOut", repeat: Infinity, repeatType: "reverse", repeatDelay: 3 }}
-                            />
-                        </svg>
+                    <div className="w-full h-32 flex items-center justify-center -mt-2">
+                        <ShelfTileArt />
                     </div>
-
                     <div className="relative z-10 w-full">
-                        <h3 className="text-2xl font-extrabold text-white leading-none mb-1">RANKUE<br />PRO-AM</h3>
-                        <p className="text-[10px] font-bold text-[#64DD17] opacity-80">랭큐 프로암</p>
+                        <h3 className="text-2xl font-extrabold text-white leading-none mb-1">볼마커<br />장식장</h3>
+                        <p className="text-[12px] font-bold text-white/40 group-hover:text-[#64DD17] transition-colors">도장첩을 다 채우면 하나씩</p>
                     </div>
                 </motion.button>
             </div>

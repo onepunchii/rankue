@@ -27,6 +27,7 @@ import { CourseLogo } from "@/golf/components/course/CourseLogo";
 import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/CourseHeader";
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";
 import { AroundListings } from "@/golf/components/course/detail/AroundListings";
+import { CourseStampBlock } from "@/golf/stamps/CourseStampBlock";
 import { WeatherCard, WeatherSkeleton, type RoundPick } from "@/golf/components/course/detail/WeatherCard";
 import { parseRoundRef, type RoundRef } from "@shared/golfRoundShare";
 import { MembershipPrices, topPrice } from "@/golf/components/course/detail/MembershipPrices";
@@ -285,6 +286,9 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             {/* 이 근처 조인·부킹(2026-10-08 오너: "각 개별 CC 페이지에 이 카드 들어가면 어때? … 조인 활성화" → "시안 1 이 좋네") — 이 골프장에 글이
                 없어도 같은 지역의 자리로 이어 준다. 티타임 바로 밑, 소개 띠 앞 */}
             <AroundListings key={`around:${d.slug}`} slug={d.slug} lat={here?.lat ?? null} lng={here?.lng ?? null} region={d.region} className="px-5 mt-3" />
+            {/* 도장첩(2026-10-12 오너: "골프 코스도 해당 우리가 만든 이미지 같이 들어가면") — 이 골프장이 도장첩의 한 칸이면 그 권의 표지와 내 도장.
+                명단 밖 골프장에서는 아무것도 그리지 않는다 */}
+            <CourseStampBlock key={`stamp:${d.slug}`} courseIds={d.courseIds} className="px-5 mt-3" />
             {/* 랭큐 골프 소개(2026-10-05) — 검색으로 들어온 비로그인 방문자에게만. 티타임 바로 아래, 시세·그린피 정보는 가리지 않게 */}
             <GolfGuestIntro className="mx-4 mt-8" />
             {/* 날씨(2026-10-05) — 골프장 이름에 붙여 가장 많이 찾는 말. 티타임 다음, 시세·그린피 앞 */}
