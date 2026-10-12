@@ -14,6 +14,7 @@ import { useSessionPhotos } from "../lib/photoApi";
 import { RoundDetailSheet, type RoundTarget } from "../components/photos/RoundDetailSheet";
 import { useOnSiteCheckin } from "../hooks/useOnSiteCheckin";
 import { OnSiteStampNote } from "../components/onsite/OnSiteStampNote";
+import { StampResultCard } from "../stamps/StampResultCard";
 import { appAlert } from "@/components/AppDialog";
 
 /**
@@ -239,6 +240,11 @@ export default function GameResult() {
                     )}
 
                     <OnSiteStampNote summary={onSite.summary} busy={onSite.busy} onRetry={() => { void onSite.retry(); }} />
+                    {/* 도장첩(2026-10-12) — 현장 인증 도장이 찍힌 라운드가 엘리트 골프장이면 그 칸과 권의 진행을 보여 준다. 다 찼으면 볼마커 */}
+                    <StampResultCard
+                        courseId={session.courseId} courseName={session.courseName} finishedAt={session.finishedAt || session.updatedAt}
+                        enabled={onSite.summary?.stamp === "onsite"}
+                    />
 
                     {/* 스코어카드 · 앨범 — 누르면 탭 두 개짜리 시트(라운딩 리포트와 같은 것) */}
                     <button

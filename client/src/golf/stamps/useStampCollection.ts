@@ -25,7 +25,8 @@ export interface ShownStamp extends StampLike {
     rounds: number;
 }
 
-const shown = (s: ServerStamp): ShownStamp => ({ clubId: s.clubId, name: s.name, date: stampDate(s.firstDate), score: s.bestScore > 0 ? s.bestScore : null, rounds: s.rounds });
+/** 서버 도장 → 화면이 그리는 도장 */
+export const shownStamp = (s: ServerStamp): ShownStamp => ({ clubId: s.clubId, name: s.name, date: stampDate(s.firstDate), score: s.bestScore > 0 ? s.bestScore : null, rounds: s.rounds });
 
 const SAMPLE_STATES = bookStates<ShownStamp>(GOLF_STAMP_SAMPLE.map((s) => ({ clubId: s.clubId, name: s.name, date: s.date, score: s.score, rounds: s.rounds })));
 const SAMPLE_SUMMARY = stampSummary(SAMPLE_STATES);
@@ -57,7 +58,7 @@ export function useStampCollection(): StampCollection {
     const [choice, setChoice] = useState<boolean | null>(null);
 
     const mine = useMemo(() => {
-        const states = bookStates<ShownStamp>((data?.stamps ?? []).map(shown), (data?.recordStamps ?? []).map(shown));
+        const states = bookStates<ShownStamp>((data?.stamps ?? []).map(shownStamp), (data?.recordStamps ?? []).map(shownStamp));
         return { states, summary: stampSummary(states) };
     }, [data]);
 

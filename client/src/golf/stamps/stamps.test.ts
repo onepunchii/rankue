@@ -10,6 +10,8 @@ import { STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_TROPHY_STEPS } from "@shared/golfSta
 import { ALL_OPEN_MARKER, BOOK_ART, GLYPH_PATHS, TROPHIES, coverSrc, markerSrc } from "./bookArt";
 import { stampNameSize, stampSeed } from "./InkStamp";
 import { stampDate } from "./stampDate";
+import { stampMoment } from "./stampMoment";
+import { bookStates } from "@shared/golfStampBooks";
 
 const ROOT = resolve(__dirname, "../../../..");
 const read = (p: string) => readFileSync(resolve(ROOT, p), "utf8");
@@ -19,7 +21,7 @@ const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").split("\n").filte
 const SCREENS = [
     "client/src/golf/stamps/StampParts.tsx", "client/src/golf/stamps/InkStamp.tsx", "client/src/golf/stamps/StampHomeEntry.tsx",
     "client/src/golf/pages/StampBooks.tsx", "client/src/golf/pages/StampBook.tsx", "client/src/golf/pages/GolfShelf.tsx",
-    "client/src/golf/components/passport/StampBooksBanner.tsx",
+    "client/src/golf/components/passport/StampBooksBanner.tsx", "client/src/golf/stamps/StampResultCard.tsx",
 ];
 
 describe("그림", () => {
@@ -129,6 +131,47 @@ describe("예시(처음 오는 사람)", () => {
         expect(s).toContain("const guestSample = col.isGuest;");
         expect(s).toContain("const stamped = guestSample || !col.canSwitch ? col.summary.stamped : 0;");
         expect(s).toContain('{guestSample && <SampleBadge tone="dark" />}');
+    });
+});
+
+describe("찍히는 순간(라운드 결과 화면)", () => {
+    const slot = (key: string) => STAMP_BOOKS.flatMap((b) => b.slots).find((x) => x.key === key)!;
+    const st = (key: string, which = 0) => ({ clubId: slot(key).clubIds[which], name: slot(key).ledgerNames[which] });
+    const states = bookStates([st("lavieestbelle"), st("hilldeloci"), st("sky72", 1), st("orangedunes"), st("bearsbest"), st("island")]);
+
+    it("라운드의 골프장 번호가 내 도장의 번호와 같으면 그 칸 — 권의 진행과 남은 칸을 같이 준다", () => {
+        const m = stampMoment(states, { courseId: slot("hilldeloci").clubIds[0], courseName: "아무 이름" })!;
+        expect(m.mine.slot.key).toBe("hilldeloci");
+        expect([m.state.book.id, m.state.got, m.state.total, m.left]).toEqual(["gangwon", 2, 7, 5]);
+    });
+
+    it("번호가 달라도(옛 번호로 적힌 라운드) 골프장 이름이 도장의 이름과 같으면 그 칸", () => {
+        expect(stampMoment(states, { courseId: "74", courseName: "라비에벨 컨트리클럽" })!.mine.slot.key).toBe("lavieestbelle");
+        expect(stampMoment(states, { courseId: null, courseName: "sky72 골프클럽(하늘코스)" })!.mine.slot.key).toBe("sky72");
+    });
+
+    it("한 권을 다 채운 라운드면 남은 칸이 0 — 화면이 볼마커를 보여 준다", () => {
+        const m = stampMoment(states, { courseId: slot("island").clubIds[0] })!;
+        expect([m.state.book.id, m.state.done, m.left]).toEqual(["seohae", true, 0]);
+    });
+
+    it("도장이 없으면 아무것도 없다 — 엘리트 골프장이어도 아직 도장이 없거나(미인증), 명단 밖이거나, 골프장을 모르는 라운드", () => {
+        expect(stampMoment(states, { courseId: slot("pineridge").clubIds[0], courseName: "파인리즈컨트리클럽" })).toBeNull();
+        expect(stampMoment(states, { courseId: "00000000-0000-4000-8000-000000000000", courseName: "동네 골프장" })).toBeNull();
+        expect(stampMoment(states, { courseId: null, courseName: "" })).toBeNull();
+        expect(stampMoment(states, {})).toBeNull();
+    });
+
+    it("결과 화면은 내 기록이 현장 인증 도장일 때만 카드를 켜고, 들어올 때 도장 통계를 새로 받는다", () => {
+        const page = code(read("client/src/golf/pages/GameResult.tsx"));
+        expect(page).toContain('enabled={onSite.summary?.stamp === "onsite"}');
+        expect(page).toContain("courseId={session.courseId} courseName={session.courseName} finishedAt={session.finishedAt || session.updatedAt}");
+        const card = code(read("client/src/golf/stamps/StampResultCard.tsx"));
+        expect(card).toContain('refetchOnMount: "always",');
+        expect(card).toContain("enabled,");
+        // 방금 찍힌 도장 = 도장을 얻은 날이 라운드를 끝낸 날. 볼마커를 '받았어요'는 그 라운드로 다 찼을 때만
+        expect(card).toContain("const fresh = !!finishedAt && mine.stamp.date === stampDate(finishedAt);");
+        expect(card).toContain("const justDone = fresh && state.done;");
     });
 });
 
