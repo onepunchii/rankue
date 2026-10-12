@@ -14,6 +14,7 @@ import { Skel } from "@/golf/components/course/detail/ui";
 import { BOOK_ART, coverSrc } from "@/golf/stamps/bookArt";
 import { InkStamp } from "@/golf/stamps/InkStamp";
 import { StampHelpButton, StampHelpSheet } from "@/golf/stamps/StampHelp";
+import { awardWhen, useStampAwards } from "@/golf/stamps/useStampAwards";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
 import { MarkerArt, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampPaper, StampSection, bookPath } from "@/golf/stamps/StampParts";
 
@@ -25,6 +26,8 @@ export default function StampBookPage() {
     const col = useStampCollection();
     const state = col.states.find((s) => s.book.id === params?.book);
     const [help, setHelp] = useState(false);
+    // 받은 기록(몇 번째 · 받은 날) — 회원의 것만. 예시에는 붙이지 않는다
+    const awards = useStampAwards();
 
     if (!state) {
         return (
@@ -42,6 +45,7 @@ export default function StampBookPage() {
     const invite = book.kind === "invite";
     const left = total - got;
     const records = slots.filter((s) => s.record).length;
+    const award = col.sample ? undefined : awards.of("book", book.id);
 
     return (
         <CourseShell title={`${book.name} 도장첩`} backTo={STAMPS_PATH} hideBottomCta right={<StampHelpButton onClick={() => setHelp(true)} />}>
@@ -70,7 +74,7 @@ export default function StampBookPage() {
                             <div className="flex items-center gap-3.5 rounded-2xl border px-3.5 py-3" style={{ background: "#FFFFFF0A", borderColor: done ? "#E9B94980" : "#FFFFFF14" }} data-testid="stamp-reward">
                                 <MarkerArt bookId={book.id} size={66} earned={done} />
                                 <div className="min-w-0 flex-1">
-                                    <p className="text-[12px] text-[#FFD36B]">{done ? "다 채워서 받은 볼마커" : "다 채우면 받는 볼마커"}</p>
+                                    <p className="text-[12px] text-[#FFD36B] break-keep" data-testid="stamp-reward-when">{done ? (award ? `다 채워서 받은 볼마커 · ${awardWhen(award)}` : "다 채워서 받은 볼마커") : "다 채우면 받는 볼마커"}</p>
                                     <p className="mt-0.5 text-[16px] font-semibold text-[#FFFFFF] break-keep">
                                         {book.name} 볼마커
                                         {!done && <span className="ml-1.5 text-[13px] font-normal text-[#FFFFFF99]">{left}곳 남음</span>}

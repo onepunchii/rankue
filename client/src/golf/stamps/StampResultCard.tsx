@@ -20,6 +20,7 @@ import { InkStamp } from "./InkStamp";
 import { MarkerArt, SHELF_PATH, StampBar, bookPath } from "./StampParts";
 import { stampDate } from "./stampDate";
 import { stampMoment } from "./stampMoment";
+import { useStampAwards } from "./useStampAwards";
 import { shownStamp } from "./useStampCollection";
 
 export function StampResultCard({ courseId, courseName, finishedAt, enabled }: {
@@ -36,6 +37,8 @@ export function StampResultCard({ courseId, courseName, finishedAt, enabled }: {
         enabled,
         refetchOnMount: "always",
     });
+    // 받은 기록(몇 번째 완성) — 서버가 끝낼 때 적는다. 이 화면에 들어올 때 새로 받는다
+    const awards = useStampAwards({ fresh: true, enabled });
     const moment = useMemo(() => {
         if (!enabled || !data) return null;
         return stampMoment(bookStates((data.stamps ?? []).map(shownStamp)), { courseId, courseName });
@@ -48,6 +51,7 @@ export function StampResultCard({ courseId, courseName, finishedAt, enabled }: {
     // 도장을 얻은 날이 이 라운드를 끝낸 날이면 방금 찍힌 도장, 아니면 예전에 찍어 둔 골프장을 다시 찾은 것
     const fresh = !!finishedAt && mine.stamp.date === stampDate(finishedAt);
     const justDone = fresh && state.done;
+    const award = state.done ? awards.of("book", book.id) : undefined;
 
     return (
         <section aria-label="도장첩" className="rounded-[1.5rem] px-5 py-4 bg-[#E9B94912] ring-1 ring-inset ring-[#E9B94933]" data-testid="stamp-result" data-fresh={fresh ? "1" : "0"} data-done={state.done ? "1" : "0"}>
@@ -76,7 +80,7 @@ export function StampResultCard({ courseId, courseName, finishedAt, enabled }: {
                     <MarkerArt bookId={book.id} size={52} earned />
                     <span className="min-w-0 flex-1">
                         <span className="block text-[14px] font-semibold text-[#FFFFFF] break-keep">{justDone ? `${book.name} 볼마커를 받았어요` : `${book.name} 볼마커를 가지고 있어요`}</span>
-                        <span className="block mt-0.5 text-[12.5px] text-[#FFFFFF8C] break-keep">{justDone ? "도장첩을 다 채웠어요 — 장식장에 놓였어요" : "다 채운 도장첩이에요"}</span>
+                        <span className="block mt-0.5 text-[12.5px] text-[#FFFFFF8C] break-keep">{justDone ? (award ? `도장첩을 다 채웠어요 — ${award.serial}번째 완성` : "도장첩을 다 채웠어요 — 장식장에 놓였어요") : "다 채운 도장첩이에요"}</span>
                     </span>
                     <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#FFD36B]" aria-hidden />
                 </Link>

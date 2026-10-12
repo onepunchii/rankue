@@ -13,6 +13,7 @@ import { stampDate } from "./stampDate";
 import { stampMoment } from "./stampMoment";
 import { STAMP_LABEL_MAX, stampLabel } from "./stampLabel";
 import { regionBookId } from "./regionBook";
+import { awardLabel } from "./awardText";
 import { bookStates } from "@shared/golfStampBooks";
 
 const ROOT = resolve(__dirname, "../../../..");
@@ -286,6 +287,32 @@ describe("우리가 만든 그림이 들어가는 곳(2026-10-12 오너: \"랭�
         expect(stampLabel("CC")).toBe("CC");
         const long = stampLabel("아주아주아주 긴 이름을 가진 어느 골프장");
         expect([...long].length).toBeLessThanOrEqual(STAMP_LABEL_MAX);
+    });
+});
+
+describe("받은 기록(몇 번째 · 받은 날)", () => {
+    it("받은 것의 이름 — 권의 볼마커 · 누구나 36 볼마커 · 트로피", () => {
+        expect(awardLabel("book", "gangwon")).toBe("강원 볼마커");
+        expect(awardLabel("book", "invite-capital")).toBe("수도권 초대장 볼마커");
+        expect(awardLabel("all", "all-open")).toBe("누구나 36 볼마커");
+        expect(awardLabel("trophy", "10")).toBe("트로피 10곳");
+        expect(awardLabel("trophy", "56")).toBe("트로피 전부");
+    });
+
+    it("회원의 것만 부르고(방문자는 부르지 않는다), 예시에는 붙이지 않는다", () => {
+        const hook = code(read("client/src/golf/stamps/useStampAwards.ts"));
+        expect(hook).toContain("enabled: !!member && opts.enabled !== false,");
+        expect(code(read("client/src/golf/pages/StampBook.tsx"))).toContain('const award = col.sample ? undefined : awards.of("book", book.id);');
+        expect(code(read("client/src/golf/pages/GolfShelf.tsx"))).toContain("{!sample && awards.list.length > 0 && (");
+    });
+
+    it("라운드를 끝낸 뒤 · 늦은 현장 인증 뒤에 받은 기록도 새로 받는다. 결과 화면은 들어올 때 새로 받는다", () => {
+        for (const p of ["client/src/golf/hooks/useRankueMatch.ts", "client/src/golf/hooks/useOnSiteCheckin.ts"]) {
+            expect(code(read(p)), p).toContain('.invalidateQueries({ queryKey: ["/api/hiq/golf/stamp-awards"] });');
+        }
+        const card = code(read("client/src/golf/stamps/StampResultCard.tsx"));
+        expect(card).toContain("const awards = useStampAwards({ fresh: true, enabled });");
+        expect(card).toContain("`도장첩을 다 채웠어요 — ${award.serial}번째 완성`");
     });
 });
 

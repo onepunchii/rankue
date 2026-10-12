@@ -38,6 +38,7 @@ import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords, passpor
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
 import { courseNameKey } from "../../shared/golfCourse.js";
 import { collectStamps, makeStampResolver, type StampAgg } from "./golfStamps.js";
+import { syncStampAwards, type StampAwardRow } from "./golfStampAwards.js";
 import { insertCheckin, listCheckins, listCheckinsInTx, readCheckins, realMemberIds, withCheckinTable } from "./golfCheckins.js";
 import { parseLatLng, sortByDistance } from "../../shared/golfNearby.js";
 import {
@@ -1041,7 +1042,20 @@ export class GolfRepository {
         }
     }
 
+    /**
+     * 도장첩에서 받은 것(볼마커 · 트로피)을 적는다(2026-10-12) — 회원의 인증 도장에서 아직 안 적은 것만. 새로 적은 것을 돌려준다.
+     * 도장은 여권과 같은 셈(getGolfPassportStats)이다. 규칙 shared/golfStampAwards, 저장 storage/golfStampAwards.
+     */
+    async syncStampAwards(memberId: string): Promise<StampAwardRow[]> {
+        const stats = await this.getGolfPassportStats(memberId);
+        return syncStampAwards(memberId, stats.stamps.map((s) => ({ clubId: s.clubId, name: s.name, firstDate: s.firstDate })));
+    }
+
     async updateGolfStats(userId: string): Promise<any> {
+        // 0. 도장첩에서 받은 것 — 골프 기록이 바뀌는 길(끝내기 · 늦은 현장 인증 · 기록 정리)이 다 여기를 지난다.
+        //    실패해도 평균 · 등급 계산은 막지 않는다(다음에 기록이 바뀔 때 다시 맞춰진다 — 안 적은 것만 적으므로)
+        await this.syncStampAwards(userId).catch((e) => console.error("[golf] syncStampAwards", e));
+
         // 1. Get all golf history for this member
         const history = await db.select().from(hiqGameHistory)
             .where(and(

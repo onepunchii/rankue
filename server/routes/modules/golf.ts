@@ -17,6 +17,7 @@ import { notifyListingAlerts } from "../../services/golfCourseWatch.js";
 import { JOIN_TYPES, JOIN_OPTIONS, MAX_SLOTS, normalizeSlots, openSlotCount, slotsFromLegacy, isKoreaCoord, isUrgentJoin, kstHour, convertibleSeats, conversionSlots, recruitCondition, listingCapacity, type JoinType, type SlotGender } from "../../../shared/golfJoin.js";
 import { msg } from "../../lib/i18n.js";
 import { getGolfFootprints } from "../../storage/golfFootprints.js";
+import { listStampAwards } from "../../storage/golfStampAwards.js";
 import { parseFootprintYear } from "../../../shared/golfFootprints.js";
 import { signFootprintShare, footprintCardPath } from "../../lib/footprintShare.js";
 import { parseLatLng } from "../../../shared/golfNearby.js";
@@ -813,6 +814,14 @@ router.get("/joins", asyncHandler(async (req: AuthRequest, res: any) => {
  * listing_type='JOIN' 을 꺼내 온다. 즉 이 라우트로 만든 조인은 어디에도 안 뜨는 유령이었다.
  * 조인 글은 POST /bookings 로 listingType:'JOIN' 을 실어 만들고, 신청은 /bookings/:id/apply 가 받는다.
  */
+
+/**
+ * 도장첩에서 받은 것(2026-10-12) — 볼마커(권 · 누구나 전부)와 트로피를 받은 때와 순번. **본인 것만**, 읽기만 한다.
+ * 적는 것은 라운드를 끝낼 때 · 늦은 현장 인증 때(golf.repo updateGolfStats → syncStampAwards). 규칙은 shared/golfStampAwards.
+ */
+router.get("/stamp-awards", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    return sendSuccess(res, { awards: await listStampAwards(req.userId!) });
+}));
 
 router.get("/passport-stats", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     // 예전엔 여기서 "비어 있으면 표본을 심는" 코드를 돌렸다. 없는 경기 번호로 넣어서 프로덕션에서

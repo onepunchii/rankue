@@ -30,6 +30,8 @@ type PostResult = OnSiteSummary & { last?: { verified: boolean; bucket: OnSiteBu
 /** 도장 수가 바뀌었을 수 있는 화면들 — 여권·발자국·라운딩 리포트 */
 export function invalidateStampViews(qc: QueryClient) {
     qc.invalidateQueries({ queryKey: ["/api/hiq/golf/passport-stats"] });
+    // 도장첩에서 받은 것(볼마커 · 트로피의 순번)도 이때 적힌다 — 같이 새로 받는다
+    qc.invalidateQueries({ queryKey: ["/api/hiq/golf/stamp-awards"] });
     qc.invalidateQueries({ queryKey: [FOOTPRINTS_KEY] });
     qc.invalidateQueries({ queryKey: ["/api/hiq/history", { sport: "GOLF" }] });
 }

@@ -12,17 +12,21 @@
 import { useState } from "react";
 import { Link } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
-import { STAMP_BOOKS, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
+import { STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
 import { CourseShell } from "@/golf/components/course/CourseShell";
 import { Skel } from "@/golf/components/course/detail/ui";
 import { StampHelpButton, StampHelpSheet } from "@/golf/stamps/StampHelp";
+import { TROPHIES } from "@/golf/stamps/bookArt";
+import { awardLabel, awardWhen, useStampAwards } from "@/golf/stamps/useStampAwards";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
-import { MarkerCase, SHELF_PATH, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampSection, TrophyShelf, bookName, bookPath } from "@/golf/stamps/StampParts";
+import { MarkerArt, MarkerCase, SHELF_PATH, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampSection, TrophyShelf, bookName, bookPath } from "@/golf/stamps/StampParts";
 
 export default function GolfShelf() {
     const col = useStampCollection({ guest: "full" });
     const { states, summary, sample } = col;
     const [help, setHelp] = useState(false);
+    // 받은 기록(몇 번째 · 받은 날) — 회원의 것만. 방문자의 예시 장식장에는 붙이지 않는다
+    const awards = useStampAwards();
     const lastStep = STAMP_TROPHY_STEPS[STAMP_TROPHY_STEPS.length - 1];
     // 볼마커는 권마다 하나 + 누구나 일곱 권 전부
     const markerTotal = STAMP_BOOKS.length + 1;
@@ -75,6 +79,22 @@ export default function GolfShelf() {
                             )}
                         </div>
                     </StampSection>
+
+                    {!sample && awards.list.length > 0 && (
+                        <StampSection title="받은 기록" aside="받은 순번 · 받은 날">
+                            <ul className="rounded-2xl bg-[#FFFFFF08]" data-testid="shelf-awards">
+                                {awards.list.map((a, i) => (
+                                    <li key={a.id} className={`flex items-center gap-3 px-3.5 py-2.5${i ? " border-t border-[#FFFFFF0F]" : ""}`}>
+                                        {a.kind === "trophy"
+                                            ? <img src={TROPHIES.find((t) => String(t.at) === a.key)?.src ?? TROPHIES[0].src} alt="" width={40} height={40} className="h-10 w-10 shrink-0" loading="lazy" decoding="async" draggable={false} />
+                                            : <span className="flex h-10 w-10 shrink-0 items-center justify-center"><MarkerArt bookId={a.kind === "all" ? STAMP_ALL_OPEN : a.key} size={36} earned /></span>}
+                                        <span className="min-w-0 flex-1 text-[14px] text-[#FFFFFF] break-keep">{awardLabel(a.kind, a.key)}</span>
+                                        <span className="shrink-0 text-[13px] tabular-nums text-[#FFFFFF99]">{awardWhen(a)}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                        </StampSection>
+                    )}
 
                     <SampleJoin col={col} from={SHELF_PATH} className="pt-7" />
 

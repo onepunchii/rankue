@@ -150,6 +150,8 @@ export function useRankueMatch(matchId: string, me?: any, opts?: { redirectOnFin
             queryClient.setQueryData(queryKey, data);
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/history", { sport: "GOLF" }] });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/passport-stats"] });
+            // 도장첩에서 받은 것(볼마커 · 트로피의 순번)도 이때 적힌다 — 같이 새로 받는다
+            queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/stamp-awards"] });
             // 발자국·현장 인증 상태(결과 화면의 인증/기록 도장)도 새 기록 기준으로
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/passport/footprints"] });
             queryClient.invalidateQueries({ queryKey: [`/api/hiq/golf/match/${matchId}/checkin`] });

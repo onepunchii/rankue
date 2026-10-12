@@ -1349,6 +1349,29 @@ export const golfRoundCheckins = pgTable("golf_round_checkins", {
 ]);
 export type GolfRoundCheckin = typeof golfRoundCheckins.$inferSelect;
 
+/**
+ * 도장첩에서 받은 것(2026-10-12) — 볼마커(권 · 누구나 전부)와 트로피를 받은 때와 순번. 규칙은 shared/golfStampAwards.ts.
+ *   kind  book(도장첩 한 권) · all(누구나 일곱 권 전부) · trophy(찍은 엘리트 골프장 수)
+ *   key   권의 id · "all-open" · 그 수("10")
+ *   serial 그것을 받은 순번(1 = 처음) — 같은 (kind, key) 안에서 겹치지 않는다. "강원 도장첩 12번째 완성"
+ *   earned_at 그것을 채운 도장을 얻은 때(적은 때가 아니다)
+ * 한 번 적은 줄은 고치지 않는다(나중에 기록이 지워져도 받은 것은 남는다). 생성 SQL: migrations/golf_stamp_awards.sql
+ */
+export const golfStampAwards = pgTable("golf_stamp_awards", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id, { onDelete: "cascade" }).notNull(),
+  kind: text("kind").notNull(),
+  key: text("key").notNull(),
+  serial: integer("serial").notNull(),
+  earnedAt: timestamp("earned_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  unique("golf_stamp_awards_member_kind_key_unique").on(t.memberId, t.kind, t.key),
+  unique("golf_stamp_awards_kind_key_serial_unique").on(t.kind, t.key, t.serial),
+  index("golf_stamp_awards_member_idx").on(t.memberId),
+]);
+export type GolfStampAward = typeof golfStampAwards.$inferSelect;
+
 // 12. 골프 회원권 거래 (Membership Orders)
 export const golfMembershipOrders = pgTable("golf_membership_orders", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
