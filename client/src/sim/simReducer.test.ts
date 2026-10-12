@@ -457,7 +457,7 @@ describe("대전: 메타 헬퍼", () => {
     it("matchStateFrom: 내 자리에 따라 내 이름·상대 이름, sameMatchMeta 는 필드 비교", () => {
         const m = publicMatch();
         const host = matchStateFrom(m, 0);
-        expect(host).toEqual({ matchId: "m-1", myIndex: 0, version: 1, myName: "호스트", opponentName: "게스트", turn: 0, status: "playing", claimableAt: m.claimableAt, turnSeenAt: null, endReason: null, winnerIndex: null, timeouts: [0, 0], watchers: 0, opponentAway: false, handicap: false, opponentAim: null, chatSeq: 0, countries: [null, null] });
+        expect(host).toEqual({ matchId: "m-1", myIndex: 0, version: 1, myName: "호스트", opponentName: "게스트", turn: 0, status: "playing", claimableAt: m.claimableAt, turnSeenAt: null, endReason: null, winnerIndex: null, timeouts: [0, 0], watchers: 0, opponentAway: false, handicap: false, opponentAim: null, chatSeq: 0, countries: [null, null], tiers: [null, null] });
         // 채팅 카운터는 메타다 — 상대가 말만 한 폴링(다른 게 하나도 안 바뀐 순간)이 버려지면 안 된다
         expect(sameMatchMeta(host, matchStateFrom({ ...m, chatSeq: 1 }, 0))).toBe(false);
         // 상대 조준은 메타가 아니다 — 1.2초마다 바뀌는 표시용 값이라 스냅을 부르면 재생 중에도 화면이 튄다(2026-09-16)

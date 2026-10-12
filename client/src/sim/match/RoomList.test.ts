@@ -324,6 +324,16 @@ describe("RoomList: 진열장 톤과 빈 화면(2026-10-12)", () => {
         expect(buttons(h).some((b) => b.textContent === ko["sim.entry.roomCreate"])).toBe(true);
     });
 
+    it("방장의 등급 배지 — 배치를 마친 방장의 이름 앞에만(서버가 tiers 로 준다)", async () => {
+        const h = mount({ rows: [room({ id: "r1", hostName: "파란초크", tiers: ["gold", null] }), room({ id: "r2", hostName: "노란큐", tiers: [null, null] }), room({ id: "r3", hostName: "빨간공" })] });
+        await settle(h, () => text(h).includes("빨간공"));
+        const badges = Array.from(h.container.querySelectorAll("[data-testid=room-host-tier] img")).map((i) => i.getAttribute("src"));
+        expect(badges).toEqual(["/sim/rank/tier-gold.webp"]);
+        // 배지는 방장 이름과 같은 줄에 있다
+        const li = h.container.querySelector("[data-testid=room-host-tier]")!.closest("li")!;
+        expect(li.textContent).toContain("파란초크");
+    });
+
     it("예전의 보라 판 · 노란 알약을 쓰지 않는다 — 랭킹과 같은 배색", async () => {
         const fs = await import("node:fs");
         const path = await import("node:path");

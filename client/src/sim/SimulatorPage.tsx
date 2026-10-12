@@ -1083,6 +1083,7 @@ export function SimulatorPage() {
         const mk = (i: 0 | 1): MatchHeaderPlayer => ({
             name: names[i] ?? "",
             country: m.countries[i] ?? null,
+            tier: m.tiers[i] ?? null,
             cueBallId: sess.players[i]?.cueBallId ?? (i === 0 ? "white" : "yellow"),
             score: sess.players[i]?.score ?? 0,
             target: sess.players[i]?.target ?? 0,
@@ -1834,6 +1835,7 @@ export function SimulatorPage() {
                             matchId={sim.match.id} names={names} myIndex={sim.match.myIndex}
                             targets={[sim.session.players[0]?.target ?? 0, sim.session.players[1]?.target ?? 0]}
                             handicap={sim.match.handicap}
+                            tiers={sim.match.tiers}
                             visible={introFor === sim.match.id}
                             onDismiss={() => setIntroFor(null)}
                         />

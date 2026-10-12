@@ -10,6 +10,7 @@
  * 실전 경기 API(/api/hiq/game/*)는 절대 부르지 않는다 — 시뮬 대전 성적은 hiqSimRatings 에만 쓰이고 RP 와 분리돼 있다.
  */
 import { CHAT_FROM_WATCHER } from "@shared/sim/chat";
+import { TIERS, type TierId } from "@shared/sim/rank";
 import { checkRoomTitle } from "@shared/sim/roomTitle";
 import type { BallState, ShotInput, SimEvent, Snapshot } from "@shared/sim/types";
 import type { CushionModelId, TableSpec } from "@shared/sim/params";
@@ -163,6 +164,11 @@ export interface MatchPublic {
      */
     readonly hostCountry: string | null;
     readonly guestCountry: string | null;
+    /**
+     * [방장, 게스트]의 온라인 대전 등급(이 대전의 종목, 2026-10-12) — 이름 옆 배지. 배치 전인 사람 · 옛 서버 응답은 null.
+     * **parseMatch 가 읽어야 화면에 닿는다**(이 타입에만 적고 빠뜨리면 늘 없는 값이 된다 — hostOnline 에서 겪은 일).
+     */
+    readonly tiers?: readonly [TierId | null, TierId | null];
     /** 정본 세션 상태. waiting 이면 null. players[0]=호스트(white), players[1]=게스트(yellow) */
     readonly state: SessionState | null;
     readonly balls: readonly BallState[] | null;
@@ -248,6 +254,11 @@ export interface ChatLine {
 }
 
 /** ISO 3166-1 alpha-2 만 통과시킨다 — 화면이 이 두 글자로 국기 이모지를 만든다. */
+/** 등급 이름표 — 아는 등급만 받는다(모르는 값은 배지를 그리지 않는다) */
+function tierOrNull(v: unknown): TierId | null {
+    return typeof v === "string" && TIERS.some((t) => t.id === v) ? (v as TierId) : null;
+}
+
 function countryOrNull(v: unknown): string | null {
     return typeof v === "string" && /^[A-Za-z]{2}$/.test(v) ? v.toUpperCase() : null;
 }
@@ -535,6 +546,7 @@ export function parseMatch(raw: unknown): MatchPublic {
         chatSeq: typeof raw.chatSeq === "number" && Number.isFinite(raw.chatSeq) ? raw.chatSeq : 0,
         hostCountry: countryOrNull(raw.hostCountry),
         guestCountry: countryOrNull(raw.guestCountry),
+        tiers: Array.isArray(raw.tiers) ? [tierOrNull(raw.tiers[0]), tierOrNull(raw.tiers[1])] : [null, null],
         state,
         balls,
         winnerIndex: playerIndexOrNull(raw.winnerIndex),

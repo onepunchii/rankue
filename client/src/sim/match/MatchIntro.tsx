@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import type { TierId } from "@shared/sim/rank";
+import { TierEmblem } from "../rank/TierEmblem";
 
 /**
  * 대전 시작 인사 화면(2026-09-15 오너: 라포 3번). 첫 샷 전에 몇 초 떴다 사라진다.
@@ -14,7 +16,7 @@ import { cn } from "@/lib/utils";
  */
 export const INTRO_MS = 3500;
 
-export function MatchIntro({ matchId, names, targets, myIndex, handicap, visible, onDismiss }: {
+export function MatchIntro({ matchId, names, targets, myIndex, handicap, tiers, visible, onDismiss }: {
     matchId: string;
     names: readonly string[];
     /** [호스트 다마수, 게스트 다마수] */
@@ -22,6 +24,8 @@ export function MatchIntro({ matchId, names, targets, myIndex, handicap, visible
     myIndex: number;
     /** 핸디전이면 다마수가 어떻게 정해졌는지 한 줄 덧붙인다 */
     handicap?: boolean;
+    /** [호스트, 게스트]의 온라인 대전 등급(2026-10-12) — 이름 위에 배지. 배치 전인 사람은 없다(자리는 비워 두어 두 칸의 높이를 맞춘다). */
+    tiers?: readonly [TierId | null, TierId | null];
     visible: boolean;
     onDismiss: () => void;
 }) {
@@ -60,6 +64,12 @@ export function MatchIntro({ matchId, names, targets, myIndex, handicap, visible
                                 <div className="h-4 flex items-center justify-center">
                                     {me && <span className="rounded-pill bg-brand px-1.5 py-[2px] text-[9.5px] font-bold leading-none tracking-wide text-brand-fg">{t("sim.intro.me")}</span>}
                                 </div>
+                                {/* 등급 배지 — 둘 중 한 사람이라도 있으면 두 칸 모두 자리를 잡는다 */}
+                                {(tiers?.[0] || tiers?.[1]) && (
+                                    <div className="h-12 flex items-center justify-center" data-testid="intro-tier">
+                                        {tiers?.[i] && <TierEmblem tier={tiers[i]!} size={46} glow />}
+                                    </div>
+                                )}
                                 <div className="mt-1 text-[14px] font-bold truncate text-white">{names[i] || "-"}</div>
                                 <div className={cn("mt-1.5 rk-num text-[30px] font-bold leading-none", me ? "text-brand" : "text-white")}>{targets[i]}</div>
                                 <div className="mt-1.5 text-[10px] font-semibold tracking-wide text-white/55">{t("sim.intro.target")}</div>

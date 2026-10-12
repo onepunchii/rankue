@@ -97,3 +97,33 @@ describe("그 판의 레이팅 변화(ratingChangeOf)", () => {
         expect(read("migrations/sim_match_rating_result.sql")).toContain("ALTER TABLE hiq_sim_matches ADD COLUMN IF NOT EXISTS rating_result jsonb;");
     });
 });
+
+/**
+ * 이름 옆 등급 배지(2026-10-12 — 순서의 2번): 대전 응답이 두 선수의 등급을 싣는다. 배치 전인 사람은 등급이 없다.
+ */
+describe("대전 응답의 등급(tiers)", () => {
+    const read = (f: string) => readFileSync(resolve(__dirname, "../..", f), "utf8");
+
+    it("서버: 이 대전의 종목에서 두 사람의 레이팅 · 판 수를 같이 읽고, 배치를 마친 사람만 등급을 준다", () => {
+        const repo = read("server/storage/simMatch.repo.ts");
+        expect(repo).toContain(".leftJoin(hostLadder, and(eq(hostLadder.memberId, hiqSimMatches.hostId), eq(hostLadder.gameType, hiqSimMatches.gameType)))");
+        expect(repo).toContain(".leftJoin(guestLadder, and(eq(guestLadder.memberId, hiqSimMatches.guestId), eq(guestLadder.gameType, hiqSimMatches.gameType)))");
+        // 줄을 대전 행으로 바꾸는 곳은 한 군데(named)다 — 다섯 곳에 따로 적혀 있던 것을 모았다
+        expect(repo.match(/hostCountry: r\.hostCountry \?\? null/g)).toHaveLength(1);
+        const route = read("server/routes/modules/simMatch.ts");
+        expect(route).toContain('return typeof rating === "number" && (rated ?? 0) >= PLACEMENT_MATCHES ? tierFor(rating).id : null;');
+        expect(route).toContain("tiers: [tierIdOf(m.hostRating, m.hostRated), m.guestId ? tierIdOf(m.guestRating, m.guestRated) : null] as const,");
+    });
+
+    it("화면: 응답 → 대전 상태 → 방 목록 · 대전 시작 · 대전 헤더 · 관전 헤더", () => {
+        expect(read("client/src/sim/matchApi.ts")).toContain("tiers: Array.isArray(raw.tiers) ? [tierOrNull(raw.tiers[0]), tierOrNull(raw.tiers[1])] : [null, null],");
+        expect(read("client/src/sim/simReducer.ts")).toContain("tiers: [m.tiers?.[0] ?? null, m.tiers?.[1] ?? null] as const,");
+        expect(read("client/src/sim/useSimulator.ts")).toContain("tiers: m.tiers ?? [null, null],");
+        const page = read("client/src/sim/SimulatorPage.tsx");
+        expect(page).toContain("tier: m.tiers[i] ?? null,");
+        expect(page).toContain("tiers={sim.match.tiers}");
+        expect(read("client/src/sim/watch/WatchPage.tsx")).toContain("tier: match.tiers?.[i] ?? null,");
+        expect(read("client/src/sim/match/MatchIntro.tsx")).toContain("{tiers?.[i] && <TierEmblem tier={tiers[i]!} size={46} glow />}");
+        expect(read("client/src/sim/components/TopBar.tsx")).toContain("{pl.tier && <TierEmblem tier={pl.tier} size={18} />}");
+    });
+});

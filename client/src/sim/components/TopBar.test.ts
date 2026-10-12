@@ -158,6 +158,19 @@ describe("TopBar", () => {
             expect(text).not.toContain("🇻🇳");
         });
 
+        it("등급 배지(2026-10-12): 등급이 있는 선수의 이름 옆에만 — 배치 전인 사람은 없다", () => {
+            const session = createSession({ rules: config.rules, players: [{ id: "p1", target: 20 }, { id: "p2", target: 20 }] });
+            const h = mount({
+                ...base(), session, record: true,
+                matchHeader: { players: players([{ tier: "gold" }, { tier: null }]), onExit: () => undefined },
+            });
+            const imgs = Array.from(h.container.querySelectorAll("img")).map((i) => i.getAttribute("src"));
+            expect(imgs).toEqual(["/sim/rank/tier-gold.webp"]);
+            // 등급 칸이 아예 없는 옛 응답도 그대로 그린다
+            const h2 = mount({ ...base(), session, record: true, matchHeader: { players: players(), onExit: () => undefined } });
+            expect(h2.container.querySelectorAll("img")).toHaveLength(0);
+        });
+
         it("쓰리아웃 점은 **선수마다** 그린다 — 예전엔 지금 차례인 사람 것만 보였다", () => {
             const h = matchBase();
             // 총 6개(3 × 2명), 그중 채워진 것은 1개(최정환 1회)

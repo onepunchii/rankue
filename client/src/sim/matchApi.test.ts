@@ -88,6 +88,12 @@ describe("요청 매핑", () => {
         expect(parseMatch(rawMatch).hostOnline).toBeUndefined();
         expect(parseMatch({ ...rawMatch, hostOnline: true }).hostOnline).toBe(true);
         expect(parseMatch({ ...rawMatch, hostOnline: false }).hostOnline).toBe(false);
+        // 두 선수의 등급(2026-10-12): 아는 등급만 받는다 — 옛 응답 · 모르는 값 · 배치 전은 배지 없음
+        expect(parseMatch(rawMatch).tiers).toEqual([null, null]);
+        expect(parseMatch({ ...rawMatch, tiers: ["gold", null] }).tiers).toEqual(["gold", null]);
+        expect(parseMatch({ ...rawMatch, tiers: ["master", "iron"] }).tiers).toEqual(["master", "iron"]);
+        expect(parseMatch({ ...rawMatch, tiers: ["legend", 3] }).tiers).toEqual([null, null]);
+        expect(parseMatch({ ...rawMatch, tiers: "gold" }).tiers).toEqual([null, null]);
         expect(isRoomTitleRejected({ data: { code: "TITLE_FILTERED" } })).toBe(true);
         expect(isRoomTitleRejected({ data: { code: "TITLE_TOO_LONG" } })).toBe(true);
         expect(isRoomTitleRejected({ data: { code: "BAD_PASSWORD" } })).toBe(false);

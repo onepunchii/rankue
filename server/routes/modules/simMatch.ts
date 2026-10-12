@@ -5,7 +5,7 @@
  */
 import { Router } from "express";
 import { V0_MAX, THETA_MAX, SHOT_LIMIT_EPS } from "../../../shared/sim/shotLimits.js";
-import { PLACEMENT_MATCHES } from "../../../shared/sim/rank.js";
+import { PLACEMENT_MATCHES, tierFor, type TierId } from "../../../shared/sim/rank.js";
 import { parseRatingResult, ratingChangeOf } from "../../../shared/sim/rating.js";
 import { createHash, randomBytes } from "crypto";
 import { z } from "zod";
@@ -224,6 +224,11 @@ function claimableAtOf(m: { shots: number; turnSeenAt: Date | null; lastShotAt: 
     return new Date((m.lastShotAt ?? m.startedAt ?? m.createdAt).getTime() + CLAIM_AFTER_MS);
 }
 
+/** 이름 옆 등급 배지 — 배치(PLACEMENT_MATCHES 판)를 마친 사람만 등급이 있다(랭킹 화면과 같은 규칙) */
+function tierIdOf(rating: number | null | undefined, rated: number | undefined): TierId | null {
+    return typeof rating === "number" && (rated ?? 0) >= PLACEMENT_MATCHES ? tierFor(rating).id : null;
+}
+
 function publicMatch(m: MatchWithNames, viewerId: string) {
     const myIndex = m.hostId === viewerId ? 0 : m.guestId === viewerId ? 1 : -1;
     return {
@@ -238,6 +243,8 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         hostName: m.hostName, guestName: m.guestName, hostTarget: m.hostTarget, guestTarget: m.guestTarget,
         /** 헤더 국기용(2026-09-16). ISO 3166-1 alpha-2, 가입할 때 IP 로 자동 — 없는 사람이 더 많다. */
         hostCountry: m.hostCountry ?? null, guestCountry: m.guestCountry ?? null,
+        /** [방장, 게스트]의 온라인 대전 등급(이 종목, 2026-10-12) — 방 목록 · 대전 시작 · 대전 화면의 이름 옆 배지. 배치 전이면 null. */
+        tiers: [tierIdOf(m.hostRating, m.hostRated), m.guestId ? tierIdOf(m.guestRating, m.guestRated) : null] as const,
         myIndex, turn: m.turn, shots: m.shots, version: m.version,
         state: m.state as SessionState | null, balls: m.balls as BallState[] | null,
         winnerIndex: m.winnerId === null ? null : m.winnerId === m.hostId ? 0 : 1,

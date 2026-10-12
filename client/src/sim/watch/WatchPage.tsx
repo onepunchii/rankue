@@ -135,6 +135,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         const mk = (i: 0 | 1): MatchHeaderPlayer => ({
             name: names[i],
             country: (i === 0 ? match.hostCountry : match.guestCountry) ?? null,
+            tier: match.tiers?.[i] ?? null,
             cueBallId: session.players[i]?.cueBallId ?? (i === 0 ? "white" : "yellow"),
             score: session.players[i]?.score ?? 0,
             target: session.players[i]?.target ?? 0,

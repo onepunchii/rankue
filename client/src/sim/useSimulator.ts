@@ -22,6 +22,7 @@ import {
     SimController,
     type ChatSendResult, type PlaybackSpeed, type SimCallbacks, type SimFrame, type SimPreview, type StartOptions,
 } from "./simController";
+import type { TierId } from "@shared/sim/rank";
 
 export type { SimFrame, SimPreview, StartOptions, PlaybackSpeed, OfflineReason, MatchEvent, ChatSendResult } from "./simController";
 export type { CueInput, Phase, SimMode } from "./simReducer";
@@ -134,6 +135,8 @@ export interface MatchView {
     readonly opponentAim: { readonly phi: number; readonly at: string } | null;
     /** 두 선수의 국가(ISO alpha-2, [호스트, 게스트]). 헤더 국기용 — 없는 사람은 null. */
     readonly countries: readonly [string | null, string | null];
+    /** 두 선수의 온라인 대전 등급([호스트, 게스트], 배치 전이면 null) — 이름 옆 배지 */
+    readonly tiers: readonly [TierId | null, TierId | null];
     /** 이 대전에서 오간 한마디(오래된 것부터). 내가 보낸 것도 들어 있다. */
     readonly chat: readonly ChatLine[];
     /**
@@ -271,6 +274,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             handicap: m.handicap === true,
             opponentAim: m.opponentAim ?? null,
             countries: m.countries ?? [null, null],
+            tiers: m.tiers ?? [null, null],
             chat: aux.chat,
             // 차례는 안 본다(2026-09-18) — 내 차례 대화창은 말풍선을 눌러 직접 연다. 보낼 샷이 남은 동안만 막는다
             // (그 창에선 서버 상태가 아직 내 샷을 모른다).

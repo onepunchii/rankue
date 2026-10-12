@@ -22,6 +22,7 @@ import { isValidTarget } from "../setupPresets";
 import { TargetPicker } from "./MatchLobby";
 import { MyRoomRow, useMyOpenRoom } from "./MyRoomRow";
 import { ReportDialog } from "@/components/hiq/community/ReportDialog";
+import { TierEmblem } from "../rank/TierEmblem";
 
 export const ROOMS_QUERY_KEY = ["sim-rooms"] as const;
 export const ROOMS_REFETCH_MS = 10_000;
@@ -93,6 +94,8 @@ const Row = memo(function Row({ m, age, onJoin, onReport }: { m: MatchPublic; ag
                 {/* 방제(2026-10-06): 있으면 방의 얼굴이고 방장 이름은 한 단계 작게, 없으면 예전처럼 방장 이름이 얼굴 */}
                 {m.title && <span className="text-[14.5px] font-bold text-ink-1 leading-snug line-clamp-2 break-words" data-testid="room-title">{m.title}</span>}
                 <span className="flex items-center gap-2 min-w-0">
+                    {/* 방장의 온라인 대전 등급(2026-10-12) — 배치를 마친 사람만 */}
+                    {m.tiers?.[0] && <span className="-mr-1 shrink-0" data-testid="room-host-tier"><TierEmblem tier={m.tiers[0]} size={22} /></span>}
                     {/* 이름이 먼저 자리를 갖는다(줄의 절반까지) — 예전엔 긴 '자리 비움' 문구가 이름을 0 폭으로 밀어냈다. 줄어드는 쪽은 문구다 */}
                     <span className={cn("truncate shrink-0 max-w-[50%]", m.title ? "text-[12.5px] font-semibold text-ink-2" : "text-[14px] font-semibold text-ink-1")} data-testid="room-host">{m.hostName}</span>
                     <span className="text-[11px] font-medium text-ink-3 shrink-0">{age}</span>

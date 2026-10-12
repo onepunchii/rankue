@@ -61,6 +61,7 @@ export const V0_MIN = 0.2;
 // 한도 값은 shared/sim/shotLimits.ts 가 정본이다 — 서버 검증과 같은 값을 쓴다.
 export { V0_MAX, V0_LEGACY_MAX, THETA_MAX } from "@shared/sim/shotLimits";
 import { V0_MAX, V0_LEGACY_MAX, THETA_MAX } from "@shared/sim/shotLimits";
+import type { TierId } from "@shared/sim/rank";
 /** 샷 재전송 시도 상한. 넘으면 이 세션은 더 기록하지 않는다(offline). 대전에선 다음 폴링 성공 때 다시 시도한다. */
 export const MAX_RETRIES = 3;
 /** 미스큐 경계 안쪽 여유. strike 는 a²+b² ≤ max² 를 요구하므로 스케일링 반올림이 경계를 넘지 않게 한다. */
@@ -235,6 +236,8 @@ export interface MatchState {
     readonly chatSeq: number;
     /** 두 자리의 국가(ISO alpha-2, 없으면 null). 대전 중에 바뀌지 않아 메타 비교에는 넣지 않는다. */
     readonly countries: readonly [string | null, string | null];
+    /** 두 자리의 온라인 대전 등급(배치 전이면 null) — 이름 옆 배지. 대전 중에는 바뀌지 않아 메타 비교에는 넣지 않는다. */
+    readonly tiers: readonly [TierId | null, TierId | null];
 }
 
 /** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
@@ -256,6 +259,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         opponentAim: m.opponentAim ?? null,
         chatSeq: m.chatSeq ?? 0,
         countries: [m.hostCountry ?? null, m.guestCountry ?? null] as const,
+        tiers: [m.tiers?.[0] ?? null, m.tiers?.[1] ?? null] as const,
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
         endReason: m.endReason,

@@ -76,7 +76,25 @@ export type MatchWithNames = HiqSimMatch & {
     hostName: string; guestName: string | null;
     /** ISO 3166-1 alpha-2. 가입할 때 IP 로 자동으로 잡히므로 없는 사람도 있다 — 화면은 없으면 국기를 안 그린다. */
     hostCountry: string | null; guestCountry: string | null;
+    /**
+     * 두 선수의 온라인 대전 레이팅과 반영된 판 수(이 대전의 종목, 2026-10-12) — 이름 옆 등급 배지용.
+     * 한 판도 반영된 적이 없으면 줄이 없어 null / 0. 등급은 화면에 보낼 때 정한다(배치 전이면 없다 — routes simMatch publicMatch).
+     */
+    hostRating?: number | null; hostRated?: number;
+    guestRating?: number | null; guestRated?: number;
 };
+
+type NamedRow = {
+    m: HiqSimMatch; hostName: string; guestName: string | null; hostCountry: string | null; guestCountry: string | null;
+    hostRating: number | null; hostRated: number | null; guestRating: number | null; guestRated: number | null;
+};
+/** withNames() 의 한 줄 → 대전 행 + 이름 · 국가 · 레이팅 */
+function named(r: NamedRow): MatchWithNames {
+    return {
+        ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null,
+        hostRating: r.hostRating ?? null, hostRated: Number(r.hostRated ?? 0), guestRating: r.guestRating ?? null, guestRated: Number(r.guestRated ?? 0),
+    };
+}
 
 function randomCode(): string {
     // 6자리, 앞자리 0 허용 안 함(입력 혼동 방지)
@@ -106,6 +124,9 @@ export class SimMatchRepository {
         const guest = alias(hiqMembers, "guest_member");
         const hostProfile = alias(profiles, "host_profile");
         const guestProfile = alias(profiles, "guest_profile");
+        // 이름 옆 등급 배지(2026-10-12): 이 대전의 종목에서 두 사람의 레이팅 · 반영된 판 수. (회원, 종목)이 기본키라 인덱스 조회 두 번이다.
+        const hostLadder = alias(hiqSimMatchRatings, "host_ladder");
+        const guestLadder = alias(hiqSimMatchRatings, "guest_ladder");
         return {
             guest,
             q: db.select({
@@ -114,25 +135,29 @@ export class SimMatchRepository {
                 guestName: guest.name,
                 hostCountry: hostProfile.countryCode,
                 guestCountry: guestProfile.countryCode,
+                hostRating: hostLadder.rating, hostRated: hostLadder.matches,
+                guestRating: guestLadder.rating, guestRated: guestLadder.matches,
             }).from(hiqSimMatches)
                 .innerJoin(hiqMembers, eq(hiqMembers.id, hiqSimMatches.hostId))
                 .leftJoin(guest, eq(guest.id, hiqSimMatches.guestId))
                 .leftJoin(hostProfile, eq(hostProfile.id, hiqMembers.profileId))
-                .leftJoin(guestProfile, eq(guestProfile.id, guest.profileId)),
+                .leftJoin(guestProfile, eq(guestProfile.id, guest.profileId))
+                .leftJoin(hostLadder, and(eq(hostLadder.memberId, hiqSimMatches.hostId), eq(hostLadder.gameType, hiqSimMatches.gameType)))
+                .leftJoin(guestLadder, and(eq(guestLadder.memberId, hiqSimMatches.guestId), eq(guestLadder.gameType, hiqSimMatches.gameType))),
         };
     }
 
     async get(id: string): Promise<MatchWithNames | undefined> {
         const { q } = this.withNames();
         const [row] = await q.where(eq(hiqSimMatches.id, id)).limit(1);
-        return row ? { ...row.m, hostName: row.hostName, guestName: row.guestName ?? null, hostCountry: row.hostCountry ?? null, guestCountry: row.guestCountry ?? null } : undefined;
+        return row ? named(row) : undefined;
     }
 
     async findLiveByCode(code: string): Promise<MatchWithNames | undefined> {
         const { q } = this.withNames();
         const [row] = await q.where(and(eq(hiqSimMatches.code, code), inArray(hiqSimMatches.status, [...LIVE])))
             .orderBy(desc(hiqSimMatches.createdAt)).limit(1);
-        return row ? { ...row.m, hostName: row.hostName, guestName: row.guestName ?? null, hostCountry: row.hostCountry ?? null, guestCountry: row.guestCountry ?? null } : undefined;
+        return row ? named(row) : undefined;
     }
 
     /** 내 대전 목록. 취소된 방(상대가 들어온 적 없다)은 빼고 준다 — 새 방을 열 때 접힌 방까지 줄로 남으면 목록이 지저분하다. */
@@ -143,7 +168,7 @@ export class SimMatchRepository {
             sql`not (${hiqSimMatches.status} = 'canceled' and ${hiqSimMatches.guestId} is null)`,
         ))
             .orderBy(desc(hiqSimMatches.createdAt)).limit(limit);
-        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null }));
+        return rows.map(named);
     }
 
     /** 최근 온라인 대전 상대 id(최근 순, 중복 없음) — 초대 목록에서 "또 한 판" 상대를 위로 올린다. */
@@ -170,7 +195,7 @@ export class SimMatchRepository {
             // 차단 관계(어느 쪽이 했든)인 방장의 방은 뺀다(2026-10-06 방제와 같이) — 방제·방장 이름이 누구에게나 보이는 글이라 차단이 여기에도 닿아야 한다
             sql`NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE (${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = ${hiqSimMatches.hostId}) OR (${hiqBlocks.blockerId} = ${hiqSimMatches.hostId} AND ${hiqBlocks.blockedId} = ${viewerId}))`,
         )).orderBy(desc(hiqSimMatches.createdAt)).limit(limit);
-        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null }));
+        return rows.map(named);
     }
 
     /**
@@ -276,7 +301,7 @@ export class SimMatchRepository {
             // 한 샷도 안 친 대전은 뺀다 — 시작하자마자 기권·취소된 판이라 볼 것이 없다.
             sql`${hiqSimMatches.shots} > 0`,
         )).orderBy(desc(timeCol)).limit(limit);
-        return rows.map((r) => ({ ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null }));
+        return rows.map(named);
     }
 
     /**

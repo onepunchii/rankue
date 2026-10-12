@@ -4,6 +4,8 @@ import { useT } from "@/lib/i18n";
 // 상대 경로로 가져온다 — vitest 에는 "@" 별칭이 없어서, 별칭으로 쓰면 TopBar 를 거치는 테스트
 // (TopBar·SimulatorPage·WatchPage)가 전부 "Cannot find package" 로 죽는다. 앱 빌드만 통과해 놓치기 쉽다.
 import { flagEmoji } from "../../lib/flag";
+import type { TierId } from "@shared/sim/rank";
+import { TierEmblem } from "../rank/TierEmblem";
 import { SHOT_CLOCK_STRIKES, type SessionState } from "@shared/sim/rules";
 import type { SimSetupConfig } from "../setupPresets";
 import type { Phase } from "../simReducer";
@@ -68,6 +70,8 @@ export interface MatchHeaderPlayer {
     readonly name: string;
     /** ISO alpha-2. 없으면 국기 없이 이름만(가입할 때 IP 로 잡히므로 없는 사람이 많다). */
     readonly country: string | null;
+    /** 온라인 대전 등급(2026-10-12) — 이름 옆 작은 배지. 배치 전인 사람은 없다. */
+    readonly tier?: TierId | null;
     readonly cueBallId: "white" | "yellow";
     readonly score: number;
     readonly target: number;
@@ -125,6 +129,7 @@ function HeaderSide({ p: pl, mirror, onSummary, label }: {
         >
             <span className={cn("flex items-center gap-1 min-w-0 max-w-full", mirror && "flex-row-reverse")}>
                 {flag && <span className="text-[13px] leading-none shrink-0" aria-hidden="true">{flag}</span>}
+                {pl.tier && <TierEmblem tier={pl.tier} size={18} />}
                 {name}
             </span>
             <span className={cn("w-full min-w-0 flex items-center gap-[5px]", mirror && "flex-row-reverse")}>
