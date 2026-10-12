@@ -13,6 +13,8 @@
  * 순수 함수만(서버 · 화면 · 적재 스크립트가 같이 쓴다). ⚠️ 서버가 임포트하는 shared 파일 — 상대 임포트는 반드시 './x.js'.
  */
 
+import { HIKING_FEATURES, type HikingFeatureId } from "./hikingFeatures.js";
+
 export type HikingRegionId = "capital" | "gangwon" | "chungcheong" | "jeonbuk" | "jeonnam" | "gyeongbuk" | "gyeongnam" | "jeju";
 export interface HikingRegion {
     id: HikingRegionId;
@@ -59,13 +61,16 @@ export const hikingList = (id: string): HikingList | undefined => HIKING_LISTS.f
 export const isHikingListId = (v: unknown): v is HikingListId => HIKING_LISTS.some((l) => l.id === v);
 
 // ── 특성 ──────────────────────────────────────────────────────────
-export type HikingTrait = "over1500" | "over1000" | "under500" | "island";
-export interface HikingTraitInfo { id: HikingTrait; name: string; how: string }
+export type HikingTrait = "over1500" | "over1000" | "under500" | "island" | HikingFeatureId;
+/** how 는 목록의 오른쪽 한 줄, note 는 목록 화면의 설명(없으면 how) */
+export interface HikingTraitInfo { id: HikingTrait; name: string; how: string; note?: string }
 export const HIKING_TRAITS: readonly HikingTraitInfo[] = [
     { id: "over1500", name: "하늘 가까운 산", how: "해발 1,500m 이상" },
     { id: "over1000", name: "천 미터 산", how: "해발 1,000m 이상" },
     { id: "under500", name: "가볍게 오르는 산", how: "해발 500m 아래" },
     { id: "island", name: "섬의 산", how: "섬에 있는 산" },
+    // 철 따라 묶은 산 — 숫자로 판정되지 않아 소개 글에 그 말이 나오는 100대 명산만(shared/hikingFeatures). 산의 traits 에는 읽을 때 얹는다(server/storage/hiking)
+    ...HIKING_FEATURES.map((f): HikingTraitInfo => ({ id: f.id, name: f.name, how: f.season, note: f.note })),
 ];
 /**
  * 섬인 시군구 — 시군구 전체가 섬인 곳만(다리가 놓였어도 섬은 섬이다). 일부만 섬인 시군(여수 · 통영 · 고흥 …)은 넣지 않는다 —
@@ -87,7 +92,7 @@ export function hikingTraits(m: { heightM?: number | null; sigungu?: string | nu
 export interface HikingGroup { id: string; kind: "list" | "trait"; name: string; short: string; note: string }
 export const HIKING_GROUPS: readonly HikingGroup[] = [
     ...HIKING_LISTS.map((l): HikingGroup => ({ id: l.id, kind: "list", name: l.name, short: l.short, note: `출처: ${l.by}` })),
-    ...HIKING_TRAITS.map((t): HikingGroup => ({ id: t.id, kind: "trait", name: t.name, short: t.name, note: t.how })),
+    ...HIKING_TRAITS.map((t): HikingGroup => ({ id: t.id, kind: "trait", name: t.name, short: t.name, note: t.note ?? t.how })),
 ];
 export const hikingGroup = (id: string | null | undefined): HikingGroup | undefined => HIKING_GROUPS.find((g) => g.id === id);
 /** 그 산이 그 묶음에 드는가 */

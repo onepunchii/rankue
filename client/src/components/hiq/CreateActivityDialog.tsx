@@ -37,12 +37,17 @@ import { LucideCalendar, LucideMapPin, LucideCoins, LucideUsers, LucideClock, Lu
 import { IconButton } from "@/components/hiq/crew-ui";
 import { useT } from "@/lib/i18n";
 import { useDateLocale } from "@/components/hiq/crew-board/dateLocale";
+import { HIKING_ACTIVITY_CATEGORY } from "@shared/crewSport";
 
 interface CreateActivityDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     crewId: string;
-    sportCategory?: 'BILLIARDS' | 'GOLF';
+    /**
+     * HIKING = 산악회의 일정(2026-10-13). 같은 창을 쓰되 당구의 칸을 뺀다: 종류 고르기(정기 · 번개 · 대회 · 뒷풀이) 없음 ·
+     * 장소는 당구장이 아니라 모이는 곳 · 비용 칸 없음. 종류는 하나(HIKING_TRIP)라 창이 채워 보낸다.
+     */
+    sportCategory?: 'BILLIARDS' | 'GOLF' | 'HIKING';
     initialData?: any; // For Edit Mode
     /** 새로 만든 정모(서버 행) — 채팅 + 에서 열었으면 그 정모를 카드로 붙인다. 고치기에는 부르지 않는다. */
     onCreated?: (activity: any) => void;
@@ -65,7 +70,7 @@ const makeFormSchema = (t: (key: string) => string) => z.object({
     locationName: z.string().optional(),
     cost: z.string().optional(),
     maxParticipants: z.coerce.number().min(2, t("createActivity.errMinParticipants")).optional().default(8),
-    sportCategory: z.enum(['BILLIARDS', 'GOLF']).default('BILLIARDS'),
+    sportCategory: z.enum(['BILLIARDS', 'GOLF', 'HIKING']).default('BILLIARDS'),
 });
 
 type FormValues = z.infer<ReturnType<typeof makeFormSchema>>;
@@ -76,19 +81,23 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const isEditMode = !!initialData;
+    const hiking = sportCategory === 'HIKING';
+    // 새 일정의 처음 값 — 산악회는 종류가 하나라 미리 채우고(고르는 칸이 없다), 산행은 아침에 모이므로 시각도 아침으로 둔다.
+    const blankCategory = hiking ? HIKING_ACTIVITY_CATEGORY : "";
+    const blankTime = hiking ? "07:00" : "19:00";
 
     const formSchema = useMemo(() => makeFormSchema(t), [t]);
 
     const form = useForm<FormValues>({
         resolver: zodResolver(formSchema),
         defaultValues: {
-            category: "",
+            category: blankCategory,
             title: "",
             description: "",
             locationName: "",
             cost: "",
             maxParticipants: 8,
-            time: "19:00",
+            time: blankTime,
             sportCategory: sportCategory || 'BILLIARDS',
         },
     });
@@ -102,7 +111,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                 const timeStr = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
 
                 form.reset({
-                    category: initialData.category || "",
+                    category: initialData.category || blankCategory,
                     title: initialData.title || "",
                     description: initialData.description || "",
                     locationName: initialData.locationName || "",
@@ -115,18 +124,18 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
             } else {
                 // Create Mode: Reset to defaults
                 form.reset({
-                    category: "",
+                    category: blankCategory,
                     title: "",
                     description: "",
                     locationName: "",
                     cost: "",
                     maxParticipants: 8,
-                    time: "19:00",
+                    time: blankTime,
                     sportCategory: sportCategory || 'BILLIARDS',
                 });
             }
         }
-    }, [open, initialData, sportCategory, form]);
+    }, [open, initialData, sportCategory, form, blankCategory, blankTime]);
 
 
     // 카테고리 변경 시 자동 제목 생성 (생성 모드일 때만, 또는 제목이 비어있을 때)
@@ -210,20 +219,22 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="flex-1 min-h-0 flex flex-col">
                         <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-4 space-y-4 custom-scrollbar">
-                        {/* 카테고리 선택 */}
-                        <FormField
-                            control={form.control}
-                            name="category"
-                            render={({ field }) => (
-                                <FormItem>
-                                    <BilliardsCategorySelector
-                                        selected={field.value as BilliardsCategory}
-                                        onSelect={(cat) => field.onChange(cat)}
-                                    />
-                                    <FormMessage className="text-destructive text-[12px] -mt-4" />
-                                </FormItem>
-                            )}
-                        />
+                        {/* 카테고리 선택 — 당구 모임의 종류다. 산악회는 종류가 하나라 고르는 칸이 없다 */}
+                        {!hiking && (
+                            <FormField
+                                control={form.control}
+                                name="category"
+                                render={({ field }) => (
+                                    <FormItem>
+                                        <BilliardsCategorySelector
+                                            selected={field.value as BilliardsCategory}
+                                            onSelect={(cat) => field.onChange(cat)}
+                                        />
+                                        <FormMessage className="text-destructive text-[12px] -mt-4" />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
 
                         <FormField
                             control={form.control}
@@ -233,7 +244,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                     <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1">{t("createActivity.nameLabel")}</FormLabel>
                                     <FormControl>
                                         <Input
-                                            placeholder={t("createActivity.namePlaceholder")}
+                                            placeholder={hiking ? t("createActivity.namePlaceholderHiking") : t("createActivity.namePlaceholder")}
                                             {...field}
                                             className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-ink-4 focus-visible:ring-1 focus-visible:ring-brand/30"
                                         />
@@ -318,11 +329,11 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 render={({ field }) => (
                                     <FormItem className="space-y-1">
                                         <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1 flex items-center gap-1">
-                                            <LucideMapPin className="w-3 h-3" /> {t("createActivity.locationLabel")}
+                                            <LucideMapPin className="w-3 h-3" /> {hiking ? t("createActivity.locationLabelHiking") : t("createActivity.locationLabel")}
                                         </FormLabel>
                                         <FormControl>
                                             <Input
-                                                placeholder={t("createActivity.locationPlaceholder")}
+                                                placeholder={hiking ? t("createActivity.locationPlaceholderHiking") : t("createActivity.locationPlaceholder")}
                                                 {...field}
                                                 value={field.value || ""}
                                                 className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-ink-4 focus-visible:ring-1 focus-visible:ring-brand/30"
@@ -355,28 +366,31 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                             />
                         </div>
 
-                        <FormField
-                            control={form.control}
-                            name="cost"
-                            render={({ field }) => (
-                                <FormItem className="space-y-1">
-                                    <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1 flex items-center gap-1">
-                                        <LucideCoins className="w-3 h-3" /> {t("createActivity.costLabel")}
-                                    </FormLabel>
-                                    <FormControl>
-                                        <Input
-                                            type="text"
-                                            autoComplete="off"
-                                            placeholder={t("createActivity.costPlaceholder")}
-                                            {...field}
-                                            value={field.value || ""}
-                                            className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-ink-4 focus-visible:ring-1 focus-visible:ring-brand/30"
-                                        />
-                                    </FormControl>
-                                    <FormMessage className="text-destructive text-[12px]" />
-                                </FormItem>
-                            )}
-                        />
+                        {/* 비용(게임비 나누기)은 당구 모임의 칸 — 산악회 일정에는 두지 않는다(필요한 말은 상세 내용에 적는다) */}
+                        {!hiking && (
+                            <FormField
+                                control={form.control}
+                                name="cost"
+                                render={({ field }) => (
+                                    <FormItem className="space-y-1">
+                                        <FormLabel className="text-[13px] text-ink-3 font-semibold ml-1 flex items-center gap-1">
+                                            <LucideCoins className="w-3 h-3" /> {t("createActivity.costLabel")}
+                                        </FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                type="text"
+                                                autoComplete="off"
+                                                placeholder={t("createActivity.costPlaceholder")}
+                                                {...field}
+                                                value={field.value || ""}
+                                                className="bg-surface-3 h-12 rounded-tile px-4 text-sm placeholder:text-ink-4 focus-visible:ring-1 focus-visible:ring-brand/30"
+                                            />
+                                        </FormControl>
+                                        <FormMessage className="text-destructive text-[12px]" />
+                                    </FormItem>
+                                )}
+                            />
+                        )}
 
                         <FormField
                             control={form.control}

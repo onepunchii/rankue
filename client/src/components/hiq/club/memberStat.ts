@@ -4,6 +4,7 @@
  *  - 골프: 평균 타수(없으면 핸디+72). 예전 설정 화면은 평균 타수에 '핸디'라는 이름을 붙여 보였다.
  *  - 당구: 크루 주 종목이 3쿠션이면 3구 에버, 4구면 4구 에버. 상관없음·포켓볼이면 있는 쪽(4구 우선).
  *    예전엔 3쿠션 크루에서도 늘 4구 에버를 보였다.
+ *  - 산악회(HIKING): 없다 — 산악회에는 종목 기록이 없고, 당구 에버를 산악회 멤버의 기록처럼 보이면 안 된다.
  * 기록이 없으면 null — 0.000 을 찍으면 신입이 더 초라해 보였다.
  */
 export interface MemberStatInput {
@@ -26,6 +27,7 @@ export function golfScoreOf(m: MemberStatInput): number {
 }
 
 export function memberStat(m: MemberStatInput, sport?: string | null, gameType?: string | null): MemberStat | null {
+    if (sport === "HIKING") return null;
     if (sport === "GOLF") {
         const score = golfScoreOf(m);
         return score > 0 ? { value: score.toFixed(0), labelKey: "crewMgmt.golfAvgStrokes" } : null;

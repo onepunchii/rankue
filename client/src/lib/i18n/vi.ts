@@ -3787,5 +3787,16 @@ const vi: Dict = {
   "link.unlinked": "Đã hủy liên kết {provider}",
   "link.failed": "Không thể liên kết. Vui lòng thử lại sau giây lát.",
   "link.unlinkFailed": "Không thể hủy liên kết. Vui lòng thử lại sau giây lát.",
+  "createClub.namePlaceholderHiking": "VD: Hội leo núi cuối tuần, CLB Bình Minh",
+  "createClub.descPlaceholderHiking": "Nhập tần suất leo núi, độ khó, đồ cần mang, v.v.",
+  "createClub.step2TitleHiking": "Khu vực hoạt động",
+  "createClub.step2SubtitleHiking": "Crew của bạn thường leo núi ở khu vực nào?",
+  "crewMgmt.sloganPlaceholderHiking": "VD: Nhóm leo núi gần thành phố mỗi cuối tuần",
+  "crewMgmt.hikingTags": "#chàoNgườiMới,#leoNúiCuốiTuần,#leoNúiBìnhMinh,#núiNổiTiếng,#xuyênDãy,#đườngDễĐi,#anToàn,#2030,#4050",
+  "createActivity.namePlaceholderHiking": "VD: Leo núi Bukhansan Baegundae",
+  "createActivity.locationLabelHiking": "Điểm tập trung",
+  "createActivity.locationPlaceholderHiking": "VD: Đầu đường mòn, trước trung tâm du khách",
+  "crewMemberList.defaultBioHiking": "Ranker mê leo núi",
+  "crewMemberList.hikingTrips": "Số lần leo núi cùng nhau",
 };
 export default vi;

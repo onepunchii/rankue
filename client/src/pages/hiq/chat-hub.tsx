@@ -68,10 +68,11 @@ export default function ChatHub() {
     const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const { member, isGuest } = useAuth();
-    const { currentSport } = useSport();
+    // sport — 등산일 땐 등산의 방(산악회 · 문의)만 묻는다. currentSport 는 등산을 당구로 보고해서(SportContext) 그대로 물으면 당구 방이 뜬다.
+    const { currentSport, sport, isHiking } = useSport();
     const q = useQuery<ChatRoomRow[]>({
-        queryKey: CHAT_ROOMS_KEY(currentSport),
-        queryFn: () => apiRequest(`/api/hiq/chat/rooms?sport=${currentSport}`),
+        queryKey: CHAT_ROOMS_KEY(sport),
+        queryFn: () => apiRequest(`/api/hiq/chat/rooms?sport=${sport}`),
         enabled: !!member,
         refetchInterval: 15_000,
         staleTime: 5_000,
@@ -115,9 +116,12 @@ export default function ChatHub() {
                                 <LucideHeadset className="w-4 h-4" /> {t("chat.support")}
                             </button>
                         )}
-                        <button type="button" onClick={() => setPickerOpen(true)} className="h-9 px-3 rounded-full bg-brand text-brand-fg text-[12.5px] font-semibold inline-flex items-center gap-1" title={t("chat.newChat")}>
-                            <LucidePlus className="w-4 h-4" /> {t("chat.newChat")}
-                        </button>
+                        {/* 새 대화 = 친구와의 1:1 방. 친구는 종목별(당구 · 골프)이라 등산에는 열 상대가 없다 — 단추를 그리지 않는다(서버도 만들지 않는다) */}
+                        {!isHiking && (
+                            <button type="button" onClick={() => setPickerOpen(true)} className="h-9 px-3 rounded-full bg-brand text-brand-fg text-[12.5px] font-semibold inline-flex items-center gap-1" title={t("chat.newChat")}>
+                                <LucidePlus className="w-4 h-4" /> {t("chat.newChat")}
+                            </button>
+                        )}
                     </div>
                 )}
             </header>

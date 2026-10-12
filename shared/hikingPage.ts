@@ -59,6 +59,7 @@ export const MOUNTAIN_LABEL = {
     about: "산 이야기",
     nearby: "가까운 산",
     stamp: "이 산의 도장",
+    books: "이 산이 칸으로 든 도장첩",
     noCourse: "이 산은 아직 받아 둔 코스가 없어요. 높이와 위치, 날씨는 볼 수 있어요.",
 } as const;
 /** 코스 자료의 출처 줄 */
@@ -89,3 +90,25 @@ export const HIKING_CTA = {
 
 export { HIKING_HUB_PATH, HIKING_LISTS, hikingList, hikingListPath, hikingMountainPath, hikingRegion, hikingRegionPath };
 export type { HikingListId, HikingRegionId };
+
+// ── 도장첩 · 배낭(등급 · 와펜 · 핀) ──────────────────────────────────────
+export const HIKING_STAMPS_PATH = "/hiking/stamps";
+export const HIKING_PACK_PATH = "/hiking/pack";
+export const HIKING_STAMPS_SEO: HikingSeo = {
+    path: HIKING_STAMPS_PATH,
+    title: `등산 도장첩 — 100대 명산 · 철 따라 가는 산 · 국립공원${BRAND}`,
+    desc: "정상에서 인증하면 그 산의 도장이 찍혀요. 산림청 100대 명산을 권역별 여덟 권으로, 철쭉 · 단풍 · 억새 · 눈꽃 산과 국립공원 · 높은 산 · 섬의 산으로 묶은 도장첩을 채우고 와펜을 받아요.",
+};
+export const HIKING_PACK_SEO: HikingSeo = {
+    path: HIKING_PACK_PATH,
+    title: `산행 등급 · 100대 명산 와펜 · 핀 — 배낭${BRAND}`,
+    desc: "산을 오를수록 산행 등급이 올라요 — 들머리에서 하늘금까지 여덟 등급. 100대 명산마다 한 장씩 받는 산 와펜, 도장첩을 다 채워 받는 와펜, 산행을 쌓아 받는 핀을 배낭에 달아요.",
+};
+/** 도장첩의 첫 줄 — 방문자에게 */
+export const HIKING_STAMPS_INTRO = "정상에서 인증하면 그 산의 도장이 찍혀요. 한 권을 다 채우면 받는 와펜을 미리 보여 드려요.";
+/** 배낭의 첫 줄 — 방문자에게 */
+export const HIKING_PACK_INTRO = "산을 오를수록 산행 등급이 오르고, 100대 명산마다 산 와펜을 한 장씩 받아요. 도장첩을 다 채우면 와펜을, 산행을 쌓으면 핀을 받아 배낭에 달아요. 받을 수 있는 것을 미리 보여 드려요.";
+export const HIKING_GRADE_NOTE = "정상에서 인증한 서로 다른 산의 수로 올라요. 같은 산을 여러 번 올라도 한 곳이에요 — 새 산으로 가야 등급이 올라요.";
+export const MOUNTAIN_PATCH_NOTE = "와펜의 그림은 산림청 안내에 나오는 그 산의 소재(억새 · 암릉 · 계곡 …)로 그린 휘장이에요. 실제 모습을 옮긴 그림은 아니에요.";
+export const HIKING_PIN_NOTE = "정상에서 인증한 산행만 세요. 빨리 오르기나 밤 산행으로 받는 것은 없어요 — 산은 천천히, 밝을 때.";
+export const HIKING_PACK_LABEL = { grade: "산행 등급", mountainPatch: "산 와펜", bookPatch: "도장첩 와펜", pin: "핀" } as const;

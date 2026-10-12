@@ -56,7 +56,11 @@ interface CrewMemberListProps {
     members: CrewMemberItemType[];
     currentMemberId?: string;
     currentUserGender?: string;
-    sportCategory?: "BILLIARDS" | "GOLF" | "MIXED";
+    /**
+     * HIKING = 산악회(2026-10-13). 멤버 줄과 프로필 창에서 종목의 것을 다 뺀다 — 당구 다마 · 에버 · 실전/온라인 등급 · 대회 우승 ·
+     * 상대전적 · 대결 신청, 골프 타수 · 등급. 남는 것은 이름 · 역할 · 소개 · 가입일 · 함께한 산행 횟수다.
+     */
+    sportCategory?: "BILLIARDS" | "GOLF" | "MIXED" | "HIKING";
     crewId: string;
     /** 보는 사람이 이 크루의 활동 멤버인가. 없으면 목록에서 추정한다(내가 목록에 있고 대기가 아니면 멤버). */
     isMember?: boolean;
@@ -83,6 +87,8 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     const [isSheetOpen, setIsSheetOpen] = useState(false);
     const [query, setQuery] = useState("");
     const [sort, setSort] = useState<MemberSort>("role");
+    // 산악회 — 아래의 당구 전용 요청(대회 기록 · 상대전적 · 대결 신청 · 활동 성향)을 보내지 않고, 그 칸도 그리지 않는다.
+    const hiking = sportCategory === "HIKING";
 
     // 비멤버·게스트에게 멤버 전용 요청(대회 기록·대결 신청)을 보내지 않는다 — 서버가 403/401 로 막는다.
     // 예전엔 비멤버에게도 '대결 신청' 버튼이 보여 누르면 403 토스트가 떴다.
@@ -93,7 +99,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     // 크루 대회 우승 횟수 — 명예의 전당과 같은 소스. 회원마다 조회하면 N+1 이라 한 번에 받는다.
     const { data: hallOfFame } = useQuery<{ honors?: Array<{ memberId: string; wins: number }> }>({
         queryKey: [`/api/hiq/crews/${crewId}/tournaments/hall-of-fame`],
-        enabled: !!crewId && viewerIsMember,
+        enabled: !!crewId && viewerIsMember && !hiking,
     });
     const winsByMember = useMemo(() => {
         const map: Record<string, number> = {};
@@ -140,7 +146,8 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
         queryFn: async () => {
             return await apiRequest(`/api/hiq/crews/activities/member/${selectedMember?.member?.id}?crewId=${crewId}`);
         },
-        enabled: isSheetOpen && !!selectedMember && !!currentMemberId
+        // 활동 성향(큐 · 필드 페르소나)은 당구 · 골프 모임 종류로 만든다 — 산악회에는 그리지 않으므로 묻지도 않는다
+        enabled: isSheetOpen && !!selectedMember && !!currentMemberId && !hiking
     });
 
     const isMe = currentMemberId === selectedMember?.member?.id;
@@ -150,14 +157,14 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     const { data: h2h } = useQuery<{ total: number; myWins: number; friendWins: number; winRate: number }>({
         queryKey: [`/api/hiq/stats/h2h/${selectedMember?.member?.id}`],
         // 이 전적은 당구 경기만 센다 — 골프 크루에서 "나와 N승 M패" 로 보여주면 남의 종목 숫자다(2026-09-09 검토).
-        enabled: isSheetOpen && !!selectedMember && !isMe && !!currentMemberId && sportCategory !== "GOLF",
+        enabled: isSheetOpen && !!selectedMember && !isMe && !!currentMemberId && sportCategory !== "GOLF" && !hiking,
         staleTime: 60 * 1000,
     });
 
     // 대결 신청 상태 — 내가 보낸 것/받은 것(24시간 내 대기 중). 크루원 전용 라우트다.
     const { data: challengeData } = useQuery<{ challenges: any[]; myId: string }>({
         queryKey: [`/api/hiq/crews/${crewId}/challenges`],
-        enabled: isSheetOpen && viewerIsMember,
+        enabled: isSheetOpen && viewerIsMember && !hiking,
         staleTime: 30 * 1000,
     });
     const sentChallenge = challengeData?.challenges?.find(
@@ -279,13 +286,16 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                     <p className={cn(CREW_TEXT.sub, "mb-2")}>{profileLine(selectedMember.member)}</p>
                                 )}
                                 {/* 한 사람을 크게 보여 주는 창에서는 글자로 밝힌다 — "온라인 대전 골드"(실전 다마 · RP 와 헷갈리지 않게) */}
-                                <TierNameChip memberId={selectedMember.member.id} className="mb-2" />
+                                {!hiking && <TierNameChip memberId={selectedMember.member.id} className="mb-2" />}
 
-                                <MemberStatsDisplay
-                                    sportCategory={sportCategory}
-                                    sheetData={sheetData}
-                                    member={selectedMember.member}
-                                />
+                                {/* 종목 기록(당구공 에버 · 골프 타수) — 산악회 프로필에는 없다 */}
+                                {!hiking && (
+                                    <MemberStatsDisplay
+                                        sportCategory={sportCategory}
+                                        sheetData={sheetData}
+                                        member={selectedMember.member}
+                                    />
+                                )}
 
                                 {/* 나와의 상대전적 — 크루 멤버를 열었을 때 가장 궁금한 숫자 */}
                                 {!isMe && h2h && h2h.total > 0 && (
@@ -297,7 +307,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                     </div>
                                 )}
                                 {/* 전적·하이런 — 데이터가 있는데 안 쓰고 있었다 */}
-                                {sportCategory !== "GOLF" && (selectedMember.member.totalBilliardsGames || 0) > 0 && (
+                                {sportCategory !== "GOLF" && !hiking && (selectedMember.member.totalBilliardsGames || 0) > 0 && (
                                     <p className={cn(CREW_TEXT.caption, "rk-num")}>
                                         {t("crewMemberList.totalGames")} {selectedMember.member.totalBilliardsGames}
                                         {(selectedMember.member as any).highRun3c || (selectedMember.member as any).highRun4c
@@ -377,9 +387,18 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                             {formatJoinDate(selectedMember.joinedAt, locale)}
                                         </span>
                                     </div>
+                                    {/* 산악회는 한 줄 — 함께한 산행 횟수(서버가 첫 칸에 센다). 모임 · 대회 · 뒷풀이 세 칸은 당구 · 골프의 것이다 */}
+                                    {hiking && (selectedMember.activityCounts?.group1 || 0) > 0 && (
+                                        <div className="flex items-center justify-between">
+                                            <span className={CREW_TEXT.caption}>{t("crewMemberList.hikingTrips")}</span>
+                                            <span className="text-[13px] font-semibold text-ink-2 rk-num">
+                                                {selectedMember.activityCounts?.group1}{t("crewMemberList.countUnit")}
+                                            </span>
+                                        </div>
+                                    )}
                                     {/* 활동 카운트 3칸 — 전부 0이면 숨긴다. 0/0/0 이 큰 칸 3개를
                                         차지하면서 정작 당구 기록을 아래로 밀어내고 있었다. */}
-                                    {((selectedMember.activityCounts?.group1 || 0)
+                                    {!hiking && ((selectedMember.activityCounts?.group1 || 0)
                                         + (selectedMember.activityCounts?.group2 || 0)
                                         + (selectedMember.activityCounts?.group3 || 0)) > 0 && (
                                     <div className="grid grid-cols-3 gap-2">
@@ -396,8 +415,8 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
 
                             {/* 하단 액션 — 대결 신청(상대에게 알림). 크루원끼리만 된다(서버 requireCrewMember) —
                                 비멤버·게스트에게는 버튼을 그리지 않는다. 색은 중립 토큰: 예전 당구 라사·노란 공 색은
-                                골프 크루(어두운 테마)에서도 그대로 나와 어색했다. */}
-                            {!isMe && viewerIsMember && (
+                                골프 크루(어두운 테마)에서도 그대로 나와 어색했다. 산악회에는 대결이 없어 이 줄 자체가 없다. */}
+                            {!isMe && viewerIsMember && !hiking && (
                             <div className="shrink-0 px-4 pt-3 bg-surface-1 border-t border-surface-line flex flex-col gap-2" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
                                 {receivedChallenge ? (
                                     <>
@@ -479,6 +498,8 @@ function MemberListItem({ item, currentMemberId, sportCategory, gameType, onClic
     const { t } = useT();
     const m = item.member;
     const isMe = m.id === currentMemberId;
+    // 산악회 줄에는 등급(온라인 대전 배지 · 실전 메달) · 대회 우승 · 대표 기록이 없다 — 이름 · 역할 · 소개만
+    const hiking = sportCategory === 'HIKING';
 
     const joinedDate = new Date(item.joinedAt);
     const daysSinceJoined = (Date.now() - joinedDate.getTime()) / (1000 * 3600 * 24);
@@ -514,7 +535,7 @@ function MemberListItem({ item, currentMemberId, sportCategory, gameType, onClic
                     </AvatarFallback>
                 </Avatar>
                 {/* 온라인 대전 등급(있는 사람만, 2026-10-12) */}
-                <TierAvatarBadge memberId={m.id} size={22} className="-bottom-1 -right-1.5" />
+                {!hiking && <TierAvatarBadge memberId={m.id} size={22} className="-bottom-1 -right-1.5" />}
             </div>
 
             {/* Identity */}
@@ -540,12 +561,12 @@ function MemberListItem({ item, currentMemberId, sportCategory, gameType, onClic
                 </div>
                 <div className="flex items-center gap-1.5 min-w-0 text-[12px] font-medium leading-none">
                     {/* 골프는 타수 등급 칩, 당구는 실전 등급(다마 메달 + "실전 골드") — 다마가 없는 사람은 칩이 없다(2026-10-12) */}
-                    {sportCategory === 'GOLF'
+                    {hiking ? null : sportCategory === 'GOLF'
                         ? <span className={cn("shrink-0 px-1.5 py-0.5 rounded-md border", tier.class)}>{t(`crewMgmt.tier.${tier.label}`)}</span>
                         : <RealTierChip member={m} size={20} />}
                     {isNewbie && <span className="text-brand shrink-0">{t("crewMemberList.newbie")}</span>}
                     <span className="text-ink-3 truncate">
-                        {m.introduction || (sportCategory === 'GOLF' ? t("crewMemberList.defaultBioGolf") : t("crewMemberList.defaultBioBilliards"))}
+                        {m.introduction || (hiking ? t("crewMemberList.defaultBioHiking") : sportCategory === 'GOLF' ? t("crewMemberList.defaultBioGolf") : t("crewMemberList.defaultBioBilliards"))}
                     </span>
                 </div>
             </div>

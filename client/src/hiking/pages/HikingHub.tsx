@@ -15,14 +15,18 @@ import { HIKING_H1, HIKING_TAGLINE, OSM_NOTE, hikingHubSeo } from "@shared/hikin
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { MountainMap } from "../components/MountainMap";
 import { HikingCta, MountainRow } from "../components/MountainParts";
+import { SeasonNow } from "../components/SeasonNow";
 import { HIKING_HERO, hikingCover } from "../theme";
 import { HIKING_HUB_KEY, type HikingHubData } from "../lib/api";
+import { useHikingStamps } from "../stamps/useHikingStamps";
 
 const TOP = 8;
 
 export default function HikingHub() {
     const { data, isLoading } = useQuery<HikingHubData>({ queryKey: HIKING_HUB_KEY, staleTime: 10 * 60_000 });
     const [region, setRegion] = useState<string | null>(null);
+    // 내 깃발 — 등산을 쓸 수 있는 회원만
+    const my = useHikingStamps();
     const seo = hikingHubSeo(data?.counts ?? { total: 3800, famous: 300, courses: 5400 });
     useSeo(data ? { title: seo.title, description: seo.desc, path: seo.path } : null);
     const kfs = (data?.famous ?? []).filter((m) => m.lists.includes("kfs100"));
@@ -59,7 +63,7 @@ export default function HikingHub() {
                                     );
                                 })}
                             </div>
-                            <MountainMap mountains={data.famous} region={region} />
+                            <MountainMap mountains={data.famous} region={region} done={my.done} />
                             <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">큰 산 그림은 산림청 100대 명산, 작은 산 그림은 그 밖의 명산이에요. 높을수록 크게 그렸어요.</p>
                             {picked && (
                                 <Link href={hikingRegionPath(picked.id)} className="mt-3 flex h-12 items-center justify-center gap-1 rounded-xl bg-[#FFFFFF14] text-[15px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24]" data-testid="hub-region-link">
@@ -67,6 +71,8 @@ export default function HikingHub() {
                                 </Link>
                             )}
                         </HkSection>
+
+                        <SeasonNow mountains={data.famous} done={my.done} mine={my.mine} />
 
                         <HkSection title="권역으로 찾기" aside="여덟 권역">
                             <ul className="grid grid-cols-2 gap-2.5">
@@ -101,14 +107,14 @@ export default function HikingHub() {
 
                         <HkSection title="산림청 100대 명산" aside={`${kfs.length}곳`}>
                             <ul className="rounded-2xl bg-[#FFFFFF0A] px-3.5">
-                                {kfs.slice(0, TOP).map((m, i) => <li key={m.id} className={i ? "border-t border-[#FFFFFF14]" : ""}><MountainRow m={m} /></li>)}
+                                {kfs.slice(0, TOP).map((m, i) => <li key={m.id} className={i ? "border-t border-[#FFFFFF14]" : ""}><MountainRow m={m} done={my.done.has(m.id)} /></li>)}
                             </ul>
                             <Link href={hikingListPath("kfs100")} className="mt-3 flex h-12 items-center justify-center gap-1 rounded-xl bg-[#FFFFFF14] text-[15px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24]">
                                 100곳 다 보기<LucideChevronRight weight="bold" className="h-4 w-4" aria-hidden />
                             </Link>
                         </HkSection>
 
-                        <div className="px-5 pt-8"><HikingCta /></div>
+                        {!my.mine && <div className="px-5 pt-8"><HikingCta /></div>}
                         <p className="px-5 pt-6 text-[12px] leading-relaxed text-[#F4EFE366] break-keep">{OSM_NOTE}</p>
                     </>
                 )}

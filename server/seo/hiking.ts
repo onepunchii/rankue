@@ -1,4 +1,4 @@
-// 등산 프리렌더(2026-10-13) — /hiking(허브) · /hiking/regions/<권역> · /hiking/lists/<목록> · /hiking/mountains/<산>.
+// 등산 프리렌더(2026-10-13) — /hiking(허브) · /hiking/regions/<권역> · /hiking/lists/<목록> · /hiking/mountains/<산> · /hiking/stamps(도장첩) · /hiking/pack(등급 · 와펜 · 핀).
 //
 // 본문은 shared/hikingPage · hikingMountains · hikingGuide · hikingPois 로 화면(client/src/hiking)과 같은 글을 쓴다.
 // prerender.ts 와 서로 import 하는 모양이 되지만, 이 파일은 page·esc·hubNav 를 함수 안에서만 부른다(최상위에서 호출하지 말 것).
@@ -9,14 +9,17 @@ import { HIKING_GROUPS, HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, heightText,
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "../../shared/hikingGuide.js";
 import { HIKING_POI_NAME, hikingPoiTitle, type HikingPoiKind } from "../../shared/hikingPois.js";
 import {
-    COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, HIKING_CTA, HIKING_H1, HIKING_HUB_PATH, HIKING_NAV_LABEL, HIKING_TAGLINE, MOUNTAIN_LABEL, OSM_NOTE,
+    COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, HIKING_CTA, HIKING_GRADE_NOTE, HIKING_H1, HIKING_HUB_PATH, HIKING_NAV_LABEL, HIKING_PACK_INTRO, HIKING_PACK_LABEL, HIKING_PACK_PATH, HIKING_PACK_SEO,
+    HIKING_PIN_NOTE, HIKING_STAMPS_INTRO, HIKING_STAMPS_PATH, HIKING_STAMPS_SEO, HIKING_TAGLINE, MOUNTAIN_LABEL, MOUNTAIN_PATCH_NOTE, OSM_NOTE,
     courseFacts, courseShape, hikingHubSeo, hikingListPath, hikingListSeo, hikingMountainPath, hikingRegionPath, hikingRegionSeo, kmRange, listNames, mountainSeo,
 } from "../../shared/hikingPage.js";
+import { HIKING_GRADES } from "../../shared/hikingGrade.js";
+import { HIKING_GRANDS, HIKING_PINS, HIKING_SERIES, hikingBooks, type HikingBookKind } from "../../shared/hikingStamps.js";
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface HikingRender { status: 200; tag: string; html: string }
 /** 등산의 주소인가 — 라우트의 정규식. vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
-export const HIKING_RE = /^\/hiking(?:\/(?:regions|lists|mountains)\/[^/]+)?\/?$/;
+export const HIKING_RE = /^\/hiking(?:\/(?:regions|lists|mountains)\/[^/]+|\/stamps|\/pack)?\/?$/;
 
 const crumbs = (...tail: [string, string][]) => ({
     "@context": "https://schema.org", "@type": "BreadcrumbList",
@@ -33,6 +36,8 @@ const cta = () => `  <section>
   </section>`;
 const nav = () => `  <nav aria-label="등산">
     <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a>
+    <a href="${HIKING_STAMPS_PATH}">등산 도장첩</a>
+    <a href="${HIKING_PACK_PATH}">산행 등급 · 와펜</a>
 ${HIKING_REGIONS.map((r) => `    <a href="${hikingRegionPath(r.id)}">${esc(`${r.name}의 산`)}</a>`).join("\n")}
 ${HIKING_GROUPS.map((l) => `    <a href="${hikingListPath(l.id)}">${esc(l.name)}</a>`).join("\n")}
   </nav>`;
@@ -159,6 +164,76 @@ ${hubNav("ko")}`;
     return { status: 200, tag: `hiking:mountain:${d.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd }) };
 }
 
+/** 도장첩 — 묶음마다의 권과 칸 수. 화면(StampShelf)의 방문자 모습과 같은 글 */
+const SHELF_ORDER: readonly HikingBookKind[] = ["kfs", "season", "theme", "plus"];
+function stamps(all: readonly MountainSummary[]): HikingRender {
+    const books = hikingBooks(all);
+    const seo = HIKING_STAMPS_SEO;
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a> › 도장첩</nav>
+  <h1>등산 도장첩</h1>
+  <p>${esc(HIKING_STAMPS_INTRO)}</p>
+  <p>${esc(seo.desc)}</p>
+${SHELF_ORDER.map((kind) => {
+        const mine = books.filter((b) => b.kind === kind);
+        if (mine.length === 0) return "";
+        const grand = HIKING_GRANDS.find((g) => g.kind === kind);
+        return `  <section>
+    <h2>${esc(HIKING_SERIES[kind])}</h2>
+    <ul>
+${mine.map((b) => `      <li>${b.region ? `<a href="${hikingRegionPath(b.region)}">${esc(b.name)}</a>` : `<a href="${hikingListPath(b.id)}">${esc(b.name)}</a>`} — ${esc(b.note)}</li>`).join("\n")}
+    </ul>${grand ? `\n    <p>${esc(`${grand.name} — ${grand.how} 채우면 받는 큰 와펜`)}</p>` : ""}
+  </section>`;
+    }).filter(Boolean).join("\n")}
+  <p><a href="${HIKING_PACK_PATH}">${esc(`${HIKING_PACK_LABEL.grade} · ${HIKING_PACK_LABEL.mountainPatch} · ${HIKING_PACK_LABEL.pin} 보기`)}</a></p>
+${cta()}
+${nav()}
+</main>
+${hubNav("ko")}`;
+    return { status: 200, tag: "hiking:stamps", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [crumbs(["도장첩", seo.path])] }) };
+}
+
+/** 배낭 — 산행 등급 여덟 · 산 와펜(100대 명산, 권역별) · 핀. 화면(PackPage)의 방문자 모습과 같은 글 */
+function pack(all: readonly MountainSummary[]): HikingRender {
+    const kfs = all.filter((m) => m.lists.includes("kfs100"));
+    const seo = HIKING_PACK_SEO;
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a> › 배낭</nav>
+  <h1>배낭 — ${esc(`${HIKING_PACK_LABEL.grade} · ${HIKING_PACK_LABEL.mountainPatch} · ${HIKING_PACK_LABEL.pin}`)}</h1>
+  <p>${esc(HIKING_PACK_INTRO)}</p>
+  <section>
+    <h2>${esc(HIKING_PACK_LABEL.grade)}</h2>
+    <ol>
+${HIKING_GRADES.map((g) => `      <li>${esc(`${g.name} — ${g.min === 0 ? "시작" : `산 ${g.min}곳`} · ${g.line}`)}</li>`).join("\n")}
+    </ol>
+    <p>${esc(HIKING_GRADE_NOTE)}</p>
+  </section>
+  <section>
+    <h2>${esc(`${HIKING_PACK_LABEL.mountainPatch} — 100대 명산 ${kfs.length}장`)}</h2>
+${HIKING_REGIONS.map((r) => {
+        const list = kfs.filter((m) => m.region === r.id).sort((a, b) => (b.heightM ?? 0) - (a.heightM ?? 0));
+        return list.length ? `    <h3>${esc(`${r.name} ${list.length}곳`)}</h3>
+    <ul>
+${list.map((m) => `      <li><a href="${hikingMountainPath(m.slug)}">${esc(m.name)}</a>${m.heightM ? ` — ${esc(heightText(m.heightM))}` : ""}</li>`).join("\n")}
+    </ul>` : "";
+    }).filter(Boolean).join("\n")}
+    <p>${esc(MOUNTAIN_PATCH_NOTE)}</p>
+  </section>
+  <section>
+    <h2>${esc(HIKING_PACK_LABEL.pin)}</h2>
+    <ul>
+${HIKING_PINS.map((p) => `      <li>${esc(`${p.name} — ${p.how}`)}</li>`).join("\n")}
+    </ul>
+    <p>${esc(HIKING_PIN_NOTE)}</p>
+  </section>
+  <p><a href="${HIKING_STAMPS_PATH}">등산 도장첩 보기</a></p>
+${cta()}
+${nav()}
+</main>
+${hubNav("ko")}`;
+    return { status: 200, tag: "hiking:pack", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [crumbs(["배낭", seo.path])] }) };
+}
+
 /**
  * 주소 → 검색용 화면. 등산의 주소가 아니거나 없는 권역 · 목록 · 산이면 null(다음 라우트로 — 화면이 '없는 산이에요'를 그린다).
  * detail 은 산 화면일 때만 부른다(산 한 곳의 글 · 코스 · 지점).
@@ -166,6 +241,8 @@ ${hubNav("ko")}`;
 export async function renderHiking(path: string, all: readonly MountainSummary[], detail: (slug: string) => Promise<{ d: MountainDetail; nearby: (MountainSummary & { km: number })[] } | null>): Promise<HikingRender | null> {
     const p = path.replace(/\/+$/, "") || "/";
     if (p === HIKING_HUB_PATH) return all.length ? hub(all) : null;
+    if (p === HIKING_STAMPS_PATH) return all.length ? stamps(all) : null;
+    if (p === HIKING_PACK_PATH) return all.length ? pack(all) : null;
     const m = /^\/hiking\/(regions|lists|mountains)\/([^/]+)$/.exec(p);
     if (!m) return null;
     const key = decodeURIComponent(m[2]);
@@ -191,6 +268,8 @@ export function hikingSitemapParts(all: readonly MountainSummary[]): string[] {
     if (all.length === 0) return [];
     return [
         entry(`${ORIGIN}${HIKING_HUB_PATH}`, { changefreq: "weekly", priority: "0.8" }),
+        entry(`${ORIGIN}${HIKING_STAMPS_PATH}`, { changefreq: "monthly", priority: "0.6" }),
+        entry(`${ORIGIN}${HIKING_PACK_PATH}`, { changefreq: "monthly", priority: "0.6" }),
         ...HIKING_REGIONS.map((r) => entry(`${ORIGIN}${hikingRegionPath(r.id)}`, { changefreq: "weekly", priority: "0.6" })),
         ...HIKING_GROUPS.map((l) => entry(`${ORIGIN}${hikingListPath(l.id)}`, { changefreq: "weekly", priority: l.kind === "list" ? "0.7" : "0.5" })),
         ...all.filter((m) => m.courses > 0 || m.hasGuide).map((m) => entry(`${ORIGIN}${hikingMountainPath(m.slug)}`, { changefreq: "monthly", priority: m.tier === 1 ? "0.7" : m.tier === 2 ? "0.5" : "0.4" })),

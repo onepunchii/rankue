@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { fullPrefs, normalizePrefs } from "../../../shared/notificationPrefs.js";
 import { golfAllowed } from "../../lib/golfAccess.js";
+import { hikingAllowed } from "../../lib/hikingAccess.js";
 import { put } from "@vercel/blob";
 import { deleteBlobs } from "../../utils/blob.js";
 import { stripImageMetadata, IMAGE_CONTENT_TYPE, IMAGE_EXT } from "../../utils/imageMeta.js";
@@ -107,6 +108,8 @@ router.get("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) =
         countryCode: profile?.countryCode ?? null,
         // 골프를 쓸 수 있는가 — 서버만 허용 목록을 안다(번호가 화면 번들에 실리지 않게. 2026-09-11)
         golfAccess: golfAllowed(member),
+        // 등산(세 번째 종목)을 쓸 수 있는가 — 지금은 운영자와 시험 계정만(server/lib/hikingAccess. 2026-10-13)
+        hikingAccess: hikingAllowed(member, profile?.role),
         // 설정 화면 '연결된 로그인' 표시용 — 값 자체는 절대 노출하지 않고 연결 여부만
         connections: {
             phone: !member.phone?.startsWith("social:"),

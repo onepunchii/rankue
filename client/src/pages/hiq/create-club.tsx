@@ -52,7 +52,10 @@ export default function CreateClub() {
     const [uploadingField, setUploadingField] = useState<null | 'emblem' | 'coverImage'>(null);
     const [step, setStep] = useState(1);
     const [searchQuery, setSearchQuery] = useState("");
-    const { currentSport } = useSport();
+    // sport — 등산에서 만들면 산악회다(HIKING). currentSport 는 등산을 당구로 보고해서(SportContext) 당구 칸(베이스캠프 · 주 종목)이 그려지므로
+    // 산악회인지는 따로 본다: 산악회에는 단골 구장도 주 종목도 없다(골프처럼 활동 지역만 받는다).
+    const { currentSport, sport } = useSport();
+    const hiking = sport === "HIKING";
     const [nameError, setNameError] = useState<string | null>(null);
     const [checkingName, setCheckingName] = useState(false);
     const logoInput = useRef<HTMLInputElement>(null);
@@ -189,7 +192,7 @@ export default function CreateClub() {
             baseStoreId: selectedStore?.type === "partner" ? selectedStore.id : null,
             baseListingCode: selectedStore?.type === "listing" ? selectedStore.code : null,
             tags: formData.tags || [],
-            sportCategory: currentSport,
+            sportCategory: sport,
         } as any));
     };
 
@@ -226,8 +229,8 @@ export default function CreateClub() {
         }
     };
 
-    const stepTitle = t(step === 2 && currentSport === "GOLF" ? "createClub.step2TitleGolf" : STEPS[step - 1].title);
-    const stepSubtitle = t(step === 2 && currentSport === "GOLF" ? "createClub.step2SubtitleGolf" : STEPS[step - 1].subtitle);
+    const stepTitle = t(step === 2 && hiking ? "createClub.step2TitleHiking" : step === 2 && currentSport === "GOLF" ? "createClub.step2TitleGolf" : STEPS[step - 1].title);
+    const stepSubtitle = t(step === 2 && hiking ? "createClub.step2SubtitleHiking" : step === 2 && currentSport === "GOLF" ? "createClub.step2SubtitleGolf" : STEPS[step - 1].subtitle);
     const busy = createCrewMutation.isPending || uploadingField !== null || checkingName;
 
     return (
@@ -271,7 +274,7 @@ export default function CreateClub() {
                                     autoFocus
                                     maxLength={NAME_MAX}
                                     aria-invalid={!!nameError}
-                                    placeholder={currentSport === "GOLF" ? t("createClub.namePlaceholderGolf") : t("createClub.namePlaceholderBilliards")}
+                                    placeholder={hiking ? t("createClub.namePlaceholderHiking") : currentSport === "GOLF" ? t("createClub.namePlaceholderGolf") : t("createClub.namePlaceholderBilliards")}
                                     className={cn(FIELD_INPUT, "h-14 text-[17px] font-semibold", nameError && "border-destructive focus-visible:border-destructive")}
                                     value={formData.name || ""}
                                     onChange={(e) => { set({ name: e.target.value }); setNameError(null); }}
@@ -281,7 +284,7 @@ export default function CreateClub() {
                                 <Input
                                     id="crew-intro"
                                     maxLength={INTRO_MAX}
-                                    placeholder={currentSport === "GOLF" ? t("crewMgmt.sloganPlaceholderGolf") : t("crewMgmt.sloganPlaceholderBilliards")}
+                                    placeholder={hiking ? t("crewMgmt.sloganPlaceholderHiking") : currentSport === "GOLF" ? t("crewMgmt.sloganPlaceholderGolf") : t("crewMgmt.sloganPlaceholderBilliards")}
                                     className={FIELD_INPUT}
                                     value={formData.shortIntro || ""}
                                     onChange={(e) => set({ shortIntro: e.target.value })}
@@ -290,7 +293,7 @@ export default function CreateClub() {
                             <Field label={t("createClub.descLabel")} htmlFor="crew-desc">
                                 <Textarea
                                     id="crew-desc"
-                                    placeholder={currentSport === "GOLF" ? t("createClub.descPlaceholderGolf") : t("createClub.descPlaceholderBilliards")}
+                                    placeholder={hiking ? t("createClub.descPlaceholderHiking") : currentSport === "GOLF" ? t("createClub.descPlaceholderGolf") : t("createClub.descPlaceholderBilliards")}
                                     className={cn(FIELD_TEXTAREA, "min-h-[160px]")}
                                     value={formData.description || ""}
                                     onChange={(e) => set({ description: e.target.value })}
@@ -360,8 +363,9 @@ export default function CreateClub() {
 
                             {/* 베이스캠프는 당구 크루만 — 당구 크루엔 단골 당구장이 있지만 골프 크루는 한 골프장에
                                 매이지 않는다. 게다가 여기 검색은 당구 파트너 매장을 뒤진다(골프장 목록은 비어 있다).
-                                골프는 위의 '주 활동 지역'이 그 역할을 한다(2026-09-09 오너: 골프 크루는 골프에 맞게). */}
-                            {currentSport !== "GOLF" && (
+                                골프는 위의 '주 활동 지역'이 그 역할을 한다(2026-09-09 오너: 골프 크루는 골프에 맞게).
+                                산악회도 같다 — 한 산에 매이지 않고, 이 검색은 당구장을 뒤진다. */}
+                            {currentSport !== "GOLF" && !hiking && (
                                 <Field label={t("createClub.step2Title")} htmlFor="crew-store">
                                     {selectedStore ? (
                                         <div className="flex items-center justify-between gap-2 pl-3.5 pr-1 py-2 min-h-14 rounded-tile bg-brand/10">
@@ -445,11 +449,14 @@ export default function CreateClub() {
                                 onDayChange={(meetingDay) => set({ meetingDay })}
                                 onTimeChange={(meetingTime) => set({ meetingTime })}
                             />
-                            <Field label={t("createClub.gameTypeLabel")}>
-                                <GameTypePicker sport={currentSport} value={formData.gameType || "any"} onChange={(gameType) => set({ gameType: gameType as any })} />
-                            </Field>
+                            {/* 주 종목은 당구(3쿠션 · 4구 …) · 골프(필드 · 스크린 …)의 칸이다 — 산악회에는 없다(서버도 'any' 로 둔다) */}
+                            {!hiking && (
+                                <Field label={t("createClub.gameTypeLabel")}>
+                                    <GameTypePicker sport={currentSport} value={formData.gameType || "any"} onChange={(gameType) => set({ gameType: gameType as any })} />
+                                </Field>
+                            )}
                             <Field label={t("createClub.vibeLabel")}>
-                                <TagPicker sport={currentSport} value={(formData.tags as string[]) || []} onChange={(tags) => set({ tags })} />
+                                <TagPicker sport={sport} value={(formData.tags as string[]) || []} onChange={(tags) => set({ tags })} />
                             </Field>
                             <Field label={t("createClub.joinTypeLabel")}>
                                 <JoinTypePicker value={formData.joinType === "approval" ? "approval" : "auto"} onChange={(joinType) => set({ joinType })} />

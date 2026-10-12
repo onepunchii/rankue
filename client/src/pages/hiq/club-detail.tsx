@@ -313,6 +313,8 @@ export default function HiqClubDetail() {
 
     const { crew, baseStore, baseListing = null } = crewData;
     const isGolfCrew = crew.sportCategory === 'GOLF';
+    // 대회(대진표)는 당구 크루만 — 골프 크루도 산악회(HIKING)도 열 수 없다. 주소(/crew/:id/tournament)로 들어오면 안내만 보인다.
+    const noTournament = isGolfCrew || crew.sportCategory === 'HIKING';
 
     // 게시판·사진첩·투표·대회는 서버도 크루원 전용으로 막혀 있다 — 비멤버·승인 대기자에게는
     // 빈 목록 대신 가입 안내를 보여준다. 가입 버튼도 여기 둔다(예전엔 안내만 있고 가입하려면 홈으로 돌아가야 했다).
@@ -530,8 +532,8 @@ export default function HiqClubDetail() {
                             className="h-full overflow-y-auto custom-scrollbar"
                             style={CONTENT_BOTTOM_PAD}
                         >
-                            {(isGolfCrew || !isMember) && subHeader(t("crewMgmt.tournamentTitle"))}
-                            {isGolfCrew ? (
+                            {(noTournament || !isMember) && subHeader(t("crewMgmt.tournamentTitle"))}
+                            {noTournament ? (
                                 // 대회(대진표)는 당구 크루에서만 열 수 있다(서버 tournamentBilliardsOnly) — '대회 열기'를 보여 주면 누르는 순간 거절된다.
                                 <div className="min-h-full flex flex-col items-center justify-center gap-1.5 px-8 py-12 text-center">
                                     <span className="w-12 h-12 mb-1 rounded-full bg-surface-3 text-ink-3 inline-flex items-center justify-center" aria-hidden="true">

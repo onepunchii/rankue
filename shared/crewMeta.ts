@@ -15,6 +15,8 @@ export interface CrewMetaInput {
   region?: string | null;
   shortIntro?: string | null;
   description?: string | null;
+  /** 크루 종목 — 소개가 없는 산악회(HIKING)를 당구 크루라고 적지 않으려고 본다. 없으면 예전 문구 그대로. */
+  sportCategory?: string | null;
 }
 
 export function crewTitle(c: CrewMetaInput): string {
@@ -23,6 +25,7 @@ export function crewTitle(c: CrewMetaInput): string {
 
 export function crewDescription(c: CrewMetaInput): string {
   const intro = c.shortIntro || c.description;
+  if (!intro && c.sportCategory === "HIKING") return `${c.name} — 랭큐 산악회. 함께 산에 오르고 산행 일정과 소식을 나눠요.`;
   if (!intro) return `${c.name} — 랭큐 당구 크루. 함께 경기하고 전적·랭킹에 도전하세요.`;
   return `${c.name}${c.region ? ` (${c.region})` : ""} — ${intro}`.slice(0, 155);
 }

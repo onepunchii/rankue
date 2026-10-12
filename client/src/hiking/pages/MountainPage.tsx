@@ -7,7 +7,7 @@
  * ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상, 굵기는 semibold 까지. 형제 key 는 구역마다 다르게.
  */
 import { useMemo, useState } from "react";
-import { useRoute } from "wouter";
+import { Link, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { LucideChevronDown } from "@/lib/icons";
 import { useSeo } from "@/hooks/useSeo";
@@ -19,6 +19,11 @@ import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { CourseProfile, CourseTrace } from "../components/CourseParts";
 import { Fact, HikingCta, MountainRow, MountainWeather } from "../components/MountainParts";
 import { SummitStamp, regionInk } from "../stamps/SummitStamp";
+import { SummitCheckin } from "../stamps/SummitCheckin";
+import { MountainPatch } from "../stamps/MountainPatch";
+import { hikingBookPath } from "../stamps/StampParts";
+import { useHikingStamps } from "../stamps/useHikingStamps";
+import { stampDate } from "../lib/date";
 import { POI_COLOR, hikingCover } from "../theme";
 import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi } from "../lib/api";
 
@@ -185,6 +190,9 @@ export default function MountainPage() {
     const seo = d ? mountainSeo(d) : null;
     useSeo(seo ? { title: seo.title, description: seo.desc, path: seo.path } : null);
     const region = hikingRegion(d?.region);
+    // 내 도장 — 등산을 쓸 수 있는 회원만(그 밖의 사람에게는 받는 것의 모습만 보여 준다)
+    const my = useHikingStamps();
+    const mine = d ? my.stampOf(d.id) : undefined;
 
     if (isLoading) return <HikingShell title="산"><div className="space-y-4 px-5 pt-5" aria-busy="true"><HkSkel className="h-52" /><HkSkel className="h-28" /><HkSkel className="h-72" /></div></HikingShell>;
     if (isError || !d) {
@@ -198,6 +206,8 @@ export default function MountainPage() {
         );
     }
     const lists = listNames(d.lists);
+    const kfs = d.lists.includes("kfs100");
+    const books = my.states.filter((x) => x.slots.some((sl) => sl.m.id === d.id));
     return (
         <HikingShell title={d.name} backTo={region ? hikingRegionPath(region.id) : undefined}>
             <div data-testid="mountain-page" data-slug={d.slug}>
@@ -206,9 +216,17 @@ export default function MountainPage() {
                     <img src={hikingCover(d.region)} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 40%" }} draggable={false} decoding="async" />
                     <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2600 18%,#0B1F26CC 62%,#0B1F26F5 97%)" }} aria-hidden />
                     {/* 칩이 두 줄이 되어도 잘리지 않게 높이를 내용에 맡긴다 */}
+                    {/* 100대 명산은 그 산의 와펜을 표지에 건다 — 정상에서 인증하면 배낭에 달린다 */}
+                    {kfs && (
+                        <div className="absolute right-5 top-[58px] flex flex-col items-center" data-testid="mountain-patch">
+                            <MountainPatch id={d.id} region={d.region} size={78} earned={!!mine?.verified} preview />
+                            <span className="mt-1.5 rounded-full bg-[#0B1F26B3] px-2 py-0.5 text-[12px] text-[#F6D9A8]">{mine?.verified ? "받은 와펜" : "이 산의 와펜"}</span>
+                        </div>
+                    )}
                     <div className="relative px-5 pb-4 pt-[124px]">
-                        {d.guide?.subtitle && <p className="text-[13px] text-[#F6D9A8] break-keep">{d.guide.subtitle}</p>}
-                        <h1 className="mt-0.5 text-[30px] font-semibold leading-tight tracking-tight text-[#F4EFE3]">{d.name}</h1>
+                        {/* 와펜이 걸린 산은 한 줄 소개와 이름이 그 밑으로 들어가지 않게 오른쪽을 비운다 */}
+                        {d.guide?.subtitle && <p className={`text-[13px] text-[#F6D9A8] break-keep ${kfs ? "pr-[92px]" : ""}`}>{d.guide.subtitle}</p>}
+                        <h1 className={`mt-0.5 text-[30px] font-semibold leading-tight tracking-tight text-[#F4EFE3] ${kfs ? "pr-[92px]" : ""}`}>{d.name}</h1>
                         <div className="mt-2 flex flex-wrap gap-1.5">
                             {[heightText(d.heightM) ? `높이 ${heightText(d.heightM)}` : "", mountainPlace(d), ...lists].filter(Boolean).map((t) => <Fact key={`fact:${t}`}>{t}</Fact>)}
                         </div>
@@ -218,14 +236,32 @@ export default function MountainPage() {
                 {/* 이 산의 도장 — 정상에서 받는 것. 방문자를 가입으로 잇는다 */}
                 <div className="px-5 pt-4">
                     <div className="flex items-center gap-3.5 rounded-2xl bg-[#F4EFE3] px-3.5 py-3 text-[#0E2A33]" data-testid="mountain-stamp">
-                        <div className="w-[88px] shrink-0"><SummitStamp name={d.name} heightM={d.heightM} ink={regionInk(d.region)} tilt={-4} /></div>
+                        <div className="w-[88px] shrink-0">
+                            <SummitStamp name={d.name} heightM={d.heightM} ink={regionInk(d.region)} tilt={-4} state={mine ? (mine.verified ? "on" : "faded") : "on"} date={mine ? stampDate(new Date(mine.firstAt)) : null} />
+                        </div>
                         <div className="min-w-0 flex-1">
                             <p className="text-[12.5px] text-[#8A5E00]">{MOUNTAIN_LABEL.stamp}</p>
-                            <p className="mt-0.5 text-[15.5px] font-semibold leading-snug break-keep">정상에서 인증하면 {d.name} 도장이 찍혀요</p>
-                            <p className="mt-0.5 text-[13px] leading-snug text-[#0E2A3399] break-keep">{region ? `${region.name} 도장첩의 한 칸이에요. 다 채우면 와펜을 받아요.` : "오른 산을 도장으로 모아요."}</p>
+                            <p className="mt-0.5 text-[15.5px] font-semibold leading-snug break-keep">{mine?.verified ? `${d.name} 도장을 찍었어요` : `정상에서 인증하면 ${d.name} 도장이 찍혀요`}</p>
+                            <p className="mt-0.5 text-[13px] leading-snug text-[#0E2A3399] break-keep">{kfs ? (mine?.verified ? "이 산의 와펜이 배낭에 달렸어요." : "인증하면 이 산의 와펜이 배낭에 달리고, 산행 등급이 올라요.") : d.tier === 1 && region ? `${region.name} 도장첩의 한 칸이에요. 다 채우면 와펜을 받아요.` : "오른 산이 늘수록 산행 등급이 올라요."}</p>
+                            {my.mine && <SummitCheckin key={`checkin:${d.id}`} mountainId={d.id} name={d.name} stamp={mine} hasSummit={d.lat != null && d.lng != null} region={d.region} patch={kfs} />}
                         </div>
                     </div>
                 </div>
+
+                {/* 이 산이 칸으로 든 도장첩 — 한 산으로 여러 권이 같이 찬다는 것을 보여 준다 */}
+                {books.length > 0 && (
+                    <div className="px-5 pt-3.5" data-testid="mountain-books">
+                        <p className="text-[12.5px] text-[#F4EFE380]">{MOUNTAIN_LABEL.books}</p>
+                        <div className="mt-1.5 flex flex-wrap gap-1.5">
+                            {books.map((b) => (
+                                <Link key={`book:${b.book.id}`} href={hikingBookPath(b.book.id)} className="inline-flex h-8 items-center gap-1.5 rounded-full bg-[#FFFFFF14] px-3 text-[13px] text-[#F4EFE3] active:bg-[#FFFFFF24]">
+                                    {b.book.kind === "plus" ? `${b.book.name} 플러스` : b.book.name}
+                                    {my.mine && <span className="tabular-nums text-[#F6D9A8]">{b.got}/{b.total}</span>}
+                                </Link>
+                            ))}
+                        </div>
+                    </div>
+                )}
 
                 <HkSection title={MOUNTAIN_LABEL.courses} aside={d.courseList.length ? `${d.courseList.length}개` : undefined} id="sec-courses">
                     <Courses key={`courses:${d.slug}`} d={d} />
@@ -241,7 +277,7 @@ export default function MountainPage() {
                     </HkSection>
                 )}
 
-                <div className="px-5 pt-8"><HikingCta /></div>
+                {!my.mine && <div className="px-5 pt-8"><HikingCta /></div>}
 
                 {d.nearby.length > 0 && (
                     <HkSection title={MOUNTAIN_LABEL.nearby} id="sec-nearby">

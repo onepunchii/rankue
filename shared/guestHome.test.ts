@@ -60,11 +60,12 @@ describe("골프 홈", () => {
         });
 
         it("공용 화면의 종목 = 저장된 선호, 볼 수 없는 사람이면 당구 — 로그인·콘솔 화면과 주소 우선은 그대로", () => {
-            expect(src).toContain('consolePath ? "BILLIARDS" : routeSport ?? (golfVisible ? saved : "BILLIARDS")');
+            // 2026-10-13 등산이 세 번째 종목으로 들어왔다 — 저장된 선호가 등산이면 등산을 쓸 수 있는 사람만, 그 밖은 예전 그대로
+            expect(src).toContain('consolePath ? "BILLIARDS" : routeSport ?? (saved === "HIKING" ? (hikingOk ? "HIKING" : "BILLIARDS") : golfVisible ? saved : "BILLIARDS")');
         });
 
         it("종목 알약(setSport)도 같은 기준 — 볼 수 없는 사람이 골프를 고르면 당구로 되돌린다", () => {
-            expect(src).toContain('sport === "GOLF" && !golfVisible ? "BILLIARDS" : sport');
+            expect(src).toContain('(picked === "GOLF" && !golfVisible) || (picked === "HIKING" && !hikingOk) ? "BILLIARDS" : picked');
         });
 
         it("한국어 화면은 로그인 확인을 기다리지 않는다 — 골프가 전면 공개인 동안엔 회원이든 방문자든 본다(당구를 먼저 그렸다 뒤집지 않는다)", () => {

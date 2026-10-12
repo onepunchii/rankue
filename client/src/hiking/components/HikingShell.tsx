@@ -7,6 +7,8 @@ import type { ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
 import { goLogin } from "@/components/hiq/LoginGate";
+import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { useHikingAccess } from "@/hooks/useHikingAccess";
 import { LucideChevronLeft } from "@/lib/icons";
 import { HIKING_HUB_PATH } from "@shared/hikingMountains";
 
@@ -24,8 +26,10 @@ export function HikingShell({ title, backTo = HIKING_HUB_PATH, right, children, 
     // 검색에서 막 들어온 사람은 history 가 이 화면 하나다 — back() 하면 검색 결과로 나가 버린다
     const back = () => (window.history.length > 1 && document.referrer.startsWith(window.location.origin) ? window.history.back() : setLocation(backTo));
     const guest = !isLoading && !member;
+    // 등산을 쓸 수 있는 회원에게는 하단 탭(홈 · 산 · 도장첩 · 크루 · 채팅)을 붙인다 — 산 화면에서도 등산 안에 머문다
+    const hikingOk = useHikingAccess();
     return (
-        <div className={`min-h-screen bg-[#0B1F26] font-sans text-[#F4EFE3] ${guest && cta ? "pb-24" : "pb-10"}`} data-hiking="1">
+        <div className={`min-h-screen bg-[#0B1F26] font-sans text-[#F4EFE3] ${hikingOk ? "pb-nav" : guest && cta ? "pb-24" : "pb-10"}`} data-hiking="1">
             <header className="sticky top-0 z-40 border-b border-[#FFFFFF14] bg-[#0B1F26E6] backdrop-blur-md" style={{ paddingTop: "env(safe-area-inset-top)" }}>
                 <div className="mx-auto flex h-14 max-w-[720px] items-center gap-1.5 px-3">
                     <button type="button" onClick={back} aria-label="뒤로" className="-ml-1 flex h-10 w-10 items-center justify-center rounded-full text-[#F4EFE3] active:bg-[#FFFFFF14]">
@@ -39,6 +43,7 @@ export function HikingShell({ title, backTo = HIKING_HUB_PATH, right, children, 
                 </div>
             </header>
             <main className="mx-auto max-w-[720px]">{children}</main>
+            {hikingOk && <HiqNavigation />}
             {guest && cta && (
                 <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#FFFFFF14] bg-[#0B1F26F2] px-4 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
                     <button type="button" onClick={() => goLogin(setLocation)} data-track-as="hiking-join" className="mx-auto block h-12 w-full max-w-[688px] rounded-xl bg-[#F28C6A] text-[15px] font-semibold text-[#2A1208] active:bg-[#E67C59]">

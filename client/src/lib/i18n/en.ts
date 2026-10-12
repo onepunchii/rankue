@@ -3787,5 +3787,16 @@ const en: Dict = {
   "link.unlinked": "{provider} disconnected",
   "link.failed": "We couldn't connect it. Please try again shortly.",
   "link.unlinkFailed": "We couldn't disconnect it. Please try again shortly.",
+  "createClub.namePlaceholderHiking": "e.g. Weekend Hikers, Dawn Ridge Club",
+  "createClub.descPlaceholderHiking": "Share how often you hike, the difficulty, what to bring, and more.",
+  "createClub.step2TitleHiking": "Home area",
+  "createClub.step2SubtitleHiking": "Which area's mountains does your crew usually hike?",
+  "crewMgmt.sloganPlaceholderHiking": "e.g. A group that hikes nearby mountains every weekend",
+  "crewMgmt.hikingTags": "#beginnersWelcome,#weekendHikes,#dawnHikes,#famousPeaks,#ridgeTraverse,#easyTrails,#safetyFirst,#2030,#4050",
+  "createActivity.namePlaceholderHiking": "e.g. Bukhansan Baegundae hike",
+  "createActivity.locationLabelHiking": "Meeting point",
+  "createActivity.locationPlaceholderHiking": "e.g. Trailhead, visitor center entrance",
+  "crewMemberList.defaultBioHiking": "A ranker who loves the mountains",
+  "crewMemberList.hikingTrips": "Hikes together",
 };
 export default en;

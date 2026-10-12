@@ -60,6 +60,13 @@ const msTrunc = (col: any) => sql`date_trunc('milliseconds', ${col})`;
 const cursorBefore = (createdCol: any, idCol: any, cursor?: CrewCursor | null) =>
     cursor ? sql`(${msTrunc(createdCol)}, ${idCol}) < (${cursor.createdAt}::timestamp, ${cursor.id}::uuid)` : sql`true`;
 
+/** 산악회 멤버 응답에서 비우는 종목 기록(당구 · 골프 · 온라인게임) — getCrew 가 쓴다. */
+const NO_SPORT_STATS = {
+    handi3c: null, handi4c: null, average: null, rating3c: 0, rating4c: 0, avg3c: null, avg4c: null,
+    golfHandicap: null, golfBestScore: null, golfAvgScore: null, golfGrade: null, golfGradeVerified: false,
+    totalGolfGames: 0, totalSimPoints: 0,
+} as const;
+
 export interface CrewPulse {
     nextActivityAt: string | null;
     monthActivities: number;
@@ -142,12 +149,19 @@ export class CrewRepository {
 
         // 4a. Batch activity counts for ALL members in ONE grouped query (avoids N+1).
         const isGolfCrew = crew.sportCategory === 'GOLF';
+        // 산악회(2026-10-13) — 일정의 종류가 하나(산행)라 첫 칸에 '함께한 산행'만 센다. 당구 종류(정기 · 번개 · 대회)로 세면
+        // 늘 0 이고, 대회 칸은 산악회에 없다. 일정의 종목은 서버가 크루 종목으로 정한다(routes/modules/crew.ts).
+        const isHikingCrew = crew.sportCategory === 'HIKING';
         const activityCountRows = await db.select({
             memberId: hiqCrewActivityParticipants.memberId,
-            group1Count: isGolfCrew
+            group1Count: isHikingCrew
+                ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.sportCategory} = 'HIKING' THEN 1 ELSE 0 END)`
+                : isGolfCrew
                 ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_ROUNDING', 'BLITZ_ROUNDING', 'GOLF_TOUR') THEN 1 ELSE 0 END)`
                 : sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_BILLIARDS', 'BLITZ_BILLIARDS') THEN 1 ELSE 0 END)`,
-            group2Count: isGolfCrew
+            group2Count: isHikingCrew
+                ? sql<number>`0`
+                : isGolfCrew
                 ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_SCREEN', 'BLITZ_SCREEN') THEN 1 ELSE 0 END)`
                 : sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('BILLIARDS_TOURNAMENT') THEN 1 ELSE 0 END)`,
             group3Count: sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('AFTER_PARTY', 'SOCIAL') THEN 1 ELSE 0 END)`,
@@ -172,7 +186,9 @@ export class CrewRepository {
 
         // 4b. Enrich members (golf stats only computed for golf/mixed crews).
         const enrichedMembers = await Promise.all(membersData.map(async (data) => {
-            const memberObj = { ...data.member };
+            // 산악회에는 종목 기록이 없다 — 당구의 다마 · 에버리지 · RP 나 골프 타수를 산악회 멤버의 기록처럼 내보내지 않는다
+            // (공개 응답이다 — 화면이 안 그리는 것과 별개로 싣지 않는다). 칸은 그대로 두고 값만 비운다.
+            const memberObj: typeof data.member = isHikingCrew ? { ...data.member, ...NO_SPORT_STATS } : { ...data.member };
 
             // For Golf Crews or Mixed, calculate real-time golf stats
             if (crew.sportCategory === 'GOLF' || crew.sportCategory === 'MIXED') {
@@ -218,6 +234,12 @@ export class CrewRepository {
             .from(hiqCrewMembers)
             .where(and(eq(hiqCrewMembers.crewId, crewId), eq(hiqCrewMembers.memberId, memberId)));
         return row || null;
+    }
+
+    /** 크루의 종목만 — 일정을 만들 때 그 종목을 서버가 정하려고 본다(명단까지 읽는 getCrew 를 부르지 않는다). 없는 크루는 null. */
+    async crewSportCategory(crewId: string): Promise<HiqCrew["sportCategory"] | null> {
+        const [row] = await db.select({ sport: hiqCrews.sportCategory }).from(hiqCrews).where(eq(hiqCrews.id, crewId)).limit(1);
+        return row?.sport ?? null;
     }
 
     // Resolve a poll (id, crewId, isAnonymous) from one of its option ids — for authorization/anonymity checks.
@@ -567,7 +589,9 @@ export class CrewRepository {
                         ilike(hiqCrews.description, pattern),
                         sql`${hiqCrews.tags}::text ilike ${pattern}`,
                     ) : undefined,
-                    sportCategory ? eq(hiqCrews.sportCategory, sportCategory as any) : undefined
+                    // 종목을 안 주면 예전처럼 당구 · 골프를 함께 준다 — 산악회는 등산을 달라고 한 요청에만 나간다
+                    // (등산을 모르는 옛 화면 · 종목 없는 호출의 목록에 산악회가 섞이지 않게).
+                    sportCategory ? eq(hiqCrews.sportCategory, sportCategory as any) : ne(hiqCrews.sportCategory, 'HIKING')
                 )
             )
             .groupBy(hiqCrews.id, hiqStores.latitude, hiqStores.longitude, storeListings.latitude, storeListings.longitude, profiles.countryCode)
@@ -642,7 +666,7 @@ export class CrewRepository {
             id: String(r.id),
             name: String(r.name ?? ""),
             description: (r.description as string | null) ?? (r.short_intro as string | null) ?? "",
-            sportCategory: String(r.sport_category ?? "BILLIARDS") as "BILLIARDS" | "GOLF" | "MIXED",
+            sportCategory: String(r.sport_category ?? "BILLIARDS") as "BILLIARDS" | "GOLF" | "MIXED" | "HIKING",
             region: (r.region as string | null) ?? null,
             joinType: String(r.join_type ?? "auto"),
             maxMembers: Number(r.max_members ?? 50),

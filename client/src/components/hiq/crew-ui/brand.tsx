@@ -1,16 +1,18 @@
 /**
  * 크루 자동 커버·엠블럼(2026-09-26 크루 디자인 A안, 오너 승인 시안). 사진이 있으면 사진, 없으면 크루 id 로 정한 그림.
- *  - CrewCover: 당구 = 라사 초록 + 크루마다 다른 공 세 개와 쿠션 경로 점선, 골프 = 잔디 줄무늬 + 그린·깃발·공 궤적.
- *  - CrewEmblem: 크루 색 그라데이션 동그라미 + 첫 글자, 오른쪽 아래 작은 공으로 종목 표시.
- * 공·잔디 색은 실제 물건 색이라 테마 토큰을 쓰지 않는다(어두운 골프 테마에서도 라사는 라사다).
+ *  - CrewCover: 당구 = 라사 초록 + 크루마다 다른 공 세 개와 쿠션 경로 점선, 골프 = 잔디 줄무늬 + 그린·깃발·공 궤적,
+ *    산악회(HIKING, 2026-10-13) = 새벽 하늘 + 겹친 능선 + 해(크루마다 자리가 다르다) + 정상으로 오르는 길 점선.
+ *  - CrewEmblem: 크루 색 그라데이션 동그라미 + 첫 글자, 오른쪽 아래 작은 공(산악회는 작은 산)으로 종목 표시.
+ * 공·잔디 색은 실제 물건 색이라 테마 토큰을 쓰지 않는다(어두운 골프 테마에서도 라사는 라사다). 산악회의 색도 등산의 색
+ * (client/src/hiking/theme 의 짙은 청록 · 산호빛 · 모래빛)을 값 그대로 쓴다 — 당구 · 골프 화면에서 열어도 산은 산이다.
  * 순수 계산(색·배치)은 shared/crewBrand.ts.
  */
 import { memo, useId } from "react";
 import { cn } from "@/lib/utils";
 import { crewImageSrc } from "@shared/crewManage";
-import { coverBalls, crewColors, crewInitial } from "@shared/crewBrand";
+import { coverBalls, crewColors, crewInitial, crewSeed } from "@shared/crewBrand";
 
-type Sport = "BILLIARDS" | "GOLF" | string | null | undefined;
+type Sport = "BILLIARDS" | "GOLF" | "HIKING" | string | null | undefined;
 interface BrandCrew {
     id: string;
     name: string;
@@ -30,6 +32,7 @@ export const CrewCover = memo(function CrewCover({ crew, height, className, alt 
     }
     const W = 390, H = height;
     const golf = crew.sportCategory === "GOLF";
+    const hiking = crew.sportCategory === "HIKING";
     const r = Math.max(9, Math.round(H * 0.066));
     return (
         <svg viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="xMidYMid slice" className={cn("w-full block", className)} style={{ height }} aria-hidden="true">
@@ -39,8 +42,11 @@ export const CrewCover = memo(function CrewCover({ crew, height, className, alt 
                 <pattern id={`fair${uid}`} width="60" height={H} patternUnits="userSpaceOnUse"><rect width="30" height={H} fill="#2f7d32" /><rect x="30" width="30" height={H} fill="#347f36" /></pattern>
                 <radialGradient id={`shine${uid}`} cx="35%" cy="30%" r="70%"><stop offset="0" stopColor="rgba(255,255,255,.55)" /><stop offset=".5" stopColor="rgba(255,255,255,0)" /></radialGradient>
                 <linearGradient id={`fade${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stopColor="rgba(0,0,0,0)" /><stop offset="1" stopColor="rgba(0,0,0,.35)" /></linearGradient>
+                <linearGradient id={`dawn${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0E2A33" /><stop offset="1" stopColor="#2B6975" /></linearGradient>
             </defs>
-            {golf ? (
+            {hiking ? (
+                <HikingCover id={crew.id} uid={uid} W={W} H={H} />
+            ) : golf ? (
                 <g>
                     <rect width={W} height={H} fill={`url(#fair${uid})`} />
                     <ellipse cx={W * 0.74} cy={H * 0.56} rx={W * 0.31} ry={H * 0.31} fill="#3f9142" />
@@ -83,7 +89,25 @@ function BilliardsCover({ id, uid, W, H, r }: { id: string; uid: string; W: numb
     );
 }
 
-/** 엠블럼 — 사진(emblem)이 있으면 사진, 없으면 크루 색 동그라미 + 첫 글자. sport 를 주면 오른쪽 아래 작은 공. */
+/** 산악회 커버 — 새벽 하늘, 먼 능선과 가까운 능선, 해, 정상으로 오르는 길. 해의 자리만 크루마다 다르다(왼쪽 아래는 엠블럼 자리라 오른쪽에 둔다). */
+function HikingCover({ id, uid, W, H }: { id: string; uid: string; W: number; H: number }) {
+    const sunX = W * (0.6 + (crewSeed(id) % 26) / 100);
+    const far = `M0 ${H * 0.7} L${W * 0.18} ${H * 0.5} L${W * 0.33} ${H * 0.62} L${W * 0.52} ${H * 0.38} L${W * 0.7} ${H * 0.58} L${W * 0.86} ${H * 0.44} L${W} ${H * 0.6} L${W} ${H} L0 ${H} Z`;
+    const near = `M0 ${H * 0.88} L${W * 0.22} ${H * 0.68} L${W * 0.4} ${H * 0.82} L${W * 0.62} ${H * 0.6} L${W * 0.8} ${H * 0.8} L${W} ${H * 0.7} L${W} ${H} L0 ${H} Z`;
+    return (
+        <g>
+            <rect width={W} height={H} fill={`url(#dawn${uid})`} />
+            <circle cx={sunX} cy={H * 0.4} r={Math.max(10, H * 0.11)} fill="#F28C6A" />
+            <path d={far} fill="#1F5560" />
+            <path d={near} fill="#0E2A33" />
+            <path d={`M${W * 0.4} ${H} Q${W * 0.5} ${H * 0.8} ${W * 0.62} ${H * 0.6}`} stroke="rgba(246,217,168,.55)" strokeWidth="1.5" fill="none" strokeDasharray="4 5" />
+            <line x1={W * 0.62} y1={H * 0.6} x2={W * 0.62} y2={H * 0.6 - 14} stroke="#F6D9A8" strokeWidth="1.5" />
+            <path d={`M${W * 0.62} ${H * 0.6 - 14} l10 4 l-10 4 Z`} fill="#F6D9A8" />
+        </g>
+    );
+}
+
+/** 엠블럼 — 사진(emblem)이 있으면 사진, 없으면 크루 색 동그라미 + 첫 글자. sport 를 주면 오른쪽 아래 작은 공(산악회는 작은 산). */
 export const CrewEmblem = memo(function CrewEmblem({ crew, size, ring, showSport = false, className }: {
     crew: BrandCrew;
     size: number;
@@ -115,7 +139,12 @@ export const CrewEmblem = memo(function CrewEmblem({ crew, size, ring, showSport
             {showSport && (
                 <svg width={badge} height={badge} viewBox="0 0 22 22" className="absolute -right-0.5 -bottom-0.5" aria-hidden="true">
                     <circle cx="11" cy="11" r="10.5" fill={ring ?? "var(--surface-1)"} />
-                    {crew.sportCategory === "GOLF" ? (
+                    {crew.sportCategory === "HIKING" ? (
+                        <>
+                            <circle cx="11" cy="11" r="7.5" fill="#1F5560" stroke="rgba(0,0,0,.2)" />
+                            <path d="M5.5 14.5 L9.5 8 L12 11.5 L13.5 9.5 L16.5 14.5 Z" fill="#F4EFE3" />
+                        </>
+                    ) : crew.sportCategory === "GOLF" ? (
                         <>
                             <circle cx="11" cy="11" r="7.5" fill="#fff" stroke="rgba(0,0,0,.18)" />
                             <circle cx="9" cy="9" r="1" fill="#bbb" /><circle cx="13" cy="10" r="1" fill="#bbb" /><circle cx="10" cy="13" r="1" fill="#bbb" />
@@ -143,11 +172,18 @@ export const CrewThumb = memo(function CrewThumb({ crew, size = 64, className }:
     }
     const [from] = crewColors(crew.id);
     const golf = crew.sportCategory === "GOLF";
+    const hiking = crew.sportCategory === "HIKING";
     const balls = coverBalls(crew.id);
     return (
         <span className={cn("relative shrink-0 rounded-tile overflow-hidden inline-flex", className)} style={{ width: size, height: size }} aria-hidden="true">
             <svg width={size} height={size} viewBox="0 0 64 64" className="absolute inset-0">
-                {golf ? (
+                {hiking ? (
+                    <>
+                        <rect width="64" height="64" fill="#1F5560" />
+                        <circle cx="47" cy="19" r="7" fill="#F28C6A" />
+                        <path d="M0 46 L16 28 L28 40 L42 22 L64 44 L64 64 L0 64 Z" fill="#0E2A33" />
+                    </>
+                ) : golf ? (
                     <>
                         <rect width="64" height="64" fill="#2f7d32" />
                         <rect x="16" width="16" height="64" fill="#347f36" /><rect x="48" width="16" height="64" fill="#347f36" />

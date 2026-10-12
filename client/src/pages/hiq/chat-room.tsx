@@ -56,7 +56,8 @@ interface RoomInfo {
     key: string; kind: "crew" | "listing" | "dm" | "support"; id: string;
     title: string; subtitle: string;
     members: { id: string; name: string; profileImageUrl: string | null }[];
-    canManage: boolean; crewId?: string; booking?: any; sport?: "BILLIARDS" | "GOLF";
+    /** sport — 방의 종목. HIKING 은 산악회 방(2026-10-13): 당구 · 골프 첨부 줄이 없고 크루 줄(정모 · 투표 · 정산 · 공지)만 있다. */
+    canManage: boolean; crewId?: string; booking?: any; sport?: "BILLIARDS" | "GOLF" | "HIKING";
     /** 방에 들어온 순간의 내 읽음 커서 — "여기까지 읽었어요" 줄의 기준(읽음 처리 전 값이다). */
     lastReadAt?: string | null;
     /** 이 방 알림 꺼짐(크루는 크루 알림 설정의 채팅 스위치). */
@@ -95,9 +96,11 @@ export default function ChatRoomPage() {
     const gone = info.isError && (info.error as any)?.status === 404; // 글을 내려 방이 닫혔다
     const forbidden = info.isError && ((info.error as any)?.status === 403 || gone);
     // 푸시로 골프 방에 들어왔는데 앱이 당구 모드면 골프 테마·골프 채팅 탭으로 맞춘다(방마다 종목이 있다).
-    const { currentSport, setSport } = useSport();
+    // 비교는 sport(등산 포함)로 한다 — currentSport 는 등산을 당구로 보고해서(SportContext), 그걸로 비교하면 산악회 방에 있는 내내
+    // 종목을 다시 고르고, 등산 모드에서 연 당구 방은 당구로 맞춰지지 않는다. 당구 · 골프끼리는 두 값이 같아 예전과 같다.
+    const { currentSport, sport: appSport, setSport } = useSport();
     const roomSport = info.data?.sport;
-    useEffect(() => { if (roomSport && roomSport !== currentSport) setSport(roomSport); }, [roomSport, currentSport, setSport]);
+    useEffect(() => { if (roomSport && roomSport !== appSport) setSport(roomSport); }, [roomSport, appSport, setSport]);
 
     const [messages, setMessages] = useState<ChatMsg[]>([]);
     const [loading, setLoading] = useState(true);
@@ -402,7 +405,7 @@ export default function ChatRoomPage() {
     const d = info.data;
     const b = d?.booking;
     // 방 종목: 서버가 준 sport, 없으면 조인·부킹 방은 골프, 그 밖은 지금 앱 모드.
-    const attachSport: "BILLIARDS" | "GOLF" = d?.sport ?? (d?.kind === "listing" ? "GOLF" : currentSport === "GOLF" ? "GOLF" : "BILLIARDS");
+    const attachSport: "BILLIARDS" | "GOLF" | "HIKING" = d?.sport ?? (d?.kind === "listing" ? "GOLF" : currentSport === "GOLF" ? "GOLF" : "BILLIARDS");
     const canAttach = !!d && d.kind !== "support" && !!member;
 
     // 신고·차단 — 문의 방은 뺀다(상대가 운영자다). 고른 남의 메시지 한 건을 잡아 두고 [신고] [차단하기] 시트를 띄운다.
@@ -627,7 +630,7 @@ export default function ChatRoomPage() {
                                 />
                             ) : (
                                 <CreateActivityDialog
-                                    open={crewPicker === "CREW_MEETUP"} onOpenChange={(o) => { if (!o) setCrewPicker(null); }} crewId={roomCrewId} sportCategory="BILLIARDS"
+                                    open={crewPicker === "CREW_MEETUP"} onOpenChange={(o) => { if (!o) setCrewPicker(null); }} crewId={roomCrewId} sportCategory={attachSport === "HIKING" ? "HIKING" : "BILLIARDS"}
                                     onCreated={(a) => void postCrewCard("crew-meetup", { activityId: a.id })}
                                 />
                             )}

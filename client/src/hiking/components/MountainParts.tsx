@@ -12,6 +12,7 @@ import { WX_LABEL, type CourseWeather, type WxHalf } from "@shared/golfWeather";
 import { heightText, hikingMountainPath, mountainPlace } from "@shared/hikingMountains";
 import { HIKING_CTA, WEATHER_NOTE, kmRange } from "@shared/hikingPage";
 import { mountainWeatherKey, type MountainSummary } from "../lib/api";
+import { MountainPatch } from "../stamps/MountainPatch";
 
 /** 작은 산 그림 — 목록의 앞머리 */
 export function Peak({ height, done, size = 34 }: { height: number | null; done?: boolean; size?: number }) {
@@ -29,7 +30,13 @@ export function MountainRow({ m, km, done }: { m: MountainSummary; km?: number; 
     const facts = [heightText(m.heightM), mountainPlace(m), m.courses > 0 ? `코스 ${m.courses}개 ${kmRange(m.minKm, m.maxKm)}` : ""].filter(Boolean).join(" · ");
     return (
         <Link href={hikingMountainPath(m.slug)} className="flex min-h-[58px] items-center gap-3 py-2 active:opacity-70" data-testid={`mountain-row-${m.slug}`}>
-            <Peak height={m.heightM} done={done} />
+            {/* 100대 명산은 그 산의 와펜을 앞머리에 — 오른 산은 산호빛 점을 붙인다 */}
+            {m.lists.includes("kfs100") ? (
+                <span className="relative shrink-0">
+                    <MountainPatch id={m.id} region={m.region} size={36} earned={!!done} preview />
+                    {done && <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#F28C6A]" style={{ boxShadow: "0 0 0 2px #0B1F26" }} aria-hidden />}
+                </span>
+            ) : <Peak height={m.heightM} done={done} />}
             <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5">
                     <span className="truncate text-[15.5px] font-semibold text-[#F4EFE3]">{m.name}</span>

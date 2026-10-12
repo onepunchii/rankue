@@ -27,7 +27,8 @@ interface ClubActivityListProps {
     crewId: string;
     isMember: boolean;
     currentMemberId?: string;
-    sportType: SportType;
+    /** HIKING = 산악회의 일정 — 팀 편성(실력으로 나누는 당구 · 골프의 것)이 없고, 고치기 창도 종류 고르기 없이 뜬다 */
+    sportType: SportType | 'HIKING';
     onCreateClick: () => void;
     onShareToChat?: (message: string, activityId?: string) => void;
     isAdmin?: boolean;
@@ -236,7 +237,7 @@ export function ClubActivityList({
                     open={!!editingActivity}
                     onOpenChange={(open) => { if (!open) setEditingActivity(null); }}
                     crewId={crewId}
-                    sportCategory={'BILLIARDS'}
+                    sportCategory={sportType === 'HIKING' ? 'HIKING' : 'BILLIARDS'}
                     initialData={editingActivity}
                 />
             )}
@@ -271,7 +272,7 @@ function ActivityCard({
 }: {
     activity: any;
     crewId: string;
-    sportType: SportType;
+    sportType: SportType | 'HIKING';
     isMember: boolean;
     isAdmin: boolean;
     currentMemberId?: string;
@@ -288,7 +289,10 @@ function ActivityCard({
     const { toast } = useToast();
     const dateLocale = useDateLocale();
     const ddayPill = useDdayPill();
-    const terms = getSportTerminology(sportType);
+    // 산악회에는 팀 편성이 없다(에버 · 타수로 나누는 기능이다) — 단추를 그리지 않으므로 아래 teamSport 는 산악회에서 쓰이지 않는다.
+    const hiking = sportType === 'HIKING';
+    const teamSport: SportType = hiking ? 'BILLIARDS' : sportType;
+    const terms = getSportTerminology(teamSport);
     const [teamOpen, setTeamOpen] = useState(false);
 
     const participants = participantsOf(activity);
@@ -305,7 +309,8 @@ function ActivityCard({
         : `${participants.length} / ${cap}${t("clubActivityListView.personSuffix")}`;
 
     const share = () => {
-        const fullMsg = `[${terms.emoji} ${t("clubActivityListView.shareNoticeTitle")}]\n--------------------------\n${t("clubActivityListView.shareMeetupLabel")}${activity.title}\n${t("clubActivityListView.shareLocationLabel")}${activity.locationName || t("clubActivityListView.locationTbd")}\n${t("clubActivityListView.shareDateLabel")}${dateStr}\n${t("clubActivityListView.shareParticipantsLabel")}${countText}\n--------------------------`;
+        // 머리의 그림 글자는 종목의 것(당구공 · 깃발)이라 산악회 안내에는 붙이지 않는다
+        const fullMsg = `[${hiking ? "" : `${terms.emoji} `}${t("clubActivityListView.shareNoticeTitle")}]\n--------------------------\n${t("clubActivityListView.shareMeetupLabel")}${activity.title}\n${t("clubActivityListView.shareLocationLabel")}${activity.locationName || t("clubActivityListView.locationTbd")}\n${t("clubActivityListView.shareDateLabel")}${dateStr}\n${t("clubActivityListView.shareParticipantsLabel")}${countText}\n--------------------------`;
         // 채팅이 있으면 정모 카드로(채팅 안에서 바로 참석) — 알림은 부르는 쪽이 띄운다. 없으면 글로 복사.
         if (onShareToChat) { onShareToChat(fullMsg, activity.id); return; }
         void navigator.clipboard?.writeText(fullMsg);
@@ -408,7 +413,7 @@ function ActivityCard({
                     <IconButton label={t("clubActivityListView.shareTitle")} onClick={share}>
                         <LucideShare2 />
                     </IconButton>
-                    {canManage && (
+                    {canManage && !hiking && (
                         <button
                             type="button"
                             onClick={() => setTeamOpen(v => !v)}
@@ -434,11 +439,11 @@ function ActivityCard({
             </div>
 
             {/* 팀 편성 — 발의 '팀 편성'으로 펼친다(운영진·만든 사람) */}
-            {canManage && teamOpen && (
+            {canManage && !hiking && teamOpen && (
                 <div className="px-4 pb-4">
                     <TeamWizard
                         activity={activity}
-                        sportType={sportType}
+                        sportType={teamSport}
                         currentMemberId={currentMemberId}
                         onShareToChat={onShareToChat}
                         onClose={() => setTeamOpen(false)}

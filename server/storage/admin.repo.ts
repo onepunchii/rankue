@@ -42,7 +42,8 @@ import type {
     SuggestionReply,
     HiqModerationAction
 } from "../../shared/schema.js";
-import { eq, desc, asc, and, or, sql, gt, gte, like, isNull, inArray } from "drizzle-orm";
+import { eq, ne, desc, asc, and, or, sql, gt, gte, like, isNull, inArray } from "drizzle-orm";
+import { hikingOpenToAll } from "../lib/hikingAccess.js";
 import {
     TARGET_LABEL, ACTION_LABEL, REPORT_ALERT_TYPE, REPORT_ALERT_WINDOW_MIN,
     isReportTargetType, isModerationAction, reportKey, reasonLabel, previewText,
@@ -177,7 +178,9 @@ export class AdminRepository {
 
     // ── 사이트맵/공개 매장 조회 (인증 불필요, 민감필드 제외) ──
     async getCrewsForSitemap() {
-        return db.select({ id: hiqCrews.id }).from(hiqCrews);
+        // 등산이 닫혀 있는 동안(2026-10-13) 산악회는 싣지 않는다 — 시험 계정이 만든 산악회가 검색에 먼저 나가지 않게(server/lib/hikingAccess)
+        if (hikingOpenToAll()) return db.select({ id: hiqCrews.id }).from(hiqCrews);
+        return db.select({ id: hiqCrews.id }).from(hiqCrews).where(ne(hiqCrews.sportCategory, "HIKING"));
     }
 
     async getStoresForSitemap() {

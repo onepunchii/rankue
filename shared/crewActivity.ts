@@ -51,6 +51,7 @@ const ACTIVITY_CATEGORY_KEYS: Record<string, string> = {
     GOLF_TOUR: "categorySelector.golfTour",
     REGULAR_SCREEN: "categorySelector.regularScreen",
     BLITZ_SCREEN: "categorySelector.blitzScreen",
+    // 산악회의 일정(HIKING_TRIP — shared/crewSport)은 종류가 하나뿐이라 라벨이 없다: 카드마다 같은 말이 붙을 뿐이다.
 };
 
 /** 정모 카드의 종류 라벨 키. 종류 없는 옛 정모는 null(화면은 라벨을 그리지 않는다). */

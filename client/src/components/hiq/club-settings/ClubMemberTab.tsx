@@ -167,8 +167,11 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                             <CrewRoleBadge role={m.role} />
                                             {isMe && <span className="shrink-0 text-[12px] font-semibold text-brand">{t("clubMemberTab.me")}</span>}
                                         </span>
+                                        {/* 산악회에는 종목 기록이 없다(memberStat 이 null) — '기록 없음'이라고 적는 대신 가입일을 보인다 */}
                                         <span className={cn(CREW_TEXT.caption, "rk-num")}>
-                                            {stat ? `${t(stat.labelKey)} ${stat.value}` : t("crewMgmt.noRecord")}
+                                            {crew?.sportCategory === "HIKING"
+                                                ? `${t("crewMemberList.joinedDate")} ${new Date(m.joinedAt).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })}`
+                                                : stat ? `${t(stat.labelKey)} ${stat.value}` : t("crewMgmt.noRecord")}
                                         </span>
                                     </span>
                                     {isBusy(id) ? (

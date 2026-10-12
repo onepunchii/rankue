@@ -622,6 +622,45 @@ body {
   --primary-foreground: #0a0a0a;
 }
 
+/**
+ * 등산(2026-10-13) — 세 번째 종목의 색. '새벽 능선': 짙은 청록 바탕에 산호빛 강조(client/src/hiking/theme.ts 의 HK 와 같은 값).
+ *
+ * 등산은 어두운 화면이라 골프의 어두운 층을 그대로 탄다: <html data-sport="GOLF" data-skin="hiking">(contexts/SportContext).
+ * 공용 화면(크루 · 채팅 · 전체 메뉴 · 하단 탭)의 흰 카드 · 검정 글씨를 토큰으로 되받는 다리(아래 '골프 모드 임시 다리')가
+ * 골프 구역에만 걸려 있어서다 — 다리를 두 벌 만들지 않고, 여기서 **색 토큰만** 등산의 것으로 덮는다.
+ * 당구 · 골프 화면에는 닿지 않는다(data-skin 은 등산일 때만 붙는다).
+ */
+:root[data-sport="GOLF"][data-skin="hiking"] {
+  --surface-0: #0b1f26;
+  --surface-1: #12303a;
+  --surface-2: #12303a;
+  --surface-3: rgba(244, 239, 227, 0.08);
+  --surface-line: rgba(244, 239, 227, 0.12);
+  --surface-line-strong: rgba(244, 239, 227, 0.22);
+
+  /* 산호빛 #F28C6A — 짙은 청록 위의 강조색. 글씨는 짙은 밤색을 얹는다. */
+  --brand: 242 140 106;
+  --brand-strong: 230 124 89;
+  --brand-fg: 42 18 8;
+
+  --ink-1: rgba(244, 239, 227, 0.95);
+  --ink-2: rgba(244, 239, 227, 0.76);
+  --ink-3: rgba(244, 239, 227, 0.6);
+  --ink-4: rgba(244, 239, 227, 0.52);
+  --nav-idle: rgba(244, 239, 227, 0.78);
+  --rk-frame-outer: #06141a;
+  --rk-inbox-bg: #102a33;
+
+  --background: #0b1f26;
+  --foreground: rgba(244, 239, 227, 0.95);
+  --card: #12303a;
+  --card-foreground: rgba(244, 239, 227, 0.95);
+  --popover: #12303a;
+  --popover-foreground: rgba(244, 239, 227, 0.95);
+  --primary: #f28c6a;
+  --primary-foreground: #2a1208;
+}
+
 
 @layer base {
 

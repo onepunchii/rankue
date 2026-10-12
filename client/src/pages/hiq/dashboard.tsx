@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { Suspense, lazy, useState, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { HiqMember } from "@shared/schema";
@@ -6,6 +6,7 @@ import { useSport } from "@/contexts/SportContext";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { AppInstallCard } from "@/components/hiq/AppInstallCard";
 import GolfDashboard from "@/golf/pages/Dashboard";
+const HikingHome = lazy(() => import("@/hiking/pages/HikingHome"));
 
 // New Components
 import { DashboardHeader } from "@/components/hiq/dashboard/DashboardHeader";
@@ -397,7 +398,7 @@ function HiqDashboardBilliards() {
  * 두 화면을 형제로 두면 그런 일이 없다 — 애초에 서로 다른 플랫폼이라 섞을 이유도 없다.
  */
 export default function HiqDashboard() {
-    const { currentSport } = useSport();
+    const { currentSport, isHiking } = useSport();
     const { isLoading } = useAuth();
     // 로그인 확인 중의 골프 홈(2026-10-05) — 한국어 화면은 확인을 기다리지 않고 저장된 종목(골프)으로 시작한다(useGolfVisible).
     // 골프 홈에는 '확인 중' 모습이 없어서 그대로 끼우면 빈 숫자(0.0)를 먼저 그렸다가 예시(방문자)나 내 기록(회원)으로 바뀐다 — 그동안은 돌림표만.
@@ -409,5 +410,7 @@ export default function HiqDashboard() {
             </div>
         );
     }
+    // 등산(2026-10-13) — 세 번째 종목의 홈. 당구 · 골프 홈과 따로 선 화면이다(client/src/hiking)
+    if (isHiking) return <Suspense fallback={<div className="min-h-[100dvh] bg-[#0B1F26]" aria-busy="true" />}><HikingHome /></Suspense>;
     return currentSport === "GOLF" ? <GolfDashboard /> : <HiqDashboardBilliards />;
 }

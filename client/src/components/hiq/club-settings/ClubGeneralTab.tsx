@@ -37,6 +37,8 @@ interface ClubGeneralTabProps {
 export function ClubGeneralTab({ crew, baseName: initialBaseName, activeCount, isLeader, canEdit, onUpdate, onDelete, isUpdating, isDeleting }: ClubGeneralTabProps) {
     const { t } = useT();
     const { toast } = useToast();
+    // 산악회에는 베이스캠프(단골 당구장)도 주 종목도 없다 — 두 칸을 그리지 않는다(서버도 그 칸은 고치지 않는다).
+    const hiking = crew?.sportCategory === "HIKING";
     const [form, setForm] = useState<CrewSettingsForm>(() => crewToSettingsForm(crew as any));
     const [uploading, setUploading] = useState<null | 'emblem' | 'coverImage'>(null);
     const [deleteOpen, setDeleteOpen] = useState(false);
@@ -162,7 +164,7 @@ export function ClubGeneralTab({ crew, baseName: initialBaseName, activeCount, i
                     maxLength={60}
                     onChange={(e) => set("shortIntro", e.target.value)}
                     disabled={!canEdit}
-                    placeholder={crew?.sportCategory === "GOLF" ? t("crewMgmt.sloganPlaceholderGolf") : t("crewMgmt.sloganPlaceholderBilliards")}
+                    placeholder={hiking ? t("crewMgmt.sloganPlaceholderHiking") : crew?.sportCategory === "GOLF" ? t("crewMgmt.sloganPlaceholderGolf") : t("crewMgmt.sloganPlaceholderBilliards")}
                     className={FIELD_INPUT}
                 />
             </Field>
@@ -186,8 +188,8 @@ export function ClubGeneralTab({ crew, baseName: initialBaseName, activeCount, i
             {/* 베이스캠프는 당구 크루만 — 골프 크루는 한 골프장에 매이지 않고, 이 검색은 당구 매장을 뒤진다
                 (골프장 목록은 비어 있다). 골프는 위의 '주 활동 지역'이 그 역할을 한다(2026-09-09).
                 2026-08-05 에는 수정 제외였는데, 그 결과 생성 때 안 고른 크루는 영영 베이스가 비고 '내 주변 크루'가 죽었다
-                (오너 확인 2026-08-24). 크루장·운영진만 변경 가능. */}
-            {crew?.sportCategory !== "GOLF" && (
+                (오너 확인 2026-08-24). 크루장·운영진만 변경 가능. 산악회도 골프와 같다 — 한 산에 매이지 않는다. */}
+            {crew?.sportCategory !== "GOLF" && !hiking && (
                 <Field label={t("clubSettings.baseCampLabel")} htmlFor="crew-set-base" hint={baseName ? t("clubSettings.baseCampHint") : undefined}>
                     {baseName ? (
                         <div className="flex items-center justify-between gap-2 pl-3.5 pr-1 min-h-11 rounded-tile bg-brand/10">
@@ -259,10 +261,12 @@ export function ClubGeneralTab({ crew, baseName: initialBaseName, activeCount, i
                 disabled={!canEdit}
             />
 
-            {/* 활동 종목 — 생성 위저드(활동 성향)와 같은 선택지. */}
-            <Field label={t("createClub.gameTypeLabel")}>
-                <GameTypePicker sport={crew?.sportCategory} value={form.gameType} onChange={(v) => set("gameType", v)} disabled={!canEdit} />
-            </Field>
+            {/* 활동 종목 — 생성 위저드(활동 성향)와 같은 선택지. 산악회에는 없다. */}
+            {!hiking && (
+                <Field label={t("createClub.gameTypeLabel")}>
+                    <GameTypePicker sport={crew?.sportCategory} value={form.gameType} onChange={(v) => set("gameType", v)} disabled={!canEdit} />
+                </Field>
+            )}
 
             {/* 분위기 태그 — 최대 3개 */}
             <Field label={t("createClub.vibeLabel")}>

@@ -3787,5 +3787,16 @@ const tr: Dict = {
   "link.unlinked": "{provider} bağlantısı kaldırıldı",
   "link.failed": "Bağlanamadı. Lütfen biraz sonra tekrar deneyin.",
   "link.unlinkFailed": "Bağlantı kaldırılamadı. Lütfen biraz sonra tekrar deneyin.",
+  "createClub.namePlaceholderHiking": "örn. Hafta Sonu Dağcıları, Şafak Sırtı Kulübü",
+  "createClub.descPlaceholderHiking": "Yürüyüş sıklığı, zorluk, yanınıza alınacaklar gibi detayları yaz.",
+  "createClub.step2TitleHiking": "Bölge",
+  "createClub.step2SubtitleHiking": "Ekibiniz genelde hangi bölgenin dağlarına çıkıyor?",
+  "crewMgmt.sloganPlaceholderHiking": "Örn: Her hafta sonu yakın dağlara çıkan grup",
+  "crewMgmt.hikingTags": "#yeniBaşlayanlar,#haftaSonuYürüyüşü,#şafakYürüyüşü,#ünlüZirveler,#sırtGeçişi,#kolayParkur,#önceGüvenlik,#2030,#4050",
+  "createActivity.namePlaceholderHiking": "örn. Bukhansan Baegundae yürüyüşü",
+  "createActivity.locationLabelHiking": "Buluşma noktası",
+  "createActivity.locationPlaceholderHiking": "örn. Patika başı, ziyaretçi merkezi önü",
+  "crewMemberList.defaultBioHiking": "Dağları seven bir ranker",
+  "crewMemberList.hikingTrips": "Birlikte yürüyüş",
 };
 export default tr;

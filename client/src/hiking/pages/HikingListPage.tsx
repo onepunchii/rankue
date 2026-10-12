@@ -14,7 +14,7 @@ import { OSM_NOTE, hikingListSeo, hikingRegionSeo } from "@shared/hikingPage";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { MountainMap } from "../components/MountainMap";
 import { HikingCta, MountainRow } from "../components/MountainParts";
-import { HIKING_HERO, hikingCover } from "../theme";
+import { hikingCover, hikingListCover } from "../theme";
 import { mountainsKey, type MountainSummary } from "../lib/api";
 
 const PAGE = 60;
@@ -51,7 +51,7 @@ export default function HikingListPage() {
         <HikingShell title={title}>
             <div data-testid="hiking-list" data-kind={region ? "region" : "group"}>
                 <div className="relative h-[168px] overflow-hidden">
-                    <img src={region ? hikingCover(region.id) : HIKING_HERO} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 60%" }} draggable={false} decoding="async" />
+                    <img src={region ? hikingCover(region.id) : hikingListCover(group?.id)} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 60%" }} draggable={false} decoding="async" />
                     <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2600 20%,#0B1F26F5 97%)" }} aria-hidden />
                     <div className="absolute inset-x-5 bottom-3.5">
                         <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-[#F4EFE3]">{title}</h1>

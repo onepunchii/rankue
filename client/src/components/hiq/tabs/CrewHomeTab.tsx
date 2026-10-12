@@ -108,7 +108,9 @@ export const CrewHomeTab = memo(({
 
     const activeMembers = useMemo(() => members.filter((m: any) => m.role !== 'pending'), [members]);
     const isGolf = crew.sportCategory === 'GOLF';
-
+    // 산악회(2026-10-13) — 당구의 것(평균 에버 · 대회 · 베이스캠프)도 골프의 것(평균 타수 · 크루 도장)도 그리지 않는다.
+    // 남는 것: 소개 · 일정 · 투표 · 멤버. 아래에서 isGolf 가 아니면 당구로 떨어지는 자리마다 따로 가른다.
+    const isHiking = crew.sportCategory === 'HIKING';
 
     // 통계 계산 (useMemo 최적화)
     const stats = useMemo(() => {
@@ -169,11 +171,11 @@ export const CrewHomeTab = memo(({
                     <h1 className={cn(CREW_TEXT.title, "mt-2.5 leading-tight break-words")}>{crew.name}</h1>
                     <p className={cn(CREW_TEXT.sub, "mt-0.5 text-[14px]")}>{crew.shortIntro || crew.region || t("crewHome.ourCrew")}</p>
 
-                    {/* 요약 한 줄: 멤버 · 이번 달 정모 · 평균 · 함께한 날 */}
-                    <section className={cn(CREW_CARD, "mt-3.5 grid grid-cols-4 divide-x divide-surface-line py-3 px-0")} aria-label={t("crewHub.stats")}>
+                    {/* 요약 한 줄: 멤버 · 이번 달 정모 · 평균 · 함께한 날. 산악회는 평균 칸이 없어 세 칸이다(종목 기록이 없다) */}
+                    <section className={cn(CREW_CARD, "mt-3.5 grid divide-x divide-surface-line py-3 px-0", isHiking ? "grid-cols-3" : "grid-cols-4")} aria-label={t("crewHub.stats")}>
                         <Stat label={t("crewHome.members")} value={<>{countNow}{countMax && <span className="text-[12px] text-ink-3">/{countMax}</span>}</>} />
                         <Stat label={t("crewHome.monthMeetups")} value={pulse ? pulse.monthActivities : "-"} />
-                        <Stat label={avgCell.label} value={avgCell.value} />
+                        {!isHiking && <Stat label={avgCell.label} value={avgCell.value} />}
                         <Stat label={t("crewHome.together")} value={together ? <>{together.toLocaleString()}<span className="text-[12px] text-ink-3">{t("crewHome.dayUnit")}</span></> : "-"} />
                     </section>
                 </div>
@@ -233,7 +235,7 @@ export const CrewHomeTab = memo(({
                         crewId={crew.id}
                         isMember={isMember}
                         currentMemberId={me?.id}
-                        sportType={isGolf ? 'GOLF' : 'BILLIARDS'}
+                        sportType={isHiking ? 'HIKING' : isGolf ? 'GOLF' : 'BILLIARDS'}
                         onCreateClick={onCreateActivity}
                         onShareToChat={onShareToChat}
                         isAdmin={isAdmin}
@@ -251,8 +253,8 @@ export const CrewHomeTab = memo(({
                     </CrewSection>
                 )}
 
-                {/* 5. 대회 — 3쿠션/4구 전용이라 골프 크루에는 그리지 않는다(2026-09-09 오너: 두 종목을 아예 가른다). 크루원 전용. */}
-                {isMember && !isGolf && (
+                {/* 5. 대회 — 3쿠션/4구 전용이라 골프 크루에는 그리지 않는다(2026-09-09 오너: 두 종목을 아예 가른다). 크루원 전용. 산악회도 같다. */}
+                {isMember && !isGolf && !isHiking && (
                     <CrewSection title={t("crewHome.tournament")} add={isAdmin ? { label: t("crewHome.addTournament"), onClick: onCreateTournament } : undefined} action={{ label: t("crewUi.seeAll"), onClick: onTournamentClick }}>
                         <TournamentPreview crewId={crew.id} onOpen={onTournamentClick} onCreate={isAdmin ? onCreateTournament : undefined} />
                         {/* 명예의 전당은 전용 페이지로 — 홈에 펼쳐 두면 목록이 길어져 대회가 묻힌다. */}
@@ -268,10 +270,12 @@ export const CrewHomeTab = memo(({
                     </CrewSection>
                 )}
 
-                {/* 6. 베이스캠프 */}
-                <CrewSection title={t("crewHome.baseCamp")}>
-                    <BaseCamp baseStore={baseStore} baseListing={baseListing} />
-                </CrewSection>
+                {/* 6. 베이스캠프 — 단골 당구장이다. 산악회에는 없다(만들 때도 받지 않는다) */}
+                {!isHiking && (
+                    <CrewSection title={t("crewHome.baseCamp")}>
+                        <BaseCamp baseStore={baseStore} baseListing={baseListing} />
+                    </CrewSection>
+                )}
 
                 {/* 7. 멤버 — 내 크루 카드의 인원 버튼이 ?focus=members 로 여기까지 데려온다(2026-09-23) */}
                 <div id="crew-members" className="scroll-mt-4">

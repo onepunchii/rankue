@@ -76,7 +76,8 @@ export const AllCrewList = memo(({ searchQuery, currentSport }: AllCrewListProps
 
     // 거르기 칩(2026-09-26 A안): 전체 · 모집 중 · 종목(당구 3쿠션·4구 / 골프 필드·스크린). 받은 목록 안에서 거른다.
     const [filter, setFilter] = useState<"all" | "open" | string>("all");
-    const gameChips = currentSport === "GOLF" ? (["field", "screen"] as const) : (["3c", "4c"] as const);
+    // 산악회에는 주 종목이 없다 — 등산일 땐 종목 칩을 그리지 않는다(전체 · 모집 중만).
+    const gameChips: readonly string[] = currentSport === "HIKING" ? [] : currentSport === "GOLF" ? ["field", "screen"] : ["3c", "4c"];
     const isOpen = (c: any) => {
         const st = crewRowStatus(c);
         return !st.full && !myRoles.has(c.id);

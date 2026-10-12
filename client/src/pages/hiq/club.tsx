@@ -17,7 +17,8 @@ export default function HiqClub() {
     const { t } = useT();
     const [, setLocation] = useLocation();
     const [searchQuery, setSearchQuery] = useState("");
-    const { currentSport } = useSport();
+    // sport — 등산일 때는 산악회만 보인다. currentSport 는 등산을 당구로 보고해서(SportContext) 그대로 쓰면 등산 탭에 당구 크루가 뜬다.
+    const { sport } = useSport();
     // 크루 목록·검색은 공개다. 만들기(=계정 필요)만 로그인으로 보낸다 — 머리의 '만들기'와 빈 목록의 버튼이 같은 길을 쓴다.
     const { isGuest } = useAuth();
     const handleCreate = () => (isGuest ? goLogin(setLocation, "/club") : setLocation("/club/create"));
@@ -40,7 +41,7 @@ export default function HiqClub() {
                             {t("club.create")}
                         </button>
                     </header>
-                    <MyCrewList currentSport={currentSport} onCreate={handleCreate} />
+                    <MyCrewList currentSport={sport} onCreate={handleCreate} />
                 </section>
 
                 {/* 둘러보기 — 검색 + 내 주변 */}
@@ -65,7 +66,7 @@ export default function HiqClub() {
                             </IconButton>
                         )}
                     </label>
-                    <AllCrewList searchQuery={searchQuery} currentSport={currentSport} />
+                    <AllCrewList searchQuery={searchQuery} currentSport={sport} />
                 </section>
 
                 <AppInstallCard />

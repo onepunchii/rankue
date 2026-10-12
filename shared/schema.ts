@@ -346,7 +346,8 @@ export const hiqCrews = pgTable("hiq_crews", {
   shortIntro: text("short_intro"), // Short slogan (e.g. "광진구 2030 크루")
   meetingDay: text("meeting_day"), // e.g. "SAT"
   meetingTime: text("meeting_time"), // e.g. "14:00"
-  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "MIXED"] }).default("BILLIARDS").notNull(),
+  // HIKING(2026-10-13) — 산악회. 당구 · 골프 크루와 섞이지 않는 따로 선 종류다(shared/crewSport). 열은 글자라 DB 는 그대로.
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "MIXED", "HIKING"] }).default("BILLIARDS").notNull(),
   introQuestions: jsonb("intro_questions"),
 
   latitude: doublePrecision("latitude"),
@@ -379,8 +380,9 @@ export const hiqCrewActivities = pgTable("hiq_crew_activities", {
   locationName: text("location_name"), // If generic location
   maxParticipants: integer("max_participants").default(8),
   cost: text("cost"), // e.g. "Game fee Dutch pay"
-  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
-  category: text("category"), // REGULAR_ROUNDING, BLITZ_SCREEN, etc.
+  // HIKING — 산악회의 일정(서버가 크루 종목으로 정한다 — routes/modules/crew.ts)
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "HIKING"] }).default("BILLIARDS").notNull(),
+  category: text("category"), // REGULAR_ROUNDING, BLITZ_SCREEN, HIKING_TRIP, etc.
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
@@ -404,7 +406,8 @@ export const hiqCrewPosts = pgTable("hiq_crew_posts", {
   category: text("category"), // 공지사항, 가입인사, 모임후기, 자유글
   isNotice: boolean("is_notice").default(false).notNull(),
   images: jsonb("images").$type<string[]>(), // Array of image URLs
-  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF"] }).default("BILLIARDS").notNull(),
+  // 글의 종목은 크루가 정한다 — 산악회의 글은 HIKING
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "HIKING"] }).default("BILLIARDS").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

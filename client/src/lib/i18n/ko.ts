@@ -3795,4 +3795,17 @@ export const ko: Dict = {
   "link.unlinked": "{provider} 연결을 해제했어요",
   "link.failed": "연결하지 못했어요. 잠시 후 다시 시도해 주세요.",
   "link.unlinkFailed": "연결을 해제하지 못했어요. 잠시 후 다시 시도해 주세요.",
+  // 산악회(2026-10-13) — 등산의 크루(sportCategory HIKING). 공용 크루 화면이 당구 · 골프 문구 대신 쓰는 것만 둔다:
+  // 만들기의 예시 문구 · 추천 태그, 일정 만들기 창의 장소 칸, 멤버 줄의 기본 소개 · 함께한 산행 횟수
+  "createClub.namePlaceholderHiking": "예: 주말 산악회, 새벽 능선 모임",
+  "createClub.descPlaceholderHiking": "산행 주기, 난이도, 준비물 등 모임을 자세히 소개해 주세요.",
+  "createClub.step2TitleHiking": "활동 지역",
+  "createClub.step2SubtitleHiking": "주로 어느 지역의 산을 오르시나요?",
+  "crewMgmt.sloganPlaceholderHiking": "예: 주말마다 근교 산을 오르는 모임",
+  "crewMgmt.hikingTags": "#초보환영,#주말산행,#새벽산행,#명산탐방,#종주,#둘레길,#안전산행,#2030,#4050",
+  "createActivity.namePlaceholderHiking": "예: 북한산 백운대 산행",
+  "createActivity.locationLabelHiking": "모이는 곳",
+  "createActivity.locationPlaceholderHiking": "예: 등산로 입구, 탐방지원센터 앞",
+  "crewMemberList.defaultBioHiking": "산을 즐기는 랭커",
+  "crewMemberList.hikingTrips": "함께한 산행",
 };

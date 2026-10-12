@@ -3787,5 +3787,16 @@ const es: Dict = {
   "link.unlinked": "{provider} desconectado",
   "link.failed": "No pudimos conectarlo. Inténtalo de nuevo en un momento.",
   "link.unlinkFailed": "No pudimos desconectarlo. Inténtalo de nuevo en un momento.",
+  "createClub.namePlaceholderHiking": "Ej.: Senderistas del Finde, Club Cresta del Alba",
+  "createClub.descPlaceholderHiking": "Frecuencia de las salidas, dificultad, qué llevar, etc.",
+  "createClub.step2TitleHiking": "Zona de actividad",
+  "createClub.step2SubtitleHiking": "¿En qué zona suele subir montañas tu crew?",
+  "crewMgmt.sloganPlaceholderHiking": "Ej.: grupo que sube montañas cercanas cada fin de semana",
+  "crewMgmt.hikingTags": "#principiantes,#rutasDeFinde,#rutasAlAmanecer,#cumbresFamosas,#travesías,#senderosFáciles,#seguridadPrimero,#2030,#4050",
+  "createActivity.namePlaceholderHiking": "Ej.: subida a Bukhansan Baegundae",
+  "createActivity.locationLabelHiking": "Punto de encuentro",
+  "createActivity.locationPlaceholderHiking": "Ej.: inicio del sendero, frente al centro de visitantes",
+  "crewMemberList.defaultBioHiking": "Un ranker que ama la montaña",
+  "crewMemberList.hikingTrips": "Salidas juntos",
 };
 export default es;

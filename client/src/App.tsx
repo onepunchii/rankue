@@ -211,6 +211,12 @@ const hikingFallback = <div className="min-h-[100dvh] bg-[#0B1F26]" aria-busy="t
 const HikingHub = lazy(() => import("@/hiking/pages/HikingHub"));
 const HikingListPage = lazy(() => import("@/hiking/pages/HikingListPage"));
 const HikingMountainPage = lazy(() => import("@/hiking/pages/MountainPage"));
+const HikingStampShelf = lazy(() => import("@/hiking/pages/StampShelf"));
+const HikingStampBook = lazy(() => import("@/hiking/pages/StampBookPage"));
+const HikingPack = lazy(() => import("@/hiking/pages/PackPage"));
+function HikingStampShelfRoute() { return <Suspense fallback={hikingFallback}><HikingStampShelf /></Suspense>; }
+function HikingStampBookRoute() { return <Suspense fallback={hikingFallback}><HikingStampBook /></Suspense>; }
+function HikingPackRoute() { return <Suspense fallback={hikingFallback}><HikingPack /></Suspense>; }
 function HikingHubRoute() { return <Suspense fallback={hikingFallback}><HikingHub /></Suspense>; }
 function HikingListRoute() { return <Suspense fallback={hikingFallback}><HikingListPage /></Suspense>; }
 function HikingMountainRoute() { return <Suspense fallback={hikingFallback}><HikingMountainPage /></Suspense>; }
@@ -409,6 +415,10 @@ function AppRoutes() {
       <Route path="/hiking/regions/:id" component={HikingListRoute} />
       <Route path="/hiking/lists/:id" component={HikingListRoute} />
       <Route path="/hiking/mountains/:slug" component={HikingMountainRoute} />
+      {/* 도장첩 · 배낭 — 누구에게나 열린다(등산이 열리지 않은 사람에게는 받을 와펜을 보여 준다) */}
+      <Route path="/hiking/stamps" component={HikingStampShelfRoute} />
+      <Route path="/hiking/stamps/:book" component={HikingStampBookRoute} />
+      <Route path="/hiking/pack" component={HikingPackRoute} />
       {/* 골프장 페이지(2026-09-24) — 검색 유입용 공개 페이지라 GolfOnly 를 타지 않는다(GolfOnly 는 비로그인을 /dashboard 로 쫓아낸다).
           슬러그는 한글(정본). 옛 숫자 주소(/golf/course/74)는 GolfCoursePage 가 슬러그로 바꿔 준다.
           wouter 는 기본이 정확 일치라(regexparam, loose 아님) /golf/booking 이 /golf/booking-list 를 먹지 않는다. */}

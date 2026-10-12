@@ -36,9 +36,11 @@ import { msg, localeOf, type I18nText } from "../../lib/i18n.js";
 import { notifyRoom } from "./chat.js";
 import { createSchema as simCreateSchema, createHostMatch } from "./simMatch.js";
 import { kstShortDateTime } from "../../../shared/crewActivity.js";
+import type { CrewSport } from "../../../shared/crewSport.js";
 
 const router = Router();
-type Sport = "BILLIARDS" | "GOLF";
+// 방의 종목. 산악회 방(HIKING)에는 당구 · 골프 카드가 붙지 않는다(아래 openRoom 의 종목 비교) — 크루 카드(정모 · 투표 · 공지)만 붙는다.
+type Sport = CrewSport;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** 디렉터리 매장 코드(listings.ts 의 CODE_RE 와 같다). */
 const LISTING_CODE_RE = /^[A-Za-z0-9_-]{1,20}$/;
@@ -253,6 +255,8 @@ router.post("/rooms/:key/cards/store", ...billiardsGate, asyncHandler(async (req
 router.post("/rooms/:key/cards/my-stats", ...billiardsGate, asyncHandler(async (req: AuthRequest, res: any) => {
     const room = await openRoom(req, res, "ANY"); if (!room) return;
     const { me, sport } = room;
+    // 산악회 방에는 내보낼 종목 기록이 없다 — 당구 다마를 산악회 방에 올리지 않는다.
+    if (sport === "HIKING") return sendError(res, 400, "err.chat.card.sportMismatch", "SPORT_MISMATCH");
     const nz = <T,>(v: T | null | undefined): T | null => (v === undefined || v === null ? null : v);
     const summary = sport === "GOLF"
         ? `📊 내 기록 · 핸디 ${nz(me.golfHandicap) ?? "-"} · 평균 ${me.golfAvgScore ? Math.round(me.golfAvgScore) : "-"}타`

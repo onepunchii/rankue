@@ -23,6 +23,7 @@ import {
 } from "../../shared/chatSupport.js";
 import { DELETED_PHONE_PREFIX } from "../../shared/loginPhone.js";
 import { DEFAULT_STORE_SLUG, GLOBAL_STORE_SLUG } from "../../shared/systemStores.js";
+import type { CrewSport } from "../../shared/crewSport.js";
 
 export type RoomKind = "crew" | "listing" | "dm" | "support";
 export interface RoomRef { kind: RoomKind; id: string; key: string }
@@ -351,7 +352,7 @@ export class ChatRepository {
 
     /* ── 방 정보(머리줄·고정 카드) ───────────────────────── */
     /** locale: 응답에 실리는 라벨(부제·대체 제목)의 언어 — 라우트가 localeOf(res) 를 넘긴다. */
-    async roomInfo(ref: RoomRef, viewerId: string, locale: Locale = "ko"): Promise<{ title: string; subtitle: string; members: { id: string; name: string; profileImageUrl: string | null }[]; canManage: boolean; crewId?: string; booking?: any; sport?: "BILLIARDS" | "GOLF" }> {
+    async roomInfo(ref: RoomRef, viewerId: string, locale: Locale = "ko"): Promise<{ title: string; subtitle: string; members: { id: string; name: string; profileImageUrl: string | null }[]; canManage: boolean; crewId?: string; booking?: any; sport?: CrewSport }> {
         const memberIds = await this.roomMembers(ref);
         // 남의 메시지를 지울 수 있나 — 크루 운영진·앱 운영자. 화면이 삭제 단추를 보일지 정하는 데만 쓴다(서버 검사는 따로).
         let canManage = await this.isAdmin(viewerId);
@@ -364,7 +365,8 @@ export class ChatRepository {
         const members = people.map((p) => ({ id: String(p.id), name: p.name, profileImageUrl: p.profileImageUrl ?? null }));
         if (ref.kind === "crew") {
             const [c] = await db.select({ name: hiqCrews.name, sport: hiqCrews.sportCategory }).from(hiqCrews).where(eq(hiqCrews.id, ref.id)).limit(1);
-            return { title: c?.name ?? tr(locale, "ui.chat.crew"), subtitle: tr(locale, "ui.chat.crewCount", { n: members.length }), members, canManage, crewId: ref.id, sport: c?.sport === "GOLF" ? "GOLF" : "BILLIARDS" };
+            // 산악회 방은 등산 — 당구로 뭉개면 화면이 당구 첨부 줄(매칭 대결 · 온라인 대전)을 그리고 당구 카드가 붙는다(chatCards 가 방 종목으로 거른다).
+            return { title: c?.name ?? tr(locale, "ui.chat.crew"), subtitle: tr(locale, "ui.chat.crewCount", { n: members.length }), members, canManage, crewId: ref.id, sport: c?.sport === "GOLF" ? "GOLF" : c?.sport === "HIKING" ? "HIKING" : "BILLIARDS" };
         }
         if (ref.kind === "listing") {
             const [b] = await db.select().from(golfBookings).where(eq(golfBookings.id, ref.id)).limit(1);
@@ -385,8 +387,12 @@ export class ChatRepository {
     }
 
     /* ── 내 방 목록 ─────────────────────────────────────── */
-    /** locale: 응답에 실리는 라벨(부제·대체 제목)의 언어 — 라우트가 localeOf(res) 를 넘긴다. */
-    async myRooms(memberId: string, sport: "BILLIARDS" | "GOLF", locale: Locale = "ko"): Promise<ChatRoomSummary[]> {
+    /**
+     * locale: 응답에 실리는 라벨(부제·대체 제목)의 언어 — 라우트가 localeOf(res) 를 넘긴다.
+     * 등산(HIKING, 2026-10-13)의 목록 = 산악회 방 + 문의 방. 조인 · 부킹 방은 골프의 것이고, 1:1 방은 없다 —
+     * 친구 관계가 종목별(당구 · 골프)이라 등산에는 방을 열 상대가 없다(방의 종목 열도 당구 · 골프뿐이다).
+     */
+    async myRooms(memberId: string, sport: CrewSport, locale: Locale = "ko"): Promise<ChatRoomSummary[]> {
         const rooms: ChatRoomSummary[] = [];
         // 크루(종목별)
         const crews = await db.select({ crew: hiqCrews }).from(hiqCrewMembers)
@@ -421,7 +427,8 @@ export class ChatRepository {
         }
 
         // 1:1 · 소그룹 — 방이 종목을 가진다(2026-09-21 오너: "골프 채팅과 당구 채팅은 구별되게")
-        const dms = await db.select({ roomId: hiqChatRoomMembers.roomId }).from(hiqChatRoomMembers)
+        // 등산에는 1:1 방이 없다(위 주석) — 묻지 않는다.
+        const dms = sport === "HIKING" ? [] : await db.select({ roomId: hiqChatRoomMembers.roomId }).from(hiqChatRoomMembers)
             .innerJoin(hiqChatRooms, eq(hiqChatRooms.id, hiqChatRoomMembers.roomId))
             .where(and(eq(hiqChatRoomMembers.memberId, memberId), eq(hiqChatRooms.sport, sport)));
         if (dms.length > 0) {

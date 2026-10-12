@@ -10,7 +10,7 @@ import { FilterChips, SearchBox, EmptyState, Panel, Pill, KpiTile, kstDate } fro
 
 export type AdminCrew = {
     id: string; name: string; description: string;
-    sportCategory: "BILLIARDS" | "GOLF" | "MIXED";
+    sportCategory: "BILLIARDS" | "GOLF" | "MIXED" | "HIKING";
     region: string | null; joinType: string; maxMembers: number;
     memberCount: number; pendingCount: number;
     leaderName: string; storeName: string; createdAt: string;
@@ -20,6 +20,8 @@ const SPORT: Record<string, { label: string; tone: "brand" | "info" | "warn" }> 
     BILLIARDS: { label: "당구", tone: "info" },
     GOLF: { label: "골프", tone: "brand" },
     MIXED: { label: "당구·골프", tone: "warn" },
+    // 산악회(2026-10-13) — 이름표가 없으면 아래 대체값 때문에 '당구'로 찍힌다. '전체'에서만 보인다(종목 칩은 당구 · 골프 둘).
+    HIKING: { label: "등산", tone: "warn" },
 };
 
 export default function CrewsView() {

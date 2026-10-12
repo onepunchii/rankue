@@ -11,6 +11,7 @@ import { db } from "../db.js";
 import { hasMountainGuide, type MountainGuide } from "../../shared/hikingGuide.js";
 import { distM, type LinePoint } from "../../shared/hikingGeo.js";
 import type { HikingPoiKind } from "../../shared/hikingPois.js";
+import { hikingFeaturesOf } from "../../shared/hikingFeatures.js";
 
 export interface MountainSummary {
     id: string;
@@ -76,13 +77,13 @@ const toSummary = (r: any): MountainSummary => {
     const lists: { list: string; no: number | null }[] = Array.isArray(r.lists) ? r.lists : [];
     return {
         id: r.id, slug: r.slug, name: r.name, heightM: num(r.height_m), lat: num(r.lat), lng: num(r.lng), region: r.region ?? null, sido: r.sido ?? null, sigungu: r.sigungu ?? null,
-        tier: Number(r.tier), lists: lists.map((l) => l.list), kfsNo: lists.find((l) => l.list === "kfs100")?.no ?? null, traits: Array.isArray(r.traits) ? r.traits : [],
+        tier: Number(r.tier), lists: lists.map((l) => l.list), kfsNo: lists.find((l) => l.list === "kfs100")?.no ?? null, traits: Array.from(new Set([...(Array.isArray(r.traits) ? r.traits : []), ...hikingFeaturesOf(r.id)])),
         courses: Number(r.course_count ?? 0), minKm: num(r.course_min_km), maxKm: num(r.course_max_km), hasGuide: !!r.has_guide, subtitle: r.subtitle ?? null,
     };
 };
 
 const TTL_MS = 10 * 60_000;
-let cache: { at: number; list: MountainSummary[]; bySlug: Map<string, MountainSummary> } | null = null;
+let cache: { at: number; list: MountainSummary[]; bySlug: Map<string, MountainSummary>; byId: Map<string, MountainSummary> } | null = null;
 let loading: Promise<MountainSummary[]> | null = null;
 
 /** 산 요약 전부 — 명산 먼저(100대 명산의 순번), 그다음 높은 산부터 */
@@ -96,7 +97,7 @@ export async function allMountains(): Promise<MountainSummary[]> {
                            (guide is not null) as has_guide, guide->>'subtitle' as subtitle
                     from hiking_mountains`);
                 const list = raw.map(toSummary).sort((a, b) => a.tier - b.tier || (a.kfsNo ?? 999) - (b.kfsNo ?? 999) || (b.heightM ?? 0) - (a.heightM ?? 0) || a.name.localeCompare(b.name, "ko"));
-                cache = { at: Date.now(), list, bySlug: new Map(list.map((m) => [m.slug, m])) };
+                cache = { at: Date.now(), list, bySlug: new Map(list.map((m) => [m.slug, m])), byId: new Map(list.map((m) => [m.id, m])) };
                 return list;
             } catch (e) {
                 if (missingTable(e)) return [];
@@ -109,6 +110,10 @@ export async function allMountains(): Promise<MountainSummary[]> {
 export async function mountainBySlug(slug: string): Promise<MountainSummary | null> {
     await allMountains();
     return cache?.bySlug.get(slug) ?? null;
+}
+export async function mountainById(id: string): Promise<MountainSummary | null> {
+    await allMountains();
+    return cache?.byId.get(id) ?? null;
 }
 
 /** 가까운 산 — 직선거리 순. 코스가 있거나 글이 있는 산만(빈 페이지로 보내지 않는다) */

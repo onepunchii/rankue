@@ -26,7 +26,8 @@ export type CrewAttachItem = "CREW_MEETUP" | "CREW_POLL" | "CREW_SETTLE" | "CREW
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    sport: "BILLIARDS" | "GOLF";
+    /** HIKING = 산악회 방(2026-10-13) — 종목 줄이 없다(붙일 당구 · 골프 카드가 없다). 크루 줄만 그린다. */
+    sport: "BILLIARDS" | "GOLF" | "HIKING";
     roomKind: "crew" | "listing" | "dm" | "support";
     onPick: (item: AttachItem) => void;
     /** 크루 방 운영진 — 정산 요청·공지 칸을 보인다. */
@@ -70,7 +71,7 @@ export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick, canMa
     const { t } = useT();
     // support 방은 chat-room.tsx 가 onAttach 를 안 넘겨 + 자체가 없다 — 혹시 열려도 아무것도 안 그린다.
     if (roomKind === "support") return null;
-    const items = sport === "GOLF" ? GOLF_ITEMS : BILLIARDS_ITEMS;
+    const items: AttachItem[] = sport === "HIKING" ? [] : sport === "GOLF" ? GOLF_ITEMS : BILLIARDS_ITEMS;
     const crew = roomKind === "crew" && !!onPickCrew ? CREW_ITEMS.filter((i) => !CREW_TILES[i].staff || canManage) : [];
 
     return (
@@ -78,7 +79,7 @@ export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick, canMa
             <SheetContent side="bottom" hideClose className="bg-surface-0 text-ink-1 border-surface-line rounded-t-2xl p-0 pb-[calc(1rem+env(safe-area-inset-bottom))] focus:outline-none">
                 <SheetHeader className={cn("px-5 pt-4 pb-1 text-left", crew.length > 0 && "sr-only")}>
                     <SheetTitle className="text-[15px] font-semibold text-ink-1">{t("chat.attach.title")}</SheetTitle>
-                    <SheetDescription className="sr-only">{sport === "GOLF" ? t("chat.attach.descGolf") : t("chat.attach.descBilliards")}</SheetDescription>
+                    <SheetDescription className="sr-only">{sport === "HIKING" ? t("chat.attach.crewSection") : sport === "GOLF" ? t("chat.attach.descGolf") : t("chat.attach.descBilliards")}</SheetDescription>
                 </SheetHeader>
                 {/* 크루 방: 위에 크루 줄(브랜드 색 칸), 가는 줄, 아래 종목 줄. 다른 방은 종목 줄만(예전 그대로). */}
                 {crew.length > 0 && (
@@ -90,18 +91,25 @@ export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick, canMa
                                 return <Tile key={item} label={t(`chat.attach.${key}`)} Icon={Icon} tinted onClick={() => { onOpenChange(false); onPickCrew!(item); }} />;
                             })}
                         </div>
-                        <div className="mx-5 mt-2 border-t border-surface-line" />
-                        <p className="px-5 pt-3 pb-0.5 text-[12.5px] font-semibold text-ink-3">{sport === "GOLF" ? t("chat.attach.sportGolf") : t("chat.attach.sportBilliards")}</p>
+                        {/* 산악회 방은 아래 종목 줄이 없다 — 가는 줄과 종목 이름도 그리지 않는다 */}
+                        {items.length > 0 && (
+                            <>
+                                <div className="mx-5 mt-2 border-t border-surface-line" />
+                                <p className="px-5 pt-3 pb-0.5 text-[12.5px] font-semibold text-ink-3">{sport === "GOLF" ? t("chat.attach.sportGolf") : t("chat.attach.sportBilliards")}</p>
+                            </>
+                        )}
                     </>
                 )}
                 {/* 이름만 남긴 한 줄짜리 칸(2026-09-23 오너: "내용이 너무 많아 심플하고 아이콘도 깔끔하게").
                     설명 줄은 뺐다 — 이름만으로 뜻이 서는 넷뿐이고, 설명이 붙으면 시트가 화면 절반을 먹는다. */}
-                <div className={cn("px-4 grid grid-cols-4 gap-1", crew.length > 0 ? "pt-1" : "pt-2")}>
-                    {items.map((item) => {
-                        const { key, Icon } = TILES[item];
-                        return <Tile key={item} label={t(`chat.attach.${key}`)} Icon={Icon} onClick={() => { onOpenChange(false); onPick(item); }} />;
-                    })}
-                </div>
+                {items.length > 0 && (
+                    <div className={cn("px-4 grid grid-cols-4 gap-1", crew.length > 0 ? "pt-1" : "pt-2")}>
+                        {items.map((item) => {
+                            const { key, Icon } = TILES[item];
+                            return <Tile key={item} label={t(`chat.attach.${key}`)} Icon={Icon} onClick={() => { onOpenChange(false); onPick(item); }} />;
+                        })}
+                    </div>
+                )}
             </SheetContent>
         </Sheet>
     );

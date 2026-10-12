@@ -39,6 +39,7 @@ import { AppInstallCard } from "@/components/hiq/AppInstallCard";
 import { apiRequest } from "@/lib/queryClient";
 import { uploadImage } from "@/lib/imageUtils";
 import { useGolfVisible } from "@/hooks/useGolfAccess";
+import { useHikingAccess } from "@/hooks/useHikingAccess";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -70,7 +71,9 @@ export default function HiqMenu() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [isUploading, setIsUploading] = useState(false);
-    const { currentSport, setSport } = useSport();
+    const { currentSport, setSport, sport } = useSport();
+    // 등산(세 번째 종목) — 허용된 회원에게만 보인다(지금은 운영자와 시험 계정)
+    const hikingOk = useHikingAccess();
     // 종목 전환은 '볼 수 있는가'로 가른다(2026-10-05 홈을 비로그인에 열면서) — 골프 홈을 둘러보던 한국어 방문자가 메뉴에서 당구로 갔다가 되돌아올 수 있게
     const golfOk = useGolfVisible();
     // 당구 전용 항목은 골프 모드에서 그리지 않는다 — 매장(당구장)·UMB·PBA·RP 안내·파트너는 골프와 무관하다
@@ -377,19 +380,19 @@ export default function HiqMenu() {
                             }}
                             className={cn(
                                 "w-16 h-16 rounded-2xl flex items-center justify-center transition-all active:scale-90",
-                                currentSport === "BILLIARDS"
+                                sport === "BILLIARDS"
                                     ? "bg-brand border border-brand/50 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
                                     : "bg-black/[0.04] "
                             )}
                         >
                             <LucideCircle className={cn(
                                 "w-7 h-7",
-                                currentSport === "BILLIARDS" ? "text-brand-fg" : "text-black/35"
+                                sport === "BILLIARDS" ? "text-brand-fg" : "text-black/35"
                             )} />
                         </button>
                         <span className={cn(
                             "text-[12px] font-semibold tracking-tight",
-                            currentSport === "BILLIARDS" ? "text-brand" : "text-black/45"
+                            sport === "BILLIARDS" ? "text-brand" : "text-black/45"
                         )}>{t("menu.billiards")}</span>
                     </div>
 
@@ -420,6 +423,31 @@ export default function HiqMenu() {
                                     "text-[12px] font-semibold tracking-tight",
                                     currentSport === "GOLF" ? "text-brand" : "text-black/45"
                                 )}>{t("menu.golf")}</span>
+                            </div>
+                        </>
+                    )}
+
+                    {/* 등산 — 세 번째 종목. 한국어 전용이라 글자를 번역 키로 두지 않는다 */}
+                    {hikingOk && (
+                        <>
+                            <div className="w-px h-8 bg-black/10 mx-1" />
+                            <div className="flex flex-col gap-2 items-center">
+                                <button
+                                    title="등산 모드" data-testid="menu-sport-hiking"
+                                    onClick={() => {
+                                        setSport("HIKING");
+                                        toast({ title: t("menu.sportModeChanged"), description: "등산으로 바꿨어요" });
+                                    }}
+                                    className={cn(
+                                        "w-16 h-16 rounded-2xl flex items-center justify-center transition-all active:scale-90",
+                                        sport === "HIKING" ? "bg-brand border border-brand/50 shadow-[0_1px_2px_rgba(0,0,0,0.06)]" : "bg-black/[0.04] "
+                                    )}
+                                >
+                                    <svg viewBox="0 0 24 24" className={cn("w-7 h-7", sport === "HIKING" ? "text-brand-fg" : "text-black/35")} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                        <path d="M3 19 L9.5 7 L13 13 L15.5 9.5 L21 19 Z" />
+                                    </svg>
+                                </button>
+                                <span className={cn("text-[12px] font-semibold tracking-tight", sport === "HIKING" ? "text-brand" : "text-black/45")}>등산</span>
                             </div>
                         </>
                     )}

@@ -28,3 +28,15 @@ export const POI_COLOR: Readonly<Record<string, string>> = {
 /** 권역 표지 그림 · 허브 그림(client/public/hiking/art) — 그림에는 글자가 없다 */
 export const hikingCover = (region: string | null | undefined) => `/hiking/art/cover-${region ?? "gangwon"}.webp`;
 export const HIKING_HERO = "/hiking/art/hero.webp";
+
+/** 와펜(자수 패치) · 핀의 그림 — 이름은 shared/hikingStamps 의 art. 그림에는 글자가 없다 */
+export const patchSrc = (art: string) => `/hiking/art/patch-${art}.webp`;
+export const pinSrc = (art: string) => `/hiking/art/${art}.webp`;
+
+/** 목록 · 특성 묶음의 표지 그림(kfs100 · nationalparks · maple …) — 그림에는 글자가 없다 */
+const LIST_COVERS = new Set(["kfs100", "kfs100plus", "nationalparks", "provincialparks", "highest50", "over1500", "over1000", "under500", "island", "azalea", "maple", "reeds", "snow"]);
+export const hikingListCover = (id: string | null | undefined) => (id && LIST_COVERS.has(id) ? `/hiking/art/cover-list-${id}.webp` : HIKING_HERO);
+/** 산행 등급의 휘장(shared/hikingGrade) */
+export const gradeSrc = (id: string) => `/hiking/art/grade-${id}.webp`;
+/** 산 와펜의 그림 — 산림청 100대 명산만 있다(산의 id). 모양 · 테두리는 MountainPatch 가 그린다 */
+export const mountainPatchSrc = (mountainId: string) => `/hiking/art/mt/${mountainId}.webp`;

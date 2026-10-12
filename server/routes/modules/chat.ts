@@ -27,11 +27,13 @@ import { notificationService } from "../../services/notificationService.js";
 import { parseRoomKey, type RoomRef } from "../../storage/chat.repo.js";
 import { msg, localeOf, memberLocale, type I18nText } from "../../lib/i18n.js";
 import { memberSearchTerm, supportHidesSender, supportNotifyTitleKey } from "../../../shared/chatSupport.js";
+import { crewSportOf, type CrewSport } from "../../../shared/crewSport.js";
 import { translateConfigured, translateText, TranslateError, translateCacheKey, cachedTranslation, rememberTranslation, takeTranslateSlot } from "../../lib/chatTranslate.js";
 import { polishReply, replyDraft, REPLY_DRAFT_MAX } from "../../lib/chatReply.js";
 
 const router = Router();
-const sportOf = (q: unknown): "BILLIARDS" | "GOLF" => (q === "GOLF" ? "GOLF" : "BILLIARDS");
+// 등산(HIKING)이면 산악회 방 + 문의 방만(chat.repo myRooms) — 값을 읽는 규칙은 크루 라우트와 같은 shared/crewSport.
+const sportOf = crewSportOf;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** 조인·부킹 방은 티타임 이틀 뒤 목록에서 빠진다(chat.repo myRooms 와 같은 값) — 그 뒤엔 읽기만. */
 const LISTING_ROOM_GRACE_MS = 2 * 86_400_000;
@@ -162,7 +164,7 @@ router.get("/rooms/:key/messages", requireAuth, asyncHandler(async (req: AuthReq
  * 문의 방에서 운영자가 쓴 글이 **그 방의 회원에게** 갈 때는 본문에 보낸 사람 이름을 붙이지 않는다(운영자 개인 이름이 알림으로 샌다 —
  * 누가 보냈는지는 제목이 말한다). 이 규칙은 부르는 쪽이 아니라 여기서 지킨다.
  */
-export async function notifyRoom(ref: RoomRef, senderId: string, preview: string | I18nText, heading: I18nText | ((memberId: string) => I18nText), sport?: "BILLIARDS" | "GOLF", urlOverride?: string): Promise<void> {
+export async function notifyRoom(ref: RoomRef, senderId: string, preview: string | I18nText, heading: I18nText | ((memberId: string) => I18nText), sport?: CrewSport, urlOverride?: string): Promise<void> {
     const members = (await storage.chat.roomMembers(ref)).filter((m) => m !== senderId);
     // 이 방 알림을 끈 사람(채팅 ⋯ 메뉴). 크루 방은 아래에서 크루 설정을 따로 보므로 여기서는 빈 집합이다.
     const muted = ref.kind === "crew" ? new Set<string>() : await storage.chat.mutedMemberIds(ref.key);
@@ -177,6 +179,9 @@ export async function notifyRoom(ref: RoomRef, senderId: string, preview: string
     // 알림함은 종목으로 갈린다 — 방의 종목을 따라야 한다. 예전엔 listing 만 골프로 쳐서 골프 크루·골프 친구 방 알림이
     // 당구 알림함에 쌓이고 골프 알림함에서는 안 보였다(2026-09-22 리뷰).
     const isGolf = sport === "GOLF" || ref.kind === "listing";
+    // 산악회 방의 알림은 다른 산악회 알림(정모 · 가입 — category: crew.sportCategory)과 같은 값으로 남긴다.
+    // 알림함은 '골프가 아닌 것'을 한데 보여 주므로 지금은 당구 알림함에 뜬다(storage/notification.repo).
+    const category = isGolf ? "GOLF" : sport === "HIKING" ? "HIKING" : "BILLIARDS";
     // 제목·본문은 받는 사람 언어로 풀린다(notificationService). 사용자 글(preview 가 문자열)은 그대로 두고,
     // 서버가 만든 문구(카드 요약 — I18nText)는 받는 사람 언어로 푼다. 이름을 덧붙이는 틀은 문자열일 때만 쓴다.
     const body: string | I18nText = typeof preview !== "string" ? preview
@@ -191,7 +196,7 @@ export async function notifyRoom(ref: RoomRef, senderId: string, preview: string
             memberId, title: typeof heading === "function" ? heading(memberId) : heading,
             body: supportHidesSender(ref, senderId, memberId) ? preview : body,
             // 문의 답변은 '크루' 알림을 꺼 둔 사람에게도 가야 한다 → notice.
-            category: isGolf ? "GOLF" : "BILLIARDS", type: "CHAT", ...(isGolf ? { pref: "golf" as const } : ref.kind === "support" ? { pref: "notice" as const } : {}),
+            category, type: "CHAT", ...(isGolf ? { pref: "golf" as const } : ref.kind === "support" ? { pref: "notice" as const } : {}),
             params: { url },
         }).catch((e) => console.error("[ChatNotify]", e));
     }));
@@ -331,6 +336,9 @@ router.post("/dm", requireAuth, asyncHandler(async (req: AuthRequest, res: any) 
     if (ids.length === 0 || ids.length > 7) return sendError(res, 400, "err.chat.pickMembers");
     // 방은 종목을 가진다 — 골프 탭에서 연 방은 골프 친구와만, 골프 탭에만 보인다(2026-09-21).
     const sport = sportOf(req.body?.sport);
+    // 등산에는 1:1 방이 없다(2026-10-13) — 친구 관계가 종목별(당구 · 골프)이라 등산 친구라는 것이 없다. 화면도 '새 대화'를 그리지 않는다.
+    // 당구로 뭉개 만들면 등산 탭에서 연 방이 당구 탭에만 생긴다 — 만들지 않고 "친구와만"으로 거절한다.
+    if (sport === "HIKING") return sendError(res, 403, "err.chat.friendsOnly", "NOT_FRIENDS");
     // getFriends 는 친구마다 상대전적까지 계산한다(N+1) — 여기서는 고른 사람만 isFriend 로 본다.
     const checks = await Promise.all(ids.map((id) => storage.isFriend(req.userId!, id, sport)));
     const strangers = ids.filter((_, i) => !checks[i]);

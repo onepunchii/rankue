@@ -46,9 +46,10 @@ export function GameTypePicker({ sport, value, onChange, disabled }: {
 /**
  * 추천 태그 — 언어별 목록(사전에 쉼표로 이어 둔다). "#내기환영" 은 뺐다 — 앱이 금전 내기를 권하는 모양이 된다
  * (감사 S5, shared/crewTags.ts). 골프 목록도 이제 사전 키다(예전엔 한국어 배열이 두 화면에 박혀 있었다).
+ * 산악회(HIKING)는 산행 태그 — 당구 태그(#빡겜 …)를 산악회에 권하지 않는다. 주 종목 칸(GameTypePicker)은 산악회에서 부르지 않는다.
  */
 export function suggestedTags(t: (k: string) => string, sport?: string | null): string[] {
-    const raw = sportKey(sport) === "GOLF" ? t("crewMgmt.golfTags") : t("clubSettings.billiardsTags");
+    const raw = sport === "HIKING" ? t("crewMgmt.hikingTags") : sportKey(sport) === "GOLF" ? t("crewMgmt.golfTags") : t("clubSettings.billiardsTags");
     return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }
 

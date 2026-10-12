@@ -9,7 +9,9 @@ import {
     LucideUsers,
     LucideFlag,
     LucideCalendarDays,
-    LucideCalendarCheck
+    LucideCalendarCheck,
+    LucideMap,
+    LucideStamp
 } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { useQuery } from "@tanstack/react-query";
@@ -31,7 +33,7 @@ export function HiqNavigation() {
     }, []);
     const { isApp } = useNativeBridge();
     const [location, setLocation] = useLocation();
-    const { currentSport } = useSport();
+    const { currentSport, sport, isHiking } = useSport();
     const activeColor = "rgb(var(--brand))";
 
     /**
@@ -50,10 +52,11 @@ export function HiqNavigation() {
      */
     const isGolf = currentSport === "GOLF";
     // 채팅 탭 배지 — 안 읽은 메시지 합계. 1분마다, 로그인했을 때만.
+    // 종목은 sport(등산 포함)로 묻는다 — currentSport 로 물으면 등산 탭의 배지가 당구 방의 안 읽은 수를 센다.
     const { member } = useAuth();
     const { data: unreadData } = useQuery<{ unread: number }>({
-        queryKey: ["/api/hiq/chat/unread", currentSport],
-        queryFn: () => apiRequest(`/api/hiq/chat/unread?sport=${currentSport}`),
+        queryKey: ["/api/hiq/chat/unread", sport],
+        queryFn: () => apiRequest(`/api/hiq/chat/unread?sport=${sport}`),
         enabled: !!member,
         refetchInterval: 60_000,
         staleTime: 30_000,
@@ -79,7 +82,21 @@ export function HiqNavigation() {
         return () => { document.removeEventListener("visibilitychange", refresh); window.removeEventListener("focus", refresh); };
     }, []);
     const bookingUnseen = currentSport === "GOLF" && hasUnseenRequestChange(myRequests.data, seenAt);
-    const tabs = isGolf
+    /**
+     * 등산(2026-10-13 오너: "네비게이션은 크루와 채팅은 들어가야 돼, 나머지는 등산러가 좋아하는 것으로"):
+     * 홈 · 산 · 도장첩 · 크루 · 채팅. 산(지도 · 목록 · 산 화면)과 도장첩은 등산의 것이고, 크루 · 채팅은 다른 종목과 같은 자리다.
+     * 등산은 한국어 전용이라 '산' · '도장첩'은 번역 키로 두지 않는다(text).
+     */
+    const tabs: { id: string; label?: string; text?: string; icon: typeof LucideHome; path: string; to?: string; also?: string[]; only?: boolean }[] = isHiking
+        ? [
+            { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
+            // 산 — /hiking 아래의 지도 · 목록 · 산 화면. 도장첩(/hiking/stamps …)은 옆 탭의 것이라 여기서 켜지지 않게 한다(only)
+            { id: "mountains", text: "산", icon: LucideMap, path: "/hiking", also: ["/hiking/regions", "/hiking/lists", "/hiking/mountains"], only: true },
+            { id: "stamps", text: "도장첩", icon: LucideStamp, path: "/hiking/stamps", also: ["/hiking/pack", "/hiking/trips"] },
+            { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
+            { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
+        ]
+        : isGolf
         ? [
             { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
@@ -102,7 +119,8 @@ export function HiqNavigation() {
         ];
 
     // 조인은 상세(/golf/booking-list/:id)로 들어가도 그 탭이 켜져 있어야 한다 — 정확히 같을 때만 보면 꺼진다.
-    const isActive = (path: string, also?: string[]) => [path, ...(also ?? [])].some((p) => location === p || location.startsWith(p + "/"));
+    // only — 그 주소 자체일 때만(아래 주소로 번지지 않는다). also 의 주소는 평소처럼 그 아래까지 본다
+    const isActive = (path: string, also?: string[], only?: boolean) => (only ? location === path : location === path || location.startsWith(path + "/")) || (also ?? []).some((p) => location === p || location.startsWith(p + "/"));
 
     return (
         <nav
@@ -116,13 +134,13 @@ export function HiqNavigation() {
         >
             <div className="max-w-md mx-auto px-6 flex items-center justify-between">
                 {tabs.map((tab) => {
-                    const active = isActive(tab.path, (tab as any).also);
+                    const active = isActive(tab.path, tab.also, tab.only);
                     return (
                         <motion.button
                             key={tab.id}
                             whileTap={{ scale: 0.9 }}
                             // 안 본 신청 소식이 있으면 '내가 신청한 글' 탭으로 바로(예전 머리 단추와 같은 동작)
-                            onClick={() => setLocation(tab.id === "myBookings" && bookingUnseen ? "/golf/my-bookings?role=applied" : (tab as any).to ?? tab.path)}
+                            onClick={() => setLocation(tab.id === "myBookings" && bookingUnseen ? "/golf/my-bookings?role=applied" : tab.to ?? tab.path)}
                             className="flex-1 flex flex-col items-center justify-center py-2 gap-2 relative group"
                         >
                             <div className={`relative transition-all duration-300 ${active ? 'scale-110' : 'opacity-55 group-hover:opacity-100'}`}>
@@ -140,7 +158,7 @@ export function HiqNavigation() {
                                 )}
                             </div>
                             <span className="text-[12px] font-semibold transition-all duration-300" style={active ? { color: activeColor } : { color: 'var(--nav-idle)' }}>
-                                {t(tab.label)}
+                                {(tab.text ?? t(tab.label ?? ""))}
                             </span>
                         </motion.button>
                     );

@@ -14,6 +14,8 @@ import { requireTermsAccepted } from "../../middleware/terms.js";
 import { screenCrewFields, screenCrewText, screenCrewProfile, screenCrewBody, changedCrewProfileFields, isCrewReportTarget, isReportReason, type CrewReportTarget } from "../../utils/crewModeration.js";
 
 import { isSuperAdmin } from "../../lib/superAdmin.js";
+import { hikingAllowed } from "../../lib/hikingAccess.js";
+import { crewSportOf, HIKING_ACTIVITY_CATEGORY } from "../../../shared/crewSport.js";
 import { kstShortDateTime } from "../../../shared/crewActivity.js";
 import {
     resolveCrewPostCategory, canonicalCrewPostCategory, parseCrewPageQuery, validateCrewPostImages, imageUrlList, unreferencedUrls,
@@ -118,6 +120,16 @@ router.post("/:id/activities", requireAuth, requireTermsAccepted, asyncHandler(a
         // Ensure activityDate is Date object if string
         activityDate: new Date(req.body.activityDate)
     };
+    // 산악회의 일정은 늘 등산이다(2026-10-13) — 목록이 일정을 종목으로 거르기 때문에, 화면(예: 채팅 + 의 정모 만들기)이 종목을
+    // 잘못 실어 보내면 만든 일정이 크루 홈에서 사라진다. 그래서 산악회만은 서버가 정한다. 당구 · 골프 크루는 예전처럼 화면이 보낸 값이다
+    // (등산 값만 못 쓴다 — 산악회가 아닌 크루에 등산 일정이 생기면 같은 이유로 안 보인다).
+    const crewSport = await storage.crews.crewSportCategory(req.params.id);
+    if (crewSport === "HIKING") {
+        data.sportCategory = "HIKING";
+        data.category = HIKING_ACTIVITY_CATEGORY;
+    } else if (data.sportCategory === "HIKING") {
+        data.sportCategory = crewSport === "GOLF" ? "GOLF" : "BILLIARDS";
+    }
 
     const validation = insertHiqCrewActivitySchema.safeParse(data);
     if (!validation.success) {
@@ -1325,6 +1337,19 @@ router.post("/", requireAuth, requireTermsAccepted, asyncHandler(async (req: Aut
     if (!validation.data.name || validation.data.name.length > 30) {
         return sendError(res, 400, "err.crew.nameLength");
     }
+    // 산악회(2026-10-13) — 등산을 쓸 수 있는 회원만 만든다(등산은 아직 닫혀 있다 — server/lib/hikingAccess. 화면만 가리면 주소로 뚫린다).
+    // 산악회에는 당구장 베이스캠프도 주 종목도 없다: 화면이 보내지 않지만 실려 와도 저장하지 않는다
+    // (매장 화면의 '활동 크루'에 산악회가 뜨지 않게).
+    if (validation.data.sportCategory === "HIKING") {
+        const creator = await storage.getMemberById(req.userId!);
+        const creatorProfile = creator?.profileId ? await storage.getProfile(creator.profileId) : null;
+        if (!hikingAllowed(creator, (creatorProfile as { role?: string | null } | null | undefined)?.role)) {
+            return sendError(res, 403, "등산은 아직 준비 중이에요", "HIKING_NOT_AVAILABLE");
+        }
+        validation.data.baseStoreId = null;
+        validation.data.baseListingCode = null;
+        validation.data.gameType = "any";
+    }
     // 크루 이름·소개·태그·가입 질문도 공개 탐색에 뜨는 글이라 게시글과 같은 필터를 건다
     // ("#내기환영" 같은 내기 권유 태그 차단, 소개의 연락처 마스킹).
     // 정원·태그·좌표·파트너 매장 — 수정(PATCH)과 같은 검사. 예전엔 만들기만 비어 있어 정원 -5, 태그 객체,
@@ -1390,7 +1415,8 @@ router.get("/name-check", requireAuth, asyncHandler(async (req: AuthRequest, res
 router.get("/mine", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     // 종목을 안 주면 당구로 본다. 예전엔 undefined 가 "필터 없음"이라 두 종목 크루가 섞여 나갔고,
     // 골프 부킹 공유 시트가 당구 크루까지 나열해 그 채팅방에 골프 글이 올라갔다(2026-09-09 검토).
-    const sport = req.query.sport === "GOLF" ? "GOLF" : "BILLIARDS";
+    // 등산(HIKING)이면 산악회만 — shared/crewSport.
+    const sport = crewSportOf(req.query.sport);
     const crews = await storage.getUserCrews(req.userId!, sport);
     // 줄마다 "내일 정모 · 새 글 3" 을 보여 주려고 활동 요약을 붙인다(2026-09-26 크루 디자인 A안). 실패해도 목록은 나간다.
     const pulse = await storage.crews.crewPulse(crews.map((c) => c.crew.id)).catch(() => new Map());
@@ -1459,6 +1485,12 @@ router.get("/:id/members", asyncHandler(async (req: any, res: any) => {
 
 // POST /crews/:id/join - Join a crew
 router.post("/:id/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    // 산악회(2026-10-13) — 등산을 쓸 수 있는 회원만 든다. 등산이 닫힌 회원이 주소로 들어와 가입하면, 든 크루가 자기 크루 목록(당구 · 골프)에 보이지 않는다.
+    if ((await storage.crews.crewSportCategory(req.params.id)) === "HIKING") {
+        const joiner = await storage.getMemberById(req.userId!);
+        const joinerProfile = joiner?.profileId ? await storage.getProfile(joiner.profileId) : null;
+        if (!hikingAllowed(joiner, (joinerProfile as { role?: string | null } | null | undefined)?.role)) return sendError(res, 403, "등산은 아직 준비 중이에요", "HIKING_NOT_AVAILABLE");
+    }
     const role = await storage.joinCrew(req.params.id, req.userId!);
     // P0: 가입 → 리더/매니저에게 알림
     // joinType이 'auto'(기본값)면 joinCrew가 곧바로 'member'로 확정한다 — 그때도 "승인해주세요"를
@@ -1508,6 +1540,12 @@ router.patch("/:id", requireAuth, requireTermsAccepted, asyncHandler(async (req:
     const updateData: any = {};
     for (const key of EDITABLE) {
         if (req.body[key] !== undefined) updateData[key] = req.body[key];
+    }
+    // 산악회에는 당구장 베이스캠프 · 주 종목이 없다(만들 때와 같은 규칙) — 실려 와도 고치지 않는다.
+    if (data?.crew?.sportCategory === "HIKING") {
+        delete updateData.gameType;
+        delete updateData.baseStoreId;
+        delete updateData.baseListingCode;
     }
 
     // 값 검증 — 화이트리스트만으로는 부족하다. 드리즐 text enum은 DB CHECK가 아니라서
