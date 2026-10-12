@@ -205,6 +205,11 @@ function GolfStampBookRoute() {
 function GolfShelfRoute() {
   return <Suspense fallback={golfReadFallback}><GolfShelf /></Suspense>;
 }
+// 크루 도장첩(2026-10-12 크루 도장깨기) — 골프 크루의 도장 · 깃발. 크루 홈처럼 로그인 없이 열린다
+const GolfCrewStamps = lazy(() => import("@/golf/pages/CrewStamps"));
+function GolfCrewStampsRoute() {
+  return <Suspense fallback={golfReadFallback}><GolfCrewStamps /></Suspense>;
+}
 // 골프 용어 사전(2026-10-05) — 본문(shared/golfTerms.ts)이 길어 메인 청크에서 뺀다. 허브와 용어 한 개가 같은 화면 파일.
 const GolfTerms = lazy(() => import("@/golf/pages/GolfTerms"));
 function GolfTermsRoute() {
@@ -368,6 +373,8 @@ function AppRoutes() {
       {/* 명예의 전당은 탭이 아니라 별도 페이지다. 아래 /crew/:id/:tab? 보다 반드시 위에
           둬야 한다 — 아래면 "hall-of-fame" 이 탭 이름으로 먹혀 홈으로 떨어진다. */}
       <Route path="/crew/:id/hall-of-fame" component={CrewHallOfFame} />
+      {/* 크루 도장첩(골프 크루) — 명예의 전당처럼 탭이 아니라 별도 화면이다. 같은 까닭으로 아래 별칭보다 위에 */}
+      <Route path="/crew/:id/stamps" component={GolfCrewStampsRoute} />
       {/* 이미 발송된 푸시 페이로드(/crew/:id/:tab) 호환 별칭 */}
       <Route path="/crew/:id/:tab?" component={HiqClubDetail} />
       <Route path="/join/:code" component={FramedJoin} />

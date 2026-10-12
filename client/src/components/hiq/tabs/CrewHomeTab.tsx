@@ -18,6 +18,7 @@ import { CrewMemberList } from "@/components/hiq/CrewMemberList";
 import { useQuery } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { BallDot } from "@/components/hiq/BallDot";
+import { CrewStampEntry } from "@/golf/stamps/CrewStampParts";
 import {
     CREW_BTN, CREW_CARD, CREW_TEXT, ConfirmDialog, CrewEmpty, CrewError, CrewRoleBadge, CrewSection, CrewSkeleton,
 } from "@/components/hiq/crew-ui";
@@ -238,6 +239,10 @@ export const CrewHomeTab = memo(({
                         isAdmin={isAdmin}
                     />
                 </CrewSection>
+
+                {/* 3. 크루 도장깨기(2026-10-12) — 골프 크루만. 같은 라운드에서 크루원 둘 이상이 현장 인증한 골프장이 크루 도장이 된다.
+                    제 바탕을 가진 한 칸이라 당구 · 골프 어느 테마에서도 같은 모습이다(client/src/golf/stamps/CrewStampParts) */}
+                {isGolf && <CrewStampEntry crewId={crew.id} crew={{ name: crew.name, emblem: crew.emblem }} />}
 
                 {/* 4. 투표 — 크루원 전용(서버가 비회원에게 403). 예전엔 비회원에게 '투표 없음' 으로 잘못 보였다. */}
                 {isMember && (

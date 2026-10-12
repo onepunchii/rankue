@@ -1377,6 +1377,46 @@ export const golfStampAwards = pgTable("golf_stamp_awards", {
 ]);
 export type GolfStampAward = typeof golfStampAwards.$inferSelect;
 
+/**
+ * 크루 도장(2026-10-12 크루 도장깨기 — 규칙 shared/golfCrewStamps). 같은 라운드에서 크루원 둘 이상이 현장 인증한 골프장, 크루마다 골프장당 한 줄.
+ * 기록에서 다시 계산할 수 있는 값이지만 적어 둔다 — 골프장 페이지의 '이 골프장을 깬 크루'가 골프장으로 찾아 읽고,
+ * 크루원이 나가거나 기록이 지워져도 크루가 찍은 도장은 남는다(준 것은 거두지 않는다).
+ * club_key 는 원장 번호, 번호 없는 옛 기록이면 "name:<이름 알맹이>".
+ */
+export const golfCrewStamps = pgTable("golf_crew_stamps", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id, { onDelete: "cascade" }).notNull(),
+  clubKey: text("club_key").notNull(),
+  clubId: text("club_id"),
+  clubName: text("club_name").notNull(),
+  firstAt: timestamp("first_at").notNull(),
+  fullAt: timestamp("full_at"),
+  rounds: integer("rounds").default(1).notNull(),
+  most: integer("most").default(2).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  unique("golf_crew_stamps_crew_club_unique").on(t.crewId, t.clubKey),
+  index("golf_crew_stamps_club_idx").on(t.clubId),
+]);
+export type GolfCrewStamp = typeof golfCrewStamps.$inferSelect;
+
+/** 크루가 받은 깃발 — kind 'flag'(권을 다 채움 · 'all-open') · 'full'(그 권이 전부 풀조). serial 1 = 그 깃발을 처음 받은 크루(1호) */
+export const golfCrewStampAwards = pgTable("golf_crew_stamp_awards", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  crewId: uuid("crew_id").references(() => hiqCrews.id, { onDelete: "cascade" }).notNull(),
+  kind: text("kind").notNull(),
+  key: text("key").notNull(),
+  serial: integer("serial").notNull(),
+  earnedAt: timestamp("earned_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  unique("golf_crew_stamp_awards_crew_kind_key_unique").on(t.crewId, t.kind, t.key),
+  unique("golf_crew_stamp_awards_kind_key_serial_unique").on(t.kind, t.key, t.serial),
+  index("golf_crew_stamp_awards_crew_idx").on(t.crewId),
+]);
+export type GolfCrewStampAward = typeof golfCrewStampAwards.$inferSelect;
+
 // 12. 골프 회원권 거래 (Membership Orders)
 export const golfMembershipOrders = pgTable("golf_membership_orders", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),

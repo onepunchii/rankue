@@ -5,6 +5,7 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { msg, tr, memberLocale } from "../../lib/i18n.js";
 import { notificationService } from "../../services/notificationService.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
+import { listCrewStamps } from "../../storage/golfCrewStamps.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { deleteBlobs } from "../../utils/blob.js";
 import { notifyCrewChat } from "../../services/crewChatNotify.js";
@@ -1431,6 +1432,15 @@ async function stripMemberPrivacy(req: any, crew: any): Promise<any> {
         })),
     };
 }
+
+/**
+ * 크루 도장깨기(2026-10-12) — 크루의 도장과 깃발. 크루 홈처럼 누구에게나 열려 있고 읽기만 한다(사람 이름은 싣지 않는다 — 골프장 · 날짜 · 인원 수뿐).
+ * 적는 것은 라운드를 끝낼 때(golf.repo updateGolfStats → storage/golfCrewStamps). 규칙은 shared/golfCrewStamps.
+ */
+router.get("/:id/golf-stamps", asyncHandler(async (req: any, res: any) => {
+    if (!/^[0-9a-f-]{36}$/i.test(String(req.params.id))) return sendError(res, 404, "err.crew.notFound");
+    return sendSuccess(res, await listCrewStamps(req.params.id));
+}));
 
 router.get("/:id", asyncHandler(async (req: any, res: any) => {
     const crew = await storage.getCrew(req.params.id);

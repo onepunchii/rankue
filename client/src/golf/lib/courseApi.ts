@@ -65,6 +65,8 @@ export interface CourseDetail {
     intro: string | null;
     /** 코스 가이드(2026-10-12) — 서버가 걸러 담아 둔 값. 없는 골프장 · 옛 응답에는 없다 */
     guide?: CourseGuide | null;
+    /** 이 골프장을 깬 크루(2026-10-12 크루 도장깨기) — 먼저 깬 순서. 옛 응답에는 없다 */
+    crews?: { crewId: string; name: string; emblem: string | null; firstAt: string; full: boolean; rounds: number }[];
     info: { opened: string | null; members: number | null; homepage: string | null; membershipTypes: string | null; membershipNotes: string | null } | null;
     fees: Fees | null;
     courseIds: number[];

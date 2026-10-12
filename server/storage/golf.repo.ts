@@ -40,6 +40,7 @@ import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
 import { courseNameKey } from "../../shared/golfCourse.js";
 import { collectStamps, makeStampResolver, type StampAgg } from "./golfStamps.js";
 import { syncStampAwards, type StampAwardRow } from "./golfStampAwards.js";
+import { syncCrewStampsForMember } from "./golfCrewStamps.js";
 import type { DatedStamp } from "../../shared/golfStampAwards.js";
 import { stampOneLeft } from "../../shared/golfStampOneLeft.js";
 import { pinsDue, type PinRound } from "../../shared/golfPins.js";
@@ -1195,6 +1196,8 @@ export class GolfRepository {
         // 0. 도장첩에서 받은 것 — 골프 기록이 바뀌는 길(끝내기 · 늦은 현장 인증 · 기록 정리)이 다 여기를 지난다.
         //    실패해도 평균 · 등급 계산은 막지 않는다(다음에 기록이 바뀔 때 다시 맞춰진다 — 안 적은 것만 적으므로)
         await this.syncStampAwards(userId).catch((e) => console.error("[golf] syncStampAwards", e));
+        // 0-1. 크루 도장(2026-10-12) — 이 회원이 든 골프 크루마다. 같은 라운드의 크루원이 끝낼 때마다 다시 맞춰지므로 순서는 상관없다
+        await syncCrewStampsForMember(userId).catch((e) => console.error("[golf] syncCrewStamps", e));
 
         // 1. Get all golf history for this member
         const history = await db.select().from(hiqGameHistory)

@@ -35,6 +35,7 @@ import { weatherPoint } from "../../../shared/golfWeatherZones.js";
 import { findLocalDish } from "../../../shared/golfLocalDish.js";
 import { summaryForViewer } from "../../lib/golfListingBlock.js";
 import { getCourseGuide } from "../../storage/golfCourseGuide.js";
+import { crewsAtClub } from "../../storage/golfCrewStamps.js";
 
 const router = Router();
 
@@ -366,6 +367,8 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
         logo: p.logo, grass: p.grass, play: p.play, phone: p.phone, website: p.website, feeFrom: p.feeFrom, aliases: p.aliases,
         // 코스 가이드(2026-10-12) — 이 골프장 한 곳만 따로 읽는다(요약 묶음에는 없다). 못 읽어도 상세는 나간다
         guide: await getCourseGuide(p.slug).catch((e) => { console.error("[golf] course guide", e); return null; }),
+        // 이 골프장을 깬 크루(2026-10-12 크루 도장깨기) — 먼저 깬 순서. 못 읽어도 상세는 나간다
+        crews: await crewsAtClub(p.clubId ? [p.clubId] : []).catch((e) => { console.error("[golf] course crews", e); return []; }),
         bookable: p.courseIds.length > 0,
         prices: prices.map((m) => ({
             itemId: m.item_id, label: m.label, price: m.price, change: m.change, yearHigh: m.year_high, yearLow: m.year_low,

@@ -28,6 +28,7 @@ import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/C
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";
 import { AroundListings } from "@/golf/components/course/detail/AroundListings";
 import { CourseStampBlock } from "@/golf/stamps/CourseStampBlock";
+import { CourseCrews } from "@/golf/stamps/CrewStampParts";
 import { WeatherCard, WeatherSkeleton, type RoundPick } from "@/golf/components/course/detail/WeatherCard";
 import { parseRoundRef, type RoundRef } from "@shared/golfRoundShare";
 import { MembershipPrices, topPrice } from "@/golf/components/course/detail/MembershipPrices";
@@ -292,6 +293,8 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             {/* 도장(2026-10-12 오너: "골프장 상세에도 해당 지역에 이미지와 도장 볼마커 등등이 들어가면") — 모든 골프장에: 그 권역의 표지 그림 위에
                 여기서 받는 도장과 그 권역의 볼마커. 도장첩의 골프장이면 그 권의 한 칸으로, 아니면 골프 여권의 도장으로 */}
             <CourseStampBlock key={`stamp:${d.slug}`} courseIds={d.courseIds} name={d.name} region={d.region} city={d.city} className="px-5 mt-3" />
+            {/* 이 골프장을 깬 크루(2026-10-12 크루 도장깨기) — 있을 때만. 검색으로 들어온 사람이 크루를 발견하는 길 */}
+            <CourseCrews key={`crews:${d.slug}`} crews={d.crews} className="px-5 mt-3" />
             {/* 랭큐 골프 소개(2026-10-05) — 검색으로 들어온 비로그인 방문자에게만. 티타임 바로 아래, 시세·그린피 정보는 가리지 않게 */}
             <GolfGuestIntro className="mx-4 mt-8" />
             {/* 날씨(2026-10-05) — 골프장 이름에 붙여 가장 많이 찾는 말. 티타임 다음, 시세·그린피 앞 */}

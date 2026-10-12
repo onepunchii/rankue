@@ -44,7 +44,7 @@ describe("그림", () => {
         expect(existsSync(pub(ALL_OPEN_MARKER))).toBe(true);
     });
 
-    it("쓰지 않는 그림을 싣지 않는다 — 폴더에는 표지 · 볼마커(등급 그림까지) · 트로피 · 업적 핀 · 시즌 태그 · 한정 볼마커뿐", () => {
+    it("쓰지 않는 그림을 싣지 않는다 — 폴더에는 표지 · 볼마커(등급 그림까지) · 트로피 · 업적 핀 · 시즌 태그 · 한정 볼마커 · 크루 깃발뿐", () => {
         const files = readdirSync(pub("/golf/stamp-art")).filter((f) => !f.startsWith(".")).sort();
         const want = [
             ...STAMP_BOOKS.map((b) => `cover-${b.id}.webp`), ...STAMP_BOOKS.map((b) => `marker-${b.id}.webp`), `marker-${STAMP_ALL_OPEN}.webp`,
@@ -53,6 +53,8 @@ describe("그림", () => {
             // 볼마커의 등급(블랙 · 자개) — 누구나 일곱 권과 일곱 권 전부만. 초대장 두 권은 등급 그림이 없다
             ...[...STAMP_BOOKS.filter((b) => b.kind === "open").map((b) => b.id), STAMP_ALL_OPEN].flatMap((id) => [`marker-${id}-black.webp`, `marker-${id}-pearl.webp`]),
             ...SEASON_TAG_TIERS.map((t) => `${t.art}.webp`), ...SPECIAL_MARKERS.map((m) => `${m.art}.webp`),
+            // 크루 깃발 다섯 가지(크루 도장깨기 — CrewStampParts)
+            ...["green", "crimson", "navy", "purple", "gold"].map((c) => `flag-${c}.webp`),
         ].sort();
         expect(files).toEqual(want);
     });
