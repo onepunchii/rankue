@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    HIKING_GROUPS, HIKING_LISTS, HIKING_REGIONS, ISLAND_SIGUNGU, assignMountainSlugs, heightText, hikingGroup, hikingListPath, hikingMountainPath, hikingRegionOf, hikingTraits,
+    HIKING_GROUPS, HIKING_LISTS, HIKING_REGIONS, ISLAND_SIGUNGU, assignMountainSlugs, heightText, hikingGroup, hikingListPath, hikingMountainPath, hikingRegionOf, hikingTraits, duplicateNames, mountainLabel,
     inHikingGroup, mountainPlace, sigunguShort,
 } from "./hikingMountains";
 import { courseStats, distM, durationText, eleAtKm, nearestOnLine, packLine, thinLine, walkMinutes, withKm } from "./hikingGeo";
@@ -63,6 +63,19 @@ describe("권역 · 묶음 · 주소", () => {
         expect(hikingListPath("kfs100")).toBe("/hiking/lists/kfs100");
         expect(heightText(1708.4)).toBe("1,708m");
         expect(heightText(null)).toBe("");
+    });
+});
+
+describe("같은 이름의 산", () => {
+    it("주소에 시군이 붙은 산은 그 시군을, 이름 그대로인 산은 겹칠 때만 제 시군을 붙인다", () => {
+        const big = { name: "지리산", slug: "지리산", sigungu: "산청군" }, small = { name: "지리산", slug: "지리산-통영", sigungu: "통영시" };
+        const dup = duplicateNames([big, small, { name: "설악산" }]);
+        expect(Array.from(dup)).toEqual(["지리산"]);
+        expect(mountainLabel(small, dup)).toBe("지리산(통영)");
+        expect(mountainLabel(big, dup)).toBe("지리산(산청)");
+        // 겹치지 않는 화면에서는 이름 그대로
+        expect(mountainLabel(big)).toBe("지리산");
+        expect(mountainLabel({ name: "설악산", slug: "설악산", sigungu: "양양군" }, dup)).toBe("설악산");
     });
 });
 
@@ -198,6 +211,14 @@ describe("화면의 글 · 따로 선 세계", () => {
             expect(src.replace(/\/\*[\s\S]*?\*\//, ""), f).not.toMatch(/\b(?:bg|text|border|ring)-(?:white|black)\b/);
             expect([...src.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].every((x) => Number(x[1]) >= 12), f).toBe(true);
         }
+    });
+
+    it("등산의 알림함 — 산악회의 알림만 모이고, 당구 알림함에는 섞이지 않는다", () => {
+        const repo = read("server/storage/notification.repo.ts");
+        expect(repo).toContain('if (sport === "GOLF" || sport === "HIKING") return eq(hiqNotifications.category, sport);');
+        expect(repo).toContain('and(ne(hiqNotifications.category, "GOLF"), ne(hiqNotifications.category, "HIKING"))');
+        expect(read("server/routes/modules/notification.ts")).toContain("const sportOf = (req: AuthRequest) => crewSportOf(req.query.sport);");
+        expect(read("client/src/components/hiq/menu/NotificationInbox.tsx")).toContain("const { sport: currentSport } = useSport();");
     });
 
     it("새 공개 주소의 네 곳 — 봇 경로 · 검색용 화면 · 화면 라우트 · 사이트맵과 허브 내비", () => {

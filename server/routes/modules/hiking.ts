@@ -10,6 +10,9 @@ import { allMountains, getMountainDetail, mountainById, mountainBySlug, nearbyMo
 import { addSummit, listHikingAwards, listSummits, removeRecord, syncHikingAwards } from "../../storage/hikingStamps.js";
 import { addTrip, listTrips } from "../../storage/hikingTrips.js";
 import { cleanTrip } from "../../../shared/hikingTrail.js";
+import { addPhoto, listPhotos, photoCounts, removePhoto } from "../../storage/hikingPhotos.js";
+import { HIKING_PHOTO_CATEGORY, HIKING_PHOTO_DAILY_MAX, HIKING_PHOTO_LABEL, HIKING_PHOTO_PER_MOUNTAIN_MAX, HIKING_THUMB_CATEGORY, isHikingPhotoPath, validPhotoSize } from "../../../shared/hikingPhotos.js";
+import { deleteBlobs, isOnOwnBlobHost } from "../../utils/blob.js";
 import { requireHikingAccess } from "../../middleware/hikingAccess.js";
 import type { AuthRequest } from "../../middleware/auth.js";
 import { distM } from "../../../shared/hikingGeo.js";
@@ -145,6 +148,41 @@ router.post("/trips", ...requireHikingAccess, asyncHandler(async (req: AuthReque
     }, Date.now());
     if (!trip) return sendSuccess(res, { saved: false });
     return sendSuccess(res, { saved: await addTrip(req.userId!, trip) });
+}));
+
+// ── 산행 사진(내 사진첩) ──────────────────────────────────────────────
+/** 내 사진(새 것부터) — ?mountainId= 를 주면 그 산의 것만. 올린 사람만 읽는다 */
+router.get("/me/photos", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    const mountainId = typeof req.query.mountainId === "string" && req.query.mountainId ? req.query.mountainId.slice(0, 60) : null;
+    res.set("Cache-Control", "no-store");
+    return sendSuccess(res, { photos: await listPhotos(req.userId!, mountainId) });
+}));
+
+/**
+ * 사진 한 장을 적는다 — 파일은 화면이 먼저 POST /api/hiq/upload 로 올리고(서버가 사진 정보를 걷는다), 여기에는 그 주소 둘만 온다.
+ * 우리 저장소의 등산 사진 폴더에 올린 주소만 받는다(남의 주소를 적어 넣지 못하게). **좌표는 받지 않는다.**
+ */
+router.post("/photos", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    const b = req.body ?? {};
+    const m = await mountainById(String(b.mountainId ?? ""));
+    if (!m) return sendError(res, 404, "없는 산이에요");
+    const width = Number(b.width), height = Number(b.height);
+    if (!isHikingPhotoPath(b.url, HIKING_PHOTO_CATEGORY) || !isHikingPhotoPath(b.thumbUrl, HIKING_THUMB_CATEGORY) || !isOnOwnBlobHost(b.url) || !isOnOwnBlobHost(b.thumbUrl) || !validPhotoSize(width, height)) {
+        return sendError(res, 400, "사진을 다시 올려 주세요");
+    }
+    const n = await photoCounts(req.userId!, m.id);
+    if (n.mountain >= HIKING_PHOTO_PER_MOUNTAIN_MAX) return sendError(res, 409, HIKING_PHOTO_LABEL.full, "PHOTO_FULL");
+    if (n.day >= HIKING_PHOTO_DAILY_MAX) return sendError(res, 429, HIKING_PHOTO_LABEL.daily, "PHOTO_DAILY");
+    return sendSuccess(res, { photo: await addPhoto(req.userId!, { mountainId: m.id, url: b.url, thumbUrl: b.thumbUrl, width, height }) });
+}));
+
+/** 내 사진 한 장을 지운다 — 저장소의 파일도 같이 지운다 */
+router.delete("/photos/:id", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!/^[0-9a-f-]{36}$/i.test(String(req.params.id))) return sendError(res, 404, "없는 사진이에요");
+    const gone = await removePhoto(req.userId!, String(req.params.id));
+    if (!gone) return sendError(res, 404, "없는 사진이에요");
+    void deleteBlobs([gone.url, gone.thumbUrl]);
+    return sendSuccess(res, { removed: true });
 }));
 
 export default router;

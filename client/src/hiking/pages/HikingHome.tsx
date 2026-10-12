@@ -11,7 +11,9 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useSport } from "@/contexts/SportContext";
 import { useGolfVisible } from "@/hooks/useGolfAccess";
+import { useState } from "react";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { NotificationInbox, UNREAD_COUNT_KEY } from "@/components/hiq/menu/NotificationInbox";
 import { LucideChevronRight } from "@/lib/icons";
 import { hikingMountainPath } from "@shared/hikingMountains";
 import { HkSection, HkSkel } from "../components/HikingShell";
@@ -43,6 +45,9 @@ export default function HikingHome() {
     const kfsBooks = s.states.filter((x) => x.book.kind === "kfs" && !x.done);
     const near = [...kfsBooks].filter((x) => x.got > 0).sort((a, b) => (a.total - a.got) - (b.total - b.got))[0] ?? [...kfsBooks].filter((x) => x.total > 1).sort((a, b) => a.total - b.total)[0];
     const recent = [...verified].sort((a, b) => b.firstAt - a.firstAt).slice(0, 3);
+    // 등산 알림함 — 산악회의 알림만 모인다(server/storage/notification.repo 의 sportWhere)
+    const [inbox, setInbox] = useState(false);
+    const unread = useQuery<{ unread: number }>({ queryKey: [UNREAD_COUNT_KEY, { sport: "HIKING" }], refetchInterval: 60_000, staleTime: 30_000, enabled: s.mine }).data?.unread ?? 0;
     const trips = useQuery<{ trips: MyTrip[] }>({ queryKey: MY_TRIPS_KEY, enabled: s.mine }).data?.trips ?? [];
     const name = (member as { nickname?: string; name?: string } | undefined)?.nickname ?? (member as { name?: string } | undefined)?.name ?? "";
 
@@ -58,6 +63,10 @@ export default function HikingHome() {
                         {golfOk && <button type="button" onClick={() => setSport("GOLF")} className="h-8 rounded-full px-3 text-[13px] text-[#F4EFE3B3] active:bg-[#FFFFFF14]" data-testid="hk-to-golf">골프</button>}
                         <span className="flex h-8 items-center rounded-full bg-[#F28C6A] px-3 text-[13px] font-semibold text-[#2A1208]">등산</span>
                     </div>
+                    <button type="button" onClick={() => setInbox(true)} aria-label={unread > 0 ? `알림 ${unread}개` : "알림"} className="relative flex h-10 w-10 items-center justify-center rounded-full active:bg-[#FFFFFF14]" data-testid="hk-home-bell">
+                        <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Z" /><path d="M10 20a2.2 2.2 0 0 0 4 0" /></svg>
+                        {unread > 0 && <span className="absolute right-1.5 top-1.5 h-2.5 w-2.5 rounded-full bg-[#F28C6A]" style={{ boxShadow: "0 0 0 2px #0B1F26" }} aria-hidden />}
+                    </button>
                     <button type="button" onClick={() => setLocation("/menu")} aria-label="전체 메뉴" className="flex h-10 w-10 items-center justify-center rounded-full active:bg-[#FFFFFF14]">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden><path d="M4 7h16M4 12h16M4 17h16" /></svg>
                     </button>
@@ -165,6 +174,7 @@ export default function HikingHome() {
                 )}
             </main>
             <HiqNavigation />
+            <NotificationInbox open={inbox} onClose={() => setInbox(false)} />
         </div>
     );
 }

@@ -1,4 +1,5 @@
 import { Router } from "express";
+import { crewSportOf } from "../../../shared/crewSport.js";
 import { storage } from "../../storage/index.js";
 import { sendSuccess } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
@@ -7,7 +8,8 @@ import { NOTIF_GROUPS, type NotifGroup } from "../../../shared/notificationGroup
 
 const router = Router();
 
-const sportOf = (req: AuthRequest) => ((req.query.sport as string) === "GOLF" ? "GOLF" : "BILLIARDS") as "BILLIARDS" | "GOLF";
+// 등산(HIKING)이면 산악회의 알림만 — 종목을 읽는 규칙은 크루 · 채팅과 같은 shared/crewSport
+const sportOf = (req: AuthRequest) => crewSportOf(req.query.sport);
 
 /** ?group= 은 넷 중 하나이거나 없음(전체). 모르는 값은 조용히 무시한다 — 칩이 늘어도 옛 앱이 깨지지 않게. */
 function groupOf(raw: unknown): NotifGroup | undefined {

@@ -7,7 +7,7 @@
  */
 import { Link, useRoute } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
-import { heightText, hikingMountainPath } from "@shared/hikingMountains";
+import { duplicateNames, heightText, hikingMountainPath, mountainLabel } from "@shared/hikingMountains";
 import { HIKING_SEASON_NAME } from "@shared/hikingStamps";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { HikingCta } from "../components/MountainParts";
@@ -75,7 +75,7 @@ export default function StampBookPage() {
                                         <div className="w-full max-w-[96px] px-1">
                                             <SummitStamp name={x.m.name} heightM={x.m.heightM} ink={regionInk(x.m.region)} date={st ? stampDate(new Date(st.firstAt)) : null} state={x.stamp ? "on" : x.record ? "faded" : "empty"} tilt={x.stamp ? TILT[i % TILT.length] : 0} />
                                         </div>
-                                        <span className="text-[13px] leading-tight break-keep" style={{ color: x.stamp ? "#0E2A33" : "#0E2A3399", fontWeight: x.stamp ? 600 : 400 }}>{x.m.name}</span>
+                                        <span className="text-[13px] leading-tight break-keep" style={{ color: x.stamp ? "#0E2A33" : "#0E2A3399", fontWeight: x.stamp ? 600 : 400 }}>{mountainLabel(x.m, duplicateNames(slots.map((y) => y.m)))}</span>
                                         {x.stamp
                                             ? <span className="text-[12px] text-[#8A5E00]">{x.stamp.seasons.map((k) => HIKING_SEASON_NAME[k]).join(" · ")}{x.stamp.count > 1 ? ` · ${x.stamp.count}번` : ""}</span>
                                             : x.record

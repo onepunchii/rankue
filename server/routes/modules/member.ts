@@ -6,6 +6,7 @@ import { put } from "@vercel/blob";
 import { deleteBlobs } from "../../utils/blob.js";
 import { stripImageMetadata, IMAGE_CONTENT_TYPE, IMAGE_EXT } from "../../utils/imageMeta.js";
 import { GOLF_PHOTO_CATEGORIES } from "../../../shared/golfPhoto.js";
+import { HIKING_PHOTO_CATEGORIES } from "../../../shared/hikingPhotos.js";
 import { storage, getRecentOpponents, searchUsers } from "../../storage/index.js";
 import { localeOf, msg } from "../../lib/i18n.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
@@ -59,7 +60,8 @@ router.post("/upload", requireAuth, asyncHandler(async (req: AuthRequest, res: a
     // 형식을 알아보면 그 형식으로 싣는다 — iOS 웹뷰는 캔버스 webp 인코딩이 없어 JPEG·PNG 가 온다.
     const clean = stripImageMetadata(buffer);
     // 공개로 나갈 수 있는 골프 사진은 알아볼 수 있는 이미지만 받는다(메타를 걷었다고 장담할 수 있는 것만).
-    if (GOLF_PHOTO_CATEGORIES.has(safeCat) && !clean.type) return sendError(res, 400, "err.member.imageRequired");
+    // 등산의 산행 사진도 같다(2026-10-13) — 사진의 위치 정보를 걷었다고 장담할 수 있는 것만 받는다.
+    if ((GOLF_PHOTO_CATEGORIES.has(safeCat) || HIKING_PHOTO_CATEGORIES.has(safeCat)) && !clean.type) return sendError(res, 400, "err.member.imageRequired");
     const { url } = await put(`hiq/${safeCat}/${req.userId}.${clean.type ? IMAGE_EXT[clean.type] : "webp"}`, clean.buffer, {
         access: "public",
         contentType: clean.type ? IMAGE_CONTENT_TYPE[clean.type] : "image/webp",

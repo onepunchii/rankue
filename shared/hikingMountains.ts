@@ -134,5 +134,22 @@ export function assignMountainSlugs<T extends { id: string; name: string; sigung
     return out;
 }
 
+/**
+ * 같은 이름의 산이 한 화면에 같이 놓일 때의 이름표 — "지리산(통영)" · "백운산(포천)".
+ * 주소(slug)에 시군이 붙은 산은 그 시군을, 이름 그대로를 주소로 가진 산은 dup(그 화면에 겹치는 이름들)에 들 때만 제 시군을 붙인다.
+ * 겹치지 않으면 이름 그대로다.
+ */
+export function mountainLabel(m: { name: string; slug: string; sigungu?: string | null }, dup?: ReadonlySet<string>): string {
+    if (m.slug !== m.name && m.slug.startsWith(`${m.name}-`)) return `${m.name}(${m.slug.slice(m.name.length + 1).replace(/-/g, " ")})`;
+    const where = sigunguShort(m.sigungu);
+    return dup?.has(m.name) && where ? `${m.name}(${where})` : m.name;
+}
+/** 그 목록에서 두 번 넘게 나오는 이름들 */
+export function duplicateNames(list: readonly { name: string }[]): Set<string> {
+    const seen = new Set<string>(), dup = new Set<string>();
+    for (const m of list) { if (seen.has(m.name)) dup.add(m.name); seen.add(m.name); }
+    return dup;
+}
+
 /** "1,708m" */
 export const heightText = (h: number | null | undefined): string => (h != null && h > 0 ? `${Math.round(h).toLocaleString("en-US")}m` : "");

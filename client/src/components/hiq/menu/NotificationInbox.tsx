@@ -104,7 +104,8 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
     const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const queryClient = useQueryClient();
-    const { currentSport } = useSport();
+    // 등산일 때는 등산 알림함이다(산악회의 알림만) — 옛 값 currentSport 는 등산을 당구로 알려 주므로 sport 를 본다
+    const { sport: currentSport } = useSport();
     const { toast } = useToast();
 
     const [chip, setChip] = useState<ChipKey>("all");

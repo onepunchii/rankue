@@ -231,12 +231,12 @@ class Storage {
 
     // Notifications
     /** 한 페이지(기본 30·최대 50) + 다음 커서. 묶음(turn|chat|crew|notice)으로 걸러 볼 수 있다. */
-    async getNotifications(id: string, sport?: "BILLIARDS" | "GOLF", opts?: { group?: NotifGroup; before?: string; limit?: number }) { return this.notifs.getNotifications(id, sport, opts); }
+    async getNotifications(id: string, sport?: "BILLIARDS" | "GOLF" | "HIKING", opts?: { group?: NotifGroup; before?: string; limit?: number }) { return this.notifs.getNotifications(id, sport, opts); }
     async createNotification(data: any) { return this.notifs.createNotification(data); }
     async markNotificationAsRead(id: string, mid: string) { return this.notifs.markNotificationAsRead(id, mid); }
     /** 지금 보고 있는 종목만 읽음 처리한다 — 종목을 빼먹으면 당구에서 눌러 골프까지 읽힌다. */
-    async markAllNotificationsAsRead(mid: string, sport?: "BILLIARDS" | "GOLF") { return this.notifs.markAllNotificationsAsRead(mid, sport); }
-    async countUnreadNotifications(mid: string, sport?: "BILLIARDS" | "GOLF") { return this.notifs.countUnread(mid, sport); }
+    async markAllNotificationsAsRead(mid: string, sport?: "BILLIARDS" | "GOLF" | "HIKING") { return this.notifs.markAllNotificationsAsRead(mid, sport); }
+    async countUnreadNotifications(mid: string, sport?: "BILLIARDS" | "GOLF" | "HIKING") { return this.notifs.countUnread(mid, sport); }
     async deleteNotification(id: string, mid: string) { return this.notifs.deleteNotification(id, mid); }
     /** 골프 긴급 조인 전체 방송 대상(골프에 흔적이 있고 푸시 토큰이 있는 회원). */
     async listGolfPushMembers(excludeIds: readonly string[], limit?: number) { return this.notifs.listGolfPushMembers(excludeIds, limit); }

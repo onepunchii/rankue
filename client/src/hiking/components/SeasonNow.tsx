@@ -8,7 +8,7 @@
 import { Link } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
 import { hikingFeaturesInMonth } from "@shared/hikingFeatures";
-import { heightText, hikingListPath, hikingMountainPath } from "@shared/hikingMountains";
+import { duplicateNames, heightText, hikingListPath, hikingMountainPath, mountainLabel } from "@shared/hikingMountains";
 import type { MountainSummary } from "../lib/api";
 import { MountainPatch } from "../stamps/MountainPatch";
 import { HkSection } from "./HikingShell";
@@ -23,6 +23,7 @@ export function SeasonNow({ mountains, done, mine, month = kstMonth() }: { mount
         <HkSection title={`지금은 ${features.map((x) => x.f.name.replace(/ 산$/, "")).join(" · ")} 철`} aside={`${month}월`}>
             <div className="space-y-4" data-testid="hk-season-now">
                 {features.map(({ f, list }) => {
+                    const dup = duplicateNames(list);
                     const sorted = [...list].sort((a, b) => Number(done?.has(a.id) ?? false) - Number(done?.has(b.id) ?? false) || (b.heightM ?? 0) - (a.heightM ?? 0));
                     return (
                         <div key={f.id} data-testid={`hk-season-${f.id}`}>
@@ -35,7 +36,7 @@ export function SeasonNow({ mountains, done, mine, month = kstMonth() }: { mount
                                     <li key={m.id} className="w-[72px] shrink-0">
                                         <Link href={hikingMountainPath(m.slug)} className="flex flex-col items-center text-center active:opacity-70" data-testid={`hk-season-mt-${m.id}`}>
                                             <MountainPatch id={m.id} region={m.region} size={64} earned={!!done?.has(m.id)} preview />
-                                            <span className="mt-1.5 w-full truncate text-[13px] font-semibold leading-tight text-[#F4EFE3]">{m.name}</span>
+                                            <span className="mt-1.5 w-full truncate text-[13px] font-semibold leading-tight text-[#F4EFE3]">{mountainLabel(m, dup)}</span>
                                             <span className="text-[12px] tabular-nums leading-tight text-[#F4EFE380]">{done?.has(m.id) ? "다녀옴" : heightText(m.heightM)}</span>
                                         </Link>
                                     </li>

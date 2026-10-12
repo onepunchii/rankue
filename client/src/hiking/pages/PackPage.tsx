@@ -12,7 +12,7 @@
 import { Link } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
 import { HIKING_GRADES, type HikingGradeId } from "@shared/hikingGrade";
-import { HIKING_REGIONS, hikingMountainPath } from "@shared/hikingMountains";
+import { HIKING_REGIONS, duplicateNames, hikingMountainPath, mountainLabel } from "@shared/hikingMountains";
 import { HIKING_GRADE_NOTE, HIKING_PACK_INTRO, HIKING_PACK_LABEL, HIKING_PACK_SEO, HIKING_PIN_NOTE, MOUNTAIN_PATCH_NOTE } from "@shared/hikingPage";
 import { HIKING_GRANDS, HIKING_PINS } from "@shared/hikingStamps";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
@@ -30,6 +30,8 @@ export default function PackPage() {
     const patchN = s.states.filter((x) => x.done).length + HIKING_GRANDS.filter((g) => s.award("grand", g.id)).length;
     const kfs = s.famous.filter((m) => m.lists.includes("kfs100"));
     const kfsGot = kfs.filter((m) => s.done.has(m.id)).length;
+    // 100대 명산에는 같은 이름의 산이 있다(지리산 둘 · 백운산 셋) — 시군을 붙여 가른다
+    const dup = duplicateNames(kfs);
     const gradeOn = (id: HikingGradeId) => { const a = s.award("grade", id); return a ? stampDate(a.earnedAt) : null; };
 
     return (
@@ -80,7 +82,7 @@ export default function PackPage() {
                                                     <li key={m.id} className="min-w-0">
                                                         <Link href={hikingMountainPath(m.slug)} className="flex flex-col items-center text-center active:opacity-70" data-testid={`hk-mt-${m.id}`}>
                                                             <MountainPatch id={m.id} region={m.region} size={52} earned={s.done.has(m.id)} preview={!s.mine} />
-                                                            <span className="mt-1 w-full truncate text-[12px] leading-tight" style={{ color: s.done.has(m.id) || !s.mine ? "#F4EFE3" : "#F4EFE399" }}>{m.name}</span>
+                                                            <span className="mt-1 w-full truncate text-[12px] leading-tight" style={{ color: s.done.has(m.id) || !s.mine ? "#F4EFE3" : "#F4EFE399" }}>{mountainLabel(m, dup)}</span>
                                                         </Link>
                                                     </li>
                                                 ))}

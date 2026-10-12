@@ -25,6 +25,7 @@ import { CourseProfile } from "../components/CourseParts";
 import { HikingShell, HkSkel } from "../components/HikingShell";
 import { HikingCta } from "../components/MountainParts";
 import { mountainKey, type MountainDetail } from "../lib/api";
+import { MyPhotos } from "../photos/MyPhotos";
 import { SummitCheckin } from "../stamps/SummitCheckin";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { POI_COLOR } from "../theme";
@@ -222,6 +223,9 @@ export default function TrailPage() {
                                         )}
                                     </section>
                                 )}
+
+                                {/* 산행 중 사진 — 내 사진첩에 담는다(위치 정보는 지운다) */}
+                                <div className="mt-5"><MyPhotos key={`trail-photos:${d.id}`} mountainId={d.id} name={d.name} compact /></div>
 
                                 {grid && (
                                     <p className="mt-4 rounded-2xl bg-[#FFFFFF0A] px-4 py-3 text-[13.5px] leading-snug text-[#F4EFE3CC] break-keep" data-testid="trail-grid">

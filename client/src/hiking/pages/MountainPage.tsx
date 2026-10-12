@@ -24,6 +24,8 @@ import { MountainPatch } from "../stamps/MountainPatch";
 import { hikingBookPath } from "../stamps/StampParts";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { trailPath } from "../trail/useTrail";
+import { MyPhotos } from "../photos/MyPhotos";
+import { HIKING_PHOTO_LABEL } from "@shared/hikingPhotos";
 import { stampDate } from "../lib/date";
 import { POI_COLOR, hikingCover } from "../theme";
 import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi } from "../lib/api";
@@ -272,6 +274,13 @@ export default function MountainPage() {
                 <HkSection title={MOUNTAIN_LABEL.courses} aside={d.courseList.length ? `${d.courseList.length}개` : undefined} id="sec-courses">
                     <Courses key={`courses:${d.slug}`} d={d} canStart={my.mine} />
                 </HkSection>
+
+                {/* 내 산행 사진 — 올린 사람만 본다 */}
+                {my.mine && (
+                    <HkSection title={HIKING_PHOTO_LABEL.title} aside={HIKING_PHOTO_LABEL.aside} id="sec-photos">
+                        <MyPhotos key={`photos:${d.id}`} mountainId={d.id} name={d.name} />
+                    </HkSection>
+                )}
 
                 <HkSection title={MOUNTAIN_LABEL.weather} aside="오늘부터 이레" id="sec-weather">
                     <MountainWeather key={`wx:${d.slug}`} slug={d.slug} />
