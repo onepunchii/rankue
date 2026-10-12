@@ -11,6 +11,8 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { TourNews } from "@/components/hiq/TourNews";
 import { PBA_INCOME_NOTE_KO, PBA_LIST_TITLE_KO, PBA_LIST_DESC_KO } from "@shared/pbaMeta";
 import { cn } from "@/lib/utils";
+import { PBA_COVER } from "@shared/pageCovers";
+import { PageCover } from "@/components/hiq/PageCover";
 
 // PBA 투어 랭킹 — pbatour.org 공개 데이터 재가공(출처 표기). 시즌 2019~현재.
 // 선수 사진은 초상권 문제로 쓰지 않는다 — 국기 + 이름만.
@@ -131,7 +133,10 @@ export default function HiqPba() {
 
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
-            <div className="flex items-center gap-3 mb-6 relative z-10">
+            {/* 표지 그림 위의 머리줄(2026-10-12) — PBA 선수 페이지와 같은 그림. 목록이 밀리지 않게 얇게.
+                겹치지 않는다(overlap 0) — 그림(relative)이 바로 아래의 탭 줄을 덮어 탭이 잘려 보였다 */}
+            <PageCover src={PBA_COVER} className="-mx-5 -mt-6 mb-3" height={132} overlap={0} fadeFrom={46} position="50% 6%">
+            <div className="flex items-center gap-3 px-5 pt-6">
                 <motion.button
                     whileTap={{ scale: 0.9 }}
                     onClick={() => setLocation("/dashboard")}
@@ -141,10 +146,11 @@ export default function HiqPba() {
                     <LucideChevronLeft className="w-5 h-5" />
                 </motion.button>
                 <div>
-                    <h1 className="text-[26px] font-bold tracking-tight text-ink-1 leading-none">{t.title}</h1>
-                    <p className="text-[13px] font-medium text-black/55 mt-1">{t.subtitle}</p>
+                    <h1 className="text-[26px] font-bold tracking-tight text-[#FFFFFF] leading-none [text-shadow:0_1px_8px_rgba(0,0,0,0.55)]">{t.title}</h1>
+                    <p className="text-[13px] font-medium text-[#FFFFFFE6] mt-1 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]">{t.subtitle}</p>
                 </div>
             </div>
+            </PageCover>
 
             {/* 리그 탭 + 정렬 전환 */}
             <div className="flex items-center justify-between mb-4">

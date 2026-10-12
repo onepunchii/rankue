@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { storeCover } from "@shared/pageCovers";
+import { STORE_THRONE, storeCover } from "@shared/pageCovers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute, useSearch } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
@@ -438,7 +438,8 @@ export default function StoreListingPage() {
                 </div>
               ) : (
                 <div className="text-center py-3">
-                  <p className="text-[22px] mb-1.5">🪑</p>
+                  {/* 빈 왕좌(2026-10-12) — 의자 이모지 대신 우리가 그린 빈 왕관. 장식이다 */}
+                  <img src={STORE_THRONE} alt="" aria-hidden width={88} height={88} loading="lazy" decoding="async" draggable={false} className="mx-auto mb-2 h-[88px] w-[88px] select-none" />
                   <p className="text-[14px] font-bold text-ink-1">{t.emptyThrone}</p>
                   <p className="text-[12.5px] text-black/50 mt-1 leading-relaxed">{t.emptyThroneDesc}</p>
                 </div>

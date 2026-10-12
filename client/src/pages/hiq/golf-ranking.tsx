@@ -19,6 +19,8 @@ import { GMove, useGolfTheme } from "@/components/hiq/golf/ui";
 import { golferName, iocToAlpha2, type GolfRankRow, type GolfRankingsResponse, type GolfStatKey, type GolfStatRow, type GolfTour } from "@/components/hiq/golf/types";
 import { golferCardUrl } from "@/lib/playerCard";
 import { golfRankingDesc, golfRankingPath, golfRankingTitle, golfSeoLang } from "@shared/siteGraph";
+import { golferCover } from "@shared/pageCovers";
+import { PageCover } from "@/components/hiq/PageCover";
 
 const PAGE_SIZE = 50;
 const API = "/api/hiq/golf-rank";
@@ -139,14 +141,18 @@ export default function HiqGolfRanking() {
 
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
-            <div className="flex items-center gap-3 mb-6 relative z-10">
-                <GolfBackButton onClick={() => setLocation("/dashboard")} label={t("golf.back")} />
+            {/* 표지 그림 위의 머리줄(2026-10-12) — 고른 투어의 그림이라 선수 페이지로 넘어가도 같은 그림이 이어진다. 목록이 밀리지 않게 얇게.
+                겹치지 않는다(overlap 0) — 그림(relative)이 바로 아래의 탭 줄을 덮어 탭이 잘려 보였다 */}
+            <PageCover src={golferCover(tour)} className="-mx-5 -mt-6 mb-3" height={132} overlap={0} fadeFrom={46}>
+            <div className="flex items-center gap-3 px-5 pt-6">
+                <GolfBackButton onClick={() => setLocation("/dashboard")} label={t("golf.back")} className="bg-[#0A0A0A8C] backdrop-blur-[6px]" />
                 <div className="min-w-0">
-                    <h1 className="text-[26px] font-bold tracking-tight text-ink-1 leading-none">⛳ {t("golf.pageTitle")}</h1>
-                    <p className="text-[13px] font-medium text-ink-3 mt-1 truncate">{t("golf.subtitle")}</p>
+                    <h1 className="text-[26px] font-bold tracking-tight text-[#FFFFFF] leading-none [text-shadow:0_1px_8px_rgba(0,0,0,0.6)]">⛳ {t("golf.pageTitle")}</h1>
+                    <p className="text-[13px] font-medium text-[#FFFFFFE6] mt-1 truncate [text-shadow:0_1px_6px_rgba(0,0,0,0.65)]">{t("golf.subtitle")}</p>
                 </div>
                 <ShareButton className="ml-auto" url={`https://www.rankue.co.kr/golf-ranking?tour=${tour}`} title={t("golf.pageTitle")} />
             </div>
+            </PageCover>
 
             {/* 투어 탭(가로 스크롤) */}
             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-5 px-5 mb-3">

@@ -41,5 +41,11 @@ export function storeCover(code: string | null | undefined): string {
     return coverSrc(STORE_COVERS[idx]);
 }
 
+/**
+ * 매장 '명예의 전당'의 빈 자리 — 초록 방석 위의 빈 왕관(금테 에나멜 화풍, 바탕을 따낸 그림 300×300).
+ * 아직 초대 대장이 없는 매장에서 의자 이모지 대신 놓는다.
+ */
+export const STORE_THRONE = coverSrc("store-throne");
+
 /** 쓰는 그림 전부 — 파일이 다 있는지 시험이 본다 */
 export const ALL_COVERS: readonly string[] = [...Object.values(UMB), "pba", ...Object.values(GOLF), ...STORE_COVERS];

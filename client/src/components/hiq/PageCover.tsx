@@ -10,7 +10,7 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-export function PageCover({ src, children, className, height = 208, overlap = 56, fadeFrom = 52 }: {
+export function PageCover({ src, children, className, height = 208, overlap = 56, fadeFrom = 52, position }: {
     src: string;
     children?: ReactNode;
     /** 바깥 여백을 되돌리는 클래스(-mx-5 -mt-6 같은) */
@@ -21,10 +21,12 @@ export function PageCover({ src, children, className, height = 208, overlap = 56
     overlap?: number;
     /** 바탕색으로 녹기 시작하는 곳(%) */
     fadeFrom?: number;
+    /** 그림에서 보여 줄 자리(object-position) — 얇은 띠에서 글씨가 그림의 밝은 곳과 겹칠 때 옮긴다. 기본은 가운데 */
+    position?: string;
 }) {
     return (
-        <div className={cn("relative overflow-hidden", className)} style={{ height, marginBottom: -overlap }} data-testid="page-cover">
-            <img src={src} alt="" aria-hidden width={880} height={440} draggable={false} decoding="async" className="absolute inset-0 h-full w-full select-none object-cover" />
+        <div className={cn("relative overflow-hidden", className)} style={{ height, ...(overlap ? { marginBottom: -overlap } : {}) }} data-testid="page-cover">
+            <img src={src} alt="" aria-hidden width={880} height={440} draggable={false} decoding="async" className="absolute inset-0 h-full w-full select-none object-cover" style={position ? { objectPosition: position } : undefined} />
             {/* 위쪽 — 머리줄의 글씨가 읽히게. 아래쪽 — 페이지 바탕으로 녹는다 */}
             <div aria-hidden className="absolute inset-x-0 top-0 h-24" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.42) 0%, rgba(0,0,0,0) 100%)" }} />
             <div aria-hidden className="absolute inset-x-0 bottom-0" style={{ top: `${fadeFrom}%`, background: "linear-gradient(180deg, transparent 0%, var(--surface-0) 92%)" }} />

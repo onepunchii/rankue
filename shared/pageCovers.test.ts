@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { ALL_COVERS, PBA_COVER, STORES_COVER, STORE_COVERS, coverSrc, golferCover, storeCover, umbCover } from "./pageCovers";
+import { ALL_COVERS, PBA_COVER, STORES_COVER, STORE_COVERS, STORE_THRONE, coverSrc, golferCover, storeCover, umbCover } from "./pageCovers";
 import { HUB_CARD_NAMES, HUB_CARD_SIZE, HUB_CARD_VERSION, HUB_STAMP_BOOKS, hubCard, hubCardName } from "./ogCards";
 import { STAMP_BOOKS } from "./golfStampBooks";
 import { GOLF_TOURS } from "./golfTours";
@@ -19,7 +19,9 @@ const pub = (p: string) => resolve(root, "client/public", p.replace(/^\//, ""));
 describe("표지 그림", () => {
     it("쓰는 그림이 다 있고 가볍다 — 폴더에 남는 파일이 없다", () => {
         const files = readdirSync(pub("/covers")).filter((f) => !f.startsWith(".")).sort();
-        expect(files).toEqual([...ALL_COVERS].map((n) => `${n}.webp`).sort());
+        // 표지 12장 + 매장 '명예의 전당'의 빈 왕관 한 장
+        expect(files).toEqual([...ALL_COVERS, "store-throne"].map((n) => `${n}.webp`).sort());
+        expect(STORE_THRONE).toBe("/covers/store-throne.webp");
         for (const n of ALL_COVERS) expect(statSync(pub(coverSrc(n))).size, n).toBeLessThan(100_000);
         expect(ALL_COVERS).toHaveLength(12);
     });
@@ -69,6 +71,22 @@ describe("표지를 얹는 화면", () => {
         expect(pba).toContain('<Card className="pt-5 relative z-10">');
         // 골프 화면은 테마가 흰색 · 검정 유틸을 바꿔 끼운다 — 그림 위의 글씨는 리터럴 색
         expect(code(read("client/src/pages/hiq/golfer.tsx"))).toContain("text-[#FFFFFF] [text-shadow:");
+    });
+
+    it("랭킹 목록 세 곳도 같은 그림을 얇게 단다 — 고른 부문 · 투어의 그림이라 선수 페이지로 넘어가도 이어진다", () => {
+        expect(code(read("client/src/pages/hiq/world-ranking.tsx"))).toContain('<PageCover src={umbCover(category)} className="-mx-5 -mt-6 mb-3" height={132} overlap={0} fadeFrom={46}>');
+        // PBA 는 그림을 위쪽으로 — 가운데로 두면 제목 밑의 한 줄이 당구대의 금테와 겹친다
+        expect(code(read("client/src/pages/hiq/pba.tsx"))).toContain('<PageCover src={PBA_COVER} className="-mx-5 -mt-6 mb-3" height={132} overlap={0} fadeFrom={46} position="50% 6%">');
+        expect(code(read("client/src/pages/hiq/golf-ranking.tsx"))).toContain('<PageCover src={golferCover(tour)} className="-mx-5 -mt-6 mb-3" height={132} overlap={0} fadeFrom={46}>');
+        // 그림을 아래 탭 줄과 겹치지 않는다(overlap 0) — 겹치면 그림이 탭을 덮는다
+        // 제목(h1)은 그대로 한 번
+        for (const p of ["world-ranking", "pba", "golf-ranking"]) expect(code(read(`client/src/pages/hiq/${p}.tsx`)).match(/<h1\b/g), p).toHaveLength(1);
+    });
+
+    it("매장의 빈 왕좌 — 의자 이모지 대신 우리가 그린 빈 왕관(장식)", () => {
+        const s = code(read("client/src/pages/store-listing.tsx"));
+        expect(s).toContain('<img src={STORE_THRONE} alt="" aria-hidden');
+        expect(s).not.toContain("🪑");
     });
 
     it("매장 — 이름(h1)이 그림 위에 놓이고, 뒤로 가기는 밝은 그림 위에서도 읽히게 어두운 알약에 담는다", () => {
