@@ -205,6 +205,15 @@ function GolfStampBookRoute() {
 function GolfShelfRoute() {
   return <Suspense fallback={golfReadFallback}><GolfShelf /></Suspense>;
 }
+// 등산(2026-10-13) — 세 번째 종목의 공개 화면: 전국 명산 허브 · 권역/묶음 목록 · 산 한 곳. 로그인 없이 열린다(검색으로 들어온 사람이 본다).
+// 당구 · 골프 화면과 섞이지 않게 client/src/hiking 아래에만 산다. 메인 청크에서 뺀다(코스 선 · 지도 그림이 무겁다).
+const hikingFallback = <div className="min-h-[100dvh] bg-[#0B1F26]" aria-busy="true" />;
+const HikingHub = lazy(() => import("@/hiking/pages/HikingHub"));
+const HikingListPage = lazy(() => import("@/hiking/pages/HikingListPage"));
+const HikingMountainPage = lazy(() => import("@/hiking/pages/MountainPage"));
+function HikingHubRoute() { return <Suspense fallback={hikingFallback}><HikingHub /></Suspense>; }
+function HikingListRoute() { return <Suspense fallback={hikingFallback}><HikingListPage /></Suspense>; }
+function HikingMountainRoute() { return <Suspense fallback={hikingFallback}><HikingMountainPage /></Suspense>; }
 // 크루 도장첩(2026-10-12 크루 도장깨기) — 골프 크루의 도장 · 깃발. 크루 홈처럼 로그인 없이 열린다
 const GolfCrewStamps = lazy(() => import("@/golf/pages/CrewStamps"));
 function GolfCrewStampsRoute() {
@@ -395,6 +404,11 @@ function AppRoutes() {
       <Route path="/golf/stamps" component={GolfStampBooksRoute} />
       <Route path="/golf/stamps/:book" component={GolfStampBookRoute} />
       <Route path="/golf/shelf" component={GolfShelfRoute} />
+      {/* 등산(2026-10-13) — 공개 화면. 검색용 화면은 server/seo/hiking, 봇 경로는 vercel.json */}
+      <Route path="/hiking" component={HikingHubRoute} />
+      <Route path="/hiking/regions/:id" component={HikingListRoute} />
+      <Route path="/hiking/lists/:id" component={HikingListRoute} />
+      <Route path="/hiking/mountains/:slug" component={HikingMountainRoute} />
       {/* 골프장 페이지(2026-09-24) — 검색 유입용 공개 페이지라 GolfOnly 를 타지 않는다(GolfOnly 는 비로그인을 /dashboard 로 쫓아낸다).
           슬러그는 한글(정본). 옛 숫자 주소(/golf/course/74)는 GolfCoursePage 가 슬러그로 바꿔 준다.
           wouter 는 기본이 정확 일치라(regexparam, loose 아님) /golf/booking 이 /golf/booking-list 를 먹지 않는다. */}

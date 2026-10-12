@@ -15,6 +15,8 @@ import { rankingExtraSitemapParts } from "./seo/rankingExtra.js";
 import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
 import { golfGuideSitemapParts } from "./seo/golfGuide.js";
 import { golfStampsSitemapParts } from "./seo/golfStamps.js";
+import { hikingSitemapParts } from "./seo/hiking.js";
+import { allMountains } from "./storage/hiking.js";
 import { golfTermsSitemapParts } from "./seo/golfTerms.js";
 import { FIND_FEATURES, findPath, findRegionCounts, hasFindTag } from "../shared/golfFind.js";
 import { tournamentsSitemapParts } from "./seo/tournaments.js";
@@ -48,7 +50,7 @@ const ORIGIN = "https://www.rankue.co.kr";
 const APP_LANGS = ["en", "vi", "tr", "es"];
 const ABOUT_LANGS = ["en", "vi", "tr", "es", "ja", "zh"];
 
-export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs", "rankings", "terms", "tournaments", "pba-records"] as const;
+export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs", "rankings", "terms", "tournaments", "pba-records", "hiking"] as const;
 export type SitemapSection = (typeof SITEMAP_SECTIONS)[number];
 
 function esc(s: string): string {
@@ -316,6 +318,8 @@ const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
   // 용어 사전 — 당구(2026-09-24) + 골프(2026-10-05). 둘 다 본문이 코드에 있다.
   rankings: rankingExtraSitemapParts, terms: async () => [...(await billiardsTermsSitemapParts()), ...golfTermsSitemapParts()],
   tournaments: tournamentsSitemapParts, "pba-records": pbaRecordsSitemapParts,
+  // 등산(2026-10-13) — 허브 · 권역 · 목록 · 산(코스나 글이 있는 산만). 자료를 못 읽으면 빈 구역
+  hiking: async () => hikingSitemapParts(await allMountains().catch((e) => { console.warn("[sitemap] hiking:", (e as Error)?.message); return []; })),
 };
 
 export async function generateSitemapSection(section: SitemapSection): Promise<string> {

@@ -25,6 +25,7 @@ import compareRouter from "./modules/compare.js";
 import tournamentsRouter from "./modules/tournaments.js";
 import golfRankRouter from "./modules/golfRank.js";
 import golfCoursesRouter from "./modules/golfCourses.js";
+import hikingRouter from "./modules/hiking.js";
 import tourNewsRouter from "./modules/tourNews.js";
 import listingsRouter from "./modules/listings.js";
 import appMetaRouter from "./modules/appMeta.js";
@@ -41,6 +42,8 @@ router.use("/golf", ...requireGolfAccess, golfRouter);
 // 골프장 페이지(2026-09-24) — 검색으로 들어온 사람이 보는 공개 페이지라 로그인 없이 읽힌다(관심 등록만 로그인).
 // "/golf-courses" 는 "/golf" 마운트에 걸리지 않는다(Express 는 경로 조각 단위로 맞춘다).
 router.use("/golf-courses", golfCoursesRouter);
+// 등산(2026-10-13) — 산 허브 · 목록 · 산 한 곳 · 날씨. 공개 읽기라 로그인 없이 열린다. 당구 · 골프와 따로 선 길이다.
+router.use("/hiking", hikingRouter);
 
 // 2. Crew (/crews)
 router.use("/crews", crewRouter);

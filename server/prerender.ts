@@ -36,6 +36,9 @@ import { renderRankingExtra, type RankingExtraRender } from "./seo/rankingExtra.
 import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js";
 import { renderGolfChecklist } from "./seo/golfGuide.js";
 import { GOLF_STAMPS_RE, renderGolfStamps } from "./seo/golfStamps.js";
+import { HIKING_RE, renderHiking } from "./seo/hiking.js";
+import { allMountains, getMountainDetail, nearbyMountains } from "./storage/hiking.js";
+import { HIKING_HUB_PATH, HIKING_NAV_LABEL } from "../shared/hikingPage.js";
 import { STAMPS_HUB_PATH, STAMPS_NAV_LABEL } from "../shared/golfStampGuide.js";
 import { GUIDE_LABEL, type CourseGuide } from "../shared/golfCourseGuide.js";
 import { getCourseGuide } from "./storage/golfCourseGuide.js";
@@ -152,6 +155,8 @@ export function hubNav(lang = "ko"): string {
     ...(ko ? [[PACK_PATH, PACK_NAV_LABEL] as [string, string], [GOLF_TERMS_PATH, GOLF_TERMS_NAV_LABEL] as [string, string]] : []),
     // 골프 도장깨기(2026-10-12) — 책장 · 도장첩 아홉 권 · 장식장. 한국어 전용.
     ...(ko ? [[STAMPS_HUB_PATH, STAMPS_NAV_LABEL] as [string, string]] : []),
+    // 등산(2026-10-13) — 전국 명산 허브. 한국어 전용.
+    ...(ko ? [[HIKING_HUB_PATH, HIKING_NAV_LABEL] as [string, string]] : []),
     // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 문서에만 건다.
     ...(ko ? [["/billiards/terms", "당구 용어"] as [string, string]] : []),
     // 당구 대회(2026-09-24) — 프리렌더가 한국어 전용(?lang= 무시)이라 한국어 문서에만 건다.
@@ -2036,6 +2041,24 @@ ${list}
   // 본문이 코드에 있다(shared/golfStampBooks · golfStampGuide · golfPins). 골프장 요약은 그 권의 골프장 공개 페이지로 잇는 슬러그를 찾는 데만 쓴다 —
   // 못 받아도(DB 가 죽어도) 이름만 적어 내보낸다. 없는 권은 다음 라우트로(화면이 '없는 도장첩이에요'를 그린다).
   // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  // 등산(2026-10-13) — 허브 · 권역 · 목록 · 산 한 곳. 본문은 server/seo/hiking 이 화면과 같은 글(shared/hikingPage)로 쓴다.
+  // 산 요약은 인스턴스가 10분 기억하고, 산 한 곳의 글 · 코스 · 지점만 그때 읽는다. 없는 산은 다음 라우트로(화면이 '없는 산이에요'를 그린다).
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  app.get(HIKING_RE, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    try {
+      const all = await allMountains();
+      const r = await renderHiking(req.path, all, async (slug) => { const d = await getMountainDetail(slug); return d ? { d, nearby: nearbyMountains(all, d) } : null; });
+      if (!r) return next();
+      noStore(res);
+      res.setHeader("X-Prerender", r.tag);
+      res.status(r.status).send(r.html);
+    } catch (e) {
+      console.warn("[prerender] hiking:", (e as Error)?.message);
+      next();
+    }
+  });
+
   app.get(GOLF_STAMPS_RE, async (req, res, next) => {
     if (!isBot(req)) return next();
     let pages: { slug: string; courseIds: number[] }[] = [];
