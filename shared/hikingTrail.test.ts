@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { withKm, type LinePoint } from "./hikingGeo";
-import { TRAIL_FAR_M, aheadText, cleanTrip, climbBetween, emptyTally, projectOnLine, tallyStep, trailState, type TrailPoi } from "./hikingTrail";
+import { TRAIL_FAR_M, aheadText, cleanTrip, climbBetween, emptyTally, projectOnLine, spokenDistance, tallyStep, trailSpeech, trailState, type TrailPoi } from "./hikingTrail";
 
 // 북쪽으로 곧게 2km 오르는 길 — 500m 마다 한 점, 높이 200 → 600 → 500
 const LINE: LinePoint[] = withKm([[37.0, 127.0, 200], [37.0045, 127.0, 300], [37.009, 127.0, 450], [37.0135, 127.0, 600], [37.018, 127.0, 500]]);
@@ -107,6 +107,46 @@ describe("길 띠의 상태", () => {
     });
 });
 
+describe("음성 안내 — 짧게, 드물게", () => {
+    const at = (lat: number, prev?: { km: number; dir: 1 | -1 } | null, lng = 127.0) => trailState({ line: LINE, pois: POIS, summitKm: SUMMIT_KM, summit: SUMMIT, fix: { lat, lng, accuracy: 10 }, prev, kinds: ["SIGN", "DANGER", "SHELTER"] })!;
+    it("가까운 갈림길을 300m 에서 한 번, 다 와서 한 번 — 같은 말을 되풀이하지 않는다", () => {
+        // 갈림길(0.4km) 약 250m 앞
+        const a = trailSpeech(at(37.00135), new Set());
+        expect(a.lines).toHaveLength(1);
+        expect(a.lines[0]).toMatch(/^\d+미터 앞, 갈림길\.$/);
+        expect(trailSpeech(at(37.0015), a.said).lines).toEqual([]);
+        const b = trailSpeech(at(37.0031), a.said);
+        expect(b.lines).toEqual(["곧 갈림길."]);
+        expect(trailSpeech(at(37.0032), b.said).lines).toEqual([]);
+    });
+    it("위험 구간에는 조심하라는 말을 붙인다 — 이름이 있으면 같이 읽는다", () => {
+        const s = trailState({ line: LINE, pois: [{ id: "d", kind: "DANGER", name: "낙석 주의", km: 1.1 }], summitKm: null, fix: { lat: 37.0085, lng: 127.0, accuracy: 10 } })!;
+        expect(trailSpeech(s, new Set()).lines[0]).toMatch(/미터 앞, 위험 구간, 낙석 주의\. 조심하세요\.$/);
+    });
+    it("정상이 500m 남았을 때와 정상에 닿았을 때 한 번씩", () => {
+        const far5 = trailSpeech(at(37.0095, { km: 0.9, dir: 1 }), new Set());
+        expect(far5.lines.some((l) => /^정상까지 \d+미터 남았어요\.$/.test(l))).toBe(true);
+        const top = trailSpeech(at(37.0134, { km: 1.4, dir: 1 }), far5.said);
+        expect(top.lines).toContain("정상이에요. 정상 인증을 해 보세요.");
+        expect(trailSpeech(at(37.0134, { km: 1.49, dir: 1 }), top.said).lines).toEqual([]);
+    });
+    it("코스에서 멀어지면 한 번 — 돌아왔다 다시 멀어지면 또 알린다", () => {
+        const off = trailSpeech(at(37.005, null, 127.006), new Set());
+        expect(off.lines).toEqual(["이 코스에서 멀어졌어요. 코스가 맞는지 확인해 주세요."]);
+        expect(trailSpeech(at(37.005, null, 127.006), off.said).lines).toEqual([]);
+        const back = trailSpeech(at(37.006), off.said);
+        expect(back.said.has("far")).toBe(false);
+        expect(trailSpeech(at(37.005, null, 127.006), back.said).lines).toHaveLength(1);
+    });
+    it("흐린 위치 · 상태 없음에는 말하지 않는다. 거리는 말로", () => {
+        expect(trailSpeech(null, new Set()).lines).toEqual([]);
+        const coarse = trailState({ line: LINE, pois: POIS, summitKm: SUMMIT_KM, fix: { lat: 37.0031, lng: 127.0, accuracy: 500 }, prev: { km: 0.3, dir: 1 } })!;
+        expect(trailSpeech(coarse, new Set()).lines).toEqual([]);
+        expect(spokenDistance(318)).toBe("320미터");
+        expect(spokenDistance(1240)).toBe("1.2킬로미터");
+    });
+});
+
 describe("산행 요약 — 좌표 없이", () => {
     it("걸은 거리와 오른 높이를 쌓는다 — 튄 위치 · 흐린 위치 · 코스 밖은 세지 않는다", () => {
         let t = emptyTally();
@@ -158,6 +198,13 @@ describe("걸은 길 · 좌표는 저장하지 않는다", () => {
         expect(hook).toContain("keepTrail(keepId, { tally: tally.current, prev: prev.current, reached: reached.current })");
         // 서버로 가는 요청이 없다 — 위치는 이 훅 안에서만 쓴다
         expect(hook).not.toMatch(/apiRequest|fetch\(/);
+    });
+    it("음성 안내는 기본이 끔이고, 꺼 둔 동안 지난 지점을 켜는 순간 몰아 읽지 않는다", () => {
+        const speak = read("client/src/hiking/trail/speak.ts");
+        expect(speak).toContain('localStorage.getItem(KEY) === "1"');
+        const page = read("client/src/hiking/pages/TrailPage.tsx");
+        expect(page).toContain("said.current = r.said;");
+        expect(page).toContain("if (voice) for (const line of r.lines) speakLine(line);");
     });
     it("산행 중 화면은 설치 안내와 하단 탭이 덮지 않는다", () => {
         expect(read("shared/installPrompt.ts")).toContain('"/hiking/trail"');

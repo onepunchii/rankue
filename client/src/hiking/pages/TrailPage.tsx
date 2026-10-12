@@ -9,7 +9,7 @@
  *  - 코스 선은 2022년 기록을 줄인 것이라 '길을 벗어났다'는 경보는 내지 않는다 — 이 코스에서 아주 멀 때만 알린다. 안내는 참고용이라고 적는다.
  * 등산을 쓸 수 있는 회원만 쓴다. ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상, 굵기는 semibold 까지.
  */
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useRoute, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { appConfirm } from "@/components/AppDialog";
@@ -20,7 +20,7 @@ import { durationText } from "@shared/hikingGeo";
 import { heightText, hikingMountainPath } from "@shared/hikingMountains";
 import { courseFacts } from "@shared/hikingPage";
 import { HIKING_POI_NAME, gridNumber, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
-import { aheadText, type TrailPoi } from "@shared/hikingTrail";
+import { aheadText, trailSpeech, type TrailPoi } from "@shared/hikingTrail";
 import { CourseProfile } from "../components/CourseParts";
 import { HikingShell, HkSkel } from "../components/HikingShell";
 import { HikingCta } from "../components/MountainParts";
@@ -29,6 +29,7 @@ import { MyPhotos } from "../photos/MyPhotos";
 import { SummitCheckin } from "../stamps/SummitCheckin";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { POI_COLOR } from "../theme";
+import { setVoiceOn, speakLine, voiceOn } from "../trail/speak";
 import { MY_TRIPS_KEY, dropKeptTrail, keepTrail, readKeptTrail, useTrail } from "../trail/useTrail";
 
 /** 앞에 알려 줄 지점 — 국가지점번호 · 그 밖의 표지는 '다음'에 넣지 않는다(국가지점번호는 아래에 따로) */
@@ -79,6 +80,18 @@ export default function TrailPage() {
     };
 
     const s = trail.state;
+    // 음성 안내 — 가까운 갈림길 · 위험 구간 · 대피소, 정상, 코스에서 멀어짐을 말로(짧게 · 드물게 — shared/hikingTrail.trailSpeech). 기본은 끔
+    const [voice, setVoice] = useState(voiceOn);
+    const said = useRef<Set<string>>(new Set());
+    useEffect(() => { if (!active) said.current = new Set(); }, [active]);
+    useEffect(() => {
+        if (!active || !s) return;
+        // 꺼 둔 동안에도 '이미 지난 것'은 적어 둔다 — 켜는 순간 지나온 지점을 한꺼번에 읽지 않게
+        const r = trailSpeech(s, said.current);
+        said.current = r.said;
+        if (voice) for (const line of r.lines) speakLine(line);
+    }, [s, active, voice]);
+    const toggleVoice = () => { const on = !voice; setVoice(on); setVoiceOn(on); if (on) speakLine("음성 안내를 켰어요."); };
     // 가까운 국가지점번호 — 구조를 부를 때 알려 줄 번호
     const grid = useMemo(() => {
         if (!s || !d || !course) return null;
@@ -223,6 +236,16 @@ export default function TrailPage() {
                                         )}
                                     </section>
                                 )}
+
+                                <button type="button" onClick={toggleVoice} aria-pressed={voice} data-track-as="hiking-trail-voice" data-testid="trail-voice"
+                                    className="mt-4 flex h-12 w-full items-center justify-between rounded-xl px-4 text-[15px] text-[#F4EFE3] active:opacity-80" style={{ background: voice ? "#F28C6A29" : "#FFFFFF14", boxShadow: voice ? "inset 0 0 0 1px #F28C6A" : undefined }}>
+                                    <span className="flex items-center gap-2.5 whitespace-nowrap">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 10v4h3.5L12 18V6L7.5 10Z" />{voice && <path d="M15.5 9a4 4 0 0 1 0 6M18 6.5a7.5 7.5 0 0 1 0 11" />}</svg>
+                                        음성 안내
+                                    </span>
+                                    <span className="shrink-0 text-[13.5px]" style={{ color: voice ? "#F6D9A8" : "#F4EFE399" }}>{voice ? "켜짐" : "꺼짐"}</span>
+                                </button>
+                                {voice && <p className="mt-1.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">갈림길 · 위험 구간 · 대피소가 가까워질 때와 정상에서 말로 알려요.</p>}
 
                                 {/* 산행 중 사진 — 내 사진첩에 담는다(위치 정보는 지운다) */}
                                 <div className="mt-5"><MyPhotos key={`trail-photos:${d.id}`} mountainId={d.id} name={d.name} compact /></div>

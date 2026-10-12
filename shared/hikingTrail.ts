@@ -135,6 +135,41 @@ export function trailState(input: TrailInput): TrailState | null {
 /** "320m" · "1.2km" */
 export const aheadText = (m: number): string => (m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)}m` : `${(Math.round(m / 100) / 10).toFixed(1)}km`);
 
+// ── 음성 안내 ────────────────────────────────────────────────────────
+/** 말로 알릴 지점의 종류 — 갈림길 · 위험 구간 · 대피소. 그 밖(문화 · 동식물)은 화면에만 */
+export const TRAIL_SPEAK_KINDS: readonly string[] = ["SIGN", "DANGER", "SHELTER"];
+/** 이 거리 안에 들어오면 한 번씩 알린다(m) — 미리 한 번, 다 와서 한 번 */
+export const TRAIL_SPEAK_AT_M = [300, 80] as const;
+const SPEAK_KIND_NAME: Readonly<Record<string, string>> = { SIGN: "갈림길", DANGER: "위험 구간", SHELTER: "대피소" };
+/** 말로 읽는 거리 — "300미터" · "1.2킬로미터" */
+export const spokenDistance = (m: number): string => (m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)}미터` : `${(Math.round(m / 100) / 10).toString()}킬로미터`);
+/**
+ * 지금 상태에서 새로 말할 것 — 이미 말한 것(said)은 다시 말하지 않는다. 걷는 사람의 손과 눈을 쓰지 않게 하려는 것이라 **짧게, 드물게**:
+ *   · 가장 가까운 갈림길 · 위험 구간 · 대피소가 300m · 80m 안에 들어올 때 한 번씩
+ *   · 정상이 500m 남았을 때 · 정상 가까이에 닿았을 때
+ *   · 이 코스에서 멀어졌을 때(돌아오면 다시 알릴 수 있게 지운다)
+ * 지점의 이름이 종류와 같거나 없으면 종류만 말한다("300미터 앞, 갈림길").
+ */
+export function trailSpeech(state: TrailState | null, said: ReadonlySet<string>): { lines: string[]; said: Set<string> } {
+    const next = new Set(said), lines: string[] = [];
+    if (!state || state.coarse) return { lines, said: next };
+    const once = (key: string, line: string) => { if (!next.has(key)) { next.add(key); lines.push(line); } };
+    if (state.far) { once("far", "이 코스에서 멀어졌어요. 코스가 맞는지 확인해 주세요."); return { lines, said: next }; }
+    next.delete("far");
+    if (state.nearSummit) once("summit:near", "정상이에요. 정상 인증을 해 보세요.");
+    else if (state.toSummitM != null && state.toSummitM <= 500 && state.toSummitM > TRAIL_SUMMIT_NEAR_M) once("summit:500", `정상까지 ${spokenDistance(state.toSummitM)} 남았어요.`);
+    const n = state.next.find((x) => TRAIL_SPEAK_KINDS.includes(x.poi.kind));
+    if (n) {
+        const kind = SPEAK_KIND_NAME[n.poi.kind] ?? "지점";
+        const name = (n.poi.name ?? "").trim();
+        const what = name && name !== kind && name.length <= 20 ? `${kind}, ${name}` : kind;
+        const tail = n.poi.kind === "DANGER" ? " 조심하세요." : "";
+        if (n.aheadM <= TRAIL_SPEAK_AT_M[1]) { next.add(`${n.poi.id}:${TRAIL_SPEAK_AT_M[0]}`); once(`${n.poi.id}:${TRAIL_SPEAK_AT_M[1]}`, `곧 ${what}.${tail}`); }
+        else if (n.aheadM <= TRAIL_SPEAK_AT_M[0]) once(`${n.poi.id}:${TRAIL_SPEAK_AT_M[0]}`, `${spokenDistance(n.aheadM)} 앞, ${what}.${tail}`);
+    }
+    return { lines, said: next };
+}
+
 // ── 산행 요약(좌표 없이) ─────────────────────────────────────────────
 /** 걸으며 쌓는 값 — 화면이 자리를 받을 때마다 더한다 */
 export interface TripTally { walkedKm: number; gainM: number; lastKm: number | null; lastEle: number | null; samples: number }
