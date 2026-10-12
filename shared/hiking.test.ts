@@ -8,7 +8,8 @@ import {
 import { courseStats, distM, durationText, eleAtKm, nearestOnLine, packLine, thinLine, walkMinutes, withKm } from "./hikingGeo";
 import { HIKING_GUIDE_BLOCK, cleanHikingText, cleanMountainGuide, hasMountainGuide } from "./hikingGuide";
 import { gridNumber, hikingPoiKind, hikingPoiTitle } from "./hikingPois";
-import { courseFacts, courseShape, hikingHubSeo, hikingListSeo, kmRange, mountainSeo } from "./hikingPage";
+import { courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListSeo, kmRange, mountainSeo } from "./hikingPage";
+import { isPrimarySport, isStartSport } from "./primarySport";
 
 /**
  * 등산의 뿌리 규칙(2026-10-13 오너: "산은 지역으로도 특성으로도 묶고 … 산 정보 페이지를 골프처럼 사이트맵 + 가입 유도").
@@ -211,6 +212,43 @@ describe("화면의 글 · 따로 선 세계", () => {
             expect(src.replace(/\/\*[\s\S]*?\*\//, ""), f).not.toMatch(/\b(?:bg|text|border|ring)-(?:white|black)\b/);
             expect([...src.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)].every((x) => Number(x[1]) >= 12), f).toBe(true);
         }
+    });
+
+    it("등산으로 시작하기 — 주 종목 둘과 따로 선 값이고, 등산을 쓸 수 있는 회원만 고른다", () => {
+        expect(isStartSport("HIKING")).toBe(true);
+        expect(isStartSport("GOLF")).toBe(true);
+        expect(isStartSport("TENNIS")).toBe(false);
+        // 주 종목을 추정하는 식 · 문의 화면은 당구 · 골프만 안다
+        expect(isPrimarySport("HIKING")).toBe(false);
+        const member = read("server/routes/modules/member.ts");
+        const route = member.slice(member.indexOf('router.post("/me/primary-sport"'));
+        expect(route.slice(0, 900)).toContain('if (sport === "HIKING") {');
+        expect(route.slice(0, 900)).toContain("if (!hikingAllowed(me,");
+        expect(read("client/src/contexts/SportContext.tsx")).toContain('!(primary === "HIKING" && hikingOk)) return;');
+    });
+
+    it("코스가 없는 명산 — 이웃 봉우리의 코스를 옮기지 않고 이어서 보여 준다", () => {
+        expect(courseViaNote("노적봉")).toBe("노적봉 쪽에서 이 산의 정상을 지나는 길이에요.");
+        expect(courseViaNote(null)).toBe("");
+        const repo = read("server/storage/hiking.ts");
+        expect(repo).toContain("from hiking_course_links l join hiking_courses c on c.id = l.course_id");
+        const script = read("server/scripts/hiking-link-courses.ts");
+        // 정상 인증이 되는 거리 안을 지나는 코스만, 제 코스가 없는 명산에만
+        expect(script).toContain("const LINK_NEAR_M = SUMMIT_RADIUS_M;");
+        expect(script).toContain("Number(m.tier) === 1 && Number(m.own) === 0");
+        expect(read("migrations/hiking_course_links.sql")).toContain("primary key (mountain_id, course_id)");
+    });
+
+    it("산악회가 함께 오른 산 — 누가 올랐는지는 싣지 않고, 산악회일 때만 그 조각을 받는다", () => {
+        const repo = read("server/storage/hikingStamps.ts");
+        expect(repo).toContain("having count(distinct s.member_id) >= ${CREW_TOGETHER}");
+        expect(repo).toContain("cm.role <> 'pending'");
+        expect(repo).toContain("c.sport_category = 'HIKING'");
+        const fn = repo.slice(repo.indexOf("export async function crewSummits"));
+        expect(fn).not.toMatch(/member_id as|name as|nickname/);
+        const tab = read("client/src/components/hiq/tabs/CrewHomeTab.tsx");
+        expect(tab).toContain('const CrewSummits = lazy(() => import("@/hiking/crew/CrewSummits")');
+        expect(tab).toContain("{isHiking && <Suspense fallback={null}><CrewSummits");
     });
 
     it("등산의 알림함 — 산악회의 알림만 모이고, 당구 알림함에는 섞이지 않는다", () => {

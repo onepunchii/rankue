@@ -71,6 +71,8 @@ export const OSM_NOTE = "산의 위치 · 높이 자료: 산림청 · © OpenStr
 export function courseFacts(c: { km: number; gainM: number }): { km: string; gain: string; time: string } {
     return { km: `${(Math.round(c.km * 10) / 10).toString()}km`, gain: `${c.gainM.toLocaleString("en-US")}m`, time: `약 ${durationText(walkMinutes(c.km, c.gainM))}` };
 }
+/** 이웃 봉우리의 코스를 이어 보여 줄 때의 한 줄 — "노적봉 쪽에서 이 산의 정상을 지나는 길" */
+export const courseViaNote = (via: string | null | undefined): string => (via ? `${via} 쪽에서 이 산의 정상을 지나는 길이에요.` : "");
 export const COURSE_TIME_NOTE = "걷는 시간은 거리와 오르막으로 어림한 값이에요(쉬는 시간 빼고).";
 /** 코스의 모양 — 원점 회귀 · 정상까지 · 지나가는 길 */
 export function courseShape(c: { loop: boolean; summitKm: number | null; km: number }): string {

@@ -14,7 +14,7 @@ import { useSeo } from "@/hooks/useSeo";
 import { heightText, hikingRegion, hikingRegionPath, mountainPlace } from "@shared/hikingMountains";
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "@shared/hikingGuide";
 import { HIKING_POI_NAME, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
-import { COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, MOUNTAIN_LABEL, OSM_NOTE, courseFacts, courseShape, listNames, mountainSeo } from "@shared/hikingPage";
+import { COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, MOUNTAIN_LABEL, OSM_NOTE, courseFacts, courseShape, courseViaNote, listNames, mountainSeo } from "@shared/hikingPage";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { CourseProfile, CourseTrace } from "../components/CourseParts";
 import { Fact, HikingCta, MountainRow, MountainWeather } from "../components/MountainParts";
@@ -45,6 +45,7 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
     const list = all ? shown : shown.slice(0, POI_FIRST);
     return (
         <div className="rounded-2xl bg-[#F4EFE3] p-3.5 text-[#0E2A33]" data-testid={`course-${c.id}`}>
+            {c.via && <p className="mb-2.5 text-[13px] leading-snug text-[#8A5E00] break-keep" data-testid="course-via">{courseViaNote(c.via)}</p>}
             <ul className="flex divide-x divide-[#0E2A331F] text-center">
                 {([[f.km, "거리"], [f.gain, "오르막"], [f.time, "걷는 시간"]] as const).map(([v, k]) => (
                     <li key={k} className="flex-1 px-1">

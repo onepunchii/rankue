@@ -12,7 +12,7 @@ import { HIKING_POI_NAME, hikingPoiTitle, type HikingPoiKind } from "../../share
 import {
     COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, HIKING_CTA, HIKING_GRADE_NOTE, HIKING_H1, HIKING_HUB_PATH, HIKING_NAV_LABEL, HIKING_PACK_INTRO, HIKING_PACK_LABEL, HIKING_PACK_PATH, HIKING_PACK_SEO,
     HIKING_PIN_NOTE, HIKING_STAMPS_INTRO, HIKING_STAMPS_PATH, HIKING_STAMPS_SEO, HIKING_TAGLINE, MOUNTAIN_LABEL, MOUNTAIN_PATCH_NOTE, OSM_NOTE,
-    courseFacts, courseShape, hikingHubSeo, hikingListPath, hikingListSeo, hikingMountainPath, hikingRegionPath, hikingRegionSeo, kmRange, listNames, mountainSeo,
+    courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListPath, hikingListSeo, hikingMountainPath, hikingRegionPath, hikingRegionSeo, kmRange, listNames, mountainSeo,
 } from "../../shared/hikingPage.js";
 import { HIKING_GRADES } from "../../shared/hikingGrade.js";
 import {
@@ -126,7 +126,7 @@ function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: n
         const count = (k: HikingPoiKind) => on.filter((p) => p.kind === k).length;
         const bits = [`거리 ${f.km}`, `오르막 ${f.gain}`, `걷는 시간 ${f.time}`, courseShape(c), `해발 ${c.minM.toLocaleString("en-US")}~${c.maxM.toLocaleString("en-US")}m`,
             count("SIGN") ? `갈림길 ${count("SIGN")}곳` : "", count("DANGER") ? `위험 구간 ${count("DANGER")}곳` : "", count("SHELTER") ? `대피소 ${count("SHELTER")}곳` : ""].filter(Boolean);
-        return `      <li><strong>${esc(`코스 ${c.seq}`)}</strong> — ${esc(bits.join(" · "))}</li>`;
+        return `      <li><strong>${esc(`코스 ${c.seq}`)}</strong> — ${esc(bits.join(" · "))}${c.via ? ` ${esc(courseViaNote(c.via))}` : ""}</li>`;
     });
     const named = NAMED_KINDS.map((k) => ({ k, items: d.pois.filter((p) => p.kind === k).map((p) => hikingPoiTitle(p)).filter((t, i, a) => a.indexOf(t) === i).slice(0, NAMED_MAX) })).filter((x) => x.items.length > 0);
     const body = `<main>

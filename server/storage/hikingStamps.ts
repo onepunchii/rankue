@@ -96,3 +96,31 @@ export async function syncHikingAwards(memberId: string, mountains: readonly Sta
         throw e;
     }
 }
+
+// ── 산악회가 함께 오른 산 ─────────────────────────────────────────────
+export interface CrewSummitRow { mountainId: string; firstDay: string; times: number; people: number }
+/**
+ * 산악회가 **함께** 오른 산 — 같은 날(한국 날짜) 그 산의 정상에서 인증한 회원이 CREW_TOGETHER 명 이상인 날이 있는 산.
+ * 한 사람이 혼자 오른 산은 산악회의 도장이 아니다(그것은 그 사람의 도장이다). 가입 대기 중인 사람은 세지 않는다.
+ * 돌려주는 것은 산 · 처음 함께 오른 날 · 함께 오른 횟수 · 가장 많이 모인 사람 수뿐 — 누가 올랐는지는 싣지 않는다.
+ */
+export const CREW_TOGETHER = 2;
+export async function crewSummits(crewId: string): Promise<CrewSummitRow[]> {
+    try {
+        const r = await rows<any>(sql`
+            with days as (
+                select s.mountain_id, s.day, count(distinct s.member_id)::int as n
+                from hiking_summits s
+                join hiq_crew_members cm on cm.member_id = s.member_id and cm.crew_id = ${crewId}::uuid and cm.role <> 'pending'
+                join hiq_crews c on c.id = cm.crew_id and c.sport_category = 'HIKING'
+                where s.verified
+                group by s.mountain_id, s.day
+                having count(distinct s.member_id) >= ${CREW_TOGETHER}
+            )
+            select mountain_id, min(day) as first_day, count(*)::int as times, max(n)::int as people from days group by mountain_id order by min(day), mountain_id`);
+        return r.map((x) => ({ mountainId: x.mountain_id, firstDay: String(x.first_day), times: Number(x.times), people: Number(x.people) }));
+    } catch (e) {
+        if (missingTable(e)) return [];
+        throw e;
+    }
+}

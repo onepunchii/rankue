@@ -11,7 +11,7 @@ export interface MountainSummary {
     region: string | null; sido: string | null; sigungu: string | null; tier: number;
     lists: string[]; kfsNo: number | null; traits: string[]; courses: number; minKm: number | null; maxKm: number | null; hasGuide: boolean; subtitle: string | null;
 }
-export interface MountainCourse { id: string; seq: number; km: number; gainM: number; lossM: number; minM: number; maxM: number; loop: boolean; summitKm: number | null; line: LinePoint[] }
+export interface MountainCourse { id: string; seq: number; km: number; gainM: number; lossM: number; minM: number; maxM: number; loop: boolean; summitKm: number | null; line: LinePoint[]; via?: string | null }
 export interface MountainPoi { id: string; kind: HikingPoiKind; name: string; note: string | null; lat: number; lng: number; altM: number | null; courseId: string | null; km: number | null }
 export interface MountainDetail extends MountainSummary {
     peakName: string | null; aliases: string[]; dong: string | null; guide: MountainGuide | null; poiCounts: Record<string, number>;

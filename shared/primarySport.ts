@@ -9,6 +9,13 @@ export type PrimarySport = "BILLIARDS" | "GOLF";
 
 export const isPrimarySport = (v: unknown): v is PrimarySport => v === "BILLIARDS" || v === "GOLF";
 
+/**
+ * 앱을 열 때 시작하는 종목(2026-10-13) — 주 종목 둘에 등산을 더한 것. 등산은 그것을 쓸 수 있는 회원만 고른다(서버가 확인한다 — server/lib/hikingAccess).
+ * PrimarySport 를 넓히지 않고 따로 둔다: 주 종목을 추정하는 식 · 문의 화면의 종목 표시는 당구 · 골프만 안다.
+ */
+export type StartSport = PrimarySport | "HIKING";
+export const isStartSport = (v: unknown): v is StartSport => isPrimarySport(v) || v === "HIKING";
+
 /** 아직 안 고른 회원의 기본값 — 골프 라운드·조인/부킹 흔적이 있으면 골프, 아니면 당구 */
 export function suggestPrimarySport(signals: { golfRounds: number; golfPosts: number; golfRequests: number }): PrimarySport {
     return signals.golfRounds + signals.golfPosts + signals.golfRequests > 0 ? "GOLF" : "BILLIARDS";

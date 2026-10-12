@@ -3097,6 +3097,8 @@ export const ko: Dict = {
   "primarySport.settingsDesc": "앱을 열면 이 종목으로 시작해요",
   "primarySport.savedGolf": "이제 골프로 시작해요",
   "primarySport.savedBilliards": "이제 당구로 시작해요",
+  "primarySport.hiking": "등산",
+  "primarySport.savedHiking": "이제 등산으로 시작해요",
   "settings.notifSportBilliards": "당구",
   "settings.notifSportGolf": "골프",
   "settings.notificationsDesc": "대결 신청·크루 소식을 알림으로 받아요",

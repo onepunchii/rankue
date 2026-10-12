@@ -3095,6 +3095,8 @@ const tr: Dict = {
   "primarySport.settingsDesc": "Uygulama bu sporla açılır",
   "primarySport.savedGolf": "Uygulama artık golfle açılıyor",
   "primarySport.savedBilliards": "Uygulama artık bilardoyla açılıyor",
+  "primarySport.hiking": "Doğa yürüyüşü",
+  "primarySport.savedHiking": "Artık doğa yürüyüşüyle başlıyor",
   "settings.notifSportBilliards": "Bilardo",
   "settings.notifSportGolf": "Golf",
   "settings.notificationsDesc": "Meydan okumalar ve ekip haberleri için bildirim al",

@@ -361,7 +361,7 @@ export default function HiqSettings() {
                 <NotificationKinds golfAllowed={!!member?.golfAccess} />
 
                 {/* 주 종목(2026-10-01) — 앱을 열면 이 종목으로 시작한다. 골프를 쓰는 회원에게만 */}
-                {member?.golfAccess && <PrimarySportSetting current={(member as any)?.primarySport ?? null} />}
+                {member?.golfAccess && <PrimarySportSetting current={(member as any)?.primarySport ?? null} hiking={(member as any)?.hikingAccess === true} />}
 
                 {/* 친구 접속(2026-10-01) — 앱 안 배너 받기·내 접속 알리기 */}
                 {member && <PresenceSettings />}

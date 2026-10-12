@@ -7,7 +7,7 @@ import { Router } from "express";
 import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { allMountains, getMountainDetail, mountainById, mountainBySlug, nearbyMountains, type MountainSummary } from "../../storage/hiking.js";
-import { addSummit, listHikingAwards, listSummits, removeRecord, syncHikingAwards } from "../../storage/hikingStamps.js";
+import { addSummit, listHikingAwards, listSummits, removeRecord, syncHikingAwards, CREW_TOGETHER, crewSummits } from "../../storage/hikingStamps.js";
 import { addTrip, listTrips } from "../../storage/hikingTrips.js";
 import { cleanTrip } from "../../../shared/hikingTrail.js";
 import { addPhoto, listPhotos, photoCounts, removePhoto } from "../../storage/hikingPhotos.js";
@@ -183,6 +183,22 @@ router.delete("/photos/:id", ...requireHikingAccess, asyncHandler(async (req: Au
     if (!gone) return sendError(res, 404, "없는 사진이에요");
     void deleteBlobs([gone.url, gone.thumbUrl]);
     return sendSuccess(res, { removed: true });
+}));
+
+// ── 산악회가 함께 오른 산 ─────────────────────────────────────────────
+/**
+ * 산악회의 도장 — 같은 날 두 사람 이상이 정상에서 인증한 산. 산악회 화면이 그린다(크루 화면은 누구나 보므로 이것도 열려 있다).
+ * 산 · 처음 함께 오른 날 · 횟수 · 모인 사람 수만 싣는다 — 누가 올랐는지는 싣지 않는다.
+ */
+router.get("/crews/:id/summits", asyncHandler(async (req: any, res: any) => {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(req.params.id))) return sendError(res, 404, "없는 산악회예요");
+    const [list, all] = await Promise.all([crewSummits(String(req.params.id)), allMountains()]);
+    const by = new Map(all.map((m) => [m.id, m]));
+    res.set("Cache-Control", "public, max-age=60, s-maxage=120");
+    return sendSuccess(res, {
+        together: CREW_TOGETHER,
+        mountains: list.flatMap((x) => { const m = by.get(x.mountainId); return m ? [{ ...x, name: m.name, slug: m.slug, heightM: m.heightM, region: m.region, sigungu: m.sigungu, kfs100: m.lists.includes("kfs100") }] : []; }),
+    });
 }));
 
 export default router;

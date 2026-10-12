@@ -209,9 +209,15 @@ router.get("/me/notification-prefs", requireAuth, asyncHandler(async (req: AuthR
 /** PATCH /me/notification-prefs — 보낸 카테고리만 바꾼다. 모르는 키는 버린다(normalizePrefs). */
 /** POST /me/primary-sport { sport } — 주 종목 고르기·바꾸기(2026-10-01). 가입 화면·처음 한 번 묻는 창·설정이 같이 쓴다 */
 router.post("/me/primary-sport", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const { isPrimarySport } = await import("../../../shared/primarySport.js");
+    const { isStartSport } = await import("../../../shared/primarySport.js");
     const sport = req.body?.sport;
-    if (!isPrimarySport(sport)) return sendError(res, 400, "err.member.badSport");
+    if (!isStartSport(sport)) return sendError(res, 400, "err.member.badSport");
+    // 등산으로 시작하기는 등산을 쓸 수 있는 회원만(2026-10-13) — 화면만 가리면 주소로 뚫린다
+    if (sport === "HIKING") {
+        const me = await storage.getMemberById(req.userId!);
+        const myProfile = me?.profileId ? await storage.getProfile(me.profileId) : null;
+        if (!hikingAllowed(me, (myProfile as { role?: string | null } | null | undefined)?.role)) return sendError(res, 400, "err.member.badSport");
+    }
     await storage.updateMember(req.userId!, { primarySport: sport });
     return sendSuccess(res, { primarySport: sport });
 }));

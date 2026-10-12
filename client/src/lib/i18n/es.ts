@@ -3095,6 +3095,8 @@ const es: Dict = {
   "primarySport.settingsDesc": "La app se abre en este deporte",
   "primarySport.savedGolf": "Ahora la app se abre en golf",
   "primarySport.savedBilliards": "Ahora la app se abre en billar",
+  "primarySport.hiking": "Senderismo",
+  "primarySport.savedHiking": "Ahora empieza con senderismo",
   "settings.notifSportBilliards": "Billar",
   "settings.notifSportGolf": "Golf",
   "settings.notificationsDesc": "Recibe avisos de desafíos y novedades de tu crew",

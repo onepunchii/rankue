@@ -3095,6 +3095,8 @@ const vi: Dict = {
   "primarySport.settingsDesc": "Ứng dụng mở ở môn này",
   "primarySport.savedGolf": "Giờ ứng dụng mở ở golf",
   "primarySport.savedBilliards": "Giờ ứng dụng mở ở bi-a",
+  "primarySport.hiking": "Leo núi",
+  "primarySport.savedHiking": "Từ giờ sẽ bắt đầu với leo núi",
   "settings.notifSportBilliards": "Bi-a",
   "settings.notifSportGolf": "Golf",
   "settings.notificationsDesc": "Nhận thông báo về lời thách đấu và tin tức crew",

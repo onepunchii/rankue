@@ -3095,6 +3095,8 @@ const en: Dict = {
   "primarySport.settingsDesc": "The app opens in this sport",
   "primarySport.savedGolf": "The app now opens in golf",
   "primarySport.savedBilliards": "The app now opens in billiards",
+  "primarySport.hiking": "Hiking",
+  "primarySport.savedHiking": "Rankue now starts with hiking",
   "settings.notifSportBilliards": "Billiards",
   "settings.notifSportGolf": "Golf",
   "settings.notificationsDesc": "Get notified about challenges and crew news",
