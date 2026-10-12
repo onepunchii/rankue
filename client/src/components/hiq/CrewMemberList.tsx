@@ -30,6 +30,7 @@ import { CREW_BTN, CREW_CARD, CREW_TEXT, CrewEmpty, CrewRoleBadge, IconButton } 
 import { MemberSearchBar } from "@/components/hiq/club/MemberSearchBar";
 import { golfScoreOf, memberStat } from "@/components/hiq/club/memberStat";
 import { filterSortMembers, type MemberSort } from "@shared/crewManage";
+import { TierAvatarBadge, TierNameChip } from "@/components/hiq/TierAvatarBadge";
 
 // --- Types ---
 interface EnhancedHiqMember extends HiqMember {
@@ -276,6 +277,8 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
                                 {profileLine(selectedMember.member) && (
                                     <p className={cn(CREW_TEXT.sub, "mb-2")}>{profileLine(selectedMember.member)}</p>
                                 )}
+                                {/* 한 사람을 크게 보여 주는 창에서는 글자로 밝힌다 — "온라인 대전 골드"(실전 다마 · RP 와 헷갈리지 않게) */}
+                                <TierNameChip memberId={selectedMember.member.id} className="mb-2" />
 
                                 <MemberStatsDisplay
                                     sportCategory={sportCategory}
@@ -509,6 +512,8 @@ function MemberListItem({ item, currentMemberId, sportCategory, gameType, onClic
                         {m.nickname?.[0] || m.name?.[0]}
                     </AvatarFallback>
                 </Avatar>
+                {/* 온라인 대전 등급(있는 사람만, 2026-10-12) */}
+                <TierAvatarBadge memberId={m.id} size={22} className="-bottom-1 -right-1.5" />
             </div>
 
             {/* Identity */}

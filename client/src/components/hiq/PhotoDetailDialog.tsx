@@ -161,7 +161,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
             >
                 <header className="flex items-center gap-2 pl-1 pr-2 pt-[env(safe-area-inset-top)] min-h-14 border-b border-surface-line shrink-0">
                     <IconButton label={t("crewPost.close")} onClick={() => onOpenChange(false)}><LucideX /></IconButton>
-                    <CrewAvatar src={photo.author?.profileImageUrl} name={photo.author?.name} size={32} />
+                    <CrewAvatar src={photo.author?.profileImageUrl} name={photo.author?.name} size={32} memberId={photo.uploaderId} />
                     <div className="flex-1 min-w-0">
                         <DialogTitle className="text-[15px] font-semibold text-ink-1 truncate">{photo.author?.name}</DialogTitle>
                         <p className={CREW_TEXT.caption}>
@@ -244,7 +244,7 @@ export function PhotoDetailDialog({ open, onOpenChange, photo, isAdmin, currentM
                             <ul className="space-y-4">
                                 {comments.map((comment) => (
                                     <li key={comment.id} className="flex gap-3">
-                                        <CrewAvatar src={comment.author.profileImageUrl} name={comment.author.name} size={32} />
+                                        <CrewAvatar src={comment.author.profileImageUrl} name={comment.author.name} size={32} memberId={comment.authorId} />
                                         <div className="flex-1 min-w-0 space-y-0.5">
                                             <div className="flex items-baseline gap-2">
                                                 <span className="text-[13px] font-semibold text-ink-1 truncate">{comment.author.name}</span>

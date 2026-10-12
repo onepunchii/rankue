@@ -11,6 +11,7 @@ import { GameResultCard } from "./GameResultCard";
 import { ReportDialog } from "./ReportDialog";
 import { BOARD_KEYS, invalidateCommunityPosts, type CommunityPost } from "./types";
 import { appConfirm } from "@/components/AppDialog";
+import { TierAvatarBadge } from "@/components/hiq/TierAvatarBadge";
 
 interface CommunityPostCardProps {
     post: CommunityPost;
@@ -83,14 +84,18 @@ export const CommunityPostCard = ({ post, myId, showBoardChip, onClick, detail, 
             {/* 작성자 + 실력 뱃지 + 시간 */}
             <header className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5 min-w-0">
-                    <div className="w-9 h-9 shrink-0 rounded-full bg-black/[0.06] overflow-hidden">
-                        {post.author?.profileImageUrl ? (
-                            <img src={post.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
-                        ) : (
-                            <div className="w-full h-full flex items-center justify-center text-[12px] font-bold text-black/40">
-                                {post.author?.name?.charAt(0)}
-                            </div>
-                        )}
+                    {/* 사진 상자는 넘치는 것을 자른다 — 글쓴이의 온라인 대전 등급 배지는 바깥 상자에(2026-10-12, 있는 사람만) */}
+                    <div className="relative shrink-0">
+                        <div className="w-9 h-9 rounded-full bg-black/[0.06] overflow-hidden">
+                            {post.author?.profileImageUrl ? (
+                                <img src={post.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
+                            ) : (
+                                <div className="w-full h-full flex items-center justify-center text-[12px] font-bold text-black/40">
+                                    {post.author?.name?.charAt(0)}
+                                </div>
+                            )}
+                        </div>
+                        <TierAvatarBadge memberId={post.authorId} size={17} className="-bottom-1 -right-1.5" />
                     </div>
                     <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">

@@ -19,6 +19,7 @@ import type { CommunityComment, CommunityPost } from "@/components/hiq/community
 import type { HiqMember } from "@shared/schema";
 import { ShareButton } from "@/components/hiq/ShareButton";
 import { appConfirm } from "@/components/AppDialog";
+import { TierAvatarBadge } from "@/components/hiq/TierAvatarBadge";
 
 interface PostDetail extends CommunityPost {
     comments: CommunityComment[];
@@ -116,14 +117,18 @@ export default function HiqCommunityPost() {
         const isMine = me?.id === c.authorId;
         return (
             <div className="flex gap-2.5">
-                <div className={`${avatarSize} shrink-0 rounded-full bg-black/[0.06] overflow-hidden`}>
-                    {c.author?.profileImageUrl ? (
-                        <img src={c.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
-                    ) : (
-                        <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-black/40">
-                            {c.author?.name?.charAt(0)}
-                        </div>
-                    )}
+                {/* 사진 상자는 넘치는 것을 자른다 — 댓글 쓴 사람의 온라인 대전 등급 배지는 바깥 상자에(2026-10-12, 있는 사람만) */}
+                <div className="relative shrink-0 self-start">
+                    <div className={`${avatarSize} rounded-full bg-black/[0.06] overflow-hidden`}>
+                        {c.author?.profileImageUrl ? (
+                            <img src={c.author.profileImageUrl} className="w-full h-full object-cover" alt="" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-[11px] font-bold text-black/40">
+                                {c.author?.name?.charAt(0)}
+                            </div>
+                        )}
+                    </div>
+                    <TierAvatarBadge memberId={c.authorId} size={isReply ? 14 : 15} className="-bottom-1 -right-1.5" />
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 flex-wrap">

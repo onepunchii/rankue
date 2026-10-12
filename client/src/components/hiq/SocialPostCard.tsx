@@ -83,7 +83,7 @@ export function SocialPostCard({ post, isMember, isAdmin, currentMemberId }: Soc
         <article className={cn(CREW_CARD, "flex flex-col gap-3")}>
             {/* 머리: 글쓴이 · 역할 · 시각 · 메뉴 */}
             <header className="flex items-center gap-3 -mt-1">
-                <CrewAvatar src={post.author?.profileImageUrl} name={post.author?.name} size={36} />
+                <CrewAvatar src={post.author?.profileImageUrl} name={post.author?.name} size={36} memberId={post.authorId} />
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5 min-w-0">
                         <span className="text-[15px] font-semibold text-ink-1 truncate">{post.author?.name}</span>

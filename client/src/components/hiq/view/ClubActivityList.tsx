@@ -720,7 +720,7 @@ function ParticipantsSheet({ activity, onClose }: { activity: any | null; onClos
                     <ul className="mt-3 flex flex-col">
                         {participants.map((p: any, i: number) => (
                             <li key={p.memberId ?? i} className="flex items-center gap-3 min-h-12 border-t border-surface-line first:border-0">
-                                <CrewAvatar src={p.member?.profileImageUrl} name={p.member?.name} size={32} />
+                                <CrewAvatar src={p.member?.profileImageUrl} name={p.member?.name} size={32} memberId={p.memberId} />
                                 <span className="text-[15px] font-medium text-ink-1 truncate">{p.member?.name}</span>
                             </li>
                         ))}

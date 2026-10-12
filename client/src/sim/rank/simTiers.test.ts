@@ -83,3 +83,53 @@ describe("사진 옆 배지(TierAvatarBadge)", () => {
         expect(read("server/storage/chat.repo.ts")).toContain("peerId: others.length === 1 ? others[0].id : null,");
     });
 });
+
+/**
+ * 크루 · 커뮤니티(2026-10-12 오너: "크루랑 커뮤니티도 붙여주고").
+ * 크루 화면은 공용 사진(CrewAvatar)에 memberId 를 주면 배지가 붙는다. 커뮤니티는 글쓴이 · 댓글 쓴 사람의 사진 옆.
+ */
+describe("크루 · 커뮤니티의 배지", () => {
+    it("공용 사진(CrewAvatar): memberId 를 줄 때만 바깥 상자와 배지가 생긴다 — 안 주면 예전 그대로", () => {
+        const ui = read("client/src/components/hiq/crew-ui/index.tsx");
+        expect(ui).toContain("if (!memberId) return face;");
+        expect(ui).toContain('<span className="relative shrink-0 inline-flex" style={{ width: size, height: size }}>');
+        expect(ui).toContain("<TierAvatarBadge memberId={memberId} size={Math.max(14, Math.round(size * 0.46))}");
+    });
+
+    it("크루: 멤버 목록 · 가입 관리 · 게시글과 댓글 · 사진과 댓글 · 모임 참가자 · 투표한 사람", () => {
+        const list = read("client/src/components/hiq/CrewMemberList.tsx");
+        expect(list).toContain("<TierAvatarBadge memberId={m.id} size={22}");
+        // 한 사람을 크게 보여 주는 창에서는 글자로 밝힌다
+        expect(list).toContain("<TierNameChip memberId={selectedMember.member.id}");
+        expect(read("client/src/components/hiq/club-settings/ClubMemberTab.tsx").match(/memberId=\{m\.member\.id\}/g)).toHaveLength(2);
+        expect(read("client/src/components/hiq/SocialPostCard.tsx")).toContain("memberId={post.authorId}");
+        const post = read("client/src/components/hiq/PostDetailDialog.tsx");
+        expect(post).toContain("memberId={post?.authorId}");
+        expect(post).toContain("memberId={comment.authorId}");
+        const photo = read("client/src/components/hiq/PhotoDetailDialog.tsx");
+        expect(photo).toContain("memberId={photo.uploaderId}");
+        expect(photo).toContain("memberId={comment.authorId}");
+        expect(read("client/src/components/hiq/view/ClubActivityList.tsx")).toContain("memberId={p.memberId}");
+        expect(read("client/src/components/hiq/poll/PollVotersSheet.tsx")).toContain("memberId={v.id}");
+    });
+
+    it("겹쳐 쌓는 작은 사진 줄에는 붙이지 않는다(배지가 옆 사진을 가린다)", () => {
+        const acts = read("client/src/components/hiq/view/ClubActivityList.tsx");
+        const stacked = acts.split("\n").find((l) => l.includes("<CrewAvatar key={p.memberId ?? idx}"))!;
+        expect(stacked).toBeTruthy();
+        expect(stacked).not.toContain("memberId={");
+    });
+
+    it("커뮤니티: 글쓴이와 댓글 쓴 사람 — 사진 상자 바깥의 relative 상자에", () => {
+        const card = read("client/src/components/hiq/community/CommunityPostCard.tsx");
+        expect(card).toContain("<TierAvatarBadge memberId={post.authorId}");
+        const page = read("client/src/pages/hiq/community-post.tsx");
+        expect(page).toContain("<TierAvatarBadge memberId={c.authorId}");
+        expect(page).toContain('<div className="relative shrink-0 self-start">');
+    });
+
+    it("이름 한 줄(TierNameChip)도 등급이 없거나 골프 화면이면 그리지 않는다", () => {
+        const badge = read("client/src/components/hiq/TierAvatarBadge.tsx");
+        expect(badge.match(/if \(!tier \|\| currentSport === "GOLF"\) return null;/g)).toHaveLength(2);
+    });
+});

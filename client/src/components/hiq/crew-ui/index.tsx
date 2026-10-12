@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { TierAvatarBadge } from "@/components/hiq/TierAvatarBadge";
 
 export const CREW_CARD = "rk-card p-4";
 /** 화면 제목(22) · 섹션 제목(17) · 본문(15) · 보조(13) · 캡션(12) */
@@ -197,10 +198,15 @@ export function CrewChipRow({ children, className, label }: { children: ReactNod
     );
 }
 
-/** 사람 동그라미 — 사진이 없으면 이름 첫 글자. */
-export function CrewAvatar({ src, name, size = 40, className }: { src?: string | null; name?: string | null; size?: number; className?: string }) {
+/**
+ * 사람 동그라미 — 사진이 없으면 이름 첫 글자.
+ * memberId 를 주면 오른쪽 아래에 그 사람의 온라인 대전 등급 배지가 붙는다(2026-10-12 오너: "크루랑 커뮤니티도 붙여주고").
+ * 등급이 없는 사람 · 골프 화면에서는 아무것도 붙지 않는다(TierAvatarBadge). 겹쳐 쌓는 작은 사진(여럿을 포개 보여 주는 줄)에는 주지 않는다 —
+ * 배지가 옆 사진을 가린다. memberId 를 주면 바깥에 상자가 하나 생기므로, 바깥 여백 · 테두리 클래스를 쓰는 곳에서도 주지 않는다.
+ */
+export function CrewAvatar({ src, name, size = 40, className, memberId }: { src?: string | null; name?: string | null; size?: number; className?: string; memberId?: string | null }) {
     const initial = (name ?? "").trim().charAt(0) || "?";
-    return src ? (
+    const face = src ? (
         <img src={src} alt="" loading="lazy" className={cn("shrink-0 rounded-full object-cover bg-surface-3", className)} style={{ width: size, height: size }} />
     ) : (
         <span
@@ -209,6 +215,13 @@ export function CrewAvatar({ src, name, size = 40, className }: { src?: string |
             style={{ width: size, height: size, fontSize: Math.round(size * 0.4) }}
         >
             {initial}
+        </span>
+    );
+    if (!memberId) return face;
+    return (
+        <span className="relative shrink-0 inline-flex" style={{ width: size, height: size }}>
+            {face}
+            <TierAvatarBadge memberId={memberId} size={Math.max(14, Math.round(size * 0.46))} className="-bottom-1 -right-1.5" />
         </span>
     );
 }

@@ -54,7 +54,7 @@ export function PollVotersSheet({ crewId, option, anonymous, onOpenChange }: {
                             {voters.map((v, i) => (
                                 <li key={v.id} className={i > 0 ? "border-t border-surface-line" : undefined}>
                                     <div className="flex items-center gap-3 min-h-12 py-1.5">
-                                        <CrewAvatar src={v.profileImageUrl} name={v.name} size={36} />
+                                        <CrewAvatar src={v.profileImageUrl} name={v.name} size={36} memberId={v.id} />
                                         <span className="min-w-0 truncate text-[15px] font-medium text-ink-1">{v.name}</span>
                                     </div>
                                 </li>

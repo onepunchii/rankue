@@ -146,7 +146,7 @@ export function PostDetailDialog({ open, onOpenChange, post: postProp, isAdmin, 
                     {/* 원글 */}
                     <div className="space-y-4 pb-5 border-b border-surface-line">
                         <div className="flex items-center gap-3">
-                            <CrewAvatar src={post?.author?.profileImageUrl} name={post?.author?.name} size={36} />
+                            <CrewAvatar src={post?.author?.profileImageUrl} name={post?.author?.name} size={36} memberId={post?.authorId} />
                             <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
                                     <span className="text-[15px] font-semibold text-ink-1 truncate">{post?.author?.name}</span>
@@ -210,7 +210,7 @@ export function PostDetailDialog({ open, onOpenChange, post: postProp, isAdmin, 
                             <ul className="space-y-4">
                                 {comments.map((comment) => (
                                     <li key={comment.id} className="flex gap-3">
-                                        <CrewAvatar src={comment.author.profileImageUrl} name={comment.author.name} size={32} />
+                                        <CrewAvatar src={comment.author.profileImageUrl} name={comment.author.name} size={32} memberId={comment.authorId} />
                                         <div className="flex-1 min-w-0 space-y-0.5">
                                             <div className="flex items-baseline gap-2">
                                                 <span className="text-[13px] font-semibold text-ink-1 truncate">{comment.author.name}</span>

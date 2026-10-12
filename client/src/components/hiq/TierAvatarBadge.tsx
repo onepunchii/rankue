@@ -35,4 +35,22 @@ export function TierAvatarBadge({ memberId, size = 20, className }: {
     );
 }
 
+/**
+ * 프로필 창의 **글자 한 줄** — "온라인 대전 골드". 사진 위 배지에는 글자가 없어 무엇의 등급인지 알 수 없다:
+ * 한 사람을 크게 보여 주는 창에서는 이름으로 밝힌다(실전 다마 · RP 와 헷갈리지 않게). 등급이 없거나 골프 화면이면 그리지 않는다.
+ */
+export function TierNameChip({ memberId, className }: { memberId: string | null | undefined; className?: string }) {
+    const { t } = useT();
+    const { currentSport } = useSport();
+    const tier = useSimTier(memberId);
+    if (!tier || currentSport === "GOLF") return null;
+    const name = t("sim.rank.badgeAria").replace("{tier}", t(TIERS.find((x) => x.id === tier)!.nameKey));
+    return (
+        <span className={cn("inline-flex items-center gap-1 h-7 pl-1.5 pr-2.5 rounded-pill bg-[#1e1812] text-white text-[12px] font-bold", className)} data-testid="tier-name-chip">
+            <TierEmblem tier={tier} size={20} />
+            {name}
+        </span>
+    );
+}
+
 export default TierAvatarBadge;

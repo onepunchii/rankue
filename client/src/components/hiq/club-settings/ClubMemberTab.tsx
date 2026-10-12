@@ -115,7 +115,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                             const id = m.member.id;
                             return (
                                 <li key={id} className="rk-card p-3 flex items-center gap-3">
-                                    <CrewAvatar src={m.member.profileImageUrl} name={nameOf(m)} size={40} />
+                                    <CrewAvatar src={m.member.profileImageUrl} name={nameOf(m)} size={40} memberId={m.member.id} />
                                     <div className="min-w-0 flex-1">
                                         <p className="text-[15px] font-semibold text-ink-1 truncate">{nameOf(m)}</p>
                                         <p className={cn(CREW_TEXT.caption, "rk-num")}>
@@ -160,7 +160,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                             const stat = memberStat(m.member as any, crew?.sportCategory, crew?.gameType);
                             const body = (
                                 <>
-                                    <CrewAvatar src={m.member.profileImageUrl} name={nameOf(m)} size={40} />
+                                    <CrewAvatar src={m.member.profileImageUrl} name={nameOf(m)} size={40} memberId={m.member.id} />
                                     <span className="min-w-0 flex-1 flex flex-col gap-0.5">
                                         <span className="flex items-center gap-1.5 min-w-0">
                                             <span className={cn("text-[15px] font-semibold truncate", isMe ? "text-brand" : "text-ink-1")}>{nameOf(m)}</span>
