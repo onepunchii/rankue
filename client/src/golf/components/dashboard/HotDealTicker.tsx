@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { kstDateKey, kstTime } from "@/lib/kst";
 import { DATE_STRIP_DAYS } from "../../constants/booking";
 import { useAuth } from "@/hooks/useAuth";
+import { UrgentArt } from "./HomeArt";
 
 /**
  * 홈 맨 위의 **긴급티**.
@@ -85,7 +86,9 @@ function whenLabel(datetime: string): string {
 /** 다섯 가지 상태가 나눠 쓰는 **하나뿐인** 뼈대. 크기·바탕·테두리는 여기서만 정한다. */
 // 홈 맨 위에서 4초마다 넘어가는 자리다 — 여백을 넉넉히 주면 화면의 5분의 1을 먹는다(첫 시안 156px).
 // 주황 면(2026-09-24 오너: "긴급티 배너를 전국 골프장 카드와 같은 주황으로 — 골프 색은 그린과 이 주황이 잘 어울린다"). 홈 GOLF COURSES 카드와 같은 그라데이션.
-const SHELL = "w-full rounded-2xl bg-gradient-to-br from-[#FF8A3D] to-[#E85200] shadow-lg shadow-[#FF6B00]/20 px-4 py-3 text-left transition-transform";
+// 그림(2026-10-12 오너: "이미지 써도 되니 홈에 긴급티 배너랑 …"): 오른쪽에 해가 넘어가는 그린의 깃발(UrgentArt). 뼈대는 여전히 하나다 —
+// 로딩 · 빈 상태 · 매물이 같은 그림을 같은 자리에 둔다. `relative isolate overflow-hidden` 은 그 그림을 카드 안의 맨 뒤에 가두려는 것이다.
+const SHELL = "relative isolate overflow-hidden w-full rounded-2xl bg-gradient-to-br from-[#FF8A3D] to-[#E85200] shadow-lg shadow-[#FF6B00]/20 px-4 py-3 text-left transition-transform";
 
 /** 카드 맨 위 줄: 왼쪽 배지 · 오른쪽 '언제'. */
 function TopRow({ badge, when, tone }: { badge: ReactNode; when?: string; tone: "urgent" | "lime" | "muted" }) {
@@ -129,6 +132,7 @@ export function DealCard({ deal, onOpen }: { deal: Deal; onOpen: (d: Deal) => vo
                 "active:scale-[0.995]",
             )}
         >
+            <UrgentArt />
             <TopRow
                 tone={tone}
                 /* 긴급은 날짜가 아니라 남은 시간이다 — 자정을 넘긴 티오프라도 '내일'이라고 쓰면 '긴급' 배지와 말이 어긋난다. */
@@ -251,6 +255,7 @@ export function HotDealTicker() {
     if (isLoading) {
         return (
             <div className={cn(SHELL, "mb-4 animate-pulse")} aria-hidden>
+                <UrgentArt />
                 <span className="flex items-center h-[22px]"><span className="block w-12 h-[22px] rounded-md bg-[#FFFFFF33]" /></span>
                 <span className="mt-2 block w-28 h-[30px] rounded-md bg-[#FFFFFF33]" />
                 <span className="mt-1.5 block w-40 h-3 rounded bg-[#FFFFFF26]" />
@@ -267,6 +272,7 @@ export function HotDealTicker() {
                 onClick={() => setLocation("/golf/booking-list?view=JOIN")}
                 className={cn(SHELL, "mb-4 group active:scale-[0.995]")}
             >
+                <UrgentArt />
                 <span className="flex items-center h-[22px]">
                     <span className="shrink-0 inline-flex items-center gap-1 h-[22px] px-2 rounded-md bg-[#FFFFFF33] text-[#FFFFFF] text-[10.5px] font-black">
                         <LucideTimer className="w-3 h-3" />긴급티

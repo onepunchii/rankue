@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import { useLocation } from "wouter";
 import {
     Sheet,
@@ -11,6 +10,7 @@ import {
     LucideFlag,
 } from "lucide-react";
 import { useGuestGate } from "@/components/hiq/GuestGate";
+import { HOME_ART } from "./HomeArt";
 
 interface GameModeSheetProps {
     open: boolean;
@@ -55,14 +55,12 @@ export function GameModeSheet({ open, onOpenChange, onOpenScanner }: GameModeShe
                         <div className="absolute inset-0 bg-gradient-to-b from-[#64DD17]/10 to-transparent opacity-50" />
 
                         <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center">
-                            <div className="w-[100px] h-[100px] flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                                <DotLottieReact
-                                    src="https://lottie.host/3fbea7ec-66b6-4723-b294-e3e58e01ccd1/OY1OsEbf4v.lottie"
-                                    loop
-                                    autoplay
-                                    style={{ width: '100%', height: '100%' }}
-                                />
-                            </div>
+                            {/* 홈의 RANKUE MATCH 타일과 같은 그림(2026-10-12) — 예전엔 바깥 서버에서 받아 오는 움직이는 그림이었다 */}
+                            <img
+                                src={HOME_ART.match} alt="" aria-hidden draggable={false} decoding="async"
+                                className="w-[104px] h-[104px] mb-4 rounded-[1.4rem] object-cover ring-1 ring-inset ring-[#64DD1766] group-hover:scale-105 transition-transform duration-300"
+                                style={{ objectPosition: "28% 40%" }}
+                            />
                         </div>
 
                         <div className="relative z-10 text-center">
@@ -86,14 +84,11 @@ export function GameModeSheet({ open, onOpenChange, onOpenScanner }: GameModeShe
                         <div className="absolute inset-0 bg-gradient-to-b from-[#FF4081]/5 to-transparent opacity-30" />
 
                         <div className="relative z-10 w-full flex-1 flex flex-col items-center justify-center">
-                            <div className="w-20 h-20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform duration-300">
-                                <DotLottieReact
-                                    src="https://lottie.host/1c7d117c-412c-452a-9150-e0b3ed8b5e2d/cf8pvA7Grd.lottie"
-                                    loop
-                                    autoplay
-                                    style={{ width: '100%', height: '100%' }}
-                                />
-                            </div>
+                            {/* 종이 스코어카드를 사진기 틀에 넣은 그림 — 바탕은 이 타일의 색(#1A1A1A)에 맞춰 내보냈다 */}
+                            <img
+                                src={HOME_ART.scan} alt="" aria-hidden draggable={false} decoding="async"
+                                className="w-[104px] h-[104px] mb-4 group-hover:scale-105 transition-transform duration-300"
+                            />
                         </div>
 
                         <div className="relative z-10 text-center">

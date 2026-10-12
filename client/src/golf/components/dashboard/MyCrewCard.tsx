@@ -63,9 +63,10 @@ export function MyCrewCard() {
                     </Link>
                 ) : (
                     <Link href="/club">
-                        <div className="flex flex-col items-center justify-center py-4 border-2 border-dashed border-white/5 rounded-2xl hover:bg-white/5 transition-all group cursor-pointer">
-                            <p className="text-xs font-bold text-white/20">가입된 골프 크루가 없습니다</p>
-                            <p className="text-[10px] text-white/10 mt-1">새로운 크루를 찾아보세요</p>
+                        {/* 2026-10-12: 글자가 너무 흐리고 작았다(흰색 20% · 10% / 10px) — 화면 갈무리에서 빈 상자로 보였다. 방문자 줄과 같은 밝기로 올린다 */}
+                        <div className="flex flex-col items-center justify-center py-4 border-2 border-dashed border-[#FFFFFF1F] rounded-2xl hover:bg-[#FFFFFF0D] transition-all group cursor-pointer">
+                            <p className="text-[13px] font-bold text-[#FFFFFFCC]">가입된 골프 크루가 없습니다</p>
+                            <p className="text-[12px] font-medium text-[#FFFFFF8C] mt-1">새로운 크루를 찾아보세요</p>
                         </div>
                     </Link>
                 )}

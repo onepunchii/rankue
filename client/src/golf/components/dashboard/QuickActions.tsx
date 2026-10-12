@@ -1,13 +1,12 @@
 import { motion } from "framer-motion";
 import { useLocation } from "wouter";
-import { DotLottieReact } from '@lottiefiles/dotlottie-react';
 import {
-    LucideHash,
     LucideChevronRight,
     LucideFlag,
 } from "lucide-react";
 import { useGuestGate } from "@/components/hiq/GuestGate";
 import { PassportTileArt, ShelfTileArt } from "../../stamps/HomeTileArt";
+import { JoinTileArt, MatchTileArt, MatchTileHill } from "./HomeArt";
 
 interface QuickActionsProps {
     onOpenGameMode: () => void;
@@ -41,9 +40,13 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
         <>
             {/* 가입 안내 시트 — 방문자가 타일을 눌렀을 때만 열린다(닫혀 있으면 아무것도 그리지 않는다) */}
             {gate.sheet}
-            {/* Hero Actions (Top Row) */}
+            {/* Hero Actions (Top Row).
+                2026-10-12 오너: "이미지 써도 되니 홈에 긴급티 배너랑 랭큐매치 골프코스 카드 등등 변경이 필요하고 더 완벽하게".
+                두 타일의 그림을 우리 것으로 바꿨다(HomeArt) — 도장첩 표지와 같은 포스터 화풍이다.
+                예전 RANKUE MATCH 의 골퍼는 바깥 서버에서 받아 오는 움직이는 그림, ENTER CODE 는 '#' 아이콘 하나였다.
+                타일의 면(라임 · 어두운 면에 라임 테두리)과 제목 · 굵기 · 누르면 하는 일은 그대로다. */}
             <div className="grid grid-cols-2 gap-4 mb-4 relative z-10">
-                {/* 1. Rankue Match */}
+                {/* 1. Rankue Match — 아침 티샷. 제목은 그림 아래를 덮는 앞 언덕(라임) 위에 놓인다 */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
                     onClick={() => gate.guard(onOpenGameMode, {
@@ -52,23 +55,19 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                         desc: "골프장에서 스코어를 적으면 핸디캡과 그래프가 쌓여요. 가입하면 새 라운드 화면에서 바로 이어집니다.",
                         from: "/golf/game/new?mode=match",
                     })}
-                    className="aspect-[4/5] rounded-[2rem] bg-gradient-to-br from-[#64DD17] to-[#388E3C] p-6 flex flex-col justify-between items-start text-left shadow-2xl shadow-[#64DD17]/20 group relative overflow-hidden"
+                    className="aspect-[4/5] rounded-[2rem] bg-gradient-to-br from-[#64DD17] to-[#388E3C] p-6 flex flex-col justify-end items-start text-left shadow-2xl shadow-[#64DD17]/20 group relative overflow-hidden"
                 >
-                    <div className="w-full h-32 flex items-center justify-center -mt-2">
-                        <DotLottieReact
-                            src="https://lottie.host/bdd7e9d6-727e-47b6-91a7-f1480696aa8f/k5YppJ00Hq.lottie"
-                            loop
-                            autoplay
-                            className="w-full h-full"
-                        />
-                    </div>
-                    <div>
+                    <MatchTileArt />
+                    {/* isolate — 앞 언덕(-z-10)을 이 상자 안에 가둔다: 그림보다 위, 제목보다 아래 */}
+                    <div className="relative isolate z-10 w-full">
+                        <MatchTileHill />
                         <h3 className="text-2xl font-extrabold text-[#051907] leading-none mb-1">RANKUE<br />MATCH</h3>
-                        <p className="text-xs font-semibold text-[#051907]/60">스코어 기록 · 동반자 게임</p>
+                        {/* 폭 360 기기에서 두 줄로 넘어가면 언덕이 올라와 그림을 다 가린다 — 한 줄로 묶는다(오른쪽 여백을 조금 쓴다). 더 좁으면 넘긴다 */}
+                        <p className="text-xs font-semibold tracking-tight text-[#051907B3] min-[350px]:whitespace-nowrap">스코어 기록 · 동반자 게임</p>
                     </div>
                 </motion.button>
 
-                {/* 2. Enter Code (Big) */}
+                {/* 2. Enter Code — 밤의 티 박스에 공 네 개(핀 번호 네 자리 · 네 사람의 자리), 마지막 하나가 라임 */}
                 <motion.button
                     whileTap={{ scale: 0.98 }}
                     onClick={() => gate.guard(onOpenJoin, {
@@ -77,16 +76,10 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                         // 번호 입력만 있는 화면 — 가입을 마치면 홈으로 돌아와 타일을 다시 찾지 않아도 된다
                         from: "/golf/game/new?mode=join",
                     })}
-                    className="aspect-[4/5] rounded-[2rem] bg-[#1a1a1a] border border-[#64DD17]/30 p-6 flex flex-col justify-between items-start text-left shadow-2xl shadow-[#64DD17]/10 group relative overflow-hidden"
+                    className="aspect-[4/5] rounded-[2rem] bg-[#1a1a1a] border border-[#64DD17]/30 p-6 flex flex-col justify-end items-start text-left shadow-2xl shadow-[#64DD17]/10 group relative overflow-hidden"
                 >
+                    <JoinTileArt />
                     <div className="absolute inset-0 bg-gradient-to-br from-[#64DD17]/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-
-                    {/* Pulsing Background Glow */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32 bg-[#64DD17]/10 rounded-full blur-3xl animate-pulse" />
-
-                    <div className="w-full h-32 flex items-center justify-center -mt-2 relative z-10">
-                        <LucideHash className="w-20 h-20 text-[#64DD17] group-hover:scale-110 transition-transform duration-500 drop-shadow-[0_0_15px_rgba(100,221,23,0.4)]" />
-                    </div>
                     <div className="relative z-10">
                         <h3 className="text-2xl font-extrabold text-white leading-none mb-1">ENTER<br />CODE</h3>
                         <p className="text-xs font-semibold text-[#64DD17]/80">매치 핀 번호 입력</p>

@@ -20,6 +20,12 @@
  *    a 안에 a 를 넣을 수 없어서 바깥은 div 다 — 카드 전체를 덮는 링크를 밑에 깔고, 숫자 줄만 그 위에 올린다.
  *  - 홈 바탕도 검정(#0A0A0A)이라 어두운 귀퉁이가 녹는다 — 옅은 안쪽 테두리 한 줄이 카드의 끝을 잡는다.
  *
+ * 다섯째 판(2026-10-12 오너: "이미지 써도 되니 홈에 긴급티 배너랑 랭큐매치 골프코스 카드 등등 변경이 필요하고 더 완벽하게"):
+ *  - 왼쪽 절반에 **그림**(dashboard/HomeArt CoursesArt) — 해 질 녘의 구불구불한 페어웨이, 도장첩 표지와 같은 포스터 화풍.
+ *    넷째 판의 왼쪽은 주황이 어둠으로 번지는 빈 면이었다(글이 없는 날엔 카드의 절반이 비어 보였다).
+ *  - 지도는 그대로다(크기 · 색의 뜻 · 윤곽선). 그림은 지도가 시작하는 곳에서 사라져 점의 바탕은 여전히 어둡다.
+ *  - 숫자 줄은 그림 위에 놓이게 됐다 — 바탕을 옅은 흰색에서 **짙은 유리**로 바꿨다(밝은 페어웨이 위에서도 흰 글씨가 읽힌다).
+ *
  * ⚠️ 리터럴 색만(골프 테마가 bg-white·text-white/40 같은 유틸을 바꿔 끼운다). 글자는 12px 이상.
  */
 import { useMemo } from "react";
@@ -31,6 +37,7 @@ import { hereTone } from "@shared/golfHereMap";
 import { useCourseList, useMyWatches, type CourseListItem } from "../../../lib/courseApi";
 import { CourseDotMap, DOT_COLOR, type MapDot } from "./CourseDotMap";
 import { KoreaOutline } from "./KoreaOutline";
+import { CoursesArt } from "../../dashboard/HomeArt";
 
 /**
  * 카드의 면 — 왼쪽 위(제목)의 주황이 오른쪽 아래로 가며 어둠이 된다. 타원의 가로 125% · 세로 95% 라
@@ -106,6 +113,9 @@ export function CourseHomeEntry() {
                 className="absolute inset-0 rounded-[2rem] focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-[#FFFFFF]"
             />
 
+            {/* 그림 — 왼쪽 절반의 해 질 녘 페어웨이(다섯째 판). 지도가 시작하는 곳에서 사라진다 */}
+            <CoursesArt />
+
             {/* 지도 — 오른쪽에 크게. 카드 폭의 62%, 위아래로 거의 가득(384 − 34 − 20 = 330 높이 × 0.62 ≈ 205 폭).
                 폭을 205 에서 멈춰야 넓은 화면에서도 오른쪽에 붙는다(SVG 는 남는 폭의 가운데로 간다). 허브 지도와 같은 그림·같은 색이다 */}
             <div aria-hidden="true" className="pointer-events-none absolute right-0.5 top-[34px] bottom-5 w-[62%] max-w-[205px]">
@@ -135,7 +145,7 @@ export function CourseHomeEntry() {
                                 <Link
                                     href={s.href}
                                     aria-label={s.aria}
-                                    className="pointer-events-auto relative z-10 inline-flex items-center gap-[7px] h-8 pl-[9px] pr-[11px] rounded-full bg-[#FFFFFF14] active:bg-[#FFFFFF29] transition-colors before:absolute before:-inset-y-[3.5px] before:-inset-x-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#FFFFFF]"
+                                    className="pointer-events-auto relative z-10 inline-flex items-center gap-[7px] h-8 pl-[9px] pr-[11px] rounded-full bg-[#120803BF] ring-1 ring-inset ring-[#FFFFFF24] backdrop-blur-[6px] active:bg-[#120803E6] transition-colors before:absolute before:-inset-y-[3.5px] before:-inset-x-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#FFFFFF]"
                                 >
                                     <StatMark kind={s.key} />
                                     <span className="text-[13px] font-bold text-[#FFFFFF]">{s.label}</span>
