@@ -10,6 +10,7 @@ import { apiRequest } from "@/lib/queryClient";
 import type { Fees, GolfIntent, PublicListing } from "@shared/golfCourse";
 import type { CourseWeather } from "@shared/golfWeather";
 import type { NearbyKind, NearbyResult } from "@shared/golfAround";
+import type { CourseGuide } from "@shared/golfCourseGuide";
 
 export const COURSES_KEY = "/api/hiq/golf-courses";
 
@@ -62,6 +63,8 @@ export interface CourseDetail {
     courses: { name: string; par: number; holes: number }[] | null;
     /** TGM 소개문 */
     intro: string | null;
+    /** 코스 가이드(2026-10-12) — 서버가 걸러 담아 둔 값. 없는 골프장 · 옛 응답에는 없다 */
+    guide?: CourseGuide | null;
     info: { opened: string | null; members: number | null; homepage: string | null; membershipTypes: string | null; membershipNotes: string | null } | null;
     fees: Fees | null;
     courseIds: number[];

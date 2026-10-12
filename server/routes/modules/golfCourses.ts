@@ -34,6 +34,7 @@ import { isNearbyKind, nearbySearchNames } from "../../../shared/golfAround.js";
 import { weatherPoint } from "../../../shared/golfWeatherZones.js";
 import { findLocalDish } from "../../../shared/golfLocalDish.js";
 import { summaryForViewer } from "../../lib/golfListingBlock.js";
+import { getCourseGuide } from "../../storage/golfCourseGuide.js";
 
 const router = Router();
 
@@ -363,6 +364,8 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
         kind: p.kind, holes: p.holes, parts: p.parts, courses: p.courses, intro: p.intro, info: p.info, fees: p.fees,
         courseIds: p.courseIds, updatedAt: p.updatedAt,
         logo: p.logo, grass: p.grass, play: p.play, phone: p.phone, website: p.website, feeFrom: p.feeFrom, aliases: p.aliases,
+        // 코스 가이드(2026-10-12) — 이 골프장 한 곳만 따로 읽는다(요약 묶음에는 없다). 못 읽어도 상세는 나간다
+        guide: await getCourseGuide(p.slug).catch((e) => { console.error("[golf] course guide", e); return null; }),
         bookable: p.courseIds.length > 0,
         prices: prices.map((m) => ({
             itemId: m.item_id, label: m.label, price: m.price, change: m.change, yearHigh: m.year_high, yearLow: m.year_low,

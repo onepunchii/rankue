@@ -43,6 +43,8 @@ import { SectionNav, jumpTo } from "@/golf/components/course/detail/SectionNav";
 import { Card, Section, Skel, type SectionId } from "@/golf/components/course/detail/ui";
 import { CoursePhotoGallery } from "@/golf/components/photos/CoursePhotoGallery";
 import { GolfGuestIntro } from "@/golf/components/course/GolfGuide";
+import { hasGuide } from "@shared/golfCourseGuide";
+import { CourseGuide } from "@/golf/components/course/detail/CourseGuide";
 
 function decodeSlug(raw: string | undefined): string {
     if (!raw) return "";
@@ -211,6 +213,7 @@ export default function GolfCoursePage() {
         price: d.prices.length > 0,
         fee: !!d.fees?.rows?.some((r) => r.nonMember || r.member || r.family),
         course: !!d.courses?.some((c) => c.holes > 0) || (d.parts?.filter((p) => p.holes).length ?? 0) >= 2,
+        guide: hasGuide(d.guide),
         about: !!d.intro || !!d.grass?.length || !!(d.info && (d.info.opened || d.info.members || d.info.membershipTypes)),
         map: true,
         food: true,
@@ -296,6 +299,8 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             {ids.includes("price") && <MembershipPrices key={`price:${d.slug}`} prices={d.prices} />}
             {ids.includes("fee") && d.fees && <GreenFees fees={d.fees} />}
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}
+            {/* 코스 가이드(2026-10-12) — 개요 · 코스 구성 · 대표 홀 · 시설 · 오는 길 · 팁 · 문답. 코스(파 표) 바로 아래, 소개 앞 */}
+            {ids.includes("guide") && hasGuide(d.guide) && <CourseGuide key={`guide:${d.slug}`} name={d.name} guide={d.guide} />}
             {ids.includes("about") && <AboutInfo key={`about:${d.slug}`} intro={d.intro} info={d.info} grass={d.grass} />}
             <LocationCard name={d.name} address={d.address} lat={d.lat} lng={d.lng} distance={distance} phone={d.phone} website={d.website || d.info?.homepage || null} region={d.region} tone={hereTone(d.counts, !!d.myWatch)}
                 here={here} />

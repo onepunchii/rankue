@@ -37,6 +37,8 @@ import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js"
 import { renderGolfChecklist } from "./seo/golfGuide.js";
 import { GOLF_STAMPS_RE, renderGolfStamps } from "./seo/golfStamps.js";
 import { STAMPS_HUB_PATH, STAMPS_NAV_LABEL } from "../shared/golfStampGuide.js";
+import { GUIDE_LABEL, type CourseGuide } from "../shared/golfCourseGuide.js";
+import { getCourseGuide } from "./storage/golfCourseGuide.js";
 import { renderGolfTerms, type GolfTermsRender } from "./seo/golfTerms.js";
 import { GOLF_TERMS_NAV_LABEL, GOLF_TERMS_PATH } from "../shared/golfTermsMeta.js";
 import { localDishLabel, localDishLine, localDishes } from "../shared/golfLocalDish.js";
@@ -623,7 +625,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
     return golfGone("골프장을 찾을 수 없습니다.", "요청한 골프장 정보가 없습니다.");
   }
   const rows = async (x: any) => { const r: any = await db.execute(x); return (r.rows ?? r) as any[]; };
-  const [prices, hist, rounds, photos] = await Promise.all([
+  const [prices, hist, rounds, photos, guide] = await Promise.all([
     rows(sql`select item_id, label, price, change, year_high, year_low, as_of::text as as_of
              from golf_membership_prices where slug = ${slug} order by price desc`),
     rows(sql`select h.item_id, h.d::text as d, h.price from golf_membership_price_history h
@@ -634,6 +636,8 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
       : Promise.resolve([{ n: 0 }]),
     // 회원이 공개한 라운드 사진(2026-09-30) — 화면과 같은 규칙(가려진 것·정지 계정 제외). 봇은 차단 목록이 없다.
     storage.golfPhotos.listForCourse(slug, null, COURSE_GALLERY_LIMIT).catch(() => []),
+    // 코스 가이드(2026-10-12) — 화면과 같은 값(golf_course_pages.guide). 못 읽으면 그 구역 없이 나간다
+    getCourseGuide(slug).catch(() => null),
   ]);
   const byListing = golfListingsBySlug(s);
   const listings = byListing.get(slug) ?? [];
@@ -768,6 +772,8 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
   }
 
   const introHtml = p.intro ? `\n  <h2>${esc(p.name)} 소개</h2>\n  <p>${esc(p.intro)}</p>` : "";
+  // 코스 가이드 — 화면의 '가이드' 구역과 같은 글 · 같은 순서(shared/golfCourseGuide GUIDE_LABEL)
+  const guideHtml = guide ? courseGuideHtml(p.name, guide) : "";
 
   // 라운드 사진 — figure + figcaption(사진 · 닉네임 · 달). 날짜는 달까지만(화면과 같다)
   const photoHtml = photos.length
@@ -901,7 +907,8 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
     canonical,
     // 골프장마다 자기 카드(이름·로고·그린피·시세) — 490곳이 같은 가로 그림을 쓰던 것(잘려서 '골프 490곳'만 보였다)을 대신한다
     image: roundImage ?? { url: golfCourseCardUrl(ORIGIN, slug), width: CARD_SIZE, height: CARD_SIZE, alt: `${p.name} — 랭큐 골프` },
-    jsonLd: [{ "@context": "https://schema.org", "@graph": [course, crumbs.ld] }],
+    // 자주 묻는 것 — 골프장마다 다른 문답이라 페이지마다 단다(허브의 공통 문답과 다르다)
+    jsonLd: [{ "@context": "https://schema.org", "@graph": [course, crumbs.ld, ...(guide?.faq.length ? [{ "@type": "FAQPage", mainEntity: guide.faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) }] : [])] }],
     body: `<main>
   ${crumbs.html}
   <img src="${esc(golfCourseCardUrl(ORIGIN, slug))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(cardAlt(p.name, "골프장"))}" loading="eager">
@@ -912,11 +919,25 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
   <dl>
     ${dlHtml}
   </dl>
-  ${mapHtml}${listingHtml}${weatherHtml}${feeHtml}${priceHtml}${courseHtml}${introHtml}${dishHtml}${photoHtml}${nearHtml}${hubHtml}
+  ${mapHtml}${listingHtml}${weatherHtml}${feeHtml}${priceHtml}${courseHtml}${guideHtml}${introHtml}${dishHtml}${photoHtml}${nearHtml}${hubHtml}
   ${hubNav("ko")}
 </main>`,
   });
   return { status: 200, tag: `golf-course:${encodeURIComponent(slug)}`, html };
+}
+/** 코스 가이드의 검색용 화면 — 화면(CourseGuide.tsx)과 같은 구역 · 같은 순서. 값이 없는 구역은 내지 않는다 */
+export function courseGuideHtml(name: string, g: CourseGuide): string {
+  const L = GUIDE_LABEL;
+  const p = (t: string | null) => (t ? `\n  <p>${esc(t)}</p>` : "");
+  return `\n  <h2>${esc(`${name} ${L.section}`)}</h2>${p(g.overview)}`
+    + (g.courses.length ? `\n  <h3>${esc(L.courses)}</h3>\n  <ul>\n  ${g.courses.map((c) => `<li><strong>${esc(c.name)}</strong>${c.holes ? ` ${c.holes}홀` : ""}${c.desc ? ` — ${esc(c.desc)}` : ""}</li>`).join("\n  ")}\n  </ul>` : "")
+    + (g.layout ? `\n  <h3>${esc(L.layout)}</h3>${p(g.layout)}` : "")
+    + (g.signature.length ? `\n  <h3>${esc(L.signature)}</h3>\n  <ul>\n  ${g.signature.map((h) => `<li><strong>${esc(h.hole)}</strong> — ${esc(h.desc)}</li>`).join("\n  ")}\n  </ul>` : "")
+    + (g.facilities ? `\n  <h3>${esc(L.facilities)}</h3>${p(g.facilities)}` : "")
+    + (g.access ? `\n  <h3>${esc(L.access)}</h3>${p(g.access)}` : "")
+    + (g.tips.length ? `\n  <h3>${esc(L.tips)}</h3>\n  <ul>\n  ${g.tips.map((t) => `<li>${esc(t)}</li>`).join("\n  ")}\n  </ul>` : "")
+    + (g.faq.length ? `\n  <h3>${esc(L.faq)}</h3>\n  <dl>\n  ${g.faq.map((f) => `<dt>${esc(f.q)}</dt>\n  <dd>${esc(f.a)}</dd>`).join("\n  ")}\n  </dl>` : "")
+    + `\n  <p>${esc(L.note)}</p>`;
 }
 /** 티타임 그린피로 믿을 만한 값(1천원~200만원). 입력 실수(27 → 27원)가 가격 범위를 망치지 않게. */
 function l0(v: number): boolean { return Number.isFinite(v) && v >= 1000 && v <= 2_000_000; }

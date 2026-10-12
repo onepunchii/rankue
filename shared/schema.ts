@@ -834,6 +834,11 @@ export const golfCoursePages = pgTable("golf_course_pages", {
    * 적재 스크립트(golf-course-pages.ts --write)는 여기 적힌 칸을 원본 자료 값으로 덮지 않는다.
    */
   adminKeep: text("admin_keep").array().default([]).notNull(),
+  /**
+   * 코스 가이드(2026-10-12) — 개요 · 코스 구성 · 코스 특징 · 대표 홀 · 시설 · 오는 길 · 팁 · 문답(shared/golfCourseGuide.ts CourseGuide).
+   * 공개 자료를 근거로 정리한 글을 규칙으로 걸러 담는다. 적재 스크립트는 이 칸을 건드리지 않는다. 생성 SQL: migrations/golf_course_guide.sql
+   */
+  guide: jsonb("guide"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (t) => [index("golf_course_pages_region_idx").on(t.region, t.city)]);
 
