@@ -482,7 +482,7 @@ function getTabTitle(tab: string) {
 const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     dashboard: "밀린 일과 오늘 접속을 먼저 봅니다.",
     today: "한국 시간 0시부터 앱을 연 회원 — 1분마다 새로 읽습니다.",
-    visitors: "웹으로 온 사람이 어디로 들어와 무엇을 보고 누르는지 — 1분마다 새로 읽습니다.",
+    visitors: "웹과 앱에서 사람들이 어디로 들어와 무엇을 보고 누르는지 — 1분마다 새로 읽습니다.",
     members: "누르면 상세 — 정보 수정·경기 기록·알림·PIN·정지.",
     push: "받는 사람을 고르고, 미리보기로 확인한 뒤 보냅니다.",
     moderation: "신고는 접수 후 24시간 안에 처리해 주세요.",

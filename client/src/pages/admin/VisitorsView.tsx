@@ -7,8 +7,9 @@
  *
  *  · 사람 = 브라우저 하나(난수 ID). 같은 사람이 폰·PC 로 오면 둘로 센다. 이름·IP 는 모으지 않는다(로그인한 사람만 회원 이름이 붙는다).
  *  · 주소는 화면 종류로 묶었다("/golf/course/…"). 낱개 주소는 한 사람의 발자국에서 본다.
- *  · 웹으로 온 사람만이다 — 앱 안의 움직임은 모으지 않는다(shared/uiTrail TRAIL_IN_APP). 채팅·경기 중 화면은 화면 이동만 남는다.
- *  · 자료는 2026-10-08 부터 쌓이고 60일이 지나면 지운다.
+ *  · 어디서: 웹(기본) · 앱 · 전체. 앱 안의 움직임은 2026-10-12 부터 모은다(shared/uiTrail). 가입 깔때기·유입처는 웹 손님 이야기라 기본이 웹이다.
+ *  · 채팅·크루·경기 중 화면은 화면 이동만 남는다.
+ *  · 자료는 웹 2026-10-08 · 앱 2026-10-12 부터 쌓이고 60일이 지나면 지운다.
  *  · 회원 이름이 들어 있어 캐시에 남기지 않는다(gcTime 0 — localStorage 스냅샷에도 안 남는다).
  */
 import { useState } from "react";
@@ -16,10 +17,11 @@ import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { apiRequest } from "@/lib/queryClient";
 import { LucideRefreshCw } from "@/lib/icons";
-import { TRAIL_KEEP_DAYS, pageKind } from "@shared/uiTrail";
+import { TRAIL_KEEP_DAYS, TRAIL_SINCE, pageKind } from "@shared/uiTrail";
 import { EmptyState, FilterChips, KpiTile, Panel, Pill, SHEET_SAFE_TOP } from "./adminUtils";
 
 type Who = "guest" | "member" | "all";
+type Where = "web" | "app" | "all";
 type Days = "1" | "7" | "30";
 interface Summary {
     days: number; who: Who;
@@ -30,11 +32,12 @@ interface Summary {
     hourly: number[]; refs: { ref: string; n: number }[]; signups: number;
     daily: { d: string; guests: number; members: number }[];
 }
-interface Visitor { visitor: string; member: boolean; memberId: string | null; name: string | null; pages: number; clicks: number; opened: boolean; firstAt: string; lastAt: string; stay: number; entry: string | null; exit: string | null; ref: string | null; device: string | null }
+interface Visitor { visitor: string; member: boolean; memberId: string | null; name: string | null; pages: number; clicks: number; opened: boolean; firstAt: string; lastAt: string; stay: number; entry: string | null; exit: string | null; ref: string | null; device: string | null; os?: string | null }
 interface Trail { visitor: string; firstDay: string | null; events: { id: number; name: string; path: string | null; meta: Record<string, unknown> | null; at: string; member: boolean }[] }
 
 const BASE = "/api/hiq/admin/visitors";
 const WHO: { id: Who; label: string }[] = [{ id: "guest", label: "비회원" }, { id: "member", label: "회원" }, { id: "all", label: "전체" }];
+const WHERE: { id: Where; label: string }[] = [{ id: "web", label: "웹" }, { id: "app", label: "앱" }, { id: "all", label: "웹+앱" }];
 const DAYS: { id: Days; label: string }[] = [{ id: "1", label: "오늘" }, { id: "7", label: "7일" }, { id: "30", label: "30일" }];
 const hm = (s: string) => s.slice(11, 16);
 const md = (s: string) => `${Number(s.slice(5, 7))}/${Number(s.slice(8, 10))}`;
@@ -126,9 +129,10 @@ function Funnel({ t, signups }: { t: Summary["totals"]; signups: number }) {
 
 export default function VisitorsView({ onOpenMember }: { onOpenMember?: (id: string) => void }) {
     const [who, setWho] = useState<Who>("guest");
+    const [where, setWhere] = useState<Where>("web");
     const [days, setDays] = useState<Days>("1");
     const [open, setOpen] = useState<string | null>(null);
-    const qs = `days=${days}&who=${who}`;
+    const qs = `days=${days}&who=${who}&where=${where}`;
     const sum = useQuery<Summary>({ queryKey: [BASE, "summary", qs], queryFn: () => apiRequest(`${BASE}/summary?${qs}`), refetchInterval: 60_000, staleTime: 0, gcTime: 0 });
     const rows = useQuery<Visitor[]>({ queryKey: [BASE, "list", qs], queryFn: () => apiRequest(`${BASE}/list?${qs}`), refetchInterval: 60_000, staleTime: 0, gcTime: 0 });
     const trail = useQuery<Trail>({ queryKey: [BASE, "trail", open], queryFn: () => apiRequest(`${BASE}/trail/${encodeURIComponent(open!)}`), enabled: !!open, staleTime: 0, gcTime: 0 });
@@ -147,8 +151,8 @@ export default function VisitorsView({ onOpenMember }: { onOpenMember?: (id: str
                     <div className="min-w-0">
                         <p className="text-[15px] font-black text-black/85">방문자 발자국</p>
                         <p className="mt-1 text-[12.5px] leading-relaxed text-black/50 break-keep">
-                            웹으로 온 사람이 어디로 들어와 무엇을 보고 무엇을 누르는지 봅니다. 사람은 브라우저 하나이고, 이름·IP 는 모으지 않습니다.
-                            앱 안의 움직임은 모으지 않고, 채팅·경기 중 화면은 화면 이동만 남습니다. {TRAIL_KEEP_DAYS}일이 지나면 지웁니다.
+                            사람들이 어디로 들어와 무엇을 보고 무엇을 누르는지 봅니다. 웹과 앱을 갈라 보며(앱은 {TRAIL_SINCE.app.slice(5).replace("-", "/")}부터), 사람은 브라우저·앱 하나이고 이름·IP 는 모으지 않습니다.
+                            채팅·크루·경기 중 화면은 화면 이동만 남습니다. {TRAIL_KEEP_DAYS}일이 지나면 지웁니다.
                         </p>
                     </div>
                     <button onClick={() => { void sum.refetch(); void rows.refetch(); }} className="shrink-0 flex items-center gap-1 text-[12px] text-black/45 hover:text-brand" aria-label="새로고침">
@@ -156,6 +160,7 @@ export default function VisitorsView({ onOpenMember }: { onOpenMember?: (id: str
                     </button>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2">
+                    <FilterChips value={where} onChange={setWhere} options={WHERE} />
                     <FilterChips value={who} onChange={setWho} options={WHO} />
                     <FilterChips value={days} onChange={setDays} options={DAYS} />
                 </div>
@@ -167,7 +172,7 @@ export default function VisitorsView({ onOpenMember }: { onOpenMember?: (id: str
                 <>
                     {num(t.visitors) === 0 && (
                         <Panel className="px-4 py-3 text-[13px] text-black/60 break-keep">
-                            아직 쌓인 발자국이 없습니다. 수집은 2026-10-08 에 켜졌고, 방문자가 화면을 5초 넘게 보면 20초 안에 올라오기 시작합니다.
+                            아직 쌓인 발자국이 없습니다. 수집은 웹 {TRAIL_SINCE.web} · 앱 {TRAIL_SINCE.app} 에 켜졌고, 화면을 5초 넘게 보면 20초 안에 올라오기 시작합니다.
                         </Panel>
                     )}
                     <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
@@ -210,7 +215,7 @@ export default function VisitorsView({ onOpenMember }: { onOpenMember?: (id: str
                                                     <p className="flex flex-wrap items-center gap-1.5">
                                                         <span className="text-[13px] font-black tabular-nums text-black/80">{md(v.lastAt)} {hm(v.lastAt)}</span>
                                                         {v.member ? <Pill tone="brand">{v.name ?? "회원"}</Pill> : <Pill>비회원</Pill>}
-                                                        {v.device && <Pill>{v.device === "m" ? "폰" : "PC"}</Pill>}
+                                                        {v.os ? <Pill tone="info">{v.os === "i" ? "아이폰 앱" : "안드로이드 앱"}</Pill> : v.device && <Pill>{v.device === "m" ? "폰" : "PC"}</Pill>}
                                                         {v.ref && <Pill tone="info">{v.ref}</Pill>}
                                                         {v.opened && <Pill tone="warn">가입 창</Pill>}
                                                         <span className="ml-auto text-[12px] text-black/45 tabular-nums">{v.pages}장 · {v.clicks}번 누름{v.stay > 0 ? ` · ${dur(v.stay)}` : ""}</span>

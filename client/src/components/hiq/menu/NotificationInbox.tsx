@@ -341,8 +341,10 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                     const openMenu = menuId === notif.id;
                                     return (
                                         <div key={notif.id} className="relative rounded-2xl bg-surface-1 border border-surface-line">
+                                            {/* 알림 제목(보낸 사람·방 이름)은 발자국에 남기지 않는다 — 구역 이름만(shared/uiTrail) */}
                                             <button
                                                 type="button"
+                                                data-track-as="알림 한 줄"
                                                 onClick={() => handleItemClick(notif)}
                                                 className="w-full text-left flex items-start gap-2.5 px-3.5 py-3 active:opacity-70 transition-opacity"
                                             >

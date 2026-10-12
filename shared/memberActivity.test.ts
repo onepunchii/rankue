@@ -250,8 +250,9 @@ describe("뼈대", () => {
             const at = s.indexOf('<SheetContent side="right"');
             expect(s.slice(at, s.indexOf("</SheetContent>", at)), f).not.toMatch(/sticky top-0|<SheetContent[^>]*overflow-y-auto/);
         }
-        expect(view).toContain("본 화면과 누른 것은 웹에서 쓴 것만 남습니다");
-        expect(view).toContain('{TRAIL_IN_APP ? " " : " 앱 안에서 누른 것은 아직 모으지 않습니다. "}');
+        // 언제부터 남는지(웹 10/8 · 앱 10/12)와 누른 것이 남지 않는 화면을 적는다
+        expect(view).toContain('{TRAIL_IN_APP ? `웹 ${md(TRAIL_SINCE.web)} · 앱 ${md(TRAIL_SINCE.app)}부터 남습니다` : "웹에서 쓴 것만 남습니다"}');
+        expect(view).toContain("채팅 · 크루 · 경기 중 화면은 화면 이동만 남고 누른 것은 남기지 않습니다.");
         expect(view).toContain("채팅은 보낸 건수만 세고 내용은 읽지 않습니다.");
         expect(view).not.toContain("data-admin-write");
         expect(view).not.toMatch(/method:\s*"(POST|PATCH|PUT|DELETE)"/);

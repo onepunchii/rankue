@@ -5,8 +5,8 @@
  * 회원 상세 창 → 관리 → '활동 기록'. 날짜별로 언제 들어와 무엇을 보고 누르고 무엇을 했는지 한 줄씩 읽는다.
  * 묶는 규칙·글은 shared/memberActivity, 질의는 server storage/adminMemberActivity — 여기는 그리기만 한다.
  *
- * 알아 둘 것(화면에도 적는다): **누른 것은 웹에서 쓴 것만** 남는다. 앱 안의 누름은 아직 모으지 않는다(shared/uiTrail TRAIL_IN_APP —
- * 스토어 개인정보 표기를 고친 뒤 켠다). 접속·경기·글 같은 기록은 앱·웹 가리지 않고 나온다. 채팅은 건수만 — 내용은 서버가 읽지 않는다.
+ * 알아 둘 것(화면에도 적는다): 본 화면과 누른 것은 **모으기 시작한 날부터만** 있다 — 웹 2026-10-08, 앱 2026-10-12(shared/uiTrail TRAIL_SINCE).
+ * 채팅·크루·경기 중 화면은 화면 이동만 남는다. 접속·경기·글 같은 기록은 그 전 것도 나온다. 채팅은 건수만 — 내용은 서버가 읽지 않는다.
  *
  * 조회뿐이라 보기 전용 관리자도 본다(고치는 단추 없음). 닫으면 캐시에서 바로 지운다(gcTime 0 — 남의 활동이 기기에 남지 않게).
  */
@@ -20,7 +20,7 @@ import {
     ACTIVITY_DAYS, ACTIVITY_DEFAULT_DAYS, ACTIVITY_GROUPS, PLATFORM_LABEL, activityDayLabel,
     type ActivityDay, type ActivityGroup, type ActivityItem, type ActivityTone, type MemberActivity,
 } from "@shared/memberActivity";
-import { TRAIL_IN_APP, TRAIL_KEEP_DAYS } from "@shared/uiTrail";
+import { TRAIL_IN_APP, TRAIL_KEEP_DAYS, TRAIL_SINCE } from "@shared/uiTrail";
 
 export const memberActivityKey = (id: string, days: number) => ["/api/hiq/admin/members", id, "activity", days] as const;
 
@@ -32,6 +32,8 @@ const DAY_FOLD = 30;
 
 const list = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : []);
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
+/** "2026-10-08" → "10/8" */
+const md = (day: string) => `${Number(day.slice(5, 7))}/${Number(day.slice(8, 10))}`;
 const hours = (min: number) => (min < 60 ? `${min}분` : `${Math.floor(min / 60)}시간${min % 60 ? ` ${min % 60}분` : ""}`);
 
 const TEXT_TONE: Record<ActivityTone, string> = {
@@ -176,9 +178,9 @@ export default function MemberActivitySheet({ member, onClose }: { member: { id:
                             </div>
 
                             <p data-activity-note className="rounded-xl bg-white border border-black/[0.07] px-3 py-2.5 text-[12px] leading-relaxed text-black/50 break-keep">
-                                <b className="font-black text-black/65">본 화면과 누른 것은 웹에서 쓴 것만 남습니다</b>(2026-10-08부터, {TRAIL_KEEP_DAYS}일 보관).
-                                {TRAIL_IN_APP ? " " : " 앱 안에서 누른 것은 아직 모으지 않습니다. "}
-                                접속 · 경기 · 온라인게임 · 골프 · 글은 앱과 웹 모두 나옵니다. 채팅은 보낸 건수만 세고 내용은 읽지 않습니다.
+                                <b className="font-black text-black/65">본 화면과 누른 것은 {TRAIL_IN_APP ? `웹 ${md(TRAIL_SINCE.web)} · 앱 ${md(TRAIL_SINCE.app)}부터 남습니다` : "웹에서 쓴 것만 남습니다"}</b>({TRAIL_KEEP_DAYS}일 보관).
+                                {" "}채팅 · 크루 · 경기 중 화면은 화면 이동만 남고 누른 것은 남기지 않습니다.
+                                접속 · 경기 · 온라인게임 · 골프 · 글은 그 전 것도 나옵니다. 채팅은 보낸 건수만 세고 내용은 읽지 않습니다.
                             </p>
 
                             {list<ActivityGroup>(a.capped).length > 0 && (

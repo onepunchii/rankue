@@ -13,7 +13,14 @@
  *  · **네이버 검색 결과의 글자** — 저장 금지(검색 API 특약). 그 구역은 data-track-as 로 구역 이름만 남긴다(주소도 버린다).
  *  · data-notrack 안의 모든 누름(PIN 창).
  *  · 관리자·사장님 콘솔(TRAIL_SKIP_PATH), 개발 서버(localhost).
- *  · **앱(iOS·Android) 안** — 스토어의 개인정보 표기(App Store 라벨·Play 데이터 보안)에 '앱 내 활동 수집'이 아직 없다. 오너가 표기를 고친 뒤 TRAIL_IN_APP 을 켠다.
+ *
+ * 앱(iOS·Android) 안 — 2026-10-12 에 켰다(오너: "앱 안 클릭도 해야지" · 스토어 개인정보 표기는 오너가 콘솔에서 맞춘다: "콘솔은 내가 할게").
+ * 회원 대부분이 앱을 쓴다 — 회원 한 명의 '활동 기록'(shared/memberActivity)이 누른 것을 보여 주려면 앱 안이 있어야 했다.
+ * 앱에서 온 줄에는 a(i 아이폰 · a 안드로이드)가 붙는다 — '방문자 발자국'은 웹/앱을 갈라 본다(기본은 웹: 가입 깔때기가 웹 손님 이야기다).
+ * 앱을 켜면서 더 막은 것(웹에도 같이 적용된다):
+ *  · **크루 화면의 누름** — 글 제목·투표 보기·정산의 이름과 금액이 단추 글자다(모임 안의 것). 화면 이동만 남긴다.
+ *  · **알림 줄·최근 검색어** — 알림 제목(보낸 사람)과 내가 친 검색어가 단추 글자다. 구역 이름만 남긴다(data-track-as).
+ *  · **전화번호·메일 주소** — 단추 글자에 섞여 있으면 가린다(trailLabel).
  *
  * ⚠️ shared 상대 임포트는 반드시 ./x.js(서버리스 규칙) — 이 파일은 아무것도 임포트하지 않는다.
  */
@@ -26,28 +33,41 @@ const NAME_SET: ReadonlySet<string> = new Set(TRAIL_NAMES);
 export const TRAIL_KEEP_DAYS = 60;
 /** 한 묶음(요청 하나)의 최대 줄 수 */
 export const TRAIL_BATCH_MAX = 60;
-/** 앱 안에서도 모을 것인가 — 스토어 개인정보 표기를 고친 뒤에만 true(머리말) */
-export const TRAIL_IN_APP = false;
+/** 앱 안에서도 모을 것인가(머리말). 끄려면 false 로 바꿔 배포한다 — 앱은 원격 화면이라 바로 멈춘다 */
+export const TRAIL_IN_APP = true;
+/** 모으기 시작한 날(한국 날짜) — 화면이 "언제부터 남는다"를 적는 데 쓴다 */
+export const TRAIL_SINCE = { web: "2026-10-08", app: "2026-10-12" } as const;
+/** 앱에서 온 줄의 표시(meta.a) — i 아이폰 · a 안드로이드. 웹에는 없다 */
+export type TrailApp = "i" | "a";
+export const trailAppOf = (platform: string | null | undefined): TrailApp | null => (platform === "ios" ? "i" : platform === "android" ? "a" : null);
 
 /** 아예 모으지 않는 화면 — 관리자 콘솔·사장님 콘솔 */
 export const TRAIL_SKIP_PATH = /^\/(admin|partner)(\/|$)/;
 /**
  * 화면 이동만 남기고 **누른 것은 남기지 않는** 화면.
  *  chat · friends      상대 이름·메시지 미리보기가 단추 글자다
+ *  club · crew         글 제목·투표 보기·정산의 이름과 금액 — 모임 안의 것이다(탭 이동은 주소가 바뀌어 화면 줄로 남는다)
  *  game · golf/game    경기 중 점수판 — 한 판에 수백 번, 숫자 단추
  *  online-game · golf/play|minigolf|arcade|range   게임 화면
  *  register · auth · kakao-preview                 가입·로그인 절차
  */
-export const TRAIL_NO_CLICK_PATH = /^\/(chat|friends|game|golf\/game|online-game|golf\/(?:play|minigolf|arcade|range)|register|auth|kakao-preview)(\/|$)/;
+export const TRAIL_NO_CLICK_PATH = /^\/(chat|friends|club|crew|game|golf\/game|online-game|golf\/(?:play|minigolf|arcade|range)|register|auth|kakao-preview)(\/|$)/;
 
 const LABEL_MAX = 40;
 /** 숫자·기호·공백뿐인가 — PIN·점수 단추 */
 const NUMERIC_ONLY = /^[\d\s.,:%+\-−–→←↑↓×*#/()]*$/;
 
-/** 단추 글자를 남길 꼴로. 남기면 안 되는 글자(한 글자·숫자뿐)는 null */
+/** 전화번호 — 010-1234-5678 · 02 123 4567 · +82 10… · 붙여 쓴 9~11자리 */
+const PHONE = /(?:\+?82[-\s.]?)?0?\d{1,3}[-\s.]\d{3,4}[-\s.]\d{4}|\d{9,11}/g;
+const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+/g;
+
+/**
+ * 단추 글자를 남길 꼴로. 남기면 안 되는 글자(한 글자·숫자뿐)는 null.
+ * 전화번호·메일 주소가 섞여 있으면 가린다 — "문자 010-…" 같은 단추가 연락처를 통째로 남기지 않게(자르기 전에 가린다: 잘린 번호는 못 알아본다).
+ */
 export function trailLabel(raw: unknown): string | null {
     if (typeof raw !== "string") return null;
-    const s = raw.replace(/\s+/g, " ").trim().slice(0, LABEL_MAX);
+    const s = raw.replace(/\s+/g, " ").trim().replace(EMAIL, "(메일)").replace(PHONE, "(번호)").slice(0, LABEL_MAX);
     if (s.length < 2 || NUMERIC_ONLY.test(s)) return null;
     return s;
 }
@@ -121,6 +141,8 @@ export function cleanTrailEvent(e: unknown): TrailRow | null {
         if (typeof src.ref === "string" && /^[A-Za-z0-9.-]{1,80}$/.test(src.ref)) meta.ref = src.ref.toLowerCase();
         if (src.w === "m" || src.w === "d") meta.w = src.w;
     }
+    // 앱에서 온 줄 — 어느 종류의 줄에나 붙는다(화면이 앱 안에서 오래 떠 있어 '첫 화면'이 드물다)
+    if (src.a === "i" || src.a === "a") meta.a = src.a;
     return { name: name as TrailName, path, meta };
 }
 

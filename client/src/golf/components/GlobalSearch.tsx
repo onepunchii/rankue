@@ -137,8 +137,10 @@ export function GlobalSearch({ isOpen, onClose, onSelectBooking, viewType }: Glo
                                     </div>
                                     <div className="flex flex-wrap gap-2">
                                         {recentSearches.map((s, i) => (
+                                            // 내가 친 검색어가 단추 글자다 — 발자국에는 구역 이름만 남긴다(shared/uiTrail)
                                             <button
                                                 key={i}
+                                                data-track-as="최근 검색어"
                                                 onClick={() => handleSearch(s)}
                                                 className="px-4 py-2 bg-white/5 border border-white/5 rounded-full text-xs font-bold text-white/60 hover:border-[#64DD17]/30 hover:text-white transition-all"
                                                 title={`'${s}' 검색`}

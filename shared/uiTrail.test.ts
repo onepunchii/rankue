@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    TRAIL_BATCH_MAX, TRAIL_IN_APP, TRAIL_KEEP_DAYS, TRAIL_NO_CLICK_PATH, TRAIL_SKIP_PATH,
+    TRAIL_BATCH_MAX, TRAIL_IN_APP, TRAIL_KEEP_DAYS, TRAIL_NO_CLICK_PATH, TRAIL_SINCE, TRAIL_SKIP_PATH, trailAppOf,
     cleanTrailEvent, isTrailVisitor, pageKind, trailFirstLine, trailHref, trailLabel, trailPath,
 } from "./uiTrail";
 
@@ -77,14 +77,15 @@ describe("cleanTrailEvent — 서버가 한 번 더 거른다", () => {
         expect(cleanTrailEvent({ n: "page", p: "/partners" })?.path).toBe("/partners");
     });
 
-    it("채팅·친구·경기 중·게임·가입 절차 — 화면 이동은 남기고 누른 것은 버린다", () => {
-        for (const p of ["/chat", "/chat/dm/abc", "/friends", "/game/abc", "/game/result", "/golf/game/abc", "/golf/game/abc/result", "/online-game", "/golf/play", "/golf/minigolf", "/golf/arcade", "/golf/range", "/register", "/auth/kakao", "/kakao-preview"]) {
+    it("채팅·친구·크루·경기 중·게임·가입 절차 — 화면 이동은 남기고 누른 것은 버린다", () => {
+        // 크루(2026-10-12 앱 안을 켜면서): 글 제목·투표 보기·정산의 이름과 금액이 단추 글자다. 탭 이동은 주소가 바뀌어 화면 줄로 남는다
+        for (const p of ["/chat", "/chat/dm/abc", "/friends", "/club", "/club/create", "/club/abc", "/crew/abc", "/crew/abc/board", "/crew/abc/hall-of-fame", "/game/abc", "/game/result", "/golf/game/abc", "/golf/game/abc/result", "/online-game", "/golf/play", "/golf/minigolf", "/golf/arcade", "/golf/range", "/register", "/auth/kakao", "/kakao-preview"]) {
             expect(TRAIL_NO_CLICK_PATH.test(p), p).toBe(true);
             expect(cleanTrailEvent({ n: "click", p, m: { l: "아무 이름" } }), p).toBeNull();
             expect(cleanTrailEvent({ n: "page", p })?.path, p).toBe(p);
         }
         // 닮았지만 다른 화면은 누른 것도 남긴다
-        for (const p of ["/golf/join", "/golf/courses", "/community", "/club/abc", "/golf/passport", "/gamers"]) expect(TRAIL_NO_CLICK_PATH.test(p), p).toBe(false);
+        for (const p of ["/golf/join", "/golf/courses", "/community", "/clubs", "/crewmate", "/golf/passport", "/gamers"]) expect(TRAIL_NO_CLICK_PATH.test(p), p).toBe(false);
     });
 
     it("누름 — 글자가 있어야 하고(숫자뿐이면 버림), 글자는 40자, 주소는 경로·호스트만", () => {
@@ -162,8 +163,10 @@ describe("수집기(Tracker)와 표시해 둔 구역", () => {
         expect(code(root("client/src/components/hiq/VisitBeacon.tsx"))).toContain('const ID_KEY = "rankue-visitor";');
     });
 
-    it("끄는 곳 — 개발 서버(운영 DB 를 같이 쓴다) · 앱 안(스토어 개인정보 표기 전) · 관리자 콘솔", () => {
-        expect(TRAIL_IN_APP).toBe(false);
+    it("끄는 곳 — 개발 서버(운영 DB 를 같이 쓴다) · 관리자 콘솔. 앱 안은 스위치 하나(2026-10-12 켬)", () => {
+        // 오너(10/12): "앱 안 클릭도 해야지" · "콘솔은 내가 할게"(스토어 개인정보 표기). 끄려면 이 값을 false 로 — 앱은 원격 화면이라 배포하면 바로 멈춘다
+        expect(TRAIL_IN_APP).toBe(true);
+        expect(TRAIL_SINCE).toEqual({ web: "2026-10-08", app: "2026-10-12" });
         expect(tracker).toContain("return !TRAIL_IN_APP && isNativeApp();");
         expect(tracker).toContain("localhost|127\\.0\\.0\\.1");
         expect(tracker).toContain("if (disabled.current || TRAIL_SKIP_PATH.test(e.p)) return;");
@@ -258,12 +261,59 @@ describe("서버 — 수집 · 조회 · 정리", () => {
     });
 });
 
+describe("앱 안(2026-10-12) — 표시와 더 막은 것", () => {
+    it("앱에서 온 줄에는 a(i·a)가 붙는다 — 어느 종류의 줄에나, 그 밖의 값은 버린다", () => {
+        expect(trailAppOf("ios")).toBe("i");
+        expect(trailAppOf("android")).toBe("a");
+        for (const p of ["web", "", null, undefined, "IOS"]) expect(trailAppOf(p as any), String(p)).toBeNull();
+        expect(cleanTrailEvent({ n: "page", p: "/dashboard", m: { a: "i", w: "m" } })?.meta).toEqual({ w: "m", a: "i" });
+        expect(cleanTrailEvent({ n: "click", p: "/dashboard", m: { l: "점수판 열기", a: "a" } })?.meta).toEqual({ l: "점수판 열기", a: "a" });
+        expect(cleanTrailEvent({ n: "scroll", p: "/dashboard", m: { d: 50, a: "a" } })?.meta).toEqual({ d: 50, a: "a" });
+        expect(cleanTrailEvent({ n: "open", p: "/dashboard", m: { l: "가입 창", a: "i" } })?.meta).toEqual({ l: "가입 창", a: "i" });
+        for (const a of ["ios", "x", 1, true, "<script>"]) expect(cleanTrailEvent({ n: "page", p: "/dashboard", m: { a } })?.meta, String(a)).toEqual({});
+        // 수집기는 줄마다 붙인다(앱은 한 번 뜨면 오래 떠 있다 — 첫 화면에만 붙이면 대부분의 줄이 어디서 왔는지 모른다)
+        const tracker = code(root("client/src/components/hiq/Tracker.tsx"));
+        expect(tracker).toContain("const app = useRef(trailAppOf(nativePlatform()));");
+        expect(tracker).toContain("if (app.current) e.m = { ...(e.m ?? {}), a: app.current };");
+    });
+
+    it("단추 글자에 섞인 전화번호·메일 주소는 가린다(자르기 전에)", () => {
+        expect(trailLabel("문자 010-1234-5678")).toBe("문자 (번호)");
+        expect(trailLabel("전화 01012345678 걸기")).toBe("전화 (번호) 걸기");
+        expect(trailLabel("매장 02 123 4567")).toBe("매장 (번호)");
+        expect(trailLabel("+82 10-1234-5678 로 연락")).toBe("(번호) 로 연락");
+        expect(trailLabel("문의 someone.name+tag@example.co.kr")).toBe("문의 (메일)");
+        // 40자를 넘는 글자 끝의 번호도 남지 않는다
+        const long = trailLabel(`${"가".repeat(34)} 010-1234-5678`)!;
+        expect(long).not.toMatch(/\d{3}/);
+        // 점수·날짜·순위 같은 숫자는 그대로
+        for (const s of ["3쿠션 25점", "10월 12일 07:30 티", "1,124 RP", "2인 플레이 되는 곳", "88CC", "9홀 2026", "세계 12위"]) expect(trailLabel(s), s).toBe(s);
+    });
+
+    it("알림 줄·최근 검색어는 구역 이름만 남긴다 — 보낸 사람 이름과 내가 친 검색어가 단추 글자다", () => {
+        expect(code(root("client/src/components/hiq/menu/NotificationInbox.tsx"))).toContain('data-track-as="알림 한 줄"');
+        expect(code(root("client/src/golf/components/GlobalSearch.tsx"))).toContain('data-track-as="최근 검색어"');
+    });
+
+    it("방문자 발자국은 웹과 앱을 갈라 본다 — 기본은 웹(가입 깔때기가 웹 손님 이야기다)", () => {
+        const api = code(root("server/routes/modules/adminVisitors.ts"));
+        expect(api).toContain('const whereOf = (v: unknown): Where => (v === "app" ? "app" : v === "all" ? "all" : "web");');
+        expect(api.match(/bool_or\(meta \? 'a'\) as app/g)!.length).toBe(3);
+        const view = code(root("client/src/pages/admin/VisitorsView.tsx"));
+        expect(view).toContain('const [where, setWhere] = useState<Where>("web");');
+        expect(view).toContain("const qs = `days=${days}&who=${who}&where=${where}`;");
+    });
+});
+
 describe("개인정보 처리방침 — 무엇을 모으는지 적혀 있다(화면 · 검색엔진용 화면 두 곳)", () => {
     it("본 화면·누른 메뉴·유입 경로, 임의의 번호로만 구분, 입력 내용·IP 없음, 60일", () => {
         for (const p of ["client/src/pages/privacy.tsx", "server/prerender.ts"]) {
             const s = root(p);
-            expect(s, p).toContain("서비스 이용 기록(접속 일시·이용 시간·기기 종류, 웹에서 본 화면·누른 메뉴·유입 경로)");
-            expect(s, p).toContain("입력한 내용과 IP 주소는 남기지 않으며 60일 뒤 지웁니다.");
+            // 2026-10-12 앱 안을 켜면서 '웹에서' → '웹과 앱에서'. 모으는 것이 바뀌면 두 곳을 같이 고친다
+            expect(s, p).toContain("서비스 이용 기록(접속 일시·이용 시간·기기 종류, 웹과 앱에서 본 화면·누른 메뉴, 웹의 유입 경로)");
+            expect(s, p).toContain("브라우저·앱에 만든 임의의 번호(로그인한 경우 회원 번호)로만 구분하고");
+            expect(s, p).toContain("입력한 내용·채팅 내용·IP 주소는 남기지 않으며 60일 뒤 지웁니다.");
+            expect(s, p).toContain("시행일: 2026년 7월 14일 · 최근 개정: 2026년 10월 12일(서비스 이용 기록 항목)");
         }
     });
 });

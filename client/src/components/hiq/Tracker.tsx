@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "wouter";
-import { TRAIL_BATCH_MAX, TRAIL_IN_APP, TRAIL_NO_CLICK_PATH, TRAIL_SKIP_PATH, trailFirstLine, trailHref, trailLabel, trailPath } from "@shared/uiTrail";
-import { isNativeApp } from "@/lib/nativeBridge";
+import { TRAIL_BATCH_MAX, TRAIL_IN_APP, TRAIL_NO_CLICK_PATH, TRAIL_SKIP_PATH, trailAppOf, trailFirstLine, trailHref, trailLabel, trailPath } from "@shared/uiTrail";
+import { isNativeApp, nativePlatform } from "@/lib/nativeBridge";
 import { TRAIL_EVENT } from "@/lib/trail";
 
 /**
@@ -14,7 +14,8 @@ import { TRAIL_EVENT } from "@/lib/trail";
  *
  * 비용: 화면마다 서버를 두드리지 않는다. 모아 뒀다가 20초마다 또는 화면을 떠날 때 **한 번에** 보낸다.
  * 봇: 첫 조작(스크롤·터치·키) 또는 5초 체류 전에는 아무것도 보내지 않는다(위장 크롤러는 그 문턱을 못 넘는다).
- * 끄는 곳: 관리자·사장님 콘솔, 개발 서버(localhost — 운영 DB 를 같이 쓴다), 앱 안(TRAIL_IN_APP — 스토어 개인정보 표기를 고친 뒤 켠다).
+ * 끄는 곳: 관리자·사장님 콘솔, 개발 서버(localhost — 운영 DB 를 같이 쓴다).
+ * 앱 안(2026-10-12 켬 — TRAIL_IN_APP): 줄마다 a(i·a)를 붙여 보낸다. 앱은 한 번 뜨면 오래 떠 있어 '첫 화면'에만 붙이면 대부분의 줄이 어디서 왔는지 모른다.
  */
 const ID_KEY = "rankue-visitor";      // VisitBeacon 과 같은 방문자 ID
 const SID_KEY = "rankue-session";     // 탭을 닫으면 끝나는 방문 한 번
@@ -59,6 +60,7 @@ export function Tracker() {
     const first = useRef(true);
     const pageAt = useRef(0);
     const disabled = useRef(off());
+    const app = useRef(trailAppOf(nativePlatform()));
 
     // 보내기 — 화면을 떠나는 순간에도 끊기지 않게 sendBeacon 을 먼저 쓴다
     const flush = useRef(() => {
@@ -74,6 +76,7 @@ export function Tracker() {
     });
     const push = useRef((e: Ev) => {
         if (disabled.current || TRAIL_SKIP_PATH.test(e.p)) return;
+        if (app.current) e.m = { ...(e.m ?? {}), a: app.current };
         buf.current.push(e);
         if (buf.current.length >= TRAIL_BATCH_MAX) flush.current();
     });

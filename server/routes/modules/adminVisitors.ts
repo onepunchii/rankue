@@ -11,6 +11,8 @@ import { isTrailVisitor, pageKind } from "../../../shared/uiTrail.js";
  * 화면(client Tracker)이 모은 ui_events(page·click·scroll·open)를 읽는다. 전부 GET — 보기 전용 관리자도 본다.
  *
  *  · 사람 = 브라우저 하나(방문자 난수 ID). 회원 id 가 한 번이라도 붙은 방문자는 회원으로 본다.
+ *  · 어디서(2026-10-12 앱 안 수집을 켜면서): 앱에서 온 줄에는 meta.a 가 있다. 앱의 웹뷰와 브라우저는 저장소가 달라 방문자 ID 도 다르다 —
+ *    방문자 하나는 웹이거나 앱이다. 기본은 **웹**(가입 깔때기·유입처가 웹 손님 이야기라서). ?where=web|app|all
  *  · 주소는 화면 종류로 묶는다(/golf/course/세레니티CC → "/golf/course/…", shared pageKind) — 낱개로 세면 상위가 전부 1건이다.
  *  · created_at 은 timestamptz 다(이 표만). 날짜 경계는 한국 자정을 timestamptz 로 바꿔 견준다 — 인덱스를 탄다.
  *  · 발자국은 60일만 둔다(정리 크론). 통계는 그 안에서만 본다.
@@ -19,8 +21,12 @@ const router = Router();
 router.use(checkSuperAdmin);
 
 type Who = "guest" | "member" | "all";
+type Where = "web" | "app" | "all";
 const daysOf = (v: unknown) => { const n = parseInt(String(v), 10); return [1, 7, 30].includes(n) ? n : 1; };
 const whoOf = (v: unknown): Who => (v === "member" ? "member" : v === "all" ? "all" : "guest");
+const whereOf = (v: unknown): Where => (v === "app" ? "app" : v === "all" ? "all" : "web");
+/** 방문자 한 줄(app = 앱에서 온 사람)에 거는 조건 */
+const placeOf = (where: Where) => (where === "all" ? sql`true` : where === "app" ? sql`app` : sql`not app`);
 /** 기간 시작 — 한국 자정(1 = 오늘). timestamptz */
 const since = (days: number) => sql`((date_trunc('day', now() at time zone 'Asia/Seoul') - make_interval(days => ${days - 1})) at time zone 'Asia/Seoul')`;
 const KST = sql`(created_at at time zone 'Asia/Seoul')`;
@@ -30,11 +36,15 @@ const rowsOf = <T = any>(r: unknown): T[] => ((r as { rows?: T[] })?.rows ?? [])
 
 /** 요약 — 사람 수·본 화면·누른 것·들어온 곳·나간 곳·유입처·가입까지 */
 router.get("/summary", asyncHandler(async (req: any, res: any) => {
-    const days = daysOf(req.query.days), who = whoOf(req.query.who);
-    // 기간 안 발자국을 방문자별로 접는다
+    const days = daysOf(req.query.days), who = whoOf(req.query.who), where = whereOf(req.query.where);
+    // 기간 안 발자국을 방문자별로 접는다 — 고른 곳(웹/앱)의 방문자만 남긴다
     const base = sql`
-        with ev as (
+        with ev0 as (
             select id, name, visitor, member_id, path, meta, created_at from ui_events where created_at >= ${since(days)}
+        ), place as (
+            select visitor from (select visitor, bool_or(meta ? 'a') as app from ev0 group by visitor) p where ${placeOf(where)}
+        ), ev as (
+            select * from ev0 where visitor in (select visitor from place)
         ), v as (
             select visitor, bool_or(member_id is not null) as member,
                    count(*) filter (where name = 'page')::int as pages, count(*) filter (where name = 'click')::int as clicks,
@@ -82,8 +92,10 @@ router.get("/summary", asyncHandler(async (req: any, res: any) => {
         // 같은 기간 새 회원 — hiq_members.created_at 은 시간대 없는 UTC 다
         db.execute(sql`select count(*)::int as n from hiq_members where (created_at at time zone 'UTC') >= ${since(days)}`).then((r) => Number(rowsOf(r)[0]?.n ?? 0)),
         db.execute(sql`
+            with e as (select visitor, member_id, meta, created_at from ui_events where created_at >= ${since(Math.max(days, 7))}),
+                 place as (select visitor from (select visitor, bool_or(meta ? 'a') as app from e group by visitor) p where ${placeOf(where)})
             select to_char(${KST}, 'MM.DD') as d, count(distinct visitor) filter (where member_id is null)::int as guests, count(distinct visitor) filter (where member_id is not null)::int as members
-            from ui_events where created_at >= ${since(Math.max(days, 7))} group by 1 order by 1`).then(rowsOf),
+            from e where visitor in (select visitor from place) group by 1 order by 1`).then(rowsOf),
     ]);
 
     const fold = (rows: any[], keys: string[]) => {
@@ -104,7 +116,7 @@ router.get("/summary", asyncHandler(async (req: any, res: any) => {
     }
     const hourly = Array.from({ length: 24 }, (_, h) => Number(hours.find((x: any) => Number(x.h) === h)?.n ?? 0));
     return sendSuccess(res, {
-        days, who, totals,
+        days, who, where, totals,
         pages: fold(pages, ["views", "people"]).sort((a, b) => b.views - a.views).slice(0, 25),
         clicks: [...clickMap.values()].sort((a, b) => b.n - a.n).slice(0, 40),
         entries: fold(entries, ["n"]).sort((a, b) => b.n - a.n).slice(0, 12),
@@ -115,7 +127,7 @@ router.get("/summary", asyncHandler(async (req: any, res: any) => {
 
 /** 최근 방문자 — 한 줄이 한 사람(브라우저). 들어온 화면·본 화면 수·누른 수·마지막 화면 */
 router.get("/list", asyncHandler(async (req: any, res: any) => {
-    const days = daysOf(req.query.days), who = whoOf(req.query.who);
+    const days = daysOf(req.query.days), who = whoOf(req.query.who), where = whereOf(req.query.where);
     const rows = rowsOf(await db.execute(sql`
         with ev as (
             select id, name, visitor, member_id, path, meta, created_at from ui_events where created_at >= ${since(days)}
@@ -125,14 +137,16 @@ router.get("/list", asyncHandler(async (req: any, res: any) => {
                    bool_or(name = 'open') as opened, min(created_at) as first_at, max(created_at) as last_at,
                    (array_agg(path order by created_at, id) filter (where name = 'page'))[1] as entry,
                    (array_agg(path order by created_at desc, id desc) filter (where name = 'page'))[1] as exit,
-                   max(meta->>'ref') as ref, max(meta->>'w') as device
+                   max(meta->>'ref') as ref, max(meta->>'w') as device,
+                   bool_or(meta ? 'a') as app, max(meta->>'a') as os
             from ev group by visitor
         )
         select v.visitor, v.member, v.member_id as "memberId", v.pages, v.clicks, v.opened,
                ${AT(sql`v.first_at`)} as "firstAt", ${AT(sql`v.last_at`)} as "lastAt",
-               extract(epoch from (v.last_at - v.first_at))::int as stay, v.entry, v.exit, v.ref, v.device, m.name
+               extract(epoch from (v.last_at - v.first_at))::int as stay, v.entry, v.exit, v.ref, v.device, v.os, m.name
         from v left join hiq_members m on m.id = v.member_id
         where ${who === "all" ? sql`true` : who === "member" ? sql`v.member` : sql`not v.member`}
+          and ${where === "all" ? sql`true` : where === "app" ? sql`v.app` : sql`not v.app`}
         order by v.last_at desc limit 200`));
     // firstAt·lastAt 은 한국 시각 글자("2026-10-08T14:03:11")다 — 화면이 그대로 쓴다
     return sendSuccess(res, rows);
