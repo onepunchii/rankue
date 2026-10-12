@@ -34,6 +34,8 @@ export interface ChatRoomSummary {
     title: string;
     subtitle: string;
     imageUrl: string | null;
+    /** 1:1 방의 상대 회원 id(2026-10-12 — 채팅 목록의 사진 옆 온라인 대전 등급 배지). 여럿이 있는 방 · 다른 종류의 방은 없다. */
+    peerId?: string | null;
     listing?: { listingType: string; joinType: string | null; datetime: Date; courseName: string; region: string; lat: number | null; lng: number | null; ownerId: string | null; isBlind: boolean };
     lastMessage: { text: string; at: Date; senderName: string | null; i18n?: { key: string; params?: Record<string, unknown> } | null } | null;
     unread: number;
@@ -432,7 +434,7 @@ export class ChatRepository {
             for (const rid of roomIds) {
                 const all = byRoom.get(rid) ?? [];
                 const others = all.filter((m) => m.id !== memberId);
-                rooms.push({ key: `dm:${rid}`, kind: "dm", id: rid, title: others.map((m) => m.name).join(", ") || tr(locale, "ui.chat.me"), subtitle: all.length > 2 ? tr(locale, "ui.chat.memberCount", { n: all.length }) : tr(locale, "ui.chat.dm"), imageUrl: others[0]?.img ?? null, lastMessage: null, unread: 0, memberCount: all.length });
+                rooms.push({ key: `dm:${rid}`, kind: "dm", id: rid, title: others.map((m) => m.name).join(", ") || tr(locale, "ui.chat.me"), subtitle: all.length > 2 ? tr(locale, "ui.chat.memberCount", { n: all.length }) : tr(locale, "ui.chat.dm"), imageUrl: others[0]?.img ?? null, peerId: others.length === 1 ? others[0].id : null, lastMessage: null, unread: 0, memberCount: all.length });
             }
         }
 

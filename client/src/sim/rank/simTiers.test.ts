@@ -68,7 +68,7 @@ describe("사진 옆 배지(TierAvatarBadge)", () => {
         expect(badge).toContain("pointer-events-none");
     });
 
-    it("붙인 곳: 친구 목록 · 최근 상대 · 채팅 말풍선 — 사진 상자(overflow-hidden) 바깥의 relative 상자에", () => {
+    it("붙인 곳: 친구 목록 · 최근 상대 · 채팅 말풍선 · 채팅 목록 — 사진 상자(overflow-hidden) 바깥의 relative 상자에", () => {
         const friends = read("client/src/components/hiq/rivals/FriendList.tsx");
         expect(friends).toContain('{currentSport !== "GOLF" && simTiers[friend.id] ? (');
         expect(friends).toContain('<TierAvatarBadge memberId={friend.id} size={26} className="-bottom-2 -right-2" />');
@@ -78,5 +78,8 @@ describe("사진 옆 배지(TierAvatarBadge)", () => {
         const chat = read("client/src/components/hiq/chat/ChatRoom.tsx");
         expect(chat).toContain('<span className={cn("relative shrink-0", grouped && "invisible")}>');
         expect(chat).toContain("<TierAvatarBadge memberId={m.senderId}");
+        // 채팅 목록: 1:1 방의 상대만(서버가 peerId 를 싣는다 — 여럿이 있는 방은 없다)
+        expect(read("client/src/pages/hiq/chat-hub.tsx")).toContain('{r.kind === "dm" && <TierAvatarBadge memberId={r.peerId}');
+        expect(read("server/storage/chat.repo.ts")).toContain("peerId: others.length === 1 ? others[0].id : null,");
     });
 });

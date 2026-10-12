@@ -19,6 +19,7 @@ import { AdminMemberPicker } from "@/components/hiq/chat/AdminMemberPicker";
 import { INTL_TAG } from "@/components/hiq/chat/ChatRoom";
 import { LucidePlus, LucideHeadset, LucideUserSearch } from "lucide-react";
 import { useEffect, useState } from "react";
+import { TierAvatarBadge } from "@/components/hiq/TierAvatarBadge";
 
 export interface ChatRoomRow {
     key: string;
@@ -27,6 +28,8 @@ export interface ChatRoomRow {
     title: string;
     subtitle: string;
     imageUrl: string | null;
+    /** 1:1 방의 상대 회원 id — 사진 옆 온라인 대전 등급 배지(2026-10-12). 옛 응답 · 다른 종류의 방은 없다. */
+    peerId?: string | null;
     listing?: { listingType: string; joinType: string | null; datetime: string; courseName: string; region: string };
     lastMessage: { text: string; at: string; senderName: string | null; i18n?: { key: string; params?: Record<string, unknown> } | null } | null;
     unread: number;
@@ -168,10 +171,14 @@ export default function ChatHub() {
                                     onClick={() => setLocation(roomPath(r))}
                                     className="w-full px-2 py-3 flex items-center gap-3 text-left active:bg-surface-2 rounded-xl transition-colors"
                                 >
-                                    <span className={cn("w-12 h-12 shrink-0 overflow-hidden flex items-center justify-center text-[15px] font-semibold",
+                                    {/* 사진 상자는 넘치는 것을 자른다 — 1:1 방 상대의 온라인 대전 등급 배지는 바깥 상자에(2026-10-12, 골프 채팅에서는 안 그린다) */}
+                                    <span className="relative shrink-0">
+                                    <span className={cn("w-12 h-12 overflow-hidden flex items-center justify-center text-[15px] font-semibold",
                                         r.kind === "dm" ? "rounded-full bg-surface-3 text-ink-2" : "rounded-2xl",
                                         r.kind === "crew" ? "bg-brand/10 text-brand" : r.kind === "support" ? "bg-[#6E5BC8]/20 text-[#B8A7FF]" : r.kind === "listing" ? (r.listing?.listingType === "JOIN" ? "bg-[#FF6B00]/12 text-[#FF8A33]" : "bg-[#64DD17]/12 text-[#6DBE2A]") : "")}>
                                         {r.imageUrl ? <img src={r.imageUrl} alt="" className="w-full h-full object-cover" /> : r.kind === "support" ? <LucideHeadset className="w-5 h-5" /> : r.kind === "listing" ? (r.listing?.listingType === "JOIN" ? t("chat.iconJoin") : t("chat.iconBooking")) : r.title.charAt(0)}
+                                    </span>
+                                        {r.kind === "dm" && <TierAvatarBadge memberId={r.peerId} size={20} className="-bottom-1 -right-1.5" />}
                                     </span>
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-center gap-2 min-w-0">
