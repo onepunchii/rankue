@@ -15,6 +15,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { golfStampAwards } from "../../shared/schema.js";
 import { stampAwardId, stampAwardsDue, type DatedStamp, type StampAwardDue, type StampAwardKind } from "../../shared/golfStampAwards.js";
+import type { PinDue } from "../../shared/golfPins.js";
 
 export interface StampAwardRow {
     /** "book:gangwon" · "all:all-open" · "trophy:10" */
@@ -70,8 +71,9 @@ async function insertAward(memberId: string, d: StampAwardDue): Promise<StampAwa
  * 회원의 인증 도장에서 받았어야 할 것 가운데 아직 안 적은 것을 적는다. 새로 적은 것을 돌려준다(받은 순서).
  * 받을 것이 없으면 표를 읽지도 않는다.
  */
-export async function syncStampAwards(memberId: string, stamps: readonly DatedStamp[]): Promise<StampAwardRow[]> {
-    const due = stampAwardsDue(stamps);
+export async function syncStampAwards(memberId: string, stamps: readonly DatedStamp[], pins: readonly PinDue[] = []): Promise<StampAwardRow[]> {
+    // 업적 핀(shared/golfPins)도 같은 표에 같은 방식으로 적는다 — kind 'pin', 순번은 그 핀을 받은 순서
+    const due = [...stampAwardsDue(stamps), ...pins.map((p): StampAwardDue => ({ kind: "pin", key: p.id, earnedAt: p.earnedAt }))].sort((a, b) => a.earnedAt - b.earnedAt);
     if (due.length === 0) return [];
     try {
         const have = new Set((await db.select({ kind: golfStampAwards.kind, key: golfStampAwards.key }).from(golfStampAwards).where(eq(golfStampAwards.memberId, memberId)))

@@ -7,6 +7,7 @@ import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
+import { GOLF_PINS } from "@shared/golfPins";
 import { ALL_OPEN_MARKER, BOOK_ART, GLYPH_PATHS, PLAIN_STAMP, TROPHIES, coverSrc, markerSrc } from "./bookArt";
 import { stampNameSize, stampSeed } from "./InkStamp";
 import { stampDate } from "./stampDate";
@@ -42,11 +43,12 @@ describe("그림", () => {
         expect(existsSync(pub(ALL_OPEN_MARKER))).toBe(true);
     });
 
-    it("쓰지 않는 그림을 싣지 않는다 — 폴더에는 표지 9 · 볼마커 10 · 트로피 5 뿐", () => {
+    it("쓰지 않는 그림을 싣지 않는다 — 폴더에는 표지 9 · 볼마커 10 · 트로피 5 · 업적 핀 9 뿐", () => {
         const files = readdirSync(pub("/golf/stamp-art")).filter((f) => !f.startsWith(".")).sort();
         const want = [
             ...STAMP_BOOKS.map((b) => `cover-${b.id}.webp`), ...STAMP_BOOKS.map((b) => `marker-${b.id}.webp`), `marker-${STAMP_ALL_OPEN}.webp`,
             ...STAMP_TROPHY_STEPS.map((_, i) => `trophy-${i + 1}.webp`),
+            ...GOLF_PINS.map((p) => `${p.art}.webp`),
         ].sort();
         expect(files).toEqual(want);
     });
@@ -156,8 +158,11 @@ describe("예시와 내 도장첩", () => {
         ]);
         expect(code(read("client/src/golf/pages/StampBook.tsx"))).toContain("<StampSection title={`도장 ${total}칸`} sample={col.sample}");
         expect(code(read("client/src/golf/pages/GolfShelf.tsx")).match(/<StampSection title="[^"]+" sample=\{sample\}/g)).toEqual([
-            '<StampSection title="볼마커 수집함" sample={sample}', '<StampSection title="엘리트 트로피" sample={sample}',
+            '<StampSection title="볼마커 수집함" sample={sample}', '<StampSection title="엘리트 트로피" sample={sample}', '<StampSection title="업적 핀" sample={sample}',
         ]);
+        // 예시의 핀에는 날짜 · 순번을 지어내지 않는다(다 받은 모습만)
+        expect(code(read("client/src/golf/pages/GolfShelf.tsx"))).toContain("when={sample ? undefined : (id) =>");
+        expect(code(read("client/src/golf/pages/GolfShelf.tsx"))).toContain('const pinGot = (id: string) => sample || !!awards.of("pin", id);');
         // 방문자에게는 맨 위에 한 줄 + 그림 아래에 가입으로 가는 길
         for (const p of ["client/src/golf/pages/StampBooks.tsx", "client/src/golf/pages/StampBook.tsx", "client/src/golf/pages/GolfShelf.tsx"]) {
             const s = code(read(p));

@@ -13,7 +13,8 @@
  */
 import { STAMP_ALL_OPEN, STAMP_TROPHY_STEPS, bookStates, type StampLike } from "./golfStampBooks.js";
 
-export type StampAwardKind = "book" | "all" | "trophy";
+/** book · all · trophy 는 도장첩에서 받는 것, pin 은 업적 핀(shared/golfPins — 이름표는 "pin:break-100") */
+export type StampAwardKind = "book" | "all" | "trophy" | "pin";
 
 export interface StampAwardDue {
     kind: StampAwardKind;

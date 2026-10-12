@@ -48,7 +48,7 @@ describe("부르는 곳", () => {
     const fn = repo.slice(repo.indexOf("async syncStampAwards(memberId: string)"), repo.indexOf("async updateGolfStats(userId: string)"));
 
     it("받은 것을 적은 뒤에 같은 도장으로 부른다 — 인증 도장만", () => {
-        expect(fn).toContain("const fresh = await syncStampAwards(memberId, stamps);\n        await this.nudgeStampOneLeft(memberId, stamps);\n        return fresh;");
+        expect(fn).toContain("const fresh = await syncStampAwards(memberId, stamps, pins);\n        await this.nudgeStampOneLeft(memberId, stamps);\n        return fresh;");
         expect(fn).not.toContain("recordStamps");
     });
 

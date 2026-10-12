@@ -47,6 +47,17 @@ describe("적는 길", () => {
     });
 });
 
+describe("업적 핀도 같은 표에", () => {
+    it("kind 'pin' 으로, 도장첩의 것과 받은 순서로 섞어 적는다 — 순번 · 한 번만 · 고치지 않음은 같은 길이다", () => {
+        const store = code(read("server/storage/golfStampAwards.ts"));
+        expect(store).toContain("export async function syncStampAwards(memberId: string, stamps: readonly DatedStamp[], pins: readonly PinDue[] = []): Promise<StampAwardRow[]> {");
+        expect(store).toContain('...pins.map((p): StampAwardDue => ({ kind: "pin", key: p.id, earnedAt: p.earnedAt }))].sort((a, b) => a.earnedAt - b.earnedAt);');
+        // 표의 kind 칸은 글자라 표를 고칠 일이 없다
+        expect(code(read("migrations/golf_stamp_awards.sql"))).toMatch(/\n\s+kind\s+text not null/);
+        expect(read("shared/golfStampAwards.ts")).toContain('export type StampAwardKind = "book" | "all" | "trophy" | "pin";');
+    });
+});
+
 describe("읽는 길", () => {
     it("GET /api/hiq/golf/stamp-awards — 본인 것만, 읽기만(적지 않는다)", () => {
         const routes = code(read("server/routes/modules/golf.ts"));

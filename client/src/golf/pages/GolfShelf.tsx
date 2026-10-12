@@ -13,12 +13,14 @@ import { useState } from "react";
 import { Link } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
 import { STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
+import { GOLF_PINS, golfPin } from "@shared/golfPins";
 import { CourseShell } from "@/golf/components/course/CourseShell";
 import { Skel } from "@/golf/components/course/detail/ui";
 import { StampHelpButton, StampHelpSheet } from "@/golf/stamps/StampHelp";
 import { TROPHIES } from "@/golf/stamps/bookArt";
 import { awardLabel, awardWhen, useStampAwards } from "@/golf/stamps/useStampAwards";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
+import { PinCase, PinPiece } from "@/golf/stamps/PinParts";
 import { MarkerArt, MarkerCase, SHELF_PATH, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampSection, TrophyShelf, bookName, bookPath } from "@/golf/stamps/StampParts";
 
 export default function GolfShelf() {
@@ -30,6 +32,9 @@ export default function GolfShelf() {
     const lastStep = STAMP_TROPHY_STEPS[STAMP_TROPHY_STEPS.length - 1];
     // 볼마커는 권마다 하나 + 누구나 일곱 권 전부
     const markerTotal = STAMP_BOOKS.length + 1;
+    // 업적 핀 — 회원은 받은 기록(서버가 라운드를 끝낼 때 적는다)으로, 예시는 다 받은 모습으로
+    const pinGot = (id: string) => sample || !!awards.of("pin", id);
+    const pinCount = GOLF_PINS.filter((p) => pinGot(p.id)).length;
 
     return (
         <CourseShell title="골프 장식장" backTo={STAMPS_PATH} hideBottomCta right={<StampHelpButton onClick={() => setHelp(true)} />}>
@@ -44,7 +49,7 @@ export default function GolfShelf() {
 
                     <div className="px-5 pt-4">
                         <div className="flex rounded-2xl bg-[#FFFFFF0A] border border-[#FFFFFF14] py-3.5" data-testid="shelf-summary">
-                            {([[summary.markers, `볼마커 · ${markerTotal}`], [summary.trophies, `트로피 · ${STAMP_TROPHY_STEPS.length}`], [summary.stamped, `찍은 도장 · ${summary.total}`]] as const).map(([n, label]) => (
+                            {([[summary.markers, `볼마커 · ${markerTotal}`], [summary.trophies, `트로피 · ${STAMP_TROPHY_STEPS.length}`], [pinCount, `핀 · ${GOLF_PINS.length}`], [summary.stamped, `도장 · ${summary.total}`]] as const).map(([n, label]) => (
                                 <div key={label} className="flex-1 text-center">
                                     <div className="text-[24px] font-semibold tabular-nums leading-none text-[#FFFFFF]">{n}</div>
                                     <div className="mt-1.5 text-[12px] text-[#FFFFFF8C]">{label}</div>
@@ -80,12 +85,20 @@ export default function GolfShelf() {
                         </div>
                     </StampSection>
 
+                    {/* 업적 핀 — 골프장을 새로 가지 않아도 라운드를 쌓으면 붙는다(shared/golfPins). 못 받은 핀은 조건이 보인다 */}
+                    <StampSection title="업적 핀" sample={sample} aside="라운드를 쌓으면 붙어요">
+                        <PinCase earned={pinGot} when={sample ? undefined : (id) => { const a = awards.of("pin", id); return a ? awardWhen(a) : undefined; }} />
+                        <p className="mt-2.5 text-[12.5px] leading-snug text-[#FFFFFF73] break-keep">골프장에서 끝낸 라운드만 세요. 타수 핀은 정규 18홀(총 파 68 이상)에서 붙어요.</p>
+                    </StampSection>
+
                     {!sample && awards.list.length > 0 && (
                         <StampSection title="받은 기록" aside="받은 순번 · 받은 날">
                             <ul className="rounded-2xl bg-[#FFFFFF08]" data-testid="shelf-awards">
                                 {awards.list.map((a, i) => (
                                     <li key={a.id} className={`flex items-center gap-3 px-3.5 py-2.5${i ? " border-t border-[#FFFFFF0F]" : ""}`}>
-                                        {a.kind === "trophy"
+                                        {a.kind === "pin"
+                                            ? <span className="flex h-10 w-10 shrink-0 items-center justify-center">{golfPin(a.key) && <PinPiece pin={{ ...golfPin(a.key)!, num: undefined }} earned size={38} />}</span>
+                                            : a.kind === "trophy"
                                             ? <img src={TROPHIES.find((t) => String(t.at) === a.key)?.src ?? TROPHIES[0].src} alt="" width={40} height={40} className="h-10 w-10 shrink-0" loading="lazy" decoding="async" draggable={false} />
                                             : <span className="flex h-10 w-10 shrink-0 items-center justify-center"><MarkerArt bookId={a.kind === "all" ? STAMP_ALL_OPEN : a.key} size={36} earned /></span>}
                                         <span className="min-w-0 flex-1 text-[14px] text-[#FFFFFF] break-keep">{awardLabel(a.kind, a.key)}</span>
