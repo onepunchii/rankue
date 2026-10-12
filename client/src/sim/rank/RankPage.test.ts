@@ -115,7 +115,9 @@ describe("RankPage", () => {
         const h = mount(ladder());
         await settle(h, () => text(h).includes("고수"));
         expect(h.container.querySelector(`[role=group][aria-label="${ko["sim.rank.scopeAria"]}"]`)).toBeNull();
-        for (const k of ["sim.rank.scopeAll", "sim.rank.scopePick"] as const) expect(Array.from(h.container.querySelectorAll("button, label")).some((b) => b.textContent?.trim() === ko[k])).toBe(false);
+        // 예전 범위 칩의 글자(전체 · 나라 고르기) — 문구도 사전에서 뺐다(2026-10-12)
+        for (const label of ["전체", "나라 고르기"]) expect(Array.from(h.container.querySelectorAll("button, label")).some((b) => b.textContent?.trim() === label)).toBe(false);
+        expect(ko["sim.rank.scopePick"]).toBeUndefined();
         expect((h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls[0][0]).toEqual({ gameType: "3c", country: null });
         // 다른 나라 사람도 같은 목록에 있다 — 국기로만 표시한다
         expect(h.container.querySelectorAll("ol li")).toHaveLength(3);
@@ -148,5 +150,105 @@ describe("RankPage", () => {
         } finally {
             if (desc) Object.defineProperty(nav, "language", desc); else delete (nav as unknown as Record<string, unknown>).language;
         }
+    });
+});
+
+/**
+ * [이달] [통산] 탭(2026-10-12 오너: "랭킹을 달로 해야겠지? … 매월초가 되면 리셋되고 그렇지?" → "추천대로").
+ * 통산 등급은 그대로 두고, 그 달에 올린 점수로 겨루는 '이달의 랭킹'을 따로 둔다.
+ */
+describe("RankPage: 이달 · 통산", () => {
+    const NOW = Date.UTC(2026, 9, 12, 6);   // 한국 시각 2026-10-12 15시
+    const monthly = (month: string): import("./rankApi").MonthlyRank => month === "2026-09"
+        ? { month, minMatches: 5, rows: [{ memberId: "a", name: "고수", country: "KR", points: 94, matches: 13, wins: 12, rank: 1, tier: "master" }], total: 1, players: 4, me: { points: 0, matches: 0, wins: 0, rank: null, tier: "gold" }, months: ["2026-10", "2026-09"] }
+        : {
+            month, minMatches: 5, total: 2, players: 5, months: ["2026-10", "2026-09"],
+            rows: [
+                { memberId: "a", name: "고수", country: "KR", points: 47, matches: 9, wins: 7, rank: 1, tier: "master" },
+                { memberId: "me", name: "나", country: "KR", points: -12, matches: 6, wins: 2, rank: 2, tier: "gold" },
+            ],
+            me: { points: -12, matches: 6, wins: 2, rank: 2, tier: "gold" },
+        };
+    function mountM(opts: { initialScope?: "month" | "all"; me?: import("./rankApi").MonthlyRank["me"] } = {}) {
+        const container = document.createElement("div");
+        document.body.appendChild(container);
+        const root = createRoot(container);
+        const qc = new rq.QueryClient({ defaultOptions: { queries: { retry: false } } });
+        const getMonthly = vi.fn(async (q: { gameType: string; month?: string }) => { const m = monthly(q.month ?? "2026-10"); return opts.me ? { ...m, me: opts.me, rows: m.rows.filter((r) => r.memberId !== "me") } : m; });
+        const api: RankApi = { getLadder: vi.fn(async () => ladder()), setCountry: vi.fn(async () => undefined), getMonthly };
+        const realNow = Date.now;
+        Date.now = () => NOW;
+        React.act(() => { root.render(React.createElement(rq.QueryClientProvider, { client: qc }, React.createElement(RankPage, { onClose: () => undefined, api, initialScope: opts.initialScope }))); });
+        const h = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); Date.now = realNow; }, api, getMonthly };
+        live.push(h);
+        return h;
+    }
+    const tab = (h: Harness, k: "month" | "all") => h.container.querySelector(`[data-testid=rank-scope-${k}]`)!;
+
+    it("처음은 이달 탭 — 이달 점수(부호) · 순위 · 전적, 목록의 점수는 +/− 로", async () => {
+        const h = mountM();
+        await settle(h, () => h.container.querySelector("[data-testid=rank-monthly-me]") !== null);
+        expect(tab(h, "month").getAttribute("aria-selected")).toBe("true");
+        expect(h.getMonthly).toHaveBeenCalledWith({ gameType: "3c", month: "2026-10" });
+        const me = h.container.querySelector("[data-testid=rank-monthly-me]")!;
+        expect(me.querySelector("[data-points]")!.textContent).toBe("−12");
+        expect(me.textContent).toContain(ko["sim.rank.rankOf"].replace("{r}", "2").replace("{n}", "2"));
+        expect(me.textContent).toContain("2승 4패");
+        expect(me.textContent).toContain(ko["sim.rank.monthHint"]);
+        const rows = h.container.querySelectorAll("[data-testid=rank-monthly] ol li");
+        expect(Array.from(rows).map((r) => r.textContent)).toEqual([expect.stringContaining("+47"), expect.stringContaining("−12")]);
+        expect(rows[1].className).toContain("hall-row-mine");
+        // 이름 옆 배지는 통산 등급이다
+        expect(Array.from(rows[0].querySelectorAll("img")).map((i) => i.getAttribute("src"))).toEqual(["/sim/rank/medal-1.webp", "/sim/rank/tier-master.webp"]);
+        // 통산의 내 카드(레이팅)는 이 탭에 없다
+        expect(h.container.querySelector("[data-testid=rank-me]")).toBeNull();
+        expect(h.container.querySelector("[data-testid=rank-month-label]")!.textContent).toContain("2026");
+        expect(text(h)).toContain(ko["sim.rank.monthDaysLeft"].replace("{n}", "20"));
+    });
+
+    it("통산 탭으로 바꾸면 예전의 레이팅 사다리 — initialScope=all 이면 처음부터", async () => {
+        const h = mountM();
+        await settle(h, () => h.container.querySelector("[data-testid=rank-monthly-me]") !== null);
+        click(tab(h, "all"));
+        await settle(h, () => h.container.querySelector("[data-testid=rank-me]") !== null);
+        expect(h.container.querySelector("[data-testid=rank-monthly]")).toBeNull();
+        expect(h.container.querySelector("[data-testid=rank-me] [data-rating]")!.textContent).toBe("1160");
+        const h2 = mountM({ initialScope: "all" });
+        await settle(h2, () => h2.container.querySelector("[data-testid=rank-me]") !== null);
+        expect(tab(h2, "all").getAttribute("aria-selected")).toBe("true");
+        expect(h2.getMonthly).not.toHaveBeenCalled();
+    });
+
+    it("그 달 5판 전에는 순위가 없다 — 남은 판 수를 말한다", async () => {
+        const h = mountM({ me: { points: 24, matches: 3, wins: 3, rank: null, tier: null } });
+        await settle(h, () => h.container.querySelector("[data-testid=rank-monthly-me]") !== null);
+        const me = h.container.querySelector("[data-testid=rank-monthly-me]")!;
+        expect(me.querySelector("[data-points]")!.textContent).toBe("+24");
+        expect(me.textContent).toContain(ko["sim.rank.monthNeed"].replace("{n}", "3").replace("{m}", "5").replace("{left}", "2"));
+        // 배치 전이면 배지가 없다(실루엣)
+        expect(me.querySelector("img")!.getAttribute("style")).toContain("grayscale(1)");
+    });
+
+    it("지난 달로 넘겨 본다 — 마감된 달, 이번 달보다 뒤로는 못 간다", async () => {
+        const h = mountM();
+        await settle(h, () => h.container.querySelector("[data-testid=rank-monthly-me]") !== null);
+        const btn = (label: string) => Array.from(h.container.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === label) as HTMLButtonElement;
+        expect(btn(ko["sim.rank.monthNext"]).disabled).toBe(true);
+        click(btn(ko["sim.rank.monthPrev"]));
+        // '마감된 달'은 달을 넘기자마자 뜬다 — 그 달의 답이 올 때까지 기다린다
+        await settle(h, () => text(h).includes("+94"));
+        expect(text(h)).toContain(ko["sim.rank.monthClosed"]);
+        expect(h.getMonthly).toHaveBeenLastCalledWith({ gameType: "3c", month: "2026-09" });
+        expect(text(h)).toContain(ko["sim.rank.monthPointsClosed"]);
+        expect(text(h)).not.toContain(ko["sim.rank.monthHint"]);
+        // 대전이 있었던 가장 옛 달이라 더 앞으로는 못 간다
+        expect(btn(ko["sim.rank.monthPrev"]).disabled).toBe(true);
+        expect(btn(ko["sim.rank.monthNext"]).disabled).toBe(false);
+    });
+
+    it("이달의 랭킹을 주지 않는 api(옛 주입)면 탭 없이 통산만", async () => {
+        const h = mount(ladder());
+        await settle(h, () => h.container.querySelector("[data-testid=rank-me]") !== null);
+        expect(h.container.querySelector("[role=tablist]")).toBeNull();
     });
 });

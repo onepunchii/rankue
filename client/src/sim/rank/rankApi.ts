@@ -1,6 +1,7 @@
 /** GET /sim/rank 클라이언트 + 국가 저장(PATCH /me). 값은 전부 hiq_sim_ratings(온라인 대전 Elo) — 실전 RP 와 무관. */
 import { apiRequest } from "@/lib/queryClient";
 import type { DashGameType, DashTableId } from "../dash/dashApi";
+import { TIERS, type TierId } from "@shared/sim/rank";
 
 export interface RankRow {
     readonly memberId: string;
@@ -70,9 +71,69 @@ export function parseRankLadder(raw: unknown): RankLadder {
     };
 }
 
+/* ── 이달의 랭킹(2026-10-12) — 그 달에 올린 점수. 통산 레이팅과 따로, 매월 1일 0 에서 시작한다(shared/simMonthly) ── */
+
+export interface MonthlyRankRow {
+    readonly memberId: string;
+    readonly name: string;
+    readonly country: string | null;
+    /** 이달에 올린 점수(잃으면 음수) */
+    readonly points: number;
+    readonly matches: number;
+    readonly wins: number;
+    readonly rank: number;
+    /** 지금 통산 등급(배치 전이면 null) — 이름 옆 배지 */
+    readonly tier: TierId | null;
+}
+export interface MonthlyRank {
+    /** "2026-10" */
+    readonly month: string;
+    /** 순위에 오르는 최소 판 수 */
+    readonly minMatches: number;
+    readonly rows: readonly MonthlyRankRow[];
+    /** 순위에 오른 사람 수 */
+    readonly total: number;
+    /** 그 달에 한 판이라도 친 사람 수 */
+    readonly players: number;
+    readonly me: { readonly points: number; readonly matches: number; readonly wins: number; readonly rank: number | null; readonly tier: TierId | null };
+    /** 대전이 있었던 달들(최근 달부터) */
+    readonly months: readonly string[];
+}
+export interface MonthlyQuery { readonly gameType: DashGameType; readonly month?: string }
+
+export function monthlyRankUrl(q: MonthlyQuery): string {
+    const p = new URLSearchParams({ gameType: q.gameType });
+    if (q.month) p.set("month", q.month);
+    return `/api/hiq/sim/rank/monthly?${p.toString()}`;
+}
+
+const tierOrNull = (v: unknown): TierId | null => (typeof v === "string" && TIERS.some((t) => t.id === v) ? (v as TierId) : null);
+const monthOr = (v: unknown, d: string): string => (typeof v === "string" && /^\d{4}-(0[1-9]|1[0-2])$/.test(v) ? v : d);
+
+export function parseMonthlyRank(raw: unknown, fallbackMonth = ""): MonthlyRank {
+    const o = rec(raw);
+    const rows = Array.isArray(o.rows) ? o.rows.map(rec) : [];
+    const me = rec(o.me);
+    const month = monthOr(o.month, fallbackMonth);
+    return {
+        month,
+        minMatches: num(o.minMatches, 5),
+        rows: rows.filter((r) => typeof r.memberId === "string").map((r) => ({
+            memberId: String(r.memberId), name: typeof r.name === "string" ? r.name : "", country: cc(r.country),
+            points: num(r.points), matches: num(r.matches), wins: num(r.wins), rank: num(r.rank), tier: tierOrNull(r.tier),
+        })),
+        total: num(o.total),
+        players: num(o.players),
+        me: { points: num(me.points), matches: num(me.matches), wins: num(me.wins), rank: numOrNull(me.rank), tier: tierOrNull(me.tier) },
+        months: (Array.isArray(o.months) ? o.months : []).filter((m): m is string => typeof m === "string" && monthOr(m, "") !== ""),
+    };
+}
+
 export interface RankApi {
     getLadder(q: RankQuery): Promise<RankLadder>;
     setCountry(code: string): Promise<void>;
+    /** 이달의 랭킹. 옛 주입(시험)에는 없을 수 있다 — 없으면 화면이 통산만 보여 준다 */
+    getMonthly?(q: MonthlyQuery): Promise<MonthlyRank>;
 }
 
 export type Request = (url: string, options?: { method?: string; body?: unknown }) => Promise<unknown>;
@@ -81,6 +142,7 @@ export function createRankApi(request: Request): RankApi {
     return {
         async getLadder(q) { return parseRankLadder(await request(rankUrl(q))); },
         async setCountry(code) { await request("/api/hiq/me", { method: "PATCH", body: { country: code } }); },
+        async getMonthly(q) { return parseMonthlyRank(await request(monthlyRankUrl(q)), q.month ?? ""); },
     };
 }
 

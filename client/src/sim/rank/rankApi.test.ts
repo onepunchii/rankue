@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
-import { createRankApi, parseRankLadder, rankUrl } from "./rankApi";
+import { createRankApi, monthlyRankUrl, parseMonthlyRank, parseRankLadder, rankUrl } from "./rankApi";
 import { guessCountry, isCountryCode, countryName } from "./country";
 
 describe("rankApi", () => {
@@ -38,5 +38,36 @@ describe("rankApi", () => {
         expect(isCountryCode("kr")).toBe(false);
         expect(countryName("KR", "ko")).toBe("대한민국");
         expect(countryName(null, "ko")).toBe("");
+    });
+});
+
+/** 이달의 랭킹(2026-10-12) — 그 달에 올린 점수. 통산 레이팅과 따로다. */
+describe("rankApi: 이달의 랭킹", () => {
+    it("URL: 종목, 달은 줄 때만", () => {
+        expect(monthlyRankUrl({ gameType: "3c" })).toBe("/api/hiq/sim/rank/monthly?gameType=3c");
+        expect(monthlyRankUrl({ gameType: "4c", month: "2026-09" })).toBe("/api/hiq/sim/rank/monthly?gameType=4c&month=2026-09");
+    });
+    it("파서: 음수 점수 · 모르는 등급 · 깨진 달 · 순위 없는 나", () => {
+        const m = parseMonthlyRank({
+            month: "2026-10", minMatches: "5", total: 2, players: "6",
+            rows: [{ memberId: "a", name: "가", country: "KR", points: "-34", matches: 20, wins: 11, rank: 3, tier: "iron" }, { memberId: "b", name: "나", country: "korea", points: 12, matches: 5, wins: 3, rank: 4, tier: "legend" }, { name: "no id" }],
+            me: { points: 24, matches: 3, wins: 3, rank: null, tier: null },
+            months: ["2026-10", "2026-09", "2026-13", 7],
+        });
+        expect(m.rows).toEqual([
+            { memberId: "a", name: "가", country: "KR", points: -34, matches: 20, wins: 11, rank: 3, tier: "iron" },
+            { memberId: "b", name: "나", country: null, points: 12, matches: 5, wins: 3, rank: 4, tier: null },
+        ]);
+        expect([m.month, m.minMatches, m.total, m.players]).toEqual(["2026-10", 5, 2, 6]);
+        expect(m.me).toEqual({ points: 24, matches: 3, wins: 3, rank: null, tier: null });
+        expect(m.months).toEqual(["2026-10", "2026-09"]);
+        // 깨진 답 — 달은 물어본 달로, 나머지는 빈 값
+        expect(parseMonthlyRank(undefined, "2026-10")).toMatchObject({ month: "2026-10", rows: [], total: 0, me: { points: 0, rank: null } });
+    });
+    it("요청: getMonthly", async () => {
+        const calls: string[] = [];
+        const api = createRankApi(async (url) => { calls.push(url); return { month: "2026-10", rows: [], me: {} }; });
+        await api.getMonthly!({ gameType: "3c", month: "2026-10" });
+        expect(calls).toEqual(["/api/hiq/sim/rank/monthly?gameType=3c&month=2026-10"]);
     });
 });

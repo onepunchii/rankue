@@ -74,9 +74,13 @@ describe("홈 온라인 대전 배너", () => {
     it("보던 종목의 순위표로 연다(?g=) — 랭킹 화면이 그 값을 받는다", () => {
         expect(banner).toContain("const rankUrl = game ? `${RANK_URL}&g=${game}` : RANK_URL;");
         expect(banner).not.toContain("go(RANK_URL)");
+        // 내 등급(통산)을 누르면 통산 탭으로 — 랭킹 화면의 첫 탭은 '이달'이다(2026-10-12 이달의 랭킹). 랭킹 칸은 첫 탭 그대로
+        expect(banner).toContain("const tierUrl = `${rankUrl}&s=all`;");
+        expect(banner).toContain("onClick={() => go(tierUrl)} data-track-as=\"홈 배너 내 등급\"");
+        expect(banner).toContain("onClick={() => go(rankUrl)} trackAs=\"홈 배너 랭킹\"");
         const page = code(client("sim/SimulatorPage.tsx"));
         expect(page).toContain('const rankGame = params.get("g") === "4c" ? "4c" as const : params.get("g") === "3c" ? "3c" as const : undefined;');
-        expect(page).toContain("initial={rankGame ? { gameType: rankGame } : undefined}");
+        expect(page).toContain("initial={rankGame ? { gameType: rankGame } : undefined} initialScope={rankScope}");
     });
 
     it("누른 기록에 숫자가 남지 않게 단추마다 이름표가 있다(방문자 발자국)", () => {

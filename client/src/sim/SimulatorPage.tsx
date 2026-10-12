@@ -234,6 +234,8 @@ export function SimulatorPage() {
     const rankView = params.get("rank") === "1";
     // ?rank=1&g=3c|4c: 그 종목의 순위표로 연다(홈 배너에서 보던 종목 그대로, 2026-10-12). 없으면 랭킹 화면이 고른다(내가 많이 둔 종목).
     const rankGame = params.get("g") === "4c" ? "4c" as const : params.get("g") === "3c" ? "3c" as const : undefined;
+    // ?rank=1&s=all: 통산 탭으로 바로(홈 배너 · 대시보드의 '내 등급'에서). 없으면 이달 탭(2026-10-12 이달의 랭킹).
+    const rankScope = params.get("s") === "all" ? "all" as const : params.get("s") === "month" ? "month" as const : undefined;
     // ?watch=<대전 id> 관전·다시보기(2026-09-12 오너). 읽기 전용 화면이라 시뮬레이터 세션을 열지 않는다.
     const watchId = params.get("watch");
     // ?join=<code>[&auto=1]: 푸시 초대 딥링크. auto 면 비밀번호 없는 대기 방에 바로 참가, 아니면 코드가 채워진 참가 화면
@@ -1900,7 +1902,7 @@ export function SimulatorPage() {
             )}
             {showRank && (
                 <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    <RankPage onClose={() => navigate(ENTRY_PATH, { replace: true })} initial={rankGame ? { gameType: rankGame } : undefined} />
+                    <RankPage onClose={() => navigate(ENTRY_PATH, { replace: true })} initial={rankGame ? { gameType: rankGame } : undefined} initialScope={rankScope} />
                 </div>
             )}
             {/* 관전·다시보기: 읽기 전용 화면을 위에 덮는다(대전 화면·시뮬 세션과 완전히 분리) */}
@@ -1928,7 +1930,7 @@ export function SimulatorPage() {
                         onPractice={() => { navigate("/online-game?solo=1", { replace: true }); setSetupOpen(true); }}
                         onDrills={() => navigate("/online-game?drills=1")}
                         onLobby={() => navigate("/online-game?lobby=1")}
-                        onRank={() => navigate("/online-game?rank=1")}
+                        onRank={() => navigate("/online-game?rank=1&s=all")}
                     />
                 </div>
             )}

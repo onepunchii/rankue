@@ -8,6 +8,10 @@
  *    다음에 얻을 것이 보이게 한다(갖고 싶게).
  *  - 색·광택은 .rank-hall 아래에만(index.css). 예전의 보라 판(.rank-arcade, 2026-09-09)은 이 화면에서 뺐다.
  * 순위표는 나라 구분 없이 하나다(2026-10-12 오너: "국가별인데 통합하는 건 어때?") — 예전의 범위 칩(전체 / 내 나라 / 나라 고르기)과 국가 순위 줄을 뺐다. 국기는 이름 옆에 남는다.
+ * 2026-10-12(오너: "랭킹을 달로 해야겠지? … 매월초가 되면 리셋되고 그렇지?" → "추천대로"): 탭 둘 — **[이달] [통산]**.
+ *  - 이달: 그 달에 올린 점수로 겨루는 판(./MonthlyRank). 매월 1일 0 에서 시작한다. 처음 열면 이 탭이다.
+ *  - 통산: 예전 그대로의 레이팅 · 등급 사다리. 등급은 달이 바뀌어도 지워지지 않는다.
+ *  `?rank=1&s=all` 로 통산을 바로 연다(홈 배너 · 대시보드의 '내 등급'에서 들어올 때).
  * 내 나라가 없으면 기기 언어의 지역으로 한 번 저장하고(PATCH /me), 카드의 "내 나라 바꾸기"로 고친다. 값은 온라인 대전 Elo 뿐 — 실전 RP 와 무관.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,13 +27,18 @@ import { COUNTRY_OPTIONS, countryName, guessCountry, isCountryCode } from "./cou
 import { rankFlag } from "./flag";
 import { rankApi as defaultApi, RANK_QUERY_KEY, type RankApi } from "./rankApi";
 import { RANK_TROPHY_SRC, TIER_GLOW, TierEmblem } from "./TierEmblem";
+import { MonthlyRank } from "./MonthlyRank";
 
 export interface RankPageProps {
     onClose: () => void;
     api?: RankApi;
     /** 처음 보여줄 종목 */
     initial?: { gameType: DashGameType };
+    /** 처음 보여줄 탭 — 안 주면 이달(이달의 랭킹을 주는 api 일 때). */
+    initialScope?: RankScope;
 }
+
+export type RankScope = "month" | "all";
 
 /** 2026-09-12 오너: "대대 중대 통합해줘" — 사다리는 종목 둘뿐이다(인원이 적어 넷으로 쪼개면 한 판에 서너 명이었다). */
 const COMBOS: readonly { gameType: DashGameType }[] = [{ gameType: "3c" }, { gameType: "4c" }];
@@ -37,7 +46,7 @@ const pill = "h-10 px-3.5 shrink-0 inline-flex items-center rounded-pill border 
 const chipOn = "border-transparent bg-[color:var(--hall-lime)] text-[#0B1A03]";
 const chipOff = "border-white/15 bg-white/[0.08] text-white/85 active:bg-white/15";
 
-export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) {
+export function RankPage({ onClose, api = defaultApi, initial, initialScope }: RankPageProps) {
     const { t, locale } = useT();
     const { member } = useAuth();
     const qc = useQueryClient();
@@ -45,6 +54,9 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
     // 첫 화면은 사람이 있는 곳으로: 내가 가장 많이 친 조합 → 없으면 등재자가 가장 많은 조합(2026-09-09 오너).
     // 링크로 조합을 지정해 들어왔거나(initial) 사용자가 한 번이라도 고른 뒤에는 건드리지 않는다.
     const pickedRef = useRef(!!initial);
+    // 탭: 이달 | 통산. 이달의 랭킹을 주지 않는 api(옛 주입)면 통산만 보여 준다.
+    const hasMonthly = typeof api.getMonthly === "function";
+    const [scope, setScope] = useState<RankScope>(hasMonthly ? (initialScope ?? "month") : "all");
     // 나라로 나누지 않는다 — 순위표는 하나다(2026-10-12 오너: "온라인대전 레이팅 랭킹 지금 … 국가별인데 통합하는 건 어때?").
     // 순위에 오른 사람이 3쿠션 7명 · 4구 3명이고 그중 서너 명은 나라가 비어 있었다 — 나라로 거르면 세 명짜리 목록이 되고, 나라가 빈 사람은 어디에도 안 나왔다.
     // 예전의 범위 칩(전체 · 내 나라 · 나라 고르기)과 '내 나라 순위' 줄을 뺐다. 이름 옆 국기와 '내 나라' 고르기는 그대로다(대전 화면의 국기도 이 값이다).
@@ -125,15 +137,32 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
                     })}
                 </div>
 
-                {q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.rank.loading")}</p>}
-                {q.isError && (
+                {hasMonthly && (
+                    <div role="tablist" aria-label={t("sim.rank.periodAria")} className="grid grid-cols-2 p-1 rounded-pill bg-white/[0.07] border border-white/10 mb-4">
+                        {(["month", "all"] as const).map((k) => (
+                            <button
+                                key={k} type="button" role="tab" aria-selected={scope === k} onClick={() => setScope(k)} data-testid={`rank-scope-${k}`}
+                                className={cn("h-10 rounded-pill text-[13.5px] font-black transition-colors", scope === k ? "bg-white text-[#14110d]" : "text-white/70 active:bg-white/10")}
+                            >
+                                {t(k === "month" ? "sim.rank.periodMonth" : "sim.rank.periodAll")}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
+                {scope === "month" && hasMonthly && (
+                    <MonthlyRank gameType={combo.gameType} api={api} myMemberId={member?.id} locale={locale} />
+                )}
+
+                {scope === "all" && q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.rank.loading")}</p>}
+                {scope === "all" && q.isError && (
                     <div className="flex items-center justify-between gap-3 min-h-11">
                         <p className="text-[13px] font-medium text-ink-2">{t("sim.rank.failed")}</p>
                         <button type="button" onClick={() => { void q.refetch(); }} className={cn(pill, chipOff)}>{t("sim.match.retry")}</button>
                     </div>
                 )}
 
-                {data && status && (
+                {scope === "all" && data && status && (
                     <div className={cn("flex flex-col gap-4", q.isFetching && "opacity-80")}>
                         <section className="hall-me rounded-[22px] px-4 pt-3 pb-4" aria-label={t("sim.rank.myTitle")} data-testid="rank-me">
                             <div className="flex items-center gap-2">

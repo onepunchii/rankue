@@ -12,6 +12,12 @@ import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS, START_ABSENT_GRACE_MS, R
 import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
 import { CHAT_PAGE_MAX, chatReject, type ChatReject } from "../../shared/sim/chat.js";
 import { ratingEligibility, ratingDelta, START_RATING, SAME_PAIR_WINDOW_MS, MIN_SHOTS_EACH, AT_FAULT_END_REASONS, type RatingResult } from "../../shared/sim/rating.js";
+import { MONTHLY_MIN_MATCHES, monthlyBoard, monthsWithMatches, replayDeltas, type FinishedMatchRow } from "../../shared/simMonthly.js";
+import { tierFor } from "../../shared/sim/rank.js";
+
+/** 이달의 랭킹 재료(끝난 대전 전부)를 잠깐 간직한다 — 서버리스 인스턴스마다 따로이고 1분이면 버린다 */
+const REPLAY_CACHE_MS = 60_000;
+let replayCache: { at: number; rows: FinishedMatchRow[] } | null = null;
 
 const LIVE = ["waiting", "playing"] as const;
 /** 접속 표시 갱신 간격(폴링마다 쓰지 않고 이 간격이 지났을 때만) */
@@ -713,6 +719,76 @@ export class SimMatchRepository {
                          and s.player_index = (case when x.winner_id = x.host_id then 1 else 0 end)) >= 1)
               )`)).rows as { n: number }[];
         return Number(row?.n ?? 0);
+    }
+
+    /**
+     * 끝난 대전 모두(끝난 순서대로) — 이달의 랭킹이 판마다의 레이팅 변화를 다시 계산한다(shared/simMonthly replayDeltas).
+     * 아래 recomputeRatings 와 **같은 순서 · 같은 재료**다(순서가 다르면 '같은 상대 연속 판' 세기가 달라진다).
+     * 2026-10-12 부터 남는 그 판의 변화(rating_result.delta)도 같이 읽는다 — 있으면 그 값이 정본이다.
+     * 판마다 샷 수를 세므로 가볍지 않다 — monthlyLadder 가 1분 간직한다.
+     */
+    private async finishedForReplay(): Promise<FinishedMatchRow[]> {
+        const rows = (await db.execute(sql`
+            select m.id, m.host_id, m.guest_id, m.game_type, m.handicap, m.winner_id, m.end_reason,
+                   extract(epoch from coalesce(m.finished_at, m.last_shot_at, m.created_at)) * 1000 as ended_ms,
+                   (m.rating_result->>'delta') as stored_delta,
+                   (select count(*)::int from hiq_sim_match_shots s where s.match_id = m.id and s.player_index = 0) as s0,
+                   (select count(*)::int from hiq_sim_match_shots s where s.match_id = m.id and s.player_index = 1) as s1
+            from hiq_sim_matches m
+            where m.status = 'finished' and m.guest_id is not null
+            order by coalesce(m.finished_at, m.last_shot_at, m.created_at) asc, m.id asc`)).rows as Record<string, unknown>[];
+        return rows.map((r) => ({
+            id: String(r.id), hostId: String(r.host_id), guestId: String(r.guest_id), gameType: String(r.game_type) as "3c" | "4c",
+            handicap: r.handicap === true, winnerId: r.winner_id ? String(r.winner_id) : null,
+            endReason: r.end_reason == null ? null : String(r.end_reason),
+            endedMs: Number(r.ended_ms), shots: [Number(r.s0), Number(r.s1)] as const,
+            storedDelta: r.stored_delta == null || r.stored_delta === "" ? null : Number(r.stored_delta),
+        }));
+    }
+
+    /**
+     * 이달의 랭킹(2026-10-12 오너: "랭킹을 달로 … 매월초가 되면 리셋" → 통산 등급은 두고 '이달의 랭킹'을 따로).
+     * 그 달(한국 시각)에 끝난 대전의 레이팅 변화를 더한 점수. 순위는 그 달 MONTHLY_MIN_MATCHES 판을 친 사람만.
+     * 규칙은 shared/simMonthly — 여기는 재료를 읽고 이름 · 국기 · 지금 등급을 붙일 뿐이다. 아무것도 쓰지 않는다.
+     */
+    async monthlyLadder(memberId: string, gameType: "3c" | "4c", month: string, limit = 100, placement = 3) {
+        const now = Date.now();
+        if (!replayCache || now - replayCache.at > REPLAY_CACHE_MS) replayCache = { at: now, rows: await this.finishedForReplay() };
+        const deltas = replayDeltas(replayCache.rows);
+        const board = monthlyBoard(deltas, month, gameType);
+        const ranked = board.filter((r) => r.rank !== null);
+        const top = ranked.slice(0, limit);
+        const mine = board.find((r) => r.memberId === memberId) ?? null;
+        const ids = [...new Set([...top.map((r) => r.memberId), memberId])];
+        const people = await db.select({
+            id: hiqMembers.id, name: hiqMembers.name, country: hiqMembers.country,
+            rating: hiqSimMatchRatings.rating, rated: hiqSimMatchRatings.matches,
+        }).from(hiqMembers)
+            .leftJoin(hiqSimMatchRatings, and(eq(hiqSimMatchRatings.memberId, hiqMembers.id), eq(hiqSimMatchRatings.gameType, gameType)))
+            .where(inArray(hiqMembers.id, ids));
+        type Person = { name: string; country: string | null; rating: number | null; rated: number | null };
+        const who = new Map<string, Person>((people as { id: string; name: string; country: string | null; rating: number | null; rated: number | null }[])
+            .map((p) => [String(p.id), { name: p.name, country: p.country ?? null, rating: p.rating ?? null, rated: p.rated ?? null }]));
+        const tierOf = (id: string) => {
+            const p = who.get(id);
+            return p && typeof p.rating === "number" && Number(p.rated ?? 0) >= placement ? tierFor(p.rating).id : null;
+        };
+        const months = monthsWithMatches(deltas, gameType);
+        return {
+            month, minMatches: MONTHLY_MIN_MATCHES,
+            // 탈퇴한 회원의 줄은 뺀다(이름이 없다) — 등수는 그대로 둔다
+            rows: top.filter((r) => who.has(r.memberId)).map((r) => ({
+                memberId: r.memberId, name: String(who.get(r.memberId)!.name), country: who.get(r.memberId)!.country ?? null,
+                points: r.points, matches: r.matches, wins: r.wins, rank: r.rank as number, tier: tierOf(r.memberId),
+            })),
+            /** 순위에 오른 사람 수 · 그 달에 한 판이라도 친 사람 수 */
+            total: ranked.length, players: board.length,
+            me: mine
+                ? { points: mine.points, matches: mine.matches, wins: mine.wins, rank: mine.rank, tier: tierOf(memberId) }
+                : { points: 0, matches: 0, wins: 0, rank: null, tier: tierOf(memberId) },
+            /** 대전이 있었던 달들(최근 달부터) — 지난 달 보기. 이번 달은 늘 들어 있다 */
+            months: months.includes(month) ? months : [month, ...months].sort().reverse(),
+        };
     }
 
     /**

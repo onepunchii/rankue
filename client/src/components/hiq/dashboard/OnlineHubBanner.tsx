@@ -87,6 +87,8 @@ export function OnlineHubBanner() {
     const caption = `${t("home.hubLabel")}${game && !s.canSwap ? ` · ${gameName}` : ""}`;
     // 보던 종목의 순위표로 연다(?g=) — 4구를 보다가 눌렀는데 3쿠션 순위표가 뜨지 않게
     const rankUrl = game ? `${RANK_URL}&g=${game}` : RANK_URL;
+    // 내 등급(통산)을 누르면 통산 탭으로 — 랭킹 화면의 첫 탭은 '이달'이다(2026-10-12 이달의 랭킹)
+    const tierUrl = `${rankUrl}&s=all`;
     const record = (w: number, l: number) => t("sim.entry.record").replace("{w}", String(w)).replace("{l}", String(l));
 
     const rankSub = s.kind === "ranked" && s.rank !== null
@@ -109,7 +111,7 @@ export function OnlineHubBanner() {
     } else if (s.kind === "ranked") {
         const glow = TIER_GLOW[s.tier.id];
         hero = (
-            <button type="button" onClick={() => go(rankUrl)} data-track-as="홈 배너 내 등급" data-testid="hub-hero"
+            <button type="button" onClick={() => go(tierUrl)} data-track-as="홈 배너 내 등급" data-testid="hub-hero"
                 className="w-full px-4 pt-4 pb-3.5 flex items-center gap-2 text-left min-h-[124px] transition-colors active:bg-white/[0.05]">
                 <span className="hall-emblem shrink-0 -ml-1.5"><TierEmblem tier={s.tier.id} size={96} glow /></span>
                 <span className="flex-1 min-w-0">

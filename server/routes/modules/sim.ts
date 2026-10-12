@@ -23,6 +23,7 @@ import {
 } from "../../../shared/sim/rules/index.js";
 import { openingLayout, isValidLayout } from "../../../shared/sim/layouts.js";
 import { tierFor } from "../../../shared/sim/rank.js";
+import { isMonthId, kstMonthOf } from "../../../shared/simMonthly.js";
 
 const router = Router();
 
@@ -155,6 +156,17 @@ router.get("/sim/rank", requireAuth, asyncHandler(async (req: AuthRequest, res: 
     const country = /^[A-Z]{2}$/.test(raw) ? raw : null;
     const limit = Math.min(200, Math.max(10, Number(req.query.limit) || 100));
     return sendSuccess(res, await storage.sim.rankLadder(req.userId!, gameType, country, limit, PLACEMENT_MATCHES));
+}));
+
+/**
+ * GET /sim/rank/monthly?gameType=3c|4c&month=YYYY-MM — 이달의 랭킹(2026-10-12 오너: "랭킹을 달로 … 매월초가 되면 리셋").
+ * 통산 레이팅(GET /sim/rank)은 그대로 두고, 그 달(한국 시각)에 올린 점수만 따로 센다 — 매월 1일 0 에서 시작한다.
+ * month 를 안 주면 이번 달. 지난 달도 볼 수 있다(장식장의 근거).
+ */
+router.get("/sim/rank/monthly", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const gameType = req.query.gameType === "4c" ? "4c" : "3c";
+    const month = isMonthId(req.query.month) ? req.query.month : kstMonthOf(Date.now());
+    return sendSuccess(res, await storage.simMatch.monthlyLadder(req.userId!, gameType, month, 100, PLACEMENT_MATCHES));
 }));
 
 // GET /sim/rank/me — 네 판의 내 대전 순위(진입 화면 '랭킹' 줄). 랭킹 화면을 네 번 부르지 않으려고 따로 둔다.
