@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { storeCover } from "@shared/pageCovers";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute, useSearch } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
@@ -276,23 +277,36 @@ export default function StoreListingPage() {
   return (
     <div className="min-h-screen w-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans">
       <div className="mx-auto max-w-2xl px-5 py-12 pb-28 md:pb-12">
-        <button onClick={() => setLocation("/stores")} className="text-[13.5px] font-semibold text-black/50 mb-5 hover:text-black/70">
-          ← {t.back}
-        </button>
+        {/* 매장 자료가 오기 전 · 못 찾았을 때만 맨 위에 둔다. 자료가 오면 표지 그림 위로 올라간다 */}
+        {!s && (
+          <button onClick={() => setLocation("/stores")} className="text-[13.5px] font-semibold text-black/50 mb-5 hover:text-black/70">
+            ← {t.back}
+          </button>
+        )}
 
         {isLoading && <div className="h-40 bg-black/[0.04] rounded-2xl animate-pulse" />}
         {!isLoading && !s && <p className="text-center text-black/45 py-16 text-[14px]">{t.notFound}</p>}
 
         {s && (
           <>
-            <header className="mb-6">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h1 className="text-[26px] font-bold tracking-tight">{s.name}</h1>
-                <span className={`px-2 py-1 rounded-full text-[11px] font-bold leading-none ${s.claimed ? "bg-brand/10 text-brand" : "bg-black/[0.05] text-black/45"}`}>
-                  {s.claimed ? t.verified : t.unverified}
-                </span>
+            {/* 표지 그림(2026-10-12) — 네 장을 매장 코드로 나눠 쓴다(shared/pageCovers storeCover). 이 매장의 사진이 아니라 장식이다.
+                이름 · 인증 표시 · 지역이 그림의 어두운 아래쪽에 놓인다. 좁은 화면에서는 양 끝까지, 넓은 화면에서는 둥근 판 */}
+            <header className="relative -mx-5 -mt-12 mb-6 h-[212px] overflow-hidden md:mx-0 md:mt-0 md:rounded-3xl" data-testid="store-cover">
+              <img src={storeCover(s.code)} alt="" aria-hidden width={880} height={440} draggable={false} decoding="async" className="absolute inset-0 h-full w-full select-none object-cover" />
+              <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.34) 0%, rgba(0,0,0,0.02) 34%, rgba(6,42,30,0.9) 100%)" }} />
+              {/* 밝은 그림(주판알 점수판) 위에서도 읽히게 어두운 유리 알약에 담는다 */}
+              <button onClick={() => setLocation("/stores")} className="absolute left-3 top-3 h-10 px-3.5 rounded-full bg-[#00000059] backdrop-blur-[6px] text-[13.5px] font-semibold text-[#FFFFFF]">
+                ← {t.back}
+              </button>
+              <div className="absolute inset-x-5 bottom-4">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h1 className="text-[26px] font-bold tracking-tight text-[#FFFFFF]">{s.name}</h1>
+                  <span className={`px-2 py-1 rounded-full text-[11px] font-bold leading-none ${s.claimed ? "bg-[#FFFFFF] text-brand" : "bg-[#FFFFFF2E] text-[#FFFFFFE6]"}`}>
+                    {s.claimed ? t.verified : t.unverified}
+                  </span>
+                </div>
+                <p className="text-[14px] text-[#FFFFFFD9] font-semibold mt-1">{s.region}</p>
               </div>
-              <p className="text-[14px] text-brand font-semibold mt-1">{s.region}</p>
             </header>
 
             {/* 매장 QR 로 온 비로그인(2026-10-07 오너: "매장 QR 을 통해 유저가 가입하면 해당 매장 고객으로") — 맨 위에 가입 한 줄.

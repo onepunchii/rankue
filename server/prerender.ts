@@ -10,7 +10,7 @@ import { crewTitle, crewDescription } from "../shared/crewMeta.js";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo } from "../shared/storeMeta.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
-import { cardAlt } from "../shared/ogCards.js";
+import { cardAlt, hubCard } from "../shared/ogCards.js";
 import { COURSE_GALLERY_LIMIT } from "../shared/golfPhoto.js";
 import { storeCardUrl } from "./services/storeCard.js";
 import { LANDING_META, LANDING_FEATURES, LANDING_FAQS, LANDING_CREW, LANDING_LANGS, landingContent } from "../shared/landingContent.js";
@@ -244,6 +244,10 @@ export function page(p: PageParts): string {
     .join("");
 
   const lang = p.lang ?? "ko";
+  // 썸네일 — ① 그 페이지의 고유 카드(선수 · 매장 · 골프장) ② 목록 페이지의 허브 카드(shared/ogCards hubCard, 2026-10-12)
+  //          ③ 골프 공용 그림 ④ 공용 og.png. 허브 카드는 '골프 공용 그림'보다 먼저다(전국 골프장 · 골프 용어 사전).
+  const hub = (() => { try { return hubCard(ORIGIN, new URL(p.canonical).pathname); } catch { return null; } })();
+  const img = (p.image && p.image.url !== OG_GOLF_IMAGE ? p.image : null) ?? hub ?? p.image ?? null;
   const headMeta = (p.headMeta ?? []).map((m) => `\n  <meta name="${esc(m.name)}" content="${esc(m.content)}" />`).join("");
   return `<!DOCTYPE html>
 <html lang="${esc(lang)}">
@@ -260,14 +264,14 @@ export function page(p: PageParts): string {
   <meta property="og:description" content="${esc(p.desc)}" />
   <meta property="og:url" content="${esc(p.canonical)}" />
   <meta property="og:locale" content="${esc(OG_LOCALE[lang] ?? "ko_KR")}" />
-  <meta property="og:image" content="${esc(p.image?.url ?? OG_IMAGE)}" />
-  <meta property="og:image:width" content="${p.image?.width ?? 1200}" />
-  <meta property="og:image:height" content="${p.image?.height ?? 630}" />
-  <meta property="og:image:alt" content="${esc(p.image?.alt ?? "랭큐 RANKUE — 당구 실력 랭킹·매칭 앱")}" />
+  <meta property="og:image" content="${esc(img?.url ?? OG_IMAGE)}" />
+  <meta property="og:image:width" content="${img?.width ?? 1200}" />
+  <meta property="og:image:height" content="${img?.height ?? 630}" />
+  <meta property="og:image:alt" content="${esc(img?.alt ?? "랭큐 RANKUE — 당구 실력 랭킹·매칭 앱")}" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${esc(p.title)}" />
   <meta name="twitter:description" content="${esc(p.desc)}" />
-  <meta name="twitter:image" content="${esc(p.image?.url ?? OG_IMAGE)}" />${ld}
+  <meta name="twitter:image" content="${esc(img?.url ?? OG_IMAGE)}" />${ld}
 </head>
 <body>
 ${withToc(p.body, p.lang ?? "ko")}

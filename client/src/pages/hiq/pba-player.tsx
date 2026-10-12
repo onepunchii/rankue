@@ -23,6 +23,8 @@ import { seasonLabel, formatPrize } from "./pba";
 import { PBA_INCOME_NOTE_KO, formatPrizeKo, pbaL10n, pbaLatestSeasonRank } from "@shared/pbaMeta";
 import { PBA_RECORDS_MIN_GAMES } from "@shared/pbaRecordsMeta";
 import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
+import { PBA_COVER } from "@shared/pageCovers";
+import { PageCover } from "@/components/hiq/PageCover";
 import {
     pbaAge, pbaDisplayName, pbaGames, pbaPlayerFaq, pbaPlayerLdNodes, pbaPlayerSummary, pbaPrizeLabel, type PbaPlayerProfile,
 } from "@shared/pbaPlayerProfile";
@@ -267,8 +269,10 @@ export default function HiqPbaPlayer() {
 
             {p && (
                 <main className="px-4 flex flex-col gap-3">
+                    {/* 표지 그림(2026-10-12) — 대회장의 조명 아래 당구대. 머리 카드가 그림 아래 끝에 겹쳐 올라온다(카드는 그림보다 위 — relative) */}
+                    <PageCover src={PBA_COVER} className="-mx-4" height={148} overlap={68} fadeFrom={40} />
                     {/* 머리 — 이름·배지·한 문장 요약(AI 검색이 인용하는 첫 문장)·팔로우·카드 */}
-                    <Card className="pt-5">
+                    <Card className="pt-5 relative z-10">
                         <div className="flex items-center gap-3.5">
                             <span className="shrink-0 flex flex-col items-center">
                                 <PlayerPhoto memCode={p.memCode} name={name} size={72} className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhotoShown(true)}>

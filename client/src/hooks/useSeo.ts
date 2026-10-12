@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { hubCard } from "@shared/ogCards";
 
 // SPA 라우트/언어 전환 시 <head> 메타를 갱신한다. Google 등 JS 렌더링 크롤러가
 // 페이지별·언어별 title/description/canonical/OG를 정확히 읽게 하기 위함.
@@ -56,9 +57,11 @@ export function useSeo(opts: SeoOptions | null) {
     upsertMeta("name", "twitter:title", title);
     upsertMeta("name", "twitter:description", description);
     upsertMeta("name", "twitter:url", url);
-    if (image) {
-      upsertMeta("property", "og:image", image);
-      upsertMeta("name", "twitter:image", image);
+    // 고유 그림이 없는 목록 페이지는 허브 카드(shared/ogCards — 프리렌더와 같은 주소). 둘 다 없으면 건드리지 않는다
+    const img = image ?? hubCard(ORIGIN, path)?.url;
+    if (img) {
+      upsertMeta("property", "og:image", img);
+      upsertMeta("name", "twitter:image", img);
     }
     document.documentElement.lang = locale;
 

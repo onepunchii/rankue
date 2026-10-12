@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { STORES_COVER } from "@shared/pageCovers";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
@@ -219,9 +220,14 @@ export default function Stores() {
   return (
     <div className="min-h-screen w-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans">
       <div className="mx-auto max-w-2xl px-5 py-12 pb-28 md:pb-12">
-        <header className="mb-6">
-          <h1 className="text-[28px] font-bold tracking-tight">{t.title}</h1>
-          <p className="text-[14px] text-black/55 mt-1">{t.subtitle}</p>
+        {/* 표지 그림(2026-10-12) — 당구장 한 장. 좁은 화면에서는 양 끝까지, 넓은 화면에서는 둥근 판 */}
+        <header className="relative -mx-5 -mt-12 mb-6 h-[208px] overflow-hidden md:mx-0 md:mt-0 md:rounded-3xl" data-testid="stores-cover">
+          <img src={STORES_COVER} alt="" aria-hidden width={880} height={440} draggable={false} decoding="async" className="absolute inset-0 h-full w-full select-none object-cover" />
+          <div aria-hidden className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(0,0,0,0.05) 30%, rgba(6,42,30,0.86) 100%)" }} />
+          <div className="absolute inset-x-5 bottom-4">
+            <h1 className="text-[28px] font-bold tracking-tight text-[#FFFFFF]">{t.title}</h1>
+            <p className="text-[14px] text-[#FFFFFFD9] mt-1">{t.subtitle}</p>
+          </div>
         </header>
 
         <input

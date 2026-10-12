@@ -7,6 +7,8 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { UmbPlayerBody, usePlayerDetail } from "@/components/hiq/umb/UmbPlayerSheet";
 import type { UmbCategory } from "@/components/hiq/umb/types";
 import { umbPlayerDesc, umbPlayerTitle } from "@shared/siteGraph";
+import { umbCover } from "@shared/pageCovers";
+import { PageCover } from "@/components/hiq/PageCover";
 
 const CATEGORIES = ["players", "ladies", "juniors"];
 
@@ -49,17 +51,20 @@ export default function HiqWorldPlayer() {
 
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
-            <div className="flex items-center gap-3 mb-5 relative z-10">
-                <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setLocation("/world-ranking")}
-                    className="w-11 h-11 rounded-full bg-white flex items-center justify-center transition-transform text-black/60 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                    aria-label={t("umb.back")}
-                >
-                    <LucideChevronLeft className="w-5 h-5" />
-                </motion.button>
-                <h2 className="text-[20px] font-bold tracking-tight text-ink-1">{t("umb.pageTitle")}</h2>
-            </div>
+            {/* 표지 그림(2026-10-12) — 부문마다 한 장. 머리줄은 그림 위에 놓이고, 본문 카드가 그림 아래 끝에 겹쳐 올라온다 */}
+            <PageCover src={umbCover(category)} className="-mx-5 -mt-6">
+                <div className="flex items-center gap-3 px-5 pt-6">
+                    <motion.button
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => setLocation("/world-ranking")}
+                        className="w-11 h-11 rounded-full bg-white flex items-center justify-center transition-transform text-black/60 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
+                        aria-label={t("umb.back")}
+                    >
+                        <LucideChevronLeft className="w-5 h-5" />
+                    </motion.button>
+                    <h2 className="text-[20px] font-bold tracking-tight text-[#FFFFFF] [text-shadow:0_1px_8px_rgba(0,0,0,0.55)]">{t("umb.pageTitle")}</h2>
+                </div>
+            </PageCover>
 
             <div className="rk-card p-6 relative z-10">
                 {umbId && (

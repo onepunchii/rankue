@@ -20,3 +20,54 @@ export const storeCardUrl = (origin: string, code: string) => `${origin}/og/stor
  * ("허슬러1 당구장 당구장 카드" — 매장 이름의 절반쯤이 '당구장'으로 끝난다).
  */
 export const cardAlt = (name: string, kind: "골프장" | "당구장") => (name.includes(kind) ? `${name} 카드` : `${name} ${kind} 카드`);
+
+/**
+ * 허브 페이지의 썸네일(2026-10-12 오너: "유입을 극대화도 추가해 줘 … 이미지 제작해서 더 시각적으로 풍부하고").
+ *
+ * 세계랭킹 · PBA · 매장 찾기 · 용어 사전 · 전국 골프장 · 도장깨기 같은 **목록 페이지**는 고유한 그림 없이 공용 og.png 하나를 달고 나갔다 —
+ * 검색 결과와 메신저 미리보기에서 어느 페이지든 같은 그림이었다. 페이지마다 우리 그림 + 큰 제목의 정사각 카드를 둔다
+ * (위는 그림, 아래는 큰 이름 — 매장 · 골프장 카드와 같은 식구. 90~110px 로 줄어도 제목 두 줄이 읽힌다).
+ *
+ * 그림은 **정적 파일**이다(client/public/og-hub/<이름>.jpg, 1200 정사각) — 서버가 그리지 않는다. 그래서 주소가 /og/… 가 아니다
+ * (vercel.json 이 /og/(.*) 를 서버 함수로 보낸다). 선수 · 매장 · 골프장처럼 **고유 카드가 있는 페이지는 그 카드가 먼저**다.
+ * 그림을 바꾸면 HUB_CARD_VERSION 을 올린다.
+ */
+export const HUB_CARD_VERSION = 1;
+export const HUB_CARD_SIZE = 1200;
+
+/** 도장첩의 이름표 — 권마다 카드가 있다(shared/golfStampBooks 의 id 와 같아야 한다. 시험이 맞춰 본다) */
+export const HUB_STAMP_BOOKS: readonly string[] = ["seohae", "gyeonggi", "gangwon", "chungcheong", "honam", "yeongnam", "jeju", "invite-capital", "invite-regional"];
+
+interface HubRule { test: (path: string) => string | null; alt: string }
+const exact = (re: RegExp, name: string) => (path: string) => (re.test(path) ? name : null);
+const HUB_RULES: readonly HubRule[] = [
+    { test: exact(/^\/world-ranking(\/|$)/, "world-ranking"), alt: "당구 세계랭킹 — 랭큐" },
+    { test: exact(/^\/pba(\/records)?\/?$/, "pba"), alt: "PBA 투어 랭킹 · 상금 — 랭큐" },
+    { test: exact(/^\/stores\/?$/, "stores"), alt: "전국 당구장 찾기 — 랭큐" },
+    { test: exact(/^\/terms(\/|$)/, "terms"), alt: "당구 용어 사전 — 랭큐" },
+    { test: exact(/^\/golf\/terms(\/|$)/, "golf-terms"), alt: "골프 용어 사전 — 랭큐 골프" },
+    { test: exact(/^\/golf\/courses(\/|$)/, "golf-courses"), alt: "전국 골프장 — 랭큐 골프" },
+    // 도장첩 한 권 — 그 권의 표지와 볼마커
+    { test: (path) => { const m = /^\/golf\/stamps\/([a-z-]+)\/?$/.exec(path); return m && HUB_STAMP_BOOKS.includes(m[1]) ? `golf-stamps-${m[1]}` : null; }, alt: "랭큐 골프 도장첩" },
+    { test: exact(/^\/golf\/(stamps|shelf)(\/|$)/, "golf-stamps"), alt: "골프 도장깨기 — 랭큐 골프" },
+];
+
+/** 이 주소(경로만 — 쿼리 없이)의 허브 카드 이름. 없으면 null */
+export function hubCardName(pathname: string): string | null {
+    const path = pathname.split("?")[0].split("#")[0];
+    for (const r of HUB_RULES) { const n = r.test(path); if (n) return n; }
+    return null;
+}
+
+/** 이 주소의 허브 카드(주소 · 크기 · 설명). 없으면 null — 부르는 쪽이 공용 그림으로 떨어진다 */
+export function hubCard(origin: string, pathname: string): { url: string; width: number; height: number; alt: string } | null {
+    const path = pathname.split("?")[0].split("#")[0];
+    for (const r of HUB_RULES) {
+        const n = r.test(path);
+        if (n) return { url: `${origin}/og-hub/${n}.jpg?v=${HUB_CARD_VERSION}`, width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: r.alt };
+    }
+    return null;
+}
+
+/** 쓰는 카드 전부 — 파일이 다 있는지 · 남는 파일이 없는지 시험이 본다 */
+export const HUB_CARD_NAMES: readonly string[] = ["world-ranking", "pba", "stores", "terms", "golf-terms", "golf-courses", "golf-stamps", ...HUB_STAMP_BOOKS.map((b) => `golf-stamps-${b}`)];
