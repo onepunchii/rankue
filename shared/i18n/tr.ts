@@ -47,6 +47,7 @@ export const tr: Record<string, string> = {
   "err.crew.tournamentTitleRequired": "Lütfen turnuva adını girin",
   "err.crew.gameTypeRequired": "Lütfen oyun türünü seçin",
   "err.crew.tournamentBilliardsOnly": "Turnuvalar yalnızca bilardo crew'larında açılabilir",
+  "err.crew.challengeBilliardsOnly": "Meydan okuma yalnızca bilardo ekiplerinde yapılabilir",
   "err.crew.tournamentMaxPlayers": "Oyuncu sayısı 2, 4, 8 veya 16 olmalı",
   "err.crew.tournamentBestOf": "Maç sayısı 1, 3 veya 5 olmalı",
   "err.crew.swapPickTwo": "Değiştirilecek iki yeri seçin",

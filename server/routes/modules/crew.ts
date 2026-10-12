@@ -1988,6 +1988,8 @@ router.patch("/:id/notifications/settings", requireAuth, asyncHandler(async (req
 router.post("/:id/challenge", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const role = await requireCrewMember(req, res);
     if (!role) return;
+    // 도전(당구 한 판 신청)은 산악회에 없다(2026-10-13) — 화면은 가려 두었고, 길도 막는다
+    if ((await storage.crews.crewSportCategory(req.params.id)) === "HIKING") return sendError(res, 400, "err.crew.challengeBilliardsOnly");
 
     const toMemberId = String(req.body?.toMemberId || "");
     if (!/^[0-9a-f-]{36}$/i.test(toMemberId)) return sendError(res, 400, "err.crew.opponentNotFound");

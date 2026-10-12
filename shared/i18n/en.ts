@@ -47,6 +47,7 @@ export const en: Record<string, string> = {
   "err.crew.tournamentTitleRequired": "Please enter a tournament name",
   "err.crew.gameTypeRequired": "Please choose a game type",
   "err.crew.tournamentBilliardsOnly": "Tournaments are only available in billiards crews",
+  "err.crew.challengeBilliardsOnly": "Challenges are only available in billiards crews",
   "err.crew.tournamentMaxPlayers": "Player limit must be 2, 4, 8 or 16",
   "err.crew.tournamentBestOf": "Number of games must be 1, 3 or 5",
   "err.crew.swapPickTwo": "Pick the two slots to swap",

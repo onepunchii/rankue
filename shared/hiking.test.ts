@@ -10,6 +10,7 @@ import { HIKING_GUIDE_BLOCK, cleanHikingText, cleanMountainGuide, hasMountainGui
 import { gridNumber, hikingPoiKind, hikingPoiTitle } from "./hikingPois";
 import { courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListSeo, kmRange, mountainSeo } from "./hikingPage";
 import { isPrimarySport, isStartSport } from "./primarySport";
+import { HUB_CARD_NAMES, HUB_CARD_VERSION, HUB_HIKING_REGIONS, hubCard, hubCardName } from "./ogCards";
 
 /**
  * 등산의 뿌리 규칙(2026-10-13 오너: "산은 지역으로도 특성으로도 묶고 … 산 정보 페이지를 골프처럼 사이트맵 + 가입 유도").
@@ -249,6 +250,21 @@ describe("화면의 글 · 따로 선 세계", () => {
         const tab = read("client/src/components/hiq/tabs/CrewHomeTab.tsx");
         expect(tab).toContain('const CrewSummits = lazy(() => import("@/hiking/crew/CrewSummits")');
         expect(tab).toContain("{isHiking && <Suspense fallback={null}><CrewSummits");
+    });
+
+    it("검색 · 공유에 뜨는 그림 — 등산 화면은 등산의 카드를 단다(당구의 공용 그림이 아니다)", () => {
+        const O = "https://www.rankue.co.kr";
+        expect([...HUB_HIKING_REGIONS]).toEqual(HIKING_REGIONS.map((r) => r.id));
+        const cases: [string, string][] = [
+            ["/hiking", "hiking"], ["/hiking/lists/kfs100", "hiking"], ["/hiking/mountains/설악산", "hiking"], ["/hiking/regions/gangwon", "hiking-gangwon"], ["/hiking/regions/nowhere", "hiking"],
+            ["/hiking/stamps", "hiking-stamps"], ["/hiking/pack", "hiking-stamps"], ["/hiking/terms", "hiking-terms"], ["/hiking/terms/alba", "hiking-terms"], ["/hiking/checklist", "hiking-checklist"],
+        ];
+        for (const [path, name] of cases) expect(hubCardName(path), path).toBe(name);
+        expect(hubCard(O, "/hiking/regions/jeju")!.url).toBe(`${O}/og-hub/hiking-jeju.jpg?v=${HUB_CARD_VERSION}`);
+        // 당구 · 골프의 주소는 그대로다
+        expect(hubCardName("/golf/terms")).toBe("golf-terms");
+        expect(hubCardName("/hikingx")).toBeNull();
+        for (const n of HUB_CARD_NAMES.filter((x) => x.startsWith("hiking"))) expect(existsSync(resolve(root, `client/public/og-hub/${n}.jpg`)), n).toBe(true);
     });
 
     it("등산의 알림함 — 산악회의 알림만 모이고, 당구 알림함에는 섞이지 않는다", () => {

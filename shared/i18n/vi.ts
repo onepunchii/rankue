@@ -47,6 +47,7 @@ export const vi: Record<string, string> = {
   "err.crew.tournamentTitleRequired": "Vui lòng nhập tên giải đấu",
   "err.crew.gameTypeRequired": "Vui lòng chọn thể loại",
   "err.crew.tournamentBilliardsOnly": "Chỉ crew bida mới mở được giải đấu",
+  "err.crew.challengeBilliardsOnly": "Thách đấu chỉ có ở crew bida",
   "err.crew.tournamentMaxPlayers": "Số người chơi phải là 2, 4, 8 hoặc 16",
   "err.crew.tournamentBestOf": "Số ván phải là 1, 3 hoặc 5",
   "err.crew.swapPickTwo": "Chọn hai vị trí cần hoán đổi",

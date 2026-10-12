@@ -47,6 +47,7 @@ export const ko: Record<string, string> = {
   "err.crew.tournamentTitleRequired": "대회 이름을 입력해주세요",
   "err.crew.gameTypeRequired": "종목을 선택해주세요",
   "err.crew.tournamentBilliardsOnly": "대회는 당구 크루에서만 열 수 있어요",
+  "err.crew.challengeBilliardsOnly": "도전은 당구 크루에서만 할 수 있어요",
   "err.crew.tournamentMaxPlayers": "정원은 2·4·8·16명 중에서 고를 수 있습니다",
   "err.crew.tournamentBestOf": "판 수는 1·3·5판 중에서 고를 수 있습니다",
   "err.crew.swapPickTwo": "바꿀 두 자리를 골라주세요",

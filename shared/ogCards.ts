@@ -38,6 +38,9 @@ export const HUB_CARD_SIZE = 1200;
 /** 도장첩의 이름표 — 권마다 카드가 있다(shared/golfStampBooks 의 id 와 같아야 한다. 시험이 맞춰 본다) */
 export const HUB_STAMP_BOOKS: readonly string[] = ["seohae", "gyeonggi", "gangwon", "chungcheong", "honam", "yeongnam", "jeju", "invite-capital", "invite-regional"];
 
+/** 등산의 권역 — 권역마다 카드가 있다(shared/hikingMountains 의 HIKING_REGIONS 와 같아야 한다. 시험이 맞춰 본다) */
+export const HUB_HIKING_REGIONS: readonly string[] = ["capital", "gangwon", "chungcheong", "jeonbuk", "jeonnam", "gyeongbuk", "gyeongnam", "jeju"];
+
 interface HubRule { test: (path: string) => string | null; alt: string }
 const exact = (re: RegExp, name: string) => (path: string) => (re.test(path) ? name : null);
 const HUB_RULES: readonly HubRule[] = [
@@ -51,6 +54,12 @@ const HUB_RULES: readonly HubRule[] = [
     // 도장첩 한 권 — 그 권의 표지와 볼마커
     { test: (path) => { const m = /^\/golf\/stamps\/([a-z-]+)\/?$/.exec(path); return m && HUB_STAMP_BOOKS.includes(m[1]) ? `golf-stamps-${m[1]}` : null; }, alt: "랭큐 골프 도장첩" },
     { test: exact(/^\/golf\/(stamps|shelf)(\/|$)/, "golf-stamps"), alt: "골프 도장깨기 — 랭큐 골프" },
+    // 등산(2026-10-13) — 읽을거리 · 도장첩 · 권역은 제 카드, 그 밖의 등산 화면(허브 · 목록 · 산)은 허브 카드
+    { test: exact(/^\/hiking\/terms(\/|$)/, "hiking-terms"), alt: "등산 용어 사전 — 랭큐 등산" },
+    { test: exact(/^\/hiking\/checklist\/?$/, "hiking-checklist"), alt: "등산 준비물 — 랭큐 등산" },
+    { test: exact(/^\/hiking\/(stamps|pack)(\/|$)/, "hiking-stamps"), alt: "등산 도장첩 · 산행 등급 — 랭큐 등산" },
+    { test: (path) => { const m = /^\/hiking\/regions\/([a-z]+)\/?$/.exec(path); return m && HUB_HIKING_REGIONS.includes(m[1]) ? `hiking-${m[1]}` : null; }, alt: "권역의 산 — 랭큐 등산" },
+    { test: exact(/^\/hiking(\/|$)/, "hiking"), alt: "전국 명산 — 랭큐 등산" },
 ];
 
 /** 이 주소(경로만 — 쿼리 없이)의 허브 카드 이름. 없으면 null */
@@ -71,4 +80,5 @@ export function hubCard(origin: string, pathname: string): { url: string; width:
 }
 
 /** 쓰는 카드 전부 — 파일이 다 있는지 · 남는 파일이 없는지 시험이 본다 */
-export const HUB_CARD_NAMES: readonly string[] = ["world-ranking", "pba", "stores", "terms", "golf-terms", "golf-courses", "golf-stamps", ...HUB_STAMP_BOOKS.map((b) => `golf-stamps-${b}`)];
+export const HUB_CARD_NAMES: readonly string[] = ["world-ranking", "pba", "stores", "terms", "golf-terms", "golf-courses", "golf-stamps", ...HUB_STAMP_BOOKS.map((b) => `golf-stamps-${b}`),
+    "hiking", "hiking-stamps", "hiking-terms", "hiking-checklist", ...HUB_HIKING_REGIONS.map((r) => `hiking-${r}`)];
