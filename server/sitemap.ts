@@ -14,6 +14,7 @@ import { GOLF_REGIONS, GOLF_INTENTS, cityShort, coursePath, listPath, listingInt
 import { rankingExtraSitemapParts } from "./seo/rankingExtra.js";
 import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
 import { golfGuideSitemapParts } from "./seo/golfGuide.js";
+import { golfStampsSitemapParts } from "./seo/golfStamps.js";
 import { golfTermsSitemapParts } from "./seo/golfTerms.js";
 import { FIND_FEATURES, findPath, findRegionCounts, hasFindTag } from "../shared/golfFind.js";
 import { tournamentsSitemapParts } from "./seo/tournaments.js";
@@ -251,7 +252,8 @@ async function golfCourseParts(): Promise<string[]> {
 // 빈 조합은 프리렌더가 noindex 로 내보낸다 — 사이트맵에 올리면 "제출됨·noindex" 경고만 쌓인다.
 async function golfHubParts(): Promise<string[]> {
   // 골프 읽을거리(준비물 체크리스트) — 본문이 코드에 있어 DB 가 죽어도 싣는다
-  const parts: string[] = [...golfGuideSitemapParts()];
+  // 골프 도장깨기(책장 · 도장첩 아홉 권 · 장식장, 2026-10-12) — 이것도 본문이 코드에 있다
+  const parts: string[] = [...golfGuideSitemapParts(), ...golfStampsSitemapParts()];
   try {
     const raw = await loadGolfCourseSummary();
     // 이름·슬러그가 빈 행은 프리렌더도 싣지 않는다(server/prerender.ts golfView) — 같은 기준

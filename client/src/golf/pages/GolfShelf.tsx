@@ -22,11 +22,16 @@ import { awardLabel, awardWhen, useStampAwards } from "@/golf/stamps/useStampAwa
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
 import { PinCase, PinPiece } from "@/golf/stamps/PinParts";
 import { MarkerArt, MarkerCase, SHELF_PATH, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampSection, TrophyShelf, bookName, bookPath } from "@/golf/stamps/StampParts";
+import { useSeo } from "@/hooks/useSeo";
+import { stampShelfSeo } from "@shared/golfStampGuide";
 
 export default function GolfShelf() {
     const col = useStampCollection({ guest: "full" });
     const { states, summary, sample } = col;
     const [help, setHelp] = useState(false);
+    // 검색 · 공유의 제목과 설명 — 검색용 화면(server/seo/golfStamps)과 같은 글
+    const seo = stampShelfSeo();
+    useSeo({ title: seo.title, description: seo.desc, path: seo.path });
     // 받은 기록(몇 번째 · 받은 날) — 회원의 것만. 방문자의 예시 장식장에는 붙이지 않는다
     const awards = useStampAwards();
     const lastStep = STAMP_TROPHY_STEPS[STAMP_TROPHY_STEPS.length - 1];

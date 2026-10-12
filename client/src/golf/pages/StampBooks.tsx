@@ -22,8 +22,13 @@ import { useStampCollection } from "@/golf/stamps/useStampCollection";
 import { TROPHIES } from "@/golf/stamps/bookArt";
 import { StampGuide, StampHelpButton, StampHelpSheet } from "@/golf/stamps/StampHelp";
 import { BookCover, BookWide, MarkerArt, MarkerCatalog, SHELF_PATH, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampSection, bookName, bookPath } from "@/golf/stamps/StampParts";
+import { useSeo } from "@/hooks/useSeo";
+import { stampsHubSeo } from "@shared/golfStampGuide";
 
 export default function StampBooks() {
+    // 검색 · 공유의 제목과 설명 — 검색용 화면(server/seo/golfStamps)과 같은 글(shared/golfStampGuide)
+    const seo = stampsHubSeo();
+    useSeo({ title: seo.title, description: seo.desc, path: seo.path });
     const col = useStampCollection();
     const { states, summary, sample } = col;
     const open = states.filter((s) => s.book.kind === "open");

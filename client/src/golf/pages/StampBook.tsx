@@ -19,6 +19,8 @@ import { awardWhen, useStampAwards } from "@/golf/stamps/useStampAwards";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
 import { MarkerArt, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampPaper, StampSection, bookPath } from "@/golf/stamps/StampParts";
 import { lastEmptySlot } from "@shared/golfStampOneLeft";
+import { useSeo } from "@/hooks/useSeo";
+import { stampBookSeo } from "@shared/golfStampGuide";
 
 /** 손으로 찍은 것처럼 칸마다 조금씩 다른 기울기(도) */
 const TILT = [-5, 4, -2, 6, -4, 3, -6, 5, -3, 2, -5];
@@ -29,6 +31,9 @@ export default function StampBookPage() {
     const state = col.states.find((s) => s.book.id === params?.book);
     const [help, setHelp] = useState(false);
     const [share, setShare] = useState(false);
+    // 검색 · 공유의 제목과 설명 — 검색용 화면(server/seo/golfStamps)과 같은 글. 없는 권이면 건드리지 않는다
+    const seo = state ? stampBookSeo(state.book) : null;
+    useSeo(seo ? { title: seo.title, description: seo.desc, path: seo.path } : null);
     // 받은 기록(몇 번째 · 받은 날) — 회원의 것만. 예시에는 붙이지 않는다
     const awards = useStampAwards();
 

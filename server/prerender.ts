@@ -35,6 +35,8 @@ import { JOIN_TYPE_LABEL, distanceKm, formatDistance, type JoinType } from "../s
 import { renderRankingExtra, type RankingExtraRender } from "./seo/rankingExtra.js";
 import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js";
 import { renderGolfChecklist } from "./seo/golfGuide.js";
+import { GOLF_STAMPS_RE, renderGolfStamps } from "./seo/golfStamps.js";
+import { STAMPS_HUB_PATH, STAMPS_NAV_LABEL } from "../shared/golfStampGuide.js";
 import { renderGolfTerms, type GolfTermsRender } from "./seo/golfTerms.js";
 import { GOLF_TERMS_NAV_LABEL, GOLF_TERMS_PATH } from "../shared/golfTermsMeta.js";
 import { localDishLabel, localDishLine, localDishes } from "../shared/golfLocalDish.js";
@@ -146,6 +148,8 @@ export function hubNav(lang = "ko"): string {
     ...(ko ? [["/golf/courses", "전국 골프장"] as [string, string]] : []),
     // 골프 읽을거리(2026-10-05) — 준비물 체크리스트 · 용어 사전. 한국어 전용.
     ...(ko ? [[PACK_PATH, PACK_NAV_LABEL] as [string, string], [GOLF_TERMS_PATH, GOLF_TERMS_NAV_LABEL] as [string, string]] : []),
+    // 골프 도장깨기(2026-10-12) — 책장 · 도장첩 아홉 권 · 장식장. 한국어 전용.
+    ...(ko ? [[STAMPS_HUB_PATH, STAMPS_NAV_LABEL] as [string, string]] : []),
     // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 문서에만 건다.
     ...(ko ? [["/billiards/terms", "당구 용어"] as [string, string]] : []),
     // 당구 대회(2026-09-24) — 프리렌더가 한국어 전용(?lang= 무시)이라 한국어 문서에만 건다.
@@ -2004,6 +2008,22 @@ ${list}
     // X-Prerender 에 한글을 그대로 넣으면 Node 가 ERR_INVALID_CHAR 로 죽는다 — tag 는 이미 encodeURIComponent 된 값이다.
     res.setHeader("X-Prerender", r.tag);
     if (r.status === 301 && r.location) return res.redirect(301, r.location);
+    res.status(r.status).send(r.html);
+  });
+
+  // ── /golf/stamps[/:book] · /golf/shelf 골프 도장깨기(2026-10-12) ─────────────
+  // 본문이 코드에 있다(shared/golfStampBooks · golfStampGuide · golfPins). 골프장 요약은 그 권의 골프장 공개 페이지로 잇는 슬러그를 찾는 데만 쓴다 —
+  // 못 받아도(DB 가 죽어도) 이름만 적어 내보낸다. 없는 권은 다음 라우트로(화면이 '없는 도장첩이에요'를 그린다).
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  app.get(GOLF_STAMPS_RE, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    let pages: { slug: string; courseIds: number[] }[] = [];
+    try { pages = (await loadGolfCourseSummary()).pages.map((p) => ({ slug: p.slug, courseIds: p.courseIds })); }
+    catch (e) { console.warn("[prerender] golf stamps: no course summary:", (e as Error)?.message); }
+    const r = renderGolfStamps(req.path, pages);
+    if (!r) return next();
+    noStore(res);
+    res.setHeader("X-Prerender", r.tag);
     res.status(r.status).send(r.html);
   });
 

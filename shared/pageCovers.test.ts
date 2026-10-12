@@ -93,7 +93,7 @@ describe("허브 페이지의 썸네일", () => {
         const cases: [string, string | null][] = [
             ["/world-ranking", "world-ranking"], ["/world-ranking/movers", "world-ranking"], ["/world-ranking/country/KR", "world-ranking"],
             ["/pba", "pba"], ["/pba/records", "pba"], ["/stores", "stores"], ["/stores/", "stores"],
-            ["/terms", "terms"], ["/golf/terms", "golf-terms"], ["/golf/terms/%EB%B2%84%EB%94%94", "golf-terms"],
+            ["/billiards/terms", "terms"], ["/billiards/terms/%EB%8B%A4%EB%A7%88", "terms"], ["/golf/terms", "golf-terms"], ["/golf/terms/%EB%B2%84%EB%94%94", "golf-terms"],
             ["/golf/courses", "golf-courses"], ["/golf/courses/gangwon", "golf-courses"], ["/golf/courses/gangwon/chuncheon", "golf-courses"],
             ["/golf/stamps", "golf-stamps"], ["/golf/shelf", "golf-stamps"], ["/golf/stamps/gangwon", "golf-stamps-gangwon"], ["/golf/stamps/invite-capital", "golf-stamps-invite-capital"],
             // 없는 권은 도장깨기 카드로
@@ -103,7 +103,8 @@ describe("허브 페이지의 썸네일", () => {
     });
 
     it("고유 카드가 있는 페이지 · 그 밖의 페이지는 허브 카드를 받지 않는다", () => {
-        for (const path of ["/", "/stores/C00007", "/stores/register", "/pba-player/M0016551", "/player/players/0364", "/golfer/owgr/18417", "/golf/course/pinx", "/golf-ranking", "/world-rankings", "/pbax", "/dashboard"]) {
+        // /terms 는 이용약관이다(용어 사전이 아니다)
+        for (const path of ["/", "/terms", "/stores/C00007", "/stores/register", "/pba-player/M0016551", "/player/players/0364", "/golfer/owgr/18417", "/golf/course/pinx", "/golf-ranking", "/world-rankings", "/pbax", "/dashboard"]) {
             expect(hubCardName(path), path).toBeNull();
             expect(hubCard("https://www.rankue.co.kr", path), path).toBeNull();
         }

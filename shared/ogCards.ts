@@ -44,7 +44,8 @@ const HUB_RULES: readonly HubRule[] = [
     { test: exact(/^\/world-ranking(\/|$)/, "world-ranking"), alt: "당구 세계랭킹 — 랭큐" },
     { test: exact(/^\/pba(\/records)?\/?$/, "pba"), alt: "PBA 투어 랭킹 · 상금 — 랭큐" },
     { test: exact(/^\/stores\/?$/, "stores"), alt: "전국 당구장 찾기 — 랭큐" },
-    { test: exact(/^\/terms(\/|$)/, "terms"), alt: "당구 용어 사전 — 랭큐" },
+    // 당구 용어 사전은 /billiards/terms 다 — /terms 는 이용약관이라 카드를 주지 않는다
+    { test: exact(/^\/billiards\/terms(\/|$)/, "terms"), alt: "당구 용어 사전 — 랭큐" },
     { test: exact(/^\/golf\/terms(\/|$)/, "golf-terms"), alt: "골프 용어 사전 — 랭큐 골프" },
     { test: exact(/^\/golf\/courses(\/|$)/, "golf-courses"), alt: "전국 골프장 — 랭큐 골프" },
     // 도장첩 한 권 — 그 권의 표지와 볼마커

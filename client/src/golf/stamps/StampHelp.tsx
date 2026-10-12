@@ -14,11 +14,11 @@
 import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/ui/sheet";
 import { SampleBadge } from "@/components/hiq/GuestGate";
 import { useBackToClose } from "@/hooks/useBackToClose";
-import { STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
 import { BOOK_ART, coverSrc } from "./bookArt";
 import { InkStamp } from "./InkStamp";
 import { MarkerArt, MarkerCase, StampPaper, TrophyShelf } from "./StampParts";
 import { FULL_SAMPLE_STATES, FULL_SAMPLE_SUMMARY } from "./useStampCollection";
+import { STAMP_GUIDE_STEPS } from "@shared/golfStampGuide";
 
 /** 안내의 설명 그림 · 다 채운 한 권의 예시에 쓰는 권 */
 const GUIDE_BOOK = "gangwon";
@@ -45,8 +45,8 @@ export function StampGuide() {
                     <img src={coverSrc(GUIDE_BOOK)} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" decoding="async" draggable={false} />
                 </span>
                 <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] text-[#64DD17]">1 · 도장첩을 고른다</span>
-                    <span className="mt-0.5 block text-[14px] leading-snug text-[#FFFFFFCC] break-keep">가고 싶은 권역의 도장첩을 열어 보세요. 빈 칸이 앞으로 갈 곳이에요.</span>
+                    <span className="block text-[12px] text-[#64DD17]">{1} · {STAMP_GUIDE_STEPS[0].title}</span>
+                    <span className="mt-0.5 block text-[14px] leading-snug text-[#FFFFFFCC] break-keep">{STAMP_GUIDE_STEPS[0].body}</span>
                 </span>
             </li>
             <li className="flex items-center gap-3.5 rounded-2xl bg-[#FFFFFF08] p-3">
@@ -54,15 +54,15 @@ export function StampGuide() {
                     <InkStamp name="도장깨기" ink={BOOK_ART[GUIDE_BOOK].ink} glyph={BOOK_ART[GUIDE_BOOK].glyph} size={46} tilt={-6} />
                 </span>
                 <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] text-[#64DD17]">2 · 골프장에서 18홀을 끝낸다</span>
-                    <span className="mt-0.5 block text-[14px] leading-snug text-[#FFFFFFCC] break-keep">랭큐매치로 라운드를 적고 그 골프장에서 끝내면 현장 인증이 되고, 그 칸에 도장이 찍혀요.</span>
+                    <span className="block text-[12px] text-[#64DD17]">{2} · {STAMP_GUIDE_STEPS[1].title}</span>
+                    <span className="mt-0.5 block text-[14px] leading-snug text-[#FFFFFFCC] break-keep">{STAMP_GUIDE_STEPS[1].body}</span>
                 </span>
             </li>
             <li className="flex items-center gap-3.5 rounded-2xl bg-[#FFFFFF08] p-3">
                 <span className="flex w-[54px] shrink-0 justify-center" aria-hidden><MarkerArt bookId={GUIDE_BOOK} size={54} earned /></span>
                 <span className="min-w-0 flex-1">
-                    <span className="block text-[12px] text-[#64DD17]">3 · 한 권을 다 채우면 볼마커</span>
-                    <span className="mt-0.5 block text-[14px] leading-snug text-[#FFFFFFCC] break-keep">볼마커는 장식장에 놓여요. 찍은 골프장이 {STAMP_TROPHY_STEPS.slice(0, 3).join(" · ")}곳이 되면 트로피도 받아요.</span>
+                    <span className="block text-[12px] text-[#64DD17]">{3} · {STAMP_GUIDE_STEPS[2].title}</span>
+                    <span className="mt-0.5 block text-[14px] leading-snug text-[#FFFFFFCC] break-keep">{STAMP_GUIDE_STEPS[2].body}</span>
                 </span>
             </li>
         </ol>
