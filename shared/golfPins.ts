@@ -1,7 +1,7 @@
 /**
  * 업적 핀(2026-10-12) — 기획서 6.2. 골프장을 새로 가지 않아도 붙는 것.
  *
- * **있는 자료로 틀림없이 판정되는 것만** 연다(지금 스무 개). 판정할 수 없는 핀을 목록에 먼저 걸어 두지 않는다(받을 수 없는 것을 보여 주게 된다).
+ * **있는 자료로 틀림없이 판정되는 것만** 연다(지금 스물한 개). 판정할 수 없는 핀을 목록에 먼저 걸어 두지 않는다(받을 수 없는 것을 보여 주게 된다).
  *
  * 1차(아홉 개)
  *   첫 도장            골프장에서 18홀을 끝낸 첫 라운드(첫 인증 도장)
@@ -9,6 +9,7 @@
  *   100 · 90 · 80 깨기    정규 18홀(총 파 68 이상)에서 99 · 89 · 79타 이하
  *   전국 한 바퀴        '누구나' 일곱 권역 도장첩에 도장이 하나씩
  *   첫 초대            초대장(회원제) 도장첩의 첫 도장
+ * 3차(하나) 첫 금테 — 도장 하나가 금테가 됐다(도장의 깊이 shared/golfStampDepth 가 생기면서 열었다)
  * 2차(열한 개 — 자료를 하나씩 확인하고 열었다)
  *   세 달 연속 · 열두 달 개근  한국 날짜의 달마다 인증 라운드가 하나 이상, 잇달아 3 · 12달
  *   하루 36홀           같은 날(한국 날짜)에 끝낸 인증 라운드 둘
@@ -18,7 +19,7 @@
  *   풀조              같은 라운드에서 넷이 다 인증 기록을 받았다
  *   새 동반자           같이 인증 라운드를 끝낸 회원이 열 명
  *   라운드 사진          내가 올린 라운드 사진 열 장(가려진 사진은 빼고)
- * 아직 열지 않은 것: 니어핀(기록이 쌓이는 곳이 없다) · 긴급 조인 · 첫 원정(라운드와 이어져 있지 않다) · 첫 금테(도장 깊이가 먼저) · 우중 · 한여름 · 한겨울(지난 시각의 날씨).
+ * 아직 열지 않은 것: 니어핀(기록이 쌓이는 곳이 없다) · 긴급 조인 · 첫 원정(라운드와 이어져 있지 않다) · 우중 · 한여름 · 한겨울(지난 시각의 날씨).
  *
  * 규칙 둘:
  *  - **인증 라운드만.** 집에서 적은 기록으로는 붙지 않는다(도장과 같다 — shared/golfOnSite).
@@ -33,7 +34,8 @@ import type { DatedStamp } from "./golfStampAwards.js";
 
 export type GolfPinId =
     | "first-stamp" | "rounds-10" | "rounds-50" | "rounds-100" | "break-100" | "break-90" | "break-80" | "tour-korea" | "first-invite"
-    | "streak-3" | "streak-12" | "day-36" | "sunrise" | "night" | "birdie" | "eagle" | "clean-9" | "full-group" | "companions-10" | "photos-10";
+    | "streak-3" | "streak-12" | "day-36" | "sunrise" | "night" | "birdie" | "eagle" | "clean-9" | "full-group" | "companions-10" | "photos-10"
+    | "first-gold";
 
 export interface GolfPin {
     id: GolfPinId;
@@ -68,6 +70,7 @@ export const GOLF_PINS: readonly GolfPin[] = [
     { id: "photos-10", name: "라운드 사진", how: "라운드 사진 열 장", art: "pin-camera" },
     { id: "tour-korea", name: "전국 한 바퀴", how: "일곱 권역 도장첩에 도장 하나씩", art: "pin-eight" },
     { id: "first-invite", name: "첫 초대", how: "초대장 도장첩의 첫 도장", art: "pin-envelope" },
+    { id: "first-gold", name: "첫 금테", how: "같은 골프장의 코스를 전부(18홀은 두 번)", art: "pin-ring" },
 ];
 export const golfPin = (id: string): GolfPin | undefined => GOLF_PINS.find((p) => p.id === id);
 
@@ -108,6 +111,10 @@ export interface PinRound {
     pars?: readonly (number | null)[] | null;
     /** 같은 라운드에서 인증 기록을 받은 다른 회원(나 빼고) */
     mates?: readonly string[];
+    /** 그 라운드의 골프장(원장 번호 · 적힌 이름)과 돈 코스 이름(전반 · 후반) — 도장의 깊이(shared/golfStampDepth)가 쓴다 */
+    clubId?: string | null;
+    clubName?: string | null;
+    nines?: readonly (string | null)[] | null;
 }
 
 export interface PinDue { id: GolfPinId; earnedAt: number }
@@ -124,7 +131,7 @@ const holeOk = (v: unknown): v is number => typeof v === "number" && Number.isIn
  * 인증 라운드 + 인증 도장 → 지금까지 받았어야 할 핀 전부(받은 순서).
  * 받은 때는 그 조건을 처음 채운 라운드 · 도장의 때다.
  */
-export function pinsDue(rounds: readonly PinRound[], stamps: readonly DatedStamp[], photoTimes: readonly (Date | string | number)[] = []): PinDue[] {
+export function pinsDue(rounds: readonly PinRound[], stamps: readonly DatedStamp[], photoTimes: readonly (Date | string | number)[] = [], goldTimes: readonly number[] = []): PinDue[] {
     const out: PinDue[] = [];
     const rs = rounds.map((r) => ({
         at: ms(r.at), score: r.score, par: r.par,
@@ -201,6 +208,10 @@ export function pinsDue(rounds: readonly PinRound[], stamps: readonly DatedStamp
     if (open.length > 0 && open.every((d) => d != null)) out.push({ id: "tour-korea", earnedAt: Math.max(...(open as number[])) });
     const invite = states.filter((s) => s.book.kind === "invite").map(firstIn).filter((d): d is number => d != null);
     if (invite.length > 0) out.push({ id: "first-invite", earnedAt: Math.min(...invite) });
+
+    // 첫 금테 — 도장 하나가 처음 금테가 된 때(shared/golfStampDepth 가 판정해 넘긴다)
+    const golds = goldTimes.filter(Number.isFinite);
+    if (golds.length > 0) out.push({ id: "first-gold", earnedAt: Math.min(...golds) });
 
     return out.sort((a, b) => a.earnedAt - b.earnedAt);
 }

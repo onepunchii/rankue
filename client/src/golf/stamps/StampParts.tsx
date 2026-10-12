@@ -10,6 +10,7 @@ import { Link } from "wouter";
 import { cn } from "@/lib/utils";
 import { GuestJoinCta, SampleBadge } from "@/components/hiq/GuestGate";
 import { STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_OPEN_TOTAL, type BookState, type StampBook, type StampSummary } from "@shared/golfStampBooks";
+import { MARKER_TIER_NAME, type MarkerTier } from "@shared/golfStampDepth";
 import { BOOK_ART, TROPHIES, coverSrc, markerSrc } from "./bookArt";
 import type { StampCollection } from "./useStampCollection";
 
@@ -41,13 +42,17 @@ export function StampPaper({ children, className }: { children: ReactNode; class
 }
 
 /** 볼마커 한 개 — 못 받은 것은 윤곽만(회색 · 옅게) */
-export function MarkerArt({ bookId, size, earned, className }: { bookId: string; size: number; earned: boolean; className?: string }) {
+export function MarkerArt({ bookId, size, earned, className, tier, preview }: {
+    bookId: string; size: number; earned: boolean; className?: string; tier?: MarkerTier | null;
+    /** 아직 못 받은 등급을 미리 보여 줄 때 — 제 색을 살리고 흐리게만(회색으로 만들면 블랙과 자개가 구별되지 않는다) */
+    preview?: boolean;
+}) {
     return (
         <img
-            src={markerSrc(bookId)} width={size} height={size} alt="" draggable={false} decoding="async" loading="lazy"
-            data-marker={bookId} data-earned={earned ? "1" : "0"}
+            src={markerSrc(bookId, earned || preview ? tier : null)} width={size} height={size} alt="" draggable={false} decoding="async" loading="lazy"
+            data-marker={bookId} data-earned={earned ? "1" : "0"} data-tier={earned && tier ? tier : undefined}
             className={cn("block shrink-0", className)}
-            style={{ width: size, height: size, filter: earned ? "drop-shadow(0 3px 5px rgba(0,0,0,0.5))" : "grayscale(1) brightness(0.7)", opacity: earned ? 1 : 0.42 }}
+            style={{ width: size, height: size, filter: earned ? "drop-shadow(0 3px 5px rgba(0,0,0,0.5))" : preview ? "saturate(0.75)" : "grayscale(1) brightness(0.7)", opacity: earned ? 1 : preview ? 0.5 : 0.42 }}
         />
     );
 }
@@ -106,12 +111,27 @@ export function BookWide({ state, sub }: { state: BookState<unknown>; sub: strin
     );
 }
 
+/** 볼마커 등급의 점 셋 — 일반 · 블랙 · 자개. 받은 데까지 찬다 */
+export function TierDots({ done, tier, className }: { done: boolean; tier: MarkerTier | null; className?: string }) {
+    const level = !done ? 0 : tier === "pearl" ? 3 : tier === "black" ? 2 : 1;
+    const label = !done ? "아직 없음" : MARKER_TIER_NAME[tier ?? "base"];
+    const colors = ["#E9B949", "#9AA3AD", "#DCE8F2"];
+    return (
+        <span className={`inline-flex items-center gap-[3px] ${className ?? ""}`} role="img" aria-label={`등급 ${label}`} data-tier-level={level}>
+            {colors.map((c, i) => (
+                <span key={c} className="block h-[5px] w-[5px] rounded-full" style={{ background: i < level ? c : "#FFFFFF24" }} />
+            ))}
+        </span>
+    );
+}
+
 /** 볼마커 수집함 — 펠트 깔린 나무 상자. 권마다 한 칸 + 누구나 일곱 권 전부 */
-export function MarkerCase({ states, summary }: { states: readonly BookState<unknown>[]; summary: StampSummary }) {
-    const cells: { id: string; name: string; earned: boolean; prog: string }[] = [
-        ...states.filter((s) => s.book.kind === "open").map((s) => ({ id: s.book.id, name: s.book.name, earned: s.done, prog: `${s.got}/${s.total}` })),
-        { id: STAMP_ALL_OPEN, name: `누구나 ${STAMP_OPEN_TOTAL}`, earned: summary.allOpenDone, prog: `${summary.openStamped}/${summary.openTotal}` },
-        ...states.filter((s) => s.book.kind === "invite").map((s) => ({ id: s.book.id, name: s.book.name.replace(" 초대장", ""), earned: s.done, prog: `${s.got}/${s.total}` })),
+export function MarkerCase({ states, summary, tierOf }: { states: readonly BookState<unknown>[]; summary: StampSummary; tierOf?: (bookId: string) => MarkerTier | null }) {
+    // 등급(일반 · 블랙 · 자개)은 '누구나' 일곱 권과 일곱 권 전부에만 있다 — 초대장 두 권은 점을 그리지 않는다
+    const cells: { id: string; name: string; earned: boolean; prog: string; tiered: boolean }[] = [
+        ...states.filter((s) => s.book.kind === "open").map((s) => ({ id: s.book.id, name: s.book.name, earned: s.done, prog: `${s.got}/${s.total}`, tiered: true })),
+        { id: STAMP_ALL_OPEN, name: `누구나 ${STAMP_OPEN_TOTAL}`, earned: summary.allOpenDone, prog: `${summary.openStamped}/${summary.openTotal}`, tiered: true },
+        ...states.filter((s) => s.book.kind === "invite").map((s) => ({ id: s.book.id, name: s.book.name.replace(" 초대장", ""), earned: s.done, prog: `${s.got}/${s.total}`, tiered: false })),
     ];
     return (
         <div className="rounded-2xl p-[9px]" style={{ background: "linear-gradient(145deg,#6B4A2B,#3A2614 60%,#55391F)", boxShadow: "inset 0 1px 0 #FFFFFF2E, 0 6px 16px #00000080" }} data-testid="marker-case">
@@ -119,9 +139,10 @@ export function MarkerCase({ states, summary }: { states: readonly BookState<unk
                 {cells.map((c) => (
                     <div key={c.id} className="min-w-0 text-center" data-testid={`case-${c.id}`}>
                         <div className="mx-auto flex h-[54px] w-[54px] items-center justify-center rounded-full" style={{ background: "radial-gradient(circle at 50% 38%,#072417,#0A2E1E)", boxShadow: "inset 0 3px 6px #000000BF, 0 1px 0 #FFFFFF12" }}>
-                            <MarkerArt bookId={c.id} size={c.earned ? 58 : 48} earned={c.earned} />
+                            <MarkerArt bookId={c.id} size={c.earned ? 58 : 48} earned={c.earned} tier={c.tiered ? tierOf?.(c.id) : null} />
                         </div>
-                        <div className={cn("mt-1.5 text-[12px] leading-tight break-keep", c.earned ? "text-[#FFFFFF]" : "text-[#FFFFFF80]")}>
+                        {c.tiered && tierOf && <TierDots done={c.earned} tier={tierOf(c.id)} className="mt-1.5" />}
+                        <div className={cn(c.tiered && tierOf ? "mt-1" : "mt-1.5", "text-[12px] leading-tight break-keep", c.earned ? "text-[#FFFFFF]" : "text-[#FFFFFF80]")}>
                             {c.name}
                             {!c.earned && <span className="block tabular-nums">{c.prog}</span>}
                         </div>

@@ -9,6 +9,7 @@
  */
 import { STAMP_BOOKS, STAMP_INVITE_TOTAL, STAMP_OPEN_TOTAL, STAMP_TOTAL, STAMP_TROPHY_STEPS, type StampBook } from "./golfStampBooks.js";
 import { GOLF_PINS } from "./golfPins.js";
+import { SEASON_TAG_TIERS } from "./golfStampExtras.js";
 
 export const STAMPS_HUB_PATH = "/golf/stamps";
 export const STAMP_SHELF_PATH = "/golf/shelf";
@@ -27,7 +28,12 @@ export const STAMP_GUIDE_STEPS: readonly { title: string; body: string }[] = [
     { title: "도장첩을 고른다", body: "가고 싶은 권역의 도장첩을 열어 보세요. 빈 칸이 앞으로 갈 곳이에요." },
     { title: "골프장에서 18홀을 끝낸다", body: "랭큐매치로 라운드를 적고 그 골프장에서 끝내면 현장 인증이 되고, 그 칸에 도장이 찍혀요." },
     { title: "한 권을 다 채우면 볼마커", body: `볼마커는 장식장에 놓여요. 찍은 골프장이 ${STAMP_TROPHY_STEPS.slice(0, 3).join(" · ")}곳이 되면 트로피도 받아요.` },
+    { title: "다시 가면 도장이 진해진다", body: "같은 골프장의 코스를 전부 돌면 금테, 네 계절에 다 가면 사철이에요. 한 권이 전부 금테면 볼마커가 블랙으로, 전부 사철이면 자개로 바뀌어요." },
 ];
+
+/** 도장의 깊이 — 도장첩 한 권의 설명 카드(규칙은 shared/golfStampDepth) */
+export const STAMP_DEPTH_TITLE = "다시 가면 도장이 진해져요";
+export const STAMP_DEPTH_BODY = "코스가 셋 이상인 골프장은 돈 코스만큼 고리가 채워지고, 전부 돌면 금테예요. 18홀 골프장은 두 번 다녀오면 금테. 네 계절에 다 가면 사철이에요.";
 
 /** 책장의 두 구역 */
 export const STAMP_OPEN_TITLE = "누구나 도장첩";
@@ -65,11 +71,19 @@ export function stampShelfSeo(): StampSeo {
     return {
         path: STAMP_SHELF_PATH,
         title: `골프 장식장 — 볼마커 ${STAMP_BOOKS.length + 1}개 · 트로피 ${STAMP_TROPHY_STEPS.length}개 · 업적 핀 ${GOLF_PINS.length}개${BRAND}`,
-        desc: `도장첩을 다 채우면 받는 볼마커, 찍은 엘리트 골프장 수로 받는 트로피, 라운드를 쌓으면 붙는 업적 핀(${GOLF_PINS.slice(0, 3).map((p) => p.name).join(" · ")} 등)을 모으는 곳이에요.`,
+        desc: `도장첩을 다 채우면 받는 볼마커(일반 · 블랙 · 자개), 찍은 엘리트 골프장 수로 받는 트로피, 해마다 하나씩 생기는 시즌 태그, 라운드를 쌓으면 붙는 업적 핀(${GOLF_PINS.slice(0, 3).map((p) => p.name).join(" · ")} 등)을 모으는 곳이에요.`,
     };
 }
 
-/** 장식장의 세 구역 이름 */
+/** 장식장의 구역 이름 */
 export const SHELF_MARKER_TITLE = "볼마커 수집함";
 export const SHELF_TROPHY_TITLE = "엘리트 트로피";
+export const SHELF_TAG_TITLE = "시즌 태그";
+export const SHELF_SPECIAL_TITLE = "한정 볼마커";
 export const SHELF_PIN_TITLE = "업적 핀";
+/** 볼마커의 등급(점 셋) · 시즌 태그 · 한정 볼마커의 설명 — 화면과 검색용 화면이 같이 쓴다 */
+export const SHELF_TIER_NOTE = "점 셋은 등급이에요 — 다 채우면 일반, 그 권의 도장이 전부 금테면 블랙, 전부 사철이면 자개로 바뀌어요.";
+export const SHELF_TAG_NOTE = `해마다 그해의 태그가 하나 생겨요. 그해에 골프장에서 끝낸 라운드가 ${SEASON_TAG_TIERS.map((t) => `${t.at}번이면 ${t.name}`).join(", ")} 태그예요. 지난 해의 태그는 장식장에 남아요.`;
+export const SHELF_SPECIAL_NOTE = "계절 볼마커는 해마다 다시 열려요. 골프장에서 끝낸 라운드만 세요.";
+export const SHELF_HIDDEN_NAME = "숨은 볼마커";
+export const SHELF_HIDDEN_HOW = "받는 순간 알게 돼요";

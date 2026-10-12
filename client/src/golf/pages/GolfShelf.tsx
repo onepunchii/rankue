@@ -1,5 +1,5 @@
 /**
- * /golf/shelf — 골프 장식장(2026-10-12). 볼마커 수집함 + 엘리트 트로피.
+ * /golf/shelf — 골프 장식장(2026-10-12). 볼마커 수집함 + 엘리트 트로피 + 시즌 태그 + 한정 볼마커 + 업적 핀.
  *
  * 볼마커는 도장첩 한 권을 다 채우면 하나(권 아홉 + 누구나 일곱 권 전부 = 열 칸), 트로피는 찍은 엘리트 골프장 수(10 · 20 · 30 · 45 · 전부).
  * 못 받은 것도 윤곽이 보인다 — 무엇이 남았는지 알아야 모으고 싶어진다.
@@ -21,9 +21,13 @@ import { TROPHIES } from "@/golf/stamps/bookArt";
 import { awardLabel, awardWhen, useStampAwards } from "@/golf/stamps/useStampAwards";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
 import { PinCase, PinPiece } from "@/golf/stamps/PinParts";
+import { SeasonTagPiece, SeasonTagShelf, SpecialCase } from "@/golf/stamps/ExtraParts";
+import { extraSrc } from "@/golf/stamps/bookArt";
+import { useStampDepth } from "@/golf/stamps/useStampDepth";
+import { parseSeasonTagKey, parseSpecialKey } from "@shared/golfStampExtras";
 import { MarkerArt, MarkerCase, SHELF_PATH, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampSection, TrophyShelf, bookName, bookPath } from "@/golf/stamps/StampParts";
 import { useSeo } from "@/hooks/useSeo";
-import { stampShelfSeo } from "@shared/golfStampGuide";
+import { SHELF_SPECIAL_NOTE, SHELF_TAG_NOTE, SHELF_TIER_NOTE, stampShelfSeo } from "@shared/golfStampGuide";
 
 export default function GolfShelf() {
     const col = useStampCollection({ guest: "full" });
@@ -34,6 +38,8 @@ export default function GolfShelf() {
     useSeo({ title: seo.title, description: seo.desc, path: seo.path });
     // 받은 기록(몇 번째 · 받은 날) — 회원의 것만. 방문자의 예시 장식장에는 붙이지 않는다
     const awards = useStampAwards();
+    // 도장의 깊이 → 볼마커 등급 · 시즌 태그 · 한정 볼마커. 방문자는 다 모았을 때의 예시
+    const depth = useStampDepth({ guest: "full" });
     const lastStep = STAMP_TROPHY_STEPS[STAMP_TROPHY_STEPS.length - 1];
     // 볼마커는 권마다 하나 + 누구나 일곱 권 전부
     const markerTotal = STAMP_BOOKS.length + 1;
@@ -64,7 +70,8 @@ export default function GolfShelf() {
                     </div>
 
                     <StampSection title="볼마커 수집함" sample={sample} aside="도장첩을 다 채우면 한 개">
-                        <MarkerCase states={states} summary={summary} />
+                        <MarkerCase states={states} summary={summary} tierOf={depth.tier} />
+                        <p className="mt-2.5 text-[12.5px] leading-snug text-[#FFFFFF73] break-keep" data-testid="shelf-tier-note">{SHELF_TIER_NOTE}</p>
                         {summary.nearest && (
                             <Link href={bookPath(summary.nearest.bookId)} className="mt-3 flex items-center gap-1 text-[14px] text-[#FFFFFFB3] active:text-[#FFFFFF]" data-testid="shelf-nearest">
                                 <span className="flex-1 break-keep">다음 볼마커는 {bookName(summary.nearest.bookId)} — {summary.nearest.left}곳 남았어요</span>
@@ -90,6 +97,18 @@ export default function GolfShelf() {
                         </div>
                     </StampSection>
 
+                    {/* 시즌 태그 — 해마다 하나. 그해의 인증 라운드 수로 가죽이 바뀌고, 지난 해의 태그는 남는다(shared/golfStampExtras) */}
+                    <StampSection title="시즌 태그" sample={sample} aside="해마다 하나">
+                        <SeasonTagShelf tags={depth.tags} />
+                        <p className="mt-2.5 text-[12.5px] leading-snug text-[#FFFFFF73] break-keep">{SHELF_TAG_NOTE}</p>
+                    </StampSection>
+
+                    {/* 한정 볼마커 — 철마다 · 특별한 날에만. 숨은 볼마커는 받기 전에 '?' */}
+                    <StampSection title="한정 볼마커" sample={sample} aside="그 철 · 그날에만">
+                        <SpecialCase depth={depth} />
+                        <p className="mt-2.5 text-[12.5px] leading-snug text-[#FFFFFF73] break-keep">{SHELF_SPECIAL_NOTE}</p>
+                    </StampSection>
+
                     {/* 업적 핀 — 골프장을 새로 가지 않아도 라운드를 쌓으면 붙는다(shared/golfPins). 못 받은 핀은 조건이 보인다 */}
                     <StampSection title="업적 핀" sample={sample} aside="라운드를 쌓으면 붙어요">
                         <PinCase earned={pinGot} when={sample ? undefined : (id) => { const a = awards.of("pin", id); return a ? awardWhen(a) : undefined; }} />
@@ -105,7 +124,11 @@ export default function GolfShelf() {
                                             ? <span className="flex h-10 w-10 shrink-0 items-center justify-center">{golfPin(a.key) && <PinPiece pin={{ ...golfPin(a.key)!, num: undefined }} earned size={38} />}</span>
                                             : a.kind === "trophy"
                                             ? <img src={TROPHIES.find((t) => String(t.at) === a.key)?.src ?? TROPHIES[0].src} alt="" width={40} height={40} className="h-10 w-10 shrink-0" loading="lazy" decoding="async" draggable={false} />
-                                            : <span className="flex h-10 w-10 shrink-0 items-center justify-center"><MarkerArt bookId={a.kind === "all" ? STAMP_ALL_OPEN : a.key} size={36} earned /></span>}
+                                            : a.kind === "tag"
+                                            ? <span className="flex h-10 w-10 shrink-0 items-center justify-center">{parseSeasonTagKey(a.key) && <SeasonTagPiece tier={parseSeasonTagKey(a.key)!.tier} year={parseSeasonTagKey(a.key)!.year} size={40} earned />}</span>
+                                            : a.kind === "special"
+                                            ? <span className="flex h-10 w-10 shrink-0 items-center justify-center">{parseSpecialKey(a.key) && <img src={extraSrc(parseSpecialKey(a.key)!.marker.art)} alt="" width={36} height={36} className="h-9 w-9" loading="lazy" decoding="async" draggable={false} />}</span>
+                                            : <span className="flex h-10 w-10 shrink-0 items-center justify-center"><MarkerArt bookId={a.kind === "all" ? STAMP_ALL_OPEN : a.key} size={36} earned tier={a.kind === "black" || a.kind === "pearl" ? a.kind : null} /></span>}
                                         <span className="min-w-0 flex-1 text-[14px] text-[#FFFFFF] break-keep">{awardLabel(a.kind, a.key)}</span>
                                         <span className="shrink-0 text-[13px] tabular-nums text-[#FFFFFF99]">{awardWhen(a)}</span>
                                     </li>

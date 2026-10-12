@@ -43,6 +43,10 @@ import { syncStampAwards, type StampAwardRow } from "./golfStampAwards.js";
 import type { DatedStamp } from "../../shared/golfStampAwards.js";
 import { stampOneLeft } from "../../shared/golfStampOneLeft.js";
 import { pinsDue, type PinRound } from "../../shared/golfPins.js";
+import { STAMP_BOOKS, slotForStamp } from "../../shared/golfStampBooks.js";
+import { markerTiersDue, stampDepths, type SlotDepth } from "../../shared/golfStampDepth.js";
+import { seasonTagYears, seasonTagsDue, specialMarkersDue, type SeasonTagYear } from "../../shared/golfStampExtras.js";
+import type { StampAwardDue } from "../../shared/golfStampAwards.js";
 import { insertCheckin, listCheckins, listCheckinsInTx, readCheckins, realMemberIds, withCheckinTable } from "./golfCheckins.js";
 import { parseLatLng, sortByDistance } from "../../shared/golfNearby.js";
 import {
@@ -1060,10 +1064,50 @@ export class GolfRepository {
             this.getGolfPinRounds(memberId).catch((e) => { console.error("[golf] pinRounds", e); return [] as PinRound[]; }),
             this.getGolfPinPhotoTimes(memberId).catch((e) => { console.error("[golf] pinPhotos", e); return [] as Date[]; }),
         ]);
-        const pins = pinsDue(rounds, stamps, shots);
-        const fresh = await syncStampAwards(memberId, stamps, pins);
+        // 도장의 깊이(코스 조각 · 금테 · 사철) → 볼마커 등급 · 첫 금테 핀 · 시즌 태그 · 한정 볼마커. 코스 이름을 못 읽으면 조각 없이(두 번 방문 = 금테) 판정한다
+        const nineNames = await this.getStampNineNames().catch((e) => { console.error("[golf] stampNines", e); return {} as Record<string, string[]>; });
+        const depths = stampDepths(rounds.map((r) => ({ at: r.at, clubId: r.clubId ?? null, name: r.clubName ?? "", nines: r.nines })), nineNames);
+        const golds = Array.from(depths.values()).map((d) => d.goldAt).filter((t): t is number => t != null);
+        const pins = pinsDue(rounds, stamps, shots, golds);
+        const extra: StampAwardDue[] = [
+            ...markerTiersDue(depths).map((d): StampAwardDue => ({ kind: d.tier, key: d.key, earnedAt: d.earnedAt })),
+            ...seasonTagsDue(rounds.map((r) => r.at)).map((d): StampAwardDue => ({ kind: "tag", key: d.key, earnedAt: d.earnedAt })),
+            ...specialMarkersDue(rounds.map((r) => ({ at: r.at, elite: !!slotForStamp({ clubId: r.clubId ?? null, name: r.clubName ?? "" }), strokes: r.strokes, pars: r.pars })), depths, stamps)
+                .map((d): StampAwardDue => ({ kind: "special", key: d.key, earnedAt: d.earnedAt })),
+        ];
+        const fresh = await syncStampAwards(memberId, stamps, pins, extra);
         await this.nudgeStampOneLeft(memberId, stamps);
         return fresh;
+    }
+
+    /**
+     * 도장첩 골프장의 코스 이름 — 칸의 이름표 → 그 골프장 원장의 코스(9홀) 이름 전부(2026-10-12 도장의 깊이).
+     * 원장이 두 줄인 골프장(회원제 · 대중제)은 두 줄의 코스를 합친다. 겹치는 이름 걷어 내기는 shared/golfStampDepth.slotNineKeys.
+     * 코스 자료가 없는 골프장은 빈 목록 — 그런 곳은 조각 없이 '두 번 다녀오면 금테'다.
+     */
+    async getStampNineNames(): Promise<Record<string, string[]>> {
+        const slots = STAMP_BOOKS.flatMap((b) => b.slots);
+        const ids = Array.from(new Set<string>(slots.flatMap((s) => [...s.clubIds])));
+        const out: Record<string, string[]> = {};
+        if (ids.length === 0) return out;
+        const rows = await db.select({ clubId: rankueGolfCourses.clubId, name: rankueGolfCourses.name })
+            .from(rankueGolfCourses).where(inArray(rankueGolfCourses.clubId, ids));
+        const by = new Map<string, string[]>();
+        for (const r of rows) by.set(r.clubId, [...(by.get(r.clubId) ?? []), r.name]);
+        for (const s of slots) out[s.key] = s.clubIds.flatMap((c) => by.get(c) ?? []);
+        return out;
+    }
+
+    /**
+     * 내 도장의 깊이와 시즌 태그(2026-10-12) — 화면이 읽는다(GET /golf/stamp-depth). 아무것도 적지 않는다.
+     * 판정은 받은 기록을 적을 때(syncStampAwards)와 같은 자료 · 같은 규칙이다.
+     */
+    async getGolfStampDepth(memberId: string): Promise<{ depths: SlotDepth[]; tags: SeasonTagYear[] }> {
+        const [rounds, nineNames] = await Promise.all([this.getGolfPinRounds(memberId), this.getStampNineNames().catch(() => ({} as Record<string, string[]>))]);
+        const depths = stampDepths(rounds.map((r) => ({ at: r.at, clubId: r.clubId ?? null, name: r.clubName ?? "", nines: r.nines })), nineNames);
+        // 올해(한국 날짜)는 라운드가 없어도 맨 앞에 — 빈 태그 자리를 그린다
+        const thisYear = new Date(Date.now() + 9 * 3_600_000).getUTCFullYear();
+        return { depths: Array.from(depths.values()), tags: seasonTagYears(rounds.map((r) => r.at), thisYear) };
     }
 
     /**
@@ -1073,13 +1117,13 @@ export class GolfRepository {
      * 읽기 세 번: 내 기록 → 그 경기들 → 그 경기들의 기록(동반자). 코스의 파는 parsForMany 가 한 번에 읽는다.
      */
     async getGolfPinRounds(memberId: string): Promise<PinRound[]> {
-        const rows = await db.select({ score: hiqGameHistory.score, createdAt: hiqGameHistory.createdAt, onSite: hiqGameHistory.onSite, sessionId: hiqGameHistory.golfSessionId, scoreJson: hiqGameHistory.scoreJson })
+        const rows = await db.select({ score: hiqGameHistory.score, createdAt: hiqGameHistory.createdAt, onSite: hiqGameHistory.onSite, sessionId: hiqGameHistory.golfSessionId, scoreJson: hiqGameHistory.scoreJson, golfClubId: hiqGameHistory.golfClubId, locationName: hiqGameHistory.locationName })
             .from(hiqGameHistory)
             .where(and(eq(hiqGameHistory.memberId, memberId), eq(hiqGameHistory.sportCategory, 'GOLF' as any)))
             .orderBy(asc(hiqGameHistory.createdAt));
         const verified = rows.filter((r) => countsOnSite(r.onSite));
         const ids = Array.from(new Set<string>(verified.filter((r) => r.sessionId).map((r) => String(r.sessionId))));
-        const info = new Map<string, { par: number | null; pars: (number | null)[]; startAt: Date | null; mates: string[] }>();
+        const info = new Map<string, { par: number | null; pars: (number | null)[]; startAt: Date | null; mates: string[]; nines: (string | null)[] }>();
         if (ids.length > 0) {
             const sessions = await db.select({ id: golfMatchSessions.id, courseId: golfMatchSessions.courseId, frontCourseName: golfMatchSessions.frontCourseName, backCourseName: golfMatchSessions.backCourseName, startedAt: golfMatchSessions.startedAt })
                 .from(golfMatchSessions).where(inArray(golfMatchSessions.id, ids));
@@ -1103,13 +1147,15 @@ export class GolfRepository {
                     pars: cp.pars.map((v, k) => (cp.known[k] ? v : null)),
                     startAt: s.startedAt ?? null,
                     mates: [...(matesOf.get(s.id) ?? [])],
+                    // 그 라운드에서 돈 코스(전반 · 후반) — 도장의 깊이(코스 조각)
+                    nines: [s.frontCourseName ?? null, s.backCourseName ?? null],
                 });
             });
         }
         return verified.map((r) => {
             const x = r.sessionId ? info.get(r.sessionId) : undefined;
             const strokes = Array.isArray(r.scoreJson) && r.scoreJson.length === 18 ? (r.scoreJson as unknown[]).map((v) => (typeof v === "number" ? v : null)) : null;
-            return { at: r.createdAt, score: r.score, par: x?.par ?? null, startAt: x?.startAt ?? null, strokes, pars: x?.pars ?? null, mates: x?.mates ?? [] };
+            return { at: r.createdAt, score: r.score, par: x?.par ?? null, startAt: x?.startAt ?? null, strokes, pars: x?.pars ?? null, mates: x?.mates ?? [], clubId: r.golfClubId ?? null, clubName: r.locationName ?? null, nines: x?.nines ?? null };
         });
     }
 

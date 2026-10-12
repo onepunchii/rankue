@@ -13,8 +13,12 @@
  */
 import { STAMP_ALL_OPEN, STAMP_TROPHY_STEPS, bookStates, type StampLike } from "./golfStampBooks.js";
 
-/** book · all · trophy 는 도장첩에서 받는 것, pin 은 업적 핀(shared/golfPins — 이름표는 "pin:break-100") */
-export type StampAwardKind = "book" | "all" | "trophy" | "pin";
+/**
+ * book · all · trophy 는 도장첩에서 받는 것, pin 은 업적 핀(shared/golfPins — 이름표는 "pin:break-100").
+ * black · pearl 은 볼마커의 등급(shared/golfStampDepth — 열쇠는 권의 id · 'all-open'),
+ * tag 는 시즌 태그("tag:2026:navy"), special 은 한정 볼마커("special:spring:2026" · "special:holeinone") — shared/golfStampExtras.
+ */
+export type StampAwardKind = "book" | "all" | "trophy" | "pin" | "black" | "pearl" | "tag" | "special";
 
 export interface StampAwardDue {
     kind: StampAwardKind;

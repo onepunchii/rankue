@@ -17,10 +17,12 @@ import { StampHelpButton, StampHelpSheet } from "@/golf/stamps/StampHelp";
 import { StampShareSheet } from "@/golf/stamps/StampShareSheet";
 import { awardWhen, useStampAwards } from "@/golf/stamps/useStampAwards";
 import { useStampCollection } from "@/golf/stamps/useStampCollection";
+import { useStampDepth } from "@/golf/stamps/useStampDepth";
+import { MARKER_TIER_NAME, bookDepthProgress, depthNext } from "@shared/golfStampDepth";
 import { MarkerArt, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampPaper, StampSection, bookPath } from "@/golf/stamps/StampParts";
 import { lastEmptySlot } from "@shared/golfStampOneLeft";
 import { useSeo } from "@/hooks/useSeo";
-import { stampBookSeo } from "@shared/golfStampGuide";
+import { STAMP_DEPTH_BODY, STAMP_DEPTH_TITLE, stampBookSeo } from "@shared/golfStampGuide";
 
 /** 손으로 찍은 것처럼 칸마다 조금씩 다른 기울기(도) */
 const TILT = [-5, 4, -2, 6, -4, 3, -6, 5, -3, 2, -5];
@@ -36,6 +38,8 @@ export default function StampBookPage() {
     useSeo(seo ? { title: seo.title, description: seo.desc, path: seo.path } : null);
     // 받은 기록(몇 번째 · 받은 날) — 회원의 것만. 예시에는 붙이지 않는다
     const awards = useStampAwards();
+    // 도장의 깊이(코스 조각 · 금테 · 사철) — 방문자는 예시 인물의 것
+    const depth = useStampDepth();
 
     if (!state) {
         return (
@@ -56,6 +60,9 @@ export default function StampBookPage() {
     const award = col.sample ? undefined : awards.of("book", book.id);
     // '한 곳 남음' — 내 도장첩에서 빈 칸이 딱 하나일 때(누구나 권만). 알림(서버)과 같은 셈이다. 예시에는 붙이지 않는다
     const last = col.sample ? null : lastEmptySlot(state);
+    // 볼마커의 등급 — '누구나' 권만. 금테 · 사철이 몇 칸인지
+    const deep = bookDepthProgress(slots.map((s) => s.slot.key), depth.all);
+    const tier = invite ? null : depth.tier(book.id);
 
     return (
         <CourseShell title={`${book.name} 도장첩`} backTo={STAMPS_PATH} hideBottomCta right={<StampHelpButton onClick={() => setHelp(true)} />}>
@@ -84,7 +91,7 @@ export default function StampBookPage() {
                         {/* 다 채우면 받는 것 */}
                         <div className="px-5 pt-3.5">
                             <div className="flex items-center gap-3.5 rounded-2xl border px-3.5 py-3" style={{ background: "#FFFFFF0A", borderColor: done ? "#E9B94980" : "#FFFFFF14" }} data-testid="stamp-reward">
-                                <MarkerArt bookId={book.id} size={66} earned={done} />
+                                <MarkerArt bookId={book.id} size={66} earned={done} tier={tier} />
                                 <div className="min-w-0 flex-1">
                                     <p className="text-[12px] text-[#FFD36B] break-keep" data-testid="stamp-reward-when">{done ? (award ? `다 채워서 받은 볼마커 · ${awardWhen(award)}` : "다 채워서 받은 볼마커") : "다 채우면 받는 볼마커"}</p>
                                     <p className="mt-0.5 text-[16px] font-semibold text-[#FFFFFF] break-keep">
@@ -139,11 +146,23 @@ export default function StampBookPage() {
                                                     <InkStamp
                                                         name={s.slot.name} date={shownStamp?.date} ink={art?.ink ?? "#2F6BD6"} glyph={art?.glyph ?? "tree"}
                                                         state={s.stamp ? "on" : s.record ? "faded" : "empty"} tilt={s.stamp ? TILT[i % TILT.length] : 0}
+                                                        depth={s.stamp ? depth.of(s.slot.key) : null}
                                                     />
                                                 </div>
                                                 <span className="text-[12.5px] leading-tight break-keep" style={{ color: s.stamp ? "#1F1C16" : "#5C5444", fontWeight: s.stamp ? 600 : 400 }}>{s.slot.name}</span>
                                                 {s.stamp
-                                                    ? (s.stamp.score != null && <span className="text-[12px] tabular-nums text-[#6B6456]">베스트 {s.stamp.score}</span>)
+                                                    ? (
+                                                        <>
+                                                            {s.stamp.score != null && <span className="text-[12px] tabular-nums text-[#6B6456]">베스트 {s.stamp.score}</span>}
+                                                            {/* 깊이 — 금테 · 사철이면 그 이름, 아니면 다음까지 남은 것 */}
+                                                            {(() => {
+                                                                const d = depth.of(s.slot.key);
+                                                                if (!d) return null;
+                                                                const next = depthNext(d);
+                                                                return <span className="text-[12px] leading-tight" style={{ color: d.gold ? "#8A5E00" : "#6B6456", fontWeight: d.gold ? 600 : 400 }} data-testid={`stamp-depth-${s.slot.key}`}>{d.four ? "금테 · 사철" : d.gold ? `금테${next ? ` · ${next}` : ""}` : next}</span>;
+                                                            })()}
+                                                        </>
+                                                    )
                                                     : s.record
                                                         ? <span className="text-[12px] text-[#8A6A1A]">미인증 기록</span>
                                                         : <span className="inline-flex h-6 items-center rounded-full bg-[#DDEBC8] px-2 text-[12px] text-[#2F6A0C]">골프장 보기</span>}
@@ -152,6 +171,26 @@ export default function StampBookPage() {
                                     })}
                                 </div>
                             </StampPaper>
+                            {/* 도장의 깊이 — 다시 가면 진해진다. '누구나' 권은 볼마커의 등급(일반 · 블랙 · 자개)까지 미리 보여 준다 */}
+                            <div className="mt-3 rounded-2xl bg-[#FFFFFF08] px-3.5 py-3.5" data-testid="stamp-depth-card">
+                                <p className="text-[14px] font-semibold text-[#FFFFFF]">{STAMP_DEPTH_TITLE}</p>
+                                <p className="mt-1 text-[13px] leading-snug text-[#FFFFFFB3] break-keep">{STAMP_DEPTH_BODY}</p>
+                                {!invite && (
+                                    <ul className="mt-3 flex gap-2" data-testid="stamp-tiers">
+                                        {([
+                                            ["base", null, done, `도장 ${got}/${total}`],
+                                            ["black", "black", tier === "black" || tier === "pearl", `금테 ${deep.gold}/${total}`],
+                                            ["pearl", "pearl", tier === "pearl", `사철 ${deep.four}/${total}`],
+                                        ] as const).map(([id, t, has, prog]) => (
+                                            <li key={id} className="flex flex-1 flex-col items-center rounded-xl px-1 py-2.5 text-center" style={{ background: has ? "#E9B9491F" : "#FFFFFF0A", boxShadow: has ? "inset 0 0 0 1px #E9B94959" : undefined }} data-tier={id} data-has={has ? "1" : "0"}>
+                                                <MarkerArt bookId={book.id} size={48} earned={has} tier={t} preview={!has} />
+                                                <span className="mt-1.5 text-[13px] font-medium" style={{ color: has ? "#FFD36B" : "#FFFFFFCC" }}>{MARKER_TIER_NAME[id]}</span>
+                                                <span className="text-[12px] tabular-nums text-[#FFFFFF8C]">{prog}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
                             {records > 0 && (
                                 <p className="mt-2.5 text-[13px] leading-snug text-[#FFFFFF8C] break-keep">흐린 도장은 현장 인증 없이 적은 기록이에요. 그 골프장에서 라운드를 끝내면 또렷한 도장으로 바뀌어요.</p>
                             )}

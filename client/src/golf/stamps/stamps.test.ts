@@ -8,6 +8,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
 import { GOLF_PINS } from "@shared/golfPins";
+import { SEASON_TAG_TIERS, SPECIAL_MARKERS } from "@shared/golfStampExtras";
 import { ALL_OPEN_MARKER, BOOK_ART, GLYPH_PATHS, PLAIN_STAMP, TROPHIES, coverSrc, markerSrc } from "./bookArt";
 import { stampNameSize, stampSeed } from "./InkStamp";
 import { stampDate } from "./stampDate";
@@ -43,12 +44,15 @@ describe("그림", () => {
         expect(existsSync(pub(ALL_OPEN_MARKER))).toBe(true);
     });
 
-    it("쓰지 않는 그림을 싣지 않는다 — 폴더에는 표지 9 · 볼마커 10 · 트로피 5 · 업적 핀 9 뿐", () => {
+    it("쓰지 않는 그림을 싣지 않는다 — 폴더에는 표지 · 볼마커(등급 그림까지) · 트로피 · 업적 핀 · 시즌 태그 · 한정 볼마커뿐", () => {
         const files = readdirSync(pub("/golf/stamp-art")).filter((f) => !f.startsWith(".")).sort();
         const want = [
             ...STAMP_BOOKS.map((b) => `cover-${b.id}.webp`), ...STAMP_BOOKS.map((b) => `marker-${b.id}.webp`), `marker-${STAMP_ALL_OPEN}.webp`,
             ...STAMP_TROPHY_STEPS.map((_, i) => `trophy-${i + 1}.webp`),
             ...GOLF_PINS.map((p) => `${p.art}.webp`),
+            // 볼마커의 등급(블랙 · 자개) — 누구나 일곱 권과 일곱 권 전부만. 초대장 두 권은 등급 그림이 없다
+            ...[...STAMP_BOOKS.filter((b) => b.kind === "open").map((b) => b.id), STAMP_ALL_OPEN].flatMap((id) => [`marker-${id}-black.webp`, `marker-${id}-pearl.webp`]),
+            ...SEASON_TAG_TIERS.map((t) => `${t.art}.webp`), ...SPECIAL_MARKERS.map((m) => `${m.art}.webp`),
         ].sort();
         expect(files).toEqual(want);
     });
@@ -158,7 +162,8 @@ describe("예시와 내 도장첩", () => {
         ]);
         expect(code(read("client/src/golf/pages/StampBook.tsx"))).toContain("<StampSection title={`도장 ${total}칸`} sample={col.sample}");
         expect(code(read("client/src/golf/pages/GolfShelf.tsx")).match(/<StampSection title="[^"]+" sample=\{sample\}/g)).toEqual([
-            '<StampSection title="볼마커 수집함" sample={sample}', '<StampSection title="엘리트 트로피" sample={sample}', '<StampSection title="업적 핀" sample={sample}',
+            '<StampSection title="볼마커 수집함" sample={sample}', '<StampSection title="엘리트 트로피" sample={sample}',
+            '<StampSection title="시즌 태그" sample={sample}', '<StampSection title="한정 볼마커" sample={sample}', '<StampSection title="업적 핀" sample={sample}',
         ]);
         // 예시의 핀에는 날짜 · 순번을 지어내지 않는다(다 받은 모습만)
         expect(code(read("client/src/golf/pages/GolfShelf.tsx"))).toContain("when={sample ? undefined : (id) =>");

@@ -7,8 +7,10 @@
  *   cover-<권>.webp   도장첩 표지(600×800, 위 3분의 1 이 빈 하늘 — 제목 자리)
  *   marker-<권>.webp  그 권을 다 채우면 받는 볼마커(400×400, 투명 바탕) · marker-all-open 은 누구나 일곱 권 전부
  *   trophy-1..5.webp  찍은 골프장 수 트로피(440×440, 투명 바탕, 네모 깃발이 비어 있다 — 숫자 자리)
+ *   marker-<권>-black · -pearl.webp  볼마커의 등급(360×360) · tag-*.webp 시즌 태그(440×440, 이름판이 비어 있다) · special-*.webp 한정 볼마커
  */
 import { STAMP_ALL_OPEN, STAMP_TROPHY_STEPS } from "@shared/golfStampBooks";
+import type { MarkerTier } from "@shared/golfStampDepth";
 
 export type StampGlyph = "sunsea" | "tree" | "peaks" | "lake" | "flower" | "sunrise" | "volcano" | "gate" | "flag";
 
@@ -34,8 +36,22 @@ export const BOOK_ART: Readonly<Record<string, BookArt>> = {
 };
 
 export const coverSrc = (bookId: string) => `/golf/stamp-art/cover-${bookId}.webp`;
-/** 볼마커 그림 — 권의 id, 또는 STAMP_ALL_OPEN(누구나 일곱 권 전부) */
-export const markerSrc = (bookId: string) => `/golf/stamp-art/marker-${bookId}.webp`;
+/**
+ * 볼마커 그림 — 권의 id, 또는 STAMP_ALL_OPEN(누구나 일곱 권 전부).
+ * tier 는 등급(블랙 = 밤 풍경 · 검은 니켈, 자개 = 자개 상감) — '누구나' 일곱 권과 일곱 권 전부에만 그림이 있다(초대장 두 권은 등급이 없다).
+ */
+export const markerSrc = (bookId: string, tier?: MarkerTier | null) => `/golf/stamp-art/marker-${bookId}${tier ? `-${tier}` : ""}.webp`;
+/** 시즌 태그 · 한정 볼마커의 그림(art 는 shared/golfStampExtras 가 정한다) */
+export const extraSrc = (art: string) => `/golf/stamp-art/${art}.webp`;
+/**
+ * 시즌 태그의 이름판 — 그림에는 글자가 없고 코드가 해(2026)를 얹는다. 자리는 그림에서 찾은 값(그림 한 변에 대한 비율),
+ * 글자색은 판의 색(놋쇠 · 은)에 맞춘다.
+ */
+export const TAG_PLATE: Readonly<Record<string, { x: number; y: number; w: number; h: number; ink: string }>> = {
+    "tag-brown": { x: 0.3117, y: 0.3974, w: 0.3706, h: 0.3368, ink: "#4A3200" },
+    "tag-navy": { x: 0.2825, y: 0.4046, w: 0.4289, h: 0.3196, ink: "#23272C" },
+    "tag-burgundy": { x: 0.3006, y: 0.4087, w: 0.3887, h: 0.3163, ink: "#4A3200" },
+};
 export const ALL_OPEN_MARKER = markerSrc(STAMP_ALL_OPEN);
 
 /** 도장 가운데 무늬 — 24×24 상자의 선 그림(SVG path 의 d). 색 · 굵기는 도장이 정한다 */

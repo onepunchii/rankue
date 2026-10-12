@@ -10,6 +10,8 @@
  */
 import { GUEST_SAMPLE } from "./guestSample.js";
 import { STAMP_BOOKS, type StampLike, type StampSlot } from "./golfStampBooks.js";
+import { GOLF_SEASONS, stampDepths, type MarkerTier, type SlotDepth } from "./golfStampDepth.js";
+import { SPECIAL_MARKERS, seasonTagOf, specialKey, type SeasonTagYear } from "./golfStampExtras.js";
 
 /** 예시 라운드(옛 → 최근)가 찍은 칸과 날짜. 길이는 예시 인물의 라운드 수와 같아야 한다 */
 const WHERE: readonly [slotKey: string, date: string][] = [
@@ -56,3 +58,39 @@ const fullDate = (i: number): string => {
 export const GOLF_STAMP_FULL_SAMPLE: readonly SampleStamp[] = STAMP_BOOKS.flatMap((b) => b.slots).map((slot, i): SampleStamp => ({
     sample: true, clubId: slot.clubIds[0], name: slot.ledgerNames[0], date: fullDate(i), score: 84 + ((i * 7) % 13), rounds: 1,
 }));
+
+// ── 도장의 깊이 · 시즌 태그 · 한정 볼마커의 예시(2026-10-12) ─────────────
+const sampleMs = (date: string): number => { const [y, m, d] = date.split(".").map(Number); return Date.UTC(y, m - 1, d, 6); };
+/**
+ * 예시 인물이 돈 코스 — 코스가 셋 이상인 골프장에서만 적는다(나머지는 18홀이라 조각이 없다).
+ * 코스 이름은 그 골프장 원장의 이름이다(2026-10-12 운영 자료에서 읽었다). 한 번씩만 갔으므로 다 '2/3' · '2/4' — 한 코스가 남은 모습.
+ */
+const SAMPLE_NINES: Readonly<Record<string, readonly string[]>> = {
+    bearsbest: ["USA", "아시아", "유럽"],
+    lavieestbelle: ["올드 IN", "올드 OUT", "듄스 IN", "듄스 OUT"],
+    island: ["East", "South", "West"],
+    pineridge: ["LAKE", "PINE", "RIDGE"],
+};
+/** 예시 인물의 깊이 — 진짜 규칙(stampDepths)으로 계산한다 */
+export const GOLF_DEPTH_SAMPLE: readonly SlotDepth[] = Array.from(stampDepths(
+    WHERE.map(([key, date]) => { const slot = slotByKey.get(key)!; return { at: sampleMs(date), clubId: slot.clubIds[0], name: slot.ledgerNames[0], nines: (SAMPLE_NINES[key] ?? []).slice(0, 2) }; }),
+    SAMPLE_NINES,
+).values());
+/** 예시 인물의 시즌 태그 — 2026년에 여덟 번 */
+export const GOLF_TAG_SAMPLE: readonly SeasonTagYear[] = [seasonTagOf(2026, WHERE.length)];
+/** 예시 인물이 받은 한정 볼마커 — 봄 · 여름 · 가을에 도장첩의 골프장을 갔다(날짜가 그렇다) */
+export const GOLF_SPECIAL_SAMPLE: readonly string[] = [specialKey("spring", 2026), specialKey("summer", 2026), specialKey("autumn", 2026)];
+
+/**
+ * 다 모았을 때의 예시 — 오래 모은 사람의 장식장. 볼마커가 세 등급으로 섞여 보이게:
+ * 서해는 자개(전부 사철), 경기 · 강원은 블랙(전부 금테), 나머지 권은 일반(도장 절반이 금테).
+ */
+export const GOLF_MARKER_TIER_FULL_SAMPLE: Readonly<Record<string, MarkerTier>> = { seohae: "pearl", gyeonggi: "black", gangwon: "black" };
+export const GOLF_DEPTH_FULL_SAMPLE: readonly SlotDepth[] = STAMP_BOOKS.flatMap((b) => b.slots.map((slot, i): SlotDepth => {
+    const tier = GOLF_MARKER_TIER_FULL_SAMPLE[b.id];
+    const four = tier === "pearl", gold = !!tier || i % 2 === 0;
+    return { slotKey: slot.key, bookId: b.id, visits: four ? 5 : gold ? 2 : 1, nines: null, seasons: four ? [...GOLF_SEASONS] : gold ? ["spring", "autumn"] : ["spring"], gold, goldAt: null, four, fourAt: null };
+}));
+export const GOLF_TAG_FULL_SAMPLE: readonly SeasonTagYear[] = [seasonTagOf(2026, 14), seasonTagOf(2025, 26), seasonTagOf(2024, 16)];
+/** 다 모았을 때 — 한정 볼마커도 전부(올해 것) */
+export const GOLF_SPECIAL_FULL_SAMPLE: readonly string[] = SPECIAL_MARKERS.map((m) => specialKey(m.id, 2026));

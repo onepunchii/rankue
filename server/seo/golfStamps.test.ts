@@ -18,7 +18,7 @@ import { GOLF_PINS } from "../../shared/golfPins";
 import { coursePath } from "../../shared/golfCourse";
 import {
     STAMPS_HUB_PATH, STAMPS_NAV_LABEL, STAMP_GUIDE_STEPS, STAMP_INVITE_ASIDE, STAMP_INVITE_NOTE, STAMP_INVITE_TITLE, STAMP_OPEN_ASIDE, STAMP_OPEN_TITLE, STAMP_SHELF_PATH,
-    SHELF_MARKER_TITLE, SHELF_PIN_TITLE, SHELF_TROPHY_TITLE, stampBookPath, stampBookSeo, stampShelfSeo, stampsHubSeo,
+    SHELF_HIDDEN_HOW, SHELF_HIDDEN_NAME, SHELF_MARKER_TITLE, SHELF_PIN_TITLE, SHELF_SPECIAL_NOTE, SHELF_SPECIAL_TITLE, SHELF_TAG_NOTE, SHELF_TAG_TITLE, SHELF_TIER_NOTE, SHELF_TROPHY_TITLE, stampBookPath, stampBookSeo, stampShelfSeo, stampsHubSeo,
 } from "../../shared/golfStampGuide";
 
 /**
@@ -104,7 +104,11 @@ describe("/golf/shelf 장식장", () => {
 
     it("볼마커 열 · 트로피 다섯 · 업적 핀 아홉 — 화면의 세 구역과 같은 이름", () => {
         expect(doc(r).title).toBe(stampShelfSeo().title);
-        for (const h of [SHELF_MARKER_TITLE, SHELF_TROPHY_TITLE, SHELF_PIN_TITLE]) expect(doc(r).body).toContain(`>${h}</h2>`);
+        for (const h of [SHELF_MARKER_TITLE, SHELF_TROPHY_TITLE, SHELF_TAG_TITLE, SHELF_SPECIAL_TITLE, SHELF_PIN_TITLE]) expect(doc(r).body).toContain(`>${h}</h2>`);
+        // 등급 · 태그 · 한정 볼마커의 설명도 화면과 같은 글. 숨은 볼마커의 조건은 검색용 화면에도 내지 않는다
+        for (const t of [SHELF_TIER_NOTE, SHELF_TAG_NOTE, SHELF_SPECIAL_NOTE]) expect(doc(r).body).toContain(t);
+        expect(doc(r).body).toContain(`${SHELF_HIDDEN_NAME} — ${SHELF_HIDDEN_HOW}`);
+        expect(doc(r).body).not.toMatch(/1월 1일|새해 첫 티/);
         for (const b of STAMP_BOOKS) expect(text(doc(r).body)).toContain(`${b.name} 볼마커`);
         for (const p of GOLF_PINS) expect(text(doc(r).body), p.id).toContain(`${p.name} — ${p.how}`);
         expect(text(doc(r).body)).toContain("트로피 10곳");
@@ -149,7 +153,7 @@ describe("화면과 같은 글", () => {
         const help = code(read("client/src/golf/stamps/StampHelp.tsx"));
         for (const i of [0, 1, 2]) { expect(help).toContain(`STAMP_GUIDE_STEPS[${i}].title`); expect(help).toContain(`STAMP_GUIDE_STEPS[${i}].body`); }
         const shelf = read("client/src/golf/pages/GolfShelf.tsx");
-        for (const h of [SHELF_MARKER_TITLE, SHELF_TROPHY_TITLE, SHELF_PIN_TITLE]) expect(shelf).toContain(`<StampSection title="${h}"`);
+        for (const h of [SHELF_MARKER_TITLE, SHELF_TROPHY_TITLE, SHELF_TAG_TITLE, SHELF_SPECIAL_TITLE, SHELF_PIN_TITLE]) expect(shelf).toContain(`<StampSection title="${h}"`);
     });
 
     it("세 화면이 검색용 화면과 같은 제목 · 설명을 단다", () => {

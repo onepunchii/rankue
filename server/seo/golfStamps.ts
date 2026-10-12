@@ -10,10 +10,11 @@ import { page, esc, hubNav } from "../prerender.js";
 import { entry } from "../sitemap.js";
 import { STAMP_ALL_OPEN, STAMP_BOOKS, STAMP_OPEN_TOTAL, STAMP_TROPHY_STEPS, stampBook, type StampBook } from "../../shared/golfStampBooks.js";
 import { GOLF_PINS } from "../../shared/golfPins.js";
+import { SPECIAL_MARKERS } from "../../shared/golfStampExtras.js";
 import { coursePath } from "../../shared/golfCourse.js";
 import { hubCard } from "../../shared/ogCards.js";
 import {
-    SHELF_H1, SHELF_MARKER_TITLE, SHELF_PIN_TITLE, SHELF_TROPHY_TITLE, STAMPS_H1, STAMPS_HUB_PATH, STAMPS_NAV_LABEL, STAMP_GUIDE_STEPS, STAMP_GUIDE_UPDATED,
+    SHELF_H1, SHELF_HIDDEN_HOW, SHELF_HIDDEN_NAME, SHELF_MARKER_TITLE, SHELF_PIN_TITLE, SHELF_SPECIAL_NOTE, SHELF_SPECIAL_TITLE, SHELF_TAG_NOTE, SHELF_TAG_TITLE, SHELF_TIER_NOTE, SHELF_TROPHY_TITLE, STAMP_DEPTH_BODY, STAMP_DEPTH_TITLE, STAMPS_H1, STAMPS_HUB_PATH, STAMPS_NAV_LABEL, STAMP_GUIDE_STEPS, STAMP_GUIDE_UPDATED,
     STAMP_INVITE_ASIDE, STAMP_INVITE_NOTE, STAMP_INVITE_TITLE, STAMP_OPEN_ASIDE, STAMP_OPEN_TITLE, STAMP_SHELF_PATH, stampBookPath, stampBookSeo, stampShelfSeo, stampsHubSeo,
 } from "../../shared/golfStampGuide.js";
 
@@ -88,6 +89,10 @@ ${slots.map((s) => `      <li>${s.slug ? `<a href="${coursePath(s.slug)}">${esc(
     </ul>
     <p>${esc(`다 채우면 받는 볼마커 — ${b.name} 볼마커`)}</p>
   </section>
+  <section>
+    <h2>${esc(STAMP_DEPTH_TITLE)}</h2>
+    <p>${esc(STAMP_DEPTH_BODY)}</p>
+  </section>
 ${guide()}
   <section>
     <h2>다른 도장첩 보기</h2>
@@ -116,6 +121,7 @@ function shelf(): GolfStampsRender {
 ${STAMP_BOOKS.map((b) => `      <li><a href="${stampBookPath(b.id)}">${esc(`${b.name} 볼마커`)}</a> — ${esc(`${b.name} 도장첩 ${b.slots.length}곳`)}</li>`).join("\n")}
       <li data-key="${STAMP_ALL_OPEN}">${esc(`누구나 ${STAMP_OPEN_TOTAL} 볼마커 — 누구나 도장첩 일곱 권 전부`)}</li>
     </ul>
+    <p>${esc(SHELF_TIER_NOTE)}</p>
   </section>
   <section>
     <h2>${esc(SHELF_TROPHY_TITLE)}</h2>
@@ -123,6 +129,17 @@ ${STAMP_BOOKS.map((b) => `      <li><a href="${stampBookPath(b.id)}">${esc(`${b.
     <ul>
 ${STAMP_TROPHY_STEPS.map((n) => `      <li>${esc(n === last ? `트로피 전부 — ${n}곳` : `트로피 ${n}곳`)}</li>`).join("\n")}
     </ul>
+  </section>
+  <section>
+    <h2>${esc(SHELF_TAG_TITLE)}</h2>
+    <p>${esc(SHELF_TAG_NOTE)}</p>
+  </section>
+  <section>
+    <h2>${esc(SHELF_SPECIAL_TITLE)}</h2>
+    <ul>
+${SPECIAL_MARKERS.map((m) => `      <li>${esc(m.hidden ? `${SHELF_HIDDEN_NAME} — ${SHELF_HIDDEN_HOW}` : `${m.name} — ${m.how}`)}</li>`).join("\n")}
+    </ul>
+    <p>${esc(SHELF_SPECIAL_NOTE)}</p>
   </section>
   <section>
     <h2>${esc(SHELF_PIN_TITLE)}</h2>

@@ -827,6 +827,13 @@ router.get("/stamp-awards", requireAuth, asyncHandler(async (req: AuthRequest, r
 }));
 
 /**
+ * 내 도장의 깊이(코스 조각 · 금테 · 사철)와 시즌 태그(2026-10-12) — **본인 것만**, 읽기만 한다. 규칙은 shared/golfStampDepth · golfStampExtras.
+ */
+router.get("/stamp-depth", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    return sendSuccess(res, await storage.golf.getGolfStampDepth(req.userId!));
+}));
+
+/**
  * 도장첩 완성 카드의 공유 주소(2026-10-12) — **본인의, 다 채운 권만**. 서명된 주소를 만들어 줄 뿐 아무것도 저장하지 않는다
  * (그래서 GET 이다 — 발자국 카드의 /passport/footprints/share 와 같다). 주소는 30일 뒤 닫힌다(server/lib/stampShare).
  */

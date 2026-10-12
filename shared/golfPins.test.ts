@@ -27,10 +27,10 @@ const PAR = [4, 4, 3, 4, 5, 4, 3, 4, 5, 4, 4, 3, 4, 5, 4, 3, 4, 5];
 const bogeys = PAR.map((p) => p + 1);
 
 describe("목록", () => {
-    it("스무 개 — 이름표가 겹치지 않고, 그림 파일이 다 있다. 타수 핀 셋만 숫자를 얹는다", () => {
-        expect(GOLF_PINS).toHaveLength(20);
-        expect(new Set(GOLF_PINS.map((p) => p.id)).size).toBe(20);
-        expect(new Set(GOLF_PINS.map((p) => p.art)).size).toBe(20);
+    it("스물한 개 — 이름표가 겹치지 않고, 그림 파일이 다 있다. 타수 핀 셋만 숫자를 얹는다", () => {
+        expect(GOLF_PINS).toHaveLength(21);
+        expect(new Set(GOLF_PINS.map((p) => p.id)).size).toBe(21);
+        expect(new Set(GOLF_PINS.map((p) => p.art)).size).toBe(21);
         for (const p of GOLF_PINS) {
             expect(existsSync(resolve(root, `client/public/golf/stamp-art/${p.art}.webp`)), p.art).toBe(true);
             expect(golfPin(p.id)).toBe(p);
@@ -42,7 +42,7 @@ describe("목록", () => {
 
     it("조건의 글에 돈 · 내기 · 술 이야기가 없다. 판정할 수 없는 핀(니어핀 · 날씨 · 원정)은 목록에 없다", () => {
         for (const p of GOLF_PINS) expect(`${p.name} ${p.how}`, p.id).not.toMatch(/원\b|내기|상금|술|맥주|소주|만원/);
-        expect(GOLF_PINS.map((p) => p.name).join(" ")).not.toMatch(/니어|우중|한여름|한겨울|원정|금테|긴급/);
+        expect(GOLF_PINS.map((p) => p.name).join(" ")).not.toMatch(/니어|우중|한여름|한겨울|원정|긴급/);
     });
 });
 
@@ -237,8 +237,8 @@ describe("판정에 쓰는 자료 — 인증 라운드만", () => {
     it("도장첩의 기록과 같은 곳에서 같이 적는다 — 읽다 실패해도 도장첩의 기록은 적는다. 열 번째 사진을 올린 순간에도 맞춘다", () => {
         const sync = repo.slice(repo.indexOf("async syncStampAwards(memberId: string)"), repo.indexOf("async getGolfPinRounds(memberId: string)"));
         expect(sync).toContain('this.getGolfPinRounds(memberId).catch((e) => { console.error("[golf] pinRounds", e); return [] as PinRound[]; }),');
-        expect(sync).toContain("const pins = pinsDue(rounds, stamps, shots);");
-        expect(sync).toContain("const fresh = await syncStampAwards(memberId, stamps, pins);");
+        expect(sync).toContain("const pins = pinsDue(rounds, stamps, shots, golds);");
+        expect(sync).toContain("const fresh = await syncStampAwards(memberId, stamps, pins, extra);");
         const routes = read("server/routes/modules/golf.ts");
         expect(routes).toContain("if (shots.length === PIN_PHOTOS) await Promise.race([storage.golf.syncStampAwards(req.userId!), new Promise((r) => setTimeout(r, 2000))]);");
     });
