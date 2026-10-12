@@ -2250,6 +2250,11 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   /** 쓰리아웃: 각자의 40초 시간 초과 횟수. SHOT_CLOCK_STRIKES(3) 가 되면 그 사람의 실격패. */
   hostTimeouts: integer("host_timeouts").default(0).notNull(),
   guestTimeouts: integer("guest_timeouts").default(0).notNull(),
+  /**
+   * 이 판이 끝나며 반영된 레이팅(2026-10-12): { delta(방장 기준), after: [방장, 게스트], matches: [방장, 게스트] } — shared/sim/rating RatingResult.
+   * 끝난 화면의 "레이팅 +12" · "등급이 올랐어요"가 이 값으로 그린다. 반영하지 않은 판(친선전 · 너무 짧은 판)과 그 전에 끝난 판은 null.
+   */
+  ratingResult: jsonb("rating_result"),
   finishedAt: timestamp("finished_at"),
 }, (t) => ({
   idxCode: index("idx_sim_matches_code").on(t.code, t.status),

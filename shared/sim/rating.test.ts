@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { ratingEligibility, ratingDelta, isAtFaultLoss, ELO_K, MIN_SHOTS_EACH } from "./rating";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { ratingEligibility, ratingDelta, isAtFaultLoss, ELO_K, MIN_SHOTS_EACH, parseRatingResult, ratingChangeOf } from "./rating";
 
 describe("온라인 대전 레이팅 규칙", () => {
     it("다마수 수동 방(맞대결)은 반영하지 않는다", () => {
@@ -36,5 +38,62 @@ describe("온라인 대전 레이팅 규칙", () => {
     });
     it("맞대결(수동 다마수)은 자리 비움이어도 반영하지 않는다", () => {
         expect(ratingEligibility({ handicap: false, hasGuest: true, shots: [2, 1], endReason: "timeout", winner: 0 })).toEqual({ rated: false, reason: "manual" });
+    });
+});
+
+/**
+ * 그 판의 레이팅 변화(2026-10-12 — 끝난 화면의 "레이팅 +12" · "등급이 올랐어요").
+ * 끝난 화면은 지금 사다리 값이 아니라 **그 판에 남긴 값**으로 그린다 — 나중에 다시 열어 본 끝난 판에서도 같아야 한다.
+ */
+describe("그 판의 레이팅 변화(ratingChangeOf)", () => {
+    const r = (delta: number, after: [number, number], matches: [number, number]) => ({ delta, after, matches });
+
+    it("방장은 delta 그대로, 게스트는 부호 반대 — 반영 전 = 반영 뒤 − 변화", () => {
+        const res = r(12, [1042, 988], [21, 9]);
+        expect(ratingChangeOf(res, 0)).toMatchObject({ delta: 12, before: 1030, after: 1042, matches: 21, tierBefore: "bronze", tierAfter: "bronze", promoted: false });
+        expect(ratingChangeOf(res, 1)).toMatchObject({ delta: -12, before: 1000, after: 988, matches: 9, tierBefore: "bronze", tierAfter: "bronze", promoted: false });
+    });
+
+    it("등급이 오르면 promoted — 문턱을 넘은 그 판에서만", () => {
+        expect(ratingChangeOf(r(12, [1152, 1000], [40, 40]), 0)).toMatchObject({ tierBefore: "silver", tierAfter: "gold", promoted: true });
+        expect(ratingChangeOf(r(12, [1164, 1000], [41, 41]), 0)).toMatchObject({ tierBefore: "gold", tierAfter: "gold", promoted: false });
+    });
+
+    it("배치를 마치는 판에서 첫 등급을 얻는다 — 그 전에는 등급이 없다", () => {
+        expect(ratingChangeOf(r(12, [1024, 976], [2, 2]), 0)).toMatchObject({ tierBefore: null, tierAfter: null, promoted: false });
+        expect(ratingChangeOf(r(12, [1036, 964], [3, 3]), 0)).toMatchObject({ tierBefore: null, tierAfter: "bronze", promoted: true });
+        // 졌어도 배치를 마치면 첫 등급을 받는다
+        expect(ratingChangeOf(r(12, [1036, 940], [3, 3]), 1)).toMatchObject({ delta: -12, tierBefore: null, tierAfter: "iron", promoted: true });
+        expect(ratingChangeOf(r(12, [1048, 928], [4, 4]), 0)).toMatchObject({ tierBefore: "bronze", tierAfter: "bronze", promoted: false });
+    });
+
+    it("내려간 것은 알리지 않는다", () => {
+        expect(ratingChangeOf(r(12, [1000, 1144], [30, 30]), 1)).toMatchObject({ delta: -12, tierBefore: "gold", tierAfter: "silver", promoted: false });
+    });
+
+    it("무승부(변화 0)도 값이 있다 — 반영하지 않은 판은 null", () => {
+        expect(ratingChangeOf(r(0, [1010, 1010], [5, 5]), 0)).toMatchObject({ delta: 0, before: 1010, after: 1010, promoted: false });
+        expect(ratingChangeOf(null, 0)).toBeNull();
+    });
+
+    it("저장된 값은 모양을 보고 받는다 — 틀리면 없는 것으로", () => {
+        expect(parseRatingResult({ delta: 12, after: [1042, 988], matches: [21, 9] })).toEqual({ delta: 12, after: [1042, 988], matches: [21, 9] });
+        for (const bad of [null, undefined, "x", 3, {}, { delta: "12", after: [1, 2], matches: [1, 2] }, { delta: 1, after: [1], matches: [1, 2] }, { delta: 1, after: [1, 2], matches: [1, Number.NaN] }, { delta: 1, after: [1, 2] }]) {
+            expect(parseRatingResult(bad)).toBeNull();
+        }
+    });
+
+    it("서버: 반영하면서 그 판에 남기고(rating_result), 끝난 화면 응답(rapport)이 내 쪽 변화를 싣는다", () => {
+        const read = (f: string) => readFileSync(resolve(__dirname, "../..", f), "utf8");
+        const repo = read("server/storage/simMatch.repo.ts");
+        expect(repo).toContain("}).returning({ rating: hiqSimMatchRatings.rating, matches: hiqSimMatchRatings.matches });");
+        expect(repo).toContain("await tx.update(hiqSimMatches).set({ ratingResult: result }).where(eq(hiqSimMatches.id, m.id));");
+        // 세 갈래(샷으로 끝 · 시간 초과 · 기권/무응답) 모두 돌려주는 행에 얹는다
+        expect(repo.match(/ratingResult: rated \}/g)).toHaveLength(3);
+        const route = read("server/routes/modules/simMatch.ts");
+        expect(route).toContain('const rating = m.status === "finished" ? ratingChangeOf(parseRatingResult(m.ratingResult), myIndex, PLACEMENT_MATCHES) : null;');
+        expect(route).toContain("return sendSuccess(res, { opponentId: otherId, opponentName: otherName, headToHead, isRival, rating });");
+        expect(read("shared/schema.ts")).toContain('ratingResult: jsonb("rating_result"),');
+        expect(read("migrations/sim_match_rating_result.sql")).toContain("ALTER TABLE hiq_sim_matches ADD COLUMN IF NOT EXISTS rating_result jsonb;");
     });
 });

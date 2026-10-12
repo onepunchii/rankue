@@ -16,6 +16,8 @@
  *    "들어왔다 나가기"를 반복해 점수를 옮기는 길을 막는다.
  */
 
+import { PLACEMENT_MATCHES, TIERS, tierFor, type TierId } from "./rank.js";
+
 export const ELO_K = 24;
 export const START_RATING = 1000;
 /** 두 사람 각각 이 수 이상 쳐야 레이팅 판이다. */
@@ -65,4 +67,58 @@ export function ratingDelta(winner: 0 | 1 | null, samePairPrior = 0): number {
     const s = winner === 0 ? 1 : 0;
     const scale = 1 / (1 + Math.max(0, samePairPrior));
     return Math.round(ELO_K * (s - 0.5) * scale);
+}
+
+/* ── 대전이 끝나며 반영된 레이팅(2026-10-12 — '등급이 올랐어요' 화면) ───────────────────────────── */
+
+/**
+ * 한 판이 끝나며 반영된 레이팅을 그 대전 행에 남긴다(hiq_sim_matches.rating_result).
+ * 끝난 화면이 "레이팅 +12" · "등급이 올랐어요"를 **그 판의 값으로** 보여 주려면 반영 전후를 알아야 하는데, 사다리 표(hiq_sim_match_ratings)에는
+ * 지금 값만 있다 — 나중에 다시 열어 본 끝난 판에서 지금 값으로 비교하면 틀린다.
+ * 반영하지 않은 판(친선전 · 너무 짧은 판)은 남기지 않는다(null). 전체 다시 계산(recomputeRatings)은 이 값을 고치지 않는다 — 그때의 기록이다.
+ */
+export interface RatingResult {
+    /** 방장 기준 변화(게스트는 부호 반대) */
+    delta: number;
+    /** 반영 뒤 [방장, 게스트] 레이팅 */
+    after: [number, number];
+    /** 반영 뒤 [방장, 게스트] 판 수(배치 판단) */
+    matches: [number, number];
+}
+
+const isPair = (v: unknown): v is [number, number] => Array.isArray(v) && v.length === 2 && v.every((n) => typeof n === "number" && Number.isFinite(n));
+
+/** 저장된 값(jsonb)을 믿지 않고 모양을 본다 — 틀리면 없는 것으로 친다. */
+export function parseRatingResult(raw: unknown): RatingResult | null {
+    if (!raw || typeof raw !== "object") return null;
+    const r = raw as Record<string, unknown>;
+    if (typeof r.delta !== "number" || !Number.isFinite(r.delta) || !isPair(r.after) || !isPair(r.matches)) return null;
+    return { delta: r.delta, after: [r.after[0], r.after[1]], matches: [r.matches[0], r.matches[1]] };
+}
+
+/** 한 사람이 본 그 판의 레이팅 변화 — 끝난 화면이 그린다 */
+export interface RatingChange {
+    delta: number;
+    before: number;
+    after: number;
+    /** 반영 뒤 내 판 수 */
+    matches: number;
+    /** 배치 전이면 null(등급이 없다) */
+    tierBefore: TierId | null;
+    tierAfter: TierId | null;
+    /** 새 등급을 얻었다 — 배치를 마쳐 첫 등급을 받았거나, 등급이 올랐다. 내려간 것은 알리지 않는다. */
+    promoted: boolean;
+}
+
+export function ratingChangeOf(result: RatingResult | null, index: 0 | 1, placement: number = PLACEMENT_MATCHES): RatingChange | null {
+    if (!result) return null;
+    const delta = index === 0 ? result.delta : -result.delta;
+    const after = result.after[index];
+    const matches = result.matches[index];
+    const before = after - delta;
+    const tierAfter = matches >= placement ? tierFor(after).id : null;
+    const tierBefore = matches - 1 >= placement ? tierFor(before).id : null;
+    const order = (id: TierId) => TIERS.findIndex((t) => t.id === id);
+    const promoted = tierAfter !== null && (tierBefore === null || order(tierAfter) > order(tierBefore));
+    return { delta, before, after, matches, tierBefore, tierAfter, promoted };
 }

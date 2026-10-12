@@ -6,6 +6,7 @@
 import { Router } from "express";
 import { V0_MAX, THETA_MAX, SHOT_LIMIT_EPS } from "../../../shared/sim/shotLimits.js";
 import { PLACEMENT_MATCHES } from "../../../shared/sim/rank.js";
+import { parseRatingResult, ratingChangeOf } from "../../../shared/sim/rating.js";
 import { createHash, randomBytes } from "crypto";
 import { z } from "zod";
 import { storage } from "../../storage/index.js";
@@ -1053,13 +1054,15 @@ router.get("/sim/matches/:id/rapport", requireAuth, asyncHandler(async (req: Aut
     const myIndex = m.hostId === req.userId ? 0 : 1;
     const otherId = myIndex === 0 ? m.guestId : m.hostId;
     const otherName = (myIndex === 0 ? m.guestName : m.hostName) ?? null;
-    if (!otherId) return sendSuccess(res, { opponentId: null, opponentName: null, headToHead: null, isRival: false });
+    if (!otherId) return sendSuccess(res, { opponentId: null, opponentName: null, headToHead: null, isRival: false, rating: null });
     // 라이벌 여부는 실전과 같은 관계(친구)를 쓴다 — 새 개념을 만들지 않는다.
     const [isRival, headToHead] = await Promise.all([
         storage.isFriend(req.userId!, otherId, "BILLIARDS").catch(() => false),
         storage.simMatch.headToHead(req.userId!, otherId),
     ]);
-    return sendSuccess(res, { opponentId: otherId, opponentName: otherName, headToHead, isRival });
+    // 이 판이 끝나며 반영된 내 레이팅(2026-10-12) — 끝난 화면의 "레이팅 +12" · "등급이 올랐어요". 반영하지 않은 판 · 그 전에 끝난 판은 null.
+    const rating = m.status === "finished" ? ratingChangeOf(parseRatingResult(m.ratingResult), myIndex, PLACEMENT_MATCHES) : null;
+    return sendSuccess(res, { opponentId: otherId, opponentName: otherName, headToHead, isRival, rating });
 }));
 
 /**

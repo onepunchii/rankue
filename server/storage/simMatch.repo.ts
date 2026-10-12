@@ -11,7 +11,7 @@ import type { HiqSimMatch, HiqSimMatchShot, HiqSimMatchChat } from "../../shared
 import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS, START_ABSENT_GRACE_MS, REPEAT_ABSENT_GRACE_MS } from "../../shared/sim/rules/session.js";
 import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
 import { CHAT_PAGE_MAX, chatReject, type ChatReject } from "../../shared/sim/chat.js";
-import { ratingEligibility, ratingDelta, START_RATING, SAME_PAIR_WINDOW_MS, MIN_SHOTS_EACH, AT_FAULT_END_REASONS } from "../../shared/sim/rating.js";
+import { ratingEligibility, ratingDelta, START_RATING, SAME_PAIR_WINDOW_MS, MIN_SHOTS_EACH, AT_FAULT_END_REASONS, type RatingResult } from "../../shared/sim/rating.js";
 
 const LIVE = ["waiting", "playing"] as const;
 /** 접속 표시 갱신 간격(폴링마다 쓰지 않고 이 간격이 지났을 때만) */
@@ -564,8 +564,8 @@ export class SimMatchRepository {
                 ...(a.finished ? { status: "finished" as const, finishedAt: new Date(), winnerId, endReason: a.endReason } : {}),
             }).where(eq(hiqSimMatches.id, a.matchId)).returning();
 
-            if (a.finished && m.guestId) await this.applyElo(tx, updated, winnerId);
-            return { shot, duplicate: false, match: updated };
+            const rated = a.finished && m.guestId ? await this.applyElo(tx, updated, winnerId) : null;
+            return { shot, duplicate: false, match: rated ? { ...updated, ratingResult: rated } : updated };
         });
     }
 
@@ -600,8 +600,8 @@ export class SimMatchRepository {
                 ...(a.strikeIndex === 0 ? { hostTimeouts: m.hostTimeouts + 1 } : a.strikeIndex === 1 ? { guestTimeouts: m.guestTimeouts + 1 } : {}),
                 ...(a.finished ? { status: "finished" as const, finishedAt: new Date(), winnerId, endReason: a.endReason } : {}),
             }).where(eq(hiqSimMatches.id, a.id)).returning();
-            if (a.finished && m.guestId) await this.applyElo(tx, row, winnerId);
-            return row;
+            const rated = a.finished && m.guestId ? await this.applyElo(tx, row, winnerId) : null;
+            return rated ? { ...row, ratingResult: rated } : row;
         });
     }
 
@@ -613,8 +613,8 @@ export class SimMatchRepository {
             const [row] = await tx.update(hiqSimMatches).set({
                 status: "finished", finishedAt: new Date(), winnerId, endReason, version: m.version + 1,
             }).where(eq(hiqSimMatches.id, id)).returning();
-            if (m.guestId) await this.applyElo(tx, row, winnerId);
-            return row;
+            const rated = m.guestId ? await this.applyElo(tx, row, winnerId) : null;
+            return rated ? { ...row, ratingResult: rated } : row;
         });
     }
 
@@ -624,21 +624,23 @@ export class SimMatchRepository {
      * 2026-09-12 부터 **테이블(대대·중대)을 합쳐** hiq_sim_match_ratings 에 (회원, 종목) 한 줄로 쌓는다 — 오너 지시.
      * 반영하지 않는 판은 판 수·승수도 세지 않는다(랭킹 배치 3판에 안 들어간다).
      */
-    private async applyElo(tx: any, m: HiqSimMatch, winnerId: string | null) {
-        if (!m.guestId) return;
+    private async applyElo(tx: any, m: HiqSimMatch, winnerId: string | null): Promise<RatingResult | null> {
+        if (!m.guestId) return null;
         const shots = await this.shotCounts(tx, m.id);
         const winner = winnerId === null ? null : winnerId === m.hostId ? 0 : 1;
         const ok = ratingEligibility({ handicap: m.handicap, hasGuest: true, shots, endReason: m.endReason, winner });
-        if (!ok.rated) return;
+        if (!ok.rated) return null;
         const prior = await this.samePairPrior(tx, m);
         const da = ratingDelta(winner, prior);
         const ids = [m.hostId, m.guestId];
+        const after: [number, number] = [START_RATING, START_RATING];
+        const matches: [number, number] = [0, 0];
         for (const [i, id] of ids.entries()) {
             const delta = i === 0 ? da : -da;
             // 무승부는 **양쪽 다 승**으로 센다(2026-09-16 오너: "어차피 둘이 모두 같은 거라면 둘 다 승이 보기 좋다").
             // 랭킹 화면이 패를 `matches - wins` 로 뽑으므로, 여기서 세지 않으면 무승부가 패로 보인다.
             const won = winnerId === null || winnerId === id ? 1 : 0;
-            await tx.insert(hiqSimMatchRatings).values({
+            const [now] = await tx.insert(hiqSimMatchRatings).values({
                 memberId: id, gameType: m.gameType,
                 rating: START_RATING + delta, matches: 1, wins: won, updatedAt: new Date(),
             }).onConflictDoUpdate({
@@ -649,8 +651,14 @@ export class SimMatchRepository {
                     wins: sql`${hiqSimMatchRatings.wins} + ${won}`,
                     updatedAt: new Date(),
                 },
-            });
+            }).returning({ rating: hiqSimMatchRatings.rating, matches: hiqSimMatchRatings.matches });
+            after[i] = Number(now?.rating ?? START_RATING + delta);
+            matches[i] = Number(now?.matches ?? 1);
         }
+        // 이 판의 값으로 남긴다 — 끝난 화면의 "레이팅 +12" · "등급이 올랐어요"(shared/sim/rating RatingResult)
+        const result: RatingResult = { delta: da, after, matches };
+        await tx.update(hiqSimMatches).set({ ratingResult: result }).where(eq(hiqSimMatches.id, m.id));
+        return result;
     }
 
     /** [방장 샷 수, 게스트 샷 수] */

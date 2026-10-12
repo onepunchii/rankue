@@ -829,6 +829,42 @@ body {
   .rank-hall .hall-rating {
     background: rgba(255, 255, 255, 0.09);
   }
+  /**
+   * 끝난 대전 화면의 '등급이 올랐어요'(2026-10-12, sim/match/MatchRatingCard). 새 등급의 색(--promo)으로 빛살이 천천히 돌고 배지가 한 번 튀어나온다.
+   * 빛살은 그림이 아니라 여기서 그린다(등급마다 색이 달라야 하고, 그림에 구우면 배지를 따낼 수 없다).
+   */
+  .rank-hall .hall-promo {
+    background: radial-gradient(120% 90% at 50% 0%, #33271a 0%, #1c1611 58%, #14110d 100%);
+    border: 1px solid color-mix(in srgb, var(--promo, #e8c46a) 45%, transparent);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
+  .rank-hall .hall-rays {
+    position: absolute;
+    left: 50%;
+    top: 78px;
+    width: 420px;
+    height: 420px;
+    margin: -210px 0 0 -210px;
+    background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--promo, #e8c46a) 30%, transparent) 0deg 7deg, transparent 7deg 20deg);
+    -webkit-mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.55) 30%, transparent 62%);
+    mask-image: radial-gradient(circle, #000 0%, rgba(0, 0, 0, 0.55) 30%, transparent 62%);
+    animation: hall-spin 36s linear infinite;
+    pointer-events: none;
+  }
+  @keyframes hall-spin {
+    to { transform: rotate(360deg); }
+  }
+  @keyframes hall-pop {
+    0% { transform: scale(0.55); opacity: 0; }
+    60% { transform: scale(1.1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+  .rank-hall .hall-pop {
+    animation: hall-pop 0.7s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .rank-hall .hall-rays, .rank-hall .hall-pop { animation: none; }
+  }
   /* 내 배지는 살짝 떠 있다 — 움직임을 줄여 달라는 기기에서는 멈춘다 */
   @keyframes hall-float {
     0%, 100% { transform: translateY(0); }

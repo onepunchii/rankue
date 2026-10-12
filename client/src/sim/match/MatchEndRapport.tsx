@@ -6,6 +6,8 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { CHAT_END_CODES } from "@shared/sim/chat";
 import { matchApi, type ChatLine } from "../matchApi";
+import type { RatingChange } from "@shared/sim/rating";
+import { MatchRatingCard } from "./MatchRatingCard";
 
 /**
  * 끝난 대전 화면에 붙는 "상대가 누구였나" 묶음(2026-09-15 오너: "라포를 느낄 방안").
@@ -13,6 +15,8 @@ import { matchApi, type ChatLine } from "../matchApi";
  * 왜 여기가 구멍이었나: 멀티방에서 만난 사람은 대전이 끝나면 그냥 사라졌다. 결과 화면에 상대를 다시 만날 길이
  * 하나도 없었고(친구 추가 동선 없음), 이미 있는 상대전적·라이벌 기능은 실전 경기에만 붙어 있었다.
  * 당구장에서 관계는 "한 판 더"에서 시작한다 — 같은 사람과 세 판 치면 이름을 기억하게 된다.
+ *
+ * 2026-10-12: 맨 위에 **이 판의 레이팅** 한 칸(MatchRatingCard) — "레이팅 +12", 등급이 올랐으면 새 배지를 크게. 값은 같은 응답(rapport)에 실려 온다.
  *
  * 화면이 하는 일 셋:
  *   1) 상대전적 한 줄 — "3승 2패 · 6번째 대결". 상대가 기록이 있는 사람이 된다.
@@ -29,6 +33,8 @@ interface RapportInfo {
     opponentName: string | null;
     headToHead: { wins: number; losses: number; total: number } | null;
     isRival: boolean;
+    /** 이 판이 끝나며 반영된 내 레이팅(2026-10-12). 반영하지 않은 판(친선전 · 너무 짧은 판)과 옛 서버 응답에는 없다. */
+    rating?: RatingChange | null;
 }
 interface RematchState {
     rematch: { mine: boolean; theirs: boolean; matchId: string | null } | null;
@@ -98,6 +104,8 @@ export function MatchEndRapport({ matchId, myIndex, onRematch }: { matchId: stri
     if (!info?.opponentId) return null;
 
     return (
+        <>
+        {info.rating && <MatchRatingCard rating={info.rating} />}
         <div className="rounded-tile border border-surface-line px-4 py-3">
             <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[13px] font-semibold text-ink-1 truncate">{name}</span>
@@ -156,5 +164,6 @@ export function MatchEndRapport({ matchId, myIndex, onRematch }: { matchId: stri
                 ))}
             </div>
         </div>
+        </>
     );
 }
