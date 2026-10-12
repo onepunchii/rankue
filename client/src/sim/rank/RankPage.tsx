@@ -1,6 +1,7 @@
 /**
  * 온라인 대전 랭킹(2026-09-08 오너: "랭킹제 · 국가별 · 랭커 게임처럼"). `/online-game?rank=1`.
- * 위: 종목·테이블 칩 → 범위(전체 / 내 나라 / 나라 고르기) → 내 카드(티어 배지·레이팅·전역 순위·국가 순위·전적, 배치 전엔 "배치 중 n/3") → 순위 목록.
+ * 위: 종목 칩 → 내 카드(티어 배지·레이팅·순위·전적, 배치 전엔 "배치 중 n/3") → 순위 목록.
+ * 순위표는 나라 구분 없이 하나다(2026-10-12 오너: "국가별인데 통합하는 건 어때?") — 예전의 범위 칩(전체 / 내 나라 / 나라 고르기)과 국가 순위 줄을 뺐다. 국기는 이름 옆에 남는다.
  * 내 나라가 없으면 기기 언어의 지역으로 한 번 저장하고(PATCH /me), 카드의 "내 나라 바꾸기"로 고친다. 값은 온라인 대전 Elo 뿐 — 실전 RP 와 무관.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -73,13 +74,14 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
     // 첫 화면은 사람이 있는 곳으로: 내가 가장 많이 친 조합 → 없으면 등재자가 가장 많은 조합(2026-09-09 오너).
     // 링크로 조합을 지정해 들어왔거나(initial) 사용자가 한 번이라도 고른 뒤에는 건드리지 않는다.
     const pickedRef = useRef(!!initial);
-    const [scope, setScope] = useState<"all" | "mine" | "pick">("all");
-    const [picked, setPicked] = useState<string>("");
+    // 나라로 나누지 않는다 — 순위표는 하나다(2026-10-12 오너: "온라인대전 레이팅 랭킹 지금 … 국가별인데 통합하는 건 어때?").
+    // 순위에 오른 사람이 3쿠션 7명 · 4구 3명이고 그중 서너 명은 나라가 비어 있었다 — 나라로 거르면 세 명짜리 목록이 되고, 나라가 빈 사람은 어디에도 안 나왔다.
+    // 예전의 범위 칩(전체 · 내 나라 · 나라 고르기)과 '내 나라 순위' 줄을 뺐다. 이름 옆 국기와 '내 나라' 고르기는 그대로다(대전 화면의 국기도 이 값이다).
+    // 월대회 출전권도 이 하나의 순위표로 정한다(docs/01-plan/features/online-game-monthly-tournament-badges.md).
     const myCountry = member?.country && isCountryCode(member.country) ? member.country : null;
-    const country = scope === "all" ? null : scope === "mine" ? myCountry : picked || null;
     const q = useQuery({
-        queryKey: [...RANK_QUERY_KEY, combo.gameType, country ?? "all"],
-        queryFn: () => api.getLadder({ gameType: combo.gameType, country }),
+        queryKey: [...RANK_QUERY_KEY, combo.gameType, "all"],
+        queryFn: () => api.getLadder({ gameType: combo.gameType, country: null }),
         staleTime: 15_000,
     });
 
@@ -130,7 +132,7 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
                 </button>
             </div>
 
-            <div role="group" aria-label={t("sim.dash.filterAria")} className="flex gap-1.5 overflow-x-auto -mx-5 px-5 pb-1 mb-1.5">
+            <div role="group" aria-label={t("sim.dash.filterAria")} className="flex gap-1.5 overflow-x-auto -mx-5 px-5 pb-1 mb-3">
                 {(["3c", "4c"] as const).map((g) => {
                     const sel = combo.gameType === g;
                     const ranked = (data?.combos ?? []).filter((c) => c.gameType === g).reduce((a, c) => a + c.ranked, 0);
@@ -145,22 +147,6 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
                         </button>
                     );
                 })}
-            </div>
-            <div role="group" aria-label={t("sim.rank.scopeAria")} className="flex items-center gap-1.5 flex-wrap mb-3">
-                <button type="button" aria-pressed={scope === "all"} onClick={() => setScope("all")} className={cn(pill, scope === "all" ? chipOn : chipOff)}>{t("sim.rank.scopeAll")}</button>
-                <button type="button" aria-pressed={scope === "mine"} onClick={() => setScope("mine")} disabled={!myCountry} className={cn(pill, scope === "mine" ? chipOn : chipOff, !myCountry && "opacity-40")}>
-                    {myCountry ? t("sim.rank.scopeMine").replace("{c}", myCountry) : t("sim.rank.countryUnset")}
-                </button>
-                <label className={cn(pill, scope === "pick" ? chipOn : chipOff, "gap-1.5 cursor-pointer")}>
-                    <span>{t("sim.rank.scopePick")}</span>
-                    <select
-                        aria-label={t("sim.rank.scopePick")} value={picked} onChange={(e) => { setPicked(e.target.value); setScope("pick"); }}
-                        className="bg-transparent text-inherit text-[13px] font-semibold outline-none max-w-[110px]"
-                    >
-                        <option value="">–</option>
-                        {options.map((o) => <option key={o.code} value={o.code}>{o.name}</option>)}
-                    </select>
-                </label>
             </div>
 
             {q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.rank.loading")}</p>}
@@ -192,7 +178,6 @@ export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) 
                                 : status.toNext !== null
                                     ? t("sim.rank.nextTier").replace("{tier}", t(tierFor(data.me.rating + status.toNext).nameKey)).replace("{n}", n(status.toNext))
                                     : t("sim.rank.topTier")}
-                            {status.placed && myCountry && data.me.countryRank !== null && ` · ${t("sim.rank.countryRankOf").replace("{c}", myCountry).replace("{r}", n(data.me.countryRank))}`}
                         </p>
                         {/* 티어 사다리(2026-09-09 오너: 재미 = 다음 목표가 보이는 것). 지금 티어에 표시, 다음 티어까지 몇 점인지 막대로. */}
                         {status.placed && (

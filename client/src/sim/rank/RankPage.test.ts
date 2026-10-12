@@ -1,5 +1,5 @@
 /**
- * RankPage 스모크(jsdom, QueryClientProvider, api 주입). 내 카드(티어·레이팅·순위 / 배치 중) · 목록 행·내 행 강조 · 범위 칩(내 나라 → country 파라미터) ·
+ * RankPage 스모크(jsdom, QueryClientProvider, api 주입). 내 카드(티어·레이팅·순위 / 배치 중) · 목록 행·내 행 강조 · 나라로 나누지 않는다(순위표 하나) ·
  * 내 나라가 없으면 기기 언어로 한 번 저장.
  */
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
@@ -69,7 +69,7 @@ const click = (el: Element) => React.act(() => { el.dispatchEvent(new window.Mou
 const text = (h: Harness) => h.container.textContent ?? "";
 
 describe("RankPage", () => {
-    it("내 카드: 골드 · 1160 · #2 전체 3명 · 플래티넘까지 90점 · KR #2, 리더보드 줄(1 금 · 2 하늘 · 3 산호)", async () => {
+    it("내 카드: 골드 · 1160 · #2 전체 3명 · 플래티넘까지 90점, 리더보드 줄(1 금 · 2 하늘 · 3 산호)", async () => {
         const h = mount(ladder());
         await settle(h, () => text(h).includes("고수"));
         const me = h.container.querySelector("[data-testid=rank-me]")!;
@@ -77,7 +77,7 @@ describe("RankPage", () => {
         expect(me.querySelector("[data-rating]")!.textContent).toBe("1160");
         expect(me.textContent).toContain("#2 · 전체 3명");
         expect(me.textContent).toContain("플래티넘까지 90점");
-        expect(me.textContent).toContain("KR #2");
+        expect(me.textContent).not.toContain("KR #2");   // 나라 순위는 보이지 않는다(2026-10-12 통합)
         expect(me.textContent).toContain("4승 2패");
         // 리더보드: 순위마다 색이 다른 알약 줄(1 금 · 2 하늘 · 3 산호), 내 줄에 "나" 표시
         const rows = h.container.querySelectorAll("ol li");
@@ -93,17 +93,19 @@ describe("RankPage", () => {
         expect(h.api.setCountry).not.toHaveBeenCalled(); // 내 나라가 이미 있다
     });
 
-    it("내 나라 칩 → country=KR 로 다시 조회, 종목 칩 → 4구", async () => {
+    it("나라로 나누지 않는다 — 범위 칩이 없고 늘 전체로 묻는다(종목 칩 → 4구도 전체)", async () => {
+        // 2026-10-12 오너: "온라인대전 레이팅 랭킹 … 국가별인데 통합하는 건 어때?" — 순위에 오른 사람이 열 명 남짓이라 나라로 거르면 서너 명이 남았다
         const h = mount(ladder());
         await settle(h, () => text(h).includes("고수"));
-        const scope = h.container.querySelector(`[role=group][aria-label="${ko["sim.rank.scopeAria"]}"]`)!;
-        click(Array.from(scope.querySelectorAll("button")).find((b) => b.textContent?.includes("내 나라"))!);
-        await settle(h, () => (h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls.length >= 2);
-        expect((h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls[1][0]).toEqual({ gameType: "3c", country: "KR" });
+        expect(h.container.querySelector(`[role=group][aria-label="${ko["sim.rank.scopeAria"]}"]`)).toBeNull();
+        for (const k of ["sim.rank.scopeAll", "sim.rank.scopePick"] as const) expect(Array.from(h.container.querySelectorAll("button, label")).some((b) => b.textContent?.trim() === ko[k])).toBe(false);
+        expect((h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls[0][0]).toEqual({ gameType: "3c", country: null });
+        // 다른 나라 사람도 같은 목록에 있다 — 국기로만 표시한다
+        expect(h.container.querySelectorAll("ol li")).toHaveLength(3);
         const combos = h.container.querySelector(`[role=group][aria-label="${ko["sim.dash.filterAria"]}"]`)!;
         click(Array.from(combos.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === ko["sim.setup.type4c"])!);
-        await settle(h, () => (h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls.length >= 3);
-        expect((h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls[2][0]).toMatchObject({ gameType: "4c", country: "KR" });
+        await settle(h, () => (h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls.length >= 2);
+        expect((h.api.getLadder as ReturnType<typeof vi.fn>).mock.calls[1][0]).toEqual({ gameType: "4c", country: null });
     });
 
     it("배치 전: '배치 중 1/3'·남은 판 안내, 내 나라 없으면 기기 언어로 저장, 빈 목록 안내", async () => {
@@ -119,8 +121,8 @@ describe("RankPage", () => {
         expect(text(h)).toContain("대전 2판을 더 마치면 랭킹에 올라요");
         expect(text(h)).toContain(ko["sim.rank.unrankedShort"]);
         expect(h.api.setCountry).toHaveBeenCalledWith("MX");
-        const mine = Array.from(h.container.querySelectorAll("button")).find((b) => b.textContent === ko["sim.rank.countryUnset"]) as HTMLButtonElement;
-        expect(mine.disabled).toBe(true);
+        // '내 나라' 고르기는 남아 있다(이름 옆 국기에 쓴다)
+        expect(h.container.querySelector(`select[aria-label="${ko["sim.rank.countryChange"]}"]`)).not.toBeNull();
         } finally {
             if (desc) Object.defineProperty(nav, "language", desc); else delete (nav as unknown as Record<string, unknown>).language;
         }
