@@ -20,7 +20,8 @@ import {
 } from "@/lib/icons";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
-import { getTier } from "@/lib/hiqUtils";
+import { getTier, getMemberTier } from "@/lib/hiqUtils";
+import { RealTierChip } from "@/components/hiq/RealMedal";
 import { apiRequest } from "@/lib/queryClient";
 import { MemberActivityStats } from "@/components/hiq/member/MemberActivityStats";
 import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
@@ -195,7 +196,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
             const golfScore = golfScoreOf(m);
             return { golfScore, tier: getTier(golfScore, false, 'GOLF') };
         }
-        return { golfScore: 0, tier: getTier(Number(m.handi4c || 0), false, 'BILLIARDS') };
+        return { golfScore: 0, tier: getMemberTier(m) };
     }, [selectedMember, sportCategory]);
 
     // 나이대·성별 — 서버는 크루원이 아닌 조회자에게 둘 다 지워서 보낸다(stripMemberPrivacy).
@@ -487,7 +488,7 @@ function MemberListItem({ item, currentMemberId, sportCategory, gameType, onClic
     // 예전엔 한국어 라벨("골드")로 색을 찾아 늘 회색이었고, 라벨도 번역 없이 영문 코드가 찍혔다.
     const tier = sportCategory === 'GOLF'
         ? getTier(golfScoreOf(m), false, 'GOLF')
-        : getTier(Number(m.handi4c || 0), false, 'BILLIARDS');
+        : getMemberTier(m);
     // 대표 기록 — 크루 주 종목(3쿠션이면 3구 에버)에 맞춘다. 기록이 없으면 숫자 칸을 비운다.
     const stat = memberStat(m, sportCategory, gameType);
 
@@ -538,7 +539,10 @@ function MemberListItem({ item, currentMemberId, sportCategory, gameType, onClic
                     )}
                 </div>
                 <div className="flex items-center gap-1.5 min-w-0 text-[12px] font-medium leading-none">
-                    <span className={cn("shrink-0 px-1.5 py-0.5 rounded-md border", tier.class)}>{t(`crewMgmt.tier.${tier.label}`)}</span>
+                    {/* 골프는 타수 등급 칩, 당구는 실전 등급(다마 메달 + "실전 골드") — 다마가 없는 사람은 칩이 없다(2026-10-12) */}
+                    {sportCategory === 'GOLF'
+                        ? <span className={cn("shrink-0 px-1.5 py-0.5 rounded-md border", tier.class)}>{t(`crewMgmt.tier.${tier.label}`)}</span>
+                        : <RealTierChip member={m} size={20} />}
                     {isNewbie && <span className="text-brand shrink-0">{t("crewMemberList.newbie")}</span>}
                     <span className="text-ink-3 truncate">
                         {m.introduction || (sportCategory === 'GOLF' ? t("crewMemberList.defaultBioGolf") : t("crewMemberList.defaultBioBilliards"))}

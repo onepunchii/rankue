@@ -7,7 +7,8 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { SearchResult, SportConfig } from "./types";
-import { getTier } from "@/lib/hiqUtils";
+import { getTier, getMemberTier } from "@/lib/hiqUtils";
+import { RealTierChip } from "@/components/hiq/RealMedal";
 import { flagEmoji } from "@/lib/flag";
 import { useT } from "@/lib/i18n";
 
@@ -111,8 +112,7 @@ export const SearchUserDialog = ({
                     <AnimatePresence>
                         {searchResults.map((result, idx) => {
                             const golfScore = Number((result.golfAvgScore || 0) > 0 ? result.golfAvgScore : (result.golfHandicap || 0) + 72);
-                            const handi = currentSport === "GOLF" ? golfScore : result.handi4c;
-                            const tier = getTier(Number(handi || 0), false, currentSport);
+                            const tier = currentSport === "GOLF" ? getTier(golfScore, false, "GOLF") : getMemberTier(result);
                             return (
                                 <motion.div
                                     key={result.id}
@@ -130,7 +130,8 @@ export const SearchUserDialog = ({
                                                         alt={result.name}
                                                     />
                                                 ) : (
-                                                    tier.icon
+                                                    // 당구는 이름 첫 글자 — 예전의 등급 그림 문자(🥉🔥)는 옆의 다마 메달과 겹친다(2026-10-12). 골프는 예전 그대로
+                                                    currentSport === "GOLF" ? tier.icon : <span className="text-[18px] font-bold text-ink-3">{(result.name ?? "").trim().charAt(0) || "?"}</span>
                                                 )}
                                             </div>
                                             <div>
@@ -141,7 +142,9 @@ export const SearchUserDialog = ({
                                                     {/* @핸들 — 동명이인 구분 (글로벌 유저 대비) */}
                                                     {(result as any).handle && <span className="ml-1.5 text-[13px] font-medium text-black/40">@{(result as any).handle}</span>}
                                                 </p>
-                                                <p className={cn("text-[12px] font-semibold", tier.class)}>{tier.label}</p>
+                                                {currentSport === "GOLF"
+                                                    ? <p className={cn("text-[12px] font-semibold", tier.class)}>{tier.label}</p>
+                                                    : <RealTierChip member={result} size={20} className="mt-0.5" />}
                                             </div>
                                         </div>
 

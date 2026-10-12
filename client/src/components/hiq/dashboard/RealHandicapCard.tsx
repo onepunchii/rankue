@@ -40,6 +40,8 @@ import { SampleBadge } from "@/components/hiq/GuestGate";
 import { CrewAvatar } from "@/components/hiq/crew-ui";
 import type { GuestSampleBilliards } from "@shared/guestSample";
 import { BadgeAvatar, CardActions, CompareTable, FormDots, GOLD_TEXT, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, RecordStrip, RecordValue, fill, gapText, proName } from "@/components/hiq/compare/lookalikeUi";
+import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
+import { realTierFor } from "@shared/realTier";
 
 type HistoryRow = { sportCategory?: string | null; gameMode?: string | null; isRanked?: boolean | null; gameType?: string | null; isWinner?: boolean | null };
 
@@ -130,6 +132,28 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
         </div>
     );
     const title = <h3 className="text-[14.5px] font-bold text-ink-1 truncate">🎱 {t("real.titleRecord")}</h3>;
+    // 실전 등급 한 줄(2026-10-12) — 고른 종목의 다마 메달 · "실전 골드" · 다음 다마까지. 공식 5판 전에는 빈 메달과 남은 판 수.
+    // 응답을 받기 전에는 그리지 않는다(빈 메달을 먼저 그렸다가 바뀌지 않게).
+    const side = data?.[cur];
+    const sideReady = !!(side?.ready && side.handi);
+    const sideTier = sideReady ? realTierFor(side!.handi, cur) : null;
+    const medalRow = side ? (
+        <div className="mt-3 flex items-center gap-3" data-testid="real-tier-row">
+            <RealMedal game={cur} handi={sideReady ? side.handi : null} size={56} />
+            <div className="min-w-0">
+                <p className="text-[16px] font-black leading-tight truncate" style={sideTier ? { color: REAL_TIER_INK[sideTier.id] } : undefined}>
+                    {sideTier ? fill(t("real.tierOf"), { tier: t(sideTier.nameKey) }) : t("real.tierNone")}
+                </p>
+                <p className="mt-0.5 text-[12px] font-semibold text-ink-3 rk-num truncate">
+                    {!sideReady
+                        ? fill(t("home.damaNeed"), { n: Math.max(1, side.needed - side.games) })
+                        : side.nextHandi
+                            ? fill(t("real.nextHandiGap"), { n: side.nextHandi.handi, gap: side.nextHandi.gap.toFixed(2) })
+                            : t("real.topHandi")}
+                </p>
+            </div>
+        </div>
+    ) : null;
     const head = (
         <>
             {/* 예시 숫자는 진짜처럼 보이면 안 된다 — 제목 바로 옆에 "예시" 표시(회원은 제목만, 예전 그대로).
@@ -138,6 +162,7 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
                 {sample ? <div className="flex items-center gap-1.5 min-w-0">{title}<SampleBadge /></div> : title}
                 {tabs}
             </div>
+            {medalRow}
             {strip}
         </>
     );

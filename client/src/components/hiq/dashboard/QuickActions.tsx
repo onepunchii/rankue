@@ -27,6 +27,8 @@ import { useLocation } from "wouter";
 import { Target, LogIn, LucideMessageCircle, LucideStore, LucideInfo, LucideChevronRight } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 import { BallCluster } from "@/components/hiq/ui/BilliardBall";
+import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
+import { realTierFor } from "@shared/realTier";
 
 /** 구역 머리 — 제목·한 줄 설명, 오른쪽에 '설명' 단추(또는 다른 조작) */
 export function HomeSectionHeader({ title, desc, onGuide, children }: { title: string; desc?: string; onGuide?: () => void; children?: ReactNode }) {
@@ -68,14 +70,19 @@ function MyDamaPanel({ sample }: { sample?: GuestSampleBilliards | null }) {
     const cell = (type: "3c" | "4c") => {
         const s = data?.[type];
         const ready = !!(s?.ready && s.handi);
+        const damaTier = ready ? realTierFor(s!.handi, type) : null;
         return (
             <div className="flex-1 min-w-0 px-3.5 pt-2 pb-3">
                 <div className="flex items-center gap-1.5">
                     <BallCluster colors={type === "3c" ? ["white", "yellow", "red"] : ["white", "yellow", "red", "red"]} size={15} />
                     <span className="text-[12.5px] font-bold text-[#5B4A1E]">{t(type === "3c" ? "real.tab3c" : "real.tab4c")}</span>
                 </div>
-                <span className={`block mt-1.5 text-[28px] leading-none font-bold tabular-nums tracking-tight ${ready ? "text-[#141414]" : "text-[#D9CFB5]"}`}>
-                    {ready ? s!.handi : "—"}
+                {/* 내 다마 = 다마 메달(2026-10-12). 공식 5판 전에는 빈 메달 — 아래 줄이 "n판 더 치면 나와요"를 말한다 */}
+                <span className="mt-1.5 flex items-center gap-2 min-w-0" data-testid={`home-dama-${type}`}>
+                    <RealMedal game={type} handi={ready ? s!.handi : null} size={54} />
+                    {damaTier && (
+                        <span className="min-w-0 text-[13.5px] font-black truncate" style={{ color: REAL_TIER_INK[damaTier.id] }}>{t(damaTier.nameKey)}</span>
+                    )}
                 </span>
                 <span className="block mt-1.5 text-[11.5px] leading-snug font-semibold text-[#8A7A55] truncate">
                     {!s ? "\u00a0"

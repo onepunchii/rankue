@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { LucideZap, LucideUserPlus } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { RecentOpponent, SportConfig } from "./types";
-import { getTier } from "@/lib/hiqUtils";
+import { getTier, getMemberTier } from "@/lib/hiqUtils";
+import { RealTierChip } from "@/components/hiq/RealMedal";
 import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
 import { useT } from "@/lib/i18n";
 import { TierAvatarBadge } from "@/components/hiq/TierAvatarBadge";
@@ -30,8 +31,7 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                 <AnimatePresence>
                     {opponents.map((opponent, idx) => {
                         const golfScore = Number((opponent.golfAvgScore || 0) > 0 ? opponent.golfAvgScore : (opponent.golfHandicap || 0) + 72);
-                        const handi = currentSport === "GOLF" ? golfScore : opponent.handi4c;
-                        const tier = getTier(Number(handi || 0), false, currentSport);
+                        const tier = currentSport === "GOLF" ? getTier(golfScore, false, "GOLF") : getMemberTier(opponent);
                         const lastForm: MatchResult = opponent.lastGameResult === 'win' ? 'W' : opponent.lastGameResult === 'loss' ? 'L' : 'D';
                         return (
                             <motion.div
@@ -46,10 +46,14 @@ export const RecentOpponentsSlider = ({ opponents, config, currentSport, onAddFr
                                         <div className="flex justify-between items-start mb-5">
                                             <div>
                                                 <h3 className="text-[22px] font-bold text-ink-1 mb-1.5 tracking-tight">{opponent.name}</h3>
-                                                <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md", tier.class)}>
-                                                    <span className="text-xs">{tier.icon}</span>
-                                                    <span className="text-[12px] font-semibold">{t(tier.label)}</span>
-                                                </div>
+                                                {currentSport === "GOLF" ? (
+                                                    <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md", tier.class)}>
+                                                        <span className="text-xs">{tier.icon}</span>
+                                                        <span className="text-[12px] font-semibold">{t(tier.label)}</span>
+                                                    </div>
+                                                ) : (
+                                                    <RealTierChip member={opponent} />
+                                                )}
                                             </div>
                                             {/* 사진 상자는 넘치는 것을 자른다 — 등급 배지는 그 바깥 상자에 둔다(2026-10-12) */}
                                             <div className="relative shrink-0">

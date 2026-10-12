@@ -269,6 +269,9 @@ export class GameRepository {
             return {
                 oldHandi,
                 newHandi,
+                // 근거를 숫자로도 준다(2026-10-12) — 결과 화면의 "다마가 올랐어요"가 다섯 언어로 적는다. message 는 한국어뿐이라 옛 화면만 쓴다.
+                games: filtered.length,
+                avg: Number(totalAvg.toFixed(3)),
                 message: `최근 ${filtered.length}게임 에버리지(${totalAvg.toFixed(2)}) 기준 핸디가 ${newHandi}로 조정되었습니다.`
             };
         }

@@ -3,7 +3,7 @@ import { useSearch, useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { LucideTrophy, LucideTrendingUp, LucideArrowRight, LucideX, LucideMedal, LucideCheckCircle2, LucideRefreshCw, LucideLayoutGrid } from "@/lib/icons";
+import { LucideTrophy, LucideArrowRight, LucideX, LucideMedal, LucideCheckCircle2, LucideRefreshCw, LucideLayoutGrid } from "@/lib/icons";
 import confetti from "canvas-confetti";
 import { useQuery } from "@tanstack/react-query";
 import { HiqMember } from "@shared/schema";
@@ -13,6 +13,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { FormBadges, MatchResult } from "@/components/hiq/ui/FormBadges";
 import { ShareResultButton, type SharePlayer } from "@/components/hiq/game/ShareResultCard";
 import { useT } from "@/lib/i18n";
+import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
+import { handiChangeKind, realTierFor } from "@shared/realTier";
 
 export default function HiqGameResult() {
     const { t } = useT();
@@ -224,22 +226,44 @@ export default function HiqGameResult() {
                     </div>
                 )}
 
-                {handicapUpdate?.message && (
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="mt-4 p-3 bg-brand rounded-tile text-brand-fg"
-                    >
-                        <div className="flex items-center gap-2 mb-1">
-                            <LucideTrendingUp className="w-3 h-3" />
-                            <span className="text-[12px] font-semibold">{t("gameResult.handicapUp")}</span>
-                        </div>
-                        <p className="text-[12px] font-bold leading-tight">{handicapUpdate.message}</p>
-                        <div className="flex items-center gap-1 mt-1 font-semibold text-sm tabular-nums">
-                            {handicapUpdate.oldHandi} <LucideArrowRight className="w-2 h-2" /> {handicapUpdate.newHandi}
-                        </div>
-                    </motion.div>
-                )}
+                {/* 다마가 바뀌었다(2026-10-12 — 실전에서 배지를 '얻는' 순간).
+                    올랐거나 처음 생겼으면 빛살 위에 새 다마 메달을 크게. 내려간 것은 알리지 않고 작은 한 줄만(온라인 대전과 같은 원칙).
+                    예전에는 내려가도 "핸디캡 상승!"이라고 적었고, 까닭은 서버의 한국어 문장 그대로였다. */}
+                {handicapUpdate?.message && (() => {
+                    const kind = handiChangeKind(handicapUpdate.oldHandi, handicapUpdate.newHandi);
+                    const g: "3c" | "4c" = game.gameType === "4c" ? "4c" : "3c";
+                    const basis = typeof handicapUpdate.games === "number" && typeof handicapUpdate.avg === "number"
+                        ? t("real.handiBasis").replace("{n}", String(handicapUpdate.games)).replace("{avg}", handicapUpdate.avg.toFixed(2))
+                        : null;
+                    if (kind === "up" || kind === "first") {
+                        const tier = realTierFor(handicapUpdate.newHandi, g);
+                        return (
+                            <div className="rank-hall mt-4" data-testid="handi-promo">
+                                <div className="hall-promo relative overflow-hidden rounded-[22px] px-4 pt-4 pb-4 text-center" style={{ ["--promo" as string]: tier ? REAL_TIER_INK[tier.id] : "#e8c46a" }}>
+                                    <span className="hall-rays" aria-hidden="true" />
+                                    <span className="hall-pop relative inline-block"><RealMedal game={g} handi={handicapUpdate.newHandi} size={112} /></span>
+                                    <p className="relative text-[13px] font-black mt-1 text-[#F5C443]">{t(kind === "first" ? "real.handiFirst" : "real.handiUp")}</p>
+                                    <p className="relative rk-num text-[26px] font-black text-white leading-tight">
+                                        {kind === "first" ? handicapUpdate.newHandi : <>{handicapUpdate.oldHandi} → {handicapUpdate.newHandi}</>}
+                                    </p>
+                                    <p className="relative rk-num text-[12px] font-bold text-white/75 mt-1 break-keep">
+                                        {tier ? t("real.tierOf").replace("{tier}", t(tier.nameKey)) : null}
+                                        {tier && basis ? " · " : null}
+                                        {basis}
+                                    </p>
+                                </div>
+                            </div>
+                        );
+                    }
+                    if (kind === "down") {
+                        return (
+                            <p className="mt-4 text-center text-[12px] font-semibold text-black/50 rk-num" data-testid="handi-adjusted">
+                                {t("real.handiChanged")} · {handicapUpdate.oldHandi} → {handicapUpdate.newHandi}
+                            </p>
+                        );
+                    }
+                    return null;
+                })()}
             </CardContent>
         </Card>
     );

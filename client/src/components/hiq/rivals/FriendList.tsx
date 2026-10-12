@@ -3,7 +3,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { LucideUsers, LucideTarget } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { HiqMemberWithH2H, SportConfig } from "./types";
-import { getTier } from "@/lib/hiqUtils";
+import { getTier, getMemberTier } from "@/lib/hiqUtils";
+import { RealTierChip } from "@/components/hiq/RealMedal";
 import { Button } from "@/components/ui/button";
 import { RadialGauge } from "@/components/hiq/ui/RadialGauge";
 import { getRivalryLabel } from "./HeadToHeadCard";
@@ -62,8 +63,8 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                         {friends.map((friend, idx) => {
                             const golfScore = Number((friend.golfAvgScore || 0) > 0 ? friend.golfAvgScore : (friend.golfHandicap || 0) + 72);
                             const displayHandi = golfScore - 72;
-                            const handi = currentSport === "GOLF" ? golfScore : friend.handi4c;
-                            const tier = getTier(Number(handi || 0), false, currentSport);
+                            // 골프는 타수 기준 등급, 당구는 실전 등급(두 종목 다마 가운데 높은 쪽 — 예전에는 4구 다마만 봤다)
+                            const tier = currentSport === "GOLF" ? getTier(golfScore, false, "GOLF") : getMemberTier(friend);
                             const h2hTotal = friend.h2h ? friend.h2h.wins + friend.h2h.losses + friend.h2h.draws : 0;
                             const h2hRate = h2hTotal ? Math.round((friend.h2h!.wins / h2hTotal) * 100) : 0;
                             // 천적/우세/박빙 — 목록에서부터 "다시 붙어야 할 이유"가 보이게 한다
@@ -103,7 +104,8 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                                 alt={friend.name}
                                                             />
                                                         ) : (
-                                                            tier.icon
+                                                            // 당구는 이름 첫 글자 — 예전의 등급 그림 문자(🥉🔥)는 옆의 다마 메달과 겹친다(2026-10-12). 골프는 예전 그대로
+                                                            currentSport === "GOLF" ? tier.icon : <span className="text-[18px] font-bold text-ink-3">{(friend.name ?? "").trim().charAt(0) || "?"}</span>
                                                         )}
                                                     </div>
                                                     {/* 온라인 대전 등급이 있는 친구는 점 대신 등급 배지(2026-10-12). 골프 화면에서는 예전 그대로 점 */}
@@ -146,9 +148,14 @@ export const FriendList = ({ friends, config, currentSport, onSelectFriend, onSe
                                                         값은 12px 회색이라 이름 아래 회색 줄 하나로 뭉개졌다.
                                                         이제 칩은 등급색 하나로, 값은 **숫자를 크게** 하고 단위를 작게 앞에 둔다. */}
                                                     <div className="flex items-center gap-2.5">
-                                                        <span className={cn("px-2 py-0.5 rounded-md text-[11px] font-bold tracking-wide", tier.class)}>
-                                                            {t(tier.label)}
-                                                        </span>
+                                                        {currentSport === "GOLF" ? (
+                                                            <span className={cn("px-2 py-0.5 rounded-md text-[11px] font-bold tracking-wide", tier.class)}>
+                                                                {t(tier.label)}
+                                                            </span>
+                                                        ) : (
+                                                            // 실전 등급 = 다마 메달 + "실전 골드". 다마가 없는 사람(공식 5판 전)은 칩이 없다
+                                                            <RealTierChip member={friend} />
+                                                        )}
                                                         <span className="flex items-baseline gap-1">
                                                             <span className="text-[10.5px] font-semibold text-ink-4">{currentSport === "GOLF" ? "HDCP" : "AVG"}</span>
                                                             <span className="rk-num text-[14px] font-bold text-ink-1 leading-none">

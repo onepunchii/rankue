@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { HiqGameHistory, HiqMember } from "@shared/schema";
 import { FilterType, ExtendedGameHistory } from "../components/hiq/history/types";
 import { countsOnSite } from "@shared/golfOnSite";
+import { realTierFor } from "@shared/realTier";
 
 export const useGameStats = (
     history: HiqGameHistory[] | undefined,
@@ -94,7 +95,7 @@ export const useGameStats = (
             ? ((totalEmptyInnings / totalCalculatedInnings) * 100).toFixed(1)
             : "0.0";
 
-        // Tier Calculation (Performance Based)
+        // 골프 등급(핸디 기준). 당구의 실전 등급은 아래 realTier 가 정한다.
         const getTier = (avg: number, is3c: boolean) => {
             if (currentSport === "GOLF") {
                 const h = member?.golfHandicap || 0;
@@ -106,22 +107,28 @@ export const useGameStats = (
                 return { label: "ROOKIE", color: "#CD7F32", icon: "🐣", glow: "rgba(205, 127, 50, 0.15)" };
             }
 
-            if (is3c) {
-                if (avg >= 0.90) return { label: "PLATINUM", color: "#00FFD1", icon: "💎", glow: "rgba(0, 255, 209, 0.15)" };
-                if (avg >= 0.56) return { label: "GOLD", color: "#FFD700", icon: "🥇", glow: "rgba(255, 215, 0, 0.15)" };
-                if (avg >= 0.36) return { label: "SILVER", color: "#E0E0E0", icon: "🥈", glow: "rgba(224, 224, 224, 0.15)" };
-                return { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.15)" };
-            } else {
-                if (avg >= 5.00) return { label: "PLATINUM", color: "#00FFD1", icon: "💎", glow: "rgba(0, 255, 209, 0.15)" };
-                if (avg >= 3.00) return { label: "GOLD", color: "#FFD700", icon: "🥇", glow: "rgba(255, 215, 0, 0.15)" };
-                if (avg >= 1.51) return { label: "SILVER", color: "#E0E0E0", icon: "🥈", glow: "rgba(224, 224, 224, 0.15)" };
-                return { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.15)" };
-            }
+            // 당구는 여기서 매기지 않는다 — 아래 realTier(shared/realTier: 그 종목의 내 다마)가 정한다.
+            void avg; void is3c;
+            return { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.15)" };
         };
 
+        // 당구의 실전 등급은 한 가지 식이다(shared/realTier — 그 종목의 내 다마, 2026-10-12).
+        // 예전에는 여기서만 **누적 에버리지**로 4단계를 매겨, 친구 · 크루 화면의 등급(4구 다마 6단계)과 서로 달랐다.
+        // 다마가 없으면(공식 5판 전) 등급이 없다 — realTier 가 null.
+        const realGame: "3c" | "4c" = is3cContext ? "3c" : "4c";
+        const realHandi = currentSport === "GOLF" ? null : (is3cContext ? member?.handi3c : member?.handi4c) ?? null;
+        const realTier = currentSport === "GOLF" ? null : realTierFor(realHandi, realGame);
+        const BILLIARDS_LOOK: Record<string, { label: string; color: string; icon: string; glow: string }> = {
+            master: { label: "MASTER", color: "#B4232A", icon: "🔥", glow: "rgba(239, 68, 68, 0.15)" },
+            diamond: { label: "DIAMOND", color: "#2F6FB5", icon: "💠", glow: "rgba(185, 242, 255, 0.15)" },
+            platinum: { label: "PLATINUM", color: "#00FFD1", icon: "💎", glow: "rgba(0, 255, 209, 0.15)" },
+            gold: { label: "GOLD", color: "#FFD700", icon: "🥇", glow: "rgba(255, 215, 0, 0.15)" },
+            silver: { label: "SILVER", color: "#E0E0E0", icon: "🥈", glow: "rgba(224, 224, 224, 0.15)" },
+            bronze: { label: "BRONZE", color: "#CD7F32", icon: "🥉", glow: "rgba(205, 127, 50, 0.15)" },
+        };
         const currentTier = currentSport === "GOLF"
             ? getTier(0, false)
-            : getTier(parseFloat(cumulativeAverage), is3cContext);
+            : BILLIARDS_LOOK[realTier?.id ?? "bronze"];
 
         // Last 10 games for sparkline — 종목이 섞이면 눈금이 달라 선이 의미를 잃으므로 avgBase 기준
         const last10Games = [...avgBase].slice(0, 10).reverse().map((g, idx) => ({
@@ -147,6 +154,8 @@ export const useGameStats = (
             emptyInningRate,
             cumulativeAverage,
             currentTier,
+            /** 당구: 실전 등급의 근거 — 화면이 다마 메달을 그린다. handi 가 null 이면 아직 등급이 없다 */
+            realTier: currentSport === "GOLF" ? null : { game: realGame, handi: realHandi, id: realTier?.id ?? null, nameKey: realTier?.nameKey ?? null },
             last10Games,
             mainMode,
             totalAllGames,

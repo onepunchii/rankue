@@ -8,6 +8,7 @@ import { FormBadges, MatchResult } from "../ui/FormBadges";
 import { BilliardBall, BallColor } from "../ui/BilliardBall";
 import { SportConfig, FilterType } from "./types";
 import { useT } from "@/lib/i18n";
+import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
 
 // Tier → billiard-ball color (replaces the emoji medal with our ball motif).
 const tierBall = (label: string): BallColor => {
@@ -39,6 +40,7 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
     // 안전한 데이터 접근을 위한 구조 분해 할당 (기본값 설정)
     const {
         currentTier = { icon: '🏌️', label: 'ROOKIE', color: '#ffffff', glow: '#ffffff' },
+        realTier = null as null | { game: "3c" | "4c"; handi: number | null; id: string | null; nameKey: string | null },
         last10Games = [],
         totalGames = 0,
         totalNormalizedScore = 0,
@@ -150,12 +152,18 @@ export const StatsOverviewCard = ({ stats, config, filter, currentSport }: Stats
             <div className="rk-card p-5">
                 {/* Tier row — 우측 "상위 15%" 칩은 고정 문자열이라 제거했다(모집단을 몰라 계산 불가). */}
                 <div className="flex items-center mb-5">
-                    <div className="flex items-center gap-3 min-w-0">
-                        <BilliardBall color={tierBall(currentTier.label)} size={36} />
+                    {/* 실전 등급 = 다마 메달 + "실전 골드"(2026-10-12). 예전에는 공 하나와 SILVER 같은 글자였고, 누적 에버리지로 매겨
+                        친구 · 크루 화면의 등급과 달랐다. 이제 어디서나 그 종목의 내 다마로 정한다. 공식 5판 전에는 빈 메달. */}
+                    <div className="flex items-center gap-3 min-w-0" data-testid="history-real-tier">
+                        {realTier
+                            ? <RealMedal game={realTier.game} handi={realTier.handi} size={52} />
+                            : <BilliardBall color={tierBall(currentTier.label)} size={36} />}
                         <div className="min-w-0">
                             <p className="text-[12px] font-medium text-black/45 mb-0.5">{t("statsOverview.tier")}</p>
-                            <p className="text-[17px] font-bold tracking-tight truncate text-ink-1">
-                                {currentTier.label}
+                            <p className="text-[17px] font-bold tracking-tight truncate text-ink-1" style={realTier?.id ? { color: REAL_TIER_INK[realTier.id as keyof typeof REAL_TIER_INK] } : undefined}>
+                                {realTier
+                                    ? (realTier.nameKey ? t("real.tierOf").replace("{tier}", t(realTier.nameKey)) : t("real.tierNone"))
+                                    : currentTier.label}
                             </p>
                         </div>
                     </div>
