@@ -15,7 +15,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
-import { rankStatus, tierFor, nextTier, TIERS, PLACEMENT_MATCHES } from "@shared/sim/rank";
+import { rankStatus, tierFor, tierProgress, TIERS, PLACEMENT_MATCHES } from "@shared/sim/rank";
 import { RankBoard } from "./RankBoard";
 import { GameBalls } from "./GameBalls";
 import type { DashGameType } from "../dash/dashApi";
@@ -36,19 +36,6 @@ const COMBOS: readonly { gameType: DashGameType }[] = [{ gameType: "3c" }, { gam
 const pill = "h-10 px-3.5 shrink-0 inline-flex items-center rounded-pill border text-[13px] font-bold";
 const chipOn = "border-transparent bg-[color:var(--hall-lime)] text-[#0B1A03]";
 const chipOff = "border-white/15 bg-white/[0.08] text-white/85 active:bg-white/15";
-
-/**
- * 지금 등급 안에서 다음 등급까지 얼마나 왔나(0~1). 아이언은 아래 끝이 없어(−∞) 브론즈 문턱에서 100점 아래를 바닥으로 본다.
- * 막대의 길이일 뿐이다 — 점수는 글자로 따로 적는다.
- */
-export function tierProgress(rating: number): number {
-    const next = nextTier(rating);
-    if (!next) return 1;
-    const cur = tierFor(rating);
-    const floor = Number.isFinite(cur.min) ? cur.min : next.min - 100;
-    const p = (rating - floor) / (next.min - floor);
-    return p < 0 ? 0 : p > 1 ? 1 : p;
-}
 
 export function RankPage({ onClose, api = defaultApi, initial }: RankPageProps) {
     const { t, locale } = useT();

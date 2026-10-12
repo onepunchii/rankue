@@ -792,6 +792,19 @@ body {
     border: 1px solid rgba(232, 196, 106, 0.28);
     box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.07);
   }
+  /**
+   * 홈 '온라인 대전' 배너(2026-10-12 오너: "혼자 치기 카드 위에 배너 카드를 …") — 랭킹의 내 카드와 같은 판.
+   * 당구장 불빛(흐린 그림)이 오른쪽 위에 비치고 왼쪽으로 갈수록 판 색에 잠긴다 — 글자가 놓이는 쪽은 늘 어둡다.
+   * 밝은 홈 위에 놓이는 카드라 그림자는 랭킹 화면보다 옅다.
+   */
+  .rank-hall .hall-banner {
+    background:
+      linear-gradient(100deg, #1e1812 0%, rgba(30, 24, 18, 0.9) 48%, rgba(20, 17, 13, 0.58) 100%),
+      url("/sim/rank/hall.webp") right top / cover no-repeat,
+      #14110d;
+    border: 1px solid rgba(232, 196, 106, 0.3);
+    box-shadow: 0 10px 22px rgba(20, 17, 13, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.07);
+  }
   .rank-hall .hall-row {
     border-radius: 18px;
     background: var(--surface-1);

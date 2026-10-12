@@ -12,7 +12,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { MATCH_LIST_QUERY_KEY, MATCH_LIST_REFETCH_MS } from "../match/queryKeys";
 import { matchRecord, type EntryMatchRow, type MatchRecord } from "./entryStats";
 
-export interface RankBoard { gameType: "3c" | "4c"; matches: number; wins?: number; rank: number | null; total: number }
+/** rating 은 2026-10-12 부터 온다(홈 배너의 등급 배지). 기기에 남아 있던 옛 응답에는 없을 수 있다 — 없으면 배너가 등급을 그리지 않고 기다린다. */
+export interface RankBoard { gameType: "3c" | "4c"; rating?: number; matches: number; wins?: number; rank: number | null; total: number }
 export interface RankMe { placement: number; boards: RankBoard[] }
 
 export interface OnlineRecord {
@@ -24,6 +25,8 @@ export interface OnlineRecord {
     placement: number;
     /** 종목별 판(3쿠션·4구) — 홈 '내 온라인 실력' 카드의 3쿠션|4구 탭 */
     boards: RankBoard[];
+    /** 내 순위 응답을 받았는가(실패도 받은 것으로 친다) — 받기 전에 "아직 대전을 안 했다"고 그리지 않으려고 */
+    ready: boolean;
 }
 
 export function useOnlineRecord(): OnlineRecord {
@@ -52,5 +55,5 @@ export function useOnlineRecord(): OnlineRecord {
         .filter((b) => b.rank !== null)
         .sort((a, b) => (a.rank! - b.rank!) || (b.total - a.total))[0] ?? null;
     const placingMatches = Math.max(0, ...boards.map((b) => b.matches));
-    return { record, bestBoard, placingMatches, placement: myRank.data?.placement ?? 3, boards };
+    return { record, bestBoard, placingMatches, placement: myRank.data?.placement ?? 3, boards, ready: myRank.data !== undefined || myRank.isError };
 }

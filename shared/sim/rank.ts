@@ -58,3 +58,16 @@ export function rankStatus(rating: number, matches: number): RankStatus {
     const next = nextTier(rating);
     return { placed: true, tier: tierFor(rating), toNext: next ? next.min - rating : null, placementLeft: 0 };
 }
+
+/**
+ * 지금 등급 안에서 다음 등급까지 얼마나 왔나(0~1). 아이언은 아래 끝이 없어(−∞) 브론즈 문턱에서 100점 아래를 바닥으로 본다.
+ * 막대의 길이일 뿐이다 — 점수는 글자로 따로 적는다. 랭킹 화면의 내 카드와 홈 배너가 같이 쓴다.
+ */
+export function tierProgress(rating: number): number {
+    const next = nextTier(rating);
+    if (!next) return 1;
+    const cur = tierFor(rating);
+    const floor = Number.isFinite(cur.min) ? cur.min : next.min - 100;
+    const p = (rating - floor) / (next.min - floor);
+    return p < 0 ? 0 : p > 1 ? 1 : p;
+}

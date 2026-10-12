@@ -16,6 +16,7 @@ import { PbaRankingCard, PBA_CARD_L } from "@/components/hiq/pba/PbaRankingCard"
 import { OngoingGameBanner } from "@/components/hiq/dashboard/OngoingGameBanner";
 import { SimMatchBanner } from "@/components/hiq/dashboard/SimMatchBanner";
 import { HomeSectionHeader, ScoreboardActions, ExploreActions } from "@/components/hiq/dashboard/QuickActions";
+import { OnlineHubBanner } from "@/components/hiq/dashboard/OnlineHubBanner";
 import { OnlineGameCard } from "@/components/hiq/dashboard/OnlineGameCard";
 import { LookalikeProCard } from "@/components/hiq/dashboard/LookalikeProCard";
 import { HomeGuideDialog, type HomeGuideTopic } from "@/components/hiq/dashboard/HomeGuideDialog";
@@ -251,11 +252,13 @@ function HiqDashboardBilliards() {
                 <ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={handleJoinGameClick} sample={sample} />
             </section>
 
-            {/* 당구 게임(예전 이름 온라인게임) — 혼자 치기 · 같이 치기 · 내 온라인 실력(대전 기록 띠 + 닮은 프로).
-                홈이 온라인게임의 입구다(2026-10-04) — 게임·멀티방·랭킹을 닫으면 ?sec=game 으로 이 구역에 돌아온다. */}
+            {/* 당구 게임(예전 이름 온라인게임) — 온라인 대전 배너(내 등급 · 랭킹 · 대시보드) · 혼자 치기 · 같이 치기 · 내 온라인 실력(닮은 프로 + 내 다마수).
+                홈이 온라인게임의 입구다(2026-10-04) — 게임·멀티방·랭킹을 닫으면 ?sec=game 으로 이 구역에 돌아온다.
+                배너는 2026-10-12 오너: "혼자 치기 카드 위에 배너 카드를 만들어서 … 대시보드 랭킹 들어가게". */}
             <section id="home-game" className="mb-10 scroll-mt-4">
                 <HomeSectionHeader title={t("home.secOnline")} desc={t("home.secOnlineDesc")} onGuide={() => setGuide("online")} />
                 <div className="space-y-3">
+                    <OnlineHubBanner />
                     <OnlineGameCard />
                     <LookalikeProCard />
                 </div>

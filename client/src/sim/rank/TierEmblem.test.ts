@@ -26,8 +26,8 @@ describe("등급 배지 그림", () => {
         expect(Object.keys(TIER_GLOW).sort()).toEqual(TIERS.map((t) => t.id).sort());
     });
 
-    it("메달 셋 · 트로피 · 머리 배경이 있다", () => {
-        for (const src of [rankMedalSrc(1), rankMedalSrc(2), rankMedalSrc(3), RANK_TROPHY_SRC, "/sim/rank/hall.webp"]) {
+    it("메달 셋 · 트로피 · 머리 배경 · 대시보드 그림(홈 배너)이 있다", () => {
+        for (const src of [rankMedalSrc(1), rankMedalSrc(2), rankMedalSrc(3), RANK_TROPHY_SRC, "/sim/rank/hall.webp", "/sim/rank/icon-stats.webp"]) {
             expect(existsSync(file(src)), src).toBe(true);
             expect(isWebp(file(src)), src).toBe(true);
         }
@@ -36,7 +36,7 @@ describe("등급 배지 그림", () => {
     });
 
     it("가볍다 — 한 장 60KB, 모두 합쳐 400KB 를 넘지 않는다(랭킹을 열 때 한꺼번에 받는다)", () => {
-        const all = [...TIERS.map((t) => tierEmblemSrc(t.id)), rankMedalSrc(1), rankMedalSrc(2), rankMedalSrc(3), RANK_TROPHY_SRC, "/sim/rank/hall.webp"];
+        const all = [...TIERS.map((t) => tierEmblemSrc(t.id)), rankMedalSrc(1), rankMedalSrc(2), rankMedalSrc(3), RANK_TROPHY_SRC, "/sim/rank/hall.webp", "/sim/rank/icon-stats.webp"];
         let total = 0;
         for (const src of all) { const n = statSync(file(src)).size; total += n; expect(n, src).toBeLessThan(60 * 1024); }
         expect(total).toBeLessThan(400 * 1024);

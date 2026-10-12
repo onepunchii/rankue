@@ -886,7 +886,7 @@ describe("당구 홈", () => {
     });
 
     describe("문구 — 다섯 언어 사전, 사실과 다른 말 없음", () => {
-        const files = ["pages/hiq/dashboard.tsx", ...["DashboardHeader", "RealHandicapCard", "QuickActions", "OnlineGameCard", "RankingListCard"].map((f) => `${DASH}/${f}.tsx`)];
+        const files = ["pages/hiq/dashboard.tsx", ...["DashboardHeader", "RealHandicapCard", "QuickActions", "OnlineHubBanner", "OnlineGameCard", "RankingListCard"].map((f) => `${DASH}/${f}.tsx`)];
         const used = new Set(files.flatMap((f) => Array.from(code(client(f)).matchAll(/"(guestHome\.[A-Za-z0-9]+)"/g), (m) => m[1])));
 
         it("화면이 쓰는 guestHome.* 키가 ko·en·es·tr·vi 에 전부 있다", () => {

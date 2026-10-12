@@ -7,9 +7,13 @@
  *
  * 2026-10-04 오너: "내 대전 기록도 이 카드 디자인을 살려 통합" → "3구·4구 토글로 보기 편하게" → "온라인게임 페이지로 안 가고 홈에서 다".
  *  - 머리에 3쿠션 | 4구 탭(실전 카드와 같은 모양). 기본은 대전을 더 많이 둔 종목.
- *  - 기록 띠: 대전 전적 · 랭킹(몇 명 중) · 내 다마수(온라인 핸디 — 예전엔 온라인게임 입구에만 있던 카드).
+ *  - 기록 띠: 대전 전적 · 랭킹(몇 명 중) · 내 다마수(온라인 핸디 — 예전엔 온라인게임 입구에만 있던 카드). → 2026-10-12 내 다마수만 남김(아래).
  *  - 3쿠션: 닮은 프로·비교표 그대로. 4구: 프로 기록이 없어 기록 띠 + 한 판 하기만.
  *  - '한 판 하기'는 멀티방으로(닮은 프로는 온라인 대전 기록으로 매긴다). 입구 화면은 거치지 않는다.
+ *
+ * 2026-10-12: 대전 전적 · 랭킹 칸은 구역 맨 위의 온라인 대전 배너(OnlineHubBanner)가 가져갔다 — 같은 숫자를 한 화면에 두 번 적지 않는다.
+ * 이 카드에는 **내 다마수** 한 줄과 닮은 프로가 남는다. 여기의 '재미 등급'(아마추어 ~ PBA 톱10급)은 글자로만 둔다 —
+ * 등급 배지 그림은 온라인 대전 등급(아이언 ~ 마스터)에만 쓴다(둘이 나란히 그림이면 헷갈린다).
  */
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -22,7 +26,7 @@ import { shareImage } from "@/lib/shareImage";
 import { GameController } from "@/lib/icons";
 import { proRatio, type LookalikeResponse } from "@shared/proCompare";
 import { drawCompareCard } from "@/components/hiq/compare/compareCard";
-import { BadgeAvatar, CardActions, CompareTable, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, RecordStrip, RecordValue, fill, proName } from "@/components/hiq/compare/lookalikeUi";
+import { BadgeAvatar, CardActions, CompareTable, MeAvatar, NeedMore, NextCell, ProAvatar, ProTwinHeader, fill, proName } from "@/components/hiq/compare/lookalikeUi";
 import { useOnlineRecord } from "@/sim/entry/useOnlineRecord";
 import { HANDICAP_QUERY_KEY } from "@/sim/entry/HandicapCard";
 import { matchApi } from "@/sim/matchApi";
@@ -35,20 +39,17 @@ export function LookalikeProCard() {
     const [sharing, setSharing] = useState(false);
     const [tab, setTab] = useState<"3c" | "4c" | null>(null);
     const q = useQuery<LookalikeResponse>({ queryKey: ["/api/hiq/sim/lookalike"], enabled: !!member, staleTime: 60_000, retry: false });
-    // 종목별 대전 전적·순위 — 진입 화면과 같은 계산(useOnlineRecord). 내 다마수는 진입 화면 '내 다마수' 카드와 같은 캐시.
-    const { boards, placement } = useOnlineRecord();
+    // 종목별 판 수 — 기본 탭(많이 둔 종목)을 정한다. 전적 · 순위는 위의 배너가 그린다. 내 다마수는 진입 화면 '내 다마수' 카드와 같은 캐시.
+    const { boards } = useOnlineRecord();
     const hc = useQuery({ queryKey: HANDICAP_QUERY_KEY, queryFn: () => matchApi.getMyHandicap(), enabled: !!member, staleTime: 60_000 });
     const d = q.data;
     if (!member) return null;
 
     const boardOf = (g: "3c" | "4c") => boards.find((b) => b.gameType === g);
     const cur: "3c" | "4c" = tab ?? ((boardOf("4c")?.matches ?? 0) > (boardOf("3c")?.matches ?? 0) ? "4c" : "3c");
-    const board = boardOf(cur);
-    const played = board?.matches ?? 0;
-    const wins = board?.wins ?? 0;
     const handi = (Array.isArray(hc.data?.boards) ? hc.data!.boards : []).find((b) => b.gameType === cur);
 
-    // 한 판 하기 = 멀티방(닮은 프로는 온라인 대전 기록으로 매긴다). 기록 칸은 대시보드·랭킹 화면으로.
+    // 한 판 하기 = 멀티방(닮은 프로는 온라인 대전 기록으로 매긴다).
     const play = () => setLocation("/online-game?rooms=1");
     const tabs = (
         <div className="inline-flex p-[3px] rounded-full bg-surface-3 shrink-0" role="tablist">
@@ -60,27 +61,19 @@ export function LookalikeProCard() {
             ))}
         </div>
     );
+    // 내 다마수(온라인 핸디) 한 줄 — 예전 기록 띠의 세 칸 가운데 이것만 남았다(전적 · 랭킹은 배너로)
     const strip = (
-        <RecordStrip cells={[
-            {
-                label: t("home.stripMatchRecord"),
-                value: <RecordValue template={t("real.stripRecord")} w={wins} l={Math.max(0, played - wins)} />,
-                sub: played ? fill(t("real.stripRate"), { n: Math.round((wins / played) * 100) }) : t("real.stripNone"),
-                onClick: () => setLocation("/online-game?dash=1&sec=matches"),
-            },
-            {
-                label: t("sim.rank.title"),
-                // 배치 중이면 숫자(2/3)를 값으로, '배치 중'은 아래 줄로 — 긴 번역(Sin clasificar)이 값 칸에서 잘리지 않게
-                value: board?.rank != null ? `#${board.rank}` : played > 0 ? `${played}/${placement}` : "—",
-                sub: board?.rank != null ? fill(t("home.rankOf"), { n: board.total.toLocaleString() }) : played > 0 ? t("sim.rank.unrankedShort") : t("real.stripNone"),
-                onClick: () => setLocation("/online-game?rank=1"),
-            },
-            {
-                label: t("sim.entry.handicapTitle"),
-                value: handi ? <>{handi.target}<span className="ml-0.5 text-[11px] font-semibold text-ink-3">{t("sim.entry.handicapUnit")}</span></> : "—",
-                sub: handi?.fromRecord ? fill(t("home.handiAvgShort"), { avg: handi.avg.toFixed(3) }) : t("home.handiDefault"),
-            },
-        ]} />
+        <div className="mt-3 rounded-tile border border-surface-line px-3 py-2.5 flex items-center justify-between gap-3" data-testid="online-handi">
+            <span className="text-[12px] font-semibold text-ink-3 shrink-0">{t("sim.entry.handicapTitle")}</span>
+            <span className="flex items-baseline gap-2 min-w-0">
+                <span className="text-[11px] font-semibold text-ink-4 rk-num truncate">
+                    {handi?.fromRecord ? fill(t("home.handiAvgShort"), { avg: handi.avg.toFixed(3) }) : t("home.handiDefault")}
+                </span>
+                <span className="text-[16px] leading-[18px] font-bold text-ink-1 rk-num shrink-0">
+                    {handi ? <>{handi.target}<span className="ml-0.5 text-[11px] font-semibold text-ink-3">{t("sim.entry.handicapUnit")}</span></> : "—"}
+                </span>
+            </span>
+        </div>
     );
     const head = (
         <>
@@ -92,7 +85,7 @@ export function LookalikeProCard() {
         </>
     );
 
-    // 닮은 프로를 불러오는 중이거나 실패해도 머리·기록 띠(전적·랭킹·다마수)는 보인다 — 아래만 자리를 잡아 둔다(2026-10-04 리뷰)
+    // 닮은 프로를 불러오는 중이거나 실패해도 머리·내 다마수 줄은 보인다 — 아래만 자리를 잡아 둔다(2026-10-04 리뷰)
     if (!d && cur === "3c") {
         return (
             <section className="rk-card rounded-3xl p-4">
@@ -103,7 +96,7 @@ export function LookalikeProCard() {
         );
     }
 
-    // 4구 — 닮은 프로는 3쿠션 프로 기록으로만 매긴다. 기록 띠와 한 판 하기만.
+    // 4구 — 닮은 프로는 3쿠션 프로 기록으로만 매긴다. 내 다마수 줄과 한 판 하기만.
     if (cur === "4c" || !d) {
         return (
             <section className="rk-card rounded-3xl p-4">

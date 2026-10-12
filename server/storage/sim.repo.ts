@@ -449,7 +449,7 @@ export class SimRepository {
      * 배치 전(대전 < placement)이면 rank 가 null 이고 matches 로 '배치 중 n/m' 을 보여 준다.
      * 2026-09-12: 대대·중대를 합쳐 판이 넷에서 둘로 줄었다(오너 지시).
      */
-    async myMatchRanks(memberId: string, placement = 3): Promise<{ gameType: "3c" | "4c"; matches: number; wins: number; rank: number | null; total: number }[]> {
+    async myMatchRanks(memberId: string, placement = 3): Promise<{ gameType: "3c" | "4c"; rating: number; matches: number; wins: number; rank: number | null; total: number }[]> {
         const res = await db.execute(sql`
             with ranked as (
                 select r.member_id, r.game_type,
@@ -458,12 +458,14 @@ export class SimRepository {
                 from hiq_sim_match_ratings r join hiq_members mem on mem.id = r.member_id
                 where r.matches >= ${placement}
             )
-            select m.game_type, m.matches, m.wins, x.rank, x.total
+            select m.game_type, m.rating, m.matches, m.wins, x.rank, x.total
             from hiq_sim_match_ratings m
             left join ranked x on x.member_id = m.member_id and x.game_type = m.game_type
             where m.member_id = ${memberId}`);
         return (res.rows as Record<string, unknown>[]).map((r) => ({
             gameType: String(r.game_type) as "3c" | "4c",
+            // 레이팅 — 홈 배너의 등급 배지(2026-10-12). 등급은 화면이 shared/sim/rank 의 tierFor 로 정한다.
+            rating: Number(r.rating ?? 1000),
             matches: Number(r.matches ?? 0),
             // 무승부는 wins 에 포함돼 있다(오너 규칙) — 패 = matches - wins.
             wins: Number(r.wins ?? 0),
