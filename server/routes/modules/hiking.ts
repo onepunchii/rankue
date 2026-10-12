@@ -8,6 +8,8 @@ import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { allMountains, getMountainDetail, mountainById, mountainBySlug, nearbyMountains, type MountainSummary } from "../../storage/hiking.js";
 import { addSummit, listHikingAwards, listSummits, removeRecord, syncHikingAwards } from "../../storage/hikingStamps.js";
+import { addTrip, listTrips } from "../../storage/hikingTrips.js";
+import { cleanTrip } from "../../../shared/hikingTrail.js";
 import { requireHikingAccess } from "../../middleware/hikingAccess.js";
 import type { AuthRequest } from "../../middleware/auth.js";
 import { distM } from "../../../shared/hikingGeo.js";
@@ -117,6 +119,32 @@ router.delete("/summits/:id", ...requireHikingAccess, asyncHandler(async (req: A
     if (!/^[0-9a-f-]{36}$/i.test(String(req.params.id))) return sendError(res, 404, "없는 기록이에요");
     const ok = await removeRecord(req.userId!, String(req.params.id));
     return ok ? sendSuccess(res, { removed: true }) : sendError(res, 404, "없는 기록이에요");
+}));
+
+// ── 산행(길 띠를 마치고 남기는 요약) ─────────────────────────────────────
+const outTrip = (t: { id: string; mountainId: string; courseId: string | null; startedAt: Date; endedAt: Date; km: number; gainM: number; reachedSummit: boolean }) =>
+    ({ id: t.id, mountainId: t.mountainId, courseId: t.courseId, startedAt: t.startedAt.toISOString(), endedAt: t.endedAt.toISOString(), km: t.km, gainM: t.gainM, reachedSummit: t.reachedSummit });
+
+/** 내 산행(새 것부터) — 읽기만 */
+router.get("/me/trips", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    res.set("Cache-Control", "no-store");
+    return sendSuccess(res, { trips: (await listTrips(req.userId!)).map(outTrip) });
+}));
+
+/**
+ * 산행 한 번을 남긴다 — **좌표를 받지 않는다**(본문에 실려 와도 읽지 않는다). 기기가 센 요약(시간 · 길 위의 거리 · 오른 높이)만 적는다.
+ * 너무 짧거나 말이 안 되는 값은 적지 않고 saved:false 로 답한다(shared/hikingTrail.cleanTrip).
+ */
+router.post("/trips", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    const b = req.body ?? {};
+    const m = await mountainById(String(b.mountainId ?? ""));
+    if (!m) return sendError(res, 404, "없는 산이에요");
+    const trip = cleanTrip({
+        mountainId: m.id, courseId: typeof b.courseId === "string" && b.courseId ? b.courseId : null,
+        startedAt: Date.parse(String(b.startedAt ?? "")), endedAt: Date.parse(String(b.endedAt ?? "")), km: Number(b.km), gainM: Number(b.gainM), reachedSummit: b.reachedSummit === true,
+    }, Date.now());
+    if (!trip) return sendSuccess(res, { saved: false });
+    return sendSuccess(res, { saved: await addTrip(req.userId!, trip) });
 }));
 
 export default router;

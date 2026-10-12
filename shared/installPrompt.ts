@@ -70,6 +70,8 @@ const BLOCKED_UNDER = [
     "/game", "/golf/game",
     // 온라인게임 · 골프 아크/레인지 · 필드/미니골프 — 화면 아래가 조작부다(2026-09-07 · 09-15 실측: 샷 단추 · 스윙 패드를 덮었다)
     "/online-game", "/golf/arcade", "/golf/range", "/golf/play", "/golf/minigolf",
+    // 등산의 산행 중 화면 — 걷는 사람의 길 띠를 덮지 않는다(2026-10-13)
+    "/hiking/trail",
     // 공개 골프 페이지(CourseShell) — 비로그인에게 바닥에 '로그인하고 취소티 알림 받기' 줄을 깐다. 한 화면에 바닥 권유 둘은 소음이다.
     // '/golf/booking' 은 '/golf/booking-list' 와 맞지 않는다(회원 화면).
     "/golf/course", "/golf/courses", "/golf/booking", "/golf/join", "/golf/urgent",

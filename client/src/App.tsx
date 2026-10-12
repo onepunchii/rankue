@@ -214,6 +214,8 @@ const HikingMountainPage = lazy(() => import("@/hiking/pages/MountainPage"));
 const HikingStampShelf = lazy(() => import("@/hiking/pages/StampShelf"));
 const HikingStampBook = lazy(() => import("@/hiking/pages/StampBookPage"));
 const HikingPack = lazy(() => import("@/hiking/pages/PackPage"));
+const HikingTrail = lazy(() => import("@/hiking/pages/TrailPage"));
+function HikingTrailRoute() { return <Suspense fallback={hikingFallback}><HikingTrail /></Suspense>; }
 function HikingStampShelfRoute() { return <Suspense fallback={hikingFallback}><HikingStampShelf /></Suspense>; }
 function HikingStampBookRoute() { return <Suspense fallback={hikingFallback}><HikingStampBook /></Suspense>; }
 function HikingPackRoute() { return <Suspense fallback={hikingFallback}><HikingPack /></Suspense>; }
@@ -419,6 +421,8 @@ function AppRoutes() {
       <Route path="/hiking/stamps" component={HikingStampShelfRoute} />
       <Route path="/hiking/stamps/:book" component={HikingStampBookRoute} />
       <Route path="/hiking/pack" component={HikingPackRoute} />
+      {/* 산행 중 '길 띠' — 회원 화면(검색용 화면 없음) */}
+      <Route path="/hiking/trail/:slug" component={HikingTrailRoute} />
       {/* 골프장 페이지(2026-09-24) — 검색 유입용 공개 페이지라 GolfOnly 를 타지 않는다(GolfOnly 는 비로그인을 /dashboard 로 쫓아낸다).
           슬러그는 한글(정본). 옛 숫자 주소(/golf/course/74)는 GolfCoursePage 가 슬러그로 바꿔 준다.
           wouter 는 기본이 정확 일치라(regexparam, loose 아님) /golf/booking 이 /golf/booking-list 를 먹지 않는다. */}

@@ -23,6 +23,7 @@ import { SummitCheckin } from "../stamps/SummitCheckin";
 import { MountainPatch } from "../stamps/MountainPatch";
 import { hikingBookPath } from "../stamps/StampParts";
 import { useHikingStamps } from "../stamps/useHikingStamps";
+import { trailPath } from "../trail/useTrail";
 import { stampDate } from "../lib/date";
 import { POI_COLOR, hikingCover } from "../theme";
 import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi } from "../lib/api";
@@ -94,7 +95,7 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
     );
 }
 
-function Courses({ d }: { d: MountainDetail }) {
+function Courses({ d, canStart }: { d: MountainDetail; canStart?: boolean }) {
     const [i, setI] = useState(0);
     const c = d.courseList[Math.min(i, d.courseList.length - 1)];
     if (!c) return <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-4 text-[14px] leading-relaxed text-[#F4EFE3B3] break-keep">{MOUNTAIN_LABEL.noCourse}</p>;
@@ -111,6 +112,11 @@ function Courses({ d }: { d: MountainDetail }) {
                 </div>
             )}
             <CourseCard key={`card:${c.id}`} c={c} pois={d.pois} />
+            {canStart && (
+                <Link href={trailPath(d.slug, c.id)} className="mt-3 flex h-12 items-center justify-center rounded-xl bg-[#F28C6A] text-[15px] font-semibold text-[#2A1208] active:bg-[#E67C59]" data-track-as="hiking-trail-open" data-testid="course-start">
+                    이 코스로 산행 시작
+                </Link>
+            )}
             <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{COURSE_TIME_NOTE} {COURSE_SOURCE_NOTE}</p>
         </div>
     );
@@ -264,7 +270,7 @@ export default function MountainPage() {
                 )}
 
                 <HkSection title={MOUNTAIN_LABEL.courses} aside={d.courseList.length ? `${d.courseList.length}개` : undefined} id="sec-courses">
-                    <Courses key={`courses:${d.slug}`} d={d} />
+                    <Courses key={`courses:${d.slug}`} d={d} canStart={my.mine} />
                 </HkSection>
 
                 <HkSection title={MOUNTAIN_LABEL.weather} aside="오늘부터 이레" id="sec-weather">

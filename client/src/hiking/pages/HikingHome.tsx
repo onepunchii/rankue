@@ -7,6 +7,7 @@
  * ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상, 굵기는 semibold 까지.
  */
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useSport } from "@/contexts/SportContext";
 import { useGolfVisible } from "@/hooks/useGolfAccess";
@@ -22,6 +23,8 @@ import { stampDate } from "../lib/date";
 import { HIKING_PACK_PATH, HIKING_STAMPS_PATH, HkBar, HkPaper, PatchArt, hikingBookPath } from "../stamps/StampParts";
 import { SummitStamp, regionInk } from "../stamps/SummitStamp";
 import { useHikingStamps } from "../stamps/useHikingStamps";
+import { MY_TRIPS_KEY, type MyTrip } from "../trail/useTrail";
+import { durationText } from "@shared/hikingGeo";
 import { HIKING_HERO } from "../theme";
 
 const TILT = [-4, 3, -2, 5];
@@ -40,6 +43,7 @@ export default function HikingHome() {
     const kfsBooks = s.states.filter((x) => x.book.kind === "kfs" && !x.done);
     const near = [...kfsBooks].filter((x) => x.got > 0).sort((a, b) => (a.total - a.got) - (b.total - b.got))[0] ?? [...kfsBooks].filter((x) => x.total > 1).sort((a, b) => a.total - b.total)[0];
     const recent = [...verified].sort((a, b) => b.firstAt - a.firstAt).slice(0, 3);
+    const trips = useQuery<{ trips: MyTrip[] }>({ queryKey: MY_TRIPS_KEY, enabled: s.mine }).data?.trips ?? [];
     const name = (member as { nickname?: string; name?: string } | undefined)?.nickname ?? (member as { name?: string } | undefined)?.name ?? "";
 
     return (
@@ -107,6 +111,28 @@ export default function HikingHome() {
                         <HkSection title="내 산 지도" aside={verified.length ? `깃발 ${s.done.size}개` : "오른 산에 깃발이 꽂혀요"}>
                             <MountainMap mountains={s.famous} done={s.done} />
                         </HkSection>
+
+                        {trips.length > 0 && (
+                            <HkSection title="최근 산행" aside={`${trips.length}번`}>
+                                <ul className="rounded-2xl bg-[#FFFFFF0A] px-3.5" data-testid="hk-home-trips">
+                                    {trips.slice(0, 4).map((t, i) => {
+                                        const m = byId.get(t.mountainId);
+                                        const min = Math.max(1, Math.round((Date.parse(t.endedAt) - Date.parse(t.startedAt)) / 60_000));
+                                        return (
+                                            <li key={t.id} className={i ? "border-t border-[#FFFFFF14]" : ""}>
+                                                <Link href={m ? hikingMountainPath(m.slug) : "/hiking"} className="flex min-h-[56px] items-center gap-3 py-2 active:opacity-70">
+                                                    <span className="min-w-0 flex-1">
+                                                        <span className="block truncate text-[15.5px] font-semibold text-[#F4EFE3]">{m?.name ?? "산행"}{t.reachedSummit && <span className="ml-1.5 text-[12.5px] font-medium text-[#F6D9A8]">정상</span>}</span>
+                                                        <span className="mt-0.5 block text-[13px] tabular-nums text-[#F4EFE399]">{stampDate(new Date(t.startedAt))} · {durationText(min)} · {t.km.toFixed(1)}km · 오른 높이 {t.gainM.toLocaleString("en-US")}m</span>
+                                                    </span>
+                                                    <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
+                                                </Link>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+                            </HkSection>
+                        )}
 
                         {recent.length > 0 ? (
                             <HkSection title="최근에 찍은 도장" aside={<Link href={HIKING_STAMPS_PATH} className="text-[#F6D9A8]">도장첩 보기</Link>}>

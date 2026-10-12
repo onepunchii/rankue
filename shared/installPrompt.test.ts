@@ -155,6 +155,9 @@ describe("isPromptBlockedPath — 막는 주소", () => {
 
     it("게임 화면 — 아래가 조작부다", () => {
         for (const p of ["/golf/play", "/golf/minigolf"]) expect(isPromptBlockedPath(p), p).toBe(true);
+        // 등산의 산행 중 화면도 막는다 — 산 화면(/hiking/mountains/…)은 띄워도 된다
+        expect(isPromptBlockedPath("/hiking/trail/설악산")).toBe(true);
+        expect(isPromptBlockedPath("/hiking/mountains/설악산")).toBe(false);
     });
 
     it("로그인 · 가입 · 약관 · 콜백", () => {

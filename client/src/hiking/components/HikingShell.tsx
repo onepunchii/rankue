@@ -12,7 +12,7 @@ import { useHikingAccess } from "@/hooks/useHikingAccess";
 import { LucideChevronLeft } from "@/lib/icons";
 import { HIKING_HUB_PATH } from "@shared/hikingMountains";
 
-export function HikingShell({ title, backTo = HIKING_HUB_PATH, right, children, cta = "가입하고 산 도장 모으기" }: {
+export function HikingShell({ title, backTo = HIKING_HUB_PATH, right, children, cta = "가입하고 산 도장 모으기", nav = true }: {
     title?: ReactNode;
     /** 뒤로 갈 곳이 없을 때(검색에서 막 들어온 경우) */
     backTo?: string;
@@ -20,6 +20,8 @@ export function HikingShell({ title, backTo = HIKING_HUB_PATH, right, children, 
     children: ReactNode;
     /** 방문자에게 보이는 아래 단추의 글. null 이면 그리지 않는다 */
     cta?: string | null;
+    /** 하단 탭을 그리는가 — 산행 중에는 뺀다(걷다가 잘못 눌러 화면을 떠나지 않게) */
+    nav?: boolean;
 }) {
     const [, setLocation] = useLocation();
     const { member, isLoading } = useAuth();
@@ -27,7 +29,7 @@ export function HikingShell({ title, backTo = HIKING_HUB_PATH, right, children, 
     const back = () => (window.history.length > 1 && document.referrer.startsWith(window.location.origin) ? window.history.back() : setLocation(backTo));
     const guest = !isLoading && !member;
     // 등산을 쓸 수 있는 회원에게는 하단 탭(홈 · 산 · 도장첩 · 크루 · 채팅)을 붙인다 — 산 화면에서도 등산 안에 머문다
-    const hikingOk = useHikingAccess();
+    const hikingOk = useHikingAccess() && nav;
     return (
         <div className={`min-h-screen bg-[#0B1F26] font-sans text-[#F4EFE3] ${hikingOk ? "pb-nav" : guest && cta ? "pb-24" : "pb-10"}`} data-hiking="1">
             <header className="sticky top-0 z-40 border-b border-[#FFFFFF14] bg-[#0B1F26E6] backdrop-blur-md" style={{ paddingTop: "env(safe-area-inset-top)" }}>
