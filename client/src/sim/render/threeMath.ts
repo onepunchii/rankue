@@ -103,6 +103,68 @@ export function cueGap(R: number, pullback: number): number {
     return R + CUE_GAP + pb * CUE_PULLBACK_MAX;
 }
 
+/** 큐대가 넘어가는 것(레일 윗면·다른 공)과 띄우는 틈(m) */
+export const CUE_CLEARANCE = 0.004;
+/** 큐대를 드는 각의 상한(rad, ≈34°) — 수구가 레일·다른 공에 붙어 있으면 이보다 세워야 하지만 화면에서는 여기까지만 */
+export const CUE_ELEVATION_MAX = 0.6;
+
+/** 팁에서 s(m) 떨어진 곳의 큐대 반지름 — 팁(6 mm)에서 손잡이 끝(15 mm)까지 고르게 굵어진다(buildCue 와 같은 꼴) */
+export function cueRadiusAt(s: number): number {
+    const k = s <= 0 ? 0 : s >= CUE_LENGTH ? 1 : s / CUE_LENGTH;
+    return CUE_TIP_W / 2 + (CUE_BUTT_W / 2 - CUE_TIP_W / 2) * k;
+}
+
+/**
+ * 큐대 뒤쪽을 들어 올리는 각(rad) — **그리기 전용**(물리의 샷과는 무관하다).
+ * 2026-10-12 오너: "온라인게임에서 큐가 당구 테두리 안으로 들어간 모습이 보이는데 … 꼬이지 않게". 큐대를 수구 높이(R ≈ 31 mm)에
+ * 수평으로 눕혀 그리는데 레일 윗면이 그보다 높아(45 mm), 큐대가 레일 위를 지나는 자리에서 나무 속에 파묻혔다(위에서 보기에는 레일이
+ * 큐대를 덮고, 선수 시점에서는 큐대가 레일을 뚫는다). 다른 공이 큐대 길 위에 있을 때도 그 공을 꿰뚫었다.
+ * 실제로 치는 사람이 하듯 수구 중심을 축으로 뒤를 든다: 레일을 넘기 시작하는 자리와 길 위의 공마다 '큐대 밑면이 넘어야 할 높이'를
+ * 그 자리까지의 거리로 나눈 것(sin) 가운데 가장 큰 값. 넘을 것이 없으면 0(수평). 조준을 돌려도 값이 끊기지 않는다.
+ *
+ * draw() 에서 매 프레임 부른다 — 아무것도 할당하지 않는다. balls 는 프레임의 공 목록(수구는 skipId 로 뺀다).
+ */
+export function cueElevation(
+    x: number, y: number, phi: number, pullback: number, R: number,
+    width: number, length: number, railTop: number,
+    balls: readonly { readonly id: string; readonly r: readonly number[] }[] | null, skipId: string | null,
+): number {
+    // 큐대는 공 뒤쪽(−phi)으로 뻗는다
+    const ux = -Math.cos(phi), uy = -Math.sin(phi);
+    const gap = cueGap(R, pullback);
+    const t0 = gap - CUE_TIP_L, t1 = gap + CUE_LENGTH;
+    let need = 0;
+
+    // 레일: 플레이 면을 벗어나는 자리부터 레일 윗면 위에 있어야 한다. 높이는 거리에 비례해 오르므로 벗어나는 자리가 가장 빠듯하다.
+    let exit = Infinity;
+    if (ux < 0) exit = Math.min(exit, x / -ux); else if (ux > 0) exit = Math.min(exit, (width - x) / ux);
+    if (uy < 0) exit = Math.min(exit, y / -uy); else if (uy > 0) exit = Math.min(exit, (length - y) / uy);
+    if (exit < t1) {
+        const t = Math.max(exit, t0, 1e-3);
+        const lift = railTop + CUE_CLEARANCE + cueRadiusAt(t - gap) - R;
+        if (lift > 0) need = Math.max(need, lift / t);
+    }
+
+    // 다른 공: 큐대 축에서 옆으로 (공 반지름 + 큐대 반지름 + 틈) 안에 중심이 있으면 그 위로 넘는다
+    if (balls) {
+        for (let i = 0; i < balls.length; i++) {
+            const b = balls[i];
+            if (b.id === skipId) continue;
+            const dx = b.r[0] - x, dy = b.r[1] - y;
+            const t = dx * ux + dy * uy;
+            if (t <= 0 || t > t1 + R) continue;
+            const reach = R + cueRadiusAt(t - gap) + CUE_CLEARANCE;
+            if (t < t0 - reach) continue;
+            const d = Math.abs(dx * uy - dy * ux);
+            if (d >= reach) continue;
+            need = Math.max(need, Math.sqrt(reach * reach - d * d) / Math.max(t, 1e-3));
+        }
+    }
+
+    const max = Math.sin(CUE_ELEVATION_MAX);
+    return Math.asin(need > max ? max : need);
+}
+
 /**
  * 큐대 그룹의 z 회전. 그룹 로컬 +y 가 큐대 방향(공 뒤쪽, −phi)이 되게 한다:
  * R_z(θ)·(0, 1) = (−sin θ, cos θ) = (−cos phi, −sin phi) ⇒ θ = phi + π/2.

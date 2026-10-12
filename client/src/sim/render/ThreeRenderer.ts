@@ -43,7 +43,7 @@ import { ZOOM_MIN, type RenderFrame, type Renderer, type RendererView, type Safe
 import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, parseColor, readPalette, rgba, scaleColor, type Palette, type RGBA } from "./tokens";
 import {
-    CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, copyPose, CUE_BUTT_W, CUE_FERRULE_L, CUE_LENGTH, CUE_TIP_L, CUE_TIP_W, cameraBasis, cueGap,
+    CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, copyPose, CUE_BUTT_W, CUE_FERRULE_L, CUE_LENGTH, CUE_TIP_L, CUE_TIP_W, cameraBasis, cueElevation, cueGap,
     cueRotationZ, dampRig, diamondWorld, integrateOrientation, makeBasis, makePose, makeRig, MAX_DT, orthoFrustum, overviewPose, PLAYER_FAR,
     PLAYER_FOV_DEG, PLAYER_NEAR, playerPose, projectPerspective, rigSmoothTime, snapRig, unprojectPerspective, type CameraBasis,
     type CameraPose, type CameraRig, dampScalar, ZOOM_SMOOTH_S, zoomedFovDeg,
@@ -726,6 +726,10 @@ export class ThreeRenderer implements Renderer {
             this.cueGroup.visible = true;
             this.cueGroup.position.set(cb.r[0], cb.r[1], R);
             this.cueGroup.rotation.z = cueRotationZ(cue.phi);
+            // 레일 윗면·길 위의 다른 공을 넘어가게 뒤를 든다(수구 중심이 축) — 수평으로 두면 레일 속에 파묻힌다(threeMath.cueElevation)
+            this.cueGroup.rotation.x = this.table
+                ? cueElevation(cb.r[0], cb.r[1], cue.phi, cue.pullback, R, this.table.width, this.table.length, RAIL_TOP, balls, cb.id)
+                : 0;
             this.cueBody.position.y = cueGap(R, cue.pullback);
         } else {
             this.cueGroup.visible = false;
@@ -1138,6 +1142,8 @@ export class ThreeRenderer implements Renderer {
         part(midR, tipR, shaftL, CUE_FERRULE_L + shaftL / 2, CUE_SHAFT);
         part(buttR, midR, buttL, CUE_LENGTH * 0.55 + buttL / 2, CUE_BUTT);
         this.cueGroup.add(this.cueBody);
+        // 회전 순서: 먼저 로컬 x 로 뒤를 들고(올림각), 그 다음 z 로 조준 방향을 돌린다 — 기본 순서(XYZ)면 올림각이 조준과 무관한 세계 x 축으로 걸린다
+        this.cueGroup.rotation.order = "ZXY";
     }
 
     private readInsets(): SafeInsets {
