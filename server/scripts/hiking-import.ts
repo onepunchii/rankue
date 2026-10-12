@@ -11,7 +11,8 @@
  *
  * 싣는 산: 명산 목록의 산(tier 1) · 백과 문서가 있는 산(tier 2) · 코스가 이어진 산. 그 밖의 이름뿐인 봉우리는 싣지 않는다(빈 페이지가 된다).
  * 산과 코스를 잇는 법: ① 받은 자료가 이어 둔 것(지점 묶음의 masterId) ② 못 이은 명산은 폴더 이름의 알맹이('설악산(대청봉)' → 설악산 · 대청봉)가
- *   산의 이름 · 봉우리 이름과 같고 정상이 코스 상자에서 3km 안일 때.
+ *   산의 이름 · 봉우리 이름과 같고 정상이 코스 상자에서 3km 안일 때 ③ 그래도 코스가 없는 명산은, 아직 안 이어진 묶음 가운데 그 산의 정상 150m 안을 지나는 것.
+ *   (이미 다른 산에 이어진 코스 가운데 정상을 지나는 것은 옮기지 않고 hiking-link-courses.ts 가 잇는다 — 이 스크립트를 돌린 뒤 그것도 다시 돌린다.)
  * ⚠️ 맥의 폴더 이름은 풀어쓴 한글(NFD)이다 — 반드시 NFC 로 바꿔 견준다.
  */
 import { readFileSync, readdirSync, statSync } from "node:fs";
@@ -122,6 +123,23 @@ async function main() {
         }
     }
 
+    // ③ 아직 안 이어진 묶음 가운데, 코스가 **제 코스 없는 명산의 정상(150m 안)을 지나는** 것 — 묶음의 이름이 봉우리(용문봉 · 추월산보리암 · 사량도지리산)라
+    //    이름으로는 못 이었지만 길은 그 산의 정상을 지난다(2026-10-13). 이미 이어진 묶음은 건드리지 않는다(남의 코스를 뺏지 않는다).
+    let bySummit = 0;
+    {
+        const has = new Set(link.values());
+        const bare = master.filter((x) => x.tier === 1 && x.lat != null && !has.has(x.id)).sort(byRank);
+        if (bare.length) for (const fid of folders.keys()) {
+            if (link.has(fid)) continue;
+            const lines = linesOf(fid);
+            if (lines.length === 0) continue;
+            let la0 = Infinity, la1 = -Infinity, lo0 = Infinity, lo1 = -Infinity;
+            for (const l of lines) for (const p of l) { if (p[0] < la0) la0 = p[0]; if (p[0] > la1) la1 = p[0]; if (p[1] < lo0) lo0 = p[1]; if (p[1] > lo1) lo1 = p[1]; }
+            const m = bare.find((x) => x.lat >= la0 - 0.003 && x.lat <= la1 + 0.003 && x.lon >= lo0 - 0.004 && x.lon <= lo1 + 0.004 && nearM(fid, x) <= SUMMIT_ON_COURSE_M);
+            if (m) { link.set(fid, m.id); bySummit++; }
+        }
+    }
+
     // 싣는 산
     const withCourse = new Set(link.values());
     let mountains = master.filter((m) => m.tier === 1 || m.tier === 2 || withCourse.has(m.id));
@@ -189,7 +207,7 @@ async function main() {
 
     const famousN = mountainRows.filter((m) => m.tier === 1);
     console.log(`산 ${mountainRows.length}(명산 ${famousN.length} · 코스 있는 산 ${mountainRows.filter((m) => m.course_count > 0).length} · 코스 있는 명산 ${famousN.filter((m) => m.course_count > 0).length} · 글 ${guideKept}${guideDropped ? ` · 걸러져 못 실은 글 ${guideDropped}` : ""})`);
-    console.log(`코스 ${courseRows.length}(이름으로 이은 폴더 ${byName} · 너무 짧아 뺀 선 ${shortLines}) · 지점 ${poiRows.length}(코스 선 밖 ${offCourse})`);
+    console.log(`코스 ${courseRows.length}(이름으로 이은 폴더 ${byName} · 정상을 지나서 이은 폴더 ${bySummit} · 너무 짧아 뺀 선 ${shortLines}) · 지점 ${poiRows.length}(코스 선 밖 ${offCourse})`);
     console.log("산림청 100 가운데 코스 있는 산:", mountainRows.filter((m) => m.lists.some((l: any) => l.list === "kfs100") && m.course_count > 0).length, "| 주소 예:", mountainRows.slice(0, 6).map((m) => m.slug).join(", "));
     const dup = mountainRows.length - new Set(mountainRows.map((m) => m.slug)).size;
     if (dup) { console.error("주소가 겹친다:", dup); process.exitCode = 1; return; }
