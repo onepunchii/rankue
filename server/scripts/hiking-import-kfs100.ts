@@ -28,7 +28,7 @@ import { pool } from "../db";
 import { courseStats, distM, nearestOnLine, packLine, thinLine, withKm, type LinePoint } from "../../shared/hikingGeo";
 import { hikingPoiKindOfGpx, signpostNote } from "../../shared/hikingPois";
 import { HIKING_SUMMIT_FIXES } from "../../shared/hikingSummitFix";
-import { packSurface, surfaceIdOf, type SurfaceId } from "../../shared/hikingSurface";
+import { SURFACE_MIN_COVER, packSurface, surfaceOfNames, type SurfaceId } from "../../shared/hikingSurface";
 
 const args = process.argv.slice(2);
 const flagAt = (f: string) => args.indexOf(f);
@@ -61,7 +61,8 @@ function parseFile(file: string): { segs: RawPoint[][]; wpts: RawWpt[]; rtName: 
     for (const s of t.matchAll(/<trkseg>([\s\S]*?)<\/trkseg>/g)) {
         const pts: RawPoint[] = [];
         for (const m of s[1].matchAll(/<trkpt\s+lat="([-\d.]+)"\s+lon="([-\d.]+)"\s*>([\s\S]*?)<\/trkpt>/g)) {
-            const ele = /<ele>([-\d.]+)<\/ele>/.exec(m[3]), rt = /<rtcd>(\d+)<\/rtcd>/.exec(m[3]);
+            // 구간 번호는 여럿이 겹쳐 적히기도 한다("1;3" — 오솔길 위의 계단)
+            const ele = /<ele>([-\d.]+)<\/ele>/.exec(m[3]), rt = /<rtcd>([\d;]+)<\/rtcd>/.exec(m[3]);
             const lat = Number(m[1]), lng = Number(m[2]);
             if (Number.isFinite(lat) && Number.isFinite(lng)) pts.push({ lat, lng, ele: ele ? Number(ele[1]) : 0, rt: rt ? rt[1] : "" });
         }
@@ -157,7 +158,7 @@ async function main() {
     const courseRows: Record<string, unknown>[] = [], poiRows: Record<string, unknown>[] = [];
     const touched = new Set<string>();
     const rtNames = new Map<string, Map<string, number>>();
-    let files = 0, tooShort = 0, flat = 0, same = 0, branchKm = 0, branchFiles = 0, mainKm = 0, wptAll = 0, wptSkipped = 0, wptOff = 0, noSummit = 0;
+    let files = 0, tooShort = 0, flat = 0, noSurface = 0, same = 0, branchKm = 0, branchFiles = 0, mainKm = 0, wptAll = 0, wptSkipped = 0, wptOff = 0, noSummit = 0;
     const sameList: string[] = [], perFolder: string[] = [], kindCount: Record<string, number> = {};
     for (const f of folders) {
         const m = match.get(f.name);
@@ -182,12 +183,17 @@ async function main() {
             const top = m.lat != null ? nearestOnLine(main.line, m.lat, m.lng) : null;
             const onSummit = !!top && top.offM <= SUMMIT_ON_COURSE_M;
             if (!onSummit) noSummit++;
-            // 길의 종류 — 점과 점 사이의 거리를 뒤 점의 종류에 더한다
+            // 길의 종류 — 점과 점 사이의 거리를 뒤 점의 종류에 더한다. 구간이 겹친 점은 더 구체적인 길로, 조사하지 않은 점은 세지 않는다
             const parts: [SurfaceId, number][] = [];
-            for (let k = 1; k < main.s.length; k++) parts.push([surfaceIdOf(file.rtName.get(main.s[k].rt)), main.line[k][3] - main.line[k - 1][3]]);
+            for (let k = 1; k < main.s.length; k++) {
+                const kind = surfaceOfNames(main.s[k].rt.split(";").map((c) => file.rtName.get(c)));
+                if (kind) parts.push([kind, main.line[k][3] - main.line[k - 1][3]]);
+            }
+            const covered = parts.reduce((x, [, km]) => x + km, 0) / s.km >= SURFACE_MIN_COVER;
+            if (!covered) noSurface++;
             courseRows.push({
                 id, mountain_id: m.id, frtrl_id: frtrl, seq: n, km: Math.round(s.km * 100) / 100, gain_m: s.gainM, loss_m: s.lossM, min_m: s.minM, max_m: s.maxM, loop: s.loop,
-                summit_km: onSummit ? Math.round(top!.km * 1000) / 1000 : null, line: packLine(thinLine(main.line)), surface: packSurface(parts),
+                summit_km: onSummit ? Math.round(top!.km * 1000) / 1000 : null, line: packLine(thinLine(main.line)), surface: covered ? packSurface(parts) : null,
             });
             kept++; mainKm += s.km; touched.add(m.id);
             for (const w of file.wpts) {
@@ -207,7 +213,7 @@ async function main() {
         perFolder.push(`${f.name} ${kept}/${f.files.length}`);
     }
     const odd = [...rtNames].filter(([, names]) => names.size > 1).map(([code, names]) => `${code}: ${[...names.keys()].join("/")}`);
-    console.log(`파일 ${files} → 실을 코스 ${courseRows.length}(본선 ${mainKm.toFixed(0)}km) · 이미 있는 길이라 뺀 것 ${same} · 너무 짧아 뺀 것 ${tooShort} · 높이 기록이 없어 뺀 것 ${flat} · 곁길을 뗀 파일 ${branchFiles}(곁길 ${branchKm.toFixed(0)}km) · 정상을 안 지나는 코스 ${noSummit}`);
+    console.log(`파일 ${files} → 실을 코스 ${courseRows.length}(본선 ${mainKm.toFixed(0)}km) · 이미 있는 길이라 뺀 것 ${same} · 너무 짧아 뺀 것 ${tooShort} · 높이 기록이 없어 뺀 것 ${flat} · 곁길을 뗀 파일 ${branchFiles}(곁길 ${branchKm.toFixed(0)}km) · 정상을 안 지나는 코스 ${noSummit} · 길의 종류가 조사되지 않은 코스 ${noSurface}`);
     console.log(`지점 ${wptAll} → 실을 것 ${poiRows.length}(코스 선 밖 ${wptOff}) · 싣지 않는 것 ${wptSkipped} ·`, JSON.stringify(kindCount));
     if (odd.length) console.log("구간 번호가 파일마다 다른 이름을 가리킨다(파일 안의 이름으로 읽었다):", odd.join(" | "));
     if (sameList.length) console.log("같은 길:", sameList.slice(0, 40).join(" · "), sameList.length > 40 ? `… 외 ${sameList.length - 40}` : "");

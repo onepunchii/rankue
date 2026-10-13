@@ -18,6 +18,19 @@ const SURFACE_OF: Readonly<Record<string, SurfaceId>> = {
     교량: "bridge", 밧줄: "rope", 사다리: "rope", 철구조물: "rope", 기타: "etc",
 };
 export const surfaceIdOf = (name: string | null | undefined): SurfaceId => SURFACE_OF[String(name ?? "").trim()] ?? "etc";
+/**
+ * 한 점에 구간이 여럿 겹쳐 적혀 있을 때("오솔길 + 계단") 고르는 차례 — 더 구체적인 길이 이긴다.
+ * 받은 파일은 코스 전체를 덮는 긴 구간(대개 오솔길) 위에 짧은 구간(계단 · 다리 · 밧줄)을 겹쳐 적는다.
+ */
+export const SURFACE_PRIORITY: readonly SurfaceId[] = ["rope", "rock", "bridge", "stairs", "scree", "paved", "trail", "etc"];
+/** 겹친 구간 이름들 → 그 점의 길. 이름이 하나도 없으면 null(조사하지 않은 점) */
+export function surfaceOfNames(names: readonly (string | null | undefined)[]): SurfaceId | null {
+    const ids = names.filter((n): n is string => typeof n === "string" && n.trim().length > 0).map(surfaceIdOf);
+    if (ids.length === 0) return null;
+    return ids.reduce((a, b) => (SURFACE_PRIORITY.indexOf(b) < SURFACE_PRIORITY.indexOf(a) ? b : a));
+}
+/** 코스 길이의 이만큼은 조사돼 있어야 길의 종류를 싣는다 — 모자라면 막대가 거짓이 된다 */
+export const SURFACE_MIN_COVER = 0.6;
 
 export type CourseSurface = readonly (readonly [SurfaceId, number])[];
 

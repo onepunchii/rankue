@@ -144,8 +144,9 @@ export async function getMountainDetail(slug: string): Promise<MountainDetail | 
             from hiking_mountains where slug = ${slug}`);
         if (!m) return null;
         const [own, linked, ownPois] = await Promise.all([
+            // 차례: 정상을 지나는 코스가 먼저(산을 찾아온 사람이 먼저 보는 길 — 북한산은 36개 가운데 셋뿐이다), 그 안에서는
             // 산림청 100대 명산 코스 파일의 코스(frtrl_id 'k100-…' — 그 산의 이름으로 조사한 길 · 길의 종류와 편의 지점이 있다)를 앞에 놓는다
-            rows<any>(sql`select id, seq, km, gain_m, loss_m, min_m, max_m, loop, summit_km, line, surface from hiking_courses where mountain_id = ${m.id} order by (frtrl_id like 'k100-%') desc, frtrl_id, seq`),
+            rows<any>(sql`select id, seq, km, gain_m, loss_m, min_m, max_m, loop, summit_km, line, surface from hiking_courses where mountain_id = ${m.id} order by (summit_km is not null) desc, (frtrl_id like 'k100-%') desc, frtrl_id, seq`),
             // 이웃 봉우리의 코스 가운데 이 산의 정상을 지나는 것(migrations/hiking_course_links.sql) — 표가 아직 없으면 없는 것으로
             rows<any>(sql`
                 select c.id, c.km, c.gain_m, c.loss_m, c.min_m, c.max_m, c.loop, l.summit_km, c.line, c.surface, o.name as via

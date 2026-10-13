@@ -193,10 +193,14 @@ function Courses({ d, canStart, i, onPick }: { d: MountainDetail; canStart?: boo
                     {d.courseList.map((x, k) => (
                         <button key={x.id} type="button" role="tab" aria-selected={k === i} onClick={() => onPick(k)} data-testid={`course-tab-${k + 1}`}
                             className="h-10 shrink-0 rounded-full px-3.5 text-[13.5px]" style={{ background: k === i ? "#F28C6A" : "#FFFFFF14", color: k === i ? "#2A1208" : "#F4EFE3", fontWeight: k === i ? 600 : 400 }}>
-                            코스 {x.seq} · {courseFacts(x).km}
+                            {x.summitKm != null && <span className="mr-1 text-[12px]" aria-label="정상을 지나는 코스">▲</span>}코스 {x.seq} · {courseFacts(x).km}
                         </button>
                     ))}
                 </div>
+            )}
+            {/* 코스가 많은 산(북한산 36 · 금정산 37)은 정상을 지나지 않는 길이 더 많다 — 세모의 뜻을 한 줄로 */}
+            {d.courseList.length > 1 && d.courseList.some((x) => x.summitKm != null) && d.courseList.some((x) => x.summitKm == null) && (
+                <p className="-mt-1 mb-3 text-[12.5px] text-[#F4EFE399]" data-testid="course-summit-legend">▲ 정상을 지나는 코스 {d.courseList.filter((x) => x.summitKm != null).length}개 · 나머지는 능선 · 계곡 · 둘레를 걷는 길</p>
             )}
             <CourseCard key={`card:${c.id}`} c={c} pois={d.pois} />
             {canStart && (

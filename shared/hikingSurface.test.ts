@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { SURFACE_IDS, SURFACE_LABEL, packSurface, readSurface, surfaceIdOf, surfaceNote, surfaceShares } from "./hikingSurface";
+import { SURFACE_IDS, SURFACE_LABEL, SURFACE_PRIORITY, packSurface, readSurface, surfaceIdOf, surfaceNote, surfaceOfNames, surfaceShares } from "./hikingSurface";
 import { HIKING_POI_KINDS, HIKING_POI_NAME, HIKING_POI_ORDER, hikingPoiKindOfGpx, signpostNote } from "./hikingPois";
 import { HIKING_SUMMIT_FIXES } from "./hikingSummitFix";
 
@@ -14,6 +14,19 @@ describe("길의 종류 — 받은 구간 이름을 여덟 가지로", () => {
         for (const [name, id] of Object.entries(seen)) expect(surfaceIdOf(name), name).toBe(id);
         for (const v of ["", "  ", "처음 보는 길", null, undefined]) expect(surfaceIdOf(v as string)).toBe("etc");
         expect(Object.keys(SURFACE_LABEL).sort()).toEqual([...SURFACE_IDS].sort());
+    });
+    it("한 점에 구간이 겹치면 더 구체적인 길 — 긴 오솔길 위에 적힌 계단 · 다리 · 밧줄을 살린다", () => {
+        // 받은 파일의 점 31만 가운데 9만이 "1;3" 꼴이다 — 이것을 못 읽으면 전부 '그 밖'이 된다(설악산 한 코스가 61%였다)
+        expect(surfaceOfNames(["오솔길", "계단"])).toBe("stairs");
+        expect(surfaceOfNames(["오솔길", "포장길", "계단"])).toBe("stairs");
+        expect(surfaceOfNames(["기타", "오솔길", "포장길"])).toBe("paved");
+        expect(surfaceOfNames(["오솔길", "너덜길"])).toBe("scree");
+        expect(surfaceOfNames(["계단", "암릉"])).toBe("rock");
+        expect(surfaceOfNames(["암릉", "밧줄"])).toBe("rope");
+        expect(surfaceOfNames(["오솔길"])).toBe("trail");
+        expect(surfaceOfNames([undefined, "", null])).toBeNull();
+        expect(surfaceOfNames([])).toBeNull();
+        expect([...SURFACE_PRIORITY].sort()).toEqual([...SURFACE_IDS].sort());
     });
     it("코스에 싣는 꼴 — 같은 종류는 더하고, 긴 것부터, 0.01km 아래는 뺀다", () => {
         expect(packSurface([["trail", 1.204], ["stairs", 0.3], ["trail", 0.8], ["bridge", 0.004], ["rock", 0], ["rope", NaN]])).toEqual([["trail", 2], ["stairs", 0.3]]);
@@ -91,8 +104,8 @@ describe("산림청 100대 명산 코스 파일의 지점 — 분류 · 이름 �
 
 describe("고정: 코스의 차례 · 번호 · 길의 종류(소스)", () => {
     const store = code(read("server/storage/hiking.ts"));
-    it("산림청 100대 명산 코스 파일의 코스가 앞에 놓이고, 번호는 놓인 차례대로 1부터(묶음의 순번을 쓰면 '코스 1'이 겹친다)", () => {
-        expect(store).toContain("order by (frtrl_id like 'k100-%') desc, frtrl_id, seq`");
+    it("정상을 지나는 코스가 먼저, 그 안에서 산림청 100대 명산 코스 파일의 코스가 앞에 놓이고, 번호는 놓인 차례대로 1부터(묶음의 순번을 쓰면 '코스 1'이 겹친다)", () => {
+        expect(store).toContain("order by (summit_km is not null) desc, (frtrl_id like 'k100-%') desc, frtrl_id, seq`");
         expect(store).toContain("...own.map((c, i) => ({ ...c, seq: i + 1, via: null })), ...linked.map((c, i) => ({ ...c, seq: own.length + i + 1 }))");
         expect(store).toContain("surface: readSurface(c.surface)");
     });
@@ -112,6 +125,8 @@ describe("고정: 코스의 차례 · 번호 · 길의 종류(소스)", () => {
         expect(imp).toContain("const dup = (existing.get(m.id) ?? []).find((e) => sameRoute(main.line, s.km, e.line, e.km));");
         expect(imp).toContain("const kind = hikingPoiKindOfGpx(w.category, w.name);");
         expect(imp).toContain("if (s.maxM === 0 && s.minM === 0) { flat++; return; }");
+        expect(imp).toContain("const kind = surfaceOfNames(main.s[k].rt.split(\";\").map((c) => file.rtName.get(c)));");
+        expect(imp).toContain("surface: covered ? packSurface(parts) : null,");
         expect(imp).toContain("const skipFolder = new Set(far.filter((x) => x.km > FOLDER_FAR_KM).map((x) => x.f));");
         expect(imp).not.toMatch(/update hiking_mountains[^`]*\b(name|slug)\s*=/);
         expect(imp).not.toMatch(/delete from/i);
