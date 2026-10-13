@@ -323,7 +323,7 @@ describe("좌표는 받지도 저장하지도 내보내지도 않는다", () => 
         expect(code(read("shared/hikingPhotos.ts"))).not.toMatch(/\blat\b|\blng\b|latitude|longitude/);
     });
     it("올릴 때 사진 정보를 걷는다 — 알아볼 수 없는 파일은 받지 않는다", () => {
-        expect(read("server/routes/modules/member.ts")).toContain("(GOLF_PHOTO_CATEGORIES.has(safeCat) || HIKING_PHOTO_CATEGORIES.has(safeCat)) && !clean.type");
+        expect(read("server/routes/modules/member.ts")).toContain("(GOLF_PHOTO_CATEGORIES.has(safeCat) || HIKING_PHOTO_CATEGORIES.has(safeCat) || FISHING_PHOTO_CATEGORIES.has(safeCat)) && !clean.type");
         expect(read("client/src/hiking/photos/photoApi.ts")).toContain("canvas.toDataURL(");
     });
 });

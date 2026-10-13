@@ -14,7 +14,7 @@ import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
 import { fishingAllowed } from "../../lib/fishingAccess.js";
-import { cleanCatch, fishingKstDay, type FishingCatch, type FishingPlace } from "../../../shared/fishing.js";
+import { FISHING_PHOTO_CATEGORY, FISHING_THUMB_CATEGORY, cleanCatch, fishingKstDay, isOwnFishingPhotoUrl, type FishingCatch, type FishingPlace } from "../../../shared/fishing.js";
 
 const router = Router();
 const rowsOf = (r: any) => (r.rows ?? r) as any[];
@@ -30,7 +30,9 @@ const gate = asyncHandler(async (req: AuthRequest, res: any, next: any) => {
 
 const view = (r: any): FishingCatch => ({
     id: String(r.id), day: String(r.fished_on), place: String(r.place), spot: r.spot ?? null, species: String(r.species),
-    lengthCm: r.length_cm == null ? null : Number(r.length_cm), count: Number(r.fish_count) || 1, note: r.note ?? null,
+    lengthCm: r.length_cm == null ? null : Number(r.length_cm), count: Number(r.fish_count) || 1,
+    weightKg: r.weight_kg == null ? null : Number(r.weight_kg), ji: r.ji == null ? null : Number(r.ji), released: r.released === true,
+    photoUrl: r.photo_url ?? null, thumbUrl: r.thumb_url ?? null, note: r.note ?? null,
     createdAt: new Date(r.created_at).toISOString(),
 });
 
@@ -44,9 +46,13 @@ router.post("/catches", requireAuth, gate, asyncHandler(async (req: AuthRequest,
     const c = cleanCatch(req.body, fishingKstDay(Date.now()));
     if (!c.ok) return sendError(res, 400, c.error);
     const v = c.value;
+    // 사진은 둘 다 있거나 둘 다 없다 — 그리고 이 회원이 우리 저장소에 올린 것만
+    if (v.photoUrl || v.thumbUrl) {
+        if (!isOwnFishingPhotoUrl(v.photoUrl, req.userId!, FISHING_PHOTO_CATEGORY) || !isOwnFishingPhotoUrl(v.thumbUrl, req.userId!, FISHING_THUMB_CATEGORY)) return sendError(res, 400, "사진 주소가 올바르지 않아요");
+    }
     const [row] = rowsOf(await db.execute(sql`
-        insert into fishing_catches (member_id, fished_on, place, spot, species, length_cm, fish_count, note)
-        values (${req.userId!}, ${v.day}, ${v.place}, ${v.spot}, ${v.species}, ${v.lengthCm}, ${v.count}, ${v.note}) returning *`));
+        insert into fishing_catches (member_id, fished_on, place, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url, thumb_url, note)
+        values (${req.userId!}, ${v.day}, ${v.place}, ${v.spot}, ${v.species}, ${v.lengthCm}, ${v.count}, ${v.weightKg}, ${v.ji}, ${v.released}, ${v.photoUrl}, ${v.thumbUrl}, ${v.note}) returning *`));
     return sendSuccess(res, view(row));
 }));
 

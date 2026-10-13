@@ -54,6 +54,15 @@ export interface FishingCatch {
     lengthCm: number | null;
     /** 마릿수 */
     count: number;
+    /** 가장 큰 것의 무게(kg) — 무늬오징어 · 문어처럼 무게로 말하는 어종 */
+    weightKg: number | null;
+    /** 갈치의 굵기(지 — 손가락 너비) */
+    ji: number | null;
+    /** 놓아 줬는가 */
+    released: boolean;
+    /** 사진(우리 저장소의 주소) — 나만 본다 */
+    photoUrl: string | null;
+    thumbUrl: string | null;
     note: string | null;
     createdAt: string;
 }
@@ -78,7 +87,12 @@ export function cleanCatch(raw: unknown, today: string): { ok: true; value: Fish
     if (len != null && !(len >= 1 && len <= 400)) return { ok: false, error: "길이는 1~400cm 로 적어 주세요" };
     const spot = FISHING_SPOTS.some((s) => s.id === o.spot) ? (o.spot as FishingSpotId) : null;
     const note = text(o.note, 200) || null;
-    return { ok: true, value: { day, place, spot, species, lengthCm: len, count, note } };
+    const kg = o.weightKg == null || o.weightKg === "" ? null : Math.round(Number(o.weightKg) * 100) / 100;
+    if (kg != null && !(kg >= 0.05 && kg <= 300)) return { ok: false, error: "무게는 0.05~300kg 으로 적어 주세요" };
+    const ji = o.ji == null || o.ji === "" ? null : Math.round(Number(o.ji));
+    if (ji != null && !(ji >= 1 && ji <= 10)) return { ok: false, error: "갈치 굵기는 1~10지로 적어 주세요" };
+    const url = (v: unknown) => (typeof v === "string" && v ? v : null);
+    return { ok: true, value: { day, place, spot, species, lengthCm: len, count, weightKg: kg, ji, released: o.released === true, photoUrl: url(o.photoUrl), thumbUrl: url(o.thumbUrl), note } };
 }
 
 export interface FishingSummary {
@@ -140,5 +154,23 @@ export const fishingSidoShort = (sido: string | null | undefined): string => {
     const s = String(sido ?? "");
     return SIDO_SHORT[s] ?? s.replace(/(특별시|광역시|특별자치시|특별자치도|도)$/, "");
 };
+
+/* ── 조과 사진 — 올리는 길은 다른 사진과 같다(POST /api/hiq/upload · 기기에서 다시 그려 위치 꼬리표가 떨어진다) ── */
+export const FISHING_PHOTO_CATEGORY = "fishing-photo";
+export const FISHING_THUMB_CATEGORY = "fishing-thumb";
+export const FISHING_PHOTO_CATEGORIES: ReadonlySet<string> = new Set([FISHING_PHOTO_CATEGORY, FISHING_THUMB_CATEGORY]);
+/** 긴 변(px) · 품질 */
+export const FISHING_PHOTO_LONG_SIDE = 1600;
+export const FISHING_THUMB_LONG_SIDE = 480;
+const FISHING_BLOB_HOST = /^[a-z0-9-]+\.public\.blob\.vercel-storage\.com$/i;
+/** 이 주소가 우리 업로드 길이 **이 회원에게** 만든 낚시 사진인가 — 남의 사진 · 바깥 주소를 내 조과에 붙이지 못하게 */
+export function isOwnFishingPhotoUrl(url: unknown, memberId: string, category: string): url is string {
+    if (typeof url !== "string" || url.length > 400 || !FISHING_PHOTO_CATEGORIES.has(category)) return false;
+    let u: URL;
+    try { u = new URL(url); } catch { return false; }
+    if (u.protocol !== "https:" || !FISHING_BLOB_HOST.test(u.hostname) || u.search || u.hash) return false;
+    if (!/^[0-9a-f-]{8,40}$/i.test(memberId)) return false;
+    return new RegExp(`^/hiq/${category}/${memberId}-[A-Za-z0-9]{6,64}\\.(webp|jpg|png)$`, "i").test(u.pathname);
+}
 
 export const fishingKstDay = (ms: number): string => new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);

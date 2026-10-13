@@ -5,7 +5,7 @@ import { FISHING_PUBLIC, FISHING_SPECIES, FISHING_SPOTS, fishingSidoShort, clean
 
 const TODAY = "2026-10-14";
 const ok = (over: Record<string, unknown> = {}) => cleanCatch({ day: "2026-10-12", place: " 여수  국동항 ", spot: "boat", species: "갈치", count: "12", lengthCm: "92.46", note: " 물때 8물 ", ...over }, TODAY);
-const row = (over: Partial<FishingCatch>): FishingCatch => ({ id: "x", day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: null, count: 1, note: null, createdAt: "2026-10-12T00:00:00.000Z", ...over });
+const row = (over: Partial<FishingCatch>): FishingCatch => ({ id: "x", day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: null, count: 1, weightKg: null, ji: null, released: false, photoUrl: null, thumbUrl: null, note: null, createdAt: "2026-10-12T00:00:00.000Z", ...over });
 
 describe("낚시는 아직 닫혀 있다", () => {
     it("전면 공개 스위치는 꺼져 있고, 문은 역할(슈퍼관리자)로만 연다 — 번호 · 이메일로 가르지 않는다", () => {
@@ -16,13 +16,17 @@ describe("낚시는 아직 닫혀 있다", () => {
         // 길마다 문지기를 거친다
         const routes = readFileSync(resolve(__dirname, "../server/routes/modules/fishing.ts"), "utf8");
         expect(routes.match(/requireAuth, gate,/g)).toHaveLength(4);
+        // 조과에 붙는 사진은 이 회원이 우리 저장소에 올린 것만
+        expect(routes).toContain("isOwnFishingPhotoUrl(v.photoUrl, req.userId!, FISHING_PHOTO_CATEGORY)");
     });
 });
 
 describe("조과 한 줄 다듬기", () => {
     it("앞뒤 공백을 걷고, 길이는 소수 한 자리로", () => {
         const c = ok();
-        expect(c).toEqual({ ok: true, value: { day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: 92.5, count: 12, note: "물때 8물" } });
+        expect(c).toEqual({ ok: true, value: { day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: 92.5, count: 12, weightKg: null, ji: null, released: false, photoUrl: null, thumbUrl: null, note: "물때 8물" } });
+        expect(ok({ weightKg: "1.234", ji: "4", released: true })).toMatchObject({ ok: true, value: { weightKg: 1.23, ji: 4, released: true } });
+        for (const bad of [{ weightKg: 0 }, { weightKg: 301 }, { ji: 0 }, { ji: 11 }]) expect(ok(bad).ok, JSON.stringify(bad)).toBe(false);
     });
     it("길이 · 갈래 · 한마디는 비워도 된다", () => {
         expect(ok({ lengthCm: "", spot: "space", note: "" })).toMatchObject({ ok: true, value: { lengthCm: null, spot: null, note: null } });
