@@ -12,7 +12,7 @@
  *
  * ⚠️ 리터럴 색만(StampParts 머리말). 글자 12px 이상.
  */
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
 import { STAMP_ALL_OPEN, STAMP_INVITE_TOTAL, STAMP_OPEN_TOTAL } from "@shared/golfStampBooks";
@@ -24,6 +24,11 @@ import { StampGuide, StampHelpButton, StampHelpSheet } from "@/golf/stamps/Stamp
 import { BookCover, BookWide, MarkerArt, MarkerCatalog, SHELF_PATH, STAMPS_PATH, SampleJoin, SampleNotice, StampBar, StampSection, bookName, bookPath } from "@/golf/stamps/StampParts";
 import { useSeo } from "@/hooks/useSeo";
 import { stampsHubSeo } from "@shared/golfStampGuide";
+import { useScanEntry } from "@/golf/lib/scanEntry";
+import { ScanRoundSheet } from "@/golf/components/scan/ScanRoundSheet";
+
+/** 도장이 없는 회원에게 '이렇게 채워진다'를 한 번 저절로 보여 줬는가(기기마다) */
+const FIRST_LOOK_KEY = "rankue-golf-stamp-first-look";
 
 export default function StampBooks() {
     // 검색 · 공유의 제목과 설명 — 검색용 화면(server/seo/golfStamps)과 같은 글(shared/golfStampGuide)
@@ -36,10 +41,23 @@ export default function StampBooks() {
     const [help, setHelp] = useState(false);
     // 회원인데 아직 도장이 없다 — 내 도장첩(빈 칸)을 그대로 보여 주되, 다 모은 모습으로 가는 한 줄을 맨 위에 둔다
     const fresh = !col.isGuest && !col.isLoading && summary.stamped === 0;
+    // 아무것도 없는 화면부터 보면 하고 싶지 않다 — 처음 한 번은 다 모은 모습(예시)을 먼저 띄운다(2026-10-14 오너: "하고 싶게 만드는 게 중요해").
+    // 거기서 바로 스코어카드를 올려 시작할 수 있다. 기기마다 한 번만 — 그 뒤로는 맨 위의 한 줄과 '?' 단추가 같은 창을 연다.
+    const scan = useScanEntry(!col.isGuest);
+    const [scanOpen, setScanOpen] = useState(false);
+    useEffect(() => {
+        if (!fresh) return;
+        try {
+            if (localStorage.getItem(FIRST_LOOK_KEY)) return;
+            localStorage.setItem(FIRST_LOOK_KEY, "1");
+        } catch { return; }
+        setHelp(true);
+    }, [fresh]);
 
     return (
         <CourseShell title="도장깨기" backTo="/dashboard" hideBottomCta right={<StampHelpButton onClick={() => setHelp(true)} />}>
-            <StampHelpSheet open={help} onOpenChange={setHelp} />
+            <StampHelpSheet open={help} onOpenChange={setHelp} onStart={fresh && scan.available ? () => { setHelp(false); setScanOpen(true); } : undefined} />
+            {scanOpen && <ScanRoundSheet onClose={() => setScanOpen(false)} />}
             {col.isLoading ? (
                 <div className="px-5 pt-6 space-y-4" aria-busy="true">
                     <Skel className="h-24" />

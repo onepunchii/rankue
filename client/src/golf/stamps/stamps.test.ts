@@ -120,8 +120,12 @@ describe("예시와 내 도장첩", () => {
         for (const p of ["client/src/golf/pages/StampBooks.tsx", "client/src/golf/pages/StampBook.tsx", "client/src/golf/pages/GolfShelf.tsx"]) {
             const s = code(read(p));
             expect(s, p).toContain("right={<StampHelpButton onClick={() => setHelp(true)} />}");
-            expect(s, p).toContain("<StampHelpSheet open={help} onOpenChange={setHelp} />");
+            expect(s, p).toContain("<StampHelpSheet open={help} onOpenChange={setHelp}");
         }
+        // 도장이 없는 회원에게는 처음 한 번 저절로 뜨고, 거기서 스코어카드 올리기로 이어진다(2026-10-14 오너: "하고 싶게 만드는 게 중요해")
+        const books = code(read("client/src/golf/pages/StampBooks.tsx"));
+        expect(books).toContain("localStorage.setItem(FIRST_LOOK_KEY");
+        expect(books).toContain("onStart={fresh && scan.available ?");
         const help = code(read("client/src/golf/stamps/StampHelp.tsx"));
         expect(help).toContain('aria-label="도장깨기 안내"');
         // 기기의 '뒤로'가 시트부터 닫는다

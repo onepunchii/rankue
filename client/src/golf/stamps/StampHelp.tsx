@@ -76,7 +76,8 @@ const head = (title: string, sample = false) => (
     </h3>
 );
 
-export function StampHelpSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+/** onStart: 맨 아래의 '시작하기' 단추(스코어카드 올리기) — 줄 때만 보인다. 도장이 없는 회원에게 저절로 뜬 창에서 바로 시작하게 */
+export function StampHelpSheet({ open, onOpenChange, onStart }: { open: boolean; onOpenChange: (open: boolean) => void; onStart?: () => void }) {
     useBackToClose(open, () => onOpenChange(false));
     const book = FULL_SAMPLE_STATES.find((s) => s.book.id === GUIDE_BOOK)!;
     const art = BOOK_ART[GUIDE_BOOK];
@@ -123,6 +124,15 @@ export function StampHelpSheet({ open, onOpenChange }: { open: boolean; onOpenCh
                     <div className="mt-3"><TrophyShelf stamped={FULL_SAMPLE_SUMMARY.stamped} /></div>
                     <p className="mt-3 text-[13px] leading-snug text-[#FFFFFF8C] break-keep">볼마커는 도장첩마다 하나, 트로피는 찍은 엘리트 골프장 수로 받아요.</p>
                 </div>
+                {onStart && (
+                    <div className="shrink-0 border-t border-[#FFFFFF14] bg-[#0A0A0A] px-5 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
+                        <button type="button" onClick={onStart} data-testid="stamp-help-start" data-track-as="golf-stamp-start"
+                            className="flex h-[52px] w-full items-center justify-center rounded-2xl bg-[#64DD17] text-[15px] font-semibold text-[#051907] active:bg-[#58C414]">
+                            스코어카드 올리고 시작하기
+                        </button>
+                        <p className="mt-2 text-center text-[12px] text-[#FFFFFF80]">스코어카드를 올리면 라운드가 기록되고, 도장첩에 있는 골프장이면 도장이 찍혀요</p>
+                    </div>
+                )}
             </SheetContent>
         </Sheet>
     );
