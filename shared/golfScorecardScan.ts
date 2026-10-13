@@ -377,6 +377,7 @@ export const SCAN_COPY = {
     accept: "스마트스코어처럼 앱이 만든 스코어카드만 읽어요. 손으로 적은 카드는 읽지 않아요.",
     pick: "스코어카드 그림 고르기",
     privacy: "그림은 읽는 동안만 쓰고 저장하지 않아요.",
+    abroad: "글자를 읽으려고 그림을 해외의 AI 서비스로 보내요. 원하지 않으면 올리지 말고 직접 적어 주세요.",
     reading: "카드를 읽고 있어요",
     states: { ok: "확정", check: "확인 필요", empty: "빈칸" } as Record<CellState, string>,
     why: { sum: "아홉 홀 합이 카드와 달라요", sign: "버디 표시에 − 가 가려졌을 수 있어요", derived: "가려진 칸이라 카드의 합에서 계산했어요" } as Record<CellWhy, string>,

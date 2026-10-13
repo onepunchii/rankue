@@ -59,8 +59,11 @@ function halfSum(cells: readonly Cell[], from: number, chk: SumCheck) {
     return { now, want, ok: now != null && want != null ? now === want : null };
 }
 
-/** 카드의 날짜(YYYY-MM-DD) → "10월 13일" */
-const dayLabel = (day: string | null) => { const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(day ?? ""); return m ? `${Number(m[1])}월 ${Number(m[2])}일` : null; };
+/**
+ * 카드의 날짜(YYYY-MM-DD) → "2017년 10월 13일". 해를 꼭 적는다 — 옛 카드가 올해 것처럼 보이면 안 된다
+ * (오너: "2017년 일자면 해당 일자로 — 지금은 올해만 되는 것 같은데": 날짜는 그 날로 남고 있었는데 화면이 해를 빼고 적었다).
+ */
+const dayLabel = (day: string | null) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(day ?? ""); return m ? `${m[1]}년 ${Number(m[2])}월 ${Number(m[3])}일` : null; };
 
 const COLS = "grid grid-cols-[58px_repeat(9,minmax(0,1fr))_34px]";
 
@@ -296,6 +299,7 @@ export function ScanSheet({ matchId, players, pars: roomPars, parKnown: roomKnow
                         <li>· {SCAN_COPY.accept}</li>
                         <li>· 카드 전체가 나온 그림이 가장 잘 읽혀요.</li>
                         <li>· {SCAN_COPY.privacy}</li>
+                        <li>· {SCAN_COPY.abroad}</li>
                     </ul>
                 </div>
             )}
@@ -332,7 +336,7 @@ export function ScanSheet({ matchId, players, pars: roomPars, parKnown: roomKnow
                             <ScorecardBand
                                 title={round ? (card?.club?.name ?? card?.clubRead ?? "읽은 스코어카드") : "읽은 스코어카드"}
                                 sub={round
-                                    ? [[card?.front ?? card?.coursesRead?.[0], card?.back ?? card?.coursesRead?.[1]].filter(Boolean).join(" → "), cardDay ?? "오늘"].filter(Boolean).join(" · ")
+                                    ? [[card?.front ?? card?.coursesRead?.[0], card?.back ?? card?.coursesRead?.[1]].filter(Boolean).join(" → "), cardDay ?? "날짜를 못 읽어 오늘로 남아요"].filter(Boolean).join(" · ")
                                     : cardDay ? `카드의 날짜 · ${cardDay}` : "카드와 견줘 보세요"}
                                 right={round && card?.club ? <button type="button" onClick={() => setClubAsk((v) => !v)} className="shrink-0 rounded-full bg-[#050505B3] px-3 py-1.5 text-[12px] text-[#FFFFFFCC]" data-testid="scan-club-change">골프장 바꾸기</button> : undefined}
                             />
