@@ -22,7 +22,11 @@ export function OpenTeeHome() {
     const rows = useMemo(() => {
         const today = kstDay(now);
         // 기기에 남은 옛 답을 그리지 않게 한 번 더 거른다
-        return (q.data ?? []).filter((t) => t.day >= today && now - t.checkedAt <= FRESH_MS && teeStillAhead(t.day, t.time, now)).slice(0, ROWS);
+        const live = (q.data ?? []).filter((t) => t.day >= today && now - t.checkedAt <= FRESH_MS && teeStillAhead(t.day, t.time, now));
+        // 홈의 다섯 줄은 골프장마다 한 줄씩 먼저(받은 순서 = 새로 나온 것 · 가까운 날 먼저) — 한 곳의 이른 티 셋이 홈을 다 차지하지 않게
+        const seen = new Set<string>();
+        const first = live.filter((t) => (seen.has(t.slug) ? false : (seen.add(t.slug), true)));
+        return [...first, ...live.filter((t) => !first.includes(t))].slice(0, ROWS);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [q.data]);
     if (!rows.length) return null;

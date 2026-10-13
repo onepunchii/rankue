@@ -171,6 +171,8 @@ describe("지키는 것 — 서버 · 화면", () => {
         expect(card).toContain("teeStillAhead(d.day, t.time, now)");
         const home = read("client/src/golf/components/dashboard/OpenTeeHome.tsx");
         expect(home).toContain("now - t.checkedAt <= FRESH_MS && teeStillAhead(t.day, t.time, now)");
+        // 홈의 다섯 줄은 골프장마다 한 줄씩 먼저 — 한 곳의 이른 티 셋이 홈을 다 차지하지 않게
+        expect(home).toContain("const first = live.filter((t) => (seen.has(t.slug) ? false : (seen.add(t.slug), true)));");
         expect(home).toContain("if (!rows.length) return null;");
         const api = read("client/src/golf/lib/courseApi.ts");
         expect(api).toContain('export const OPEN_TEES_KEY = "golf-open-tees";');
