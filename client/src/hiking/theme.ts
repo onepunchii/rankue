@@ -23,6 +23,12 @@ export const HK = {
 /** 길 위의 지점의 색 — 종이 위(높낮이 그림)와 짙은 바탕 둘 다에서 읽히는 값 */
 export const POI_COLOR: Readonly<Record<string, string>> = {
     SIGN: "#3F8FA3", DANGER: "#E0533B", SHELTER: "#3D7BE0", WILD: "#4FA35A", CULTURAL: "#B07A3A", GRID: "#8E7CC3", MARK: "#8A979B",
+    // 산림청 100대 명산 코스 파일의 편의 지점(2026-10-13)
+    ENTRY: "#F28C6A", PARK: "#5C6F7B", BUS: "#2E9E8F", TOILET: "#6A5ACD", WATER: "#1F9BD1", VIEW: "#D9A441", PEAK: "#7A5230", REST: "#9BAA5B",
+};
+/** 길의 종류의 색(shared/hikingSurface) — 종이 위의 막대. 이름과 퍼센트를 늘 같이 적는다(색만으로 가르지 않는다) */
+export const SURFACE_COLOR: Readonly<Record<string, string>> = {
+    trail: "#3F7D58", stairs: "#D9A441", scree: "#8A7F6A", paved: "#9AA7AB", rock: "#C8553D", bridge: "#1F5560", rope: "#7A2E1E", etc: "#C9C2B0",
 };
 
 /** 권역 표지 그림 · 허브 그림(client/public/hiking/art) — 그림에는 글자가 없다 */

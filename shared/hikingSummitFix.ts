@@ -10,13 +10,16 @@
  *   · 둘 다 아니면 그 산 이름의 코스 묶음에서 가장 높은 점(by: "track") — 소백산 비로봉 · 두타산 · 천성산 원효봉.
  *   · 정상이 막혀 있어 사람이 서는 곳이 따로 있는 산은 그 자리(공식 값이 그 자리다) — 한라산 동릉 · 무등산 서석대 · 계룡산 관음봉 · 화악산 중봉.
  * 높이는 고치지 않는다(우리 값이 최근 측량값에 더 가깝다 — 한라산 1,947m 등).
+ *   · 산림청 100대 명산 코스 파일(같은 날 오너가 받아 준 607개)의 '봉우리' 지점이 그 산의 정상 이름 · 높이로 다른 자리를 가리키면 그 자리(by: "peak") —
+ *     청량산: 우리 자리는 장인봉(정상 · 870m)에서 1.6km 동쪽이었다. 그 파일로 100곳을 다시 보니 95곳은 정상 150m 안을 코스가 지난다.
+ *     나머지: 명성산(받은 코스가 삼각봉에서 끝난다 — 자리는 그대로) · 점봉산(걸을 수 있는 길이 곰배령까지다) · 대암산(높이 기록이 없는 선) · 천성산(그 폴더의 길은 토곡산이다).
  * 판정하지 못해 그대로 둔 산: 대야산 · 내연산 · 백운산(정선) · 점봉산 · 깃대봉(홍도) — 지나는 기록이 없고 공식 좌표는 이웃 봉우리를 가리킨다.
  *
  * 적재(server/scripts/hiking-import.ts)가 산 자료를 읽은 바로 뒤에 이 표를 덮어쓴다 — 다시 적재해도 고친 자리가 남는다.
  * was 는 고치기 전 자리와의 거리(m) — 기록용.
  * ⚠️ 서버가 임포트하는 shared 파일 — 상대 임포트는 반드시 './x.js'.
  */
-export interface SummitFix { id: string; name: string; lat: number; lng: number; by: "official" | "track"; was: number }
+export interface SummitFix { id: string; name: string; lat: number; lng: number; by: "official" | "track" | "peak"; was: number }
 
 export const HIKING_SUMMIT_FIXES: readonly SummitFix[] = [
     { id: "Q626912", name: "방태산", lat: 37.88814, lng: 128.39034, by: "official", was: 3138 },
@@ -33,6 +36,7 @@ export const HIKING_SUMMIT_FIXES: readonly SummitFix[] = [
     { id: "Q625589", name: "소백산", lat: 36.95749, lng: 128.48482, by: "track", was: 572 },
     { id: "Q5317235", name: "두타산", lat: 37.4272, lng: 129.00574, by: "track", was: 22392 },
     { id: "Q5091685", name: "천성산", lat: 35.40124, lng: 129.10606, by: "track", was: 15364 },
+    { id: "Q5091652", name: "청량산", lat: 36.79442, lng: 128.90884, by: "peak", was: 1648 },
 ];
 
 /** 산 자료의 한 줄에 고친 자리를 덮어쓴다 — 이름이 다르면(자료의 id 가 바뀌었으면) 건드리지 않는다 */

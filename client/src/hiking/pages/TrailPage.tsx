@@ -35,7 +35,7 @@ import { setVoiceOn, speakLine, voiceOn } from "../trail/speak";
 import { MY_TRIPS_KEY, dropKeptTrail, keepTrail, readKeptTrail, useTrail } from "../trail/useTrail";
 
 /** 앞에 알려 줄 지점 — 국가지점번호 · 그 밖의 표지는 '다음'에 넣지 않는다(국가지점번호는 아래에 따로) */
-const NEXT_KINDS: readonly HikingPoiKind[] = ["SIGN", "DANGER", "SHELTER", "CULTURAL", "WILD"];
+const NEXT_KINDS: readonly HikingPoiKind[] = ["SIGN", "DANGER", "SHELTER", "WATER", "TOILET", "VIEW", "PEAK", "CULTURAL", "WILD"];
 /** 걸은 시간 — 분까지 그대로("1시간 42분" · "23분"). durationText 는 어림값(5분 단위)이라 여기에는 쓰지 않는다 */
 const clock = (ms: number) => { const m = Math.max(0, Math.round(ms / 60_000)); return m >= 60 ? `${Math.floor(m / 60)}시간${m % 60 ? ` ${m % 60}분` : ""}` : `${m}분`; };
 

@@ -14,7 +14,7 @@ describe("100대 명산 — 정상 자리 바로잡기", () => {
             expect(f.lat, f.name).toBeGreaterThan(33); expect(f.lat, f.name).toBeLessThan(38.7);
             expect(f.lng, f.name).toBeGreaterThan(124.5); expect(f.lng, f.name).toBeLessThan(131);
             expect(f.was, f.name).toBeGreaterThan(150);
-            expect(["official", "track"]).toContain(f.by);
+            expect(["official", "track", "peak"]).toContain(f.by);
         }
     });
     it("알려진 자리와 맞는다 — 한라산은 사람이 서는 동쪽 정상, 속리산 천왕봉 · 월악산 영봉 · 소백산 비로봉", () => {

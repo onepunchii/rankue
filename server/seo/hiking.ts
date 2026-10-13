@@ -9,6 +9,7 @@ import type { MountainDetail, MountainSummary } from "../storage/hiking.js";
 import { HIKING_GROUPS, HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, heightText, hikingGroup, hikingRegion, inHikingGroup, mountainPlace } from "../../shared/hikingMountains.js";
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "../../shared/hikingGuide.js";
 import { HIKING_POI_NAME, hikingPoiTitle, type HikingPoiKind } from "../../shared/hikingPois.js";
+import { SURFACE_COPY, surfaceShares } from "../../shared/hikingSurface.js";
 import {
     COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, HIKING_CTA, HIKING_GRADE_NOTE, HIKING_H1, HIKING_HUB_PATH, HIKING_NAV_LABEL, HIKING_PACK_INTRO, HIKING_PACK_LABEL, HIKING_PACK_PATH, HIKING_PACK_SEO,
     HIKING_PIN_NOTE, HIKING_STAMPS_INTRO, HIKING_STAMPS_PATH, HIKING_STAMPS_SEO, HIKING_TAGLINE, MOUNTAIN_LABEL, MOUNTAIN_PATCH_NOTE, OSM_NOTE,
@@ -128,7 +129,11 @@ function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: n
         const on = d.pois.filter((p) => p.courseId === c.id);
         const count = (k: HikingPoiKind) => on.filter((p) => p.kind === k).length;
         const bits = [`거리 ${f.km}`, `오르막 ${f.gain}`, `걷는 시간 ${f.time}`, courseShape(c), `해발 ${c.minM.toLocaleString("en-US")}~${c.maxM.toLocaleString("en-US")}m`,
-            count("SIGN") ? `갈림길 ${count("SIGN")}곳` : "", count("DANGER") ? `위험 구간 ${count("DANGER")}곳` : "", count("SHELTER") ? `대피소 ${count("SHELTER")}곳` : ""].filter(Boolean);
+            count("SIGN") ? `갈림길 ${count("SIGN")}곳` : "", count("DANGER") ? `위험 구간 ${count("DANGER")}곳` : "", count("SHELTER") ? `대피소 ${count("SHELTER")}곳` : "",
+            // 화면의 칩과 같은 것 — 채비에 쓰는 지점(산림청 100대 명산 코스 파일에서 온 코스에만 있다)
+            ...(["PARK", "TOILET", "WATER", "VIEW"] as const).map((k) => (count(k) ? `${HIKING_POI_NAME[k]} ${count(k)}곳` : "")),
+            // 화면의 '어떤 길을 걷나' 막대와 같은 숫자
+            ...(() => { const s = surfaceShares(c.surface); return s.length ? [`${SURFACE_COPY.title}: ${s.map((x) => `${x.label} ${x.pct}%`).join(", ")}(${SURFACE_COPY.source})`] : []; })()].filter(Boolean);
         return `      <li><strong>${esc(`코스 ${c.seq}`)}</strong> — ${esc(bits.join(" · "))}${c.via ? ` ${esc(courseViaNote(c.via))}` : ""}</li>`;
     });
     // 위치 — 화면의 '위치 · 들머리' 구역과 같은 말(시도 · 시군구 · 동)

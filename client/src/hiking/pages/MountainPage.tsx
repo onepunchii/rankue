@@ -21,7 +21,8 @@ import { useToast } from "@/hooks/use-toast";
 import { hubCard } from "@shared/ogCards";
 import { heightText, hikingMountainPath, hikingRegion, hikingRegionPath, mountainPlace } from "@shared/hikingMountains";
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "@shared/hikingGuide";
-import { HIKING_POI_NAME, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
+import { HIKING_POI_NAME, HIKING_POI_ORDER, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
+import { SURFACE_COPY, surfaceNote, surfaceShares } from "@shared/hikingSurface";
 import { COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, MOUNTAIN_LABEL, OSM_NOTE, courseFacts, courseShape, courseViaNote, kmRange, listNames, mountainSeo } from "@shared/hikingPage";
 import { MOUNTAIN_AROUND_LABEL, MOUNTAIN_SECTIONS, NEARBY_DIAL_MIN, fromMeText, nearbyDialItems, shortestCourse } from "@shared/hikingAround";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
@@ -44,7 +45,7 @@ import { summitReach, summitRewards } from "@shared/hikingStamps";
 import { MountainPhotos } from "../photos/MountainPhotos";
 import { HIKING_PHOTOS_ANCHOR, HIKING_PHOTO_LABEL } from "@shared/hikingPhotos";
 import { stampDate } from "../lib/date";
-import { POI_COLOR, hikingCover } from "../theme";
+import { POI_COLOR, SURFACE_COLOR, hikingCover } from "../theme";
 import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi } from "../lib/api";
 import { useMyLocation } from "../lib/useMyLocation";
 
@@ -64,8 +65,10 @@ const LEVEL_STYLE: Readonly<Record<CourseLevelId, { background: string; color: s
     hard: { background: "#D8492F24", color: "#A2321C" },
 };
 
-/** 길 위의 지점을 고르는 칩 — 갈림길은 수가 많아 맨 뒤 */
-const POI_ORDER: readonly HikingPoiKind[] = ["DANGER", "SHELTER", "WILD", "CULTURAL", "GRID", "MARK", "SIGN"];
+/** 길 위의 지점을 고르는 칩의 차례 — 조심할 곳 · 채비(들머리 · 주차 · 화장실 · 물) · 쉬고 보는 곳 · 그 밖, 갈림길은 수가 많아 맨 뒤(shared/hikingPois) */
+const POI_ORDER = HIKING_POI_ORDER;
+/** 처음에는 접어 두는 종류 — 수가 많고 이름이 비슷하다(갈림길 · 쉼터 · 표지). 칩을 누르면 그 종류만 보인다 */
+const POI_QUIET: readonly HikingPoiKind[] = ["SIGN", "REST", "MARK", "GRID"];
 
 function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi[] }) {
     const f = courseFacts(c);
@@ -75,7 +78,9 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
     const kinds = POI_ORDER.filter((k) => on.some((p) => p.kind === k));
     const [kind, setKind] = useState<HikingPoiKind | null>(null);
     const [all, setAll] = useState(false);
-    const shown = on.filter((p) => (kind ? p.kind === kind : p.kind !== "SIGN" || on.length <= POI_FIRST));
+    const shown = on.filter((p) => (kind ? p.kind === kind : !POI_QUIET.includes(p.kind) || on.length <= POI_FIRST));
+    const surface = useMemo(() => surfaceShares(c.surface), [c.surface]);
+    const surfaceTip = surfaceNote(surface);
     const list = all ? shown : shown.slice(0, POI_FIRST);
     return (
         <div className="overflow-hidden rounded-[20px] bg-[#F4EFE3] text-[#0E2A33]" style={{ boxShadow: "0 6px 16px rgba(0,0,0,0.28)" }} data-testid={`course-${c.id}`}>
@@ -117,6 +122,27 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
                 </dl>
             </div>
             <p className="px-4 pt-1.5 text-[12px] leading-snug text-[#0E2A3380] break-keep">흰 점에서 출발해 검은 점까지 · 위가 북쪽{c.summitKm != null ? " · 세모가 정상" : ""}</p>
+            {surface.length > 0 && (
+                // 어떤 길을 걷나 — 조사한 구간의 종류를 길이의 몫으로. 색 옆에 이름과 퍼센트를 늘 적는다
+                <div className="mt-3 border-t border-[#0E2A331A] px-4 pt-3" data-testid="course-surface">
+                    <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-[14.5px] font-semibold">{SURFACE_COPY.title}</p>
+                        <p className="shrink-0 text-[12px] text-[#0E2A3380]">{SURFACE_COPY.source}</p>
+                    </div>
+                    <div className="mt-2 flex h-3 gap-[2px] overflow-hidden rounded-full" role="img" aria-label={surface.map((s) => `${s.label} ${s.pct}%`).join(", ")}>
+                        {surface.map((s) => <span key={s.id} className="h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${s.pct}%`, minWidth: 3, background: SURFACE_COLOR[s.id] }} />)}
+                    </div>
+                    <ul className="mt-2 flex flex-wrap gap-x-3.5 gap-y-1 text-[12.5px]">
+                        {surface.map((s) => (
+                            <li key={s.id} className="flex items-center gap-1.5 whitespace-nowrap">
+                                <span className="h-2.5 w-2.5 rounded-[3px]" style={{ background: SURFACE_COLOR[s.id] }} aria-hidden />
+                                <span className="text-[#0E2A33CC]">{s.label}</span><span className="font-semibold tabular-nums">{s.pct}%</span>
+                            </li>
+                        ))}
+                    </ul>
+                    {surfaceTip && <p className="mt-2 rounded-xl bg-[#0E2A330D] px-3 py-2 text-[13px] leading-snug text-[#0E2A33] break-keep" data-testid="course-surface-tip">{surfaceTip}</p>}
+                </div>
+            )}
             {on.length > 0 ? (
                 <div className="mt-3 border-t border-[#0E2A331A] px-4 pb-3.5 pt-3">
                     <p className="text-[14.5px] font-semibold">길 위에서 만나는 것</p>

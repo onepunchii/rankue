@@ -11,6 +11,7 @@ import { db } from "../db.js";
 import { hasMountainGuide, type MountainGuide } from "../../shared/hikingGuide.js";
 import { distM, type LinePoint } from "../../shared/hikingGeo.js";
 import type { HikingPoiKind } from "../../shared/hikingPois.js";
+import { readSurface, type CourseSurface } from "../../shared/hikingSurface.js";
 import { hikingFeaturesOf } from "../../shared/hikingFeatures.js";
 
 export interface MountainSummary {
@@ -49,6 +50,8 @@ export interface MountainCourse {
     line: LinePoint[];
     /** 이웃 봉우리의 코스를 이어 보여 줄 때 그 봉우리의 이름(hiking_course_links) — 제 코스면 null */
     via: string | null;
+    /** 길의 종류 [[종류, km], …](shared/hikingSurface) — 산림청 100대 명산 코스 파일에서 온 코스에만 있다. 없으면 null */
+    surface: CourseSurface | null;
 }
 export interface MountainPoi {
     id: string;
@@ -141,25 +144,26 @@ export async function getMountainDetail(slug: string): Promise<MountainDetail | 
             from hiking_mountains where slug = ${slug}`);
         if (!m) return null;
         const [own, linked, ownPois] = await Promise.all([
-            rows<any>(sql`select id, seq, km, gain_m, loss_m, min_m, max_m, loop, summit_km, line from hiking_courses where mountain_id = ${m.id} order by frtrl_id, seq`),
+            // 산림청 100대 명산 코스 파일의 코스(frtrl_id 'k100-…' — 그 산의 이름으로 조사한 길 · 길의 종류와 편의 지점이 있다)를 앞에 놓는다
+            rows<any>(sql`select id, seq, km, gain_m, loss_m, min_m, max_m, loop, summit_km, line, surface from hiking_courses where mountain_id = ${m.id} order by (frtrl_id like 'k100-%') desc, frtrl_id, seq`),
             // 이웃 봉우리의 코스 가운데 이 산의 정상을 지나는 것(migrations/hiking_course_links.sql) — 표가 아직 없으면 없는 것으로
             rows<any>(sql`
-                select c.id, c.km, c.gain_m, c.loss_m, c.min_m, c.max_m, c.loop, l.summit_km, c.line, o.name as via
+                select c.id, c.km, c.gain_m, c.loss_m, c.min_m, c.max_m, c.loop, l.summit_km, c.line, c.surface, o.name as via
                 from hiking_course_links l join hiking_courses c on c.id = l.course_id join hiking_mountains o on o.id = c.mountain_id
                 where l.mountain_id = ${m.id} order by c.km, c.id`).catch((e) => { if (missingTable(e)) return []; throw e; }),
             rows<any>(sql`select id, type, name, note, lat, lng, alt_m, course_id, km from hiking_pois where mountain_id = ${m.id} order by course_id nulls last, km nulls last, id`),
         ]);
         // 이어 온 코스의 지점도 같이 — 제 주인 산에 묶여 있어 따로 읽는다
         const linkedPois = linked.length ? await rows<any>(sql`select id, type, name, note, lat, lng, alt_m, course_id, km from hiking_pois where course_id in (${sql.join(linked.map((c) => sql`${c.id}`), sql`, `)}) order by course_id, km nulls last, id`) : [];
-        // 번호는 제 코스 뒤에 잇는다
-        const courses = [...own.map((c) => ({ ...c, via: null })), ...linked.map((c, i) => ({ ...c, seq: own.length + i + 1 }))];
+        // 번호는 놓인 차례대로 1부터 — 묶음마다의 순번(seq)을 그대로 쓰면 묶음이 여럿인 산에서 '코스 1'이 겹친다. 이어 온 코스는 제 코스 뒤에 잇는다
+        const courses = [...own.map((c, i) => ({ ...c, seq: i + 1, via: null })), ...linked.map((c, i) => ({ ...c, seq: own.length + i + 1 }))];
         const pois = [...ownPois, ...linkedPois];
         return {
             ...toSummary(m), peakName: m.peak_name ?? null, aliases: Array.isArray(m.aliases) ? m.aliases : [], dong: m.dong ?? null,
             guide: hasMountainGuide(m.guide) ? m.guide : null, poiCounts: m.poi_counts && typeof m.poi_counts === "object" ? m.poi_counts : {},
             courseList: courses.map((c): MountainCourse => ({
                 id: c.id, seq: Number(c.seq), km: Number(c.km), gainM: Number(c.gain_m), lossM: Number(c.loss_m), minM: Number(c.min_m), maxM: Number(c.max_m), loop: !!c.loop,
-                summitKm: num(c.summit_km), line: Array.isArray(c.line) ? c.line : [], via: c.via ?? null,
+                summitKm: num(c.summit_km), line: Array.isArray(c.line) ? c.line : [], via: c.via ?? null, surface: readSurface(c.surface),
             })),
             pois: pois.map((p): MountainPoi => ({ id: p.id, kind: p.type, name: p.name, note: p.note ?? null, lat: Number(p.lat), lng: Number(p.lng), altM: num(p.alt_m), courseId: p.course_id ?? null, km: num(p.km) })),
         };
