@@ -22,6 +22,7 @@ import { GradeCard, GradeLadder } from "../stamps/GradeParts";
 import { MountainPatch } from "../stamps/MountainPatch";
 import { HIKING_STAMPS_PATH, PatchArt, PinArt, hikingBookPath } from "../stamps/StampParts";
 import { useHikingStamps } from "../stamps/useHikingStamps";
+import { YearReport } from "../components/YearReport";
 
 export default function PackPage() {
     const s = useHikingStamps();
@@ -58,6 +59,9 @@ export default function PackPage() {
                                 <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-3.5 text-[14px] leading-relaxed text-[#F4EFE3CC] break-keep">{HIKING_PACK_INTRO}</p>
                             )}
                         </div>
+
+                        {/* 올해의 산행 — 등산을 쓰는 회원의 것만. 올해 기록이 없으면 그리지 않는다 */}
+                        {s.mine && <YearReport summits={s.summits} nameOf={(id) => s.famous.find((m) => m.id === id)?.name} heightOf={(id) => s.famous.find((m) => m.id === id)?.heightM} />}
 
                         <HkSection title={HIKING_PACK_LABEL.grade} aside={`여덟 등급 · 맨 위는 산 ${HIKING_GRADES[HIKING_GRADES.length - 1].min}곳`}>
                             <GradeLadder state={s.grade} earnedOn={gradeOn} preview={!s.mine} />
