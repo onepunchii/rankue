@@ -12,6 +12,8 @@
  *  - 워드마크는 그림 한 장(client/public/brand/rankue-wordmark.png — 글자 모양만 남긴 투명 그림)에 종목의 색을 입힌다(mask).
  *  - 종목 전환은 그 사람이 볼 수 있는 종목만: 골프(useGolfVisible) · 등산(useHikingAccess)은 **한국어 화면에서만** 열린다 —
  *    다른 언어에서는 당구 하나뿐이라 전환 자리를 그리지 않는다.
+ *  - 등산은 방문자에게도 보인다(등산을 연 2026-10-13 저녁부터 — HIKING_PUBLIC). 방문자에게는 등산 홈(내 도장 · 내 산행)이 없으므로
+ *    알약은 종목을 바꾸지 않고 **공개 허브(/hiking)** 로 보낸다 — 산을 둘러보다 거기서 가입한다. 저장된 종목은 건드리지 않는다.
  *  - 비로그인: 알림은 회원의 것이라 종 자리에 '로그인' 단추(알림 수도 부르지 않는다).
  * 색은 전부 리터럴이다 — 골프 테마는 bg-white · text-black 같은 유틸의 색을 바꿔 끼우므로(index.css) 유틸로 색을 주면 뒤집힌다.
  *
@@ -31,6 +33,8 @@ import { useGolfVisible } from "@/hooks/useGolfAccess";
 import { useHikingAccess } from "@/hooks/useHikingAccess";
 import { useSport } from "@/contexts/SportContext";
 import { useT } from "@/lib/i18n";
+import { HIKING_PUBLIC } from "@shared/hikingAccess";
+import { HIKING_HUB_PATH } from "@shared/hikingMountains";
 
 export type HeaderSport = "BILLIARDS" | "GOLF" | "HIKING";
 
@@ -60,18 +64,23 @@ const barStyle = (c: { bar: string; line: string }, bleed: number, lift: number)
     marginTop: `calc(${-lift}px - env(safe-area-inset-top, 0px))`, paddingTop: "env(safe-area-inset-top, 0px)",
 });
 const BAR_CLASS = "rk-no-safe sticky top-0 z-40 backdrop-blur-md";
+// 알약의 옆 여백 10. 폭 340 미만(아주 작은 폰)에서만 6 으로 — 세 종목 + 로그인 + 메뉴가 320 한 줄에 들어가지 않아 메뉴 단추가 화면 밖으로 잘렸다.
+// 종목에 따라 달라지는 것이 아니라 화면 폭에 따라 세 종목이 똑같이 줄어든다(종목을 바꿔도 자리는 그대로).
+const PILL_PAD = "px-2.5 max-[339px]:px-1.5";
 
 export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
     sport: HeaderSport; /** 홈 바탕 상자의 옆 여백(px) */ bleed?: number; /** 홈 바탕 상자의 윗여백(px) */ lift?: number; className?: string;
     /** 줄을 본문의 너비에 맞출 때(넓은 화면) — 예: 크루 화면의 "mx-auto max-w-md". 없으면 등산만 720 에 맞춘다 */
     inner?: string;
 }) {
-    const { t } = useT();
+    const { t, locale } = useT();
     const { setSport } = useSport();
     const [, setLocation] = useLocation();
     const { member, isGuest } = useAuth();
     const golfVisible = useGolfVisible();
     const hikingOk = useHikingAccess();
+    // 방문자의 등산 — 볼 수는 있지만(공개 허브) 등산 홈은 회원의 것이다
+    const hikingGuest = HIKING_PUBLIC && isGuest && locale === "ko";
     const [notifOpen, setNotifOpen] = useState(false);
     // 숫자 하나만 받는다(목록이 아니다). 종목을 붙여야 그 종목의 알림이 세어진다. 비로그인은 부르지 않는다 — 401 만 쌓인다.
     const { data: notifCount } = useQuery<{ unread: number }>({ queryKey: [UNREAD_COUNT_KEY, { sport }], refetchInterval: 60_000, staleTime: 30_000, enabled: !!member });
@@ -83,7 +92,7 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
     const sports: { id: HeaderSport; label: string }[] = [
         { id: "BILLIARDS", label: t("dashboardHeader.billiardsMode") },
         ...(golfVisible || sport === "GOLF" ? [{ id: "GOLF" as const, label: t("dashboardHeader.golfMode") }] : []),
-        ...(hikingOk || sport === "HIKING" ? [{ id: "HIKING" as const, label: "등산" }] : []),
+        ...(hikingOk || hikingGuest || sport === "HIKING" ? [{ id: "HIKING" as const, label: "등산" }] : []),
     ];
     const icon = "flex shrink-0 items-center justify-center rounded-full active:scale-95 transition-transform";
     const iconSize = { width: z.button, height: z.button };
@@ -98,10 +107,10 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
                     {sports.length > 1 && (
                         <div className="flex shrink-0 items-center rounded-full p-[3px]" style={{ background: c.pill }} role="group" aria-label="종목 바꾸기" data-testid="sport-switch">
                             {sports.map((s) => (s.id === sport ? (
-                                <span key={s.id} className="flex items-center rounded-full px-2.5 text-[13px] font-semibold" style={{ height: z.pill, background: c.brand, color: c.onBrand }} aria-current="true">{s.label}</span>
+                                <span key={s.id} className={`flex items-center rounded-full ${PILL_PAD} text-[13px] font-semibold`} style={{ height: z.pill, background: c.brand, color: c.onBrand }} aria-current="true">{s.label}</span>
                             ) : (
                                 // 고른 것과 같은 굵기의 자리를 미리 잡아 둔다(보이지 않는 겹 글자) — 종목을 바꿔도 알약의 폭이 달라지지 않는다
-                                <button key={s.id} type="button" onClick={() => setSport(s.id)} className="relative rounded-full px-2.5 text-[13px] active:opacity-70" style={{ height: z.pill, color: c.soft }}
+                                <button key={s.id} type="button" onClick={() => (s.id === "HIKING" && !hikingOk ? setLocation(HIKING_HUB_PATH) : setSport(s.id))} className={`relative rounded-full ${PILL_PAD} text-[13px] active:opacity-70`} style={{ height: z.pill, color: c.soft }}
                                     data-testid={`sport-to-${s.id.toLowerCase()}`}>
                                     <span className="invisible font-semibold" aria-hidden>{s.label}</span>
                                     <span className="absolute inset-0 flex items-center justify-center">{s.label}</span>

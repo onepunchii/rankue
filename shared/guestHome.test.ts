@@ -519,8 +519,15 @@ describe("당구 홈", () => {
             expect(bar).toContain('...(golfVisible || sport === "GOLF" ? [{ id: "GOLF" as const');
             expect(bar).not.toContain("useGolfAccess()");
             expect(bar).not.toMatch(/\bgolfOk\b/);
-            // 등산은 등산이 열린 회원에게만(한국어 화면에서만) · 언어 단추는 당구에만
-            expect(bar).toContain('...(hikingOk || sport === "HIKING" ? [{ id: "HIKING" as const');
+            // 등산은 등산이 열린 회원과, 등산을 연 뒤로는 한국어 방문자에게도(한국어 화면에서만)
+            expect(bar).toContain('...(hikingOk || hikingGuest || sport === "HIKING" ? [{ id: "HIKING" as const');
+            expect(bar).toContain('const hikingGuest = HIKING_PUBLIC && isGuest && locale === "ko";');
+            // 방문자에게는 등산 홈이 없다 — 알약은 종목을 바꾸지 않고 공개 허브로 보낸다(저장된 종목을 덮지 않는다: SportContext 가 등산을 못 쓰는 사람의 /hiking 을 선택으로 치지 않는다)
+            expect(bar).toContain('onClick={() => (s.id === "HIKING" && !hikingOk ? setLocation(HIKING_HUB_PATH) : setSport(s.id))}');
+            expect(client("contexts/SportContext.tsx")).toContain('if (routeSport === "HIKING" && !hikingOk) return;');
+            // 폭 320: 세 종목 + 로그인 + 메뉴가 한 줄에 안 들어가 메뉴 단추가 잘렸다 — 알약의 옆 여백만 340 미만에서 줄인다(세 종목이 똑같이)
+            expect(bar).toContain('const PILL_PAD = "px-2.5 max-[339px]:px-1.5";');
+            expect(bar.match(/\$\{PILL_PAD\}/g)?.length).toBe(2);
             // 언어 단추는 머리줄이 아니라 당구 홈의 이름 줄에 있다 — 머리줄에 넣으면 당구에서만 종목 전환과 종이 밀린다
             expect(bar).not.toMatch(/LanguageSheet|LucideTranslate/);
             expect(src).toContain("<LanguageSheet open={langOpen} onOpenChange={setLangOpen} />");
@@ -537,7 +544,8 @@ describe("당구 홈", () => {
             // 크기는 치수 표에서만 온다(종목에 따라 갈리는 삼항이 색 말고는 없다)
             expect(bar).toContain("<RankueWordmark color={c.brand} height={z.wordmark} />");
             expect(bar).toContain("const iconSize = { width: z.button, height: z.button };");
-            expect(bar.match(/px-2\.5 text-\[13px\]/g)?.length).toBe(2);
+            // 두 알약(고른 것 · 안 고른 것)이 같은 여백 상수를 쓴다 — 여백은 화면 폭으로만 갈리고 종목으로는 갈리지 않는다
+            expect(bar.match(/\$\{PILL_PAD\} text-\[13px\]/g)?.length).toBe(2);
             // 고르지 않은 알약도 고른 것(굵은 글씨)과 같은 폭 — 종목을 바꿔도 전환 자리가 움직이지 않는다
             expect(bar).toContain('<span className="invisible font-semibold" aria-hidden>{s.label}</span>');
             // 세 종목 모두 맨 위에 붙는다 · 상태바 여백은 스스로(전역 규칙이 한 번 더 밀지 않게 rk-no-safe)
