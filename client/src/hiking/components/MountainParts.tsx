@@ -3,6 +3,7 @@
  * 글은 shared/hikingPage 의 것을 쓴다(검색용 화면과 같은 글).
  * ⚠️ 리터럴 색만. 글자는 12px 이상, 굵기는 semibold 까지.
  */
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,6 +13,7 @@ import { WX_LABEL, type CourseWeather, type WxHalf } from "@shared/golfWeather";
 import { heightText, hikingMountainPath, mountainPlace } from "@shared/hikingMountains";
 import { HIKING_CTA, WEATHER_NOTE, kmRange } from "@shared/hikingPage";
 import { SUN_NOTE, kstClock, kstYmd, spanText, sunLine, sunTimes } from "@shared/hikingSun";
+import { SUMMIT_WX_COPY, summitFirstDay, summitWx, type SummitBase } from "@shared/hikingSummitWx";
 import { mountainWeatherKey, type MountainSummary } from "../lib/api";
 import { MountainPatch } from "../stamps/MountainPatch";
 
@@ -70,7 +72,8 @@ const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 
 /** 산의 날씨 — 오늘부터 이레. 정상 좌표의 격자 예보다(산 위는 더 춥다는 한 줄을 붙인다) */
 export function MountainWeather({ slug }: { slug: string }) {
-    const { data, isLoading } = useQuery<CourseWeather | null>({ queryKey: mountainWeatherKey(slug), staleTime: 10 * 60_000 });
+    // summit: 정상의 날씨를 어림할 바탕(정상 · 들머리의 높이) — 서버가 들머리를 구한 산에만 붙는다. 그때 예보는 들머리 자리의 것이다
+    const { data, isLoading } = useQuery<(CourseWeather & { summit?: SummitBase | null }) | null>({ queryKey: mountainWeatherKey(slug), staleTime: 10 * 60_000 });
     if (isLoading) return <div className="h-[104px] animate-pulse rounded-2xl bg-[#FFFFFF0F]" aria-busy="true" />;
     if (!data?.days?.length) return <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-4 text-[14px] text-[#F4EFE399]">지금은 날씨를 받아 오지 못했어요.</p>;
     const days = data.days.slice(0, 7);
@@ -98,6 +101,7 @@ export function MountainWeather({ slug }: { slug: string }) {
                     <p className="mt-0.5 text-[20px] font-semibold tabular-nums leading-none" style={{ color: wetOf(today) ? "#8EC5FF" : "#F4EFE3" }}>{popOf(today) > 0 ? `${popOf(today)}%` : "0%"}</p>
                 </div>
             </div>
+            {data.summit && <SummitWeather hours={data.hours ?? []} heightM={data.summit.heightM} baseM={data.summit.baseM} />}
             {/* 엿새 — 한 줄씩, 기온의 폭을 막대로 */}
             {rest.length > 0 && (
                 <ul className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-4" data-testid="weather-days">
@@ -122,6 +126,58 @@ export function MountainWeather({ slug }: { slug: string }) {
                 </ul>
             )}
             <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{WEATHER_NOTE}</p>
+        </div>
+    );
+}
+
+/**
+ * 정상의 날씨(2026-10-13 오너: "날씨에 정상에서의 날씨 추가 · 시간 3개 정도는 정상 온도") — 새벽 6시 · 낮 12시 · 오후 3시의 정상 기온.
+ * 잰 값이 아니라 산 아래 예보를 높이 차만큼 낮춰 **어림한 값**이다(shared/hikingSummitWx) — 각주에 셈을 그대로 적는다.
+ * 높이 차를 모르거나 작으면, 또는 시간별 예보가 없으면 그리지 않는다.
+ */
+function SummitWeather({ hours, heightM, baseM }: { hours: CourseWeather["hours"]; heightM: number | null; baseM: number | null }) {
+    const wx = summitWx(hours, { heightM, baseM, nowMs: Date.now() });
+    const [pick, setPick] = useState<string | null>(null);
+    if (!wx) return null;
+    const day = wx.days.find((d) => d.date === pick) ?? wx.days[summitFirstDay(wx.days)];
+    return (
+        <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-4 pb-3.5 pt-3.5" data-testid="summit-weather">
+            <div className="flex items-center justify-between gap-3">
+                <p className="min-w-0 truncate text-[14px] font-semibold text-[#F4EFE3]">
+                    <span className="mr-1 text-[#F28C6A]" aria-hidden>▲</span>{SUMMIT_WX_COPY.title} <span className="font-normal tabular-nums text-[#F4EFE399]">{wx.heightM.toLocaleString("ko-KR")}m</span>
+                </p>
+                {wx.days.length > 1 && (
+                    <div className="flex shrink-0 rounded-full bg-[#FFFFFF0F] p-[3px]" role="tablist" aria-label="날짜">
+                        {wx.days.map((d) => {
+                            const on = d.date === day.date;
+                            return (
+                                <button key={d.date} type="button" role="tab" aria-selected={on} onClick={() => setPick(d.date)} data-testid={`summit-day-${d.label}`}
+                                    className={`h-7 rounded-full px-2.5 text-[12.5px] ${on ? "bg-[#F6D9A8] font-semibold text-[#2A1208]" : "text-[#F4EFE399] active:text-[#F4EFE3]"}`}>{d.label}</button>
+                            );
+                        })}
+                    </div>
+                )}
+            </div>
+            <ul className="mt-3 grid grid-cols-3 gap-2" role="tabpanel">
+                {day.slots.map((s) => (
+                    <li key={s.hour} className="rounded-xl bg-[#0E2A33] px-2 py-3 text-center" style={{ boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid={`summit-slot-${s.hour}`}>
+                        <p className="text-[12.5px] text-[#F6D9A8]">{s.label}</p>
+                        {s.tmp == null ? (
+                            <p className="mt-2 pb-[22px] text-[13px] text-[#F4EFE366]">{SUMMIT_WX_COPY.passed}</p>
+                        ) : (
+                            <>
+                                <span className="mt-1.5 flex justify-center" role="img" aria-label={s.kind ? WX_LABEL[s.kind] : undefined}><Sky h={s.kind ? { kind: s.kind, pop: s.pop ?? 0 } : null} size={24} /></span>
+                                <p className="mt-1 text-[22px] font-semibold tabular-nums leading-none text-[#F4EFE3]">{s.tmp}°</p>
+                                <p className="mt-1.5 text-[12px] tabular-nums text-[#F4EFE399]">
+                                    {s.feel != null && s.feel < s.tmp ? <span className="text-[#8EC5FF]">{SUMMIT_WX_COPY.feel} {s.feel}°</span> : <>{SUMMIT_WX_COPY.below} {s.below}°</>}
+                                </p>
+                                <p className="mt-0.5 text-[12px] tabular-nums text-[#F4EFE366]">{s.wsd != null ? `바람 ${Math.round(s.wsd)}m/s` : "\u00A0"}</p>
+                            </>
+                        )}
+                    </li>
+                ))}
+            </ul>
+            <p className="mt-2.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{SUMMIT_WX_COPY.note(wx.riseM, wx.dropC)}</p>
         </div>
     );
 }

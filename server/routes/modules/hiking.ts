@@ -7,6 +7,7 @@ import { Router, type NextFunction, type Response } from "express";
 import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { allMountains, getMountainDetail, mountainById, mountainBySlug, nearbyMountains, type MountainSummary } from "../../storage/hiking.js";
+import { trailheadPoint, type SummitBase } from "../../../shared/hikingSummitWx.js";
 import { addSummit, listHikingAwards, listSummits, removeRecord, syncHikingAwards, CREW_TOGETHER, crewSummits } from "../../storage/hikingStamps.js";
 import { addTrip, listTrips } from "../../storage/hikingTrips.js";
 import { cleanTrip } from "../../../shared/hikingTrail.js";
@@ -78,13 +79,29 @@ router.get("/mountains/:slug", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, { ...d, nearby: near });
 }));
 
-/** 산의 날씨 — 정상 좌표의 격자(기상청 단기 · 중기). 받아 둔 것이 낡았으면 그 자리에서 새로 받는다 */
+/** 산의 들머리(코스의 가장 낮은 곳) — 코스 선을 다 읽어야 해서 인스턴스가 6시간 기억한다. 못 구하면 null */
+const trailheads = new Map<string, { at: number; v: { lat: number; lng: number; m: number } | null }>();
+async function trailheadOf(slug: string, heightM: number | null): Promise<{ lat: number; lng: number; m: number } | null> {
+    const hit = trailheads.get(slug);
+    if (hit && Date.now() - hit.at < 6 * 3_600_000) return hit.v;
+    const d = await getMountainDetail(slug).catch(() => null);
+    const v = d ? trailheadPoint(heightM, d.courseList) : null;
+    trailheads.set(slug, { at: Date.now(), v });
+    return v;
+}
+
+/** 산의 날씨 — 들머리 자리의 격자(기상청 단기 · 중기), 들머리를 모르면 정상 좌표의 격자. 받아 둔 것이 낡았으면 그 자리에서 새로 받는다 */
 router.get("/mountains/:slug/weather", asyncHandler(async (req: any, res: any) => {
     const m = await mountainBySlug(String(req.params.slug));
     if (!m) return sendError(res, 404, "없는 산이에요");
-    const weather = m.lat != null && m.lng != null ? await getCourseWeather({ lat: m.lat, lng: m.lng }, { fetch: true }).catch((e) => { console.error("[HikingWeather]", e); return null; }) : null;
+    // 산 아래의 예보는 들머리(코스의 가장 낮은 곳) 자리의 격자에서 받는다 — 정상 좌표의 격자는 이미 그 높이만큼 낮아서 '산 아래'가 아니다.
+    // 들머리를 모르는 산(코스가 없거나 높이 자료를 못 믿는 산)은 예전대로 정상 좌표의 격자, 정상 칸은 없다(shared/hikingSummitWx).
+    const base = await trailheadOf(m.slug, m.heightM);
+    const at = base ?? (m.lat != null && m.lng != null ? { lat: m.lat, lng: m.lng } : null);
+    const weather = at ? await getCourseWeather({ lat: at.lat, lng: at.lng }, { fetch: true }).catch((e) => { console.error("[HikingWeather]", e); return null; }) : null;
     res.set("Cache-Control", weather ? "public, max-age=300, s-maxage=600, stale-while-revalidate=1800" : "no-store");
-    return sendSuccess(res, weather);
+    const summit: SummitBase | null = weather && base && m.heightM != null ? { heightM: m.heightM, baseM: base.m } : null;
+    return sendSuccess(res, weather ? { ...weather, summit } : null);
 }));
 
 // ── 산 근처의 맛집 · 카페(2026-10-13) ─────────────────────────────────────

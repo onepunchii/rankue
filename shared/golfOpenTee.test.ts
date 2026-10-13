@@ -169,17 +169,14 @@ describe("지키는 것 — 서버 · 화면", () => {
         expect(card).toContain("확인 {kstClock(day.checkedAt)}");
         expect(card).toContain("now - d.checkedAt <= FRESH_MS");
         expect(card).toContain("teeStillAhead(d.day, t.time, now)");
-        const home = read("client/src/golf/components/dashboard/OpenTeeHome.tsx");
-        expect(home).toContain("now - t.checkedAt <= FRESH_MS && teeStillAhead(t.day, t.time, now)");
-        // 홈의 다섯 줄은 골프장마다 한 줄씩 먼저 — 한 곳의 이른 티 셋이 홈을 다 차지하지 않게
-        expect(home).toContain("const first = live.filter((t) => (seen.has(t.slug) ? false : (seen.add(t.slug), true)));");
-        expect(home).toContain("if (!rows.length) return null;");
+        // 골프 홈에는 구역을 두지 않는다(2026-10-13 오너: "지금 남은 티 섹션 넣지 말고 부킹에 넣어줘")
+        expect(read("client/src/golf/pages/Dashboard.tsx")).not.toMatch(/OpenTeeHome|지금 남은 티/);
         const api = read("client/src/golf/lib/courseApi.ts");
         expect(api).toContain('export const OPEN_TEES_KEY = "golf-open-tees";');
         expect(api).toContain("queryKey: [OPEN_TEES_KEY, slug],");
         expect(api).toContain("queryKey: [OPEN_TEES_KEY],");
         // 골프 화면의 글자 규칙 — 12px 미만 없음
-        for (const src of [card, home]) for (const m of src.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) expect(Number(m[1]), m[0]).toBeGreaterThanOrEqual(12);
+        for (const src of [card]) for (const m of src.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) expect(Number(m[1]), m[0]).toBeGreaterThanOrEqual(12);
         expect(code(card)).not.toMatch(/font-(bold|extrabold|black)/);
         // 구역의 key 는 형제와 달라야 한다(2026-10-05 사고)
         expect(read("client/src/golf/pages/GolfCoursePage.tsx")).toContain("<OpenTees key={`opentee:${d.slug}`} slug={d.slug} className=\"px-5 mt-3\" />");
