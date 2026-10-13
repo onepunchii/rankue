@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { FISHING_PUBLIC, FISHING_SPECIES, FISHING_SPOTS, cleanCatch, fishingDayLabel, fishingDex, fishingKstDay, fishingSpotName, fishingSummary, type FishingCatch } from "./fishing";
+import { FISHING_PUBLIC, FISHING_SPECIES, FISHING_SPOTS, fishingSidoShort, cleanCatch, fishingDayLabel, fishingDex, fishingKstDay, fishingSpotName, fishingSummary, type FishingCatch } from "./fishing";
 
 const TODAY = "2026-10-14";
 const ok = (over: Record<string, unknown> = {}) => cleanCatch({ day: "2026-10-12", place: " 여수  국동항 ", spot: "boat", species: "갈치", count: "12", lengthCm: "92.46", note: " 물때 8물 ", ...over }, TODAY);
@@ -15,7 +15,7 @@ describe("낚시는 아직 닫혀 있다", () => {
         expect(lib).not.toMatch(/010|@/);
         // 길마다 문지기를 거친다
         const routes = readFileSync(resolve(__dirname, "../server/routes/modules/fishing.ts"), "utf8");
-        expect(routes.match(/requireAuth, gate,/g)).toHaveLength(3);
+        expect(routes.match(/requireAuth, gate,/g)).toHaveLength(4);
     });
 });
 
@@ -62,6 +62,9 @@ describe("한눈에 · 도감", () => {
     it("날짜 — 올해가 아니면 해를 적는다", () => {
         expect(fishingDayLabel("2026-10-12", TODAY)).toBe("10월 12일");
         expect(fishingDayLabel("2025-05-11", TODAY)).toBe("2025년 5월 11일");
+    });
+    it("시도 이름을 짧게", () => {
+        expect(["충청북도", "경기도", "인천광역시", "강원특별자치도", "전남광주통합특별시", "세종특별자치시", null].map(fishingSidoShort)).toEqual(["충북", "경기", "인천", "강원", "전남 · 광주", "세종", ""]);
     });
     it("갈래 · 어종 칩은 겹치지 않는다", () => {
         expect(new Set(FISHING_SPOTS.map((s) => s.id)).size).toBe(FISHING_SPOTS.length);

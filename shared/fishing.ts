@@ -129,4 +129,16 @@ export function fishingDayLabel(day: string, today: string): string {
     return m[1] === today.slice(0, 4) ? md : `${m[1]}년 ${md}`;
 }
 
+/** 낚시터 한 곳(받은 자료를 걸러 실은 것 — migrations/fishing_places.sql) */
+export interface FishingPlace { id: string; name: string; kind: string | null; sido: string | null; sigungu: string | null; address: string | null; species: string[]; fee: string | null; tel: string | null; dataDate: string | null }
+/** 실은 자료의 출처 — 화면에 그대로 적는다 */
+export const FISHING_PLACE_SOURCE = "행정안전부 낚시터정보 · 지자체에 등록된 낚시터(유료 낚시터 중심)";
+
+const SIDO_SHORT: Record<string, string> = { 충청북도: "충북", 충청남도: "충남", 경상북도: "경북", 경상남도: "경남", 전라남도: "전남", 전북특별자치도: "전북", 강원특별자치도: "강원", 제주특별자치도: "제주", 세종특별자치시: "세종", 전남광주통합특별시: "전남 · 광주" };
+/** 시도 이름을 칩에 들어가게 — "충청북도" → "충북", "인천광역시" → "인천" */
+export const fishingSidoShort = (sido: string | null | undefined): string => {
+    const s = String(sido ?? "");
+    return SIDO_SHORT[s] ?? s.replace(/(특별시|광역시|특별자치시|특별자치도|도)$/, "");
+};
+
 export const fishingKstDay = (ms: number): string => new Date(ms + 9 * 3_600_000).toISOString().slice(0, 10);

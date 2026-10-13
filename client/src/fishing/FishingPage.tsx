@@ -17,8 +17,8 @@ import { appConfirm } from "@/components/AppDialog";
 import { LucideChevronLeft, LucideFlag, LucideHome, LucideMap, LucideMessageSquare, LucidePlus, LucideX } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import {
-    FISHING_COLORS as C, FISHING_SPECIES, FISHING_SPOTS, cleanCatch, fishingDayLabel, fishingDex, fishingKstDay, fishingSpotName, fishingSummary,
-    type FishingCatch, type FishingSpotId,
+    FISHING_COLORS as C, FISHING_PLACE_SOURCE, FISHING_SPECIES, FISHING_SPOTS, cleanCatch, fishingDayLabel, fishingDex, fishingKstDay, fishingSidoShort, fishingSpotName, fishingSummary,
+    type FishingCatch, type FishingPlace, type FishingSpotId,
 } from "@shared/fishing";
 
 const KEY = ["/api/hiq/fishing/catches"];
@@ -42,6 +42,8 @@ export default function FishingPage() {
     const list = data ?? [];
     const [tab, setTab] = useState<Tab>("home");
     const [adding, setAdding] = useState(false);
+    // 포인트에서 '조과 적기'를 누르면 그 낚시터 이름이 미리 들어간다
+    const [preset, setPreset] = useState<{ place: string; spot: FishingSpotId } | null>(null);
     const today = fishingKstDay(Date.now());
     const sum = useMemo(() => fishingSummary(list), [list]);
     const dex = useMemo(() => fishingDex(list), [list]);
@@ -157,15 +159,7 @@ export default function FishingPage() {
                     </section>
                 )}
 
-                {tab === "points" && (
-                    <section className="pt-5" data-testid="fishing-points">
-                        <h2 className="text-[17px] font-semibold tracking-tight">포인트</h2>
-                        <div className="mt-3 rounded-2xl px-5 py-6" style={{ background: C.card }}>
-                            <p className="text-[15px] font-semibold">낚시터 · 낚시어선 자료를 싣는 자리예요</p>
-                            <p className="mt-2 text-[13px] leading-relaxed" style={{ color: C.soft }}>받아 둔 자료(낚시터 1,151곳 · 낚시어선 4,987척 · 출항지 960곳)를 다듬어 다음 단계에 실어요. 아직은 비어 있어요.</p>
-                        </div>
-                    </section>
-                )}
+                {tab === "points" && <Points onPick={(p) => { setPreset({ place: p.name, spot: "pay" }); setAdding(true); }} />}
             </main>
 
             {/* 조과 적기 — 어느 탭에서든 */}
@@ -197,16 +191,71 @@ export default function FishingPage() {
                 </div>
             </nav>
 
-            {adding && <CatchSheet today={today} onClose={() => setAdding(false)} />}
+            {adding && <CatchSheet today={today} preset={preset} onClose={() => { setAdding(false); setPreset(null); }} />}
         </div>
     );
 }
 
+/**
+ * 포인트 — 실은 낚시터(지자체에 등록된 낚시터 1,151곳)를 지역 · 글자로 찾는다. 낚시어선 · 출항지는 아직 싣지 않았다(다음).
+ * 요금 · 전화는 오래된 값일 수 있어 자료 기준일을 같이 적는다. 방파제 · 갯바위 같은 자유 포인트는 이 자료에 없다 — 그렇다고 말한다.
+ */
+function Points({ onPick }: { onPick: (p: FishingPlace) => void }) {
+    const [sido, setSido] = useState("");
+    const [text, setText] = useState("");
+    const [q, setQ] = useState("");
+    const { data, isLoading } = useQuery<{ total: number; regions: { sido: string; n: number }[]; items: FishingPlace[] }>({
+        queryKey: ["/api/hiq/fishing/places", sido, q],
+        queryFn: () => apiRequest(`/api/hiq/fishing/places?sido=${encodeURIComponent(sido)}&q=${encodeURIComponent(q)}`),
+    });
+    const chip = "h-9 shrink-0 rounded-full px-3 text-[13px]";
+    return (
+        <section className="pt-5" data-testid="fishing-points">
+            <div className="flex items-baseline justify-between"><h2 className="text-[17px] font-semibold tracking-tight">낚시터</h2>{data && <span className="text-[12.5px] tabular-nums" style={{ color: C.dim }}>{data.total}곳</span>}</div>
+            <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); setQ(text.trim()); }}>
+                <input value={text} onChange={(e) => setText(e.target.value)} maxLength={30} placeholder="이름 · 시군구 · 어종(예: 붕어)" aria-label="낚시터 찾기"
+                    className="h-11 min-w-0 flex-1 rounded-xl px-3.5 text-[14px] outline-none placeholder:text-[#E6F6FF59]" style={{ background: "#FFFFFF0F", color: C.foam }} data-testid="fishing-place-q" />
+                <button type="submit" className="h-11 shrink-0 rounded-xl px-4 text-[14px] font-semibold" style={{ background: C.brand, color: C.onBrand }} data-testid="fishing-place-find">찾기</button>
+            </form>
+            <div className="-mx-4 mt-3 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="지역">
+                <button type="button" aria-pressed={sido === ""} onClick={() => setSido("")} className={cn(chip, sido === "" && "font-semibold")} style={sido === "" ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>전체</button>
+                {(data?.regions ?? []).map((r) => (
+                    <button key={r.sido} type="button" aria-pressed={sido === r.sido} onClick={() => setSido(sido === r.sido ? "" : r.sido)} data-testid={`fishing-sido-${fishingSidoShort(r.sido)}`}
+                        className={cn(chip, sido === r.sido && "font-semibold")} style={sido === r.sido ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>
+                        {fishingSidoShort(r.sido)} <span className="tabular-nums opacity-70">{r.n}</span>
+                    </button>
+                ))}
+            </div>
+            {isLoading ? <div className="mt-3 h-40 animate-pulse rounded-2xl bg-[#FFFFFF0F]" /> : !data?.items.length ? (
+                <p className="mt-3 rounded-2xl px-5 py-6 text-center text-[13.5px]" style={{ background: C.card, color: C.soft }} data-testid="fishing-place-none">찾는 낚시터가 없어요. 글자를 바꿔 보세요.</p>
+            ) : (
+                <ul className="mt-3 space-y-2">
+                    {data.items.map((p) => (
+                        <li key={p.id} className="rounded-2xl px-4 py-3.5" style={{ background: C.card }} data-testid="fishing-place-row">
+                            <div className="flex items-start gap-3">
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-[15px] font-semibold">{p.name}</p>
+                                    <p className="mt-0.5 truncate text-[12.5px]" style={{ color: C.dim }}>{[p.kind, fishingSidoShort(p.sido), p.sigungu].filter(Boolean).join(" · ")}</p>
+                                </div>
+                                <button type="button" onClick={() => onPick(p)} className="h-9 shrink-0 rounded-full px-3 text-[13px] font-semibold" style={{ background: "#38BDF826", color: C.brand }} data-testid="fishing-place-pick">조과 적기</button>
+                            </div>
+                            {p.species.length > 0 && <p className="mt-2 truncate text-[13px]" style={{ color: C.soft }}>{p.species.slice(0, 6).join(" · ")}</p>}
+                            {(p.fee || p.dataDate) && <p className="mt-1 truncate text-[12px]" style={{ color: C.dim }}>{[p.fee ? `요금 ${p.fee}` : null, p.dataDate ? `자료 기준 ${p.dataDate}` : null].filter(Boolean).join(" · ")}</p>}
+                        </li>
+                    ))}
+                </ul>
+            )}
+            {data && data.total > data.items.length && <p className="mt-3 text-center text-[12.5px]" style={{ color: C.dim }}>{data.items.length}곳만 보여요. 글자나 지역으로 좁혀 보세요.</p>}
+            <p className="mt-4 text-[12px] leading-relaxed" style={{ color: C.dim }}>출처: {FISHING_PLACE_SOURCE}. 방파제 · 갯바위 같은 자유 포인트와 낚시어선은 아직 없어요. 요금은 바뀌었을 수 있어요.</p>
+        </section>
+    );
+}
+
 /** 조과 한 줄 적기 — 날짜 · 다녀온 곳 · 어디서 · 어종 · 마릿수 · 길이 · 한마디 */
-function CatchSheet({ today, onClose }: { today: string; onClose: () => void }) {
+function CatchSheet({ today, onClose, preset }: { today: string; onClose: () => void; preset?: { place: string; spot: FishingSpotId } | null }) {
     const [day, setDay] = useState(today);
-    const [place, setPlace] = useState("");
-    const [spot, setSpot] = useState<FishingSpotId | null>(null);
+    const [place, setPlace] = useState(preset?.place ?? "");
+    const [spot, setSpot] = useState<FishingSpotId | null>(preset?.spot ?? null);
     const [species, setSpecies] = useState("");
     const [count, setCount] = useState("1");
     const [lengthCm, setLengthCm] = useState("");
