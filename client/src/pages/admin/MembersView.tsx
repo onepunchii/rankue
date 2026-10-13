@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
 import { adminRoleLabel } from "@shared/adminRole";
-import { MemberAvatar, PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, daysSince, isKstToday, phoneLabel, KpiTile, ADMIN_STICKY_TOP } from "./adminUtils";
+import { MemberAvatar, PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, daysSince, isKstToday, phoneLabel, KpiTile, ADMIN_STICKY_TOP, SPORT_CHIP, SportChip } from "./adminUtils";
 
 type Activity = {
     today: number; yesterday: number;
@@ -100,6 +100,7 @@ export default function MembersView({ onOpenId }: {
             "마지막 접속": m.lastSeenAt ? kstDate(m.lastSeenAt) : "",
             "7일 접속일": m.activeDays7 ?? 0,
             "가입일": kstDate(m.createdAt),
+            "주 종목": m.primarySport ? SPORT_CHIP[m.primarySport]?.label ?? "" : "",
             "상태": m.status === "banned" ? "정지" : "",
         }));
         const ws = XLSX.utils.json_to_sheet(data);
@@ -203,6 +204,7 @@ export default function MembersView({ onOpenId }: {
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-center gap-1.5">
                                             <span className="font-bold text-[14px] truncate">{m.name}</span>
+                                            <SportChip sport={m.primarySport} />
                                             {m.status === "banned" && <span className="shrink-0 rounded-full bg-red-500/10 px-1.5 text-[10.5px] font-bold text-red-600">정지</span>}
                                             <PlatformIcon platform={m.platform} className="text-[12px]" />
                                             <CountryFlag code={m.countryCode} />
@@ -245,6 +247,7 @@ export default function MembersView({ onOpenId }: {
                                                 <div className="min-w-0">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="font-bold text-[rgba(0,0,0,0.87)]">{m.name}</span>
+                                                        <SportChip sport={m.primarySport} />
                                                         {m.status === "banned" && <span className="rounded-full bg-red-500/10 px-1.5 text-[10.5px] font-bold text-red-600">정지</span>}
                                                         {adminRoleLabel(m.role) && <span className="rounded-full bg-black/[0.06] px-1.5 text-[10.5px] font-bold text-black/55">{adminRoleLabel(m.role)}</span>}
                                                     </div>

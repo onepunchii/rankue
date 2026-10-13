@@ -296,6 +296,8 @@ export class AdminRepository {
             handi4c: hiqMembers.handi4c,
             marketingAgree: hiqMembers.marketingAgree,
             locale: hiqMembers.locale,
+            // 주 종목(2026-10-13 오너: "어드민 회원에 어떤 카테고리로 설정했는지 표기만 — 골프 · 당구 · 등산 초기 설정으로") — 가입 뒤 한 번 고르는 값. 아직 안 골랐으면 null
+            primarySport: hiqMembers.primarySport,
             // 계정 상태·권한(정지 여부를 회원 관리에서 바로 보이게) — 프로필이 없으면 null
             status: profiles.status,
             role: profiles.role,

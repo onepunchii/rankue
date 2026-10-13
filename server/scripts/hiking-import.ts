@@ -23,6 +23,7 @@ import { courseStats, distM, nearestOnLine, packLine, thinLine, withKm, type Lin
 import { cleanMountainGuide } from "../../shared/hikingGuide";
 import { hikingPoiKind } from "../../shared/hikingPois";
 import { HIKING_SUMMIT_FIXES, applySummitFix } from "../../shared/hikingSummitFix";
+import { bundleCourses } from "./lib/hikingGpx";
 import { isTwinFrom, twinGuideSource } from "../../shared/hikingTwins";
 
 const args = process.argv.slice(2);
@@ -166,20 +167,23 @@ async function main() {
     for (const [frtrlId, mid] of link) {
         if (!loaded.has(mid)) continue;
         const m = byId.get(mid);
-        const lines = linesOf(frtrlId);
-        const ids: string[] = [];
-        lines.forEach((line, i) => {
-            const s = courseStats(line);
-            if (s.km < 0.2) { shortLines++; ids.push(""); return; }
-            const id = `${frtrlId}-${i + 1}`;
-            ids.push(id);
-            const top = m.lat != null ? nearestOnLine(line, m.lat, m.lon) : null;
+        // 코스 — 조각이 하나인 파일은 그대로 한 코스, 조각이 여럿인 파일(등산로 그물)은 이어서 들머리 → 정상의 길들로(scripts/lib/hikingGpx · shared/hikingRoutes).
+        // 예전에는 파일의 점을 전부 한 줄로 이어 붙여, 조각 사이를 건너뛴 거리까지 코스의 길이에 들어갔다(292m 객산이 29.6km).
+        // 이미 실린 것을 바꾸는 일은 hiking-reroute.ts 가 한다(이 스크립트는 지우지 않는다 — 옛 줄 "<번호>-<파일 순번>" 은 거기서 지운다).
+        const f = folders.get(frtrlId)!;
+        const built = bundleCourses(f.dir, f.files, frtrlId, m.lat != null ? { lat: m.lat, lng: m.lon } : null);
+        const lines: LinePoint[][] = [], ids: string[] = [];
+        for (const c of built) {
+            const s = courseStats(c.line);
+            if (s.km < 0.2) { shortLines++; continue; }
+            lines.push(c.line); ids.push(c.id);
+            const top = m.lat != null ? nearestOnLine(c.line, m.lat, m.lon) : null;
             courseRows.push({
-                id, mountain_id: mid, frtrl_id: frtrlId, seq: i + 1, km: Math.round(s.km * 100) / 100, gain_m: s.gainM, loss_m: s.lossM, min_m: s.minM, max_m: s.maxM, loop: s.loop,
-                summit_km: top && top.offM <= SUMMIT_ON_COURSE_M ? Math.round(top.km * 1000) / 1000 : null, line: packLine(thinLine(line)),
+                id: c.id, mountain_id: mid, frtrl_id: frtrlId, seq: c.built ? c.file * 100 + Number(c.id.split("r").pop()) : c.file, km: Math.round(s.km * 100) / 100, gain_m: s.gainM, loss_m: s.lossM, min_m: s.minM, max_m: s.maxM, loop: s.loop,
+                summit_km: top && top.offM <= SUMMIT_ON_COURSE_M ? Math.round(top.km * 1000) / 1000 : null, line: packLine(thinLine(c.line)),
             });
             const st = stat(mid); st.n++; st.min = Math.min(st.min, s.km); st.max = Math.max(st.max, s.km);
-        });
+        }
         for (const p of bundleOf.get(frtrlId)?.pois ?? []) {
             if (typeof p.lat !== "number" || typeof p.lon !== "number") continue;
             const kind = hikingPoiKind(String(p.type ?? ""), String(p.name ?? ""));

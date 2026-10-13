@@ -218,3 +218,18 @@ export const ADMIN_STICKY_TOP = "sticky top-[calc(3.5rem+env(safe-area-inset-top
  * className 의 p-0 이 지우지 못하게 style 로 준다. 닫기(X) 단추의 자리는 ui/sheet 가 같은 만큼 내린다.
  */
 export const SHEET_SAFE_TOP = { paddingTop: "env(safe-area-inset-top)" } as const;
+
+/**
+ * 주 종목의 표시(2026-10-13 오너: "어드민 회원에 어떤 카테고리로 설정했는지 표기만 해줘 보기 편하게") — 가입 뒤 '어떤 운동을 주로 하세요?'에서 고른 값.
+ * 색은 앱의 종목 색 그대로(당구 녹색 · 골프 주황 · 등산 살구). 아직 안 고른 회원에게는 붙이지 않는다.
+ */
+export const SPORT_CHIP: Record<string, { label: string; bg: string; fg: string }> = {
+    BILLIARDS: { label: "당구", bg: "#0062411F", fg: "#006241" },
+    GOLF: { label: "골프", bg: "#FF6B0024", fg: "#C24E00" },
+    HIKING: { label: "등산", bg: "#F28C6A33", fg: "#A34E2E" },
+};
+export function SportChip({ sport }: { sport?: string | null }) {
+    const c = sport ? SPORT_CHIP[sport] : undefined;
+    if (!c) return null;
+    return <span className="shrink-0 rounded-full px-1.5 text-[10.5px] font-bold" style={{ background: c.bg, color: c.fg }} title="주 종목" data-testid="member-sport">{c.label}</span>;
+}

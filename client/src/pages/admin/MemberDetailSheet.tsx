@@ -25,7 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle, LucideFootprints } from "@/lib/icons";
 import MemberGamesDialog from "./MemberGamesDialog";
 import MemberActivitySheet from "./MemberActivitySheet";
-import { MemberAvatar, PlatformIcon, CountryFlag, Pill, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday, SHEET_SAFE_TOP } from "./adminUtils";
+import { MemberAvatar, PlatformIcon, CountryFlag, Pill, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday, SHEET_SAFE_TOP, SportChip } from "./adminUtils";
 import { TODAY_ACTIVE_KEY } from "./TodayActiveView";
 import { appConfirm, appAlert } from "@/components/AppDialog";
 import { useT } from "@/lib/i18n";
@@ -57,6 +57,8 @@ export type AdminMember = {
     profileImageUrl?: string | null;
     status: "active" | "banned" | null;
     role: string | null;
+    /** 주 종목 — 가입 뒤 한 번 고르는 값("BILLIARDS" | "GOLF" | "HIKING"). 아직 안 골랐으면 null */
+    primarySport?: string | null;
     marketingAgree: boolean | null;
     locale: string | null;
     countryCode: string | null;
@@ -400,6 +402,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                     <div className="min-w-0">
                                         <SheetTitle className="flex items-center gap-1.5 text-[18px] font-black text-[rgba(0,0,0,0.87)]">
                                             <span className="truncate">{m.name}</span>
+                                            <SportChip sport={m.primarySport} />
                                             {banned && <span className="shrink-0 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-600">정지됨</span>}
                                             {isStaff && <span className="shrink-0 rounded-full bg-black/[0.06] px-2 py-0.5 text-[11px] font-bold text-black/60">{adminRoleLabel(role)}</span>}
                                             {role === "store_owner" && <span className="shrink-0 rounded-full bg-black/[0.06] px-2 py-0.5 text-[11px] font-bold text-black/60">사장님</span>}
