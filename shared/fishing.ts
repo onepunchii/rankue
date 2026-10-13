@@ -20,8 +20,10 @@ export const FISHING_PATH = "/fishing";
 
 /** 바다 색 — 등산(청록 · 살구) · 골프(검정 · 라임) · 당구와 섞이지 않게 남색 바탕에 물빛 */
 export const FISHING_COLORS = {
-    bg: "#071A2B", bar: "#0A2238", card: "#0E2A44", line: "#FFFFFF14",
-    brand: "#38BDF8", onBrand: "#04202F", foam: "#E6F6FF", soft: "#E6F6FFB3", dim: "#E6F6FF80", sun: "#FFC857",
+    // 2026-10-14 다시 고름(오너: "등산의 느낌이 좋아") — '새벽 바다': 짙은 바다색 바탕 · 동틀 녘의 따뜻한 강조 · 모래빛 숫자 · 종이빛 글자.
+    // 등산(짙은 청록 + 산호빛)과 같은 결이고, 값은 표지 그림(client/public/fishing/art/hero.webp)에서 가져왔다. card 는 바탕 위에 얹는 옅은 판이다.
+    bg: "#0B1E2D", bar: "#0B1E2D", card: "#FFFFFF0A", line: "#FFFFFF14",
+    brand: "#F4A963", onBrand: "#2A1606", foam: "#F3ECDD", soft: "#F3ECDDB3", dim: "#F3ECDD80", sun: "#F8DDB0",
 } as const;
 
 /** 어디서 낚았는가 — 낚시꾼이 쓰는 갈래 */

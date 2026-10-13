@@ -43,8 +43,8 @@ export const SPORT_HEADER_THEME: Readonly<Record<HeaderSport, { brand: string; o
     BILLIARDS: { brand: "#006241", onBrand: "#FFFFFF", text: "#1A1A1A", soft: "#1A1A1A99", pill: "#0000000D", iconBg: "#0062411A", bar: "#F2F0EB", ring: "#F2F0EB", line: "#0000000F" },
     GOLF: { brand: "#FF6B00", onBrand: "#1A0A00", text: "#FFFFFF", soft: "#FFFFFFB3", pill: "#FFFFFF14", iconBg: "#FFFFFF0F", bar: "#0A0A0A", ring: "#0A0A0A", line: "#FFFFFF14" },
     HIKING: { brand: "#F28C6A", onBrand: "#2A1208", text: "#F4EFE3", soft: "#F4EFE3B3", pill: "#FFFFFF0F", iconBg: "#FFFFFF0F", bar: "#0B1F26", ring: "#0B1F26", line: "#FFFFFF14" },
-    // 낚시(2026-10-14) — 새벽 바다: 짙은 남색 + 물빛
-    FISHING: { brand: "#38BDF8", onBrand: "#04202F", text: "#E6F6FF", soft: "#E6F6FFB3", pill: "#FFFFFF0F", iconBg: "#FFFFFF0F", bar: "#071A2B", ring: "#071A2B", line: "#FFFFFF14" },
+    // 낚시(2026-10-14) — 새벽 바다: 짙은 바다색 + 동틀 녘의 따뜻한 빛(등산과 같은 결)
+    FISHING: { brand: "#F4A963", onBrand: "#2A1606", text: "#F3ECDD", soft: "#F3ECDDB3", pill: "#FFFFFF0F", iconBg: "#FFFFFF0F", bar: "#0B1E2D", ring: "#0B1E2D", line: "#FFFFFF14" },
 };
 
 /** rankue 워드마크 — 글자 모양의 그림에 색을 입힌다. 높이를 주면 너비는 비율대로 */

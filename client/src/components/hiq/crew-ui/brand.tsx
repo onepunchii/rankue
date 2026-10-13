@@ -45,17 +45,19 @@ export const CrewCover = memo(function CrewCover({ crew, height, className, alt 
                 <linearGradient id={`dawn${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0E2A33" /><stop offset="1" stopColor="#2B6975" /></linearGradient>
             </defs>
             {crew.sportCategory === "FISHING" ? (
-                // 낚시 크루 — 새벽 바다: 수평선 · 물결 · 찌 하나
+                // 낚시 크루 — 새벽 바다: 동틀 녘 하늘 · 해 · 물결 띠 · 찌 하나(표지 그림과 같은 색)
                 <g>
-                    <rect width={W} height={H} fill="#071A2B" />
-                    <rect y={H * 0.46} width={W} height={H * 0.54} fill="#0E2A44" />
-                    <circle cx={W * 0.78} cy={H * 0.4} r={H * 0.13} fill="#FFC857" opacity=".9" />
-                    <rect y={H * 0.46} width={W} height={H * 0.54} fill="#0E2A44" opacity=".55" />
-                    <path d={`M0 ${H * 0.62} Q${W * 0.12} ${H * 0.56} ${W * 0.25} ${H * 0.62} T${W * 0.5} ${H * 0.62} T${W * 0.75} ${H * 0.62} T${W} ${H * 0.62}`} stroke="#38BDF8" strokeOpacity=".55" strokeWidth="2" fill="none" />
-                    <path d={`M0 ${H * 0.78} Q${W * 0.1} ${H * 0.73} ${W * 0.2} ${H * 0.78} T${W * 0.4} ${H * 0.78} T${W * 0.6} ${H * 0.78} T${W * 0.8} ${H * 0.78} T${W} ${H * 0.78}`} stroke="#38BDF8" strokeOpacity=".3" strokeWidth="2" fill="none" />
-                    <line x1={W * 0.3} y1={H * 0.36} x2={W * 0.3} y2={H * 0.6} stroke="#E6F6FF" strokeWidth="2" strokeLinecap="round" />
-                    <ellipse cx={W * 0.3} cy={H * 0.56} rx="6" ry="11" fill="#C8372D" />
-                    <ellipse cx={W * 0.3} cy={H * 0.6} rx="6" ry="6" fill="#E6F6FF" />
+                    <rect width={W} height={H} fill="#F4A963" />
+                    <rect width={W} height={H * 0.5} fill="#F8C98E" opacity=".45" />
+                    <circle cx={W * 0.72} cy={H * 0.3} r={H * 0.12} fill="#FBE6C4" />
+                    <rect y={H * 0.48} width={W} height={H * 0.52} fill="#1F5A78" />
+                    <rect y={H * 0.6} width={W} height={H * 0.4} fill="#164863" />
+                    <rect y={H * 0.76} width={W} height={H * 0.24} fill="#0F2F45" />
+                    <rect x={W * 0.52} y={H * 0.52} width={W * 0.4} height="3" rx="1.5" fill="#FBE6C4" opacity=".7" />
+                    <rect x={W * 0.6} y={H * 0.66} width={W * 0.26} height="3" rx="1.5" fill="#FBE6C4" opacity=".45" />
+                    <line x1={W * 0.26} y1={H * 0.36} x2={W * 0.26} y2={H * 0.6} stroke="#0B1E2D" strokeWidth="2" strokeLinecap="round" />
+                    <ellipse cx={W * 0.26} cy={H * 0.57} rx="6" ry="11" fill="#C8372D" />
+                    <ellipse cx={W * 0.26} cy={H * 0.61} rx="6" ry="6" fill="#F3ECDD" />
                 </g>
             ) : hiking ? (
                 <HikingCover id={crew.id} uid={uid} W={W} H={H} />
@@ -154,8 +156,8 @@ export const CrewEmblem = memo(function CrewEmblem({ crew, size, ring, showSport
                     <circle cx="11" cy="11" r="10.5" fill={ring ?? "var(--surface-1)"} />
                     {crew.sportCategory === "FISHING" ? (
                         <>
-                            <circle cx="11" cy="11" r="7.5" fill="#0E2A44" stroke="rgba(0,0,0,.2)" />
-                            <path d="M5 12 Q7 9.5 9 12 T13 12 T17 12" stroke="#38BDF8" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+                            <circle cx="11" cy="11" r="7.5" fill="#1F5A78" stroke="rgba(0,0,0,.2)" />
+                            <path d="M5 12 Q7 9.5 9 12 T13 12 T17 12" stroke="#F3ECDD" strokeWidth="1.6" fill="none" strokeLinecap="round" />
                         </>
                     ) : crew.sportCategory === "HIKING" ? (
                         <>
@@ -197,11 +199,12 @@ export const CrewThumb = memo(function CrewThumb({ crew, size = 64, className }:
             <svg width={size} height={size} viewBox="0 0 64 64" className="absolute inset-0">
                 {crew.sportCategory === "FISHING" ? (
                     <>
-                        <rect width="64" height="64" fill="#0E2A44" />
-                        <circle cx="46" cy="20" r="7" fill="#FFC857" />
-                        <rect y="34" width="64" height="30" fill="#071A2B" />
-                        <path d="M0 42 Q8 37 16 42 T32 42 T48 42 T64 42" stroke="#38BDF8" strokeWidth="2.5" fill="none" />
-                        <path d="M0 53 Q8 48 16 53 T32 53 T48 53 T64 53" stroke="#38BDF8" strokeOpacity=".5" strokeWidth="2.5" fill="none" />
+                        <rect width="64" height="64" fill="#F4A963" />
+                        <circle cx="45" cy="19" r="7" fill="#FBE6C4" />
+                        <rect y="31" width="64" height="33" fill="#1F5A78" />
+                        <rect y="42" width="64" height="22" fill="#164863" />
+                        <rect y="53" width="64" height="11" fill="#0F2F45" />
+                        <rect x="30" y="35" width="26" height="2.5" rx="1.25" fill="#FBE6C4" opacity=".7" />
                     </>
                 ) : hiking ? (
                     <>

@@ -90,13 +90,15 @@ export function HiqNavigation() {
     const tabs: { id: string; label?: string; text?: string; icon: typeof LucideHome; path: string; to?: string; also?: string[]; only?: boolean }[] = isFishing
         /**
          * 낚시(2026-10-14 오너: "낚시도 골프 · 등산처럼 완전히 구별 — 탭 크기도 같게, 누르면 당구로 가지 않게"):
-         * 홈 · 크루 · 낚시터 · 어탁첩 · 채팅. 크루(둘째) · 채팅(끝)은 다른 종목과 같은 자리이고, 그 화면들은 낚시 크루 · 낚시 방만 보여 준다.
-         * 낚시는 한국어 전용이라 '낚시터' · '어탁첩'은 번역 키로 두지 않는다(text).
+         * 홈 · 크루 · 출조 · 어탁첩 · 채팅. 크루(둘째) · 채팅(끝)은 다른 종목과 같은 자리이고, 그 화면들은 낚시 크루 · 낚시 방만 보여 준다.
+         * 출조 = 나가기 전에 보는 것(오늘의 바다 · 물때 · 낚시터) — 등산의 '산' 자리. 어탁첩 = 모으는 것 — 등산의 '도장첩' 자리.
+         * 조과 적기는 탭에 두지 않는다(2026-10-14 오너: "네비게이션바에 + 빼고") — 홈 표지의 단추와 어탁첩 · 내 조과에 있다.
+         * 낚시는 한국어 전용이라 '출조' · '어탁첩'은 번역 키로 두지 않는다(text).
          */
         ? [
             { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard", also: ["/fishing/log"] },
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
-            { id: "points", text: "낚시터", icon: LucideMap, path: "/fishing/points" },
+            { id: "trip", text: "출조", icon: LucideMap, path: "/fishing/trip", also: ["/fishing/points"] },
             { id: "book", text: "어탁첩", icon: LucideStamp, path: "/fishing/book" },
             { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
         ]

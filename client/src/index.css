@@ -675,38 +675,38 @@ body {
 }
 
 /**
- * 낚시(2026-10-14) — 네 번째 종목의 색. '새벽 바다': 짙은 남색 바탕에 물빛 강조(shared/fishing 의 FISHING_COLORS 와 같은 값).
+ * 낚시(2026-10-14) — 네 번째 종목의 색. '새벽 바다': 짙은 바다색 바탕에 동틀 녘의 따뜻한 강조(shared/fishing 의 FISHING_COLORS 와 같은 값).
  * 등산과 같은 방식으로 골프의 어두운 층을 타고 색 토큰만 덮는다: <html data-sport="GOLF" data-skin="fishing">.
  */
 :root[data-sport="GOLF"][data-skin="fishing"] {
-  --surface-0: #071a2b;
-  --surface-1: #0e2a44;
-  --surface-2: #0e2a44;
-  --surface-3: rgba(230, 246, 255, 0.08);
-  --surface-line: rgba(230, 246, 255, 0.12);
-  --surface-line-strong: rgba(230, 246, 255, 0.22);
+  --surface-0: #0b1e2d;
+  --surface-1: #102a3b;
+  --surface-2: #102a3b;
+  --surface-3: rgba(243, 236, 221, 0.08);
+  --surface-line: rgba(243, 236, 221, 0.12);
+  --surface-line-strong: rgba(243, 236, 221, 0.22);
 
-  /* 물빛 #38BDF8 — 짙은 남색 위의 강조색. 글씨는 짙은 남색을 얹는다. */
-  --brand: 56 189 248;
-  --brand-strong: 14 165 233;
-  --brand-fg: 4 32 47;
+  /* 동틀 녘 #F4A963 — 짙은 바다색 위의 강조색. 글씨는 짙은 밤색을 얹는다. */
+  --brand: 244 169 99;
+  --brand-strong: 233 150 78;
+  --brand-fg: 42 22 6;
 
-  --ink-1: rgba(230, 246, 255, 0.95);
-  --ink-2: rgba(230, 246, 255, 0.76);
-  --ink-3: rgba(230, 246, 255, 0.6);
-  --ink-4: rgba(230, 246, 255, 0.52);
-  --nav-idle: rgba(230, 246, 255, 0.78);
-  --rk-frame-outer: #04111d;
-  --rk-inbox-bg: #0b2439;
+  --ink-1: rgba(243, 236, 221, 0.95);
+  --ink-2: rgba(243, 236, 221, 0.76);
+  --ink-3: rgba(243, 236, 221, 0.6);
+  --ink-4: rgba(243, 236, 221, 0.52);
+  --nav-idle: rgba(243, 236, 221, 0.78);
+  --rk-frame-outer: #071520;
+  --rk-inbox-bg: #0d2535;
 
-  --background: #071a2b;
-  --foreground: rgba(230, 246, 255, 0.95);
-  --card: #0e2a44;
-  --card-foreground: rgba(230, 246, 255, 0.95);
-  --popover: #0e2a44;
-  --popover-foreground: rgba(230, 246, 255, 0.95);
-  --primary: #38bdf8;
-  --primary-foreground: #04202f;
+  --background: #0b1e2d;
+  --foreground: rgba(243, 236, 221, 0.95);
+  --card: #102a3b;
+  --card-foreground: rgba(243, 236, 221, 0.95);
+  --popover: #102a3b;
+  --popover-foreground: rgba(243, 236, 221, 0.95);
+  --primary: #f4a963;
+  --primary-foreground: #2a1606;
 }
 
 

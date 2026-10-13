@@ -35,7 +35,10 @@ describe("낚시 — 따로 선 종목", () => {
         expect(page).not.toContain("<nav ");
         expect(page).not.toContain("<header className=\"sticky");
         const nav = read("client/src/components/hiq/HiqNavigation.tsx");
-        expect(nav).toContain('{ id: "points", text: "낚시터", icon: LucideMap, path: "/fishing/points" },');
+        expect(nav).toContain('{ id: "trip", text: "출조", icon: LucideMap, path: "/fishing/trip", also: ["/fishing/points"] },');
+        // 조과 적기는 탭 · 떠 있는 단추에 두지 않는다(오너: "네비게이션바에 + 빼고") — 홈 표지의 단추다
+        expect(page).not.toContain("fixed right-4");
+        expect(page).toContain('data-testid="fishing-add">조과 적기</button>');
         expect(nav).toContain('{ id: "book", text: "어탁첩", icon: LucideStamp, path: "/fishing/book" },');
         const ctx = read("client/src/contexts/SportContext.tsx");
         expect(ctx).toContain('else if (sport === "FISHING") document.documentElement.setAttribute("data-skin", "fishing");');

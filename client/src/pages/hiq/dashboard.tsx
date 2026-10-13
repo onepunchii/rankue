@@ -414,6 +414,6 @@ export default function HiqDashboard() {
     // 등산(2026-10-13) — 세 번째 종목의 홈. 당구 · 골프 홈과 따로 선 화면이다(client/src/hiking)
     if (isHiking) return <Suspense fallback={<div className="min-h-[100dvh] bg-[#0B1F26]" aria-busy="true" />}><HikingHome /></Suspense>;
     // 낚시(2026-10-14) — 네 번째 종목의 홈. 따로 선 화면이다(client/src/fishing)
-    if (isFishing) return <Suspense fallback={<div className="min-h-[100dvh] bg-[#071A2B]" aria-busy="true" />}><FishingHome view="home" /></Suspense>;
+    if (isFishing) return <Suspense fallback={<div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />}><FishingHome view="home" /></Suspense>;
     return currentSport === "GOLF" ? <GolfDashboard /> : <HiqDashboardBilliards />;
 }

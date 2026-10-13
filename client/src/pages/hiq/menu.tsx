@@ -215,7 +215,7 @@ export default function HiqMenu() {
         ? { label: t("menu.tierExplorer"), class: "border-amber-500/50 text-amber-500", icon: "⛳️" }
         : getTier(member?.handi4c || 0, false, currentSport);
 
-    const sportColor = isFishing ? "#38BDF8" : isHiking ? "#F28C6A" : currentSport === "GOLF" ? "#64DD17" : "#006241";
+    const sportColor = isFishing ? "#F4A963" : isHiking ? "#F28C6A" : currentSport === "GOLF" ? "#64DD17" : "#006241";
     const sportColorClass = currentSport === "GOLF" ? "text-brand" : "text-brand";
     const sportBgClass = currentSport === "GOLF" ? "bg-brand" : "bg-brand";
     const sportGlowClass = currentSport === "GOLF" ? "" : "";
@@ -532,7 +532,7 @@ export default function HiqMenu() {
                             ? [
                                 { icon: LucideStamp, label: "어탁첩", desc: "어종마다 한 장 · 짜 승급", onClick: () => setLocation("/fishing/book") },
                                 { icon: LucideHistory, label: "내 조과", desc: "적어 둔 조과 전부", onClick: () => setLocation("/fishing/log") },
-                                { icon: LucideMap, label: "낚시터 찾기", desc: "지역 · 이름 · 어종으로", onClick: () => setLocation("/fishing/points") },
+                                { icon: LucideMap, label: "출조", desc: "오늘의 바다 · 물때 · 낚시터", onClick: () => setLocation("/fishing/trip") },
                             ]
                             : []),
                         ...(isHiking
