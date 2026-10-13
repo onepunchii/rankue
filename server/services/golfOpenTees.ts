@@ -130,6 +130,34 @@ export async function courseOpenTees(slug: string, nowMs = Date.now()): Promise<
     }
 }
 
+/**
+ * 기간(한국 날짜 startDay ~ endDay)의 남은 티 전부 — 부킹 목록 · 날짜 띠의 건수가 쓴다(services/golfOfficialListings).
+ * 화면에 싣는 기준은 같다: 받는 곳의 줄만 · 12시간 안에 확인한 날만 · 이미 지난 시각은 뺀다. 이른 시각부터.
+ */
+export async function openTeesBetween(startDay: string, endDay: string, nowMs = Date.now()): Promise<OpenTeeFeedRow[]> {
+    if (!openTeesEnabled()) return [];
+    try {
+        const raw = rowsOf(await db.execute(sql`
+            select t.slug, t.play_date, t.tee_time, t.course, t.holes, t.list_price, t.price,
+                   (extract(epoch from t.first_seen) * 1000)::bigint as first_ms,
+                   (extract(epoch from d.first_checked) * 1000)::bigint as day_first_ms, (extract(epoch from d.checked_at) * 1000)::bigint as ms
+            from golf_open_tees t join golf_open_tee_days d on d.slug = t.slug and d.play_date = t.play_date and d.ok
+            where t.play_date >= ${startDay} and t.play_date <= ${endDay} and d.checked_at > now() - interval '12 hours'
+            order by t.play_date, t.tee_time, t.slug, t.course`));
+        const out: OpenTeeFeedRow[] = [];
+        for (const t of raw) {
+            const s = teeSource(t.slug);
+            if (!s || !teeStillAhead(t.play_date, t.tee_time, nowMs)) continue;
+            out.push({ slug: t.slug, day: t.play_date, time: t.tee_time, course: t.course, holes: t.holes ?? null, listPrice: t.list_price ?? null, price: t.price ?? null,
+                fresh: isNewTee(Number(t.first_ms), Number(t.day_first_ms), nowMs), checkedAt: Number(t.ms), page: s.page });
+        }
+        return out;
+    } catch (e) {
+        if (missingTable(e)) return [];
+        throw e;
+    }
+}
+
 /** 여러 골프장의 남은 티 한 줄씩 — 새로 나온 것 먼저, 그다음 가까운 날 · 이른 시각. 골프장마다 몇 줄까지만(한 곳이 목록을 다 차지하지 않게) */
 export async function openTeeFeed(nowMs = Date.now(), limit = 24, perCourse = 3): Promise<OpenTeeFeedRow[]> {
     if (!openTeesEnabled()) return [];

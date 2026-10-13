@@ -75,6 +75,42 @@ export interface OpenTeeFeedRow extends OpenTeeRow { slug: string; day: string; 
 /** 모아 본 한 줄에 골프장의 이름 · 자리를 붙인 것(GET /api/hiq/golf-courses/open-tees) */
 export interface OpenTeeFeedItem extends OpenTeeFeedRow { name: string; region: string; city: string | null }
 
+/**
+ * 부킹 목록에 싣는 꼴(2026-10-13 오너: "부킹에 넣어줘 … '해당 부킹은 홈페이지 예약 티입니다'라고 안내하고 연결되게") — 부킹 한 줄과 같은 칸에
+ * sellerType "OFFICIAL" 과 official(골프장 예약 화면 · 정상 요금 · 확인한 때)을 얹는다. golf_bookings 표의 줄이 아니다(신청 · 채팅 · 삭제의 대상이 아니다).
+ */
+export interface OfficialListing {
+    /** "official:<slug>:<날짜>:<시간>:<코스>" — 부킹의 uuid 와 겹치지 않는다 */
+    id: string;
+    courseId: string;
+    courseName: string;
+    region: string;
+    /** 티타임(ISO) */
+    datetime: string;
+    /** 그 티의 요금(원) — 모르면 0(official.price 가 null) */
+    greenFee: number;
+    isHotDeal: false; isBlind: false; options: string[]; comment: null;
+    /** 코스 이름 */
+    courseType: string | null;
+    listingType: "BOOKING";
+    sellerType: "OFFICIAL";
+    lat: number | null; lng: number | null;
+    official: { slug: string; page: string; course: string; holes: number | null; listPrice: number | null; price: number | null; checkedAt: number; fresh: boolean };
+}
+export const isOfficialListing = (x: unknown): x is OfficialListing => !!x && typeof x === "object" && (x as { sellerType?: unknown }).sellerType === "OFFICIAL" && !!(x as { official?: unknown }).official;
+
+/** 부킹 화면의 글 — 묶음의 제목과 눌렀을 때의 안내 */
+export const OFFICIAL_LISTING_COPY = {
+    title: "골프장 홈페이지 예약 티",
+    sub: "골프장 공식 홈페이지에 열려 있는 티타임이에요.",
+    notice: "이 부킹은 골프장 홈페이지 예약 티예요.",
+    how: "예약은 골프장 홈페이지에서 해요. 랭큐가 받는 예약이 아니에요.",
+    stale: "확인한 뒤에 예약됐을 수 있어요.",
+    go: "골프장 홈페이지에서 예약",
+    info: "골프장 정보",
+    badge: "홈페이지 예약",
+} as const;
+
 /** 날짜의 짧은 이름 — "오늘" · "내일" · "10/16 금" */
 export function teeDayLabel(day: string, nowMs: number): string {
     const today = kstDay(nowMs);

@@ -37,6 +37,8 @@ import { BookingCard } from "../components/booking/BookingCard";
 import { DateSelector } from "../components/booking/DateSelector";
 import { FilterBar } from "../components/booking/FilterBar";
 import { EmptyResult, type ActiveFilter } from "../components/booking/EmptyResult";
+import { OfficialTees } from "../components/booking/OfficialTees";
+import { isOfficialListing, type OfficialListing } from "@shared/golfOpenTee";
 import { CourseGroupRow } from "../components/booking/CourseGroupRow";
 import { ShareSheet } from "../components/booking/ShareSheet";
 import { appConfirm } from "@/components/AppDialog";
@@ -297,6 +299,16 @@ export default function BookingList() {
     }, [bookings, viewType, selectedFilters, selectedDate, weekDates, joinKind, location]);
 
     /**
+     * 골프장 홈페이지 예약 티(2026-10-13 오너: "부킹에 넣어줘 … '해당 부킹은 홈페이지 예약 티입니다'라고 안내하고 연결되게") — 서버가 부킹 목록에
+     * 섞어 준 줄(sellerType "OFFICIAL")을 갈라낸다. 거르는 · 정렬하는 규칙은 위에서 이미 같이 탔다(시간 · 가격 필터, 날짜).
+     * 회원이 올린 글(listed)은 예전 그대로 카드로, 홈페이지 예약 티는 그 아래에 골프장별로 묶어 따로 그린다(신청 · 채팅 · 삭제가 없는 줄이라 카드가 다르다).
+     */
+    const { listed, officialTees } = useMemo(() => {
+        const all = filteredTimes as any[];
+        return { listed: all.filter((x) => !isOfficialListing(x)), officialTees: all.filter(isOfficialListing) as OfficialListing[] };
+    }, [filteredTimes]);
+
+    /**
      * 골프장별 보기는 **부킹에서만** 켠다(2026-09-23 판단, 근거 넷).
      *
      *  1. 조인의 '장소' 는 골프장이 아니다. JoinCreateSheet 는 스크린·파크 조인을 올릴 때
@@ -320,8 +332,8 @@ export default function BookingList() {
      * 묶음의 순서는 지금 걸린 정렬을 따르고(groupSortOf), 묶음 안의 순서는 받은 순서 그대로다.
      */
     const grouped = useMemo(
-        () => (groupingOn ? groupByCourse(filteredTimes as any[], groupSortOf(selectedFilters.price)) : null),
-        [groupingOn, filteredTimes, selectedFilters.price],
+        () => (groupingOn ? groupByCourse(listed as any[], groupSortOf(selectedFilters.price)) : null),
+        [groupingOn, listed, selectedFilters.price],
     );
 
     /**
@@ -624,8 +636,13 @@ export default function BookingList() {
                     </div>
                 ) : (
                     <div className="space-y-4">
-                        {filteredTimes.map(renderCard)}
+                        {listed.map(renderCard)}
                     </div>
+                )}
+                {/* 골프장 홈페이지 예약 티 — 회원이 올린 부킹 아래에. 받아 온 것이 없으면 스스로 숨는다.
+                    아래 여백(pb-16): 떠 있는 '부킹 올리기' 단추가 마지막 골프장의 줄을 가리지 않게 */}
+                {!isLoading && !isError && officialTees.length > 0 && (
+                    <OfficialTees key={`official:${weekDates[selectedDate].fullDate}`} items={officialTees} className={cn("pb-16", listed.length > 0 && "mt-8")} />
                 )}
             </main>
 

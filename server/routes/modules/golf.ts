@@ -53,8 +53,25 @@ router.get("/bookings", asyncHandler(async (req: AuthRequest, res: any) => {
     // 보는 사람(viewerId)은 **로그인 id 로만** 넣는다 — 나와 차단 관계인 사람(내가 차단했든, 나를 차단했든)의 글을 목록에서 뺀다(2026-10-06, Apple 1.2 · Play UGC).
     // 질의 문자열의 viewerId 는 위에서 버렸고, 여기서 뒤에 적어 한 번 더 덮는다(남의 차단 목록으로 걸러 보지 못하게).
     const bookings = await storage.getGolfBookings(date, { ...filters, viewerId: req.userId });
-    return sendSuccess(res, await withTeeWeather(await withJoinCounts(bookings as any[], req.userId)));
+    const listed = await withTeeWeather(await withJoinCounts(bookings as any[], req.userId));
+    // 골프장 홈페이지 예약 티(2026-10-13) — 그 날의 공개 티타임을 부킹 한 줄의 꼴로 뒤에 붙인다(sellerType "OFFICIAL"). golf_bookings 의 줄이 아니라
+    // 신청 수 · 날씨를 붙이는 위의 길을 타지 않는다. 날짜 없는 요청 · 조인 · 답할 수 없는 필터(조건 · 특가 · 긴급 · 검색)에는 싣지 않는다.
+    const official = date ? await officialFor(date, req.query as Record<string, unknown>) : [];
+    return sendSuccess(res, official.length ? [...listed, ...official] : listed);
 }));
+
+/** 홈페이지 예약 티를 못 읽어도 부킹 목록은 그대로 나가야 한다 — 실패는 빈 목록으로 */
+async function officialFor(date: string, query: Record<string, unknown>): Promise<any[]> {
+    try {
+        const [{ officialListingsOn }, { loadGolfCourseSummary }] = await Promise.all([import("../../services/golfOfficialListings.js"), import("./golfCourses.js")]);
+        const day = /^\d{4}-\d{2}-\d{2}/.exec(String(date))?.[0];
+        if (!day) return [];
+        return await officialListingsOn(day, query, (await loadGolfCourseSummary()).bySlug);
+    } catch (e) {
+        console.error("[golf] official listings:", (e as Error)?.message);
+        return [];
+    }
+}
 
 router.get("/bookings/counts", asyncHandler(async (req: any, res: any) => {
     const { startDate, endDate, viewType } = req.query;
@@ -66,6 +83,19 @@ router.get("/bookings/counts", asyncHandler(async (req: any, res: any) => {
     // 차단도 목록과 **같이** 건다 — 목록에서는 빠지는데 날짜 칩 숫자에는 남으면 "3건"을 열어 2건을 본다.
     // viewerId 는 질의 뒤에 적는다: 질의 문자열로 덮어쓸 수 없다.
     const counts = await storage.getGolfBookingCounts(startDate as string, endDate as string, viewType as string, { ...req.query, viewerId: req.userId });
+    // 홈페이지 예약 티도 같이 센다 — 목록에는 있는데 날짜 띠의 숫자에 없으면 "0건"을 열어 스무 줄을 본다(목록과 같은 필터)
+    try {
+        const [{ officialListingCounts }, { loadGolfCourseSummary }] = await Promise.all([import("../../services/golfOfficialListings.js"), import("./golfCourses.js")]);
+        const s = /^\d{4}-\d{2}-\d{2}/.exec(String(startDate))?.[0], e = /^\d{4}-\d{2}-\d{2}/.exec(String(endDate))?.[0];
+        const extra = s && e ? await officialListingCounts(s, e, req.query as Record<string, unknown>, (await loadGolfCourseSummary()).bySlug) : new Map<string, number>();
+        if (extra.size) {
+            const merged = new Map<string, number>((counts as { date: string; count: number }[]).map((c) => [c.date, Number(c.count)]));
+            for (const [d, n] of extra) merged.set(d, (merged.get(d) ?? 0) + n);
+            return sendSuccess(res, [...merged].sort((a, b) => a[0].localeCompare(b[0])).map(([date, count]) => ({ date, count })));
+        }
+    } catch (e) {
+        console.error("[golf] official counts:", (e as Error)?.message);
+    }
     return sendSuccess(res, counts);
 }));
 
