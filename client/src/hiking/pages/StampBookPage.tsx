@@ -84,7 +84,7 @@ export default function StampBookPage() {
                     <div className="flex items-center gap-3.5 rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0A", boxShadow: done ? "inset 0 0 0 1px #F6D9A880" : "inset 0 0 0 1px #FFFFFF14" }} data-testid="hk-book-reward">
                         <PatchArt art={book.art} size={76} earned={done} preview={!s.mine} />
                         <div className="min-w-0 flex-1">
-                            <p className="text-[12.5px] text-[#F6D9A8] break-keep">{done ? (award ? `다 채워서 받은 와펜 · ${award.serial}번째 · ${stampDate(award.earnedAt)}` : "다 채워서 받은 와펜") : "다 채우면 받는 와펜"}</p>
+                            <p className="text-[12.5px] text-[#F6D9A8] break-keep">{done ? (award ? (example ? `다 채워서 받은 와펜 · ${stampDate(award.earnedAt)}` : `다 채워서 받은 와펜 · ${award.serial}번째 · ${stampDate(award.earnedAt)}`) : "다 채워서 받은 와펜") : "다 채우면 받는 와펜"}</p>
                             <p className="mt-0.5 text-[16.5px] font-semibold text-[#F4EFE3] break-keep">{book.name} 와펜{s.mine && !done && <span className="ml-1.5 text-[13px] font-normal text-[#F4EFE399]">{total - got}곳 남음</span>}</p>
                             {s.mine ? <HkBar got={got} total={total} className="mt-2" /> : <p className="mt-1 text-[13px] text-[#F4EFE399] break-keep">{book.note}</p>}
                         </div>

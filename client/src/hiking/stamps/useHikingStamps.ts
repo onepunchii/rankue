@@ -10,8 +10,8 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useHikingAccess } from "@/hooks/useHikingAccess";
-import { hikingAwardId, hikingBookStates, hikingBooks, mountainStamps, type HikingAwardKind, type HikingBookState, type MountainStamp } from "@shared/hikingStamps";
-import { hikingGrade, summitHeightSum, type HikingGradeState } from "@shared/hikingGrade";
+import { HIKING_GRANDS, HIKING_PINS, hikingAwardId, hikingBookStates, hikingBooks, mountainStamps, type HikingAwardKind, type HikingBookState, type MountainStamp } from "@shared/hikingStamps";
+import { HIKING_GRADES, hikingGrade, summitHeightSum, type HikingGradeState } from "@shared/hikingGrade";
 import { exampleSummits } from "@shared/hikingStampExample";
 import { HIKING_HUB_KEY, type HikingHubData, type MountainSummary } from "../lib/api";
 
@@ -44,6 +44,30 @@ export interface HikingStamps {
     heightSum: number;
 }
 
+/**
+ * 예시의 받은 것 — 다 모은 모습이라 전부 받는다: 권마다의 와펜(그 권의 마지막 도장을 찍은 날) · 큰 와펜 · 등급 휘장(그 수의 산을 채운 날) · 핀.
+ * 순번(serial)은 실제로만 있는 숫자라 만들지 않는다(0 — 화면은 예시일 때 순번을 적지 않는다).
+ */
+function exampleAwards(states: readonly HikingBookState[], stamps: readonly MountainStamp[]): MyAward[] {
+    const out: MyAward[] = [];
+    const add = (kind: HikingAwardKind, key: string, at: number | undefined) => { if (at != null && Number.isFinite(at)) out.push({ id: hikingAwardId(kind, key), kind, key, serial: 0, earnedAt: new Date(at).toISOString() }); };
+    const firstAt = new Map(stamps.map((s) => [s.mountainId, s.firstAt]));
+    const bookAt = new Map<string, number>();
+    for (const st of states) {
+        const at = Math.max(...st.slots.map((x) => firstAt.get(x.m.id) ?? 0));
+        bookAt.set(st.book.id, at);
+        add("patch", st.book.id, at);
+    }
+    for (const g of HIKING_GRANDS) {
+        const ats = states.filter((s) => s.book.kind === g.kind).map((s) => bookAt.get(s.book.id) ?? 0);
+        if (ats.length) add("grand", g.id, Math.max(...ats));
+    }
+    const ordered = stamps.map((s) => s.firstAt).sort((a, b) => a - b);
+    for (const g of HIKING_GRADES) add("grade", g.id, ordered[Math.max(0, g.min - 1)]);
+    HIKING_PINS.forEach((p, i) => add("pin", p.id, ordered[Math.min(ordered.length - 1, Math.floor(((i + 1) * ordered.length) / (HIKING_PINS.length + 1)))]));
+    return out;
+}
+
 export function useHikingStamps(opts: { example?: boolean } = {}): HikingStamps {
     const member = useHikingAccess();
     const example = !!opts.example;
@@ -57,8 +81,9 @@ export function useHikingStamps(opts: { example?: boolean } = {}): HikingStamps 
         const summits: MySummit[] = example
             ? exampleSummits(hikingBooks(famous).flatMap((b) => b.slots.map((x) => x.id)), Date.now())
             : member ? my.data?.summits ?? [] : [];
-        const awards = !example && member ? my.data?.awards ?? [] : [];
         const stamps = mountainStamps(summits);
+        const states = hikingBookStates(hikingBooks(famous), stamps);
+        const awards = example ? exampleAwards(states, stamps) : member ? my.data?.awards ?? [] : [];
         const by = new Map(stamps.map((s) => [s.mountainId, s]));
         const aw = new Map(awards.map((a) => [a.id, a]));
         const verified = stamps.filter((x) => x.verified);
@@ -66,7 +91,7 @@ export function useHikingStamps(opts: { example?: boolean } = {}): HikingStamps 
         return {
             grade: hikingGrade(verified.length), heightSum: summitHeightSum(verified.map((x) => x.mountainId), (id) => heights.get(id)),
             mine, example, member, isLoading: hub.isLoading || (member && !example && my.isLoading), famous,
-            states: hikingBookStates(hikingBooks(famous), stamps), stamps, stampOf: (id) => by.get(id),
+            states, stamps, stampOf: (id) => by.get(id),
             done: new Set(stamps.filter((s) => s.verified).map((s) => s.mountainId)), summits, awards, award: (kind, key) => aw.get(hikingAwardId(kind, key)),
         };
     }, [mine, example, member, hub.data, hub.isLoading, my.data, my.isLoading]);

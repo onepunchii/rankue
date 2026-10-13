@@ -9,7 +9,7 @@
  * 예시(2026-10-13 오너: "등산에 도장첩 예시 만들어줘 — 수집욕이 올라가게. 골프는 예시 버튼을 잘 활용하는데 등산은 부족하네"):
  *   머리줄의 '예시' 단추(또는 도장이 없는 회원 · 방문자에게 보이는 카드)를 누르면 주소에 ?example=1 이 붙고 **다 모은 모습**으로 바뀐다 —
  *   모든 권이 채워지고 와펜이 제 색으로 달리고 산행 등급이 맨 위에 선다. 누구의 기록도 아니라 산의 목록에서 만든 것이라(shared/hikingStampExample)
- *   화면 맨 위에 '예시'라고 적고, 내 것으로 가는 길(배낭 · 사진첩)은 그리지 않는다. 뒤로 가면 내 도장첩이다.
+ *   화면 맨 위에 '예시'라고 적고, 내 사진첩으로 가는 길은 그리지 않는다. 등급 · 요약을 누르면 예시 배낭(와펜 · 핀을 다 단 모습)으로 간다. 뒤로 가면 내 도장첩이다.
  * 회원에게는 맨 위 요약 밑에 '내 사진첩'의 입구가 놓인다(album/AlbumParts AlbumEntry — 산마다 올린 내 사진을 한 곳에서 본다).
  * ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상.
  */
@@ -76,14 +76,10 @@ export default function StampShelf() {
                                     <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F6D9A8]" aria-hidden />
                                 </button>
                             )}
-                            {s.mine && (example
-                                ? <div className="mb-2.5" data-testid="hk-shelf-grade"><GradeCard state={s.grade} /></div>
-                                : <Link href={HIKING_PACK_PATH} className="mb-2.5 block active:opacity-80" data-testid="hk-shelf-grade"><GradeCard state={s.grade} /></Link>)}
-                            {example ? (
-                                // 예시의 숫자는 눌러 갈 곳이 없다(배낭은 내 것이다)
-                                <div className="flex items-center rounded-2xl border border-[#FFFFFF14] bg-[#FFFFFF0A] py-3.5" data-testid="hk-stamp-summary">{summaryRow}</div>
-                            ) : s.mine ? (
-                                <Link href={HIKING_PACK_PATH} className="flex items-center rounded-2xl border border-[#FFFFFF14] bg-[#FFFFFF0A] py-3.5 active:bg-[#FFFFFF14]" data-testid="hk-stamp-summary">
+                            {/* 등급 · 요약을 누르면 배낭으로 — 예시에서는 예시 배낭으로(와펜 · 핀을 다 단 모습) */}
+                            {s.mine && <Link href={example ? withHikingExample(HIKING_PACK_PATH) : HIKING_PACK_PATH} className="mb-2.5 block active:opacity-80" data-testid="hk-shelf-grade"><GradeCard state={s.grade} /></Link>}
+                            {s.mine ? (
+                                <Link href={example ? withHikingExample(HIKING_PACK_PATH) : HIKING_PACK_PATH} className="flex items-center rounded-2xl border border-[#FFFFFF14] bg-[#FFFFFF0A] py-3.5 active:bg-[#FFFFFF14]" data-testid="hk-stamp-summary">
                                     {summaryRow}
                                     <span className="mr-3 flex items-center gap-0.5 text-[13px] text-[#F6D9A8]">배낭<LucideChevronRight weight="bold" className="h-4 w-4" aria-hidden /></span>
                                 </Link>

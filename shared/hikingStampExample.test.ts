@@ -58,7 +58,9 @@ describe("등산 도장첩의 예시 — 다 모은 모습", () => {
     it("화면 — 기록은 부르지 않고 만든다 · 순번은 만들지 않는다 · 예시의 띠 · 내 것으로 가는 길(배낭 · 사진첩)은 두지 않는다", () => {
         const hook = read("client/src/hiking/stamps/useHikingStamps.ts");
         expect(hook).toContain("const my = useQuery<MyStampsResponse>({ queryKey: MY_STAMPS_KEY, enabled: member && !example });");
-        expect(hook).toContain("const awards = !example && member ? my.data?.awards ?? [] : [];");
+        // 받은 것도 만든다(다 모은 모습) — 순번은 0 으로 두고 화면은 예시일 때 순번을 적지 않는다
+        expect(hook).toContain("const awards = example ? exampleAwards(states, stamps) : member ? my.data?.awards ?? [] : [];");
+        expect(hook).toContain("out.push({ id: hikingAwardId(kind, key), kind, key, serial: 0, earnedAt: new Date(at).toISOString() });");
         expect(hook).toContain("? exampleSummits(hikingBooks(famous).flatMap((b) => b.slots.map((x) => x.id)), Date.now())");
         const shelf = read("client/src/hiking/pages/StampShelf.tsx");
         expect(shelf).toContain("const example = isHikingExample(useSearch());");
@@ -74,7 +76,16 @@ describe("등산 도장첩의 예시 — 다 모은 모습", () => {
         expect(book).toContain("const hasPhoto = s.member && !example && slots.some((x) => photoOf.has(x.m.id));");
         // 책장의 줄 — 예시에서 권으로 들어가도 예시가 이어진다
         expect(read("client/src/hiking/stamps/StampParts.tsx")).toContain("<Link href={example ? withHikingExample(hikingBookPath(book.id)) : hikingBookPath(book.id)}");
-        for (const src of [shelf, book]) {
+        // 배낭도 예시로(오너: "도장첩 예시에 배낭도 예시로 보여지게") — 예시 책장의 등급 · 요약이 예시 배낭으로 간다
+        const pack = read("client/src/hiking/pages/PackPage.tsx");
+        expect(pack).toContain("const s = useHikingStamps({ example });");
+        expect(pack).toContain("{EX.packBanner}");
+        expect(pack).toContain("{!example && <AlbumEntry from=\"pack\" className=\"mt-2.5\" />}");
+        expect(pack).toContain("{a ? (example ? stampDate(a.earnedAt) : `${a.serial}번째 · ${stampDate(a.earnedAt)}`) : p.how}");
+        expect(pack).toContain("{!s.member && <div className=\"px-5 pt-8\"><HikingCta /></div>}");
+        expect(shelf.match(/href=\{example \? withHikingExample\(HIKING_PACK_PATH\) : HIKING_PACK_PATH\}/g)?.length).toBe(2);
+        expect(book).toContain("(example ? `다 채워서 받은 와펜 · ${stampDate(award.earnedAt)}`");
+        for (const src of [shelf, book, pack]) {
             for (const m of src.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) expect(Number(m[1]), m[0]).toBeGreaterThanOrEqual(12);
             expect(src.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/font-(bold|extrabold|black)/);
         }

@@ -9,7 +9,8 @@
  * 못 받은 것은 흐린 윤곽과 조건이 보인다. 받은 것에는 받은 순번과 날.
  * 누구에게나 열린다(등산이 열리지 않은 사람에게는 받을 수 있는 것을 제 색으로). ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상.
  */
-import { Link } from "wouter";
+import { Link, useSearch } from "wouter";
+import { HIKING_EXAMPLE_COPY as EX, isHikingExample, withHikingExample } from "@shared/hikingStampExample";
 import { useSeo } from "@/hooks/useSeo";
 import { HIKING_GRADES, type HikingGradeId } from "@shared/hikingGrade";
 import { HIKING_REGIONS, duplicateNames, hikingMountainPath, mountainLabel } from "@shared/hikingMountains";
@@ -21,12 +22,14 @@ import { HikingCta } from "../components/MountainParts";
 import { stampDate } from "../lib/date";
 import { GradeCard, GradeLadder } from "../stamps/GradeParts";
 import { MountainPatch } from "../stamps/MountainPatch";
-import { HIKING_STAMPS_PATH, PatchArt, PinArt, hikingBookPath } from "../stamps/StampParts";
+import { HIKING_PACK_PATH, HIKING_STAMPS_PATH, PatchArt, PinArt, hikingBookPath } from "../stamps/StampParts";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { YearReport } from "../components/YearReport";
 
 export default function PackPage() {
-    const s = useHikingStamps();
+    // 예시(?example=1) — 와펜 · 핀 · 등급 휘장을 다 단 배낭(2026-10-13 오너: "도장첩 예시에 배낭도 예시로 보여지게"). 예시 책장에서 들어온다
+    const example = isHikingExample(useSearch());
+    const s = useHikingStamps({ example });
     useSeo({ title: HIKING_PACK_SEO.title, description: HIKING_PACK_SEO.desc, path: HIKING_PACK_SEO.path });
     const got = s.stamps.filter((x) => x.verified).length;
     const patchN = s.states.filter((x) => x.done).length + HIKING_GRANDS.filter((g) => s.award("grand", g.id)).length;
@@ -37,13 +40,20 @@ export default function PackPage() {
     const gradeOn = (id: HikingGradeId) => { const a = s.award("grade", id); return a ? stampDate(a.earnedAt) : null; };
 
     return (
-        <HikingShell title="배낭" backTo={HIKING_STAMPS_PATH}>
-            <div data-testid="hk-pack" data-mine={s.mine ? "1" : "0"}>
+        <HikingShell title={example ? "배낭 예시" : "배낭"} backTo={example ? withHikingExample(HIKING_STAMPS_PATH) : HIKING_STAMPS_PATH}>
+            <div data-testid="hk-pack" data-mine={s.mine ? "1" : "0"} data-example={example ? "1" : "0"}>
                 {s.isLoading ? (
                     <div className="space-y-3 px-5 pt-6" aria-busy="true"><HkSkel className="h-20" /><HkSkel className="h-80" /></div>
                 ) : (
                     <>
                         <div className="px-5 pt-5">
+                            {example && (
+                                <div className="mb-3 flex items-center gap-3 rounded-2xl bg-[#F6D9A81F] px-3.5 py-3" style={{ boxShadow: "inset 0 0 0 1px #F6D9A866" }} data-testid="hk-example-banner" role="note">
+                                    <span className="shrink-0 rounded-full bg-[#F6D9A8] px-2 py-0.5 text-[12px] font-semibold text-[#2A1208]">{EX.chip}</span>
+                                    <p className="min-w-0 flex-1 text-[13.5px] leading-snug text-[#F4EFE3] break-keep">{EX.packBanner}</p>
+                                    <Link href={HIKING_PACK_PATH} replace className="shrink-0 text-[13px] text-[#F6D9A8] underline underline-offset-2" data-testid="hk-example-exit">{s.member ? EX.exitPack : EX.exitPackGuest}</Link>
+                                </div>
+                            )}
                             {s.mine ? (
                                 <>
                                     <GradeCard state={s.grade} heightSum={s.heightSum} />
@@ -56,7 +66,7 @@ export default function PackPage() {
                                         ))}
                                     </div>
                                     {/* 모아 둔 것의 하나 — 산마다 올린 내 사진(내 사진첩) */}
-                                    <AlbumEntry from="pack" className="mt-2.5" />
+                                    {!example && <AlbumEntry from="pack" className="mt-2.5" />}
                                 </>
                             ) : (
                                 <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-3.5 text-[14px] leading-relaxed text-[#F4EFE3CC] break-keep">{HIKING_PACK_INTRO}</p>
@@ -106,8 +116,8 @@ export default function PackPage() {
                             <div className="rounded-[26px] p-[10px]" style={{ background: "linear-gradient(160deg,#7A7448,#5C5733 55%,#6B6540)", boxShadow: "inset 0 1px 0 #FFFFFF33, 0 8px 18px #00000080" }} data-testid="hk-pack-flap">
                                 <div className="rounded-[18px] px-2 pb-3 pt-4" style={{ background: "repeating-linear-gradient(45deg,#6E6941 0 3px,#686339 3px 6px)", boxShadow: "inset 0 0 0 1.5px #D9CF9A66, inset 0 0 0 5px #0000001F" }}>
                                     <ul className="grid grid-cols-4 gap-x-1 gap-y-4">
-                                        {[...s.states.map((x) => ({ id: x.book.id, art: x.book.art, name: x.book.kind === "plus" ? `${x.book.name} 플러스` : x.book.name, done: x.done, prog: `${x.got}/${x.total}`, href: hikingBookPath(x.book.id), award: s.award("patch", x.book.id) })),
-                                            ...HIKING_GRANDS.map((g) => ({ id: g.id, art: g.art, name: g.name, done: !!s.award("grand", g.id), prog: g.how, href: HIKING_STAMPS_PATH, award: s.award("grand", g.id) }))].map((c) => (
+                                        {[...s.states.map((x) => ({ id: x.book.id, art: x.book.art, name: x.book.kind === "plus" ? `${x.book.name} 플러스` : x.book.name, done: x.done, prog: `${x.got}/${x.total}`, href: example ? withHikingExample(hikingBookPath(x.book.id)) : hikingBookPath(x.book.id), award: s.award("patch", x.book.id) })),
+                                            ...HIKING_GRANDS.map((g) => ({ id: g.id, art: g.art, name: g.name, done: !!s.award("grand", g.id), prog: g.how, href: example ? withHikingExample(HIKING_STAMPS_PATH) : HIKING_STAMPS_PATH, award: s.award("grand", g.id) }))].map((c) => (
                                             <li key={c.id} className="min-w-0">
                                                 <Link href={c.href} className="flex flex-col items-center text-center active:opacity-70" data-testid={`hk-pack-${c.id}`} data-done={c.done ? "1" : "0"}>
                                                     {c.done || !s.mine
@@ -131,7 +141,7 @@ export default function PackPage() {
                                         <li key={p.id} className="flex flex-col items-center text-center" data-testid={`hk-pin-${p.id}`} data-earned={a ? "1" : "0"}>
                                             <PinArt art={p.art} size={58} earned={!!a || !s.mine} />
                                             <span className="mt-1.5 text-[13px] font-semibold leading-tight break-keep" style={{ color: a || !s.mine ? "#F4EFE3" : "#F4EFE399" }}>{p.name}</span>
-                                            <span className="mt-0.5 px-0.5 text-[12px] leading-snug break-keep" style={{ color: a ? "#F6D9A8" : "#F4EFE373" }}>{a ? `${a.serial}번째 · ${stampDate(a.earnedAt)}` : p.how}</span>
+                                            <span className="mt-0.5 px-0.5 text-[12px] leading-snug break-keep" style={{ color: a ? "#F6D9A8" : "#F4EFE373" }}>{a ? (example ? stampDate(a.earnedAt) : `${a.serial}번째 · ${stampDate(a.earnedAt)}`) : p.how}</span>
                                         </li>
                                     );
                                 })}
@@ -139,7 +149,7 @@ export default function PackPage() {
                             <p className="mt-2.5 text-[12.5px] leading-snug text-[#F4EFE373] break-keep">{HIKING_PIN_NOTE}</p>
                         </HkSection>
 
-                        {!s.mine && <div className="px-5 pt-8"><HikingCta /></div>}
+                        {!s.member && <div className="px-5 pt-8"><HikingCta /></div>}
                     </>
                 )}
             </div>
