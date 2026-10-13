@@ -25,7 +25,7 @@ import {
     hiqPollVotes,
     hiqBlocks
 } from "../../shared/schema.js";
-import { eq, and, desc, asc, sql, or, gte, lt, like, ilike, inArray, ne } from "drizzle-orm";
+import { eq, and, desc, asc, sql, or, gte, lt, like, ilike, inArray, ne, getTableColumns } from "drizzle-orm";
 import { notFound, conflict } from "../utils/errors.js";
 import { msg } from "../lib/i18n.js";
 import { upcomingActivityCutoff } from "../../shared/crewActivity.js";
@@ -34,6 +34,7 @@ import { CREW_NOTICES_MAX, imageUrlList, type CrewCursor } from "../../shared/cr
 import type {
     InsertHiqCrew,
     HiqCrew,
+    HiqCrewActivity,
     InsertHiqCrewActivity,
     InsertHiqCrewPost,
     InsertHiqCrewComment,
@@ -51,6 +52,21 @@ const notBlockedBy = (viewerId: string | undefined, authorCol: any) =>
     viewerId
         ? sql`NOT EXISTS (SELECT 1 FROM ${hiqBlocks} WHERE ${hiqBlocks.blockerId} = ${viewerId} AND ${hiqBlocks.blockedId} = ${authorCol})`
         : sql`true`;
+
+// 정모의 산 칸(mountain_slug — migrations/crew_activity_mountain.sql, 2026-10-13). 표보다 코드가 먼저 나간 DB 에서도 정모 목록은 열려야 한다(당구 · 골프 크루도 같은 표다):
+// 칸이 없다는 오류(42703)면 그 칸만 빼고 다시 읽고, 산은 없는 것(null)으로 돌려준다. 쓰기(만들기 · 고치기)는 칸이 있어야 한다 — 그래서 표를 먼저 돌린다.
+const ACTIVITY_COLUMNS = getTableColumns(hiqCrewActivities);
+const { mountainSlug: _activityMountainSlug, ...ACTIVITY_COLUMNS_BEFORE_MOUNTAIN } = ACTIVITY_COLUMNS;
+const missingMountainColumn = (e: any) => (e?.code ?? e?.cause?.code) === "42703" && /mountain_slug/.test(`${e?.message ?? ""} ${e?.cause?.message ?? ""}`);
+async function readActivityRows(read: (cols: typeof ACTIVITY_COLUMNS) => PromiseLike<HiqCrewActivity[]>): Promise<HiqCrewActivity[]> {
+    try {
+        return await read(ACTIVITY_COLUMNS);
+    } catch (e) {
+        if (!missingMountainColumn(e)) throw e;
+        const before = await read(ACTIVITY_COLUMNS_BEFORE_MOUNTAIN as typeof ACTIVITY_COLUMNS);
+        return before.map((a) => ({ ...a, mountainSlug: null }));
+    }
+}
 
 // 쪽 나누기 정렬·비교는 밀리초로 자른 작성 시각 기준 — DB 는 마이크로초까지 두는데 커서(JS Date/ISO)는 밀리초라,
 // 그대로 비교하면 같은 밀리초 안의 글이 경계에서 빠지거나 두 번 나온다. id 를 두 번째 열쇠로 둬 동률을 가른다.
@@ -698,10 +714,11 @@ export class CrewRepository {
      * 상한은 넉넉히 둔다 — 크루 정모가 한 번에 수십 개 잡히는 일은 없다.
      */
     async getUpcomingCrewActivities(crewId: string, limit = 30) {
-        const activities = await db.select().from(hiqCrewActivities)
-            .where(and(eq(hiqCrewActivities.crewId, crewId), gte(hiqCrewActivities.activityDate, upcomingActivityCutoff())))
+        const cutoff = upcomingActivityCutoff();
+        const activities = await readActivityRows((cols) => db.select(cols).from(hiqCrewActivities)
+            .where(and(eq(hiqCrewActivities.crewId, crewId), gte(hiqCrewActivities.activityDate, cutoff)))
             .orderBy(asc(hiqCrewActivities.activityDate), asc(hiqCrewActivities.id))
-            .limit(limit);
+            .limit(limit));
         return this.withActivityParticipants(activities);
     }
 
@@ -710,14 +727,15 @@ export class CrewRepository {
      * 진행 중 창 안의 정모는 다가오는 목록에 있으므로 여기선 뺀다(두 번 보이지 않게).
      */
     async getPastCrewActivities(crewId: string, opts: { cursor?: CrewCursor | null; limit?: number } = {}) {
-        const activities = await db.select().from(hiqCrewActivities)
+        const cutoff = upcomingActivityCutoff();
+        const activities = await readActivityRows((cols) => db.select(cols).from(hiqCrewActivities)
             .where(and(
                 eq(hiqCrewActivities.crewId, crewId),
-                lt(hiqCrewActivities.activityDate, upcomingActivityCutoff()),
+                lt(hiqCrewActivities.activityDate, cutoff),
                 cursorBefore(hiqCrewActivities.activityDate, hiqCrewActivities.id, opts.cursor),
             ))
             .orderBy(desc(msTrunc(hiqCrewActivities.activityDate)), desc(hiqCrewActivities.id))
-            .limit(Math.min(Math.max(opts.limit ?? 20, 1), 50));
+            .limit(Math.min(Math.max(opts.limit ?? 20, 1), 50)));
         return this.withActivityParticipants(activities);
     }
 
@@ -791,6 +809,8 @@ export class CrewRepository {
         cost: string | null;
         maxParticipants: number;
         category: string;
+        // 산악회 일정에서 고른 산의 주소 — 라우트가 산악회일 때만 넘긴다(null = 고른 산을 지웠다)
+        mountainSlug: string | null;
     }>) {
         const [updated] = await db.update(hiqCrewActivities)
             .set(data)
@@ -811,8 +831,8 @@ export class CrewRepository {
     }
 
     async getCrewActivity(activityId: string) {
-        const [activity] = await db.select().from(hiqCrewActivities)
-            .where(eq(hiqCrewActivities.id, activityId));
+        const [activity] = await readActivityRows((cols) => db.select(cols).from(hiqCrewActivities)
+            .where(eq(hiqCrewActivities.id, activityId)));
         return activity || null;
     }
 

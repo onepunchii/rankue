@@ -6,6 +6,8 @@
  *  - listSummits()        내 기록(오래된 순).
  *  - syncHikingAwards()   기록에서 받았어야 할 것(와펜 · 핀) 가운데 아직 안 적은 것을 적는다. 준 것은 거두지 않는다.
  *  - listHikingAwards()   받은 것(받은 순서).
+ *  - crewSummits()        산악회가 함께 오른 산(같은 날 둘 이상이 인증한 산) — 사람은 싣지 않는다.
+ *  - activitySummitCounts() 산악회 일정마다 그날 그 산에서 인증한 참석자의 수 — 일정 여러 개를 한 번에, 수만.
  * 표가 아직 없으면(배포 순서가 어긋났을 때) 빈 값.
  */
 import { sql } from "drizzle-orm";
@@ -121,6 +123,34 @@ export async function crewSummits(crewId: string): Promise<CrewSummitRow[]> {
         return r.map((x) => ({ mountainId: x.mountain_id, firstDay: String(x.first_day), times: Number(x.times), people: Number(x.people) }));
     } catch (e) {
         if (missingTable(e)) return [];
+        throw e;
+    }
+}
+
+// ── 일정의 '함께 정상 인증' ─────────────────────────────────────────────
+/** 셀 일정 하나 — 일정 · 그 일정에서 고른 산(hiking_mountains.id) · 모이는 날의 한국 날짜(YYYY-MM-DD) */
+export interface ActivitySummitKey { activityId: string; mountainId: string; day: string }
+/**
+ * 산악회 일정마다 — 그 일정의 **참석자** 가운데 그날(한국 날짜) 그 산의 정상에서 인증한 사람 수. 일정 여러 개를 **한 번에** 센다(일정마다 따로 묻지 않는다).
+ * 참석자는 일정 목록이 싣는 그 표(hiq_crew_activity_participants)의 참석(joined) 줄이다. 인증 없이 적은 기록(verified = false)은 세지 않는다.
+ * 돌려주는 것은 일정 → 사람 수뿐 — 누가 인증했는지는 싣지 않는다. 한 명도 없는 일정은 답에 없다(0 으로 읽는다).
+ * 산과 날짜는 부르는 쪽(routes/modules/crew)이 정해 넘긴다 — 날짜는 hiking_summits.day 를 적을 때와 같은 셈(shared/hikingStamps kstDay)이어야 맞는다.
+ */
+export async function activitySummitCounts(items: readonly ActivitySummitKey[]): Promise<Map<string, number>> {
+    const out = new Map<string, number>();
+    if (items.length === 0) return out;
+    try {
+        const wanted = sql.join(items.map((x) => sql`(${x.activityId}::uuid, ${x.mountainId}::text, ${x.day}::text)`), sql`, `);
+        const r = await rows<any>(sql`
+            select w.activity_id::text as activity_id, count(distinct s.member_id)::int as n
+            from (values ${wanted}) as w(activity_id, mountain_id, day)
+            join hiq_crew_activity_participants p on p.activity_id = w.activity_id and p.status = 'joined'
+            join hiking_summits s on s.member_id = p.member_id and s.mountain_id = w.mountain_id and s.day = w.day and s.verified
+            group by w.activity_id`);
+        for (const x of r) out.set(String(x.activity_id), Number(x.n));
+        return out;
+    } catch (e) {
+        if (missingTable(e)) return out;
         throw e;
     }
 }

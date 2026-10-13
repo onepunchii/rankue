@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useMemo, useState } from "react";
 import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { differenceInCalendarDays, format } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,10 @@ import { mapLink } from "@shared/storeMeta";
 import { useDateLocale } from "@/components/hiq/crew-board/dateLocale";
 import { CreateActivityDialog } from "../CreateActivityDialog";
 import { CreateGolfActivityModal } from "../club/activity/CreateGolfActivityModal";
+
+// 산악회 일정의 줄('산 정보 보기' · '함께 정상 인증 N명')은 등산의 조각 — 메인 청크에 싣지 않고 산악회 일정에 그릴 것이 있을 때만 불러 온다
+// (만들기 창의 산 고르기와 같은 파일 · 같은 길). 글과 색은 그 조각의 것이라 이 파일에는 등산의 글이 없다.
+const ActivityMountainMarks = lazy(() => import("@/hiking/crew/ActivityMountainPicker").then((m) => ({ default: m.ActivityMountainMarks })));
 
 interface ClubActivityListProps {
     crewId: string;
@@ -207,7 +211,7 @@ export function ClubActivityList({
                 past.isError ? <CrewError onRetry={() => void past.refetch()} /> :
                 pastList.length === 0 ? <p className={cn(CREW_TEXT.sub, "text-center py-2")}>{t("crewMeet.noPast")}</p> : (
                     <ul className={cn(CREW_CARD, "p-0 overflow-hidden")}>
-                        {pastList.map(a => <PastRow key={a.id} activity={a} onShowPeople={() => setPeopleOf(a)} />)}
+                        {pastList.map(a => <PastRow key={a.id} activity={a} hiking={sportType === 'HIKING'} onShowPeople={() => setPeopleOf(a)} />)}
                         {past.hasNextPage && (
                             <li className="border-t border-surface-line">
                                 <button
@@ -380,6 +384,15 @@ function ActivityCard({
                     )}
                     {activity.description && (
                         <p className="text-[13px] font-medium text-ink-3 leading-relaxed whitespace-pre-wrap break-words line-clamp-2">{activity.description}</p>
+                    )}
+                    {/* 산악회 일정에서 고른 산 — 그 산의 화면으로 가는 링크와, 모인 뒤에는 정상에서 인증한 참석자 수(수만). 당구 · 골프 카드에는 없다.
+                        줄의 높이를 먼저 잡아 둔다(조각을 불러 오는 동안 카드가 덜컥거리지 않게) */}
+                    {hiking && activity.mountainSlug && (
+                        <div className="min-h-9 pt-0.5">
+                            <Suspense fallback={null}>
+                                <ActivityMountainMarks slug={activity.mountainSlug} together={activity.summitTogether} />
+                            </Suspense>
+                        </div>
                     )}
 
                 <div className="flex flex-col gap-1 pt-1">
@@ -687,7 +700,7 @@ function TeamWizard({ activity, sportType, currentMemberId, onShareToChat, onClo
 }
 
 /** 지난 정모 한 줄 — 날짜 · 제목 · 참석 수(누르면 명단). */
-function PastRow({ activity, onShowPeople }: { activity: any; onShowPeople: () => void }) {
+function PastRow({ activity, hiking, onShowPeople }: { activity: any; hiking: boolean; onShowPeople: () => void }) {
     const { t, locale } = useT();
     const categoryKey = activityCategoryLabelKey(activity.category);
     const n = participantsOf(activity).length;
@@ -700,6 +713,14 @@ function PastRow({ activity, onShowPeople }: { activity: any; onShowPeople: () =
                 <span className="flex-1 min-w-0">
                     <span className="block text-[15px] font-semibold text-ink-1 truncate">{activity.title}</span>
                     {categoryKey && <span className={CREW_TEXT.caption}>{t(categoryKey)}</span>}
+                    {/* 산악회의 지난 일정 — 참석자 가운데 그날 그 산의 정상에서 인증한 사람 수(수만). 이 줄은 통째로 단추라 링크는 두지 않는다 */}
+                    {hiking && Number(activity.summitTogether) >= 1 && (
+                        <span className="mt-1 block">
+                            <Suspense fallback={null}>
+                                <ActivityMountainMarks together={activity.summitTogether} />
+                            </Suspense>
+                        </span>
+                    )}
                 </span>
                 <span className="text-[13px] font-semibold text-ink-3 rk-num shrink-0">{n}{t("clubActivityListView.personSuffix")}</span>
             </button>

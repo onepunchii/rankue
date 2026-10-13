@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -21,6 +21,11 @@ import { useT } from "@/lib/i18n";
 //  - '직접 고르기'로 날짜·시각을 KST 로 받는다.
 //  - 검증은 서버와 같은 함수(shared/crewPoll) — 빈 칸·중복·60자 초과·지난 마감을 보내기 전에 막는다.
 //  - 틀은 대회 개설 창과 같다: 제목·만들기 버튼은 고정, 본문만 스크롤(폰에서 버튼이 화면 밖으로 밀리지 않게).
+//  - 산악회(2026-10-13)는 보기 칸 아래에 '산으로 보기 채우기'가 놓인다 — 산을 고르면 그 이름이 보기로 들어간다(다음 산 투표).
+//    보기는 여전히 글자다(표 · 서버는 그대로). 그 조각과 규칙(shared/hikingChat)은 산악회일 때만 불러 온다 —
+//    당구 · 골프 회원이 받는 공용 묶음에 등산의 것을 싣지 않고, 이 창에는 등산의 글을 적지 않는다.
+
+const PollMountainFill = lazy(() => import("@/hiking/chat/MountainCardPicker").then((m) => ({ default: m.PollMountainFill })));
 
 interface CreatePollDialogProps {
     open: boolean;
@@ -28,15 +33,21 @@ interface CreatePollDialogProps {
     crewId: string;
     /** 새로 만든 투표(서버 행) — 채팅 + 에서 열었으면 그 투표를 카드로 붙인다. */
     onCreated?: (poll: any) => void;
+    /**
+     * 크루의 종목 — HIKING(산악회)이면 '산으로 보기 채우기'가 놓인다. 채팅 방은 방의 종목을 넘긴다.
+     * 안 주면(크루 홈 · 투표 탭) 그 화면이 이미 받아 둔 크루 정보에서 읽는다 — 이 창이 따로 묻지는 않는다.
+     */
+    sportCategory?: "BILLIARDS" | "GOLF" | "HIKING";
 }
 
 const PRESETS = [0, 1, 3, 7] as const;
 type Preset = (typeof PRESETS)[number] | "custom";
 
-export function CreatePollDialog({ open, onOpenChange, crewId, onCreated }: CreatePollDialogProps) {
+export function CreatePollDialog({ open, onOpenChange, crewId, onCreated, sportCategory }: CreatePollDialogProps) {
     const { t, locale } = useT();
     const { toast } = useToast();
     const queryClient = useQueryClient();
+    const hiking = (sportCategory ?? queryClient.getQueryData<{ crew?: { sportCategory?: string | null } }>([`/api/hiq/crews/${crewId}`])?.crew?.sportCategory) === "HIKING";
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [options, setOptions] = useState<string[]>(["", ""]);
@@ -193,6 +204,11 @@ export function CreatePollDialog({ open, onOpenChange, crewId, onCreated }: Crea
                                 <LucidePlus className="w-4 h-4" />
                                 {t("createPoll.addOption")}
                             </button>
+                        )}
+                        {hiking && (
+                            <Suspense fallback={null}>
+                                <PollMountainFill options={options} maxOptions={POLL_LIMITS.maxOptions} optionMax={POLL_LIMITS.optionMax} onFill={setOptions} />
+                            </Suspense>
                         )}
                     </div>
 

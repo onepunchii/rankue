@@ -15,6 +15,7 @@
  *   POST /chat/rooms/:key/cards/crew-meetup   { activityId }   크루  📅 정모(그 크루의 정모만 — 카드 안에서 참석)
  *   POST /chat/rooms/:key/cards/crew-poll     { pollId }       크루  🗳 투표(그 크루의 투표만 — 카드 안에서 투표)
  *   POST /chat/rooms/:key/cards/crew-notice   { postId }       크루  📢 공지(운영진, 그 크루의 공지 글만)
+ *   POST /chat/rooms/:key/cards/mountain      { slug }         등산  산(산악회 방에서만 — 산 표에서 읽어 채운다)
  *
  * 응답은 보내기 라우트와 같은 모양(메시지 행 + sender) — 화면이 목록에 바로 끼운다. 요약(message)은 카드를 못 그리는
  * 옛 앱용 한 줄이라 한국어 그대로 저장하고, 카드 본문은 화면이 metadata 로 자기 언어로 그린다.
@@ -37,9 +38,12 @@ import { notifyRoom } from "./chat.js";
 import { createSchema as simCreateSchema, createHostMatch } from "./simMatch.js";
 import { kstShortDateTime } from "../../../shared/crewActivity.js";
 import type { CrewSport } from "../../../shared/crewSport.js";
+import { requireHikingAccess } from "../../middleware/hikingAccess.js";
+import { mountainBySlug } from "../../storage/hiking.js";
+import { MOUNTAIN_CARD, buildMountainCard, mountainCardPushTitle, mountainCardSlug, mountainCardSummary } from "../../../shared/hikingChat.js";
 
 const router = Router();
-// 방의 종목. 산악회 방(HIKING)에는 당구 · 골프 카드가 붙지 않는다(아래 openRoom 의 종목 비교) — 크루 카드(정모 · 투표 · 공지)만 붙는다.
+// 방의 종목. 산악회 방(HIKING)에는 당구 · 골프 카드가 붙지 않는다(아래 openRoom 의 종목 비교) — 크루 카드(정모 · 투표 · 공지)와 산 카드만 붙는다.
 type Sport = CrewSport;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** 디렉터리 매장 코드(listings.ts 의 CODE_RE 와 같다). */
@@ -49,6 +53,8 @@ const LISTING_ROOM_GRACE_MS = 2 * 86_400_000;
 /** 골프 카드는 골프 문지기(허용 목록)까지 — /golf 라우터와 같은 규칙. */
 const golfGate = [...requireGolfAccess, requireTermsAccepted];
 const billiardsGate = [requireAuth, requireTermsAccepted];
+/** 산 카드는 등산 문지기(지금은 운영자 · 시험 계정)까지 — 골프 카드와 같은 규칙. */
+const hikingGate = [...requireHikingAccess, requireTermsAccepted];
 
 const gameTypeKo = (t: string) => (t === "3c" ? "3쿠션" : t === "4c" ? "4구" : t);
 
@@ -89,13 +95,15 @@ async function openRoom(req: AuthRequest, res: any, want: Sport | "ANY"): Promis
 /**
  * 카드 행을 만들고 방 사람들에게 푸시한 뒤 보내기 라우트와 같은 모양으로 돌려준다.
  * push: 푸시 본문(받는 사람 언어). url: 누르면 갈 곳(없으면 방).
+ * title: 푸시 제목을 사전 키 대신 글로 줄 때(방 이름표를 받아 만든다) — 등산 카드가 쓴다(등산의 글은 번역 열쇠가 없다. 사전에 없는 키는 키째로 나간다).
  */
-async function postCard(res: any, room: Room, type: string, summary: string, metadata: Record<string, unknown>, opts?: { push?: I18nText; url?: string; silent?: boolean }) {
+async function postCard(res: any, room: Room, type: string, summary: string, metadata: Record<string, unknown>, opts?: { push?: I18nText; url?: string; silent?: boolean; title?: (room: string) => string }) {
     const { ref, me, info } = room;
     const row = await storage.chat.addMessage({ key: ref.key, senderId: me.id, type: "card", message: summary, metadata: { type, ...metadata } });
     // 1:1 은 제목이 곧 보낸 사람이다 — 방 제목은 보는 사람 기준 상대 이름이라 그대로 쓰면 받는 사람 폰에 자기 이름이 뜬다(chat.ts 와 같다).
     // 대괄호는 '방 이름' 표기라 1:1 에서는 안 쓴다(notif.chat.dm.title 관례).
-    const heading = msg(`notif.chat.card.${type}`, { room: ref.kind === "dm" ? me.name : `[${info.title}]` });
+    const roomLabel = ref.kind === "dm" ? me.name : `[${info.title}]`;
+    const heading = opts?.title ? opts.title(roomLabel) : msg(`notif.chat.card.${type}`, { room: roomLabel });
     // silent: 방금 만든 정모·투표를 올리는 카드 — 만들 때 크루 알림이 이미 나갔다(같은 일로 푸시 두 번 방지).
     if (!opts?.silent) await notifyRoom(ref, me.id, opts?.push ?? summary.slice(0, 80), heading, room.sport, opts?.url);
     const profile = me.profileId ? await storage.getProfile(me.profileId) : null;
@@ -333,6 +341,22 @@ router.post("/rooms/:key/cards/golf-round", ...golfGate, asyncHandler(async (req
     const summary = `⛳ 라운드 결과 · ${courseName ?? "골프장"} · ${h.score}타`;
     return postCard(res, room, "GOLF_ROUND", summary, { sessionId: h.golfSessionId, courseName, score: h.score, playedAt: h.createdAt, name: room.me.name },
         { push: msg("notif.chat.card.body.GOLF_ROUND", { name: courseName ?? "", n: String(h.score ?? "") }) });
+}));
+
+/* ── 등산(산악회 방 전용) ─────────────────────────────── */
+// 2026-10-13: 산 카드. 화면은 산의 주소(slug) 하나만 보낸다 — 이름 · 높이 · 자리 · 코스는 산 표에서 읽은 줄로만 채운다
+// (shared/hikingChat buildMountainCard). 본문의 다른 열쇠는 읽지 않는다 — 화면이 이름 · 높이를 지어 보낼 길이 없다.
+// 요약은 "산 · 설악산" — 푸시 본문도 이 한 줄이다(등산은 번역 열쇠가 없다. 방 알림 틀이 보낸 사람 이름을 앞에 붙인다).
+
+// 산 — 산악회 방에서만(openRoom 의 종목 검사). 없는 주소는 404.
+router.post("/rooms/:key/cards/mountain", ...hikingGate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const slug = mountainCardSlug(req.body);
+    if (!slug) return sendError(res, 400, "err.chat.card.badInput");
+    const room = await openRoom(req, res, "HIKING"); if (!room) return;
+    const m = await mountainBySlug(slug);
+    if (!m) return sendError(res, 404, "없는 산이에요", "MOUNTAIN_NOT_FOUND");
+    const card = buildMountainCard(m);
+    return postCard(res, room, MOUNTAIN_CARD, mountainCardSummary(card), { ...card }, { title: mountainCardPushTitle });
 }));
 
 /* ── 크루(크루 방 전용) ───────────────────────────────── */

@@ -6,7 +6,7 @@
  * 옛 앱·모르는 종류는 message 를 그대로 보인다. 이동이 있는 종류만 "열기 ›" 를 단다(MY_STATS 는 이동 없음).
  * 사진·큰 자산은 없다(오너: 용량 최소) — 값 2~3줄이 전부.
  */
-import { useState, type ReactNode } from "react";
+import { lazy, Suspense, useState, type ReactNode } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { LucideLoader2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
@@ -16,6 +16,10 @@ import { cn } from "@/lib/utils";
 import { kstDateLabel, kstTime } from "@/lib/kst";
 import { INTL_TAG, type ChatMsg } from "./ChatRoom";
 import { CrewMeetupBody, CrewNoticeBody, CrewPollBody } from "./crew/CrewChatCards";
+
+// 산 카드(등산, 2026-10-13)는 산악회 방에만 온다 — 그 조각은 카드가 실제로 그려질 때만 불러 온다
+// (당구 · 골프 회원이 받는 공용 묶음에 등산의 규칙 · 그림 조각을 싣지 않는다).
+const MountainChatCard = lazy(() => import("@/hiking/chat/MountainChatCard").then((m) => ({ default: m.MountainChatCard })));
 
 interface Props {
     msg: ChatMsg;
@@ -268,6 +272,14 @@ export function ChatCard({ msg, onOpen, meId }: Props) {
             badge = t("chat.card.notice");
             body = <CrewNoticeBody md={md} />;
             break;
+        case "MOUNTAIN":
+            // 산 카드 — 껍데기까지 등산의 색이라 통째로 그 조각이 그린다(안에 '산 정보 보기'가 있어 카드 자체는 눌러도 가지 않는다).
+            // 조각이 오기 전에는 서버 요약 한 줄을 같은 크기의 자리에 보인다(대화가 밀리지 않게).
+            return (
+                <Suspense fallback={<span className="block w-[228px] max-w-full min-h-[192px] rounded-2xl border border-surface-line bg-surface-1 px-3.5 py-3 text-[14px] font-medium text-ink-1 break-words">{msg.message}</span>}>
+                    <MountainChatCard md={md} summary={msg.message} />
+                </Suspense>
+            );
         default:
             // 모르는 종류(앞으로 생길 카드·옛 앱) — 서버 요약 한 줄이라도 보인다.
             badge = t("chat.card.generic");

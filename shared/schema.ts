@@ -383,6 +383,8 @@ export const hiqCrewActivities = pgTable("hiq_crew_activities", {
   // HIKING — 산악회의 일정(서버가 크루 종목으로 정한다 — routes/modules/crew.ts)
   sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "HIKING"] }).default("BILLIARDS").notNull(),
   category: text("category"), // REGULAR_ROUNDING, BLITZ_SCREEN, HIKING_TRIP, etc.
+  // 산악회 일정에서 고른 산의 주소(hiking_mountains.slug) — 산악회만 적는다(migrations/crew_activity_mountain.sql · shared/crewMountain.ts)
+  mountainSlug: text("mountain_slug"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

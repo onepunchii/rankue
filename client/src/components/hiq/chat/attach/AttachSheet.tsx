@@ -9,24 +9,27 @@
  * 크루 방(2026-09-26 크루 채팅 1단계, 오너 승인 시안)은 위에 "우리 크루" 줄(정모 만들기·투표·정산 요청·공지)을 더 두고,
  * 아래에 종목 줄을 그대로 둔다. 정산 요청·공지는 운영진만(크루 홈의 정산 창·공지 고정과 같은 권한).
  *
+ * 산악회 방(2026-10-13)의 종목 줄은 '산 보내기' 하나다 — 산을 찾아 고르면 서버가 산 카드를 만든다(hiking/chat/MountainCardPicker).
+ * 등산의 글은 번역 열쇠 없이 한국어 그대로 적는다(등산은 한국어 화면만 있다).
+ *
  * 아래에서 올라오는 시트(Radix Sheet). 검색칸이 없어 키보드 회피 문제(FriendPicker 참고)가 없다 — 검색이 있는 매장 고르기는
  * 다른 시트가 맡는다.
  */
 import type { ComponentType } from "react";
-import { LucideGamepad2, LucideFlag, LucideTarget, LucideMapPin, LucideCalendarDays, LucideKeyRound, LucideTrophy } from "lucide-react";
+import { LucideGamepad2, LucideFlag, LucideTarget, LucideMapPin, LucideCalendarDays, LucideKeyRound, LucideTrophy, LucideMountain } from "lucide-react";
 import { LucideBarChart3, LucideCalendarPlus, LucideMegaphone, LucideReceipt, LucideUsers } from "@/lib/icons";
 import { cn } from "@/lib/utils";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { useT } from "@/lib/i18n";
 
-export type AttachItem = "MATCH_INVITE" | "SIM_INVITE" | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND";
+export type AttachItem = "MATCH_INVITE" | "SIM_INVITE" | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND" | "MOUNTAIN";
 /** 크루 방 전용 줄 — 카드 라우트가 아니라 크루 기능(정모·투표·정산·공지 글)을 먼저 만들고 그걸 카드로 붙인다. */
 export type CrewAttachItem = "CREW_MEETUP" | "CREW_POLL" | "CREW_SETTLE" | "CREW_NOTICE";
 
 interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    /** HIKING = 산악회 방(2026-10-13) — 종목 줄이 없다(붙일 당구 · 골프 카드가 없다). 크루 줄만 그린다. */
+    /** HIKING = 산악회 방(2026-10-13) — 당구 · 골프 카드는 없고 종목 줄에 '산 보내기' 하나가 놓인다. 위는 크루 줄. */
     sport: "BILLIARDS" | "GOLF" | "HIKING";
     roomKind: "crew" | "listing" | "dm" | "support";
     onPick: (item: AttachItem) => void;
@@ -35,8 +38,8 @@ interface Props {
     onPickCrew?: (item: CrewAttachItem) => void;
 }
 
-/** 타일 정의 — 이름은 t("chat.attach.<key>"). 설명 줄은 2026-09-23 에 뺐다(오너: "내용이 너무 많아"). */
-const TILES: Record<AttachItem, { key: string; Icon: ComponentType<{ className?: string }> }> = {
+/** 타일 정의 — 이름은 t("chat.attach.<key>"), label 이 있으면 그 글 그대로(등산). 설명 줄은 2026-09-23 에 뺐다(오너: "내용이 너무 많아"). */
+const TILES: Record<AttachItem, { key: string; Icon: ComponentType<{ className?: string }>; label?: string }> = {
     MATCH_INVITE: { key: "matchInvite", Icon: LucideTarget },
     SIM_INVITE: { key: "simInvite", Icon: LucideGamepad2 },
     GAME_RESULT: { key: "gameResult", Icon: LucideFlag },
@@ -44,11 +47,14 @@ const TILES: Record<AttachItem, { key: string; Icon: ComponentType<{ className?:
     GOLF_BOOKING: { key: "golfBooking", Icon: LucideCalendarDays },
     GOLF_MATCH: { key: "golfMatch", Icon: LucideKeyRound },
     GOLF_ROUND: { key: "golfRound", Icon: LucideTrophy },
+    MOUNTAIN: { key: "mountain", Icon: LucideMountain, label: "산 보내기" },
 };
 
 // 실제 테이블에서 치는 매칭 대결이 먼저다 — 대화 중 "한 판 치자"가 제일 잦은 쓰임이라 첫 칸.
 const BILLIARDS_ITEMS: AttachItem[] = ["MATCH_INVITE", "SIM_INVITE", "GAME_RESULT", "STORE"];
 const GOLF_ITEMS: AttachItem[] = ["GOLF_BOOKING", "GOLF_MATCH", "GOLF_ROUND"];
+// 산악회 방 — 산 카드 하나. 당구 · 골프 방에는 이 칸이 없다(서버도 산악회 방에서만 받는다).
+const HIKING_ITEMS: AttachItem[] = ["MOUNTAIN"];
 
 const CREW_TILES: Record<CrewAttachItem, { key: string; Icon: ComponentType<{ className?: string }>; staff?: boolean }> = {
     CREW_MEETUP: { key: "crewMeetup", Icon: LucideCalendarPlus },
@@ -71,7 +77,7 @@ export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick, canMa
     const { t } = useT();
     // support 방은 chat-room.tsx 가 onAttach 를 안 넘겨 + 자체가 없다 — 혹시 열려도 아무것도 안 그린다.
     if (roomKind === "support") return null;
-    const items: AttachItem[] = sport === "HIKING" ? [] : sport === "GOLF" ? GOLF_ITEMS : BILLIARDS_ITEMS;
+    const items: AttachItem[] = sport === "HIKING" ? HIKING_ITEMS : sport === "GOLF" ? GOLF_ITEMS : BILLIARDS_ITEMS;
     const crew = roomKind === "crew" && !!onPickCrew ? CREW_ITEMS.filter((i) => !CREW_TILES[i].staff || canManage) : [];
 
     return (
@@ -91,11 +97,11 @@ export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick, canMa
                                 return <Tile key={item} label={t(`chat.attach.${key}`)} Icon={Icon} tinted onClick={() => { onOpenChange(false); onPickCrew!(item); }} />;
                             })}
                         </div>
-                        {/* 산악회 방은 아래 종목 줄이 없다 — 가는 줄과 종목 이름도 그리지 않는다 */}
+                        {/* 종목 줄이 비면 가는 줄과 종목 이름도 그리지 않는다. 산악회 방의 종목 이름은 '등산' */}
                         {items.length > 0 && (
                             <>
                                 <div className="mx-5 mt-2 border-t border-surface-line" />
-                                <p className="px-5 pt-3 pb-0.5 text-[12.5px] font-semibold text-ink-3">{sport === "GOLF" ? t("chat.attach.sportGolf") : t("chat.attach.sportBilliards")}</p>
+                                <p className="px-5 pt-3 pb-0.5 text-[12.5px] font-semibold text-ink-3">{sport === "HIKING" ? "등산" : sport === "GOLF" ? t("chat.attach.sportGolf") : t("chat.attach.sportBilliards")}</p>
                             </>
                         )}
                     </>
@@ -105,8 +111,8 @@ export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick, canMa
                 {items.length > 0 && (
                     <div className={cn("px-4 grid grid-cols-4 gap-1", crew.length > 0 ? "pt-1" : "pt-2")}>
                         {items.map((item) => {
-                            const { key, Icon } = TILES[item];
-                            return <Tile key={item} label={t(`chat.attach.${key}`)} Icon={Icon} onClick={() => { onOpenChange(false); onPick(item); }} />;
+                            const { key, Icon, label } = TILES[item];
+                            return <Tile key={item} label={label ?? t(`chat.attach.${key}`)} Icon={Icon} onClick={() => { onOpenChange(false); onPick(item); }} />;
                         })}
                     </div>
                 )}

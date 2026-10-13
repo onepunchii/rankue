@@ -11,11 +11,13 @@
  * 크루 방(2026-09-26 크루 채팅 1단계): + 에 "우리 크루" 줄(정모 만들기·투표·정산 요청·공지) — 크루 기능의 만들기 창을 그대로 열고,
  *   만든 정모·투표·공지를 카드로 붙인다(정산은 서버가 원래 카드를 올린다). 윗줄은 다가오는 정모 띠(없으면 예전 한 줄).
  *   정모·투표 카드는 크루 API 로 살아 있다 — 카드 안에서 참석·투표.
+ * 산악회 방(2026-10-13): + 의 종목 줄에 '산 보내기' — 산을 찾아 고르면 그 산의 주소만 보내고 서버가 산 카드를 만든다(shared/hikingChat).
+ *   투표 만들기 창에는 방의 종목을 넘긴다 — 산악회면 '산으로 보기 채우기'가 놓인다.
  * 신고·차단(2026-10-06, 스토어 심사 1.2 — 9/21 채팅을 한 체계로 합치며 빠졌던 입구): 남의 말풍선 옆 ⋯(말풍선마다) · 길게 누르기 →
  *   [신고] [차단하기]. 크루 방은 그 메시지를(crew_chat), 조인/부킹·1:1 방은 보낸 사람을(member) 신고한다. 문의 방은 뺀다.
  *   차단하면 그 사람 글을 바로 걷는다. ⋯ 메뉴의 참여자 줄에서도 회원 신고·차단이 된다.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useRoute } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { LucideChevronLeft, LucideMapPin, LucideUsers, LucideMoreVertical } from "lucide-react";
@@ -47,6 +49,9 @@ import { kstDateLabel, kstTime } from "@/lib/kst";
 import { appConfirm } from "@/components/AppDialog";
 import { copyText } from "@/lib/copyText";
 import { languageLabel } from "@shared/languageLabel";
+
+// 산 고르기(등산)는 산악회 방에서만 쓴다 — 그때만 불러 온다(당구 · 골프 회원이 받는 묶음에 싣지 않는다).
+const MountainCardPicker = lazy(() => import("@/hiking/chat/MountainCardPicker").then((m) => ({ default: m.MountainCardPicker })));
 
 const POLL_MS = 2500;
 /** 서버가 한 번에 주는 최근 메시지 수(chat.repo messages 와 같은 값) — 이만큼 꽉 차서 오면 위에 더 있다. */
@@ -336,7 +341,7 @@ export default function ChatRoomPage() {
     const [attachOpen, setAttachOpen] = useState(false);
     const [simBusy, setSimBusy] = useState(false);
     const [matchBusy, setMatchBusy] = useState(false);
-    const [picker, setPicker] = useState<null | "MATCH_INVITE" | "SIM_INVITE" | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND">(null);
+    const [picker, setPicker] = useState<null | "MATCH_INVITE" | "SIM_INVITE" | "GAME_RESULT" | "STORE" | "GOLF_BOOKING" | "GOLF_MATCH" | "GOLF_ROUND" | "MOUNTAIN">(null);
     // 경로의 종류는 metadata.type 과 같은 이름(SIM_INVITE·GAME_RESULT·…) — 서버 라우터(chatCards.ts)와 맞춘 계약.
     const postCard = useCallback(async (item: AttachItem, body: Record<string, unknown>, after?: (row: ChatMsg) => void) => {
         const myKey = key;
@@ -635,7 +640,7 @@ export default function ChatRoomPage() {
                                 />
                             )}
                             <CreatePollDialog
-                                open={crewPicker === "CREW_POLL"} onOpenChange={(o) => { if (!o) setCrewPicker(null); }} crewId={roomCrewId}
+                                open={crewPicker === "CREW_POLL"} onOpenChange={(o) => { if (!o) setCrewPicker(null); }} crewId={roomCrewId} sportCategory={attachSport}
                                 onCreated={(p) => void postCrewCard("crew-poll", { pollId: p.id })}
                             />
                             {d.canManage && (
@@ -678,6 +683,12 @@ export default function ChatRoomPage() {
                     <GolfRoundsPicker open={picker === "GOLF_ROUND"} onOpenChange={(o) => { if (!o) setPicker(null); }} onPick={(historyId) => { setPicker(null); void postCard("GOLF_ROUND", { historyId }); }} />
                     {/* 조인·부킹 방이면 그 글의 코스명을 기본값으로 — 같은 골프장에서 치는 사람들이다 */}
                     <GolfMatchCreateSheet open={picker === "GOLF_MATCH"} onOpenChange={(o) => { if (!o) setPicker(null); }} defaultCourseName={d.kind === "listing" && b && !b.isBlind ? b.courseName : undefined} onCreate={(courseName) => { setPicker(null); void postCard("GOLF_MATCH", { courseName }); }} />
+                    {/* 산악회 방: 산을 고르면 주소(slug)만 보낸다 — 카드의 글은 서버가 산 표에서 읽어 채운다 */}
+                    {attachSport === "HIKING" && (
+                        <Suspense fallback={null}>
+                            <MountainCardPicker open={picker === "MOUNTAIN"} onOpenChange={(o) => { if (!o) setPicker(null); }} onPick={(slug) => { setPicker(null); void postCard("MOUNTAIN", { slug }); }} />
+                        </Suspense>
+                    )}
                 </>
             )}
         </div>

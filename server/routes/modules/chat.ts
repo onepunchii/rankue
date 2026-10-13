@@ -163,8 +163,9 @@ router.get("/rooms/:key/messages", requireAuth, asyncHandler(async (req: AuthReq
  * heading 은 받는 사람마다 다를 수 있다(함수) — 문의 방은 회원과 다른 운영자에게 가는 제목이 다르다.
  * 문의 방에서 운영자가 쓴 글이 **그 방의 회원에게** 갈 때는 본문에 보낸 사람 이름을 붙이지 않는다(운영자 개인 이름이 알림으로 샌다 —
  * 누가 보냈는지는 제목이 말한다). 이 규칙은 부르는 쪽이 아니라 여기서 지킨다.
+ * heading 이 글(문자열)이면 그대로 나간다 — 번역 열쇠가 없는 등산의 산 카드가 쓴다(chatCards.ts postCard 의 title).
  */
-export async function notifyRoom(ref: RoomRef, senderId: string, preview: string | I18nText, heading: I18nText | ((memberId: string) => I18nText), sport?: CrewSport, urlOverride?: string): Promise<void> {
+export async function notifyRoom(ref: RoomRef, senderId: string, preview: string | I18nText, heading: string | I18nText | ((memberId: string) => string | I18nText), sport?: CrewSport, urlOverride?: string): Promise<void> {
     const members = (await storage.chat.roomMembers(ref)).filter((m) => m !== senderId);
     // 이 방 알림을 끈 사람(채팅 ⋯ 메뉴). 크루 방은 아래에서 크루 설정을 따로 보므로 여기서는 빈 집합이다.
     const muted = ref.kind === "crew" ? new Set<string>() : await storage.chat.mutedMemberIds(ref.key);

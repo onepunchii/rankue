@@ -107,20 +107,28 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
         },
     });
 
-    // 산악회의 '산 고르기' — 고른 산은 저장되지 않는다(칸을 채우는 일까지 — shared/crewMountain 머리말). 창은 조각이 정해 준 글을 두 칸에 넣기만 한다.
+    // 산악회의 '산 고르기' — 창은 조각이 정해 준 글을 칸에 넣고, 고른 산의 주소(slug)만 일정에 실어 보낸다(shared/crewMountain 머리말).
     const [pickedMountain, setPickedMountain] = useState<PickedMountain | null>(null);
+    // 고치기 창이 열릴 때 일정에 저장돼 있던 산의 주소 — 조각이 이 주소로 '고른 산'을 되살린다. 산을 고르거나 지우면 비운다.
+    // 되살리지 못했어도(연결이 끊겼을 때) 이 값을 그대로 보내므로, 다른 칸만 고쳐 저장해도 적어 둔 산이 지워지지 않는다.
+    const [storedMountainSlug, setStoredMountainSlug] = useState<string | null>(null);
     const readMountainFields = (): ActivityFields => ({ title: form.getValues("title") ?? "", place: form.getValues("locationName") ?? "" });
     const fillMountainFields = (next: ActivityFields, picked: PickedMountain | null) => {
         form.setValue("locationName", next.place, { shouldDirty: true });
         // 모임명은 바뀔 때만 건드린다 — 채워졌으면 '모임명을 입력해주세요'도 같이 걷힌다(비울 때는 오류를 띄우지 않는다)
         if (next.title !== (form.getValues("title") ?? "")) form.setValue("title", next.title, { shouldDirty: true, shouldValidate: next.title !== "" });
         setPickedMountain(picked);
+        setStoredMountainSlug(null);
     };
+    // 코스를 고르면 조각이 상세 내용에 한 줄을 적는다 — 무엇을 적고 언제 그대로 둘지는 조각(shared/crewMountain)이 정한다
+    const readMountainNote = (): string => form.getValues("description") ?? "";
+    const fillMountainNote = (next: string) => form.setValue("description", next, { shouldDirty: true });
 
     // Reset form when initialData changes or dialog opens
     useEffect(() => {
         if (open) {
             setPickedMountain(null);
+            setStoredMountainSlug(hiking && typeof initialData?.mountainSlug === "string" && initialData.mountainSlug ? initialData.mountainSlug : null);
             if (initialData) {
                 // Edit Mode: Populate form
                 const dt = new Date(initialData.activityDate);
@@ -151,7 +159,7 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                 });
             }
         }
-    }, [open, initialData, sportCategory, form, blankCategory, blankTime]);
+    }, [open, initialData, sportCategory, form, blankCategory, blankTime, hiking]);
 
 
     // 카테고리 변경 시 자동 제목 생성 (생성 모드일 때만, 또는 제목이 비어있을 때)
@@ -184,16 +192,18 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
             category: data.category,
             sportCategory: data.sportCategory
         };
+        // 산악회의 일정만 고른 산의 주소를 싣는다(지웠으면 null) — 당구 크루로 가는 값은 위의 것 그대로다. 서버도 산악회일 때만 읽는다.
+        const body = hiking ? { ...payload, mountainSlug: pickedMountain?.mountain.slug ?? storedMountainSlug } : payload;
 
         if (isEditMode) {
             return await apiRequest(`/api/hiq/crews/${crewId}/activities/${initialData.id}`, {
                 method: "PATCH",
-                body: payload,
+                body,
             });
         } else {
             return await apiRequest(`/api/hiq/crews/${crewId}/activities`, {
                 method: "POST",
-                body: payload,
+                body,
             });
         }
     };
@@ -339,10 +349,11 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                         </div>
 
                         {/* 산 고르기 — 산악회만. 고르면 바로 아래 '모이는 곳'에 산의 자리가, 비어 있는 모임명에 "<산> 산행"이 채워진다.
-                            두 칸 모두 그 뒤에 손으로 고칠 수 있다. 자리의 틀은 조각을 불러 오는 동안 창이 덜컥거리지 않게 두는 것(등산의 색 · 리터럴) */}
+                            두 칸 모두 그 뒤에 손으로 고칠 수 있다. 이어서 코스를 고르면 상세 내용에 한 줄이 적힌다(비어 있을 때만).
+                            자리의 틀은 조각을 불러 오는 동안 창이 덜컥거리지 않게 두는 것(등산의 색 · 리터럴) */}
                         {hiking && (
                             <Suspense fallback={<div className="h-[132px] rounded-2xl bg-[#0E2A33]" aria-hidden="true" />}>
-                                <ActivityMountainPicker picked={pickedMountain} read={readMountainFields} onFill={fillMountainFields} />
+                                <ActivityMountainPicker picked={pickedMountain} storedSlug={storedMountainSlug} read={readMountainFields} onFill={fillMountainFields} onRestore={setPickedMountain} readNote={readMountainNote} onNote={fillMountainNote} />
                             </Suspense>
                         )}
 

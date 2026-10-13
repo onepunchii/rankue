@@ -13,13 +13,17 @@
  *    산 이름이 끝에 오는 것도 일부러다 — 이 칸은 '모이는 곳'이라 회원이 만나는 자리를 이어 적는다("… 설악산 오색 탐방지원센터 앞").
  *  · 모임명은 **비어 있을 때만** 권한다. 회원이 적은 이름은 건드리지 않는다.
  *  · 고른 산을 지우면 우리가 채운 글만 지운다 — 회원이 손댄 칸은 그대로 둔다.
- *  · **고른 산은 저장되지 않는다.** 일정 표(hiq_crew_activities)에 산을 적을 칸이 없다 — 자유 칸 · 링크 칸이 없고, 설명 끝에 붙여 두는 길은
- *    골프 투어 종료일에서 이미 탈이 났다(shared/crewActivity splitTourTrailer). 칸이 생기면(예: mountain_slug text) 아래 toActivityMountain 이
- *    서버의 검사로 그대로 쓰인다 — 주소(slug)는 80자 안의 빈칸 없는 글자, 다른 열쇠는 믿지 않는다.
+ *  · **고른 산은 일정에 남는다**(2026-10-13 · hiq_crew_activities.mountain_slug — migrations/crew_activity_mountain.sql). 남기는 것은 산의 주소(slug)
+ *    한 칸뿐이다: 창이 mountainSlug 로 보내고, 서버(routes/modules/crew)가 **산악회일 때만** 아래 activityMountainSlug 로 꼴을 보고 있는 산인지 확인해 적는다.
+ *    당구 · 골프 크루의 일정에는 이 값을 보내도 버린다. 설명 끝에 붙여 두는 길은 쓰지 않는다(골프 투어 종료일에서 탈이 났다 — shared/crewActivity splitTourTrailer).
+ *    그 칸으로 일정 카드의 '산 정보 보기', 고치기 창의 '고른 산', 지난 일정의 '함께 정상 인증 N명'을 그린다.
+ *  · **고른 코스는 남지 않는다.** 코스를 고르면 상세 내용에 한 줄을 적어 줄 뿐이다 — 칸이 비어 있거나 우리가 앞서 적은 글 그대로일 때만.
+ *  · '함께 정상 인증'은 **사람 수만** 센다. 누가 인증했는지는 서버의 답에도 화면에도 없다.
  *
  * 순수 함수만. 서버가 임포트할 수 있는 shared 파일 — 상대 임포트는 반드시 './x.js'.
  */
 import { duplicateNames, heightText, mountainLabel, mountainPlace } from "./hikingMountains.js";
+import { courseFacts, courseShape } from "./hikingPage.js";
 
 /** 산의 주소(slug) · 이름의 길이 상한 — 이보다 길면 우리 자료가 아니다 */
 export const MOUNTAIN_SLUG_MAX = 80;
@@ -45,16 +49,25 @@ export interface ActivityMountain {
 const text = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim() : null);
 
 /**
+ * 일정에 적어 둘 산의 주소(slug) — **서버가 받는 값의 검사**(routes/modules/crew 의 정모 만들기 · 고치기). 꼴이 어긋나면 null.
+ * 글자여야 하고, 비어 있지 않고 80자 안이며 빈칸 · 빗금 · ? · # 이 없어야 한다(우리 주소는 그렇게 만들어진다 — hikingMountains assignMountainSlugs).
+ * 꼴만 본다 — 그 주소의 산이 정말 있는지는 서버가 따로 본다(storage/hiking mountainBySlug).
+ */
+export function activityMountainSlug(raw: unknown): string | null {
+    const slug = text(raw);
+    return slug && slug.length <= MOUNTAIN_SLUG_MAX && !/[\s/\\?#]/.test(slug) ? slug : null;
+}
+
+/**
  * 받은 값 한 줄 → 고를 수 있는 산. 꼴이 어긋나면 null(목록에서 뺀다).
- * 주소(slug)는 비어 있지 않고 80자 안이며 빈칸 · 빗금 · ? · # 이 없어야 한다(우리 주소는 그렇게 만들어진다 — hikingMountains assignMountainSlugs).
- * 정해 둔 여섯 가지 말고는 아무것도 옮기지 않는다.
+ * 주소(slug)의 꼴은 위의 activityMountainSlug 그대로다. 정해 둔 여섯 가지 말고는 아무것도 옮기지 않는다.
  */
 export function toActivityMountain(raw: unknown): ActivityMountain | null {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
     const r = raw as Record<string, unknown>;
-    const slug = text(r.slug);
+    const slug = activityMountainSlug(r.slug);
     const name = text(r.name);
-    if (!slug || slug.length > MOUNTAIN_SLUG_MAX || /[\s/\\?#]/.test(slug)) return null;
+    if (!slug) return null;
     if (!name || name.length > MOUNTAIN_NAME_MAX) return null;
     const h = typeof r.heightM === "number" && Number.isFinite(r.heightM) && r.heightM > 0 ? Math.round(r.heightM) : null;
     return { slug, name, sido: text(r.sido), sigungu: text(r.sigungu), heightM: h, kfs100: Array.isArray(r.lists) && r.lists.includes("kfs100") };
@@ -126,8 +139,11 @@ export const activityMountainTitle = (m: { name: string }): string => `${m.name}
 
 /** 만들기 창의 두 칸 — 모임명 · 모이는 곳 */
 export interface ActivityFields { title: string; place: string }
-/** 고른 산과, 그때 모임명도 우리가 채웠는지(지울 때 쓴다) */
-export interface PickedMountain { mountain: ActivityMountain; titleOurs: boolean }
+/**
+ * 고른 산과, 그때 모임명도 우리가 채웠는지(지울 때 쓴다).
+ * restored 는 고치기 창이 일정에 저장해 둔 산을 되살린 것이라는 표시다 — 그때는 아무 칸도 채우지 않았다(안내 글이 달라진다).
+ */
+export interface PickedMountain { mountain: ActivityMountain; titleOurs: boolean; restored?: boolean }
 
 /**
  * 산을 골랐을 때 두 칸에 들어갈 글. 모이는 곳은 늘 그 산의 자리로 바꾼다(고른 것이 곧 채워 달라는 말이다).
@@ -150,6 +166,105 @@ export function clearFromMountain(now: ActivityFields, picked: PickedMountain): 
     };
 }
 
+// ── 코스 고르기 ────────────────────────────────────────────────────────
+/** 한 번에 보여 주는 코스의 수 — 그보다 많으면 '더 보기'로 전부 */
+export const ACTIVITY_COURSES_STEP = 6;
+/** 한 산에서 받는 코스의 상한 — 이보다 많으면 우리 자료가 아니다 */
+export const ACTIVITY_COURSES_MAX = 60;
+
+/** 고를 수 있는 코스 — 산 화면의 답(courseList)에서 이 여섯 가지만 꺼내 쓴다. 길의 선(line)은 들고 있지 않는다 */
+export interface ActivityCourse {
+    id: string;
+    /** 산 화면의 "코스 N"과 같은 번호 */
+    seq: number;
+    km: number;
+    gainM: number;
+    loop: boolean;
+    summitKm: number | null;
+}
+
+const finite = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? v : null);
+
+/** 받은 코스 한 줄 → 고를 수 있는 코스. 번호 · 거리가 없거나 어긋나면 null(칩을 그리지 않는다) */
+export function toActivityCourse(raw: unknown): ActivityCourse | null {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+    const r = raw as Record<string, unknown>;
+    const id = typeof r.id === "number" && Number.isFinite(r.id) ? String(r.id) : text(r.id);
+    const seq = finite(r.seq), km = finite(r.km), gain = finite(r.gainM), summit = finite(r.summitKm);
+    if (!id || id.length > MOUNTAIN_SLUG_MAX || seq == null || !Number.isInteger(seq) || seq < 1 || km == null || km <= 0) return null;
+    return { id, seq, km, gainM: gain != null && gain > 0 ? Math.round(gain) : 0, loop: r.loop === true, summitKm: summit != null && summit >= 0 ? summit : null };
+}
+
+/**
+ * 산 한 곳의 답(GET /api/hiq/hiking/mountains/:slug) → 그 산(고치기 창이 '고른 산'을 되살릴 때 쓴다)과 고를 수 있는 코스들.
+ * 어긋난 줄 · 같은 코스(id)가 두 번 온 줄은 뺀다. 순서와 번호는 받은 그대로(산 화면의 순서 · "코스 N")다.
+ */
+export function readMountainDetail(res: unknown): { mountain: ActivityMountain | null; courses: ActivityCourse[] } {
+    const list = res && typeof res === "object" && Array.isArray((res as { courseList?: unknown }).courseList) ? ((res as { courseList: unknown[] }).courseList) : [];
+    const ids = new Set<string>();
+    const courses: ActivityCourse[] = [];
+    for (const it of list) {
+        const c = toActivityCourse(it);
+        if (!c || ids.has(c.id)) continue;
+        ids.add(c.id);
+        courses.push(c);
+        if (courses.length >= ACTIVITY_COURSES_MAX) break;
+    }
+    return { mountain: toActivityMountain(res), courses };
+}
+
+/** 코스 칩의 글 — "코스 1 · 7.1km"(산 화면의 코스 번호 · 거리 그대로) */
+export const activityCourseChip = (c: { seq: number; km: number; gainM: number }): string => `코스 ${c.seq} · ${courseFacts(c).km}`;
+/**
+ * 상세 내용에 적는 한 줄 — "코스 1 · 정상까지 · 7.1km · 오르막 1,370m · 걷는 시간 약 4시간 5분(어림)".
+ * 숫자와 길의 모양은 산 화면의 것(shared/hikingPage courseFacts · courseShape)이다. 걷는 시간은 거리와 오르막으로 어림한 값이라 그렇게 적는다.
+ */
+export function activityCourseLine(c: ActivityCourse): string {
+    const f = courseFacts(c);
+    return `코스 ${c.seq} · ${courseShape(c)} · ${f.km} · 오르막 ${f.gain} · 걷는 시간 ${f.time}(어림)`;
+}
+
+/**
+ * 코스를 골랐을 때 상세 내용에 들어갈 글. **칸이 비어 있거나(빈칸뿐이어도) 우리가 앞서 적은 줄(ours) 그대로일 때만** 그 줄로 바꾼다.
+ * 회원이 적은 글이 있으면 건드리지 않는다(filled: false — 화면이 그렇게 말해 준다). 산 고르기의 '우리가 채운 글만' 규칙과 같다.
+ */
+export function fillCourseLine(description: string | null | undefined, line: string, ours: string | null): { description: string; filled: boolean } {
+    const now = String(description ?? "");
+    if (now.trim() === "" || (ours != null && now.trim() === ours)) return { description: line, filled: true };
+    return { description: now, filled: false };
+}
+/** 고른 코스를 풀거나 산을 지웠을 때 상세 내용에 남길 글 — 우리가 적은 줄 그대로면 비우고, 회원이 손댔으면 그대로 둔다 */
+export function clearCourseLine(description: string | null | undefined, ours: string | null): string {
+    const now = String(description ?? "");
+    return ours != null && now.trim() === ours ? "" : now;
+}
+
+// ── 함께 정상 인증 ─────────────────────────────────────────────────────
+/**
+ * '함께 정상 인증'을 셀 일정인가 — 고른 산이 있고 **모이는 시각이 지난** 일정만. 아직 모이지 않은 일정은 세지 않는다(셀 것이 없다).
+ * 세는 것은 그 일정의 참석자 가운데 그날(한국 날짜) 그 산의 정상에서 인증한 사람 수다 — server/storage/hikingStamps activitySummitCounts.
+ */
+export function summitTogetherDue(a: { mountainSlug?: string | null; activityDate?: Date | string | number | null }, nowMs: number): boolean {
+    if (!activityMountainSlug(a.mountainSlug)) return false;
+    const t = a.activityDate == null ? NaN : new Date(a.activityDate).getTime();
+    return Number.isFinite(t) && t <= nowMs;
+}
+/**
+ * 이만큼의 참석자가 인증해야 수를 싣는다 — 한 명이면 싣지 않는다(참석자가 한 명뿐인 일정에서는 그 수가 곧 그 사람이다).
+ * '함께 오른 산'(server/storage/hikingStamps crewSummits — 같은 날 둘 이상)과 같은 기준이다. 서버가 이 아래의 수는 0 으로 내보낸다.
+ */
+export const SUMMIT_TOGETHER_MIN = 2;
+/** 답에 실을 수 — 기준에 못 미치면 0(없는 것과 같다) */
+export function summitTogetherCount(n: unknown): number {
+    const k = typeof n === "number" && Number.isFinite(n) ? Math.floor(n) : 0;
+    return k >= SUMMIT_TOGETHER_MIN ? k : 0;
+}
+/** 일정 카드의 칩 — "함께 정상 인증 3명". 기준에 못 미치면(또는 값이 없으면) 빈 글 — 칩을 그리지 않는다. 사람 수만이다 */
+export function summitTogetherText(n: unknown): string {
+    const k = summitTogetherCount(n);
+    return k > 0 ? `함께 정상 인증 ${k.toLocaleString("en-US")}명` : "";
+}
+
 // ── 화면의 글 ──────────────────────────────────────────────────────────
 /** '모이는 곳' · '모임명'은 만들기 창의 칸 이름 그대로다(i18n ko 의 createActivity.locationLabelHiking · nameLabel) */
 export const ACTIVITY_MOUNTAIN_COPY = {
@@ -166,6 +281,18 @@ export const ACTIVITY_MOUNTAIN_COPY = {
     chosen: "고른 산",
     clear: "고른 산 지우기",
     badge: "100대 명산",
+    // 고치기 창 — 일정에 저장해 둔 산을 되살린다
+    restoring: "고른 산을 불러오는 중이에요…",
+    restored: "이 일정에 저장해 둔 산이에요. 바꾸려면 지우고 다시 골라 주세요.",
+    // 코스 고르기 — '상세 내용'은 만들기 창의 칸 이름 그대로다(i18n ko 의 createActivity.descLabel)
+    courseTitle: "코스 고르기",
+    courseAside: "고르면 상세 내용에 적어 드려요",
+    courseLoading: "코스를 불러오는 중이에요…",
+    courseMore: "개 더 보기",
+    courseFilled: "상세 내용에 코스를 적었어요. 걷는 시간은 거리와 오르막으로 어림한 값이에요(쉬는 시간 빼고).",
+    courseKept: "상세 내용에 적어 둔 글이 있어 그대로 뒀어요. 코스는 직접 적어 주세요.",
+    // 일정 카드
+    link: "산 정보 보기",
 } as const;
 
 /**

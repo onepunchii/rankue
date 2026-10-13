@@ -17,6 +17,11 @@ import { isSuperAdmin } from "../../lib/superAdmin.js";
 import { hikingAllowed } from "../../lib/hikingAccess.js";
 import { crewSportOf, HIKING_ACTIVITY_CATEGORY } from "../../../shared/crewSport.js";
 import { kstShortDateTime } from "../../../shared/crewActivity.js";
+// 산악회 일정의 고른 산 · '함께 정상 인증'(2026-10-13) — 아래 정모 라우트의 산악회 갈래만 쓴다
+import { activityMountainSlug, summitTogetherCount, summitTogetherDue } from "../../../shared/crewMountain.js";
+import { kstDay } from "../../../shared/hikingStamps.js";
+import { mountainBySlug } from "../../storage/hiking.js";
+import { activitySummitCounts, type ActivitySummitKey } from "../../storage/hikingStamps.js";
 import {
     resolveCrewPostCategory, canonicalCrewPostCategory, parseCrewPageQuery, validateCrewPostImages, imageUrlList, unreferencedUrls,
     decodeCrewCursor, CREW_POSTS_FIRST_PAGE, CREW_PHOTOS_FIRST_PAGE,
@@ -87,6 +92,41 @@ async function canManageActivity(req: AuthRequest, activity: { creatorId: string
 
 // --- Activities ---
 
+// 일정에 적을 산의 주소(mountain_slug) — 꼴이 맞고(shared/crewMountain activityMountainSlug) 우리 표에 있는 산일 때만. 아니면 null(산 없는 일정).
+// **산악회의 일정에만 부른다** — 당구 · 골프 크루의 일정은 이 값을 보내도 읽지 않는다.
+async function activityMountainSlugOf(raw: unknown): Promise<string | null> {
+    const slug = activityMountainSlug(raw);
+    if (!slug) return null;
+    const m = await mountainBySlug(slug);
+    return m ? m.slug : null;
+}
+
+// 산악회 일정의 '함께 정상 인증 N명'(2026-10-13) — 고른 산이 있고 모이는 시각이 지난 일정에만 summitTogether(사람 수)를 붙인다.
+// 그 일정의 참석자 가운데 그날(한국 날짜) 그 산의 정상에서 인증한 사람 수다. **수만 싣는다 — 누가 인증했는지는 답에 없다.**
+// 한 명뿐이면 0 으로 내보낸다(SUMMIT_TOGETHER_MIN — 참석자가 한 명인 일정에서는 수가 곧 그 사람이다).
+// 산을 고른 일정이 없으면(당구 · 골프 크루는 늘 그렇다) 아무것도 묻지 않고 받은 목록을 그대로 돌려준다. 세는 질의는 목록 하나에 한 번이다.
+// 곁들이는 숫자라 실패해도 목록은 그대로 나간다.
+async function withSummitTogether<T extends { id: string; activityDate: Date; mountainSlug: string | null }>(crewId: string, activities: T[]): Promise<(T & { summitTogether?: number })[]> {
+    const now = Date.now();
+    const due = activities.filter((a) => summitTogetherDue(a, now));
+    if (due.length === 0) return activities;
+    try {
+        if (await storage.crews.crewSportCategory(crewId) !== "HIKING") return activities;
+        const keys: ActivitySummitKey[] = [];
+        for (const a of due) {
+            // 산의 표는 인스턴스가 기억해 둔 것이다(storage/hiking allMountains) — 일정마다 DB 를 읽지 않는다
+            const m = await mountainBySlug(a.mountainSlug ?? "");
+            if (m) keys.push({ activityId: a.id, mountainId: m.id, day: kstDay(a.activityDate) });
+        }
+        const counts = await activitySummitCounts(keys);
+        const counted = new Set(keys.map((k) => k.activityId));
+        return activities.map((a) => (counted.has(a.id) ? { ...a, summitTogether: summitTogetherCount(counts.get(a.id)) } : a));
+    } catch (e) {
+        console.error("[CrewActivities] 함께 정상 인증:", e);
+        return activities;
+    }
+}
+
 // GET /activities - 다가오는 정모(시작 뒤 몇 시간은 '진행 중' 으로 포함), ?past=1 이면 지난 정모(최근 것부터)
 // 가입 검토 중인 로그인 사용자에게는 보여주되(가입 유도), 비로그인 크롤러성 접근은 차단
 // 지난 정모 쪽 나누기: ?past=1&before=<activityDate ISO>_<id>&limit=20
@@ -97,10 +137,10 @@ router.get("/:id/activities", requireAuth, asyncHandler(async (req: AuthRequest,
         if (hasBefore && !cursor) return sendError(res, 400, "err.crew.badCursor");
         const n = Number(req.query.limit);
         const past = await storage.crews.getPastCrewActivities(req.params.id, { cursor, limit: Number.isFinite(n) ? n : 20 });
-        return sendSuccess(res, past);
+        return sendSuccess(res, await withSummitTogether(req.params.id, past));
     }
     const activities = await storage.getUpcomingCrewActivities(req.params.id);
-    return sendSuccess(res, activities);
+    return sendSuccess(res, await withSummitTogether(req.params.id, activities));
 }));
 
 // 정모의 사람이 쓰는 칸 — 제목은 크루원 전원의 푸시 본문으로도 나가므로 채팅과 같은 필터를 건다(검토 policy:R3).
@@ -130,6 +170,11 @@ router.post("/:id/activities", requireAuth, requireTermsAccepted, asyncHandler(a
     } else if (data.sportCategory === "HIKING") {
         data.sportCategory = crewSport === "GOLF" ? "GOLF" : "BILLIARDS";
     }
+    // 고른 산은 산악회의 일정에만 적는다 — 꼴이 맞고 있는 산일 때만(아니면 산 없는 일정). 산의 표를 읽지 못해도 일정은 만들어져야 한다.
+    // 당구 · 골프 크루는 화면이 무엇을 보내도 버린다(insert 스키마가 이 열쇠를 알게 됐으므로 여기서 꼭 비운다).
+    data.mountainSlug = crewSport === "HIKING"
+        ? await activityMountainSlugOf(req.body.mountainSlug).catch((e) => { console.error("[CrewActivities] 고른 산 확인:", e); return null; })
+        : null;
 
     const validation = insertHiqCrewActivitySchema.safeParse(data);
     if (!validation.success) {
@@ -228,6 +273,12 @@ router.patch("/:id/activities/:activityId", requireAuth, requireTermsAccepted, a
         updateData.maxParticipants = n;
     }
     if (req.body.category !== undefined) updateData.category = req.body.category;
+    // 고른 산 — 산악회의 일정만 받는다. null · 어긋난 값 · 없는 산이면 고른 산을 지운다(null).
+    // 당구 · 골프 크루의 일정은 이 값을 보내도 건드리지 않는다. 산의 표를 읽지 못했으면 적어 둔 산을 그대로 둔다.
+    if (req.body.mountainSlug !== undefined && await storage.crews.crewSportCategory(req.params.id) === "HIKING") {
+        try { updateData.mountainSlug = await activityMountainSlugOf(req.body.mountainSlug); }
+        catch (e) { console.error("[CrewActivities] 고른 산 확인:", e); }
+    }
     const screenedEdit = screenCrewBody(updateData, ACTIVITY_TEXT_KEYS);
     if (!screenedEdit.ok) return sendError(res, 400, screenedEdit.reason);
     Object.assign(updateData, screenedEdit.value.fields);
