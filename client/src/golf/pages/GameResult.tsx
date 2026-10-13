@@ -5,6 +5,7 @@ import { LucideHome, LucideShare2, LucideCrown, LucideArrowRight, LucideCamera, 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
+import { HERO_ART_H, ResultHeroArt } from "../components/RoundArt";
 import { motion } from "framer-motion";
 import { useRankueMatch } from "../hooks/useRankueMatch";
 import { useMoneyUnit, formatMoney } from "../lib/money";
@@ -120,13 +121,14 @@ export default function GameResult() {
         <div className="min-h-screen bg-[#050505] text-white font-sans overflow-x-hidden flex flex-col">
             <div className="flex-1 overflow-y-auto pb-44">
                 <div className="relative pt-14 pb-8 px-6 flex flex-col items-center overflow-hidden">
-                    <div className="absolute top-[-50px] left-1/2 -translate-x-1/2 w-[400px] h-[400px] bg-[#64DD17]/15 blur-[100px] rounded-full pointer-events-none" />
-                    <p className="relative z-10 text-[12px] font-bold text-white/60">{session.courseName || "골프장 미정"} · {dateLabel}</p>
+                    {/* 해 질 녘의 마지막 그린(components/RoundArt) — 하늘이 밝아 글은 어두운 알약 안에, 제목부터는 그림이 잦아든 아래에 둔다 */}
+                    <ResultHeroArt />
+                    <p className="relative z-10 max-w-full truncate rounded-full bg-[#050505B3] px-3 py-1 text-[12px] font-bold text-white/80">{session.courseName || "골프장 미정"} · {dateLabel}</p>
                     {session.status !== "finished" && (
-                        <p className="relative z-10 mt-2 text-[12px] font-bold text-amber-300">아직 끝나지 않은 경기예요 — 지금까지 기록이에요</p>
+                        <p className="relative z-10 mt-2 rounded-full bg-[#050505B3] px-3 py-1 text-[12px] font-bold text-amber-300">아직 끝나지 않은 경기예요 — 지금까지 기록이에요</p>
                     )}
 
-                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative z-10 flex flex-col items-center w-full mt-6">
+                    <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative z-10 flex flex-col items-center w-full" style={{ marginTop: session.status !== "finished" ? HERO_ART_H - 150 : HERO_ART_H - 116 }}>
                         <h1 className="text-[#64DD17] font-black text-3xl tracking-tight mb-6">
                             {!multi ? "라운드 완료" : winners.length > 1 ? "공동 우승" : "우승"}
                         </h1>

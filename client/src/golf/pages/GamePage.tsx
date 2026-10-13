@@ -42,6 +42,7 @@ import { appConfirm } from "@/components/AppDialog";
 import { LucideImage } from "@/lib/icons";
 import { SCAN_COPY } from "@shared/golfScorecardScan";
 import { ScanSheet } from "../components/scan/ScanSheet";
+import { ScorecardBand } from "../components/RoundArt";
 
 export default function GolfScorecard() {
     const [, params] = useRoute("/golf/game/:id");
@@ -506,12 +507,19 @@ export default function GolfScorecard() {
 
                 return (
                     <div className="px-4 mt-2">
-                        <div className="rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] px-4 py-4">
-                            <div className="flex items-baseline justify-between mb-3">
-                                <span className="text-[13px] font-semibold text-[#FFFFFF99]">기록표</span>
-                                <span className="text-[13px] text-[#FFFFFF73] tabular-nums">총 <span className="text-[17px] font-bold text-[#ffffff]">{golfScore.totalStrokes}</span>타</span>
+                        {/* 종이 스코어카드처럼 — 윗단에 그림 띠(골프장 · 날짜), 그 아래 칸(components/RoundArt) */}
+                        <div className="overflow-hidden rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F]">
+                            <ScorecardBand
+                                title="기록표"
+                                sub={[session.courseName, new Date(session.startedAt ?? session.createdAt ?? Date.now()).toLocaleDateString("ko-KR", { month: "long", day: "numeric", timeZone: "Asia/Seoul" })].filter(Boolean).join(" · ")}
+                            />
+                            <div className="px-4 pb-4 pt-3">
+                                <div className="mb-2 flex items-baseline justify-between">
+                                    <span className="min-w-0 truncate text-[12.5px] text-[#FFFFFF73]">{[session.frontCourseName, session.backCourseName].filter(Boolean).join(" → ") || "18홀"}</span>
+                                    <span className="shrink-0 text-[13px] text-[#FFFFFF73] tabular-nums">총 <span className="text-[17px] font-bold text-[#ffffff]">{golfScore.totalStrokes}</span>타</span>
+                                </div>
+                                <HoleGrid scores={scores} pars={coursePar} currentHole={currentHole} />
                             </div>
-                            <HoleGrid scores={scores} pars={coursePar} currentHole={currentHole} />
                         </div>
                     </div>
                 );

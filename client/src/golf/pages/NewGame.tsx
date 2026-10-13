@@ -16,6 +16,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { GolfBackButton } from "../components/common/GolfBackButton";
+import { NewRoundBanner } from "../components/RoundArt";
 import { CourseLogo } from "../components/course/CourseLogo";
 
 // import { COURSES } from "@/golf/data/golfCourses"; // 더 이상 사용하지 않음
@@ -405,6 +406,9 @@ export default function GolfNewGame() {
                             exit={{ opacity: 0, y: -8 }}
                             className="max-w-md mx-auto px-5 pt-5 pb-10 space-y-7"
                         >
+                            {/* 해 뜨기 전의 1번 티 — 그림 한 장(components/RoundArt). 아래 간격은 구역들과 같게 두지 않고 조금 붙인다 */}
+                            <NewRoundBanner className="!mb-[-8px]" />
+
                             {/* ── 골프장 ── 검색창이 화면에 바로 있다. 비어 있으면 가까운 곳·최근 친 곳 */}
                             <section>
                                 <Label>골프장</Label>
