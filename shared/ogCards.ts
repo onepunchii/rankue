@@ -50,7 +50,16 @@ export const HUB_HIKING_REGIONS: readonly string[] = ["capital", "gangwon", "chu
 /** 등산의 묶음 — 묶음마다 카드가 있다(shared/hikingMountains 의 HIKING_GROUPS 와 같아야 한다. 시험이 맞춰 본다). 2026-10-13 */
 export const HUB_HIKING_LISTS: readonly string[] = ["kfs100", "kfs100plus", "nationalparks", "provincialparks", "highest50", "over1500", "over1000", "under500", "island", "azalea", "maple", "reeds", "snow"];
 
-interface HubRule { test: (path: string) => string | null; alt: string }
+/** 카드에 적힌 이름 — 그림의 설명(alt)에 쓴다. shared/hikingMountains 의 권역 · 묶음 이름과 같아야 한다(시험이 맞춰 본다). 이 파일은 아무것도 임포트하지 않는다 */
+export const HUB_HIKING_REGION_NAMES: Readonly<Record<string, string>> = { capital: "수도권", gangwon: "강원", chungcheong: "충청", jeonbuk: "전북", jeonnam: "전남", gyeongbuk: "경북", gyeongnam: "경남", jeju: "제주" };
+export const HUB_HIKING_LIST_NAMES: Readonly<Record<string, string>> = {
+    kfs100: "산림청 100대 명산", kfs100plus: "산림청 100대 명산 플러스", nationalparks: "국립공원의 산", provincialparks: "도립공원의 산", highest50: "남한의 높은 산 50",
+    over1500: "해발 1,500m 넘는 산", over1000: "해발 1,000m 넘는 산", under500: "가볍게 오르는 산", island: "섬 산행",
+    azalea: "철쭉 · 진달래 명산", maple: "단풍 명산", reeds: "억새 명산", snow: "눈꽃 산행",
+};
+
+/** alt 는 글이거나, 카드 이름(test 가 돌려준 값)으로 글을 만드는 함수다 — 권역 · 묶음은 카드마다 이름이 다르다 */
+interface HubRule { test: (path: string) => string | null; alt: string | ((name: string) => string) }
 const exact = (re: RegExp, name: string) => (path: string) => (re.test(path) ? name : null);
 const HUB_RULES: readonly HubRule[] = [
     { test: exact(/^\/world-ranking(\/|$)/, "world-ranking"), alt: "당구 세계랭킹 — 랭큐" },
@@ -67,9 +76,9 @@ const HUB_RULES: readonly HubRule[] = [
     { test: exact(/^\/hiking\/terms(\/|$)/, "hiking-terms"), alt: "등산 용어 사전 — 랭큐 등산" },
     { test: exact(/^\/hiking\/checklist\/?$/, "hiking-checklist"), alt: "등산 준비물 — 랭큐 등산" },
     { test: exact(/^\/hiking\/(stamps|pack)(\/|$)/, "hiking-stamps"), alt: "등산 도장첩 · 산행 등급 — 랭큐 등산" },
-    { test: (path) => { const m = /^\/hiking\/regions\/([a-z]+)\/?$/.exec(path); return m && HUB_HIKING_REGIONS.includes(m[1]) ? `hiking-${m[1]}` : null; }, alt: "권역의 산 — 랭큐 등산" },
+    { test: (path) => { const m = /^\/hiking\/regions\/([a-z]+)\/?$/.exec(path); return m && HUB_HIKING_REGIONS.includes(m[1]) ? `hiking-${m[1]}` : null; }, alt: (n) => `${HUB_HIKING_REGION_NAMES[n.replace(/^hiking-/, "")] ?? "권역"}의 산 · 등산코스 — 랭큐 등산` },
     // 묶음(100대 명산 · 국립공원 · 단풍 · 억새 · 섬 …) — 묶음마다 그 표지와 큰 이름
-    { test: (path) => { const m = /^\/hiking\/lists\/([a-z0-9]+)\/?$/.exec(path); return m && HUB_HIKING_LISTS.includes(m[1]) ? `hiking-list-${m[1]}` : null; }, alt: "묶어서 찾는 산 — 랭큐 등산" },
+    { test: (path) => { const m = /^\/hiking\/lists\/([a-z0-9]+)\/?$/.exec(path); return m && HUB_HIKING_LISTS.includes(m[1]) ? `hiking-list-${m[1]}` : null; }, alt: (n) => `${HUB_HIKING_LIST_NAMES[n.replace(/^hiking-list-/, "")] ?? "묶어서 찾는 산"} · 등산코스 — 랭큐 등산` },
     { test: exact(/^\/hiking(\/|$)/, "hiking"), alt: "전국 명산 — 랭큐 등산" },
 ];
 
@@ -85,7 +94,7 @@ export function hubCard(origin: string, pathname: string): { url: string; width:
     const path = pathname.split("?")[0].split("#")[0];
     for (const r of HUB_RULES) {
         const n = r.test(path);
-        if (n) return { url: `${origin}/og-hub/${n}.jpg?v=${HUB_CARD_VERSION}`, width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: r.alt };
+        if (n) return { url: `${origin}/og-hub/${n}.jpg?v=${HUB_CARD_VERSION}`, width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: typeof r.alt === "function" ? r.alt(n) : r.alt };
     }
     return null;
 }

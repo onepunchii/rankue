@@ -11,7 +11,7 @@ import { gridNumber, hikingPoiKind, hikingPoiTitle } from "./hikingPois";
 import { courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListSeo, hikingMountainCardInput, hikingRegionSeo, kmRange, mountainSeo, HIKING_CTA } from "./hikingPage";
 import { HIKING_PUBLIC } from "./hikingAccess";
 import { isPrimarySport, isStartSport } from "./primarySport";
-import { HUB_CARD_NAMES, HUB_CARD_VERSION, HUB_HIKING_REGIONS, hubCard, hubCardName, HUB_HIKING_LISTS } from "./ogCards";
+import { HUB_CARD_NAMES, HUB_CARD_VERSION, HUB_HIKING_REGIONS, hubCard, hubCardName, HUB_HIKING_LISTS, HUB_HIKING_LIST_NAMES, HUB_HIKING_REGION_NAMES } from "./ogCards";
 
 /**
  * 등산의 뿌리 규칙(2026-10-13 오너: "산은 지역으로도 특성으로도 묶고 … 산 정보 페이지를 골프처럼 사이트맵 + 가입 유도").
@@ -284,6 +284,14 @@ describe("화면의 글 · 따로 선 세계", () => {
         ];
         for (const [path, name] of cases) expect(hubCardName(path), path).toBe(name);
         expect(hubCard(O, "/hiking/regions/jeju")!.url).toBe(`${O}/og-hub/hiking-jeju.jpg?v=${HUB_CARD_VERSION}`);
+        // 그림의 설명은 카드마다 — 권역 · 묶음의 이름이 들어간다(공통 문구 "권역의 산" · "묶어서 찾는 산"이 아니다)
+        expect(hubCard(O, "/hiking/regions/jeju")!.alt).toBe("제주의 산 · 등산코스 — 랭큐 등산");
+        expect(hubCard(O, "/hiking/lists/maple")!.alt).toBe("단풍 명산 · 등산코스 — 랭큐 등산");
+        expect(hubCard(O, "/hiking/lists/kfs100")!.alt).toBe("산림청 100대 명산 · 등산코스 — 랭큐 등산");
+        expect(HUB_HIKING_REGION_NAMES).toEqual(Object.fromEntries(HIKING_REGIONS.map((r) => [r.id, r.name])));
+        expect(Object.keys(HUB_HIKING_LIST_NAMES).sort()).toEqual(HIKING_GROUPS.map((g) => g.id).sort());
+        // 목록(산림청 · 공원)은 이름 그대로, 특성 묶음은 찾는 말로
+        for (const l of HIKING_LISTS) expect(HUB_HIKING_LIST_NAMES[l.id], l.id).toBe(l.name);
         // 당구 · 골프의 주소는 그대로다
         expect(hubCardName("/golf/terms")).toBe("golf-terms");
         expect(hubCardName("/hikingx")).toBeNull();
