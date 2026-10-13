@@ -101,7 +101,9 @@ export default function ChatHub() {
 
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 pb-nav">
-            <header className="sticky top-0 z-40 bg-surface-0/90 backdrop-blur border-b border-surface-line px-5 h-14 flex items-center justify-between gap-2">
+            {/* 높이(h-14)는 안쪽 줄에 — 바깥 상자에는 전역 규칙이 상태바만큼의 윗여백을 건다(index.css). 한 상자에 같이 두면 여백이 줄을 밀어 경계선이 글자 가운데에 걸친다 */}
+            <header className="sticky top-0 z-40 bg-surface-0/90 backdrop-blur border-b border-surface-line" data-testid="chat-hub-header">
+                <div className="px-5 h-14 flex items-center justify-between gap-2">
                 <h1 className="text-[18px] font-semibold">{t("chat.title")}</h1>
                 {member && (
                     <div className="flex items-center gap-1.5">
@@ -124,10 +126,12 @@ export default function ChatHub() {
                         )}
                     </div>
                 )}
+                </div>
             </header>
 
             {member && showChips && (
-                <div className="sticky top-14 z-30 bg-surface-0/90 backdrop-blur px-3 py-2 flex gap-1.5 overflow-x-auto scrollbar-hide">
+                // 머리줄(56px) 바로 밑에 붙는다 — 아이폰에서는 상태바만큼 더 내려서
+                <div className="sticky z-30 bg-surface-0/90 backdrop-blur px-3 py-2 flex gap-1.5 overflow-x-auto scrollbar-hide" style={{ top: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}>
                     {(["all", ...kindsPresent] as ("all" | ChatRoomRow["kind"])[]).map((k) => {
                         const on = activeKind === k;
                         const n = unreadOf(k);

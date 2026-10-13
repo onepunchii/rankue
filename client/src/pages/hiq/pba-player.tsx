@@ -245,12 +245,15 @@ export default function HiqPbaPlayer() {
 
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 pb-nav overflow-x-hidden">
-            <header className="sticky top-0 z-20 bg-surface-0/95 backdrop-blur flex items-center gap-1 h-14 px-1">
+            {/* 높이는 안쪽 줄에(index.css 의 상태바 여백 규칙) */}
+            <header className="sticky top-0 z-20 bg-surface-0/95 backdrop-blur">
+                <div className="flex items-center gap-1 h-14 px-1">
                 <button type="button" onClick={() => (window.history.length > 1 ? window.history.back() : setLocation("/pba"))} aria-label={t.back} className="w-11 h-11 rounded-full flex items-center justify-center text-ink-2 active:bg-surface-2">
                     <LucideChevronLeft className="w-6 h-6" />
                 </button>
                 <span className="flex-1 text-[16px] font-semibold truncate">{t.head}</span>
                 {p && <ShareButton className="mr-1" url={`https://www.rankue.co.kr/pba-player/${memCode}`} title={name} />}
+            </div>
             </header>
 
             {isLoading && (

@@ -1534,6 +1534,16 @@ body.keyboard-open .hide-on-keyboard {
   .fixed.top-0:not(.rk-no-safe), .sticky.top-0:not(.rk-no-safe) {
     padding-top: env(safe-area-inset-top);
   }
+  /* 맨 위에 붙는 머리줄(sticky top-0)은 그만큼 위로 끌어올린다(2026-10-13 오너의 아이폰: "간격이랑 여백이 엄청 심하고").
+     #root 가 이미 상태바만큼 내려와 있어, 끌어올리지 않으면 맨 위에서 여백이 **두 번** 들어간다(골프 조인 · 내 예약의 큰 빈칸).
+     끌어올리면 맨 위에서도, 내려 본 뒤에도 줄이 상태바 바로 밑이고 머리줄의 바탕이 상태바 밑까지 이어진다 —
+     오너가 아이폰에서 확인한 세 종목 머리줄(SportHeader)과 같은 놓임이다.
+     ⚠️ 이 규칙은 머리줄이 **화면의 맨 위에 있을 때**만 맞다. 다른 것 아래에 놓이는 sticky top-0(탭 줄 …)은 .rk-no-safe 로 빼고 직접 정한다.
+     ⚠️ 높이를 고정한 상자(h-14)에 직접 걸면 여백이 상자 안으로 밀려 글자가 경계선 밖으로 넘친다(채팅 화면의 '선이 글자 가운데에') —
+        바깥 상자에 sticky, 높이는 안쪽 줄에 둔다. */
+  .sticky.top-0:not(.rk-no-safe) {
+    margin-top: calc(-1 * env(safe-area-inset-top));
+  }
   .fixed.bottom-0 {
     padding-bottom: env(safe-area-inset-bottom);
   }

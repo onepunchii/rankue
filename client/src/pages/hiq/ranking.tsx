@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { LucideMedal, LucideStore, LucideGlobe, LucideTarget, LucideBarChart3, LucideTrophy } from "@/lib/icons";
 import { HiqMember } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { SportBackHeader } from "@/components/hiq/SportHeader";
 import { useSport } from "@/contexts/SportContext";
 import { useAuth } from "@/hooks/useAuth";
 import { BallDot } from "@/components/hiq/BallDot";
@@ -27,7 +28,7 @@ export default function HiqRanking() {
     const [rankingTab, setRankingTab] = useState<"3c" | "4c">("4c");
     // 매장(하이퍼로컬) → 국가 → 글로벌 3계층 랭킹
     const [rankingScope, setRankingScope] = useState<"store" | "country" | "national">("store");
-    const { currentSport } = useSport();
+    const { currentSport, sport } = useSport();
 
     const { member, isGuest, isLoading: isAuthLoading } = useAuth();
 
@@ -106,16 +107,13 @@ export default function HiqRanking() {
     }
 
     return (
-        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] px-5 pt-6 pb-nav font-sans relative overflow-x-hidden">
+        <div className="rk-clip-x min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] px-5 pt-6 pb-nav font-sans relative">
+            {/* 머리줄 — 세 종목의 뒤로가기 머리줄(맨 위에 붙는다). 화면 상자의 바로 아래 자식이어야 붙어 따라온다 */}
+            <SportBackHeader sport={sport} title={currentSport === "GOLF" ? t("ranking.golfTitle") : t("ranking.title")} bleed={20} lift={24} />
             <div className="relative z-10">
-                <header className="mb-7">
-                    <h1 className="text-[26px] font-bold tracking-tight mb-1.5">
-                        {currentSport === "GOLF" ? t("ranking.golfTitle") : t("ranking.title")}
-                    </h1>
-                    <p className="text-black/55 text-[13px] font-medium">
-                        {currentSport === "GOLF" ? t("ranking.golfSubtitle") : t("ranking.subtitle")}
-                    </p>
-                </header>
+                <p className="mt-4 mb-6 text-black/55 text-[13px] font-medium">
+                    {currentSport === "GOLF" ? t("ranking.golfSubtitle") : t("ranking.subtitle")}
+                </p>
 
                 {/* Scope Tabs */}
                 <div className="flex p-1 bg-black/[0.04] rounded-2xl mb-4 ">

@@ -47,6 +47,7 @@ import { useHikingAccess } from "@/hooks/useHikingAccess";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
+import { SportBackHeader, SportHeaderButton } from "@/components/hiq/SportHeader";
 import { useSport } from "@/contexts/SportContext";
 import { getTier } from "@/lib/hiqUtils";
 import { InfoModal, InfoModalType } from "@/components/hiq/menu/InfoModal";
@@ -224,32 +225,22 @@ export default function HiqMenu() {
     }
 
     return (
-        <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav font-sans relative overflow-x-hidden">
+        <div className="rk-clip-x min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav font-sans relative">
             {/* Background Light Effect */}
             <div
                 className="absolute top-0 right-0 w-[80dvw] h-[50dvh] blur-[120px] rounded-full -mr-[30dvw] -mt-[10dvh] pointer-events-none transition-colors duration-700"
                 style={{ backgroundColor: `${sportColor}0D` }}
             />
 
-            {/* Header */}
-            <div className="relative z-10 flex items-center justify-between mb-8 pt-5">
-                <h1 className="text-[26px] font-bold tracking-tight text-ink-1">{t("menu.title")}</h1>
-                {/* 알림함·설정은 계정이 있어야 의미가 있다 — 게스트에겐 숨긴다 */}
-                {!isGuest && (
-                <div className="flex gap-2.5">
-                    <button
-                        title={t("menu.notifications")}
-                        onClick={() => setNotifOpen(true)}
-                        className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center active:scale-95 transition-transform"
-                    >
-                        <LucideBell className="w-5 h-5 text-black/55" />
-                    </button>
-                    <button title={t("menu.settings")} onClick={() => setLocation("/settings")} className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center active:scale-95 transition-transform">
-                        <LucideSettings className="w-5 h-5 text-black/55" />
-                    </button>
-                </div>
-                )}
-            </div>
+            {/* 머리줄 — 세 종목의 뒤로가기 머리줄(맨 위에 붙는다 · 2026-10-13 오너: "각 페이지에 헤더에 해당하는 부분을 고정시키기").
+                알림함 · 설정은 계정이 있어야 의미가 있다 — 게스트에겐 숨긴다 */}
+            <SportBackHeader sport={sport} title={t("menu.title")} bleed={20} lift={24} className="mb-6"
+                right={!isGuest ? (
+                    <div className="flex shrink-0 items-center gap-1">
+                        <SportHeaderButton sport={sport} label={t("menu.notifications")} onClick={() => setNotifOpen(true)} testId="menu-notifications"><LucideBell className="h-[20px] w-[20px]" /></SportHeaderButton>
+                        <SportHeaderButton sport={sport} label={t("menu.settings")} onClick={() => setLocation("/settings")} testId="menu-settings"><LucideSettings className="h-[20px] w-[20px]" /></SportHeaderButton>
+                    </div>
+                ) : undefined} />
 
             {/* Section A: Profile card — 게스트에겐 가짜 프로필("사용자님 · Lv.1") 대신 로그인 카드.
                 메뉴의 공개 항목(매장 찾기·안내)은 그대로 보이므로 화면이 비지 않는다. */}

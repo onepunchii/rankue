@@ -2,7 +2,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { LucideChevronLeft, LucidePlus } from "@/lib/icons";
+import { LucidePlus } from "@/lib/icons";
+import { SportBackHeader } from "@/components/hiq/SportHeader";
+import { useSport } from "@/contexts/SportContext";
 import { apiRequest } from "@/lib/queryClient";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { useT } from "@/lib/i18n";
@@ -17,6 +19,7 @@ const BOARDS: (CommunityBoard | "all")[] = ["all", "brag", "ask", "store", "less
 export default function HiqCommunity() {
     const { t, locale } = useT();
     const [, setLocation] = useLocation();
+    const { sport } = useSport();
     const [board, setBoard] = useState<CommunityBoard | "all">("all");
     // 언어 필터 — 기본은 전체. 글이 몇 건 없는 지금 내 언어만 기본으로 걸면 빈 목록이 된다
     // (오너 결정 2026-08-31: 게시판 분리가 아니라 태그+필터). 내 언어가 아닌 글에는 뱃지가 붙는다.
@@ -70,24 +73,10 @@ export default function HiqCommunity() {
     const writeBoard: CommunityBoard = board === "all" ? "ask" : board;
 
     return (
-        <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6 relative z-10">
-                <div className="flex items-center gap-3">
-                    <motion.button
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => setLocation("/dashboard")}
-                        className="w-11 h-11 rounded-full bg-white flex items-center justify-center transition-transform text-black/60 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                        aria-label={t("community.back")}
-                    >
-                        <LucideChevronLeft className="w-5 h-5" />
-                    </motion.button>
-                    <div>
-                        <h1 className="text-[26px] font-bold tracking-tight text-ink-1 leading-none">{t("community.title")}</h1>
-                        <p className="text-[13px] font-medium text-black/55 mt-1">{t("community.subtitle")}</p>
-                    </div>
-                </div>
-            </div>
+        <div className="rk-clip-x min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative font-sans">
+            {/* 머리줄 — 세 종목의 뒤로가기 머리줄(맨 위에 붙는다) */}
+            <SportBackHeader sport={sport} title={t("community.title")} bleed={20} lift={24} />
+            <p className="mt-4 mb-5 text-[13px] font-medium text-black/55">{t("community.subtitle")}</p>
 
             {/* 게시판 탭 */}
             <div className="flex gap-1.5 mb-5 overflow-x-auto scrollbar-hide -mx-5 px-5">

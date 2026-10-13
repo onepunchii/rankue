@@ -17,7 +17,8 @@ export function MembershipTabs({ activeTab, onChange, category = 'Golf' }: Membe
     ] as const;
 
     return (
-        <div className="sticky top-0 z-40 bg-[#050505]/90 backdrop-blur-xl border-b border-white/10 px-0 flex justify-between">
+        // 표지(MembershipHero) 아래에 놓이는 탭 줄 — 화면의 맨 위가 아니라 전역 규칙(끌어올리기)에서 뺀다. 붙었을 때 상태바에 가리지 않게 윗여백만 직접
+        <div className="rk-no-safe sticky top-0 z-40 bg-[#050505]/90 backdrop-blur-xl border-b border-white/10 px-0 flex justify-between" style={{ paddingTop: "env(safe-area-inset-top, 0px)" }}>
             {tabs.map(tab => (
                 <button
                     key={tab.id}

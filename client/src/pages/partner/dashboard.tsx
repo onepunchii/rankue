@@ -370,8 +370,9 @@ export default function PartnerDashboard() {
             )}
 
             {/* 머리줄 */}
-            <header className="sticky top-0 z-30 bg-surface-0/95 backdrop-blur border-b border-black/[0.05]"
-                style={store.impersonating ? undefined : { paddingTop: "env(safe-area-inset-top)" }}>
+            {/* 대신 보는 중에는 위에 노란 띠가 있어 화면의 맨 위가 아니다 — 전역 규칙(끌어올리기)에서 빼고, 붙을 자리만 상태바 밑으로 */}
+            <header className={store.impersonating ? "rk-no-safe sticky top-0 z-30 bg-surface-0/95 backdrop-blur border-b border-black/[0.05]" : "sticky top-0 z-30 bg-surface-0/95 backdrop-blur border-b border-black/[0.05]"}
+                style={store.impersonating ? { top: "env(safe-area-inset-top, 0px)" } : undefined}>
                 <div className="max-w-lg mx-auto px-4 h-14 flex items-center gap-3">
                     <div className="w-9 h-9 shrink-0 bg-brand rounded-xl flex items-center justify-center">
                         <LucideStore className="w-[18px] h-[18px] text-white" />

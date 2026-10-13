@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 // 당구 홈의 예시 랭킹이 카드의 거르는 조건을 통과하는지 볼 때 쓴다(순수 자료 — DB·서버 모듈을 물지 않는다)
 import { GUEST_SAMPLE } from "./guestSample.js";
@@ -553,6 +553,38 @@ describe("당구 홈", () => {
             expect(golfHome).toContain('className="golf-home golf-home-clip min-h-screen bg-[#0A0A0A] text-white p-6 pb-32 font-sans relative"');
             expect(golfHome).not.toMatch(/golf-home[^"]*overflow-x-hidden/);
             expect(client("index.css")).toMatch(/\.golf-home-clip \{ overflow-x: hidden; \}\n@supports \(overflow: clip\) \{\n  \.golf-home-clip \{ overflow-x: clip; \}/);
+        });
+
+        it("아이폰 상태바 — 맨 위에 붙는 머리줄은 그만큼 끌어올린다(여백이 두 번 들어가지 않게) · 높이를 고정한 상자에 직접 걸지 않는다", () => {
+            // 2026-10-13 오너의 아이폰 사진: 골프 조인 · 내 예약의 큰 빈칸(#root 여백 + 머리줄 여백), 채팅의 '선이 글자 가운데에'(h-14 상자에 여백이 밀려 들어감)
+            const css = client("index.css");
+            expect(css).toMatch(/\.fixed\.top-0:not\(\.rk-no-safe\), \.sticky\.top-0:not\(\.rk-no-safe\) \{\n    padding-top: env\(safe-area-inset-top\);\n  \}/);
+            expect(css).toMatch(/\.sticky\.top-0:not\(\.rk-no-safe\) \{\n    margin-top: calc\(-1 \* env\(safe-area-inset-top\)\);\n  \}/);
+            // 채팅 목록 · PBA 선수 — 바깥 상자에 sticky, 높이(h-14)는 안쪽 줄에. 채팅의 갈래 칩은 머리줄 밑(상태바만큼 더)에 붙는다
+            const hub = client("pages/hiq/chat-hub.tsx");
+            expect(hub).toContain('<header className="sticky top-0 z-40 bg-surface-0/90 backdrop-blur border-b border-surface-line" data-testid="chat-hub-header">');
+            expect(hub).toContain('<div className="px-5 h-14 flex items-center justify-between gap-2">');
+            expect(hub).toContain('style={{ top: "calc(3.5rem + env(safe-area-inset-top, 0px))" }}');
+            expect(hub).not.toMatch(/sticky top-0[^"]*\bh-14\b/);
+            expect(client("pages/hiq/pba-player.tsx")).not.toMatch(/sticky top-0[^"]*\bh-14\b/);
+            // 화면의 맨 위가 아닌 sticky top-0 은 전역 규칙에서 뺀다(끌어올리면 위의 것을 덮는다)
+            expect(client("golf/components/membership/MembershipTabs.tsx")).toContain('className="rk-no-safe sticky top-0 z-40');
+            expect(client("pages/partner/dashboard.tsx")).toContain('store.impersonating ? "rk-no-safe sticky top-0 z-30');
+            // 앱 전체에 '높이를 고정한 sticky top-0'(rk-no-safe 없이)이 남아 있지 않다 — 새로 만들 때도 같은 함정이다
+            const walk = (dir: string): string[] => readdirSync(resolve(__dirname, "../client/src", dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : e.name.endsWith(".tsx") ? [`${dir}/${e.name}`] : []));
+            const squeezed = walk(".").flatMap((f) => [...client(f).matchAll(/className="([^"]*)"/g)].map((m) => m[1]).filter((c) => /\bsticky\b/.test(c) && /\btop-0\b/.test(c) && !/rk-no-safe/.test(c) && /(^|\s)h-(\d+|\[\d)/.test(c)).map((c) => `${f}: ${c.slice(0, 80)}`));
+            expect(squeezed).toEqual([]);
+        });
+
+        it("전체 메뉴 · 랭킹 · 커뮤니티 — 흘러가 버리던 머리를 같은 뒤로가기 머리줄로 고정", () => {
+            // 2026-10-13 오너: "각 페이지에 헤더에 해당하는 부분을 고정시키기"
+            const menu = client("pages/hiq/menu.tsx"), ranking = client("pages/hiq/ranking.tsx"), community = client("pages/hiq/community.tsx");
+            expect(menu).toContain('<SportBackHeader sport={sport} title={t("menu.title")} bleed={20} lift={24} className="mb-6"');
+            expect(ranking).toContain('<SportBackHeader sport={sport} title={currentSport === "GOLF" ? t("ranking.golfTitle") : t("ranking.title")} bleed={20} lift={24} />');
+            expect(community).toContain('<SportBackHeader sport={sport} title={t("community.title")} bleed={20} lift={24} />');
+            for (const src of [menu, ranking, community]) { expect(src).toContain("rk-clip-x min-h-screen"); expect(src).not.toMatch(/min-h-screen[^"]*overflow-x-hidden/); }
+            // 게스트에게는 알림함 · 설정 단추를 그리지 않는다(예전 그대로)
+            expect(menu).toContain("right={!isGuest ? (");
         });
 
         it("크루 화면에도 같은 고정 머리줄 — 세 종목이 한 화면을 쓴다 · '크루' 글자는 화면에 두지 않는다", () => {
