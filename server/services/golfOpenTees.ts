@@ -9,7 +9,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import {
-    GOLF_TEE_SOURCES, golfResRequest, isNewTee, kstDay, openTeeDays, openTeeDue, teeQuietHour, teeSource, teeStillAhead,
+    GOLF_TEE_SOURCES, isNewTee, teeRequests, kstDay, openTeeDays, openTeeDue, teeQuietHour, teeSource, teeStillAhead,
     type CourseOpenTees, type OpenTee, type OpenTeeDay, type OpenTeeFeedRow, type OpenTeeRow, type TeeSource,
 } from "../../shared/golfOpenTee.js";
 import { fetchOpenTees, robotsAllows } from "./golfOpenTeeFetch.js";
@@ -79,7 +79,9 @@ export async function collectOpenTees(opts: { budgetMs?: number; nowMs?: number;
     const worker = async () => {
         while (i < due.length && Date.now() < until) {
             const { s, days: list } = due[i++];
-            if (!(await robotsAllows(s.origin, new URL(golfResRequest(s, list[0]).url).pathname))) {
+            // 요청이 가는 자리(예약 화면과 다른 API 자리일 수 있다)의 robots 를 본다
+            const first = new URL(teeRequests(s, list[0])[0].url);
+            if (!(await robotsAllows(first.origin, first.pathname))) {
                 // 막은 곳은 부르지 않는다 — '못 받음'으로 적어 둬야 다음 차례까지 다시 묻지 않는다(안 적으면 크론마다 robots.txt 를 받는다)
                 for (const day of list) await saveMiss(s, day, "robots 가 막음");
                 blocked++;

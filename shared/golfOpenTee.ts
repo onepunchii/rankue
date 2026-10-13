@@ -7,12 +7,17 @@
  * 예약은 우리가 받지 않는다 — 화면은 그 골프장의 예약 화면(page)으로 보낸다. 받은 값에는 확인한 시각을 같이 보인다(그사이 팔렸을 수 있다).
  *
  * 받는 곳은 이 파일의 목록이 전부다. 한 줄을 지우면 그 골프장은 더 받지 않는다(골프장이 원하지 않으면 지운다).
- * 틀(family)마다 받는 법이 다르다 — 지금은 가장 큰 틀 하나("golfres": /GolfRes/onepage/…)만. 목록의 곳은 하나씩 받아 보고 넣는다.
+ * 틀(family)마다 받는 법이 다르다(같은 예약 프로그램을 쓰는 곳끼리 요청과 답의 꼴이 같다). 목록의 곳은 하나씩 받아 보고 넣는다:
+ *   golfres  /GolfRes/onepage/… — 날짜를 POST → 표(EUC-KR)                         13곳
+ *   v1cal    <api>/v1/reservation-calender?…&date= — GET → JSON(그 날의 resveTimes)   5곳
+ *   qctl     /controller/ReservationController.asp method=getTeeList — POST → JSON   1곳
+ *   rows     날짜를 POST → 머리줄 없는 표(줄마다 시간 · 홀 · 요금 · 코스)              3곳
+ * 넣지 않은 곳(2026-10-13): 폼의 상태값(__VIEWSTATE)이나 화면에서 받은 세션이 있어야 답하는 곳 — 쿠키 없이 공개 요청 한 번으로 받는다는 선 밖이다.
  *
  * 얼마나 자주: 가까운 날(오늘 ~ 사흘 뒤)은 4시간, 그 뒤(나흘 ~ 엿새 뒤)는 8시간에 한 번. 밤(23 ~ 06시)에는 쉰다 — 한 곳에 하루 스무 번 남짓.
  */
 
-export type TeeFamily = "golfres";
+export type TeeFamily = "golfres" | "v1cal" | "qctl" | "rows";
 
 export interface TeeSource {
     /** 우리 골프장 페이지의 slug */
@@ -20,8 +25,19 @@ export interface TeeSource {
     family: TeeFamily;
     /** 그 골프장 사이트(끝에 / 없이) */
     origin: string;
-    /** 예약 화면이 비회원 손님에게 붙이는 구분값(그 화면의 숨은 칸 usrmemcd 에 적혀 있다 — 곳마다 다르다) */
-    memcd: string;
+    /** golfres — 예약 화면이 비회원 손님에게 붙이는 구분값(그 화면의 숨은 칸 usrmemcd 에 적혀 있다 — 곳마다 다르다) */
+    memcd?: string;
+    /** v1cal — 예약 화면이 부르는 API 의 자리(끝에 / 없이) */
+    api?: string;
+    /** v1cal — 코스 구분(회원제 R · 대중제 P …). 예약 화면이 붙이는 값 그대로. 구분이 없는 곳은 [null] */
+    classes?: readonly (string | null)[];
+    /** v1cal — 코스 번호 → 이름(그 사이트의 코스 이름표) */
+    courses?: Readonly<Record<string, string>>;
+    /** qctl — 골프장 구분값 */
+    coDiv?: string;
+    /** rows — 날짜를 보내는 길과 보내는 값({ymd} 자리에 20261016 꼴의 날짜) */
+    path?: string;
+    form?: string;
     /** 사람이 여는 예약 화면 — 화면의 '예약 화면으로' 가 가는 곳 */
     page: string;
     /**
@@ -32,6 +48,11 @@ export interface TeeSource {
 }
 
 const golfres = (slug: string, origin: string, memcd: string, dateLink = true): TeeSource => ({ slug, family: "golfres", origin, memcd, dateLink, page: `${origin}/GolfRes/onepage/real_reservation.asp` });
+
+const v1cal = (slug: string, page: string, api: string, classes: readonly (string | null)[], courses: Record<string, string>): TeeSource =>
+    ({ slug, family: "v1cal", origin: new URL(page).origin, page, api, classes, courses, dateLink: false });
+const rows = (slug: string, page: string, path: string, form: string): TeeSource =>
+    ({ slug, family: "rows", origin: new URL(page).origin, page, path, form, dateLink: false });
 
 /** 받는 곳 — 하나씩 받아 보고 넣은 것만(server/scripts/golf-open-tees-check.ts 로 다시 볼 수 있다) */
 // 같은 틀인데 넣지 않은 곳: 로드힐스(같은 요청에 표가 오지 않는다 — 화면이 다른 값을 더 보낸다) · 익산CC(상떼힐과 같은 사이트)
@@ -50,6 +71,16 @@ export const GOLF_TEE_SOURCES: readonly TeeSource[] = [
     // 솔라고는 주소의 날짜를 읽지 않는다(늘 오늘을 연다) — 날짜를 붙이지 않는다
     golfres("솔라고CC", "http://sollago.co.kr", "10", false),
     golfres("코스카CC", "https://www.koscacc.kr", "60"),
+    // v1cal — 블루원용인은 회원제(R) · 대중제(P) 코스를 따로 묻는다
+    v1cal("블루원용인CC", "https://yi.blueone.com/reservation/reservation", "https://api-yi.blueone.com", ["R", "P"], { 1: "서코스", 2: "중코스", 3: "동코스" }),
+    v1cal("블루원상주CC", "https://sj.blueone.com/reservation/reservation", "https://api-sj.blueone.com", ["P"], { 1: "동코스", 2: "서코스" }),
+    v1cal("클럽모우골프-라이프스타일", "https://www.clubmow.com/internet-resve/reserve-view", "https://api.clubmow.com", [null], { 1: "Mountain", 2: "Oasis", 3: "Wild" }),
+    v1cal("포천힐마루CC", "https://pocheon.hillmaru.com/booking/reservations/reserve", "https://api.pocheon.hillmaru.com", [null], { 1: "시그니처A", 2: "시그니처B", 3: "브리즈", 4: "선샤인", 5: "네스트" }),
+    v1cal("메이플비치-골프앤리조트", "https://www.maplebeach.co.kr/reservation/golf-reservation", "https://api.maplebeach.co.kr", ["P"], { 1: "MAPLE", 2: "BEACH" }),
+    { slug: "골프클럽-Q", family: "qctl", origin: "http://www.golfclubq.com", page: "http://www.golfclubq.com/reservation/reservation.asp", coDiv: "660", dateLink: false },
+    rows("오창에딘버러CC", "https://www.ochangedincc.com/Booking/ReservationCalendar", "/Booking/AjaxGetTime_new", "day={ymd}&change_day="),
+    rows("금실대덕밸리CC", "https://www.hanmircc.com/Reservation/ReservCalendar", "/Reservation/AjaxTimeList", "date={ymd}&changeDate=&changeSeq=&course=&gubun=WEB"),
+    rows("전주샹그릴라CC", "http://www.jeonjucc.co.kr/html/reserve/reserve01.asp", "/html/reserve/reserve01.asp", "book_date={ymd}"),
 ];
 
 const BY_SLUG: ReadonlyMap<string, TeeSource> = new Map(GOLF_TEE_SOURCES.map((s) => [s.slug, s]));
@@ -184,7 +215,7 @@ export function teeStillAhead(day: string, time: string, nowMs: number): boolean
  */
 export function golfResRequest(s: Pick<TeeSource, "origin" | "memcd">, day: string): { url: string; body: string; headers: Record<string, string> } {
     const weekday = new Date(`${day}T00:00:00Z`).getUTCDay() + 1;
-    const body = new URLSearchParams({ golfrestype: "real", courseid: "0", usrmemcd: s.memcd, pointdate: day.replace(/-/g, ""), openyn: "1", dategbn: String(weekday), choice_time: "00", cssncourseum: "", inputtype: "I" }).toString();
+    const body = new URLSearchParams({ golfrestype: "real", courseid: "0", usrmemcd: s.memcd ?? "", pointdate: day.replace(/-/g, ""), openyn: "1", dategbn: String(weekday), choice_time: "00", cssncourseum: "", inputtype: "I" }).toString();
     return {
         url: `${s.origin}/GolfRes/onepage/real_timelist_ajax_list.asp`,
         body,
@@ -237,6 +268,109 @@ export function parseGolfResTimes(html: string): OpenTee[] | null {
         out.push({ time, course, holes: holes === 9 || holes === 18 || holes === 27 ? holes : null, listPrice: listPrice != null && price != null && listPrice > price ? listPrice : null, price });
     }
     return out.sort((a, b) => a.time.localeCompare(b.time) || a.course.localeCompare(b.course, "ko"));
+}
+
+// ── 그 밖의 틀 ───────────────────────────────────────────────────────
+
+/** 한 번의 공개 요청 */
+export interface TeeRequest { url: string; method: "GET" | "POST"; headers: Record<string, string>; body?: string }
+
+const FORM = "application/x-www-form-urlencoded; charset=UTF-8";
+/** 그 골프장 · 그 날의 시간표를 부르는 요청들(대부분 하나 — 코스 구분이 둘인 곳만 둘). 예약 화면이 스스로 보내는 것과 같은 값이다 */
+export function teeRequests(s: TeeSource, day: string): TeeRequest[] {
+    const ymd = day.replace(/-/g, "");
+    if (s.family === "golfres") { const r = golfResRequest(s, day); return [{ url: r.url, method: "POST", headers: r.headers, body: r.body }]; }
+    if (s.family === "v1cal") {
+        const [y, m] = day.split("-");
+        return (s.classes ?? [null]).map((c) => ({ url: `${s.api}/v1/reservation-calender?year=${y}&month=${Number(m)}&date=${day}${c ? `&courseClass=${c}` : ""}`, method: "GET" as const, headers: { referer: s.page } }));
+    }
+    if (s.family === "qctl") {
+        return [{ url: `${s.origin}/controller/ReservationController.asp`, method: "POST", headers: { "content-type": FORM, referer: s.page, "x-requested-with": "XMLHttpRequest" }, body: `method=getTeeList&coDiv=${s.coDiv ?? ""}&date=${ymd}` }];
+    }
+    return [{ url: `${s.origin}${s.path ?? ""}`, method: "POST", headers: { "content-type": FORM, referer: s.page, "x-requested-with": "XMLHttpRequest" }, body: (s.form ?? "").replace(/\{ymd\}/g, ymd) }];
+}
+
+const hhmm = (v: unknown): string | null => {
+    const m = /^([01]?\d|2[0-3])\s*:?\s*([0-5]\d)/.exec(String(v ?? "").trim());
+    return m ? `${m[1].padStart(2, "0")}:${m[2]}` : null;
+};
+const holesOf = (v: unknown): number | null => { const n = Number(/\d+/.exec(String(v ?? ""))?.[0] ?? NaN); return n === 9 || n === 18 || n === 27 ? n : null; };
+const tidy = (out: OpenTee[]): OpenTee[] => {
+    const seen = new Set<string>();
+    return out.filter((t) => { const k = `${t.time}|${t.course}`; if (seen.has(k)) return false; seen.add(k); return true; })
+        .sort((a, b) => a.time.localeCompare(b.time) || a.course.localeCompare(b.course, "ko"));
+};
+const pair = (list: number | null, price: number | null): Pick<OpenTee, "listPrice" | "price"> => ({ price: price ?? list, listPrice: list != null && price != null && list > price ? list : null });
+
+/** v1cal — 달력 답의 그 날 칸에 든 시간들. 비어 있는(EMPTY) · 홈페이지에 연(webOpenFlag) 줄만 */
+export function parseV1Cal(text: string, day: string, courses: Readonly<Record<string, string>> = {}): OpenTee[] | null {
+    let d: any;
+    try { d = JSON.parse(text); } catch { return null; }
+    const cal = d?.data?.calenders;
+    if (!Array.isArray(cal)) return null;
+    const times: any[] = cal.find((c: any) => c?.bsnDate === day)?.resveTimes ?? [];
+    const out: OpenTee[] = [];
+    for (const t of times) {
+        if (t?.timeStatus !== "EMPTY" || t?.webOpenFlag === false || t?.delFlag === true) continue;
+        const time = hhmm(t.resveTime);
+        if (!time) continue;
+        const num = (v: unknown) => (typeof v === "number" && v >= 10_000 && v <= 2_000_000 ? Math.round(v) : null);
+        out.push({ time, course: String(courses[String(t.resveCourse)] ?? "").slice(0, 30), holes: holesOf(t.holeDiv), ...pair(num(t.nomPrice) ?? num(t.price), num(t.promtnPrice) ?? num(t.price)) });
+    }
+    return tidy(out);
+}
+
+/** qctl — rows[] 의 한 줄이 티 하나(BK_TIME "0621" · BK_COS_NM · BK_CHARGE "160,000" · BK_BASIC_CHARGE "코드,200000,구분") */
+export function parseQctl(text: string): OpenTee[] | null {
+    let d: any;
+    try { d = JSON.parse(text); } catch { return null; }
+    if (!Array.isArray(d?.rows)) return null;
+    const out: OpenTee[] = [];
+    for (const r of d.rows) {
+        const time = hhmm(r?.BK_TIME);
+        if (!time) continue;
+        out.push({ time, course: String(r.BK_COS_NM ?? "").slice(0, 30), holes: holesOf(r.BK_ROUNDF_NM), ...pair(won(String(r.BK_BASIC_CHARGE ?? "").split(",")[1] ?? ""), won(String(r.BK_CHARGE ?? ""))) });
+    }
+    return tidy(out);
+}
+
+/** 코스 이름으로 볼 수 없는 칸의 말 */
+const NOT_COURSE = /^(예약|신청|마감|대기|캐디|노캐디|셀프|카트|\d부|[\d,]+원?|\d+홀|-|)$/;
+/**
+ * rows — 머리줄 없는 표: 줄(tr)마다 시간이 든 칸을 찾고, 같은 줄의 다른 칸에서 홀 수 · 요금 · 코스 이름을 읽는다.
+ * 코스 이름은 줄에 적힌 속성(data-coursekor)이 있으면 그것, 없으면 글자뿐인 짧은 칸. 요금이 둘이면 앞이 정상 · 뒤가 그 티의 요금.
+ * 표가 아예 없으면 null(못 받음), 표는 있는데 시간이 든 줄이 없으면 [](남은 티 없음).
+ */
+export function parseTeeRows(html: string): OpenTee[] | null {
+    const clean = html.replace(/<!--[\s\S]*?-->/g, "").replace(/<script[\s\S]*?<\/script>/gi, "");
+    if (!/<table/i.test(clean)) return null;
+    const out: OpenTee[] = [];
+    for (const row of clean.matchAll(/<tr([^>]*)>([\s\S]*?)<\/tr>/gi)) {
+        const cells = [...row[2].matchAll(/<td[^>]*>([\s\S]*?)<\/td>/gi)].map((m) => cellText(m[1].replace(/<br\s*\/?>/gi, " ")));
+        const iTime = cells.findIndex((c) => /(^|\s)([01]?\d|2[0-3])\s*:\s*[0-5]\d(\s|$)/.test(c));
+        if (iTime < 0) continue;
+        const t = /([01]?\d|2[0-3])\s*:\s*([0-5]\d)/.exec(cells[iTime])!;
+        const time = `${t[1].padStart(2, "0")}:${t[2]}`;
+        // 시간 칸에 코스 이름이 같이 적힌 곳("Hill 17:21")
+        const beside = cells[iTime].replace(t[0], "").trim();
+        const attr = /data-coursekor="([^"]*)"/i.exec(row[1])?.[1]?.trim();
+        const others = cells.filter((_, i) => i !== iTime);
+        const named = attr || (beside && !NOT_COURSE.test(beside) ? beside : "") || others.find((c) => c.length <= 12 && !/\d/.test(c) && !NOT_COURSE.test(c)) || "";
+        // 칸의 폭을 맞추려고 글자 사이를 띄운 이름("드 림")은 붙인다
+        const course = (/^[가-힣]( [가-힣])+$/.test(named) ? named.replace(/ /g, "") : named).slice(0, 30);
+        const holes = holesOf(others.find((c) => /^\d{1,2}\s*홀/.test(c)));
+        const money = others.map((c) => (/^[^\d]{0,6}[\d,]{5,9}\s*원?$/.test(c) ? won(c) : null)).filter((v): v is number => v != null);
+        out.push({ time, course, holes, ...pair(money.length >= 2 ? money[0] : null, money.length ? money[money.length - 1] : null) });
+    }
+    return tidy(out);
+}
+
+/** 그 틀의 답 → 남은 티. 못 읽으면 null(못 받음) */
+export function parseTees(s: TeeSource, text: string, day: string): OpenTee[] | null {
+    if (s.family === "golfres") return parseGolfResTimes(text);
+    if (s.family === "v1cal") return parseV1Cal(text, day, s.courses);
+    if (s.family === "qctl") return parseQctl(text);
+    return parseTeeRows(text);
 }
 
 /** 그 날의 한 줄 요약 — "남은 티 12 · 06:16부터" */

@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
     GOLF_TEE_SOURCES, OPEN_TEE_COPY, golfResRequest, isNewTee, kstClock, kstDay, openTeeDays, openTeeDue, parseGolfResTimes, teeDayLabel, teePriceText, teeQuietHour,
-    teeBookingUrl, teeSource, teeStillAhead,
+    parseQctl, parseTeeRows, parseV1Cal, teeBookingUrl, teeRequests, teeSource, teeStillAhead,
 } from "./golfOpenTee";
 
 const root = resolve(__dirname, "..");
@@ -16,13 +16,16 @@ const NOON = Date.UTC(2026, 9, 13, 3, 0);   // 한국 10/13(화) 12:00
 // 실측: 공식 사이트 435곳 가운데 41곳이 로그인 없이 시간표를 보여 준다(reports/golf-tee-survey-1013.md). 가장 큰 틀 하나부터 받는다.
 describe("받는 곳 — 공식 사이트만, 하나씩 받아 본 곳만", () => {
     it("목록 — slug 가 겹치지 않고, 예약 화면은 그 골프장 사이트 안에 있다", () => {
-        expect(GOLF_TEE_SOURCES.length).toBe(13);
+        expect(GOLF_TEE_SOURCES.length).toBe(22);
+        expect(Object.fromEntries(["golfres", "v1cal", "qctl", "rows"].map((f) => [f, GOLF_TEE_SOURCES.filter((s) => s.family === f).length]))).toEqual({ golfres: 13, v1cal: 5, qctl: 1, rows: 3 });
         expect(new Set(GOLF_TEE_SOURCES.map((s) => s.slug)).size).toBe(GOLF_TEE_SOURCES.length);
         expect(new Set(GOLF_TEE_SOURCES.map((s) => s.origin)).size).toBe(GOLF_TEE_SOURCES.length);
         for (const s of GOLF_TEE_SOURCES) {
             expect(s.origin, s.slug).toMatch(/^https?:\/\/[a-z0-9.-]+$/);
             expect(s.page.startsWith(`${s.origin}/`), s.slug).toBe(true);
-            expect(s.memcd, s.slug).toMatch(/^\d+$/);
+            if (s.family === "golfres") expect(s.memcd, s.slug).toMatch(/^\d+$/);
+            if (s.family === "v1cal") { expect(s.api, s.slug).toMatch(/^https:\/\/api[.-]/); expect(Object.keys(s.courses ?? {}).length, s.slug).toBeGreaterThan(0); }
+            if (s.family === "rows") { expect(s.path, s.slug).toMatch(/^\//); expect(s.form, s.slug).toContain("{ymd}"); }
         }
         expect(teeSource("솔라고CC")?.page).toBe("http://sollago.co.kr/GolfRes/onepage/real_reservation.asp");
         expect(teeSource("레이크사이드CC")).toBeNull();
@@ -105,6 +108,63 @@ describe("시간표 읽기 — 표의 꼴 둘, 칸은 머리줄의 이름으로"
     });
 });
 
+// 2026-10-13 오너: "최대한 골프티 취소티 확보가 가능한 홈페이지를 연결하는 게 1번" → 남은 28곳의 요청을 받아 보고, 쿠키 없이 받아지는 틀 셋을 더했다(9곳)
+describe("그 밖의 틀 — 요청과 답의 꼴", () => {
+    it("요청 — 틀마다 예약 화면이 스스로 보내는 값. 코스 구분이 둘인 곳은 둘", () => {
+        const yi = teeRequests(teeSource("블루원용인CC")!, "2026-10-16");
+        expect(yi.map((r) => `${r.method} ${r.url}`)).toEqual([
+            "GET https://api-yi.blueone.com/v1/reservation-calender?year=2026&month=10&date=2026-10-16&courseClass=R",
+            "GET https://api-yi.blueone.com/v1/reservation-calender?year=2026&month=10&date=2026-10-16&courseClass=P",
+        ]);
+        expect(teeRequests(teeSource("클럽모우골프-라이프스타일")!, "2026-01-05")[0].url).toBe("https://api.clubmow.com/v1/reservation-calender?year=2026&month=1&date=2026-01-05");
+        expect(teeRequests(teeSource("골프클럽-Q")!, "2026-10-16")[0]).toMatchObject({ method: "POST", url: "http://www.golfclubq.com/controller/ReservationController.asp", body: "method=getTeeList&coDiv=660&date=20261016" });
+        expect(teeRequests(teeSource("금실대덕밸리CC")!, "2026-10-16")[0]).toMatchObject({ method: "POST", url: "https://www.hanmircc.com/Reservation/AjaxTimeList", body: "date=20261016&changeDate=&changeSeq=&course=&gubun=WEB" });
+        expect(teeRequests(teeSource("코스카CC")!, "2026-10-16")[0].url).toBe("https://www.koscacc.kr/GolfRes/onepage/real_timelist_ajax_list.asp");
+        for (const s of GOLF_TEE_SOURCES) for (const r of teeRequests(s, "2026-10-16")) expect(Object.keys(r.headers).map((k) => k.toLowerCase()), s.slug).not.toContain("cookie");
+    });
+    it("v1cal — 그 날 칸의 비어 있는 · 홈페이지에 연 줄만. 코스는 이름표로, 정상 요금은 더 쌀 때만", () => {
+        const body = JSON.stringify({ status: "OK", data: { calenders: [
+            { bsnDate: "2026-10-15", resveTimes: [{ timeStatus: "EMPTY", webOpenFlag: true, resveCourse: "1", resveTime: "09:00", holeDiv: "18", price: 100000 }] },
+            { bsnDate: "2026-10-16", resveTimes: [
+                { timeStatus: "EMPTY", webOpenFlag: true, resveCourse: "1", resveTime: "17:34", holeDiv: "18", nomPrice: 275000, price: 275000, promtnPrice: 185000 },
+                { timeStatus: "RESVE", webOpenFlag: true, resveCourse: "2", resveTime: "06:20", holeDiv: "18", price: 200000 },
+                { timeStatus: "EMPTY", webOpenFlag: false, resveCourse: "2", resveTime: "06:27", holeDiv: "18", price: 200000 },
+                { timeStatus: "EMPTY", webOpenFlag: true, resveCourse: "3", resveTime: "06:40:00", holeDiv: "09", price: 258000 },
+            ] },
+        ] } });
+        expect(parseV1Cal(body, "2026-10-16", { 1: "서코스", 3: "동코스" })).toEqual([
+            { time: "06:40", course: "동코스", holes: 9, listPrice: null, price: 258000 },
+            { time: "17:34", course: "서코스", holes: 18, listPrice: 275000, price: 185000 },
+        ]);
+        // 그 날 칸에 시간이 없으면 남은 티 없음 · 답의 꼴이 다르면 못 받음
+        expect(parseV1Cal(JSON.stringify({ data: { calenders: [{ bsnDate: "2026-10-16" }] } }), "2026-10-16")).toEqual([]);
+        expect(parseV1Cal(JSON.stringify({ status: "FAIL" }), "2026-10-16")).toBeNull();
+        expect(parseV1Cal("<html>로그인</html>", "2026-10-16")).toBeNull();
+    });
+    it("qctl — rows 의 한 줄이 티 하나", () => {
+        const body = JSON.stringify({ rows: [{ BK_COS_NM: "팜파스", BK_TIME: "0621", BK_ROUNDF_NM: 18, BK_CHARGE: "160,000", BK_BASIC_CHARGE: "P0044,200000,B" }, { BK_COS_NM: "밸리", BK_TIME: "1310", BK_ROUNDF_NM: 18, BK_CHARGE: "200,000", BK_BASIC_CHARGE: "P0044,200000,B" }] });
+        expect(parseQctl(body)).toEqual([
+            { time: "06:21", course: "팜파스", holes: 18, listPrice: 200000, price: 160000 },
+            { time: "13:10", course: "밸리", holes: 18, listPrice: null, price: 200000 },
+        ]);
+        expect(parseQctl(JSON.stringify({ rows: [] }))).toEqual([]);
+        expect(parseQctl("{}")).toBeNull();
+    });
+    it("rows — 머리줄 없는 표: 줄마다 시간 · 홀 · 요금 · 코스(줄의 속성 · 글자뿐인 칸 · 시간 옆의 글자)", () => {
+        const a = `<div class="scrollBox"><table class="timeTbl"><tbody id="timeList"><tr><td>06:23</td><td>18홀</td><td><p>캐디</p></td><td class="txt_sun">80,000원</td><td><a href="/Member/Login?url=x">예약</a></td></tr></tbody></table></div>`;
+        expect(parseTeeRows(a)).toEqual([{ time: "06:23", course: "", holes: 18, listPrice: null, price: 80000 }]);
+        const b = `<table class="timeTbl"><tr data-course="11" data-coursekor="미르"><td>05:06</td><td>09홀 </td><td> <span class="txt_sub"></span> 50,000원 </td><td><a href="javascript:x()">예약</a></td></tr></table>`;
+        expect(parseTeeRows(b)).toEqual([{ time: "05:06", course: "미르", holes: 9, listPrice: null, price: 50000 }]);
+        // 달력(날짜만 든 표)이 같이 와도 시간이 든 줄만 · 폭을 맞추려 띄운 이름("드 림")은 붙인다
+        const c = `<table><tr><th>일</th><th>월</th></tr><tr><td>16</td><td>17</td></tr></table><table summary="코스 및 시간 선택"><tbody><tr><td>레이크</td><td>06:39</td><td></td><td><a href="#"><button>예약</button></a></td></tr><tr><td>드 림</td><td>06:25</td><td></td><td><button>예약</button></td></tr></tbody></table>`;
+        expect(parseTeeRows(c)).toEqual([{ time: "06:25", course: "드림", holes: null, listPrice: null, price: null }, { time: "06:39", course: "레이크", holes: null, listPrice: null, price: null }]);
+        const d = `<table class="table_typeA"><tbody><tr><td>3부</td><td>Hill<br/>17:21</td><td>180,000</td><td>150,000</td><td></td><td><button>예약</button></td></tr></tbody></table>`;
+        expect(parseTeeRows(d)).toEqual([{ time: "17:21", course: "Hill", holes: null, listPrice: 180000, price: 150000 }]);
+        expect(parseTeeRows(`<table><tr><td>예약 가능한 시간이 없습니다</td></tr></table>`)).toEqual([]);
+        expect(parseTeeRows("로그인 후 이용해 주세요")).toBeNull();
+    });
+});
+
 describe("언제 다시 보는가 — 가까운 날 4시간 · 먼 날 8시간 · 밤에는 쉰다", () => {
     it("한국 날짜 — 오늘부터 이레", () => {
         expect(kstDay(NOON)).toBe("2026-10-13");
@@ -152,7 +212,8 @@ describe("지키는 것 — 서버 · 화면", () => {
         expect(fetcher).toContain("export async function fetchOpenTees(s: TeeSource, day: string, timeoutMs = 4000): Promise<TeeFetch> {");
         expect(fetcher).toContain('const UA = "Mozilla/5.0 (compatible; RankueBot/1.0; +https://www.rankue.co.kr/support)";');
         expect(code(fetcher)).not.toMatch(/cookie|password|login\(/i);
-        expect(fetcher).toContain('if (!tees) return { ok: false, note: /로그인/.test(html) ? "로그인 화면" : "표 없음" };');
+        expect(fetcher).toContain('if (!tees) return { ok: false, note: /로그인/.test(text.slice(0, 4000)) ? "로그인 화면" : "표 없음" };');
+        expect(fetcher).toContain("for (const rq of teeRequests(s, day)) {");
         // DB 를 모른다
         expect(code(fetcher)).not.toMatch(/from "\.\.\/db/);
     });
