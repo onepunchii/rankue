@@ -29,6 +29,7 @@ import { MyPhotos } from "../photos/MyPhotos";
 import { SummitCheckin } from "../stamps/SummitCheckin";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { POI_COLOR } from "../theme";
+import { CourseMap } from "../components/CourseMap";
 import { kstYmd, sunTimes, sunsetNotice } from "@shared/hikingSun";
 import { bgWatchAvailable } from "../trail/bgWatch";
 import { setVoiceOn, speakLine, voiceOn } from "../trail/speak";
@@ -179,6 +180,10 @@ export default function TrailPage() {
                         <div className="rounded-2xl bg-[#F4EFE3] px-2.5 pb-1.5 pt-2.5 text-[#0E2A33]" data-testid="trail-ribbon">
                             <CourseProfile line={course.line} pois={pois.map((p) => ({ id: p.id, kind: p.kind as HikingPoiKind, km: p.km }))} summitKm={course.summitKm} now={active && s && !s.far ? s.km : null} />
                         </div>
+                        {/* 코스 지도 — 길 띠는 '코스의 어디쯤'을, 지도는 '코스가 어느 쪽에 있는지'를 보여 준다(코스에서 벗어났을 때 돌아갈 방향이 보인다).
+                            걷기 전에는 옅은 선을 눌러 코스를 바꿀 수 있고, 걷는 동안에는 바꾸지 않는다 */}
+                        <CourseMap className="mt-3" courses={d.courseList} index={Math.max(0, d.courseList.findIndex((c) => c.id === course.id))} onPick={active ? undefined : (k) => setCourseId(d.courseList[k]?.id ?? null)}
+                            pois={d.pois} summit={summit} here={active ? trail.here : null} live={active} />
 
                         {!active ? (
                             <>

@@ -6,6 +6,7 @@
  * 한 산이 여러 권에 든다 — 설악산 하나로 여러 권의 칸이 같이 찬다. 한 권을 다 채우면 와펜을 받아 배낭에 단다.
  *
  * 누구에게나 열린다. 등산을 쓸 수 있는 회원은 내 진행을, 그 밖의 사람은 받을 수 있는 와펜을 제 색으로 본다(지어낸 예시는 그리지 않는다).
+ * 회원에게는 맨 위 요약 밑에 '내 사진첩'의 입구가 놓인다(album/AlbumParts AlbumEntry — 산마다 올린 내 사진을 한 곳에서 본다).
  * ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상.
  */
 import { Link } from "wouter";
@@ -13,6 +14,7 @@ import { LucideChevronRight } from "@/lib/icons";
 import { useSeo } from "@/hooks/useSeo";
 import { HIKING_STAMPS_INTRO, HIKING_STAMPS_SEO } from "@shared/hikingPage";
 import { HIKING_GRANDS, HIKING_SERIES, type HikingBookKind } from "@shared/hikingStamps";
+import { AlbumEntry } from "../album/AlbumParts";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { HikingCta } from "../components/MountainParts";
 import { GradeCard } from "../stamps/GradeParts";
@@ -50,6 +52,8 @@ export default function StampShelf() {
                             ) : (
                                 <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-3.5 text-[14px] leading-relaxed text-[#F4EFE3CC] break-keep" data-testid="hk-stamp-intro">{HIKING_STAMPS_INTRO}</p>
                             )}
+                            {/* 내 사진첩 — 등산을 쓰는 회원에게만(그 밖의 사람에게는 그려지지 않는다) */}
+                            <AlbumEntry from="shelf" className="mt-2.5" />
                         </div>
 
                         {SERIES.map((kind) => {

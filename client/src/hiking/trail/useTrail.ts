@@ -58,6 +58,8 @@ export function useTrail({ active, line, pois, summitKm, summit, kinds, keepId }
     const [state, setState] = useState<TrailState | null>(null);
     const [phase, setPhase] = useState<TrailPhase>("idle");
     const [accuracy, setAccuracy] = useState<number | null>(null);
+    /** 방금 받은 자리 — 코스 지도의 '나' 점에 쓴다. 이 화면의 메모리에만 있다(서버로 가지 않고 기기에 적지도 않는다) */
+    const [here, setHere] = useState<{ lat: number; lng: number; accuracy: number | null } | null>(null);
     /** 화면이 꺼져도 받고 있는가(앱 1.4 부터) — 화면이 '켜 두세요'라고 말할지를 정한다 */
     const [background, setBackground] = useState(false);
     const prev = useRef<{ km: number; dir: 1 | -1 } | null>(null);
@@ -68,7 +70,7 @@ export function useTrail({ active, line, pois, summitKm, summit, kinds, keepId }
     input.current = { line, pois, summitKm, summit, kinds };
 
     useEffect(() => {
-        if (!active) { setPhase("idle"); return; }
+        if (!active) { setPhase("idle"); setHere(null); return; }
         let stop = false, first = true;
         let timer: ReturnType<typeof setTimeout> | undefined;
         let stopBg: (() => void) | null = null;
@@ -87,6 +89,7 @@ export function useTrail({ active, line, pois, summitKm, summit, kinds, keepId }
                 setState(s);
             }
             setAccuracy(fix.accuracy);
+            setHere({ lat: fix.lat, lng: fix.lng, accuracy: fix.accuracy });
             setPhase("on");
         };
         const tick = async () => {
@@ -133,5 +136,5 @@ export function useTrail({ active, line, pois, summitKm, summit, kinds, keepId }
 
     /** 지금까지 쌓은 것 — 마칠 때 읽는다 */
     const summary = useCallback(() => ({ walkedKm: tally.current.walkedKm, gainM: tally.current.gainM, reachedSummit: reached.current, samples: tally.current.samples }), []);
-    return { state, phase, accuracy, summary, background };
+    return { state, phase, accuracy, summary, background, here };
 }

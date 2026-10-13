@@ -230,7 +230,8 @@ describe("들머리 — 고른 코스의 선에서", () => {
         expect(ui).toContain("<p>{COURSE_SOURCE_NOTE}</p>");
         // 고른 코스는 산 화면이 들고 있다가 넘겨 준다
         const page = read("client/src/hiking/pages/MountainPage.tsx");
-        expect(page).toContain("<Courses key={`courses:${d.slug}`} d={d} canStart={my.mine} i={ci} onPick={pickCourse} />");
+        // loc — 코스 지도(components/CourseMap)가 내 위치를 그린다(받은 자리는 이 화면의 메모리에만 있다)
+        expect(page).toContain("<Courses key={`courses:${d.slug}`} d={d} canStart={my.mine} i={ci} onPick={pickCourse} loc={loc} />");
         expect(page).toContain("<MountainLocation key={`location:${d.slug}`} d={d} course={course} fromMe={fromMe} ask={loc.ask} asking={loc.asking} />");
     });
 });

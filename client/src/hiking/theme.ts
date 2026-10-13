@@ -34,6 +34,9 @@ export const SURFACE_COLOR: Readonly<Record<string, string>> = {
 /** 권역 표지 그림 · 허브 그림(client/public/hiking/art) — 그림에는 글자가 없다 */
 export const hikingCover = (region: string | null | undefined) => `/hiking/art/cover-${region ?? "gangwon"}.webp`;
 export const HIKING_HERO = "/hiking/art/hero.webp";
+/** 내 사진첩(pages/AlbumPage)의 머리 그림 · 사진이 아직 없을 때의 그림 — 꾸밈이라 글자가 없다 */
+export const HIKING_ALBUM_COVER = "/hiking/art/album-cover.webp";
+export const HIKING_ALBUM_EMPTY = "/hiking/art/album-empty.webp";
 
 /** 와펜(자수 패치) · 핀의 그림 — 이름은 shared/hikingStamps 의 art. 그림에는 글자가 없다 */
 export const patchSrc = (art: string) => `/hiking/art/patch-${art}.webp`;

@@ -18,6 +18,11 @@ import {
 
 const MY_PHOTOS_URL = "/api/hiq/hiking/me/photos";
 export const myPhotosKey = (mountainId: string) => [`${MY_PHOTOS_URL}?mountainId=${encodeURIComponent(mountainId)}`] as const;
+/** 내 사진첩(산마다 묶은 내 사진 전부 — shared/hikingAlbum). 사진 하나가 바뀌면 같이 다시 받는다(refreshHikingPhotos) */
+const MY_ALBUM_URL = "/api/hiq/hiking/me/album";
+export const HIKING_ALBUM_KEY = [MY_ALBUM_URL] as const;
+/** 내 사진에서 나온 답인가 — 산마다의 내 사진과 사진첩 */
+const isMyPhotosKey = (key: unknown): boolean => typeof key === "string" && (key.startsWith(MY_PHOTOS_URL) || key.startsWith(MY_ALBUM_URL));
 export const HIKING_PHOTOS_KEY = "hiking-photos";
 export const mountainPhotosKey = (slug: string, viewer: string) => [HIKING_PHOTOS_KEY, "mountain", slug, viewer] as const;
 export class HikingPhotoError extends Error {}
@@ -26,9 +31,9 @@ export class HikingPhotoError extends Error {}
 export const fetchMountainPhotos = (slug: string): Promise<{ photos: MountainPhoto[] }> =>
     apiRequest(`/api/hiq/hiking/mountains/${encodeURIComponent(slug)}/photos?limit=${HIKING_GALLERY_LIMIT}`);
 
-/** 사진 하나가 바뀐 뒤 — 내 사진(어느 산이든)과 이 산의 사진을 다시 받는다 */
+/** 사진 하나가 바뀐 뒤 — 내 사진(어느 산이든) · 내 사진첩과 이 산의 사진을 다시 받는다 */
 export function refreshHikingPhotos(qc: QueryClient) {
-    void qc.invalidateQueries({ predicate: (q) => typeof q.queryKey[0] === "string" && (q.queryKey[0] as string).startsWith(MY_PHOTOS_URL) });
+    void qc.invalidateQueries({ predicate: (q) => isMyPhotosKey(q.queryKey[0]) });
     void qc.invalidateQueries({ queryKey: [HIKING_PHOTOS_KEY] });
 }
 

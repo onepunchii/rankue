@@ -23,6 +23,7 @@ import { heightText, hikingMountainPath, hikingRegion, hikingRegionPath, mountai
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "@shared/hikingGuide";
 import { HIKING_POI_NAME, HIKING_POI_ORDER, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
 import { SURFACE_COPY, surfaceNote, surfaceShares } from "@shared/hikingSurface";
+import { COURSE_MAP_COPY } from "@shared/hikingCourseMap";
 import { COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, MOUNTAIN_LABEL, OSM_NOTE, courseFacts, courseShape, courseViaNote, kmRange, listNames, mountainSeo } from "@shared/hikingPage";
 import { MOUNTAIN_AROUND_LABEL, MOUNTAIN_SECTIONS, NEARBY_DIAL_MIN, fromMeText, nearbyDialItems, shortestCourse } from "@shared/hikingAround";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
@@ -30,6 +31,7 @@ import { HkSectionNav, hkJumpTo, type HkNavItem } from "../components/HkSectionN
 import { MountainLocation } from "../components/MountainLocation";
 import { MountainNearbyPlaces } from "../components/MountainNearbyPlaces";
 import { NearDial } from "../components/NearMe";
+import { CourseMap } from "../components/CourseMap";
 import { CourseProfile, CourseTrace, SLOPE_COLOR } from "../components/CourseParts";
 import { SLOPE_LABEL, courseLevel, courseSlopes, type CourseLevelId } from "@shared/hikingCourseLook";
 import { Fact, HikingCta, MountainRow, MountainWeather, SunToday } from "../components/MountainParts";
@@ -47,7 +49,7 @@ import { HIKING_PHOTOS_ANCHOR, HIKING_PHOTO_LABEL } from "@shared/hikingPhotos";
 import { stampDate } from "../lib/date";
 import { POI_COLOR, SURFACE_COLOR, hikingCover } from "../theme";
 import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi } from "../lib/api";
-import { useMyLocation } from "../lib/useMyLocation";
+import { useMyLocation, type MyLocation } from "../lib/useMyLocation";
 
 const ORIGIN = "https://www.rankue.co.kr";
 /**
@@ -183,7 +185,7 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
 }
 
 /** 코스 구역 — 고른 코스(i)는 산 화면이 들고 있는다: '위치 · 들머리' 구역이 그 코스의 들머리를 쓴다 */
-function Courses({ d, canStart, i, onPick }: { d: MountainDetail; canStart?: boolean; i: number; onPick: (i: number) => void }) {
+function Courses({ d, canStart, i, onPick, loc }: { d: MountainDetail; canStart?: boolean; i: number; onPick: (i: number) => void; loc: MyLocation }) {
     const c = d.courseList[Math.min(i, d.courseList.length - 1)];
     if (!c) return <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-4 text-[14px] leading-relaxed text-[#F4EFE3B3] break-keep">{MOUNTAIN_LABEL.noCourse}</p>;
     return (
@@ -202,6 +204,14 @@ function Courses({ d, canStart, i, onPick }: { d: MountainDetail; canStart?: boo
             {d.courseList.length > 1 && d.courseList.some((x) => x.summitKm != null) && d.courseList.some((x) => x.summitKm == null) && (
                 <p className="-mt-1 mb-3 text-[12.5px] text-[#F4EFE399]" data-testid="course-summit-legend">▲ 정상을 지나는 코스 {d.courseList.filter((x) => x.summitKm != null).length}개 · 나머지는 능선 · 계곡 · 둘레를 걷는 길</p>
             )}
+            {/* 코스 지도 — 이 산의 코스 전부와 내 위치를 한 장에(바깥 지도 없이 우리 자료로 그린다) */}
+            <div className="mb-3" data-testid="course-map-wrap">
+                <div className="mb-2 flex items-baseline justify-between gap-2">
+                    <p className="text-[15px] font-semibold text-[#F4EFE3]">{COURSE_MAP_COPY.title}</p>
+                    <p className="shrink-0 text-[12.5px] text-[#F4EFE380]">{COURSE_MAP_COPY.aside}</p>
+                </div>
+                <CourseMap courses={d.courseList} index={i} onPick={onPick} pois={d.pois} summit={d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null} here={loc.here} ask={loc.ask} asking={loc.asking} />
+            </div>
             <CourseCard key={`card:${c.id}`} c={c} pois={d.pois} />
             {canStart && (
                 <Link href={trailPath(d.slug, c.id)} className="mt-3 flex h-12 items-center justify-center rounded-xl bg-[#F28C6A] text-[15px] font-semibold text-[#2A1208] active:bg-[#E67C59]" data-track-as="hiking-trail-open" data-testid="course-start">
@@ -496,7 +506,7 @@ export default function MountainPage() {
                 <HkSectionNav key={`secnav:${d.slug}`} items={NAV_ITEMS} className="mt-6" />
 
                 <HkSection title={MOUNTAIN_LABEL.courses} aside={d.courseList.length ? `${d.courseList.length}개` : undefined} sec="courses">
-                    <Courses key={`courses:${d.slug}`} d={d} canStart={my.mine} i={ci} onPick={pickCourse} />
+                    <Courses key={`courses:${d.slug}`} d={d} canStart={my.mine} i={ci} onPick={pickCourse} loc={loc} />
                 </HkSection>
 
                 {/* 이 산의 사진 — 회원이 올린 공개 사진. 방문자에게도 보인다(한 장도 없으면 구역이 없다) */}

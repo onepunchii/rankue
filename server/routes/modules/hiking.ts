@@ -12,6 +12,7 @@ import { addTrip, listTrips } from "../../storage/hikingTrips.js";
 import { cleanTrip } from "../../../shared/hikingTrail.js";
 import { addPhoto, appealPhoto, listMountainPhotos, listPhotos, photoCounts, removePhoto, setPhotoPublic } from "../../storage/hikingPhotos.js";
 import { HIKING_GALLERY_LIMIT, HIKING_GALLERY_MAX, HIKING_PHOTO_CATEGORY, HIKING_PHOTO_DAILY_MAX, HIKING_PHOTO_LABEL, HIKING_PHOTO_PER_MOUNTAIN_MAX, HIKING_THUMB_CATEGORY, isOwnHikingPhotoUrl, validPhotoSize } from "../../../shared/hikingPhotos.js";
+import { HIKING_ALBUM_MAX, groupHikingAlbum, type AlbumMountainInfo } from "../../../shared/hikingAlbum.js";
 import { deleteBlobs, isOnOwnBlobHost } from "../../utils/blob.js";
 import { checkHiking, requireHikingAccess } from "../../middleware/hikingAccess.js";
 import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
@@ -222,6 +223,22 @@ router.get("/me/photos", ...requireHikingAccess, asyncHandler(async (req: AuthRe
     const mountainId = typeof req.query.mountainId === "string" && req.query.mountainId ? req.query.mountainId.slice(0, 60) : null;
     res.set("Cache-Control", "no-store");
     return sendSuccess(res, { photos: await listPhotos(req.userId!, mountainId) });
+}));
+
+/**
+ * 내 사진첩 — 내가 올린 사진을 산마다 묶어 한 번에(새로 올린 산부터, 사진은 새 것부터). 올린 사람만 읽는다(비공개 · 가려진 것까지).
+ * 산의 이름 · 높이 · 권역은 기억해 둔 산의 표에서 붙인다 — 자리는 싣지 않는다. 표에 없는 산의 사진은 뺀다(shared/hikingAlbum).
+ * 끝(HIKING_ALBUM_MAX)보다 한 장 더 읽어, 넘쳤는지를 capped 로 알린다.
+ */
+router.get("/me/album", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    const photos = await listPhotos(req.userId!, null, HIKING_ALBUM_MAX + 1);
+    const known = new Map<string, AlbumMountainInfo>();
+    for (const id of new Set(photos.map((p) => p.mountainId))) {
+        const m = await mountainById(id);
+        if (m) known.set(id, { id: m.id, slug: m.slug, name: m.name, heightM: m.heightM, region: m.region });
+    }
+    res.set("Cache-Control", "no-store");
+    return sendSuccess(res, groupHikingAlbum(photos, (id) => known.get(id)));
 }));
 
 /**

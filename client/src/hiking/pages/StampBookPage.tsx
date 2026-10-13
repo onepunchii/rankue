@@ -3,12 +3,18 @@
  *
  * 빈 칸은 산 이름과 함께 보인다 — 무엇이 남았는지 알아야 가고 싶어진다. 칸을 누르면 그 산의 화면(코스 · 날씨 · 정상 인증)으로 간다.
  * 인증 없이 적은 산은 흐린 도장으로 보이고 칸은 차지 않는다.
+ * 도장 | 사진 — 이 권의 산에 내가 올린 사진이 한 장이라도 있으면 전환 단추가 생긴다(기본은 도장). 사진으로 보면 사진이 있는 칸은
+ * 그 사진으로 바뀌고 내 사진첩의 그 산(/hiking/album?m=)으로 간다. 사진이 없는 칸은 도장을 흐리게 둔다.
  * 누구에게나 열린다(등산이 열리지 않은 사람에게는 빈 도장첩과 받을 와펜). ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상.
  */
+import { useMemo, useState } from "react";
 import { Link, useRoute } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
 import { duplicateNames, heightText, hikingMountainPath, mountainLabel } from "@shared/hikingMountains";
+import { HIKING_ALBUM_LABEL, HIKING_ALBUM_PATH, albumPhotoCount, albumSlots, hikingAlbumMountainPath } from "@shared/hikingAlbum";
 import { HIKING_SEASON_NAME } from "@shared/hikingStamps";
+import { SlotPhoto } from "../album/AlbumParts";
+import { useHikingAlbum } from "../album/useHikingAlbum";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { HikingCta } from "../components/MountainParts";
 import { stampDate } from "../lib/date";
@@ -24,6 +30,10 @@ export default function StampBookPage() {
     const [, params] = useRoute("/hiking/stamps/:book");
     const s = useHikingStamps();
     const state = s.states.find((x) => x.book.id === params?.book);
+    // 도장 | 사진 — 기본은 도장. 사진은 내 사진첩의 자료(등산을 쓰는 회원만 받는다)
+    const { album } = useHikingAlbum();
+    const photoOf = useMemo(() => albumSlots(album), [album]);
+    const [mode, setMode] = useState<"stamp" | "photo">("stamp");
     useSeo(state ? { title: `${state.book.name} 도장첩 — ${state.book.series} ${state.total}곳 | 랭큐 등산`, description: `${state.book.note}. 정상에서 인증하면 도장이 찍히고, 다 채우면 ${state.book.name} 와펜을 받아요.`, path: `${HIKING_STAMPS_PATH}/${state.book.id}` } : null);
 
     if (s.isLoading) return <HikingShell title="도장첩" backTo={HIKING_STAMPS_PATH}><div className="space-y-3 px-5 pt-6" aria-busy="true"><HkSkel className="h-44" /><HkSkel className="h-72" /></div></HikingShell>;
@@ -40,6 +50,11 @@ export default function StampBookPage() {
     const { book, slots, got, total, done } = state;
     const award = s.award("patch", book.id);
     const records = slots.filter((x) => x.record).length;
+    // 이 권의 산에 내 사진이 한 장이라도 있을 때만 전환 단추를 낸다
+    const hasPhoto = s.mine && slots.some((x) => photoOf.has(x.m.id));
+    const photoMode = hasPhoto && mode === "photo";
+    const dup = duplicateNames(slots.map((y) => y.m));
+    const seg = (active: boolean) => `flex h-9 min-w-[64px] items-center justify-center rounded-[10px] px-3.5 text-[13.5px] ${active ? "bg-[#F4EFE3] font-semibold text-[#0E2A33]" : "text-[#F4EFE3B3] active:bg-[#FFFFFF14]"}`;
     return (
         <HikingShell title={`${book.name} 도장첩`} backTo={HIKING_STAMPS_PATH}>
             <div data-testid="hk-stamp-book" data-book={book.id} data-mine={s.mine ? "1" : "0"}>
@@ -65,17 +80,36 @@ export default function StampBookPage() {
                     </div>
                 </div>
 
-                <HkSection title={`정상 도장 ${total}칸`} aside="정상에서 인증하면 찍혀요">
+                <HkSection title={`정상 도장 ${total}칸`} aside={photoMode ? HIKING_ALBUM_LABEL.bookPhotoAside : "정상에서 인증하면 찍혀요"}>
+                    {hasPhoto && (
+                        <div className="mb-3 flex justify-end">
+                            <div role="tablist" aria-label="도장첩 보기" className="inline-flex gap-1 rounded-[13px] bg-[#FFFFFF14] p-1" data-testid="hk-book-mode" data-mode={photoMode ? "photo" : "stamp"}>
+                                <button type="button" role="tab" aria-selected={!photoMode} onClick={() => setMode("stamp")} className={seg(!photoMode)} data-testid="hk-book-mode-stamp" data-track-as="hiking-album-book-stamp">{HIKING_ALBUM_LABEL.bookStamp}</button>
+                                <button type="button" role="tab" aria-selected={photoMode} onClick={() => setMode("photo")} className={seg(photoMode)} data-testid="hk-book-mode-photo" data-track-as="hiking-album-book-photo">{HIKING_ALBUM_LABEL.bookPhoto}</button>
+                            </div>
+                        </div>
+                    )}
                     <HkPaper className="px-2 pb-3.5 pt-4">
                         <div className="grid grid-cols-3 gap-x-1 gap-y-4">
                             {slots.map((x, i) => {
                                 const st = x.stamp ?? x.record;
+                                const photo = photoMode ? photoOf.get(x.m.id) : undefined;
+                                // 사진으로 볼 때 — 내 사진이 있는 칸은 그 사진으로(같은 자리 · 같은 비율), 내 사진첩의 그 산으로 간다
+                                if (photo) {
+                                    return (
+                                        <Link key={x.m.id} href={hikingAlbumMountainPath(photo.slug)} className="flex min-w-0 flex-col items-center gap-1 text-center active:opacity-70" data-testid={`hk-slot-${x.m.slug}`} data-state={x.stamp ? "on" : x.record ? "record" : "empty"} data-photo="1" data-track-as="hiking-album-slot">
+                                            <div className="w-full max-w-[96px] px-1"><SlotPhoto slot={photo} tilt={TILT[i % TILT.length] / 2} /></div>
+                                            <span className="text-[13px] font-semibold leading-tight text-[#0E2A33] break-keep">{mountainLabel(x.m, dup)}</span>
+                                            <span className="text-[12px] tabular-nums text-[#8A5E00]">{albumPhotoCount(photo.count)}</span>
+                                        </Link>
+                                    );
+                                }
                                 return (
-                                    <Link key={x.m.id} href={hikingMountainPath(x.m.slug)} className="flex flex-col items-center gap-1 text-center active:opacity-70" data-testid={`hk-slot-${x.m.slug}`} data-state={x.stamp ? "on" : x.record ? "record" : "empty"}>
-                                        <div className="w-full max-w-[96px] px-1">
+                                    <Link key={x.m.id} href={hikingMountainPath(x.m.slug)} className="flex flex-col items-center gap-1 text-center active:opacity-70" data-testid={`hk-slot-${x.m.slug}`} data-state={x.stamp ? "on" : x.record ? "record" : "empty"} data-photo="0">
+                                        <div className="w-full max-w-[96px] px-1" style={photoMode ? { opacity: 0.4 } : undefined}>
                                             <SummitStamp name={x.m.name} heightM={x.m.heightM} ink={regionInk(x.m.region)} date={st ? stampDate(new Date(st.firstAt)) : null} state={x.stamp ? "on" : x.record ? "faded" : "empty"} tilt={x.stamp ? TILT[i % TILT.length] : 0} />
                                         </div>
-                                        <span className="text-[13px] leading-tight break-keep" style={{ color: x.stamp ? "#0E2A33" : "#0E2A3399", fontWeight: x.stamp ? 600 : 400 }}>{mountainLabel(x.m, duplicateNames(slots.map((y) => y.m)))}</span>
+                                        <span className="text-[13px] leading-tight break-keep" style={{ color: x.stamp ? "#0E2A33" : "#0E2A3399", fontWeight: x.stamp ? 600 : 400 }}>{mountainLabel(x.m, dup)}</span>
                                         {x.stamp
                                             ? <span className="text-[12px] text-[#8A5E00]">{x.stamp.seasons.map((k) => HIKING_SEASON_NAME[k]).join(" · ")}{x.stamp.count > 1 ? ` · ${x.stamp.count}번` : ""}</span>
                                             : x.record
@@ -86,8 +120,11 @@ export default function StampBookPage() {
                             })}
                         </div>
                     </HkPaper>
-                    {records > 0 && <p className="mt-2.5 text-[13px] leading-snug text-[#F4EFE38C] break-keep">흐린 도장은 인증 없이 적은 기록이에요. 정상에서 인증하면 또렷한 도장으로 바뀌어요.</p>}
-                    <p className="mt-2.5 text-[13px] leading-snug text-[#F4EFE38C] break-keep">다른 철에 다시 오르면 그 철이 도장 밑에 쌓여요.</p>
+                    {photoMode && (
+                        <Link href={HIKING_ALBUM_PATH} className="mt-3 flex h-12 items-center justify-center rounded-xl bg-[#FFFFFF14] text-[14.5px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24]" data-testid="hk-book-album" data-track-as="hiking-album-entry-book">{HIKING_ALBUM_LABEL.title} 전체 보기</Link>
+                    )}
+                    {!photoMode && records > 0 && <p className="mt-2.5 text-[13px] leading-snug text-[#F4EFE38C] break-keep">흐린 도장은 인증 없이 적은 기록이에요. 정상에서 인증하면 또렷한 도장으로 바뀌어요.</p>}
+                    {!photoMode && <p className="mt-2.5 text-[13px] leading-snug text-[#F4EFE38C] break-keep">다른 철에 다시 오르면 그 철이 도장 밑에 쌓여요.</p>}
                 </HkSection>
 
                 {!s.mine && <div className="px-5 pt-8"><HikingCta /></div>}

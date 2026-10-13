@@ -15,6 +15,7 @@ import { HIKING_GRADES, type HikingGradeId } from "@shared/hikingGrade";
 import { HIKING_REGIONS, duplicateNames, hikingMountainPath, mountainLabel } from "@shared/hikingMountains";
 import { HIKING_GRADE_NOTE, HIKING_PACK_INTRO, HIKING_PACK_LABEL, HIKING_PACK_SEO, HIKING_PIN_NOTE, MOUNTAIN_PATCH_NOTE } from "@shared/hikingPage";
 import { HIKING_GRANDS, HIKING_PINS } from "@shared/hikingStamps";
+import { AlbumEntry } from "../album/AlbumParts";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { HikingCta } from "../components/MountainParts";
 import { stampDate } from "../lib/date";
@@ -54,6 +55,8 @@ export default function PackPage() {
                                             </div>
                                         ))}
                                     </div>
+                                    {/* 모아 둔 것의 하나 — 산마다 올린 내 사진(내 사진첩) */}
+                                    <AlbumEntry from="pack" className="mt-2.5" />
                                 </>
                             ) : (
                                 <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-3.5 text-[14px] leading-relaxed text-[#F4EFE3CC] break-keep">{HIKING_PACK_INTRO}</p>
