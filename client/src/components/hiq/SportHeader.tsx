@@ -79,6 +79,7 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
     const { member, isGuest } = useAuth();
     const golfVisible = useGolfVisible();
     const hikingOk = useHikingAccess();
+    const fishingOk = (member as { fishingAccess?: boolean } | null | undefined)?.fishingAccess === true;
     // 방문자의 등산 — 볼 수는 있지만(공개 허브) 등산 홈은 회원의 것이다
     const hikingGuest = HIKING_PUBLIC && isGuest && locale === "ko";
     const [notifOpen, setNotifOpen] = useState(false);
@@ -116,6 +117,10 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
                                     <span className="absolute inset-0 flex items-center justify-center">{s.label}</span>
                                 </button>
                             )))}
+                            {/* 낚시(네 번째 종목 · 2026-10-14) — 지금은 운영자에게만 보인다. 저장된 종목은 바꾸지 않고 낚시 화면으로 간다 */}
+                            {fishingOk && (
+                                <button type="button" onClick={() => setLocation("/fishing")} className={`relative rounded-full ${PILL_PAD} text-[13px] active:opacity-70`} style={{ height: z.pill, color: c.soft }} data-testid="sport-to-fishing">낚시</button>
+                            )}
                         </div>
                     )}
                     {isGuest ? (
