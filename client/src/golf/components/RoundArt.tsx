@@ -14,15 +14,16 @@ import { cn } from "@/lib/utils";
 
 const ART = "/golf/round-art";
 
-export function NewRoundBanner({ className }: { className?: string }) {
+/** scan: 홈의 '스코어카드 스캔'에서 온 길 — 무엇을 하면 되는지 한 줄로 말해 준다 */
+export function NewRoundBanner({ className, scan }: { className?: string; scan?: boolean }) {
     return (
         <div className={cn("relative isolate h-[108px] overflow-hidden rounded-2xl bg-[#07140A] ring-1 ring-inset ring-[#FFFFFF14]", className)} data-testid="new-round-banner">
             <img src={`${ART}/new.webp`} alt="" width={800} height={322} decoding="async" className="absolute inset-0 -z-10 h-full w-full object-cover object-[78%_center]" />
             {/* 글이 놓이는 왼쪽을 한 번 더 누른다 */}
             <div aria-hidden className="absolute inset-0 -z-10 bg-gradient-to-r from-[#07140AF2] via-[#07140A99] to-[#07140A00]" />
             <div className="flex h-full flex-col justify-center px-4">
-                <p className="text-[17px] font-semibold tracking-tight text-[#FFFFFF]">오늘의 라운드</p>
-                <p className="mt-1 max-w-[60%] text-[12.5px] leading-snug text-[#FFFFFFB3] break-keep">골프장과 방식을 고르면 바로 시작해요</p>
+                <p className="text-[17px] font-semibold tracking-tight text-[#FFFFFF]">{scan ? "스코어카드로 기록하기" : "오늘의 라운드"}</p>
+                <p className="mt-1 max-w-[62%] text-[12.5px] leading-snug text-[#FFFFFFB3] break-keep">{scan ? "골프장을 고르고 시작하면 카드를 올리는 창이 열려요" : "골프장과 방식을 고르면 바로 시작해요"}</p>
             </div>
         </div>
     );

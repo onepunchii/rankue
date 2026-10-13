@@ -43,6 +43,7 @@ import { LucideImage } from "@/lib/icons";
 import { SCAN_COPY } from "@shared/golfScorecardScan";
 import { ScanSheet } from "../components/scan/ScanSheet";
 import { ScorecardBand } from "../components/RoundArt";
+import { takeScanNext } from "../lib/scanEntry";
 
 export default function GolfScorecard() {
     const [, params] = useRoute("/golf/game/:id");
@@ -104,6 +105,10 @@ export default function GolfScorecard() {
         enabled: isHost && session?.status === "playing",
         staleTime: 60_000,
     });
+    // 홈의 '스코어카드 스캔'에서 온 길이면 창을 한 번 저절로 연다(lib/scanEntry)
+    useEffect(() => {
+        if (isHost && scan?.available && session?.status === "playing" && takeScanNext()) setScanOpen(true);
+    }, [isHost, scan?.available, session?.status]);
     const [finishOpen, setFinishOpen] = useState(false);
     const [exitOpen, setExitOpen] = useState(false);
     const [unit, setUnit] = useMoneyUnit();

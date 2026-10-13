@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
 import { GolfBackButton } from "../components/common/GolfBackButton";
 import { NewRoundBanner } from "../components/RoundArt";
+import { clearScanNext } from "../lib/scanEntry";
 import { CourseLogo } from "../components/course/CourseLogo";
 
 // import { COURSES } from "@/golf/data/golfCourses"; // 더 이상 사용하지 않음
@@ -108,6 +109,8 @@ export default function GolfNewGame() {
     const [_, setLocation] = useLocation();
     const searchParams = new URLSearchParams(window.location.search);
     const initialMode = searchParams.get("mode") || "match";
+    // 홈의 '스코어카드 스캔'에서 왔다 — 방이 열리면 스캔 창이 저절로 뜬다(lib/scanEntry). 그냥 나가면 표시를 지운다
+    const scanMode = searchParams.get("scan") === "1";
 
     // 2. 상태 관리 최적화
     const [step, setStep] = useState<'setup' | 'lobby' | 'join'>(initialMode === 'join' ? 'join' : 'setup');
@@ -341,6 +344,7 @@ export default function GolfNewGame() {
     // 대기실에서 뒤로 가도 방은 남는다 — 홈의 '진행 중 라운드' 로 돌아온다.
     // (예전엔 설정 화면으로 돌아가 방을 하나 더 만들 수 있었다.)
     const handleBack = useCallback(() => {
+        clearScanNext(); // 스캔하러 왔다가 그냥 나간다 — 다음에 방을 열 때 창이 뜨지 않게
         setLocation('/dashboard');
     }, [setLocation]);
 
@@ -407,7 +411,7 @@ export default function GolfNewGame() {
                             className="max-w-md mx-auto px-5 pt-5 pb-10 space-y-7"
                         >
                             {/* 해 뜨기 전의 1번 티 — 그림 한 장(components/RoundArt). 아래 간격은 구역들과 같게 두지 않고 조금 붙인다 */}
-                            <NewRoundBanner className="!mb-[-8px]" />
+                            <NewRoundBanner className="!mb-[-8px]" scan={scanMode} />
 
                             {/* ── 골프장 ── 검색창이 화면에 바로 있다. 비어 있으면 가까운 곳·최근 친 곳 */}
                             <section>

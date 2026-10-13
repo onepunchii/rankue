@@ -5,7 +5,8 @@ import { LucideHome, LucideShare2, LucideCrown, LucideArrowRight, LucideCamera, 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
-import { HERO_ART_H, ResultHeroArt } from "../components/RoundArt";
+import { HERO_ART_H, ResultHeroArt, ScorecardBand } from "../components/RoundArt";
+import { HoleGrid } from "../components/ScoreCard";
 import { motion } from "framer-motion";
 import { useRankueMatch } from "../hooks/useRankueMatch";
 import { useMoneyUnit, formatMoney } from "../lib/money";
@@ -69,6 +70,7 @@ export default function GameResult() {
     const rankOf = (i: number) => rows[i].rank;
     const winners = rows.filter((r: any) => r.winner);
     const multi = rows.filter((r: any) => r.holesPlayed > 0).length >= 2;
+    const cardRow: any = rows.find((r: any) => r.p?.memberId === me?.id) ?? rows[0] ?? null;
     const nameOf = (id: string) => rows.find((r: any) => r.p.memberId === id)?.p.name ?? "?";
     const transfers = hasStakes ? minimalTransfers(settlement.totals || {}) : [];
     const birdieKing = [...rows].sort((a: any, b: any) => b.birdies - a.birdies)[0];
@@ -219,6 +221,20 @@ export default function GameResult() {
                                         <span className="text-sm font-black">{formatMoney(t.amount, unit)}</span>
                                     </div>
                                 ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 오늘의 스코어카드 — 종이 카드처럼 윗단 그림 띠와 전반 · 후반 판(내 줄, 내가 없는 방이면 첫 줄) */}
+                    {cardRow && cardRow.holesPlayed > 0 && Array.isArray(session.pars) && session.pars.length === 18 && (
+                        <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-white/[0.03]" data-testid="result-scorecard">
+                            <ScorecardBand
+                                title="스코어카드"
+                                sub={`${cardRow.p.name} · ${session.courseName || "골프장 미정"}`}
+                                right={<span className="shrink-0 rounded-full bg-[#050505B3] px-3 py-1 text-[13px] text-white/80 tabular-nums"><b className="text-[17px] font-bold text-white">{cardRow.strokes}</b>타</span>}
+                            />
+                            <div className="px-3 pb-3 pt-3">
+                                <HoleGrid scores={Array.isArray(cardRow.p.scores) ? cardRow.p.scores : []} pars={session.pars} currentHole={-1} />
                             </div>
                         </div>
                     )}

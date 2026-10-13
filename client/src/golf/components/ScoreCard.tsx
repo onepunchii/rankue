@@ -46,6 +46,9 @@ const toParColor = (n: number) => (n < 0 ? "text-[#7DD3FC]" : n > 0 ? "text-[#FF
  * 18홀 기록표 한 판(전반·후반 두 줄). 혼자 기록 화면과 선수 줄의 '기록표'가 같이 쓴다.
  * 동그라미 = 파보다 적게(버디 하나, 이글 이상 두 겹), 네모 = 파보다 많게(보기 한 겹, 더블 이상 채움). 파는 숫자만.
  */
+/** 기록표 한 줄의 칸 나눔 — 이름표 · 아홉 홀 · 합 */
+const HOLE_ROW = "grid grid-cols-[38px_repeat(9,minmax(0,1fr))_36px] items-center";
+
 export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap, putts, gir }: {
     scores: number[]; pars: number[]; currentHole: number;
     /** 사진이 있는 홀(0부터) — 홀 번호 위에 작은 라임 점(2026-09-30 라운드 사진). 누르면 onHoleTap(그 홀 사진으로) */
@@ -62,11 +65,12 @@ export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap, put
         const parSum = idx.reduce((a, i) => a + (pars[i] || 0), 0);
         const puttSum = hasPutts ? idx.reduce((a, i) => a + (putts![i] ?? 0), 0) : 0;
         return (
-            <div className="grid grid-cols-[34px_repeat(9,minmax(0,1fr))_36px] gap-y-1 items-center text-center">
-                <span className="text-[11px] text-[#FFFFFF59] text-left">홀</span>
+            <div className="overflow-hidden rounded-[10px] text-center ring-1 ring-inset ring-[#FFFFFF12]">
+                <div className={cn(HOLE_ROW, "bg-[#144D1F] py-1.5")}>
+                <span className="pl-2 text-[12px] text-[#D9F7C4] text-left">홀</span>
                 {idx.map((i) => {
                     const hasPhoto = !!photoHoles?.has(i);
-                    const label = <span className={cn("text-[11px] tabular-nums", i === currentHole ? "text-[#9BEF5C] font-semibold" : hasPhoto ? "text-[#ffffff]" : "text-[#FFFFFF73]")}>{i + 1}</span>;
+                    const label = <span className={cn("text-[12px] tabular-nums", i === currentHole ? "text-[#B6F28A] font-semibold" : hasPhoto ? "text-[#ffffff]" : "text-[#D9F7C4B3]")}>{i + 1}</span>;
                     // 점이 있든 없든 같은 칸 모양(높이 고정) — 단추만 줄 높이가 달라 번호가 들쭉날쭉했다
                     if (!hasPhoto) return <span key={i} className="relative flex h-4 items-center justify-center">{label}</span>;
                     return (
@@ -79,13 +83,17 @@ export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap, put
                         </button>
                     );
                 })}
-                <span className="text-[11px] text-[#FFFFFF59]">{from === 0 ? "전반" : "후반"}</span>
+                <span className="text-[12px] text-[#D9F7C4]">{from === 0 ? "전반" : "후반"}</span>
+                </div>
 
-                <span className="text-[11px] text-[#FFFFFF59] text-left">파</span>
-                {idx.map((i) => <span key={i} className="text-[11px] text-[#FFFFFF8C] tabular-nums">{pars[i]}</span>)}
-                <span className="text-[11px] text-[#FFFFFF8C] tabular-nums">{parSum}</span>
+                <div className={cn(HOLE_ROW, "bg-[#0B2A12] py-1")}>
+                <span className="pl-2 text-[12px] text-[#FFFFFF73] text-left">파</span>
+                {idx.map((i) => <span key={i} className="text-[12px] text-[#FFFFFF99] tabular-nums">{pars[i]}</span>)}
+                <span className="text-[12px] text-[#FFFFFF99] tabular-nums">{parSum}</span>
+                </div>
 
-                <span className="text-[11px] text-[#FFFFFF59] text-left">타수</span>
+                <div className={cn(HOLE_ROW, "py-1")}>
+                <span className="pl-2 text-[12px] text-[#FFFFFF73] text-left">타수</span>
                 {idx.map((i) => {
                     const s = scores[i] || 0;
                     const d = s > 0 ? s - pars[i] : null;
@@ -104,11 +112,12 @@ export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap, put
                         </span>
                     );
                 })}
-                <span className="text-[12px] font-semibold text-[#ffffff] tabular-nums">{sum || "–"}</span>
+                <span className="text-[13px] font-semibold text-[#ffffff] tabular-nums">{sum || "–"}</span>
+                </div>
 
                 {hasPutts && (
-                    <>
-                        <span className="text-[11px] text-[#FFFFFF59] text-left">퍼트</span>
+                    <div className={cn(HOLE_ROW, "border-t border-[#FFFFFF0F] py-0.5")}>
+                        <span className="pl-2 text-[12px] text-[#FFFFFF73] text-left">퍼트</span>
                         {idx.map((i) => {
                             const p = putts![i];
                             return (
@@ -119,15 +128,14 @@ export function HoleGrid({ scores, pars, currentHole, photoHoles, onHoleTap, put
                             );
                         })}
                         <span className="text-[12px] text-[#FFFFFFB3] tabular-nums">{puttSum || "–"}</span>
-                    </>
+                    </div>
                 )}
             </div>
         );
     };
     return (
-        <div className="space-y-3">
+        <div className="space-y-2.5">
             {half(0)}
-            <div className="h-px bg-[#FFFFFF0F]" />
             {half(9)}
         </div>
     );

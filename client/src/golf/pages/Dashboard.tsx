@@ -3,6 +3,7 @@ import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { ScorecardScanner } from "../components/ScorecardScanner";
+import { useScanEntry } from "../lib/scanEntry";
 import { apiRequest } from "@/lib/queryClient";
 import { useGameStats } from "@/hooks/useGameStats";
 import { useAuth } from "@/hooks/useAuth";
@@ -35,6 +36,8 @@ export default function GolfDashboard() {
     // 2. UI State & Logic
     const [isGameModeOpen, setIsGameModeOpen] = useState(false);
     const [isScannerOpen, setIsScannerOpen] = useState(false);
+    // 스코어카드 스캔 — 쓸 수 있는 사람은 읽는 길로(방 · 라운드 만들기), 아니면 예전 안내 창(lib/scanEntry)
+    const scanEntry = useScanEntry();
     const matchLogic = useGolfMatch(me);
     const [, setLocation] = useLocation();
     // 비로그인 방문자(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다").
@@ -140,7 +143,7 @@ export default function GolfDashboard() {
             <GameModeSheet
                 open={isGameModeOpen}
                 onOpenChange={setIsGameModeOpen}
-                onOpenScanner={() => setIsScannerOpen(true)}
+                onOpenScanner={() => { if (scanEntry.available) { setIsGameModeOpen(false); scanEntry.go(); } else setIsScannerOpen(true); }}
             />
 
             <PinEntrySheet

@@ -1,7 +1,8 @@
 /**
  * 스코어카드로 채우기(2026-10-13) — 앱에서 받은 스코어카드 그림을 올리면 읽어서 표로 보여 주고, 방장이 확인한 뒤 점수판에 넣는다.
  *
- * 오너가 정한 것: 받는 것은 스마트스코어 꼴의 디지털 카드뿐(수기는 안 받는다) · 카메라가 아니라 **그림 올리기**.
+ * 오너가 정한 것: 받는 것은 스마트스코어 꼴의 디지털 카드뿐(수기는 안 받는다) · 카메라가 아니라 **그림 올리기**
+ * · "스코어카드 인식 후 디자인도 신경 써 줘" → 읽은 결과를 **카드와 같은 모양의 표**로 그린다(윗단 그림 띠 · 전반/후반 판 · PAR 줄 · 사람 줄 · 합).
  * 읽은 것은 초안이다 — 여기서는 아무것도 저장되지 않고, '점수판에 넣기'를 눌러야 지금의 점수 저장 길로 들어간다.
  * 칸은 카드와 견주기 쉽게 **카드에 적힌 꼴**(파 기준 0 · 1 · −1)로 보여 주고, 고칠 때 타수를 같이 적는다.
  * 칸의 색: 확정(그대로) · 확인 필요(주황 — 아홉 홀 합이 카드와 다르거나, 가려진 칸을 합에서 계산한 값) · 빈칸(점선) · 내가 고친 칸(초록).
@@ -14,11 +15,13 @@ import { appConfirm } from "@/components/AppDialog";
 import { LucideCheck, LucideImage, LucideLoader2, LucideMinus, LucidePlus, LucideX } from "@/lib/icons";
 import { isValidStroke } from "@shared/golfMatch";
 import { SCAN_COPY, SCAN_MAX_EDGE, applyScanRows, guessSeats, type ScanCell, type ScanDraft, type SumCheck } from "@shared/golfScorecardScan";
+import { ScorecardBand } from "../RoundArt";
 
 interface Player { memberId: string; name?: string | null; scores?: unknown }
 /** 화면의 칸 — 사람이 손댄 칸은 mine */
 type Cell = ScanCell & { mine?: boolean };
 interface Row { label: string | null; seat: string | null; cells: Cell[]; out: SumCheck; in: SumCheck }
+type Sel = { kind: "cell"; r: number; h: number } | { kind: "seat"; r: number };
 
 /** 올릴 그림을 줄인다 — 긴 변 SCAN_MAX_EDGE 까지, 흰 바탕의 JPEG 로(위치 정보 같은 꼬리표도 이때 떨어진다) */
 async function shrink(file: File): Promise<string> {
@@ -56,6 +59,11 @@ function halfSum(cells: readonly Cell[], from: number, chk: SumCheck) {
     return { now, want, ok: now != null && want != null ? now === want : null };
 }
 
+/** 카드의 날짜(YYYY-MM-DD) → "10월 13일" */
+const dayLabel = (day: string | null) => { const m = /^\d{4}-(\d{2})-(\d{2})$/.exec(day ?? ""); return m ? `${Number(m[1])}월 ${Number(m[2])}일` : null; };
+
+const COLS = "grid grid-cols-[58px_repeat(9,minmax(0,1fr))_34px]";
+
 export function ScanSheet({ matchId, players, pars, parKnown, onApply, onClose }: {
     matchId: string;
     players: readonly Player[];
@@ -69,10 +77,11 @@ export function ScanSheet({ matchId, players, pars, parKnown, onApply, onClose }
     const [error, setError] = useState<string | null>(null);
     const [draft, setDraft] = useState<ScanDraft | null>(null);
     const [rows, setRows] = useState<Row[]>([]);
-    const [sel, setSel] = useState<{ r: number; h: number } | null>(null);
+    const [sel, setSel] = useState<Sel | null>(null);
     const [saving, setSaving] = useState(false);
     const fileRef = useRef<HTMLInputElement>(null);
     const parAt = (h: number) => (parKnown[h] ? pars[h] : null);
+    const nameOf = (id: string | null) => (id ? players.find((p) => p.memberId === id)?.name || "이름 없음" : null);
 
     const onFile = async (file: File | undefined) => {
         if (!file) return;
@@ -86,7 +95,9 @@ export function ScanSheet({ matchId, players, pars, parKnown, onApply, onClose }
             const seats = guessSeats(d.rows.map((r) => r.label), players);
             setDraft(d);
             setRows(d.rows.map((r, i) => ({ label: r.label, seat: seats[i], cells: r.cells, out: r.out, in: r.in })));
-            setSel(null);
+            // 못 이은 줄이 있으면 그것부터 묻는다
+            const first = seats.findIndex((s) => !s);
+            setSel(first >= 0 ? { kind: "seat", r: first } : null);
             setStep("confirm");
         } catch (e: any) {
             setError(e?.message === "image" || e?.message === "canvas" ? "그림을 열지 못했어요. 다른 그림으로 해 주세요." : (e?.message || SCAN_COPY.failed));
@@ -134,7 +145,63 @@ export function ScanSheet({ matchId, players, pars, parKnown, onApply, onClose }
         }
     };
 
-    const picked = sel ? rows[sel.r]?.cells[sel.h] : null;
+    const picked = sel?.kind === "cell" ? rows[sel.r]?.cells[sel.h] : null;
+    const cardDay = dayLabel(draft?.day ?? null);
+
+    /** 전반 · 후반 한 판 — 카드처럼 머리 줄(홀 번호) · PAR 줄 · 사람 줄 */
+    const half = (from: number) => (
+        <div key={from} data-testid={`scan-half-${from}`}>
+            <div className={cn(COLS, "items-center bg-[#144D1F] text-center text-[12px] text-[#D9F7C4]")}>
+                <span className="py-1.5 pl-3 text-left font-semibold">{from === 0 ? "전반" : "후반"}</span>
+                {Array.from({ length: 9 }, (_, i) => <span key={i} className="tabular-nums">{from + i + 1}</span>)}
+                <span>합</span>
+            </div>
+            <div className={cn(COLS, "items-center bg-[#0B2A12] text-center text-[12px] text-[#FFFFFF99]")}>
+                <span className="py-1.5 pl-3 text-left">PAR</span>
+                {Array.from({ length: 9 }, (_, i) => <span key={i} className="tabular-nums">{parAt(from + i) ?? "–"}</span>)}
+                <span className="tabular-nums">{Array.from({ length: 9 }, (_, i) => parAt(from + i)).every((p) => p != null) ? pars.slice(from, from + 9).reduce((a, b) => a + b, 0) : "–"}</span>
+            </div>
+            {rows.map((row, r) => {
+                const sum = halfSum(row.cells, from, from === 0 ? row.out : row.in);
+                const seatOn = sel?.kind === "seat" && sel.r === r;
+                return (
+                    <div key={r} className={cn(COLS, "items-center border-t border-[#FFFFFF0F]", !row.seat && "opacity-70")} data-testid={`scan-row-${r}-${from}`}>
+                        <button type="button" onClick={() => setSel(seatOn ? null : { kind: "seat", r })} data-testid={`scan-name-${r}-${from}`} aria-label={`${r + 1}번째 줄 · ${nameOf(row.seat) ?? "누구인지 고르기"}`}
+                            className={cn("mx-1 my-1 h-8 truncate rounded-md px-1.5 text-left text-[12px]", row.seat ? "text-[#B6F28A]" : "border border-dashed border-[#FFB02E99] text-[#FFD08A]", seatOn && "ring-2 ring-[#FFFFFF]")}>
+                            {nameOf(row.seat) ?? "누구?"}
+                        </button>
+                        {row.cells.slice(from, from + 9).map((c, i) => {
+                            const h = from + i;
+                            const on = sel?.kind === "cell" && sel.r === r && sel.h === h;
+                            const hot = c.state === "check" && (c.why === "sign" || c.why === "derived");
+                            return (
+                                <button key={h} type="button" onClick={() => setSel(on ? null : { kind: "cell", r, h })} data-testid={`scan-cell-${r}-${h}`} data-state={c.mine ? "mine" : c.state}
+                                    aria-label={`${h + 1}번 홀 ${c.strokes ? `${c.strokes}타` : "빈칸"}${c.state === "check" ? " · 확인 필요" : ""}`}
+                                    className="flex h-10 items-center justify-center">
+                                    <span className={cn("flex h-7 w-full max-w-[26px] items-center justify-center rounded-md border text-[13px] tabular-nums",
+                                        c.mine ? "border-[#64DD1766] bg-[#64DD171F] text-[#B6F28A]"
+                                            : c.state === "empty" ? "border-dashed border-[#FFFFFF40] text-[#FFFFFF59]"
+                                                : hot ? "border-[#FFB02E] bg-[#FFB02E33] font-semibold text-[#FFD08A]"
+                                                    : c.state === "check" ? "border-[#FFB02E80] text-[#FFD08A]"
+                                                        : "border-transparent text-[#FFFFFF]",
+                                        on && "ring-2 ring-[#FFFFFF]")}>
+                                        {c.strokes ? cardText(c.strokes, parAt(h)) : "·"}
+                                    </span>
+                                </button>
+                            );
+                        })}
+                        <span className={cn("text-center text-[13px] tabular-nums", sum.ok === false ? "font-semibold text-[#FFD08A]" : sum.ok ? "text-[#9BEF5C]" : "text-[#FFFFFF99]")} data-testid={`scan-sum-${r}-${from}`}>{sum.now ?? "–"}</span>
+                    </div>
+                );
+            })}
+        </div>
+    );
+
+    /** 합이 카드와 다른 줄 — 표 밑에 한 줄씩 */
+    const sumNotes = rows.flatMap((row, r) => [0, 9].flatMap((from) => {
+        const s = halfSum(row.cells, from, from === 0 ? row.out : row.in);
+        return s.ok === false ? [`${nameOf(row.seat) ?? `${r + 1}번째 줄`} · ${from === 0 ? "전반" : "후반"} 합이 ${s.now}인데 카드에는 ${s.want}이에요.`] : [];
+    }));
 
     return (
         <div role="dialog" aria-modal="true" aria-label={SCAN_COPY.title} className="fixed inset-0 z-[60] flex flex-col bg-[#050505] text-[#FFFFFF]" data-testid="scan-sheet">
@@ -174,71 +241,50 @@ export function ScanSheet({ matchId, players, pars, parKnown, onApply, onClose }
 
             {step === "confirm" && draft && (
                 <>
-                    <div className="flex-1 overflow-y-auto px-4 pb-6 pt-4">
+                    <div className="flex-1 overflow-y-auto px-3 pb-6 pt-4">
                         {draft.notices.map((n) => (
                             <p key={n} role="alert" className="mb-3 rounded-xl bg-[#FFB02E1F] px-3.5 py-3 text-[13px] leading-relaxed text-[#FFD08A]" data-testid={`scan-notice-${n}`}>{SCAN_COPY.notices[n]}</p>
                         ))}
-                        <p className="mb-3 text-[13px] leading-relaxed text-[#FFFFFF99]">
-                            카드에 적힌 그대로(파 기준) 보여 드려요. <span className="text-[#FFD08A]">주황색 칸</span>은 카드와 견줘 보고, 다르면 눌러서 고쳐 주세요.
-                        </p>
 
-                        {rows.map((row, r) => (
-                            <section key={r} className="mb-4 rounded-2xl border border-[#FFFFFF14] bg-[#FFFFFF08] p-3" data-testid={`scan-row-${r}`}>
-                                <p className="text-[12px] text-[#FFFFFF80]">{SCAN_COPY.seat}{row.label ? <span className="ml-1.5 text-[#FFFFFFB3]">카드의 이름 · {row.label}</span> : null}</p>
-                                <div className="mt-2 flex flex-wrap gap-1.5">
-                                    {players.map((p) => {
-                                        const on = row.seat === p.memberId;
-                                        return (
-                                            <button key={p.memberId} type="button" aria-pressed={on} onClick={() => setSeat(r, on ? null : p.memberId)} data-testid={`scan-seat-${r}-${p.memberId}`}
-                                                className={cn("h-9 max-w-[9rem] truncate rounded-full px-3 text-[13px]", on ? "bg-[#64DD17] font-semibold text-[#051907]" : "bg-[#FFFFFF0F] text-[#FFFFFFCC] active:bg-[#FFFFFF1F]")}>
-                                                {p.name || "이름 없음"}
-                                            </button>
-                                        );
-                                    })}
-                                    {!row.seat && <span className="flex h-9 items-center px-1 text-[12px] text-[#FFFFFF66]">고르지 않으면 넣지 않아요</span>}
-                                </div>
+                        {/* 읽은 카드 — 종이 스코어카드와 같은 모양으로(윗단 그림 띠 · 전반/후반 판) */}
+                        <div className="overflow-hidden rounded-2xl bg-[#0C110D] ring-1 ring-inset ring-[#FFFFFF14]" data-testid="scan-card">
+                            <ScorecardBand title="읽은 스코어카드" sub={cardDay ? `카드의 날짜 · ${cardDay}` : "카드와 견줘 보세요"} />
+                            {half(0)}
+                            <div className="h-2 bg-[#050505]" aria-hidden />
+                            {half(9)}
+                        </div>
 
-                                {[0, 9].map((from) => {
-                                    const sum = halfSum(row.cells, from, from === 0 ? row.out : row.in);
-                                    return (
-                                        <div key={from} className="mt-3">
-                                            <div className="grid grid-cols-[repeat(9,minmax(0,1fr))_3rem] gap-1 text-center text-[12px] text-[#FFFFFF66]" aria-hidden>
-                                                {Array.from({ length: 9 }, (_, i) => <span key={i}>{from + i + 1}</span>)}
-                                                <span>합</span>
-                                            </div>
-                                            <div className="mt-1 grid grid-cols-[repeat(9,minmax(0,1fr))_3rem] gap-1">
-                                                {row.cells.slice(from, from + 9).map((c, i) => {
-                                                    const h = from + i;
-                                                    const on = sel?.r === r && sel.h === h;
-                                                    const hot = c.state === "check" && (c.why === "sign" || c.why === "derived");
-                                                    return (
-                                                        <button key={h} type="button" onClick={() => setSel(on ? null : { r, h })} data-testid={`scan-cell-${r}-${h}`} data-state={c.mine ? "mine" : c.state}
-                                                            aria-label={`${h + 1}번 홀 ${c.strokes ? `${c.strokes}타` : "빈칸"}${c.state === "check" ? " · 확인 필요" : ""}`}
-                                                            className={cn("h-10 rounded-lg border text-[14px] tabular-nums",
-                                                                c.mine ? "border-[#64DD1766] bg-[#64DD171F] text-[#B6F28A]"
-                                                                    : c.state === "empty" ? "border-dashed border-[#FFFFFF40] bg-transparent text-[#FFFFFF59]"
-                                                                        : hot ? "border-[#FFB02E] bg-[#FFB02E33] font-semibold text-[#FFD08A]"
-                                                                            : c.state === "check" ? "border-[#FFB02E80] bg-transparent text-[#FFD08A]"
-                                                                                : "border-transparent bg-[#FFFFFF0F] text-[#FFFFFF]",
-                                                                on && "ring-2 ring-[#FFFFFF]")}>
-                                                            {c.strokes ? cardText(c.strokes, parAt(h)) : "·"}
-                                                        </button>
-                                                    );
-                                                })}
-                                                <span className={cn("flex h-10 items-center justify-center rounded-lg text-[13px] tabular-nums", sum.ok === false ? "bg-[#FFB02E26] text-[#FFD08A]" : sum.ok ? "text-[#9BEF5C]" : "text-[#FFFFFF99]")} data-testid={`scan-sum-${r}-${from}`}>
-                                                    {sum.now ?? "–"}
-                                                </span>
-                                            </div>
-                                            {sum.ok === false && <p className="mt-1.5 text-[12px] text-[#FFD08A]">{from === 0 ? "앞" : "뒤"} 9홀 합이 {sum.now}인데 카드에는 {sum.want}이에요.</p>}
-                                        </div>
-                                    );
-                                })}
-                            </section>
-                        ))}
+                        {sumNotes.map((t) => <p key={t} className="mt-2 px-1 text-[12.5px] leading-relaxed text-[#FFD08A]">{t}</p>)}
+
+                        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 px-1 text-[12px] text-[#FFFFFF80]" aria-hidden>
+                            <span className="inline-flex items-center gap-1.5"><i className="h-3 w-3 rounded-[3px] border border-[#FFB02E] bg-[#FFB02E33]" />확인 필요</span>
+                            <span className="inline-flex items-center gap-1.5"><i className="h-3 w-3 rounded-[3px] border border-dashed border-[#FFFFFF59]" />빈칸</span>
+                            <span className="inline-flex items-center gap-1.5"><i className="h-3 w-3 rounded-[3px] border border-[#64DD1766] bg-[#64DD171F]" />내가 고친 칸</span>
+                        </div>
+                        <p className="mt-2 px-1 text-[12.5px] leading-relaxed text-[#FFFFFF80]">카드에 적힌 그대로(파 기준) 보여 드려요. 이름 칸을 눌러 누구의 줄인지 고르고, 다른 칸은 눌러서 고쳐 주세요.</p>
                     </div>
 
+                    {/* 이 줄은 누구인가요 */}
+                    {sel?.kind === "seat" && rows[sel.r] && (
+                        <div className="shrink-0 border-t border-[#FFFFFF14] bg-[#101010] px-4 py-3" data-testid="scan-seats">
+                            <p className="text-[13px] text-[#FFFFFFB3]">{sel.r + 1}번째 줄 · {SCAN_COPY.seat}{rows[sel.r].label ? <span className="ml-2 text-[#FFFFFF80]">카드의 이름 · {rows[sel.r].label}</span> : null}</p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                                {players.map((p) => {
+                                    const on = rows[sel.r].seat === p.memberId;
+                                    return (
+                                        <button key={p.memberId} type="button" aria-pressed={on} onClick={() => { setSeat(sel.r, on ? null : p.memberId); if (!on) setSel(null); }} data-testid={`scan-seat-${sel.r}-${p.memberId}`}
+                                            className={cn("h-10 max-w-[9rem] truncate rounded-full px-3.5 text-[13px]", on ? "bg-[#64DD17] font-semibold text-[#051907]" : "bg-[#FFFFFF14] text-[#FFFFFFD9] active:bg-[#FFFFFF24]")}>
+                                            {p.name || "이름 없음"}
+                                        </button>
+                                    );
+                                })}
+                                <button type="button" onClick={() => { setSeat(sel.r, null); setSel(null); }} className="h-10 rounded-full px-3.5 text-[13px] text-[#FFFFFF99] active:bg-[#FFFFFF14]" data-testid={`scan-seat-${sel.r}-none`}>넣지 않기</button>
+                            </div>
+                        </div>
+                    )}
+
                     {/* 고르는 칸 — 카드의 숫자와 타수를 같이 보여 준다 */}
-                    {sel && picked && (
+                    {sel?.kind === "cell" && picked && (
                         <div className="shrink-0 border-t border-[#FFFFFF14] bg-[#101010] px-4 py-3" data-testid="scan-editor">
                             <p className="text-[13px] text-[#FFFFFFB3]">
                                 {sel.h + 1}번 홀{parAt(sel.h) != null ? ` · 파 ${parAt(sel.h)}` : ""}
@@ -265,7 +311,7 @@ export function ScanSheet({ matchId, players, pars, parKnown, onApply, onClose }
                     <div className="shrink-0 border-t border-[#FFFFFF14] bg-[#050505] px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
                         <button type="button" disabled={!seated.length || saving} onClick={() => { void apply(); }} data-testid="scan-apply"
                             className={cn("flex h-[52px] w-full items-center justify-center rounded-2xl text-[15px] font-semibold", seated.length && !saving ? "bg-[#64DD17] text-[#051907] active:bg-[#58C414]" : "bg-[#FFFFFF14] text-[#FFFFFF59]")}>
-                            {saving ? "넣는 중…" : !seated.length ? "줄마다 누구인지 골라 주세요" : unchecked ? `${SCAN_COPY.apply} · 확인 필요 ${unchecked}칸` : SCAN_COPY.apply}
+                            {saving ? "넣는 중…" : !seated.length ? "이름 칸을 눌러 누구의 줄인지 골라 주세요" : unchecked ? `${SCAN_COPY.apply} · 확인 필요 ${unchecked}칸` : SCAN_COPY.apply}
                         </button>
                     </div>
                 </>

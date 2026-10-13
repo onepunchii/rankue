@@ -5,6 +5,7 @@ import { listPath } from "@shared/golfCourse";
 
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { ScorecardScanner } from "../components/ScorecardScanner";
+import { useScanEntry } from "../lib/scanEntry";
 
 // Components
 import { PassportHeader } from "../components/passport/PassportHeader";
@@ -41,6 +42,7 @@ export default function Passport() {
 
     // Hooks
     const { stats, stamps, recordStamps, savedImages, isLoading, handleScanComplete } = usePassportData();
+    const scanEntry = useScanEntry();
     const [, setLocation] = useLocation();
 
     // View mode change effect: scroll to top
@@ -62,7 +64,7 @@ export default function Passport() {
 
     return (
         <div className="min-h-screen bg-[#050505] text-white pb-24 font-['Inter', 'Outfit', sans-serif] overflow-x-hidden">
-            <PassportHeader onScanClick={() => setScannerOpen(true)} />
+            <PassportHeader onScanClick={() => { if (scanEntry.available) scanEntry.go(); else setScannerOpen(true); }} />
 
             <main className="max-w-2xl mx-auto px-6 pt-24">
                 <ViewSwitcher current={viewMode} onChange={setViewMode} />
