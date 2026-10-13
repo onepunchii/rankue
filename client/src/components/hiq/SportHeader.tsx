@@ -36,13 +36,15 @@ import { useT } from "@/lib/i18n";
 import { HIKING_PUBLIC } from "@shared/hikingAccess";
 import { HIKING_HUB_PATH } from "@shared/hikingMountains";
 
-export type HeaderSport = "BILLIARDS" | "GOLF" | "HIKING";
+export type HeaderSport = "BILLIARDS" | "GOLF" | "HIKING" | "FISHING";
 
 /** 종목의 색 — 워드마크 · 고른 종목의 알약(당구 녹색 · 골프 주황 · 등산 살구) */
 export const SPORT_HEADER_THEME: Readonly<Record<HeaderSport, { brand: string; onBrand: string; text: string; soft: string; pill: string; iconBg: string; bar: string; ring: string; line: string }>> = {
     BILLIARDS: { brand: "#006241", onBrand: "#FFFFFF", text: "#1A1A1A", soft: "#1A1A1A99", pill: "#0000000D", iconBg: "#0062411A", bar: "#F2F0EB", ring: "#F2F0EB", line: "#0000000F" },
     GOLF: { brand: "#FF6B00", onBrand: "#1A0A00", text: "#FFFFFF", soft: "#FFFFFFB3", pill: "#FFFFFF14", iconBg: "#FFFFFF0F", bar: "#0A0A0A", ring: "#0A0A0A", line: "#FFFFFF14" },
     HIKING: { brand: "#F28C6A", onBrand: "#2A1208", text: "#F4EFE3", soft: "#F4EFE3B3", pill: "#FFFFFF0F", iconBg: "#FFFFFF0F", bar: "#0B1F26", ring: "#0B1F26", line: "#FFFFFF14" },
+    // 낚시(2026-10-14) — 새벽 바다: 짙은 남색 + 물빛
+    FISHING: { brand: "#38BDF8", onBrand: "#04202F", text: "#E6F6FF", soft: "#E6F6FFB3", pill: "#FFFFFF0F", iconBg: "#FFFFFF0F", bar: "#071A2B", ring: "#071A2B", line: "#FFFFFF14" },
 };
 
 /** rankue 워드마크 — 글자 모양의 그림에 색을 입힌다. 높이를 주면 너비는 비율대로 */
@@ -94,6 +96,8 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
         { id: "BILLIARDS", label: t("dashboardHeader.billiardsMode") },
         ...(golfVisible || sport === "GOLF" ? [{ id: "GOLF" as const, label: t("dashboardHeader.golfMode") }] : []),
         ...(hikingOk || hikingGuest || sport === "HIKING" ? [{ id: "HIKING" as const, label: "등산" }] : []),
+        // 낚시(네 번째 종목 · 2026-10-14) — 지금은 운영자에게만 보인다. 다른 종목과 같은 알약이다(고르면 그 자리에서 낚시 세계로 바뀐다)
+        ...(fishingOk || sport === "FISHING" ? [{ id: "FISHING" as const, label: "낚시" }] : []),
     ];
     const icon = "flex shrink-0 items-center justify-center rounded-full active:scale-95 transition-transform";
     const iconSize = { width: z.button, height: z.button };
@@ -102,7 +106,7 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
     return (
         <>
             <header className={`${BAR_CLASS} ${className ?? ""}`} style={barStyle(c, bleed, lift)} data-testid="sport-header" data-sport-header={sport}>
-                <div className={`flex items-center ${inner ?? (sport === "HIKING" ? "mx-auto max-w-[720px]" : "")}`} style={{ height: z.row, paddingLeft: z.side, paddingRight: z.side, gap: z.gap }}>
+                <div className={`flex items-center ${inner ?? (sport === "HIKING" || sport === "FISHING" ? "mx-auto max-w-[720px]" : "")}`} style={{ height: z.row, paddingLeft: z.side, paddingRight: z.side, gap: z.gap }}>
                     <RankueWordmark color={c.brand} height={z.wordmark} />
                     <span className="min-w-0 flex-1" />
                     {sports.length > 1 && (
@@ -117,10 +121,6 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
                                     <span className="absolute inset-0 flex items-center justify-center">{s.label}</span>
                                 </button>
                             )))}
-                            {/* 낚시(네 번째 종목 · 2026-10-14) — 지금은 운영자에게만 보인다. 저장된 종목은 바꾸지 않고 낚시 화면으로 간다 */}
-                            {fishingOk && (
-                                <button type="button" onClick={() => setLocation("/fishing")} className={`relative rounded-full ${PILL_PAD} text-[13px] active:opacity-70`} style={{ height: z.pill, color: c.soft }} data-testid="sport-to-fishing">낚시</button>
-                            )}
                         </div>
                     )}
                     {isGuest ? (

@@ -44,6 +44,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { uploadImage } from "@/lib/imageUtils";
 import { useGolfVisible } from "@/hooks/useGolfAccess";
 import { useHikingAccess } from "@/hooks/useHikingAccess";
+import { useFishingAccess } from "@/hooks/useFishingAccess";
 import { useToast } from "@/hooks/use-toast";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -81,7 +82,11 @@ export default function HiqMenu() {
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [isUploading, setIsUploading] = useState(false);
-    const { currentSport, setSport, sport, isHiking } = useSport();
+    const { currentSport, setSport, sport, isHiking, isFishing } = useSport();
+    // 낚시(네 번째 종목) — 허용된 회원에게만 보인다(지금은 운영자)
+    const fishingOk = useFishingAccess();
+    // 따로 선 종목(등산 · 낚시) — 당구의 것(레벨 · 공지 · 이용안내 · 앱 설치 카드)을 내지 않는다
+    const ownWorld = isHiking || isFishing;
     // 등산(세 번째 종목) — 허용된 회원에게만 보인다(지금은 운영자와 시험 계정)
     const hikingOk = useHikingAccess();
     // 종목 전환은 '볼 수 있는가'로 가른다(2026-10-05 홈을 비로그인에 열면서) — 골프 홈을 둘러보던 한국어 방문자가 메뉴에서 당구로 갔다가 되돌아올 수 있게
@@ -91,7 +96,7 @@ export default function HiqMenu() {
     const isGolf = currentSport === "GOLF";
     // 등산(2026-10-13 오너: "지금 등산 전체 메뉴는 당구 메뉴로 되어 있는데 … 등산 전체 메뉴로") — 등산일 때 currentSport 는 당구라서
     // !isGolf 만 보면 당구 항목이 그대로 나온다. 당구 전용 항목은 isBilliards 로 묻는다.
-    const isBilliards = !isGolf && !isHiking;
+    const isBilliards = !isGolf && !isHiking && !isFishing;
 
     const [infoModal, setInfoModal] = useState<{ open: boolean, type: InfoModalType | null }>({ open: false, type: null });
     const openInfoModal = (type: InfoModalType) => setInfoModal({ open: true, type });
@@ -210,7 +215,7 @@ export default function HiqMenu() {
         ? { label: t("menu.tierExplorer"), class: "border-amber-500/50 text-amber-500", icon: "⛳️" }
         : getTier(member?.handi4c || 0, false, currentSport);
 
-    const sportColor = isHiking ? "#F28C6A" : currentSport === "GOLF" ? "#64DD17" : "#006241";
+    const sportColor = isFishing ? "#38BDF8" : isHiking ? "#F28C6A" : currentSport === "GOLF" ? "#64DD17" : "#006241";
     const sportColorClass = currentSport === "GOLF" ? "text-brand" : "text-brand";
     const sportBgClass = currentSport === "GOLF" ? "bg-brand" : "bg-brand";
     const sportGlowClass = currentSport === "GOLF" ? "" : "";
@@ -343,7 +348,7 @@ export default function HiqMenu() {
                                 )}
                                 <span className="text-[13px] font-medium text-black/55">{t("menu.regularMember")}</span>
                                 {/* 레벨은 매장 방문 수로 매긴 당구의 값 — 등산에서는 그 자리에 산행 등급을 놓는다(아래) */}
-                                {!isHiking && (
+                                {!ownWorld && (
                                     <>
                                         <span className="w-1 h-1 rounded-full bg-black/25" />
                                         <span className="text-[13px] font-medium text-black/40">Lv.{Math.floor((member?.visitCount || 0) / 5) + 1}</span>
@@ -441,6 +446,32 @@ export default function HiqMenu() {
                         </>
                     )}
 
+                    {/* 낚시 — 네 번째 종목. 한국어 전용이라 글자를 번역 키로 두지 않는다 */}
+                    {fishingOk && (
+                        <>
+                            <div className="w-px h-8 bg-black/10 mx-1" />
+                            <div className="flex flex-col gap-2 items-center">
+                                <button
+                                    title="낚시 모드" data-testid="menu-sport-fishing"
+                                    onClick={() => {
+                                        setSport("FISHING");
+                                        toast({ title: t("menu.sportModeChanged"), description: "낚시로 바꿨어요" });
+                                    }}
+                                    className={cn(
+                                        "w-16 h-16 rounded-2xl flex items-center justify-center transition-all active:scale-90",
+                                        sport === "FISHING" ? "bg-brand border border-brand/50 shadow-[0_1px_2px_rgba(0,0,0,0.06)]" : "bg-black/[0.04] "
+                                    )}
+                                >
+                                    <svg viewBox="0 0 24 24" className={cn("w-7 h-7", sport === "FISHING" ? "text-brand-fg" : "text-black/35")} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                                        <path d="M3 12 C6 7 12 6 16 9 L21 6 L20 12 L21 18 L16 15 C12 18 6 17 3 12 Z" />
+                                        <circle cx="8" cy="11" r="0.6" fill="currentColor" />
+                                    </svg>
+                                </button>
+                                <span className={cn("text-[12px] font-semibold tracking-tight", sport === "FISHING" ? "text-brand" : "text-black/45")}>낚시</span>
+                            </div>
+                        </>
+                    )}
+
                     {/* 등산 — 세 번째 종목. 한국어 전용이라 글자를 번역 키로 두지 않는다 */}
                     {hikingOk && (
                         <>
@@ -496,6 +527,14 @@ export default function HiqMenu() {
                         ...(isGolf ? [{ icon: LucideTrophy, label: t("menu.golfMembershipInfo"), desc: t("menu.golfMembershipInfoDesc"), onClick: () => setLocation("/golf/membership") }] : []),
                         // 등산(2026-10-13) — 등산의 다섯 곳. 하단 탭(홈 · 크루 · 산 · 도장첩 · 채팅)에 없는 배낭 · 준비물 · 용어는 홈 말고는 여기가 입구다.
                         // 등산은 한국어 전용이라 문구를 번역 키로 두지 않는다. 주소는 하단 탭처럼 글자로 적는다(shared/hiking* 을 메인 청크에 싣지 않게).
+                        // 낚시(2026-10-14) — 낚시의 네 곳. 하단 탭(홈 · 크루 · 낚시터 · 어탁첩 · 채팅)에 없는 '내 조과'는 홈 말고는 여기가 입구다
+                        ...(isFishing
+                            ? [
+                                { icon: LucideStamp, label: "어탁첩", desc: "어종마다 한 장 · 짜 승급", onClick: () => setLocation("/fishing/book") },
+                                { icon: LucideHistory, label: "내 조과", desc: "적어 둔 조과 전부", onClick: () => setLocation("/fishing/log") },
+                                { icon: LucideMap, label: "낚시터 찾기", desc: "지역 · 이름 · 어종으로", onClick: () => setLocation("/fishing/points") },
+                            ]
+                            : []),
                         ...(isHiking
                             ? [
                                 { icon: LucideMap, label: "산 찾기", desc: "전국 명산 · 코스 · 날씨", onClick: () => setLocation("/hiking") },
@@ -519,9 +558,9 @@ export default function HiqMenu() {
                             ? [{ icon: LucideMail, label: t("menu.supportChat"), desc: t("menu.supportChatDesc"), onClick: () => setLocation(`/chat/support/${member?.id}`) }]
                             : []),
                         // 공지사항의 글은 당구 런칭 소식뿐이다(InfoModal) — 등산 메뉴에서는 내지 않는다
-                        ...(isHiking ? [] : [{ icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') }]),
+                        ...(ownWorld ? [] : [{ icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') }]),
                         // 이용안내의 본문(InfoModal)은 당구 · 골프 두 벌뿐이다 — 등산에서 열면 당구 점수판 안내가 나와서 등산일 땐 뺀다
-                        ...(isHiking ? [] : [{ icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') }]),
+                        ...(ownWorld ? [] : [{ icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') }]),
                         ...(!isBilliards ? [] : [{ icon: LucideTrophy, label: t("menu.rankingSystem"), desc: t("menu.rankingSystemDesc"), onClick: () => openInfoModal('ranking') }]),
                         // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 화면에만 둔다(문구도 그래서 사전 키 없이 한국어).
                         ...(isBilliards && locale === "ko"
@@ -670,7 +709,7 @@ export default function HiqMenu() {
             </Dialog>
 
             {/* 앱 설치 카드의 그림은 당구공 · 당구대 펠트, 글은 '경기 초대'다 — 등산에서는 그리지 않는다 */}
-            {!isHiking && <AppInstallCard className="mt-6" />}
+            {!ownWorld && <AppInstallCard className="mt-6" />}
 
             <HiqNavigation />
         </div>

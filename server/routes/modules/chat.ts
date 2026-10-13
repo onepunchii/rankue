@@ -182,7 +182,7 @@ export async function notifyRoom(ref: RoomRef, senderId: string, preview: string
     const isGolf = sport === "GOLF" || ref.kind === "listing";
     // 산악회 방의 알림은 다른 산악회 알림(정모 · 가입 — category: crew.sportCategory)과 같은 값으로 남긴다.
     // 알림함은 '골프가 아닌 것'을 한데 보여 주므로 지금은 당구 알림함에 뜬다(storage/notification.repo).
-    const category = isGolf ? "GOLF" : sport === "HIKING" ? "HIKING" : "BILLIARDS";
+    const category = isGolf ? "GOLF" : sport === "HIKING" ? "HIKING" : sport === "FISHING" ? "FISHING" : "BILLIARDS";
     // 제목·본문은 받는 사람 언어로 풀린다(notificationService). 사용자 글(preview 가 문자열)은 그대로 두고,
     // 서버가 만든 문구(카드 요약 — I18nText)는 받는 사람 언어로 푼다. 이름을 덧붙이는 틀은 문자열일 때만 쓴다.
     const body: string | I18nText = typeof preview !== "string" ? preview
@@ -339,7 +339,7 @@ router.post("/dm", requireAuth, asyncHandler(async (req: AuthRequest, res: any) 
     const sport = sportOf(req.body?.sport);
     // 등산에는 1:1 방이 없다(2026-10-13) — 친구 관계가 종목별(당구 · 골프)이라 등산 친구라는 것이 없다. 화면도 '새 대화'를 그리지 않는다.
     // 당구로 뭉개 만들면 등산 탭에서 연 방이 당구 탭에만 생긴다 — 만들지 않고 "친구와만"으로 거절한다.
-    if (sport === "HIKING") return sendError(res, 403, "err.chat.friendsOnly", "NOT_FRIENDS");
+    if (sport === "HIKING" || sport === "FISHING") return sendError(res, 403, "err.chat.friendsOnly", "NOT_FRIENDS");
     // getFriends 는 친구마다 상대전적까지 계산한다(N+1) — 여기서는 고른 사람만 isFriend 로 본다.
     const checks = await Promise.all(ids.map((id) => storage.isFriend(req.userId!, id, sport)));
     const strangers = ids.filter((_, i) => !checks[i]);

@@ -64,6 +64,8 @@ export interface FishingCatch {
     photoUrl: string | null;
     thumbUrl: string | null;
     note: string | null;
+    /** 그날의 물때를 어느 바다 식으로 세는가(서해 7물때 · 남해/동해/제주 8물때). 민물이거나 옛 줄이면 없다 — 물때 이름은 날짜로 그때그때 센다(shared/fishingTide) */
+    tideSea?: "west" | "south" | null;
     createdAt: string;
 }
 export type FishingCatchInput = Omit<FishingCatch, "id" | "createdAt">;
@@ -92,7 +94,7 @@ export function cleanCatch(raw: unknown, today: string): { ok: true; value: Fish
     const ji = o.ji == null || o.ji === "" ? null : Math.round(Number(o.ji));
     if (ji != null && !(ji >= 1 && ji <= 10)) return { ok: false, error: "갈치 굵기는 1~10지로 적어 주세요" };
     const url = (v: unknown) => (typeof v === "string" && v ? v : null);
-    return { ok: true, value: { day, place, spot, species, lengthCm: len, count, weightKg: kg, ji, released: o.released === true, photoUrl: url(o.photoUrl), thumbUrl: url(o.thumbUrl), note } };
+    return { ok: true, value: { day, place, spot, species, lengthCm: len, count, weightKg: kg, ji, released: o.released === true, photoUrl: url(o.photoUrl), thumbUrl: url(o.thumbUrl), note, tideSea: o.tideSea === "west" || o.tideSea === "south" ? o.tideSea : null } };
 }
 
 export interface FishingSummary {

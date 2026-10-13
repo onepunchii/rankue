@@ -366,7 +366,7 @@ export class ChatRepository {
         if (ref.kind === "crew") {
             const [c] = await db.select({ name: hiqCrews.name, sport: hiqCrews.sportCategory }).from(hiqCrews).where(eq(hiqCrews.id, ref.id)).limit(1);
             // 산악회 방은 등산 — 당구로 뭉개면 화면이 당구 첨부 줄(매칭 대결 · 온라인 대전)을 그리고 당구 카드가 붙는다(chatCards 가 방 종목으로 거른다).
-            return { title: c?.name ?? tr(locale, "ui.chat.crew"), subtitle: tr(locale, "ui.chat.crewCount", { n: members.length }), members, canManage, crewId: ref.id, sport: c?.sport === "GOLF" ? "GOLF" : c?.sport === "HIKING" ? "HIKING" : "BILLIARDS" };
+            return { title: c?.name ?? tr(locale, "ui.chat.crew"), subtitle: tr(locale, "ui.chat.crewCount", { n: members.length }), members, canManage, crewId: ref.id, sport: c?.sport === "GOLF" ? "GOLF" : c?.sport === "HIKING" ? "HIKING" : c?.sport === "FISHING" ? "FISHING" : "BILLIARDS" };
         }
         if (ref.kind === "listing") {
             const [b] = await db.select().from(golfBookings).where(eq(golfBookings.id, ref.id)).limit(1);
@@ -428,7 +428,7 @@ export class ChatRepository {
 
         // 1:1 · 소그룹 — 방이 종목을 가진다(2026-09-21 오너: "골프 채팅과 당구 채팅은 구별되게")
         // 등산에는 1:1 방이 없다(위 주석) — 묻지 않는다.
-        const dms = sport === "HIKING" ? [] : await db.select({ roomId: hiqChatRoomMembers.roomId }).from(hiqChatRoomMembers)
+        const dms = sport === "HIKING" || sport === "FISHING" ? [] : await db.select({ roomId: hiqChatRoomMembers.roomId }).from(hiqChatRoomMembers)
             .innerJoin(hiqChatRooms, eq(hiqChatRooms.id, hiqChatRoomMembers.roomId))
             .where(and(eq(hiqChatRoomMembers.memberId, memberId), eq(hiqChatRooms.sport, sport)));
         if (dms.length > 0) {

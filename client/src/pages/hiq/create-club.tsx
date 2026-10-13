@@ -55,7 +55,9 @@ export default function CreateClub() {
     // sport — 등산에서 만들면 산악회다(HIKING). currentSport 는 등산을 당구로 보고해서(SportContext) 당구 칸(베이스캠프 · 주 종목)이 그려지므로
     // 산악회인지는 따로 본다: 산악회에는 단골 구장도 주 종목도 없다(골프처럼 활동 지역만 받는다).
     const { currentSport, sport } = useSport();
-    const hiking = sport === "HIKING";
+    // 낚시(2026-10-14)에서 만들면 낚시 크루다(FISHING) — 산악회처럼 단골 구장 · 주 종목이 없다. 글만 낚시의 것으로 따로 적는다(한국어 전용)
+    const fishing = sport === "FISHING";
+    const hiking = sport === "HIKING" || fishing;
     const [nameError, setNameError] = useState<string | null>(null);
     const [checkingName, setCheckingName] = useState(false);
     const logoInput = useRef<HTMLInputElement>(null);
@@ -229,8 +231,8 @@ export default function CreateClub() {
         }
     };
 
-    const stepTitle = t(step === 2 && hiking ? "createClub.step2TitleHiking" : step === 2 && currentSport === "GOLF" ? "createClub.step2TitleGolf" : STEPS[step - 1].title);
-    const stepSubtitle = t(step === 2 && hiking ? "createClub.step2SubtitleHiking" : step === 2 && currentSport === "GOLF" ? "createClub.step2SubtitleGolf" : STEPS[step - 1].subtitle);
+    const stepTitle = step === 2 && fishing ? "활동 지역" : t(step === 2 && hiking ? "createClub.step2TitleHiking" : step === 2 && currentSport === "GOLF" ? "createClub.step2TitleGolf" : STEPS[step - 1].title);
+    const stepSubtitle = step === 2 && fishing ? "주로 어느 바다 · 어느 물로 나가시나요?" : t(step === 2 && hiking ? "createClub.step2SubtitleHiking" : step === 2 && currentSport === "GOLF" ? "createClub.step2SubtitleGolf" : STEPS[step - 1].subtitle);
     const busy = createCrewMutation.isPending || uploadingField !== null || checkingName;
 
     return (
@@ -274,7 +276,7 @@ export default function CreateClub() {
                                     autoFocus
                                     maxLength={NAME_MAX}
                                     aria-invalid={!!nameError}
-                                    placeholder={hiking ? t("createClub.namePlaceholderHiking") : currentSport === "GOLF" ? t("createClub.namePlaceholderGolf") : t("createClub.namePlaceholderBilliards")}
+                                    placeholder={fishing ? "예: 새벽물때, 주말 갯바위" : hiking ? t("createClub.namePlaceholderHiking") : currentSport === "GOLF" ? t("createClub.namePlaceholderGolf") : t("createClub.namePlaceholderBilliards")}
                                     className={cn(FIELD_INPUT, "h-14 text-[17px] font-semibold", nameError && "border-destructive focus-visible:border-destructive")}
                                     value={formData.name || ""}
                                     onChange={(e) => { set({ name: e.target.value }); setNameError(null); }}
@@ -284,7 +286,7 @@ export default function CreateClub() {
                                 <Input
                                     id="crew-intro"
                                     maxLength={INTRO_MAX}
-                                    placeholder={hiking ? t("crewMgmt.sloganPlaceholderHiking") : currentSport === "GOLF" ? t("crewMgmt.sloganPlaceholderGolf") : t("crewMgmt.sloganPlaceholderBilliards")}
+                                    placeholder={fishing ? "예: 달마다 한 번 같이 나가는 모임" : hiking ? t("crewMgmt.sloganPlaceholderHiking") : currentSport === "GOLF" ? t("crewMgmt.sloganPlaceholderGolf") : t("crewMgmt.sloganPlaceholderBilliards")}
                                     className={FIELD_INPUT}
                                     value={formData.shortIntro || ""}
                                     onChange={(e) => set({ shortIntro: e.target.value })}
@@ -293,7 +295,7 @@ export default function CreateClub() {
                             <Field label={t("createClub.descLabel")} htmlFor="crew-desc">
                                 <Textarea
                                     id="crew-desc"
-                                    placeholder={hiking ? t("createClub.descPlaceholderHiking") : currentSport === "GOLF" ? t("createClub.descPlaceholderGolf") : t("createClub.descPlaceholderBilliards")}
+                                    placeholder={fishing ? "출조 주기, 주로 하는 낚시(갯바위 · 선상 · 민물), 준비물 등을 소개해 주세요." : hiking ? t("createClub.descPlaceholderHiking") : currentSport === "GOLF" ? t("createClub.descPlaceholderGolf") : t("createClub.descPlaceholderBilliards")}
                                     className={cn(FIELD_TEXTAREA, "min-h-[160px]")}
                                     value={formData.description || ""}
                                     onChange={(e) => set({ description: e.target.value })}

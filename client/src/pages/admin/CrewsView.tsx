@@ -10,7 +10,7 @@ import { FilterChips, SearchBox, EmptyState, Panel, Pill, KpiTile, kstDate } fro
 
 export type AdminCrew = {
     id: string; name: string; description: string;
-    sportCategory: "BILLIARDS" | "GOLF" | "MIXED" | "HIKING";
+    sportCategory: "BILLIARDS" | "GOLF" | "MIXED" | "HIKING" | "FISHING";
     region: string | null; joinType: string; maxMembers: number;
     memberCount: number; pendingCount: number;
     leaderName: string; storeName: string; createdAt: string;

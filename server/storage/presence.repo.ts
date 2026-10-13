@@ -51,7 +51,7 @@ export async function listArrivals(viewerId: string, since: Date): Promise<Prese
             from hiq_crew_members me
             join hiq_crew_members cm on cm.crew_id = me.crew_id and cm.member_id <> me.member_id and cm.role <> 'pending'
             -- 산악회(등산)는 뺀다(2026-10-13) — 이 배너는 당구 · 골프의 '한 판 할까요'로 이어지는데, 산악회 동료에게 당구를 권하게 된다
-            join hiq_crews c on c.id = me.crew_id and c.sport_category <> 'HIKING'
+            join hiq_crews c on c.id = me.crew_id and c.sport_category not in ('HIKING', 'FISHING')
             where me.member_id = ${viewerId} and me.role <> 'pending' and cm.member_id in (select mid from coplay)
         ),
         circle as (select mid from friends union select mid from crew_mates),

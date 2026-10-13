@@ -347,7 +347,7 @@ export const hiqCrews = pgTable("hiq_crews", {
   meetingDay: text("meeting_day"), // e.g. "SAT"
   meetingTime: text("meeting_time"), // e.g. "14:00"
   // HIKING(2026-10-13) — 산악회. 당구 · 골프 크루와 섞이지 않는 따로 선 종류다(shared/crewSport). 열은 글자라 DB 는 그대로.
-  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "MIXED", "HIKING"] }).default("BILLIARDS").notNull(),
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "MIXED", "HIKING", "FISHING"] }).default("BILLIARDS").notNull(),
   introQuestions: jsonb("intro_questions"),
 
   latitude: doublePrecision("latitude"),
@@ -381,7 +381,7 @@ export const hiqCrewActivities = pgTable("hiq_crew_activities", {
   maxParticipants: integer("max_participants").default(8),
   cost: text("cost"), // e.g. "Game fee Dutch pay"
   // HIKING — 산악회의 일정(서버가 크루 종목으로 정한다 — routes/modules/crew.ts)
-  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "HIKING"] }).default("BILLIARDS").notNull(),
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "HIKING", "FISHING"] }).default("BILLIARDS").notNull(),
   category: text("category"), // REGULAR_ROUNDING, BLITZ_SCREEN, HIKING_TRIP, etc.
   // 산악회 일정에서 고른 산의 주소(hiking_mountains.slug) — 산악회만 적는다(migrations/crew_activity_mountain.sql · shared/crewMountain.ts)
   mountainSlug: text("mountain_slug"),
@@ -409,7 +409,7 @@ export const hiqCrewPosts = pgTable("hiq_crew_posts", {
   isNotice: boolean("is_notice").default(false).notNull(),
   images: jsonb("images").$type<string[]>(), // Array of image URLs
   // 글의 종목은 크루가 정한다 — 산악회의 글은 HIKING
-  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "HIKING"] }).default("BILLIARDS").notNull(),
+  sportCategory: text("sport_category", { enum: ["BILLIARDS", "GOLF", "HIKING", "FISHING"] }).default("BILLIARDS").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

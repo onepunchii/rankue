@@ -60,7 +60,7 @@ interface CrewMemberListProps {
      * HIKING = 산악회(2026-10-13). 멤버 줄과 프로필 창에서 종목의 것을 다 뺀다 — 당구 다마 · 에버 · 실전/온라인 등급 · 대회 우승 ·
      * 상대전적 · 대결 신청, 골프 타수 · 등급. 남는 것은 이름 · 역할 · 소개 · 가입일 · 함께한 산행 횟수다.
      */
-    sportCategory?: "BILLIARDS" | "GOLF" | "MIXED" | "HIKING";
+    sportCategory?: "BILLIARDS" | "GOLF" | "MIXED" | "HIKING" | "FISHING";
     crewId: string;
     /** 보는 사람이 이 크루의 활동 멤버인가. 없으면 목록에서 추정한다(내가 목록에 있고 대기가 아니면 멤버). */
     isMember?: boolean;
@@ -88,7 +88,7 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     const [query, setQuery] = useState("");
     const [sort, setSort] = useState<MemberSort>("role");
     // 산악회 — 아래의 당구 전용 요청(대회 기록 · 상대전적 · 대결 신청 · 활동 성향)을 보내지 않고, 그 칸도 그리지 않는다.
-    const hiking = sportCategory === "HIKING";
+    const hiking = sportCategory === "HIKING" || sportCategory === "FISHING"; // 낚시 크루도 같다(따로 선 종목)
 
     // 비멤버·게스트에게 멤버 전용 요청(대회 기록·대결 신청)을 보내지 않는다 — 서버가 403/401 로 막는다.
     // 예전엔 비멤버에게도 '대결 신청' 버튼이 보여 누르면 403 토스트가 떴다.
@@ -499,7 +499,7 @@ function MemberListItem({ item, currentMemberId, sportCategory, gameType, onClic
     const m = item.member;
     const isMe = m.id === currentMemberId;
     // 산악회 줄에는 등급(온라인 대전 배지 · 실전 메달) · 대회 우승 · 대표 기록이 없다 — 이름 · 역할 · 소개만
-    const hiking = sportCategory === 'HIKING';
+    const hiking = sportCategory === 'HIKING' || sportCategory === 'FISHING';
 
     const joinedDate = new Date(item.joinedAt);
     const daysSinceJoined = (Date.now() - joinedDate.getTime()) / (1000 * 3600 * 24);

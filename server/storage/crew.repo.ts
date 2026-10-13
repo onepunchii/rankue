@@ -167,11 +167,12 @@ export class CrewRepository {
         const isGolfCrew = crew.sportCategory === 'GOLF';
         // 산악회(2026-10-13) — 일정의 종류가 하나(산행)라 첫 칸에 '함께한 산행'만 센다. 당구 종류(정기 · 번개 · 대회)로 세면
         // 늘 0 이고, 대회 칸은 산악회에 없다. 일정의 종목은 서버가 크루 종목으로 정한다(routes/modules/crew.ts).
-        const isHikingCrew = crew.sportCategory === 'HIKING';
+        // 낚시 크루(2026-10-14)도 같다 — 일정의 종류가 하나(출조)이고 당구 · 골프의 종목 기록이 없다
+        const isHikingCrew = crew.sportCategory === 'HIKING' || crew.sportCategory === 'FISHING';
         const activityCountRows = await db.select({
             memberId: hiqCrewActivityParticipants.memberId,
             group1Count: isHikingCrew
-                ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.sportCategory} = 'HIKING' THEN 1 ELSE 0 END)`
+                ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.sportCategory} = ${crew.sportCategory} THEN 1 ELSE 0 END)`
                 : isGolfCrew
                 ? sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_ROUNDING', 'BLITZ_ROUNDING', 'GOLF_TOUR') THEN 1 ELSE 0 END)`
                 : sql<number>`SUM(CASE WHEN ${hiqCrewActivities.category} IN ('REGULAR_BILLIARDS', 'BLITZ_BILLIARDS') THEN 1 ELSE 0 END)`,
@@ -607,7 +608,7 @@ export class CrewRepository {
                     ) : undefined,
                     // 종목을 안 주면 예전처럼 당구 · 골프를 함께 준다 — 산악회는 등산을 달라고 한 요청에만 나간다
                     // (등산을 모르는 옛 화면 · 종목 없는 호출의 목록에 산악회가 섞이지 않게).
-                    sportCategory ? eq(hiqCrews.sportCategory, sportCategory as any) : ne(hiqCrews.sportCategory, 'HIKING')
+                    sportCategory ? eq(hiqCrews.sportCategory, sportCategory as any) : sql`${hiqCrews.sportCategory} not in ('HIKING', 'FISHING')`
                 )
             )
             .groupBy(hiqCrews.id, hiqStores.latitude, hiqStores.longitude, storeListings.latitude, storeListings.longitude, profiles.countryCode)
@@ -682,7 +683,7 @@ export class CrewRepository {
             id: String(r.id),
             name: String(r.name ?? ""),
             description: (r.description as string | null) ?? (r.short_intro as string | null) ?? "",
-            sportCategory: String(r.sport_category ?? "BILLIARDS") as "BILLIARDS" | "GOLF" | "MIXED" | "HIKING",
+            sportCategory: String(r.sport_category ?? "BILLIARDS") as "BILLIARDS" | "GOLF" | "MIXED" | "HIKING" | "FISHING",
             region: (r.region as string | null) ?? null,
             joinType: String(r.join_type ?? "auto"),
             maxMembers: Number(r.max_members ?? 50),

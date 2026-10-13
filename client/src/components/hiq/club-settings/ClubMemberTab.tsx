@@ -169,7 +169,7 @@ export function ClubMemberTab({ crew, members, me, onUpdateRole, onKick, onAppro
                                         </span>
                                         {/* 산악회에는 종목 기록이 없다(memberStat 이 null) — '기록 없음'이라고 적는 대신 가입일을 보인다 */}
                                         <span className={cn(CREW_TEXT.caption, "rk-num")}>
-                                            {crew?.sportCategory === "HIKING"
+                                            {crew?.sportCategory === "HIKING" || crew?.sportCategory === "FISHING"
                                                 ? `${t("crewMemberList.joinedDate")} ${new Date(m.joinedAt).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: 'numeric' })}`
                                                 : stat ? `${t(stat.labelKey)} ${stat.value}` : t("crewMgmt.noRecord")}
                                         </span>

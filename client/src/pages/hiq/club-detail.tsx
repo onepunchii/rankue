@@ -314,7 +314,7 @@ export default function HiqClubDetail() {
     const { crew, baseStore, baseListing = null } = crewData;
     const isGolfCrew = crew.sportCategory === 'GOLF';
     // 대회(대진표)는 당구 크루만 — 골프 크루도 산악회(HIKING)도 열 수 없다. 주소(/crew/:id/tournament)로 들어오면 안내만 보인다.
-    const noTournament = isGolfCrew || crew.sportCategory === 'HIKING';
+    const noTournament = isGolfCrew || crew.sportCategory === 'HIKING' || crew.sportCategory === 'FISHING';
 
     // 게시판·사진첩·투표·대회는 서버도 크루원 전용으로 막혀 있다 — 비멤버·승인 대기자에게는
     // 빈 목록 대신 가입 안내를 보여준다. 가입 버튼도 여기 둔다(예전엔 안내만 있고 가입하려면 홈으로 돌아가야 했다).

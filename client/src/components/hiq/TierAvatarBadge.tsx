@@ -25,7 +25,8 @@ export function TierAvatarBadge({ memberId, size = 20, className }: {
     className?: string;
 }) {
     const { t } = useT();
-    const { currentSport, isHiking } = useSport();
+    const { currentSport, isHiking: hikingOnly, isFishing } = useSport();
+    const isHiking = hikingOnly || isFishing; // 낚시에도 당구의 등급 배지를 붙이지 않는다
     const tier = useSimTier(memberId);
     if (isHiking) return null;
     if (!tier || currentSport === "GOLF") return null;
@@ -43,7 +44,8 @@ export function TierAvatarBadge({ memberId, size = 20, className }: {
  */
 export function TierNameChip({ memberId, className }: { memberId: string | null | undefined; className?: string }) {
     const { t } = useT();
-    const { currentSport, isHiking } = useSport();
+    const { currentSport, isHiking: hikingOnly, isFishing } = useSport();
+    const isHiking = hikingOnly || isFishing; // 낚시에도 당구의 등급 배지를 붙이지 않는다
     const tier = useSimTier(memberId);
     if (isHiking) return null;
     if (!tier || currentSport === "GOLF") return null;

@@ -27,7 +27,7 @@ export function golfScoreOf(m: MemberStatInput): number {
 }
 
 export function memberStat(m: MemberStatInput, sport?: string | null, gameType?: string | null): MemberStat | null {
-    if (sport === "HIKING") return null;
+    if (sport === "HIKING" || sport === "FISHING") return null;
     if (sport === "GOLF") {
         const score = golfScoreOf(m);
         return score > 0 ? { value: score.toFixed(0), labelKey: "crewMgmt.golfAvgStrokes" } : null;

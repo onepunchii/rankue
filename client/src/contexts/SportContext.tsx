@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useLayoutEffect, useState 
 import { useLocation } from "wouter";
 import { useGolfVisible } from "@/hooks/useGolfAccess";
 import { useHikingAccess } from "@/hooks/useHikingAccess";
+import { useFishingAccess } from "@/hooks/useFishingAccess";
 import { sportForPath } from "@shared/sportRoute";
 import { useAuth } from "@/hooks/useAuth";
 
@@ -11,7 +12,8 @@ export type SportType = "BILLIARDS" | "GOLF";
  * 그 자리를 한 번에 다 고치지 않는다 — currentSport 는 그대로 **둘 중 하나**로 두고(등산일 땐 당구), 등산을 아는 화면
  * (하단 탭 · 홈 · 크루 · 채팅 · 전체 메뉴)만 sport · isHiking 을 본다. 등산을 모르는 화면이 등산 값을 받고 깨지는 일이 없다.
  */
-export type AppSport = SportType | "HIKING";
+/** 낚시(2026-10-14)가 네 번째 종목 — 등산과 같은 꼴의 따로 선 세계다(isFishing). currentSport 는 낚시일 때도 당구로 보고한다. */
+export type AppSport = SportType | "HIKING" | "FISHING";
 
 interface SportContextType {
     /** 당구 · 골프 둘 중 하나 — 등산일 때는 당구(등산을 모르는 화면이 쓰는 값) */
@@ -19,6 +21,7 @@ interface SportContextType {
     /** 지금의 종목(등산 포함) */
     sport: AppSport;
     isHiking: boolean;
+    isFishing: boolean;
     setSport: (sport: AppSport) => void;
 }
 
@@ -29,7 +32,7 @@ const STORAGE_KEY = "rankue_current_sport";
 const BOOT_KEY = "rankue_primary_sport_applied";
 
 function readSaved(): AppSport {
-    try { const v = localStorage.getItem(STORAGE_KEY); return v === "GOLF" || v === "HIKING" ? v : "BILLIARDS"; } catch { return "BILLIARDS"; }
+    try { const v = localStorage.getItem(STORAGE_KEY); return v === "GOLF" || v === "HIKING" || v === "FISHING" ? v : "BILLIARDS"; } catch { return "BILLIARDS"; }
 }
 
 /**
@@ -55,6 +58,8 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
     const [location] = useLocation();
     // 등산은 허용된 회원만(지금은 운영자와 시험 계정 — useHikingAccess). 공개 산 화면(/hiking …)의 색은 허용과 무관하게 등산이다(주소가 이긴다).
     const hikingOk = useHikingAccess();
+    // 낚시도 허용된 회원만(지금은 운영자 — useFishingAccess)
+    const fishingOk = useFishingAccess();
     const [saved, setSaved] = useState<AppSport>(readSaved);
 
     /**
@@ -74,8 +79,8 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
     // '보기'(/privacy)에서 이 화면을 만나게 됐다 — 골프 모드 회원이 설정·동의 시트에서 열 때도 같아서 조건 없이 당구(기본)색으로 둔다.
     // 카카오 로그인에서 돌아오는 화면(/auth/kakao, 2026-10-05)도 로그인 화면과 같은 밝은 화면 한 가지다.
     const consolePath = /^\/(admin|partner|register|terms|privacy|support|account-delete|auth)(\/|$|\?)/.test(location) || location === "/" || location === "/hiq";
-    const sport: AppSport = consolePath ? "BILLIARDS" : routeSport ?? (saved === "HIKING" ? (hikingOk ? "HIKING" : "BILLIARDS") : golfVisible ? saved : "BILLIARDS");
-    const currentSport: SportType = sport === "HIKING" ? "BILLIARDS" : sport;
+    const sport: AppSport = consolePath ? "BILLIARDS" : routeSport ?? (saved === "HIKING" ? (hikingOk ? "HIKING" : "BILLIARDS") : saved === "FISHING" ? (fishingOk ? "FISHING" : "BILLIARDS") : golfVisible ? saved : "BILLIARDS");
+    const currentSport: SportType = sport === "HIKING" || sport === "FISHING" ? "BILLIARDS" : sport;
 
     // 주 종목(2026-10-01) — 앱을 열 때(세션마다 한 번) 회원이 고른 종목으로 시작한다. 폰을 바꾸거나 다시 깔아도 골프 회원은 골프로.
     // 세션 안에서 사용자가 종목을 바꾸면 그대로 둔다(한 번만 맞춘다). 주소가 종목을 정하는 화면은 위에서 이미 주소가 이긴다.
@@ -101,28 +106,32 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
         // 등산을 쓸 수 없는 사람이 공개 산 화면(/hiking …)을 본 것은 종목을 고른 것이 아니다 — 저장된 종목(당구 · 골프)을 덮지 않는다.
         // 덮으면 산 화면을 구경한 골프 회원이 홈으로 돌아갈 때 당구 홈에 떨어진다.
         if (routeSport === "HIKING" && !hikingOk) return;
+        if (routeSport === "FISHING" && !fishingOk) return;
         // 저장값과 같을 때도 남긴다 — 골프가 이미 저장돼 있던 방문자가 골프 주소로 들어와 로그인해도 주 종목이 덮지 않게(markSportChosen)
         markSportChosen();
         if (routeSport !== saved) {
             setSaved(routeSport);
             try { localStorage.setItem(STORAGE_KEY, routeSport); } catch { /* 저장소를 못 쓰는 환경 */ }
         }
-    }, [routeSport, saved, hikingOk]);
+    }, [routeSport, saved, hikingOk, fishingOk]);
 
     // 토큰 층을 갈아 끼우는 스위치. index.css 의 [data-sport="GOLF"] 가 이 값을 본다.
     // 그리기 전에(useLayoutEffect) 붙여야 골프 주소로 들어온 첫 화면이 당구색으로 한 번 번쩍이지 않는다.
     // 등산은 어두운 화면이라 골프의 어두운 층(공용 화면의 흰 카드 · 검정 글씨를 토큰으로 되받는 다리 — index.css)을 그대로 타고,
     // 그 위에 data-skin="hiking" 으로 색만 등산의 것(짙은 청록 + 산호빛)으로 갈아 끼운다. 다리를 두 벌 만들지 않기 위해서다.
     useLayoutEffect(() => {
-        document.documentElement.setAttribute("data-sport", sport === "HIKING" ? "GOLF" : sport);
-        if (sport === "HIKING") document.documentElement.setAttribute("data-skin", "hiking"); else document.documentElement.removeAttribute("data-skin");
+        // 낚시도 같은 다리를 탄다 — data-skin="fishing"(새벽 바다: 짙은 남색 + 물빛)
+        document.documentElement.setAttribute("data-sport", sport === "HIKING" || sport === "FISHING" ? "GOLF" : sport);
+        if (sport === "HIKING") document.documentElement.setAttribute("data-skin", "hiking");
+        else if (sport === "FISHING") document.documentElement.setAttribute("data-skin", "fishing");
+        else document.documentElement.removeAttribute("data-skin");
         return () => { document.documentElement.removeAttribute("data-sport"); document.documentElement.removeAttribute("data-skin"); };
     }, [sport]);
 
     const setSport = (picked: AppSport) => {
         // 골프를 볼 수 없는 사람이 골프를 고르면 당구로 되돌린다. 한국어 비로그인 방문자는 볼 수 있으므로 머리줄의 종목 알약이 그대로 동작한다.
         // 등산도 같다 — 허용되지 않은 사람이 고르면 당구로.
-        const next: AppSport = (picked === "GOLF" && !golfVisible) || (picked === "HIKING" && !hikingOk) ? "BILLIARDS" : picked;
+        const next: AppSport = (picked === "GOLF" && !golfVisible) || (picked === "HIKING" && !hikingOk) || (picked === "FISHING" && !fishingOk) ? "BILLIARDS" : picked;
         setSaved(next);
         try { localStorage.setItem(STORAGE_KEY, next); } catch { /* 저장소를 못 쓰는 환경 */ }
         // 직접 고른 종목 — 이 세션에서는 뒤에 로그인해도 주 종목이 이 선택을 덮지 않는다
@@ -130,7 +139,7 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
     };
 
     return (
-        <SportContext.Provider value={{ currentSport, sport, isHiking: sport === "HIKING", setSport }}>
+        <SportContext.Provider value={{ currentSport, sport, isHiking: sport === "HIKING", isFishing: sport === "FISHING", setSport }}>
             {children}
         </SportContext.Provider>
     );

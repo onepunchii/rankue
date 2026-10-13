@@ -4,7 +4,7 @@ import { eq, and, or, ne, isNull, desc, sql, getTableColumns, type SQL } from "d
 import type { HiqNotification, InsertHiqNotification, InsertHiqCrewNotificationSetting } from "../../shared/schema.js";
 import { NOTIF_GROUPS, NOTIF_GROUP_TYPES, type NotifGroup } from "../../shared/notificationGroup.js";
 
-export type NotifSport = "BILLIARDS" | "GOLF" | "HIKING";
+export type NotifSport = "BILLIARDS" | "GOLF" | "HIKING" | "FISHING";
 
 /**
  * 종목 조건. 한 벌만 둔다 — 목록·읽음처리·개수가 서로 다른 조건을 쓰면
@@ -13,8 +13,9 @@ export type NotifSport = "BILLIARDS" | "GOLF" | "HIKING";
  */
 function sportWhere(sport: NotifSport): SQL {
     // 등산(2026-10-13) — 산악회의 알림(category 'HIKING')은 등산 알림함에만 뜬다. 당구 알림함은 골프도 등산도 아닌 것 전부다.
-    if (sport === "GOLF" || sport === "HIKING") return eq(hiqNotifications.category, sport);
-    return or(isNull(hiqNotifications.category), and(ne(hiqNotifications.category, "GOLF"), ne(hiqNotifications.category, "HIKING")))!;
+    // 낚시(2026-10-14)도 같다 — 낚시 크루의 알림(category 'FISHING')은 낚시 알림함에만.
+    if (sport === "GOLF" || sport === "HIKING" || sport === "FISHING") return eq(hiqNotifications.category, sport);
+    return or(isNull(hiqNotifications.category), and(ne(hiqNotifications.category, "GOLF"), ne(hiqNotifications.category, "HIKING"), ne(hiqNotifications.category, "FISHING")))!;
 }
 
 /** 저장된 type 을 shared/notificationGroup 의 notifGroup 과 같은 방식으로 정규화(trim + 대문자, NULL 은 ''). */

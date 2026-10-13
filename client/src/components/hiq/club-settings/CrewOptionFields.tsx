@@ -49,7 +49,8 @@ export function GameTypePicker({ sport, value, onChange, disabled }: {
  * 산악회(HIKING)는 산행 태그 — 당구 태그(#빡겜 …)를 산악회에 권하지 않는다. 주 종목 칸(GameTypePicker)은 산악회에서 부르지 않는다.
  */
 export function suggestedTags(t: (k: string) => string, sport?: string | null): string[] {
-    const raw = sport === "HIKING" ? t("crewMgmt.hikingTags") : sportKey(sport) === "GOLF" ? t("crewMgmt.golfTags") : t("clubSettings.billiardsTags");
+    // 낚시 크루(한국어 전용이라 사전 키 없이)
+    const raw = sport === "FISHING" ? "#초보환영,#주말출조,#정출,#갯바위,#선상,#루어,#원투,#민물,#방류" : sport === "HIKING" ? t("crewMgmt.hikingTags") : sportKey(sport) === "GOLF" ? t("crewMgmt.golfTags") : t("clubSettings.billiardsTags");
     return raw.split(",").map((s) => s.trim()).filter(Boolean);
 }
 

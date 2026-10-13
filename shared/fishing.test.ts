@@ -26,7 +26,9 @@ describe("낚시는 아직 닫혀 있다", () => {
 describe("조과 한 줄 다듬기", () => {
     it("앞뒤 공백을 걷고, 길이는 소수 한 자리로", () => {
         const c = ok();
-        expect(c).toEqual({ ok: true, value: { day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: 92.5, count: 12, weightKg: null, ji: null, released: false, photoUrl: null, thumbUrl: null, note: "물때 8물" } });
+        expect(c).toEqual({ ok: true, value: { day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: 92.5, count: 12, weightKg: null, ji: null, released: false, photoUrl: null, thumbUrl: null, note: "물때 8물", tideSea: null } });
+        // 물때를 세는 바다는 두 값만 받는다
+        expect([ok({ tideSea: "south" }), ok({ tideSea: "east" })].map((r) => (r.ok ? r.value.tideSea : "x"))).toEqual(["south", null]);
         expect(ok({ weightKg: "1.234", ji: "4", released: true })).toMatchObject({ ok: true, value: { weightKg: 1.23, ji: 4, released: true } });
         for (const bad of [{ weightKg: 0 }, { weightKg: 301 }, { ji: 0 }, { ji: 11 }]) expect(ok(bad).ok, JSON.stringify(bad)).toBe(false);
     });

@@ -30,7 +30,7 @@ interface Props {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     /** HIKING = 산악회 방(2026-10-13) — 당구 · 골프 카드는 없고 종목 줄에 '산 보내기' 하나가 놓인다. 위는 크루 줄. */
-    sport: "BILLIARDS" | "GOLF" | "HIKING";
+    sport: "BILLIARDS" | "GOLF" | "HIKING" | "FISHING";
     roomKind: "crew" | "listing" | "dm" | "support";
     onPick: (item: AttachItem) => void;
     /** 크루 방 운영진 — 정산 요청·공지 칸을 보인다. */
@@ -77,15 +77,17 @@ export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick, canMa
     const { t } = useT();
     // support 방은 chat-room.tsx 가 onAttach 를 안 넘겨 + 자체가 없다 — 혹시 열려도 아무것도 안 그린다.
     if (roomKind === "support") return null;
-    const items: AttachItem[] = sport === "HIKING" ? HIKING_ITEMS : sport === "GOLF" ? GOLF_ITEMS : BILLIARDS_ITEMS;
-    const crew = roomKind === "crew" && !!onPickCrew ? CREW_ITEMS.filter((i) => !CREW_TILES[i].staff || canManage) : [];
+    // 낚시 방에는 종목 카드가 아직 없다 — 크루 줄(정모 · 투표 …)만 뜬다. 당구 카드(매칭 대결 · 온라인 대전)를 낚시 방에 내지 않는다
+    const items: AttachItem[] = sport === "FISHING" ? [] : sport === "HIKING" ? HIKING_ITEMS : sport === "GOLF" ? GOLF_ITEMS : BILLIARDS_ITEMS;
+    // 낚시 크루의 일정은 정출판에서 만든다(크루 홈) — 여기의 '정모 만들기'는 당구 · 골프 · 산악회의 일정 창이라 낚시 방에서는 뺀다
+    const crew = roomKind === "crew" && !!onPickCrew ? CREW_ITEMS.filter((i) => (!CREW_TILES[i].staff || canManage) && !(sport === "FISHING" && i === "CREW_MEETUP")) : [];
 
     return (
         <Sheet open={open} onOpenChange={onOpenChange}>
             <SheetContent side="bottom" hideClose className="bg-surface-0 text-ink-1 border-surface-line rounded-t-2xl p-0 pb-[calc(1rem+env(safe-area-inset-bottom))] focus:outline-none">
                 <SheetHeader className={cn("px-5 pt-4 pb-1 text-left", crew.length > 0 && "sr-only")}>
                     <SheetTitle className="text-[15px] font-semibold text-ink-1">{t("chat.attach.title")}</SheetTitle>
-                    <SheetDescription className="sr-only">{sport === "HIKING" ? t("chat.attach.crewSection") : sport === "GOLF" ? t("chat.attach.descGolf") : t("chat.attach.descBilliards")}</SheetDescription>
+                    <SheetDescription className="sr-only">{sport === "HIKING" || sport === "FISHING" ? t("chat.attach.crewSection") : sport === "GOLF" ? t("chat.attach.descGolf") : t("chat.attach.descBilliards")}</SheetDescription>
                 </SheetHeader>
                 {/* 크루 방: 위에 크루 줄(브랜드 색 칸), 가는 줄, 아래 종목 줄. 다른 방은 종목 줄만(예전 그대로). */}
                 {crew.length > 0 && (
@@ -101,7 +103,7 @@ export function AttachSheet({ open, onOpenChange, sport, roomKind, onPick, canMa
                         {items.length > 0 && (
                             <>
                                 <div className="mx-5 mt-2 border-t border-surface-line" />
-                                <p className="px-5 pt-3 pb-0.5 text-[12.5px] font-semibold text-ink-3">{sport === "HIKING" ? "등산" : sport === "GOLF" ? t("chat.attach.sportGolf") : t("chat.attach.sportBilliards")}</p>
+                                <p className="px-5 pt-3 pb-0.5 text-[12.5px] font-semibold text-ink-3">{sport === "FISHING" ? "낚시" : sport === "HIKING" ? "등산" : sport === "GOLF" ? t("chat.attach.sportGolf") : t("chat.attach.sportBilliards")}</p>
                             </>
                         )}
                     </>

@@ -104,5 +104,19 @@ export function nextTideMark(ymd: string, mark: "사리" | "조금"): { ymd: str
     return null;
 }
 
+export interface TideTally { total: number; byPhase: Record<TidePhase, number>; /** 가장 많이 나온 날의 갈래 — 셋 넘게 쌓이고 혼자 앞설 때만 */ top: TidePhase | null }
+/** 내 조과가 어떤 물에 나왔는가 — 물때가 붙은 줄만 센다(민물 · 옛 줄은 빠진다). 내 기록을 세는 것이지 예보가 아니다 */
+export function tideTally(list: readonly { day: string; tideSea?: TideSea | null }[]): TideTally {
+    const byPhase: Record<TidePhase, number> = { neap: 0, rising: 0, spring: 0, falling: 0 };
+    let total = 0;
+    for (const c of list) {
+        const t = c.tideSea ? tideOf(c.day, c.tideSea) : null;
+        if (t) { byPhase[t.phase] += 1; total += 1; }
+    }
+    const max = Math.max(...Object.values(byPhase));
+    const tops = (Object.keys(byPhase) as TidePhase[]).filter((p) => byPhase[p] === max);
+    return { total, byPhase, top: total >= 3 && tops.length === 1 ? tops[0] : null };
+}
+
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"] as const;
 export const tideWeekday = (ymd: string): string => WEEK[new Date(Date.parse(`${ymd}T00:00:00Z`)).getUTCDay()];

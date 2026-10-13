@@ -264,7 +264,7 @@ router.post("/rooms/:key/cards/my-stats", ...billiardsGate, asyncHandler(async (
     const room = await openRoom(req, res, "ANY"); if (!room) return;
     const { me, sport } = room;
     // 산악회 방에는 내보낼 종목 기록이 없다 — 당구 다마를 산악회 방에 올리지 않는다.
-    if (sport === "HIKING") return sendError(res, 400, "err.chat.card.sportMismatch", "SPORT_MISMATCH");
+    if (sport === "HIKING" || sport === "FISHING") return sendError(res, 400, "err.chat.card.sportMismatch", "SPORT_MISMATCH");
     const nz = <T,>(v: T | null | undefined): T | null => (v === undefined || v === null ? null : v);
     const summary = sport === "GOLF"
         ? `📊 내 기록 · 핸디 ${nz(me.golfHandicap) ?? "-"} · 평균 ${me.golfAvgScore ? Math.round(me.golfAvgScore) : "-"}타`

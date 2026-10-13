@@ -13,25 +13,30 @@
  * 글자 · 숫자는 전부 화면이 얹는다(그림에는 글자가 없다). 색은 남색 바다 + 한지 + 먹 + 낙관의 붉은색 — 골프의 포스터 · 등산의 자수와 겹치지 않는다.
  * ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지. 한국어만.
  */
-import { useMemo, useRef, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { appConfirm } from "@/components/AppDialog";
-import { LucideChevronLeft, LucideChevronRight, LucideFlag, LucideHome, LucideImage, LucideMap, LucideMessageSquare, LucidePlus, LucideX } from "@/lib/icons";
+import { LucideChevronLeft, LucideChevronRight, LucideImage, LucideMap, LucidePlus, LucideX } from "@/lib/icons";
+import { SportBackHeader, SportHeader } from "@/components/hiq/SportHeader";
+import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { cn } from "@/lib/utils";
 import {
-    FISHING_COLORS as C, FISHING_PHOTO_CATEGORY, FISHING_PHOTO_LONG_SIDE, FISHING_PLACE_SOURCE, FISHING_SPOTS, FISHING_THUMB_CATEGORY, FISHING_THUMB_LONG_SIDE,
+    FISHING_COLORS as C, FISHING_PUBLIC, FISHING_PHOTO_CATEGORY, FISHING_PHOTO_LONG_SIDE, FISHING_PLACE_SOURCE, FISHING_SPOTS, FISHING_THUMB_CATEGORY, FISHING_THUMB_LONG_SIDE,
     cleanCatch, fishingDayLabel, fishingKstDay, fishingSidoShort, fishingSpotName,
     type FishingCatch, type FishingPlace, type FishingSpotId,
 } from "@shared/fishing";
 import { FISH, FISH_BOOKS, FISH_UNIT_LABEL, fishByName, fishRecords, fishTier, fishValue, fishValueText, nearestPromotion, type FishKind, type FishRecord } from "@shared/fishingFish";
 import { TRIP_AWARD_NAME, TRIP_POINTS, cleanTrip, type SeasonRow, type TripAward, type TripBoard } from "@shared/fishingTrip";
-import { TIDE_PHASE_TEXT, TIDE_SEAS, nextTideMark, tideDays, tideWeekday, type TideSea } from "@shared/fishingTide";
+import { TIDE_PHASE_TEXT, TIDE_SEAS, nextTideMark, tideDays, tideOf, tideTally, tideWeekday, type TideSea } from "@shared/fishingTide";
 import { SEA_AREAS, SEA_CAUTION, SEA_COLS, SEA_SOURCE, seaHeadline, seaNotes, seaWord, type SeaNow, type SeaState } from "@shared/fishingSea";
 
 const KEY = ["/api/hiq/fishing/catches"];
-type Tab = "home" | "book" | "log" | "points" | "crew";
+type Tab = "home" | "book" | "log" | "points";
+/** 화면마다 주소가 있다 — 홈은 공용 홈 주소(/dashboard)에서 종목이 낚시일 때 그려진다 */
+const TAB_PATH: Readonly<Record<Tab, string>> = { home: "/dashboard", book: "/fishing/book", log: "/fishing/log", points: "/fishing/points" };
+const TAB_TITLE: Readonly<Record<Tab, string>> = { home: "랭큐 낚시", book: "어탁첩", log: "내 조과", points: "낚시터" };
 /** 조과 적기에 미리 들어가는 것 — 낚시터에서 왔으면 그 이름, 정출에서 왔으면 그 날 · 출조지 · 정출 */
 interface Preset { place: string; spot?: FishingSpotId | null; day?: string; tripId?: string }
 const PAPER = "#EFE8D8", INK = "#1B1B1F", SEAL = "#C8372D";
@@ -98,13 +103,14 @@ async function uploadPhoto(file: File): Promise<{ photoUrl: string; thumbUrl: st
     } finally { URL.revokeObjectURL(src); }
 }
 
-export default function FishingPage() {
+export default function FishingPage({ view = "home" }: { view?: Tab }) {
     const [, setLocation] = useLocation();
+    const tab = view;
+    const setTab = (t: Tab) => setLocation(TAB_PATH[t]);
     const { data: me, isLoading: meLoading } = useQuery<any>({ queryKey: ["/api/hiq/me"] });
     const allowed = me?.fishingAccess === true;
     const { data, isLoading } = useQuery<FishingCatch[]>({ queryKey: KEY, enabled: allowed });
     const list = data ?? [];
-    const [tab, setTab] = useState<Tab>("home");
     const [adding, setAdding] = useState(false);
     const [preset, setPreset] = useState<Preset | null>(null);
     // 방금 오른 단계 — 승급 창
@@ -143,7 +149,7 @@ export default function FishingPage() {
                     <span className="block truncate text-[15px] font-semibold" style={{ color: C.foam }}>
                         {c.species} <span className="font-normal tabular-nums" style={{ color: C.soft }}>{v != null ? fishValueText(fish?.unit ?? "cm", v) : `${c.count}수`}{fish && fish.unit !== "count" && c.count > 1 ? ` · ${c.count}수` : ""}{c.released ? " · 방류" : ""}</span>
                     </span>
-                    <span className="mt-0.5 block truncate text-[12.5px]" style={{ color: C.dim }}>{[fishingDayLabel(c.day, today), c.place, fishingSpotName(c.spot)].filter(Boolean).join(" · ")}</span>
+                    <span className="mt-0.5 block truncate text-[12.5px]" style={{ color: C.dim }}>{[fishingDayLabel(c.day, today), c.place, fishingSpotName(c.spot), c.tideSea ? tideOf(c.day, c.tideSea)?.name : null].filter(Boolean).join(" · ")}</span>
                     {c.note ? <span className="mt-0.5 block truncate text-[12.5px]" style={{ color: C.soft }}>{c.note}</span> : null}
                 </span>
                 <button type="button" aria-label="이 기록 지우기" data-testid="fishing-catch-delete"
@@ -154,20 +160,16 @@ export default function FishingPage() {
     };
 
     return (
-        <div className="min-h-screen pb-[calc(84px+env(safe-area-inset-bottom))] font-sans" style={{ background: C.bg, color: C.foam }} data-fishing="1">
-            <header className="sticky top-0 z-40 border-b backdrop-blur-md" style={{ paddingTop: "env(safe-area-inset-top)", background: "#071A2BE6", borderColor: C.line }}>
-                <div className="mx-auto flex h-14 max-w-[720px] items-center gap-1.5 px-3">
-                    <button type="button" onClick={() => (tab === "home" ? setLocation("/dashboard") : setTab("home"))} aria-label="뒤로" className="-ml-1 flex h-10 w-10 items-center justify-center rounded-full active:bg-[#FFFFFF14]"><LucideChevronLeft weight="bold" className="h-5 w-5" aria-hidden /></button>
-                    <div className="min-w-0 flex-1 truncate text-[16px] font-semibold tracking-tight">{tab === "book" ? "어탁첩" : tab === "log" ? "내 조과" : tab === "points" ? "낚시터" : tab === "crew" ? "크루 정출" : "랭큐 낚시"}</div>
-                    <span className="rounded-full px-2.5 py-1 text-[12px]" style={{ background: "#FFC8571F", color: C.sun }}>운영자만 보는 중</span>
-                </div>
-            </header>
+        <div className="min-h-screen pb-nav font-sans" style={{ background: C.bg, color: C.foam }} data-fishing="1" data-testid={`fishing-${tab}`}>
+            {/* 머리줄 — 다른 종목과 같은 것(홈: 워드마크 · 종목 전환 · 알림 · 전체 메뉴, 그 밖: 뒤로 · 제목) */}
+            {tab === "home" ? <SportHeader sport="FISHING" /> : <SportBackHeader sport="FISHING" title={TAB_TITLE[tab]} inner="mx-auto max-w-[720px]" />}
+            {!FISHING_PUBLIC && <p className="mx-auto max-w-[720px] px-4 pt-2.5 text-right text-[12px]" style={{ color: C.sun }} data-testid="fishing-owner-only">운영자만 보는 중</p>}
 
             <main className="mx-auto max-w-[720px]">
                 {tab === "home" && (
                     <>
                         {/* 날마다 먼저 보는 것 — 기록이 있는 사람에게는 맨 위에 */}
-                        {!empty && <Today today={today} />}
+                        {!empty && <Today today={today} list={list} />}
                         {/* 새벽 바다 — 먹으로 그린 수평선 위에 내 기록어 */}
                         <section className="relative isolate overflow-hidden px-4 pb-5 pt-5" data-testid="fishing-hero">
                             <img src="/fishing/art/sea.webp" alt="" width={900} height={520} decoding="async" className="absolute inset-0 -z-10 h-full w-full object-cover" />
@@ -189,7 +191,7 @@ export default function FishingPage() {
                             )}
                         </section>
 
-                        {empty && <Today today={today} />}
+                        {empty && <Today today={today} list={list} />}
 
                         {/* 어탁 벽 — 어종마다 한 장 */}
                         <section className="px-4 pt-6">
@@ -260,21 +262,16 @@ export default function FishingPage() {
 
                 {tab === "points" && <div className="px-4"><Points onPick={(p) => { setPreset({ place: p.name, spot: "pay" }); setAdding(true); }} /></div>}
 
-                {tab === "crew" && <Crew meId={String(me?.id ?? "")} today={today} onAdd={(p) => { setPreset(p); setAdding(true); }} onFindCrew={() => setLocation("/club")} />}
+                {/* 떠 있는 '조과 적기' 단추가 마지막 줄을 가리지 않게 */}
+                <div className="h-24" aria-hidden />
             </main>
 
-            {/* 하단 탭 — 홈 · 크루 · 기록 · 어탁첩 · 채팅 */}
-            <nav className="fixed inset-x-0 bottom-0 z-40 border-t" style={{ background: C.bar, borderColor: C.line, paddingBottom: "env(safe-area-inset-bottom)" }} aria-label="낚시 메뉴" data-testid="fishing-nav">
-                <div className="mx-auto grid h-[64px] max-w-[720px] grid-cols-5 items-center">
-                    <TabButton id="home" label="홈" on={tab === "home"} onClick={() => setTab("home")} icon={<LucideHome className="h-5 w-5" />} />
-                    <TabButton id="crew" label="크루" on={tab === "crew"} onClick={() => setTab("crew")} icon={<LucideFlag className="h-5 w-5" />} />
-                    <button type="button" onClick={() => setAdding(true)} aria-label="조과 적기" data-testid="fishing-add" className="mx-auto -mt-5 flex h-14 w-14 items-center justify-center rounded-full shadow-lg active:scale-95" style={{ background: C.brand, color: C.onBrand, boxShadow: "0 6px 18px #38BDF859" }}>
-                        <LucidePlus weight="bold" className="h-6 w-6" />
-                    </button>
-                    <TabButton id="book" label="어탁첩" on={tab === "book"} onClick={() => setTab("book")} icon={<span className="flex h-5 w-5 items-center justify-center rounded-[4px] text-[12px] font-semibold" style={{ border: "1.5px solid currentColor" }} aria-hidden>拓</span>} />
-                    <TabButton id="chat" label="채팅" on={false} onClick={() => setLocation("/chat")} icon={<LucideMessageSquare className="h-5 w-5" />} />
-                </div>
-            </nav>
+            {/* 하단 탭 — 다른 종목과 같은 것(홈 · 크루 · 낚시터 · 어탁첩 · 채팅). 조과 적기는 그 위에 떠 있다 */}
+            <HiqNavigation />
+            <button type="button" onClick={() => setAdding(true)} aria-label="조과 적기" data-testid="fishing-add" className="fixed right-4 z-40 flex h-14 w-14 items-center justify-center rounded-full active:scale-95"
+                style={{ bottom: "calc(108px + env(safe-area-inset-bottom))", background: C.brand, color: C.onBrand, boxShadow: "0 6px 18px #38BDF859" }}>
+                <LucidePlus weight="bold" className="h-6 w-6" />
+            </button>
 
             {adding && (
                 <CatchSheet today={today} preset={preset} before={records}
@@ -307,7 +304,7 @@ function readArea(): string | null { try { const v = localStorage.getItem(AREA_K
 const keep = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* 저장을 못 해도 화면은 바뀐다 */ } };
 
 /** 날마다 먼저 보는 묶음 — 오늘의 바다(특보) + 물때. 바다를 고르면 물때도 그 바다의 식으로 센다 */
-function Today({ today }: { today: string }) {
+function Today({ today, list }: { today: string; list: readonly FishingCatch[] }) {
     const [sea, setSea] = useState<TideSea>(readSea);
     const [area, setArea] = useState<string | null>(readArea);
     const pickSea = (id: TideSea) => { setSea(id); keep(SEA_KEY, id); };
@@ -315,7 +312,7 @@ function Today({ today }: { today: string }) {
     return (
         <>
             <SeaBoard area={area} onArea={pickArea} />
-            <TideCard today={today} sea={sea} onSea={pickSea} />
+            <TideCard today={today} sea={sea} onSea={pickSea} list={list} />
         </>
     );
 }
@@ -386,8 +383,9 @@ function SeaBoard({ area, onArea }: { area: string | null; onArea: (id: string) 
  * 오늘의 물때 — 몇 물인지 크게, 앞으로 이레를 띠로. 음력으로 세는 값이라 바깥 자료 없이 늘 나온다.
  * 말하는 것은 물의 세기뿐이다(잘 낚인다는 말은 하지 않는다). 달력을 못 쓰는 기기에서는 아무것도 그리지 않는다.
  */
-function TideCard({ today, sea, onSea }: { today: string; sea: TideSea; onSea: (id: TideSea) => void }) {
+function TideCard({ today, sea, onSea, list }: { today: string; sea: TideSea; onSea: (id: TideSea) => void; list: readonly FishingCatch[] }) {
     const days = useMemo(() => tideDays(today, sea, 7), [today, sea]);
+    const tally = useMemo(() => tideTally(list), [list]);
     const now = days[0];
     if (!now || days.length < 7) return null;
     const spring = nextTideMark(today, "사리"), neap = nextTideMark(today, "조금");
@@ -409,6 +407,14 @@ function TideCard({ today, sea, onSea }: { today: string; sea: TideSea; onSea: (
                     <p className="min-w-0 flex-1 pb-0.5 text-[14px]" style={{ color: C.foam }}>{TIDE_PHASE_TEXT[now.phase]}</p>
                 </div>
                 <p className="mt-1.5 text-[12.5px]" style={{ color: C.dim }}>{[until(spring, "사리"), until(neap, "조금")].filter(Boolean).join(" · ")}</p>
+                {/* 내 기록을 센 것 — 예보가 아니다. 물때가 붙은 조과가 셋은 쌓여야 말한다 */}
+                {tally.total >= 3 && (tally.byPhase[now.phase] > 0 || tally.top) && (
+                    <p className="mt-2 rounded-xl px-3 py-2 text-[12.5px] leading-relaxed [word-break:keep-all]" style={{ background: "#FFFFFF0A", color: C.soft }} data-testid="fishing-tide-mine">
+                        {tally.byPhase[now.phase] > 0
+                            ? <>내 조과 {tally.total}줄 가운데 <span className="font-semibold" style={{ color: C.foam }}>{tally.byPhase[now.phase]}줄</span>이 오늘 같은 날에 나왔어요{tally.top === now.phase ? " · 내 조과가 가장 많이 나온 물이에요" : tally.top ? ` · 가장 많이 나온 건 ${TIDE_PHASE_TEXT[tally.top]}(${tally.byPhase[tally.top]}줄)` : ""}</>
+                            : <>내 조과 {tally.total}줄 가운데 가장 많이 나온 건 <span className="font-semibold" style={{ color: C.foam }}>{TIDE_PHASE_TEXT[tally.top!]}</span>({tally.byPhase[tally.top!]}줄)이에요</>}
+                    </p>
+                )}
 
                 <ol className="mt-3.5 grid grid-cols-7 gap-1" aria-label="앞으로 이레의 물때">
                     {days.map((t, i) => {
@@ -431,11 +437,22 @@ function TideCard({ today, sea, onSea }: { today: string; sea: TideSea; onSea: (
     );
 }
 
-function TabButton({ id, label, on, onClick, icon }: { id: string; label: string; on: boolean; onClick: () => void; icon: ReactNode }) {
+/**
+ * 낚시 크루의 정출판 — 크루 화면(공용) 안에 들어간다. 그 크루의 정출 · 그날의 판 · 올해의 판, 그리고 '내 조과 올리기'.
+ * 크루원만 본다(서버도 그 크루에 든 사람에게만 준다).
+ */
+export function FishingCrewTrips({ crewId, isMember }: { crewId: string; isMember: boolean }) {
+    const { data: me } = useQuery<any>({ queryKey: ["/api/hiq/me"] });
+    const { data } = useQuery<FishingCatch[]>({ queryKey: KEY, enabled: isMember });
+    const records = useMemo(() => fishRecords(data ?? []), [data]);
+    const [preset, setPreset] = useState<Preset | null>(null);
+    const today = fishingKstDay(Date.now());
+    if (!isMember) return <p className="rounded-2xl px-5 py-6 text-center text-[13.5px]" style={{ background: C.card, color: C.soft }} data-testid="fishing-trips-locked">정출판은 크루원만 봐요.</p>;
     return (
-        <button type="button" onClick={onClick} aria-current={on ? "page" : undefined} data-testid={`fishing-tab-${id}`} className="flex h-full flex-col items-center justify-center gap-1 text-[12px]" style={{ color: on ? C.brand : C.dim }}>
-            {icon}{label}
-        </button>
+        <div style={{ color: C.foam }} data-fishing="1">
+            <Crew crewId={crewId} meId={String(me?.id ?? "")} today={today} onAdd={setPreset} />
+            {preset && <CatchSheet today={today} preset={preset} before={records} onClose={() => setPreset(null)} onSaved={() => { /* 판은 조과 창이 다시 받아 온다 */ }} />}
+        </div>
     );
 }
 
@@ -446,12 +463,9 @@ interface TripCatchRow { id: string; memberId: string; name: string; species: st
  * 크루 정출 — 동호회가 하는 방식 그대로: 정출마다 최대어 · 마릿수 · 잡어상, 한 해의 점수. 크루는 랭큐의 크루를 그대로 쓴다.
  * 정출에 붙인 조과만 크루가 본다(붙이지 않은 내 조과는 여전히 나만 본다). 상금 · 참가비는 없다 — 점수와 낙관뿐이다.
  */
-function Crew({ meId, today, onAdd, onFindCrew }: { meId: string; today: string; onAdd: (p: Preset) => void; onFindCrew: () => void }) {
-    const { data: crews, isLoading } = useQuery<{ id: string; name: string; emblem: string | null }[]>({ queryKey: ["/api/hiq/fishing/crews"] });
-    const [pick, setPick] = useState<string | null>(null);
+function Crew({ crewId, meId, today, onAdd }: { crewId: string; meId: string; today: string; onAdd: (p: Preset) => void }) {
     const [tripId, setTripId] = useState<string | null>(null);
     const [making, setMaking] = useState(false);
-    const crewId = pick ?? crews?.[0]?.id ?? null;
     const { data: list } = useQuery<{ trips: TripRow[]; year: string; season: SeasonRow[] }>({
         queryKey: ["/api/hiq/fishing/trips", crewId], enabled: !!crewId,
         queryFn: () => apiRequest(`/api/hiq/fishing/trips?crewId=${crewId}`),
@@ -460,21 +474,6 @@ function Crew({ meId, today, onAdd, onFindCrew }: { meId: string; today: string;
         queryKey: ["/api/hiq/fishing/trip", tripId], enabled: !!tripId,
         queryFn: () => apiRequest(`/api/hiq/fishing/trips/${tripId}`),
     });
-    const chip = "h-9 shrink-0 rounded-full px-3 text-[13px]";
-
-    if (isLoading) return <div className="mx-4 mt-5 h-40 animate-pulse rounded-2xl bg-[#FFFFFF0F]" />;
-    if (!crews?.length) {
-        return (
-            <section className="px-4 pt-6" data-testid="fishing-crew-none">
-                <div className="rounded-2xl px-5 py-8 text-center" style={{ background: C.card }}>
-                    <p className="text-[16px] font-semibold">크루와 같이 가면 정출판이 열려요</p>
-                    <p className="mt-2 text-[13.5px] leading-relaxed" style={{ color: C.soft }}>정출마다 최대어 · 마릿수 · 잡어상을 가리고, 한 해의 점수를 쌓아요.</p>
-                    <button type="button" onClick={onFindCrew} className="mt-4 h-11 rounded-xl px-5 text-[14px] font-semibold" style={{ background: C.brand, color: C.onBrand }}>크루 찾기 · 만들기</button>
-                </div>
-            </section>
-        );
-    }
-
     // 한 정출의 판
     if (tripId && one) {
         const nameOf = (id: string) => one.board.members.find((m) => m.memberId === id)?.name ?? "";
@@ -491,7 +490,7 @@ function Crew({ meId, today, onAdd, onFindCrew }: { meId: string; today: string;
             );
         };
         return (
-            <section className="px-4 pt-5" data-testid="fishing-trip">
+            <section data-testid="fishing-trip">
                 <button type="button" onClick={() => setTripId(null)} className="flex items-center text-[13px]" style={{ color: C.brand }}><LucideChevronLeft className="h-4 w-4" />정출 목록</button>
                 <h2 className="mt-2 text-[20px] font-semibold tracking-tight">{one.trip.title || `${one.trip.place} 정출`}</h2>
                 <p className="mt-0.5 text-[13px]" style={{ color: C.soft }}>{fishingDayLabel(one.trip.day, today)} · {one.trip.place}</p>
@@ -522,15 +521,10 @@ function Crew({ meId, today, onAdd, onFindCrew }: { meId: string; today: string;
     }
 
     return (
-        <section className="px-4 pt-5" data-testid="fishing-crew">
-            {crews.length > 1 && (
-                <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="크루">
-                    {crews.map((c) => <button key={c.id} type="button" aria-pressed={c.id === crewId} onClick={() => { setPick(c.id); setTripId(null); }} className={cn(chip, c.id === crewId && "font-semibold")} style={c.id === crewId ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{c.name}</button>)}
-                </div>
-            )}
-            <div className="mt-3 flex items-baseline justify-between">
-                <h2 className="text-[17px] font-semibold tracking-tight">{crews.find((c) => c.id === crewId)?.name} 정출</h2>
-                <button type="button" onClick={() => setMaking(true)} className="h-9 rounded-full px-3.5 text-[13px] font-semibold" style={{ background: "#38BDF826", color: C.brand }} data-testid="fishing-trip-new">정출 만들기</button>
+        <section data-testid="fishing-crew">
+            <div className="flex items-center justify-between gap-3">
+                <p className="min-w-0 text-[13px]" style={{ color: C.soft }}>정출마다 최대어 · 마릿수 · 잡어상을 가려요</p>
+                <button type="button" onClick={() => setMaking(true)} className="h-9 shrink-0 rounded-full px-3.5 text-[13px] font-semibold" style={{ background: "#38BDF826", color: C.brand }} data-testid="fishing-trip-new">정출 만들기</button>
             </div>
             {!list?.trips.length ? (
                 <p className="mt-3 rounded-2xl px-5 py-7 text-center text-[13.5px] leading-relaxed" style={{ background: C.card, color: C.soft }} data-testid="fishing-trip-none">아직 정출이 없어요. 날과 출조지만 정하면 판이 열려요.</p>
@@ -568,7 +562,6 @@ function Crew({ meId, today, onAdd, onFindCrew }: { meId: string; today: string;
                     </ul>
                 </div>
             )}
-            <button type="button" onClick={onFindCrew} className="mt-6 text-[13px] underline underline-offset-4" style={{ color: C.dim }}>크루 화면으로 가기</button>
 
             {making && crewId && <TripForm crewId={crewId} today={today} onClose={() => setMaking(false)} onMade={(id) => { setMaking(false); setTripId(id); }} />}
         </section>
@@ -681,8 +674,12 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
     const [shot, setShot] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
+    const [tideSea, setTideSea] = useState<TideSea>(readSea);
     const fileRef = useRef<HTMLInputElement>(null);
     const fish: FishKind | null = fishByName(species);
+    // 민물이면 물때가 없다 — 민물 어종이거나 저수지 · 강에서 낚았을 때
+    const fresh = fish?.water === "fresh" || spot === "lake" || spot === "river";
+    const dayTide = fresh ? null : tideOf(day, tideSea);
     const unit = fish?.unit ?? "cm";
     const num = value === "" ? null : Number(value);
     const live = fish && num != null && num > 0 ? fishTier(fish, num) : null;
@@ -696,7 +693,7 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
     const submit = async () => {
         if (busy) return;
         // 어종이 자랑하는 값은 그 단위의 칸으로 간다 — 마릿수 어종은 마릿수 칸 하나로
-        const body: Record<string, unknown> = { day, place, spot, species, note, released, count: unit === "count" ? (value || count) : count, lengthCm: unit === "cm" ? value : "", weightKg: unit === "kg" ? value : "", ji: unit === "ji" ? value : "" };
+        const body: Record<string, unknown> = { day, place, spot, species, note, released, tideSea: dayTide ? tideSea : null, count: unit === "count" ? (value || count) : count, lengthCm: unit === "cm" ? value : "", weightKg: unit === "kg" ? value : "", ji: unit === "ji" ? value : "" };
         const c = cleanCatch(body, today);
         if (!c.ok) { setError(c.error); return; }
         setError(null); setBusy(true);
@@ -788,6 +785,15 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                         ))}
                     </div>
                 </div>
+                {/* 그날의 물때 — 날짜로 저절로 센다. 바다만 맞는지 보면 된다 */}
+                {dayTide && (
+                    <div className="flex items-center gap-3 rounded-xl px-3.5 py-2.5" style={fieldStyle} data-testid="fishing-sheet-tide">
+                        <span className="min-w-0 flex-1 text-[14px]">그날의 물때 <span className="ml-1 font-semibold tabular-nums" style={{ color: C.brand }}>{dayTide.name}</span></span>
+                        <span className="flex shrink-0 rounded-full p-0.5" style={{ background: "#FFFFFF0F" }} role="group" aria-label="물때를 세는 바다">
+                            {TIDE_SEAS.map((s) => <button key={s.id} type="button" aria-pressed={tideSea === s.id} onClick={() => setTideSea(s.id)} className={cn("h-8 rounded-full px-2.5 text-[12px]", tideSea === s.id && "font-semibold")} style={tideSea === s.id ? chipOn : { color: C.soft }} data-testid={`fishing-sheet-sea-${s.id}`}>{s.id === "west" ? "서해" : "남해 · 동해"}</button>)}
+                        </span>
+                    </div>
+                )}
                 <button type="button" aria-pressed={released} onClick={() => setReleased((v) => !v)} className="flex h-12 w-full items-center justify-between rounded-xl px-3.5 text-[14px]" style={fieldStyle} data-testid="fishing-released">
                     <span>놓아 줬어요(방류)</span>
                     <span className="flex h-6 w-11 items-center rounded-full p-0.5" style={{ background: released ? C.brand : "#FFFFFF24" }}><i className="h-5 w-5 rounded-full bg-[#FFFFFF] transition-transform" style={{ transform: released ? "translateX(20px)" : "none" }} /></span>

@@ -23,7 +23,7 @@ export interface CrewData {
     emblem: string | null;
     coverImage: string | null;
     /** HIKING = 산악회(2026-10-13) — 당구 · 골프의 칸(주 종목 · 베이스캠프 · 종목 기록)이 없다 */
-    sportCategory: 'GOLF' | 'BILLIARDS' | 'MIXED' | 'HIKING';
+    sportCategory: 'GOLF' | 'BILLIARDS' | 'MIXED' | 'HIKING' | 'FISHING';
     maxMembers: number | null;
     joinType?: 'auto' | 'approval' | null;
     gameType?: string | null;

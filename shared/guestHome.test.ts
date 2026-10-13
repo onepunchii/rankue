@@ -61,11 +61,11 @@ describe("골프 홈", () => {
 
         it("공용 화면의 종목 = 저장된 선호, 볼 수 없는 사람이면 당구 — 로그인·콘솔 화면과 주소 우선은 그대로", () => {
             // 2026-10-13 등산이 세 번째 종목으로 들어왔다 — 저장된 선호가 등산이면 등산을 쓸 수 있는 사람만, 그 밖은 예전 그대로
-            expect(src).toContain('consolePath ? "BILLIARDS" : routeSport ?? (saved === "HIKING" ? (hikingOk ? "HIKING" : "BILLIARDS") : golfVisible ? saved : "BILLIARDS")');
+            expect(src).toContain('consolePath ? "BILLIARDS" : routeSport ?? (saved === "HIKING" ? (hikingOk ? "HIKING" : "BILLIARDS") : saved === "FISHING" ? (fishingOk ? "FISHING" : "BILLIARDS") : golfVisible ? saved : "BILLIARDS")');
         });
 
         it("종목 알약(setSport)도 같은 기준 — 볼 수 없는 사람이 골프를 고르면 당구로 되돌린다", () => {
-            expect(src).toContain('(picked === "GOLF" && !golfVisible) || (picked === "HIKING" && !hikingOk) ? "BILLIARDS" : picked');
+            expect(src).toContain('(picked === "GOLF" && !golfVisible) || (picked === "HIKING" && !hikingOk) || (picked === "FISHING" && !fishingOk) ? "BILLIARDS" : picked');
         });
 
         it("한국어 화면은 로그인 확인을 기다리지 않는다 — 골프가 전면 공개인 동안엔 회원이든 방문자든 본다(당구를 먼저 그렸다 뒤집지 않는다)", () => {
@@ -527,9 +527,10 @@ describe("당구 홈", () => {
             expect(client("contexts/SportContext.tsx")).toContain('if (routeSport === "HIKING" && !hikingOk) return;');
             // 폭 320: 세 종목 + 로그인 + 메뉴가 한 줄에 안 들어가 메뉴 단추가 잘렸다 — 알약의 옆 여백만 340 미만에서 줄인다(세 종목이 똑같이)
             expect(bar).toContain('const PILL_PAD = "px-2.5 max-[339px]:px-1.5";');
-            // 셋째는 운영자에게만 보이는 낚시 알약(2026-10-14) — 같은 여백 상수를 쓴다
-            expect(bar.match(/\$\{PILL_PAD\}/g)?.length).toBe(3);
-            expect(bar).toContain('{fishingOk && (');
+            // 낚시(2026-10-14)도 다른 종목과 같은 알약이다 — 따로 그리는 단추가 없다(고르면 그 자리에서 낚시 세계로 바뀐다)
+            expect(bar.match(/\$\{PILL_PAD\}/g)?.length).toBe(2);
+            expect(bar).not.toContain('setLocation("/fishing")');
+            expect(bar).toContain('...(fishingOk || sport === "FISHING" ? [{ id: "FISHING" as const, label: "낚시" }] : []),');
             // 언어 단추는 머리줄이 아니라 당구 홈의 이름 줄에 있다 — 머리줄에 넣으면 당구에서만 종목 전환과 종이 밀린다
             expect(bar).not.toMatch(/LanguageSheet|LucideTranslate/);
             expect(src).toContain("<LanguageSheet open={langOpen} onOpenChange={setLangOpen} />");
@@ -547,7 +548,7 @@ describe("당구 홈", () => {
             expect(bar).toContain("<RankueWordmark color={c.brand} height={z.wordmark} />");
             expect(bar).toContain("const iconSize = { width: z.button, height: z.button };");
             // 두 알약(고른 것 · 안 고른 것)이 같은 여백 상수를 쓴다 — 여백은 화면 폭으로만 갈리고 종목으로는 갈리지 않는다
-            expect(bar.match(/\$\{PILL_PAD\} text-\[13px\]/g)?.length).toBe(3);
+            expect(bar.match(/\$\{PILL_PAD\} text-\[13px\]/g)?.length).toBe(2);
             // 고르지 않은 알약도 고른 것(굵은 글씨)과 같은 폭 — 종목을 바꿔도 전환 자리가 움직이지 않는다
             expect(bar).toContain('<span className="invisible font-semibold" aria-hidden>{s.label}</span>');
             // 세 종목 모두 맨 위에 붙는다 · 상태바 여백은 스스로(전역 규칙이 한 번 더 밀지 않게 rk-no-safe)

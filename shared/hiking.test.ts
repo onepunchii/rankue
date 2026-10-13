@@ -322,8 +322,8 @@ describe("화면의 글 · 따로 선 세계", () => {
 
     it("등산의 알림함 — 산악회의 알림만 모이고, 당구 알림함에는 섞이지 않는다", () => {
         const repo = read("server/storage/notification.repo.ts");
-        expect(repo).toContain('if (sport === "GOLF" || sport === "HIKING") return eq(hiqNotifications.category, sport);');
-        expect(repo).toContain('and(ne(hiqNotifications.category, "GOLF"), ne(hiqNotifications.category, "HIKING"))');
+        expect(repo).toContain('if (sport === "GOLF" || sport === "HIKING" || sport === "FISHING") return eq(hiqNotifications.category, sport);');
+        expect(repo).toContain('and(ne(hiqNotifications.category, "GOLF"), ne(hiqNotifications.category, "HIKING"), ne(hiqNotifications.category, "FISHING"))');
         expect(read("server/routes/modules/notification.ts")).toContain("const sportOf = (req: AuthRequest) => crewSportOf(req.query.sport);");
         expect(read("client/src/components/hiq/menu/NotificationInbox.tsx")).toContain("const { sport: currentSport } = useSport();");
     });

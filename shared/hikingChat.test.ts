@@ -150,13 +150,13 @@ describe("산 카드 — 화면", () => {
 
     it("+ 의 '산 보내기'는 산악회 방에만 놓인다", () => {
         expect(attach).toContain('const HIKING_ITEMS: AttachItem[] = ["MOUNTAIN"];');
-        expect(attach).toContain('const items: AttachItem[] = sport === "HIKING" ? HIKING_ITEMS : sport === "GOLF" ? GOLF_ITEMS : BILLIARDS_ITEMS;');
+        expect(attach).toContain('const items: AttachItem[] = sport === "FISHING" ? [] : sport === "HIKING" ? HIKING_ITEMS : sport === "GOLF" ? GOLF_ITEMS : BILLIARDS_ITEMS;');
         expect(attach).toContain('const BILLIARDS_ITEMS: AttachItem[] = ["MATCH_INVITE", "SIM_INVITE", "GAME_RESULT", "STORE"];');
         expect(attach).toContain('const GOLF_ITEMS: AttachItem[] = ["GOLF_BOOKING", "GOLF_MATCH", "GOLF_ROUND"];');
         expect(attach).toContain('MOUNTAIN: { key: "mountain", Icon: LucideMountain, label: "산 보내기" },');
         expect(attach).toContain("label={label ?? t(`chat.attach.${key}`)}");
         // 산악회 방의 종목 줄 이름 — 당구 · 골프의 이름은 그대로 번역 열쇠로
-        expect(attach).toContain('{sport === "HIKING" ? "등산" : sport === "GOLF" ? t("chat.attach.sportGolf") : t("chat.attach.sportBilliards")}');
+        expect(attach).toContain('{sport === "FISHING" ? "낚시" : sport === "HIKING" ? "등산" : sport === "GOLF" ? t("chat.attach.sportGolf") : t("chat.attach.sportBilliards")}');
     });
     it("방 화면: 산악회 방에서만 고르는 창을 불러 오고, 고른 산의 주소만 보낸다", () => {
         expect(page).toContain('const MountainCardPicker = lazy(() => import("@/hiking/chat/MountainCardPicker").then((m) => ({ default: m.MountainCardPicker })));');

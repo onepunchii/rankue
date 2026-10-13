@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { TIDE_PHASE_TEXT, lunarDay, nextTideMark, tideAddDays, tideDays, tideName, tideOf, tideWeekday } from "./fishingTide";
+import { TIDE_PHASE_TEXT, lunarDay, nextTideMark, tideAddDays, tideDays, tideName, tideOf, tideTally, tideWeekday } from "./fishingTide";
 
 describe("음력 — 한국 달력으로 센다", () => {
     it("합삭이 자정 근처인 달도 한국 날짜로(2026-10-11 이 음력 9월 1일 — 중국 달력은 10일)", () => {
@@ -31,6 +31,17 @@ describe("물때 이름", () => {
     });
     it("2026-10-14: 서해 10물 · 남해 11물", () => {
         expect([tideOf("2026-10-14", "west")!.name, tideOf("2026-10-14", "south")!.name]).toEqual(["10물", "11물"]);
+    });
+});
+
+describe("내 조과가 나온 물", () => {
+    it("물때가 붙은 줄만 센다 — 민물 · 옛 줄은 빠지고, 셋 넘게 쌓여 혼자 앞설 때만 '가장 많이'를 말한다", () => {
+        // 2026-10: 18일 조금(neap) · 20~23일 살아나는 물(rising) · 25일 사리 무렵(spring)
+        const list = [{ day: "2026-10-20", tideSea: "west" as const }, { day: "2026-10-21", tideSea: "south" as const }, { day: "2026-10-25", tideSea: "west" as const }, { day: "2026-10-21", tideSea: null }, { day: "2026-10-21" }];
+        expect(tideTally(list)).toEqual({ total: 3, byPhase: { neap: 0, rising: 2, spring: 1, falling: 0 }, top: "rising" });
+        expect(tideTally(list.slice(0, 2)).top).toBeNull();
+        expect(tideTally([...list, { day: "2026-10-26", tideSea: "west" as const }]).top).toBeNull(); // 2 대 2
+        expect(tideTally([])).toEqual({ total: 0, byPhase: { neap: 0, rising: 0, spring: 0, falling: 0 }, top: null });
     });
 });
 

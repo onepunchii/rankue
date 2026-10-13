@@ -2842,7 +2842,7 @@ ${list}
             "@type": "SportsTeam",
             name: crew.name,
             // 산악회를 당구 팀이라고 적지 않는다(설명 문구도 crewMeta 가 종목을 본다)
-            sport: crew.sportCategory === "HIKING" ? "Hiking" : "Billiards",
+            sport: crew.sportCategory === "HIKING" ? "Hiking" : crew.sportCategory === "FISHING" ? "Fishing" : "Billiards",
             url: `${ORIGIN}/club/${encodeURIComponent(id)}`,
             ...(crew.description ? { description: crew.description } : {}),
           },

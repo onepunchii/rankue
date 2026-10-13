@@ -15,7 +15,8 @@ import { screenCrewFields, screenCrewText, screenCrewProfile, screenCrewBody, ch
 
 import { isSuperAdmin } from "../../lib/superAdmin.js";
 import { hikingAllowed } from "../../lib/hikingAccess.js";
-import { crewSportOf, HIKING_ACTIVITY_CATEGORY } from "../../../shared/crewSport.js";
+import { fishingAllowed } from "../../lib/fishingAccess.js";
+import { crewSportOf, isOwnWorldSport, FISHING_ACTIVITY_CATEGORY, HIKING_ACTIVITY_CATEGORY } from "../../../shared/crewSport.js";
 import { kstShortDateTime } from "../../../shared/crewActivity.js";
 // 산악회 일정의 고른 산 · '함께 정상 인증'(2026-10-13) — 아래 정모 라우트의 산악회 갈래만 쓴다
 import { activityMountainSlug, summitTogetherCount, summitTogetherDue } from "../../../shared/crewMountain.js";
@@ -167,7 +168,11 @@ router.post("/:id/activities", requireAuth, requireTermsAccepted, asyncHandler(a
     if (crewSport === "HIKING") {
         data.sportCategory = "HIKING";
         data.category = HIKING_ACTIVITY_CATEGORY;
-    } else if (data.sportCategory === "HIKING") {
+    } else if (crewSport === "FISHING") {
+        // 낚시 크루의 일정은 늘 낚시(출조)다 — 같은 까닭(2026-10-14)
+        data.sportCategory = "FISHING";
+        data.category = FISHING_ACTIVITY_CATEGORY;
+    } else if (isOwnWorldSport(data.sportCategory)) {
         data.sportCategory = crewSport === "GOLF" ? "GOLF" : "BILLIARDS";
     }
     // 고른 산은 산악회의 일정에만 적는다 — 꼴이 맞고 있는 산일 때만(아니면 산 없는 일정). 산의 표를 읽지 못해도 일정은 만들어져야 한다.
@@ -1391,6 +1396,17 @@ router.post("/", requireAuth, requireTermsAccepted, asyncHandler(async (req: Aut
     // 산악회(2026-10-13) — 등산을 쓸 수 있는 회원만 만든다(등산은 아직 닫혀 있다 — server/lib/hikingAccess. 화면만 가리면 주소로 뚫린다).
     // 산악회에는 당구장 베이스캠프도 주 종목도 없다: 화면이 보내지 않지만 실려 와도 저장하지 않는다
     // (매장 화면의 '활동 크루'에 산악회가 뜨지 않게).
+    // 낚시 크루(2026-10-14)도 같다 — 낚시를 쓸 수 있는 회원만 만들고, 당구장 베이스캠프 · 주 종목이 없다
+    if (validation.data.sportCategory === "FISHING") {
+        const creator = await storage.getMemberById(req.userId!);
+        const creatorProfile = creator?.profileId ? await storage.getProfile(creator.profileId) : null;
+        if (!fishingAllowed(creator, (creatorProfile as { role?: string | null } | null | undefined)?.role)) {
+            return sendError(res, 403, "낚시는 아직 준비 중이에요", "FISHING_NOT_AVAILABLE");
+        }
+        validation.data.baseStoreId = null;
+        validation.data.baseListingCode = null;
+        validation.data.gameType = "any";
+    }
     if (validation.data.sportCategory === "HIKING") {
         const creator = await storage.getMemberById(req.userId!);
         const creatorProfile = creator?.profileId ? await storage.getProfile(creator.profileId) : null;
@@ -1537,7 +1553,14 @@ router.get("/:id/members", asyncHandler(async (req: any, res: any) => {
 // POST /crews/:id/join - Join a crew
 router.post("/:id/join", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     // 산악회(2026-10-13) — 등산을 쓸 수 있는 회원만 든다. 등산이 닫힌 회원이 주소로 들어와 가입하면, 든 크루가 자기 크루 목록(당구 · 골프)에 보이지 않는다.
-    if ((await storage.crews.crewSportCategory(req.params.id)) === "HIKING") {
+    const joinSport = await storage.crews.crewSportCategory(req.params.id);
+    // 낚시 크루(2026-10-14)도 같다 — 낚시를 쓸 수 있는 회원만 든다
+    if (joinSport === "FISHING") {
+        const joiner = await storage.getMemberById(req.userId!);
+        const joinerProfile = joiner?.profileId ? await storage.getProfile(joiner.profileId) : null;
+        if (!fishingAllowed(joiner, (joinerProfile as { role?: string | null } | null | undefined)?.role)) return sendError(res, 403, "낚시는 아직 준비 중이에요", "FISHING_NOT_AVAILABLE");
+    }
+    if (joinSport === "HIKING") {
         const joiner = await storage.getMemberById(req.userId!);
         const joinerProfile = joiner?.profileId ? await storage.getProfile(joiner.profileId) : null;
         if (!hikingAllowed(joiner, (joinerProfile as { role?: string | null } | null | undefined)?.role)) return sendError(res, 403, "등산은 아직 준비 중이에요", "HIKING_NOT_AVAILABLE");
@@ -1593,7 +1616,7 @@ router.patch("/:id", requireAuth, requireTermsAccepted, asyncHandler(async (req:
         if (req.body[key] !== undefined) updateData[key] = req.body[key];
     }
     // 산악회에는 당구장 베이스캠프 · 주 종목이 없다(만들 때와 같은 규칙) — 실려 와도 고치지 않는다.
-    if (data?.crew?.sportCategory === "HIKING") {
+    if (isOwnWorldSport(data?.crew?.sportCategory)) {
         delete updateData.gameType;
         delete updateData.baseStoreId;
         delete updateData.baseListingCode;
@@ -2040,7 +2063,7 @@ router.post("/:id/challenge", requireAuth, asyncHandler(async (req: AuthRequest,
     const role = await requireCrewMember(req, res);
     if (!role) return;
     // 도전(당구 한 판 신청)은 산악회에 없다(2026-10-13) — 화면은 가려 두었고, 길도 막는다
-    if ((await storage.crews.crewSportCategory(req.params.id)) === "HIKING") return sendError(res, 400, "err.crew.challengeBilliardsOnly");
+    if (isOwnWorldSport(await storage.crews.crewSportCategory(req.params.id))) return sendError(res, 400, "err.crew.challengeBilliardsOnly");
 
     const toMemberId = String(req.body?.toMemberId || "");
     if (!/^[0-9a-f-]{36}$/i.test(toMemberId)) return sendError(res, 400, "err.crew.opponentNotFound");

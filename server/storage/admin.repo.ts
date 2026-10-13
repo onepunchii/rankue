@@ -180,8 +180,9 @@ export class AdminRepository {
     // ── 사이트맵/공개 매장 조회 (인증 불필요, 민감필드 제외) ──
     async getCrewsForSitemap() {
         // 등산이 닫혀 있는 동안(2026-10-13) 산악회는 싣지 않는다 — 시험 계정이 만든 산악회가 검색에 먼저 나가지 않게(server/lib/hikingAccess)
-        if (hikingOpenToAll()) return db.select({ id: hiqCrews.id }).from(hiqCrews);
-        return db.select({ id: hiqCrews.id }).from(hiqCrews).where(ne(hiqCrews.sportCategory, "HIKING"));
+        // 낚시 크루(2026-10-14)는 낚시가 열릴 때까지 싣지 않는다(같은 까닭)
+        if (hikingOpenToAll()) return db.select({ id: hiqCrews.id }).from(hiqCrews).where(ne(hiqCrews.sportCategory, "FISHING"));
+        return db.select({ id: hiqCrews.id }).from(hiqCrews).where(sql`${hiqCrews.sportCategory} not in ('HIKING', 'FISHING')`);
     }
 
     async getStoresForSitemap() {

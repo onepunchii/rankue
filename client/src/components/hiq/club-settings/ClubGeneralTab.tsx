@@ -38,7 +38,7 @@ export function ClubGeneralTab({ crew, baseName: initialBaseName, activeCount, i
     const { t } = useT();
     const { toast } = useToast();
     // 산악회에는 베이스캠프(단골 당구장)도 주 종목도 없다 — 두 칸을 그리지 않는다(서버도 그 칸은 고치지 않는다).
-    const hiking = crew?.sportCategory === "HIKING";
+    const hiking = crew?.sportCategory === "HIKING" || crew?.sportCategory === "FISHING"; // 낚시 크루도 같다
     const [form, setForm] = useState<CrewSettingsForm>(() => crewToSettingsForm(crew as any));
     const [uploading, setUploading] = useState<null | 'emblem' | 'coverImage'>(null);
     const [deleteOpen, setDeleteOpen] = useState(false);

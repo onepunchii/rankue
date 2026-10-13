@@ -37,7 +37,7 @@ interface CreatePollDialogProps {
      * 크루의 종목 — HIKING(산악회)이면 '산으로 보기 채우기'가 놓인다. 채팅 방은 방의 종목을 넘긴다.
      * 안 주면(크루 홈 · 투표 탭) 그 화면이 이미 받아 둔 크루 정보에서 읽는다 — 이 창이 따로 묻지는 않는다.
      */
-    sportCategory?: "BILLIARDS" | "GOLF" | "HIKING";
+    sportCategory?: "BILLIARDS" | "GOLF" | "HIKING" | "FISHING";
 }
 
 const PRESETS = [0, 1, 3, 7] as const;

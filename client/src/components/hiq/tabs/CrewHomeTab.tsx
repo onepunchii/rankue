@@ -22,6 +22,8 @@ import { CrewStampEntry } from "@/golf/stamps/CrewStampParts";
 // 등산의 조각은 산악회일 때만 받는다 — 당구 · 골프 크루의 화면 묶음에 싣지 않는다
 const CrewSummits = lazy(() => import("@/hiking/crew/CrewSummits").then((m) => ({ default: m.CrewSummits })));
 const CrewWishes = lazy(() => import("@/hiking/crew/CrewWishes").then((m) => ({ default: m.CrewWishes })));
+// 낚시의 조각도 낚시 크루일 때만 받는다
+const FishingCrewTrips = lazy(() => import("@/fishing/FishingPage").then((m) => ({ default: m.FishingCrewTrips })));
 import {
     CREW_BTN, CREW_CARD, CREW_TEXT, ConfirmDialog, CrewEmpty, CrewError, CrewRoleBadge, CrewSection, CrewSkeleton,
 } from "@/components/hiq/crew-ui";
@@ -114,6 +116,9 @@ export const CrewHomeTab = memo(({
     // 산악회(2026-10-13) — 당구의 것(평균 에버 · 대회 · 베이스캠프)도 골프의 것(평균 타수 · 크루 도장)도 그리지 않는다.
     // 남는 것: 소개 · 일정 · 투표 · 멤버. 아래에서 isGolf 가 아니면 당구로 떨어지는 자리마다 따로 가른다.
     const isHiking = crew.sportCategory === 'HIKING';
+    // 낚시 크루(2026-10-14) — 산악회처럼 당구 · 골프의 것을 그리지 않는다. 일정 자리에는 정출판이 선다(정출이 곧 낚시 크루의 일정이다).
+    const isFishing = crew.sportCategory === 'FISHING';
+    const ownWorld = isHiking || isFishing;
 
     // 통계 계산 (useMemo 최적화)
     const stats = useMemo(() => {
@@ -175,18 +180,19 @@ export const CrewHomeTab = memo(({
                     <p className={cn(CREW_TEXT.sub, "mt-0.5 text-[14px]")}>{crew.shortIntro || crew.region || t("crewHome.ourCrew")}</p>
 
                     {/* 요약 한 줄: 멤버 · 이번 달 정모 · 평균 · 함께한 날. 산악회는 평균 칸이 없어 세 칸이다(종목 기록이 없다) */}
-                    <section className={cn(CREW_CARD, "mt-3.5 grid divide-x divide-surface-line py-3 px-0", isHiking ? "grid-cols-3" : "grid-cols-4")} aria-label={t("crewHub.stats")}>
+                    <section className={cn(CREW_CARD, "mt-3.5 grid divide-x divide-surface-line py-3 px-0", isFishing ? "grid-cols-2" : ownWorld ? "grid-cols-3" : "grid-cols-4")} aria-label={t("crewHub.stats")}>
                         <Stat label={t("crewHome.members")} value={<>{countNow}{countMax && <span className="text-[12px] text-ink-3">/{countMax}</span>}</>} />
-                        <Stat label={t("crewHome.monthMeetups")} value={pulse ? pulse.monthActivities : "-"} />
-                        {!isHiking && <Stat label={avgCell.label} value={avgCell.value} />}
+                        {!isFishing && <Stat label={t("crewHome.monthMeetups")} value={pulse ? pulse.monthActivities : "-"} />}
+                        {!ownWorld && <Stat label={avgCell.label} value={avgCell.value} />}
                         <Stat label={t("crewHome.together")} value={together ? <>{together.toLocaleString()}<span className="text-[12px] text-ink-3">{t("crewHome.dayUnit")}</span></> : "-"} />
                     </section>
                 </div>
 
                 {/* 빠른 실행 — 크루원만. 자주 쓰는 동작을 한 번에(정모 만들기 · 투표 · 사진 올리기 · 크루 채팅) */}
                 {isMember && (
-                    <div className="px-4 mt-4 grid grid-cols-4 gap-2">
-                        <QuickAction icon={<LucideCalendarPlus />} label={t("crewHome.qaMeetup")} onClick={onCreateActivity} />
+                    <div className={cn("px-4 mt-4 grid gap-2", isFishing ? "grid-cols-3" : "grid-cols-4")}>
+                        {/* 낚시 크루의 일정은 아래 정출판에서 만든다 — 여기의 정모 창은 당구 · 골프 · 산악회의 것이다 */}
+                        {!isFishing && <QuickAction icon={<LucideCalendarPlus />} label={t("crewHome.qaMeetup")} onClick={onCreateActivity} />}
                         <QuickAction icon={<LucideVote />} label={t("crewHome.qaPoll")} onClick={onPollClick} />
                         <QuickAction icon={<LucideImagePlus />} label={t("crewHome.qaPhoto")} onClick={onOpenGallery} />
                         <QuickAction icon={<LucideMessageCircle />} label={t("crewHome.qaChat")} onClick={onOpenChat} />
@@ -232,8 +238,14 @@ export const CrewHomeTab = memo(({
             </div>
 
             <div className="px-4 flex flex-col gap-8">
+                {/* 낚시 크루 — 정출판(정출마다 최대어 · 마릿수 · 잡어상, 올해의 판). 낚시 크루의 일정은 정출 하나다 */}
+                {isFishing && (
+                    <CrewSection title="정출판">
+                        <Suspense fallback={null}><FishingCrewTrips crewId={crew.id} isMember={isMember} /></Suspense>
+                    </CrewSection>
+                )}
                 {/* 2. 다음 정모 — 크루 홈에서 제일 먼저 궁금한 것 */}
-                <CrewSection title={t("crewHub.nextMeetup")} add={isMember ? { label: t("crewHome.addMeetup"), onClick: onCreateActivity } : undefined}>
+                {!isFishing && <CrewSection title={t("crewHub.nextMeetup")} add={isMember ? { label: t("crewHome.addMeetup"), onClick: onCreateActivity } : undefined}>
                     <ClubActivityList
                         crewId={crew.id}
                         isMember={isMember}
@@ -243,7 +255,7 @@ export const CrewHomeTab = memo(({
                         onShareToChat={onShareToChat}
                         isAdmin={isAdmin}
                     />
-                </CrewSection>
+                </CrewSection>}
 
                 {/* 3. 크루 도장깨기(2026-10-12) — 골프 크루만. 같은 라운드에서 크루원 둘 이상이 현장 인증한 골프장이 크루 도장이 된다.
                     제 바탕을 가진 한 칸이라 당구 · 골프 어느 테마에서도 같은 모습이다(client/src/golf/stamps/CrewStampParts) */}
@@ -261,7 +273,7 @@ export const CrewHomeTab = memo(({
                 )}
 
                 {/* 5. 대회 — 3쿠션/4구 전용이라 골프 크루에는 그리지 않는다(2026-09-09 오너: 두 종목을 아예 가른다). 크루원 전용. 산악회도 같다. */}
-                {isMember && !isGolf && !isHiking && (
+                {isMember && !isGolf && !ownWorld && (
                     <CrewSection title={t("crewHome.tournament")} add={isAdmin ? { label: t("crewHome.addTournament"), onClick: onCreateTournament } : undefined} action={{ label: t("crewUi.seeAll"), onClick: onTournamentClick }}>
                         <TournamentPreview crewId={crew.id} onOpen={onTournamentClick} onCreate={isAdmin ? onCreateTournament : undefined} />
                         {/* 명예의 전당은 전용 페이지로 — 홈에 펼쳐 두면 목록이 길어져 대회가 묻힌다. */}
@@ -278,7 +290,7 @@ export const CrewHomeTab = memo(({
                 )}
 
                 {/* 6. 베이스캠프 — 단골 당구장이다. 산악회에는 없다(만들 때도 받지 않는다) */}
-                {!isHiking && (
+                {!ownWorld && (
                     <CrewSection title={t("crewHome.baseCamp")}>
                         <BaseCamp baseStore={baseStore} baseListing={baseListing} />
                     </CrewSection>

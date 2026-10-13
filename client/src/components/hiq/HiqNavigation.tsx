@@ -33,7 +33,7 @@ export function HiqNavigation() {
     }, []);
     const { isApp } = useNativeBridge();
     const [location, setLocation] = useLocation();
-    const { currentSport, sport, isHiking } = useSport();
+    const { currentSport, sport, isHiking, isFishing } = useSport();
     const activeColor = "rgb(var(--brand))";
 
     /**
@@ -87,7 +87,20 @@ export function HiqNavigation() {
      * 홈 · 크루 · 산 · 도장첩 · 채팅. 산(지도 · 목록 · 산 화면)과 도장첩은 등산의 것이고, 크루(둘째) · 채팅(끝)은 다른 종목과 같은 자리다.
      * 등산은 한국어 전용이라 '산' · '도장첩'은 번역 키로 두지 않는다(text).
      */
-    const tabs: { id: string; label?: string; text?: string; icon: typeof LucideHome; path: string; to?: string; also?: string[]; only?: boolean }[] = isHiking
+    const tabs: { id: string; label?: string; text?: string; icon: typeof LucideHome; path: string; to?: string; also?: string[]; only?: boolean }[] = isFishing
+        /**
+         * 낚시(2026-10-14 오너: "낚시도 골프 · 등산처럼 완전히 구별 — 탭 크기도 같게, 누르면 당구로 가지 않게"):
+         * 홈 · 크루 · 낚시터 · 어탁첩 · 채팅. 크루(둘째) · 채팅(끝)은 다른 종목과 같은 자리이고, 그 화면들은 낚시 크루 · 낚시 방만 보여 준다.
+         * 낚시는 한국어 전용이라 '낚시터' · '어탁첩'은 번역 키로 두지 않는다(text).
+         */
+        ? [
+            { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard", also: ["/fishing/log"] },
+            { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
+            { id: "points", text: "낚시터", icon: LucideMap, path: "/fishing/points" },
+            { id: "book", text: "어탁첩", icon: LucideStamp, path: "/fishing/book" },
+            { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
+        ]
+        : isHiking
         ? [
             { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
             // 크루는 둘째 자리(2026-10-13 오너: "네비게이션 바에 크루를 2번째로") — 당구 · 골프와 같은 자리다
@@ -135,7 +148,8 @@ export function HiqNavigation() {
         >
             <div className="max-w-md mx-auto px-6 flex items-center justify-between">
                 {tabs.map((tab) => {
-                    const active = isActive(tab.path, tab.also, tab.only);
+                    // 낚시의 옛 주소(/fishing)는 낚시 홈이다
+                    const active = isActive(tab.path, tab.also, tab.only) || (isFishing && tab.id === "home" && location === "/fishing");
                     return (
                         <motion.button
                             key={tab.id}

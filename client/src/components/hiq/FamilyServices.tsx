@@ -57,10 +57,10 @@ function detectPlatform(): FamilyPlatform {
 
 export function FamilyServices() {
     const { t } = useT();
-    const { currentSport, isHiking } = useSport();
+    const { currentSport, isHiking, isFishing } = useSport();
     // 골프 모드는 어두운 화면이다 — 서비스 색을 밝은 쪽으로 쓴다
     // 등산도 어두운 판이다(전체 메뉴가 등산 색으로 뜬다) — 골프만 보면 등산 메뉴에서 밝은 판의 색으로 그려져 흐리다
-    const dark = currentSport === "GOLF" || isHiking;
+    const dark = currentSport === "GOLF" || isHiking || isFishing;
 
     // 네이티브 앱 안에서도 형제 서비스는 보여준다(자기 앱 설치 배너와 달리 홍보 대상이
     // 다른 앱이므로 "이미 쓰는 사람에게 받으라고 한다"는 사고가 아니다).

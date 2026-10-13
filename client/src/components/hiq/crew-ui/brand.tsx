@@ -44,7 +44,20 @@ export const CrewCover = memo(function CrewCover({ crew, height, className, alt 
                 <linearGradient id={`fade${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset=".55" stopColor="rgba(0,0,0,0)" /><stop offset="1" stopColor="rgba(0,0,0,.35)" /></linearGradient>
                 <linearGradient id={`dawn${uid}`} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#0E2A33" /><stop offset="1" stopColor="#2B6975" /></linearGradient>
             </defs>
-            {hiking ? (
+            {crew.sportCategory === "FISHING" ? (
+                // 낚시 크루 — 새벽 바다: 수평선 · 물결 · 찌 하나
+                <g>
+                    <rect width={W} height={H} fill="#071A2B" />
+                    <rect y={H * 0.46} width={W} height={H * 0.54} fill="#0E2A44" />
+                    <circle cx={W * 0.78} cy={H * 0.4} r={H * 0.13} fill="#FFC857" opacity=".9" />
+                    <rect y={H * 0.46} width={W} height={H * 0.54} fill="#0E2A44" opacity=".55" />
+                    <path d={`M0 ${H * 0.62} Q${W * 0.12} ${H * 0.56} ${W * 0.25} ${H * 0.62} T${W * 0.5} ${H * 0.62} T${W * 0.75} ${H * 0.62} T${W} ${H * 0.62}`} stroke="#38BDF8" strokeOpacity=".55" strokeWidth="2" fill="none" />
+                    <path d={`M0 ${H * 0.78} Q${W * 0.1} ${H * 0.73} ${W * 0.2} ${H * 0.78} T${W * 0.4} ${H * 0.78} T${W * 0.6} ${H * 0.78} T${W * 0.8} ${H * 0.78} T${W} ${H * 0.78}`} stroke="#38BDF8" strokeOpacity=".3" strokeWidth="2" fill="none" />
+                    <line x1={W * 0.3} y1={H * 0.36} x2={W * 0.3} y2={H * 0.6} stroke="#E6F6FF" strokeWidth="2" strokeLinecap="round" />
+                    <ellipse cx={W * 0.3} cy={H * 0.56} rx="6" ry="11" fill="#C8372D" />
+                    <ellipse cx={W * 0.3} cy={H * 0.6} rx="6" ry="6" fill="#E6F6FF" />
+                </g>
+            ) : hiking ? (
                 <HikingCover id={crew.id} uid={uid} W={W} H={H} />
             ) : golf ? (
                 <g>
@@ -139,7 +152,12 @@ export const CrewEmblem = memo(function CrewEmblem({ crew, size, ring, showSport
             {showSport && (
                 <svg width={badge} height={badge} viewBox="0 0 22 22" className="absolute -right-0.5 -bottom-0.5" aria-hidden="true">
                     <circle cx="11" cy="11" r="10.5" fill={ring ?? "var(--surface-1)"} />
-                    {crew.sportCategory === "HIKING" ? (
+                    {crew.sportCategory === "FISHING" ? (
+                        <>
+                            <circle cx="11" cy="11" r="7.5" fill="#0E2A44" stroke="rgba(0,0,0,.2)" />
+                            <path d="M5 12 Q7 9.5 9 12 T13 12 T17 12" stroke="#38BDF8" strokeWidth="1.6" fill="none" strokeLinecap="round" />
+                        </>
+                    ) : crew.sportCategory === "HIKING" ? (
                         <>
                             <circle cx="11" cy="11" r="7.5" fill="#1F5560" stroke="rgba(0,0,0,.2)" />
                             <path d="M5.5 14.5 L9.5 8 L12 11.5 L13.5 9.5 L16.5 14.5 Z" fill="#F4EFE3" />
@@ -177,7 +195,15 @@ export const CrewThumb = memo(function CrewThumb({ crew, size = 64, className }:
     return (
         <span className={cn("relative shrink-0 rounded-tile overflow-hidden inline-flex", className)} style={{ width: size, height: size }} aria-hidden="true">
             <svg width={size} height={size} viewBox="0 0 64 64" className="absolute inset-0">
-                {hiking ? (
+                {crew.sportCategory === "FISHING" ? (
+                    <>
+                        <rect width="64" height="64" fill="#0E2A44" />
+                        <circle cx="46" cy="20" r="7" fill="#FFC857" />
+                        <rect y="34" width="64" height="30" fill="#071A2B" />
+                        <path d="M0 42 Q8 37 16 42 T32 42 T48 42 T64 42" stroke="#38BDF8" strokeWidth="2.5" fill="none" />
+                        <path d="M0 53 Q8 48 16 53 T32 53 T48 53 T64 53" stroke="#38BDF8" strokeOpacity=".5" strokeWidth="2.5" fill="none" />
+                    </>
+                ) : hiking ? (
                     <>
                         <rect width="64" height="64" fill="#1F5560" />
                         <circle cx="47" cy="19" r="7" fill="#F28C6A" />
