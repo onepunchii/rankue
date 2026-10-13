@@ -46,6 +46,36 @@ const toParColor = (n: number) => (n < 0 ? "text-[#7DD3FC]" : n > 0 ? "text-[#FF
  * 18홀 기록표 한 판(전반·후반 두 줄). 혼자 기록 화면과 선수 줄의 '기록표'가 같이 쓴다.
  * 동그라미 = 파보다 적게(버디 하나, 이글 이상 두 겹), 네모 = 파보다 많게(보기 한 겹, 더블 이상 채움). 파는 숫자만.
  */
+/**
+ * 오늘의 타수를 종류별로 센 띠(2026-10-13 라운드 완료 화면) — 기록표와 같은 표기(동그라미 = 버디, 네모 = 보기)로 그린다.
+ * 파를 모르는 홀 · 안 친 홀은 세지 않는다.
+ */
+export function ScoreTally({ scores, pars }: { scores: readonly number[]; pars: readonly number[] }) {
+    const n = { eagle: 0, birdie: 0, par: 0, bogey: 0, double: 0 };
+    scores.forEach((s, i) => {
+        if (!(s > 0) || !(pars[i] > 0)) return;
+        const d = s - pars[i];
+        if (d <= -2) n.eagle++; else if (d === -1) n.birdie++; else if (d === 0) n.par++; else if (d === 1) n.bogey++; else n.double++;
+    });
+    const items: { key: keyof typeof n; label: string; mark: string }[] = [
+        { key: "eagle", label: "이글", mark: "rounded-full ring-1 ring-[#9BEF5C] outline outline-1 outline-offset-2 outline-[#9BEF5C] text-[#9BEF5C]" },
+        { key: "birdie", label: "버디", mark: "rounded-full ring-1 ring-[#7DD3FC] text-[#7DD3FC]" },
+        { key: "par", label: "파", mark: "text-[#ffffff]" },
+        { key: "bogey", label: "보기", mark: "rounded-[4px] ring-1 ring-[#FFB27A] text-[#FFB27A]" },
+        { key: "double", label: "더블 이상", mark: "rounded-[4px] bg-[#FF8A3333] ring-1 ring-[#FF8A33] text-[#FFC9A3]" },
+    ];
+    return (
+        <div className="grid grid-cols-5 gap-1 rounded-[10px] bg-[#0B2A12] px-1 py-2.5 text-center" data-testid="score-tally">
+            {items.map((it) => (
+                <div key={it.key} className={cn("flex flex-col items-center gap-1.5", n[it.key] === 0 && "opacity-45")}>
+                    <span className={cn("flex h-7 w-7 items-center justify-center text-[14px] font-semibold tabular-nums", it.mark)}>{n[it.key]}</span>
+                    <span className="whitespace-nowrap text-[12px] text-[#FFFFFF99]">{it.label}</span>
+                </div>
+            ))}
+        </div>
+    );
+}
+
 /** 기록표 한 줄의 칸 나눔 — 이름표 · 아홉 홀 · 합 */
 const HOLE_ROW = "grid grid-cols-[38px_repeat(9,minmax(0,1fr))_36px] items-center";
 

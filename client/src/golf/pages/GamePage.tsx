@@ -480,10 +480,11 @@ export default function GolfScorecard() {
                 return (
                     <div className="px-4 pt-3">
                         <div className="rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F] p-1.5 flex items-stretch gap-1.5">
-                            <div className="w-[92px] shrink-0 rounded-xl bg-[#FFFFFF0A] px-3 py-2.5">
-                                <span className="block text-[11.5px] text-[#FFFFFF80]">내 핸디</span>
+                            {/* 내 핸디 — 기록표의 초록 띠와 같은 말투로(스코어카드의 한 칸처럼) */}
+                            <div className="w-[100px] shrink-0 rounded-xl bg-[#0B2A12] ring-1 ring-inset ring-[#64DD1733] px-2.5 py-2.5">
+                                <span className="block text-[12px] text-[#B6F28A]">내 핸디</span>
                                 <span className="block mt-1 text-[28px] leading-none font-bold text-[#ffffff] tabular-nums">{myHandicap}</span>
-                                <span className="block mt-1.5 text-[10.5px] leading-tight text-[#FFFFFF59] break-keep">{handicapSource}</span>
+                                <span className="block mt-1.5 text-[12px] leading-tight text-[#FFFFFF80] break-keep">{handicapSource}</span>
                             </div>
                             <div className="flex-1 min-w-0 pl-2 pr-2.5 py-2 flex items-center gap-2">
                                 <span className="flex-1 min-w-0">
@@ -492,7 +493,7 @@ export default function GolfScorecard() {
                                 </span>
                                 {started && (
                                     <span className="shrink-0 text-right">
-                                        <span className="block text-[11px] text-[#FFFFFF59]">핸디 대비</span>
+                                        <span className="block text-[12px] text-[#FFFFFF73]">핸디 대비</span>
                                         <span className={cn("block mt-0.5 text-[26px] leading-none font-bold tabular-nums", tone)}>{netScore > 0 ? `+${netScore}` : netScore}</span>
                                     </span>
                                 )}

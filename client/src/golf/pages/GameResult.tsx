@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import confetti from "canvas-confetti";
 import { HERO_ART_H, ResultHeroArt, ScorecardBand } from "../components/RoundArt";
-import { HoleGrid } from "../components/ScoreCard";
+import { HoleGrid, ScoreTally } from "../components/ScoreCard";
 import { motion } from "framer-motion";
 import { useRankueMatch } from "../hooks/useRankueMatch";
 import { useMoneyUnit, formatMoney } from "../lib/money";
@@ -158,7 +158,8 @@ export default function GameResult() {
                 </div>
 
                 <div className="px-6 space-y-6">
-                    <div className="space-y-3">
+                    {/* 혼자 친 라운드는 위에 이름 · 타수가 이미 있다 — 순위 줄은 둘 이상일 때만 */}
+                    <div className={cn("space-y-3", !multi && "hidden")}>
                         {rows.map((r: any, i: number) => {
                             const rank = rankOf(i);
                             return (
@@ -233,13 +234,20 @@ export default function GameResult() {
                                 sub={`${cardRow.p.name} · ${session.courseName || "골프장 미정"}`}
                                 right={<span className="shrink-0 rounded-full bg-[#050505B3] px-3 py-1 text-[13px] text-white/80 tabular-nums"><b className="text-[17px] font-bold text-white">{cardRow.strokes}</b>타</span>}
                             />
-                            <div className="px-3 pb-3 pt-3">
+                            <div className="space-y-2.5 px-3 pb-3 pt-3">
                                 <HoleGrid scores={Array.isArray(cardRow.p.scores) ? cardRow.p.scores : []} pars={session.pars} currentHole={-1} />
+                                <ScoreTally scores={Array.isArray(cardRow.p.scores) ? cardRow.p.scores : []} pars={session.pars} />
                             </div>
                         </div>
                     )}
 
-                    <div className="bg-white/[0.03] border border-white/10 rounded-[1.5rem] p-5 grid grid-cols-2 divide-x divide-white/10">
+                    {/* 혼자 친 라운드 — 버디 수는 위의 띠가 말한다. 기록됐는지만 한 줄로 */}
+                    {!multi && recordedCount > 0 && session.status === "finished" && (
+                        <p className="flex items-center gap-2 rounded-2xl border border-[#64DD1733] bg-[#0B2A12] px-4 py-3 text-[13px] text-[#B6F28A]" data-testid="result-recorded">
+                            <span aria-hidden className="h-2 w-2 shrink-0 rounded-full bg-[#64DD17]" />평균 · 여권에 기록됐어요
+                        </p>
+                    )}
+                    <div className={cn("bg-white/[0.03] border border-white/10 rounded-[1.5rem] p-5 grid grid-cols-2 divide-x divide-white/10", !multi && "hidden")}>
                         <div className="pr-4">
                             <div className="text-[11px] font-bold text-white/50 mb-1">버디 최다</div>
                             <div className="font-black text-base">
