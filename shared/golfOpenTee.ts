@@ -24,9 +24,14 @@ export interface TeeSource {
     memcd: string;
     /** 사람이 여는 예약 화면 — 화면의 '예약 화면으로' 가 가는 곳 */
     page: string;
+    /**
+     * 그 예약 화면이 주소의 # 뒤 날짜를 읽어 그 날의 시간표를 바로 여는가(2026-10-13 실측: 13곳 가운데 12곳).
+     * 되는 곳은 teeBookingUrl 이 날짜를 붙인다 — 들어가서 달력에서 날짜를 다시 찾지 않아도 된다.
+     */
+    dateLink: boolean;
 }
 
-const golfres = (slug: string, origin: string, memcd: string): TeeSource => ({ slug, family: "golfres", origin, memcd, page: `${origin}/GolfRes/onepage/real_reservation.asp` });
+const golfres = (slug: string, origin: string, memcd: string, dateLink = true): TeeSource => ({ slug, family: "golfres", origin, memcd, dateLink, page: `${origin}/GolfRes/onepage/real_reservation.asp` });
 
 /** 받는 곳 — 하나씩 받아 보고 넣은 것만(server/scripts/golf-open-tees-check.ts 로 다시 볼 수 있다) */
 // 같은 틀인데 넣지 않은 곳: 로드힐스(같은 요청에 표가 오지 않는다 — 화면이 다른 값을 더 보낸다) · 익산CC(상떼힐과 같은 사이트)
@@ -42,13 +47,24 @@ export const GOLF_TEE_SOURCES: readonly TeeSource[] = [
     golfres("웅포CC", "https://www.bearportcc.co.kr", "80"),
     golfres("대호단양", "https://www.daehocc.co.kr", "10"),
     golfres("백제CC", "https://www.baekjecc.com", "10"),
-    golfres("솔라고CC", "http://sollago.co.kr", "10"),
+    // 솔라고는 주소의 날짜를 읽지 않는다(늘 오늘을 연다) — 날짜를 붙이지 않는다
+    golfres("솔라고CC", "http://sollago.co.kr", "10", false),
     golfres("코스카CC", "https://www.koscacc.kr", "60"),
 ];
 
 const BY_SLUG: ReadonlyMap<string, TeeSource> = new Map(GOLF_TEE_SOURCES.map((s) => [s.slug, s]));
 export function teeSource(slug: string): TeeSource | null {
     return BY_SLUG.get(slug) ?? null;
+}
+
+/**
+ * 그 골프장의 예약 화면 주소 — 날짜를 알고 그 사이트가 받으면 그 날이 열린 화면으로.
+ * 붙이는 값은 예약 화면이 날짜를 눌렀을 때 스스로 주소에 적는 것과 같다(dategbn 은 요일 — 일요일 1).
+ */
+export function teeBookingUrl(s: Pick<TeeSource, "page" | "dateLink" | "family">, day?: string | null): string {
+    if (!day || !s.dateLink || s.family !== "golfres" || !/^\d{4}-\d{2}-\d{2}$/.test(day)) return s.page;
+    const weekday = new Date(`${day}T00:00:00Z`).getUTCDay() + 1;
+    return `${s.page}#pointdate=${day.replace(/-/g, "")}&courseid=0&openyn=1&dategbn=${weekday}&choice_time=00&settype=T`;
 }
 
 /** 남은 티 한 줄 */

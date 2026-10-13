@@ -9,7 +9,7 @@
  * 필터는 부킹 목록과 같은 문법으로 건다(storage/golf.repo buildGolfFilterConditions): 지역(코드) · 시간대(11시 · 15시 경계) · 가격 구간.
  * 조건(노캐디 · 식사 …) · 특가 · 긴급처럼 이 줄이 답할 수 없는 필터가 걸리면 싣지 않는다. 모르는 질의 키가 있어도 싣지 않는다(검색 등 다른 화면의 요청).
  */
-import { kstDay, teeSource, type OfficialListing, type OpenTeeFeedRow } from "../../shared/golfOpenTee.js";
+import { kstDay, teeBookingUrl, teeSource, type OfficialListing, type OpenTeeFeedRow } from "../../shared/golfOpenTee.js";
 import { expandRegionCodes, resolveGolfRegionCode } from "../../shared/golfRegions.js";
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
 
@@ -70,7 +70,8 @@ export function toOfficialListing(t: OpenTeeFeedRow, page: OfficialPage | undefi
         listingType: "BOOKING",
         sellerType: "OFFICIAL",
         lat: page.lat, lng: page.lng,
-        official: { slug: t.slug, page: source.page, course: t.course, holes: t.holes, listPrice: t.listPrice, price: t.price, checkedAt: t.checkedAt, fresh: t.fresh },
+        // 예약 화면 — 그 사이트가 날짜를 받으면 그 날이 열린 화면으로
+        official: { slug: t.slug, page: teeBookingUrl(source, t.day), course: t.course, holes: t.holes, listPrice: t.listPrice, price: t.price, checkedAt: t.checkedAt, fresh: t.fresh },
     };
 }
 

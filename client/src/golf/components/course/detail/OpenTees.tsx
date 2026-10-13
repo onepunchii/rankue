@@ -9,7 +9,8 @@
 import { useMemo, useState } from "react";
 import { cn } from "@/lib/utils";
 import { LucideArrowUpRight } from "@/lib/icons";
-import { OPEN_TEE_COPY, kstClock, kstDay, teeDayLabel, teePriceText, teeStillAhead, type OpenTeeDay } from "@shared/golfOpenTee";
+import { OPEN_TEE_COPY, kstClock, kstDay, teeBookingUrl, teeDayLabel, teePriceText, teeSource, teeStillAhead, type OpenTeeDay } from "@shared/golfOpenTee";
+import { outsideLinkClick } from "@/lib/openOutside";
 import { useCourseOpenTees } from "../../../lib/courseApi";
 import { Card } from "./ui";
 
@@ -34,6 +35,9 @@ export function OpenTees({ slug, className }: { slug: string; className?: string
     if (!q.data || !days.length) return null;
 
     const day = days.find((d) => d.day === pick) ?? days.find((d) => d.tees.length) ?? days[0];
+    // 골프장 예약 화면 — 그 사이트가 날짜를 받으면 고른 날이 열린 화면으로(달력에서 다시 찾지 않게)
+    const source = teeSource(slug);
+    const go = source ? teeBookingUrl(source, day.day) : q.data.page;
     const rows = all ? day.tees : day.tees.slice(0, FIRST);
     const more = day.tees.length - rows.length;
 
@@ -87,7 +91,8 @@ export function OpenTees({ slug, className }: { slug: string; className?: string
 
                 <div className="mt-3 border-t border-[#FFFFFF0F] px-4 py-3.5">
                     <p className="text-[12px] leading-relaxed text-[#FFFFFF80]">{OPEN_TEE_COPY.note} <span className="whitespace-nowrap">확인 {kstClock(day.checkedAt)}</span></p>
-                    <a href={q.data.page} target="_blank" rel="noopener noreferrer nofollow" data-track-as="golf-open-tee-go"
+                    {/* 앱에서는 앱 안 브라우저 창으로 연다 — 닫으면 보던 화면이고, 휴대폰에 저장된 비밀번호 · 자동 채움이 그대로 듣는다(lib/openOutside) */}
+                    <a href={go} target="_blank" rel="noopener noreferrer nofollow" onClick={outsideLinkClick(go)} data-track-as="golf-open-tee-go"
                         className="mt-3 flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#FFFFFF14] text-[14px] font-semibold text-[#FFFFFF] active:bg-[#FFFFFF24]" data-testid="open-tee-go">
                         {OPEN_TEE_COPY.go}
                         <LucideArrowUpRight className="h-4 w-4" aria-hidden />

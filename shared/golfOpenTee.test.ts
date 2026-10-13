@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
     GOLF_TEE_SOURCES, OPEN_TEE_COPY, golfResRequest, isNewTee, kstClock, kstDay, openTeeDays, openTeeDue, parseGolfResTimes, teeDayLabel, teePriceText, teeQuietHour,
-    teeSource, teeStillAhead,
+    teeBookingUrl, teeSource, teeStillAhead,
 } from "./golfOpenTee";
 
 const root = resolve(__dirname, "..");
@@ -38,6 +38,32 @@ describe("받는 곳 — 공식 사이트만, 하나씩 받아 본 곳만", () =
         expect(Object.fromEntries(b)).toEqual({ golfrestype: "real", courseid: "0", usrmemcd: "80", pointdate: "20261015", openyn: "1", dategbn: "5", choice_time: "00", cssncourseum: "", inputtype: "I" });
         expect(new URLSearchParams(golfResRequest({ origin: "https://x.test", memcd: "10" }, "2026-10-18").body).get("dategbn")).toBe("1");   // 일요일
         expect(Object.keys(rq.headers).map((k) => k.toLowerCase())).not.toContain("cookie");
+    });
+});
+
+// 2026-10-13: 더블이글의 '자동 회원가입'을 본 오너의 물음에 — 남의 사이트 비밀번호를 우리가 보관하지 않고, 예약 화면을 앱 안 브라우저 창으로 열어
+// 휴대폰의 저장된 비밀번호 · 자동 채움을 쓰게 하고, 그 날짜가 열린 화면으로 바로 보낸다.
+describe("골프장 예약 화면으로 가는 길 — 그 날이 열린 화면 · 앱 안 브라우저 창", () => {
+    it("날짜를 받는 사이트(13곳 가운데 12곳)는 그 날이 열린 주소로 — 예약 화면이 스스로 적는 값과 같다(요일은 일요일 1)", () => {
+        const s = teeSource("코스카CC")!;
+        expect(s.dateLink).toBe(true);
+        expect(teeBookingUrl(s, "2026-10-17")).toBe("https://www.koscacc.kr/GolfRes/onepage/real_reservation.asp#pointdate=20261017&courseid=0&openyn=1&dategbn=7&choice_time=00&settype=T");
+        expect(teeBookingUrl(s)).toBe(s.page);
+        expect(teeBookingUrl(s, "2026/10/17")).toBe(s.page);
+        // 솔라고는 주소의 날짜를 읽지 않는다 — 붙이지 않는다
+        const sol = teeSource("솔라고CC")!;
+        expect(sol.dateLink).toBe(false);
+        expect(teeBookingUrl(sol, "2026-10-17")).toBe(sol.page);
+        expect(GOLF_TEE_SOURCES.filter((x) => x.dateLink).length).toBe(12);
+    });
+    it("앱 안 브라우저 창 — 그 플러그인이 있는 앱에서만 링크를 가로챈다 · http(s) 만 · 우리가 비밀번호를 받거나 채우는 코드는 없다", () => {
+        const src = read("client/src/lib/openOutside.ts");
+        expect(src).toContain('export const canOpenInApp = (): boolean => hasPlugin("Browser");');
+        expect(src).toContain("if (!/^https?:\\/\\//i.test(url) || !canOpenInApp()) return false;");
+        expect(src).toContain("if (!canOpenInApp()) return;");
+        expect(code(src)).not.toMatch(/password|executeScript|inject|localStorage|apiRequest/i);
+        // 남의 도메인을 앱의 웹뷰에 들이지 않는다(allowNavigation 을 넓히지 않는다) — 따로 뜨는 창이다
+        expect(read("capacitor.config.ts")).not.toMatch(/GolfRes|sollago|koscacc/);
     });
 });
 
@@ -165,7 +191,8 @@ describe("지키는 것 — 서버 · 화면", () => {
     });
     it("화면 — 예약은 골프장에서(바깥 링크) · 확인한 시각을 적는다 · 기기에 남은 옛 답을 한 번 더 거른다 · 캐시 열쇠는 골프장 목록 밑에 두지 않는다", () => {
         const card = read("client/src/golf/components/course/detail/OpenTees.tsx");
-        expect(card).toContain('<a href={q.data.page} target="_blank" rel="noopener noreferrer nofollow" data-track-as="golf-open-tee-go"');
+        expect(card).toContain('<a href={go} target="_blank" rel="noopener noreferrer nofollow" onClick={outsideLinkClick(go)} data-track-as="golf-open-tee-go"');
+        expect(card).toContain("const go = source ? teeBookingUrl(source, day.day) : q.data.page;");
         expect(card).toContain("확인 {kstClock(day.checkedAt)}");
         expect(card).toContain("now - d.checkedAt <= FRESH_MS");
         expect(card).toContain("teeStillAhead(d.day, t.time, now)");

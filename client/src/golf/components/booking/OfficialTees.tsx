@@ -15,6 +15,7 @@ import { LucideArrowUpRight, LucideChevronDown } from "@/lib/icons";
 import { coursePath } from "@shared/golfCourse";
 import { OFFICIAL_LISTING_COPY as COPY, kstClock, teePriceText, type OfficialListing } from "@shared/golfOpenTee";
 import { kstTime } from "@/lib/kst";
+import { outsideLinkClick } from "@/lib/openOutside";
 
 /** 한 골프장을 펼쳤을 때 처음 보이는 줄 수 — 넘으면 '더 보기' */
 const FIRST = 8;
@@ -100,7 +101,7 @@ export function OfficialTees({ items, className }: { items: readonly OfficialLis
                                                             <p className="text-[14px] font-semibold text-[#FFFFFF]">{COPY.notice}</p>
                                                             <p className="mt-1 text-[12.5px] leading-relaxed text-[#FFFFFFB3]">{COPY.how} {COPY.stale} <span className="whitespace-nowrap">확인 {kstClock(o.checkedAt)}</span></p>
                                                             {/* 단추는 위아래로 — 옆으로 나란히 두면 폭 320 에서 '골프장 홈페이지에서 예약'이 잘린다 */}
-                                                            <a href={o.page} target="_blank" rel="noopener noreferrer nofollow" data-track-as="golf-official-tee-go" data-testid="official-tee-go"
+                                                            <a href={o.page} target="_blank" rel="noopener noreferrer nofollow" onClick={outsideLinkClick(o.page)} data-track-as="golf-official-tee-go" data-testid="official-tee-go"
                                                                 className="mt-3 flex h-11 items-center justify-center gap-1.5 rounded-xl bg-[#64DD17] text-[14px] font-semibold text-[#051907] active:bg-[#57C713]">
                                                                 {COPY.go}
                                                                 <LucideArrowUpRight className="h-4 w-4 shrink-0" aria-hidden />

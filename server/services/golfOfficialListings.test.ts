@@ -21,6 +21,8 @@ describe("홈페이지 예약 티를 부킹 한 줄의 꼴로", () => {
             official: { slug: "솔라고CC", page: "http://sollago.co.kr/GolfRes/onepage/real_reservation.asp", course: "Lago-Out", holes: 18, listPrice: 185000, price: 80000, fresh: true },
         });
         expect(isOfficialListing(l)).toBe(true);
+        // 날짜를 받는 사이트는 그 날이 열린 예약 화면으로
+        expect(toOfficialListing({ ...TEE, slug: "코스카CC" }, { ...PAGE, slug: "코스카CC" })!.official.page).toBe("https://www.koscacc.kr/GolfRes/onepage/real_reservation.asp#pointdate=20261014&courseid=0&openyn=1&dategbn=4&choice_time=00&settype=T");
         // 부킹의 uuid 와 겹치지 않는다 — 신청 · 삭제 주소에 넣어도 어떤 글과도 맞지 않는다
         expect(l.id).not.toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
         // 요금을 모르면 0 으로 두되 official.price 는 null(화면이 '요금은 골프장에서'라고 적는다)
@@ -84,7 +86,7 @@ describe("부킹 목록에 싣는 자리", () => {
         expect(page).not.toContain("{filteredTimes.map(renderCard)}");
         const card = read("client/src/golf/components/booking/OfficialTees.tsx");
         expect(card).toContain("{COPY.notice}");
-        expect(card).toContain('<a href={o.page} target="_blank" rel="noopener noreferrer nofollow" data-track-as="golf-official-tee-go" data-testid="official-tee-go"');
+        expect(card).toContain('<a href={o.page} target="_blank" rel="noopener noreferrer nofollow" onClick={outsideLinkClick(o.page)} data-track-as="golf-official-tee-go" data-testid="official-tee-go"');
         expect(card).toContain("확인 {kstClock(o.checkedAt)}");
         expect(card.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/onApply|onDelete|onShare|apiRequest|useMutation/);
         for (const m of card.matchAll(/text-\[(\d+(?:\.\d+)?)px\]/g)) expect(Number(m[1]), m[0]).toBeGreaterThanOrEqual(12);
