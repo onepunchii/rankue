@@ -5,6 +5,7 @@
  *   DELETE /api/hiq/fishing/catches/:id  내 줄 지우기
  *   GET    /api/hiq/fishing/places       낚시터 찾기(지역 · 글자)
  *   GET    /api/hiq/fishing/sea          오늘의 바다 — 해역 일곱 곳의 풍랑특보(기상청)
+ *   GET    /api/hiq/fishing/ports/:code  항구 브리핑 — 조석 곡선 · 해와 달 · 지금의 바다 · 바다낚시지수(?day=)
  *   GET    /api/hiq/fishing/crews        내가 든 크루
  *   GET    /api/hiq/fishing/trips        그 크루의 정출들 + 올해의 판(?crewId=)
  *   POST   /api/hiq/fishing/trips        정출 만들기(그 크루의 사람만)
@@ -21,6 +22,7 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
 import { fishingAllowed } from "../../lib/fishingAccess.js";
 import { getSeaNow } from "../../services/fishingSea.js";
+import { getPortBrief } from "../../services/fishingPort.js";
 import { FISHING_PHOTO_CATEGORY, FISHING_THUMB_CATEGORY, cleanCatch, fishingKstDay, isOwnFishingPhotoUrl, type FishingCatch, type FishingPlace } from "../../../shared/fishing.js";
 
 const router = Router();
@@ -81,6 +83,15 @@ router.delete("/catches/:id", requireAuth, gate, asyncHandler(async (req: AuthRe
 router.get("/sea", requireAuth, gate, asyncHandler(async (_req: AuthRequest, res: any) => {
     res.setHeader("Cache-Control", "private, max-age=120");
     return sendSuccess(res, await getSeaNow().catch(() => null));
+}));
+
+/** 항구 브리핑 — 받아 둔 공공 자료를 엮은 한 장. 조석을 못 받았으면 null(화면은 '잠시 뒤에'를 적는다). 모르는 항구는 404 */
+router.get("/ports/:code", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const code = String(req.params.code ?? "");
+    if (!/^DT_\d{4}$/.test(code)) return sendError(res, 404, "항구를 찾을 수 없어요");
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.day ?? "")) ? String(req.query.day) : null;
+    res.setHeader("Cache-Control", "private, max-age=300");
+    return sendSuccess(res, await getPortBrief(code, day).catch(() => null));
 }));
 
 /* ── 크루 정출판 — 정출마다 최대어 · 마릿수 · 잡어상, 한 해의 점수(shared/fishingTrip). 크루는 있는 크루(hiq_crews)를 그대로 쓴다 ── */

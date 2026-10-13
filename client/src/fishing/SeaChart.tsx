@@ -46,7 +46,11 @@ export const seaWashLine = (s: SeaState) => WASH[s].line;
 
 export interface SeaTemp { name: string; lat: number; lng: number; wtem: number }
 
-export function SeaChart({ areas, picked, onPick, temps }: { areas: readonly SeaArea[]; picked: string | null; onPick: (id: string) => void; temps?: readonly SeaTemp[] }) {
+export function SeaChart({ areas, picked, onPick, temps, ports, port }: {
+    areas: readonly SeaArea[]; picked: string | null; onPick: (id: string) => void; temps?: readonly SeaTemp[];
+    /** 항구의 점 — 고른 항구(port)는 이름과 함께 도드라진다 */
+    ports?: readonly { code: string; name: string; lat: number; lng: number }[]; port?: string | null;
+}) {
     const ref = useRef<SVGSVGElement>(null);
     // 화면에서 12px 가 그림에서 몇 칸인가 — 실제 너비를 재서 글자를 키운다
     const [u, setU] = useState(VIEW.w / 320);
@@ -131,6 +135,26 @@ export function SeaChart({ areas, picked, onPick, temps }: { areas: readonly Sea
                             <g key={t.name} transform={`translate(${x} ${y})`}>
                                 <circle r={2.4 * u} fill="#1F5A78" stroke="#F3ECDD" strokeWidth={0.8 * u} />
                                 <text x={3.6 * u} y={fs * 0.34} fontSize={fs * 0.97} fill="#1F5A78" stroke="#F3ECDD" strokeWidth={fs * 0.22} paintOrder="stroke" className="tabular-nums">{t.wtem.toFixed(1)}°</text>
+                            </g>
+                        );
+                    })}
+                </g>
+            )}
+
+            {/* 항구 — 작은 먹점. 고른 항구는 붉은 점과 이름 */}
+            {ports && ports.length > 0 && (
+                <g pointerEvents="none" data-testid="fishing-chart-ports">
+                    {ports.filter((p) => p.code !== port).map((p) => { const [x, y] = latLngToOutline(p.lat, p.lng); return x > VIEW.x + VIEW.w - 6 ? null : <circle key={p.code} cx={x} cy={y} r={1.7 * u} fill="#0F2838" opacity="0.55" />; })}
+                    {ports.filter((p) => p.code === port).map((p) => {
+                        const [px, y] = latLngToOutline(p.lat, p.lng);
+                        // 그림 밖의 항구(울릉도)는 울릉 · 독도 칸의 섬 자리에 찍는다
+                        const off = px > VIEW.x + VIEW.w - 6, x = off ? INSET.x + 30 : px, cy = off ? INSET.y + 19 : y;
+                        const left = x > VIEW.x + VIEW.w * 0.62;
+                        return (
+                            <g key={p.code} data-testid="fishing-chart-port">
+                                <circle cx={x} cy={cy} r={6.5 * u} fill="#C8372D" opacity="0.2" />
+                                <circle cx={x} cy={cy} r={3.3 * u} fill="#C8372D" stroke="#F3ECDD" strokeWidth={1.2 * u} />
+                                <text x={x + (left ? -6 : 6) * u} y={cy - 5 * u} textAnchor={left ? "end" : "start"} fontSize={fs} fontWeight="600" fill="#8E2A14" stroke="#F3ECDD" strokeWidth={fs * 0.24} paintOrder="stroke">{p.name}</text>
                             </g>
                         );
                     })}

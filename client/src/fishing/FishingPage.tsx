@@ -32,6 +32,9 @@ import { TRIP_AWARD_NAME, TRIP_POINTS, cleanTrip, type SeasonRow, type TripAward
 import { TIDE_PHASE_TEXT, TIDE_SEAS, nextTideMark, tideDays, tideOf, tideTally, tideWeekday, type TideSea } from "@shared/fishingTide";
 import { SEA_AREAS, SEA_CAUTION, SEA_SOURCE, seaHeadline, seaNotes, seaWord, type SeaNow, type SeaState } from "@shared/fishingSea";
 import { SEA_LEGEND, SeaChart, seaWashColor, seaWashLine } from "./SeaChart";
+import { TideCurve } from "./TideCurve";
+import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@shared/fishingStations";
+import { durationKo, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type PortBrief } from "@shared/fishingPort";
 
 const KEY = ["/api/hiq/fishing/catches"];
 type Tab = "home" | "trip" | "book" | "log" | "points";
@@ -381,7 +384,8 @@ function TodayStrip({ today, sea, onOpen }: { today: string; sea: TideSea; onOpe
     );
 }
 
-const SEA_KEY = "rankue-fishing-sea", AREA_KEY = "rankue-fishing-area";
+const SEA_KEY = "rankue-fishing-sea", AREA_KEY = "rankue-fishing-area", PORT_KEY = "rankue-fishing-port";
+function readPort(): string | null { try { return fishingPort(localStorage.getItem(PORT_KEY))?.code ?? null; } catch { return null; } }
 function readSea(): TideSea { try { return localStorage.getItem(SEA_KEY) === "south" ? "south" : "west"; } catch { return "west"; } }
 function readArea(): string | null { try { const v = localStorage.getItem(AREA_KEY); return SEA_AREAS.some((a) => a.id === v) ? v : null; } catch { return null; } }
 const keep = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* 저장을 못 해도 화면은 바뀐다 */ } };
@@ -391,10 +395,19 @@ function Today({ today, list, onOpenTrip }: { today: string; list: readonly Fish
     const [sea, setSea] = useState<TideSea>(readSea);
     const [area, setArea] = useState<string | null>(readArea);
     const pickSea = (id: TideSea) => { setSea(id); keep(SEA_KEY, id); };
-    const pickArea = (id: string) => { setArea(id); keep(AREA_KEY, id); const t = SEA_AREAS.find((a) => a.id === id)?.tide; if (t) pickSea(t); };
+    const [port, setPort] = useState<string | null>(readPort);
+    const pickPort = (code: string) => { setPort(code); keep(PORT_KEY, code); };
+    const pickArea = (id: string) => {
+        setArea(id); keep(AREA_KEY, id);
+        const t = SEA_AREAS.find((a) => a.id === id)?.tide; if (t) pickSea(t);
+        // 바다를 바꾸면 그 바다의 첫 항구로 — 고른 항구가 이미 그 바다에 있으면 그대로 둔다
+        if (fishingPort(port)?.area !== id) { const first = portsOfArea(id)[0]; if (first) pickPort(first.code); }
+    };
     return (
         <>
-            <SeaBoard area={area} onArea={pickArea} />
+            <SeaBoard area={area} onArea={pickArea} port={port} onPort={pickPort} />
+            {/* 내 항구 — 홈에서는 한 줄(누르면 출조 탭), 출조 탭에서는 한 장 */}
+            {port && (onOpenTrip ? <PortStrip code={port} today={today} onOpen={onOpenTrip} /> : <PortCard code={port} today={today} />)}
             {onOpenTrip ? <TodayStrip today={today} sea={sea} onOpen={onOpenTrip} /> : <TideCard today={today} sea={sea} onSea={pickSea} list={list} />}
         </>
     );
@@ -413,7 +426,7 @@ const SEA_TONE: Readonly<Record<SeaState, { bg: string; dot: string; text: strin
  * 오늘의 바다 — 해역 일곱 곳을 서해 · 남해 · 동해 세 줄로(왼쪽이 서쪽). 점수 대신 특보가 있는가 없는가를 말로 적는다.
  * 받아 온 것이 없으면 아무것도 그리지 않는다(없는데 '특보 없음'으로 보이면 안 된다).
  */
-function SeaBoard({ area, onArea }: { area: string | null; onArea: (id: string) => void }) {
+function SeaBoard({ area, onArea, port, onPort }: { area: string | null; onArea: (id: string) => void; port: string | null; onPort: (code: string) => void }) {
     const { data } = useQuery<SeaNow | null>({ queryKey: ["/api/hiq/fishing/sea"], staleTime: 5 * 60_000 });
     if (!data?.areas?.length) return null;
     const by = new Map(data.areas.map((a) => [a.id, a]));
@@ -428,7 +441,7 @@ function SeaBoard({ area, onArea }: { area: string | null; onArea: (id: string) 
             </div>
             {/* 종이 해도 — 구역을 누르면 그 바다를 고른다(등산의 '내 산 지도'와 같은 손) */}
             <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
-                <SeaChart areas={data.areas} picked={area} onPick={onArea} />
+                <SeaChart areas={data.areas} picked={area} onPick={onArea} ports={FISHING_PORTS} port={port} />
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3.5 py-2.5" style={{ borderColor: "#0F28381F" }}>
                     {SEA_LEGEND.map((l) => (
                         <span key={l.state} className="flex items-center gap-1.5 text-[12px]" style={{ color: "#0F2838B3" }}>
@@ -449,6 +462,14 @@ function SeaBoard({ area, onArea }: { area: string | null; onArea: (id: string) 
                         <div className="px-3.5 pb-3 pt-3">
                             <p className="text-[16px] font-semibold" style={{ color: SEA_TONE[picked.state].text }}>{seaHeadline(picked)}</p>
                             {seaNotes(picked).map((n) => <p key={n} className="mt-0.5 text-[12.5px] leading-relaxed [word-break:keep-all]" style={{ color: C.soft }}>{n}</p>)}
+                            {/* 이 바다의 항구 — 고르면 아래에 그 항구의 하루가 나온다 */}
+                            <div className="-mx-3.5 mt-3 flex gap-1.5 overflow-x-auto px-3.5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="항구" data-testid="fishing-ports">
+                                {portsOfArea(pickedDef.id).map((p) => (
+                                    <button key={p.code} type="button" aria-pressed={p.code === port} onClick={() => onPort(p.code)} data-testid={`fishing-port-${p.code}`}
+                                        className={cn("h-9 shrink-0 rounded-full px-3 text-[13px]", p.code === port && "font-semibold")}
+                                        style={p.code === port ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{p.name}</button>
+                                ))}
+                            </div>
                         </div>
                     </div>
                 ) : (
@@ -457,6 +478,145 @@ function SeaBoard({ area, onArea }: { area: string | null; onArea: (id: string) 
                 <p className="px-3.5 pb-3.5 text-[12px] leading-relaxed" style={{ color: C.dim, paddingTop: picked ? 0 : 10 }}>구역의 네모는 어림이에요. {SEA_SOURCE}{data.issued ? ` · ${data.issued} 발표` : ""}{data.stale ? " · 받아 온 지 오래됐어요" : ""}. {SEA_CAUTION}</p>
             </div>
         </section>
+    );
+}
+
+const INDEX_TONE: Readonly<Record<FishingIndexStep, { bg: string; text: string }>> = {
+    매우좋음: { bg: "#F4A96340", text: "#F8DDB0" }, 좋음: { bg: "#F4A96326", text: "#F8DDB0" }, 보통: { bg: "#FFFFFF14", text: "#F3ECDDCC" },
+    나쁨: { bg: "#EE7B5B26", text: "#F7B9A6" }, 매우나쁨: { bg: "#EE7B5B40", text: "#F7B9A6" },
+};
+const portKey = (code: string, day: string) => ["/api/hiq/fishing/ports", code, day] as const;
+const usePort = (code: string, day: string) => useQuery<PortBrief | null>({ queryKey: portKey(code, day), queryFn: () => apiRequest(`/api/hiq/fishing/ports/${code}?day=${day}`), staleTime: 5 * 60_000 });
+/** 지금(한국 시각)이 그날의 몇 분째인가 */
+const kstMinuteNow = () => Math.floor(((Date.now() + 9 * 3600_000) % 86_400_000) / 60_000);
+
+/**
+ * 항구의 하루 — 공공 자료를 엮은 한 장: 종이 위의 조석 곡선(만조 · 간조 · 지금 · 해 뜨고 지는 때), 지금의 바다(수온 · 파고 · 바람 · 시정),
+ * 해와 달, 그리고 국립해양조사원의 바다낚시지수. 날짜를 넘겨 엿새까지 본다.
+ * 낚시지수는 우리가 매긴 값이 아니다 — 출처를 적는다. 예측값이라고 적는다.
+ */
+function PortCard({ code, today }: { code: string; today: string }) {
+    const [day, setDay] = useState(today);
+    const def = fishingPort(code);
+    const { data, isLoading } = usePort(code, day);
+    if (!def) return null;
+    const days = data?.days ?? [today];
+    const isToday = (data?.day ?? day) === today;
+    const nowMin = isToday ? kstMinuteNow() : null;
+    const turns = data?.turns ?? [];
+    const flow = nowMin != null ? tideFlowAt(turns, nowMin) : null;
+    const range = tideRange(turns);
+    const outlook = data?.index ? indexOutlook(data.index.rows) : null;
+    const now = data?.now ?? null;
+    const fishes = data?.index ? [...new Set(data.index.rows.map((r) => r.fish))] : [];
+    const tidePart = data?.index?.rows.find((r) => r.tide)?.tide ?? null;
+    const tiles: { label: string; value: string; sub?: string | null }[] = [];
+    if (now?.wtemp != null) tiles.push({ label: "수온", value: `${now.wtemp.toFixed(1)}°`, sub: now.atemp != null ? `기온 ${now.atemp.toFixed(1)}°` : null });
+    else if (outlook && data?.index?.rows.some((r) => r.wtemp)) { const w = data.index.rows.find((r) => r.wtemp)!.wtemp!; tiles.push({ label: "수온(예보)", value: `${rangeText(w)}°` }); }
+    if (now?.buoy?.wave != null) tiles.push({ label: "파고", value: `${now.buoy.wave.toFixed(1)}m`, sub: `${now.buoy.name} 부이 · ${now.buoy.km}km` });
+    else if (outlook?.wave) tiles.push({ label: "파고(예보)", value: `${rangeText(outlook.wave)}m`, sub: data?.index ? `${data.index.point}` : null });
+    if (now?.buoy?.wind != null) tiles.push({ label: "바람", value: `${now.buoy.wind.toFixed(1)}m/s`, sub: [windDirKo(now.buoy.windDir), `${now.buoy.name} 부이`].filter(Boolean).join(" · ") });
+    else if (outlook?.wind) tiles.push({ label: "바람(예보)", value: `${rangeText(outlook.wind)}m/s`, sub: data?.index ? `${data.index.point}` : null });
+    if (now?.fog?.visM != null) tiles.push({ label: "시정", value: visibilityText(now.fog.visM) ?? "-", sub: `${now.fog.name} 해무관측소` });
+    if (data?.sun?.rise != null && data.sun.set != null) tiles.push({ label: "해", value: `${hhmm(data.sun.rise)} – ${hhmm(data.sun.set)}`, sub: data.sun.dawn != null ? `여명 ${hhmm(data.sun.dawn)}` : null });
+    if (data?.sun?.moonrise != null || data?.sun?.moonset != null) tiles.push({ label: "달", value: `${data!.sun!.moonrise != null ? hhmm(data!.sun!.moonrise!) : "–"} – ${data!.sun!.moonset != null ? hhmm(data!.sun!.moonset!) : "–"}`, sub: "뜨고 지는 때" });
+    if (range != null) tiles.push({ label: "물높이 차", value: `${range}cm`, sub: tidePart });
+    return (
+        <section className="px-5 pt-8" data-testid="fishing-port">
+            <div className="mb-3 flex items-baseline justify-between gap-3">
+                <h2 className="text-[18px] font-semibold tracking-tight">{def.name}의 하루</h2>
+                <span className="shrink-0 text-[12.5px]" style={{ color: C.dim }}>{FISHING_PORT_SOURCE} 예측</span>
+            </div>
+            {/* 날짜 넘기기 — 오늘부터 엿새 */}
+            <div className="-mx-5 mb-2.5 flex gap-1.5 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="날짜">
+                {days.map((d, i) => {
+                    const on = d === (data?.day ?? day), weekend = ["토", "일"].includes(tideWeekday(d));
+                    return (
+                        <button key={d} type="button" aria-pressed={on} onClick={() => setDay(d)} data-testid="fishing-port-day"
+                            className={cn("h-9 shrink-0 rounded-full px-3 text-[13px] tabular-nums", on && "font-semibold")}
+                            style={on ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: weekend ? C.sun : C.soft }}>{i === 0 ? "오늘" : i === 1 ? "내일" : `${Number(d.slice(8))} ${tideWeekday(d)}`}</button>
+                    );
+                })}
+            </div>
+            {isLoading && !data ? <div className="h-[260px] animate-pulse rounded-2xl bg-[#FFFFFF0F]" aria-busy="true" />
+                : !data ? <p className="rounded-2xl bg-[#FFFFFF0A] px-5 py-7 text-center text-[13.5px]" style={{ color: C.soft }} data-testid="fishing-port-none">지금은 받아 오지 못했어요. 잠시 뒤에 다시 열어 주세요.</p>
+                    : (
+                        <>
+                            <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
+                                <TideCurve points={data.points.map(([min, cm]) => ({ min, cm }))} turns={turns} nowMin={nowMin} sun={data.sun?.rise != null && data.sun.set != null ? { rise: data.sun.rise, set: data.sun.set } : null} />
+                                <p className="border-t px-3.5 py-2.5 text-[13.5px] [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F2838" }} data-testid="fishing-port-flow">
+                                    {turns.length < 2 ? "물높이 차가 아주 작은 바다예요 — 만조 · 간조가 뚜렷하지 않아요."
+                                        : flow ? <>지금은 <span className="font-semibold">{flow.flow}</span> — {flow.next.kind === "high" ? "만조" : "간조"}({hhmm(flow.next.min)})까지 <span className="font-semibold tabular-nums">{durationKo(flow.inMin)}</span></>
+                                            : turns.map((t) => `${t.kind === "high" ? "만조" : "간조"} ${hhmm(t.min)}`).join(" · ")}
+                                </p>
+                            </div>
+
+                            {/* 한 장의 표 — 칸 사이는 가는 줄(카드 여러 장으로 쪼개지 않는다). 칸이 홀수면 마지막 칸이 한 줄을 다 쓴다 */}
+                            {tiles.length > 0 && (
+                                <div className="mt-2.5 grid grid-cols-2 overflow-hidden rounded-2xl bg-[#FFFFFF0A]" data-testid="fishing-port-tiles">
+                                    {tiles.map((t, i) => (
+                                        <div key={t.label} className={cn("px-3.5 py-3", tiles.length % 2 === 1 && i === tiles.length - 1 && "col-span-2")}
+                                            style={{ borderTop: i >= 2 ? "1px solid #FFFFFF14" : undefined, borderLeft: i % 2 === 1 ? "1px solid #FFFFFF14" : undefined }}>
+                                            <p className="text-[12.5px]" style={{ color: C.dim }}>{t.label}</p>
+                                            <p className="mt-0.5 text-[19px] font-semibold tabular-nums tracking-tight">{t.value}</p>
+                                            {t.sub ? <p className="mt-0.5 truncate text-[12px]" style={{ color: C.dim }}>{t.sub}</p> : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            {data.index && fishes.length > 0 && (
+                                <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-3.5 pb-3 pt-3" data-testid="fishing-port-index">
+                                    <div className="flex items-baseline justify-between gap-2">
+                                        <p className="text-[14px] font-semibold">바다낚시지수</p>
+                                        <p className="truncate text-[12px]" style={{ color: C.dim }}>{data.index.point} 지점</p>
+                                    </div>
+                                    <div className="mt-2 grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1.5">
+                                        <span />
+                                        <span className="w-[68px] text-center text-[12px]" style={{ color: C.dim }}>오전</span>
+                                        <span className="w-[68px] text-center text-[12px]" style={{ color: C.dim }}>오후</span>
+                                        {fishes.map((f) => {
+                                            const cell = (part: "오전" | "오후") => {
+                                                const r = data.index!.rows.find((x) => x.fish === f && (x.part === part || x.part === "일"));
+                                                return r ? <span key={part} className="flex h-7 w-[68px] items-center justify-center rounded-full text-[12.5px]" style={{ background: INDEX_TONE[r.index].bg, color: INDEX_TONE[r.index].text }}>{r.index}</span> : <span key={part} className="w-[68px] text-center text-[12.5px]" style={{ color: C.dim }}>–</span>;
+                                            };
+                                            return [<span key={f} className="truncate text-[14px]">{f}</span>, cell("오전"), cell("오후")];
+                                        })}
+                                    </div>
+                                    <p className="mt-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>국립해양조사원이 물때 · 파고 · 수온 · 바람으로 매긴 지수예요. 랭큐가 매긴 값이 아니에요.</p>
+                                </div>
+                            )}
+                            <p className="mt-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>
+                                조석은 예측값이라 바람 · 기압에 따라 실제와 달라요. 출처: 국립해양조사원{data.sun ? ` · 한국천문연구원(해 · 달은 ${data.sun.at ?? def.name} 기준)` : ""}.
+                            </p>
+                        </>
+                    )}
+        </section>
+    );
+}
+
+/** 홈의 '내 항구' 한 줄 — 다음 만조 · 간조와 수온. 누르면 출조 탭의 한 장 */
+function PortStrip({ code, today, onOpen }: { code: string; today: string; onOpen: () => void }) {
+    const def = fishingPort(code);
+    const { data } = usePort(code, today);
+    if (!def || !data) return null;
+    const flow = tideFlowAt(data.turns, kstMinuteNow());
+    const head = flow ? `${flow.flow} · ${flow.next.kind === "high" ? "만조" : "간조"} ${hhmm(flow.next.min)}` : data.turns.length ? data.turns.map((t) => `${t.kind === "high" ? "만조" : "간조"} ${hhmm(t.min)}`).slice(-2).join(" · ") : "오늘의 물높이";
+    const facts = [data.now?.wtemp != null ? `수온 ${data.now.wtemp.toFixed(1)}°` : null, data.now?.buoy?.wave != null ? `파고 ${data.now.buoy.wave.toFixed(1)}m` : null, data.sun?.rise != null && data.sun.set != null ? `해 ${hhmm(data.sun.rise)}–${hhmm(data.sun.set)}` : null].filter(Boolean);
+    return (
+        <div className="px-5 pt-2.5">
+            <button type="button" onClick={onOpen} className="flex w-full items-center gap-3.5 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-3 text-left active:opacity-80" data-testid="fishing-port-strip">
+                <span className="flex h-[52px] w-[60px] shrink-0 flex-col items-center justify-center rounded-xl px-1" style={{ background: "#C8372D33" }}>
+                    <span className="text-[12px]" style={{ color: "#F3ECDD99" }}>내 항구</span>
+                    <span className="max-w-full truncate text-[15px] font-semibold leading-tight">{def.name}</span>
+                </span>
+                <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[15.5px] font-semibold">{head}</span>
+                    <span className="mt-0.5 block truncate text-[13px] tabular-nums" style={{ color: "#F3ECDD99" }}>{facts.join(" · ") || "조석 곡선 보기"}</span>
+                </span>
+                <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#F3ECDD66" }} aria-hidden />
+            </button>
+        </div>
     );
 }
 
