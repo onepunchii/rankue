@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { crewSportOf, isOwnWorldSport } from "./crewSport";
 import { sportForPath } from "./sportRoute";
+import { SEA_AREAS } from "./fishingSea";
 
 const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 
@@ -44,6 +45,19 @@ describe("낚시 — 따로 선 종목", () => {
         expect(ctx).toContain('else if (sport === "FISHING") document.documentElement.setAttribute("data-skin", "fishing");');
         expect(read("client/src/index.css")).toContain(':root[data-sport="GOLF"][data-skin="fishing"] {');
         expect(read("client/src/pages/hiq/dashboard.tsx")).toContain('<FishingHome view="home" />');
+    });
+    it("그림 — 표지 셋과 바다 일곱 곳의 표지가 다 있고(한 장 150KB 아래), 바다 지도는 종이 해도다", () => {
+        for (const n of ["hero", "cover-trip", "cover-book", ...SEA_AREAS.map((a) => `sea-${a.id}`)]) {
+            const file = resolve(__dirname, `../client/public/fishing/art/${n}.webp`);
+            expect(existsSync(file), n).toBe(true);
+            expect(statSync(file).size, n).toBeLessThan(150_000);
+        }
+        const chart = read("client/src/fishing/SeaChart.tsx");
+        // 구역 일곱 곳이 다 그려지고, 울릉도 · 독도 칸이 있다(윤곽선 자료에 없어 따로 그린다)
+        for (const a of SEA_AREAS) expect(chart, a.id).toContain(a.id.includes("-") ? `"${a.id}": {` : `${a.id}: {`);
+        expect(chart).toContain("울릉 · 독도");
+        // 구역의 네모는 어림이라고 화면에 적는다
+        expect(read("client/src/fishing/FishingPage.tsx")).toContain("구역의 네모는 어림이에요.");
     });
     it("낚시 크루의 홈에는 정출판이 서고, 당구의 것(정모 창 · 대회 · 베이스캠프)은 없다", () => {
         const home = read("client/src/components/hiq/tabs/CrewHomeTab.tsx");
