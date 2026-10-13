@@ -22,6 +22,7 @@ import { assignMountainSlugs, hikingRegionOf, hikingTraits, isHikingListId } fro
 import { courseStats, distM, nearestOnLine, packLine, thinLine, withKm, type LinePoint } from "../../shared/hikingGeo";
 import { cleanMountainGuide } from "../../shared/hikingGuide";
 import { hikingPoiKind } from "../../shared/hikingPois";
+import { HIKING_SUMMIT_FIXES, applySummitFix } from "../../shared/hikingSummitFix";
 
 const args = process.argv.slice(2);
 const flagAt = (f: string) => args.indexOf(f);
@@ -70,7 +71,10 @@ async function upsert(table: string, cols: readonly [string, string][], key: str
 
 async function main() {
     if (!contentDir || !gpxDir) { console.error("산 자료 폴더와 코스 파일 폴더의 경로를 적어 주세요."); process.exitCode = 1; return; }
-    const master: any[] = json(join(contentDir, "mountains_master.json"));
+    // 정상 자리 바로잡기(shared/hikingSummitFix — 공식 목록 · 코스 기록으로 판정한 14곳)를 읽은 자료 위에 덮어쓴다.
+    // 이 자리로 '정상을 지나는 코스'를 다시 고르므로, 코스가 없던 100대 명산에 코스가 붙는다.
+    const master: any[] = (json(join(contentDir, "mountains_master.json")) as any[]).map(applySummitFix);
+    console.log("정상 자리 고침:", HIKING_SUMMIT_FIXES.filter((f) => master.some((m) => m.id === f.id && m.lat === f.lat && m.lon === f.lng)).length, "/", HIKING_SUMMIT_FIXES.length);
     const guides: any[] = json(join(contentDir, "mountain_guides.json"));
     const bundles: any[] = json(join(contentDir, "mountain_pois.json"));
     const byId = new Map<string, any>(master.map((m) => [m.id, m]));

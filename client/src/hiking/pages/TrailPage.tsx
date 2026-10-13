@@ -29,6 +29,7 @@ import { MyPhotos } from "../photos/MyPhotos";
 import { SummitCheckin } from "../stamps/SummitCheckin";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { POI_COLOR } from "../theme";
+import { kstYmd, sunTimes, sunsetNotice } from "@shared/hikingSun";
 import { bgWatchAvailable } from "../trail/bgWatch";
 import { setVoiceOn, speakLine, voiceOn } from "../trail/speak";
 import { MY_TRIPS_KEY, dropKeptTrail, keepTrail, readKeptTrail, useTrail } from "../trail/useTrail";
@@ -51,6 +52,8 @@ export default function TrailPage() {
     const course = d?.courseList.find((c) => c.id === courseId) ?? d?.courseList[0] ?? null;
     const pois: TrailPoi[] = useMemo(() => (d && course ? d.pois.filter((p) => p.courseId === course.id && p.km != null).map((p) => ({ id: p.id, kind: p.kind, name: p.name, note: p.note, km: p.km! })) : []), [d, course]);
     const summit = d && d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null;
+    // 해 지는 때 — 이 산의 자리와 오늘 날짜로 셈한다(화면이 다시 그려질 때마다 — 위치를 받을 때마다 그려진다)
+    const sunset = summit ? sunsetNotice(Date.now(), sunTimes(kstYmd(Date.now()), summit.lat, summit.lng)) : null;
 
     const [startedAt, setStartedAt] = useState<number | null>(null);
     const [done, setDone] = useState<{ minutes: number; km: number; gainM: number; reachedSummit: boolean; saved: boolean } | null>(null);
@@ -157,6 +160,14 @@ export default function TrailPage() {
                                         : s.far ? `이 코스에서 ${aheadText(s.offM)}쯤 떨어져 있어요. 코스가 맞는지 확인해 주세요.`
                                         : `길 위 · 위치 정확도 ${trail.accuracy != null ? `±${Math.round(trail.accuracy)}m` : "확인 중"}`}
                                 </span>
+                            </p>
+                        )}
+                        {/* 해 지는 때 — 세 시간 전부터 알린다(그 전에는 그리지 않는다). 내려갈 시간을 남기라는 말 */}
+                        {active && sunset && (
+                            <p className="mb-2 flex items-start gap-2 rounded-xl px-3 py-2 text-[13.5px] leading-snug break-keep" role="status" data-testid="trail-sunset" data-urgent={sunset.urgent ? "1" : "0"}
+                                style={sunset.urgent ? { background: "#F28C6A2E", color: "#FFD9C9", boxShadow: "inset 0 0 0 1px #F28C6A80" } : { background: "#F6D9A81F", color: "#F6D9A8" }}>
+                                <svg width="17" height="17" viewBox="0 0 24 24" className="mt-0.5 shrink-0" aria-hidden><path d="M3 18h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" /><path d="M6.5 18a5.5 5.5 0 0 1 11 0" fill="currentColor" /></svg>
+                                <span>{sunset.text}</span>
                             </p>
                         )}
                         {/* 화면이 꺼져도 받는 중(앱 1.4 부터) — 주머니에 넣어도 된다는 것을 알린다 */}

@@ -30,7 +30,7 @@ import { MountainLocation } from "../components/MountainLocation";
 import { MountainNearbyPlaces } from "../components/MountainNearbyPlaces";
 import { NearDial } from "../components/NearMe";
 import { CourseProfile, CourseTrace } from "../components/CourseParts";
-import { Fact, HikingCta, MountainRow, MountainWeather } from "../components/MountainParts";
+import { Fact, HikingCta, MountainRow, MountainWeather, SunToday } from "../components/MountainParts";
 import { SummitStamp, regionInk } from "../stamps/SummitStamp";
 import { SummitCheckin } from "../stamps/SummitCheckin";
 import { MountainPatch } from "../stamps/MountainPatch";
@@ -415,6 +415,7 @@ export default function MountainPage() {
 
                 <HkSection title={MOUNTAIN_LABEL.weather} aside="오늘부터 이레" sec="weather">
                     <MountainWeather key={`wx:${d.slug}`} slug={d.slug} />
+                    <SunToday lat={d.lat} lng={d.lng} />
                 </HkSection>
 
                 {d.guide && (

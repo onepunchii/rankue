@@ -15,6 +15,9 @@ import {
     courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListPath, hikingListSeo, hikingMountainPath, hikingRegionPath, hikingRegionSeo, kmRange, listNames, mountainSeo,
 } from "../../shared/hikingPage.js";
 import { HIKING_GRADES } from "../../shared/hikingGrade.js";
+import { MOUNTAIN_AROUND_LABEL } from "../../shared/hikingAround.js";
+import { bearingDeg, compass8 } from "../../shared/hikingNear.js";
+import { hubCard } from "../../shared/ogCards.js";
 import {
     HIKING_CHECKLIST, HIKING_CHECKLIST_H1, HIKING_CHECKLIST_LEAD, HIKING_CHECKLIST_NOTE, HIKING_CHECKLIST_PATH, HIKING_CHECKLIST_SEO, HIKING_TERMS, HIKING_TERMS_H1, HIKING_TERMS_LEAD, HIKING_TERMS_PATH,
     HIKING_TERMS_SEO, HIKING_TERM_GROUPS, hikingTerm, hikingTermPath, hikingTermSeo, type HikingTerm,
@@ -128,6 +131,10 @@ function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: n
             count("SIGN") ? `갈림길 ${count("SIGN")}곳` : "", count("DANGER") ? `위험 구간 ${count("DANGER")}곳` : "", count("SHELTER") ? `대피소 ${count("SHELTER")}곳` : ""].filter(Boolean);
         return `      <li><strong>${esc(`코스 ${c.seq}`)}</strong> — ${esc(bits.join(" · "))}${c.via ? ` ${esc(courseViaNote(c.via))}` : ""}</li>`;
     });
+    // 위치 — 화면의 '위치 · 들머리' 구역과 같은 말(시도 · 시군구 · 동)
+    const where = [d.sido, d.sigungu, d.dong].filter(Boolean).join(" ");
+    // 가까운 산의 방향 — 화면의 판(가운데가 이 산)이 보여 주는 것을 글로
+    const dirOf = (m: { lat: number | null; lng: number | null }) => (d.lat != null && d.lng != null && m.lat != null && m.lng != null ? `${compass8(bearingDeg(d.lat, d.lng, m.lat, m.lng))}쪽 ` : "");
     const named = NAMED_KINDS.map((k) => ({ k, items: d.pois.filter((p) => p.kind === k).map((p) => hikingPoiTitle(p)).filter((t, i, a) => a.indexOf(t) === i).slice(0, NAMED_MAX) })).filter((x) => x.items.length > 0);
     const body = `<main>
   <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a>${region ? ` › <a href="${hikingRegionPath(region.id)}">${esc(`${region.name}의 산`)}</a>` : ""} › ${esc(d.name)}</nav>
@@ -149,10 +156,14 @@ ${named.map((x) => `    <h3>${esc(HIKING_POI_NAME[x.k])}</h3>\n    <p>${esc(x.it
     <h2>${esc(MOUNTAIN_LABEL.about)}</h2>
 ${g.selectionReason ? `    <h3>${esc(GUIDE_LABEL.why)}</h3>\n    <p>${esc(g.selectionReason)}</p>\n` : ""}${g.sections.map((s) => `    <h3>${esc(s.heading)}</h3>\n    <p>${esc(s.body)}</p>`).join("\n")}
 ${g.highlights.length ? `    <h3>${esc(GUIDE_LABEL.highlights)}</h3>\n    <ul>\n${g.highlights.map((h) => `      <li><strong>${esc(h.name)}</strong>${h.note ? ` — ${esc(h.note)}` : ""}</li>`).join("\n")}\n    </ul>\n` : ""}${g.access ? `    <h3>${esc(GUIDE_LABEL.access)}</h3>\n    <p>${esc(g.access)}</p>\n` : ""}${g.officialCourses.length ? `    <h3>${esc(GUIDE_LABEL.officialCourses)}</h3>\n    <ul>\n${g.officialCourses.map((c) => `      <li>${esc(c.waypoints.join(" → "))}${c.duration ? ` — ${esc(c.duration)}` : ""}</li>`).join("\n")}\n    </ul>\n    <p>${esc(GUIDE_COURSE_SOURCE)}</p>\n` : ""}${g.faq.length ? `    <h3>${esc(GUIDE_LABEL.faq)}</h3>\n${g.faq.map((f) => `    <p><strong>${esc(f.q)}</strong> ${esc(f.a)}</p>`).join("\n")}\n` : ""}    <p>${esc(GUIDE_NOTE)}</p>
+  </section>\n` : ""}${where ? `  <section>
+    <h2>${esc(MOUNTAIN_AROUND_LABEL.map)}</h2>
+    <p>${esc([where, heightText(d.heightM) ? `정상 높이 ${heightText(d.heightM)}` : ""].filter(Boolean).join(" · "))}</p>
+    <p>${esc(d.courseList.length ? `들머리는 코스가 시작되는 곳이에요 — 코스 ${d.courseList.length}개의 들머리를 지도에서 보고 길을 찾을 수 있어요.` : MOUNTAIN_AROUND_LABEL.noCourse)}</p>
   </section>\n` : ""}${nearby.length ? `  <section>
     <h2>${esc(MOUNTAIN_LABEL.nearby)}</h2>
     <ul>
-${nearby.map((m) => `      <li><a href="${hikingMountainPath(m.slug)}">${esc(m.name)}</a> — ${esc([heightText(m.heightM), `${m.km}km`].filter(Boolean).join(" · "))}</li>`).join("\n")}
+${nearby.map((m) => `      <li><a href="${hikingMountainPath(m.slug)}">${esc(m.name)}</a> — ${esc([heightText(m.heightM), `${dirOf(m)}${m.km}km`].filter(Boolean).join(" · "))}</li>`).join("\n")}
     </ul>
   </section>\n` : ""}${cta()}
   <p>${esc(OSM_NOTE)}</p>
@@ -168,7 +179,9 @@ ${hubNav("ko")}`;
         },
         ...(g?.faq.length ? [{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: g.faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) }] : []),
     ];
-    return { status: 200, tag: `hiking:mountain:${d.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd }) };
+    // 공유 · 검색 카드는 그 산이 있는 권역의 카드(화면의 useSeo 와 같다) — 산마다의 카드는 없다
+    const card = region ? hubCard(ORIGIN, hikingRegionPath(region.id)) : null;
+    return { status: 200, tag: `hiking:mountain:${d.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd, ...(card ? { image: { ...card, alt: `${d.name} — 랭큐 등산` } } : {}) }) };
 }
 
 /** 도장첩 — 묶음마다의 권과 칸 수. 화면(StampShelf)의 방문자 모습과 같은 글 */

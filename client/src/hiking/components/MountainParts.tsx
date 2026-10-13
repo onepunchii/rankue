@@ -11,6 +11,7 @@ import { LucideChevronRight } from "@/lib/icons";
 import { WX_LABEL, type CourseWeather, type WxHalf } from "@shared/golfWeather";
 import { heightText, hikingMountainPath, mountainPlace } from "@shared/hikingMountains";
 import { HIKING_CTA, WEATHER_NOTE, kmRange } from "@shared/hikingPage";
+import { SUN_NOTE, kstClock, kstYmd, spanText, sunLine, sunTimes } from "@shared/hikingSun";
 import { mountainWeatherKey, type MountainSummary } from "../lib/api";
 import { MountainPatch } from "../stamps/MountainPatch";
 
@@ -114,3 +115,25 @@ export function HikingCta({ className }: { className?: string }) {
 }
 
 export const Fact = ({ children }: { children: string }) => <span className="rounded-full bg-[#0B1F2699] px-2.5 py-1 text-[12.5px] text-[#F4EFE3] backdrop-blur-sm" style={{ boxShadow: "inset 0 0 0 1px #FFFFFF24" }}>{children}</span>;
+
+/**
+ * 오늘 해 뜨는 시각 · 지는 시각(2026-10-13) — 날씨 띠 아래의 한 줄. 정상의 자리와 오늘 날짜로 셈한다(shared/hikingSun — 밖에 묻지 않는다).
+ * 해 지기 전에 내려오라는 안전의 말이다. 자리를 모르는 산에는 그리지 않는다.
+ */
+export function SunToday({ lat, lng }: { lat: number | null; lng: number | null }) {
+    const st = lat != null && lng != null ? sunTimes(kstYmd(Date.now()), lat, lng) : null;
+    if (!st) return null;
+    return (
+        <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-4 py-3" data-testid="mountain-sun">
+            <p className="flex items-center gap-2 text-[14px] tabular-nums text-[#F4EFE3]">
+                <svg width="18" height="18" viewBox="0 0 24 24" className="shrink-0 text-[#F6D9A8]" aria-hidden>
+                    <path d="M3 18h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                    <path d="M6.5 18a5.5 5.5 0 0 1 11 0" fill="currentColor" />
+                    <path d="M12 6.5V9M5.2 9.6l1.7 1.7M18.8 9.6l-1.7 1.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                </svg>
+                <span className="min-w-0 whitespace-nowrap" aria-label={`오늘 ${sunLine(st)}`}>오늘 해 뜸 {kstClock(st.rise)} · 해 짐 {kstClock(st.set)}</span>
+            </p>
+            <p className="mt-1 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">낮 {spanText((st.set - st.rise) / 60_000)} · {SUN_NOTE}</p>
+        </div>
+    );
+}

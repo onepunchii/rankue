@@ -164,7 +164,14 @@ describe("고정: 근처 맛집은 저장 · 가공 없이 그대로", () => {
         expect(golf).toContain('r.reason === "nokey" ? 501 : r.reason === "quota" ? 429 : 502');
     });
     it("검색엔진용 화면에는 싣지 않는다", () => {
-        expect(read("server/seo/hiking.ts")).not.toMatch(/hikingAround|naverLocal|searchNearby|\/nearby|네이버|맛집/);
+        // 검색용 화면은 이 파일의 말(구역 이름 · 위치 안내)만 빌려 쓴다 — 네이버를 부르는 것 · 근처 맛집은 싣지 않는다
+        const seo = read("server/seo/hiking.ts");
+        expect(seo).not.toMatch(/naverLocal|searchNearby|hikingNearby|HIKING_NEARBY|\/nearby|네이버|맛집/);
+        expect(seo).toContain('import { MOUNTAIN_AROUND_LABEL } from "../../shared/hikingAround.js";');
+        // 화면과 같은 것을 글로: 위치 · 들머리 구역, 가까운 산의 방향, 권역의 공유 카드
+        expect(seo).toContain("<h2>${esc(MOUNTAIN_AROUND_LABEL.map)}</h2>");
+        expect(seo).toContain("compass8(bearingDeg(d.lat, d.lng, m.lat, m.lng))");
+        expect(seo).toContain("hubCard(ORIGIN, hikingRegionPath(region.id))");
     });
     it("화면 — 구역 이름만 발자국에 남기고, 기기에 남는 조회 캐시에 넣지 않는다", () => {
         const ui = read("client/src/hiking/components/MountainNearbyPlaces.tsx");
