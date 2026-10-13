@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-    applyScanRows, buildScanDraft, cardDay, clubKey, clubParsFit, courseKey, effectivePars, matchClub, matchCourses, scanDailyLimit, scanEditCount, usableCardDay, cellNumber, cellStrokes, draftCounts, guessSeats, normalizeRead, rowNotation, scanKstDay, sumLine,
+    applyScanRows, buildScanDraft, cardDay, clubKey, clubParsFit, courseKey, effectivePars, halfFits, matchClub, pickScanPars, matchCourses, scanDailyLimit, scanEditCount, usableCardDay, cellNumber, cellStrokes, draftCounts, guessSeats, normalizeRead, rowNotation, scanKstDay, sumLine,
     type ScanRead,
 } from "./golfScorecardScan";
 
@@ -34,6 +34,36 @@ describe("받아쓴 것의 꼴 맞추기", () => {
         expect(r.rows[0]).toMatchObject({ label: "홍길동", out: "41", in: null, total: "82" });
         expect(r.rows[0].cells.slice(0, 4)).toEqual(["0", "1", null, null]);
         expect(r.rows[0].cells).toHaveLength(18);
+    });
+    it("전반 · 후반을 따로 받은 답 — 아홉 칸이 아닌 쪽은 자리를 믿을 수 없어 통째로 비운다(다른 쪽은 멀쩡하다)", () => {
+        const nine = ["0", "1", "0", "1", "0", "0", "1", "0", "1"];
+        const r = normalizeRead({ kind: "app", pars_front: ["4", "3", "4", "5", "4", "4", "3", "4", "4"], pars_back: [], rows: [{ label: null, front: nine, back: ["1-1", "1", "0", "1", "3", "0", "1", "0"], out: "45", in: "42", total: "87" }] })!;
+        expect(r.rows[0].cells.slice(0, 9)).toEqual(nine);
+        expect(r.rows[0].cells.slice(9)).toEqual(new Array(9).fill(null));
+        expect(r.pars.slice(0, 9)).toEqual(["4", "3", "4", "5", "4", "4", "3", "4", "4"]);
+        expect(r.pars.slice(9)).toEqual(new Array(9).fill(null));
+    });
+    it("숫자 위의 표시로 파를 안다 — 점 = 파3 · 줄 = 파5 · 없음 = 파4(오너의 볼카노 카드: 전반 35 + 10 = 45, 후반 36 + 6 = 42)", () => {
+        const c = (s: string, m = "none") => ({ s, m });
+        const front = [c("2"), c("1", "dot"), c("3"), c("2", "bar"), c("1"), c("0"), c("1", "dot"), c("0"), c("0")];
+        const back = [c("1", "bar"), c("-1", "dot"), c("1"), c("0"), c("1"), c("3"), c("0", "bar"), c("1", "dot"), c("0")];
+        const r = normalizeRead({ kind: "app", pars_front: [], pars_back: [], rows: [{ label: null, front, back, out: "45", in: "42", total: "87" }] })!;
+        expect(r.pars).toEqual(["4", "3", "4", "5", "4", "4", "3", "4", "4", "5", "3", "4", "4", "4", "4", "5", "3", "4"]);
+        expect(r.rows[0].cells).toEqual(["2", "1", "3", "2", "1", "0", "1", "0", "0", "1", "-1", "1", "0", "1", "3", "0", "1", "0"]);
+        const e = pickScanPars(r, null, null);
+        const d = buildScanDraft(r, e.pars, e.known)!;
+        // 파3 에서 +1 = 4타 · 파5 에서 +2 = 7타
+        expect(d.rows[0].cells.map((x) => x.strokes)).toEqual([6, 4, 7, 7, 5, 4, 4, 4, 4, 6, 2, 5, 4, 5, 7, 5, 4, 4]);
+        expect([d.rows[0].out.ok, d.rows[0].in.ok, d.rows[0].total.ok]).toEqual([true, true, true]);
+        expect(draftCounts(d)).toEqual({ ok: 18, check: 0, empty: 0 });
+    });
+    it("표시가 하나도 없는 아홉 홀은 이 꼴의 카드가 아니다 — 파를 지어내지 않는다 · 인쇄된 PAR 줄이 있으면 그것이 먼저", () => {
+        const plain = Array.from({ length: 9 }, () => ({ s: "0", m: "none" }));
+        const dotted = plain.map((x, i) => (i === 1 ? { s: "0", m: "dot" } : x));
+        expect(normalizeRead({ kind: "app", pars_front: [], pars_back: [], rows: [{ front: plain, back: plain }] })!.pars.every((p) => p == null)).toBe(true);
+        const printed = normalizeRead({ kind: "app", pars_front: ["5", "4", "3", "4", "5", "4", "3", "4", "4"], pars_back: [], rows: [{ front: dotted, back: dotted }] })!;
+        expect(printed.pars.slice(0, 3)).toEqual(["5", "4", "3"]);
+        expect(printed.pars.slice(9, 12)).toEqual(["4", "3", "4"]);
     });
     it("종류를 모르면 other · 객체가 아니면 null — 모델이 딴 것을 돌려줘도 터지지 않는다", () => {
         expect(normalizeRead({ kind: "poster", rows: [] })).toMatchObject({ kind: "other", rows: [] });
@@ -137,10 +167,16 @@ describe("초안", () => {
         const d = buildScanDraft(read([row(two, "41", "41", "82")]), PARS, KNOWN)!;
         expect(d.rows[0].cells[4]).toEqual({ strokes: 0, state: "empty" });
         expect(d.rows[0].out.ok).toBeNull();
+        // 합이 찍혀 있는데 맞춰 보지 못한 아홉 홀 — 읽힌 칸도 확정이 아니다(밀려 읽힌 줄이 확정으로 보이지 않게)
+        expect(d.rows[0].cells.slice(0, 9).filter((c) => c.strokes > 0).every((c) => c.state === "check" && c.why === "sum")).toBe(true);
         expect(d.rows[0].in.ok).toBe(true);
+        expect(d.rows[0].cells.slice(9).every((c) => c.state === "ok")).toBe(true);
         expect(d.rows[0].total.ok).toBeNull();
         const one: (string | null)[] = [...REL]; one[4] = null;
-        expect(buildScanDraft(read([row(one, null, "41")]), PARS, KNOWN)!.rows[0].cells[4]).toEqual({ strokes: 0, state: "empty" });
+        const noSum = buildScanDraft(read([row(one, null, "41")]), PARS, KNOWN)!.rows[0];
+        expect(noSum.cells[4]).toEqual({ strokes: 0, state: "empty" });
+        // 카드에 합이 아예 없는 아홉 홀은 견줄 것이 없다 — 읽힌 대로 둔다
+        expect(noSum.cells[0].state).toBe("ok");
     });
     it("합에서 나온 값이 한 홀의 타수가 될 수 없으면 채우지 않는다", () => {
         const cells: (string | null)[] = [...REL]; cells[4] = null;
@@ -267,5 +303,33 @@ describe("하루 횟수 한도", () => {
     it("넣지 않으면 없다 — 양의 정수를 넣었을 때만 건다", () => {
         for (const none of [undefined, null, "", "0", "-3", "abc", "2.5"]) expect(scanDailyLimit(none), String(none)).toBeNull();
         expect(scanDailyLimit("10")).toBe(10);
+    });
+});
+
+describe("전반 · 후반 따로 파 고르기", () => {
+    const F = PARS.slice(0, 9), B = PARS.slice(9);
+    const card = (pars: (string | null)[]) => read([row(REL, "41", "41", "82")], { pars });
+    it("한쪽 코스만 명부에 있어도 그쪽은 명부의 파 · 다른 쪽은 카드의 파", () => {
+        const r = pickScanPars(card(s(PARS)), F, null);
+        expect(r.src).toEqual(["list", "card"]);
+        expect(r.pars).toEqual(PARS);
+        expect(r.known.every(Boolean)).toBe(true);
+    });
+    it("명부에도 카드에도 파가 없는 쪽은 모르는 홀 — 그쪽만 빈칸이 된다", () => {
+        const none = [...s(F), ...new Array(9).fill(null)];
+        const r = pickScanPars(card(none), null, null);
+        expect(r.src).toEqual(["card", "none"]);
+        expect(r.known.slice(9).some(Boolean)).toBe(false);
+        const d = buildScanDraft(card(none), r.pars, r.known)!;
+        expect(draftCounts(d)).toEqual({ ok: 9, check: 0, empty: 9 });
+    });
+    it("명부의 파와 카드의 파가 다르면 카드에 찍힌 합과 맞는 쪽 — 못 가르면 명부", () => {
+        const wrong = [...F]; wrong[8] = F[8] + 1; // 명부의 9번 홀 파가 하나 크다 → 합이 42 가 된다
+        expect(halfFits(card(s(PARS)), F, 0)).toBe(true);
+        expect(halfFits(card(s(PARS)), wrong, 0)).toBe(false);
+        expect(pickScanPars(card(s(PARS)), wrong, B).src).toEqual(["card", "list"]);
+        // 카드에 합이 없으면 가를 수 없다 → 명부
+        const noSum = read([row(REL)], { pars: s(PARS) });
+        expect(pickScanPars(noSum, wrong, B).src).toEqual(["list", "list"]);
     });
 });

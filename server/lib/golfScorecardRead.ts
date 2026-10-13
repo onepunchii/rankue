@@ -39,13 +39,15 @@ export const SCAN_PROMPT = [
     "You transcribe an image of a golf scorecard into JSON. Transcribe only: never calculate, never correct, never guess.",
     "kind: \"app\" if the image is a digital scorecard produced by a golf scoring app or kiosk (printed fonts in a regular grid, as issued by SmartScore-style systems; a phone photo or screenshot of one counts). \"handwritten\" if the scores are written by hand. \"other\" if it is not a golf scorecard. If kind is not \"app\", return empty pars and rows.",
     "date: the date printed on the card exactly as written, or null.",
-    "club: the golf club's name exactly as printed on the card (usually the logo text or the header), or null if none is visible.",
+    "club: the golf club's name exactly as printed on the card (usually the logo text or the header; on compact share cards it is the large name above the course names), or null if none is visible.",
     "club_ko: that same club name written in Korean (Hangul). If it is printed in Korean, copy it. If it is printed in Latin letters, write its usual Korean transliteration (for example \"SOLMORO COUNTRY CLUB\" becomes \"솔모로 컨트리클럽\"). null if there is no club name.",
     "courses: an array of two strings - the course name printed at the top-left of the first block, then of the second block (for example \"Maple\", \"레이크\"); null for a block without a name. courses_ko: the same two names in Hangul (copy Korean, transliterate Latin).",
-    "The card has two blocks of nine holes, each with a course name, holes 1-9 and TOTAL. The first block is holes 1-9 and the second block is holes 10-18. If only one block is present, use null for the other nine holes.",
-    "pars: the printed PAR row, 18 cells in hole order (first block, then second block).",
-    "rows: one entry per PLAYER row, top to bottom, at most 4. The same player appears in both blocks on the same row position; merge them into one row of 18 cells.",
-    "cells: exactly what is printed in each hole's cell, as a short string. These cards usually show the score relative to par (\"0\", \"1\", \"2\", \"-1\"). Keep a minus sign when one is printed. A small icon (a bird, a star) may sit on a cell and partly cover it: transcribe the number and the sign only if you can actually see them; if the icon hides the digit or you are not sure, use null.",
+    "The card has two blocks (or two rows) of nine holes. Each may have a course name, hole numbers 1-9 and a TOTAL; compact share cards show only one player: two rows of nine score cells each followed by that half's total, the course names listed together near the club name (first name = first row), and the 18-hole total as a large number. The first block is holes 1-9 and the second block is holes 10-18. If only one block is present, use null for the other nine holes.",
+    "pars_front / pars_back: the printed PAR row of the first half and of the second half, nine entries each, exactly as printed. If the card has no PAR row, return an empty array for both. Do not work out pars yourself.",
+    "rows: one entry per PLAYER, top to bottom, at most 4. The same player appears in both blocks on the same row position; give that player's first-half cells in front and second-half cells in back.",
+    "front / back: exactly NINE entries each - one entry per box of that half, left to right. Count the boxes: the boxes are separated by vertical lines and the half's total comes after the ninth box. Never merge two boxes into one entry and never skip a box; if you cannot tell the boxes apart, still return nine entries and use null for the ones you cannot read.",
+    "Each entry is an object for one box: s = the score printed in the box, m = the small mark printed directly ABOVE the digit in that box - \"dot\" for a dot, \"bar\" for a short horizontal line, \"none\" when there is nothing above the digit. Some app share cards print such marks; most cards have none. The mark is never part of the score: a bar above a digit is NOT a minus sign. A minus sign is printed to the LEFT of the digit (\"-1\"). Put nothing but the score in s.",
+    "s is exactly what is printed, as a short string. These cards usually show the score relative to par (\"0\", \"1\", \"2\", \"-1\"). Keep a minus sign when one is printed. A small icon (a bird, a star) may sit on a cell and partly cover it: transcribe the number and the sign only if you can actually see them; if the icon hides the digit or you are not sure, use null.",
     "If a cell is empty, unreadable or cut off, use null. Do NOT infer a cell from totals or from neighbouring cells.",
     "out: the TOTAL cell of that player's row in the first block. in: the first TOTAL cell of that row in the second block. total: the 18-hole total (the extra number at the end of the row in the second block). Each exactly as printed; null if absent.",
     "label: the text at the start of the row (the player's name) as printed, or null if it is covered or unreadable.",
@@ -54,10 +56,13 @@ export const SCAN_PROMPT = [
 
 const cell = { type: ["string", "null"] };
 const cells = { type: "array", items: cell };
+/** 점수 칸 하나 — 숫자(s)와 그 위의 표시(m). 파3 · 파5 판정은 코드가 한다(shared normalizeRead) */
+const box = { type: "object", additionalProperties: false, required: ["s", "m"], properties: { s: cell, m: { type: "string", enum: ["none", "dot", "bar"] } } };
+const boxes = { type: "array", items: box };
 export const SCAN_SCHEMA = {
     type: "object",
     additionalProperties: false,
-    required: ["kind", "date", "club", "club_ko", "courses", "courses_ko", "pars", "rows"],
+    required: ["kind", "date", "club", "club_ko", "courses", "courses_ko", "pars_front", "pars_back", "rows"],
     properties: {
         kind: { type: "string", enum: ["app", "handwritten", "other"] },
         date: cell,
@@ -65,14 +70,15 @@ export const SCAN_SCHEMA = {
         club_ko: cell,
         courses: cells,
         courses_ko: cells,
-        pars: cells,
+        pars_front: cells,
+        pars_back: cells,
         rows: {
             type: "array",
             items: {
                 type: "object",
                 additionalProperties: false,
-                required: ["label", "cells", "out", "in", "total"],
-                properties: { label: cell, cells, out: cell, in: cell, total: cell },
+                required: ["label", "front", "back", "out", "in", "total"],
+                properties: { label: cell, front: boxes, back: boxes, out: cell, in: cell, total: cell },
             },
         },
     },

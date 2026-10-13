@@ -72,23 +72,54 @@ const cells18 = (v: unknown): (string | null)[] => {
     const a = Array.isArray(v) ? v : [];
     return Array.from({ length: HOLES }, (_, i) => str(a[i], 6));
 };
+/**
+ * 전반 · 후반을 9칸씩 따로 받은 답(front · back)을 18칸으로. 따로 받는 까닭: 모델이 두 칸을 한 칸으로 붙여 읽으면 뒤가 전부 한 칸씩 밀린다 —
+ * 반으로 나눠 받으면 다른 쪽 아홉 홀은 멀쩡하다. 아홉 칸이 아닌 쪽(붙여 읽었거나 빠뜨림)은 자리를 믿을 수 없어 **통째로 못 읽은 것**으로 둔다.
+ */
+const halves18 = (front: unknown, back: unknown): (string | null)[] => {
+    const nine = (v: unknown) => {
+        const a = Array.isArray(v) ? v : [];
+        // 칸은 글자이거나 { s: 숫자, m: 위 표시 } 꼴이다
+        return a.length === 9 ? a.map((x) => str(x && typeof x === "object" ? (x as any).s : x, 6)) : new Array(9).fill(null);
+    };
+    return [...nine(front), ...nine(back)];
+};
+/**
+ * 숫자 위의 표시로 파를 안다(오너 2026-10-13: "점이 파3, − 가 파5") — 스마트스코어 앱의 공유 카드는 PAR 줄이 없고,
+ * 파3 홀의 숫자 위에 점, 파5 홀의 숫자 위에 짧은 줄을 찍는다(표시 없는 홀은 파4). 모델은 칸마다 표시만 받아쓰고 판정은 여기서 한다.
+ * 아홉 홀에 표시가 하나도 없으면 이 꼴의 카드가 아니다(아홉 홀에 파3 가 없는 코스는 없다) → 모르는 것으로 둔다.
+ */
+const marks9 = (v: unknown): (string | null)[] => {
+    const a = Array.isArray(v) ? v : [];
+    if (a.length !== 9) return new Array(9).fill(null);
+    const m = a.map((x) => (x && typeof x === "object" ? String((x as any).m ?? "") : ""));
+    if (!m.some((k) => k === "dot" || k === "bar")) return new Array(9).fill(null);
+    return m.map((k) => (k === "dot" ? "3" : k === "bar" ? "5" : "4"));
+};
+const has = (o: Record<string, unknown>, k: string) => Array.isArray(o[k]);
+/** 아홉 홀씩 — 인쇄된 PAR 줄이 있으면 그것, 없으면 숫자 위 표시에서 나온 파 */
+const printedOrMarks = (printed: (string | null)[], marks: (string | null)[]): (string | null)[] =>
+    [0, 9].flatMap((from) => (printed.slice(from, from + 9).some((p) => p != null) ? printed.slice(from, from + 9) : marks.slice(from, from + 9)));
 
 /** 모델의 답을 믿지 않고 꼴을 맞춘다 — 18칸으로 자르고 채우며, 칸이 하나도 없는 줄은 버린다. 답이 객체가 아니면 null */
 export function normalizeRead(raw: unknown): ScanRead | null {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
     const o = raw as Record<string, unknown>;
     const rows: ScanReadRow[] = [];
+    let markPars: (string | null)[] = new Array(HOLES).fill(null);
     for (const r of Array.isArray(o.rows) ? o.rows : []) {
         if (!r || typeof r !== "object") continue;
         const x = r as Record<string, unknown>;
-        const cells = cells18(x.cells);
+        const cells = has(x, "front") || has(x, "back") ? halves18(x.front, x.back) : cells18(x.cells);
+        // 첫 줄의 표시가 그 카드의 파다(한 사람짜리 공유 카드)
+        if (!rows.length) markPars = [...marks9(x.front), ...marks9(x.back)];
         if (!cells.some((c) => c != null)) continue;
         rows.push({ label: str(x.label, 20), cells, out: str(x.out, 6), in: str(x.in, 6), total: str(x.total, 6) });
         if (rows.length >= SCAN_MAX_ROWS) break;
     }
     const kind: ScanCardKind = o.kind === "app" || o.kind === "handwritten" ? o.kind : "other";
     const pair = (v: unknown) => { const a = Array.isArray(v) ? v : []; return [str(a[0], 30), str(a[1], 30)]; };
-    return { kind, date: str(o.date, 24), club: str(o.club, 60), clubKo: str(o.club_ko ?? o.clubKo, 60), courses: pair(o.courses), coursesKo: pair(o.courses_ko ?? o.coursesKo), pars: cells18(o.pars), rows };
+    return { kind, date: str(o.date, 24), club: str(o.club, 60), clubKo: str(o.club_ko ?? o.clubKo, 60), courses: pair(o.courses), coursesKo: pair(o.courses_ko ?? o.coursesKo), pars: printedOrMarks(has(o, "pars_front") || has(o, "pars_back") ? halves18(o.pars_front, o.pars_back) : cells18(o.pars), markPars), rows };
 }
 
 /** 카드의 날짜 → YYYY-MM-DD. "2016/10/10" · "2016.10.10" · "2016-10-10" · "2016년 10월 10일". 못 읽으면 null */
@@ -153,6 +184,36 @@ export function effectivePars(read: Pick<ScanRead, "pars">, pars: readonly numbe
     const printed = read.pars.map(parOf);
     const out = Array.from({ length: HOLES }, (_, h) => (pars ? pars[h] : printed[h]) ?? null);
     return { pars: out.map((p) => p ?? 4), known: out.map((p) => p != null) };
+}
+
+/** 이 아홉 홀의 파(pars9)로 바꾼 타수의 합이 카드에 찍힌 합과 맞는 줄이 있는가 — 그 파가 이 카드의 것이라는 증거다 */
+export function halfFits(read: ScanRead, pars9: readonly number[], from: 0 | 9): boolean {
+    if (pars9.length < 9) return false;
+    const pars = Array.from({ length: HOLES }, (_, h) => (h >= from && h < from + 9 ? pars9[h - from] : 4));
+    const known = Array.from({ length: HOLES }, (_, h) => h >= from && h < from + 9);
+    const d = buildScanDraft({ ...read, pars: [] }, pars, known);
+    return !!d && d.rows.some((r) => (from === 0 ? r.out : r.in).ok === true);
+}
+
+export type ScanParSource = "list" | "card" | "none";
+/**
+ * 전반 · 후반 **따로** 쓸 파를 고른다(2026-10-13 밤 — 한쪽 코스만 명부에 있는 골프장에서 전부 빈칸이 되던 것).
+ * 명부의 파가 있으면 그것, 없으면 카드의 파(PAR 줄 · 숫자 위의 점/줄 표시). 둘이 다르면 카드에 찍힌 합과 맞는 쪽을 쓴다
+ * (명부의 파가 틀렸을 수도, 카드를 잘못 읽었을 수도 있다 — 합이 가른다. 어느 쪽도 못 가르면 명부).
+ */
+export function pickScanPars(read: ScanRead, listFront: readonly number[] | null, listBack: readonly number[] | null): { pars: number[]; known: boolean[]; src: [ScanParSource, ScanParSource] } {
+    const card = effectivePars(read, null);
+    const pars: number[] = [], known: boolean[] = [], src: ScanParSource[] = [];
+    for (const [from, list] of [[0, listFront], [9, listBack]] as const) {
+        const cp = card.pars.slice(from, from + 9), ck = card.known.slice(from, from + 9);
+        const cardFull = ck.every(Boolean);
+        let use: ScanParSource = list ? "list" : ck.some(Boolean) ? "card" : "none";
+        if (list && cardFull && !cp.every((p, i) => p === list[i]) && halfFits(read, cp, from) && !halfFits(read, list, from)) use = "card";
+        pars.push(...(use === "list" ? (list as readonly number[]).slice(0, 9) : cp));
+        known.push(...(use === "list" ? new Array(9).fill(true) : ck));
+        src.push(use);
+    }
+    return { pars, known, src: [src[0], src[1]] };
 }
 
 /**
@@ -309,6 +370,11 @@ export function buildScanDraft(read: ScanRead | null | undefined, pars: readonly
         const half = (from: number, printed: string | null) => sumCheck(printed, strokes.slice(from, from + 9), usePar.slice(from, from + 9));
         const out = half(0, r.out), inn = half(9, r.in);
         for (const [from, chk] of [[0, out], [9, inn]] as const) {
+            // 카드에 합이 찍혀 있는데 맞춰 보지 못한 아홉 홀(빈칸이 둘 이상)도 확정이 아니다 — 한 칸씩 밀려 읽힌 줄이 '확정'으로 보이면 안 된다
+            if (chk.ok === null && chk.printed != null) {
+                for (let h = from; h < from + 9; h++) if (cells[h].state === "ok") cells[h] = { ...cells[h], state: "check", why: "sum" };
+                continue;
+            }
             if (chk.ok !== false || chk.off == null) continue;
             // 합이 안 맞는 아홉 홀은 어느 칸이 틀렸는지 모른다 — 읽힌 칸을 전부 '확인 필요'로 내린다
             for (let h = from; h < from + 9; h++) if (cells[h].state === "ok") cells[h] = { ...cells[h], state: "check", why: "sum" };
@@ -379,7 +445,7 @@ export const SCAN_COPY = {
     abroad: "글자를 읽으려고 그림을 해외의 AI 서비스로 보내요. 원하지 않으면 올리지 말고 직접 적어 주세요.",
     reading: "카드를 읽고 있어요",
     states: { ok: "확정", check: "확인 필요", empty: "빈칸" } as Record<CellState, string>,
-    why: { sum: "아홉 홀 합이 카드와 달라요", sign: "버디 표시에 − 가 가려졌을 수 있어요", derived: "가려진 칸이라 카드의 합에서 계산했어요" } as Record<CellWhy, string>,
+    why: { sum: "아홉 홀 합을 카드와 맞춰 보지 못했어요", sign: "버디 표시에 − 가 가려졌을 수 있어요", derived: "가려진 칸이라 카드의 합에서 계산했어요" } as Record<CellWhy, string>,
     notices: {
         course: "카드의 파가 이 방의 코스와 달라요. 코스를 맞게 골랐는지 확인해 주세요.",
         date: "카드의 날짜가 이 라운드의 날과 달라요. 이 라운드의 카드가 맞는지 확인해 주세요.",

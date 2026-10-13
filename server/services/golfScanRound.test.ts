@@ -19,12 +19,12 @@ describe("카드를 명부와 맞추기", () => {
         const r = resolveCardWith(read(), index);
         expect(r.club?.id).toBe("a");
         expect([r.front?.name, r.back?.name]).toEqual(["메이플", "파인"]);
-        expect(r.pars).toEqual([...FRONT, ...BACK]);
+        expect([r.front?.pars, r.back?.pars]).toEqual([FRONT, BACK]);
     });
-    it("코스를 하나만 맞추면 파는 비운다(카드의 파를 쓴다) · 골프장을 못 맞추면 전부 null", () => {
+    it("코스를 하나만 맞춰도 그쪽은 쓴다(다른 쪽은 카드의 파) · 골프장을 못 맞추면 전부 null", () => {
         const one = resolveCardWith(read({ courses: ["Maple", "Oak"], coursesKo: ["메이플", "오크"], pars: [...FRONT, ...Array(9).fill(4)].map(String) }), index);
-        expect([one.club?.id, one.front?.name, one.back, one.pars]).toEqual(["a", "메이플", null, null]);
-        expect(resolveCardWith(read({ club: "URBAN CC", clubKo: "어반 CC" }), index)).toEqual({ club: null, front: null, back: null, pars: null });
+        expect([one.club?.id, one.front?.name, one.back]).toEqual(["a", "메이플", null]);
+        expect(resolveCardWith(read({ club: "URBAN CC", clubKo: "어반 CC" }), index)).toEqual({ club: null, front: null, back: null });
     });
 });
 

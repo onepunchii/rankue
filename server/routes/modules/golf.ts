@@ -26,8 +26,8 @@ import { PIN_PHOTOS } from "../../../shared/golfPins.js";
 import { parseLatLng } from "../../../shared/golfNearby.js";
 import { ONSITE_SOURCES, type OnSiteSource } from "../../../shared/golfOnSite.js";
 import { sanitizeHolePatches, withoutHoleStats } from "../../../shared/golfHoleStats.js";
-import { SCAN_COPY, scanDailyLimit, buildScanDraft, draftCounts, effectivePars, scanEditCount, scanKstDay, usableCardDay } from "../../../shared/golfScorecardScan.js";
-import { clubIndex, openScan, resolveCard, signScan } from "../../services/golfScanRound.js";
+import { SCAN_COPY, scanDailyLimit, buildScanDraft, draftCounts, halfFits, pickScanPars, scanEditCount, scanKstDay, usableCardDay } from "../../../shared/golfScorecardScan.js";
+import { clubIndex, openScan, resolveCard, saveSeenCourse, signScan } from "../../services/golfScanRound.js";
 import { isSuperAdminRole } from "../../../shared/adminRole.js";
 import { readScorecard, scanConfigured, scanImage, scanPublic } from "../../lib/golfScorecardRead.js";
 import { logScan, scanRole, scansToday, type ScanOutcome } from "../../storage/golfScanLog.js";
@@ -1149,7 +1149,17 @@ router.post("/scan/card", requireAuth, asyncHandler(async (req: AuthRequest, res
     if (!r.read) { await log("failed"); return sendError(res, 502, SCAN_COPY.failed); }
     if (r.read.kind === "handwritten") { await log("handwritten"); return sendError(res, 422, SCAN_COPY.handwritten); }
     const found = await resolveCard(r.read);
-    const eff = effectivePars(r.read, found.pars);
+    // 전반 · 후반 따로 — 명부의 파, 없으면 카드의 파(PAR 줄 · 점/줄 표시). 둘이 다르면 카드의 합과 맞는 쪽
+    const eff = pickScanPars(r.read, found.front?.pars ?? null, found.back?.pars ?? null);
+    // 카드에서 확인된 코스 · 파를 쌓는다 — 그 아홉 홀의 합이 카드와 맞아떨어졌을 때만(다음 사람의 카드는 이 파로 읽힌다)
+    if (found.club && r.read.kind === "app") {
+        for (const [i, from] of [[0, 0], [1, 9]] as const) {
+            const name = (i === 0 ? found.front?.name : found.back?.name) ?? r.read.coursesKo?.[i] ?? r.read.courses?.[i];
+            const p9 = eff.pars.slice(from, from + 9);
+            if (!name || !eff.known.slice(from, from + 9).every(Boolean) || !halfFits(r.read, p9, from)) continue;
+            await saveSeenCourse({ clubId: found.club.id, name, pars: p9, memberId: req.userId! }).catch((e) => console.warn("[GolfScan] seen", String(e?.message ?? e).slice(0, 100)));
+        }
+    }
     const draft = r.read.kind === "app" ? buildScanDraft(r.read, eff.pars, eff.known) : null;
     if (!draft) { await log(r.read.kind === "app" ? "none" : "other"); return sendError(res, 422, SCAN_COPY.none); }
     await log("ok", { rows: draft.rows.length, ...draftCounts(draft) });
