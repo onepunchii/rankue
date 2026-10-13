@@ -29,7 +29,8 @@ import { HkSectionNav, hkJumpTo, type HkNavItem } from "../components/HkSectionN
 import { MountainLocation } from "../components/MountainLocation";
 import { MountainNearbyPlaces } from "../components/MountainNearbyPlaces";
 import { NearDial } from "../components/NearMe";
-import { CourseProfile, CourseTrace } from "../components/CourseParts";
+import { CourseProfile, CourseTrace, SLOPE_COLOR } from "../components/CourseParts";
+import { SLOPE_LABEL, courseLevel, courseSlopes, type CourseLevelId } from "@shared/hikingCourseLook";
 import { Fact, HikingCta, MountainRow, MountainWeather, SunToday } from "../components/MountainParts";
 import { SummitStamp, regionInk } from "../stamps/SummitStamp";
 import { SummitCheckin } from "../stamps/SummitCheckin";
@@ -55,11 +56,20 @@ const NAV_ITEMS: readonly HkNavItem[] = MOUNTAIN_SECTIONS.map((s) => (s.id === "
 
 /** 코스의 지점을 처음에 보여 주는 수 */
 const POI_FIRST = 6;
+/** 힘든 정도의 색 — 종이 위의 작은 딱지 */
+const LEVEL_STYLE: Readonly<Record<CourseLevelId, { background: string; color: string }>> = {
+    easy: { background: "#2F6B4F1F", color: "#245A40" },
+    moderate: { background: "#C98A1E26", color: "#7A5208" },
+    hard: { background: "#D8492F24", color: "#A2321C" },
+};
+
 /** 길 위의 지점을 고르는 칩 — 갈림길은 수가 많아 맨 뒤 */
 const POI_ORDER: readonly HikingPoiKind[] = ["DANGER", "SHELTER", "WILD", "CULTURAL", "GRID", "MARK", "SIGN"];
 
 function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi[] }) {
     const f = courseFacts(c);
+    const level = courseLevel(c);
+    const slopes = useMemo(() => courseSlopes(c.line), [c.line]);
     const on = useMemo(() => pois.filter((p) => p.courseId === c.id && p.km != null).sort((a, b) => a.km! - b.km!), [pois, c.id]);
     const kinds = POI_ORDER.filter((k) => on.some((p) => p.kind === k));
     const [kind, setKind] = useState<HikingPoiKind | null>(null);
@@ -67,28 +77,49 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
     const shown = on.filter((p) => (kind ? p.kind === kind : p.kind !== "SIGN" || on.length <= POI_FIRST));
     const list = all ? shown : shown.slice(0, POI_FIRST);
     return (
-        <div className="rounded-2xl bg-[#F4EFE3] p-3.5 text-[#0E2A33]" data-testid={`course-${c.id}`}>
-            {c.via && <p className="mb-2.5 text-[13px] leading-snug text-[#8A5E00] break-keep" data-testid="course-via">{courseViaNote(c.via)}</p>}
-            <ul className="flex divide-x divide-[#0E2A331F] text-center">
-                {([[f.km, "거리"], [f.gain, "오르막"], [f.time, "걷는 시간"]] as const).map(([v, k]) => (
+        <div className="overflow-hidden rounded-[20px] bg-[#F4EFE3] text-[#0E2A33]" style={{ boxShadow: "0 6px 16px rgba(0,0,0,0.28)" }} data-testid={`course-${c.id}`}>
+            {/* 머리 — 코스의 이름과 힘든 정도 */}
+            <div className="flex items-start gap-3 px-4 pb-3 pt-3.5" style={{ background: "linear-gradient(180deg,#E9E2D0,#F4EFE3)" }}>
+                <div className="min-w-0 flex-1">
+                    <p className="text-[16.5px] font-semibold leading-tight tracking-tight">코스 {c.seq} · {courseShape(c)}</p>
+                    <p className="mt-0.5 text-[13px] tabular-nums text-[#0E2A3399]">해발 {c.minM.toLocaleString("en-US")}~{c.maxM.toLocaleString("en-US")}m</p>
+                </div>
+                <span className="shrink-0 rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold leading-none" style={LEVEL_STYLE[level.id]} title={level.note} data-testid="course-level" data-level={level.id}>{level.label}</span>
+            </div>
+            {c.via && <p className="px-4 pb-2 text-[13px] leading-snug text-[#8A5E00] break-keep" data-testid="course-via">{courseViaNote(c.via)}</p>}
+            {/* 숫자 셋 */}
+            <ul className="mx-4 flex divide-x divide-[#0E2A331F] rounded-2xl bg-[#0E2A330A] py-2.5 text-center">
+                {([[f.km, "거리", "M4 18 L9 8 L13 14 L16 10 L20 18 Z"], [f.gain, "오르막", "M5 17 L12 6 L19 17 M12 6 V3 M9.5 5.5 L12 3 L14.5 5.5"], [f.time, "걷는 시간(어림)", "M12 4 a8 8 0 1 0 0.01 0 Z M12 8 V12 L15 14"]] as const).map(([v, k, icon]) => (
                     <li key={k} className="flex-1 px-1">
-                        <span className="block text-[17px] font-semibold tabular-nums leading-tight">{v}</span>
+                        <svg width="18" height="18" viewBox="0 0 24 24" className="mx-auto text-[#1F5560]" aria-hidden><path d={icon} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        <span className="mt-0.5 block whitespace-nowrap text-[16.5px] font-semibold tabular-nums leading-tight">{v}</span>
                         <span className="text-[12px] text-[#0E2A3399]">{k}</span>
                     </li>
                 ))}
             </ul>
-            <div className="mt-3"><CourseProfile line={c.line} pois={on} summitKm={c.summitKm} /></div>
-            <div className="mt-2 flex items-center gap-3">
-                <div className="w-[96px] shrink-0 rounded-xl bg-[#0E2A330D]"><CourseTrace line={c.line} summitKm={c.summitKm} /></div>
-                <div className="min-w-0 flex-1 text-[13px] leading-relaxed text-[#0E2A33B3]">
-                    <p className="text-[14.5px] font-semibold text-[#0E2A33]">{courseShape(c)}</p>
-                    <p>해발 {c.minM.toLocaleString("en-US")}~{c.maxM.toLocaleString("en-US")}m</p>
-                    <p className="break-keep">흰 점에서 출발해 검은 점까지 · 위가 북쪽{c.summitKm != null ? " · 세모가 정상" : ""}</p>
-                </div>
+            {/* 높낮이 */}
+            <div className="px-3 pt-3"><CourseProfile line={c.line} pois={on} summitKm={c.summitKm} /></div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-1.5 text-[12px] text-[#0E2A3399]" aria-label="선의 색">
+                {SLOPE_LABEL.map((label, k) => (k === 0 || (k === 1 ? slopes.steepKm > 0 : slopes.veryKm > 0)) && (
+                    <span key={label} className="flex items-center gap-1.5"><span className="h-[3px] w-4 rounded-full" style={{ background: SLOPE_COLOR[k] }} aria-hidden />{label}{k === 1 && slopes.steepKm > 0 ? ` ${slopes.steepKm}km` : k === 2 && slopes.veryKm > 0 ? ` ${slopes.veryKm}km` : ""}</span>
+                ))}
             </div>
-            {on.length > 0 && (
-                <div className="mt-3 border-t border-[#0E2A331A] pt-3">
-                    <div className="flex flex-wrap gap-1.5" role="group" aria-label="길 위의 지점 고르기">
+            {/* 길의 모양과 한눈 사실 */}
+            <div className="mt-3 flex items-stretch gap-3 px-4">
+                <div className="w-[112px] shrink-0 self-start rounded-2xl bg-[#0E2A330D] p-1" style={{ boxShadow: "inset 0 0 0 1px #0E2A3314" }}><CourseTrace line={c.line} summitKm={c.summitKm} /></div>
+                <dl className="min-w-0 flex-1 self-center text-[13px]">
+                    {([["내리막", `${slopes.lossM.toLocaleString("en-US")}m`], ["가장 높은 곳", `${c.maxM.toLocaleString("en-US")}m`], ["출발하는 높이", `${Math.round(c.line[0]?.[2] ?? c.minM).toLocaleString("en-US")}m`], ...(c.summitKm != null ? [["정상까지", `${(Math.round(c.summitKm * 10) / 10).toString()}km`]] : [])] as [string, string][]).map(([k, v]) => (
+                        <div key={k} className="flex items-baseline justify-between gap-2 border-b border-[#0E2A3312] py-1.5 last:border-b-0">
+                            <dt className="text-[#0E2A3399]">{k}</dt><dd className="font-semibold tabular-nums">{v}</dd>
+                        </div>
+                    ))}
+                </dl>
+            </div>
+            <p className="px-4 pt-1.5 text-[12px] leading-snug text-[#0E2A3380] break-keep">흰 점에서 출발해 검은 점까지 · 위가 북쪽{c.summitKm != null ? " · 세모가 정상" : ""}</p>
+            {on.length > 0 ? (
+                <div className="mt-3 border-t border-[#0E2A331A] px-4 pb-3.5 pt-3">
+                    <p className="text-[14.5px] font-semibold">길 위에서 만나는 것</p>
+                    <div className="mt-2 flex flex-wrap gap-1.5" role="group" aria-label="길 위의 지점 고르기">
                         {kinds.map((k) => {
                             const n = on.filter((p) => p.kind === k).length, sel = kind === k;
                             return (
@@ -100,23 +131,26 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
                         })}
                     </div>
                     {list.length > 0 && (
-                        <ul className="mt-2.5">
+                        // 걷는 차례대로 — 왼쪽은 출발부터의 거리, 가운데 줄이 길
+                        <ol className="relative mt-3" data-testid="course-timeline">
+                            <span className="absolute bottom-3 top-3 w-[2px] rounded-full bg-[#0E2A331F]" style={{ left: 55 }} aria-hidden />
                             {list.map((p) => (
-                                <li key={p.id} className="flex items-center gap-2.5 border-t border-[#0E2A3312] py-2 first:border-t-0">
-                                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: POI_COLOR[p.kind] }} aria-hidden />
-                                    <span className="min-w-0 flex-1 truncate text-[14px]">{hikingPoiTitle(p)}</span>
-                                    <span className="shrink-0 text-[12.5px] tabular-nums text-[#0E2A3399]">{p.km!.toFixed(1)}km{p.altM != null ? ` · ${p.altM.toLocaleString("en-US")}m` : ""}</span>
+                                <li key={p.id} className="relative flex items-center gap-0 py-1.5">
+                                    <span className="w-[46px] shrink-0 text-right text-[12.5px] tabular-nums text-[#0E2A3399]">{p.km!.toFixed(1)}km</span>
+                                    <span className="relative z-[1] mx-[5px] h-[10px] w-[10px] shrink-0 rounded-full" style={{ background: POI_COLOR[p.kind], boxShadow: "0 0 0 2.5px #F4EFE3" }} aria-hidden />
+                                    <span className="ml-1.5 min-w-0 flex-1 truncate text-[14px]">{hikingPoiTitle(p)}</span>
+                                    {p.altM != null && <span className="shrink-0 pl-2 text-[12.5px] tabular-nums text-[#0E2A3399]">{p.altM.toLocaleString("en-US")}m</span>}
                                 </li>
                             ))}
-                        </ul>
+                        </ol>
                     )}
                     {shown.length > POI_FIRST && !all && (
-                        <button type="button" onClick={() => setAll(true)} className="mt-1 flex h-10 w-full items-center justify-center gap-1 rounded-xl bg-[#0E2A330F] text-[13.5px] text-[#0E2A33]">
+                        <button type="button" onClick={() => setAll(true)} className="mt-1.5 flex h-10 w-full items-center justify-center gap-1 rounded-xl bg-[#0E2A330F] text-[13.5px] text-[#0E2A33]">
                             {shown.length - POI_FIRST}곳 더 보기<LucideChevronDown weight="bold" className="h-4 w-4" aria-hidden />
                         </button>
                     )}
                 </div>
-            )}
+            ) : <div className="h-3.5" />}
         </div>
     );
 }

@@ -53,12 +53,12 @@ export function MountainRow({ m, km, done }: { m: MountainSummary; km?: number; 
 
 const WET = ["rain", "sleet", "snow", "shower"];
 /** 하늘 그림 — 해 · 구름 · 비 · 눈(작은 선 그림. 글자 그림을 쓰지 않는다 — 기기마다 모양이 다르다) */
-function Sky({ h }: { h: WxHalf | null }) {
-    if (!h) return <span className="block h-[22px] w-[22px]" />;
+function Sky({ h, size = 22 }: { h: WxHalf | null; size?: number }) {
+    if (!h) return <span className="block" style={{ width: size, height: size }} />;
     const k = h.kind;
     const cloud = k !== "clear";
     return (
-        <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden>
+        <svg width={size} height={size} viewBox="0 0 22 22" aria-hidden>
             {(k === "clear" || k === "partly") && <circle cx={k === "partly" ? 8 : 11} cy={k === "partly" ? 8 : 11} r={k === "partly" ? 4 : 5} fill="#F6D9A8" />}
             {cloud && <path d="M6.5 16.5 a3.6 3.6 0 0 1 0.6-7.1 a4.6 4.6 0 0 1 8.8 0.9 a3.1 3.1 0 0 1-0.3 6.2 Z" fill={WET.includes(k) ? "#8FA9B3" : "#C9D6DA"} />}
             {(k === "rain" || k === "shower" || k === "sleet") && <path d="M8 18 l-1 2.6 M12 18 l-1 2.6 M16 18 l-1 2.6" stroke="#8EC5FF" strokeWidth="1.5" strokeLinecap="round" />}
@@ -73,24 +73,54 @@ export function MountainWeather({ slug }: { slug: string }) {
     const { data, isLoading } = useQuery<CourseWeather | null>({ queryKey: mountainWeatherKey(slug), staleTime: 10 * 60_000 });
     if (isLoading) return <div className="h-[104px] animate-pulse rounded-2xl bg-[#FFFFFF0F]" aria-busy="true" />;
     if (!data?.days?.length) return <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-4 text-[14px] text-[#F4EFE399]">지금은 날씨를 받아 오지 못했어요.</p>;
+    const days = data.days.slice(0, 7);
+    const today = days[0], rest = days.slice(1);
+    const temps = days.flatMap((d) => [d.tmx, d.tmn]).filter((v): v is number => v != null);
+    const lo = temps.length ? Math.min(...temps) : 0, hi = temps.length ? Math.max(...temps) : 1;
+    const at = (v: number) => ((v - lo) / Math.max(1, hi - lo)) * 100;
+    const popOf = (d: (typeof days)[number]) => Math.max(d.am?.pop ?? 0, d.pm?.pop ?? 0);
+    const wetOf = (d: (typeof days)[number]) => !!((d.am && WET.includes(d.am.kind)) || (d.pm && WET.includes(d.pm.kind)));
+    const words = [today.am, today.pm].filter(Boolean).map((h) => WX_LABEL[h!.kind]);
     return (
         <div data-testid="mountain-weather">
-            <ul className="flex gap-0.5 overflow-x-auto rounded-2xl bg-[#FFFFFF0A] px-1.5 py-3" style={{ scrollbarWidth: "none" }}>
-                {data.days.slice(0, 7).map((d, i) => {
-                    // 날짜 글자의 요일 — 그날 낮 12시(UTC)의 요일이 곧 그 달력 날짜의 요일이다
-                    const dow = DOW[new Date(`${d.date}T12:00:00Z`).getUTCDay()];
-                    const wet = (d.am && WET.includes(d.am.kind)) || (d.pm && WET.includes(d.pm.kind));
-                    const pop = Math.max(d.am?.pop ?? 0, d.pm?.pop ?? 0);
-                    return (
-                        <li key={d.date} className="flex min-w-[42px] flex-1 flex-col items-center gap-1 rounded-xl py-1.5" style={{ background: i === 0 ? "#FFFFFF14" : undefined }}>
-                            <span className="text-[12.5px] text-[#F4EFE3B3]">{i === 0 ? "오늘" : dow}</span>
-                            <span className="flex" role="img" aria-label={[d.am, d.pm].filter(Boolean).map((h) => WX_LABEL[h!.kind]).join(" → ")}><Sky h={d.pm ?? d.am} /></span>
-                            <span className="text-[13px] tabular-nums text-[#F4EFE3]">{d.tmx != null ? `${Math.round(d.tmx)}°` : "–"}<span className="text-[#F4EFE380]"> {d.tmn != null ? `${Math.round(d.tmn)}°` : ""}</span></span>
-                            <span className="text-[12px] tabular-nums" style={{ color: wet ? "#8EC5FF" : "#F4EFE366" }}>{pop > 0 ? `${pop}%` : "–"}</span>
-                        </li>
-                    );
-                })}
-            </ul>
+            {/* 오늘 — 크게 */}
+            <div className="flex items-center gap-4 rounded-2xl px-4 py-4" style={{ background: "linear-gradient(135deg,#1F556073,#0E2A33)", boxShadow: "inset 0 0 0 1px #FFFFFF1F" }} data-testid="weather-today">
+                <span className="flex h-[64px] w-[64px] shrink-0 items-center justify-center rounded-2xl bg-[#FFFFFF14]" role="img" aria-label={words.join(" → ")}><Sky h={today.pm ?? today.am} size={44} /></span>
+                <div className="min-w-0 flex-1">
+                    <p className="text-[12.5px] text-[#F6D9A8]">오늘 · 산 아래</p>
+                    <p className="mt-0.5 text-[26px] font-semibold tabular-nums leading-none text-[#F4EFE3]">
+                        {today.tmx != null ? `${Math.round(today.tmx)}°` : "–"}<span className="ml-1.5 text-[17px] font-normal text-[#F4EFE380]">{today.tmn != null ? `${Math.round(today.tmn)}°` : ""}</span>
+                    </p>
+                    <p className="mt-1 truncate text-[13.5px] text-[#F4EFE3CC]">{words.filter((w, i, arr) => arr.indexOf(w) === i).join(" → ") || "예보 준비 중"}</p>
+                </div>
+                <div className="shrink-0 text-right">
+                    <p className="text-[12.5px] text-[#F4EFE399]">비 올 확률</p>
+                    <p className="mt-0.5 text-[20px] font-semibold tabular-nums leading-none" style={{ color: wetOf(today) ? "#8EC5FF" : "#F4EFE3" }}>{popOf(today) > 0 ? `${popOf(today)}%` : "0%"}</p>
+                </div>
+            </div>
+            {/* 엿새 — 한 줄씩, 기온의 폭을 막대로 */}
+            {rest.length > 0 && (
+                <ul className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-4" data-testid="weather-days">
+                    {rest.map((d, i) => {
+                        // 날짜 글자의 요일 — 그날 낮 12시(UTC)의 요일이 곧 그 달력 날짜의 요일이다
+                        const dow = DOW[new Date(`${d.date}T12:00:00Z`).getUTCDay()];
+                        const pop = popOf(d), wet = wetOf(d);
+                        const l = d.tmn != null ? at(d.tmn) : 0, r = d.tmx != null ? at(d.tmx) : 100;
+                        return (
+                            <li key={d.date} className={`flex h-11 items-center gap-2.5 ${i ? "border-t border-[#FFFFFF14]" : ""}`}>
+                                <span className="w-7 shrink-0 text-[14px]" style={{ color: dow === "일" ? "#FF9C8A" : dow === "토" ? "#8EC5FF" : "#F4EFE3" }}>{dow}</span>
+                                <span className="flex w-7 shrink-0 justify-center" role="img" aria-label={[d.am, d.pm].filter(Boolean).map((h) => WX_LABEL[h!.kind]).join(" → ")}><Sky h={d.pm ?? d.am} /></span>
+                                <span className="w-9 shrink-0 text-right text-[12.5px] tabular-nums" style={{ color: wet ? "#8EC5FF" : "#F4EFE366" }}>{pop > 0 ? `${pop}%` : "–"}</span>
+                                <span className="w-8 shrink-0 text-right text-[13.5px] tabular-nums text-[#F4EFE399]">{d.tmn != null ? `${Math.round(d.tmn)}°` : ""}</span>
+                                <span className="relative h-1.5 min-w-0 flex-1 rounded-full bg-[#FFFFFF14]" aria-hidden>
+                                    {d.tmn != null && d.tmx != null && <span className="absolute inset-y-0 rounded-full" style={{ left: `${l}%`, right: `${100 - r}%`, minWidth: 6, background: "linear-gradient(90deg,#8EC5FF,#F6D9A8 55%,#F28C6A)" }} />}
+                                </span>
+                                <span className="w-8 shrink-0 text-[13.5px] tabular-nums text-[#F4EFE3]">{d.tmx != null ? `${Math.round(d.tmx)}°` : "–"}</span>
+                            </li>
+                        );
+                    })}
+                </ul>
+            )}
             <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{WEATHER_NOTE}</p>
         </div>
     );
@@ -121,19 +151,44 @@ export const Fact = ({ children }: { children: string }) => <span className="rou
  * 해 지기 전에 내려오라는 안전의 말이다. 자리를 모르는 산에는 그리지 않는다.
  */
 export function SunToday({ lat, lng }: { lat: number | null; lng: number | null }) {
-    const st = lat != null && lng != null ? sunTimes(kstYmd(Date.now()), lat, lng) : null;
+    const now = Date.now();
+    const st = lat != null && lng != null ? sunTimes(kstYmd(now), lat, lng) : null;
     if (!st) return null;
+    // 해의 길 — 왼쪽 끝이 해 뜸, 오른쪽 끝이 해 짐. 지금의 해가 그 위 어디쯤인지 놓는다
+    const W = 300, H = 104, X0 = 26, X1 = 274, BASE = 78, RY = 58;
+    const f = Math.min(1, Math.max(0, (now - st.rise) / Math.max(1, st.set - st.rise)));
+    const up = now >= st.rise && now <= st.set;
+    const at = (t: number): [number, number] => { const a = Math.PI * (1 - t); return [(X0 + X1) / 2 + Math.cos(a) * ((X1 - X0) / 2), BASE - Math.sin(a) * RY]; };
+    const arc = (t0: number, t1: number) => Array.from({ length: 25 }, (_, i) => at(t0 + ((t1 - t0) * i) / 24)).map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`).join(" ");
+    const [sx, sy] = at(f);
+    const left = (st.set - now) / 60_000;
+    const state = !up ? (now < st.rise ? `해 뜨기까지 ${spanText((st.rise - now) / 60_000)}` : "오늘 해는 졌어요") : `해 지기까지 ${spanText(left)}`;
     return (
-        <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-4 py-3" data-testid="mountain-sun">
-            <p className="flex items-center gap-2 text-[14px] tabular-nums text-[#F4EFE3]">
-                <svg width="18" height="18" viewBox="0 0 24 24" className="shrink-0 text-[#F6D9A8]" aria-hidden>
-                    <path d="M3 18h18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                    <path d="M6.5 18a5.5 5.5 0 0 1 11 0" fill="currentColor" />
-                    <path d="M12 6.5V9M5.2 9.6l1.7 1.7M18.8 9.6l-1.7 1.7" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                </svg>
-                <span className="min-w-0 whitespace-nowrap" aria-label={`오늘 ${sunLine(st)}`}>오늘 해 뜸 {kstClock(st.rise)} · 해 짐 {kstClock(st.set)}</span>
-            </p>
-            <p className="mt-1 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">낮 {spanText((st.set - st.rise) / 60_000)} · {SUN_NOTE}</p>
+        <div className="mt-2.5 rounded-2xl px-4 pb-3.5 pt-3" style={{ background: "linear-gradient(180deg,#F6D9A814,#FFFFFF0A)", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="mountain-sun">
+            <div className="flex items-baseline justify-between gap-3">
+                <p className="text-[14.5px] font-semibold text-[#F4EFE3]">오늘의 해</p>
+                <p className="text-[13px] tabular-nums" style={{ color: up && left <= 120 ? "#F28C6A" : "#F6D9A8" }} data-testid="mountain-sun-state">{state}</p>
+            </div>
+            <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={`오늘 ${sunLine(st)}`} style={{ display: "block", width: "100%" }} className="mt-1">
+                <defs><linearGradient id="hk-sun-day" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#F6D9A8" stopOpacity="0.3" /><stop offset="100%" stopColor="#F6D9A8" stopOpacity="0" /></linearGradient></defs>
+                {/* 지나온 낮 */}
+                {up && <path d={`${arc(0, f)} L${sx.toFixed(1)} ${BASE} L${X0} ${BASE} Z`} fill="url(#hk-sun-day)" />}
+                <path d={arc(0, 1)} fill="none" stroke="#F4EFE3" strokeOpacity="0.28" strokeWidth="1.6" strokeDasharray="2 5" strokeLinecap="round" />
+                {up && <path d={arc(0, f)} fill="none" stroke="#F6D9A8" strokeWidth="2.4" strokeLinecap="round" />}
+                <path d={`M8 ${BASE} H${W - 8}`} stroke="#F4EFE3" strokeOpacity="0.3" strokeWidth="1.2" />
+                {/* 산 능선(장식) */}
+                <path d={`M8 ${BASE} L60 ${BASE - 13} L92 ${BASE - 5} L138 ${BASE - 21} L176 ${BASE - 7} L222 ${BASE - 16} L262 ${BASE - 4} L${W - 8} ${BASE} Z`} fill="#0B1F26" fillOpacity="0.55" />
+                <circle cx={X0} cy={BASE} r="3.4" fill="#F6D9A8" /><circle cx={X1} cy={BASE} r="3.4" fill="#F28C6A" />
+                {up && (<><circle cx={sx} cy={sy} r="13" fill="#F6D9A8" opacity="0.22" /><circle cx={sx} cy={sy} r="7" fill="#F6D9A8" stroke="#FFF6E3" strokeWidth="1.6" /></>)}
+                <text x={X0} y={H - 5} textAnchor="middle" fontSize="12.5" fill="#F4EFE3" fillOpacity="0.72">해 뜸</text>
+                <text x={X1} y={H - 5} textAnchor="middle" fontSize="12.5" fill="#F4EFE3" fillOpacity="0.72">해 짐</text>
+            </svg>
+            <div className="-mt-1 flex items-end justify-between">
+                <span className="text-[19px] font-semibold tabular-nums text-[#F4EFE3]">{kstClock(st.rise)}</span>
+                <span className="pb-0.5 text-[12.5px] tabular-nums text-[#F4EFE399]">낮 {spanText((st.set - st.rise) / 60_000)}</span>
+                <span className="text-[19px] font-semibold tabular-nums text-[#F4EFE3]">{kstClock(st.set)}</span>
+            </div>
+            <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{SUN_NOTE}</p>
         </div>
     );
 }
