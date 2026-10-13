@@ -9,13 +9,16 @@
  */
 import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { hikingMountainPath, mountainLabel, duplicateNames } from "@shared/hikingMountains";
+import { hikingListPath, hikingMountainPath, mountainLabel, duplicateNames } from "@shared/hikingMountains";
 import { Peak } from "../components/MountainParts";
 import { MountainPatch } from "../stamps/MountainPatch";
 
 interface CrewSummit { mountainId: string; firstDay: string; times: number; people: number; name: string; slug: string; heightM: number | null; region: string | null; sigungu: string | null; kfs100: boolean }
 export const crewSummitsKey = (crewId: string) => [`/api/hiq/hiking/crews/${crewId}/summits`] as const;
 const dayText = (d: string) => d.replace(/-/g, ".");
+/** 산악회의 목표 — 산림청 100대 명산은 백 곳이다 */
+const KFS100_TOTAL = 100;
+const GOAL_LABEL = "함께 오른 100대 명산";
 
 /** 산악회의 깃발 — 카드마다 꽂는 작은 삼각 깃발 */
 const Pennant = ({ className }: { className?: string }) => (
@@ -34,6 +37,7 @@ export function CrewSummits({ crewId, isMember }: { crewId: string; isMember?: b
     const heightSum = list.reduce((a, m) => a + (m.heightM ?? 0), 0);
     const times = list.reduce((a, m) => a + m.times, 0);
     const kfs = list.filter((m) => m.kfs100).length;
+    const goalPct = Math.min(100, (kfs / KFS100_TOTAL) * 100);
     return (
         <section className="mt-3.5 overflow-hidden rounded-[22px] text-[#F4EFE3]" style={{ background: "#0E2A33", boxShadow: "inset 0 0 0 1px #FFFFFF14, 0 6px 16px rgba(0,0,0,0.25)" }} data-testid="hk-crew-summits" data-count={list.length} aria-label="함께 오른 산">
             <div className="flex items-center gap-3 px-4 pb-3 pt-3.5" style={{ background: "linear-gradient(135deg,#1F556099,#0E2A33)" }}>
@@ -62,6 +66,20 @@ export function CrewSummits({ crewId, isMember }: { crewId: string; isMember?: b
                         {([[`${heightSum.toLocaleString("en-US")}m`, "높이의 합"], [`${times}번`, "함께 오른 날"], [`${kfs}곳`, "100대 명산"]] as const).map(([v, k]) => (
                             <div key={k} className="flex-1 px-1"><div className="text-[15.5px] font-semibold tabular-nums leading-tight">{v}</div><div className="mt-0.5 text-[12px] text-[#F4EFE399]">{k}</div></div>
                         ))}
+                    </div>
+                    {/* 산악회의 목표 — 함께 오른 100대 명산. 아직 한 곳도 없어도(다른 산만 올랐어도) 보여 준다 */}
+                    <div className="mx-4 mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-3.5 pt-3" data-testid="hk-crew-goal" data-got={kfs}>
+                        <div className="flex items-baseline justify-between gap-3">
+                            <span className="min-w-0 truncate text-[13.5px] font-medium text-[#F4EFE3CC]">{GOAL_LABEL}</span>
+                            <span className="shrink-0 text-[16px] font-semibold tabular-nums leading-none text-[#F6D9A8]">{kfs}<span className="ml-1 text-[12.5px] font-normal text-[#F4EFE399]">/ {KFS100_TOTAL}</span></span>
+                        </div>
+                        <div className="mt-2 h-2 overflow-hidden rounded-full bg-[#FFFFFF1F]" role="progressbar" aria-label={GOAL_LABEL} aria-valuemin={0} aria-valuemax={KFS100_TOTAL} aria-valuenow={kfs}>
+                            <div className="h-full rounded-full bg-[#F28C6A]" style={{ width: `${goalPct}%`, minWidth: kfs > 0 ? 8 : 0 }} />
+                        </div>
+                        <Link href={hikingListPath("kfs100")} className="flex h-10 items-center gap-1 text-[13px] font-medium text-[#F6D9A8] active:opacity-70" data-testid="hk-crew-goal-link">
+                            100대 명산 수첩 보기
+                            <svg width="14" height="14" viewBox="0 0 24 24" aria-hidden><path d="M9 6l6 6-6 6" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                        </Link>
                     </div>
                     {/* 진열장 — 펠트 판에 산마다 한 칸. 새로 오른 산이 앞에 */}
                     <div className="mx-4 mb-4 mt-3 rounded-[20px] p-[9px]" style={{ background: "linear-gradient(160deg,#7A7448,#5C5733 55%,#6B6540)", boxShadow: "inset 0 1px 0 #FFFFFF33, 0 6px 14px rgba(0,0,0,0.35)" }}>

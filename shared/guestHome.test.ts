@@ -168,7 +168,7 @@ describe("골프 홈", () => {
         const cases: [string, string, string][] = [
             ["내 라운드 기록(useGolfStats)", "golf/hooks/useGolfStats.ts", '"/api/hiq/history"'],
             ["내 라운드 기록(골프 홈)", "golf/pages/Dashboard.tsx", '"/api/hiq/history"'],
-            ["알림 수(머리줄, 60초 폴링)", "golf/components/dashboard/GolfHeader.tsx", "UNREAD_COUNT_KEY, {"],
+            ["알림 수(머리줄, 60초 폴링 — 세 종목이 같이 쓰는 SportHeader)", "components/hiq/SportHeader.tsx", "UNREAD_COUNT_KEY, {"],
             ["진행 중 라운드", "golf/components/dashboard/ActiveRoundCard.tsx", '"/api/hiq/golf/match/active"'],
             ["내 크루", "golf/components/dashboard/MyCrewCard.tsx", '"/api/hiq/crews/mine"'],
             ["긴급 조인(60초 폴링)", "golf/components/dashboard/HotDealTicker.tsx", '"urgent-joins"'],
@@ -189,7 +189,9 @@ describe("골프 홈", () => {
 
     describe("회원의 것은 비로그인에게 그리지 않는다 — 거짓 빈 값도 없다", () => {
         it("머리줄: 알림 종 자리에 로그인 단추(goLogin), 알림함은 회원에게만", () => {
-            const src = code(client("golf/components/dashboard/GolfHeader.tsx"));
+            // 2026-10-13 머리줄 통일 — 골프 머리(GolfHeader)는 SportHeader 를 그대로 쓴다
+            expect(code(client("golf/components/dashboard/GolfHeader.tsx"))).toContain('<SportHeader sport="GOLF"');
+            const src = code(client("components/hiq/SportHeader.tsx"));
             const at = src.indexOf("{isGuest ? (");
             expect(at).toBeGreaterThan(0);
             const guest = src.slice(at, src.indexOf(") : (", at));
@@ -470,7 +472,7 @@ describe("당구 홈", () => {
             ["3쿠션 랭킹(상위 % 용)", "pages/hiq/dashboard.tsx", 'queryKey: ["/api/hiq/rankings", "3c"]'],
             ["내 경기 기록", "hooks/useDashboardStats.ts", '"/api/hiq/history"'],
             ["매장 랭킹", "hooks/useDashboardStats.ts", "`/api/hiq/rankings`"],
-            ["알림 수(머리)", `${DASH}/DashboardHeader.tsx`, "UNREAD_COUNT_KEY, {"],
+            ["알림 수(머리 — 세 종목이 같이 쓰는 SportHeader)", "components/hiq/SportHeader.tsx", "UNREAD_COUNT_KEY, {"],
             ["진행 중 경기", `${DASH}/OngoingGameBanner.tsx`, '"/api/hiq/game/ongoing/mine"'],
             ["진행 중 온라인 대전", `${DASH}/SimMatchBanner.tsx`, "queryKey: MATCH_LIST_QUERY_KEY"],
             ["실전 비교(내 실전 기록)", `${DASH}/RealHandicapCard.tsx`, '"/api/hiq/compare/real"'],
@@ -489,10 +491,12 @@ describe("당구 홈", () => {
     });
 
     describe("머리(DashboardHeader) — 이름 대신 한 줄, 종 대신 로그인", () => {
+        // 2026-10-13 머리줄 통일 — 이름 한 줄은 DashboardHeader 에, 종 · 로그인 · 종목 전환은 같이 쓰는 SportHeader 에 있다
         const src = code(client(`${DASH}/DashboardHeader.tsx`));
+        const bar = code(client("components/hiq/SportHeader.tsx"));
         const first = src.indexOf("{isGuest ? (");
-        const second = src.indexOf("{isGuest ? (", first + 1);
-        const branch = (at: number) => src.slice(at, src.indexOf(") : (", at));
+        const second = bar.indexOf("{isGuest ? (");
+        const branch = (at: number, of: string = src) => of.slice(at, of.indexOf(") : (", at));
 
         it("이름 자리: '둘러보는 중이에요' — '님'만 남는 빈 인사말을 그리지 않는다", () => {
             expect(first).toBeGreaterThan(0);
@@ -502,18 +506,22 @@ describe("당구 홈", () => {
         });
 
         it("알림 종 자리: 로그인 단추(goLogin — 끝나면 보던 홈으로), 알림함은 회원에게만", () => {
-            expect(second).toBeGreaterThan(first);
-            expect(branch(second)).toContain("goLogin(setLocation)");
-            expect(branch(second)).toContain('t("guestHome.login")');
-            expect(branch(second)).not.toContain("<Bell");
-            expect(src).toContain("{!isGuest && <NotificationInbox");
+            expect(src).toContain('<SportHeader sport="BILLIARDS"');
+            expect(second).toBeGreaterThan(0);
+            expect(branch(second, bar)).toContain("goLogin(setLocation)");
+            expect(branch(second, bar)).toContain('t("guestHome.login")');
+            expect(branch(second, bar)).not.toContain("<LucideBell");
+            expect(bar).toContain("{!isGuest && <NotificationInbox");
         });
 
         it("종목 알약은 '볼 수 있는가'(useGolfVisible)로 — 한국어 방문자도 골프 홈으로 넘어간다", () => {
-            expect(src).toContain("const golfVisible = useGolfVisible();");
-            expect(src).toContain("{golfVisible && <button");
-            expect(src).not.toContain("useGolfAccess()");
-            expect(src).not.toMatch(/\bgolfOk\b/);
+            expect(bar).toContain("const golfVisible = useGolfVisible();");
+            expect(bar).toContain('...(golfVisible || sport === "GOLF" ? [{ id: "GOLF" as const');
+            expect(bar).not.toContain("useGolfAccess()");
+            expect(bar).not.toMatch(/\bgolfOk\b/);
+            // 등산은 등산이 열린 회원에게만(한국어 화면에서만) · 언어 단추는 당구에만
+            expect(bar).toContain('...(hikingOk || sport === "HIKING" ? [{ id: "HIKING" as const');
+            expect(bar).toContain('const showLang = sport === "BILLIARDS";');
         });
     });
 

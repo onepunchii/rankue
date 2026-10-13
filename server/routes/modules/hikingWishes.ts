@@ -8,8 +8,8 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { requireHikingAccess } from "../../middleware/hikingAccess.js";
 import type { AuthRequest } from "../../middleware/auth.js";
 import { allMountains, mountainBySlug } from "../../storage/hiking.js";
-import { addWish, listWishes, removeWish } from "../../storage/hikingWishes.js";
-import { HIKING_WISH_LABEL } from "../../../shared/hikingWish.js";
+import { addWish, crewWishes, isCrewMember, listWishes, removeWish } from "../../storage/hikingWishes.js";
+import { CREW_WISH_LABEL, CREW_WISH_MIN, HIKING_WISH_LABEL, pickCrewWishes } from "../../../shared/hikingWish.js";
 
 const router = Router();
 
@@ -39,6 +39,31 @@ router.delete("/mountains/:slug/wish", ...requireHikingAccess, asyncHandler(asyn
     if (!m) return sendError(res, 404, "없는 산이에요");
     await removeWish(req.userId!, m.id);
     return sendSuccess(res, { wished: false, mountainId: m.id });
+}));
+
+// ── 우리 산악회가 가고 싶은 산 ─────────────────────────────────────────
+const CREW_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+/**
+ * 산악회 회원 여럿(CREW_WISH_MIN 명 이상)이 담아 둔 산 — 산악회 홈이 그린다.
+ * '함께 오른 산'과 달리 **회원만** 본다: 담아 둔 산은 아직 가지 않은 계획이라 모임 안의 것이다. 가입 대기 중인 사람도 못 본다.
+ * 싣는 것은 산과 사람 수뿐 — 누가 담았는지는 싣지 않는다.
+ */
+router.get("/crews/:id/wishes", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    res.set("Cache-Control", "no-store");
+    const crewId = String(req.params.id);
+    if (!CREW_ID.test(crewId)) return sendError(res, 404, "없는 산악회예요");
+    // 회원인지부터 묻는다 — 아니면 담은 산을 읽지도 않는다
+    if (!(await isCrewMember(crewId, req.userId!))) return sendError(res, 403, CREW_WISH_LABEL.membersOnly, "CREW_MEMBERS_ONLY");
+    const [list, all] = await Promise.all([crewWishes(crewId, CREW_WISH_MIN), allMountains()]);
+    const by = new Map(all.map((m) => [m.id, m]));
+    return sendSuccess(res, {
+        min: CREW_WISH_MIN,
+        // 사라진 산(다시 적재로 id 가 없어진 것)은 빼고 준다
+        mountains: pickCrewWishes(list).flatMap((x) => {
+            const m = by.get(x.mountainId);
+            return m ? [{ mountainId: x.mountainId, count: x.count, name: m.name, slug: m.slug, heightM: m.heightM, region: m.region, kfs100: m.lists.includes("kfs100") }] : [];
+        }),
+    });
 }));
 
 export default router;

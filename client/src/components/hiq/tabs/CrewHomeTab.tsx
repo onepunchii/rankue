@@ -21,6 +21,7 @@ import { BallDot } from "@/components/hiq/BallDot";
 import { CrewStampEntry } from "@/golf/stamps/CrewStampParts";
 // 등산의 조각은 산악회일 때만 받는다 — 당구 · 골프 크루의 화면 묶음에 싣지 않는다
 const CrewSummits = lazy(() => import("@/hiking/crew/CrewSummits").then((m) => ({ default: m.CrewSummits })));
+const CrewWishes = lazy(() => import("@/hiking/crew/CrewWishes").then((m) => ({ default: m.CrewWishes })));
 import {
     CREW_BTN, CREW_CARD, CREW_TEXT, ConfirmDialog, CrewEmpty, CrewError, CrewRoleBadge, CrewSection, CrewSkeleton,
 } from "@/components/hiq/crew-ui";
@@ -249,6 +250,8 @@ export const CrewHomeTab = memo(({
                 {isGolf && <CrewStampEntry crewId={crew.id} crew={{ name: crew.name, emblem: crew.emblem }} />}
                 {/* 산악회 — 함께 오른 산(같은 날 두 사람 이상이 정상에서 인증한 산) */}
                 {isHiking && <Suspense fallback={null}><CrewSummits crewId={crew.id} isMember={isMember} /></Suspense>}
+                {/* 산악회 — 우리 산악회가 가고 싶은 산(회원 여럿이 담아 둔 산). 회원만 본다(서버도 회원이 아니면 403) — 한 곳도 없으면 아무것도 안 그린다 */}
+                {isHiking && isMember && <Suspense fallback={null}><CrewWishes crewId={crew.id} /></Suspense>}
 
                 {/* 4. 투표 — 크루원 전용(서버가 비회원에게 403). 예전엔 비회원에게 '투표 없음' 으로 잘못 보였다. */}
                 {isMember && (

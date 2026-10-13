@@ -22,7 +22,7 @@ router.post("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), cup: await cupQuietly() });
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly() });
 }));
 
 // Vercel Cron은 GET으로 호출한다(문서 기준). 동일 핸들러를 재사용.
@@ -33,7 +33,7 @@ router.get("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), cup: await cupQuietly() });
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly() });
 }));
 
 // 라운드 전날 저녁 브리핑(2026-10-05) — 매시 도는 리마인더에 얹는다(크론 항목을 늘리지 않는다: Vercel 요금제가 개수를 센다).
@@ -49,6 +49,26 @@ async function cupQuietly(): Promise<unknown> {
         console.error("[CupRoll]", e);
         return { error: true };
     }
+}
+
+// 산행 전날 저녁 브리핑(2026-10-13) — 내일 산악회 산행에 가는 사람에게(services/hikingEve). 골프의 것과 같은 시간대, 같은 크론에 얹는다.
+async function hikingEveQuietly(): Promise<unknown> {
+    try {
+        const { runHikingEve } = await import("../../services/hikingEve.js");
+        return await runHikingEve();
+    } catch (e) {
+        console.error("[HikingEve]", e);
+        return { error: true };
+    }
+}
+// 점검용 — ?dry=1 은 보내지 않고 무엇이 갈지 세기만(시간 밖에서도 본다). vercel.json 크론에는 없다.
+async function handleHikingEve(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { runHikingEve } = await import("../../services/hikingEve.js");
+    const dry = req.query.dry === "1";
+    return sendSuccess(res, await runHikingEve(Date.now(), { dry, force: dry }));
 }
 
 async function golfEveQuietly(): Promise<unknown> {
@@ -72,6 +92,8 @@ async function handleGolfRoundEve(req: any, res: any) {
 }
 router.get("/golf-round-eve", asyncHandler(handleGolfRoundEve));
 router.post("/golf-round-eve", asyncHandler(handleGolfRoundEve));
+router.get("/hiking-eve", asyncHandler(handleHikingEve));
+router.post("/hiking-eve", asyncHandler(handleHikingEve));
 
 // UMB 세계랭킹 일일 동기화 — 새 회차가 있으면 부문당 최대 2개 적재
 async function handleUmbSync(req: any, res: any) {
