@@ -171,7 +171,7 @@ describe("고정: 근처 맛집은 저장 · 가공 없이 그대로", () => {
         // 화면과 같은 것을 글로: 위치 · 들머리 구역, 가까운 산의 방향, 권역의 공유 카드
         expect(seo).toContain("<h2>${esc(MOUNTAIN_AROUND_LABEL.map)}</h2>");
         expect(seo).toContain("compass8(bearingDeg(d.lat, d.lng, m.lat, m.lng))");
-        expect(seo).toContain("hubCard(ORIGIN, hikingRegionPath(region.id))");
+        expect(seo).toContain("const card = { url: hikingMountainCardUrl(ORIGIN, d.slug), width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: `${d.name} — 랭큐 등산` };");
     });
     it("화면 — 구역 이름만 발자국에 남기고, 기기에 남는 조회 캐시에 넣지 않는다", () => {
         const ui = read("client/src/hiking/components/MountainNearbyPlaces.tsx");
@@ -342,13 +342,14 @@ describe("한눈 숫자 · 구역 줄 · 공유 · 검색", () => {
         expect(page).toContain('try { await navigator.clipboard.writeText(url); toast({ title: "주소를 복사했어요" }); }');
         expect(page).toContain("right={shareBtn}>");
     });
-    it("구조화 자료(Mountain)와 미리보기 그림(권역 카드) — 새 그림 길을 만들지 않는다", () => {
+    it("구조화 자료(Mountain)와 미리보기 그림 — 이 산의 카드(검색용 화면 · 사이트맵과 같은 주소)", () => {
         const page = read("client/src/hiking/pages/MountainPage.tsx");
         expect(page).toContain('"@context": "https://schema.org", "@type": "Mountain", name: d.name,');
         expect(page).toContain('geo: { "@type": "GeoCoordinates", latitude: d.lat, longitude: d.lng,');
         expect(page).toContain("elevation: `${d.heightM} m`");
         expect(page).toContain('containedInPlace: { "@type": "AdministrativeArea", name: where }');
-        expect(page).toContain("image: r ? hubCard(ORIGIN, hikingRegionPath(r.id))?.url : undefined, jsonLd };");
+        // 2026-10-13 오너: "사이트맵 이미지랑 등등 … 우와 훅 할 정도로" — 권역 공용 그림 대신 산마다 한 장. 주소는 한 곳(shared/ogCards)에서만 만든다
+        expect(page).toContain("image: hikingMountainCardUrl(ORIGIN, d.slug), jsonLd };");
         expect(page).not.toMatch(/\/og\/hiking|og\/mountain/);
     });
     it("새 화면 조각도 등산의 색 · 글자 규칙을 지킨다 — 골프 · 당구의 그림을 가져다 쓰지 않는다", () => {

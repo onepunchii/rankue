@@ -88,7 +88,7 @@ const toSummary = (r: any): MountainSummary => {
 };
 
 const TTL_MS = 10 * 60_000;
-let cache: { at: number; list: MountainSummary[]; bySlug: Map<string, MountainSummary>; byId: Map<string, MountainSummary> } | null = null;
+let cache: { at: number; list: MountainSummary[]; bySlug: Map<string, MountainSummary>; byId: Map<string, MountainSummary>; days: Map<string, string> } | null = null;
 let loading: Promise<MountainSummary[]> | null = null;
 
 /** 산 요약 전부 — 명산 먼저(100대 명산의 순번), 그다음 높은 산부터 */
@@ -99,10 +99,11 @@ export async function allMountains(): Promise<MountainSummary[]> {
             try {
                 const raw = await rows<any>(sql`
                     select id, slug, name, height_m, lat, lng, region, sido, sigungu, tier, lists, traits, course_count, course_min_km, course_max_km,
-                           (guide is not null) as has_guide, guide->>'subtitle' as subtitle
+                           (guide is not null) as has_guide, guide->>'subtitle' as subtitle, to_char(updated_at, 'YYYY-MM-DD') as updated_day
                     from hiking_mountains`);
                 const list = raw.map(toSummary).sort((a, b) => a.tier - b.tier || (a.kfsNo ?? 999) - (b.kfsNo ?? 999) || (b.heightM ?? 0) - (a.heightM ?? 0) || a.name.localeCompare(b.name, "ko"));
-                cache = { at: Date.now(), list, bySlug: new Map(list.map((m) => [m.slug, m])), byId: new Map(list.map((m) => [m.id, m])) };
+                // 고친 날은 요약에 싣지 않는다(목록 응답이 3,800줄이라 그만큼 무거워진다) — 사이트맵만 따로 읽는다
+                cache = { at: Date.now(), list, bySlug: new Map(list.map((m) => [m.slug, m])), byId: new Map(list.map((m) => [m.id, m])), days: new Map(raw.filter((r) => typeof r.updated_day === "string").map((r) => [String(r.id), String(r.updated_day)])) };
                 return list;
             } catch (e) {
                 if (missingTable(e)) return [];
@@ -115,6 +116,11 @@ export async function allMountains(): Promise<MountainSummary[]> {
 export async function mountainBySlug(slug: string): Promise<MountainSummary | null> {
     await allMountains();
     return cache?.bySlug.get(slug) ?? null;
+}
+/** 산마다 자료를 마지막으로 고친 날(YYYY-MM-DD) — 사이트맵의 lastmod. 산의 id → 날 */
+export async function mountainUpdatedDays(): Promise<ReadonlyMap<string, string>> {
+    await allMountains();
+    return cache?.days ?? new Map();
 }
 export async function mountainById(id: string): Promise<MountainSummary | null> {
     await allMountains();

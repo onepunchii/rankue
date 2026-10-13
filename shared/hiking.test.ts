@@ -8,7 +8,7 @@ import {
 import { courseStats, distM, durationText, eleAtKm, nearestOnLine, packLine, thinLine, walkMinutes, withKm } from "./hikingGeo";
 import { HIKING_GUIDE_BLOCK, cleanHikingText, cleanMountainGuide, hasMountainGuide } from "./hikingGuide";
 import { gridNumber, hikingPoiKind, hikingPoiTitle } from "./hikingPois";
-import { courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListSeo, kmRange, mountainSeo } from "./hikingPage";
+import { courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListSeo, hikingMountainCardInput, hikingRegionSeo, kmRange, mountainSeo } from "./hikingPage";
 import { isPrimarySport, isStartSport } from "./primarySport";
 import { HUB_CARD_NAMES, HUB_CARD_VERSION, HUB_HIKING_REGIONS, hubCard, hubCardName } from "./ogCards";
 
@@ -184,17 +184,36 @@ describe("길 위의 지점", () => {
 });
 
 describe("화면의 글 · 따로 선 세계", () => {
-    it("제목 · 설명 — 산 이름 · 코스 수 · 높이가 들어간다", () => {
+    it("제목 · 설명 — 등산객이 찾는 말로 연다(등산코스 · 최단 · 높이), 없는 것은 적지 않는다", () => {
         const m = { slug: "설악산", name: "설악산", heightM: 1708, sido: "강원특별자치도", sigungu: "양양군", courses: 3, minKm: 5.12, maxKm: 11.44, lists: ["kfs100", "nationalparks"] };
         const seo = mountainSeo(m);
-        expect(seo.title).toBe("설악산 · 등산 코스 3개 · 높이 1,708m | 랭큐 등산");
+        // 2026-10-13 오너: "키워드 관심사로 사이트맵 메타 제목이랑 해야 돼" — 사람들이 치는 말은 '○○산 등산코스'(붙여 쓴다)
+        expect(seo.title).toBe("설악산 등산코스 3개 · 최단 5.1km · 높이 1,708m | 랭큐 등산");
         expect(seo.desc).toContain("강원 양양군의 설악산(1,708m)");
-        expect(seo.desc).toContain("등산 코스 3개(5.1~11.4km)");
+        expect(seo.desc).toContain("등산코스 3개(5.1~11.4km)의 코스 지도와 높낮이");
         expect(seo.desc).toContain("산림청 100대 명산 · 국립공원의 산");
-        expect(mountainSeo({ ...m, courses: 0, minKm: null, maxKm: null, lists: [] }).title).toBe("설악산 · 등산 · 높이 1,708m | 랭큐 등산");
+        // 채비 지점 · 길의 종류는 그 자료가 있는 산(산림청 100대 명산)에만 적는다
+        expect(seo.desc).toContain("들머리 · 주차장 · 화장실 · 약수터 같은 길 위의 지점과 어떤 길인지(계단 · 바위)");
+        const plain = mountainSeo({ ...m, lists: ["nationalparks"] });
+        expect(plain.desc).not.toMatch(/주차장|화장실|약수터|계단/);
+        expect(plain.desc).toContain("길 위의 갈림길 · 위험 구간 · 대피소");
+        // 코스가 하나면 그 길이만, 없으면 '등산코스'라는 말을 쓰지 않는다
+        expect(mountainSeo({ ...m, courses: 1, minKm: 7.13, maxKm: 7.13 }).title).toBe("설악산 등산코스 · 7.1km · 높이 1,708m | 랭큐 등산");
+        const bare = mountainSeo({ ...m, courses: 0, minKm: null, maxKm: null, lists: [] });
+        expect(bare.title).toBe("설악산 등산 · 높이 1,708m · 위치 · 날씨 | 랭큐 등산");
+        expect(`${bare.title} ${bare.desc}`).not.toMatch(/등산코스|코스 지도/);
+        // 우리가 보증하지 않는 말은 쓰지 않는다
+        for (const g of HIKING_GROUPS) expect(hikingListSeo(g, 10).title, g.id).not.toMatch(/추천|초보|베스트|BEST|인기/);
+        expect(hikingListSeo({ id: "kfs100", name: "산림청 100대 명산" }, 100).title).toBe("100대 명산 리스트 · 지도 — 산림청 100대 명산 100곳 등산코스 | 랭큐 등산");
+        expect(hikingListSeo({ id: "maple", name: "단풍 산" }, 27).title).toBe("단풍 명산 27곳 — 가을 단풍 산행 등산코스 | 랭큐 등산");
+        expect(hikingListSeo({ id: "처음-보는-묶음", name: "새 묶음" }, 5).title).toBe("새 묶음 5곳 — 높이 · 등산코스 | 랭큐 등산");
+        expect(hikingRegionSeo(HIKING_REGIONS[1], 447).title).toBe("강원 명산 · 등산코스 — 강원의 산 447곳 | 랭큐 등산");
+        // 카드에 싣는 것 — 100대 명산이면 와펜, 아니면 속한 묶음 하나를 이름표로
+        expect(hikingMountainCardInput({ ...m, region: "gangwon" })).toEqual({ name: "설악산", height: "1,708m", place: "강원 양양군", region: "gangwon", kfs100: true, badge: null, courses: "등산코스 3개 · 5.1~11.4km" });
+        expect(hikingMountainCardInput({ ...m, lists: ["nationalparks"], courses: 0 })).toMatchObject({ kfs100: false, badge: "국립공원의 산", courses: "", region: null });
         expect(kmRange(7.12, 7.14)).toBe("7.1km");
         expect(hikingHubSeo({ total: 3836, famous: 307, courses: 5434 }).title).toContain("5,434개");
-        expect(hikingListSeo({ id: "island", name: "섬의 산", note: "섬에 있는 산" }, 142).title).toBe("섬의 산 142곳 — 높이 · 등산 코스 | 랭큐 등산");
+        expect(hikingListSeo({ id: "island", name: "섬의 산", note: "섬에 있는 산" }, 142).title).toBe("섬 산행 142곳 — 섬의 산 등산코스 · 높이 | 랭큐 등산");
         expect(courseFacts({ km: 7.12, gainM: 1370 })).toEqual({ km: "7.1km", gain: "1,370m", time: "약 4시간 5분" });
         expect(courseShape({ loop: true, summitKm: 3, km: 6 })).toBe("원점 회귀");
         expect(courseShape({ loop: false, summitKm: 6.9, km: 7.1 })).toBe("정상까지");
@@ -288,7 +307,7 @@ describe("화면의 글 · 따로 선 세계", () => {
         expect(seo).toContain("if (p === HIKING_PACK_PATH) return all.length ? pack(all) : null;");
         const map = read("server/sitemap.ts");
         expect(map).toContain('"pba-records", "hiking"] as const;');
-        expect(map).toContain("hiking: async () => hikingSitemapParts(");
+        expect(map).toContain("return hikingSitemapParts(all, await mountainUpdatedDays().catch(() => new Map<string, string>()));");
         // 표지 그림 아홉 장
         for (const n of ["hero", ...HIKING_REGIONS.map((r) => `cover-${r.id}`)]) expect(existsSync(resolve(root, `client/public/hiking/art/${n}.webp`)), n).toBe(true);
     });

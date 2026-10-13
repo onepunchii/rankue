@@ -16,7 +16,7 @@ import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
 import { golfGuideSitemapParts } from "./seo/golfGuide.js";
 import { golfStampsSitemapParts } from "./seo/golfStamps.js";
 import { hikingSitemapParts } from "./seo/hiking.js";
-import { allMountains } from "./storage/hiking.js";
+import { allMountains, mountainUpdatedDays } from "./storage/hiking.js";
 import { golfTermsSitemapParts } from "./seo/golfTerms.js";
 import { FIND_FEATURES, findPath, findRegionCounts, hasFindTag } from "../shared/golfFind.js";
 import { tournamentsSitemapParts } from "./seo/tournaments.js";
@@ -319,7 +319,10 @@ const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
   rankings: rankingExtraSitemapParts, terms: async () => [...(await billiardsTermsSitemapParts()), ...golfTermsSitemapParts()],
   tournaments: tournamentsSitemapParts, "pba-records": pbaRecordsSitemapParts,
   // 등산(2026-10-13) — 허브 · 권역 · 목록 · 산(코스나 글이 있는 산만). 자료를 못 읽으면 빈 구역
-  hiking: async () => hikingSitemapParts(await allMountains().catch((e) => { console.warn("[sitemap] hiking:", (e as Error)?.message); return []; })),
+  hiking: async () => {
+    const all = await allMountains().catch((e) => { console.warn("[sitemap] hiking:", (e as Error)?.message); return []; });
+    return hikingSitemapParts(all, await mountainUpdatedDays().catch(() => new Map<string, string>()));
+  },
 };
 
 export async function generateSitemapSection(section: SitemapSection): Promise<string> {

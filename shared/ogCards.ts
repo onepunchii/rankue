@@ -12,6 +12,12 @@ export const CARD_VERSION = 2;
 
 /** 골프장 카드 — 슬러그는 한글이라 인코딩한다 */
 export const golfCourseCardUrl = (origin: string, slug: string) => `${origin}/og/golf-course/${encodeURIComponent(slug)}.png?v=${CARD_VERSION}`;
+/**
+ * 산 카드(2026-10-13 오너: "등산 사이트맵 … 사이트맵 이미지랑 등등") — 산마다 한 장(server/services/hikingMountainCard).
+ * 프리렌더 · 사이트맵 · 화면의 useSeo 가 이 주소 하나를 쓴다. 그림을 바꾸면 HIKING_CARD_VERSION 을 올린다. 슬러그는 한글이라 인코딩한다.
+ */
+export const HIKING_CARD_VERSION = 1;
+export const hikingMountainCardUrl = (origin: string, slug: string) => `${origin}/og/hiking-mountain/${encodeURIComponent(slug)}.png?v=${HIKING_CARD_VERSION}`;
 /** 당구장 카드 — 매장 코드는 영숫자 */
 export const storeCardUrl = (origin: string, code: string) => `${origin}/og/store/${encodeURIComponent(code)}.png?v=${CARD_VERSION}`;
 

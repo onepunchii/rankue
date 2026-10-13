@@ -77,7 +77,7 @@ describe("새 공개 주소의 네 곳 · 표지", () => {
         const seo = read("server/seo/hiking.ts");
         expect(seo).toContain("if (p === HIKING_TERMS_PATH) return terms();");
         expect(seo).toContain("if (p === HIKING_CHECKLIST_PATH) return checklist();");
-        expect(seo).toContain("...HIKING_TERMS.map((t) => entry(`${ORIGIN}${hikingTermPath(t.id)}`");
+        expect(seo).toContain("...HIKING_TERMS.map((t) => page(hikingTermPath(t.id), { changefreq: \"monthly\", priority: \"0.5\" })),");
         const app = read("client/src/App.tsx");
         for (const p of ["/hiking/terms", "/hiking/terms/:id", "/hiking/checklist"]) expect(app, p).toContain(`<Route path="${p}"`);
         expect(read("vercel.json")).toContain("|/terms(?:/[^/]+)?|/checklist)?)/?");

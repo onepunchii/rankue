@@ -18,7 +18,7 @@ import { useQuery } from "@tanstack/react-query";
 import { LucideChevronDown, LucideLocateFixed, LucideShare2 } from "@/lib/icons";
 import { useSeo } from "@/hooks/useSeo";
 import { useToast } from "@/hooks/use-toast";
-import { hubCard } from "@shared/ogCards";
+import { hikingMountainCardUrl } from "@shared/ogCards";
 import { heightText, hikingMountainPath, hikingRegion, hikingRegionPath, mountainPlace } from "@shared/hikingMountains";
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "@shared/hikingGuide";
 import { HIKING_POI_NAME, HIKING_POI_ORDER, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
@@ -335,7 +335,6 @@ export default function MountainPage() {
     const seo = useMemo(() => {
         if (!d) return null;
         const s = mountainSeo(d);
-        const r = hikingRegion(d.region);
         const where = [d.sido, d.sigungu].filter(Boolean).join(" ");
         // 검색용 화면의 Mountain 과 같은 사실(이름 · 자리 · 높이 · 시도/시군구)에 '어디에 든 산인가'를 보탠다.
         // 그림(image)은 넣지 않는다 — 권역 카드는 장식이지 이 산의 모습이 아니다
@@ -345,8 +344,8 @@ export default function MountainPage() {
             ...(d.sido ? { address: { "@type": "PostalAddress", addressCountry: "KR", addressRegion: d.sido, ...(d.sigungu ? { addressLocality: d.sigungu } : {}) } } : {}),
             ...(where ? { containedInPlace: { "@type": "AdministrativeArea", name: where } } : {}),
         };
-        // 미리보기 그림 — 그 산이 든 권역의 카드(shared/ogCards 의 정적 그림). 권역을 모르면 넘기지 않는다(useSeo 가 등산 허브 카드를 쓴다)
-        return { title: s.title, description: s.desc, path: s.path, image: r ? hubCard(ORIGIN, hikingRegionPath(r.id))?.url : undefined, jsonLd };
+        // 미리보기 그림 — 이 산의 카드(검색용 화면 · 사이트맵과 같은 주소 — shared/ogCards hikingMountainCardUrl)
+        return { title: s.title, description: s.desc, path: s.path, image: hikingMountainCardUrl(ORIGIN, d.slug), jsonLd };
     }, [d]);
     useSeo(seo);
     // 내 도장 — 등산을 쓸 수 있는 회원만(그 밖의 사람에게는 받는 것의 모습만 보여 준다)

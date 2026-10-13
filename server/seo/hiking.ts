@@ -18,7 +18,7 @@ import {
 import { HIKING_GRADES } from "../../shared/hikingGrade.js";
 import { MOUNTAIN_AROUND_LABEL } from "../../shared/hikingAround.js";
 import { bearingDeg, compass8 } from "../../shared/hikingNear.js";
-import { hubCard } from "../../shared/ogCards.js";
+import { HUB_CARD_SIZE, hikingMountainCardUrl, hubCard } from "../../shared/ogCards.js";
 import {
     HIKING_CHECKLIST, HIKING_CHECKLIST_H1, HIKING_CHECKLIST_LEAD, HIKING_CHECKLIST_NOTE, HIKING_CHECKLIST_PATH, HIKING_CHECKLIST_SEO, HIKING_TERMS, HIKING_TERMS_H1, HIKING_TERMS_LEAD, HIKING_TERMS_PATH,
     HIKING_TERMS_SEO, HIKING_TERM_GROUPS, hikingTerm, hikingTermPath, hikingTermSeo, type HikingTerm,
@@ -184,9 +184,9 @@ ${hubNav("ko")}`;
         },
         ...(g?.faq.length ? [{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: g.faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) }] : []),
     ];
-    // 공유 · 검색 카드는 그 산이 있는 권역의 카드(화면의 useSeo 와 같다) — 산마다의 카드는 없다
-    const card = region ? hubCard(ORIGIN, hikingRegionPath(region.id)) : null;
-    return { status: 200, tag: `hiking:mountain:${d.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd, ...(card ? { image: { ...card, alt: `${d.name} — 랭큐 등산` } } : {}) }) };
+    // 공유 · 검색 카드는 이 산의 카드(화면의 useSeo · 사이트맵과 같은 주소 — shared/ogCards). 권역의 표지 위에 이 산의 이름 · 높이 · 자리 · 코스
+    const card = { url: hikingMountainCardUrl(ORIGIN, d.slug), width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: `${d.name} — 랭큐 등산` };
+    return { status: 200, tag: `hiking:mountain:${d.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd, image: card }) };
 }
 
 /** 도장첩 — 묶음마다의 권과 칸 수. 화면(StampShelf)의 방문자 모습과 같은 글 */
@@ -360,17 +360,28 @@ export async function renderHiking(path: string, all: readonly MountainSummary[]
 }
 
 /** 사이트맵 — 허브 · 권역 여덟 · 목록 다섯 · 산(코스나 글이 있는 산만 — 빈 화면을 색인에 올리지 않는다) */
-export function hikingSitemapParts(all: readonly MountainSummary[]): string[] {
+/**
+ * 사이트맵의 등산 구역. 주소마다 그 화면의 미리보기 그림을 싣는다(골프장 구역과 같은 꼴 — 검색엔진이 그림을 같이 가져간다):
+ * 산은 그 산의 카드, 그 밖의 화면은 허브 카드(shared/ogCards). days 는 산마다 자료를 고친 날 — 있으면 lastmod 로 적는다
+ * (목록 화면은 거기 실린 산 가운데 가장 늦은 날).
+ */
+export function hikingSitemapParts(all: readonly MountainSummary[], days: ReadonlyMap<string, string> = new Map()): string[] {
     if (all.length === 0) return [];
+    const hubImage = (path: string) => hubCard(ORIGIN, path)?.url;
+    const latest = (list: readonly MountainSummary[]) => list.reduce<string | null>((best, m) => { const d = days.get(m.id); return d && (!best || d > best) ? d : best; }, null);
+    const everything = latest(all);
+    const page = (path: string, opts: { changefreq: string; priority: string; lastmod?: string | null }) => entry(`${ORIGIN}${path}`, { ...opts, image: hubImage(path) });
     return [
-        entry(`${ORIGIN}${HIKING_HUB_PATH}`, { changefreq: "weekly", priority: "0.8" }),
-        entry(`${ORIGIN}${HIKING_STAMPS_PATH}`, { changefreq: "monthly", priority: "0.6" }),
-        entry(`${ORIGIN}${HIKING_PACK_PATH}`, { changefreq: "monthly", priority: "0.6" }),
-        entry(`${ORIGIN}${HIKING_TERMS_PATH}`, { changefreq: "monthly", priority: "0.6" }),
-        entry(`${ORIGIN}${HIKING_CHECKLIST_PATH}`, { changefreq: "monthly", priority: "0.6" }),
-        ...HIKING_TERMS.map((t) => entry(`${ORIGIN}${hikingTermPath(t.id)}`, { changefreq: "monthly", priority: "0.5" })),
-        ...HIKING_REGIONS.map((r) => entry(`${ORIGIN}${hikingRegionPath(r.id)}`, { changefreq: "weekly", priority: "0.6" })),
-        ...HIKING_GROUPS.map((l) => entry(`${ORIGIN}${hikingListPath(l.id)}`, { changefreq: "weekly", priority: l.kind === "list" ? "0.7" : "0.5" })),
-        ...all.filter((m) => m.courses > 0 || m.hasGuide).map((m) => entry(`${ORIGIN}${hikingMountainPath(m.slug)}`, { changefreq: "monthly", priority: m.tier === 1 ? "0.7" : m.tier === 2 ? "0.5" : "0.4" })),
+        page(HIKING_HUB_PATH, { changefreq: "weekly", priority: "0.8", lastmod: everything }),
+        page(HIKING_STAMPS_PATH, { changefreq: "monthly", priority: "0.6" }),
+        page(HIKING_PACK_PATH, { changefreq: "monthly", priority: "0.6" }),
+        page(HIKING_TERMS_PATH, { changefreq: "monthly", priority: "0.6" }),
+        page(HIKING_CHECKLIST_PATH, { changefreq: "monthly", priority: "0.6" }),
+        ...HIKING_TERMS.map((t) => page(hikingTermPath(t.id), { changefreq: "monthly", priority: "0.5" })),
+        ...HIKING_REGIONS.map((r) => page(hikingRegionPath(r.id), { changefreq: "weekly", priority: "0.6", lastmod: latest(all.filter((m) => m.region === r.id)) })),
+        ...HIKING_GROUPS.map((l) => page(hikingListPath(l.id), { changefreq: "weekly", priority: l.kind === "list" ? "0.7" : "0.5", lastmod: everything })),
+        ...all.filter((m) => m.courses > 0 || m.hasGuide).map((m) => entry(`${ORIGIN}${hikingMountainPath(m.slug)}`, {
+            changefreq: "monthly", priority: m.tier === 1 ? "0.7" : m.tier === 2 ? "0.5" : "0.4", lastmod: days.get(m.id) ?? null, image: hikingMountainCardUrl(ORIGIN, m.slug),
+        })),
     ];
 }

@@ -16,18 +16,40 @@ export const HIKING_TAGLINE = "산을 고르고, 오르고, 정상에서 도장�
 
 export interface HikingSeo { path: string; title: string; desc: string }
 
+/**
+ * 제목은 등산객이 찾는 말로 연다(2026-10-13 오너: "키워드 관심사로 사이트맵 메타 제목이랑 해야 돼") — "○○산 등산코스" · "100대 명산 리스트" · "단풍 명산" …
+ * 화면의 제목(document.title)과 검색용 화면이 같은 글을 쓴다. 없는 것을 있다고 적지 않는다: 코스가 없는 산의 제목에는 '등산코스'가 없고,
+ * 주차장 · 화장실 같은 채비 지점은 그 자료가 있는 산(산림청 100대 명산 코스 파일)에만 적는다. '추천' · '초보'처럼 우리가 보증하지 않는 말은 쓰지 않는다.
+ */
 export function hikingHubSeo(c: { total: number; famous: number; courses: number }): HikingSeo {
     return {
         path: HIKING_HUB_PATH,
-        title: `전국 명산 · 등산 코스 ${c.courses.toLocaleString("en-US")}개${BRAND}`,
-        desc: `산림청 100대 명산을 비롯한 전국 ${c.total.toLocaleString("en-US")}곳의 산을 권역별로. 산마다 등산 코스의 거리 · 오르막 · 높낮이와 길 위의 갈림길 · 위험 구간 · 대피소, 날씨를 한 화면에서 볼 수 있어요.`,
+        title: `전국 명산 등산코스 ${c.courses.toLocaleString("en-US")}개 · 100대 명산 지도${BRAND}`,
+        desc: `산림청 100대 명산을 비롯한 전국 ${c.total.toLocaleString("en-US")}곳의 산을 권역별로. 산마다 등산코스의 거리 · 오르막 · 높낮이와 코스 지도, 길 위의 갈림길 · 화장실 · 대피소, 날씨를 한 화면에서 볼 수 있어요.`,
     };
 }
 export function hikingRegionSeo(r: HikingRegion, n: number): HikingSeo {
-    return { path: hikingRegionPath(r.id), title: `${r.name}의 산 ${n.toLocaleString("en-US")}곳 — 등산 코스 · 높이${BRAND}`, desc: `${r.name} 권역(${r.sidos.join(" · ")})의 산 ${n.toLocaleString("en-US")}곳. 명산부터 높은 순으로, 산마다 등산 코스와 날씨를 볼 수 있어요.` };
+    return { path: hikingRegionPath(r.id), title: `${r.name} 명산 · 등산코스 — ${r.name}의 산 ${n.toLocaleString("en-US")}곳${BRAND}`, desc: `${r.name} 권역(${r.sidos.join(" · ")})의 산 ${n.toLocaleString("en-US")}곳. 명산부터 높은 순으로, 산마다 등산 코스와 날씨를 볼 수 있어요.` };
 }
+/** 묶음마다의 제목 — 그 묶음을 찾는 사람이 쓰는 말로. 없는 묶음은 이름 그대로 */
+const LIST_TITLE: Readonly<Record<string, (n: string) => string>> = {
+    kfs100: (n) => `100대 명산 리스트 · 지도 — 산림청 100대 명산 ${n}곳 등산코스`,
+    kfs100plus: (n) => `100대 명산 플러스 리스트 ${n}곳 — 높이 · 등산코스`,
+    nationalparks: (n) => `국립공원 산 ${n}곳 — 국립공원 등산코스 · 높이`,
+    provincialparks: (n) => `도립공원 산 ${n}곳 — 도립공원 등산코스 · 높이`,
+    highest50: (n) => `우리나라 높은 산 순위 ${n} — 남한의 높은 산 등산코스`,
+    over1500: (n) => `해발 1,500m 넘는 산 ${n}곳 — 하늘 가까운 산`,
+    over1000: (n) => `해발 1,000m 넘는 산 ${n}곳 — 천 미터 산 목록`,
+    under500: (n) => `낮은 산 ${n}곳 — 가볍게 오르는 500m 아래 산`,
+    island: (n) => `섬 산행 ${n}곳 — 섬의 산 등산코스 · 높이`,
+    azalea: (n) => `철쭉 · 진달래 명산 ${n}곳 — 봄 산행 등산코스`,
+    maple: (n) => `단풍 명산 ${n}곳 — 가을 단풍 산행 등산코스`,
+    reeds: (n) => `억새 명산 ${n}곳 — 가을 억새 산행 등산코스`,
+    snow: (n) => `눈꽃 산행 명산 ${n}곳 — 겨울 산 등산코스`,
+};
 export function hikingListSeo(l: { id: string; name: string; note?: string }, n: number): HikingSeo {
-    return { path: hikingListPath(l.id), title: `${l.name} ${n.toLocaleString("en-US")}곳 — 높이 · 등산 코스${BRAND}`, desc: `${l.name} ${n.toLocaleString("en-US")}곳의 높이와 위치, 등산 코스를 한눈에.${l.note ? ` ${l.note}.` : ""}` };
+    const count = n.toLocaleString("en-US");
+    return { path: hikingListPath(l.id), title: `${LIST_TITLE[l.id]?.(count) ?? `${l.name} ${count}곳 — 높이 · 등산코스`}${BRAND}`, desc: `${l.name} ${n.toLocaleString("en-US")}곳의 높이와 위치, 등산 코스를 한눈에.${l.note ? ` ${l.note}.` : ""}` };
 }
 
 export interface SeoMountain { slug: string; name: string; heightM: number | null; sido: string | null; sigungu: string | null; courses: number; minKm: number | null; maxKm: number | null; lists: readonly string[]; subtitle?: string | null }
@@ -38,15 +60,35 @@ export const kmRange = (min: number | null, max: number | null): string => {
     return f(min) === f(max) ? `${f(min)}km` : `${f(min)}~${f(max)}km`;
 };
 export const listNames = (lists: readonly string[]): string[] => HIKING_LISTS.filter((l) => lists.includes(l.id)).map((l) => l.name);
+/** "0.9km" — 가장 짧은 코스 */
+const shortKm = (min: number | null): string => (min == null ? "" : `${(Math.round(min * 10) / 10).toString()}km`);
 export function mountainSeo(m: SeoMountain): HikingSeo {
     const h = heightText(m.heightM), place = mountainPlace(m);
-    const head = [`${m.name}`, m.courses > 0 ? `등산 코스 ${m.courses}개` : "등산", h ? `높이 ${h}` : ""].filter(Boolean).join(" · ");
-    const course = m.courses > 0 ? `등산 코스 ${m.courses}개(${kmRange(m.minKm, m.maxKm)})의 높낮이와 길 위의 갈림길 · 위험 구간 · 대피소, ` : "";
+    // "설악산 등산코스 9개 · 최단 0.9km · 높이 1,708m" — 코스가 하나면 그 길이만, 없으면 '등산코스'를 쓰지 않는다
+    const head = m.courses > 1
+        ? [`${m.name} 등산코스 ${m.courses}개`, shortKm(m.minKm) ? `최단 ${shortKm(m.minKm)}` : "", h ? `높이 ${h}` : ""]
+        : m.courses === 1 ? [`${m.name} 등산코스`, shortKm(m.minKm), h ? `높이 ${h}` : ""]
+        : [`${m.name} 등산`, h ? `높이 ${h}` : "", "위치 · 날씨"];
+    // 채비 지점(주차장 · 화장실 · 약수터)과 길의 종류는 산림청 100대 명산 코스 파일에서 온 코스에만 있다
+    const rich = m.lists.includes("kfs100");
+    const course = m.courses > 0
+        ? `등산코스 ${m.courses}개(${kmRange(m.minKm, m.maxKm)})의 코스 지도와 높낮이, ${rich ? "들머리 · 주차장 · 화장실 · 약수터 같은 길 위의 지점과 어떤 길인지(계단 · 바위)" : "길 위의 갈림길 · 위험 구간 · 대피소"}, `
+        : "";
     const lists = listNames(m.lists);
     return {
         path: hikingMountainPath(m.slug),
-        title: `${head}${BRAND}`,
+        title: `${head.filter(Boolean).join(" · ")}${BRAND}`,
         desc: `${place ? `${place}의 ` : ""}${m.name}${h ? `(${h})` : ""}. ${course}산의 날씨를 한 화면에서.${lists.length ? ` ${lists.join(" · ")}.` : ""}`.trim(),
+    };
+}
+
+/** 산 카드(server/services/hikingMountainCard)에 싣는 것 — 우리 표에 있는 사실만 */
+export function hikingMountainCardInput(m: SeoMountain & { region?: string | null }): { name: string; height: string; place: string; region: string | null; kfs100: boolean; badge: string | null; courses: string } {
+    const kfs100 = m.lists.includes("kfs100");
+    return {
+        name: m.name, height: heightText(m.heightM) ?? "", place: mountainPlace(m), region: m.region ?? null, kfs100,
+        badge: kfs100 ? null : listNames(m.lists)[0] ?? null,
+        courses: m.courses > 0 ? `등산코스 ${m.courses}개 · ${kmRange(m.minKm, m.maxKm)}` : "",
     };
 }
 

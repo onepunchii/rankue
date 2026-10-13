@@ -27,6 +27,9 @@ import { renderGolfStampCardPng, type StampCardInput } from "./services/golfStam
 import { verifyStampShare } from "./lib/stampShare.js";
 import { listStampAwards } from "./storage/golfStampAwards.js";
 import { bookStates, stampBook } from "../shared/golfStampBooks.js";
+import { renderHikingMountainCardPng } from "./services/hikingMountainCard.js";
+import { mountainBySlug } from "./storage/hiking.js";
+import { hikingMountainCardInput } from "../shared/hikingPage.js";
 
 // 공개 이미지 라우트 — 선수 카드 PNG (2026-09-14).
 //   /og/player/:category/:umbId.png   UMB 세계랭킹 (ko·en·tr·vi·es)
@@ -35,6 +38,7 @@ import { bookStates, stampBook } from "../shared/golfStampBooks.js";
 //   /og/golf-course/:slug.png         골프장 카드 (2026-09-30)
 //   /og/golf-round/:slug.png?d=&t=    라운드 브리핑 카드 (2026-10-05) — 그 날·그 티오프의 날씨. 예보가 없으면 404
 //   /og/store/:code.png               당구장 카드 (2026-09-30)
+//   /og/hiking-mountain/:slug.png     산 카드 (2026-10-13) — 권역의 표지 위에 산의 이름 · 높이 · 자리 · 코스. 우리 표에 있는 산만
 //   /og/golf-footprints/:memberId.png 골프 발자국 카드 (2026-09-30) — **비공개**: 서명(t)·만료가 맞아야 열린다
 //   /og/golf-stamp/:memberId/:book.png 도장첩 완성 카드 (2026-10-12) — **비공개**: 서명(t)·만료가 맞아야 열린다. 다 채운 권만
 // /api 아래에 두지 않는 이유: robots.txt 가 /api/ 를 막고 있어 구글이 이미지를 못 가져간다.
@@ -396,6 +400,24 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] golf course card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  // 산 카드 — 슬러그는 한글이다. 우리 표에 있는 산만 그린다(없는 주소는 404 — 아무 글자나 그려 주지 않는다)
+  app.get("/og/hiking-mountain/:slug.png", async (req, res) => {
+    const slug = String(req.params.slug ?? "").normalize("NFC");
+    if (!slug || slug.length > 80) return res.status(404).type("text/plain").send("not found");
+    try {
+      const m = await mountainBySlug(slug);
+      if (!m) return res.status(404).type("text/plain").send("not found");
+      const png = await renderHikingMountainCardPng(hikingMountainCardInput(m));
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400, stale-while-revalidate=604800");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] hiking mountain card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });
