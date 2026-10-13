@@ -39,6 +39,9 @@ import {
     LucideArrowRight
 } from "lucide-react";
 import { appConfirm } from "@/components/AppDialog";
+import { LucideImage } from "@/lib/icons";
+import { SCAN_COPY } from "@shared/golfScorecardScan";
+import { ScanSheet } from "../components/scan/ScanSheet";
 
 export default function GolfScorecard() {
     const [, params] = useRoute("/golf/game/:id");
@@ -62,6 +65,7 @@ export default function GolfScorecard() {
         handleScoreChange,
         handlePenaltyChange,
         saveCurrentHoleScores,
+        replacePlayers,
         autoFillCurrentHole,
         finishMatch,
         isFinishing,
@@ -92,6 +96,13 @@ export default function GolfScorecard() {
     const currentSubCourseName = isFrontNine ? session?.frontCourseName : session?.backCourseName;
 
     const [showMoney, setShowMoney] = useState(false);
+    // 스코어카드로 채우기 — 쓸 수 있는 사람에게만 단추가 보인다(공개 전에는 운영자만 · 서버가 가른다)
+    const [scanOpen, setScanOpen] = useState(false);
+    const { data: scan } = useQuery<{ available: boolean; left: number }>({
+        queryKey: ["/api/hiq/golf/scan/status"],
+        enabled: isHost && session?.status === "playing",
+        staleTime: 60_000,
+    });
     const [finishOpen, setFinishOpen] = useState(false);
     const [exitOpen, setExitOpen] = useState(false);
     const [unit, setUnit] = useMoneyUnit();
@@ -406,8 +417,14 @@ export default function GolfScorecard() {
                     })}
                 </div>
                 {/* 현장 인증 칩 — 한 줄짜리 조용한 상태. 이유는 칩 밑에 한 번만 잠깐 */}
-                <div className="px-4 pb-2.5 flex items-center">
+                <div className="px-4 pb-2.5 flex items-center justify-between gap-2">
                     <OnSiteChip matchId={session.id} view={onSite.view} onRetry={() => { void onSite.retry(); }} manualAt={onSite.manualAt} />
+                    {isHost && scan?.available && session.status === "playing" && (
+                        <button type="button" onClick={() => setScanOpen(true)} data-testid="scan-open" data-track-as="golf-scan-open"
+                            className="shrink-0 h-8 px-3 rounded-full inline-flex items-center gap-1.5 bg-[#FFFFFF0F] text-[12.5px] text-[#FFFFFFCC] active:bg-[#FFFFFF1F]">
+                            <LucideImage className="w-4 h-4" />{SCAN_COPY.title}
+                        </button>
+                    )}
                 </div>
             </header>
 
@@ -755,6 +772,16 @@ export default function GolfScorecard() {
             </Dialog>
 
             {photoUi.overlay}
+            {scanOpen && (
+                <ScanSheet
+                    matchId={session.id}
+                    players={localPlayers}
+                    pars={coursePar}
+                    parKnown={parKnown}
+                    onApply={(next) => replacePlayers(next)}
+                    onClose={() => setScanOpen(false)}
+                />
+            )}
         </div>
     );
 }

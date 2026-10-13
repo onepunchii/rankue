@@ -26,6 +26,10 @@ import { PIN_PHOTOS } from "../../../shared/golfPins.js";
 import { parseLatLng } from "../../../shared/golfNearby.js";
 import { ONSITE_SOURCES, type OnSiteSource } from "../../../shared/golfOnSite.js";
 import { sanitizeHolePatches, withoutHoleStats } from "../../../shared/golfHoleStats.js";
+import { SCAN_COPY, SCAN_DAILY_LIMIT, buildScanDraft, draftCounts, scanKstDay } from "../../../shared/golfScorecardScan.js";
+import { isSuperAdminRole } from "../../../shared/adminRole.js";
+import { readScorecard, scanConfigured, scanImage, scanPublic } from "../../lib/golfScorecardRead.js";
+import { logScan, scanRole, scansToday, type ScanOutcome } from "../../storage/golfScanLog.js";
 
 const router = Router();
 
@@ -912,27 +916,6 @@ router.get("/passport/footprints/share", requireAuth, asyncHandler(async (req: A
     return sendSuccess(res, { url: footprintCardPath(req.userId!, year, signed.token), expiresAt: new Date(signed.exp * 1000).toISOString() });
 }));
 
-/**
- * 스코어카드 글자 인식 결과를 표로 정리해 돌려준다. **아무것도 저장하지 않는다.**
- *
- * 예전엔 여기서 공용 코스 자료(hiq_course_hole_info)에 홀별 파를 적었다. 두 가지가 겹쳐 있었다:
- *  1. 화면(ScorecardScanner)이 올린 사진을 보지도 않고, 코드에 박아 둔 가짜 결과
- *     (HOLE 1 / PAR 4 / HONG 5)를 3초 기다린 뒤 보내고 있었다. 여기 쌓이던 건 실제 스코어카드가
- *     아니라 지어낸 숫자였고, 사용자에게는 "성공적으로 분석했습니다" 라고 말했다.
- *  2. ocrData 는 클라이언트가 보내는 값이다. 아무나 아무 숫자나 실어 보내면 그게 모든 사람이 보는
- *     골프장 코스 자료가 됐다 — 검증이 한 군데도 없었다.
- * 2026-09-10 저장을 걷어냈다. 진짜 인식을 붙일 때는 **서버가** 이미지에서 직접 뽑은 결과만 적는다.
- */
-router.post("/scorecard/ocr", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    const { ocrData } = req.body;
-    if (!ocrData) return sendError(res, 400, "OCR 데이터가 필요합니다.");
-
-    const parsed = await storage.processScorecardOCR(ocrData);
-    if (!parsed) return sendError(res, 400, "분석 가능한 데이터가 없습니다.");
-
-    return sendSuccess(res, parsed);
-}));
-
 // --- 랭큐매치 (PIN 으로 모이는 골프 경기) ---
 //
 // 2026-09-11 다시 짰다. 예전엔 참가자면 누구나 점수·시작·종료·코스를 서버에 직접 바꿀 수 있었고(방장 전용은
@@ -1123,6 +1106,50 @@ const photoAddSchema = z.object({
     holeNo: z.coerce.number().int().min(1).max(18).nullish(),
     isPublic: z.boolean().optional(),
 });
+
+/**
+ * 스코어카드로 채우기(2026-10-13) — 앱이 만든 디지털 스코어카드(스마트스코어 꼴) 그림을 읽어 점수판의 **초안**을 돌려준다.
+ * 여기서는 **아무것도 저장하지 않는다**(그림도, 읽은 점수도) — 방장이 확인 화면에서 고친 뒤 POST /match/:id/score 로 넣는다.
+ * 공용 코스 자료도 건드리지 않는다(예전 이 자리의 /scorecard/ocr 은 클라이언트가 보낸 값을 모두의 파 자료에 적었다 — 9/10 에 걷어냄).
+ *  - 방장만(점수는 방장만 쓴다) · 치는 중인 방만 · 하루 SCAN_DAILY_LIMIT 번.
+ *  - 공개 전에는 슈퍼관리자만(env GOLF_SCAN_PUBLIC=true 면 모두) — 그림이 국외 사업자에게 나가므로 처리방침이 먼저다.
+ *  - 규칙 · 계산: shared/golfScorecardScan, 읽기: lib/golfScorecardRead.
+ */
+async function scanAccess(memberId: string): Promise<{ available: boolean; left: number }> {
+    if (!scanConfigured()) return { available: false, left: 0 };
+    if (!scanPublic() && !isSuperAdminRole(await scanRole(memberId))) return { available: false, left: 0 };
+    return { available: true, left: Math.max(0, SCAN_DAILY_LIMIT - await scansToday(memberId)) };
+}
+
+router.get("/scan/status", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, { ...(await scanAccess(req.userId!)), limit: SCAN_DAILY_LIMIT });
+}));
+
+router.post("/match/:id/scan", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const session = await loadMatch(req, res, true);
+    if (!session) return;
+    if (session.status !== "playing") return sendError(res, 409, "치는 중인 경기에서만 쓸 수 있어요");
+    const access = await scanAccess(req.userId!);
+    if (!access.available) return sendError(res, 403, "아직 쓸 수 없는 기능이에요");
+    if (access.left <= 0) return sendError(res, 429, SCAN_COPY.limit);
+    const image = scanImage(req.body?.image);
+    if (!image) return sendError(res, 400, "그림 형식이 올바르지 않아요");
+
+    const r = await readScorecard(image);
+    const log = (outcome: ScanOutcome, n?: { rows: number; ok: number; check: number; empty: number }) =>
+        logScan({ memberId: req.userId!, sessionId: session.id, model: r.model, outcome, ms: r.ms, ...n }).catch((e) => console.warn("[GolfScan] log", String(e?.message ?? e).slice(0, 120)));
+    if (!r.read) { await log("failed"); return sendError(res, 502, SCAN_COPY.failed); }
+    if (r.read.kind === "handwritten") { await log("handwritten"); return sendError(res, 422, SCAN_COPY.handwritten); }
+    // 이 라운드의 날(한국 날짜) — 카드의 날짜와 견준다
+    const roundDay = scanKstDay(new Date(session.startedAt ?? session.createdAt ?? Date.now()).getTime());
+    const draft = r.read.kind === "app" ? buildScanDraft(r.read, session.pars, session.parKnown, roundDay) : null;
+    if (!draft) { await log(r.read.kind === "app" ? "none" : "other"); return sendError(res, 422, SCAN_COPY.none); }
+    const counts = draftCounts(draft);
+    await log("ok", { rows: draft.rows.length, ...counts });
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, { draft, left: access.left - 1 });
+}));
 
 router.get("/match/:id/photos", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const session = await loadMatch(req, res, false);

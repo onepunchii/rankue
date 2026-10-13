@@ -1328,59 +1328,6 @@ export class GolfRepository {
     // 없는 경기 번호(00000000-…)로 넣어 프로덕션에서 여권 화면을 열 때마다 500 이 났다.
     // 외래키가 없었다면 조용히 모든 사용자에게 가짜 라운드가 쌓였을 것이다. 다시 만들지 말 것.
 
-    async processScorecardOCR(ocrData: any) {
-        const items = ocrData.textAnnotations || [];
-        if (items.length <= 1) return null;
-
-        const words = items.slice(1).map((ann: any) => ({
-            text: ann.description,
-            bounds: ann.boundingPoly.vertices,
-            center: {
-                x: (ann.boundingPoly.vertices[0].x + ann.boundingPoly.vertices[2].x) / 2,
-                y: (ann.boundingPoly.vertices[0].y + ann.boundingPoly.vertices[2].y) / 2
-            }
-        }));
-
-        const rows: any[][] = [];
-        words.sort((a: any, b: any) => a.center.y - b.center.y);
-
-        let currentRow: any[] = [];
-        let lastY = -1;
-
-        words.forEach((w: any) => {
-            if (lastY === -1 || Math.abs(w.center.y - lastY) < 15) {
-                currentRow.push(w);
-            } else {
-                rows.push(currentRow.sort((a, b) => a.center.x - b.center.x));
-                currentRow = [w];
-            }
-            lastY = w.center.y;
-        });
-        if (currentRow.length > 0) rows.push(currentRow.sort((a, b) => a.center.x - b.center.x));
-
-        const parsed = {
-            meta: { source_type: "SMART_SCORE_IMAGE", course_name_raw: "Auto Detected", date: new Date().toISOString().split('T')[0] },
-            courses: [] as any[]
-        };
-
-        let currentCourse: any = { course_name: "Out Course", pars: [], players: [] };
-
-        rows.forEach(row => {
-            const rowText = row.map(w => w.text).join(' ');
-            if (rowText.includes('PAR') || rowText.match(/[345]\s[345]\s[345]/)) {
-                currentCourse.pars = row.filter(w => w.text.match(/^\d$/)).map(w => parseInt(w.text));
-            } else if (row.length >= 10 && row[0].text.length >= 2) {
-                const scores = row.slice(1, 10).map(w => parseInt(w.text) || 0);
-                const total = parseInt(row[10]?.text) || scores.reduce((a, b) => a + b, 0);
-                currentCourse.players.push({ name: row[0].text, scores, total });
-            }
-        });
-
-        if (currentCourse.pars.length > 0) parsed.courses.push(currentCourse);
-
-        return parsed;
-    }
-
     async updateCourseHoleInfo(data: { courseId: string, courseName: string, subPathName?: string, holeNo: number, par: number }) {
         const [existing] = await db.select().from(hiqCourseHoleInfo)
             .where(and(

@@ -104,7 +104,6 @@ class Storage {
     async updateGolfStats(id: string) { return this.golf.updateGolfStats(id); }
     async getGolfPassportStats(id: string) { return this.golf.getGolfPassportStats(id); }
     async getGolfBookingCounts(start: string, end: string, viewType?: string, filters?: any) { return this.golf.getGolfBookingCounts(start, end, viewType, filters); }
-    async processScorecardOCR(data: any) { return this.golf.processScorecardOCR(data); }
     async updateCourseHoleInfo(data: any) { return this.golf.updateCourseHoleInfo(data); }
     async createGolfMatchSession(hostId: string, input: any) { return this.golf.createGolfMatchSession(hostId, input); }
     async joinGolfMatchSession(pin: string, mid: string): Promise<{ session: any; added: boolean }> { return this.golf.joinGolfMatchSession(pin, mid); }

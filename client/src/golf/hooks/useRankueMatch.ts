@@ -254,6 +254,11 @@ export function useRankueMatch(matchId: string, me?: any, opts?: { redirectOnFin
         handleScoreChange,
         handlePenaltyChange,
         saveCurrentHoleScores,
+        /** 점수판을 통째로 바꿔 넣고 저장한다(스코어카드로 채우기) — 방장의 편집 원본도 같이 바꾼다 */
+        replacePlayers: async (next: any[]) => {
+            setLocalPlayers(next);
+            return updateScoreMutation.mutateAsync({ holeNo: holeRef.current + 1, players: next });
+        },
         autoFillCurrentHole,
         finishMatch: () => {
             if (finishingRef.current || finishMatchMutation.isPending) return;
