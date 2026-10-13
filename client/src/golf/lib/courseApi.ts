@@ -11,6 +11,7 @@ import type { Fees, GolfIntent, PublicListing } from "@shared/golfCourse";
 import type { CourseWeather } from "@shared/golfWeather";
 import type { NearbyKind, NearbyResult } from "@shared/golfAround";
 import type { CourseGuide } from "@shared/golfCourseGuide";
+import type { CourseOpenTees, OpenTeeFeedItem } from "@shared/golfOpenTee";
 
 export const COURSES_KEY = "/api/hiq/golf-courses";
 
@@ -141,6 +142,30 @@ export function useCourseWeather(slug: string | null | undefined) {
             return r && Array.isArray(r.days) && Array.isArray(r.hours) ? (r as CourseWeather) : null;
         },
         enabled: !!slug, staleTime: 10 * 60_000, refetchInterval: 15 * 60_000, retry: 0,
+    });
+}
+/**
+ * 남은 티의 캐시 열쇠 — COURSES_KEY 밑에 두지 않는다: 골프장 상세의 머리(usePrefill)가 그 밑의 배열을 전부 골프장 목록으로 읽는데,
+ * 남은 티 한 줄에도 slug · name · region · holes(그 티의 홀 수)가 있어 27홀 골프장의 머리가 잠깐 '18홀'로 그려진다.
+ */
+export const OPEN_TEES_KEY = "golf-open-tees";
+/** 이 골프장의 공식 사이트에 공개된 남은 티 — 받는 곳이 아니면 null(구역을 그리지 않는다). 20분에 한 번 받는 자료라 5분만 들고 있는다 */
+export function useCourseOpenTees(slug: string | null | undefined) {
+    return useQuery<CourseOpenTees | null>({
+        queryKey: [OPEN_TEES_KEY, slug],
+        queryFn: async () => {
+            const r: any = await apiRequest(`${COURSES_KEY}/${encodeURIComponent(slug!)}/open-tees`);
+            return r && typeof r.page === "string" && Array.isArray(r.days) ? (r as CourseOpenTees) : null;
+        },
+        enabled: !!slug, staleTime: 5 * 60_000, retry: 0,
+    });
+}
+/** 여러 골프장의 남은 티를 모아 본 것 — 골프 홈 */
+export function useOpenTeeFeed(enabled = true) {
+    return useQuery<OpenTeeFeedItem[]>({
+        queryKey: [OPEN_TEES_KEY],
+        queryFn: async () => { const r: any = await apiRequest(`${COURSES_KEY}/open-tees`); return Array.isArray(r) ? (r as OpenTeeFeedItem[]) : []; },
+        enabled, staleTime: 5 * 60_000, retry: 0,
     });
 }
 /**

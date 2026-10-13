@@ -21,6 +21,7 @@ import { GameModeSheet } from "../components/dashboard/GameModeSheet";
 import { PinEntrySheet } from "../components/dashboard/PinEntrySheet";
 import { ActiveRoundCard } from "../components/dashboard/ActiveRoundCard";
 import { CourseHomeEntry } from "../components/course/list/CourseHomeEntry";
+import { OpenTeeHome } from "@/golf/components/dashboard/OpenTeeHome";
 import { StampHomeEntry } from "../stamps/StampHomeEntry";
 
 // Hooks
@@ -122,6 +123,10 @@ export default function GolfDashboard() {
 
             {/* 전국 골프장(2026-09-24) — 골프장 목록·지역·부킹/조인/긴급 허브의 입구 */}
             <CourseHomeEntry />
+
+            {/* 지금 남은 티(2026-10-13 오너: "골프가 데이터의 변화들이 없어서 즐길 거리가 없다 — 골프장 취소티 가져오자") — 골프장 공식 예약 화면에
+                공개된 티타임을 모아 본다. 20분마다 달라진다. 받은 것이 없으면 스스로 숨는다 */}
+            <OpenTeeHome />
 
             {/* Dashboard Widgets */}
             <StatsChart

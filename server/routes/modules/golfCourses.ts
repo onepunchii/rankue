@@ -314,6 +314,16 @@ router.delete("/alerts/:region", requireAuth, asyncHandler(async (req: AuthReque
 }));
 
 // ── 한 곳 ──────────────────────────────────────────────────────────
+// 공식 사이트의 남은 티(2026-10-13) — 받는 곳 여러 곳을 한 줄씩 모아 본다(새로 나온 것 먼저). 누구에게나 같은 답이라 CDN 이 잠깐 기억한다.
+// ⚠️ "/:slug" 보다 먼저 있어야 한다(아니면 'open-tees' 라는 골프장을 찾는다).
+router.get("/open-tees", asyncHandler(async (_req: any, res: any) => {
+    const { openTeeFeed } = await import("../../services/golfOpenTees.js");
+    const [shared, feed] = await Promise.all([loadSummary(), openTeeFeed()]);
+    const rows = feed.flatMap((t) => { const p = shared.bySlug.get(t.slug); return p ? [{ ...t, name: p.name, region: p.region, city: p.city }] : []; });
+    res.set("Cache-Control", "public, max-age=120, s-maxage=300, stale-while-revalidate=600");
+    return sendSuccess(res, rows);
+}));
+
 router.get("/:slug", asyncHandler(async (req: any, res: any) => {
     const shared = await loadSummary(); const now = Date.now();
     const slug = String(req.params.slug).normalize("NFC");
@@ -419,6 +429,14 @@ router.get("/:slug/nearby", asyncHandler(async (req: any, res: any) => {
 // 기상청 단기(5km 격자)·중기 예보. 상세와 따로 받는다 — 상세는 30초마다 다시 받는데 날씨는 세 시간에 한 번 바뀐다.
 // 낡았으면 여기서 그 격자만 새로 받아 저장한다(services/golfWeather). 못 받으면 null — 화면은 구역을 그리지 않는다.
 // 모두에게 같은 공개 자료라 CDN 에 10분 둔다.
+// 이 골프장의 남은 티 — 받는 곳이 아니면 null(화면은 구역을 그리지 않는다)
+router.get("/:slug/open-tees", asyncHandler(async (req: any, res: any) => {
+    const { courseOpenTees } = await import("../../services/golfOpenTees.js");
+    const data = await courseOpenTees(String(req.params.slug).normalize("NFC"));
+    res.set("Cache-Control", "public, max-age=120, s-maxage=300, stale-while-revalidate=600");
+    return sendSuccess(res, data);
+}));
+
 router.get("/:slug/weather", asyncHandler(async (req: any, res: any) => {
     const s = await loadSummary();
     const page = s.bySlug.get(String(req.params.slug).normalize("NFC"));

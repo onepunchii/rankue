@@ -235,6 +235,23 @@ async function handleGolfWeather(req: any, res: any) {
 router.get("/golf-weather", asyncHandler(handleGolfWeather));
 router.post("/golf-weather", asyncHandler(handleGolfWeather));
 
+// 골프장 공식 사이트의 남은 티(2026-10-13) — 20분마다. 볼 때가 된 날(가까운 날 4시간 · 먼 날 8시간)만 시간 예산만큼 받고 나머지는 다음 차례에.
+// 밤(23 ~ 06시)에는 쉰다. 받는 곳 · 규칙은 shared/golfOpenTee, 끄려면 GOLF_OPEN_TEES=false. 시간 예산은 날씨 크론과 같은 셈(서버리스 10초).
+// 손으로 부를 때: ?only=<slug>(한 곳만) · ?force=1(때가 안 됐어도 · 밤에도) · ?budget=<ms>
+async function handleGolfOpenTees(req: any, res: any) {
+    const t0 = Date.now();
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { collectOpenTees } = await import("../../services/golfOpenTees.js");
+    const manual = Number(req.query.budget);
+    const budget = manual > 0 ? Math.min(20_000, manual) : Math.max(1000, 7000 - (Date.now() - t0) - 2500);
+    const result = await collectOpenTees({ budgetMs: budget, force: req.query.force === "1", only: req.query.only ? String(req.query.only).normalize("NFC") : undefined });
+    return sendSuccess(res, { ...result, budgetMs: budget, tookMs: Date.now() - t0 });
+}
+router.get("/golf-open-tees", asyncHandler(handleGolfOpenTees));
+router.post("/golf-open-tees", asyncHandler(handleGolfOpenTees));
+
 /** 알림함 보존 기간(오너 결정 2026-09-23). 읽은 것도 안 읽은 것도 이 날짜가 지나면 지운다. */
 const NOTIFICATION_KEEP_DAYS = 7;
 

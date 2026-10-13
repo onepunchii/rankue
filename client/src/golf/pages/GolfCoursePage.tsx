@@ -27,6 +27,7 @@ import { CourseLogo } from "@/golf/components/course/CourseLogo";
 import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/CourseHeader";
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";
 import { AroundListings } from "@/golf/components/course/detail/AroundListings";
+import { OpenTees } from "@/golf/components/course/detail/OpenTees";
 import { CourseStampBlock } from "@/golf/stamps/CourseStampBlock";
 import { CourseCrews } from "@/golf/stamps/CrewStampParts";
 import { WeatherCard, WeatherSkeleton, type RoundPick } from "@/golf/components/course/detail/WeatherCard";
@@ -289,6 +290,9 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             {ids.includes("tee") && <TeeTimes slug={d.slug} name={d.name} listings={d.listings} counts={d.counts} myWatch={d.myWatch} watchers={d.watchers} />}
             {/* 이 근처 조인·부킹(2026-10-08 오너: "각 개별 CC 페이지에 이 카드 들어가면 어때? … 조인 활성화" → "시안 1 이 좋네") — 이 골프장에 글이
                 없어도 같은 지역의 자리로 이어 준다. 티타임 바로 밑, 소개 띠 앞 */}
+            {/* 공식 사이트의 남은 티(2026-10-13 오너: "골프장 취소티 가져오자") — 그 골프장이 로그인 없이 공개한 티타임. 받는 곳이 아니면 그리지 않는다.
+                우리 티타임(부킹 · 조인) 바로 밑 — 둘 다 '이 골프장에서 칠 수 있는 자리'다 */}
+            <OpenTees key={`opentee:${d.slug}`} slug={d.slug} className="px-5 mt-3" />
             <AroundListings key={`around:${d.slug}`} slug={d.slug} lat={here?.lat ?? null} lng={here?.lng ?? null} region={d.region} className="px-5 mt-3" />
             {/* 도장(2026-10-12 오너: "골프장 상세에도 해당 지역에 이미지와 도장 볼마커 등등이 들어가면") — 모든 골프장에: 그 권역의 표지 그림 위에
                 여기서 받는 도장과 그 권역의 볼마커. 도장첩의 골프장이면 그 권의 한 칸으로, 아니면 골프 여권의 도장으로 */}
