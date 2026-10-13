@@ -70,7 +70,7 @@ function HereMap({ d }: { d: MountainDetail }) {
             style={{ width: "clamp(104px, 31vw, 132px)", aspectRatio: "436 / 640" }} data-testid="mountain-here-map">
             {seen && (
                 <Suspense fallback={null}>
-                    <MountainMap mountains={pins} />
+                    <MountainMap mountains={pins} interactive={false} />
                     <HereMark wrap={wrap} slug={d.slug} />
                 </Suspense>
             )}

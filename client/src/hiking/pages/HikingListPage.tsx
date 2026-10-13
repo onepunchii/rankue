@@ -12,9 +12,11 @@ import { useSeo } from "@/hooks/useSeo";
 import { hikingGroup, hikingRegion } from "@shared/hikingMountains";
 import { OSM_NOTE, hikingListSeo, hikingRegionSeo } from "@shared/hikingPage";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
+import { BookCover, hasNotebook, notebookInk } from "../components/BundleNotebook";
 import { MountainMap } from "../components/MountainMap";
 import { HikingCta, MountainRow } from "../components/MountainParts";
 import { hikingCover, hikingListCover } from "../theme";
+import { useHikingStamps } from "../stamps/useHikingStamps";
 import { mountainsKey, type MountainSummary } from "../lib/api";
 
 const PAGE = 60;
@@ -36,6 +38,9 @@ export default function HikingListPage() {
     const seo = region ? hikingRegionSeo(region, data?.total ?? 0) : group ? hikingListSeo(group, data?.total ?? 0) : null;
     useSeo(seo && data ? { title: seo.title, description: seo.desc, path: seo.path } : null);
     const famous = useMemo(() => items.filter((m) => m.tier === 1), [items]);
+    // 내 진행 — 등산을 쓰는 회원에게만. 이 화면은 묶음의 산을 다 받아 오므로(천 곳까지) 전부를 놓고 센다
+    const my = useHikingStamps();
+    const progress = my.mine && group && data && data.total > 0 && data.total <= items.length ? { got: items.filter((m) => my.done.has(m.id)).length, total: data.total } : null;
 
     if (!known) {
         return (
@@ -50,14 +55,38 @@ export default function HikingListPage() {
     return (
         <HikingShell title={title}>
             <div data-testid="hiking-list" data-kind={region ? "region" : "group"}>
-                <div className="relative h-[168px] overflow-hidden">
-                    <img src={region ? hikingCover(region.id) : hikingListCover(group?.id)} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 60%" }} draggable={false} decoding="async" />
-                    <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2600 20%,#0B1F26F5 97%)" }} aria-hidden />
-                    <div className="absolute inset-x-5 bottom-3.5">
-                        <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-[#F4EFE3]">{title}</h1>
-                        <p className="mt-1 text-[13.5px] text-[#F4EFE3B3] break-keep">{region ? region.sidos.join(" · ") : group?.note}{data ? ` · ${data.total.toLocaleString("en-US")}곳` : ""}</p>
+                {group && hasNotebook(group.id) ? (
+                    // 묶음의 머리 — 그 수첩을 펼치기 전의 겉모습. 회원에게는 오른 산의 수와 진행 띠
+                    <div className="relative overflow-hidden px-5 pb-5 pt-5" style={{ background: `linear-gradient(180deg, ${notebookInk(group.id)}59, #0B1F26 92%)` }} data-testid="hiking-list-book">
+                        <div className="flex items-end gap-4">
+                            <BookCover id={group.id} name={group.short} count={data?.total ?? 0} progress={progress} width={128} big className="mb-2" />
+                            <div className="min-w-0 flex-1 pb-1">
+                                <p className="text-[12.5px] text-[#F6D9A8]">산행 수첩</p>
+                                <h1 className="mt-0.5 text-[24px] font-semibold leading-tight tracking-tight text-[#F4EFE3] break-keep">{title}</h1>
+                                <p className="mt-1.5 text-[13.5px] leading-snug text-[#F4EFE3B3] break-keep">{group.note}</p>
+                                {data && <p className="mt-1 text-[13.5px] tabular-nums text-[#F4EFE3B3]">산 {data.total.toLocaleString("en-US")}곳</p>}
+                            </div>
+                        </div>
+                        {progress && (
+                            <div className="mt-3.5" data-testid="hiking-list-progress">
+                                <div className="flex items-baseline justify-between text-[13px]">
+                                    <span className="text-[#F4EFE3CC]">{progress.got >= progress.total ? "이 수첩의 산을 다 올랐어요" : progress.got > 0 ? "정상에서 인증한 산" : "아직 오른 산이 없어요 — 첫 산을 골라 보세요"}</span>
+                                    <span className="tabular-nums text-[#F6D9A8]">{progress.got} / {progress.total.toLocaleString("en-US")}</span>
+                                </div>
+                                <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[#FFFFFF1F]"><div className="h-full rounded-full bg-[#F28C6A]" style={{ width: `${Math.max(progress.got > 0 ? 3 : 0, Math.round((progress.got / Math.max(1, progress.total)) * 100))}%` }} /></div>
+                            </div>
+                        )}
                     </div>
-                </div>
+                ) : (
+                    <div className="relative h-[168px] overflow-hidden">
+                        <img src={region ? hikingCover(region.id) : hikingListCover(group?.id)} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 60%" }} draggable={false} decoding="async" />
+                        <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2600 20%,#0B1F26F5 97%)" }} aria-hidden />
+                        <div className="absolute inset-x-5 bottom-3.5">
+                            <h1 className="text-[26px] font-semibold leading-tight tracking-tight text-[#F4EFE3]">{title}</h1>
+                            <p className="mt-1 text-[13.5px] text-[#F4EFE3B3] break-keep">{region ? region.sidos.join(" · ") : group?.note}{data ? ` · ${data.total.toLocaleString("en-US")}곳` : ""}</p>
+                        </div>
+                    </div>
+                )}
 
                 {isLoading || !data ? (
                     <div className="space-y-3 px-5 pt-6" aria-busy="true"><HkSkel className="h-12" /><HkSkel className="h-96" /></div>
@@ -65,13 +94,13 @@ export default function HikingListPage() {
                     <>
                         {region && famous.length > 0 && (
                             <HkSection title={`${region.name}의 명산`} aside={`${famous.length}곳 · 산을 눌러 보세요`}>
-                                <MountainMap mountains={famous} region={region.id} />
+                                <MountainMap mountains={famous} region={region.id} done={my.done} />
                             </HkSection>
                         )}
                         {/* 묶음(목록 · 특성) — 이 산들이 어디어디에 있는지부터 보여 준다(2026-10-13 오너: "지도를 넣어서 어디어디 산인지 보이게") */}
                         {group && famous.length > 0 && (
                             <HkSection title="어디에 있는 산일까" aside={`명산 ${famous.length}곳 · 산을 눌러 보세요`}>
-                                <MountainMap mountains={famous} fit labelAll={famous.length <= 30} />
+                                <MountainMap mountains={famous} fit labelAll={famous.length <= 30} done={my.done} />
                                 {famous.length < items.length && (
                                     <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep" data-testid="hiking-list-map-note">
                                         이 묶음의 산 {data.total.toLocaleString("en-US")}곳 가운데 명산 {famous.length}곳을 지도에 그렸어요. 나머지는 아래 목록에 있어요.
@@ -88,7 +117,7 @@ export default function HikingListPage() {
                                 <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-6 text-center text-[14px] text-[#F4EFE399]">찾는 산이 없어요.</p>
                             ) : (
                                 <ul className="rounded-2xl bg-[#FFFFFF0A] px-3.5">
-                                    {shown.slice(0, n).map((m, i) => <li key={m.id} className={i ? "border-t border-[#FFFFFF14]" : ""}><MountainRow m={m} /></li>)}
+                                    {shown.slice(0, n).map((m, i) => <li key={m.id} className={i ? "border-t border-[#FFFFFF14]" : ""}><MountainRow m={m} done={my.done.has(m.id)} /></li>)}
                                 </ul>
                             )}
                             {shown.length > n && (

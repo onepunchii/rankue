@@ -60,17 +60,22 @@ export function NearMe({ famous, done }: {
 
     const first = near[0], firstFamous = nearFamous.find((m) => m.slug !== first?.slug) ?? nearFamous[0];
     const loading = phase === "locating" || (phase === "on" && !points);
+    const featured = useMemo(() => [first?.slug, firstFamous?.slug].filter((x): x is string => !!x), [first?.slug, firstFamous?.slug]);
+    const [more, setMore] = useState(false);
 
     return (
         <HkSection title="내 근처의 산" aside={phase === "on" && first ? `가장 가까운 산까지 ${nearKmText(first.km)}` : "가까운 산 · 가까운 명산"}>
             <div data-testid="hk-near" data-phase={loading ? "loading" : phase}>
                 {phase === "on" && points && onMap.length > 0 ? (
                     <>
-                        <NearDial items={onMap} done={isDone} />
+                        <NearDial items={onMap} done={isDone} featured={featured} />
                         <div className="mt-2.5 grid grid-cols-2 gap-2.5">
                             {first && <NearCard kind="가까운 산" m={first} info={bySlug.get(first.slug)} done={isDone(first)} />}
                             {firstFamous && <NearCard kind="가까운 명산" m={firstFamous} info={bySlug.get(firstFamous.slug)} done={isDone(firstFamous)} />}
                         </div>
+                        {onMap.length > featured.length && (more
+                            ? <NearRows items={onMap} skip={new Set(featured)} done={isDone} />
+                            : <button type="button" onClick={() => setMore(true)} data-track-as="hiking-near-more" data-testid="hk-near-more" className="mt-2.5 flex h-11 w-full items-center justify-center rounded-xl bg-[#FFFFFF14] text-[14px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24]">가까운 산 {onMap.length - featured.length}곳 더 보기</button>)}
                         <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">가운데가 지금 자리, 위쪽이 북쪽이에요. 직선 거리라 길로 가면 더 멀어요. 내 위치는 이 기기에서만 써요.</p>
                     </>
                 ) : phase === "on" && points ? (
@@ -111,62 +116,86 @@ function DialMark() {
     );
 }
 
-const VB = { w: 340, h: 300 }, C = { x: 170, y: 152 }, R = 118;
+const VB = { w: 340, h: 336 }, C = { x: 170, y: 170 }, R = 118, BEZEL = 20;
+const DIRS = [["북", 0], ["동", 90], ["남", 180], ["서", 270]] as const;
+const polar = (deg: number, r: number): [number, number] => [C.x + Math.sin((deg * Math.PI) / 180) * r, C.y - Math.cos((deg * Math.PI) / 180) * r];
+/** 땅의 결 — 판 위의 구불구불한 등고선(장식). 반지름을 여섯 굽이로 흔든다 */
+const contour = (r: number, wobble: number, phase: number): string => {
+    const pts = Array.from({ length: 72 }, (_, i) => { const a = (i / 72) * Math.PI * 2; const rr = r + Math.sin(a * 3 + phase) * wobble + Math.sin(a * 5 + phase * 2) * wobble * 0.5; return `${(C.x + Math.cos(a) * rr).toFixed(1)} ${(C.y + Math.sin(a) * rr).toFixed(1)}`; });
+    return `M${pts.join(" L")} Z`;
+};
+const CONTOURS = [contour(R * 0.24, 4, 0.4), contour(R * 0.46, 6, 1.7), contour(R * 0.68, 7, 3.1), contour(R * 0.88, 6, 4.4)].join(" ");
 
 /**
- * 동그란 판 — 가운데가 나, 위가 북. 산은 방향과 거리대로, 이름은 겹치지 않는 것만 단다.
+ * 동그란 판 — 가운데가 나, 위가 북. 나침반의 테(눈금 · 동서남북) 안에 산을 방향과 거리대로 놓는다. 이름은 겹치지 않는 것만 단다.
  * 산 화면도 이 판을 쓴다(가운데가 그 산 — 가까운 산의 방향과 거리): centre 로 가운데 표시 밑에 말("이 산")을 달고, label 로 그림을 읽어 주는 말을 바꾼다.
- * 둘 다 안 주면 홈의 판 그대로다.
+ * featured 는 카드로 따로 소개하는 산 — 가운데에서 점선을 긋고 이름 옆에 거리를 적는다.
  */
-export function NearDial({ items, done, centre, label }: {
+export function NearDial({ items, done, centre, label, featured }: {
     items: readonly NearMountain[];
     done: (m: NearMountain) => boolean;
-    /** 가운데 표시 밑에 다는 말 — 안 주면 달지 않는다(홈: 가운데가 나) */
+    /** 가운데 표시 밑에 다는 말(산 화면의 "이 산") — 없으면 '나'의 표시만 */
     centre?: string;
-    /** 그림을 읽어 주는 말 — 안 주면 "내 근처의 산 N곳" */
+    /** 그림을 읽어 주는 말 */
     label?: string;
+    /** 카드로 소개하는 산의 주소(slug) — 점선과 거리가 붙는다 */
+    featured?: readonly string[];
 }) {
     const [, setLocation] = useLocation();
     const radius = nearRadiusKm(items.map((m) => m.km));
     const spots = useMemo(() => {
-        const out = items.map((m) => { const [x, y] = nearSpot(m, radius); return { m, x: C.x + x * R, y: C.y + y * R }; });
-        // 이름 칸이 겹치면 먼 쪽의 이름을 뺀다(가까운 산 · 명산이 먼저) — 산 그림은 다 그린다. 가운데의 말이 있으면 그 자리는 먼저 비워 둔다
-        const boxes: { x0: number; x1: number; y0: number; y1: number }[] = centre ? [{ x0: C.x - centre.length * 6.8 - 4, x1: C.x + centre.length * 6.8 + 4, y0: C.y + 12, y1: C.y + 30 }] : [];
-        const order = [...out].sort((a, b) => Number(b.m.famous) - Number(a.m.famous) || a.m.km - b.m.km);
-        const labelled = new Map<string, { anchor: "start" | "end"; tx: number }>();
+        const out = items.map((m) => { const [x, y] = nearSpot(m, radius); return { m, x: C.x + x * R, y: C.y + y * R, star: !!featured?.includes(m.slug) }; });
+        // 이름 칸이 겹치면 먼 쪽의 이름을 뺀다(카드의 산 · 명산 · 가까운 산이 먼저) — 산 그림은 다 그린다
+        const boxes: { x0: number; x1: number; y0: number; y1: number }[] = centre ? [{ x0: C.x - centre.length * 6.8 - 4, x1: C.x + centre.length * 6.8 + 4, y0: C.y + 12, y1: C.y + 30 }] : [{ x0: C.x - 10, x1: C.x + 10, y0: C.y - 10, y1: C.y + 10 }];
+        const order = [...out].sort((a, b) => Number(b.star) - Number(a.star) || Number(b.m.famous) - Number(a.m.famous) || a.m.km - b.m.km);
+        const labelled = new Map<string, { anchor: "start" | "end"; tx: number; sub?: string }>();
         for (const s of order) {
-            const w = s.m.name.length * 13.5 + 6, left = s.x > C.x + R * 0.45;
-            const tx = left ? s.x - 11 : s.x + 11;
-            const box = { x0: left ? tx - w : tx, x1: left ? tx : tx + w, y0: s.y - 14, y1: s.y + 5 };
-            if (box.x0 < 2 || box.x1 > VB.w - 2) continue;
+            const sub = s.star ? nearKmText(s.m.km) : undefined;
+            const w = Math.max(s.m.name.length * 13.5, sub ? sub.length * 7.4 : 0) + 6, left = s.x > C.x + R * 0.4;
+            const tx = left ? s.x - 12 : s.x + 12;
+            const box = { x0: left ? tx - w : tx, x1: left ? tx : tx + w, y0: s.y - 14, y1: s.y + (sub ? 18 : 5) };
+            if (box.x0 < 4 || box.x1 > VB.w - 4) continue;
             if (boxes.some((b) => box.x0 < b.x1 && box.x1 > b.x0 && box.y0 < b.y1 && box.y1 > b.y0)) continue;
-            boxes.push(box); labelled.set(s.m.slug, { anchor: left ? "end" : "start", tx });
+            boxes.push(box); labelled.set(s.m.slug, { anchor: left ? "end" : "start", tx, sub });
         }
         return out.sort((a, b) => a.y - b.y).map((s) => ({ ...s, label: labelled.get(s.m.slug) }));
-    }, [items, radius, centre]);
+    }, [items, radius, centre, featured]);
     return (
         <svg viewBox={`0 0 ${VB.w} ${VB.h}`} role="img" aria-label={label ?? `내 근처의 산 ${items.length}곳`} style={{ display: "block", width: "100%", background: "#F4EFE3", borderRadius: 18 }} data-testid="hk-near-dial" data-radius={radius}>
             <defs>
-                <pattern id="hk-near-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><path d="M0 0 V5" stroke="#1F556012" strokeWidth="1.4" /></pattern>
+                <pattern id="hk-near-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><path d="M0 0 V5" stroke="#1F556010" strokeWidth="1.4" /></pattern>
+                <radialGradient id="hk-near-land" cx="50%" cy="46%" r="60%"><stop offset="0%" stopColor="#EEF1DC" /><stop offset="70%" stopColor="#DFE7CB" /><stop offset="100%" stopColor="#CFDAB9" /></radialGradient>
+                <clipPath id="hk-near-clip"><circle cx={C.x} cy={C.y} r={R} /></clipPath>
             </defs>
-            <circle cx={C.x} cy={C.y} r={R + 14} fill="#E4E9CF" />
-            <circle cx={C.x} cy={C.y} r={R + 14} fill="url(#hk-near-hatch)" />
-            <circle cx={C.x} cy={C.y} r={R} fill="none" stroke="#0E2A3340" strokeWidth="1" />
-            <circle cx={C.x} cy={C.y} r={R / 2} fill="none" stroke="#0E2A3330" strokeWidth="1" strokeDasharray="3 4" />
-            <path d={`M${C.x} ${C.y - R - 14} V${C.y + R + 14} M${C.x - R - 14} ${C.y} H${C.x + R + 14}`} stroke="#0E2A3314" strokeWidth="1" />
-            {/* 북쪽 표시 · 눈금의 거리 */}
-            <path d={`M${C.x} ${C.y - R - 22} l5 9 h-10 Z`} fill="#0E2A33" />
-            <text x={C.x + 9} y={C.y - R - 13} fontSize="12.5" fontWeight="600" fill="#0E2A33">북</text>
-            <text x={C.x + 4} y={C.y + R / 2 - 4} fontSize="12" fill="#0E2A3399">{nearKmText(radius / 2)}</text>
-            <text x={C.x + 4} y={C.y + R - 4} fontSize="12" fill="#0E2A3399">{nearKmText(radius)}</text>
+            {/* 나침반의 테 — 눈금과 동서남북 */}
+            <circle cx={C.x} cy={C.y} r={R + BEZEL} fill="#0E2A33" />
+            <circle cx={C.x} cy={C.y} r={R + BEZEL - 2.5} fill="none" stroke="#F6D9A8" strokeOpacity="0.55" strokeWidth="1" />
+            {Array.from({ length: 72 }, (_, i) => { const d = i * 5, long = d % 30 === 0; if (d % 90 === 0) return null; const [x0, y0] = polar(d, R + 2.5), [x1, y1] = polar(d, R + (long ? 9 : 5.5)); return <path key={d} d={`M${x0.toFixed(1)} ${y0.toFixed(1)} L${x1.toFixed(1)} ${y1.toFixed(1)}`} stroke="#F4EFE3" strokeOpacity={long ? 0.75 : 0.38} strokeWidth={long ? 1.3 : 1} />; })}
+            {DIRS.map(([t, d]) => { const [x, y] = polar(d, R + BEZEL / 2); return <text key={t} x={x} y={y + 4.6} textAnchor="middle" fontSize="13" fontWeight="600" fill={d === 0 ? "#F28C6A" : "#F4EFE3"}>{t}</text>; })}
+            {/* 판 — 땅의 색과 결 */}
+            <circle cx={C.x} cy={C.y} r={R} fill="url(#hk-near-land)" />
+            <g clipPath="url(#hk-near-clip)">
+                <circle cx={C.x} cy={C.y} r={R} fill="url(#hk-near-hatch)" />
+                <path d={CONTOURS} fill="none" stroke="#1F5560" strokeOpacity="0.13" strokeWidth="1.1" />
+                <path d={`M${C.x} ${C.y - R} V${C.y + R} M${C.x - R} ${C.y} H${C.x + R}`} stroke="#0E2A33" strokeOpacity="0.1" strokeWidth="1" />
+            </g>
+            <circle cx={C.x} cy={C.y} r={R / 2} fill="none" stroke="#0E2A33" strokeOpacity="0.28" strokeWidth="1" strokeDasharray="3 4" />
+            <circle cx={C.x} cy={C.y} r={R} fill="none" stroke="#0E2A33" strokeOpacity="0.5" strokeWidth="1.2" />
+            {/* 눈금의 거리 — 남동쪽 대각선에 */}
+            {[0.5, 1].map((k) => { const [x, y] = polar(135, R * k - 2); return <text key={k} x={x - 3} y={y - 3} textAnchor="end" fontSize="12" fill="#0E2A33" fillOpacity="0.62" stroke="#E6EAD2" strokeWidth="2.6" paintOrder="stroke">{nearKmText(radius * k)}</text>; })}
+            {/* 카드의 산으로 가는 점선 */}
+            {spots.filter((s) => s.star).map((s) => <path key={`l:${s.m.slug}`} d={`M${C.x} ${C.y} L${s.x.toFixed(1)} ${s.y.toFixed(1)}`} stroke={s.m.famous ? "#1F5560" : "#B5654A"} strokeOpacity="0.6" strokeWidth="1.4" strokeDasharray="2 4" strokeLinecap="round" />)}
             {spots.map((s) => {
-                const size = (s.m.famous ? 8.5 : 6) * (0.85 + Math.min(1, (s.m.heightM ?? 300) / 1500) * 0.5);
+                const size = (s.m.famous ? 9 : 6.5) * (0.85 + Math.min(1, (s.m.heightM ?? 300) / 1500) * 0.5);
                 const got = done(s.m);
-                const fill = got ? "#F28C6A" : s.m.kfs ? "#1F5560" : s.m.famous ? "#4E8A86" : "#8FAE9F";
+                const fill = got ? "#F28C6A" : s.m.kfs ? "#1F5560" : s.m.famous ? "#4E8A86" : "#8FAE9F", shade = got ? "#D2694A" : s.m.kfs ? "#143D46" : s.m.famous ? "#3A6E6A" : "#6F9183";
                 return (
                     <g key={s.m.slug} transform={`translate(${s.x.toFixed(1)} ${s.y.toFixed(1)})`} onClick={() => setLocation(hikingMountainPath(s.m.slug))} style={{ cursor: "pointer" }} data-near={s.m.slug}>
                         <circle r="17" fill="transparent" />
+                        {s.star && <circle r={size + 6} fill="#F4EFE3" fillOpacity="0.72" stroke={s.m.famous ? "#1F5560" : "#B5654A"} strokeOpacity="0.55" strokeWidth="1" />}
+                        {s.m.famous && <path d={`M${-size * 1.5} 2 L${-size * 0.72} ${2 - size * 0.72} L${-size * 0.1} 2 Z`} fill={shade} stroke="#0E2A33" strokeWidth="0.9" strokeLinejoin="round" />}
                         <path d={`M${-size} 2 L0 ${2 - size * 1.3} L${size} 2 Z`} fill={fill} stroke="#0E2A33" strokeWidth="0.9" strokeLinejoin="round" />
+                        <path d={`M0 ${2 - size * 1.3} L${size} 2 L${size * 0.18} 2 Z`} fill={shade} opacity="0.75" />
                         {(s.m.heightM ?? 0) >= 1000 && <path d={`M${-size * 0.32} ${2 - size * 0.88} L0 ${2 - size * 1.3} L${size * 0.32} ${2 - size * 0.88} L${size * 0.1} ${2 - size * 1} L${-size * 0.1} ${2 - size * 0.86} Z`} fill="#FFF6E3" />}
                         {got && (<><path d={`M0 ${2 - size * 1.3} V${2 - size * 2.2}`} stroke="#0E2A33" strokeWidth="1" /><path d={`M0 ${2 - size * 2.2} l${size * 0.75} ${size * 0.24} l${-size * 0.75} ${size * 0.26} Z`} fill="#F28C6A" stroke="#0E2A33" strokeWidth="0.6" /></>)}
                     </g>
@@ -174,36 +203,71 @@ export function NearDial({ items, done, centre, label }: {
             })}
             <g pointerEvents="none">
                 {spots.filter((s) => s.label).map((s) => (
-                    <text key={`n:${s.m.slug}`} x={s.label!.tx} y={s.y} textAnchor={s.label!.anchor} fontSize="13.5" fontWeight="600" fill="#0E2A33" stroke="#F4EFE3" strokeWidth="3.2" paintOrder="stroke">{s.m.name}</text>
+                    <g key={`n:${s.m.slug}`}>
+                        <text x={s.label!.tx} y={s.y} textAnchor={s.label!.anchor} fontSize="13.5" fontWeight="600" fill="#0E2A33" stroke="#EEF1DC" strokeWidth="3.4" paintOrder="stroke">{s.m.name}</text>
+                        {s.label!.sub && <text x={s.label!.tx} y={s.y + 14} textAnchor={s.label!.anchor} fontSize="12" fill="#0E2A33" fillOpacity="0.72" stroke="#EEF1DC" strokeWidth="3" paintOrder="stroke">{s.label!.sub}</text>}
+                    </g>
                 ))}
             </g>
-            {/* 나(산 화면에서는 그 산) */}
-            <circle cx={C.x} cy={C.y} r="13" fill="#F28C6A" opacity="0.22" />
-            <circle cx={C.x} cy={C.y} r="6" fill="#F28C6A" stroke="#FFFFFF" strokeWidth="2.2" />
-            {centre && <text x={C.x} y={C.y + 26} textAnchor="middle" fontSize="13" fontWeight="600" fill="#0E2A33" stroke="#F4EFE3" strokeWidth="3.2" paintOrder="stroke" pointerEvents="none">{centre}</text>}
+            {/* 가운데 — 나(또는 이 산) */}
+            <circle cx={C.x} cy={C.y} r="15" fill="#F28C6A" opacity="0.2" />
+            <circle cx={C.x} cy={C.y} r="6.5" fill="#F28C6A" stroke="#FFFFFF" strokeWidth="2.4" />
+            {centre && <text x={C.x} y={C.y + 26} textAnchor="middle" fontSize="13" fontWeight="600" fill="#0E2A33" stroke="#EEF1DC" strokeWidth="3.2" paintOrder="stroke" pointerEvents="none">{centre}</text>}
         </svg>
     );
 }
 
-/** 카드 하나 — 100대 명산이면 그 산의 와펜, 아니면 산 그림 */
+/** 방향 화살표 — 위가 북. deg 만큼 돌린다 */
+const Arrow = ({ deg, size = 16 }: { deg: number; size?: number }) => (
+    <svg width={size} height={size} viewBox="0 0 16 16" style={{ transform: `rotate(${deg.toFixed(0)}deg)` }} aria-hidden><path d="M8 1.5 L12.5 13 L8 10.4 L3.5 13 Z" fill="currentColor" /></svg>
+);
+
+/** 카드 하나 — 그 산이 있는 권역의 그림 위에 방향 · 거리를 적는다. 100대 명산이면 그 산의 와펜을 단다 */
 function NearCard({ kind, m, info, done }: { kind: string; m: NearMountain; info?: MountainSummary; done: boolean }) {
     const facts = [heightText(m.heightM), m.courses > 0 ? `코스 ${m.courses}개` : ""].filter(Boolean).join(" · ");
+    const ring = m.famous ? "#F6D9A8" : "#F28C6A";
     return (
-        <Link href={hikingMountainPath(m.slug)} className="block overflow-hidden rounded-2xl active:opacity-80" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid={`hk-near-card-${m.famous ? "famous" : "any"}`} data-track-as="hiking-near-card">
-            <span className="relative flex h-[96px] items-end justify-center overflow-hidden" style={{ background: "#0E2A33" }}>
+        <Link href={hikingMountainPath(m.slug)} className="block overflow-hidden rounded-2xl active:opacity-80" style={{ background: "#0E2A33", boxShadow: `inset 0 0 0 1px ${ring}40, 0 4px 10px rgba(0,0,0,0.25)` }} data-testid={`hk-near-card-${m.famous ? "famous" : "any"}`} data-track-as="hiking-near-card">
+            <span className="relative flex h-[112px] items-end justify-center overflow-hidden">
                 {/* 그 산이 있는 권역의 표지 그림 — 그 산의 사진이 아니라 장식이다 */}
                 <img src={hikingCover(m.region)} alt="" loading="lazy" decoding="async" draggable={false} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: m.famous ? "50% 55%" : "50% 72%" }} />
-                <span className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2659,#0B1F2600 45%,#0E2A33F2)" }} aria-hidden />
-                {info && m.kfs && <MountainPatch id={info.id} region={info.region} size={62} earned={done} preview className="relative mb-1.5" />}
-                <span className="absolute left-2.5 top-2.5 rounded-full bg-[#0B1F26CC] px-2 py-1 text-[12px] leading-none text-[#F6D9A8]">{kind}</span>
+                <span className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2666,#0B1F2600 42%,#0E2A33 98%)" }} aria-hidden />
+                {info && m.kfs && <MountainPatch id={info.id} region={info.region} size={66} earned={done} preview className="relative mb-2" />}
+                <span className="absolute left-2.5 top-2.5 rounded-full px-2 py-1 text-[12px] font-medium leading-none" style={{ background: "#0B1F26D9", color: ring }}>{kind}</span>
                 {done && <span className="absolute right-2.5 top-2.5 rounded-full bg-[#F28C6A] px-2 py-1 text-[12px] font-semibold leading-none text-[#2A1208]">오른 산</span>}
             </span>
-            <span className="block px-3 pb-3 pt-2.5">
-                <span className="block truncate text-[16px] font-semibold text-[#F4EFE3]">{m.name}</span>
-                <span className="mt-0.5 block truncate text-[13px] tabular-nums text-[#F6D9A8]">{compass8(m.bearing)}쪽 {nearKmText(m.km)}</span>
+            <span className="block px-3 pb-3 pt-1.5">
+                <span className="block truncate text-[17px] font-semibold text-[#F4EFE3]">{m.name}</span>
+                <span className="mt-1 flex items-center gap-1 text-[13.5px] font-medium tabular-nums" style={{ color: ring }}><Arrow deg={m.bearing} />{compass8(m.bearing)}쪽 {nearKmText(m.km)}</span>
                 <span className="mt-0.5 block truncate text-[12.5px] tabular-nums text-[#F4EFE399]">{facts || (m.kfs ? "산림청 100대 명산" : m.famous ? "명산" : "산")}</span>
             </span>
         </Link>
+    );
+}
+
+/** 가까운 산의 줄 — 판에 놓인 산을 가까운 순으로. 카드의 두 산은 뺀다 */
+function NearRows({ items, skip, done }: { items: readonly NearMountain[]; skip: ReadonlySet<string>; done: (m: NearMountain) => boolean }) {
+    const rows = items.filter((m) => !skip.has(m.slug)).sort((a, b) => a.km - b.km);
+    if (rows.length === 0) return null;
+    return (
+        <ul className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-3.5" data-testid="hk-near-rows">
+            {rows.map((m, i) => (
+                <li key={m.slug} className={i ? "border-t border-[#FFFFFF14]" : ""}>
+                    <Link href={hikingMountainPath(m.slug)} className="flex min-h-[50px] items-center gap-3 py-2 active:opacity-70" data-track-as="hiking-near-row">
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full" style={{ background: "#FFFFFF14", color: m.famous ? "#F6D9A8" : "#F4EFE3B3" }}><Arrow deg={m.bearing} size={15} /></span>
+                        <span className="min-w-0 flex-1">
+                            <span className="flex items-center gap-1.5">
+                                <span className="truncate text-[15px] text-[#F4EFE3]">{m.name}</span>
+                                {m.kfs && <span className="shrink-0 rounded-full bg-[#F6D9A824] px-1.5 py-0.5 text-[12px] leading-none text-[#F6D9A8]">100대 명산</span>}
+                                {done(m) && <span className="shrink-0 rounded-full bg-[#F28C6A33] px-1.5 py-0.5 text-[12px] leading-none text-[#F28C6A]">오른 산</span>}
+                            </span>
+                            <span className="mt-0.5 block truncate text-[12.5px] tabular-nums text-[#F4EFE38C]">{[heightText(m.heightM), m.courses > 0 ? `코스 ${m.courses}개` : ""].filter(Boolean).join(" · ") || "산"}</span>
+                        </span>
+                        <span className="shrink-0 text-[13px] tabular-nums text-[#F4EFE3B3]">{compass8(m.bearing)}쪽 {nearKmText(m.km)}</span>
+                    </Link>
+                </li>
+            ))}
+        </ul>
     );
 }
 

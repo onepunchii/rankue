@@ -14,7 +14,7 @@ import { HIKING_REGIONS, hikingGroup, hikingListPath, hikingRegionPath, inHiking
 import { HIKING_H1, HIKING_TAGLINE, OSM_NOTE, hikingHubSeo } from "@shared/hikingPage";
 import { HIKING_CHECKLIST_H1, HIKING_CHECKLIST_PATH, HIKING_TERMS, HIKING_TERMS_H1, HIKING_TERMS_PATH } from "@shared/hikingTerms";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
-import { BundleNotebook, NotebookLand } from "../components/BundleNotebook";
+import { BundleNotebook } from "../components/BundleNotebook";
 import { MountainMap } from "../components/MountainMap";
 import { HikingCta, MountainRow } from "../components/MountainParts";
 import { SeasonNow } from "../components/SeasonNow";
@@ -93,19 +93,18 @@ export default function HikingHub() {
                             </ul>
                         </HkSection>
 
-                        <HkSection title="묶어서 찾기" aside={`수첩 ${data.lists.length + data.traits.length}권 · 눌러서 펼쳐 보세요`}>
-                            {/* 수첩마다 그 묶음의 산이 어디에 있는지 찍혀 있다 — 누르면 지도와 산의 목록이 열린다 */}
-                            <NotebookLand />
-                            <ul className="grid grid-cols-3 gap-x-2.5 gap-y-4" data-testid="hub-notebooks">
+                        <HkSection title="묶어서 찾기" aside={`수첩 ${data.lists.length + data.traits.length}권`}>
+                            {/* 책장 — 묶음 하나가 수첩 한 권. 누르면 그 산들의 지도와 목록이 열린다. 회원에게는 표지에 오른 산의 수가 찍힌다 */}
+                            <ul className="grid grid-cols-3 gap-x-3.5 gap-y-6 pb-2 pr-1" data-testid="hub-notebooks">
                                 {[...data.lists.map((l) => ({ id: l.id, name: l.short, count: l.count })), ...data.traits.map((t) => ({ id: t.id, name: t.name, count: t.count }))].map((g) => {
                                     const group = hikingGroup(g.id);
-                                    return (
-                                        <li key={g.id}>
-                                            <BundleNotebook id={g.id} name={g.name} count={g.count} spots={group ? data.famous.filter((m) => inHikingGroup(group, m)) : []} />
-                                        </li>
-                                    );
+                                    const members = group ? data.famous.filter((m) => inHikingGroup(group, m)) : [];
+                                    // 진행은 그 묶음의 산을 다 알 때만 찍는다(명산만으로 이루어진 묶음) — 산이 천 곳 넘는 묶음은 수만 적는다
+                                    const progress = my.mine && members.length === g.count && g.count > 0 ? { got: members.filter((m) => my.done.has(m.id)).length, total: g.count } : null;
+                                    return <li key={g.id}><BundleNotebook id={g.id} name={g.name} count={g.count} progress={progress} /></li>;
                                 })}
                             </ul>
+                            <p className="mt-3 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">수첩을 누르면 그 산들이 어디에 있는지 지도로 보여요.{my.mine ? " 정상에서 인증한 산이 표지에 세어져요." : ""}</p>
                         </HkSection>
 
                         <HkSection title="산림청 100대 명산" aside={`${kfs.length}곳`}>

@@ -285,9 +285,9 @@ describe("가까운 산의 판 — 이 산이 가운데", () => {
     });
     it("화면 — 홈의 판을 그대로 쓴다(가운데의 말과 읽어 주는 말만 바꾼다)", () => {
         const dial = read("client/src/hiking/components/NearMe.tsx");
-        expect(dial).toContain("export function NearDial({ items, done, centre, label }: {");
-        // 홈의 모습은 그대로다
-        expect(dial).toContain("<NearDial items={onMap} done={isDone} />");
+        expect(dial).toContain("export function NearDial({ items, done, centre, label, featured }: {");
+        // 홈은 가운데의 말 없이 쓰고(가운데가 '나'), 카드로 소개하는 두 산만 따로 알려 준다
+        expect(dial).toContain("<NearDial items={onMap} done={isDone} featured={featured} />");
         expect(dial).toContain('data-testid="hk-near-dial"');
         expect(dial).toContain("aria-label={label ?? `내 근처의 산 ${items.length}곳`}");
         const page = read("client/src/hiking/pages/MountainPage.tsx");
