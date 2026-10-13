@@ -27,6 +27,7 @@ import {
 } from "@shared/fishing";
 import { FISH, FISH_BOOKS, FISH_UNIT_LABEL, fishByName, fishRecords, fishTier, fishValue, fishValueText, nearestPromotion, type FishKind, type FishRecord } from "@shared/fishingFish";
 import { TRIP_AWARD_NAME, TRIP_POINTS, cleanTrip, type SeasonRow, type TripAward, type TripBoard } from "@shared/fishingTrip";
+import { TIDE_PHASE_TEXT, TIDE_SEAS, nextTideMark, tideDays, tideWeekday, type TideSea } from "@shared/fishingTide";
 
 const KEY = ["/api/hiq/fishing/catches"];
 type Tab = "home" | "book" | "log" | "points" | "crew";
@@ -164,6 +165,8 @@ export default function FishingPage() {
             <main className="mx-auto max-w-[720px]">
                 {tab === "home" && (
                     <>
+                        {/* 날마다 먼저 보는 것 — 기록이 있는 사람에게는 맨 위에 */}
+                        {!empty && <TideCard today={today} />}
                         {/* 새벽 바다 — 먹으로 그린 수평선 위에 내 기록어 */}
                         <section className="relative isolate overflow-hidden px-4 pb-5 pt-5" data-testid="fishing-hero">
                             <img src="/fishing/art/sea.webp" alt="" width={900} height={520} decoding="async" className="absolute inset-0 -z-10 h-full w-full object-cover" />
@@ -184,6 +187,8 @@ export default function FishingPage() {
                                 </div>
                             )}
                         </section>
+
+                        {empty && <TideCard today={today} />}
 
                         {/* 어탁 벽 — 어종마다 한 장 */}
                         <section className="px-4 pt-6">
@@ -292,6 +297,60 @@ export default function FishingPage() {
                 </div>
             )}
         </div>
+    );
+}
+
+const SEA_KEY = "rankue-fishing-sea";
+function readSea(): TideSea { try { return localStorage.getItem(SEA_KEY) === "south" ? "south" : "west"; } catch { return "west"; } }
+
+/**
+ * 오늘의 물때 — 몇 물인지 크게, 앞으로 이레를 띠로. 음력으로 세는 값이라 바깥 자료 없이 늘 나온다.
+ * 말하는 것은 물의 세기뿐이다(잘 낚인다는 말은 하지 않는다). 달력을 못 쓰는 기기에서는 아무것도 그리지 않는다.
+ */
+function TideCard({ today }: { today: string }) {
+    const [sea, setSea] = useState<TideSea>(readSea);
+    const days = useMemo(() => tideDays(today, sea, 7), [today, sea]);
+    const now = days[0];
+    if (!now || days.length < 7) return null;
+    const spring = nextTideMark(today, "사리"), neap = nextTideMark(today, "조금");
+    const until = (m: { inDays: number } | null, name: string) => (!m ? null : m.inDays === 0 ? `오늘이 ${name}` : `${name}까지 ${m.inDays}일`);
+    const pick = (id: TideSea) => { setSea(id); try { localStorage.setItem(SEA_KEY, id); } catch { /* 저장을 못 해도 화면은 바뀐다 */ } };
+    return (
+        <section className="px-4 pt-4" data-testid="fishing-tide">
+            <div className="rounded-2xl px-4 pb-3.5 pt-4" style={{ background: C.card }}>
+                <div className="flex items-center justify-between gap-2">
+                    <h2 className="text-[13px]" style={{ color: C.soft }}>오늘의 물때 · 음력 {now.lunar.leap ? "윤" : ""}{now.lunar.month}월 {now.lunar.day}일</h2>
+                    <div className="flex shrink-0 rounded-full p-0.5" style={{ background: "#FFFFFF0F" }} role="group" aria-label="바다">
+                        {TIDE_SEAS.map((s) => (
+                            <button key={s.id} type="button" aria-pressed={sea === s.id} onClick={() => pick(s.id)} className={cn("h-8 rounded-full px-2.5 text-[12px]", sea === s.id && "font-semibold")}
+                                style={sea === s.id ? { background: C.brand, color: C.onBrand } : { color: C.soft }} data-testid={`fishing-sea-${s.id}`}>{s.id === "west" ? "서해" : "남해 · 동해"}</button>
+                        ))}
+                    </div>
+                </div>
+                <div className="mt-2 flex items-end gap-3">
+                    <p className="text-[34px] font-semibold leading-none tracking-tight tabular-nums" data-testid="fishing-tide-now">{now.name}</p>
+                    <p className="min-w-0 flex-1 pb-0.5 text-[14px]" style={{ color: C.foam }}>{TIDE_PHASE_TEXT[now.phase]}</p>
+                </div>
+                <p className="mt-1.5 text-[12.5px]" style={{ color: C.dim }}>{[until(spring, "사리"), until(neap, "조금")].filter(Boolean).join(" · ")}</p>
+
+                <ol className="mt-3.5 grid grid-cols-7 gap-1" aria-label="앞으로 이레의 물때">
+                    {days.map((t, i) => {
+                        const weekend = ["토", "일"].includes(tideWeekday(t.ymd));
+                        return (
+                            <li key={t.ymd} className="flex flex-col items-center rounded-xl pb-1.5 pt-2" style={i === 0 ? { background: "#38BDF81F" } : undefined} data-testid="fishing-tide-day">
+                                <span className="text-[12px]" style={{ color: weekend ? C.sun : C.dim }}>{i === 0 ? "오늘" : `${Number(t.ymd.slice(8))} ${tideWeekday(t.ymd)}`}</span>
+                                <span aria-hidden className="mt-1.5 flex h-9 w-full items-end justify-center">
+                                    <span className="w-[14px] rounded-t-[5px]" style={{ height: `${Math.round(5 + t.flow * 31)}px`, background: t.mark === "사리" ? C.sun : t.mark === "조금" ? "#E6F6FF4D" : C.brand, opacity: t.mark ? 1 : 0.35 + t.flow * 0.65 }} />
+                                </span>
+                                <span className={cn("mt-1.5 text-[12.5px] tabular-nums", (i === 0 || t.mark) && "font-semibold")} style={{ color: t.mark === "사리" ? C.sun : C.foam }}>{t.name}</span>
+                                <span className="h-[16px] text-[12px] leading-[16px]" style={{ color: t.mark === "사리" ? C.sun : C.dim }}>{t.mark && t.mark !== t.name ? t.mark : ""}</span>
+                            </li>
+                        );
+                    })}
+                </ol>
+                <p className="mt-1 text-[12px] leading-relaxed" style={{ color: C.dim }}>음력 날짜로 센 물때예요. 만조 · 간조 시각은 항구마다 달라요.</p>
+            </div>
+        </section>
     );
 }
 
