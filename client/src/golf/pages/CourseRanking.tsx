@@ -170,7 +170,7 @@ export default function CourseRanking() {
     }, [selectedFilters, searchQuery]);
 
     return (
-        <div className="min-h-screen bg-[#0A0A0A] text-white pb-32 font-sans relative overflow-x-hidden">
+        <div className="rk-clip-x min-h-screen bg-[#0A0A0A] text-white pb-32 font-sans relative">
             {/* Sticky Header */}
             <header className="sticky top-0 z-50 bg-[#0A0A0A]/80 backdrop-blur-xl border-b border-white/5 py-4 px-6 flex items-center justify-between">
                 <GolfBackButton onClick={() => setLocation("/dashboard")} label="뒤로 가기" />

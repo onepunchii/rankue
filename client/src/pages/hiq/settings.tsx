@@ -2,7 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { LucideChevronLeft, LucideChevronRight, LucideCheck, LucideLoader2, LucideGlobe, LucidePencil, LucideBadgeCheck, LucideShield, LucideLogOut, LucideBell, LucideFileText } from "@/lib/icons";
+import { SportBackHeader } from "@/components/hiq/SportHeader";
+import { useSport } from "@/contexts/SportContext";
+import { LucideChevronRight, LucideCheck, LucideLoader2, LucideGlobe, LucidePencil, LucideBadgeCheck, LucideShield, LucideLogOut, LucideBell, LucideFileText } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
@@ -26,6 +28,7 @@ import { openAttachPhoneSheet } from "@/components/hiq/AttachPhoneSheet";
 // 설정 — 전체메뉴 톱니바퀴 진입. 1순위: 계정 연결 상태 + 언어. (형 결정: 2026-07)
 export default function HiqSettings() {
     const [, setLocation] = useLocation();
+    const { sport } = useSport();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const { t, locale, setLocale } = useT();
@@ -227,13 +230,8 @@ export default function HiqSettings() {
 
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-32 font-sans">
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-8 pt-5">
-                <button title={t("settings.back")} onClick={() => setLocation("/menu")} className="w-11 h-11 -ml-2 rounded-full flex items-center justify-center active:bg-black/[0.06]">
-                    <LucideChevronLeft className="w-6 h-6 text-black/55" />
-                </button>
-                <h1 className="text-[26px] font-bold tracking-tight">{t("settings.title")}</h1>
-            </div>
+            {/* 머리줄 — 세 종목의 뒤로가기 머리줄(맨 위에 붙는다 · 2026-10-13 오너: "각 페이지에 헤더에 해당하는 부분을 고정시키기") */}
+            <SportBackHeader sport={sport} title={t("settings.title")} fallback="/menu" bleed={20} lift={24} className="mb-6" />
 
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
                 {/* @핸들 */}

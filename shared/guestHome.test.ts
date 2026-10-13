@@ -574,6 +574,9 @@ describe("당구 홈", () => {
             const walk = (dir: string): string[] => readdirSync(resolve(__dirname, "../client/src", dir), { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? walk(`${dir}/${e.name}`) : e.name.endsWith(".tsx") ? [`${dir}/${e.name}`] : []));
             const squeezed = walk(".").flatMap((f) => [...client(f).matchAll(/className="([^"]*)"/g)].map((m) => m[1]).filter((c) => /\bsticky\b/.test(c) && /\btop-0\b/.test(c) && !/rk-no-safe/.test(c) && /(^|\s)h-(\d+|\[\d)/.test(c)).map((c) => `${f}: ${c.slice(0, 80)}`));
             expect(squeezed).toEqual([]);
+            // 머리줄을 둔 화면의 상자가 스크롤 상자(overflow-x-hidden)면 끌어올린 머리줄이 그 상자의 위 끝에 도로 붙는다 — 여백이 두 번(골프 '명문 코스')
+            const boxed = walk(".").filter((f) => { const src = client(f); return /className="[^"]*\bsticky\b[^"]*\btop-0\b[^"]*"|className="[^"]*\btop-0\b[^"]*\bsticky\b[^"]*"|<SportBackHeader|<SportHeader |<HikingShell|<CourseShell/.test(src) && /className="[^"]*min-h-screen[^"]*overflow-(x-)?hidden[^"]*"|className="[^"]*overflow-(x-)?hidden[^"]*min-h-screen[^"]*"/.test(src); });
+            expect(boxed).toEqual([]);
         });
 
         it("전체 메뉴 · 랭킹 · 커뮤니티 — 흘러가 버리던 머리를 같은 뒤로가기 머리줄로 고정", () => {
@@ -582,6 +585,7 @@ describe("당구 홈", () => {
             expect(menu).toContain('<SportBackHeader sport={sport} title={t("menu.title")} bleed={20} lift={24} className="mb-6"');
             expect(ranking).toContain('<SportBackHeader sport={sport} title={currentSport === "GOLF" ? t("ranking.golfTitle") : t("ranking.title")} bleed={20} lift={24} />');
             expect(community).toContain('<SportBackHeader sport={sport} title={t("community.title")} bleed={20} lift={24} />');
+            expect(client("pages/hiq/settings.tsx")).toContain('<SportBackHeader sport={sport} title={t("settings.title")} fallback="/menu" bleed={20} lift={24} className="mb-6" />');
             for (const src of [menu, ranking, community]) { expect(src).toContain("rk-clip-x min-h-screen"); expect(src).not.toMatch(/min-h-screen[^"]*overflow-x-hidden/); }
             // 게스트에게는 알림함 · 설정 단추를 그리지 않는다(예전 그대로)
             expect(menu).toContain("right={!isGuest ? (");

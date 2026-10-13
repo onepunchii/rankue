@@ -244,7 +244,7 @@ export default function HiqPbaPlayer() {
     const rankUnit = (n: number) => (lang === "ko" ? `${n}위` : `${n}${t.rankUnit}`);
 
     return (
-        <div className="min-h-screen bg-surface-0 text-ink-1 pb-nav overflow-x-hidden">
+        <div className="rk-clip-x min-h-screen bg-surface-0 text-ink-1 pb-nav">
             {/* 높이는 안쪽 줄에(index.css 의 상태바 여백 규칙) */}
             <header className="sticky top-0 z-20 bg-surface-0/95 backdrop-blur">
                 <div className="flex items-center gap-1 h-14 px-1">

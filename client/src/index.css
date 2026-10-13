@@ -269,7 +269,9 @@ body {
 @supports (overflow: clip) {
   .golf-home-clip { overflow-x: clip; }
 }
-/* 같은 까닭 — 맨 위에 붙는 머리줄(SportHeader · SportBackHeader)을 둔 화면의 가로 넘침 자르기(친구 · 기록) */
+/* 같은 까닭 — 맨 위에 붙는 머리줄(sticky top-0)을 둔 화면의 가로 넘침 자르기.
+   overflow-x-hidden 인 상자 안에서는 머리줄이 따라오지 못할 뿐 아니라, 아이폰에서 상태바만큼 끌어올린 머리줄이
+   그 상자의 위 끝에 도로 붙어 여백이 두 번 들어간다(골프 '명문 코스' — 2026-10-13). 머리줄을 둔 화면의 상자에는 이것을 쓴다 */
 .rk-clip-x { overflow-x: hidden; }
 @supports (overflow: clip) {
   .rk-clip-x { overflow-x: clip; }
