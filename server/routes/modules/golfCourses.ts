@@ -69,7 +69,30 @@ type Summary = {
      */
     ownerOf: Map<string, string>;
     top: Map<string, { price: number; change: number | null; label: string; asOf: string | null }>; watchers: Map<string, number>; at: number;
+    /**
+     * 골프장 홈페이지 예약 티(2026-10-13 오너: 허브의 "부킹 0"을 보고 "요기 부킹 누락이야") — 공식 예약 화면에 공개된 티타임을 글 한 줄의 꼴
+     * (sellerType "OFFICIAL")로. **listings 와 따로 둔다**: listings 는 검색용 화면 · 사이트맵 · 골프장 상세의 티타임 구역이 그대로 쓰는데,
+     * 거기 섞이면 신청 단추가 달린 줄로 그려지고 검색용 화면의 글 목록까지 바뀐다. 허브의 건수 · 글 목록 · 지역 칩 · 관심 골프장만 withOfficial 로 합쳐 본다.
+     */
+    official: (PublicListing & { slug: string })[];
 };
+/** 회원이 올린 글 + 홈페이지 예약 티 — 티타임이 이른 것부터(둘 다 이미 시간순이다) */
+function withOfficial(s: Summary): (PublicListing & { slug: string })[] {
+    if (!s.official.length) return s.listings;
+    const out: (PublicListing & { slug: string })[] = [];
+    let i = 0, j = 0;
+    while (i < s.listings.length || j < s.official.length) {
+        if (j >= s.official.length || (i < s.listings.length && s.listings[i].datetime <= s.official[j].datetime)) out.push(s.listings[i++]);
+        else out.push(s.official[j++]);
+    }
+    return out;
+}
+/** 골프장마다의 글 — 목록 · 지역 묶음이 골프장 490곳을 돌 때마다 전체를 훑지 않게 한 번에 가른다 */
+function bySlugOf(ls: readonly (PublicListing & { slug: string })[]): Map<string, (PublicListing & { slug: string })[]> {
+    const m = new Map<string, (PublicListing & { slug: string })[]>();
+    for (const l of ls) { const a = m.get(l.slug); if (a) a.push(l); else m.set(l.slug, [l]); }
+    return m;
+}
 let cache: Summary | null = null;
 let inflight: Promise<Summary> | null = null;
 
@@ -137,7 +160,17 @@ async function loadSummary(): Promise<Summary> {
             }
         }
         const watchers = new Map(watch.map((w) => [w.slug, w.n]));
-        cache = { pages, bySlug, byCourseId, listings, ownerOf, top, watchers, at: Date.now() };
+        // 홈페이지 예약 티 — 오늘부터 이레. 못 읽어도 요약은 그대로 나간다(빈 목록)
+        let official: (PublicListing & { slug: string })[] = [];
+        try {
+            const [{ openTeesBetween }, { kstDay }] = await Promise.all([import("../../services/golfOpenTees.js"), import("../../../shared/golfOpenTee.js")]);
+            official = (await openTeesBetween(kstDay(now), kstDay(now, 6), now)).filter((t) => bySlug.has(t.slug)).map((t) => ({
+                id: `official:${t.slug}:${t.day}:${t.time}:${t.course}`, slug: t.slug, listingType: "BOOKING" as const, joinType: null,
+                datetime: new Date(`${t.day}T${t.time}:00+09:00`).toISOString(), greenFee: t.price, costMode: null, slots: null, options: [],
+                sellerType: "OFFICIAL", joinApplied: 0, joinCapacity: 1, isUrgent: false, wx: null,
+            }));
+        } catch (e) { console.error("[GolfOfficialTees]", (e as Error)?.message); }
+        cache = { pages, bySlug, byCourseId, listings, ownerOf, top, watchers, official, at: Date.now() };
         return cache;
     })().finally(() => { inflight = null; });
     return inflight;
@@ -186,8 +219,9 @@ const countFor = (ls: PublicListing[], now: number) => {
     return c;
 };
 
-function listItem(s: Summary, p: PageRow, now: number) {
-    const ls = s.listings.filter((l) => l.slug === p.slug);
+function listItem(s: Summary, p: PageRow, now: number, of?: ReadonlyMap<string, (PublicListing & { slug: string })[]>) {
+    // of: 골프장마다 갈라 둔 글(홈페이지 예약 티 포함 — 목록 · 허브). 없으면 회원이 올린 글만(상세의 '가까운 골프장')
+    const ls = of ? of.get(p.slug) ?? [] : s.listings.filter((l) => l.slug === p.slug);
     const t = s.top.get(p.slug);
     return {
         slug: p.slug, name: p.name, region: p.region, city: p.city, kind: p.kind, holes: p.holes,
@@ -209,7 +243,8 @@ router.get("/", asyncHandler(async (req: any, res: any) => {
     const city = typeof req.query.city === "string" ? req.query.city : undefined;
     const intent = intentOf(req.query.intent);
     let pages = s.pages.filter((p) => (!region || p.region === region) && cityMatch(p, city));
-    const items = pages.map((p) => listItem(s, p, now));
+    const of = bySlugOf(withOfficial(s));
+    const items = pages.map((p) => listItem(s, p, now, of));
     // 기본 정렬: 지금 글이 있는 곳 먼저(의도가 있으면 그 의도 수), 그다음 시세·그린피가 있는 곳, 그다음 이름
     // 기본 정렬: 지금 글이 있는 곳 → 인기(자료의 즐겨찾기 수 — 화면엔 안 싣고 정렬에만 쓴다) → 정보가 많은 곳 → 이름
     const live = (x: ReturnType<typeof listItem>) => (intent ? x.counts[intent] : x.counts.booking + x.counts.join);
@@ -221,11 +256,12 @@ router.get("/", asyncHandler(async (req: any, res: any) => {
 
 router.get("/regions", asyncHandler(async (req: any, res: any) => {
     const s = await summaryFor(req); const now = Date.now();
+    const of = bySlugOf(withOfficial(s));
     const tree = new Map<string, { region: string; courses: number; counts: Record<GolfIntent, number>; cities: Map<string, { city: string; short: string; courses: number; counts: Record<GolfIntent, number> }> }>();
     for (const p of s.pages) {
         if (!tree.has(p.region)) tree.set(p.region, { region: p.region, courses: 0, counts: { booking: 0, join: 0, urgent: 0 }, cities: new Map() });
         const r = tree.get(p.region)!; r.courses++;
-        const c = countFor(s.listings.filter((l) => l.slug === p.slug), now);
+        const c = countFor(of.get(p.slug) ?? [], now);
         for (const k of ["booking", "join", "urgent"] as const) r.counts[k] += c[k];
         if (p.city) {
             if (!r.cities.has(p.city)) r.cities.set(p.city, { city: p.city, short: cityShort(p.city), courses: 0, counts: { booking: 0, join: 0, urgent: 0 } });
@@ -248,7 +284,7 @@ router.get("/listings", asyncHandler(async (req: any, res: any) => {
     // 화면(GolfCourseHub)은 limit 를 보내지 않고, 받은 목록을 20건씩 펼친다 — 기본값이 곧 '볼 수 있는 끝'이다.
     // 60 이던 때 머리 숫자(진짜 총수)는 더 큰데 '더 보기'가 60에서 끝났다(2026-10-07 목록 점검). 넘는 만큼은 화면이 '외 N건'으로 밝힌다
     const limit = Math.min(HUB_LISTINGS_MAX, Math.max(1, Number(req.query.limit) || HUB_LISTINGS_MAX));
-    const out = s.listings.filter((l) => {
+    const out = withOfficial(s).filter((l) => {
         const p = s.bySlug.get(l.slug)!;
         if (region && p.region !== region) return false;
         if (!cityMatch(p, city)) return false;
@@ -271,9 +307,10 @@ router.get("/watches/mine", requireAuth, asyncHandler(async (req: AuthRequest, r
         from golf_course_watches w join golf_course_pages p on p.slug = w.slug
         where w.member_id = ${req.userId}::uuid order by w.created_at desc`);
     const s = await summaryFor(req); const now = Date.now();
+    const of = bySlugOf(withOfficial(s));
     return sendSuccess(res, ((r.rows ?? r) as any[]).map((w) => ({
         slug: w.slug, name: w.name, region: w.region, city: w.city, filters: w.filters ?? {},
-        counts: countFor(s.listings.filter((l) => l.slug === w.slug), now),
+        counts: countFor(of.get(w.slug) ?? [], now),
     })));
 }));
 

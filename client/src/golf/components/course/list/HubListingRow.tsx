@@ -67,7 +67,7 @@ export function HubListingRow({ l, now, onOpen }: { l: HubListing; now: number; 
                             <span className={cn("text-[12px] whitespace-nowrap", left ? "text-[#FF8A33]" : "text-[#FFFFFF59]")}>{left ? `${left}자리` : "마감"}</span>
                         </span>
                     ) : (
-                        <span className="mt-0.5 block text-[12px] text-[#FFFFFF66] whitespace-nowrap">{l.sellerType === "PERSONAL" ? "개인 양도" : "1팀"}</span>
+                        <span className="mt-0.5 block text-[12px] text-[#FFFFFF66] whitespace-nowrap">{l.sellerType === "OFFICIAL" ? "홈페이지 예약" : l.sellerType === "PERSONAL" ? "개인 양도" : "1팀"}</span>
                     )}
                 </span>
             </button>

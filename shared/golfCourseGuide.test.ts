@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { GUIDE_LABEL, cleanGuide, cleanGuideText, guideHoldReason, guideHoles, guideSentences, hasGuide } from "./golfCourseGuide";
+import { GUIDE_LABEL, cleanGuide, cleanGuideText, guideHoldReason, guideHoles, guideSentences, hasGuide, scrubGuide, stripGuideTags } from "./golfCourseGuide";
 
 /**
  * 골프장 코스 가이드(2026-10-12 오너: "…우리 누락된 거 정보랑 골프장 부가 정보 가지고 온 거 넣으면 좋지 않아?").
@@ -140,7 +140,7 @@ describe("화면 · 검색용 화면 · 저장", () => {
         const store = read("server/storage/golfCourseGuide.ts");
         expect(store).toContain("select guide from golf_course_pages where slug = ${slug}");
         expect(store).toContain("if (missingColumn(e)) return null;");
-        expect(store).toContain("return hasGuide(g) ? g : null;");
+        expect(store).toContain("return hasGuide(g) ? scrubGuide(g) : null;");
     });
 
     it("가이드 적재 스크립트 — 규칙은 shared 것만 쓰고 guide 칸만 쓴다. --apply 가 없으면 세기만", () => {
@@ -159,5 +159,33 @@ describe("화면 · 검색용 화면 · 저장", () => {
         const sql = read("migrations/golf_course_guide.sql").split("\n").filter((l) => !l.startsWith("--")).join("\n");
         expect(sql.trim()).toBe("alter table golf_course_pages add column if not exists guide jsonb;");
         expect(read("shared/schema.ts")).toContain('guide: jsonb("guide"),');
+    });
+});
+
+// 2026-10-13 오너 신고: 가평베네스트GC 가이드에 출처 꼬리표(cite)가 글자 그대로 보였다(387곳 가운데 7곳 — 받은 글을 만든 도구가 문장을 감싼 것)
+describe("글에 섞여 온 꼬리표", () => {
+    const raw = '가평베네스트GC는 27홀 회원제 골프장입니다. <cite index="1-2">개주산 자락 해발 400m에 자리 잡았습니다.</cite> <cite index="5-1">사계절 변화하는 자연 경관</cite>이 알려져 있는 산악형 코스입니다.';
+    const clean = "가평베네스트GC는 27홀 회원제 골프장입니다. 개주산 자락 해발 400m에 자리 잡았습니다. 사계절 변화하는 자연 경관이 알려져 있는 산악형 코스입니다.";
+    it("꼬리표만 지우고 감싼 글자는 남긴다 · 꺾쇠가 없는 글은 그대로 · 부등호는 꼬리표가 아니다", () => {
+        expect(raw).toContain("<cite");
+        expect(stripGuideTags(raw)).toBe(clean);
+        expect(stripGuideTags("파 3 · 파 4 · 파 5 홀이 각각 3개씩입니다.")).toBe("파 3 · 파 4 · 파 5 홀이 각각 3개씩입니다.");
+        expect(stripGuideTags("<b>굵게</b> <br/>줄")).toBe("굵게 줄");
+        expect(stripGuideTags("그린 속도 2.8 < 3.0 m")).toBe("그린 속도 2.8 < 3.0 m");
+    });
+    it("넣을 때(cleanGuideText · cleanGuide)와 읽을 때(scrubGuide) 둘 다 뗀다 — 출처의 주소는 건드리지 않는다", () => {
+        expect(cleanGuideText(raw)).toBe(clean);
+        const g = cleanGuide({ confidence: "high", overview: raw, courses: [{ name: '파인 <cite index="1">코스</cite>', holes: 9, description: '<cite index="1-5">폭포와 연못이 어우러진 코스로 소개됩니다.</cite>' }], faq: [], sources: [{ url: "https://example.com/a?x=<1>", title: "기사" }] }, "2026-10-13")!;
+        expect(JSON.stringify({ ...g, sources: [] })).not.toContain("cite");
+        expect(g.courses[0]).toMatchObject({ name: "파인 코스", desc: "폭포와 연못이 어우러진 코스로 소개됩니다." });
+        const stored = { v: 1, overview: raw, courses: [{ name: "버치 코스", holes: 9, desc: '<cite index="1-7">울창한 백자작나무</cite>가 있습니다.' }], sources: [{ url: "https://example.com/a?x=<1>", title: "<cite>기사</cite>" }] };
+        const out = scrubGuide(stored);
+        expect(out.overview).toBe(clean);
+        expect(out.courses[0].desc).toBe("울창한 백자작나무가 있습니다.");
+        expect(out.sources[0]).toEqual({ url: "https://example.com/a?x=<1>", title: "기사" });
+        expect(out.v).toBe(1);
+    });
+    it("저장소 — 읽을 때 한 번 더 뗀다", () => {
+        expect(read("server/storage/golfCourseGuide.ts")).toContain("return hasGuide(g) ? scrubGuide(g) : null;");
     });
 });

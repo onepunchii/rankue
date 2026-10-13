@@ -91,3 +91,25 @@ describe("부킹 목록에 싣는 자리", () => {
         expect(card.replace(/\/\*[\s\S]*?\*\//g, "")).not.toMatch(/font-(bold|extrabold|black)/);
     });
 });
+
+// 2026-10-13 오너: 골프장 허브의 "부킹 0"을 보고 "요기 부킹 누락이야 확인해줘"
+describe("골프장 허브 — 부킹 건수 · 글 목록에도 홈페이지 예약 티", () => {
+    const routes = read("server/routes/modules/golfCourses.ts");
+    it("회원이 올린 글과 따로 두고(official), 허브의 건수 · 글 목록 · 지역 칩 · 관심 골프장만 합쳐 본다", () => {
+        expect(routes).toContain("official: (PublicListing & { slug: string })[];");
+        expect(routes).toContain("function withOfficial(s: Summary): (PublicListing & { slug: string })[] {");
+        expect(routes.match(/bySlugOf\(withOfficial\(s\)\)/g)?.length).toBe(3);
+        expect(routes).toContain("const out = withOfficial(s).filter((l) => {");
+        // 못 읽어도 요약은 나간다
+        expect(routes).toContain('} catch (e) { console.error("[GolfOfficialTees]", (e as Error)?.message); }');
+    });
+    it("섞지 않는 곳 — 골프장 상세의 티타임 구역(신청 단추가 달린다) · 검색용 화면 · 사이트맵은 회원이 올린 글만", () => {
+        expect(routes).toContain("const listings = s.listings.filter((l) => l.slug === slug);");
+        for (const f of ["server/prerender.ts", "server/sitemap.ts"]) expect(read(f)).not.toMatch(/withOfficial|\.official\b/);
+    });
+    it("화면 — 줄에는 '홈페이지 예약', 누르면 글 하나가 아니라 그 날의 부킹 목록으로", () => {
+        expect(read("client/src/golf/components/course/list/HubListingRow.tsx")).toContain('l.sellerType === "OFFICIAL" ? "홈페이지 예약"');
+        expect(read("client/src/golf/pages/GolfCourseHub.tsx")).toContain("? `/golf/booking-list?date=${kstDateKey(l.datetime)}&view=BOOKING`");
+    });
+});
+

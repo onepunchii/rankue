@@ -141,7 +141,7 @@ describe("(다) 라우트 — routes/modules/golfCourses.ts", () => {
 
     it("공용 캐시에는 보는 사람별 결과를 넣지 않는다 — 캐시는 loadSummary 만 쓴다", () => {
         expect(src.match(/\bcache = /g)).toEqual(["cache = ", "cache = "]); // 채우기 하나, 비우기(dropCache) 하나
-        expect(src).toContain("cache = { pages, bySlug, byCourseId, listings, ownerOf, top, watchers, at: Date.now() };");
+        expect(src).toContain("cache = { pages, bySlug, byCourseId, listings, ownerOf, top, watchers, official, at: Date.now() };");
         expect(src).toContain("function dropCache() { cache = null; }");
         expect(src).not.toMatch(/cache\.listings\s*=|s\.listings\s*=|shared\.listings\s*=|\.listings\.(splice|push|pop|shift|sort|reverse)\(/);
     });

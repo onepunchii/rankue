@@ -7,7 +7,7 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
-import { hasGuide, type CourseGuide } from "../../shared/golfCourseGuide.js";
+import { hasGuide, scrubGuide, type CourseGuide } from "../../shared/golfCourseGuide.js";
 
 const missingColumn = (e: any) => (e?.code ?? e?.cause?.code) === "42703" || /column "?guide"? does not exist/.test(String(e?.message ?? ""));
 
@@ -15,7 +15,8 @@ export async function getCourseGuide(slug: string): Promise<CourseGuide | null> 
     try {
         const r: any = await db.execute(sql`select guide from golf_course_pages where slug = ${slug}`);
         const g = ((r.rows ?? r) as any[])[0]?.guide;
-        return hasGuide(g) ? g : null;
+        // 읽을 때 꼬리표(<cite …>)를 한 번 더 뗀다 — 넣을 때 놓친 글이 화면 · 검색용 화면에 나가지 않게
+        return hasGuide(g) ? scrubGuide(g) : null;
     } catch (e) {
         if (missingColumn(e)) return null;
         throw e;

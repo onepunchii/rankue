@@ -190,7 +190,11 @@ export default function GolfCourseHub() {
 
     const openListing = (l: HubListing) => {
         // 목록 화면은 그날 하루치만 불러온다 — 날짜를 붙여야 그 글이 보인다(상세의 TeeTimes 와 같은 주소).
-        const to = `/golf/booking-list/${encodeURIComponent(l.id)}?date=${kstDateKey(l.datetime)}&view=${l.listingType === "JOIN" ? "JOIN" : "BOOKING"}`;
+        // 골프장 홈페이지 예약 티(sellerType "OFFICIAL")는 회원이 올린 글이 아니라 글 하나의 주소가 없다 — 그 날의 부킹 목록으로 간다
+        // (거기 '골프장 홈페이지 예약 티' 묶음에서 그 골프장을 펼쳐 안내와 홈페이지 단추를 본다)
+        const to = l.sellerType === "OFFICIAL"
+            ? `/golf/booking-list?date=${kstDateKey(l.datetime)}&view=BOOKING`
+            : `/golf/booking-list/${encodeURIComponent(l.id)}?date=${kstDateKey(l.datetime)}&view=${l.listingType === "JOIN" ? "JOIN" : "BOOKING"}`;
         if (golfOk) setLocation(to);
         else if (!member) goLogin(setLocation, to);
         else setLocation(`/golf/course/${encodeURIComponent(l.slug)}`); // 골프를 안 쓰는 회원 — 글 목록은 닫혀 있으니 골프장 페이지로

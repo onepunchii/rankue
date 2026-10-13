@@ -71,8 +71,23 @@ export const GUIDE_BLOCK: readonly [string, RegExp][] = [
 const FAQ_DROP_Q = /그린피|요금|가격|카트비|캐디피|회원권|예약은\s*어디|어디서\s*예약/;
 
 /** 문장으로 나눈다 — 마침표 · 물음표 · 느낌표 뒤의 공백에서. 소수점(2.8m)이나 약어(A.M.) 안에서는 나누지 않는다 */
+/**
+ * 글에 섞여 온 꼬리표를 떼어 낸다(2026-10-13 오너 신고: 가평베네스트GC 가이드에 `<cite index="1-2">…</cite>` 가 그대로 보였다 — 387곳 가운데 7곳).
+ * 받은 글을 만든 도구가 출처 표시로 문장을 감싼 것이다. 감싼 글자는 남기고 꼬리표만 지운다. 글에 진짜 꺾쇠가 들어갈 일은 없다(수식 · 코드가 아니다).
+ */
+export function stripGuideTags(text: string): string {
+    return text.replace(/<\/?[a-zA-Z][^<>]{0,200}>/g, "").replace(/[ \t]{2,}/g, " ").trim();
+}
+/** 가이드 한 곳의 모든 글에서 꼬리표를 뗀다 — 저장해 둔 값을 읽을 때 한 번 더 건다(넣을 때 놓친 것이 화면에 나가지 않게) */
+export function scrubGuide<T>(v: T): T {
+    if (typeof v === "string") return stripGuideTags(v) as unknown as T;
+    if (Array.isArray(v)) return v.map((x) => scrubGuide(x)) as unknown as T;
+    if (v && typeof v === "object") return Object.fromEntries(Object.entries(v as Record<string, unknown>).map(([k, x]) => [k, k === "url" ? x : scrubGuide(x)])) as T;
+    return v;
+}
+
 export function guideSentences(text: string): string[] {
-    return text.replace(/\s+/g, " ").trim().split(/(?<=[.?!])\s+(?=[^\s])/).map((s) => s.trim()).filter(Boolean);
+    return stripGuideTags(text).replace(/\s+/g, " ").trim().split(/(?<=[.?!])\s+(?=[^\s])/).map((s) => s.trim()).filter(Boolean);
 }
 const blocked = (s: string) => GUIDE_BLOCK.some(([, re]) => re.test(s));
 /** 걸리는 문장을 빼고 남은 글. 남는 것이 없으면 null */
@@ -84,7 +99,7 @@ export function cleanGuideText(v: unknown): string | null {
     return out.length >= 5 ? out : null;
 }
 
-const str = (v: unknown) => (typeof v === "string" ? v.replace(/\s+/g, " ").trim() : "");
+const str = (v: unknown) => (typeof v === "string" ? stripGuideTags(v).replace(/\s+/g, " ").trim() : "");
 const arr = (v: unknown): any[] => (Array.isArray(v) ? v : []);
 
 /** 받은 가이드 한 곳 → 실을 값. 확신이 낮거나 실을 것이 남지 않으면 null */
