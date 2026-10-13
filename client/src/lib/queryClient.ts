@@ -7,6 +7,7 @@ import {
   hashKey,
   type QueryObserver,
 } from "@tanstack/react-query";
+import { isSearchResultKey } from "@shared/searchResultKeys";
 import { persistQueryClient } from "@tanstack/react-query-persist-client";
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { neverPersistMutations } from "@shared/gameMutationQueue";
@@ -283,7 +284,8 @@ if (typeof window !== "undefined") {
     //   복원하다 "t.then is not a function" 으로 터졌다(오류 수집 30일 65건, 2026-10-01). 이제 성공한 것만 저장하고 옛 캐시는 버린다.
     // v2.7: 멈춘 요청(오프라인이거나 같은 줄에서 기다리던 뮤테이션)까지 저장하고 있었다 — 다음 실행에 보낼 함수도 없이 되살아나
     //   그 경기의 줄(scope) 맨 앞을 막아, 점수 저장도 종료하기도 나가지 않았다(오너 제보 2026-10-06). 요청은 저장하지 않고 옛 캐시는 버린다.
-    buster: "RANKUE_CACHE_v2.7",
+    // v2.8: 네이버 검색 결과(골프장 근처 맛집 · 투어 소식)가 저장에 딸려 들어가고 있었다 — 약관 위반이라 거르고, 이미 남은 것은 버린다(2026-10-13).
+    buster: "RANKUE_CACHE_v2.8",
     // 진행 중 경기 행은 절대 영속화하지 않는다. 7일짜리 localStorage 스냅샷이
     // 앱 재실행 때 점수판에 먼저 하이드레이션되고, 점수판은 그 낡은 점수를 서버에
     // 다시 PATCH 해서 실제 진행 상황을 되돌렸다(예: 8이닝 친 경기가 0:0 으로).
@@ -297,6 +299,8 @@ if (typeof window !== "undefined") {
         if (key === "/api/hiq/me" && query.state.data == null) return false;
         // 친구 접속 배너는 지금 이 순간의 답이라 저장하지 않는다(2026-10-01)
         if (key.startsWith("/api/hiq/presence/")) return false;
+        // 네이버 검색 결과(골프장 근처 맛집 · 투어 소식)는 저장하지 않는다 — 약관이 저장 · 캐시를 금한다(shared/searchResultKeys)
+        if (isSearchResultKey(query.queryKey)) return false;
         return !key.startsWith("/api/hiq/game/");
       },
     },

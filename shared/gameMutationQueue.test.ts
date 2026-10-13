@@ -862,7 +862,8 @@ describe("점수판 요청 줄 — 요청 함수 · 기기 저장소(queryClient
     it("기기 저장소 — 요청은 남기지 않고(v2.7), 옛 캐시는 버린다", () => {
         expect(q).toContain('import { neverPersistMutations } from "@shared/gameMutationQueue";');
         const block = q.slice(q.indexOf("// 6. Persistence"));
-        expect(block).toContain('buster: "RANKUE_CACHE_v2.7",');
+        // 저장 판은 v2.7(멈춘 요청을 버림)에서 올라가기만 한다 — 2.8 은 네이버 검색 결과를 버리려고(shared/searchResultKeys)
+        expect(block).toMatch(/buster: "RANKUE_CACHE_v2\.(8|9|\d{2})",/);
         expect(block).not.toContain('"RANKUE_CACHE_v2.6"');
         expect(block).toMatch(/\/\/ v2\.7: .+/);
         const opts = block.slice(block.indexOf("dehydrateOptions: {"));

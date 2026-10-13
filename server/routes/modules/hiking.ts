@@ -21,6 +21,7 @@ import { judgeSummit, summitHint } from "../../../shared/hikingStamps.js";
 import { getCourseWeather } from "../../services/golfWeather.js";
 import { HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, hikingGroup, hikingRegion, inHikingGroup } from "../../../shared/hikingMountains.js";
 import { toMountainPoint, type MountainPoint } from "../../../shared/hikingNear.js";
+import { HIKING_NEARBY_RADIUS_KM, hikingNearbyNames, hikingNearbyWord, isHikingNearbyKind } from "../../../shared/hikingAround.js";
 
 const router = Router();
 const PUBLIC_CACHE = "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400";
@@ -83,6 +84,33 @@ router.get("/mountains/:slug/weather", asyncHandler(async (req: any, res: any) =
     const weather = m.lat != null && m.lng != null ? await getCourseWeather({ lat: m.lat, lng: m.lng }, { fetch: true }).catch((e) => { console.error("[HikingWeather]", e); return null; }) : null;
     res.set("Cache-Control", weather ? "public, max-age=300, s-maxage=600, stale-while-revalidate=1800" : "no-store");
     return sendSuccess(res, weather);
+}));
+
+// ── 산 근처의 맛집 · 카페(2026-10-13) ─────────────────────────────────────
+// 네이버 지역 검색을 그 자리에서 불러 그대로 돌려준다 — 골프장 '근처'(golfCourses 의 /:slug/nearby)와 같은 약관 · 같은 규칙이다(shared/hikingAround 머리말).
+// 응답은 no-store 이고 순서 · 낱말도 그대로다. 어디에도 저장하지 않고, 검색엔진용 화면(server/seo/hiking)에도 싣지 않는다.
+// 검색어는 서버가 만든다 — 산 이름(과 시군구)에 정해 둔 낱말(맛집 · 카페)을 붙인 것뿐이다. 손님이 친 말은 받지 않는다(아무 말이나 받아 주면 남의 검색 대리가 된다).
+// 응답의 query 는 실제로 답을 낸 검색어다 — 화면의 '네이버 지도에서 더 보기'가 그 말로 연다.
+// 하루 한도를 한 사람이 태우지 못하게 인스턴스 안에서 IP 당 1분 30회로 막는다(골프의 막이와 같은 값 — 서버리스라 느슨한 막이다).
+const nearbyHits = new Map<string, { n: number; until: number }>();
+function nearbyAllow(ip: string, now = Date.now()): boolean {
+    if (nearbyHits.size > 5000) nearbyHits.clear();
+    const h = nearbyHits.get(ip);
+    if (!h || h.until < now) { nearbyHits.set(ip, { n: 1, until: now + 60_000 }); return true; }
+    return ++h.n <= 30;
+}
+router.get("/mountains/:slug/nearby", asyncHandler(async (req: any, res: any) => {
+    const m = await mountainBySlug(String(req.params.slug));
+    if (!m) return sendError(res, 404, "없는 산이에요");
+    const kind = isHikingNearbyKind(req.query.kind) ? req.query.kind : "food";
+    res.set("Cache-Control", "no-store");
+    if (!nearbyAllow(String(req.ip ?? ""))) return sendError(res, 429, "잠시 뒤에 다시 시도해 주세요");
+    const { searchNearbyWord } = await import("../../services/naverLocal.js");
+    // 정상의 자리(at)는 다른 고장의 같은 이름 산이 낸 답을 통째로 버리는 데만 쓴다 — 줄을 거르거나 다시 줄 세우지 않는다
+    const target = { names: hikingNearbyNames(m), at: m.lat != null && m.lng != null ? { lat: m.lat, lng: m.lng, radiusKm: HIKING_NEARBY_RADIUS_KM } : null };
+    const r = await searchNearbyWord(target, hikingNearbyWord(kind));
+    if (!r.ok) return sendError(res, r.reason === "nokey" ? 501 : r.reason === "quota" ? 429 : 502, "지금은 불러올 수 없어요", `NEARBY_${r.reason.toUpperCase()}`);
+    return sendSuccess(res, { query: r.query, items: r.items });
 }));
 
 // ── 내 도장(등산을 쓸 수 있는 회원만) ────────────────────────────────────

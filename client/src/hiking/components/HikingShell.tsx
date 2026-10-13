@@ -57,10 +57,19 @@ export function HikingShell({ title, backTo = HIKING_HUB_PATH, right, children, 
     );
 }
 
-/** 구역 하나 — 제목과 오른쪽 한 줄 */
-export function HkSection({ title, aside, children, className, id }: { title: string; aside?: ReactNode; children: ReactNode; className?: string; id?: string }) {
+/**
+ * 붙박이 줄 밑에 멈추는 여백 — 머리줄(56 + 선) + 구역 줄(HkSectionNav 44 + 선). 구역 줄에서 건너뛴 구역의 제목이 그 밑에 가리지 않게.
+ */
+export const HK_SCROLL_MARGIN = "calc(104px + env(safe-area-inset-top))";
+
+/**
+ * 구역 하나 — 제목과 오른쪽 한 줄.
+ * sec 를 주면 구역 줄(HkSectionNav)이 건너오는 구역이 된다: id 가 "sec-<sec>" 로 붙고(id 를 따로 주면 그것이 이긴다),
+ * data-sec 로 이름이 달리고, 붙박이 줄 밑에 멈추게 여백(HK_SCROLL_MARGIN)을 둔다.
+ */
+export function HkSection({ title, aside, children, className, id, sec }: { title: string; aside?: ReactNode; children: ReactNode; className?: string; id?: string; sec?: string }) {
     return (
-        <section id={id} className={`px-5 pt-8 ${className ?? ""}`}>
+        <section id={id ?? (sec ? `sec-${sec}` : undefined)} data-sec={sec} className={`px-5 pt-8 ${className ?? ""}`} style={sec ? { scrollMarginTop: HK_SCROLL_MARGIN } : undefined}>
             <div className="mb-3 flex items-baseline justify-between gap-3">
                 <h2 className="text-[18px] font-semibold tracking-tight text-[#F4EFE3]">{title}</h2>
                 {aside && <span className="shrink-0 text-[12.5px] text-[#F4EFE38C]">{aside}</span>}

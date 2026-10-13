@@ -527,7 +527,8 @@ export default function HiqMenu() {
                             // 건의함 → 관리자 문의 채팅(2026-09-21 오너: "건의함 대신 빠른 답변처럼"). 옛 건의함 창은 남겨 두되 입구는 채팅이다.
                             ? [{ icon: LucideMail, label: t("menu.supportChat"), desc: t("menu.supportChatDesc"), onClick: () => setLocation(`/chat/support/${member?.id}`) }]
                             : []),
-                        { icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') },
+                        // 공지사항의 글은 당구 런칭 소식뿐이다(InfoModal) — 등산 메뉴에서는 내지 않는다
+                        ...(isHiking ? [] : [{ icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') }]),
                         // 이용안내의 본문(InfoModal)은 당구 · 골프 두 벌뿐이다 — 등산에서 열면 당구 점수판 안내가 나와서 등산일 땐 뺀다
                         ...(isHiking ? [] : [{ icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') }]),
                         ...(!isBilliards ? [] : [{ icon: LucideTrophy, label: t("menu.rankingSystem"), desc: t("menu.rankingSystemDesc"), onClick: () => openInfoModal('ranking') }]),

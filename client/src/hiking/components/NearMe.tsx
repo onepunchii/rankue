@@ -113,14 +113,25 @@ function DialMark() {
 
 const VB = { w: 340, h: 300 }, C = { x: 170, y: 152 }, R = 118;
 
-/** 동그란 판 — 가운데가 나, 위가 북. 산은 방향과 거리대로, 이름은 겹치지 않는 것만 단다 */
-function NearDial({ items, done }: { items: readonly NearMountain[]; done: (m: NearMountain) => boolean }) {
+/**
+ * 동그란 판 — 가운데가 나, 위가 북. 산은 방향과 거리대로, 이름은 겹치지 않는 것만 단다.
+ * 산 화면도 이 판을 쓴다(가운데가 그 산 — 가까운 산의 방향과 거리): centre 로 가운데 표시 밑에 말("이 산")을 달고, label 로 그림을 읽어 주는 말을 바꾼다.
+ * 둘 다 안 주면 홈의 판 그대로다.
+ */
+export function NearDial({ items, done, centre, label }: {
+    items: readonly NearMountain[];
+    done: (m: NearMountain) => boolean;
+    /** 가운데 표시 밑에 다는 말 — 안 주면 달지 않는다(홈: 가운데가 나) */
+    centre?: string;
+    /** 그림을 읽어 주는 말 — 안 주면 "내 근처의 산 N곳" */
+    label?: string;
+}) {
     const [, setLocation] = useLocation();
     const radius = nearRadiusKm(items.map((m) => m.km));
     const spots = useMemo(() => {
         const out = items.map((m) => { const [x, y] = nearSpot(m, radius); return { m, x: C.x + x * R, y: C.y + y * R }; });
-        // 이름 칸이 겹치면 먼 쪽의 이름을 뺀다(가까운 산 · 명산이 먼저) — 산 그림은 다 그린다
-        const boxes: { x0: number; x1: number; y0: number; y1: number }[] = [];
+        // 이름 칸이 겹치면 먼 쪽의 이름을 뺀다(가까운 산 · 명산이 먼저) — 산 그림은 다 그린다. 가운데의 말이 있으면 그 자리는 먼저 비워 둔다
+        const boxes: { x0: number; x1: number; y0: number; y1: number }[] = centre ? [{ x0: C.x - centre.length * 6.8 - 4, x1: C.x + centre.length * 6.8 + 4, y0: C.y + 12, y1: C.y + 30 }] : [];
         const order = [...out].sort((a, b) => Number(b.m.famous) - Number(a.m.famous) || a.m.km - b.m.km);
         const labelled = new Map<string, { anchor: "start" | "end"; tx: number }>();
         for (const s of order) {
@@ -132,9 +143,9 @@ function NearDial({ items, done }: { items: readonly NearMountain[]; done: (m: N
             boxes.push(box); labelled.set(s.m.slug, { anchor: left ? "end" : "start", tx });
         }
         return out.sort((a, b) => a.y - b.y).map((s) => ({ ...s, label: labelled.get(s.m.slug) }));
-    }, [items, radius]);
+    }, [items, radius, centre]);
     return (
-        <svg viewBox={`0 0 ${VB.w} ${VB.h}`} role="img" aria-label={`내 근처의 산 ${items.length}곳`} style={{ display: "block", width: "100%", background: "#F4EFE3", borderRadius: 18 }} data-testid="hk-near-dial" data-radius={radius}>
+        <svg viewBox={`0 0 ${VB.w} ${VB.h}`} role="img" aria-label={label ?? `내 근처의 산 ${items.length}곳`} style={{ display: "block", width: "100%", background: "#F4EFE3", borderRadius: 18 }} data-testid="hk-near-dial" data-radius={radius}>
             <defs>
                 <pattern id="hk-near-hatch" width="5" height="5" patternUnits="userSpaceOnUse" patternTransform="rotate(35)"><path d="M0 0 V5" stroke="#1F556012" strokeWidth="1.4" /></pattern>
             </defs>
@@ -166,9 +177,10 @@ function NearDial({ items, done }: { items: readonly NearMountain[]; done: (m: N
                     <text key={`n:${s.m.slug}`} x={s.label!.tx} y={s.y} textAnchor={s.label!.anchor} fontSize="13.5" fontWeight="600" fill="#0E2A33" stroke="#F4EFE3" strokeWidth="3.2" paintOrder="stroke">{s.m.name}</text>
                 ))}
             </g>
-            {/* 나 */}
+            {/* 나(산 화면에서는 그 산) */}
             <circle cx={C.x} cy={C.y} r="13" fill="#F28C6A" opacity="0.22" />
             <circle cx={C.x} cy={C.y} r="6" fill="#F28C6A" stroke="#FFFFFF" strokeWidth="2.2" />
+            {centre && <text x={C.x} y={C.y + 26} textAnchor="middle" fontSize="13" fontWeight="600" fill="#0E2A33" stroke="#F4EFE3" strokeWidth="3.2" paintOrder="stroke" pointerEvents="none">{centre}</text>}
         </svg>
     );
 }
