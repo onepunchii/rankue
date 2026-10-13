@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { ScorecardScanner } from "../components/ScorecardScanner";
 import { useScanEntry } from "../lib/scanEntry";
+import { ScanRoundSheet } from "../components/scan/ScanRoundSheet";
 import { apiRequest } from "@/lib/queryClient";
 import { useGameStats } from "@/hooks/useGameStats";
 import { useAuth } from "@/hooks/useAuth";
@@ -38,6 +39,7 @@ export default function GolfDashboard() {
     const [isScannerOpen, setIsScannerOpen] = useState(false);
     // 스코어카드 스캔 — 쓸 수 있는 사람은 읽는 길로(방 · 라운드 만들기), 아니면 예전 안내 창(lib/scanEntry)
     const scanEntry = useScanEntry();
+    const [scanRoundOpen, setScanRoundOpen] = useState(false);
     const matchLogic = useGolfMatch(me);
     const [, setLocation] = useLocation();
     // 비로그인 방문자(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다").
@@ -143,7 +145,7 @@ export default function GolfDashboard() {
             <GameModeSheet
                 open={isGameModeOpen}
                 onOpenChange={setIsGameModeOpen}
-                onOpenScanner={() => { if (scanEntry.available) { setIsGameModeOpen(false); scanEntry.go(); } else setIsScannerOpen(true); }}
+                onOpenScanner={() => { if (scanEntry.available) { setIsGameModeOpen(false); setScanRoundOpen(true); } else setIsScannerOpen(true); }}
             />
 
             <PinEntrySheet
@@ -163,6 +165,9 @@ export default function GolfDashboard() {
                     onComplete={handleScanComplete}
                 />
             )}
+
+            {/* 스코어카드 한 장으로 라운드 남기기 — 카드를 올리면 골프장 · 전후반 · 날짜를 읽어 바로 기록한다 */}
+            {scanRoundOpen && <ScanRoundSheet onClose={() => setScanRoundOpen(false)} />}
 
             <HiqNavigation />
         </div>

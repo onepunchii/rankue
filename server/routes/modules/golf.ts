@@ -26,7 +26,8 @@ import { PIN_PHOTOS } from "../../../shared/golfPins.js";
 import { parseLatLng } from "../../../shared/golfNearby.js";
 import { ONSITE_SOURCES, type OnSiteSource } from "../../../shared/golfOnSite.js";
 import { sanitizeHolePatches, withoutHoleStats } from "../../../shared/golfHoleStats.js";
-import { SCAN_COPY, SCAN_DAILY_LIMIT, buildScanDraft, draftCounts, scanKstDay } from "../../../shared/golfScorecardScan.js";
+import { SCAN_COPY, SCAN_OFFICIAL_MAX_EDITS, scanDailyLimit, buildScanDraft, draftCounts, effectivePars, scanEditCount, scanKstDay, usableCardDay } from "../../../shared/golfScorecardScan.js";
+import { clubIndex, openScan, resolveCard, signScan } from "../../services/golfScanRound.js";
 import { isSuperAdminRole } from "../../../shared/adminRole.js";
 import { readScorecard, scanConfigured, scanImage, scanPublic } from "../../lib/golfScorecardRead.js";
 import { logScan, scanRole, scansToday, type ScanOutcome } from "../../storage/golfScanLog.js";
@@ -1111,19 +1112,83 @@ const photoAddSchema = z.object({
  * 스코어카드로 채우기(2026-10-13) — 앱이 만든 디지털 스코어카드(스마트스코어 꼴) 그림을 읽어 점수판의 **초안**을 돌려준다.
  * 여기서는 **아무것도 저장하지 않는다**(그림도, 읽은 점수도) — 방장이 확인 화면에서 고친 뒤 POST /match/:id/score 로 넣는다.
  * 공용 코스 자료도 건드리지 않는다(예전 이 자리의 /scorecard/ocr 은 클라이언트가 보낸 값을 모두의 파 자료에 적었다 — 9/10 에 걷어냄).
- *  - 방장만(점수는 방장만 쓴다) · 치는 중인 방만 · 하루 SCAN_DAILY_LIMIT 번.
+ *  - 방장만(점수는 방장만 쓴다) · 치는 중인 방만. 하루 횟수 한도는 없다(걸 때는 env GOLF_SCAN_DAILY_LIMIT).
  *  - 공개 전에는 슈퍼관리자만(env GOLF_SCAN_PUBLIC=true 면 모두) — 그림이 국외 사업자에게 나가므로 처리방침이 먼저다.
  *  - 규칙 · 계산: shared/golfScorecardScan, 읽기: lib/golfScorecardRead.
  */
 async function scanAccess(memberId: string): Promise<{ available: boolean; left: number }> {
     if (!scanConfigured()) return { available: false, left: 0 };
     if (!scanPublic() && !isSuperAdminRole(await scanRole(memberId))) return { available: false, left: 0 };
-    return { available: true, left: Math.max(0, SCAN_DAILY_LIMIT - await scansToday(memberId)) };
+    // 한도는 걸려 있을 때만 센다(지금은 없음 — env GOLF_SCAN_DAILY_LIMIT)
+    const limit = scanDailyLimit(process.env.GOLF_SCAN_DAILY_LIMIT);
+    return { available: true, left: limit == null ? 9999 : Math.max(0, limit - await scansToday(memberId)) };
 }
 
 router.get("/scan/status", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     res.setHeader("Cache-Control", "no-store");
-    return sendSuccess(res, { ...(await scanAccess(req.userId!)), limit: SCAN_DAILY_LIMIT });
+    return sendSuccess(res, { ...(await scanAccess(req.userId!)), limit: scanDailyLimit(process.env.GOLF_SCAN_DAILY_LIMIT) });
+}));
+
+/**
+ * 스코어카드 한 장으로 라운드 남기기(2026-10-13 오너: "첨부하면 자동으로 CC명과 전후반 · 날짜까지" · "인식이 안 되면 물어보면 되는데" ·
+ * "저장이 되는 게 아니라 1번 홀로 가는데" · "스코어카드 넣을 정도의 정성이면 공식으로 인증해 주자").
+ *  - /scan/card   : 그림을 읽어 골프장 · 전후반 코스 · 날짜를 명부와 맞추고(못 맞춘 것은 null — 화면이 그것만 묻는다) 초안과 서명을 준다. 저장하지 않는다.
+ *  - /scan/record : 확인을 마친 내 줄을 **바로 끝난 라운드로** 남긴다(혼자 기록 라운드의 길을 그대로 — storage.golf.recordScannedRound).
+ *                   공식 여부: 골프장이 명부에 있고, 올린 줄이 카드에서 읽은 줄과 SCAN_OFFICIAL_MAX_EDITS 칸 넘게 다르지 않을 때만. 아니면 미인증으로 남는다.
+ */
+router.post("/scan/card", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const access = await scanAccess(req.userId!);
+    if (!access.available) return sendError(res, 403, "아직 쓸 수 없는 기능이에요");
+    if (access.left <= 0) return sendError(res, 429, SCAN_COPY.limit);
+    const image = scanImage(req.body?.image);
+    if (!image) return sendError(res, 400, "그림 형식이 올바르지 않아요");
+
+    const r = await readScorecard(image);
+    const log = (outcome: ScanOutcome, n?: { rows: number; ok: number; check: number; empty: number }) =>
+        logScan({ memberId: req.userId!, sessionId: "card", model: r.model, outcome, ms: r.ms, ...n }).catch((e) => console.warn("[GolfScan] log", String(e?.message ?? e).slice(0, 120)));
+    if (!r.read) { await log("failed"); return sendError(res, 502, SCAN_COPY.failed); }
+    if (r.read.kind === "handwritten") { await log("handwritten"); return sendError(res, 422, SCAN_COPY.handwritten); }
+    const found = await resolveCard(r.read);
+    const eff = effectivePars(r.read, found.pars);
+    const draft = r.read.kind === "app" ? buildScanDraft(r.read, eff.pars, eff.known) : null;
+    if (!draft) { await log(r.read.kind === "app" ? "none" : "other"); return sendError(res, 422, SCAN_COPY.none); }
+    await log("ok", { rows: draft.rows.length, ...draftCounts(draft) });
+    const day = usableCardDay(draft.day, scanKstDay(Date.now()));
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, {
+        card: { clubRead: r.read.club ?? r.read.clubKo ?? null, club: found.club, front: found.front?.name ?? null, back: found.back?.name ?? null, coursesRead: r.read.courses ?? [null, null], day },
+        draft, pars: eff.pars, parKnown: eff.known,
+        token: signScan(req.userId!, draft.rows.map((row) => row.cells.map((c) => c.strokes)), day, { clubId: found.club?.id ?? null, front: found.front?.name ?? null, back: found.back?.name ?? null }),
+        left: access.left - 1,
+    });
+}));
+
+const scanRecordSchema = z.object({
+    token: z.string().max(4000),
+    row: z.coerce.number().int().min(0).max(3),
+    clubId: z.string().max(64).nullish(),
+    courseName: z.string().trim().max(80).nullish(),
+    strokes: z.array(z.coerce.number().int()).length(18),
+});
+
+router.post("/scan/record", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const access = await scanAccess(req.userId!);
+    if (!access.available) return sendError(res, 403, "아직 쓸 수 없는 기능이에요");
+    const parsed = scanRecordSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return sendError(res, 400, "기록 형식이 올바르지 않아요");
+    const d = parsed.data;
+    const ticket = openScan(d.token, req.userId!);
+    if (!ticket || !ticket.r[d.row]) return sendError(res, 410, "읽은 지 오래됐어요. 카드를 다시 올려 주세요");
+    // 골프장 — 명부의 것이면 이름은 명부에서(화면이 보낸 이름을 믿지 않는다). 명부에 없으면 사람이 적은 이름으로, 미인증으로만
+    const index = await clubIndex();
+    const club = d.clubId ? index.clubs.find((c) => c.id === d.clubId) ?? null : null;
+    const courseName = club?.name ?? (d.courseName || "");
+    if (!courseName) return sendError(res, 400, "골프장을 골라 주세요");
+    // 전반 · 후반 — 읽을 때 맞춘 것(서명 안)을 쓴다. 사람이 다른 골프장으로 바꿨으면 그 코스 이름은 맞지 않으니 비운다
+    const same = !!club && club.id === ticket.c;
+    const official = !!club && scanEditCount(ticket.r[d.row], d.strokes) <= SCAN_OFFICIAL_MAX_EDITS;
+    const out = await storage.golf.recordScannedRound(req.userId!, { courseId: club?.id ?? null, courseName, front: same ? ticket.f : null, back: same ? ticket.b : null, scores: d.strokes, day: ticket.d, official });
+    return sendSuccess(res, out);
 }));
 
 router.post("/match/:id/scan", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {

@@ -792,7 +792,13 @@ export default function GolfScorecard() {
                     players={localPlayers}
                     pars={coursePar}
                     parKnown={parKnown}
-                    onApply={(next) => replacePlayers(next)}
+                    onApply={async (next) => {
+                        await replacePlayers(next);
+                        // 넣고 나서 1번 홀에 세워 두지 않는다(오너: "저장이 되는 게 아니라 1번 홀로 가는데") — 마지막 홀로 가고, 18홀이 다 찼으면 끝내기 창을 연다
+                        const done = next.filter((p: any) => !isGuestId(p.memberId) && !p.isGuest).every((p: any) => isCompleteRound(p.scores));
+                        setCurrentHole(17);
+                        if (done) setFinishOpen(true);
+                    }}
                     onClose={() => setScanOpen(false)}
                 />
             )}

@@ -33,7 +33,7 @@ import type {
     InsertGolfMembershipOrder,
     GolfMembershipOrder
 } from "../../shared/schema.js";
-import { eq, ne, desc, asc, and, or, sql, gte, lte, isNull, like, ilike, inArray } from "drizzle-orm";
+import { eq, ne, desc, asc, and, or, sql, gte, lte, lt, isNull, like, ilike, inArray } from "drizzle-orm";
 import { notFound, conflict, badRequest } from "../utils/errors.js";
 import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords, passportRegionGroup } from "../../shared/golfRegions.js";
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
@@ -1735,6 +1735,36 @@ export class GolfRepository {
     }
 
     /** 홈의 '진행 중 라운드' 카드. 12시간 안에 손댄, 내가 들어 있는 대기·진행 중 방 하나. */
+    /**
+     * 스코어카드로 올린 라운드를 한 번에 남긴다(2026-10-13 오너: "스코어카드 넣으면 저장이 되는 게 아니라 1번 홀로 가는데" ·
+     * "스코어카드 넣을 정도의 정성이면 공식으로 인증해 주자").
+     * 새 길을 만들지 않고 **혼자 기록 라운드의 길을 그대로** 탄다: 방 만들기 → 점수 → 끝내기. 그래서 18홀 규칙 · 평균 · 여권이 같은 코드로 돈다.
+     * 그 뒤 두 가지만 고친다 — 기록의 날을 카드의 날짜로(day), 공식 여부를 official 로(카드에서 읽은 그대로일 때만 — 판정은 부르는 쪽).
+     * 같은 날 · 같은 타수의 골프 기록이 이미 있으면 받지 않는다(같은 카드를 두 번 올림).
+     */
+    async recordScannedRound(memberId: string, input: { courseId: string | null; courseName: string; front: string | null; back: string | null; scores: number[]; day: string | null; official: boolean }): Promise<{ id: string; official: boolean }> {
+        if (!isCompleteRound(input.scores)) throw badRequest("18홀이 모두 있어야 기록할 수 있어요");
+        const total = input.scores.reduce((a, b) => a + b, 0);
+        const day = input.day ?? new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+        const from = new Date(`${day}T00:00:00+09:00`), to = new Date(from.getTime() + 86_400_000);
+        const [dup] = await db.select({ id: hiqGameHistory.id }).from(hiqGameHistory)
+            .where(and(eq(hiqGameHistory.memberId, memberId), sql`${hiqGameHistory.sportCategory} = 'GOLF'`, eq(hiqGameHistory.score, total), gte(hiqGameHistory.createdAt, from), lt(hiqGameHistory.createdAt, to)))
+            .limit(1);
+        if (dup) throw conflict("같은 날 같은 타수의 라운드가 이미 있어요");
+
+        let session = await this.createGolfMatchSession(memberId, { courseId: input.courseId, courseName: input.courseName, gameMode: "stroke", strokeMode: "solo", frontCourseName: input.front, backCourseName: input.back } as any);
+        if (session.status !== "playing") session = await this.startGolfMatchSession(session.id);
+        await this.updateGolfMatchScore(session.id, 18, [{ memberId, scores: input.scores }]);
+        await this.finishGolfMatchSession(session.id);
+
+        const when = input.day ? new Date(`${input.day}T12:00:00+09:00`) : null;
+        await db.update(hiqGameHistory).set({ onSite: input.official, ...(when ? { createdAt: when } : {}) }).where(eq(hiqGameHistory.golfSessionId, session.id));
+        if (when) await db.update(golfMatchSessions).set({ startedAt: when, finishedAt: when, holesDoneAt: when }).where(eq(golfMatchSessions.id, session.id));
+        // 끝낼 때는 미인증으로 세었다 — 공식이면 평균 · 등급 · 도장을 다시 센다
+        if (input.official) await this.recountGolfStats([memberId]);
+        return { id: session.id, official: input.official };
+    }
+
     async getActiveGolfMatch(memberId: string): Promise<any> {
         const [s] = await db.select().from(golfMatchSessions)
             .where(and(

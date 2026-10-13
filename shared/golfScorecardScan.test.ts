@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-    applyScanRows, buildScanDraft, cardDay, cellNumber, cellStrokes, draftCounts, guessSeats, normalizeRead, rowNotation, scanKstDay, sumLine,
+    applyScanRows, buildScanDraft, cardDay, clubKey, clubParsFit, courseKey, effectivePars, matchClub, matchCourses, scanDailyLimit, scanEditCount, usableCardDay, SCAN_OFFICIAL_MAX_EDITS, cellNumber, cellStrokes, draftCounts, guessSeats, normalizeRead, rowNotation, scanKstDay, sumLine,
     type ScanRead,
 } from "./golfScorecardScan";
 
@@ -199,5 +199,74 @@ describe("줄과 사람 잇기 · 점수판에 얹기", () => {
     it("범위를 벗어난 값은 얹지 않는다", () => {
         const out = applyScanRows(players, [{ memberId: "b", strokes: [16, -1, 2.5, ...new Array(15).fill(0)] }]);
         expect((out[1].scores as number[]).slice(0, 3)).toEqual([4, 0, 0]);
+    });
+});
+
+describe("카드의 골프장 · 코스 · 날짜를 명부와 맞추기", () => {
+    const clubs = [{ id: "a", name: "솔모로컨트리클럽" }, { id: "b", name: "(주)캐슬렉스서울 캐슬렉스골프클럽" }, { id: "c", name: "남서울컨트리클럽" }, { id: "d", name: "뉴서울컨트리클럽" }, { id: "e", name: "서울CC" }];
+    const never = () => false;
+    it("열쇠 — 꼬리말 · 띄어쓰기 · 기호를 걷는다", () => {
+        expect(clubKey("솔모로 컨트리클럽")).toBe("솔모로");
+        expect(clubKey("SOLMORO COUNTRY CLUB")).toBe("solmoro");
+        expect(clubKey("(주)캐슬렉스서울 캐슬렉스골프클럽")).toBe("캐슬렉스서울캐슬렉스");
+        expect(courseKey("Maple Course")).toBe("maple");
+        expect(courseKey("레이크 코스")).toBe("레이크");
+    });
+    it("영문 로고의 카드 — 한글로 옮긴 이름으로 맞춘다", () => {
+        expect(matchClub({ club: "SOLMORO COUNTRY CLUB", clubKo: "솔모로 컨트리클럽" }, clubs, never)?.id).toBe("a");
+        expect(matchClub({ club: "솔모로CC", clubKo: null }, clubs, never)?.id).toBe("a");
+    });
+    it("이름의 일부만 맞아도 한 곳이면 고른다 · 여럿이면 파가 맞는 한 곳만 · 못 고르면 null(사람에게 묻는다)", () => {
+        expect(matchClub({ club: "캐슬렉스", clubKo: null }, clubs, never)?.id).toBe("b");
+        expect(matchClub({ club: "서울", clubKo: null }, clubs, never)?.id).toBe("e"); // 꼭 맞는 이름이 먼저
+        expect(matchClub({ club: "서울컨트리", clubKo: null }, [clubs[2], clubs[3]], never)).toBeNull();
+        expect(matchClub({ club: "서울컨트리", clubKo: null }, [clubs[2], clubs[3]], (id) => id === "d")?.id).toBe("d");
+        expect(matchClub({ club: null, clubKo: null }, clubs, () => true)).toBeNull();
+        expect(matchClub({ club: "없는골프장", clubKo: null }, clubs, () => true)).toBeNull();
+    });
+    const courses = [{ name: "메이플", pars: [5, 4, 3, 4, 5, 4, 3, 4, 4] }, { name: "파인", pars: [5, 4, 3, 4, 5, 4, 4, 3, 4] }, { name: "체리", pars: [4, 4, 3, 4, 5, 4, 4, 3, 5] }];
+    const printed = ["5", "4", "3", "4", "5", "4", "3", "4", "4", "5", "4", "3", "4", "5", "4", "4", "3", "4"];
+    it("코스 — 이름(한글로 옮긴 것 포함)으로, 없으면 인쇄된 파와 꼭 같은 코스가 하나일 때", () => {
+        expect(matchCourses({ courses: ["Maple", "Pine"], coursesKo: ["메이플", "파인"], pars: printed }, courses).map((c) => c?.name)).toEqual(["메이플", "파인"]);
+        expect(matchCourses({ courses: ["A", "B"], coursesKo: [null, null], pars: printed }, courses).map((c) => c?.name)).toEqual(["메이플", "파인"]);
+        expect(matchCourses({ courses: ["A", "B"], coursesKo: [null, null], pars: printed }, [...courses, { name: "메이플2", pars: courses[0].pars }]).map((c) => c?.name)).toEqual([undefined, "파인"]);
+        expect(clubParsFit({ pars: printed }, courses)).toBe(true);
+        expect(clubParsFit({ pars: printed }, [courses[0], courses[2]])).toBe(false);
+    });
+    it("날짜 — 오늘까지 · 2010년부터만 기록의 날로 쓴다", () => {
+        expect(usableCardDay("2026-10-12", "2026-10-13")).toBe("2026-10-12");
+        expect(usableCardDay("2016-10-10", "2026-10-13")).toBe("2016-10-10");
+        for (const bad of ["2026-10-14", "2009-12-31", "2026/10/12", null, ""]) expect(usableCardDay(bad, "2026-10-13"), String(bad)).toBeNull();
+    });
+    it("받아쓴 것에서 골프장 · 코스 칸을 받는다(없어도 된다)", () => {
+        const r = normalizeRead({ kind: "app", club: " SOLMORO ", club_ko: "솔모로", courses: ["Maple", "Pine", "x"], courses_ko: ["메이플"], rows: [] })!;
+        expect([r.club, r.clubKo, r.courses, r.coursesKo]).toEqual(["SOLMORO", "솔모로", ["Maple", "Pine"], ["메이플", null]]);
+        expect(normalizeRead({ kind: "app", rows: [] })).toMatchObject({ club: null, courses: [null, null] });
+    });
+});
+
+describe("공식으로 올릴 수 있는가 — 카드에서 읽은 그대로일 때", () => {
+    it("읽은 줄과 올린 줄이 다른 칸을 센다 — 고친 칸 · 채운 빈칸 모두", () => {
+        const readRow = [...ALL]; readRow[3] = 0;
+        const final = [...ALL]; final[0] = ALL[0] + 1;
+        expect(scanEditCount(ALL, ALL)).toBe(0);
+        expect(scanEditCount(readRow, final)).toBe(2);
+        expect(scanEditCount([], ALL)).toBe(18);
+        expect(SCAN_OFFICIAL_MAX_EDITS).toBe(4);
+    });
+    it("파 한 벌 — 명부의 파가 있으면 그것, 없으면 카드에 인쇄된 파(못 읽은 홀은 모르는 홀)", () => {
+        const printed = s(PARS) as (string | null)[]; printed[2] = null;
+        expect(effectivePars({ pars: printed }, PARS)).toEqual({ pars: PARS, known: KNOWN });
+        const e = effectivePars({ pars: printed }, null);
+        expect(e.known[2]).toBe(false);
+        expect(e.known.filter(Boolean)).toHaveLength(17);
+        expect(e.pars[0]).toBe(PARS[0]);
+    });
+});
+
+describe("하루 횟수 한도", () => {
+    it("넣지 않으면 없다 — 양의 정수를 넣었을 때만 건다", () => {
+        for (const none of [undefined, null, "", "0", "-3", "abc", "2.5"]) expect(scanDailyLimit(none), String(none)).toBeNull();
+        expect(scanDailyLimit("10")).toBe(10);
     });
 });

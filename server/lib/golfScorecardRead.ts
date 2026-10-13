@@ -39,6 +39,9 @@ export const SCAN_PROMPT = [
     "You transcribe an image of a golf scorecard into JSON. Transcribe only: never calculate, never correct, never guess.",
     "kind: \"app\" if the image is a digital scorecard produced by a golf scoring app or kiosk (printed fonts in a regular grid, as issued by SmartScore-style systems; a phone photo or screenshot of one counts). \"handwritten\" if the scores are written by hand. \"other\" if it is not a golf scorecard. If kind is not \"app\", return empty pars and rows.",
     "date: the date printed on the card exactly as written, or null.",
+    "club: the golf club's name exactly as printed on the card (usually the logo text or the header), or null if none is visible.",
+    "club_ko: that same club name written in Korean (Hangul). If it is printed in Korean, copy it. If it is printed in Latin letters, write its usual Korean transliteration (for example \"SOLMORO COUNTRY CLUB\" becomes \"솔모로 컨트리클럽\"). null if there is no club name.",
+    "courses: an array of two strings - the course name printed at the top-left of the first block, then of the second block (for example \"Maple\", \"레이크\"); null for a block without a name. courses_ko: the same two names in Hangul (copy Korean, transliterate Latin).",
     "The card has two blocks of nine holes, each with a course name, holes 1-9 and TOTAL. The first block is holes 1-9 and the second block is holes 10-18. If only one block is present, use null for the other nine holes.",
     "pars: the printed PAR row, 18 cells in hole order (first block, then second block).",
     "rows: one entry per PLAYER row, top to bottom, at most 4. The same player appears in both blocks on the same row position; merge them into one row of 18 cells.",
@@ -54,10 +57,14 @@ const cells = { type: "array", items: cell };
 export const SCAN_SCHEMA = {
     type: "object",
     additionalProperties: false,
-    required: ["kind", "date", "pars", "rows"],
+    required: ["kind", "date", "club", "club_ko", "courses", "courses_ko", "pars", "rows"],
     properties: {
         kind: { type: "string", enum: ["app", "handwritten", "other"] },
         date: cell,
+        club: cell,
+        club_ko: cell,
+        courses: cells,
+        courses_ko: cells,
         pars: cells,
         rows: {
             type: "array",

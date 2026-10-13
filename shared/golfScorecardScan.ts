@@ -19,8 +19,14 @@
  */
 import { HOLES, isValidStroke } from "./golfMatch.js";
 
-/** 한 사람이 하루에 쓸 수 있는 횟수(한국 날짜) — 한 번에 5원쯤 든다 */
-export const SCAN_DAILY_LIMIT = 10;
+/**
+ * 하루 횟수 제한은 두지 않는다(2026-10-13 오너: "스코어카드 제한 풀 거야 — 내가 한도 걸 때 그때 하자").
+ * 걸 때는 env GOLF_SCAN_DAILY_LIMIT(한 사람 · 한국 날짜 기준 횟수)만 넣으면 된다 — 한 번에 5원쯤 든다.
+ */
+export function scanDailyLimit(raw: string | undefined | null): number | null {
+    const n = Number(raw);
+    return Number.isInteger(n) && n > 0 ? n : null;
+}
 /** 보내기 전에 기기에서 줄이는 긴 변(px) · 받는 쪽의 상한(data URL 글자 수) */
 export const SCAN_MAX_EDGE = 1600;
 export const SCAN_MAX_CHARS = 2_400_000;
@@ -45,6 +51,12 @@ export interface ScanRead {
     kind: ScanCardKind;
     /** 카드에 찍힌 날짜(적힌 그대로) */
     date: string | null;
+    /** 골프장 이름 — 적힌 그대로 · 한글로 옮긴 것(로고가 영문인 카드가 많다 — 우리 명부와 맞춰 볼 때만 쓴다) */
+    club?: string | null;
+    clubKo?: string | null;
+    /** 전반 · 후반 판의 코스 이름 — 적힌 그대로 · 한글로 옮긴 것 */
+    courses?: (string | null)[];
+    coursesKo?: (string | null)[];
     /** 인쇄된 파 줄(홀 1~18) */
     pars: (string | null)[];
     rows: ScanReadRow[];
@@ -75,7 +87,8 @@ export function normalizeRead(raw: unknown): ScanRead | null {
         if (rows.length >= SCAN_MAX_ROWS) break;
     }
     const kind: ScanCardKind = o.kind === "app" || o.kind === "handwritten" ? o.kind : "other";
-    return { kind, date: str(o.date, 24), pars: cells18(o.pars), rows };
+    const pair = (v: unknown) => { const a = Array.isArray(v) ? v : []; return [str(a[0], 30), str(a[1], 30)]; };
+    return { kind, date: str(o.date, 24), club: str(o.club, 60), clubKo: str(o.club_ko ?? o.clubKo, 60), courses: pair(o.courses), coursesKo: pair(o.courses_ko ?? o.coursesKo), pars: cells18(o.pars), rows };
 }
 
 /** 카드의 날짜 → YYYY-MM-DD. "2016/10/10" · "2016.10.10" · "2016-10-10" · "2016년 10월 10일". 못 읽으면 null */
@@ -85,6 +98,77 @@ export function cardDay(raw: string | null | undefined): string | null {
     const mo = Number(m[2]), d = Number(m[3]);
     if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
     return `${m[1]}-${String(mo).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+}
+
+/* ── 카드의 골프장 · 코스를 우리 명부와 맞춘다(2026-10-13 오너: "스코어카드를 첨부하면 자동으로 CC명과 전후반 · 날짜까지 인식해야") ── */
+
+const CLUB_WORDS = /\(주\)|주식회사|컨트리클럽|골프앤리조트|골프&리조트|골프리조트|골프클럽|골프장|컨트리|리조트|클럽|countryclub|golfclub|golf&resort|golfresort|country|resort|golf|club|cc|gc/g;
+/** 골프장 이름의 맞춤 열쇠 — 띄어쓰기 · 기호 · '컨트리클럽' 같은 꼬리말을 걷는다 */
+export const clubKey = (name: string | null | undefined): string =>
+    String(name ?? "").normalize("NFKC").toLowerCase().replace(/[\s·.,'"_\-]/g, "").replace(CLUB_WORDS, "").replace(/[^0-9a-z가-힣]/g, "");
+/** 코스 이름의 맞춤 열쇠 — '코스' · 'course' 를 걷는다 */
+export const courseKey = (name: string | null | undefined): string =>
+    String(name ?? "").normalize("NFKC").toLowerCase().replace(/\s|코스|course/g, "").replace(/[^0-9a-z가-힣]/g, "");
+
+export interface ScanClub { id: string; name: string }
+export interface ScanClubCourse { name: string; pars: readonly number[] }
+
+/**
+ * 카드의 골프장 이름으로 명부에서 한 곳을 고른다. 이름이 꼭 맞는 곳이 하나면 그곳, 여럿이면 카드의 파와 코스가 맞는 곳이 하나일 때만.
+ * 파만으로는 고르지 않는다(파 배치가 같은 골프장이 많다) — 못 고르면 null, 화면이 사람에게 묻는다.
+ */
+export function matchClub(read: Pick<ScanRead, "club" | "clubKo">, clubs: readonly ScanClub[], parsFit: (clubId: string) => boolean): ScanClub | null {
+    const keys = [clubKey(read.club), clubKey(read.clubKo)].filter((k) => k.length >= 2);
+    if (!keys.length) return null;
+    let hits = clubs.filter((c) => keys.includes(clubKey(c.name)));
+    if (!hits.length) hits = clubs.filter((c) => { const k = clubKey(c.name); return k.length >= 2 && keys.some((x) => k.includes(x) || x.includes(k)); });
+    if (hits.length === 1) return hits[0];
+    const fit = hits.filter((c) => parsFit(c.id));
+    return fit.length === 1 ? fit[0] : null;
+}
+
+const samePars = (a: readonly (number | null)[], b: readonly number[]) => a.length === 9 && b.length >= 9 && a.every((x, i) => x != null && x === b[i]);
+
+/** 그 골프장의 코스 가운데 전반 · 후반을 고른다 — 이름이 맞는 것, 없으면 인쇄된 파와 꼭 같은 코스가 하나일 때 그것 */
+export function matchCourses(read: Pick<ScanRead, "courses" | "coursesKo" | "pars">, courses: readonly ScanClubCourse[]): [ScanClubCourse | null, ScanClubCourse | null] {
+    const printed = read.pars.map(parOf);
+    const pick = (i: 0 | 1): ScanClubCourse | null => {
+        const keys = [courseKey(read.courses?.[i]), courseKey(read.coursesKo?.[i])].filter(Boolean);
+        const byName = courses.filter((c) => keys.includes(courseKey(c.name)));
+        if (byName.length === 1) return byName[0];
+        const byPar = courses.filter((c) => samePars(printed.slice(i * 9, i * 9 + 9), c.pars));
+        return byPar.length === 1 ? byPar[0] : null;
+    };
+    return [pick(0), pick(1)];
+}
+
+/** 카드의 인쇄된 파가 그 골프장의 코스 둘로 설명되는가(전반 · 후반 각각 같은 파의 코스가 있다) */
+export function clubParsFit(read: Pick<ScanRead, "pars">, courses: readonly ScanClubCourse[]): boolean {
+    const printed = read.pars.map(parOf);
+    return [0, 9].every((from) => courses.some((c) => samePars(printed.slice(from, from + 9), c.pars)));
+}
+
+/** 방이 모르는 홀은 카드에 인쇄된 파로 — 화면과 계산이 같은 파를 쓰게 한 벌로 만든다 */
+export function effectivePars(read: Pick<ScanRead, "pars">, pars: readonly number[] | null): { pars: number[]; known: boolean[] } {
+    const printed = read.pars.map(parOf);
+    const out = Array.from({ length: HOLES }, (_, h) => (pars ? pars[h] : printed[h]) ?? null);
+    return { pars: out.map((p) => p ?? 4), known: out.map((p) => p != null) };
+}
+
+/**
+ * 공식으로 올릴 수 있는가 — **카드에서 읽은 그대로**일 때만(오너: "스코어카드 넣을 정도의 정성이면 공식으로 인증해 주자").
+ * 읽은 줄과 올린 줄이 다른 칸(오독을 고친 칸 · 빈칸을 채운 칸)이 이 수를 넘으면 그 기록은 카드의 것이 아니라 손으로 적은 것이다 → 미인증.
+ */
+export const SCAN_OFFICIAL_MAX_EDITS = 4;
+export function scanEditCount(read: readonly number[], final: readonly number[]): number {
+    let n = 0;
+    for (let h = 0; h < HOLES; h++) if ((Number(read[h]) || 0) !== (Number(final[h]) || 0)) n++;
+    return n;
+}
+
+/** 카드의 날짜를 기록의 날로 쓸 수 있는가 — 오늘까지, 2010년부터(앞날 · 터무니없는 옛날은 오독으로 본다) */
+export function usableCardDay(day: string | null | undefined, today: string): string | null {
+    return day && /^\d{4}-\d{2}-\d{2}$/.test(day) && day <= today && day >= "2010-01-01" ? day : null;
 }
 
 /** 시각 → 한국 날짜(YYYY-MM-DD) */
@@ -115,10 +199,10 @@ export function rowNotation(cells: readonly (string | null)[]): ScanNotation {
     return nums.reduce((s, x) => s + x.n, 0) / nums.length < 2.5 ? "relative" : "strokes";
 }
 
-const parOf = (raw: string | null | undefined): number | null => {
+function parOf(raw: string | null | undefined): number | null {
     const p = cellNumber(raw ?? null);
     return p && !p.signed && p.n >= 3 && p.n <= 6 ? p.n : null;
-};
+}
 
 /** 칸 하나 → 타수. 상대 표기는 파가 있어야 바꿀 수 있다. 1~15 를 벗어나면 못 읽은 것으로 본다 */
 export function cellStrokes(raw: string | null, notation: ScanNotation, par: number | null): number | null {
@@ -305,6 +389,12 @@ export const SCAN_COPY = {
     applied: "점수판에 넣었어요",
     handwritten: "손으로 적은 카드는 읽지 않아요. 앱에서 받은 스코어카드를 올려 주세요.",
     none: "스코어카드를 찾지 못했어요. 카드 전체가 나오게 다시 올려 주세요.",
+    record: "이 카드로 기록하기",
+    official: "카드에서 읽은 그대로라 공식 라운드로 남아요.",
+    unofficial: "카드와 다르게 고친 칸이 많아 미인증으로 남아요.",
+    askClub: "골프장을 찾지 못했어요. 이름으로 찾아 주세요.",
+    askRow: "내 줄을 골라 주세요.",
+    askHoles: "18홀이 다 있어야 기록돼요. 빈칸을 눌러 채워 주세요.",
     limit: "오늘은 더 읽을 수 없어요. 내일 다시 쓸 수 있어요.",
     failed: "카드를 읽지 못했어요. 잠시 뒤에 다시 해 주세요.",
 } as const;
