@@ -186,6 +186,15 @@ export function effectivePars(read: Pick<ScanRead, "pars">, pars: readonly numbe
     return { pars: out.map((p) => p ?? 4), known: out.map((p) => p != null) };
 }
 
+/**
+ * 서로 다른 회원 몇 사람의 카드가 같은 코스 · 같은 파를 말하면 공용 명부(rankue_golf_courses)를 고치는가
+ * (2026-10-14 오너: "2명 이상 그 카드의 코스나 파의 기준이 맞다면 수정되게 하면 되겠다").
+ * 한 사람의 카드 한 장으로는 고치지 않는다 — 잘못 읽은 카드나 꾸민 그림 하나가 모두의 파 자료를 바꾸지 못하게.
+ */
+export const SCAN_PROMOTE_MEMBERS = 2;
+/** 한 번에 올릴 수 있는 카드 수(오너: "한 5개씩 어때?") */
+export const SCAN_BATCH_MAX = 5;
+
 /** 이 아홉 홀의 파(pars9)로 바꾼 타수의 합이 카드에 찍힌 합과 맞는 줄이 있는가 — 그 파가 이 카드의 것이라는 증거다 */
 export function halfFits(read: ScanRead, pars9: readonly number[], from: 0 | 9): boolean {
     if (pars9.length < 9) return false;
@@ -456,6 +465,13 @@ export const SCAN_COPY = {
     handwritten: "손으로 적은 카드는 읽지 않아요. 앱에서 받은 스코어카드를 올려 주세요.",
     none: "스코어카드를 찾지 못했어요. 카드 전체가 나오게 다시 올려 주세요.",
     record: "이 카드로 기록하기",
+    // 카드 한 장으로 남기는 길은 한 사람짜리 카드만 받는다(오너 10/14: "4인은 하지 말자")
+    single: "내 점수만 나온 스코어카드를 올려 주세요. 여러 명이 함께 나온 카드는 읽지 않아요.",
+    // 올리는 화면 — 쉬운 말로(오너: "어떤 이미지 넣는지 · 어려운 말 빼고 심플하게")
+    roundLead: "스마트스코어 앱의 내 스코어카드를 올리면 라운드가 바로 기록돼요.",
+    roundPick: "스코어카드 고르기",
+    roundTips: ["골프장 · 날짜 · 점수가 자동으로 들어가요.", "한 번에 5장까지 올릴 수 있어요.", "올린 카드는 내 라운드에 같이 저장돼요. 나만 볼 수 있어요."] as readonly string[],
+    roundAbroad: "점수를 읽을 때 해외 AI 서비스를 써요.",
     official: "스코어카드로 올려 공식 라운드로 남았어요.",
     unofficial: "명부에 없는 골프장이라 미인증으로 남았어요.",
     askClub: "골프장을 찾지 못했어요. 이름으로 찾아 주세요.",

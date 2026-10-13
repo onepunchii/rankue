@@ -12,7 +12,8 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { rankueGolfClubs, rankueGolfCourses } from "../../shared/schema.js";
-import { clubParsFit, courseKey, matchClub, matchCourses, type ScanClub, type ScanClubCourse, type ScanRead } from "../../shared/golfScorecardScan.js";
+import { eq } from "drizzle-orm";
+import { SCAN_PROMOTE_MEMBERS, clubParsFit, courseKey, matchClub, matchCourses, type ScanClub, type ScanClubCourse, type ScanRead } from "../../shared/golfScorecardScan.js";
 
 interface ClubIndex { clubs: ScanClub[]; courses: Map<string, ScanClubCourse[]>; at: number }
 let cache: ClubIndex | null = null;
@@ -62,7 +63,7 @@ const rowsOf = (r: any) => (r.rows ?? r) as any[];
 /**
  * 카드에서 확인된 코스와 파를 쌓는다(2026-10-13 오너: "해당 홀과 코스를 누적 DB 로 저장해 놓는 거 알지? 코스에 따른 정보들도 저장돼야 돼").
  * 부르는 쪽이 지킬 것: **그 카드에 찍힌 합과 맞아떨어진 아홉 홀만**(shared halfFits) 넘긴다 — 잘못 읽은 파가 쌓이지 않게.
- * 같은 사람이 같은 것을 또 올리면 횟수와 마지막 날만 늘린다. 공용 명부(rankue_golf_courses)는 여기서 고치지 않는다 — 읽을 때 보태 쓸 뿐이다.
+ * 같은 사람이 같은 것을 또 올리면 횟수와 마지막 날만 늘린다. 공용 명부(rankue_golf_courses)는 두 사람의 카드가 같은 말을 할 때만 고친다(promoteSeenCourse).
  */
 export async function saveSeenCourse(v: { clubId: string; name: string; pars: readonly number[]; memberId: string }): Promise<void> {
     const key = courseKey(v.name);
@@ -72,6 +73,28 @@ export async function saveSeenCourse(v: { clubId: string; name: string; pars: re
         values (${v.clubId}, ${key}, ${v.name.trim().slice(0, 30)}, ${v.pars.join("")}, ${v.memberId})
         on conflict (club_id, course_key, pars_key, member_id) do update set seen = golf_scan_courses.seen + 1, last_seen = now(), course_name = excluded.course_name`);
     cache = null; // 다음 읽기가 새로 쌓인 코스를 보게
+    await promoteSeenCourse(v.clubId, key, v.name.trim().slice(0, 30), v.pars).catch((e) => console.warn("[GolfScan] promote", String((e as any)?.message ?? e).slice(0, 120)));
+}
+
+/**
+ * 서로 다른 회원 SCAN_PROMOTE_MEMBERS 사람의 카드가 같은 코스 · 같은 파를 말했으면 공용 명부를 고친다 — 없는 코스는 더하고, 파가 다르면 바꾼다
+ * (오너 10/14). 같은 사람이 여러 번 올린 것은 한 사람으로 센다. 무엇을 무엇으로 바꿨는지는 서버 기록에 남긴다.
+ */
+export async function promoteSeenCourse(clubId: string, key: string, name: string, pars: readonly number[]): Promise<"added" | "fixed" | null> {
+    const [agree] = rowsOf(await db.execute(sql`select count(distinct member_id)::int as n from golf_scan_courses where club_id = ${clubId} and course_key = ${key} and pars_key = ${pars.join("")}`));
+    if ((Number(agree?.n) || 0) < SCAN_PROMOTE_MEMBERS) return null;
+    const list = await db.select({ id: rankueGolfCourses.id, name: rankueGolfCourses.name, pars: rankueGolfCourses.pars }).from(rankueGolfCourses).where(eq(rankueGolfCourses.clubId, clubId));
+    const cur = list.find((c) => courseKey(c.name) === key);
+    if (!cur) {
+        await db.insert(rankueGolfCourses).values({ clubId, name, pars: [...pars] });
+        console.info("[GolfScan] promote added", JSON.stringify({ clubId, name, pars: pars.join("") }));
+        return "added";
+    }
+    const old = Array.isArray(cur.pars) ? cur.pars.map(Number) : [];
+    if (old.length === 9 && old.every((p, i) => p === pars[i])) return null;
+    await db.update(rankueGolfCourses).set({ pars: [...pars], updatedAt: new Date() }).where(eq(rankueGolfCourses.id, cur.id));
+    console.info("[GolfScan] promote fixed", JSON.stringify({ clubId, name: cur.name, from: old.join(""), to: pars.join("") }));
+    return "fixed";
 }
 
 export interface ResolvedCard {

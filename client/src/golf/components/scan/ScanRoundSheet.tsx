@@ -15,6 +15,12 @@ export function ScanRoundSheet({ onClose }: { onClose: () => void }) {
     const { toast } = useToast();
     const { data: me } = useQuery<any>({ queryKey: ["/api/hiq/me"] });
     if (!me?.id) return null;
+    const refresh = () => {
+        // 평균 · 기록 · 여권이 새 라운드를 보게
+        for (const key of [["/api/hiq/me"], ["/api/hiq/history", { sport: "GOLF" }], ["/api/hiq/golf/passport-stats"], ["/api/hiq/golf/stamp-awards"], ["/api/hiq/golf/passport/footprints"], ["/api/hiq/golf/scan/status"]]) {
+            void queryClient.invalidateQueries({ queryKey: key });
+        }
+    };
     return (
         <ScanSheet
             players={[{ memberId: me.id, name: me.name ?? me.nickname ?? "나" }]}
@@ -22,11 +28,14 @@ export function ScanRoundSheet({ onClose }: { onClose: () => void }) {
             parKnown={[]}
             onClose={onClose}
             round={{
+                // 여러 장을 올렸을 때 — 목록에서 '마치기'
+                onBatchDone: (saved) => {
+                    refresh();
+                    if (saved > 0) toast({ title: `라운드 ${saved}개를 기록했어요`, description: "라운딩 리포트에서 볼 수 있어요." });
+                    onClose();
+                },
                 onDone: (id, official) => {
-                    // 평균 · 기록 · 여권이 새 라운드를 보게
-                    for (const key of [["/api/hiq/me"], ["/api/hiq/history", { sport: "GOLF" }], ["/api/hiq/golf/passport-stats"], ["/api/hiq/golf/stamp-awards"], ["/api/hiq/golf/passport/footprints"], ["/api/hiq/golf/scan/status"]]) {
-                        void queryClient.invalidateQueries({ queryKey: key });
-                    }
+                    refresh();
                     toast({ title: "라운드를 기록했어요", description: official ? SCAN_COPY.official : SCAN_COPY.unofficial });
                     onClose();
                     setLocation(`/golf/game/${id}/result`);

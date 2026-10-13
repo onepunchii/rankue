@@ -1163,6 +1163,8 @@ router.post("/scan/card", requireAuth, asyncHandler(async (req: AuthRequest, res
     const draft = r.read.kind === "app" ? buildScanDraft(r.read, eff.pars, eff.known) : null;
     if (!draft) { await log(r.read.kind === "app" ? "none" : "other"); return sendError(res, 422, SCAN_COPY.none); }
     await log("ok", { rows: draft.rows.length, ...draftCounts(draft) });
+    // 한 사람짜리 카드만(오너 10/14: "4인은 하지 말자") — 코스 · 파는 위에서 이미 쌓였다
+    if (draft.rows.length > 1) return sendError(res, 422, SCAN_COPY.single);
     const day = usableCardDay(draft.day, scanKstDay(Date.now()));
     res.setHeader("Cache-Control", "no-store");
     return sendSuccess(res, {

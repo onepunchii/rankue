@@ -14,7 +14,8 @@ import { apiRequest } from "@/lib/queryClient";
 import { appConfirm } from "@/components/AppDialog";
 import { LucideCheck, LucideImage, LucideLoader2, LucideMinus, LucidePlus, LucideX } from "@/lib/icons";
 import { isValidStroke } from "@shared/golfMatch";
-import { SCAN_COPY, SCAN_MAX_EDGE, applyScanRows, guessSeats, type ScanCell, type ScanDraft, type SumCheck } from "@shared/golfScorecardScan";
+import { SCAN_BATCH_MAX, SCAN_COPY, SCAN_MAX_EDGE, applyScanRows, guessSeats, type ScanCell, type ScanDraft, type SumCheck } from "@shared/golfScorecardScan";
+import { uploadRoundPhoto } from "../../lib/photoApi";
 import { ScorecardBand } from "../RoundArt";
 
 interface Player { memberId: string; name?: string | null; scores?: unknown }
@@ -22,6 +23,11 @@ interface Player { memberId: string; name?: string | null; scores?: unknown }
 type Cell = ScanCell & { mine?: boolean };
 interface Row { label: string | null; seat: string | null; cells: Cell[]; out: SumCheck; in: SumCheck }
 type Sel = { kind: "cell"; r: number; h: number } | { kind: "seat"; r: number };
+/**
+ * 여러 장을 한 번에 올릴 때의 한 장(2026-10-14 오너: "한 번에 업로드 가능한가? 한 5개씩").
+ * 읽어서 물을 것이 없으면(골프장을 맞췄고 · 내 줄이 하나로 정해지고 · 18홀이 다 읽히고 · 확인할 칸이 없다) 바로 기록하고, 있으면 그 장만 사람이 확인한다.
+ */
+interface BatchItem { file: File; status: "wait" | "reading" | "saved" | "ask" | "fail"; note?: string; image?: string; res?: any; sessionId?: string }
 
 /** 올릴 그림을 줄인다 — 긴 변 SCAN_MAX_EDGE 까지, 흰 바탕의 JPEG 로(위치 정보 같은 꼬리표도 이때 떨어진다) */
 async function shrink(file: File): Promise<string> {
@@ -67,6 +73,22 @@ const dayLabel = (day: string | null) => { const m = /^(\d{4})-(\d{2})-(\d{2})$/
 
 const COLS = "grid grid-cols-[58px_repeat(9,minmax(0,1fr))_34px]";
 
+/**
+ * 어떤 그림을 올리면 되는지 보여 주는 예시(2026-10-14 오너: "기록하기에 예시 화면 넣어 줘 — 어떤 이미지 넣는지" · "내 카드 업로드된 거 써").
+ * 오너가 올린 스마트스코어 앱 카드(볼카노 · 87타 — 이름은 찍혀 있지 않다)를 그대로 쓴다. '예시'라고 적는다.
+ */
+function CardExample() {
+    return (
+        <figure className="mt-4" data-testid="scan-example">
+            <figcaption className="mb-2 text-[13px] text-[#FFFFFFB3]">이런 스코어카드를 올려 주세요</figcaption>
+            <div className="relative overflow-hidden rounded-2xl bg-[#2E3A2C]">
+                <img src="/golf/round-art/card-example.webp" alt="스코어카드 예시 — 골프장 이름, 코스, 합계와 홀별 점수 두 줄" width={662} height={400} decoding="async" className="block h-auto w-full" />
+                <span className="absolute left-3 top-3 rounded-full bg-[#000000A6] px-2.5 py-0.5 text-[12px] text-[#FFFFFF]">예시</span>
+            </div>
+        </figure>
+    );
+}
+
 /** 카드에서 읽어 명부와 맞춘 것 — 못 맞춘 것은 null(그것만 묻는다) */
 interface Card { clubRead: string | null; club: { id: string; name: string } | null; front: string | null; back: string | null; coursesRead: (string | null)[]; day: string | null }
 
@@ -85,9 +107,14 @@ export function ScanSheet({ matchId, players, pars: roomPars, parKnown: roomKnow
     onApply?: (next: Player[]) => Promise<unknown>;
     onClose: () => void;
     /** 카드 한 장으로 라운드를 남기는 길 — players 는 나 한 사람 */
-    round?: { onDone: (sessionId: string, official: boolean) => void };
+    round?: { onDone: (sessionId: string, official: boolean) => void; onBatchDone?: (saved: number) => void };
 }) {
-    const [step, setStep] = useState<"pick" | "reading" | "confirm">("pick");
+    const [step, setStep] = useState<"pick" | "reading" | "confirm" | "batch">("pick");
+    // 여러 장 올리기 — 장마다의 상태. active 는 지금 확인 화면에 올라와 있는 장
+    const [batch, setBatch] = useState<BatchItem[] | null>(null);
+    const [active, setActive] = useState<number | null>(null);
+    const [file, setFile] = useState<File | null>(null);
+    const patchItem = (i: number, p: Partial<BatchItem>) => setBatch((prev) => (prev ? prev.map((x, j) => (j === i ? { ...x, ...p } : x)) : prev));
     const [error, setError] = useState<string | null>(null);
     const [draft, setDraft] = useState<ScanDraft | null>(null);
     const [rows, setRows] = useState<Row[]>([]);
@@ -109,32 +136,85 @@ export function ScanSheet({ matchId, players, pars: roomPars, parKnown: roomKnow
     const parAt = (h: number) => (parKnown[h] ? pars[h] : null);
     const nameOf = (id: string | null) => (id ? players.find((p) => p.memberId === id)?.name || "이름 없음" : null);
 
+    /** 줄마다 누구인가 — 방 안에서는 참가자 이름으로. 카드 한 장 길은 한 사람짜리 카드만 받으니 그 한 줄이 나다 */
+    const seatsOf = (d: ScanDraft): (string | null)[] => {
+        if (!round) return guessSeats(d.rows.map((r) => r.label), players);
+        return d.rows.map((_, i) => (i === 0 && d.rows.length === 1 ? players[0]?.memberId ?? null : null));
+    };
+
+    /** 읽은 답을 확인 화면에 올린다(한 장 올리기 · 여러 장 가운데 한 장 확인하기가 같이 쓴다) */
+    const show = (res: any, image: string, f: File | null) => {
+        const d = res?.draft as ScanDraft | undefined;
+        if (!d?.rows?.length) throw new Error(SCAN_COPY.none);
+        const seats = seatsOf(d);
+        setShot(image);
+        setFile(f);
+        setShotBig(false);
+        if (round) {
+            const c = res.card as Card;
+            setCard(c);
+            setCardPars({ pars: res.pars, known: res.parKnown });
+            setToken(res.token ?? null);
+            setClubAsk(!c.club);
+            setClubQuery(c.clubRead ?? "");
+            setClubHits(null);
+        }
+        setDraft(d);
+        setRows(d.rows.map((r, i) => ({ label: r.label, seat: seats[i], cells: r.cells, out: r.out, in: r.in })));
+        // 못 이은 줄이 있으면 그것부터 묻는다
+        const first = seats.findIndex((s) => !s);
+        setSel(!round && first >= 0 ? { kind: "seat", r: first } : null);
+        setError(null);
+        setStep("confirm");
+    };
+
+    /** 여러 장 — 한 장씩 차례로 읽고, 물을 것이 없는 장은 바로 기록한다 */
+    const runBatch = async (files: File[]) => {
+        const items: BatchItem[] = files.map((f) => ({ file: f, status: "wait" }));
+        setBatch(items);
+        setActive(null);
+        setStep("batch");
+        for (let i = 0; i < files.length; i++) {
+            patchItem(i, { status: "reading" });
+            try {
+                const image = await shrink(files[i]);
+                const res = await apiRequest("/api/hiq/golf/scan/card", { method: "POST", body: { image }, timeoutMs: 20_000 });
+                const d = res?.draft as ScanDraft | undefined;
+                const c = res?.card as Card | undefined;
+                if (!d?.rows?.length || !c) throw new Error(SCAN_COPY.none);
+                const seats = seatsOf(d);
+                const mineAt = seats.findIndex((s) => !!s);
+                const row = mineAt >= 0 ? d.rows[mineAt] : null;
+                const clean = !!row && row.cells.every((x) => x.strokes > 0 && x.state === "ok");
+                if (c.club && row && clean && res.token) {
+                    const out = await apiRequest("/api/hiq/golf/scan/record", { method: "POST", body: { token: res.token, row: mineAt, clubId: c.club.id, strokes: row.cells.map((x) => x.strokes) }, timeoutMs: 25_000 });
+                    void uploadRoundPhoto({ sessionId: String(out.id), file: files[i], holeNo: null }).catch(() => { /* 그림을 못 남겨도 기록은 남았다 */ });
+                    patchItem(i, { status: "saved", sessionId: String(out.id), note: `${c.club.name} · ${dayLabel(c.day) ?? "오늘"} · ${row.cells.reduce((a, x) => a + x.strokes, 0)}타` });
+                } else {
+                    patchItem(i, { status: "ask", image, res, note: !c.club ? "골프장을 골라 주세요" : !row ? "내 줄을 골라 주세요" : "확인할 칸이 있어요" });
+                }
+            } catch (e: any) {
+                patchItem(i, { status: "fail", note: e?.message === "image" || e?.message === "canvas" ? "그림을 열지 못했어요" : (e?.message || SCAN_COPY.failed) });
+            }
+        }
+    };
+    const openItem = (i: number) => {
+        const it = batch?.[i];
+        if (!it || it.status !== "ask" || !it.image || !it.res) return;
+        setActive(i);
+        try { show(it.res, it.image, it.file); } catch { patchItem(i, { status: "fail", note: SCAN_COPY.none }); setStep("batch"); }
+    };
+
     const onFile = async (file: File | undefined) => {
         if (!file) return;
         setError(null);
+        setBatch(null);
+        setActive(null);
         setStep("reading");
         try {
             const image = await shrink(file);
-            setShot(image);
             const res = await apiRequest(round ? "/api/hiq/golf/scan/card" : `/api/hiq/golf/match/${matchId}/scan`, { method: "POST", body: { image }, timeoutMs: 20_000 });
-            const d = res?.draft as ScanDraft | undefined;
-            if (!d?.rows?.length) throw new Error(SCAN_COPY.none);
-            const seats = guessSeats(d.rows.map((r) => r.label), players);
-            if (round) {
-                const c = res.card as Card;
-                setCard(c);
-                setCardPars({ pars: res.pars, known: res.parKnown });
-                setToken(res.token ?? null);
-                setClubAsk(!c.club);
-                setClubQuery(c.clubRead ?? "");
-                setClubHits(null);
-            }
-            setDraft(d);
-            setRows(d.rows.map((r, i) => ({ label: r.label, seat: seats[i], cells: r.cells, out: r.out, in: r.in })));
-            // 못 이은 줄이 있으면 그것부터 묻는다
-            const first = seats.findIndex((s) => !s);
-            setSel(!round && first >= 0 ? { kind: "seat", r: first } : null);
-            setStep("confirm");
+            show(res, image, file);
         } catch (e: any) {
             setError(e?.message === "image" || e?.message === "canvas" ? "그림을 열지 못했어요. 다른 그림으로 해 주세요." : (e?.message || SCAN_COPY.failed));
             setStep("pick");
@@ -182,7 +262,14 @@ export function ScanSheet({ matchId, players, pars: roomPars, parKnown: roomKnow
         setError(null);
         try {
             const out = await apiRequest("/api/hiq/golf/scan/record", { method: "POST", body: { token, row: mineIdx, clubId: card.club.id, strokes: mine.cells.map((c) => c.strokes) }, timeoutMs: 25_000 });
-            round.onDone(String(out.id), !!out.official);
+            // 올린 카드 그림을 이 라운드의 사진으로 남긴다(나만 보는 사진 — 오너 10/14: "카드 업로드된 것도 저장되면 좋겠네"). 못 남겨도 기록은 남았다
+            if (file) void uploadRoundPhoto({ sessionId: String(out.id), file, holeNo: null }).catch(() => { /* */ });
+            if (batch && active != null) {
+                // 여러 장 가운데 한 장 — 목록으로 돌아간다
+                patchItem(active, { status: "saved", sessionId: String(out.id), note: `${card.club.name} · ${dayLabel(card.day) ?? "오늘"} · ${mine.cells.reduce((a, c) => a + c.strokes, 0)}타`, image: undefined, res: undefined });
+                setActive(null);
+                setStep("batch");
+            } else round.onDone(String(out.id), !!out.official);
         } catch (e: any) {
             setError(e?.message || "기록하지 못했어요. 잠시 뒤에 다시 해 주세요.");
         } finally {
@@ -286,22 +373,67 @@ export function ScanSheet({ matchId, players, pars: roomPars, parKnown: roomKnow
 
             {step === "pick" && (
                 <div className="flex-1 overflow-y-auto px-4 py-5">
-                    <p className="text-[14px] leading-relaxed text-[#FFFFFFD9]">{round ? "앱에서 받은 스코어카드를 올리면 골프장 · 코스 · 날짜를 읽어 라운드로 남겨요." : SCAN_COPY.lead}</p>
+                    <p className="text-[14px] leading-relaxed text-[#FFFFFFD9]">{round ? SCAN_COPY.roundLead : SCAN_COPY.lead}</p>
+                    {round && <CardExample />}
                     <button type="button" onClick={() => fileRef.current?.click()} data-testid="scan-pick"
                         className="mt-4 flex w-full flex-col items-center justify-center gap-2.5 rounded-2xl border border-dashed border-[#FFFFFF33] bg-[#FFFFFF08] py-10 active:bg-[#FFFFFF12]">
                         <span className="flex h-12 w-12 items-center justify-center rounded-full bg-[#64DD1726]"><LucideImage className="h-6 w-6 text-[#9BEF5C]" /></span>
-                        <span className="text-[15px] font-semibold">{SCAN_COPY.pick}</span>
+                        <span className="text-[15px] font-semibold">{round ? SCAN_COPY.roundPick : SCAN_COPY.pick}</span>
                     </button>
                     {/* 카메라를 바로 열지 않는다(capture 없음) — 앱에서 저장해 둔 카드 그림을 고른다 */}
-                    <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { void onFile(e.target.files?.[0]); }} data-testid="scan-file" />
+                    <input ref={fileRef} type="file" accept="image/*" multiple={!!round} className="hidden" data-testid="scan-file"
+                        onChange={(e) => { const list = Array.from(e.target.files ?? []).slice(0, SCAN_BATCH_MAX); if (round && list.length > 1) { if (fileRef.current) fileRef.current.value = ""; void runBatch(list); } else void onFile(list[0]); }} />
                     {error && <p role="alert" className="mt-3 rounded-xl bg-[#FF6E6E1F] px-3.5 py-3 text-[13px] leading-relaxed text-[#FF9C9C]" data-testid="scan-error">{error}</p>}
-                    <ul className="mt-5 space-y-2 text-[13px] leading-relaxed text-[#FFFFFF99]">
-                        <li>· {SCAN_COPY.accept}</li>
-                        <li>· 카드 전체가 나온 그림이 가장 잘 읽혀요.</li>
-                        <li>· {SCAN_COPY.privacy}</li>
-                        <li>· {SCAN_COPY.abroad}</li>
-                    </ul>
+                    {round ? (
+                        <>
+                            <ul className="mt-5 space-y-2 text-[13.5px] leading-relaxed text-[#FFFFFFB3]">
+                                {SCAN_COPY.roundTips.map((t) => <li key={t}>· {t}</li>)}
+                            </ul>
+                            <p className="mt-4 text-[12px] text-[#FFFFFF66]">{SCAN_COPY.roundAbroad}</p>
+                        </>
+                    ) : (
+                        <ul className="mt-5 space-y-2 text-[13px] leading-relaxed text-[#FFFFFF99]">
+                            <li>· {SCAN_COPY.accept}</li>
+                            <li>· 카드 전체가 나온 그림이 가장 잘 읽혀요.</li>
+                            <li>· {SCAN_COPY.privacy}</li>
+                            <li>· {SCAN_COPY.abroad}</li>
+                        </ul>
+                    )}
                 </div>
+            )}
+
+            {/* 여러 장 — 장마다의 상태. 확인이 필요한 장만 눌러서 본다 */}
+            {step === "batch" && batch && (
+                <>
+                    <div className="flex-1 overflow-y-auto px-4 py-4" data-testid="scan-batch">
+                        <p className="mb-3 text-[13px] leading-relaxed text-[#FFFFFF99]">카드 {batch.length}장을 차례로 읽어요. 물을 것이 없는 카드는 바로 기록하고, 나머지는 눌러서 확인해 주세요.</p>
+                        <ul className="space-y-2">
+                            {batch.map((it, i) => (
+                                <li key={i} data-testid={`scan-batch-${i}`} data-status={it.status}>
+                                    <button type="button" disabled={it.status !== "ask"} onClick={() => openItem(i)}
+                                        className={cn("flex w-full items-center gap-3 rounded-2xl px-4 py-3.5 text-left ring-1 ring-inset", it.status === "ask" ? "bg-[#FFB02E14] ring-[#FFB02E66] active:bg-[#FFB02E26]" : it.status === "saved" ? "bg-[#0B2A12] ring-[#64DD1733]" : "bg-[#FFFFFF08] ring-[#FFFFFF14]")}>
+                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#FFFFFF14] text-[13px] tabular-nums text-[#FFFFFFCC]">{i + 1}</span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className={cn("block text-[14px] font-semibold", it.status === "saved" ? "text-[#B6F28A]" : it.status === "ask" ? "text-[#FFD08A]" : it.status === "fail" ? "text-[#FF9C9C]" : "text-[#FFFFFFD9]")}>
+                                                {it.status === "wait" ? "기다리는 중" : it.status === "reading" ? "읽는 중…" : it.status === "saved" ? "기록했어요" : it.status === "ask" ? "확인이 필요해요" : "읽지 못했어요"}
+                                            </span>
+                                            {it.note ? <span className="mt-0.5 block truncate text-[12.5px] text-[#FFFFFF99]">{it.note}</span> : null}
+                                        </span>
+                                        {it.status === "reading" && <LucideLoader2 className="h-5 w-5 shrink-0 animate-spin text-[#9BEF5C]" />}
+                                        {it.status === "saved" && <LucideCheck className="h-5 w-5 shrink-0 text-[#9BEF5C]" />}
+                                        {it.status === "ask" && <span className="shrink-0 text-[12.5px] text-[#FFD08A]">확인하기</span>}
+                                    </button>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                    <div className="shrink-0 border-t border-[#FFFFFF14] bg-[#050505] px-4 pb-[calc(env(safe-area-inset-bottom)+12px)] pt-3">
+                        <button type="button" disabled={batch.some((x) => x.status === "wait" || x.status === "reading")} onClick={() => round?.onBatchDone?.(batch.filter((x) => x.status === "saved").length)} data-testid="scan-batch-done"
+                            className={cn("flex h-[52px] w-full items-center justify-center rounded-2xl text-[15px] font-semibold", batch.some((x) => x.status === "wait" || x.status === "reading") ? "bg-[#FFFFFF14] text-[#FFFFFF80]" : "bg-[#64DD17] text-[#051907] active:bg-[#58C414]")}>
+                            {batch.some((x) => x.status === "wait" || x.status === "reading") ? "읽고 있어요…" : batch.some((x) => x.status === "ask") ? `마치기 · ${batch.filter((x) => x.status === "ask").length}장은 확인 안 함` : `마치기 · ${batch.filter((x) => x.status === "saved").length}장 기록`}
+                        </button>
+                    </div>
+                </>
             )}
 
             {step === "reading" && (
