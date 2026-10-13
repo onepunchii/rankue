@@ -47,6 +47,9 @@ export const HUB_STAMP_BOOKS: readonly string[] = ["seohae", "gyeonggi", "gangwo
 /** 등산의 권역 — 권역마다 카드가 있다(shared/hikingMountains 의 HIKING_REGIONS 와 같아야 한다. 시험이 맞춰 본다) */
 export const HUB_HIKING_REGIONS: readonly string[] = ["capital", "gangwon", "chungcheong", "jeonbuk", "jeonnam", "gyeongbuk", "gyeongnam", "jeju"];
 
+/** 등산의 묶음 — 묶음마다 카드가 있다(shared/hikingMountains 의 HIKING_GROUPS 와 같아야 한다. 시험이 맞춰 본다). 2026-10-13 */
+export const HUB_HIKING_LISTS: readonly string[] = ["kfs100", "kfs100plus", "nationalparks", "provincialparks", "highest50", "over1500", "over1000", "under500", "island", "azalea", "maple", "reeds", "snow"];
+
 interface HubRule { test: (path: string) => string | null; alt: string }
 const exact = (re: RegExp, name: string) => (path: string) => (re.test(path) ? name : null);
 const HUB_RULES: readonly HubRule[] = [
@@ -65,6 +68,8 @@ const HUB_RULES: readonly HubRule[] = [
     { test: exact(/^\/hiking\/checklist\/?$/, "hiking-checklist"), alt: "등산 준비물 — 랭큐 등산" },
     { test: exact(/^\/hiking\/(stamps|pack)(\/|$)/, "hiking-stamps"), alt: "등산 도장첩 · 산행 등급 — 랭큐 등산" },
     { test: (path) => { const m = /^\/hiking\/regions\/([a-z]+)\/?$/.exec(path); return m && HUB_HIKING_REGIONS.includes(m[1]) ? `hiking-${m[1]}` : null; }, alt: "권역의 산 — 랭큐 등산" },
+    // 묶음(100대 명산 · 국립공원 · 단풍 · 억새 · 섬 …) — 묶음마다 그 표지와 큰 이름
+    { test: (path) => { const m = /^\/hiking\/lists\/([a-z0-9]+)\/?$/.exec(path); return m && HUB_HIKING_LISTS.includes(m[1]) ? `hiking-list-${m[1]}` : null; }, alt: "묶어서 찾는 산 — 랭큐 등산" },
     { test: exact(/^\/hiking(\/|$)/, "hiking"), alt: "전국 명산 — 랭큐 등산" },
 ];
 
@@ -87,4 +92,4 @@ export function hubCard(origin: string, pathname: string): { url: string; width:
 
 /** 쓰는 카드 전부 — 파일이 다 있는지 · 남는 파일이 없는지 시험이 본다 */
 export const HUB_CARD_NAMES: readonly string[] = ["world-ranking", "pba", "stores", "terms", "golf-terms", "golf-courses", "golf-stamps", ...HUB_STAMP_BOOKS.map((b) => `golf-stamps-${b}`),
-    "hiking", "hiking-stamps", "hiking-terms", "hiking-checklist", ...HUB_HIKING_REGIONS.map((r) => `hiking-${r}`)];
+    "hiking", "hiking-stamps", "hiking-terms", "hiking-checklist", ...HUB_HIKING_REGIONS.map((r) => `hiking-${r}`), ...HUB_HIKING_LISTS.map((l) => `hiking-list-${l}`)];

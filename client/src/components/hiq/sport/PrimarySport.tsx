@@ -21,12 +21,15 @@ import { useT } from "@/lib/i18n";
 import { useSport } from "@/contexts/SportContext";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
-import type { PrimarySport } from "@shared/primarySport";
+import type { PrimarySport, StartSport } from "@shared/primarySport";
 
 export const SPORT_ACCENT: Record<PrimarySport, { color: string; tint: string; fg: string }> = {
     BILLIARDS: { color: "#12805C", tint: "#12805C12", fg: "#ffffff" },
     GOLF: { color: "#4FB512", tint: "#5CC41718", fg: "#ffffff" },
 };
+/** 등산 — 처음 묻는 창의 셋째 칸(2026-10-13 등산을 열면서). 흰 카드 위라 살구색을 한 단계 짙게 */
+const HIKING_ACCENT = { color: "#D9623C", tint: "#F28C6A1F", fg: "#ffffff" } as const;
+const accentOf = (s: StartSport) => (s === "HIKING" ? HIKING_ACCENT : SPORT_ACCENT[s]);
 
 /** 당구 — 캐롬 공 세 개(흰·노랑·빨강) */
 function BilliardsArt({ size = 44 }: { size?: number }) {
@@ -55,13 +58,27 @@ function GolfArt({ size = 44 }: { size?: number }) {
     );
 }
 
-const ART: Record<PrimarySport, (p: { size?: number }) => JSX.Element> = { BILLIARDS: BilliardsArt, GOLF: GolfArt };
+/** 등산 — 두 봉우리와 정상의 깃발 */
+function HikingArt({ size = 44 }: { size?: number }) {
+    return (
+        <svg viewBox="0 0 48 48" width={size} height={size} aria-hidden>
+            <path d="M4 39 L18 15 L26 28 L31 21 L44 39 Z" fill="#1F5560" />
+            <path d="M18 15 L22.5 22.5 L19.5 25 L17 22 L14 25.5 L12.5 24.5 Z" fill="#F4EFE3" />
+            <path d="M31 21 L35 27 L32.5 28.5 L30 26 L28.5 27.5 Z" fill="#F4EFE3" opacity="0.9" />
+            <rect x="17.4" y="6" width="1.6" height="10" rx="0.8" fill="#3A3A3A" />
+            <path d="M19 6.5 L27 9.5 L19 12.5 Z" fill="#F28C6A" />
+            <circle cx="38" cy="12" r="4" fill="#F6D9A8" />
+        </svg>
+    );
+}
+
+const ART: Record<StartSport, (p: { size?: number }) => JSX.Element> = { BILLIARDS: BilliardsArt, GOLF: GolfArt, HIKING: HikingArt };
 
 /** 주 종목 저장 — 서버(회원 정보)·지금 화면 종목·캐시를 한 번에 */
 export function useSavePrimarySport() {
     const qc = useQueryClient();
     const { setSport } = useSport();
-    return async (sport: PrimarySport) => {
+    return async (sport: StartSport) => {
         await apiRequest("/api/hiq/me/primary-sport", { method: "POST", body: { sport } });
         setSport(sport);
         try { sessionStorage.setItem("rankue_primary_sport_applied", "1"); } catch { /* 저장소를 못 쓰는 환경 */ }
@@ -69,23 +86,24 @@ export function useSavePrimarySport() {
     };
 }
 
-/** 팝업 안의 두 칸 타일 — 늘 밝은 카드 위(리터럴 색) */
-function SportTiles({ value, onChange }: { value: PrimarySport; onChange: (s: PrimarySport) => void }) {
+/** 팝업 안의 타일 — 늘 밝은 카드 위(리터럴 색). 등산을 쓸 수 있는 회원에게는 셋째 칸(등산)까지 */
+function SportTiles({ value, onChange, hiking }: { value: StartSport; onChange: (s: StartSport) => void; hiking?: boolean }) {
     const { t } = useT();
-    const items: { id: PrimarySport; title: string; sub: string }[] = [
+    const items: { id: StartSport; title: string; sub: string }[] = [
         { id: "BILLIARDS", title: t("primarySport.billiards"), sub: t("primarySport.billiardsSub") },
         { id: "GOLF", title: t("primarySport.golf"), sub: t("primarySport.golfSub") },
+        ...(hiking ? [{ id: "HIKING" as const, title: t("primarySport.hiking"), sub: t("primarySport.hikingSub") }] : []),
     ];
     return (
-        <div role="radiogroup" aria-label={t("primarySport.title")} className="grid grid-cols-2 gap-2.5">
+        <div role="radiogroup" aria-label={t("primarySport.title")} className={cn("grid", hiking ? "grid-cols-3 gap-2" : "grid-cols-2 gap-2.5")} data-testid="primary-sport-tiles" data-count={items.length}>
             {items.map(({ id, title, sub }) => {
                 const on = value === id;
-                const a = SPORT_ACCENT[id];
+                const a = accentOf(id);
                 const Art = ART[id];
                 return (
                     <button
-                        key={id} type="button" role="radio" aria-checked={on} onClick={() => onChange(id)}
-                        className="relative flex flex-col items-center text-center rounded-[20px] px-3 pt-5 pb-4 transition-all active:scale-[0.98]"
+                        key={id} type="button" role="radio" aria-checked={on} onClick={() => onChange(id)} data-testid={`primary-sport-tile-${id.toLowerCase()}`}
+                        className={cn("relative flex flex-col items-center text-center rounded-[20px] pt-5 pb-4 transition-all active:scale-[0.98]", hiking ? "px-1.5" : "px-3")}
                         style={{
                             border: `2px solid ${on ? a.color : "#EDEDEA"}`,
                             backgroundColor: on ? a.tint : "#FAFAF8",
@@ -145,9 +163,14 @@ export function PrimarySportGate() {
     const [location] = useLocation();
     const { toast } = useToast();
     const save = useSavePrimarySport();
-    const m = member as (typeof member & { primarySport?: string | null; suggestedSport?: string | null; golfAccess?: boolean }) | undefined;
-    const suggested: PrimarySport = m?.suggestedSport === "GOLF" ? "GOLF" : "BILLIARDS";
-    const [choice, setChoice] = useState<PrimarySport | null>(null);
+    const m = member as (typeof member & { primarySport?: string | null; suggestedSport?: string | null; golfAccess?: boolean; hikingAccess?: boolean }) | undefined;
+    // 등산을 쓸 수 있는 회원에게는 셋째 칸(등산)을 같이 묻는다(2026-10-13 오너: "등산으로 와서 가입했을 때 로직의 문제는 없지?" —
+    // 창에 당구 · 골프뿐이라 등산 화면에서 가입한 사람이 둘 중 하나를 골라야 했고, 다음에 열면 당구 홈으로 시작했다).
+    const hiking = m?.hikingAccess === true;
+    // 미리 골라 두는 칸 — **등산 화면에서 묻게 됐으면 등산**(거기서 가입한 사람이다). 아니면 서버가 기록으로 추정한 값
+    const { sport: here } = useSport();
+    const suggested: StartSport = hiking && (here === "HIKING" || /^\/hiking(\/|$|\?)/.test(location)) ? "HIKING" : m?.suggestedSport === "GOLF" ? "GOLF" : "BILLIARDS";
+    const [choice, setChoice] = useState<StartSport | null>(null);
     const [busy, setBusy] = useState(false);
     // "전에 전화번호로 쓰셨나요?"(AttachPhoneSheet)가 먼저다 — 이으면 계정이 바뀌어, 빈 새 계정에 주 종목을 물을 이유가 없다
     const attachPending = useAttachPhonePending();
@@ -156,7 +179,7 @@ export function PrimarySportGate() {
         && !HIDDEN_PATHS.test(location) && location !== "/" && location !== "/hiq";
     if (!need) return null;
     const picked = choice ?? suggested;
-    const a = SPORT_ACCENT[picked];
+    const a = accentOf(picked);
 
     const start = async () => {
         if (busy) return;
@@ -181,16 +204,16 @@ export function PrimarySportGate() {
                 <h1 id="primary-sport-title" className="mt-2 text-center text-[21px] leading-snug font-bold text-[#141414] break-keep">{t("primarySport.title")}</h1>
                 <p className="mt-1.5 text-center text-[13px] leading-relaxed text-[#7A7A76] break-keep">{t("primarySport.desc")}</p>
                 <div className="mt-5">
-                    <SportTiles value={picked} onChange={setChoice} />
+                    <SportTiles value={picked} onChange={setChoice} hiking={hiking} />
                 </div>
                 <button
                     type="button" onClick={() => void start()} disabled={busy}
                     className="mt-5 w-full h-[52px] rounded-2xl text-[15.5px] font-bold transition-opacity disabled:opacity-60 active:scale-[0.99]"
                     style={{ backgroundColor: a.color, color: a.fg }}
                 >
-                    {t(picked === "GOLF" ? "primarySport.startGolf" : "primarySport.startBilliards")}
+                    {t(picked === "HIKING" ? "primarySport.startHiking" : picked === "GOLF" ? "primarySport.startGolf" : "primarySport.startBilliards")}
                 </button>
-                <p className="mt-3 text-center text-[11.5px] text-[#A0A09C] break-keep">{t("primarySport.note")}</p>
+                <p className="mt-3 text-center text-[11.5px] text-[#A0A09C] break-keep">{t(hiking ? "primarySport.noteThree" : "primarySport.note")}</p>
             </motion.div>
         </div>
     );

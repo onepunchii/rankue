@@ -8,9 +8,10 @@ import {
 import { courseStats, distM, durationText, eleAtKm, nearestOnLine, packLine, thinLine, walkMinutes, withKm } from "./hikingGeo";
 import { HIKING_GUIDE_BLOCK, cleanHikingText, cleanMountainGuide, hasMountainGuide } from "./hikingGuide";
 import { gridNumber, hikingPoiKind, hikingPoiTitle } from "./hikingPois";
-import { courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListSeo, hikingMountainCardInput, hikingRegionSeo, kmRange, mountainSeo } from "./hikingPage";
+import { courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListSeo, hikingMountainCardInput, hikingRegionSeo, kmRange, mountainSeo, HIKING_CTA } from "./hikingPage";
+import { HIKING_PUBLIC } from "./hikingAccess";
 import { isPrimarySport, isStartSport } from "./primarySport";
-import { HUB_CARD_NAMES, HUB_CARD_VERSION, HUB_HIKING_REGIONS, hubCard, hubCardName } from "./ogCards";
+import { HUB_CARD_NAMES, HUB_CARD_VERSION, HUB_HIKING_REGIONS, hubCard, hubCardName, HUB_HIKING_LISTS } from "./ogCards";
 
 /**
  * 등산의 뿌리 규칙(2026-10-13 오너: "산은 지역으로도 특성으로도 묶고 … 산 정보 페이지를 골프처럼 사이트맵 + 가입 유도").
@@ -274,8 +275,11 @@ describe("화면의 글 · 따로 선 세계", () => {
     it("검색 · 공유에 뜨는 그림 — 등산 화면은 등산의 카드를 단다(당구의 공용 그림이 아니다)", () => {
         const O = "https://www.rankue.co.kr";
         expect([...HUB_HIKING_REGIONS]).toEqual(HIKING_REGIONS.map((r) => r.id));
+        expect([...HUB_HIKING_LISTS].sort()).toEqual(HIKING_GROUPS.map((g) => g.id).sort());
         const cases: [string, string][] = [
-            ["/hiking", "hiking"], ["/hiking/lists/kfs100", "hiking"], ["/hiking/mountains/설악산", "hiking"], ["/hiking/regions/gangwon", "hiking-gangwon"], ["/hiking/regions/nowhere", "hiking"],
+            ["/hiking", "hiking"], ["/hiking/mountains/설악산", "hiking"], ["/hiking/regions/gangwon", "hiking-gangwon"], ["/hiking/regions/nowhere", "hiking"],
+            // 묶음마다 제 카드(2026-10-13 — 100대 명산 · 단풍 · 억새 …가 미리보기에서 서로 갈린다). 모르는 묶음은 허브 카드
+            ["/hiking/lists/kfs100", "hiking-list-kfs100"], ["/hiking/lists/maple", "hiking-list-maple"], ["/hiking/lists/over1500", "hiking-list-over1500"], ["/hiking/lists/nowhere", "hiking"],
             ["/hiking/stamps", "hiking-stamps"], ["/hiking/pack", "hiking-stamps"], ["/hiking/terms", "hiking-terms"], ["/hiking/terms/alba", "hiking-terms"], ["/hiking/checklist", "hiking-checklist"],
         ];
         for (const [path, name] of cases) expect(hubCardName(path), path).toBe(name);
@@ -284,6 +288,28 @@ describe("화면의 글 · 따로 선 세계", () => {
         expect(hubCardName("/golf/terms")).toBe("golf-terms");
         expect(hubCardName("/hikingx")).toBeNull();
         for (const n of HUB_CARD_NAMES.filter((x) => x.startsWith("hiking"))) expect(existsSync(resolve(root, `client/public/og-hub/${n}.jpg`)), n).toBe(true);
+    });
+
+    it("등산은 열려 있다 — 가입 안내는 '기다리기'가 아니라 바로 시작(2026-10-13 오너: \"응 등산 열고 추천한 대로 진행\")", () => {
+        expect(HIKING_PUBLIC).toBe(true);
+        expect(HIKING_CTA.button).toBe("가입하고 산 도장 모으기");
+        expect(`${HIKING_CTA.title} ${HIKING_CTA.body} ${HIKING_CTA.button}`).not.toMatch(/곧 열려요|기다리|준비 중/);
+        // 돈 · 경품 · 빠르기를 말하지 않는다
+        expect(`${HIKING_CTA.title} ${HIKING_CTA.body}`).not.toMatch(/원\b|상금|경품|빨리|최단 시간/);
+        // 검색용 화면의 단추도 같은 글
+        expect(read("server/seo/hiking.ts")).toContain('<p><a href="/?login=1">${esc(HIKING_CTA.button)}</a></p>');
+    });
+
+    it("가입 직후 한 번 묻는 창에 등산 칸이 있다 — 등산 화면에서 가입했으면 등산이 미리 골라진다", () => {
+        // 오너: "등산으로 와서 가입했을 때 로직의 문제는 없지?" — 창에 당구 · 골프뿐이라 등산객이 둘 중 하나를 골라야 했고 다음에 열면 당구 홈이었다
+        const gate = read("client/src/components/hiq/sport/PrimarySport.tsx");
+        expect(gate).toContain("const hiking = m?.hikingAccess === true;");
+        expect(gate).toContain('...(hiking ? [{ id: "HIKING" as const, title: t("primarySport.hiking"), sub: t("primarySport.hikingSub") }] : []),');
+        expect(gate).toContain('const suggested: StartSport = hiking && (here === "HIKING" || /^\\/hiking(\\/|$|\\?)/.test(location)) ? "HIKING" : m?.suggestedSport === "GOLF" ? "GOLF" : "BILLIARDS";');
+        expect(gate).toContain('{t(picked === "HIKING" ? "primarySport.startHiking" : picked === "GOLF" ? "primarySport.startGolf" : "primarySport.startBilliards")}');
+        // 고른 값은 서버가 확인하고 받는다(등산을 쓸 수 있는 회원만) · 다섯 언어에 글이 다 있다
+        expect(read("server/routes/modules/member.ts")).toContain('const { isStartSport } = await import("../../../shared/primarySport.js");');
+        for (const l of ["ko", "en", "tr", "vi", "es"]) { const dict = read(`client/src/lib/i18n/${l}.ts`); for (const k of ["primarySport.hikingSub", "primarySport.startHiking", "primarySport.noteThree"]) expect(dict, `${l}:${k}`).toContain(`"${k}":`); }
     });
 
     it("등산의 알림함 — 산악회의 알림만 모이고, 당구 알림함에는 섞이지 않는다", () => {

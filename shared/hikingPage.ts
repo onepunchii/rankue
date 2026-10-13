@@ -124,12 +124,16 @@ export function courseShape(c: { loop: boolean; summitKm: number | null; km: num
     return c.summitKm != null ? "정상을 지나는 길" : "능선 · 둘레 길";
 }
 
-/** 가입 안내 — 산 화면 · 허브의 아래. 등산 기능은 아직 열리지 않았다(준비 중이라고 말한다) */
+/**
+ * 가입 안내 — 산 화면 · 허브의 아래. 2026-10-13 등산을 열면서 '곧 열려요 · 가입하고 기다리기'를 걷었다 — 가입하면 바로 쓴다.
+ * 받는 것(도장 · 와펜 · 산행 등급)을 앞세운다. 돈 · 경품 · 빠르기를 말하지 않는다.
+ */
 export const HIKING_CTA = {
     title: "오른 산을 도장으로 모아 보세요",
-    body: "정상에서 인증하면 그 산의 도장이 찍히고, 권역을 다 채우면 와펜을 받아요. 랭큐 등산이 곧 열려요 — 가입해 두면 열릴 때 알려 드려요.",
-    button: "랭큐 가입하고 기다리기",
-    member: "랭큐 등산이 곧 열려요. 열리면 알림으로 알려 드릴게요.",
+    body: "정상에서 인증하면 그 산의 도장이 찍히고, 권역을 다 채우면 와펜을 받아요. 코스 지도와 내 위치, 산행 기록, 산악회까지 — 가입하면 바로 시작할 수 있어요.",
+    button: "가입하고 산 도장 모으기",
+    /** 회원인데 등산 화면이 열리지 않는 사람(한국어가 아닌 화면) — 등산은 한국어 화면에서 쓴다 */
+    member: "등산 홈에서 도장첩과 코스 지도를 열어 보세요. 등산은 한국어 화면에서 쓸 수 있어요.",
 } as const;
 
 export { HIKING_HUB_PATH, HIKING_LISTS, hikingList, hikingListPath, hikingMountainPath, hikingRegion, hikingRegionPath };
