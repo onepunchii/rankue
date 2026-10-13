@@ -28,6 +28,7 @@ import {
 import { FISH, FISH_BOOKS, FISH_UNIT_LABEL, fishByName, fishRecords, fishTier, fishValue, fishValueText, nearestPromotion, type FishKind, type FishRecord } from "@shared/fishingFish";
 import { TRIP_AWARD_NAME, TRIP_POINTS, cleanTrip, type SeasonRow, type TripAward, type TripBoard } from "@shared/fishingTrip";
 import { TIDE_PHASE_TEXT, TIDE_SEAS, nextTideMark, tideDays, tideWeekday, type TideSea } from "@shared/fishingTide";
+import { SEA_AREAS, SEA_CAUTION, SEA_COLS, SEA_SOURCE, seaHeadline, seaNotes, seaWord, type SeaNow, type SeaState } from "@shared/fishingSea";
 
 const KEY = ["/api/hiq/fishing/catches"];
 type Tab = "home" | "book" | "log" | "points" | "crew";
@@ -166,7 +167,7 @@ export default function FishingPage() {
                 {tab === "home" && (
                     <>
                         {/* 날마다 먼저 보는 것 — 기록이 있는 사람에게는 맨 위에 */}
-                        {!empty && <TideCard today={today} />}
+                        {!empty && <Today today={today} />}
                         {/* 새벽 바다 — 먹으로 그린 수평선 위에 내 기록어 */}
                         <section className="relative isolate overflow-hidden px-4 pb-5 pt-5" data-testid="fishing-hero">
                             <img src="/fishing/art/sea.webp" alt="" width={900} height={520} decoding="async" className="absolute inset-0 -z-10 h-full w-full object-cover" />
@@ -188,7 +189,7 @@ export default function FishingPage() {
                             )}
                         </section>
 
-                        {empty && <TideCard today={today} />}
+                        {empty && <Today today={today} />}
 
                         {/* 어탁 벽 — 어종마다 한 장 */}
                         <section className="px-4 pt-6">
@@ -300,21 +301,97 @@ export default function FishingPage() {
     );
 }
 
-const SEA_KEY = "rankue-fishing-sea";
+const SEA_KEY = "rankue-fishing-sea", AREA_KEY = "rankue-fishing-area";
 function readSea(): TideSea { try { return localStorage.getItem(SEA_KEY) === "south" ? "south" : "west"; } catch { return "west"; } }
+function readArea(): string | null { try { const v = localStorage.getItem(AREA_KEY); return SEA_AREAS.some((a) => a.id === v) ? v : null; } catch { return null; } }
+const keep = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* 저장을 못 해도 화면은 바뀐다 */ } };
+
+/** 날마다 먼저 보는 묶음 — 오늘의 바다(특보) + 물때. 바다를 고르면 물때도 그 바다의 식으로 센다 */
+function Today({ today }: { today: string }) {
+    const [sea, setSea] = useState<TideSea>(readSea);
+    const [area, setArea] = useState<string | null>(readArea);
+    const pickSea = (id: TideSea) => { setSea(id); keep(SEA_KEY, id); };
+    const pickArea = (id: string) => { setArea(id); keep(AREA_KEY, id); const t = SEA_AREAS.find((a) => a.id === id)?.tide; if (t) pickSea(t); };
+    return (
+        <>
+            <SeaBoard area={area} onArea={pickArea} />
+            <TideCard today={today} sea={sea} onSea={pickSea} />
+        </>
+    );
+}
+
+// 색은 뜻 하나씩: 특보 없음(물빛) · 먼바다만/예비(노랑) · 주의보(주황) · 경보(붉은색)
+const SEA_TONE: Readonly<Record<SeaState, { bg: string; dot: string; text: string }>> = {
+    clear: { bg: "#38BDF81F", dot: "#38BDF8", text: "#E6F6FF" },
+    pre: { bg: "#FFC8571F", dot: "#FFC857", text: "#FFE2A3" },
+    far: { bg: "#FFC8571F", dot: "#FFC857", text: "#FFE2A3" },
+    warn: { bg: "#FF8A3D2E", dot: "#FF8A3D", text: "#FFC49B" },
+    alert: { bg: "#FF5A5A33", dot: "#FF5A5A", text: "#FFB0B0" },
+};
+
+/**
+ * 오늘의 바다 — 해역 일곱 곳을 서해 · 남해 · 동해 세 줄로(왼쪽이 서쪽). 점수 대신 특보가 있는가 없는가를 말로 적는다.
+ * 받아 온 것이 없으면 아무것도 그리지 않는다(없는데 '특보 없음'으로 보이면 안 된다).
+ */
+function SeaBoard({ area, onArea }: { area: string | null; onArea: (id: string) => void }) {
+    const { data } = useQuery<SeaNow | null>({ queryKey: ["/api/hiq/fishing/sea"], staleTime: 5 * 60_000 });
+    if (!data?.areas?.length) return null;
+    const by = new Map(data.areas.map((a) => [a.id, a]));
+    const warned = data.areas.filter((a) => a.state === "warn" || a.state === "alert").length;
+    const pickedDef = SEA_AREAS.find((a) => a.id === area) ?? null;
+    const picked = pickedDef ? by.get(pickedDef.id) ?? null : null;
+    return (
+        <section className="px-4 pt-4" data-testid="fishing-sea">
+            <div className="rounded-2xl px-4 pb-3.5 pt-4" style={{ background: C.card }}>
+                <div className="flex items-baseline justify-between gap-2">
+                    <h2 className="text-[13px]" style={{ color: C.soft }}>오늘의 바다</h2>
+                    <p className="text-[12.5px]" style={{ color: C.dim }} data-testid="fishing-sea-sum">{warned ? `앞바다 풍랑특보 ${warned}곳` : "앞바다 풍랑특보 없음"}</p>
+                </div>
+                <div className="mt-3 grid grid-cols-3 gap-1.5">
+                    {SEA_COLS.map((col) => (
+                        <div key={col.id} className="flex flex-col gap-1.5">
+                            <p className="text-center text-[12px]" style={{ color: C.dim }}>{col.name}</p>
+                            {SEA_AREAS.filter((a) => a.col === col.id).map((def) => {
+                                const a = by.get(def.id);
+                                if (!a) return null;
+                                const tone = SEA_TONE[a.state], on = def.id === area;
+                                return (
+                                    <button key={def.id} type="button" aria-pressed={on} onClick={() => onArea(def.id)} data-testid={`fishing-sea-${def.id}`} data-state={a.state}
+                                        className="flex min-h-[54px] flex-col items-center justify-center rounded-xl px-1 py-1.5 active:opacity-90"
+                                        style={{ background: tone.bg, boxShadow: on ? `inset 0 0 0 1.5px ${tone.dot}` : undefined }}>
+                                        <span className="flex items-center gap-1 text-[13.5px] font-semibold" style={{ color: C.foam }}><span aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: tone.dot }} />{def.short}</span>
+                                        <span className="mt-0.5 text-[12px]" style={{ color: tone.text }}>{seaWord(a)}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ))}
+                </div>
+                {picked && pickedDef ? (
+                    <div className="mt-3 rounded-xl px-3.5 py-3" style={{ background: "#FFFFFF0A" }} data-testid="fishing-sea-picked">
+                        <p className="text-[12.5px]" style={{ color: C.dim }}>{pickedDef.name} · {pickedDef.hint}</p>
+                        <p className="mt-1 text-[15px] font-semibold" style={{ color: SEA_TONE[picked.state].text }}>{seaHeadline(picked)}</p>
+                        {seaNotes(picked).map((n) => <p key={n} className="mt-0.5 text-[12.5px] leading-relaxed [word-break:keep-all]" style={{ color: C.soft }}>{n}</p>)}
+                    </div>
+                ) : (
+                    <p className="mt-3 text-[12.5px]" style={{ color: C.soft }}>자주 가는 바다를 누르면 그 바다부터 보여요.</p>
+                )}
+                <p className="mt-2.5 text-[12px] leading-relaxed" style={{ color: C.dim }}>{SEA_SOURCE}{data.issued ? ` · ${data.issued} 발표` : ""}{data.stale ? " · 받아 온 지 오래됐어요" : ""}. {SEA_CAUTION}</p>
+            </div>
+        </section>
+    );
+}
 
 /**
  * 오늘의 물때 — 몇 물인지 크게, 앞으로 이레를 띠로. 음력으로 세는 값이라 바깥 자료 없이 늘 나온다.
  * 말하는 것은 물의 세기뿐이다(잘 낚인다는 말은 하지 않는다). 달력을 못 쓰는 기기에서는 아무것도 그리지 않는다.
  */
-function TideCard({ today }: { today: string }) {
-    const [sea, setSea] = useState<TideSea>(readSea);
+function TideCard({ today, sea, onSea }: { today: string; sea: TideSea; onSea: (id: TideSea) => void }) {
     const days = useMemo(() => tideDays(today, sea, 7), [today, sea]);
     const now = days[0];
     if (!now || days.length < 7) return null;
     const spring = nextTideMark(today, "사리"), neap = nextTideMark(today, "조금");
     const until = (m: { inDays: number } | null, name: string) => (!m ? null : m.inDays === 0 ? `오늘이 ${name}` : `${name}까지 ${m.inDays}일`);
-    const pick = (id: TideSea) => { setSea(id); try { localStorage.setItem(SEA_KEY, id); } catch { /* 저장을 못 해도 화면은 바뀐다 */ } };
     return (
         <section className="px-4 pt-4" data-testid="fishing-tide">
             <div className="rounded-2xl px-4 pb-3.5 pt-4" style={{ background: C.card }}>
@@ -322,7 +399,7 @@ function TideCard({ today }: { today: string }) {
                     <h2 className="text-[13px]" style={{ color: C.soft }}>오늘의 물때 · 음력 {now.lunar.leap ? "윤" : ""}{now.lunar.month}월 {now.lunar.day}일</h2>
                     <div className="flex shrink-0 rounded-full p-0.5" style={{ background: "#FFFFFF0F" }} role="group" aria-label="바다">
                         {TIDE_SEAS.map((s) => (
-                            <button key={s.id} type="button" aria-pressed={sea === s.id} onClick={() => pick(s.id)} className={cn("h-8 rounded-full px-2.5 text-[12px]", sea === s.id && "font-semibold")}
+                            <button key={s.id} type="button" aria-pressed={sea === s.id} onClick={() => onSea(s.id)} className={cn("h-8 rounded-full px-2.5 text-[12px]", sea === s.id && "font-semibold")}
                                 style={sea === s.id ? { background: C.brand, color: C.onBrand } : { color: C.soft }} data-testid={`fishing-sea-${s.id}`}>{s.id === "west" ? "서해" : "남해 · 동해"}</button>
                         ))}
                     </div>

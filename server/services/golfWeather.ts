@@ -34,7 +34,7 @@ const rowsOf = (r: any) => (r.rows ?? r) as any[];
 export const weatherEnabled = () => !!process.env.DATA_GO_KR_KEY;
 
 /** 공공데이터포털 호출 — 키는 인코딩 안 된 꼴(Decoding)·된 꼴 어느 쪽으로 저장돼 있어도 받는다. 실패는 code 로 돌려준다(던지지 않는다). */
-async function kma(url: string, params: Record<string, string | number>, timeoutMs: number): Promise<{ code: string; items: any[] }> {
+export async function kma(url: string, params: Record<string, string | number>, timeoutMs: number): Promise<{ code: string; items: any[] }> {
     const key = process.env.DATA_GO_KR_KEY;
     if (!key) return { code: "NOKEY", items: [] };
     const u = new URL(url);

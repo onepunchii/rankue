@@ -15,7 +15,7 @@ describe("낚시는 아직 닫혀 있다", () => {
         expect(lib).not.toMatch(/010|@/);
         // 길마다 문지기를 거친다
         const routes = readFileSync(resolve(__dirname, "../server/routes/modules/fishing.ts"), "utf8");
-        expect(routes.match(/requireAuth, gate,/g)).toHaveLength(8);
+        expect(routes.match(/requireAuth, gate,/g)).toHaveLength(9);
         // 정출판은 그 크루에 든 사람만 — 목록 · 만들기 · 한 판 · 조과 붙이기 넷 다 크루를 확인한다
         expect(routes.match(/await inCrew\(req\.userId!/g)).toHaveLength(4);
         // 조과에 붙는 사진은 이 회원이 우리 저장소에 올린 것만
