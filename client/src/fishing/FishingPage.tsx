@@ -33,6 +33,7 @@ import { TIDE_PHASE_TEXT, TIDE_SEAS, nextTideMark, tideDays, tideOf, tideTally, 
 import { SEA_AREAS, SEA_CAUTION, SEA_SOURCE, seaHeadline, seaNotes, seaWord, type SeaNow, type SeaState } from "@shared/fishingSea";
 import { SEA_LEGEND, SeaChart, seaWashColor, seaWashLine } from "./SeaChart";
 import { TideCurve } from "./TideCurve";
+import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
 import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@shared/fishingStations";
 import { durationKo, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type PortBrief } from "@shared/fishingPort";
 
@@ -251,6 +252,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                     <>
                         <FsCover src={FS_COVER_TRIP} line="나가기 전에 보는 것 — 바다의 특보와 물때" />
                         <Today today={today} list={list} />
+                        <MarketBoard />
                         <FsSection title="낚시터" aside="등록된 1,151곳">
                             <button type="button" onClick={() => setTab("points")} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-points">
                                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: "#FFFFFF14" }}><LucideMap className="h-5 w-5" style={{ color: C.sun }} /></span>
@@ -333,6 +335,44 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                 </div>
             )}
         </div>
+    );
+}
+
+/**
+ * 위판장 소식 — 지난 이레 동안 전국 위판장에 어떤 어종이 얼마나 자주 올랐는가(해양수산부). 종이 한 장의 장부로 그린다:
+ * 어탁 한 점 · 이름 · 날마다의 막대 일곱 개 · 한 주의 건수. 조황 글과 달리 꾸밀 수 없는 숫자지만 **어선의 위판**이지 낚시 조과가 아니다 — 그렇게 적는다.
+ * 받은 것이 없으면 아무것도 그리지 않는다.
+ */
+function MarketBoard() {
+    const { data } = useQuery<MarketWeek | null>({ queryKey: ["/api/hiq/fishing/market"], staleTime: 15 * 60_000 });
+    if (!data?.fish?.length) return null;
+    const rows = data.fish.slice(0, 8);
+    const first = data.days[0], last = data.days[data.days.length - 1];
+    const md = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8))}`;
+    return (
+        <FsSection title="위판장 소식" aside={`${md(first)}~${md(last)} · 경매 건수`} testid="fishing-market">
+            <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, color: INK, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
+                <p className="px-3.5 pb-1 pt-3 text-[13px] break-keep" style={{ color: "#0F2838B3" }}>지난 이레, 전국 위판장에 많이 오른 어종</p>
+                <ul>
+                    {rows.map((f, i) => {
+                        const max = Math.max(1, ...f.counts);
+                        return (
+                            <li key={f.id} className="flex items-center gap-3 px-3.5 py-2.5" style={{ borderTop: i ? "1px dashed #0F283826" : undefined }} data-testid="fishing-market-row">
+                                <span className="w-4 shrink-0 text-center text-[13px] tabular-nums" style={{ color: "#0F283880" }}>{i + 1}</span>
+                                <img src={art(f.id)} alt="" width={640} height={400} loading="lazy" decoding="async" className="h-9 w-[52px] shrink-0 object-contain" style={{ mixBlendMode: "multiply" }} />
+                                <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{f.name}</span>
+                                {/* 날마다의 막대 — 오래된 날부터. 어제 것은 덜 들어왔을 수 있어 옅게 */}
+                                <span className="flex h-8 shrink-0 items-end gap-[3px]" aria-hidden>
+                                    {f.counts.map((n, k) => <i key={data.days[k]} className="w-[5px] rounded-t-[2px]" style={{ height: `${Math.max(2, Math.round((n / max) * 30))}px`, background: "#1F5A78", opacity: k === f.counts.length - 1 ? 0.4 : 0.85 }} />)}
+                                </span>
+                                <span className="w-[58px] shrink-0 text-right text-[14px] font-semibold tabular-nums">{f.total.toLocaleString("en-US")}<span className="text-[12px] font-normal" style={{ color: "#0F283880" }}>건</span></span>
+                            </li>
+                        );
+                    })}
+                </ul>
+                <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>{MARKET_NOTE} 출처: {MARKET_SOURCE}.</p>
+            </div>
+        </FsSection>
     );
 }
 
