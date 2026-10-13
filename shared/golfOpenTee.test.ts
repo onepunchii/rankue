@@ -85,6 +85,19 @@ describe("시간표 읽기 — 표의 꼴 둘, 칸은 머리줄의 이름으로"
             { time: "13:11", course: "서", holes: 18, listPrice: null, price: 185000 },
         ]);
     });
+    it("요금 칸에 다른 말이 붙어 있어도 요금만 — 숫자를 전부 이어 붙이지 않는다(에덴블루: '170,000 2인플레이가능.' 이 1,700,002원이 됐다)", () => {
+        const html = `<table class="cm_time_list_tbl"><thead><tr><th>번호</th><th>코스</th><th>시간</th><th>홀</th><th>비회원</th><th>인터넷회원</th><th>예약</th></tr></thead><tbody>
+            <tr><td>1</td><td>마운틴</td><td>08:05</td><td>18홀</td><td>170,000</td><td><span>170,000<em><br>2인플레이가능.</em></td><td><button>신청</button></td></tr>
+            <tr><td>3</td><td>레이크</td><td>18:11</td><td>18홀</td><td>140,000</td><td><span>89,900<em><br>2인플레이가능.</em></td><td><button>신청</button></td></tr>
+            <tr><td>4</td><td>밸리</td><td>18:18</td><td>18홀</td><td>140000원</td><td>4인 필수 95000</td><td><button>신청</button></td></tr></tbody></table>`;
+        expect(parseGolfResTimes(html)).toEqual([
+            { time: "08:05", course: "마운틴", holes: 18, listPrice: null, price: 170000 },
+            { time: "18:11", course: "레이크", holes: 18, listPrice: 140000, price: 89900 },
+            { time: "18:18", course: "밸리", holes: 18, listPrice: 140000, price: 95000 },
+        ]);
+        // 머리줄 없는 표도 같다
+        expect(parseTeeRows(`<table><tr><td>06:23</td><td>18홀</td><td>80,000원 2인 가능</td><td>예약</td></tr></table>`)).toEqual([{ time: "06:23", course: "", holes: 18, listPrice: null, price: 80000 }]);
+    });
     it("옛 꼴 — thead 없는 맨 표 · 시간 뒤의 점 · 요금 칸이 하나(그린피) 또는 둘(인터넷회원가 + 특가)", () => {
         const one = `<div class="cm_time_live_tab_list"><table><colgroup><col /></colgroup><tr><th>번호</th><th>코스</th><th>시간</th><th>홀</th><th>그린피</th><th>예약</th></tr>
             <tr><td class="a">1</td><td>레이크</td><td>06:03.</td><td>18홀</td><td>120,000</td><td><a href="javascript:subcmd('R','1','0603')"><img alt='신청[0603]'/></a></td></tr></table></div>`;

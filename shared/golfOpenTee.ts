@@ -223,8 +223,14 @@ export function golfResRequest(s: Pick<TeeSource, "origin" | "memcd">, day: stri
     };
 }
 
+/**
+ * 칸의 글에서 요금 하나 — **처음 나오는 돈 꼴의 수**만 읽는다(쉼표로 끊은 수, 또는 다섯 ~ 일곱 자리 수).
+ * 칸의 숫자를 전부 이어 붙이면 안 된다: 에덴블루는 요금 칸에 "170,000 2인플레이가능."이라고 적어, 뒤의 2 까지 붙어 1,700,002원이 됐다(2026-10-13 오너 신고 "금액이 10배").
+ */
 const won = (s: string): number | null => {
-    const n = Number(s.replace(/[^\d]/g, ""));
+    const m = /\d{1,3}(?:,\d{3})+|\d{5,7}/.exec(s);
+    if (!m) return null;
+    const n = Number(m[0].replace(/,/g, ""));
     // 요금이 아닌 숫자(0 · 자리수가 이상한 값)는 버린다
     return Number.isFinite(n) && n >= 10_000 && n <= 2_000_000 ? n : null;
 };
@@ -359,7 +365,8 @@ export function parseTeeRows(html: string): OpenTee[] | null {
         // 칸의 폭을 맞추려고 글자 사이를 띄운 이름("드 림")은 붙인다
         const course = (/^[가-힣]( [가-힣])+$/.test(named) ? named.replace(/ /g, "") : named).slice(0, 30);
         const holes = holesOf(others.find((c) => /^\d{1,2}\s*홀/.test(c)));
-        const money = others.map((c) => (/^[^\d]{0,6}[\d,]{5,9}\s*원?$/.test(c) ? won(c) : null)).filter((v): v is number => v != null);
+        // 요금 칸 — 수로 시작하는(앞에 짧은 말이 붙기도 한다) 칸. 뒤에 붙은 말("2인 가능")은 won 이 버린다
+        const money = others.map((c) => (/^[^\d]{0,6}\d{1,3}(,\d{3})+/.test(c) || /^[^\d]{0,6}\d{5,7}(\D|$)/.test(c) ? won(c) : null)).filter((v): v is number => v != null);
         out.push({ time, course, holes, ...pair(money.length >= 2 ? money[0] : null, money.length ? money[money.length - 1] : null) });
     }
     return tidy(out);
