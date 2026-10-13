@@ -5,6 +5,8 @@
  *   DELETE /api/hiq/fishing/catches/:id  내 줄 지우기
  *   GET    /api/hiq/fishing/places       낚시터 찾기(지역 · 글자)
  *   GET    /api/hiq/fishing/sea          오늘의 바다 — 해역 일곱 곳의 풍랑특보(기상청)
+ *   GET    /api/hiq/fishing/reservoirs         민물 — 고른 저수지들의 저수율(?codes= 여섯 곳까지 · 없으면 처음 보이는 여섯 곳)
+ *   GET    /api/hiq/fishing/reservoirs/search  시군 이름으로 저수지 찾기(?county=)
  *   GET    /api/hiq/fishing/market       위판장 소식 — 지난 이레 어종별 경매 건수(해양수산부)
  *   GET    /api/hiq/fishing/ports/:code  항구 브리핑 — 조석 곡선 · 해와 달 · 지금의 바다 · 바다낚시지수(?day=)
  *   GET    /api/hiq/fishing/crews        내가 든 크루
@@ -25,6 +27,8 @@ import { fishingAllowed } from "../../lib/fishingAccess.js";
 import { getSeaNow } from "../../services/fishingSea.js";
 import { getPortBrief } from "../../services/fishingPort.js";
 import { getMarketWeek } from "../../services/fishingMarket.js";
+import { getReservoirs, searchReservoirs } from "../../services/fishingReservoir.js";
+import { RESERVOIR_MAX, RESERVOIR_STARTERS, cleanCountyQuery, isReservoirCode, type ReservoirRef } from "../../../shared/fishingReservoir.js";
 import { FISHING_PHOTO_CATEGORY, FISHING_THUMB_CATEGORY, cleanCatch, fishingKstDay, isOwnFishingPhotoUrl, type FishingCatch, type FishingPlace } from "../../../shared/fishing.js";
 
 const router = Router();
@@ -85,6 +89,30 @@ router.delete("/catches/:id", requireAuth, gate, asyncHandler(async (req: AuthRe
 router.get("/sea", requireAuth, gate, asyncHandler(async (_req: AuthRequest, res: any) => {
     res.setHeader("Cache-Control", "private, max-age=120");
     return sendSuccess(res, await getSeaNow().catch(() => null));
+}));
+
+/** 시군 이름으로 저수지 찾기 — 두 글자 이상의 한글. 못 받았으면 null */
+router.get("/reservoirs/search", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const county = cleanCountyQuery(req.query.county);
+    if (!county) return sendError(res, 400, "시군 이름을 두 글자 넘게 적어 주세요");
+    res.setHeader("Cache-Control", "private, max-age=3600");
+    return sendSuccess(res, await searchReservoirs(county).catch(() => null));
+}));
+
+/**
+ * 고른 저수지들의 저수율 — 화면이 기기에 담아 둔 것(코드 · 이름 · 주소)을 보낸다. 이름 · 주소는 화면에 도로 보여 줄 글이라 길이만 자른다.
+ * 아무것도 안 보내면 처음 보이는 여섯 곳.
+ */
+router.get("/reservoirs", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    let refs: ReservoirRef[] = [...RESERVOIR_STARTERS];
+    const raw = String(req.query.pick ?? "");
+    if (raw) {
+        const picked = raw.split("|").map((s) => s.split("~")).filter((p) => isReservoirCode(p[0]))
+            .map((p) => ({ code: p[0], name: String(p[1] ?? "").replace(/[^가-힣0-9A-Za-z ]/g, "").slice(0, 16) || "저수지", county: String(p[2] ?? "").replace(/[^가-힣 ]/g, "").slice(0, 16) }));
+        if (picked.length) refs = picked.slice(0, RESERVOIR_MAX);
+    }
+    res.setHeader("Cache-Control", "private, max-age=900");
+    return sendSuccess(res, await getReservoirs(refs).catch(() => []));
 }));
 
 /** 위판장 소식 — 받아 둔 건수로 만든 한 주의 표. 받은 것이 없으면 null(화면은 구역을 그리지 않는다) */

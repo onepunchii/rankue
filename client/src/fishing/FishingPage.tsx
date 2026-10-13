@@ -34,6 +34,7 @@ import { SEA_AREAS, SEA_CAUTION, SEA_SOURCE, seaHeadline, seaNotes, seaWord, typ
 import { SEA_LEGEND, SeaChart, seaWashColor, seaWashLine } from "./SeaChart";
 import { TideCurve } from "./TideCurve";
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
+import { RESERVOIR_MAX, RESERVOIR_SOURCE, cleanCountyQuery, isReservoirCode, reservoirTrend, type ReservoirRef, type ReservoirView } from "@shared/fishingReservoir";
 import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@shared/fishingStations";
 import { durationKo, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type PortBrief } from "@shared/fishingPort";
 
@@ -253,6 +254,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                         <FsCover src={FS_COVER_TRIP} line="나가기 전에 보는 것 — 바다의 특보와 물때" />
                         <Today today={today} list={list} />
                         <MarketBoard />
+                        <ReservoirBoard />
                         <FsSection title="낚시터" aside="등록된 1,151곳">
                             <button type="button" onClick={() => setTab("points")} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-points">
                                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: "#FFFFFF14" }}><LucideMap className="h-5 w-5" style={{ color: C.sun }} /></span>
@@ -372,6 +374,85 @@ function MarketBoard() {
                 </ul>
                 <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>{MARKET_NOTE} 출처: {MARKET_SOURCE}.</p>
             </div>
+        </FsSection>
+    );
+}
+
+const RESV_KEY = "rankue-fishing-reservoirs";
+function readReservoirs(): ReservoirRef[] {
+    try {
+        const v = JSON.parse(localStorage.getItem(RESV_KEY) ?? "[]");
+        return Array.isArray(v) ? v.filter((x) => x && isReservoirCode(x.code) && typeof x.name === "string").slice(0, RESERVOIR_MAX).map((x) => ({ code: x.code, name: String(x.name).slice(0, 16), county: String(x.county ?? "").slice(0, 16) })) : [];
+    } catch { return []; }
+}
+
+/**
+ * 민물 — 저수지의 물높이. 종이 한 장의 수위표: 이름 · 저수율 막대(눈금 25 · 50 · 75) · 지난 이레의 움직임.
+ * 처음에는 큰 저수지 여섯 곳을 보이고, 시군 이름으로 찾아 내 저수지를 담으면(여섯 곳까지 · 이 기기에) 그것만 보인다.
+ * 저수율은 물의 양이지 조황이 아니다 — 잘 낚인다는 말은 하지 않는다.
+ */
+function ReservoirBoard() {
+    const [mine, setMine] = useState<ReservoirRef[]>(readReservoirs);
+    const [finding, setFinding] = useState(false);
+    const [text, setText] = useState("");
+    const [asked, setAsked] = useState<string | null>(null);
+    const pick = mine.map((r) => `${r.code}~${r.name}~${r.county}`).join("|");
+    const { data } = useQuery<ReservoirView[]>({ queryKey: ["/api/hiq/fishing/reservoirs", pick], queryFn: () => apiRequest(`/api/hiq/fishing/reservoirs${pick ? `?pick=${encodeURIComponent(pick)}` : ""}`), staleTime: 15 * 60_000, placeholderData: (prev) => prev });
+    const found = useQuery<ReservoirRef[] | null>({ queryKey: ["/api/hiq/fishing/reservoirs/search", asked], queryFn: () => apiRequest(`/api/hiq/fishing/reservoirs/search?county=${encodeURIComponent(asked!)}`), enabled: !!asked, staleTime: 60 * 60_000 });
+    const save = (next: ReservoirRef[]) => { setMine(next); try { localStorage.setItem(RESV_KEY, JSON.stringify(next)); } catch { /* 저장을 못 해도 화면은 바뀐다 */ } };
+    const add = (r: ReservoirRef) => { if (mine.some((x) => x.code === r.code) || mine.length >= RESERVOIR_MAX) return; save([...mine, r]); };
+    const rows = data ?? [];
+    if (!rows.length && !mine.length && !finding) return null;
+    const q = cleanCountyQuery(text);
+    return (
+        <FsSection title="민물 · 저수지 물높이" aside={mine.length ? `내 저수지 ${mine.length}곳` : "많이 찾는 저수지"} testid="fishing-reservoirs">
+            {rows.length > 0 && (
+                <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, color: INK, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
+                    <ul>
+                        {rows.map((r, i) => {
+                            const trend = reservoirTrend(r.delta);
+                            return (
+                                <li key={r.code} className="px-3.5 py-3" style={{ borderTop: i ? "1px dashed #0F283826" : undefined }} data-testid="fishing-reservoir-row">
+                                    <div className="flex items-baseline gap-2">
+                                        <span className="min-w-0 flex-1 truncate"><span className="text-[15px] font-semibold">{r.name}</span><span className="ml-1.5 text-[12.5px]" style={{ color: "#0F283880" }}>{r.county}</span></span>
+                                        <span className="shrink-0 text-[12.5px] tabular-nums" style={{ color: trend === "빠지는 중" ? SEAL : "#0F283899" }}>{trend}{trend === "그대로" ? "" : ` ${r.delta > 0 ? "+" : ""}${r.delta.toFixed(1)}`}</span>
+                                        <span className="w-[58px] shrink-0 text-right text-[16px] font-semibold tabular-nums">{r.rate.toFixed(1)}<span className="text-[12px] font-normal" style={{ color: "#0F283880" }}>%</span></span>
+                                        {mine.length > 0 && <button type="button" onClick={() => save(mine.filter((x) => x.code !== r.code))} aria-label={`${r.name} 빼기`} className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full active:bg-[#0F283814]"><LucideX className="h-3.5 w-3.5" style={{ color: "#0F283880" }} /></button>}
+                                    </div>
+                                    {/* 수위표 — 가득 찬 것이 100. 눈금은 25 · 50 · 75 */}
+                                    <div className="relative mt-2 h-2.5 overflow-hidden rounded-full" style={{ background: "#0F283814" }} role="img" aria-label={`저수율 ${r.rate.toFixed(1)}%`}>
+                                        <div className="h-full rounded-full" style={{ width: `${Math.max(2, Math.min(100, r.rate))}%`, background: "#1F5A78" }} />
+                                        {[25, 50, 75].map((t) => <i key={t} className="absolute top-0 h-full w-px" style={{ left: `${t}%`, background: "#F3ECDD" }} />)}
+                                    </div>
+                                </li>
+                            );
+                        })}
+                    </ul>
+                    <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>저수율과 지난 이레의 움직임이에요({rows[0].asOf.slice(5).replace("-", ".")} 기준). 물의 양이지 조황이 아니에요. 출처: {RESERVOIR_SOURCE}.</p>
+                </div>
+            )}
+            {!finding ? (
+                <button type="button" onClick={() => setFinding(true)} className="mt-2.5 flex h-11 w-full items-center justify-center rounded-xl bg-[#FFFFFF14] text-[14px] font-medium active:bg-[#FFFFFF24]" data-testid="fishing-reservoir-find">내 저수지 찾아 담기</button>
+            ) : (
+                <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-3.5 pb-3.5 pt-3" data-testid="fishing-reservoir-search">
+                    <form className="flex gap-2" onSubmit={(e) => { e.preventDefault(); if (q) setAsked(q); }}>
+                        <input value={text} onChange={(e) => setText(e.target.value)} maxLength={10} placeholder="시군 이름(예: 예산 · 논산 · 안성)" aria-label="시군 이름" className="h-11 min-w-0 flex-1 rounded-xl px-3.5 text-[15px] outline-none placeholder:text-[#F3ECDD59]" style={{ background: "#FFFFFF0F", color: C.foam }} data-testid="fishing-reservoir-input" />
+                        <button type="submit" disabled={!q} className="h-11 shrink-0 rounded-xl px-4 text-[14px] font-semibold disabled:opacity-40" style={{ background: C.brand, color: C.onBrand }}>찾기</button>
+                    </form>
+                    {asked && (found.isLoading ? <p className="mt-3 text-[13px]" style={{ color: C.dim }}>찾는 중…</p>
+                        : !found.data ? <p className="mt-3 text-[13px]" style={{ color: C.soft }}>지금은 받아 오지 못했어요. 잠시 뒤에 다시 해 주세요.</p>
+                            : !found.data.length ? <p className="mt-3 text-[13px]" style={{ color: C.soft }}>'{asked}'(으)로 찾은 저수지가 없어요. 시군 이름으로 적어 주세요.</p>
+                                : (
+                                    <div className="mt-3 flex flex-wrap gap-1.5" data-testid="fishing-reservoir-found">
+                                        {found.data.slice(0, 60).map((r) => {
+                                            const on = mine.some((x) => x.code === r.code);
+                                            return <button key={r.code} type="button" disabled={on || mine.length >= RESERVOIR_MAX} onClick={() => add(r)} className="h-9 rounded-full px-3 text-[13px] disabled:opacity-45" style={on ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{r.name}</button>;
+                                        })}
+                                    </div>
+                                ))}
+                    <p className="mt-2.5 text-[12px] leading-relaxed" style={{ color: C.dim }}>{mine.length >= RESERVOIR_MAX ? `여섯 곳까지 담을 수 있어요. 위의 ✕ 로 빼고 담아 주세요.` : "누르면 담겨요(여섯 곳까지 · 이 기기에 기억돼요). 한국농어촌공사가 관리하는 저수지만 있어요."}</p>
+                </div>
+            )}
         </FsSection>
     );
 }
