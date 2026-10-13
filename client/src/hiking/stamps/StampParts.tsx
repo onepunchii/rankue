@@ -9,6 +9,7 @@ import type { ReactNode } from "react";
 import { Link } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
 import type { HikingBookState } from "@shared/hikingStamps";
+import { withHikingExample } from "@shared/hikingStampExample";
 import { hikingCover, hikingListCover, patchSrc, pinSrc } from "../theme";
 
 export const HIKING_STAMPS_PATH = "/hiking/stamps";
@@ -54,10 +55,10 @@ export function HkBar({ got, total, className }: { got: number; total: number; c
 }
 
 /** 책장의 한 권 — 권역의 표지 그림(특성 · 철 묶음은 그 묶음의 표지) 위에 이름 · 진행 · 와펜 */
-export function BookRow({ state, preview }: { state: HikingBookState; preview?: boolean }) {
+export function BookRow({ state, preview, example }: { state: HikingBookState; preview?: boolean; /** 예시 — 권으로 들어가도 예시가 이어진다 */ example?: boolean }) {
     const { book, got, total, done } = state;
     return (
-        <Link href={hikingBookPath(book.id)} className="relative block h-[92px] overflow-hidden rounded-2xl bg-[#0E2A33] active:opacity-80" data-testid={`hk-book-${book.id}`} data-done={done ? "1" : "0"}>
+        <Link href={example ? withHikingExample(hikingBookPath(book.id)) : hikingBookPath(book.id)} className="relative block h-[92px] overflow-hidden rounded-2xl bg-[#0E2A33] active:opacity-80" data-testid={`hk-book-${book.id}`} data-done={done ? "1" : "0"}>
             <img src={book.region ? hikingCover(book.region) : hikingListCover(book.id)} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 60%" }} loading="lazy" decoding="async" draggable={false} />
             <span className="absolute inset-0" style={{ background: "linear-gradient(90deg,#0B1F26E6 30%,#0B1F2666)" }} aria-hidden />
             <span className="absolute left-3.5 right-[84px] top-3">

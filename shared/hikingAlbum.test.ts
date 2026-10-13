@@ -291,7 +291,8 @@ describe("도장첩에서 들어오는 길", () => {
 
     it("한 권의 도장 | 사진 — 기본은 도장이고, 이 권의 산에 내 사진이 있을 때만 전환 단추가 생긴다", () => {
         expect(book).toContain('const [mode, setMode] = useState<"stamp" | "photo">("stamp");');
-        expect(book).toContain("const hasPhoto = s.mine && slots.some((x) => photoOf.has(x.m.id));");
+        // 진짜 회원의 것일 때만(예시 도장첩에서는 사진으로 바꿔 보지 않는다 — 2026-10-13 예시 모드)
+        expect(book).toContain("const hasPhoto = s.member && !example && slots.some((x) => photoOf.has(x.m.id));");
         expect(book).toContain('const photoMode = hasPhoto && mode === "photo";');
         expect(book).toContain("{hasPhoto && (");
         // 주소 · 기기에 기억해 두지 않는다 — 다시 열면 도장이다

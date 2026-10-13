@@ -8,7 +8,8 @@
  * 누구에게나 열린다(등산이 열리지 않은 사람에게는 빈 도장첩과 받을 와펜). ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상.
  */
 import { useMemo, useState } from "react";
-import { Link, useRoute } from "wouter";
+import { useSearch, Link, useRoute } from "wouter";
+import { HIKING_EXAMPLE_COPY as EX, isHikingExample, withHikingExample } from "@shared/hikingStampExample";
 import { useSeo } from "@/hooks/useSeo";
 import { duplicateNames, heightText, hikingMountainPath, mountainLabel } from "@shared/hikingMountains";
 import { HIKING_ALBUM_LABEL, HIKING_ALBUM_PATH, albumPhotoCount, albumSlots, hikingAlbumMountainPath } from "@shared/hikingAlbum";
@@ -28,7 +29,9 @@ const TILT = [-4, 3, -2, 5, -3, 2, -5, 4, -2, 3];
 
 export default function StampBookPage() {
     const [, params] = useRoute("/hiking/stamps/:book");
-    const s = useHikingStamps();
+    // 예시(?example=1) — 이 권을 다 채운 모습(shared/hikingStampExample). 책장의 예시에서 들어오면 이어진다
+    const example = isHikingExample(useSearch());
+    const s = useHikingStamps({ example });
     const state = s.states.find((x) => x.book.id === params?.book);
     // 도장 | 사진 — 기본은 도장. 사진은 내 사진첩의 자료(등산을 쓰는 회원만 받는다)
     const { album } = useHikingAlbum();
@@ -51,13 +54,22 @@ export default function StampBookPage() {
     const award = s.award("patch", book.id);
     const records = slots.filter((x) => x.record).length;
     // 이 권의 산에 내 사진이 한 장이라도 있을 때만 전환 단추를 낸다
-    const hasPhoto = s.mine && slots.some((x) => photoOf.has(x.m.id));
+    const hasPhoto = s.member && !example && slots.some((x) => photoOf.has(x.m.id));
     const photoMode = hasPhoto && mode === "photo";
     const dup = duplicateNames(slots.map((y) => y.m));
     const seg = (active: boolean) => `flex h-9 min-w-[64px] items-center justify-center rounded-[10px] px-3.5 text-[13.5px] ${active ? "bg-[#F4EFE3] font-semibold text-[#0E2A33]" : "text-[#F4EFE3B3] active:bg-[#FFFFFF14]"}`;
     return (
-        <HikingShell title={`${book.name} 도장첩`} backTo={HIKING_STAMPS_PATH}>
-            <div data-testid="hk-stamp-book" data-book={book.id} data-mine={s.mine ? "1" : "0"}>
+        <HikingShell title={example ? `${book.name} 예시` : `${book.name} 도장첩`} backTo={example ? withHikingExample(HIKING_STAMPS_PATH) : HIKING_STAMPS_PATH}>
+            <div data-testid="hk-stamp-book" data-book={book.id} data-mine={s.mine ? "1" : "0"} data-example={example ? "1" : "0"}>
+                {example && (
+                    <div className="px-5 pt-3">
+                        <div className="flex items-center gap-3 rounded-2xl bg-[#F6D9A81F] px-3.5 py-2.5" style={{ boxShadow: "inset 0 0 0 1px #F6D9A866" }} data-testid="hk-example-banner" role="note">
+                            <span className="shrink-0 rounded-full bg-[#F6D9A8] px-2 py-0.5 text-[12px] font-semibold text-[#2A1208]">{EX.chip}</span>
+                            <p className="min-w-0 flex-1 text-[13.5px] leading-snug text-[#F4EFE3] break-keep">{EX.bookBanner}</p>
+                            <Link href={`${HIKING_STAMPS_PATH}/${book.id}`} replace className="shrink-0 text-[13px] text-[#F6D9A8] underline underline-offset-2" data-testid="hk-example-exit">{s.member ? EX.exit : EX.exitGuest}</Link>
+                        </div>
+                    </div>
+                )}
                 <div className="relative h-[176px] overflow-hidden">
                     <img src={book.region ? hikingCover(book.region) : hikingListCover(book.id)} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 55%" }} draggable={false} decoding="async" />
                     <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2600 20%,#0B1F26F5 97%)" }} aria-hidden />
@@ -127,7 +139,7 @@ export default function StampBookPage() {
                     {!photoMode && <p className="mt-2.5 text-[13px] leading-snug text-[#F4EFE38C] break-keep">다른 철에 다시 오르면 그 철이 도장 밑에 쌓여요.</p>}
                 </HkSection>
 
-                {!s.mine && <div className="px-5 pt-8"><HikingCta /></div>}
+                {!s.member && <div className="px-5 pt-8"><HikingCta /></div>}
             </div>
         </HikingShell>
     );
