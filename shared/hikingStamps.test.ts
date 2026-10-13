@@ -93,12 +93,16 @@ describe("도장첩 · 받는 것", () => {
         mt("a", { heightM: 1708, lists: ["kfs100", "nationalparks"], traits: ["over1500", "over1000", "snow"] }),
         mt("b", { heightM: 900, traits: ["reeds"] }),
         mt("c", { region: "capital", heightM: 600 }),
+        mt("low", { region: "capital", heightM: 296, lists: [], traits: ["under500"] }),
         mt("p", { region: "capital", lists: ["kfs100plus"] }),
         mt("z", { tier: 3, lists: [] }),
     ];
     it("권역 · 특성 · 철로 묶는다 — 칸이 없는 권은 만들지 않고, 명산만 칸이 된다", () => {
         const books = hikingBooks(mountains);
-        expect(books.map((b) => b.id)).toEqual(["kfs-capital", "kfs-gangwon", "plus-capital", "nationalparks", "over1500", "reeds", "snow"]);
+        expect(books.map((b) => b.id)).toEqual(["kfs-capital", "kfs-gangwon", "plus-capital", "nationalparks", "over1500", "under500", "reeds", "snow"]);
+        // 낮은 산도 한 권 — 해발 500m 아래의 명산(2026-10-13)
+        expect(books.find((b) => b.id === "under500")).toMatchObject({ kind: "theme", name: "가볍게 오르는 산", note: "해발 500m 아래의 명산 1곳" });
+        expect(books.find((b) => b.id === "under500")!.slots.map((m) => m.id)).toEqual(["low"]);
         expect(books.find((b) => b.id === "kfs-gangwon")!.slots.map((m) => m.id)).toEqual(["a", "b"]);
         expect(books.find((b) => b.id === "reeds")!.kind).toBe("season");
         expect(books.every((b) => b.slots.every((m) => m.tier === 1))).toBe(true);
@@ -176,7 +180,7 @@ describe("그림 — 이름을 건 것은 다 있다", () => {
         for (const p of HIKING_PINS) expect(has(`${p.art}.webp`), p.art).toBe(true);
     });
     it("도장첩 와펜 — 권역(100대 명산 · 플러스) · 특성 · 철 · 완등", () => {
-        const arts = [...HIKING_REGIONS.flatMap((r) => [`kfs-${r.id}`, `plus-${r.id}`]), "nationalparks", "over1500", "highest50", "island", "provincialparks", ...HIKING_FEATURES.map((f) => f.id), ...HIKING_GRANDS.map((g) => g.art)];
+        const arts = [...HIKING_REGIONS.flatMap((r) => [`kfs-${r.id}`, `plus-${r.id}`]), "nationalparks", "over1500", "highest50", "island", "provincialparks", "under500", ...HIKING_FEATURES.map((f) => f.id), ...HIKING_GRANDS.map((g) => g.art)];
         for (const a of arts) expect(has(`patch-${a}.webp`), a).toBe(true);
     });
     it("산 와펜 — 100대 명산 백 장, 철 묶음의 산은 다 그림이 있다", () => {

@@ -26,7 +26,7 @@ import { PIN_PHOTOS } from "../../../shared/golfPins.js";
 import { parseLatLng } from "../../../shared/golfNearby.js";
 import { ONSITE_SOURCES, type OnSiteSource } from "../../../shared/golfOnSite.js";
 import { sanitizeHolePatches, withoutHoleStats } from "../../../shared/golfHoleStats.js";
-import { SCAN_COPY, SCAN_OFFICIAL_MAX_EDITS, scanDailyLimit, buildScanDraft, draftCounts, effectivePars, scanEditCount, scanKstDay, usableCardDay } from "../../../shared/golfScorecardScan.js";
+import { SCAN_COPY, scanDailyLimit, buildScanDraft, draftCounts, effectivePars, scanEditCount, scanKstDay, usableCardDay } from "../../../shared/golfScorecardScan.js";
 import { clubIndex, openScan, resolveCard, signScan } from "../../services/golfScanRound.js";
 import { isSuperAdminRole } from "../../../shared/adminRole.js";
 import { readScorecard, scanConfigured, scanImage, scanPublic } from "../../lib/golfScorecardRead.js";
@@ -1134,7 +1134,7 @@ router.get("/scan/status", requireAuth, asyncHandler(async (req: AuthRequest, re
  * "저장이 되는 게 아니라 1번 홀로 가는데" · "스코어카드 넣을 정도의 정성이면 공식으로 인증해 주자").
  *  - /scan/card   : 그림을 읽어 골프장 · 전후반 코스 · 날짜를 명부와 맞추고(못 맞춘 것은 null — 화면이 그것만 묻는다) 초안과 서명을 준다. 저장하지 않는다.
  *  - /scan/record : 확인을 마친 내 줄을 **바로 끝난 라운드로** 남긴다(혼자 기록 라운드의 길을 그대로 — storage.golf.recordScannedRound).
- *                   공식 여부: 골프장이 명부에 있고, 올린 줄이 카드에서 읽은 줄과 SCAN_OFFICIAL_MAX_EDITS 칸 넘게 다르지 않을 때만. 아니면 미인증으로 남는다.
+ *                   골프장이 명부에 있으면 공식 라운드로 남는다(오너 결정 — 카드를 올리는 정성이면 인증).
  */
 router.post("/scan/card", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const access = await scanAccess(req.userId!);
@@ -1186,7 +1186,10 @@ router.post("/scan/record", requireAuth, asyncHandler(async (req: AuthRequest, r
     if (!courseName) return sendError(res, 400, "골프장을 골라 주세요");
     // 전반 · 후반 — 읽을 때 맞춘 것(서명 안)을 쓴다. 사람이 다른 골프장으로 바꿨으면 그 코스 이름은 맞지 않으니 비운다
     const same = !!club && club.id === ticket.c;
-    const official = !!club && scanEditCount(ticket.r[d.row], d.strokes) <= SCAN_OFFICIAL_MAX_EDITS;
+    // 스코어카드로 올린 라운드는 공식이다(오너 10/13: "스코어카드도 인증 구장으로 인증"). 처음엔 '읽은 줄과 4칸 넘게 다르면 미인증'을 붙였는데
+    // 오너의 실제 카드가 그 조건에 걸려 미인증으로 남았다 — 걷어냈다. 고친 칸 수는 기록만 남긴다(나중에 기준을 세울 때 볼 숫자).
+    const official = !!club;
+    console.info("[GolfScan] record", JSON.stringify({ edits: scanEditCount(ticket.r[d.row], d.strokes), official }));
     const out = await storage.golf.recordScannedRound(req.userId!, { courseId: club?.id ?? null, courseName, front: same ? ticket.f : null, back: same ? ticket.b : null, scores: d.strokes, day: ticket.d, official });
     return sendSuccess(res, out);
 }));

@@ -156,10 +156,9 @@ export function effectivePars(read: Pick<ScanRead, "pars">, pars: readonly numbe
 }
 
 /**
- * 공식으로 올릴 수 있는가 — **카드에서 읽은 그대로**일 때만(오너: "스코어카드 넣을 정도의 정성이면 공식으로 인증해 주자").
- * 읽은 줄과 올린 줄이 다른 칸(오독을 고친 칸 · 빈칸을 채운 칸)이 이 수를 넘으면 그 기록은 카드의 것이 아니라 손으로 적은 것이다 → 미인증.
+ * 읽은 줄과 올린 줄이 다른 칸 수(오독을 고친 칸 · 빈칸을 채운 칸). 공식 여부를 가르지는 않는다 —
+ * 스코어카드로 올린 라운드는 공식이다(오너 10/13). 서버가 이 수를 기록만 해 둔다.
  */
-export const SCAN_OFFICIAL_MAX_EDITS = 4;
 export function scanEditCount(read: readonly number[], final: readonly number[]): number {
     let n = 0;
     for (let h = 0; h < HOLES; h++) if ((Number(read[h]) || 0) !== (Number(final[h]) || 0)) n++;
@@ -391,8 +390,8 @@ export const SCAN_COPY = {
     handwritten: "손으로 적은 카드는 읽지 않아요. 앱에서 받은 스코어카드를 올려 주세요.",
     none: "스코어카드를 찾지 못했어요. 카드 전체가 나오게 다시 올려 주세요.",
     record: "이 카드로 기록하기",
-    official: "카드에서 읽은 그대로라 공식 라운드로 남아요.",
-    unofficial: "카드와 다르게 고친 칸이 많아 미인증으로 남아요.",
+    official: "스코어카드로 올려 공식 라운드로 남았어요.",
+    unofficial: "명부에 없는 골프장이라 미인증으로 남았어요.",
     askClub: "골프장을 찾지 못했어요. 이름으로 찾아 주세요.",
     askRow: "내 줄을 골라 주세요.",
     askHoles: "18홀이 다 있어야 기록돼요. 빈칸을 눌러 채워 주세요.",

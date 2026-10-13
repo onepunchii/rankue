@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-    applyScanRows, buildScanDraft, cardDay, clubKey, clubParsFit, courseKey, effectivePars, matchClub, matchCourses, scanDailyLimit, scanEditCount, usableCardDay, SCAN_OFFICIAL_MAX_EDITS, cellNumber, cellStrokes, draftCounts, guessSeats, normalizeRead, rowNotation, scanKstDay, sumLine,
+    applyScanRows, buildScanDraft, cardDay, clubKey, clubParsFit, courseKey, effectivePars, matchClub, matchCourses, scanDailyLimit, scanEditCount, usableCardDay, cellNumber, cellStrokes, draftCounts, guessSeats, normalizeRead, rowNotation, scanKstDay, sumLine,
     type ScanRead,
 } from "./golfScorecardScan";
 
@@ -245,14 +245,13 @@ describe("카드의 골프장 · 코스 · 날짜를 명부와 맞추기", () =>
     });
 });
 
-describe("공식으로 올릴 수 있는가 — 카드에서 읽은 그대로일 때", () => {
+describe("고친 칸 수 · 파 한 벌", () => {
     it("읽은 줄과 올린 줄이 다른 칸을 센다 — 고친 칸 · 채운 빈칸 모두", () => {
         const readRow = [...ALL]; readRow[3] = 0;
         const final = [...ALL]; final[0] = ALL[0] + 1;
         expect(scanEditCount(ALL, ALL)).toBe(0);
         expect(scanEditCount(readRow, final)).toBe(2);
         expect(scanEditCount([], ALL)).toBe(18);
-        expect(SCAN_OFFICIAL_MAX_EDITS).toBe(4);
     });
     it("파 한 벌 — 명부의 파가 있으면 그것, 없으면 카드에 인쇄된 파(못 읽은 홀은 모르는 홀)", () => {
         const printed = s(PARS) as (string | null)[]; printed[2] = null;

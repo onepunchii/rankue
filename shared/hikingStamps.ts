@@ -67,6 +67,8 @@ const THEMES: readonly [string, string, string, (m: StampMountain) => boolean][]
     ["highest50", "높은 산 50", "남한에서 높은 산 쉰 곳", (m) => m.lists.includes("highest50")],
     ["island", "섬의 산", "섬에 있는 명산", (m) => m.traits.includes("island")],
     ["provincialparks", "도립공원의 산", "도립공원으로 지정된 산", (m) => m.lists.includes("provincialparks")],
+    // 2026-10-13 밤 — 높은 산만 있던 특성 도장첩에 낮은 산을 한 권. 반나절이면 다녀오는 명산이라 첫 도장이 가장 쉽게 찍히는 권이다
+    ["under500", "가볍게 오르는 산", "해발 500m 아래의 명산", (m) => m.traits.includes("under500")],
 ];
 const byHeight = (a: StampMountain, b: StampMountain) => (b.heightM ?? 0) - (a.heightM ?? 0) || a.name.localeCompare(b.name, "ko");
 

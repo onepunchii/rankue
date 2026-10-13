@@ -371,7 +371,7 @@ export function ScanSheet({ matchId, players, pars: roomPars, parKnown: roomKnow
                             <span className="inline-flex items-center gap-1.5"><i className="h-3 w-3 rounded-[3px] border border-dashed border-[#FFFFFF59]" />빈칸</span>
                             <span className="inline-flex items-center gap-1.5"><i className="h-3 w-3 rounded-[3px] border border-[#64DD1766] bg-[#64DD171F]" />내가 고친 칸</span>
                         </div>
-                        <p className="mt-2 px-1 text-[12.5px] leading-relaxed text-[#FFFFFF80]">{round ? "카드에 적힌 그대로(파 기준) 보여 드려요. 이름 칸을 눌러 내 줄을 고르고, 다른 칸은 눌러서 고칠 수 있어요. 카드에서 읽은 그대로면 공식 라운드로 남아요." : "카드에 적힌 그대로(파 기준) 보여 드려요. 이름 칸을 눌러 누구의 줄인지 고르고, 다른 칸은 눌러서 고쳐 주세요."}</p>
+                        <p className="mt-2 px-1 text-[12.5px] leading-relaxed text-[#FFFFFF80]">{round ? "카드에 적힌 그대로(파 기준) 보여 드려요. 이름 칸을 눌러 내 줄을 고르고, 다른 칸은 눌러서 고칠 수 있어요. 스코어카드로 올린 라운드는 공식 라운드로 남아요." : "카드에 적힌 그대로(파 기준) 보여 드려요. 이름 칸을 눌러 누구의 줄인지 고르고, 다른 칸은 눌러서 고쳐 주세요."}</p>
                         {round && error && <p role="alert" className="mt-3 rounded-xl bg-[#FF6E6E1F] px-3.5 py-3 text-[13px] leading-relaxed text-[#FF9C9C]" data-testid="scan-record-error">{error}</p>}
                     </div>
 
