@@ -47,6 +47,15 @@ const TAB_TITLE: Readonly<Record<Tab, string>> = { home: "랭큐 낚시", trip: 
 /** 표지 그림(client/public/fishing/art) — 등산의 표지와 같은 손(판화)으로 그린 새벽 바다. 그림에는 글자가 없다 */
 /** 바다 일곱 곳의 표지(같은 손의 판화) */
 const seaCover = (id: string) => `/fishing/art/sea-${id}.webp`;
+/** 구역의 머리 그림 띠(위판장 · 저수지 · 포구) — 같은 손의 판화. 종이 카드의 맨 위에 놓고 아래를 종이색으로 흐린다 */
+function PaperBand({ id, at = "50% 50%" }: { id: "market" | "reservoir" | "boats"; at?: string }) {
+    return (
+        <div className="relative h-[104px] overflow-hidden" aria-hidden>
+            <img src={`/fishing/art/band-${id}.webp`} alt="" width={640} height={640} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: at }} draggable={false} />
+            <div className="absolute inset-x-0 bottom-0 h-8" style={{ background: "linear-gradient(180deg,#EFE8D800 0%,#EFE8D8 100%)" }} />
+        </div>
+    );
+}
 const FS_HERO = "/fishing/art/hero.webp", FS_COVER_TRIP = "/fishing/art/cover-trip.webp", FS_COVER_BOOK = "/fishing/art/cover-book.webp";
 /** 조과 적기에 미리 들어가는 것 — 낚시터에서 왔으면 그 이름, 정출에서 왔으면 그 날 · 출조지 · 정출 */
 interface Preset { place: string; spot?: FishingSpotId | null; day?: string; tripId?: string }
@@ -355,7 +364,8 @@ function MarketBoard() {
     return (
         <FsSection title="위판장 소식" aside={`${md(first)}~${md(last)} · 경매 건수`} testid="fishing-market">
             <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, color: INK, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
-                <p className="px-3.5 pb-1 pt-3 text-[13px] break-keep" style={{ color: "#0F2838B3" }}>지난 이레, 전국 위판장에 많이 오른 어종</p>
+                <PaperBand id="market" at="50% 52%" />
+                <p className="px-3.5 pb-1 pt-1.5 text-[13px] break-keep" style={{ color: "#0F2838B3" }}>지난 이레, 전국 위판장에 많이 오른 어종</p>
                 <ul>
                     {rows.map((f, i) => {
                         const max = Math.max(1, ...f.counts);
@@ -409,6 +419,7 @@ function ReservoirBoard() {
         <FsSection title="민물 · 저수지 물높이" aside={mine.length ? `내 저수지 ${mine.length}곳` : "많이 찾는 저수지"} testid="fishing-reservoirs">
             {rows.length > 0 && (
                 <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, color: INK, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
+                    <PaperBand id="reservoir" at="50% 74%" />
                     <ul>
                         {rows.map((r, i) => {
                             const trend = reservoirTrend(r.delta);
@@ -746,6 +757,23 @@ function PortStrip({ code, today, onOpen }: { code: string; today: string; onOpe
  * 오늘의 물때 — 몇 물인지 크게, 앞으로 이레를 띠로. 음력으로 세는 값이라 바깥 자료 없이 늘 나온다.
  * 말하는 것은 물의 세기뿐이다(잘 낚인다는 말은 하지 않는다). 달력을 못 쓰는 기기에서는 아무것도 그리지 않는다.
  */
+/** 달의 모양 — 음력 날짜로 그린다(1일 삭 · 8일 상현 · 15일 보름 · 23일 하현). 종이 위의 먹과 흰 달 */
+function Moon({ day, size = 26 }: { day: number; size?: number }) {
+    const p = (((day - 1) % 29.53) + 29.53) % 29.53 / 29.53; // 0 삭 → 0.5 보름
+    const k = Math.cos(2 * Math.PI * p), waxing = p < 0.5;   // k: 1 삭 … -1 보름
+    const rx = (Math.abs(k) * 10).toFixed(2);
+    // 밝은 쪽 = 바깥 반원(차는 달은 오른쪽 · 기우는 달은 왼쪽) + 밝고 어두움의 경계(타원 호)
+    const outer = `M12 2 A10 10 0 0 ${waxing ? 1 : 0} 12 22`;
+    const inner = `A${rx} 10 0 0 ${waxing ? (k > 0 ? 0 : 1) : (k > 0 ? 1 : 0)} 12 2`;
+    return (
+        <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden>
+            <circle cx="12" cy="12" r="10" fill="#0F283833" />
+            <path d={`${outer} ${inner} Z`} fill="#FFFDF6" />
+            <circle cx="12" cy="12" r="10" fill="none" stroke="#0F283873" strokeWidth="1" />
+        </svg>
+    );
+}
+
 function TideCard({ today, sea, onSea, list }: { today: string; sea: TideSea; onSea: (id: TideSea) => void; list: readonly FishingCatch[] }) {
     const days = useMemo(() => tideDays(today, sea, 7), [today, sea]);
     const tally = useMemo(() => tideTally(list), [list]);
@@ -759,45 +787,41 @@ function TideCard({ today, sea, onSea, list }: { today: string; sea: TideSea; on
                 <h2 className="text-[18px] font-semibold tracking-tight">오늘의 물때</h2>
                 <span className="shrink-0 text-[12.5px]" style={{ color: C.dim }}>음력 {now.lunar.leap ? "윤" : ""}{now.lunar.month}월 {now.lunar.day}일</span>
             </div>
-            <div className="rounded-2xl bg-[#FFFFFF0A] px-4 pb-3.5 pt-3.5">
-                <div className="flex items-center justify-end gap-2">
-                    <div className="flex shrink-0 rounded-full p-0.5" style={{ background: "#FFFFFF0F" }} role="group" aria-label="바다">
+            {/* 종이 물때표 — 달의 모양과 함께 이레. 보름 · 그믐이 사리, 반달이 조금이다 */}
+            <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, color: INK, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
+                <div className="flex items-end gap-3 px-3.5 pt-3.5">
+                    <p className="min-w-0 flex-1 text-[34px] font-semibold leading-none tracking-tight tabular-nums" data-testid="fishing-tide-now">{now.name}</p>
+                    <div className="flex shrink-0 rounded-full p-0.5" style={{ background: "#0F283814" }} role="group" aria-label="바다">
                         {TIDE_SEAS.map((s) => (
                             <button key={s.id} type="button" aria-pressed={sea === s.id} onClick={() => onSea(s.id)} className={cn("h-8 rounded-full px-2.5 text-[12px]", sea === s.id && "font-semibold")}
-                                style={sea === s.id ? { background: C.brand, color: C.onBrand } : { color: C.soft }} data-testid={`fishing-sea-${s.id}`}>{s.id === "west" ? "서해" : "남해 · 동해"}</button>
+                                style={sea === s.id ? { background: "#0F2838", color: "#F3ECDD" } : { color: "#0F283899" }} data-testid={`fishing-sea-${s.id}`}>{s.id === "west" ? "서해" : "남해 · 동해"}</button>
                         ))}
                     </div>
                 </div>
-                <div className="mt-2 flex items-end gap-3">
-                    <p className="text-[34px] font-semibold leading-none tracking-tight tabular-nums" data-testid="fishing-tide-now">{now.name}</p>
-                    <p className="min-w-0 flex-1 pb-0.5 text-[14px]" style={{ color: C.foam }}>{TIDE_PHASE_TEXT[now.phase]}</p>
-                </div>
-                <p className="mt-1.5 text-[12.5px]" style={{ color: C.dim }}>{[until(spring, "사리"), until(neap, "조금")].filter(Boolean).join(" · ")}</p>
+                <p className="px-3.5 pt-2 text-[14px]" style={{ color: "#0F2838CC" }}>{TIDE_PHASE_TEXT[now.phase]}</p>
+                <p className="px-3.5 pt-0.5 text-[12.5px]" style={{ color: "#0F283899" }}>{[until(spring, "사리"), until(neap, "조금")].filter(Boolean).join(" · ")}</p>
                 {/* 내 기록을 센 것 — 예보가 아니다. 물때가 붙은 조과가 셋은 쌓여야 말한다 */}
                 {tally.total >= 3 && (tally.byPhase[now.phase] > 0 || tally.top) && (
-                    <p className="mt-2 rounded-xl px-3 py-2 text-[12.5px] leading-relaxed [word-break:keep-all]" style={{ background: "#FFFFFF0A", color: C.soft }} data-testid="fishing-tide-mine">
+                    <p className="mx-3.5 mt-2.5 rounded-xl px-3 py-2 text-[12.5px] leading-relaxed [word-break:keep-all]" style={{ background: "#0F28380F", color: "#0F2838CC" }} data-testid="fishing-tide-mine">
                         {tally.byPhase[now.phase] > 0
-                            ? <>내 조과 {tally.total}줄 가운데 <span className="font-semibold" style={{ color: C.foam }}>{tally.byPhase[now.phase]}줄</span>이 오늘 같은 날에 나왔어요{tally.top === now.phase ? " · 내 조과가 가장 많이 나온 물이에요" : tally.top ? ` · 가장 많이 나온 건 ${TIDE_PHASE_TEXT[tally.top]}(${tally.byPhase[tally.top]}줄)` : ""}</>
-                            : <>내 조과 {tally.total}줄 가운데 가장 많이 나온 건 <span className="font-semibold" style={{ color: C.foam }}>{TIDE_PHASE_TEXT[tally.top!]}</span>({tally.byPhase[tally.top!]}줄)이에요</>}
+                            ? <>내 조과 {tally.total}줄 가운데 <span className="font-semibold" style={{ color: INK }}>{tally.byPhase[now.phase]}줄</span>이 오늘 같은 날에 나왔어요{tally.top === now.phase ? " · 내 조과가 가장 많이 나온 물이에요" : tally.top ? ` · 가장 많이 나온 건 ${TIDE_PHASE_TEXT[tally.top]}(${tally.byPhase[tally.top]}줄)` : ""}</>
+                            : <>내 조과 {tally.total}줄 가운데 가장 많이 나온 건 <span className="font-semibold" style={{ color: INK }}>{TIDE_PHASE_TEXT[tally.top!]}</span>({tally.byPhase[tally.top!]}줄)이에요</>}
                     </p>
                 )}
-
-                <ol className="mt-3.5 grid grid-cols-7 gap-1" aria-label="앞으로 이레의 물때">
+                <ol className="mt-3 grid grid-cols-7" style={{ borderTop: "1px dashed #0F283826" }} aria-label="앞으로 이레의 물때">
                     {days.map((t, i) => {
                         const weekend = ["토", "일"].includes(tideWeekday(t.ymd));
                         return (
-                            <li key={t.ymd} className="flex flex-col items-center rounded-xl pb-1.5 pt-2" style={i === 0 ? { background: "#FFFFFF14" } : undefined} data-testid="fishing-tide-day">
-                                <span className="text-[12px]" style={{ color: weekend ? C.sun : C.dim }}>{i === 0 ? "오늘" : `${Number(t.ymd.slice(8))} ${tideWeekday(t.ymd)}`}</span>
-                                <span aria-hidden className="mt-1.5 flex h-9 w-full items-end justify-center">
-                                    <span className="w-[14px] rounded-t-[5px]" style={{ height: `${Math.round(5 + t.flow * 31)}px`, background: t.mark === "사리" ? C.sun : t.mark === "조금" ? "#F3ECDD4D" : "#8FB3C2", opacity: t.mark ? 1 : 0.35 + t.flow * 0.65 }} />
-                                </span>
-                                <span className={cn("mt-1.5 text-[12.5px] tabular-nums", (i === 0 || t.mark) && "font-semibold")} style={{ color: t.mark === "사리" ? C.sun : C.foam }}>{t.name}</span>
-                                <span className="h-[16px] text-[12px] leading-[16px]" style={{ color: t.mark === "사리" ? C.sun : C.dim }}>{t.mark && t.mark !== t.name ? t.mark : ""}</span>
+                            <li key={t.ymd} className="flex flex-col items-center pb-2 pt-2.5" style={{ background: i === 0 ? "#0F28380F" : undefined, borderLeft: i ? "1px dashed #0F28381F" : undefined }} data-testid="fishing-tide-day">
+                                <span className="text-[12px]" style={{ color: weekend ? "#B7462A" : "#0F283899" }}>{i === 0 ? "오늘" : `${Number(t.ymd.slice(8))} ${tideWeekday(t.ymd)}`}</span>
+                                <span className="mt-1.5"><Moon day={t.lunar.day} /></span>
+                                <span className={cn("mt-1.5 text-[12.5px] tabular-nums", (i === 0 || t.mark) && "font-semibold")} style={{ color: t.mark === "사리" ? SEAL : INK }}>{t.name}</span>
+                                <span className="h-[16px] text-[12px] leading-[16px]" style={{ color: t.mark === "사리" ? SEAL : "#0F283880" }}>{t.mark && t.mark !== t.name ? t.mark : ""}</span>
                             </li>
                         );
                     })}
                 </ol>
-                <p className="mt-1 text-[12px] leading-relaxed" style={{ color: C.dim }}>음력 날짜로 센 물때예요. 만조 · 간조 시각은 항구마다 달라요.</p>
+                <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>음력 날짜로 센 물때예요. 달이 차고 기우는 대로 물이 세지고 약해져요.</p>
             </div>
         </section>
     );
@@ -1065,7 +1089,12 @@ function Boats({ today }: { today: string }) {
                     ); })}
                 </div>
             )}
-            {!q ? <p className="mt-3 rounded-2xl bg-[#FFFFFF0A] px-5 py-6 text-center text-[13.5px] leading-relaxed break-keep" style={{ color: C.soft }}>타려는 배가 신고된 낚시어선인지, 정원과 신고 기간을 확인해 보세요.</p>
+            {!q ? (
+                <div className="mt-3 overflow-hidden rounded-2xl" style={{ background: PAPER, color: INK, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
+                    <PaperBand id="boats" at="50% 54%" />
+                    <p className="px-5 pb-5 pt-2 text-center text-[13.5px] leading-relaxed break-keep" style={{ color: "#0F2838CC" }}>타려는 배가 신고된 낚시어선인지, 정원과 신고 기간을 확인해 보세요.</p>
+                </div>
+            )
                 : isLoading ? <div className="mt-3 h-40 animate-pulse rounded-2xl bg-[#FFFFFF0F]" />
                     : !data?.items.length ? <p className="mt-3 rounded-2xl bg-[#FFFFFF0A] px-5 py-6 text-center text-[13.5px]" style={{ color: C.soft }} data-testid="fishing-boat-none">찾는 배가 없어요. 지역이나 항 이름으로 적어 보세요.</p>
                         : (
