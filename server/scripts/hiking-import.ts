@@ -23,6 +23,7 @@ import { courseStats, distM, nearestOnLine, packLine, thinLine, withKm, type Lin
 import { cleanMountainGuide } from "../../shared/hikingGuide";
 import { hikingPoiKind } from "../../shared/hikingPois";
 import { HIKING_SUMMIT_FIXES, applySummitFix } from "../../shared/hikingSummitFix";
+import { isTwinFrom, twinGuideSource } from "../../shared/hikingTwins";
 
 const args = process.argv.slice(2);
 const flagAt = (f: string) => args.indexOf(f);
@@ -146,7 +147,8 @@ async function main() {
 
     // 싣는 산
     const withCourse = new Set(link.values());
-    let mountains = master.filter((m) => m.tier === 1 || m.tier === 2 || withCourse.has(m.id));
+    // 두 줄로 들어온 산의 자리 없는 쪽은 싣지 않는다(shared/hikingTwins) — 글은 아래에서 자리 있는 쪽에 붙인다
+    let mountains = master.filter((m) => (m.tier === 1 || m.tier === 2 || withCourse.has(m.id)) && !isTwinFrom(m.id));
     if (only) mountains = mountains.filter((m) => m.name === only);
     const loaded = new Set(mountains.map((m) => m.id));
     // 주소 — 이미 실린 산은 그 주소 그대로(다시 적재해도 주소가 바뀌지 않게). 새 산은 명산 · 높은 산부터 이름 그대로를 갖는다
@@ -196,7 +198,7 @@ async function main() {
     let guideKept = 0, guideDropped = 0;
     const mountainRows = mountains.map((m) => {
         const h = m.elevationM != null ? Math.round(m.elevationM) : null;
-        const raw = guideOf.get(m.id);
+        const raw = guideOf.get(m.id) ?? guideOf.get(twinGuideSource(m.id) ?? "");
         const guide = raw ? cleanMountainGuide(raw, today) : null;
         if (raw) guide ? guideKept++ : guideDropped++;
         const st = perMountain.get(m.id);

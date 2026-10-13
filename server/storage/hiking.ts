@@ -9,6 +9,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { hasMountainGuide, type MountainGuide } from "../../shared/hikingGuide.js";
+import { twinSlug } from "../../shared/hikingTwins.js";
 import { distM, type LinePoint } from "../../shared/hikingGeo.js";
 import type { HikingPoiKind } from "../../shared/hikingPois.js";
 import { readSurface, type CourseSurface } from "../../shared/hikingSurface.js";
@@ -115,7 +116,8 @@ export async function allMountains(): Promise<MountainSummary[]> {
 }
 export async function mountainBySlug(slug: string): Promise<MountainSummary | null> {
     await allMountains();
-    return cache?.bySlug.get(slug) ?? null;
+    // 두 줄로 실렸던 산의 옛 주소는 남은 산으로 잇는다(shared/hikingTwins) — 받은 쪽은 답의 slug 로 진짜 주소를 안다
+    return cache?.bySlug.get(slug) ?? cache?.bySlug.get(twinSlug(slug)) ?? null;
 }
 /** 산마다 자료를 마지막으로 고친 날(YYYY-MM-DD) — 사이트맵의 lastmod. 산의 id → 날 */
 export async function mountainUpdatedDays(): Promise<ReadonlyMap<string, string>> {
@@ -144,10 +146,13 @@ export function nearbyMountains(all: readonly MountainSummary[], m: { id: string
 /** 산 한 곳 — 글 · 코스(선) · 지점. 없으면 null */
 export async function getMountainDetail(slug: string): Promise<MountainDetail | null> {
     try {
-        const [m] = await rows<any>(sql`
+        const read = (s: string) => rows<any>(sql`
             select id, slug, name, peak_name, aliases, height_m, lat, lng, region, sido, sigungu, dong, tier, lists, traits, guide, course_count, course_min_km, course_max_km, poi_counts,
                    (guide is not null) as has_guide, guide->>'subtitle' as subtitle
-            from hiking_mountains where slug = ${slug}`);
+            from hiking_mountains where slug = ${s}`);
+        // 없는 주소가 합쳐진 산의 옛 주소면 남은 산을 준다(답의 slug 가 진짜 주소 — 화면 · 검색용 화면의 canonical 이 그것을 쓴다)
+        let [m] = await read(slug);
+        if (!m && twinSlug(slug) !== slug) [m] = await read(twinSlug(slug));
         if (!m) return null;
         const [own, linked, ownPois] = await Promise.all([
             // 차례: 정상을 지나는 코스가 먼저(산을 찾아온 사람이 먼저 보는 길 — 북한산은 36개 가운데 셋뿐이다), 그 안에서는

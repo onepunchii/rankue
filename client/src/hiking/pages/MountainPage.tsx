@@ -13,7 +13,7 @@
  * ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상, 굵기는 semibold 까지. 형제 key 는 구역마다 다르게.
  */
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Link, useRoute } from "wouter";
+import { Link, useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { LucideChevronDown, LucideLocateFixed, LucideShare2 } from "@/lib/icons";
 import { useSeo } from "@/hooks/useSeo";
@@ -330,6 +330,9 @@ export default function MountainPage() {
     const slug = params?.slug ? decodeURIComponent(params.slug) : "";
     const { data: d, isLoading, isError } = useQuery<MountainDetail>({ queryKey: mountainKey(slug), enabled: !!slug, retry: false });
     const { toast } = useToast();
+    // 두 줄로 실렸던 산의 옛 주소(shared/hikingTwins)로 들어오면 서버가 남은 산을 준다 — 주소 줄도 그 산의 것으로 바꿔 끼운다(뒤로 가기에 옛 주소가 남지 않게)
+    const [, setLocation] = useLocation();
+    useEffect(() => { if (d && slug && d.slug !== slug) setLocation(hikingMountainPath(d.slug), { replace: true }); }, [d, slug, setLocation]);
     const region = hikingRegion(d?.region);
     // 검색: 제목 · 설명은 검색용 화면(server/seo/hiking)과 같은 함수. 구조화 자료는 참조가 바뀌면 다시 심으므로 memo
     const seo = useMemo(() => {
