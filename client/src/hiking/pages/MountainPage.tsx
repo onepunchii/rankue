@@ -40,6 +40,7 @@ import { useHikingStamps } from "../stamps/useHikingStamps";
 import { trailPath } from "../trail/useTrail";
 import { MyPhotos } from "../photos/MyPhotos";
 import { WishButton } from "../wish/WishParts";
+import { summitReach, summitRewards } from "@shared/hikingStamps";
 import { MountainPhotos } from "../photos/MountainPhotos";
 import { HIKING_PHOTOS_ANCHOR, HIKING_PHOTO_LABEL } from "@shared/hikingPhotos";
 import { stampDate } from "../lib/date";
@@ -343,6 +344,8 @@ export default function MountainPage() {
     const course = d.courseList[ci] ?? null;
     const pickCourse = (i: number) => setPick({ slug: d.slug, i });
     const fromMe = fromMeText(loc.here, d);
+    // 도장 카드의 '정상까지' — 기기에서만 잰다
+    const reach = summitReach(loc.here, d);
 
     // 공유 — 기기의 공유 창, 없으면 주소 복사(골프장 상세와 같은 순서)
     const share = async () => {
@@ -397,23 +400,52 @@ export default function MountainPage() {
                     </div>
                 </div>
 
-                {/* 이 산의 도장 — 정상에서 받는 것. 방문자를 가입으로 잇는다 */}
+                {/* 이 산의 도장 — 정상에서 받는 것. 방문자를 가입으로 잇는다.
+                    카드 하나에 다 있다(2026-10-13 오너: "요기 기능을 넣으면 어때? 디자인도 살짝"): 받는 것 · 정상까지 얼마나 남았나 · 인증 · 가고 싶은 산 */}
                 <div className="px-5 pt-4">
-                    <div className="flex items-center gap-3.5 rounded-2xl bg-[#F4EFE3] px-3.5 py-3 text-[#0E2A33]" data-testid="mountain-stamp">
-                        <div className="w-[88px] shrink-0">
-                            <SummitStamp name={d.name} heightM={d.heightM} ink={regionInk(d.region)} tilt={-4} state={mine ? (mine.verified ? "on" : "faded") : "on"} date={mine ? stampDate(new Date(mine.firstAt)) : null} />
+                    <div className="overflow-hidden rounded-[22px] bg-[#F4EFE3] text-[#0E2A33]" style={{ boxShadow: "0 6px 16px rgba(0,0,0,0.28)" }} data-testid="mountain-stamp" data-done={mine?.verified ? "1" : "0"}>
+                        {/* 머리띠 — 무엇의 카드인지와 지금의 상태 */}
+                        <div className="flex items-center justify-between gap-2 px-4 py-2.5" style={{ background: mine?.verified ? "linear-gradient(90deg,#F28C6A,#E8A27E)" : "linear-gradient(90deg,#1F5560,#2F6F7A)" }}>
+                            <span className="text-[13px] font-semibold" style={{ color: mine?.verified ? "#2A1208" : "#F4EFE3" }}>{MOUNTAIN_LABEL.stamp}</span>
+                            {mine?.verified ? (
+                                <span className="rounded-full bg-[#2A120826] px-2 py-1 text-[12px] font-medium leading-none text-[#2A1208]">{stampDate(new Date(mine.firstAt))} 인증</span>
+                            ) : my.mine ? (
+                                <WishButton key={`wish:${d.id}`} slug={d.slug} mountainId={d.id} compact />
+                            ) : null}
                         </div>
-                        <div className="min-w-0 flex-1">
-                            <p className="text-[12.5px] text-[#8A5E00]">{MOUNTAIN_LABEL.stamp}</p>
-                            <p className="mt-0.5 text-[15.5px] font-semibold leading-snug break-keep">{mine?.verified ? `${d.name} 도장을 찍었어요` : `정상에서 인증하면 ${d.name} 도장이 찍혀요`}</p>
-                            <p className="mt-0.5 text-[13px] leading-snug text-[#0E2A3399] break-keep">{kfs ? (mine?.verified ? "이 산의 와펜이 배낭에 달렸어요." : "인증하면 이 산의 와펜이 배낭에 달리고, 산행 등급이 올라요.") : d.tier === 1 && region ? `${region.name} 도장첩의 한 칸이에요. 다 채우면 와펜을 받아요.` : "오른 산이 늘수록 산행 등급이 올라요."}</p>
-                            {my.mine && <SummitCheckin key={`checkin:${d.id}`} mountainId={d.id} name={d.name} stamp={mine} hasSummit={d.lat != null && d.lng != null} region={d.region} patch={kfs} />}
+                        <div className="flex items-center gap-3.5 px-4 pt-3.5">
+                            <div className="relative w-[92px] shrink-0">
+                                <span className="absolute inset-[-6px] rounded-full" style={{ border: "1.5px dashed #0E2A3326" }} aria-hidden />
+                                <SummitStamp name={d.name} heightM={d.heightM} ink={regionInk(d.region)} tilt={-4} state={mine ? (mine.verified ? "on" : "faded") : "on"} date={mine ? stampDate(new Date(mine.firstAt)) : null} />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                                <p className="text-[16px] font-semibold leading-snug break-keep">{mine?.verified ? `${d.name} 도장을 찍었어요` : `정상에서 인증하면 ${d.name} 도장이 찍혀요`}</p>
+                                {/* 받는 것 */}
+                                <ul className="mt-2 flex flex-wrap gap-1.5" aria-label={mine?.verified ? "받은 것" : "받는 것"} data-testid="mountain-stamp-rewards">
+                                    {summitRewards({ patch: kfs, books: books.length, gradeLeft: my.grade.left, nextGrade: my.mine ? my.grade.next?.name ?? null : null, done: !!mine?.verified }).map((r, i) => (
+                                        <li key={`reward:${r}`} className="rounded-full px-2.5 py-1.5 text-[12.5px] font-medium leading-none" style={i === 0 ? { background: "#0E2A33", color: "#F4EFE3" } : { background: "#0E2A3312", color: "#0E2A33" }}>{r}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                        {/* 정상까지 얼마나 남았나 — 위치를 받을 수 있을 때만(묻지 않고), 아니면 눌러서 */}
+                        {!mine?.verified && d.lat != null && d.lng != null && (reach ? (
+                            <p className="mx-4 mt-3 flex items-center gap-2 rounded-xl px-3 py-2.5 text-[13.5px] font-medium leading-snug break-keep" style={reach.ready ? { background: "#2F6B4F24", color: "#1E5238" } : { background: "#0E2A330D", color: "#0E2A33" }} role="status" data-testid="mountain-stamp-reach" data-ready={reach.ready ? "1" : "0"}>
+                                <LucideLocateFixed className="h-4 w-4 shrink-0" aria-hidden />{reach.text}
+                            </p>
+                        ) : loc.ask ? (
+                            <button type="button" onClick={loc.ask} data-track-as="hiking-stamp-distance" data-testid="mountain-stamp-ask"
+                                className="mx-4 mt-3 flex h-10 w-[calc(100%-2rem)] items-center justify-center gap-1.5 rounded-xl bg-[#0E2A330D] text-[13.5px] text-[#0E2A33] active:bg-[#0E2A331F]">
+                                <LucideLocateFixed className="h-4 w-4 shrink-0" aria-hidden />정상까지 얼마나 남았는지 보기
+                            </button>
+                        ) : null)}
+                        <div className="px-4 pb-3.5">
+                            {my.mine
+                                ? <SummitCheckin key={`checkin:${d.id}`} mountainId={d.id} name={d.name} stamp={mine} hasSummit={d.lat != null && d.lng != null} region={d.region} patch={kfs} />
+                                : <p className="mt-3 border-t border-[#0E2A331A] pt-3 text-[13px] leading-snug text-[#0E2A3399] break-keep">{kfs ? "인증하면 이 산의 와펜이 배낭에 달리고, 산행 등급이 올라요." : d.tier === 1 && region ? `${region.name} 도장첩의 한 칸이에요. 다 채우면 와펜을 받아요.` : "오른 산이 늘수록 산행 등급이 올라요."}</p>}
                         </div>
                     </div>
                 </div>
-
-                {/* 가고 싶은 산에 담기 — 골프장의 '관심 등록' 자리. 이미 오른 산에는 그리지 않는다(도장이 그 일을 한다) */}
-                {!mine?.verified && <WishButton key={`wish:${d.id}`} slug={d.slug} mountainId={d.id} className="px-5 pt-3" />}
 
                 {/* 이 산이 칸으로 든 도장첩 — 한 산으로 여러 권이 같이 찬다는 것을 보여 준다 */}
                 {books.length > 0 && (

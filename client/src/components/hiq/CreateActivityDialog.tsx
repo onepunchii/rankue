@@ -1,5 +1,5 @@
 import { useForm } from "react-hook-form";
-import { useEffect, useMemo } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { format } from "date-fns";
@@ -38,6 +38,11 @@ import { IconButton } from "@/components/hiq/crew-ui";
 import { useT } from "@/lib/i18n";
 import { useDateLocale } from "@/components/hiq/crew-board/dateLocale";
 import { HIKING_ACTIVITY_CATEGORY } from "@shared/crewSport";
+// 타입만 — 셈(shared/crewMountain 과 그것이 끌고 오는 등산의 규칙)은 아래에서 불러 오는 조각이 한다
+import type { ActivityFields, PickedMountain } from "@shared/crewMountain";
+
+// 산 고르기는 등산의 조각 — 메인 청크에 싣지 않고 산악회의 창일 때만 불러 온다(산악회 홈의 CrewSummits 와 같은 길).
+const ActivityMountainPicker = lazy(() => import("@/hiking/crew/ActivityMountainPicker").then((m) => ({ default: m.ActivityMountainPicker })));
 
 interface CreateActivityDialogProps {
     open: boolean;
@@ -102,9 +107,20 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
         },
     });
 
+    // 산악회의 '산 고르기' — 고른 산은 저장되지 않는다(칸을 채우는 일까지 — shared/crewMountain 머리말). 창은 조각이 정해 준 글을 두 칸에 넣기만 한다.
+    const [pickedMountain, setPickedMountain] = useState<PickedMountain | null>(null);
+    const readMountainFields = (): ActivityFields => ({ title: form.getValues("title") ?? "", place: form.getValues("locationName") ?? "" });
+    const fillMountainFields = (next: ActivityFields, picked: PickedMountain | null) => {
+        form.setValue("locationName", next.place, { shouldDirty: true });
+        // 모임명은 바뀔 때만 건드린다 — 채워졌으면 '모임명을 입력해주세요'도 같이 걷힌다(비울 때는 오류를 띄우지 않는다)
+        if (next.title !== (form.getValues("title") ?? "")) form.setValue("title", next.title, { shouldDirty: true, shouldValidate: next.title !== "" });
+        setPickedMountain(picked);
+    };
+
     // Reset form when initialData changes or dialog opens
     useEffect(() => {
         if (open) {
+            setPickedMountain(null);
             if (initialData) {
                 // Edit Mode: Populate form
                 const dt = new Date(initialData.activityDate);
@@ -321,6 +337,14 @@ export function CreateActivityDialog({ open, onOpenChange, crewId, sportCategory
                                 )}
                             />
                         </div>
+
+                        {/* 산 고르기 — 산악회만. 고르면 바로 아래 '모이는 곳'에 산의 자리가, 비어 있는 모임명에 "<산> 산행"이 채워진다.
+                            두 칸 모두 그 뒤에 손으로 고칠 수 있다. 자리의 틀은 조각을 불러 오는 동안 창이 덜컥거리지 않게 두는 것(등산의 색 · 리터럴) */}
+                        {hiking && (
+                            <Suspense fallback={<div className="h-[132px] rounded-2xl bg-[#0E2A33]" aria-hidden="true" />}>
+                                <ActivityMountainPicker picked={pickedMountain} read={readMountainFields} onFill={fillMountainFields} />
+                            </Suspense>
+                        )}
 
                         <div className="grid grid-cols-[1.5fr_1fr] gap-4">
                             <FormField

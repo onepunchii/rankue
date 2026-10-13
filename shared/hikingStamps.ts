@@ -13,6 +13,7 @@
  * 도장첩의 칸은 자료에서 만든다(hikingBooks) — 골프처럼 손으로 적은 명단이 아니라 산의 목록 소속 · 권역 · 특성으로.
  * 순수 함수만(서버 · 화면이 같이 쓴다). ⚠️ 서버가 임포트하는 shared 파일 — 상대 임포트는 반드시 './x.js'.
  */
+import { distM } from "./hikingGeo.js";
 import { HIKING_REGIONS, type HikingRegionId } from "./hikingMountains.js";
 import { HIKING_FEATURES } from "./hikingFeatures.js";
 import { hikingGradesDue } from "./hikingGrade.js";
@@ -200,6 +201,29 @@ export function hikingAwardsDue(mountains: readonly StampMountain[], summits: re
 // ── 정상 인증 ──────────────────────────────────────────────────────
 /** 정상에서 이 안이면 인증(m). 정상석 둘레와 산 위의 위치 오차를 받아 주되, 능선 아래는 안 되는 거리 */
 export const SUMMIT_RADIUS_M = 150;
+
+/**
+ * 정상 인증 카드의 '정상까지' 한 줄(2026-10-13 오너: "요기 기능을 넣으면 어때") — 내 자리에서 정상까지의 직선 거리.
+ * 반경 안이면 ready(지금 인증할 수 있다). **기기에서만 셈한다** — 이 값은 서버로 가지 않는다(인증을 누를 때만 위치가 간다).
+ * 나라 밖처럼 터무니없이 멀면 null(줄을 그리지 않는다).
+ */
+export function summitReach(me: { lat: number; lng: number } | null | undefined, summit: { lat: number | null; lng: number | null }): { m: number; ready: boolean; text: string } | null {
+    if (!me || summit.lat == null || summit.lng == null) return null;
+    const m = distM(me.lat, me.lng, summit.lat, summit.lng);
+    if (!Number.isFinite(m) || m > 700_000) return null;
+    const ready = m <= SUMMIT_RADIUS_M;
+    const far = m < 1000 ? `${Math.max(10, Math.round(m / 10) * 10)}m` : m < 10_000 ? `${(Math.round(m / 100) / 10).toFixed(1)}km` : `${Math.round(m / 1000)}km`;
+    return { m: Math.round(m), ready, text: ready ? "정상에 왔어요 — 지금 인증할 수 있어요" : `정상까지 직선 ${far} · ${SUMMIT_RADIUS_M}m 안에서 인증돼요` };
+}
+
+/** 이 산을 인증하면 받는 것 — 카드의 딱지. 이미 인증한 산이면 받은 것으로 읽는다 */
+export function summitRewards(o: { patch: boolean; books: number; gradeLeft: number; nextGrade: string | null; done: boolean }): string[] {
+    const out = ["정상 도장"];
+    if (o.patch) out.push("산 와펜");
+    if (o.books > 0) out.push(`도장첩 ${o.books}권에 한 칸`);
+    if (!o.done && o.nextGrade) out.push(o.gradeLeft <= 1 ? `등급 '${o.nextGrade}'` : `다음 등급까지 ${o.gradeLeft}곳`);
+    return out;
+}
 /** 이보다 흐린 위치(정확도 반경, m)는 판단에 쓰지 않는다 */
 export const SUMMIT_MAX_ACCURACY_M = 200;
 /** 남기는 거리 구간 — 좌표는 저장하지 않는다 */

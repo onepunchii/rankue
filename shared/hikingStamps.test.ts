@@ -4,10 +4,7 @@ import { resolve } from "node:path";
 import { HIKING_FEATURES, hikingFeatureSize, hikingFeaturesInMonth, hikingFeaturesOf } from "./hikingFeatures";
 import { HIKING_GRADES, hikingGrade, hikingGradeArt, hikingGradesDue, summitHeightSum } from "./hikingGrade";
 import { HIKING_GROUPS, HIKING_REGIONS, HIKING_TRAITS, hikingGroup, inHikingGroup } from "./hikingMountains";
-import {
-    HIKING_GRANDS, HIKING_PINS, hikingAwardsDue, hikingBookStates, hikingBooks, hikingSeasonOf, judgeSummit, kstDay, mountainStamps, summitHint,
-    type StampMountain, type Summit,
-} from "./hikingStamps";
+import { HIKING_GRANDS, HIKING_PINS, hikingAwardsDue, hikingBookStates, hikingBooks, hikingSeasonOf, judgeSummit, kstDay, mountainStamps, summitHint, type StampMountain, type Summit, summitReach, summitRewards, SUMMIT_RADIUS_M } from "./hikingStamps";
 
 const mt = (id: string, over: Partial<StampMountain> = {}): StampMountain => ({ id, slug: id, name: id, heightM: 800, region: "gangwon", tier: 1, lists: ["kfs100"], traits: [], ...over });
 const at = (d: string) => Date.parse(`${d}T03:00:00Z`);
@@ -192,5 +189,37 @@ describe("그림 — 이름을 건 것은 다 있다", () => {
     });
     it("목록 · 특성 묶음의 표지", () => {
         for (const g of HIKING_GROUPS) expect(has(`cover-list-${g.id}.webp`), g.id).toBe(true);
+    });
+});
+
+describe("도장 카드 — 정상까지 · 받는 것(2026-10-13)", () => {
+    const summit = { lat: 38.1191, lng: 128.4654 };
+    it("정상까지의 직선 거리 — 반경 안이면 지금 인증할 수 있다고 말한다", () => {
+        const at = summitReach({ lat: 38.1192, lng: 128.4655 }, summit)!;
+        expect(at.ready).toBe(true); expect(at.m).toBeLessThan(SUMMIT_RADIUS_M); expect(at.text).toContain("지금 인증할 수 있어요");
+        const near = summitReach({ lat: 38.1162, lng: 128.4654 }, summit)!;          // 320m 남쪽
+        expect(near.ready).toBe(false); expect(near.text).toMatch(/^정상까지 직선 3[0-9]0m · 150m 안에서 인증돼요$/);
+        expect(summitReach({ lat: 38.0742, lng: 128.4654 }, summit)!.text).toMatch(/^정상까지 직선 5\.0km/);
+        expect(summitReach({ lat: 35.3, lng: 127.7 }, summit)!.text).toMatch(/^정상까지 직선 3\d\dkm/);
+    });
+    it("자리를 모르거나 터무니없이 멀면 줄을 그리지 않는다", () => {
+        expect(summitReach(null, summit)).toBeNull();
+        expect(summitReach({ lat: 38, lng: 128 }, { lat: null, lng: null })).toBeNull();
+        expect(summitReach({ lat: 35.68, lng: 139.76 }, summit)).toBeNull();          // 도쿄
+    });
+    it("받는 것 — 도장은 늘, 와펜 · 도장첩 · 등급은 해당할 때만. 이미 인증한 산은 등급을 말하지 않는다", () => {
+        expect(summitRewards({ patch: true, books: 6, gradeLeft: 1, nextGrade: "숲길", done: false })).toEqual(["정상 도장", "산 와펜", "도장첩 6권에 한 칸", "등급 \'숲길\'"]);
+        expect(summitRewards({ patch: false, books: 0, gradeLeft: 4, nextGrade: "능선", done: false })).toEqual(["정상 도장", "다음 등급까지 4곳"]);
+        expect(summitRewards({ patch: true, books: 5, gradeLeft: 3, nextGrade: "능선", done: true })).toEqual(["정상 도장", "산 와펜", "도장첩 5권에 한 칸"]);
+        expect(summitRewards({ patch: false, books: 1, gradeLeft: 0, nextGrade: null, done: false })).toEqual(["정상 도장", "도장첩 1권에 한 칸"]);
+    });
+    it("고정: 카드는 위치를 묻지 않고 받을 수 있을 때만 거리를 보이고, 그 값을 어디에도 보내지 않는다", () => {
+        const page = readFileSync(resolve(__dirname, "..", "client/src/hiking/pages/MountainPage.tsx"), "utf8");
+        expect(page).toContain("const reach = summitReach(loc.here, d);");
+        expect(page).toContain('data-testid="mountain-stamp-reach"');
+        expect(page).toContain('data-testid="mountain-stamp-ask"');
+        // 가고 싶은 산은 카드의 머리띠 안으로 — 아래의 큰 단추는 없다
+        expect(page).toContain("<WishButton key={`wish:${d.id}`} slug={d.slug} mountainId={d.id} compact />");
+        expect(page.match(/<WishButton /g)?.length).toBe(1);
     });
 });

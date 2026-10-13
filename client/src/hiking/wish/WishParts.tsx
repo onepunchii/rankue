@@ -36,7 +36,11 @@ const Flag = ({ on }: { on: boolean }) => (
 );
 
 /** 산 화면의 단추 — 누르면 담고, 다시 누르면 뺀다 */
-export function WishButton({ slug, mountainId, className }: { slug: string; mountainId: string; className?: string }) {
+export function WishButton({ slug, mountainId, className, compact = false }: {
+    slug: string; mountainId: string; className?: string;
+    /** 작은 딱지 모양 — 도장 카드의 머리띠 안에 놓일 때(짙은 바탕 위) */
+    compact?: boolean;
+}) {
     const { member, isLoading } = useAuth();
     const [, setLocation] = useLocation();
     const qc = useQueryClient();
@@ -58,6 +62,17 @@ export function WishButton({ slug, mountainId, className }: { slug: string; moun
     // 로그인했지만 등산이 아직 안 열린 회원 — 담을 곳이 없으니 그리지 않는다
     if (member && !w.mine) return null;
     const full = toggle.isError && /WISH_FULL|100곳/.test(String((toggle.error as { code?: string; message?: string } | null)?.code ?? "") + String((toggle.error as { message?: string } | null)?.message ?? ""));
+    if (compact) {
+        return (
+            <button type="button" aria-pressed={on} disabled={toggle.isPending} aria-label={on ? HIKING_WISH_LABEL.added : HIKING_WISH_LABEL.add}
+                onClick={() => { if (!member) { goLogin(setLocation); return; } toggle.mutate(!on); }}
+                data-track-as="hiking-wish" data-testid="hk-wish" data-on={on ? "1" : "0"}
+                className={`flex h-8 shrink-0 items-center gap-1 rounded-full px-2.5 text-[12.5px] font-medium leading-none active:opacity-80 ${className ?? ""}`}
+                style={on ? { background: "#F6D9A8", color: "#2A1F08" } : { background: "#FFFFFF24", color: "#F4EFE3", boxShadow: "inset 0 0 0 1px #FFFFFF4D" }}>
+                <Flag on={on} />{on ? "담았어요" : "가고 싶은 산"}
+            </button>
+        );
+    }
     return (
         <div className={className}>
             <button type="button" aria-pressed={on} disabled={toggle.isPending}
