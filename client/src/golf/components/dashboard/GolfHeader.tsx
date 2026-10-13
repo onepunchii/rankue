@@ -10,6 +10,6 @@ interface GolfHeaderProps {
  * 비로그인에게는 종 자리에 "로그인" 단추가 놓인다(알림 수도 부르지 않는다) — SportHeader 가 맡는다.
  */
 export function GolfHeader({ member: _member }: GolfHeaderProps) {
-    // 화면의 옆 여백(p-6)을 벗어나 조금 넓게 — 종목 셋 · 알림 · 전체가 폭 360 에 한 줄로 들어가게
-    return <SportHeader sport="GOLF" className="-mx-6 px-3 -mt-2 mb-6" />;
+    // 화면의 여백(p-6)을 벗어나 끝에서 끝까지, 맨 위부터 — 세 종목의 머리줄이 같은 자리 · 같은 크기다(치수는 SportHeader 한 곳에 있다)
+    return <SportHeader sport="GOLF" bleed={24} lift={24} className="mb-5" />;
 }

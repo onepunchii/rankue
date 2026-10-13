@@ -521,7 +521,36 @@ describe("당구 홈", () => {
             expect(bar).not.toMatch(/\bgolfOk\b/);
             // 등산은 등산이 열린 회원에게만(한국어 화면에서만) · 언어 단추는 당구에만
             expect(bar).toContain('...(hikingOk || sport === "HIKING" ? [{ id: "HIKING" as const');
-            expect(bar).toContain('const showLang = sport === "BILLIARDS";');
+            // 언어 단추는 머리줄이 아니라 당구 홈의 이름 줄에 있다 — 머리줄에 넣으면 당구에서만 종목 전환과 종이 밀린다
+            expect(bar).not.toMatch(/LanguageSheet|LucideTranslate/);
+            expect(src).toContain("<LanguageSheet open={langOpen} onOpenChange={setLangOpen} />");
+            expect(src).toContain('data-testid="home-lang"');
+            expect(code(client("golf/components/dashboard/GolfHeader.tsx"))).not.toMatch(/LanguageSheet|LucideTranslate/);
+            expect(code(client("hiking/pages/HikingHome.tsx"))).not.toMatch(/LanguageSheet|LucideTranslate/);
+        });
+
+        it("머리줄의 치수는 종목과 상관없이 하나다 — 크기를 줄이는 가지가 없고, 세 홈이 같은 자리(맨 위 · 붙어 따라옴)에 놓는다", () => {
+            // 2026-10-13 오너: "헤더 크기가 일정하지 않다 — 카테고리를 바꾸더라도 이질감 없이 버튼이 고정되어 있게 · 등산처럼 헤더 고정"
+            expect(bar).toContain("export const SPORT_HEADER_SIZE = { row: 56, side: 16, wordmark: 13, pill: 32, button: 34, gap: 4 } as const;");
+            expect(bar).not.toMatch(/\btight\b|sports\.length === 3|showLang/);
+            // 크기는 치수 표에서만 온다(종목에 따라 갈리는 삼항이 색 말고는 없다)
+            expect(bar).toContain("<RankueWordmark color={c.brand} height={z.wordmark} />");
+            expect(bar).toContain("const iconSize = { width: z.button, height: z.button };");
+            expect(bar.match(/px-2\.5 text-\[13px\]/g)?.length).toBe(2);
+            // 고르지 않은 알약도 고른 것(굵은 글씨)과 같은 폭 — 종목을 바꿔도 전환 자리가 움직이지 않는다
+            expect(bar).toContain('<span className="invisible font-semibold" aria-hidden>{s.label}</span>');
+            // 세 종목 모두 맨 위에 붙는다 · 상태바 여백은 스스로(전역 규칙이 한 번 더 밀지 않게 rk-no-safe)
+            expect(bar).toContain("className={`rk-no-safe sticky top-0 z-40 backdrop-blur-md ${className ?? \"\"}`}");
+            expect(bar).toContain("marginTop: `calc(${-lift}px - env(safe-area-inset-top, 0px))`, paddingTop: \"env(safe-area-inset-top, 0px)\"");
+            // 홈마다 바탕 상자의 여백만 알려 준다 — 당구 px-5, 골프 p-6, 등산은 여백 없음
+            expect(src).toContain('<SportHeader sport="BILLIARDS" bleed={20} />');
+            expect(code(client("golf/components/dashboard/GolfHeader.tsx"))).toContain('<SportHeader sport="GOLF" bleed={24} lift={24} className="mb-5" />');
+            expect(code(client("hiking/pages/HikingHome.tsx"))).toContain('<SportHeader sport="HIKING" />');
+            // 붙어 따라오려면 화면 상자가 스크롤 상자여서는 안 된다 — 골프 홈은 가로 넘침을 clip 으로 자른다
+            const golfHome = client("golf/pages/Dashboard.tsx");
+            expect(golfHome).toContain('className="golf-home golf-home-clip min-h-screen bg-[#0A0A0A] text-white p-6 pb-32 font-sans relative"');
+            expect(golfHome).not.toMatch(/golf-home[^"]*overflow-x-hidden/);
+            expect(client("index.css")).toMatch(/\.golf-home-clip \{ overflow-x: hidden; \}\n@supports \(overflow: clip\) \{\n  \.golf-home-clip \{ overflow-x: clip; \}/);
         });
     });
 
