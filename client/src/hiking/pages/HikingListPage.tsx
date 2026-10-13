@@ -68,6 +68,17 @@ export default function HikingListPage() {
                                 <MountainMap mountains={famous} region={region.id} />
                             </HkSection>
                         )}
+                        {/* 묶음(목록 · 특성) — 이 산들이 어디어디에 있는지부터 보여 준다(2026-10-13 오너: "지도를 넣어서 어디어디 산인지 보이게") */}
+                        {group && famous.length > 0 && (
+                            <HkSection title="어디에 있는 산일까" aside={`명산 ${famous.length}곳 · 산을 눌러 보세요`}>
+                                <MountainMap mountains={famous} fit labelAll={famous.length <= 30} />
+                                {famous.length < items.length && (
+                                    <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep" data-testid="hiking-list-map-note">
+                                        이 묶음의 산 {data.total.toLocaleString("en-US")}곳 가운데 명산 {famous.length}곳을 지도에 그렸어요. 나머지는 아래 목록에 있어요.
+                                    </p>
+                                )}
+                            </HkSection>
+                        )}
                         <HkSection title={`산 ${shown.length.toLocaleString("en-US")}곳`} aside={group?.id === "kfs100" ? "목록의 순서" : "명산 먼저 · 높은 순"}>
                             <input
                                 type="search" value={q} onChange={(e) => { setQ(e.target.value); setN(PAGE); }} placeholder="산 이름 · 시군으로 찾기" aria-label="산 이름 · 시군으로 찾기" data-testid="hiking-list-search"

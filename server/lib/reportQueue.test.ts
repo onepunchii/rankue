@@ -184,6 +184,7 @@ describe("작성자 안내(authorNoticeFor)", () => {
     it("이의제기 경로가 있는 대상에만 이의제기 안내를 붙인다", () => {
         expect(authorNoticeFor("blind", "community_comment")?.body).toContain("이의제기");
         expect(authorNoticeFor("blind", "golf_photo")?.body).toContain("이의제기");
+        expect(authorNoticeFor("blind", "hiking_photo")?.body).toContain("이의제기");
         expect(authorNoticeFor("blind", "golf_booking")?.body).not.toContain("이의제기");
     });
     it("이의제기 승인·반려는 결과를 알린다", () => {
@@ -207,6 +208,12 @@ describe("작성자 안내가 가는 곳(authorNoticeRoute)", () => {
     it("지운 콘텐츠로는 링크를 싣지 않는다", () => {
         expect(authorNoticeRoute({ targetType: "golf_photo", action: "delete", link: "/golf/course/x", roundId: "r1" }).url).toBeNull();
         expect(authorNoticeRoute({ targetType: "community_post", action: "delete", link: "/community/p1" }).url).toBeNull();
+    });
+    it("산행 사진은 등산 알림함으로 가서 그 산의 '내 산행 사진'을 연다 — 공개 목록의 주소(가려진 사진은 거기 없다)나 파일 주소로 보내지 않는다", () => {
+        expect(authorNoticeRoute({ targetType: "hiking_photo", action: "appeal_reject", link: "https://x.public.blob.vercel-storage.com/a.webp", hikingPath: "/hiking/mountains/bukhansan#sec-photos" }))
+            .toEqual({ category: "HIKING", url: "/hiking/mountains/bukhansan#sec-photos" });
+        expect(authorNoticeRoute({ targetType: "hiking_photo", action: "unblind", link: null })).toEqual({ category: "HIKING", url: "/hiking" });
+        expect(authorNoticeRoute({ targetType: "hiking_photo", action: "delete", link: null, hikingPath: "/hiking/mountains/bukhansan#sec-photos" }).url).toBeNull();
     });
     it("나머지는 운영 알림(당구 쪽)으로 원문을 연다", () => {
         expect(authorNoticeRoute({ targetType: "community_post", action: "blind", link: "/community/p1" })).toEqual({ category: "admin", url: "/community/p1" });
@@ -237,10 +244,13 @@ describe("다른 곳과 목록이 맞다", () => {
     it("이의제기를 받는 대상마다 접수 경로와 큐 SQL 의 이의제기 칸이 있다 — 하나라도 빠지면 '판단 필요'가 닫히지 않는다", () => {
         const community = readFileSync(new URL("../routes/modules/community.ts", import.meta.url), "utf8");
         const golf = readFileSync(new URL("../routes/modules/golf.ts", import.meta.url), "utf8");
+        const hiking = readFileSync(new URL("../routes/modules/hiking.ts", import.meta.url), "utf8");
         const repo = readFileSync(new URL("../storage/admin.repo.ts", import.meta.url), "utf8");
         const communityAppeals = JSON.parse(community.match(/router\.post\("\/appeals"[\s\S]*?if \(!(\[[^\]]+\])\.includes\(targetType\)\)/)![1]) as string[];
         for (const t of APPEALABLE_TARGETS) {
-            const route = t === "golf_photo" ? golf.includes(`router.post("/photos/:photoId/appeal"`) : communityAppeals.includes(t);
+            const route = t === "golf_photo" ? golf.includes(`router.post("/photos/:photoId/appeal"`)
+                : t === "hiking_photo" ? hiking.includes(`router.post("/photos/:id/appeal"`)
+                : communityAppeals.includes(t);
             expect(route, `${t} 이의제기 접수 경로`).toBe(true);
             expect(repo, `${t} 큐 SQL appeal_at`).toContain(`WHEN '${t}' THEN`);
         }

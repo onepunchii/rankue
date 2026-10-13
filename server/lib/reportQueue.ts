@@ -12,6 +12,7 @@ export const REPORT_TARGET_TYPES = [
     "community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "member", "golf_booking",
     "player_cheer",   // 선수 응원글(2026-09-13)
     "golf_photo",     // 라운드 사진(2026-09-30) — 골프장 페이지에 바로 뜨는 공개 사진과 경기 앨범
+    "hiking_photo",   // 산행 사진(2026-10-13) — 산의 화면에 바로 뜨는 공개 사진(shared/hikingPhotos HIKING_PHOTO_REPORT_TARGET 과 같은 값)
 ] as const;
 export type ReportTargetType = (typeof REPORT_TARGET_TYPES)[number];
 
@@ -25,21 +26,23 @@ export type QueueState = "open" | "actioned" | "dismissed";
 
 /** 가릴 수 있는 대상 — is_blinded 칸이 있고 읽는 쪽 쿼리가 그 칸을 지킨다. 크루 콘텐츠엔 그 칸이 없어 지우기만 된다. */
 // golf_photo 는 hidden_at 칸이 가림이다(골프장 페이지·앨범 쿼리가 지킨다, storage/golfPhoto.repo).
-export const BLINDABLE_TARGETS: readonly ReportTargetType[] = ["community_post", "community_comment", "golf_booking", "player_cheer", "golf_photo"];
+// hiking_photo 도 hidden_at 이다(산 화면의 공개 목록이 지킨다, storage/hikingPhotos listMountainPhotos).
+export const BLINDABLE_TARGETS: readonly ReportTargetType[] = ["community_post", "community_comment", "golf_booking", "player_cheer", "golf_photo", "hiking_photo"];
 /**
  * 지울 수 있는 대상. 골프 매물은 빠진다 — 지우면 누가 무엇을 올렸는지 추적이 사라져서 가리기만 한다
  * (community.repo 자동 블라인드와 같은 원칙). 회원은 콘텐츠가 아니라 제재 대상이다.
  */
 export const DELETABLE_TARGETS: readonly ReportTargetType[] = [
     "community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "player_cheer",
-    "golf_photo",
+    "golf_photo", "hiking_photo",
 ];
 /**
  * 작성자가 이의제기할 수 있는 대상 — 커뮤니티 글·댓글은 POST /community/appeals, 라운드 사진은 앨범의 '가려진 사진'에서
  * POST /golf/photos/:id/appeal(2026-09-30). 여기서 빠지면 큐가 이의제기를 '판단 필요'로 띄우고도 승인·반려 버튼을 만들지 않고
  * (해제도 '승인으로만' 막혀 있다) 작성자는 결과를 영영 못 받는다 — 라운드 사진이 그랬다(2026-10-01 감사 4.1).
+ * 산행 사진은 산 화면의 '내 산행 사진'에서 POST /hiking/photos/:id/appeal(2026-10-13).
  */
-export const APPEALABLE_TARGETS: readonly ReportTargetType[] = ["community_post", "community_comment", "golf_photo"];
+export const APPEALABLE_TARGETS: readonly ReportTargetType[] = ["community_post", "community_comment", "golf_photo", "hiking_photo"];
 
 /** 신고 접수 후 이 시간 안에 처리한다(운영 약속). 넘기면 큐에서 빨갛게 표시한다. */
 export const REPORT_SLA_HOURS = 24;
@@ -69,6 +72,7 @@ export const TARGET_LABEL: Record<ReportTargetType, string> = {
     golf_booking: "골프 매물",
     player_cheer: "선수 응원글",
     golf_photo: "라운드 사진",
+    hiking_photo: "산행 사진",
 };
 
 // 신고 화면(ReportDialog)의 사유와 같은 목록·같은 말(ko.ts community.reportReason.*).
@@ -316,9 +320,16 @@ export function authorNoticeRoute(p: {
     link: string | null;
     /** 라운드 사진이 붙은 경기 id — 앨범을 연다. 모르면 기록 화면 */
     roundId?: string | null;
-}): { category: "GOLF" | "admin"; url: string | null } {
+    /** 산행 사진을 올린 사람이 그 사진을 다시 찾는 자리(그 산의 화면 '내 산행 사진') — 모르면 등산 첫 화면 */
+    hikingPath?: string | null;
+}): { category: "GOLF" | "HIKING" | "admin"; url: string | null } {
     if (p.targetType === "golf_photo") {
         return { category: "GOLF", url: p.action === "delete" ? null : p.roundId ? `/history?album=${p.roundId}` : "/history" };
+    }
+    // 산행 사진은 등산 알림함(category HIKING)으로 — 당구 알림함에 쌓이면 등산만 쓰는 사람은 결과를 못 본다. 공개 목록의 주소(link)로 보내지 않는다:
+    // 가려진 사진은 거기 없다. 올린 사람만 보는 '내 산행 사진'으로 보낸다.
+    if (p.targetType === "hiking_photo") {
+        return { category: "HIKING", url: p.action === "delete" ? null : p.hikingPath ?? "/hiking" };
     }
     return { category: "admin", url: p.action === "delete" ? null : p.link };
 }

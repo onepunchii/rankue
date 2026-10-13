@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { useEffect } from "react";
+import { useEffect, lazy, Suspense } from "react";
 import {
     LucideChevronRight,
     LucideBell,
@@ -27,7 +27,11 @@ import {
     LucideShare2,
     LucideHistory,
     LucideBookOpen,
-    LucideCalendar
+    LucideCalendar,
+    LucideMap,
+    LucideStamp,
+    LucideMedal,
+    LucideCheckCircle
 } from "@/lib/icons";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { flagEmoji } from "@/lib/flag";
@@ -65,13 +69,18 @@ const TOURNAMENTS_MENU: Record<string, { label: string; desc: string }> = {
     es: { label: "Torneos de billar", desc: "Calendario y resultados PBA y UMB a tres bandas" },
 };
 
+// 등산의 조각은 메인 청크에 싣지 않는다(산악회 홈의 CrewSummits 와 같은 길) — 등산일 때만 불러 온다.
+const HikingMenuGrade = lazy(() => import("@/hiking/components/MenuGrade").then((m) => ({ default: m.MenuGrade })));
+// 등산일 때 '친구에게 추천'에 실리는 글 — 당구 점수판 문구(share.appText) 대신. 등산은 한국어 전용이라 번역 키로 두지 않는다(공개 산 화면의 한 줄과 같은 말).
+const HIKING_SHARE_TEXT = "랭큐 등산 — 산을 고르고, 오르고, 정상에서 도장을 받아요.";
+
 export default function HiqMenu() {
     const { t, locale } = useT();
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const queryClient = useQueryClient();
     const [isUploading, setIsUploading] = useState(false);
-    const { currentSport, setSport, sport } = useSport();
+    const { currentSport, setSport, sport, isHiking } = useSport();
     // 등산(세 번째 종목) — 허용된 회원에게만 보인다(지금은 운영자와 시험 계정)
     const hikingOk = useHikingAccess();
     // 종목 전환은 '볼 수 있는가'로 가른다(2026-10-05 홈을 비로그인에 열면서) — 골프 홈을 둘러보던 한국어 방문자가 메뉴에서 당구로 갔다가 되돌아올 수 있게
@@ -79,6 +88,9 @@ export default function HiqMenu() {
     // 당구 전용 항목은 골프 모드에서 그리지 않는다 — 매장(당구장)·UMB·PBA·RP 안내·파트너는 골프와 무관하다
     // (2026-09-09 오너: 당구는 당구 전체 페이지, 골프는 골프 전체 페이지).
     const isGolf = currentSport === "GOLF";
+    // 등산(2026-10-13 오너: "지금 등산 전체 메뉴는 당구 메뉴로 되어 있는데 … 등산 전체 메뉴로") — 등산일 때 currentSport 는 당구라서
+    // !isGolf 만 보면 당구 항목이 그대로 나온다. 당구 전용 항목은 isBilliards 로 묻는다.
+    const isBilliards = !isGolf && !isHiking;
 
     const [infoModal, setInfoModal] = useState<{ open: boolean, type: InfoModalType | null }>({ open: false, type: null });
     const openInfoModal = (type: InfoModalType) => setInfoModal({ open: true, type });
@@ -174,7 +186,7 @@ export default function HiqMenu() {
     const share = useShare();
     const shareApp = () => share({
         title: t("share.appTitle"),
-        text: t("share.appText"),
+        text: isHiking ? HIKING_SHARE_TEXT : t("share.appText"),
         url: appDownloadUrl("share"),
     });
 
@@ -197,7 +209,7 @@ export default function HiqMenu() {
         ? { label: t("menu.tierExplorer"), class: "border-amber-500/50 text-amber-500", icon: "⛳️" }
         : getTier(member?.handi4c || 0, false, currentSport);
 
-    const sportColor = currentSport === "GOLF" ? "#64DD17" : "#006241";
+    const sportColor = isHiking ? "#F28C6A" : currentSport === "GOLF" ? "#64DD17" : "#006241";
     const sportColorClass = currentSport === "GOLF" ? "text-brand" : "text-brand";
     const sportBgClass = currentSport === "GOLF" ? "bg-brand" : "bg-brand";
     const sportGlowClass = currentSport === "GOLF" ? "" : "";
@@ -339,9 +351,20 @@ export default function HiqMenu() {
                                     </>
                                 )}
                                 <span className="text-[13px] font-medium text-black/55">{t("menu.regularMember")}</span>
-                                <span className="w-1 h-1 rounded-full bg-black/25" />
-                                <span className="text-[13px] font-medium text-black/40">Lv.{Math.floor((member?.visitCount || 0) / 5) + 1}</span>
+                                {/* 레벨은 매장 방문 수로 매긴 당구의 값 — 등산에서는 그 자리에 산행 등급을 놓는다(아래) */}
+                                {!isHiking && (
+                                    <>
+                                        <span className="w-1 h-1 rounded-full bg-black/25" />
+                                        <span className="text-[13px] font-medium text-black/40">Lv.{Math.floor((member?.visitCount || 0) / 5) + 1}</span>
+                                    </>
+                                )}
                             </div>
+                            {/* 등산 — 산행 등급(휘장 · 이름)과 오른 산의 수. 등산 홈과 같은 값(hiking/components/MenuGrade) */}
+                            {isHiking && (
+                                <Suspense fallback={<div className="mt-1 h-7" aria-busy="true" />}>
+                                    <HikingMenuGrade className="mt-1" />
+                                </Suspense>
+                            )}
                         </div>
                     </div>
 
@@ -462,7 +485,7 @@ export default function HiqMenu() {
                         // 내 매장 관리 — 이미 가맹점인 사장님(store_owner)에게만.
                         // 예전에는 사장님도 '파트너 프로그램' 홍보 카드를 찾아 눌러야 했다.
                         // SSO 가 로그인 상태를 그대로 파트너 세션으로 바꿔주므로 재로그인이 없다.
-                        ...((member as any)?.role === "store_owner" && !isGolf
+                        ...((member as any)?.role === "store_owner" && isBilliards
                             ? [{ icon: LucideStore, label: t("menu.myStore"), desc: t("menu.myStoreDesc"), onClick: () => setLocation("/partner/dashboard") }]
                             : []),
                         // 관리자 콘솔 — role 이 admin/super_admin 인 계정에게만 노출 (진입점 부재 문제 해결)
@@ -471,7 +494,7 @@ export default function HiqMenu() {
                             ? [{ icon: LucideBriefcase, label: t("menu.adminConsole"), desc: t("menu.adminConsoleDesc"), onClick: () => setLocation("/admin") }]
                             : []),
                         // 매장 찾기 — 모바일의 유일한 상시 진입점 (하단 네비·홈에는 자리가 없다)
-                        ...(isGolf ? [] : [{ icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") }]),
+                        ...(!isBilliards ? [] : [{ icon: LucideStore, label: t("menu.storeFinder"), desc: t("menu.storeFinderDesc"), onClick: () => setLocation("/stores") }]),
                         // 회원권은 시세·코스 정보만 남긴 자료 화면이다(거래 기능은 뺐다). 홈 타일이 프로암으로
                         // 바뀌면서 진입로가 없어져 여기에 둔다 — 나중에 크루 골프장 검색의 재료로도 쓸 자료다.
                         // 라운드 기록 — 골프에만 넣는다(당구는 하단 탭에 '기록'이 있다). 2026-09-23 하단 탭의 '라운드'가
@@ -480,10 +503,21 @@ export default function HiqMenu() {
                         ...(isGolf ? [{ icon: LucideHistory, label: t("menu.golfRoundLog"), desc: t("menu.golfRoundLogDesc"), onClick: () => setLocation("/history") }] : []),
                         ...(isGolf ? [{ icon: LucideGlobe, label: t("menu.golfRanking"), desc: t("menu.golfRankingDesc"), onClick: () => setLocation("/golf-ranking") }] : []),
                         ...(isGolf ? [{ icon: LucideTrophy, label: t("menu.golfMembershipInfo"), desc: t("menu.golfMembershipInfoDesc"), onClick: () => setLocation("/golf/membership") }] : []),
+                        // 등산(2026-10-13) — 등산의 다섯 곳. 하단 탭(홈 · 크루 · 산 · 도장첩 · 채팅)에 없는 배낭 · 준비물 · 용어는 홈 말고는 여기가 입구다.
+                        // 등산은 한국어 전용이라 문구를 번역 키로 두지 않는다. 주소는 하단 탭처럼 글자로 적는다(shared/hiking* 을 메인 청크에 싣지 않게).
+                        ...(isHiking
+                            ? [
+                                { icon: LucideMap, label: "산 찾기", desc: "전국 명산 · 코스 · 날씨", onClick: () => setLocation("/hiking") },
+                                { icon: LucideStamp, label: "내 도장첩", desc: "정상에서 받은 도장 모아 보기", onClick: () => setLocation("/hiking/stamps") },
+                                { icon: LucideMedal, label: "배낭", desc: "산행 등급 · 와펜 · 핀", onClick: () => setLocation("/hiking/pack") },
+                                { icon: LucideCheckCircle, label: "산행 준비물", desc: "철마다 배낭에 넣을 것", onClick: () => setLocation("/hiking/checklist") },
+                                { icon: LucideBookOpen, label: "등산 용어", desc: "들머리 · 안부 · 알바 뜻 풀이", onClick: () => setLocation("/hiking/terms") },
+                            ]
+                            : []),
                         // 앱 공유 — 오픈 초기 유일한 유입 경로가 입소문이라 최우선. 기기에 맞는 스토어로.
                         { icon: LucideShare2, label: t("share.appTitle"), desc: t("share.appDesc"), onClick: () => shareApp() },
                         // 세계·PBA 랭킹은 로그인 없이도 보는 공개 콘텐츠 — 게스트에게 갈 곳을 준다
-                        ...(isGuest && !isGolf
+                        ...(isGuest && isBilliards
                             ? [
                                 { icon: LucideGlobe, label: t("umb.title"), desc: t("menu.worldRankingDesc"), onClick: () => setLocation("/world-ranking") },
                                 { icon: LucideTrophy, label: t("menu.pbaTour"), desc: t("menu.pbaTourDesc"), onClick: () => setLocation("/pba") },
@@ -494,14 +528,15 @@ export default function HiqMenu() {
                             ? [{ icon: LucideMail, label: t("menu.supportChat"), desc: t("menu.supportChatDesc"), onClick: () => setLocation(`/chat/support/${member?.id}`) }]
                             : []),
                         { icon: LucideInfo, label: t("menu.announcements"), desc: t("menu.announcementsDesc"), onClick: () => openInfoModal('announcement') },
-                        { icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') },
-                        ...(isGolf ? [] : [{ icon: LucideTrophy, label: t("menu.rankingSystem"), desc: t("menu.rankingSystemDesc"), onClick: () => openInfoModal('ranking') }]),
+                        // 이용안내의 본문(InfoModal)은 당구 · 골프 두 벌뿐이다 — 등산에서 열면 당구 점수판 안내가 나와서 등산일 땐 뺀다
+                        ...(isHiking ? [] : [{ icon: LucideBriefcase, label: t("menu.guide"), desc: t("menu.guideDesc"), onClick: () => openInfoModal('guide') }]),
+                        ...(!isBilliards ? [] : [{ icon: LucideTrophy, label: t("menu.rankingSystem"), desc: t("menu.rankingSystemDesc"), onClick: () => openInfoModal('ranking') }]),
                         // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 화면에만 둔다(문구도 그래서 사전 키 없이 한국어).
-                        ...(!isGolf && locale === "ko"
+                        ...(isBilliards && locale === "ko"
                             ? [{ icon: LucideBookOpen, label: "당구 용어 사전", desc: "하이런·에버리지·빈쿠션… 용어 뜻 풀이", onClick: () => setLocation("/billiards/terms") }]
                             : []),
                         // 당구 대회(2026-09-24) — 공개 화면, 5개 언어. 로그인한 사람에게도 따로 들어갈 곳이 없어 여기 둔다.
-                        ...(isGolf ? [] : [{ icon: LucideCalendar, ...(TOURNAMENTS_MENU[locale] ?? TOURNAMENTS_MENU.en), onClick: () => setLocation("/tournaments") }]),
+                        ...(!isBilliards ? [] : [{ icon: LucideCalendar, ...(TOURNAMENTS_MENU[locale] ?? TOURNAMENTS_MENU.en), onClick: () => setLocation("/tournaments") }]),
                         // 로그아웃·계정 삭제는 계정이 있어야 성립한다
                         ...(!isGuest
                             ? [
@@ -547,10 +582,10 @@ export default function HiqMenu() {
                 /partner/login 이 신청('내 매장 찾아 관리 신청')과 로그인을 모두 안내한다.
                 이미 가맹점인 사장님에겐 숨긴다 — 위에 '내 매장 관리'가 이미 있어 중복이고,
                 가입 권유를 계속 보는 건 이상하다. */}
-            {(member as any)?.role !== "store_owner" && !isGolf && (
+            {(member as any)?.role !== "store_owner" && isBilliards && (
             // 2026-10-07 오너: "디자인 변경해줘 깔끔하지만 눈에 띄게 — 파트너 프로그램은 홈에 그린 버튼으로".
             // 옅은 초록 그라디언트 카드(주변 흰 카드에 묻혔다)를 홈의 초록 단추와 같은 꽉 찬 초록 한 줄로 바꿨다: 왼쪽 아이콘 · 가운데 글 · 오른쪽 흰 동그라미 화살표.
-            // 골프 모드에서는 이 카드를 그리지 않으므로(!isGolf) 안쪽 흰색은 리터럴로 둔다.
+            // 골프 · 등산 모드에서는 이 카드를 그리지 않으므로(isBilliards) 안쪽 흰색은 리터럴로 둔다.
             <motion.button
                 whileTap={{ scale: 0.98 }}
                 onClick={() => setLocation("/partner/login")}
@@ -642,7 +677,8 @@ export default function HiqMenu() {
                 </DialogContent>
             </Dialog>
 
-            <AppInstallCard className="mt-6" />
+            {/* 앱 설치 카드의 그림은 당구공 · 당구대 펠트, 글은 '경기 초대'다 — 등산에서는 그리지 않는다 */}
+            {!isHiking && <AppInstallCard className="mt-6" />}
 
             <HiqNavigation />
         </div>

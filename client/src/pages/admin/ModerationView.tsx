@@ -53,7 +53,7 @@ type Tone = "primary" | "danger" | "neutral";
 const ACTION_UI: Record<Action, { label: string; confirm: string; tone: Tone }> = {
     appeal_approve: { label: "이의제기 승인", confirm: "이의제기를 받아들여 블라인드를 풀까요? 작성자에게 결과 알림이 갑니다.", tone: "primary" },
     appeal_reject: { label: "이의제기 반려", confirm: "블라인드를 유지하고 이의제기를 반려할까요? 작성자에게 결과 알림이 갑니다.", tone: "neutral" },
-    blind: { label: "블라인드", confirm: "이 콘텐츠를 가릴까요? 작성자에게 안내 알림이 가고, 커뮤니티 글·댓글과 라운드 사진은 작성자가 이의제기할 수 있습니다.", tone: "primary" },
+    blind: { label: "블라인드", confirm: "이 콘텐츠를 가릴까요? 작성자에게 안내 알림이 가고, 커뮤니티 글·댓글과 라운드 사진·산행 사진은 작성자가 이의제기할 수 있습니다.", tone: "primary" },
     unblind: { label: "블라인드 해제", confirm: "가린 콘텐츠를 다시 보이게 할까요? 작성자에게 안내 알림이 갑니다.", tone: "neutral" },
     delete: { label: "삭제", confirm: "이 콘텐츠를 삭제할까요? 되돌릴 수 없습니다. 원문 일부는 처리 기록에 남습니다.", tone: "danger" },
     ban: { label: "작성자 계정 정지", confirm: "작성자 계정을 정지할까요? 잘못 눌렀다면 '정지 해제'로 되돌릴 수 있습니다.", tone: "danger" },

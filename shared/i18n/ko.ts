@@ -313,6 +313,9 @@ export const ko: Record<string, string> = {
   // 라운드 사진 자동 가림(2026-09-30) — 서로 다른 3명 신고
   "notif.golfPhoto.hidden.title": "📷 라운드 사진이 가려졌어요",
   "notif.golfPhoto.hidden.body": "신고가 여러 건 들어와 라운드 사진을 가렸어요. 문제가 없다고 생각되면 앨범에서 사진을 열어 '이의제기'를 눌러 주세요. 운영자가 다시 확인해요.",
+  // 산행 사진 자동 가림(2026-10-13) — 서로 다른 3명 신고. 등산 알림함으로 간다
+  "notif.hikingPhoto.hidden.title": "산행 사진이 가려졌어요",
+  "notif.hikingPhoto.hidden.body": "신고가 여러 건 들어와 산행 사진을 가렸어요. 문제가 없다고 생각되면 그 산의 화면 '내 산행 사진'에서 사진을 열어 '이의제기'를 눌러 주세요. 운영자가 다시 확인해요.",
   // 조인·부킹 글 가림·내림(2026-10-01) — 골프 글은 이의제기 칸이 없어 채팅 '운영자 문의'로 안내한다(storage/adminGolfListings)
   "notif.golfListing.hidden.title": "⚠️ 조인·부킹 글이 가려졌어요",
   "notif.golfListing.hidden.body": "신고가 여러 건 들어와 {course} {tee} 글을 가렸어요. 목록에 보이지 않고 새 신청도 받지 않아요. 문제가 없다고 생각되면 채팅의 '운영자 문의'로 알려 주세요.",

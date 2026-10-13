@@ -10,10 +10,11 @@ import { Link } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { LucideChevronRight } from "@/lib/icons";
 import { useSeo } from "@/hooks/useSeo";
-import { HIKING_REGIONS, hikingListPath, hikingRegionPath } from "@shared/hikingMountains";
+import { HIKING_REGIONS, hikingGroup, hikingListPath, hikingRegionPath, inHikingGroup } from "@shared/hikingMountains";
 import { HIKING_H1, HIKING_TAGLINE, OSM_NOTE, hikingHubSeo } from "@shared/hikingPage";
 import { HIKING_CHECKLIST_H1, HIKING_CHECKLIST_PATH, HIKING_TERMS, HIKING_TERMS_H1, HIKING_TERMS_PATH } from "@shared/hikingTerms";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
+import { BundleNotebook, NotebookLand } from "../components/BundleNotebook";
 import { MountainMap } from "../components/MountainMap";
 import { HikingCta, MountainRow } from "../components/MountainParts";
 import { SeasonNow } from "../components/SeasonNow";
@@ -92,17 +93,18 @@ export default function HikingHub() {
                             </ul>
                         </HkSection>
 
-                        <HkSection title="묶어서 찾기" aside="목록 · 특성">
-                            <ul className="rounded-2xl bg-[#FFFFFF0A] px-3.5">
-                                {[...data.lists.map((l) => ({ id: l.id, name: l.name, sub: `${l.count}곳` })), ...data.traits.map((t) => ({ id: t.id, name: t.name, sub: `${t.how} · ${t.count.toLocaleString("en-US")}곳` }))].map((g, i) => (
-                                    <li key={g.id} className={i ? "border-t border-[#FFFFFF14]" : ""}>
-                                        <Link href={hikingListPath(g.id)} className="flex min-h-[52px] items-center gap-3 py-2 active:opacity-70" data-testid={`hub-group-${g.id}`}>
-                                            <span className="min-w-0 flex-1 text-[15px] text-[#F4EFE3]">{g.name}</span>
-                                            <span className="shrink-0 text-[13px] tabular-nums text-[#F4EFE38C]">{g.sub}</span>
-                                            <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
-                                        </Link>
-                                    </li>
-                                ))}
+                        <HkSection title="묶어서 찾기" aside={`수첩 ${data.lists.length + data.traits.length}권 · 눌러서 펼쳐 보세요`}>
+                            {/* 수첩마다 그 묶음의 산이 어디에 있는지 찍혀 있다 — 누르면 지도와 산의 목록이 열린다 */}
+                            <NotebookLand />
+                            <ul className="grid grid-cols-3 gap-x-2.5 gap-y-4" data-testid="hub-notebooks">
+                                {[...data.lists.map((l) => ({ id: l.id, name: l.short, count: l.count })), ...data.traits.map((t) => ({ id: t.id, name: t.name, count: t.count }))].map((g) => {
+                                    const group = hikingGroup(g.id);
+                                    return (
+                                        <li key={g.id}>
+                                            <BundleNotebook id={g.id} name={g.name} count={g.count} spots={group ? data.famous.filter((m) => inHikingGroup(group, m)) : []} />
+                                        </li>
+                                    );
+                                })}
                             </ul>
                         </HkSection>
 

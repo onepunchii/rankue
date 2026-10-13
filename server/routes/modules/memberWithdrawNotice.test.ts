@@ -37,6 +37,7 @@ const m = vi.hoisted(() => {
         golf: { upcomingListingsWithRequesters: vi.fn() },
         deleteAccount: vi.fn(),
         golfPhotos: { deleteAllByMember: vi.fn() },
+        hikingPhotos: { deleteAllByMember: vi.fn() },
         // 글 내리기(DELETE /bookings/:id)가 쓰는 것
         activeRequesterIds: vi.fn(), getGolfBooking: vi.fn(), getMemberById: vi.fn(), getProfile: vi.fn(), deleteGolfBooking: vi.fn(),
         chat: { deleteRoom: vi.fn(async () => undefined), addMessage: vi.fn() },
@@ -104,6 +105,7 @@ beforeEach(() => {
     m.storage.golf.upcomingListingsWithRequesters.mockReset().mockImplementation(async () => { m.log.push("read"); return []; });
     m.storage.deleteAccount.mockReset().mockImplementation(async () => { m.log.push("deleteAccount"); return { profileImageUrl: null }; });
     m.storage.golfPhotos.deleteAllByMember.mockReset().mockImplementation(async () => { m.log.push("deletePhotos"); return []; });
+    m.storage.hikingPhotos.deleteAllByMember.mockReset().mockImplementation(async () => { m.log.push("deleteHikingPhotos"); return []; });
     m.storage.activeRequesterIds.mockReset();
     m.storage.getGolfBooking.mockReset();
     // 번호는 '있다'는 것만 쓰인다(글 내리기의 권한 확인) — 실제 번호 꼴을 적지 않는다
@@ -254,8 +256,10 @@ describe("(다) 언제 — 가려지기 전에 읽고, 탈퇴가 끝난 뒤에 �
         expect(out.body).toEqual({ success: true, data: { success: true } });
         expect(m.storage.golf.upcomingListingsWithRequesters).toHaveBeenCalledWith(ME);
         expect(m.storage.deleteAccount).toHaveBeenCalledWith(ME);
+        // 개인 자료: 프로필 사진 → 라운드 사진 → 산행 사진(2026-10-13) — 줄을 지운 뒤 그 파일을 지운다
+        expect(m.storage.hikingPhotos.deleteAllByMember).toHaveBeenCalledWith(ME);
         expect(m.log).toEqual([
-            "read", "deleteAccount", "deleteBlobs", "deletePhotos", "deleteBlobs",
+            "read", "deleteAccount", "deleteBlobs", "deletePhotos", "deleteBlobs", "deleteHikingPhotos", "deleteBlobs",
             `send:${R1}`, `send:${R2}`,
             "clearCookie:hiq_user_id", "clearCookie:hiq_partner_auth", "respond",
         ]);
@@ -265,7 +269,14 @@ describe("(다) 언제 — 가려지기 전에 읽고, 탈퇴가 끝난 뒤에 �
         const out = await withdraw();
         expect(out.status).toBe(200);
         expect(m.send).not.toHaveBeenCalled();
-        expect(m.log).toEqual(["read", "deleteAccount", "deleteBlobs", "deletePhotos", "deleteBlobs", "clearCookie:hiq_user_id", "clearCookie:hiq_partner_auth", "respond"]);
+        expect(m.log).toEqual(["read", "deleteAccount", "deleteBlobs", "deletePhotos", "deleteBlobs", "deleteHikingPhotos", "deleteBlobs", "clearCookie:hiq_user_id", "clearCookie:hiq_partner_auth", "respond"]);
+    });
+
+    it("산행 사진을 못 지워도 탈퇴는 끝난다", async () => {
+        m.storage.hikingPhotos.deleteAllByMember.mockRejectedValue(new Error("db down"));
+        const out = await withdraw();
+        expect(out.status).toBe(200);
+        expect(out.cleared).toEqual(["hiq_user_id", "hiq_partner_auth"]);
     });
 
     it("읽기가 실패해도 탈퇴는 끝난다(알림만 못 간다)", async () => {

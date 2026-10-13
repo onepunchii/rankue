@@ -8,7 +8,8 @@ import { requireAuth, AuthRequest } from "./auth.js";
 import { sendError } from "../utils/response.js";
 import { hikingAllowed } from "../lib/hikingAccess.js";
 
-async function checkHiking(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+/** 등산을 쓸 수 있는 회원인가 — requireAuth 뒤에 둔다. 조건이 맞을 때만 문을 보는 길(사진을 공개로 내놓을 때)이 따로 부른다 */
+export async function checkHiking(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     const member = req.userId ? await storage.getMemberById(req.userId) : null;
     const profile = member?.profileId ? await storage.getProfile(member.profileId) : null;
     if (!hikingAllowed(member, (profile as { role?: string | null } | null)?.role)) {

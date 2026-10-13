@@ -2,7 +2,7 @@
  * /hiking/mountains/:slug — 산 한 곳(2026-10-13 오너: "우리가 가장 잘하는 산에 대한 정보를 페이지 만들어서 … 정보 + 가입 유도").
  *
  * 위에서부터: 권역 표지 위의 이름 · 높이 · 위치 → 이 산의 도장(정상에서 받는 것 — 가입으로 가는 길) → 등산 코스(높낮이 · 길의 모양 · 길 위의 지점)
- * → 산의 날씨 → 산 이야기(소개 글) → 가까운 산.
+ * → 이 산의 사진(회원이 올린 공개 사진 — 누구에게나) → 내 산행 사진(등산을 쓰는 회원만 — 올리기 · 공개/비공개) → 산의 날씨 → 산 이야기(소개 글) → 가까운 산.
  * 로그인 없이 열린다. 글은 shared/hikingPage · hikingGuide 의 것 — 검색용 화면(server/seo/hiking)과 같다.
  * ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상, 굵기는 semibold 까지. 형제 key 는 구역마다 다르게.
  */
@@ -25,7 +25,8 @@ import { hikingBookPath } from "../stamps/StampParts";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { trailPath } from "../trail/useTrail";
 import { MyPhotos } from "../photos/MyPhotos";
-import { HIKING_PHOTO_LABEL } from "@shared/hikingPhotos";
+import { MountainPhotos } from "../photos/MountainPhotos";
+import { HIKING_PHOTOS_ANCHOR, HIKING_PHOTO_LABEL } from "@shared/hikingPhotos";
 import { stampDate } from "../lib/date";
 import { POI_COLOR, hikingCover } from "../theme";
 import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi } from "../lib/api";
@@ -276,9 +277,12 @@ export default function MountainPage() {
                     <Courses key={`courses:${d.slug}`} d={d} canStart={my.mine} />
                 </HkSection>
 
-                {/* 내 산행 사진 — 올린 사람만 본다 */}
+                {/* 이 산의 사진 — 회원이 올린 공개 사진. 방문자에게도 보인다(한 장도 없으면 구역이 없다) */}
+                <MountainPhotos key={`mountain-photos:${d.slug}`} slug={d.slug} name={d.name} />
+
+                {/* 내 산행 사진 — 내가 올린 것(공개 · 비공개 · 가려진 것까지). 올리기와 공개 여부는 여기서 */}
                 {my.mine && (
-                    <HkSection title={HIKING_PHOTO_LABEL.title} aside={HIKING_PHOTO_LABEL.aside} id="sec-photos">
+                    <HkSection title={HIKING_PHOTO_LABEL.title} aside={HIKING_PHOTO_LABEL.aside} id={HIKING_PHOTOS_ANCHOR} className="scroll-mt-16">
                         <MyPhotos key={`photos:${d.id}`} mountainId={d.id} name={d.name} />
                     </HkSection>
                 )}

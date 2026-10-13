@@ -18,6 +18,7 @@ import { LucideChevronRight } from "@/lib/icons";
 import { hikingMountainPath } from "@shared/hikingMountains";
 import { HkSection, HkSkel } from "../components/HikingShell";
 import { MountainMap } from "../components/MountainMap";
+import { NearMe } from "../components/NearMe";
 import { MountainRow } from "../components/MountainParts";
 import { SeasonNow } from "../components/SeasonNow";
 import { GradeCard } from "../stamps/GradeParts";
@@ -114,6 +115,8 @@ export default function HikingHome() {
                                 </Link>
                             </div>
                         )}
+
+                        <NearMe famous={s.famous} done={s.done} />
 
                         <SeasonNow mountains={s.famous} done={s.done} mine />
 

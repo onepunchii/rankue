@@ -14,6 +14,7 @@ import { CompareRepository } from "./compare.repo.js";
 import { GolfRankRepository } from "./golfRank.repo.js";
 import { GolfArcadeRepository } from "./golfArcade.repo.js";
 import { GolfPhotoRepository } from "./golfPhoto.repo.js";
+import * as hikingPhotos from "./hikingPhotos.js";
 import { TournamentRepository } from "./tournament.repo.js";
 import { SimRepository } from "./sim.repo.js";
 import { SimMatchRepository } from "./simMatch.repo.js";
@@ -37,6 +38,8 @@ class Storage {
     public golfRank = new GolfRankRepository();   // 골프 랭킹(2026-09-13) — 공개 읽기
     public golfArcade = new GolfArcadeRepository();   // 골프 온라인게임 방(2026-09-14)
     public golfPhotos = new GolfPhotoRepository();   // 라운드 사진(2026-09-30) — 앨범·골프장 페이지
+    // 산행 사진(2026-10-13) — 공유 기반(신고 · 운영자 조치 · 탈퇴)이 여기로 부른다. 등산 라우트는 storage/hikingPhotos 를 바로 읽는다
+    public hikingPhotos = hikingPhotos;
     public tournaments = new TournamentRepository();
     public sim = new SimRepository();
     public simMatch = new SimMatchRepository();

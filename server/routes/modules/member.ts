@@ -489,6 +489,8 @@ router.delete("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any
     await deleteBlobs(profileImageUrl);
     // 라운드 사진(2026-09-30)은 개인정보다 — 회원 행은 '탈퇴회원'으로 남아도 사진은 행·Blob 을 지운다(골프장 페이지 공개분 포함)
     await deleteBlobs(await storage.golfPhotos.deleteAllByMember(req.userId!).catch((e) => { console.error("[DeleteAccount] 라운드 사진:", e); return []; }));
+    // 산행 사진(2026-10-13)도 같다 — 공개로 산의 화면에 떠 있던 것까지 줄과 파일을 지운다. 못 지워도 탈퇴는 그대로 간다
+    await deleteBlobs(await storage.hikingPhotos.deleteAllByMember(req.userId!).catch((e) => { console.error("[DeleteAccount] 산행 사진:", e); return []; }));
     // 탈퇴가 **끝난 뒤에** 그 신청자들에게 알린다 — 글 내리기(golf.ts DELETE /bookings/:id)와 같은 함수·같은 문구다.
     // 예전엔 아무 말도 가지 않아, 확정자는 '내 신청'에서 글이 사라지고 연락처가 비워진 것을 티타임까지 몰랐다.
     // 알림이 실패하거나 늦어도 탈퇴는 이미 끝났다 — 응답을 막지 않는다(상한까지만 기다린다. 서버리스라 응답 전에 await).

@@ -228,17 +228,18 @@ router.post("/posts/:id/like", requireAuth, asyncHandler(async (req: AuthRequest
     return sendSuccess(res, result);
 }));
 
-// --- 신고 (커뮤니티·회원·골프 매물) ---
+// --- 신고 (커뮤니티·회원·골프 매물·라운드 사진·산행 사진) ---
 
 // 크루 콘텐츠(crew_*)는 크루 신고 주소(POST /crews/:id/reports)로만 받는다 — 거기서 대상이 그 크루 것인지,
 // 신고자가 크루원인지 확인한다. 여기서도 받으면 그 확인을 우회한다(검토 code:R6). 화면(ReportDialog)은 이미 crew_* 를 크루 주소로 보낸다.
-const REPORT_TARGETS = ["community_post", "community_comment", "member", "golf_booking", "player_cheer", "golf_photo"];
+const REPORT_TARGETS = ["community_post", "community_comment", "member", "golf_booking", "player_cheer", "golf_photo", "hiking_photo"];
 const REPORT_REASONS = ["abuse", "gambling", "trade", "privacy", "spam", "other"];
 
 // 신고 대상이 실제로 있는지 확인하고 작성자를 돌려준다. null = 없는 대상.
 // 없는 UUID 를 받아 두면 큐가 빈 카드로 차고, 운영자 알림 상한(시간당 대상 수)을 가짜 신고로 먼저 채워
 // 진짜 신고의 알림을 막을 수 있었다(검토 code:R6). 작성자 id 가 없는 골프 매물은 "" 로 존재만 알린다.
 // 라운드 사진은 **볼 수 있었던 사람만** 신고한다 — 공개 사진은 누구나, 비공개 사진은 그 경기 참가자만(앨범에서).
+// 산행 사진도 같다 — 공개 사진만 신고 대상이다(비공개 사진은 올린 사람 말고는 볼 길이 없다).
 async function reportTargetAuthor(targetType: string, id: string, reporterId: string): Promise<string | null> {
     switch (targetType) {
         case "community_post":
@@ -264,6 +265,10 @@ async function reportTargetAuthor(targetType: string, id: string, reporterId: st
             const s: any = await storage.getGolfMatchSession(ph.sessionId);
             const inRound = !!s && (s.hostId === reporterId || (Array.isArray(s.players) && s.players.some((p: any) => p?.memberId === reporterId)));
             return inRound ? ph.memberId : null;
+        }
+        case "hiking_photo": {
+            const ph = await storage.hikingPhotos.get(id);
+            return ph && ph.isPublic ? ph.memberId : null;
         }
         default:
             return null;
@@ -307,6 +312,22 @@ router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: 
                 params: { url: ph ? `/history?album=${ph.sessionId}` : "/history" },
             });
         } catch (e) { console.error("[Notify] 라운드 사진 가림:", e); }
+        return sendSuccess(res, { reported: true });
+    }
+
+    // 산행 사진이 가려지면 등산 알림함으로 — 그 산의 화면 '내 산행 사진'에서 가려진 사진을 열어 이의제기를 한 번 누르면 된다
+    if (result.autoBlinded && result.authorId && targetType === "hiking_photo") {
+        try {
+            const path = storage.hikingPhotos.photoPagePath(await storage.hikingPhotos.get(targetId));
+            await notificationService.sendAndSaveNotification({
+                memberId: result.authorId,
+                title: "notif.hikingPhoto.hidden.title",
+                body: "notif.hikingPhoto.hidden.body",
+                category: "HIKING",
+                type: "MODERATION",
+                params: { url: path ?? "/hiking" },
+            });
+        } catch (e) { console.error("[Notify] 산행 사진 가림:", e); }
         return sendSuccess(res, { reported: true });
     }
 

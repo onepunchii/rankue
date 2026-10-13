@@ -13,7 +13,8 @@ export type ReportTargetType =
     | "community_post" | "community_comment" | "member" | "golf_booking"
     | "crew_post" | "crew_comment" | "crew_photo" | "crew_photo_comment" | "crew_chat"
     | "player_cheer"   // 선수 응원글(2026-09-13)
-    | "golf_photo";    // 라운드 사진(2026-09-30) — 골프장 페이지 공개 사진·경기 앨범. 3명 신고면 자동으로 가려진다
+    | "golf_photo"     // 라운드 사진(2026-09-30) — 골프장 페이지 공개 사진·경기 앨범. 3명 신고면 자동으로 가려진다
+    | "hiking_photo";  // 산행 사진(2026-10-13) — 산의 화면에 뜨는 공개 사진. 라운드 사진과 같은 규칙(3명 신고면 자동으로 가려진다)
 
 interface ReportDialogProps {
     open: boolean;
@@ -46,6 +47,8 @@ export const invalidateAfterBlock = (queryClient: QueryClient) => {
     queryClient.invalidateQueries({ queryKey: ["/api/hiq/community/blocks"] });
     // 라운드 사진(골프장 페이지·경기 앨범·사진첩) — 키 앞자리 "golf-photos" 하나로(golf/lib/photoApi.ts)
     queryClient.invalidateQueries({ queryKey: ["golf-photos"] });
+    // 산의 화면 '이 산의 사진' — 키 앞자리 "hiking-photos"(hiking/photos/photoApi.ts). 서버가 차단한 사람의 사진을 뺀다
+    queryClient.invalidateQueries({ queryKey: ["hiking-photos"] });
     // 골프 조인·부킹 목록과 날짜 칩 숫자(2026-10-06) — 서버가 차단한 사람의 글을 빼므로, 다시 받아야 카드가 바로 사라진다.
     // 키 앞자리가 셋으로 갈린다(golf/hooks/useBookingData.ts): 부킹 목록·조인 목록·날짜별 개수. 개수 키는 부킹 키의 접두가 아니다.
     queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf/bookings"] });
@@ -78,9 +81,9 @@ export function useBlockMember(onDone?: () => void) {
     });
 }
 
-// 차단 확인 문구 — 크루·회원 표면에서는 사진·채팅까지 가려진다는 걸 알린다. 라운드 사진도 '사진까지' 쪽(글·댓글만이면 거짓말).
+// 차단 확인 문구 — 크루·회원 표면에서는 사진·채팅까지 가려진다는 걸 알린다. 라운드 사진·산행 사진도 '사진까지' 쪽(글·댓글만이면 거짓말).
 export const blockConfirmText = (t: (k: string) => string, targetType: ReportTargetType, name?: string) =>
-    t(usesReviewQueue(targetType) || targetType === "golf_photo" ? "community.blockConfirmCrew" : "community.blockConfirm")
+    t(usesReviewQueue(targetType) || targetType === "golf_photo" || targetType === "hiking_photo" ? "community.blockConfirmCrew" : "community.blockConfirm")
         .replace("{name}", name || t("community.thisUser"));
 
 export const ReportDialog = ({ open, onOpenChange, targetType, targetId, targetAuthorId, targetAuthorName, crewId, onBlocked, reportPath }: ReportDialogProps) => {

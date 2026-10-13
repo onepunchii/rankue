@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { withKm, type LinePoint } from "./hikingGeo";
-import { TRAIL_FAR_M, aheadText, cleanTrip, climbBetween, emptyTally, projectOnLine, spokenDistance, tallyStep, trailSpeech, trailState, type TrailPoi } from "./hikingTrail";
+import { TRAIL_BG_DISTANCE_M, TRAIL_BG_MIN_GAP_MS, TRAIL_BG_NOTICE, trailFixDue, TRAIL_FAR_M, aheadText, cleanTrip, climbBetween, emptyTally, projectOnLine, spokenDistance, tallyStep, trailSpeech, trailState, type TrailPoi } from "./hikingTrail";
 
 // 북쪽으로 곧게 2km 오르는 길 — 500m 마다 한 점, 높이 200 → 600 → 500
 const LINE: LinePoint[] = withKm([[37.0, 127.0, 200], [37.0045, 127.0, 300], [37.009, 127.0, 450], [37.0135, 127.0, 600], [37.018, 127.0, 500]]);
@@ -205,6 +205,30 @@ describe("걸은 길 · 좌표는 저장하지 않는다", () => {
         const page = read("client/src/hiking/pages/TrailPage.tsx");
         expect(page).toContain("said.current = r.said;");
         expect(page).toContain("if (voice) for (const line of r.lines) speakLine(line);");
+    });
+    it("화면이 꺼져도 받는 길(앱 1.4 부터) — '항상 허용'을 묻지 않고, 받은 위치를 어디에도 보내거나 적지 않는다", () => {
+        expect(trailFixDue(null, 1000)).toBe(true);
+        expect(trailFixDue(1000, 1000 + TRAIL_BG_MIN_GAP_MS - 1)).toBe(false);
+        expect(trailFixDue(1000, 1000 + TRAIL_BG_MIN_GAP_MS)).toBe(true);
+        // 기기의 시계가 뒤로 가도 멈추지 않는다
+        expect(trailFixDue(5000, 1000)).toBe(true);
+        expect(TRAIL_BG_DISTANCE_M).toBeGreaterThanOrEqual(5);
+        // 알림 글 — 무엇을 하는 중이고 언제 꺼지는지만. 재촉 · 기록 겨루기 없음
+        expect(TRAIL_BG_NOTICE.title).toBe("산행 기록 중");
+        expect(TRAIL_BG_NOTICE.message).toContain("마치면 꺼져요");
+        expect(`${TRAIL_BG_NOTICE.title} ${TRAIL_BG_NOTICE.message}`).not.toMatch(/빨리|서두|기록 경신|순위|랭킹/);
+        const bg = code(read("client/src/hiking/trail/bgWatch.ts"));
+        expect(bg).toContain("requestPermissions: false");
+        expect(bg).toContain('hasPlugin(PLUGIN)');
+        expect(bg).not.toMatch(/apiRequest|fetch\(|localStorage|sessionStorage/);
+        const hook = code(read("client/src/hiking/trail/useTrail.ts"));
+        expect(hook).toContain("if (bgWatchAvailable())");
+        expect(hook).toContain("if (stopBg) stopBg();");
+        // 새 앱에서는 화면을 억지로 켜 두지 않는다
+        expect(read("client/src/hiking/pages/TrailPage.tsx")).toContain("useKeepAwake(active && !trail.background)");
+        // 네이티브 쪽: 패키지가 있고, iOS 허용 목록에도 적혀 있다(안 적으면 iOS 에서만 조용히 빠진다)
+        expect(JSON.parse(read("package.json")).dependencies["@capacitor-community/background-geolocation"]).toBeTruthy();
+        expect(read("capacitor.config.ts")).toContain('"@capacitor-community/background-geolocation"');
     });
     it("산행 중 화면은 설치 안내와 하단 탭이 덮지 않는다", () => {
         expect(read("shared/installPrompt.ts")).toContain('"/hiking/trail"');

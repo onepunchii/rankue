@@ -52,6 +52,7 @@ import {
 } from "../lib/reportQueue.js";
 import { SUGGESTION_ALERT_TYPE, SUGGESTION_ALERT_WINDOW_MIN, attachReplies, type SuggestionReplyView } from "../lib/suggestionBox.js";
 import { GolfPhotoRepository } from "./golfPhoto.repo.js";
+import * as hikingPhotos from "./hikingPhotos.js";
 import { coursePath } from "../../shared/golfCourse.js";
 
 // --- 신고 큐 타입(2026-09-11, SX1) ---
@@ -467,6 +468,10 @@ export class AdminRepository {
                            -- 라운드 사진 이의제기(9/30). 표는 첫 업로드가 만든다 — 운영 DB 에는 있다(migrations/golf_round_photos.sql)
                            WHEN 'golf_photo' THEN (SELECT ph.appeal_at FROM ${golfRoundPhotos} ph
                                                     WHERE ph.id = g.target_id AND ph.hidden_at IS NOT NULL)
+                           -- 산행 사진 이의제기(10/13). 칸(hidden_at, appeal_at)은 migrations/hiking_photos_public.sql 이 붙인다.
+                           -- 줄을 통째로 읽는다(to_jsonb): 칸이 아직 없어도 이 질의는 선다 - 모든 신고가 지나는 큐라 배포 순서에 기대지 않는다. 없으면 null
+                           WHEN 'hiking_photo' THEN (SELECT (to_jsonb(hp) ->> 'appeal_at')::timestamp FROM hiking_photos hp
+                                                      WHERE hp.id = g.target_id AND (to_jsonb(hp) ->> 'hidden_at') IS NOT NULL)
                        END AS appeal_at
                 FROM g
             ), q AS (
@@ -746,6 +751,22 @@ export class AdminRepository {
             });
         });
 
+        // 산행 사진(2026-10-13) — 라운드 사진과 같은 모양. 가림 = hidden_at. '원문 열기'는 큰 사진이다(가려진 사진은 산의 화면에 없다).
+        job("hiking_photo", async (ids) => {
+            const rows = await hikingPhotos.getMany(ids);
+            for (const r of rows) put("hiking_photo", r.id, {
+                title: r.mountainName,
+                images: [r.thumbUrl || r.url],
+                isBlinded: !!r.hiddenAt,
+                blindReason: r.hiddenAt ? "신고 누적 또는 운영자 가림" : null,
+                appealText: r.appealText, appealAt: r.appealAt,
+                authorId: r.memberId,
+                meta: ["산행 사진", r.isPublic ? "공개" : "비공개(내 사진첩만)"].join(" · "),
+                link: r.url,
+                createdAt: r.createdAt,
+            });
+        });
+
         job("crew_post", async (ids) => {
             const rows = await db.select({
                 id: hiqCrewPosts.id,
@@ -923,6 +944,8 @@ export class AdminRepository {
                     .returning({ id: golfBookings.id })).length > 0;
             case "golf_photo":
                 return this.golfPhotos.setHidden(targetId, blinded);
+            case "hiking_photo":
+                return hikingPhotos.setHidden(targetId, blinded);
             default:
                 return false;
         }

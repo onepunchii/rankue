@@ -24,6 +24,24 @@ const DIR_MIN_KM = 0.03;
 /** 정상 가까이(m) — 정상 인증을 권한다. 서버의 판정(SUMMIT_RADIUS_M)과 같은 값 */
 export const TRAIL_SUMMIT_NEAR_M = 150;
 
+/**
+ * 화면이 꺼져도 받는 길(앱 1.4 부터 — client/src/hiking/trail/bgWatch). 옛 앱 · 웹은 화면이 켜진 동안 몇 초마다 한 번씩 묻는다.
+ *  - 이만큼(m) 움직였을 때만 새 위치가 온다: 쉬는 동안에는 오지 않아 배터리를 덜 쓴다.
+ *  - 온 위치를 셈에 넣는 가장 짧은 간격(ms): 빠르게 걸어도 초마다 셈하지 않는다.
+ */
+export const TRAIL_BG_DISTANCE_M = 8;
+export const TRAIL_BG_MIN_GAP_MS = 3000;
+/** 받은 위치를 지금 셈에 넣을 차례인가 — lastAt 은 앞서 셈에 넣은 때(ms), 처음이면 null */
+export function trailFixDue(lastAt: number | null, now: number): boolean {
+    return lastAt == null || now - lastAt >= TRAIL_BG_MIN_GAP_MS || now < lastAt;
+}
+/**
+ * 기록하는 동안 안드로이드가 띄워 두는 알림(운영체제가 요구한다) — 무엇을 하는 중인지, 언제 꺼지는지만 적는다.
+ * 재촉하는 말 · 기록을 겨루는 말을 넣지 않는다.
+ */
+export const TRAIL_BG_NOTICE = { title: "산행 기록 중", message: "화면을 꺼도 길 위의 자리를 재고 있어요. 산행을 마치면 꺼져요." } as const;
+
+
 export interface OnTrail { km: number; offM: number; ele: number }
 
 /**

@@ -29,6 +29,7 @@ import { MyPhotos } from "../photos/MyPhotos";
 import { SummitCheckin } from "../stamps/SummitCheckin";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { POI_COLOR } from "../theme";
+import { bgWatchAvailable } from "../trail/bgWatch";
 import { setVoiceOn, speakLine, voiceOn } from "../trail/speak";
 import { MY_TRIPS_KEY, dropKeptTrail, keepTrail, readKeptTrail, useTrail } from "../trail/useTrail";
 
@@ -62,7 +63,8 @@ export default function TrailPage() {
     }, [d, hikingOk]);
     const start = () => { const now = Date.now(); keepTrail(d!.id, { startedAt: now, courseId: course?.id ?? null, tally: undefined, prev: null, reached: false }); setStartedAt(now); };
     const trail = useTrail({ active, keepId: d?.id ?? null, line: course?.line ?? [], pois, summitKm: course?.summitKm ?? null, summit, kinds: NEXT_KINDS });
-    useKeepAwake(active);
+    // 화면이 꺼져도 받는 앱(1.4 부터)에서는 화면을 억지로 켜 두지 않는다 — 주머니에 넣고 걸어도 기록된다
+    useKeepAwake(active && !trail.background);
 
     const finish = useMutation({
         mutationFn: async () => {
@@ -157,6 +159,10 @@ export default function TrailPage() {
                                 </span>
                             </p>
                         )}
+                        {/* 화면이 꺼져도 받는 중(앱 1.4 부터) — 주머니에 넣어도 된다는 것을 알린다 */}
+                        {active && trail.background && trail.phase !== "denied" && (
+                            <p className="-mt-0.5 mb-2 pl-[18px] text-[12.5px] text-[#F4EFE380] break-keep" data-testid="trail-background">화면을 꺼도 기록돼요.</p>
+                        )}
 
                         {/* 길 띠 */}
                         <div className="rounded-2xl bg-[#F4EFE3] px-2.5 pb-1.5 pt-2.5 text-[#0E2A33]" data-testid="trail-ribbon">
@@ -176,7 +182,9 @@ export default function TrailPage() {
                                 <button type="button" onClick={start} data-track-as="hiking-trail-start" data-testid="trail-start"
                                     className="mt-4 h-14 w-full rounded-2xl bg-[#F28C6A] text-[17px] font-semibold text-[#2A1208] active:bg-[#E67C59]">산행 시작</button>
                                 <ul className="mt-4 space-y-1.5 text-[13px] leading-snug text-[#F4EFE399]">
-                                    <li className="break-keep">· 화면을 켜 둔 동안 위치를 보고, 앞에 있는 갈림길 · 위험 구간 · 대피소를 알려 드려요.</li>
+                                    <li className="break-keep">· {bgWatchAvailable()
+                                        ? "화면을 꺼도 위치를 보고, 앞에 있는 갈림길 · 위험 구간 · 대피소를 알려 드려요. 기록하는 동안 '산행 기록 중' 표시가 떠 있어요."
+                                        : "화면을 켜 둔 동안 위치를 보고, 앞에 있는 갈림길 · 위험 구간 · 대피소를 알려 드려요."}</li>
                                     <li className="break-keep">· 위치는 이 기기에서 길 위의 자리를 재는 데만 써요. 걸은 길은 저장하지 않아요.</li>
                                     <li className="break-keep">· 코스는 2022년 기록이에요. 안내는 참고용이니 현장의 표지와 통제를 따라 주세요.</li>
                                 </ul>
@@ -247,7 +255,7 @@ export default function TrailPage() {
                                 </button>
                                 {voice && <p className="mt-1.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">갈림길 · 위험 구간 · 대피소가 가까워질 때와 정상에서 말로 알려요.</p>}
 
-                                {/* 산행 중 사진 — 내 사진첩에 담는다(위치 정보는 지운다) */}
+                                {/* 산행 중 사진 — 올리면 그 산의 화면에 보인다(사진마다 비공개로 돌릴 수 있다). 위치 정보는 지운다 */}
                                 <div className="mt-5"><MyPhotos key={`trail-photos:${d.id}`} mountainId={d.id} name={d.name} compact /></div>
 
                                 {grid && (

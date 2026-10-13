@@ -45,6 +45,9 @@ const fakeDb = vi.hoisted(() => ({
     },
 }));
 vi.mock("../db.js", () => ({ db: fakeDb }));
+// 산행 사진의 가림은 등산의 저장(storage/hikingPhotos — 글자 그대로의 질의)이 한다. 여기서는 불렸는지와 돌려준 값만 본다
+const hikingHide = vi.hoisted(() => ({ fn: (async (_id: string): Promise<string | null> => null) as (id: string) => Promise<string | null>, calls: [] as string[] }));
+vi.mock("./hikingPhotos.js", () => ({ hideByReports: (id: string) => { hikingHide.calls.push(id); return hikingHide.fn(id); } }));
 
 import { CommunityRepository } from "./community.repo.js";
 import { hiqReports } from "../../shared/schema.js";
@@ -57,7 +60,7 @@ const repo = new CommunityRepository();
 const report = (targetType: string, over: Record<string, unknown> = {}) =>
     repo.report({ targetType, targetId: TARGET, reporterId: REPORTER, reason: "abuse", ...over } as any);
 
-beforeEach(() => { calls.inserts.length = 0; calls.updates.length = 0; calls.reporters = 1; calls.written = 1; });
+beforeEach(() => { calls.inserts.length = 0; calls.updates.length = 0; calls.reporters = 1; calls.written = 1; hikingHide.calls.length = 0; hikingHide.fn = async () => null; });
 
 describe("(가) 회원 신고(member) — 닫힌 신고를 다시 연다", () => {
     it("충돌 대상은 유일 제약 세 칸이고, 바꾸는 것은 상태·사유·상세·시각뿐이다", async () => {
@@ -217,8 +220,10 @@ describe("(가-2) 검토 중인 회원 신고에 다른 사유로 다시 신고 
 describe("(나) 다른 대상 — 예전 그대로 동일인 중복을 무시한다", () => {
     const others = hiqReports.targetType.enumValues.filter((t) => t !== "member");
 
-    it("member 말고 열 가지가 있다", () => {
-        expect(others).toHaveLength(10);
+    // 산행 사진(hiking_photo, 2026-10-13)이 더해져 열한 가지다
+    it("member 말고 열한 가지가 있다", () => {
+        expect(others).toHaveLength(11);
+        expect(others).toContain("hiking_photo");
         expect(hiqReports.targetType.enumValues).toContain("member");
     });
 
@@ -268,5 +273,37 @@ describe("(다) 다시 연 신고가 큐·알림에 닿는 길 — 손대지 않
     it("닫기는 pending 만 닫는다 — 다시 연 행을 운영자가 다시 판단할 수 있다", () => {
         const close = admin.slice(admin.indexOf("async closeReports("), admin.indexOf("async logModerationAction("));
         expect(close).toContain('eq(hiqReports.status, "pending")');
+    });
+});
+
+describe("(라) 산행 사진(hiking_photo) — 서로 다른 3명이면 가린다(라운드 사진과 같은 규칙)", () => {
+    const AUTHOR = "dddddddd-dddd-4ddd-8ddd-dddddddddddd";
+
+    it("두 명까지는 가리지 않는다", async () => {
+        calls.reporters = 2;
+        expect(await report("hiking_photo")).toEqual({ reportCount: 2, autoBlinded: false, authorId: null });
+        expect(hikingHide.calls).toEqual([]);
+    });
+
+    it("세 명째에 가리고, 올린 사람을 돌려준다(라우트가 그 사람에게 알린다) — 다른 표는 건드리지 않는다", async () => {
+        calls.reporters = 3;
+        hikingHide.fn = async () => AUTHOR;
+        expect(await report("hiking_photo")).toEqual({ reportCount: 3, autoBlinded: true, authorId: AUTHOR });
+        expect(hikingHide.calls).toEqual([TARGET]);
+        expect(calls.updates).toEqual([]);
+    });
+
+    it("이미 가려진 사진은 다시 가렸다고 하지 않는다 — 알림이 두 번 가지 않는다", async () => {
+        calls.reporters = 4;
+        hikingHide.fn = async () => null;
+        expect(await report("hiking_photo")).toEqual({ reportCount: 4, autoBlinded: false, authorId: null });
+        expect(hikingHide.calls).toEqual([TARGET]);
+    });
+
+    it("다른 대상의 신고는 등산의 저장을 부르지 않는다", async () => {
+        calls.reporters = 5;
+        await report("member");
+        await report("crew_post");
+        expect(hikingHide.calls).toEqual([]);
     });
 });

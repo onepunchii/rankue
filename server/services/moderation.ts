@@ -63,6 +63,8 @@ export async function applyModerationAction(p: {
     }
     // 라운드 사진의 작성자 안내는 그 경기 앨범을 연다 — 지우면 행이 없어지니 조치 전에 경기 id 를 읽어 둔다.
     const roundId = p.targetType === "golf_photo" ? (await storage.golfPhotos.get(p.targetId))?.sessionId ?? null : null;
+    // 산행 사진의 작성자 안내는 그 산의 화면 '내 산행 사진'을 연다 — 같은 까닭으로 조치 전에 읽어 둔다.
+    const hikingPath = p.targetType === "hiking_photo" ? storage.hikingPhotos.photoPagePath(await storage.hikingPhotos.get(p.targetId)) : null;
 
     let note: string | null = previewText(p.note, 500);
     switch (p.action) {
@@ -106,8 +108,8 @@ export async function applyModerationAction(p: {
     // 작성자 안내 — 알림 실패가 조치를 실패로 만들면 안 된다(조치는 이미 끝났다).
     const notice = authorNoticeFor(p.action, p.targetType) && authorNoticeKeysFor(p.action, p.targetType);
     if (notice && item.author && p.targetType !== "member") {
-        // 어느 알림함(골프 사진은 골프 알림함)·어디로 여나. 지운 글로 보내면 빈 화면이다 — 원문이 남는 조치에만 링크를 싣는다.
-        const route = authorNoticeRoute({ targetType: p.targetType, action: p.action, link: item.content.link, roundId });
+        // 어느 알림함(골프 사진은 골프 알림함 · 산행 사진은 등산 알림함)·어디로 여나. 지운 글로 보내면 빈 화면이다 — 원문이 남는 조치에만 링크를 싣는다.
+        const route = authorNoticeRoute({ targetType: p.targetType, action: p.action, link: item.content.link, roundId, hikingPath });
         try {
             await notificationService.sendAndSaveNotification({
                 memberId: item.author.memberId,
@@ -142,6 +144,12 @@ async function deleteReportedContent(targetType: ReportTargetType, id: string): 
         case "golf_photo": {
             // 행과 원본·썸네일 Blob 을 함께 — 행만 지우면 주소를 아는 사람에게 사진이 계속 열린다
             const gone = await storage.golfPhotos.delete(id);
+            if (gone) await deleteBlobs([gone.url, gone.thumbUrl]);
+            return;
+        }
+        case "hiking_photo": {
+            // 산행 사진도 같다 — 줄과 원본·썸네일 파일을 함께(올린 사람의 지우기와 같은 저장, storage/hikingPhotos)
+            const gone = await storage.hikingPhotos.remove(id);
             if (gone) await deleteBlobs([gone.url, gone.thumbUrl]);
             return;
         }

@@ -30,6 +30,8 @@ const config: CapacitorConfig = {
     // 바이너리에 박아 심사 지침 2.5.1(비공개 API) 거절 위험이 있다. iOS 설정 화면은 웹이 'app-settings:' 이동으로 연다.
     // 주의: 목록이라 package.json 에 플러그인을 새로 넣으면 여기에도 적어야 iOS 에 들어간다(안 적으면 iOS 에서만 조용히 빠진다).
     includePlugins: [
+      // 산행 중 화면이 꺼져도 위치 받기(1.4) — '항상 허용'은 묻지 않는다(client/src/hiking/trail/bgWatch.ts)
+      "@capacitor-community/background-geolocation",
       "@capacitor-community/keep-awake",
       "@capacitor-community/text-to-speech",
       "@capacitor/app",

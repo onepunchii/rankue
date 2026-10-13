@@ -26,13 +26,15 @@ const isUlleung = (m: MountainSummary) => m.sigungu === "울릉군";
 
 interface Spot { m: MountainSummary; x: number; y: number }
 
-export function MountainMap({ mountains, done, region, labelAll = false, className }: {
+export function MountainMap({ mountains, done, region, fit = false, labelAll = false, className }: {
     /** 지도에 놓을 산(명산) */
     mountains: readonly MountainSummary[];
     /** 오른 산의 id — 깃발을 꽂는다 */
     done?: ReadonlySet<string>;
     /** 고른 권역 — 그 권역으로 당겨 들어간다 */
     region?: string | null;
+    /** 놓인 산들이 한쪽에 몰려 있으면 그쪽으로 당겨 들어간다(묶음 목록 — 권역을 고르지 않았을 때만) */
+    fit?: boolean;
     labelAll?: boolean;
     className?: string;
 }) {
@@ -44,20 +46,22 @@ export function MountainMap({ mountains, done, region, labelAll = false, classNa
     }).sort((a, b) => a.y - b.y), [mountains]);
 
     const view = useMemo(() => {
-        const inRegion = region ? spots.filter((s) => s.m.region === region && !isUlleung(s.m)) : [];
-        if (!region || inRegion.length === 0) return FULL;
+        const inRegion = region ? spots.filter((s) => s.m.region === region && !isUlleung(s.m)) : fit ? spots.filter((s) => !isUlleung(s.m)) : [];
+        if (inRegion.length === 0) return FULL;
         const xs = inRegion.map((s) => s.x), ys = inRegion.map((s) => s.y);
         const pad = 26;
         let x = Math.min(...xs) - pad, y = Math.min(...ys) - pad, w = Math.max(...xs) - Math.min(...xs) + pad * 2, h = Math.max(...ys) - Math.min(...ys) + pad * 2;
+        // 묶음의 산이 나라 곳곳에 퍼져 있으면(또는 울릉도의 산이 끼어 있으면) 당기지 않는다 — 전체 지도가 '어디어디인지'를 더 잘 말한다
+        if (!region && (w > FULL.w * 0.62 || h > FULL.h * 0.62 || spots.some((s) => isUlleung(s.m)))) return FULL;
         // 그림 칸의 비(가로 39 : 세로 50)에 맞춰 넓힌다 — 좁은 권역이 길쭉하게 잘리지 않게
         const want = ZOOM_ASPECT;
         if (w / h < want) { const nw = h * want; x -= (nw - w) / 2; w = nw; } else { const nh = w / want; y -= (nh - h) / 2; h = nh; }
         return { x, y, w, h };
-    }, [region, spots]);
+    }, [region, fit, spots]);
 
     const u = view.w / FULL.w;          // 당겨 들어가면 그림 · 글자를 그만큼 줄인다
     const zoomed = view !== FULL;
-    const shown = zoomed ? spots.filter((s) => s.m.region === region && !isUlleung(s.m)) : spots;
+    const shown = zoomed ? spots.filter((s) => (region ? s.m.region === region : true) && !isUlleung(s.m)) : spots;
     // 당겨 들어간 그림에서는 100대 명산만 이름을 단다 — 플러스까지 달면 강원 · 경남은 글자가 겹친다
     const label = (s: Spot) => labelAll || (zoomed ? s.m.lists.includes("kfs100") : ["한라산", "지리산", "설악산", "태백산", "덕유산", "북한산", "무등산", "소백산"].includes(s.m.slug));
 
@@ -94,13 +98,23 @@ export function MountainMap({ mountains, done, region, labelAll = false, classNa
                     </g>
                 );
             })}
-            {/* 이름은 산 그림 위의 층에 — 뒤에 그린 산이 앞의 이름을 덮지 않게 */}
+            {/* 이름은 산 그림 위의 층에 — 뒤에 그린 산이 앞의 이름을 덮지 않게. 이름끼리 겹치면 100대 명산 · 높은 산의 이름을 남긴다 */}
             <g pointerEvents="none">
-                {shown.filter(label).map((s) => {
-                    const big = s.m.lists.includes("kfs100");
-                    const size = (big ? 7.5 : 5) * (0.8 + Math.min(1, (s.m.heightM ?? 300) / 1900) * 0.7) * (zoomed ? Math.max(u, 0.55) * 1.25 : 1);
-                    return <text key={`label:${s.m.id}`} x={s.x + size + 2.5 * u} y={s.y + 3 * u} fontSize={(zoomed ? 15 : 13.5) * u} fontWeight="600" fill="#0E2A33" stroke="#F4EFE3" strokeWidth={3 * u} paintOrder="stroke">{s.m.name}</text>;
-                })}
+                {(() => {
+                    const fs = (zoomed ? 15 : 13.5) * u;
+                    const boxes: { x0: number; x1: number; y0: number; y1: number }[] = [];
+                    return shown.filter(label)
+                        .sort((a, b) => Number(b.m.lists.includes("kfs100")) - Number(a.m.lists.includes("kfs100")) || (b.m.heightM ?? 0) - (a.m.heightM ?? 0))
+                        .map((s) => {
+                            const big = s.m.lists.includes("kfs100");
+                            const size = (big ? 7.5 : 5) * (0.8 + Math.min(1, (s.m.heightM ?? 300) / 1900) * 0.7) * (zoomed ? Math.max(u, 0.55) * 1.25 : 1);
+                            const x = s.x + size + 2.5 * u, y = s.y + 3 * u;
+                            const box = { x0: x - 1 * u, x1: x + s.m.name.length * fs * 0.98, y0: y - fs * 0.95, y1: y + fs * 0.3 };
+                            if (boxes.some((o) => box.x0 < o.x1 && box.x1 > o.x0 && box.y0 < o.y1 && box.y1 > o.y0)) return null;
+                            boxes.push(box);
+                            return <text key={`label:${s.m.id}`} x={x} y={y} fontSize={fs} fontWeight="600" fill="#0E2A33" stroke="#F4EFE3" strokeWidth={3 * u} paintOrder="stroke">{s.m.name}</text>;
+                        });
+                })()}
             </g>
         </svg>
     );

@@ -9,6 +9,7 @@ const m = vi.hoisted(() => ({
     deleteCrewComment: vi.fn(), deleteCrewPhotoComment: vi.fn(), getCrewPhoto: vi.fn(), deleteCrewChat: vi.fn(),
     getMemberById: vi.fn(), banUser: vi.fn(), send: vi.fn(), deleteBlobs: vi.fn(),
     getGolfPhoto: vi.fn(), deleteGolfPhoto: vi.fn(),
+    getHikingPhoto: vi.fn(), removeHikingPhoto: vi.fn(),
 }));
 vi.mock("../storage/index.js", () => ({
     storage: {
@@ -24,6 +25,11 @@ vi.mock("../storage/index.js", () => ({
             getCrewPhoto: m.getCrewPhoto, deleteCrewChat: m.deleteCrewChat,
         },
         golfPhotos: { get: m.getGolfPhoto, delete: m.deleteGolfPhoto },
+        // photoPagePath 는 진짜와 같은 식 — 산의 화면 '내 산행 사진'
+        hikingPhotos: {
+            get: m.getHikingPhoto, remove: m.removeHikingPhoto,
+            photoPagePath: (p: { mountainSlug?: string | null } | null) => (p?.mountainSlug ? `/hiking/mountains/${p.mountainSlug}#sec-photos` : null),
+        },
         getMemberById: m.getMemberById,
         banUser: m.banUser,
     },
@@ -243,6 +249,82 @@ describe("라운드 사진 조치(golf_photo)", () => {
         expect(m.setReportTargetBlinded).not.toHaveBeenCalled();
         expect(m.logModerationAction).not.toHaveBeenCalled();
         expect(m.send).not.toHaveBeenCalled();
+    });
+});
+
+// 산행 사진(2026-10-13) — 올리면 산의 화면에 바로 뜬다. 라운드 사진과 같은 실행기 · 같은 조치, 알림은 등산 알림함으로.
+describe("산행 사진 조치(hiking_photo)", () => {
+    const photoItem = (actions: string[], over: Record<string, unknown> = {}) => item({
+        targetType: "hiking_photo",
+        actions,
+        content: {
+            exists: true, title: "북한산", text: null, images: ["https://x.public.blob.vercel-storage.com/hiq/hiking-thumb/a.webp"],
+            isBlinded: true, blindReason: null, meta: "산행 사진 · 공개",
+            // '원문 열기'는 파일 주소다 — 올린 사람의 알림 링크로 쓰면 안 된다
+            link: "https://x.public.blob.vercel-storage.com/hiq/hiking-photo/a.webp", crewName: null, createdAt: null,
+        },
+        ...over,
+    });
+    const runPhoto = (action: string, extra: Record<string, unknown> = {}) =>
+        applyModerationAction({ targetType: "hiking_photo", targetId: "hp1", action: action as any, adminProfileId: "admin-p", ...extra });
+
+    beforeEach(() => {
+        m.getHikingPhoto.mockResolvedValue({ id: "hp1", memberId: "a1", mountainId: "m1", mountainSlug: "bukhansan" });
+    });
+
+    it("이의제기 승인: 가림을 풀고, 신고를 기각으로 닫고, 결과를 등산 알림함으로 보내 그 산의 '내 산행 사진'을 연다", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["appeal_approve", "appeal_reject", "delete"]));
+        expect(await runPhoto("appeal_approve")).toEqual({ ok: true, closed: 2 });
+        expect(m.setReportTargetBlinded).toHaveBeenCalledWith("hiking_photo", "hp1", false, null);
+        expect(m.closeReports).toHaveBeenCalledWith("hiking_photo", "hp1", "dismissed");
+        expect(m.logModerationAction).toHaveBeenCalledWith(expect.objectContaining({ targetType: "hiking_photo", action: "appeal_approve", authorMemberId: "a1" }));
+        expect(m.send).toHaveBeenCalledWith(expect.objectContaining({
+            memberId: "a1", category: "HIKING", type: "MODERATION",
+            title: "notif.moderation.appealResult.title", body: "notif.moderation.appealApprove.body",
+            params: { url: "/hiking/mountains/bukhansan#sec-photos" },
+        }));
+        // 골프의 사진 저장을 건드리지 않는다
+        expect(m.getGolfPhoto).not.toHaveBeenCalled();
+    });
+
+    it("이의제기 반려: 가린 채 두고, 신고를 조치로 닫는다", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["appeal_approve", "appeal_reject", "delete"]));
+        await runPhoto("appeal_reject");
+        expect(m.setReportTargetBlinded).not.toHaveBeenCalled();
+        expect(m.closeReports).toHaveBeenCalledWith("hiking_photo", "hp1", "actioned");
+        expect(m.send.mock.calls[0][0]).toMatchObject({ category: "HIKING", body: "notif.moderation.appealReject.body", params: { url: "/hiking/mountains/bukhansan#sec-photos" } });
+    });
+
+    it("가리기: hidden_at 을 찍고, 이의제기할 수 있다는 안내가 간다", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["blind", "delete"], { content: { ...photoItem([]).content, isBlinded: false } }));
+        await runPhoto("blind");
+        expect(m.setReportTargetBlinded).toHaveBeenCalledWith("hiking_photo", "hp1", true, expect.any(String));
+        expect(m.send.mock.calls[0][0]).toMatchObject({ category: "HIKING", body: "notif.moderation.blind.bodyAppeal" });
+    });
+
+    it("지우기: 줄과 원본·썸네일 파일을 함께 지우고, 링크 없이 등산 알림함으로 알린다", async () => {
+        m.getReportTarget.mockResolvedValue(photoItem(["unblind", "delete"]));
+        m.removeHikingPhoto.mockResolvedValue({ url: "https://x/hiq/hiking-photo/a.webp", thumbUrl: "https://x/hiq/hiking-thumb/a.webp" });
+        await runPhoto("delete");
+        expect(m.getHikingPhoto).toHaveBeenCalledWith("hp1"); // 산의 주소는 지우기 전에 읽는다
+        expect(m.removeHikingPhoto).toHaveBeenCalledWith("hp1");
+        expect(m.deleteBlobs).toHaveBeenCalledWith(["https://x/hiq/hiking-photo/a.webp", "https://x/hiq/hiking-thumb/a.webp"]);
+        expect(m.deleteGolfPhoto).not.toHaveBeenCalled();
+        expect(m.closeReports).toHaveBeenCalledWith("hiking_photo", "hp1", "actioned");
+        expect(m.logModerationAction).toHaveBeenCalledWith(expect.objectContaining({ action: "delete", note: "북한산" }));
+        const sent = m.send.mock.calls[0][0];
+        expect(sent).toMatchObject({ category: "HIKING", body: "notif.moderation.delete.body" });
+        expect(sent.params).toBeUndefined();
+    });
+
+    it("신고 큐는 신고가 있어야 조치한다 · 이미 지워진 사진이면 산의 주소 없이 등산 첫 화면으로", async () => {
+        m.getReportTarget.mockResolvedValue(null);
+        expect(await runPhoto("blind")).toMatchObject({ ok: false, status: 404 });
+        expect(m.getReportTarget).toHaveBeenCalledWith("hiking_photo", "hp1", { unreported: false });
+        m.getReportTarget.mockResolvedValue(photoItem(["unblind", "delete"]));
+        m.getHikingPhoto.mockResolvedValue(null);
+        await runPhoto("unblind");
+        expect(m.send.mock.calls[0][0]).toMatchObject({ category: "HIKING", params: { url: "/hiking" } });
     });
 });
 
