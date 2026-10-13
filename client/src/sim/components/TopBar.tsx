@@ -250,7 +250,7 @@ export const TopBar = memo(function TopBar(p: TopBarProps) {
                                     </button>
                                     <button type="button" onClick={p.onSummary} aria-label={t("sim.controls.innings")} title={t("sim.controls.innings")} className={cn(CHIP, "border-surface-line")}>
                                         <span className={LABEL}>{t("sim.hud.inning")}</span>
-                                        <span className={VALUE}>{inning}</span>
+                                        <span className={VALUE}>{inning}{s.inningCap > 0 && <span className={TARGET}>/{s.inningCap}</span>}</span>
                                     </button>
                                     <button type="button" onClick={p.onSummary} aria-label={t("sim.top.avg")} title={t("sim.top.avg")} className={cn(CHIP, "border-surface-line")}>
                                         <span className={LABEL}>{t("sim.top.avg")}</span>

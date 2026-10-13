@@ -19,8 +19,13 @@ import type { InningRow } from "../inningLog";
  * **누를 수 없다(pointer-events-none).** 이 자리는 내 차례엔 조작 버튼이 쓰는 자리라 두 기능이 번갈아 쓴다 —
  * 2026-09-15 사고(안 보이는 버튼이 탭을 가로챈 것)가 바로 이런 자리에서 났다. 자세한 이닝 시트는 헤더가 연다.
  */
-export const MatchScoreStrip = memo(function MatchScoreStrip({ rows, order, balls, className, style }: {
+export const MatchScoreStrip = memo(function MatchScoreStrip({ rows, order, balls, inning, className, style }: {
     rows: readonly InningRow[];
+    /**
+     * 지금 몇 이닝째인가 — 이닝 제한이 있는 판에서 준다. 머리줄 밑 이닝 제한 줄('이닝 제한 3/20')과 같은 숫자를 말하게 하려는 것
+     * (적힌 줄 수만 세면 새 이닝의 첫 샷 전까지 하나 적게 보인다). 제한 수(/20)는 여기 적지 않는다 — 칸이 좁아 두 줄이 된다.
+     */
+    inning?: number;
     /** 화면 칸 순서 [왼쪽, 오른쪽] = [나, 상대] 의 선수 자리 번호 */
     order: readonly [number, number];
     /** 칸 머리의 공 색(헤더와 같은 표시) */
@@ -31,7 +36,7 @@ export const MatchScoreStrip = memo(function MatchScoreStrip({ rows, order, ball
     const { t } = useT();
     // 하이런 — 선수마다 이닝 최고 득점(0 은 하이런이 아니다)
     const high = order.map((p) => rows.reduce((m, r) => Math.max(m, r.cells[p] ?? 0), 0));
-    const current = rows.length;
+    const current = Math.max(rows.length, inning ?? 0);
     return (
         <div
             aria-label={t("sim.controls.innings")}

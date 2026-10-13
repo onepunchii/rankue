@@ -62,7 +62,12 @@ describe("matchView", () => {
         expect(endReasonText(m({ status: "finished", winnerIndex: 1, endReason: "resign" }), t)).toBe(ko["sim.match.endResign"].replace("{name}", "호스트"));
         expect(endReasonText(m({ status: "finished", winnerIndex: 1, endReason: "claim" }), t)).toBe(ko["sim.match.endClaim"].replace("{name}", "게스트"));
         expect(endReasonText(m({ status: "finished", winnerIndex: 0, endReason: "target" }), t)).toBe(ko["sim.match.endTarget"]);
-        expect(endReasonText(m({ status: "finished", winnerIndex: null, endReason: "inningCap" }), t)).toBe(ko["sim.match.endInningCap"]);
+        expect(endReasonText(m({ status: "finished", winnerIndex: null, endReason: "inningCap", inningCap: 15 }), t)).toBe(ko["sim.match.endInningCap"]);
+        // 옛 기록: 이닝 제한이 없던 판인데 '이닝 제한'으로 저장된 후구 무승부 — 제한이 없으면 그렇게 적지 않는다
+        expect(endReasonText(m({ status: "finished", winnerIndex: null, endReason: "inningCap", inningCap: 0 }), t)).toBe(ko["sim.match.endTargetDraw"]);
+        expect(endReasonText(m({ status: "finished", winnerIndex: null, endReason: "inningCap", inningCap: 20 }), t)).toBe(ko["sim.match.endInningCap"]);
+        // 후구에서 따라붙어 비긴 판 — '목표 점수에 도달'이 아니라 비겼다고 적는다(2026-10-13)
+        expect(endReasonText(m({ status: "finished", winnerIndex: null, endReason: "target" }), t)).toBe(ko["sim.match.endTargetDraw"]);
         expect(endReasonText(m({ status: "finished", winnerIndex: 0, endReason: null }), t)).toBeNull();
     });
     it("참가 오류 키·공유 문구", () => {

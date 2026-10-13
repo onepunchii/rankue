@@ -268,6 +268,7 @@ export const ko: Record<string, string> = {
   "notif.sim.timeout.body": "40초를 넘겨 이닝이 넘어갔어요. ({strikes}/{max})",
   "notif.sim.finished.lost": "{name}님이 이겼어요. 결과를 확인해 보세요.",
   "notif.sim.finished.won": "당신이 이겼어요! 결과를 확인해 보세요.",
+  "notif.sim.finished.draw": "비겼어요. 결과를 확인해 보세요.",
   "notif.sim.finished.resigned": "{name}님이 기권했어요. 당신의 승리입니다.",
   "notif.sim.finished.claimed": "48시간 동안 응답이 없어 상대의 승리로 끝났어요.",
   "notif.sim.rematchAsk.title": "한 판 더?",

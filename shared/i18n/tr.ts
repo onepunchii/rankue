@@ -268,6 +268,7 @@ export const tr: Record<string, string> = {
   "notif.sim.timeout.body": "40 saniyeyi aştın, el rakibe geçti. ({strikes}/{max})",
   "notif.sim.finished.lost": "{name} kazandı. Sonuca göz at.",
   "notif.sim.finished.won": "Kazandın! Sonuca göz at.",
+  "notif.sim.finished.draw": "Berabere bitti. Sonucu kontrol edin.",
   "notif.sim.finished.resigned": "{name} çekildi. Kazandın.",
   "notif.sim.finished.claimed": "48 saat yanıt olmadığı için maç rakibinin galibiyetiyle bitti.",
   "notif.sim.rematchAsk.title": "Rövanş?",

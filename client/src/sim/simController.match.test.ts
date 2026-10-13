@@ -693,6 +693,11 @@ describe("기권·승리 주장·종료", () => {
         expect(endReasonFor({ winnerIndex: 1, state: won })).toBe("inningCap");
         expect(endReasonFor({ winnerIndex: null, state: won })).toBe("inningCap");
     });
+    it("endReasonFor: 후구에서 따라붙어 비긴 판(둘 다 목표에 닿음)은 이닝 제한이 아니라 target 이다", () => {
+        const st = createSession({ rules: DEFAULT_3C_RULES, players: [{ id: HOST, target: 1 }, { id: GUEST, target: 5 }] });
+        const tied = { ...st, players: st.players.map((p) => ({ ...p, score: p.target })) };
+        expect(endReasonFor({ winnerIndex: null, state: tied })).toBe("target");
+    });
 });
 
 /**

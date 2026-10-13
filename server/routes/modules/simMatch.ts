@@ -20,7 +20,7 @@ import {
     type SimParams, type BallState, type ShotInput,
 } from "../../../shared/sim/index.js";
 import {
-    createSession, applyShot, currentPlayer, evaluateShot, isOpeningShot, shotInning, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
+    createSession, applyShot, currentPlayer, evaluateShot, finishReason, isOpeningShot, opponentResult, shotInning, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S,
     SHOT_CLOCK_STRIKES, PRESENCE_MS, AIM_FRESH_MS,
     DEFAULT_3C_RULES, DEFAULT_4C_RULES, type Rules, type SessionState,
 } from "../../../shared/sim/rules/index.js";
@@ -796,7 +796,8 @@ async function applyTimeout(m: MatchWithNames, myIndex: 0 | 1) {
     const newState = out ? { ...applied.session, status: "finished" as const, winnerIndex } : applied.session;
     const row = await storage.simMatch.passTurn({
         id: m.id, turn: m.turn, newState, newTurn: applied.session.turn,
-        finished, winnerIndex, endReason: out ? "timeout" : finished ? "inningCap" : null,
+        // 시간 초과로 이닝이 넘어가며 끝난 판 — 이닝 상한일 수도, 후구를 못 채워 먼저 닿은 사람이 이긴 것(target)일 수도 있다
+        finished, winnerIndex, endReason: out ? "timeout" : finishReason(state, applied.session),
         strikeIndex: m.turn === 0 ? 0 : 1,
     });
     if (!row) return null;
@@ -907,7 +908,8 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
     const outcome = evaluateShot(result.events, input.cueBallId, state.rules, result.truncated, { opening: isOpeningShot(state, preState) });
     const applied = applyShot(state, outcome);
     const finished = applied.session.status === "finished";
-    const endReason = finished ? (applied.session.winnerIndex === null || applied.session.players.every((p) => p.innings >= state.inningCap && state.inningCap > 0) ? "inningCap" : "target") : null;
+    // 끝난 까닭 — 후구에서 따라붙어 비긴 판은 이닝 제한이 아니라 목표 도달이다(shared/sim/rules/session.finishReason)
+    const endReason = finishReason(state, applied.session);
 
     let rec;
     try {
@@ -927,9 +929,9 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
     const opponentId = myIndex === 0 ? m.guestId : m.hostId;
     const meName = (myIndex === 0 ? m.hostName : m.guestName) ?? "상대";
     if (finished) {
-        const winnerIdx = applied.session.winnerIndex;
-        const iWon = winnerIdx === myIndex;
-        await capped(notify(opponentId, "notif.sim.finished.title", iWon ? msg("notif.sim.finished.lost", { name: meName }) : "notif.sim.finished.won", m.id));
+        // 상대에게 가는 말 — 비긴 판(후구 동점 · 이닝 제한 동률)에 '당신이 이겼어요'를 보내지 않는다
+        const told = opponentResult(applied.session.winnerIndex, myIndex);
+        await capped(notify(opponentId, "notif.sim.finished.title", told === "draw" ? "notif.sim.finished.draw" : told === "lost" ? msg("notif.sim.finished.lost", { name: meName }) : "notif.sim.finished.won", m.id));
     } else if (applied.session.turn !== myIndex) {
         // 상대가 지금 화면을 보고 있으면 알리지 않는다 — 공이 구르는 걸 보고 있는 사람에게 "당신 차례예요"는 소음이다.
         // 끝났다는 알림(위 가지)은 화면을 보고 있어도 보낸다: 판이 끝나면 폴링도 끝나 화면이 더 말해 주지 않는다.

@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { createSession, applyShot, currentPlayer, shotInning, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S } from "./session.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { createSession, applyShot, currentInning, currentPlayer, decideByInningCap, finishReason, inningsLeft, isLastInning, opponentResult, shotInning, timeoutOutcome, SHOT_CLOCK_S, SHOT_CLOCK_GRACE_S } from "./session.js";
 import { DEFAULT_3C_RULES, DEFAULT_4C_RULES } from "./evaluate.js";
 import type { ShotOutcome } from "./types.js";
 
@@ -148,6 +150,123 @@ describe("2인 세션", () => {
     });
     it("같은 큐볼은 거부", () => {
         expect(() => createSession({ rules: DEFAULT_3C_RULES, players: [{ id: "a", target: 1, cueBallId: "white" }, { id: "b", target: 1, cueBallId: "white" }] })).toThrow();
+    });
+});
+
+/**
+ * 끝난 까닭과 상대에게 가는 말(2026-10-13 오너 제보: "후구 때 동점 되면 … 무로 되어야 되는데 알림창에는 승이라고 뜨던데").
+ * 승패 자체는 맞았다(무승부). 틀린 것은 둘: 상대에게 '당신이 이겼어요'가 갔고, 끝난 까닭이 '이닝 제한'으로 적혔다.
+ */
+describe("끝난 까닭 · 상대에게 가는 말", () => {
+    const two = (o: { inningCap?: number; t0?: number; t1?: number } = {}) => createSession({ rules: DEFAULT_3C_RULES, inningCap: o.inningCap ?? 0, players: [{ id: "a", target: o.t0 ?? 1 }, { id: "b", target: o.t1 ?? 1 }] });
+    const step = (s: ReturnType<typeof two>, o: ShotOutcome) => { const r = applyShot(s, o); return { s: r.session, why: finishReason(s, r.session) }; };
+
+    it("후구에서 따라붙어 비긴 판 — 승자는 없고, 까닭은 이닝 제한이 아니라 목표 도달이다", () => {
+        let x = step(two(), POINT);                       // 선공이 목표 → 후구
+        expect(x.s.status).toBe("playing"); expect(x.why).toBeNull();
+        x = step(x.s, POINT);                             // 후공도 목표 → 무승부
+        expect(x.s.status).toBe("finished"); expect(x.s.winnerIndex).toBeNull();
+        expect(x.why).toBe("target");
+        // 마지막에 친 사람은 후공(자리 1) — 상대(선공)에게 '당신이 이겼어요'가 아니라 '비겼어요'
+        expect(opponentResult(x.s.winnerIndex, 1)).toBe("draw");
+    });
+    it("후구를 못 채우면 먼저 닿은 사람의 승리 — 까닭은 목표 도달, 진 사람이 마지막에 쳤으니 상대는 '이겼다'", () => {
+        let x = step(two(), POINT);
+        x = step(x.s, MISS);
+        expect(x.s.winnerIndex).toBe(0); expect(x.why).toBe("target");
+        expect(opponentResult(x.s.winnerIndex, 1)).toBe("won");
+        // 이닝 제한이 걸린 판의 마지막 이닝이어도 후구 실패는 목표 도달로 끝난 것이다
+        let y = step(two({ inningCap: 1 }), POINT);
+        y = step(y.s, MISS);
+        expect(y.s.winnerIndex).toBe(0); expect(y.why).toBe("target");
+    });
+    it("후공이 먼저 닿으면 바로 끝 — 친 사람이 이겼으니 상대는 '졌다'", () => {
+        let x = step(two(), MISS);
+        x = step(x.s, POINT);
+        expect(x.s.winnerIndex).toBe(1); expect(x.why).toBe("target");
+        expect(opponentResult(x.s.winnerIndex, 1)).toBe("lost");
+    });
+    it("이닝 제한 — 둘 다 그 이닝을 마치면 달성률이 높은 쪽, 같으면 무승부. 까닭은 이닝 제한", () => {
+        // 2이닝 제한 · 목표 10: 선공 2점, 후공 1점
+        let x = step(two({ inningCap: 2, t0: 10, t1: 10 }), POINT);
+        x = step(x.s, MISS); x = step(x.s, MISS);          // 1이닝 끝(1:0)
+        x = step(x.s, POINT); x = step(x.s, MISS);          // 선공 2이닝 끝(2:0)
+        expect(x.s.status).toBe("playing");                 // 후공의 2이닝이 남았다
+        x = step(x.s, POINT); x = step(x.s, MISS);          // 후공 2이닝 끝(2:1)
+        expect(x.s.status).toBe("finished"); expect(x.s.winnerIndex).toBe(0); expect(x.why).toBe("inningCap");
+        expect(opponentResult(x.s.winnerIndex, 1)).toBe("won");
+        // 동률 — 무승부, 상대에게도 '비겼어요'
+        let y = step(two({ inningCap: 1, t0: 10, t1: 10 }), MISS);
+        y = step(y.s, MISS);
+        expect(y.s.winnerIndex).toBeNull(); expect(y.why).toBe("inningCap");
+        expect(opponentResult(y.s.winnerIndex, 1)).toBe("draw");
+    });
+    it("이닝 제한의 마지막 이닝에 선공이 목표에 닿으면 후구가 먼저다(이닝 제한으로 끝내지 않는다)", () => {
+        let x = step(two({ inningCap: 1 }), POINT);
+        expect(x.s.status).toBe("playing"); expect(x.s.pendingWinner).toBe(0);
+        x = step(x.s, POINT);
+        expect(x.s.winnerIndex).toBeNull(); expect(x.why).toBe("target");
+    });
+    it("시간 초과로 이닝이 넘어가며 끝나도 같은 규칙", () => {
+        let x = step(two(), POINT);
+        x = step(x.s, timeoutOutcome());                    // 후구 중 시간 초과 → 선공 승
+        expect(x.s.winnerIndex).toBe(0); expect(x.why).toBe("target");
+        let y = step(two({ inningCap: 1, t0: 10, t1: 10 }), timeoutOutcome());
+        y = step(y.s, timeoutOutcome());
+        expect(y.s.status).toBe("finished"); expect(y.why).toBe("inningCap");
+    });
+    it("달성률은 나눗셈 없이 견준다 — 다마가 달라도 같은 비율이면 무승부", () => {
+        expect(decideByInningCap([{ score: 10, target: 30 }, { score: 7, target: 21 }])).toBeNull();
+        expect(decideByInningCap([{ score: 1, target: 3 }, { score: 2, target: 6 }])).toBeNull();
+        expect(decideByInningCap([{ score: 11, target: 30 }, { score: 7, target: 21 }])).toBe(0);
+        expect(decideByInningCap([{ score: 10, target: 30 }, { score: 8, target: 21 }])).toBe(1);
+        // 음수 점수(4구 파울)도 그대로 견준다
+        expect(decideByInningCap([{ score: -10, target: 100 }, { score: 0, target: 200 }])).toBe(1);
+        expect(decideByInningCap([{ score: 5, target: 20 }])).toBe(0);
+    });
+    it("지금 이닝 · 마지막 이닝 — 둘이 같은 이닝을 같은 숫자로 보고, 후구는 제한이 남아도 마지막이다", () => {
+        let s = two({ inningCap: 2, t0: 10, t1: 10 });
+        expect(currentInning(s)).toBe(1); expect(isLastInning(s)).toBe(false);
+        s = applyShot(s, MISS).session;                     // 후공의 1이닝
+        expect(currentInning(s)).toBe(1); expect(isLastInning(s)).toBe(false);
+        s = applyShot(s, MISS).session;                     // 선공의 2이닝 = 마지막
+        expect(currentInning(s)).toBe(2); expect(isLastInning(s)).toBe(true);
+        s = applyShot(s, MISS).session;                     // 후공의 2이닝
+        expect(currentInning(s)).toBe(2); expect(isLastInning(s)).toBe(true);
+        // 제한이 없는 판은 마지막 이닝이 없다 — 후구만 예외
+        let n = two();
+        expect(isLastInning(n)).toBe(false);
+        n = applyShot(n, POINT).session;                    // 선공이 목표 → 후구
+        expect(n.pendingWinner).toBe(0); expect(isLastInning(n)).toBe(true);
+        // 제한 20 의 첫 이닝에 닿아도 후구가 마지막이다('남은 19'가 아니다)
+        let c = two({ inningCap: 20 });
+        c = applyShot(c, POINT).session;
+        expect(currentInning(c)).toBe(1); expect(isLastInning(c)).toBe(true);
+    });
+    it("고정: 서버는 끝난 까닭과 상대 알림을 이 규칙으로 정하고, 다섯 언어 모두 '비겼어요' 문구가 있다", () => {
+        const read = (f: string) => readFileSync(resolve(__dirname, "../../..", f), "utf8");
+        const server = read("server/routes/modules/simMatch.ts");
+        expect(server).toContain("opponentResult(applied.session.winnerIndex, myIndex)");
+        expect(server).toContain('"notif.sim.finished.draw"');
+        expect(server).toContain("finishReason(state, applied.session)");
+        // 예전 식 — 승자가 없으면 이닝 상한 · 친 사람이 안 이겼으면 상대 승 — 이 돌아오지 않는다
+        expect(server).not.toMatch(/winnerIndex === null \? "inningCap"/);
+        expect(server).not.toMatch(/iWon \? msg\("notif\.sim\.finished\.lost"/);
+        for (const loc of ["ko", "en", "vi", "tr", "es"]) {
+            expect(read(`shared/i18n/${loc}.ts`), loc).toContain('"notif.sim.finished.draw"');
+            const c = read(`client/src/lib/i18n/${loc}.ts`);
+            for (const k of ["sim.match.endTargetDraw", "sim.hud.inningsLeft", "sim.hud.lastInning"]) expect(c, `${loc} ${k}`).toContain(`"${k}"`);
+        }
+        // 화면: 머리줄 밑 이닝 제한 줄이 대전 · 연습 화면에 걸려 있다
+        const page = read("client/src/sim/SimulatorPage.tsx");
+        expect(page).toContain("<InningCapBar session={sim.session} />");
+    });
+    it("남은 이닝 — 지금 이닝을 빼고 그 뒤에 남은 수, 제한이 없으면 없다", () => {
+        expect(inningsLeft(20, 3)).toBe(17);
+        expect(inningsLeft(20, 20)).toBe(0);
+        expect(inningsLeft(20, 25)).toBe(0);
+        expect(inningsLeft(20, 0)).toBe(19);
+        expect(inningsLeft(0, 3)).toBeNull();
     });
 });
 

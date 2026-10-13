@@ -38,7 +38,7 @@ import { useLocation, useSearch } from "wouter";
 import { TABLES, type TableSpec } from "@shared/sim/params";
 import { randomLayout } from "@shared/sim/randomLayout";
 import { DEFAULT_CUE } from "@shared/sim/params";
-import { isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome } from "@shared/sim/rules";
+import { currentInning, isOpeningShot, SHOT_CLOCK_GRACE_S, SHOT_CLOCK_S, type ShotOutcome } from "@shared/sim/rules";
 import type { GameType } from "@shared/sim/rules/types";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
@@ -108,6 +108,7 @@ import { easeOppAim, OPP_AIM_PULLBACK } from "./match/oppAim";
 import { MatchChatLog, MatchChatToggle, MatchMiniChat } from "./match/MatchChat";
 import { chatMaxHeight } from "./match/chatLayout";
 import { MatchScoreStrip } from "./match/MatchScoreStrip";
+import { InningCapBar } from "./components/InningCapBar";
 import type { ChatLine } from "./matchApi";
 import type { CueInput, Phase } from "./simReducer";
 import type { SimPreview } from "./simController";
@@ -1532,7 +1533,7 @@ export function SimulatorPage() {
         });
     }, [resumeParam, sim.phase, actions, navigate, toast, t, ENTRY_PATH]);
     const endSubtitle = sim.match
-        ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1] }, t)
+        ? endReasonText({ status: sim.match.status, endReason: sim.match.endReason, winnerIndex: sim.match.winnerIndex, hostName: sim.match.names[0], guestName: sim.match.names[1], inningCap: sim.session?.inningCap }, t)
         : null;
     const aiming = sim.phase === "aim";
     // 재생(내 샷·상대 샷 따라잡기)·상대 차례·시작 전엔 조작 층을 통째로 흐린다. 상단 띠·칩·결과 배너는 남는다.
@@ -1619,6 +1620,8 @@ export function SimulatorPage() {
                     clock={clock}
                     matchHeader={headerPlayers ? { players: headerPlayers, onExit: onExitRequest } : null}
                 />
+                {/* 이닝 제한이 있는 판 — 지금 이닝과 남은 이닝(없으면 자리를 차지하지 않는다) */}
+                {!pathView && <InningCapBar session={sim.session} />}
 
                 {/* 테이블 영역: 남은 높이 전부. 렌더러·오버레이는 absolute 마운트(tableRef)에, 조작·칩은 그 형제로 얹힌다. */}
                 <div className="relative flex-1 min-h-0 overflow-hidden bg-surface-3">
@@ -1788,6 +1791,7 @@ export function SimulatorPage() {
                             className="hide-on-keyboard absolute right-1 top-2 z-[3] w-[60px]"
                             style={{ bottom: DOCK_HEIGHT + 150 }}
                             rows={scoreRows}
+                            inning={sim.session.inningCap > 0 && sim.session.status === "playing" ? currentInning(sim.session) : undefined}
                             order={[sim.match.myIndex, sim.match.myIndex === 0 ? 1 : 0]}
                             balls={[
                                 sim.session.players[sim.match.myIndex]?.cueBallId === "yellow" ? "yellow" : "white",

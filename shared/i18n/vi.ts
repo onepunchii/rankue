@@ -268,6 +268,7 @@ export const vi: Record<string, string> = {
   "notif.sim.timeout.body": "Bạn quá 40 giây nên mất lượt. ({strikes}/{max})",
   "notif.sim.finished.lost": "{name} đã thắng. Hãy xem kết quả.",
   "notif.sim.finished.won": "Bạn đã thắng! Hãy xem kết quả.",
+  "notif.sim.finished.draw": "Hòa rồi. Hãy xem kết quả.",
   "notif.sim.finished.resigned": "{name} đã bỏ cuộc. Bạn thắng.",
   "notif.sim.finished.claimed": "Không phản hồi trong 48 giờ nên đối thủ được xử thắng.",
   "notif.sim.rematchAsk.title": "Tái đấu?",

@@ -234,10 +234,13 @@ function toShotInput(cueBallId: string, i: CueInput): ShotInput {
     return { cueBallId, phi: i.phi, V0: i.V0, a: i.a, b: i.b, theta: i.theta };
 }
 
-/** 내 샷으로 끝난 대전의 사유(서버 simMatch 와 같은 식: 승자가 목표에 닿았으면 target, 아니면 inningCap). */
+/**
+ * 내 샷으로 끝난 대전의 사유(서버 shared/sim/rules/session.finishReason 과 같은 뜻): 누군가 목표에 닿아 끝났으면 target, 아니면 inningCap.
+ * 승자가 없어도(무승부) 둘 다 목표에 닿았으면 후구에서 따라붙은 것 — 이닝 제한이 아니다(2026-10-13).
+ */
 export function endReasonFor(res: Pick<PostShotResponse, "winnerIndex" | "state">): MatchEndReason {
     const w = res.winnerIndex;
-    if (w === null) return "inningCap";
+    if (w === null) return res.state.players.every((p) => p.score >= p.target) ? "target" : "inningCap";
     const p = res.state.players[w];
     return p && p.score >= p.target ? "target" : "inningCap";
 }

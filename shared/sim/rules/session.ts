@@ -219,13 +219,57 @@ export function applyShot(s: SessionState, raw: ShotOutcome): ApplyResult {
     };
 }
 
-/** 이닝 상한 종료: 목표 대비 달성률이 높은 쪽. 동률이면 null(무승부). */
-function decideByInningCap(players: readonly PlayerState[]): number | null {
+/**
+ * 이닝 상한 종료: 목표 대비 달성률이 높은 쪽. 동률이면 null(무승부).
+ * 나눗셈 없이 견준다(점수 × 상대 목표) — 다마가 다른 두 사람의 같은 달성률이 소수 오차로 갈리지 않게.
+ */
+export function decideByInningCap(players: readonly Pick<PlayerState, "score" | "target">[]): number | null {
     if (players.length === 1) return 0;
-    const r0 = players[0].score / players[0].target;
-    const r1 = players[1].score / players[1].target;
-    if (r0 === r1) return null;
-    return r0 > r1 ? 0 : 1;
+    const a = players[0].score * players[1].target, b = players[1].score * players[0].target;
+    if (a === b) return null;
+    return a > b ? 0 : 1;
+}
+
+/**
+ * 이 샷(또는 시간 초과)으로 판이 끝났다면 그 까닭 — 끝나지 않았으면 null.
+ *   inningCap  이닝 상한을 다 채워서 끝났다(후구가 걸려 있지 않았고, 친 사람이 목표에 닿지 못했다)
+ *   target     누군가 목표에 닿아서 끝났다 — 바로 이긴 것, 후구를 못 채워 먼저 닿은 사람이 이긴 것, **후구에서 따라붙어 비긴 것**까지.
+ * 예전에는 "승자가 없으면 이닝 상한"으로 보아서, 이닝 제한이 없는 판의 후구 무승부가 '이닝 제한으로 끝났어요'로 적혔다(2026-10-13 오너 제보).
+ */
+export function finishReason(prev: SessionState, next: SessionState): "target" | "inningCap" | null {
+    if (next.status !== "finished") return null;
+    const shooter = next.players[prev.turn];
+    const reached = !!shooter && shooter.score >= shooter.target;
+    return (prev.pendingWinner ?? null) === null && !reached && prev.inningCap > 0 ? "inningCap" : "target";
+}
+
+/**
+ * 끝난 판을 **상대에게** 알릴 때의 결과 — 방금 친 사람(shooter)의 맞은편에게 보내는 말.
+ * 승자가 없으면 비긴 것이다: 예전에는 "친 사람이 이기지 않았으면 당신이 이겼다"로 보내서 무승부에 '당신이 이겼어요'가 갔다(2026-10-13 오너 제보).
+ */
+export function opponentResult(winnerIndex: number | null, shooterIndex: number): "draw" | "won" | "lost" {
+    if (winnerIndex === null) return "draw";
+    return winnerIndex === shooterIndex ? "lost" : "won";
+}
+
+/** 지금 몇 이닝째인가(1부터) — 칠 사람이 마친 이닝 + 1. 이닝 제한이 있으면 그 수를 넘지 않는다(마지막 이닝을 마친 뒤의 순간) */
+export function currentInning(s: Pick<SessionState, "players" | "turn" | "inningCap">): number {
+    const n = (s.players[s.turn]?.innings ?? 0) + 1;
+    return s.inningCap > 0 ? Math.min(s.inningCap, n) : n;
+}
+
+/** 이닝 제한이 있는 판에서 남은 이닝 — 지금 이닝(진행 중)을 빼고 그 뒤에 남은 수. 제한이 없으면 null. current 는 지금 몇 이닝째인가(1부터) */
+export function inningsLeft(inningCap: number, current: number): number | null {
+    return inningCap > 0 ? Math.max(0, inningCap - Math.max(1, current)) : null;
+}
+
+/**
+ * 이 이닝이 끝나면 판이 끝나는가 — 이닝 제한의 마지막 이닝이거나, 후구(먼저 닿은 사람이 있어 이번 이닝만 남음).
+ * 후구 중에 '남은 15'라고 적으면 거짓말이 된다: 제한이 20이어도 이 이닝이 끝이다.
+ */
+export function isLastInning(s: Pick<SessionState, "players" | "turn" | "inningCap" | "pendingWinner">): boolean {
+    if ((s.pendingWinner ?? null) !== null) return true;
+    return s.inningCap > 0 && inningsLeft(s.inningCap, currentInning(s)) === 0;
 }
 
 /* ------------------------------------------------------------------ 고정 인사 */

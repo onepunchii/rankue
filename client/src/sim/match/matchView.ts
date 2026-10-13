@@ -72,7 +72,7 @@ export function inningCapLabel(inningCap: number, t: T): string {
 }
 
 /** 끝난 대전의 사유 문구 키 + 이름 치환. 이름은 players 순서의 이름 배열. */
-export function endReasonText(m: Pick<MatchPublic, "status" | "endReason" | "winnerIndex" | "hostName" | "guestName">, t: T): string | null {
+export function endReasonText(m: Pick<MatchPublic, "status" | "endReason" | "winnerIndex" | "hostName" | "guestName"> & { inningCap?: number }, t: T): string | null {
     if (m.status !== "finished") return null;
     const names = [m.hostName, m.guestName ?? ""];
     const winner = m.winnerIndex === null ? "" : names[m.winnerIndex];
@@ -81,8 +81,12 @@ export function endReasonText(m: Pick<MatchPublic, "status" | "endReason" | "win
         case "resign": return t("sim.match.endResign").replace("{name}", loser);
         case "claim": return t("sim.match.endClaim").replace("{name}", winner);
         case "timeout": return t("sim.match.endTimeout").replace("{name}", loser);
-        case "inningCap": return t("sim.match.endInningCap");
-        case "target": return t("sim.match.endTarget");
+        case "inningCap":
+            // 옛 기록(2026-10-13 이전): 이닝 제한이 없는 판의 후구 무승부가 '이닝 제한'으로 저장돼 있다 — 제한이 없던 판이면 목표 도달로 읽는다
+            if (m.inningCap !== undefined && m.inningCap <= 0) return m.winnerIndex === null ? t("sim.match.endTargetDraw") : t("sim.match.endTarget");
+            return t("sim.match.endInningCap");
+        // 승자가 없는 목표 도달 = 후구에서 따라붙어 비긴 판
+        case "target": return m.winnerIndex === null ? t("sim.match.endTargetDraw") : t("sim.match.endTarget");
         default: return null;
     }
 }

@@ -268,6 +268,7 @@ export const en: Record<string, string> = {
   "notif.sim.timeout.body": "You ran past 40 seconds, so the inning passed. ({strikes}/{max})",
   "notif.sim.finished.lost": "{name} won. Check the result.",
   "notif.sim.finished.won": "You won! Check the result.",
+  "notif.sim.finished.draw": "It's a draw. Check the result.",
   "notif.sim.finished.resigned": "{name} resigned. You win.",
   "notif.sim.finished.claimed": "No response for 48 hours, so the match went to your opponent.",
   "notif.sim.rematchAsk.title": "Rematch?",
