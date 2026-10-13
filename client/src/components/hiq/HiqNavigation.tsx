@@ -84,16 +84,17 @@ export function HiqNavigation() {
     const bookingUnseen = currentSport === "GOLF" && hasUnseenRequestChange(myRequests.data, seenAt);
     /**
      * 등산(2026-10-13 오너: "네비게이션은 크루와 채팅은 들어가야 돼, 나머지는 등산러가 좋아하는 것으로"):
-     * 홈 · 산 · 도장첩 · 크루 · 채팅. 산(지도 · 목록 · 산 화면)과 도장첩은 등산의 것이고, 크루 · 채팅은 다른 종목과 같은 자리다.
+     * 홈 · 크루 · 산 · 도장첩 · 채팅. 산(지도 · 목록 · 산 화면)과 도장첩은 등산의 것이고, 크루(둘째) · 채팅(끝)은 다른 종목과 같은 자리다.
      * 등산은 한국어 전용이라 '산' · '도장첩'은 번역 키로 두지 않는다(text).
      */
     const tabs: { id: string; label?: string; text?: string; icon: typeof LucideHome; path: string; to?: string; also?: string[]; only?: boolean }[] = isHiking
         ? [
             { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard" },
-            // 산 — /hiking 아래의 지도 · 목록 · 산 화면. 도장첩(/hiking/stamps …)은 옆 탭의 것이라 여기서 켜지지 않게 한다(only)
-            { id: "mountains", text: "산", icon: LucideMap, path: "/hiking", also: ["/hiking/regions", "/hiking/lists", "/hiking/mountains"], only: true },
-            { id: "stamps", text: "도장첩", icon: LucideStamp, path: "/hiking/stamps", also: ["/hiking/pack", "/hiking/trips"] },
+            // 크루는 둘째 자리(2026-10-13 오너: "네비게이션 바에 크루를 2번째로") — 당구 · 골프와 같은 자리다
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
+            // 산 — /hiking 아래의 지도 · 목록 · 산 화면. 도장첩(/hiking/stamps …)은 옆 탭의 것이라 여기서 켜지지 않게 한다(only)
+            { id: "mountains", text: "산", icon: LucideMap, path: "/hiking", also: ["/hiking/regions", "/hiking/lists", "/hiking/mountains", "/hiking/trail", "/hiking/terms", "/hiking/checklist"], only: true },
+            { id: "stamps", text: "도장첩", icon: LucideStamp, path: "/hiking/stamps", also: ["/hiking/pack", "/hiking/trips"] },
             { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
         ]
         : isGolf

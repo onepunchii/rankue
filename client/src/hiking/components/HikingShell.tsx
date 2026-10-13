@@ -28,7 +28,7 @@ export function HikingShell({ title, backTo = HIKING_HUB_PATH, right, children, 
     // 검색에서 막 들어온 사람은 history 가 이 화면 하나다 — back() 하면 검색 결과로 나가 버린다
     const back = () => (window.history.length > 1 && document.referrer.startsWith(window.location.origin) ? window.history.back() : setLocation(backTo));
     const guest = !isLoading && !member;
-    // 등산을 쓸 수 있는 회원에게는 하단 탭(홈 · 산 · 도장첩 · 크루 · 채팅)을 붙인다 — 산 화면에서도 등산 안에 머문다
+    // 등산을 쓸 수 있는 회원에게는 하단 탭(홈 · 크루 · 산 · 도장첩 · 채팅)을 붙인다 — 산 화면에서도 등산 안에 머문다
     const hikingOk = useHikingAccess() && nav;
     return (
         <div className={`min-h-screen bg-[#0B1F26] font-sans text-[#F4EFE3] ${hikingOk ? "pb-nav" : guest && cta ? "pb-24" : "pb-10"}`} data-hiking="1">
