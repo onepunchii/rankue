@@ -9,7 +9,7 @@
  *
  * 시각은 셋: 새벽 6시(가장 춥다 · 일출 산행) · 낮 12시(정상에 서는 때) · 오후 3시(내려오는 때). 이미 지난 시각은 비워 둔다.
  */
-import { kstParts, addDays, ymdToKey, type WxHour, type WxKind } from "./golfWeather";
+import { kstParts, addDays, ymdToKey, type WxHour, type WxKind } from "./golfWeather.js";
 
 /** 100m 오를 때마다 낮아지는 기온(℃) — 날씨 구역의 각주(WEATHER_NOTE)와 같은 수 */
 export const LAPSE_PER_100M = 0.6;
