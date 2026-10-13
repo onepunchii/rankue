@@ -7,6 +7,7 @@
  *   GET    /api/hiq/fishing/sea          오늘의 바다 — 해역 일곱 곳의 풍랑특보(기상청)
  *   GET    /api/hiq/fishing/reservoirs         민물 — 고른 저수지들의 저수율(?codes= 여섯 곳까지 · 없으면 처음 보이는 여섯 곳)
  *   GET    /api/hiq/fishing/reservoirs/search  시군 이름으로 저수지 찾기(?county=)
+ *   GET    /api/hiq/fishing/boats        낚시어선 명부 찾기(?q= 지역 · 항 · 배 이름) — 신고 정보 그대로
  *   GET    /api/hiq/fishing/market       위판장 소식 — 지난 이레 어종별 경매 건수(해양수산부)
  *   GET    /api/hiq/fishing/ports/:code  항구 브리핑 — 조석 곡선 · 해와 달 · 지금의 바다 · 바다낚시지수(?day=)
  *   GET    /api/hiq/fishing/crews        내가 든 크루
@@ -27,6 +28,7 @@ import { fishingAllowed } from "../../lib/fishingAccess.js";
 import { getSeaNow } from "../../services/fishingSea.js";
 import { getPortBrief } from "../../services/fishingPort.js";
 import { getMarketWeek } from "../../services/fishingMarket.js";
+import { cleanBoatQuery, type FishingBoat } from "../../../shared/fishingBoats.js";
 import { getReservoirs, searchReservoirs } from "../../services/fishingReservoir.js";
 import { RESERVOIR_MAX, RESERVOIR_STARTERS, cleanCountyQuery, isReservoirCode, type ReservoirRef } from "../../../shared/fishingReservoir.js";
 import { FISHING_PHOTO_CATEGORY, FISHING_THUMB_CATEGORY, cleanCatch, fishingKstDay, isOwnFishingPhotoUrl, type FishingCatch, type FishingPlace } from "../../../shared/fishing.js";
@@ -89,6 +91,25 @@ router.delete("/catches/:id", requireAuth, gate, asyncHandler(async (req: AuthRe
 router.get("/sea", requireAuth, gate, asyncHandler(async (_req: AuthRequest, res: any) => {
     res.setHeader("Cache-Control", "private, max-age=120");
     return sendSuccess(res, await getSeaNow().catch(() => null));
+}));
+
+/**
+ * 낚시어선 명부 — 받아 둔 신고 정보(fishing_boats)에서 지역 · 선적항 · 배 이름으로 찾는다. 60척까지, 많이 등록된 시군 열두 곳을 같이 준다.
+ * 유효기간이 지난 배도 준다(화면이 '지남'이라고 적는다 — 숨기면 '없는 배'로 보인다).
+ */
+router.get("/boats", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const q = cleanBoatQuery(req.query.q);
+    const like = `%${q ?? ""}%`;
+    const [items, top] = await Promise.all([
+        q ? db.execute(sql`
+            select id, name, region, port, tons, passengers, valid_until, count(*) over()::int as total from fishing_boats
+            where replace(region, ' ', '') ilike ${like} or replace(coalesce(port, ''), ' ', '') ilike ${like} or replace(name, ' ', '') ilike ${like}
+            order by region, name limit 60`).then(rowsOf) : Promise.resolve([] as any[]),
+        db.execute(sql`select region, count(*)::int as n from fishing_boats where region <> '' group by region order by n desc limit 12`).then(rowsOf),
+    ]);
+    const view = (r: any): FishingBoat => ({ id: String(r.id), name: String(r.name), region: String(r.region ?? ""), port: r.port ?? null, tons: r.tons == null ? null : Number(r.tons), passengers: r.passengers == null ? null : Number(r.passengers), validUntil: r.valid_until ? (r.valid_until instanceof Date ? new Date(r.valid_until.getTime() + 9 * 3600_000).toISOString().slice(0, 10) : String(r.valid_until).slice(0, 10)) : null });
+    res.setHeader("Cache-Control", "private, max-age=600");
+    return sendSuccess(res, { total: items[0]?.total ?? 0, items: items.map(view), top: top.map((r: any) => ({ region: String(r.region), n: Number(r.n) })) });
 }));
 
 /** 시군 이름으로 저수지 찾기 — 두 글자 이상의 한글. 못 받았으면 null */

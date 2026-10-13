@@ -34,6 +34,7 @@ import { SEA_AREAS, SEA_CAUTION, SEA_SOURCE, seaHeadline, seaNotes, seaWord, typ
 import { SEA_LEGEND, SeaChart, seaWashColor, seaWashLine } from "./SeaChart";
 import { TideCurve } from "./TideCurve";
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
+import { BOAT_SOURCE, cleanBoatQuery, type FishingBoat } from "@shared/fishingBoats";
 import { RESERVOIR_MAX, RESERVOIR_SOURCE, cleanCountyQuery, isReservoirCode, reservoirTrend, type ReservoirRef, type ReservoirView } from "@shared/fishingReservoir";
 import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@shared/fishingStations";
 import { durationKo, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type PortBrief } from "@shared/fishingPort";
@@ -255,10 +256,10 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                         <Today today={today} list={list} />
                         <MarketBoard />
                         <ReservoirBoard />
-                        <FsSection title="낚시터" aside="등록된 1,151곳">
+                        <FsSection title="낚시터 · 낚시어선" aside="1,151곳 · 3,993척">
                             <button type="button" onClick={() => setTab("points")} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-points">
                                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: "#FFFFFF14" }}><LucideMap className="h-5 w-5" style={{ color: C.sun }} /></span>
-                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">낚시터 찾기</span><span className="mt-0.5 block text-[13px]" style={{ color: C.dim }}>지역 · 이름 · 어종으로 찾고 요금 보기</span></span>
+                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">낚시터 · 낚시어선 찾기</span><span className="mt-0.5 block text-[13px]" style={{ color: C.dim }}>유료 낚시터의 요금 · 신고된 배의 정원</span></span>
                                 <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#F3ECDD66" }} />
                             </button>
                         </FsSection>
@@ -307,7 +308,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                     </FsSection>
                 )}
 
-                {tab === "points" && <div className="px-5"><Points onPick={(p) => { setPreset({ place: p.name, spot: "pay" }); setAdding(true); }} /></div>}
+                {tab === "points" && <div className="px-5"><PointsAndBoats today={today} onPick={(p) => { setPreset({ place: p.name, spot: "pay" }); setAdding(true); }} /></div>}
 
                 <div className="h-6" aria-hidden />
             </main>
@@ -635,9 +636,9 @@ function PortCard({ code, today }: { code: string; today: string }) {
     if (now?.wtemp != null) tiles.push({ label: "수온", value: `${now.wtemp.toFixed(1)}°`, sub: now.atemp != null ? `기온 ${now.atemp.toFixed(1)}°` : null });
     else if (outlook && data?.index?.rows.some((r) => r.wtemp)) { const w = data.index.rows.find((r) => r.wtemp)!.wtemp!; tiles.push({ label: "수온(예보)", value: `${rangeText(w)}°` }); }
     if (now?.buoy?.wave != null) tiles.push({ label: "파고", value: `${now.buoy.wave.toFixed(1)}m`, sub: `${now.buoy.name} 부이 · ${now.buoy.km}km` });
-    else if (outlook?.wave) tiles.push({ label: "파고(예보)", value: `${rangeText(outlook.wave)}m`, sub: data?.index ? `${data.index.point}` : null });
+    else if (outlook?.wave) tiles.push({ label: "파고(예보)", value: `${rangeText(outlook.wave)}m`, sub: data?.index ? `${data.index.point} 지점 예보` : null });
     if (now?.buoy?.wind != null) tiles.push({ label: "바람", value: `${now.buoy.wind.toFixed(1)}m/s`, sub: [windDirKo(now.buoy.windDir), `${now.buoy.name} 부이`].filter(Boolean).join(" · ") });
-    else if (outlook?.wind) tiles.push({ label: "바람(예보)", value: `${rangeText(outlook.wind)}m/s`, sub: data?.index ? `${data.index.point}` : null });
+    else if (outlook?.wind) tiles.push({ label: "바람(예보)", value: `${rangeText(outlook.wind)}m/s`, sub: data?.index ? `${data.index.point} 지점 예보` : null });
     if (now?.fog?.visM != null) tiles.push({ label: "시정", value: visibilityText(now.fog.visM) ?? "-", sub: `${now.fog.name} 해무관측소` });
     if (data?.sun?.rise != null && data.sun.set != null) tiles.push({ label: "해", value: `${hhmm(data.sun.rise)} – ${hhmm(data.sun.set)}`, sub: data.sun.dawn != null ? `여명 ${hhmm(data.sun.dawn)}` : null });
     if (data?.sun?.moonrise != null || data?.sun?.moonset != null) tiles.push({ label: "달", value: `${data!.sun!.moonrise != null ? hhmm(data!.sun!.moonrise!) : "–"} – ${data!.sun!.moonset != null ? hhmm(data!.sun!.moonset!) : "–"}`, sub: "뜨고 지는 때" });
@@ -1014,7 +1015,80 @@ function Points({ onPick }: { onPick: (p: FishingPlace) => void }) {
                 </ul>
             )}
             {data && data.total > data.items.length && <p className="mt-3 text-center text-[12.5px]" style={{ color: C.dim }}>{data.items.length}곳만 보여요. 글자나 지역으로 좁혀 보세요.</p>}
-            <p className="mt-4 text-[12px] leading-relaxed" style={{ color: C.dim }}>출처: {FISHING_PLACE_SOURCE}. 방파제 · 갯바위 같은 자유 포인트와 낚시어선은 아직 없어요. 요금은 바뀌었을 수 있어요.</p>
+            <p className="mt-4 text-[12px] leading-relaxed" style={{ color: C.dim }}>출처: {FISHING_PLACE_SOURCE}. 방파제 · 갯바위 같은 자유 포인트는 아직 없어요. 요금은 바뀌었을 수 있어요.</p>
+        </section>
+    );
+}
+
+/** 낚시터 화면의 두 갈래 — 낚시터(유료 낚시터 명부) · 낚시어선(신고된 배) */
+function PointsAndBoats({ today, onPick }: { today: string; onPick: (p: FishingPlace) => void }) {
+    const [kind, setKind] = useState<"places" | "boats">("places");
+    return (
+        <>
+            <div className="mt-4 flex rounded-full p-1" style={{ background: "#FFFFFF0F" }} role="group" aria-label="갈래">
+                {([["places", "낚시터"], ["boats", "낚시어선"]] as const).map(([id, label]) => (
+                    <button key={id} type="button" aria-pressed={kind === id} onClick={() => setKind(id)} data-testid={`fishing-kind-${id}`}
+                        className={cn("h-10 flex-1 rounded-full text-[14px]", kind === id && "font-semibold")} style={kind === id ? { background: C.brand, color: C.onBrand } : { color: C.soft }}>{label}</button>
+                ))}
+            </div>
+            {kind === "places" ? <Points onPick={onPick} /> : <Boats today={today} />}
+        </>
+    );
+}
+
+/**
+ * 낚시어선 명부 — 선상 낚시를 예약하기 전에 확인하는 것: 신고된 배인가 · 정원 · 신고의 유효기간. 지역 · 항 · 배 이름으로 찾는다.
+ * 예약을 중개하지 않는다 — 신고 정보를 그대로 보여 줄 뿐이고, 전화번호 · 요금은 자료에 없다.
+ */
+function Boats({ today }: { today: string }) {
+    const [text, setText] = useState("");
+    const [q, setQ] = useState("");
+    const { data, isLoading } = useQuery<{ total: number; items: FishingBoat[]; top: { region: string; n: number }[] }>({
+        queryKey: ["/api/hiq/fishing/boats", q], queryFn: () => apiRequest(`/api/hiq/fishing/boats?q=${encodeURIComponent(q)}`), staleTime: 10 * 60_000,
+    });
+    const ask = (v: string) => { const c = cleanBoatQuery(v); if (c) { setText(v); setQ(c); } };
+    const lastWord = (region: string) => region.split(" ").slice(-1)[0] ?? region;
+    return (
+        <section className="pt-5" data-testid="fishing-boats">
+            <div className="flex items-baseline justify-between"><h2 className="text-[17px] font-semibold tracking-tight">낚시어선</h2>{q && data ? <span className="text-[12.5px] tabular-nums" style={{ color: C.dim }}>{data.total}척</span> : null}</div>
+            <form className="mt-3 flex gap-2" onSubmit={(e) => { e.preventDefault(); ask(text); }}>
+                <input value={text} onChange={(e) => setText(e.target.value)} maxLength={12} placeholder="지역 · 항 · 배 이름(예: 여수 · 오천항)" aria-label="낚시어선 찾기"
+                    className="h-11 min-w-0 flex-1 rounded-xl px-3.5 text-[14px] outline-none placeholder:text-[#F3ECDD59]" style={{ background: "#FFFFFF0F", color: C.foam }} data-testid="fishing-boat-q" />
+                <button type="submit" disabled={!cleanBoatQuery(text)} className="h-11 shrink-0 rounded-xl px-4 text-[14px] font-semibold disabled:opacity-40" style={{ background: C.brand, color: C.onBrand }}>찾기</button>
+            </form>
+            {!!data?.top.length && (
+                <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="배가 많은 곳">
+                    {data.top.map((r) => { const w = lastWord(r.region), on = q === cleanBoatQuery(w); return (
+                        <button key={r.region} type="button" aria-pressed={on} onClick={() => ask(w)} className={cn("h-9 shrink-0 rounded-full px-3 text-[13px]", on && "font-semibold")} style={on ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>
+                            {w} <span className="tabular-nums opacity-70">{r.n}</span>
+                        </button>
+                    ); })}
+                </div>
+            )}
+            {!q ? <p className="mt-3 rounded-2xl bg-[#FFFFFF0A] px-5 py-6 text-center text-[13.5px] leading-relaxed break-keep" style={{ color: C.soft }}>타려는 배가 신고된 낚시어선인지, 정원과 신고 기간을 확인해 보세요.</p>
+                : isLoading ? <div className="mt-3 h-40 animate-pulse rounded-2xl bg-[#FFFFFF0F]" />
+                    : !data?.items.length ? <p className="mt-3 rounded-2xl bg-[#FFFFFF0A] px-5 py-6 text-center text-[13.5px]" style={{ color: C.soft }} data-testid="fishing-boat-none">찾는 배가 없어요. 지역이나 항 이름으로 적어 보세요.</p>
+                        : (
+                            <ul className="mt-3 divide-y divide-[#FFFFFF14] rounded-2xl bg-[#FFFFFF0A] px-3.5">
+                                {data.items.map((b) => {
+                                    const expired = !!b.validUntil && b.validUntil < today;
+                                    return (
+                                        <li key={b.id} className="flex min-h-[60px] items-center gap-3 py-2.5" data-testid="fishing-boat-row">
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block truncate text-[15.5px] font-semibold">{b.name}</span>
+                                                <span className="mt-0.5 block truncate text-[13px]" style={{ color: C.dim }}>{[b.port ?? b.region, b.tons != null ? `${b.tons}톤` : null].filter(Boolean).join(" · ")}</span>
+                                            </span>
+                                            <span className="shrink-0 text-right">
+                                                <span className="block text-[14px] font-semibold tabular-nums" style={{ color: C.sun }}>{b.passengers != null ? `정원 ${b.passengers}명` : "정원 –"}</span>
+                                                <span className="mt-0.5 block text-[12px] tabular-nums" style={{ color: expired ? "#F7B9A6" : C.dim }}>{b.validUntil ? `${expired ? "기간 지남 " : "~"}${b.validUntil.slice(2).replace(/-/g, ".")}` : "기간 –"}</span>
+                                            </span>
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+            {q && data && data.total > data.items.length && <p className="mt-3 text-center text-[12.5px]" style={{ color: C.dim }}>{data.items.length}척만 보여요. 항 이름으로 좁혀 보세요.</p>}
+            <p className="mt-4 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>출처: {BOAT_SOURCE}. 신고 정보 그대로예요 — 예약 · 요금 · 연락처는 없어요. 정원은 신고된 최대 승객 수예요.</p>
         </section>
     );
 }
