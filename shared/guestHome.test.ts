@@ -532,7 +532,8 @@ describe("당구 홈", () => {
         it("머리줄의 치수는 종목과 상관없이 하나다 — 크기를 줄이는 가지가 없고, 세 홈이 같은 자리(맨 위 · 붙어 따라옴)에 놓는다", () => {
             // 2026-10-13 오너: "헤더 크기가 일정하지 않다 — 카테고리를 바꾸더라도 이질감 없이 버튼이 고정되어 있게 · 등산처럼 헤더 고정"
             expect(bar).toContain("export const SPORT_HEADER_SIZE = { row: 56, side: 16, wordmark: 13, pill: 32, button: 34, gap: 4 } as const;");
-            expect(bar).not.toMatch(/\btight\b|sports\.length === 3|showLang/);
+            // 크기를 줄이던 변수(tight)와 종목 수로 가르던 가지가 없다 — Tailwind 의 leading-tight 는 그것이 아니다
+            expect(bar).not.toMatch(/\bconst tight\b|\btight \?|sports\.length === 3|showLang/);
             // 크기는 치수 표에서만 온다(종목에 따라 갈리는 삼항이 색 말고는 없다)
             expect(bar).toContain("<RankueWordmark color={c.brand} height={z.wordmark} />");
             expect(bar).toContain("const iconSize = { width: z.button, height: z.button };");
@@ -540,8 +541,9 @@ describe("당구 홈", () => {
             // 고르지 않은 알약도 고른 것(굵은 글씨)과 같은 폭 — 종목을 바꿔도 전환 자리가 움직이지 않는다
             expect(bar).toContain('<span className="invisible font-semibold" aria-hidden>{s.label}</span>');
             // 세 종목 모두 맨 위에 붙는다 · 상태바 여백은 스스로(전역 규칙이 한 번 더 밀지 않게 rk-no-safe)
-            expect(bar).toContain("className={`rk-no-safe sticky top-0 z-40 backdrop-blur-md ${className ?? \"\"}`}");
-            expect(bar).toContain("marginTop: `calc(${-lift}px - env(safe-area-inset-top, 0px))`, paddingTop: \"env(safe-area-inset-top, 0px)\"");
+            expect(bar).toContain('const BAR_CLASS = "rk-no-safe sticky top-0 z-40 backdrop-blur-md";');
+            expect(bar).toContain("marginTop: `calc(${-lift}px - env(safe-area-inset-top, 0px))`, paddingTop: \"env(safe-area-inset-top, 0px)\",");
+            expect(bar.match(/className=\{`\$\{BAR_CLASS\} \$\{className \?\? ""\}`\} style=\{barStyle\(c, bleed, lift\)\}/g)?.length).toBe(2);
             // 홈마다 바탕 상자의 여백만 알려 준다 — 당구 px-5, 골프 p-6, 등산은 여백 없음
             expect(src).toContain('<SportHeader sport="BILLIARDS" bleed={20} />');
             expect(code(client("golf/components/dashboard/GolfHeader.tsx"))).toContain('<SportHeader sport="GOLF" bleed={24} lift={24} className="mb-5" />');
@@ -551,6 +553,32 @@ describe("당구 홈", () => {
             expect(golfHome).toContain('className="golf-home golf-home-clip min-h-screen bg-[#0A0A0A] text-white p-6 pb-32 font-sans relative"');
             expect(golfHome).not.toMatch(/golf-home[^"]*overflow-x-hidden/);
             expect(client("index.css")).toMatch(/\.golf-home-clip \{ overflow-x: hidden; \}\n@supports \(overflow: clip\) \{\n  \.golf-home-clip \{ overflow-x: clip; \}/);
+        });
+
+        it("크루 화면에도 같은 고정 머리줄 — 세 종목이 한 화면을 쓴다 · '크루' 글자는 화면에 두지 않는다", () => {
+            // 2026-10-13 오너: "헤더는 크루까지만 적용하자 — 당구 크루 · 골프 크루 · 등산 크루, 크루에 크루 텍스트는 제거"
+            const club = client("pages/hiq/club.tsx");
+            expect(club).toContain('<SportHeader sport={sport} inner="mx-auto max-w-md" />');
+            expect(club).toContain('<h1 className="sr-only">{t("club.title")}</h1>');
+            expect(club).not.toContain("<h1 className={CREW_TEXT.title}>");
+            // 등산을 당구로 보고하는 currentSport 가 아니라 sport — 등산 크루에서는 등산의 색이다
+            expect(club).toContain("const { sport } = useSport();");
+        });
+
+        it("당구의 친구 · 기록 — 골프 · 등산과 같은 뒤로가기 머리줄(맨 위에 붙는 한 줄: ‹ 제목)", () => {
+            // 2026-10-13 오너: "당구에 친구 · 기록 페이지에 뒤로가기를 골프와 등산의 뒤로가기와 동일하게 — 골프와 등산의 뒤로가기 헤더가 깔끔하네"
+            const friends = client("pages/hiq/friends.tsx"), history = client("pages/hiq/history.tsx");
+            expect(friends).toContain("<SportBackHeader sport={sport} title={t(config.title)} bleed={20} lift={24}");
+            expect(history).toContain("<SportBackHeader sport={sport} title={t(config.title)} bleed={20} lift={20} />");
+            // 예전의 둥근 흰 단추 · 큰 제목은 없다
+            for (const src of [friends, history]) expect(code(src)).not.toMatch(/LucideChevronLeft|text-\[26px\]|motion\.button/);
+            // 붙어 따라오려면 화면 상자가 스크롤 상자여서는 안 된다
+            for (const src of [friends, history]) { expect(src).toContain('className="rk-clip-x min-h-screen'); expect(src).not.toMatch(/min-h-screen[^"]*overflow-x-hidden/); }
+            expect(client("index.css")).toMatch(/\.rk-clip-x \{ overflow-x: hidden; \}\n@supports \(overflow: clip\) \{\n  \.rk-clip-x \{ overflow-x: clip; \}/);
+            // 뒤로: 돌아갈 데가 있으면 한 칸, 없으면 홈으로. 높이 · 색은 세 종목 머리줄과 같은 표에서
+            expect(bar).toContain("const back = () => (window.history.length > 1 ? window.history.back() : setLocation(fallback));");
+            expect(bar).toContain("const c = SPORT_HEADER_THEME[sport], z = SPORT_HEADER_SIZE;");
+            expect(bar).toContain('<h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold leading-tight" style={{ color: c.text }}>{title}</h1>');
         });
     });
 

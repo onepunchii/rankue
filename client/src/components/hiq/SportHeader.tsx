@@ -20,10 +20,10 @@
  * 아이폰 앱의 상태바: #root 가 이미 그만큼 내려와 있으므로(index.css) 띠를 그만큼 끌어올리고 같은 만큼 안쪽 여백을 준다 —
  * 맨 위에서도, 내려 본 뒤에도 줄은 상태바 바로 밑이고 띠의 색이 상태바 밑까지 이어진다(rk-no-safe: 전역 규칙이 한 번 더 밀지 않게).
  */
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { LucideBell, LucideMenu } from "@/lib/icons";
+import { LucideBell, LucideChevronLeft, LucideMenu } from "@/lib/icons";
 import { NotificationInbox, UNREAD_COUNT_KEY } from "@/components/hiq/menu/NotificationInbox";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { useAuth } from "@/hooks/useAuth";
@@ -53,7 +53,19 @@ export function RankueWordmark({ color, height = 15, className }: { color: strin
 /** 머리줄의 치수 — 세 종목이 같은 값을 쓴다(바꾸면 셋이 같이 바뀐다) */
 export const SPORT_HEADER_SIZE = { row: 56, side: 16, wordmark: 13, pill: 32, button: 34, gap: 4 } as const;
 
-export function SportHeader({ sport, bleed = 0, lift = 0, className }: { sport: HeaderSport; /** 홈 바탕 상자의 옆 여백(px) */ bleed?: number; /** 홈 바탕 상자의 윗여백(px) */ lift?: number; className?: string }) {
+/** 띠의 놓임 — 세 종목의 머리줄과 뒤로가기 머리줄이 같이 쓴다: 맨 위에 붙어 따라오고, 화면 상자의 여백을 벗어나고, 아이폰 상태바 밑에서 시작한다 */
+const barStyle = (c: { bar: string; line: string }, bleed: number, lift: number) => ({
+    background: `${c.bar}E6`, borderBottom: `1px solid ${c.line}`,
+    marginLeft: -bleed, marginRight: -bleed,
+    marginTop: `calc(${-lift}px - env(safe-area-inset-top, 0px))`, paddingTop: "env(safe-area-inset-top, 0px)",
+});
+const BAR_CLASS = "rk-no-safe sticky top-0 z-40 backdrop-blur-md";
+
+export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
+    sport: HeaderSport; /** 홈 바탕 상자의 옆 여백(px) */ bleed?: number; /** 홈 바탕 상자의 윗여백(px) */ lift?: number; className?: string;
+    /** 줄을 본문의 너비에 맞출 때(넓은 화면) — 예: 크루 화면의 "mx-auto max-w-md". 없으면 등산만 720 에 맞춘다 */
+    inner?: string;
+}) {
     const { t } = useT();
     const { setSport } = useSport();
     const [, setLocation] = useLocation();
@@ -79,14 +91,8 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className }: { sport: 
 
     return (
         <>
-            <header className={`rk-no-safe sticky top-0 z-40 backdrop-blur-md ${className ?? ""}`}
-                style={{
-                    background: `${c.bar}E6`, borderBottom: `1px solid ${c.line}`,
-                    marginLeft: -bleed, marginRight: -bleed,
-                    marginTop: `calc(${-lift}px - env(safe-area-inset-top, 0px))`, paddingTop: "env(safe-area-inset-top, 0px)",
-                }}
-                data-testid="sport-header" data-sport-header={sport}>
-                <div className={`flex items-center ${sport === "HIKING" ? "mx-auto max-w-[720px]" : ""}`} style={{ height: z.row, paddingLeft: z.side, paddingRight: z.side, gap: z.gap }}>
+            <header className={`${BAR_CLASS} ${className ?? ""}`} style={barStyle(c, bleed, lift)} data-testid="sport-header" data-sport-header={sport}>
+                <div className={`flex items-center ${inner ?? (sport === "HIKING" ? "mx-auto max-w-[720px]" : "")}`} style={{ height: z.row, paddingLeft: z.side, paddingRight: z.side, gap: z.gap }}>
                     <RankueWordmark color={c.brand} height={z.wordmark} />
                     <span className="min-w-0 flex-1" />
                     {sports.length > 1 && (
@@ -123,6 +129,44 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className }: { sport: 
             {/* 알림함은 회원에게만 붙인다 — 방문자에게는 열 단추가 없다. 띠 밖에 둔다(띠의 흐림 효과가 고정 요소의 기준 상자가 된다) */}
             {!isGuest && <NotificationInbox open={notifOpen} onClose={() => setNotifOpen(false)} />}
         </>
+    );
+}
+
+/**
+ * 뒤로가기 머리줄(2026-10-13 오너: "당구의 친구 · 기록 페이지의 뒤로가기를 골프와 등산의 뒤로가기와 동일하게 — 골프와 등산의 뒤로가기 헤더가 깔끔하네").
+ * 골프(MyBookings) · 등산(HikingShell)의 그 꼴이다: 맨 위에 붙는 띠 한 줄 — [‹] 제목 ······ [오른쪽 단추]. 큰 제목 · 둥근 흰 단추 · 부제는 두지 않는다.
+ * 높이 · 색 · 붙는 방식은 SportHeader 와 같은 값을 쓴다(SPORT_HEADER_SIZE · SPORT_HEADER_THEME) — 탭을 오가도 띠의 높이가 달라지지 않는다.
+ * 뒤로: 돌아갈 데가 있으면 한 칸 뒤로, 없으면(알림 · 링크로 막 들어왔으면) fallback 으로.
+ */
+export function SportBackHeader({ sport, title, right, fallback = "/dashboard", bleed = 0, lift = 0, className, inner }: {
+    sport: HeaderSport; title: ReactNode; right?: ReactNode; fallback?: string; bleed?: number; lift?: number; className?: string; inner?: string;
+}) {
+    const { t } = useT();
+    const [, setLocation] = useLocation();
+    const c = SPORT_HEADER_THEME[sport], z = SPORT_HEADER_SIZE;
+    const back = () => (window.history.length > 1 ? window.history.back() : setLocation(fallback));
+    return (
+        <header className={`${BAR_CLASS} ${className ?? ""}`} style={barStyle(c, bleed, lift)} data-testid="sport-back-header" data-sport-header={sport}>
+            <div className={`flex items-center ${inner ?? ""}`} style={{ height: z.row, paddingLeft: 12, paddingRight: z.side, gap: 6 }}>
+                <button type="button" onClick={back} aria-label={t("common.back")} title={t("common.back")} data-testid="sport-back"
+                    className="-ml-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full active:opacity-60" style={{ color: c.text }}>
+                    <LucideChevronLeft weight="bold" className="h-5 w-5" aria-hidden />
+                </button>
+                <h1 className="min-w-0 flex-1 truncate text-[17px] font-semibold leading-tight" style={{ color: c.text }}>{title}</h1>
+                {right}
+            </div>
+        </header>
+    );
+}
+/** 뒤로가기 머리줄의 오른쪽 단추 — 세 종목 머리줄의 둥근 단추와 같은 크기 · 같은 색 */
+export function SportHeaderButton({ sport, label, onClick, children, testId }: { sport: HeaderSport; label: string; onClick: () => void; children: ReactNode; testId?: string }) {
+    const c = SPORT_HEADER_THEME[sport];
+    return (
+        <button type="button" onClick={onClick} title={label} aria-label={label} data-testid={testId}
+            className="flex shrink-0 items-center justify-center rounded-full active:scale-95 transition-transform"
+            style={{ width: SPORT_HEADER_SIZE.button, height: SPORT_HEADER_SIZE.button, background: c.iconBg, color: sport === "BILLIARDS" ? c.brand : c.text }}>
+            {children}
+        </button>
     );
 }
 

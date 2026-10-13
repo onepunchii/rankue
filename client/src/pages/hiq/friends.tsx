@@ -1,9 +1,8 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
-import { motion } from "framer-motion";
 import { useState, useMemo, useCallback } from "react";
-import { LucideChevronLeft, LucideSearch, LucideUsers } from "@/lib/icons";
+import { LucideSearch, LucideUsers } from "@/lib/icons";
+import { SportBackHeader, SportHeaderButton } from "@/components/hiq/SportHeader";
 import { apiRequest } from "@/lib/queryClient";
 import { HiqGame } from "@shared/schema";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
@@ -31,13 +30,12 @@ import {
 
 export default function HiqRivals() {
     const { t } = useT();
-    const [, setLocation] = useLocation();
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [selectedFriendId, setSelectedFriendId] = useState<string | null>(null);
 
     const queryClient = useQueryClient();
     const { toast } = useToast();
-    const { currentSport } = useSport();
+    const { currentSport, sport } = useSport();
     const sportKey = currentSport as keyof typeof SPORT_CONFIGS;
     const config = useMemo(() => SPORT_CONFIGS[sportKey] || SPORT_CONFIGS.BILLIARDS, [sportKey]);
 
@@ -122,34 +120,11 @@ export default function HiqRivals() {
     }
 
     return (
-        <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-8 relative z-10">
-                <div className="flex items-center gap-3">
-                    <motion.button
-                        whileTap={{ scale: 0.9 }}
-                        onClick={() => setLocation("/menu")}
-                        className="w-11 h-11 rounded-full bg-white flex items-center justify-center transition-transform text-black/60 shadow-[0_1px_2px_rgba(0,0,0,0.06)]"
-                    >
-                        <LucideChevronLeft className="w-5 h-5" />
-                    </motion.button>
-                    <div>
-                        <h1 className="text-[26px] font-bold tracking-tight text-ink-1 leading-none">
-                            {t(config.title)}
-                        </h1>
-                        <p className="text-[13px] font-medium text-black/55 mt-1">
-                            {t("friends.subtitle")}
-                        </p>
-                    </div>
-                </div>
-                <motion.button
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => setIsSearchOpen(true)}
-                    className="w-11 h-11 rounded-full bg-brand/12 border border-brand/20 flex items-center justify-center transition-transform"
-                >
-                    <LucideSearch className="w-5 h-5 text-brand" />
-                </motion.button>
-            </div>
+        <div className="rk-clip-x min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative font-sans">
+            {/* 머리줄 — 골프 · 등산의 뒤로가기 머리줄과 같은 꼴(2026-10-13 오너). 큰 제목 · 둥근 흰 단추 대신 맨 위에 붙는 한 줄 */}
+            <SportBackHeader sport={sport} title={t(config.title)} bleed={20} lift={24}
+                right={<SportHeaderButton sport={sport} label={currentSport === "GOLF" ? t("searchUserDialog.findFriend") : t("searchUserDialog.findRival")} onClick={() => setIsSearchOpen(true)} testId="friends-search"><LucideSearch className="h-[20px] w-[20px]" /></SportHeaderButton>} />
+            <p className="mt-4 mb-6 text-[13px] font-medium text-black/55">{t("friends.subtitle")}</p>
 
             {/* Main Content Sections */}
             <RecentOpponentsSlider

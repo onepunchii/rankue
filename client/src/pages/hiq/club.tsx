@@ -6,6 +6,7 @@ import { LucideSearch, LucidePlus, LucideX } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { useT } from "@/lib/i18n";
 import { CREW_TEXT, IconButton } from "@/components/hiq/crew-ui";
+import { SportHeader } from "@/components/hiq/SportHeader";
 
 // Sub-components
 import { MyCrewList } from "@/components/hiq/club/MyCrewList";
@@ -25,8 +26,11 @@ export default function HiqClub() {
 
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 font-sans pb-nav">
-            <div className="max-w-md mx-auto px-4 pt-6 flex flex-col gap-8">
-                <h1 className={CREW_TEXT.title}>{t("club.title")}</h1>
+            {/* 세 종목이 같이 쓰는 고정 머리줄(2026-10-13 오너: "헤더는 크루까지만 적용하자 — 당구 크루 · 골프 크루 · 등산 크루, 크루 텍스트는 제거").
+                화면의 제목은 하단 탭이 말해 준다 — 글자는 화면 읽기 도구에만 남긴다 */}
+            <SportHeader sport={sport} inner="mx-auto max-w-md" />
+            <h1 className="sr-only">{t("club.title")}</h1>
+            <div className="max-w-md mx-auto px-4 pt-5 flex flex-col gap-8">
 
                 {/* 내 크루 */}
                 <section className="flex flex-col gap-2.5">

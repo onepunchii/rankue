@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { motion } from "framer-motion";
-import { LucideChevronLeft, LucideTarget, LucideBarChart3, LucideLayers } from "@/lib/icons";
+import { LucideTarget, LucideBarChart3, LucideLayers } from "@/lib/icons";
+import { SportBackHeader } from "@/components/hiq/SportHeader";
 import { useSport } from "@/contexts/SportContext";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { AppInstallCard } from "@/components/hiq/AppInstallCard";
@@ -26,8 +26,7 @@ import { GolfRoundReport } from "@/golf/pages/RoundReport";
 
 export default function HiqHistory() {
     const { t } = useT();
-    const [, setLocation] = useLocation();
-    const { currentSport } = useSport();
+    const { currentSport, sport } = useSport();
     const [filter, setFilter] = useState<FilterType>("all");
     const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
 
@@ -82,28 +81,10 @@ export default function HiqHistory() {
     if ((currentSport as string) === "GOLF") return <GolfRoundReport history={history as any} />;
 
     return (
-        <div className="min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] px-5 pt-5 pb-nav font-sans relative overflow-x-hidden">
-            {/* iOS 상태바(black-translucent) 배경막 — 스크롤 시 콘텐츠가 반투명 상태바 밑으로 비쳐
-                시계·배터리와 겹치는 것을 막는다. 노치 없는 환경에선 높이 0이라 무영향. */}
-            <div className="fixed top-0 left-0 right-0 h-[env(safe-area-inset-top)] bg-surface-0 z-40 pointer-events-none" />
-            {/* Header */}
-            <div className="flex items-center gap-3 mb-7 relative z-10">
-                <motion.button
-                    whileTap={{ scale: 0.9 }}
-                    onClick={() => setLocation("/dashboard")}
-                    className="w-11 h-11 rounded-full bg-surface-1 flex items-center justify-center transition-transform text-black/55 shrink-0"
-                >
-                    <LucideChevronLeft className="w-5 h-5" />
-                </motion.button>
-                <div>
-                    <h1 className="text-[26px] font-bold tracking-tight text-ink-1 leading-none">
-                        {t(config.title)}
-                    </h1>
-                    <p className="text-[13px] font-medium text-black/55 mt-1.5">
-                        {t(config.subtitle)}
-                    </p>
-                </div>
-            </div>
+        <div className="rk-clip-x min-h-screen bg-surface-0 text-[rgba(0,0,0,0.87)] px-5 pt-5 pb-nav font-sans relative">
+            {/* 머리줄 — 골프 · 등산의 뒤로가기 머리줄과 같은 꼴(2026-10-13 오너). 띠가 아이폰 상태바 밑까지 이어져 따로 두던 상태바 배경막은 뺐다 */}
+            <SportBackHeader sport={sport} title={t(config.title)} bleed={20} lift={20} />
+            <p className="mt-4 mb-6 text-[13px] font-medium text-black/55">{t(config.subtitle)}</p>
 
             {/* Filter Tabs - Only show for Billiards */}
             {currentSport !== "GOLF" && (

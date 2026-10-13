@@ -269,6 +269,11 @@ body {
 @supports (overflow: clip) {
   .golf-home-clip { overflow-x: clip; }
 }
+/* 같은 까닭 — 맨 위에 붙는 머리줄(SportHeader · SportBackHeader)을 둔 화면의 가로 넘침 자르기(친구 · 기록) */
+.rk-clip-x { overflow-x: hidden; }
+@supports (overflow: clip) {
+  .rk-clip-x { overflow-x: clip; }
+}
 :root[data-sport="GOLF"] .text-black\/60,
 :root[data-sport="GOLF"] .text-black\/55,
 :root[data-sport="GOLF"] .text-black\/50 { color: var(--ink-2); }
