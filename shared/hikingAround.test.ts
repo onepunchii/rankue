@@ -171,7 +171,7 @@ describe("고정: 근처 맛집은 저장 · 가공 없이 그대로", () => {
         // 화면과 같은 것을 글로: 위치 · 들머리 구역, 가까운 산의 방향, 권역의 공유 카드
         expect(seo).toContain("<h2>${esc(MOUNTAIN_AROUND_LABEL.map)}</h2>");
         expect(seo).toContain("compass8(bearingDeg(d.lat, d.lng, m.lat, m.lng))");
-        expect(seo).toContain("const card = { url: hikingMountainCardUrl(ORIGIN, d.slug), width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: `${d.name} — 랭큐 등산` };");
+        expect(seo).toContain("const card = { url: hikingMountainCardUrl(ORIGIN, d.slug), width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: mountainCardAlt(d) };");
     });
     it("화면 — 구역 이름만 발자국에 남기고, 기기에 남는 조회 캐시에 넣지 않는다", () => {
         const ui = read("client/src/hiking/components/MountainNearbyPlaces.tsx");

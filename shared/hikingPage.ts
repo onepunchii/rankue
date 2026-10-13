@@ -92,6 +92,13 @@ export function hikingMountainCardInput(m: SeoMountain & { region?: string | nul
     };
 }
 
+/** 산 카드의 설명(alt) — 카드에 있는 것만 말한다: "설악산 등산 카드 — 높이 1,708m · 강원 양양군 · 등산코스 9개" */
+export function mountainCardAlt(m: SeoMountain): string {
+    const c = hikingMountainCardInput(m);
+    const facts = [c.height ? `높이 ${c.height}` : "", c.place, m.courses > 0 ? `등산코스 ${m.courses}개` : ""].filter(Boolean).join(" · ");
+    return `${m.name} 등산 카드${facts ? ` — ${facts}` : ""}`;
+}
+
 /** 산 화면의 구역 이름 — 화면과 검색용 화면이 같이 쓴다 */
 export const MOUNTAIN_LABEL = {
     courses: "등산 코스",

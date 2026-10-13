@@ -4,6 +4,14 @@
 // 본문은 shared/hikingPage · hikingMountains · hikingGuide · hikingPois 로 화면(client/src/hiking)과 같은 글을 쓴다.
 // prerender.ts 와 서로 import 하는 모양이 되지만, 이 파일은 page·esc·hubNav 를 함수 안에서만 부른다(최상위에서 호출하지 말 것).
 import { page, esc, hubNav } from "../prerender.js";
+
+/**
+ * 본문의 제목 바로 밑에 그 화면의 미리보기 그림을 싣는다(2026-10-13 — 골프장 · 도장깨기의 검색용 화면과 같은 꼴).
+ * 산은 그 산의 카드(이름 · 높이 · 자리가 그림에 있다), 그 밖은 허브 · 묶음 · 권역의 카드. 그림 검색과 미리보기가 본문의 그림을 같이 본다.
+ * 사람이 보는 화면에는 이 그림이 없다(공유할 때 붙는 카드다) — 글은 화면과 같고, 그림은 머리의 og:image 와 같은 한 장이다.
+ */
+const withCard = (body: string, card: { url: string; width: number; height: number; alt: string } | null | undefined): string =>
+    card ? body.replace("</h1>", `</h1>\n  <img src="${esc(card.url)}" width="${card.width}" height="${card.height}" alt="${esc(card.alt)}" loading="eager">`) : body;
 import { entry } from "../sitemap.js";
 import type { MountainDetail, MountainSummary } from "../storage/hiking.js";
 import { HIKING_GROUPS, HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, heightText, hikingGroup, hikingRegion, inHikingGroup, mountainPlace } from "../../shared/hikingMountains.js";
@@ -11,7 +19,7 @@ import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "../../shared/hikin
 import { HIKING_POI_NAME, hikingPoiTitle, type HikingPoiKind } from "../../shared/hikingPois.js";
 import { SURFACE_COPY, surfaceShares } from "../../shared/hikingSurface.js";
 import {
-    COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, HIKING_CTA, HIKING_GRADE_NOTE, HIKING_H1, HIKING_HUB_PATH, HIKING_NAV_LABEL, HIKING_PACK_INTRO, HIKING_PACK_LABEL, HIKING_PACK_PATH, HIKING_PACK_SEO,
+    COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, HIKING_CTA, mountainCardAlt, HIKING_GRADE_NOTE, HIKING_H1, HIKING_HUB_PATH, HIKING_NAV_LABEL, HIKING_PACK_INTRO, HIKING_PACK_LABEL, HIKING_PACK_PATH, HIKING_PACK_SEO,
     HIKING_PIN_NOTE, HIKING_STAMPS_INTRO, HIKING_STAMPS_PATH, HIKING_STAMPS_SEO, HIKING_TAGLINE, MOUNTAIN_LABEL, MOUNTAIN_PATCH_NOTE, OSM_NOTE,
     courseFacts, courseShape, courseViaNote, hikingHubSeo, hikingListPath, hikingListSeo, hikingMountainPath, hikingRegionPath, hikingRegionSeo, kmRange, listNames, mountainSeo,
 } from "../../shared/hikingPage.js";
@@ -91,7 +99,7 @@ ${nav()}
 </main>
 ${hubNav("ko")}`;
     const list = { "@context": "https://schema.org", "@type": "ItemList", name: "산림청 100대 명산", numberOfItems: kfs.length, itemListElement: kfs.map((m, i) => ({ "@type": "ListItem", position: i + 1, name: m.name, url: `${ORIGIN}${hikingMountainPath(m.slug)}` })) };
-    return { status: 200, tag: "hiking:hub", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [list, crumbs()] }) };
+    return { status: 200, tag: "hiking:hub", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, hubCard(ORIGIN, seo.path)), jsonLd: [list, crumbs()] }) };
 }
 
 function listing(tag: string, seo: { path: string; title: string; desc: string }, h1: string, lead: string, items: readonly MountainSummary[], total: number): HikingRender {
@@ -111,7 +119,7 @@ ${nav()}
 </main>
 ${hubNav("ko")}`;
     const list = { "@context": "https://schema.org", "@type": "ItemList", name: h1, numberOfItems: total, itemListElement: items.slice(0, 100).map((m, i) => ({ "@type": "ListItem", position: i + 1, name: m.name, url: `${ORIGIN}${hikingMountainPath(m.slug)}` })) };
-    return { status: 200, tag, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [list, crumbs([h1, seo.path])] }) };
+    return { status: 200, tag, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, hubCard(ORIGIN, seo.path)), jsonLd: [list, crumbs([h1, seo.path])] }) };
 }
 
 /** 산 화면에 이름으로 적는 지점 — 갈림길은 수만 적는다(이름이 거의 다 '갈림길'이다) */
@@ -185,8 +193,8 @@ ${hubNav("ko")}`;
         ...(g?.faq.length ? [{ "@context": "https://schema.org", "@type": "FAQPage", mainEntity: g.faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) }] : []),
     ];
     // 공유 · 검색 카드는 이 산의 카드(화면의 useSeo · 사이트맵과 같은 주소 — shared/ogCards). 권역의 표지 위에 이 산의 이름 · 높이 · 자리 · 코스
-    const card = { url: hikingMountainCardUrl(ORIGIN, d.slug), width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: `${d.name} — 랭큐 등산` };
-    return { status: 200, tag: `hiking:mountain:${d.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd, image: card }) };
+    const card = { url: hikingMountainCardUrl(ORIGIN, d.slug), width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: mountainCardAlt(d) };
+    return { status: 200, tag: `hiking:mountain:${d.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card), jsonLd, image: card }) };
 }
 
 /** 도장첩 — 묶음마다의 권과 칸 수. 화면(StampShelf)의 방문자 모습과 같은 글 */
@@ -215,7 +223,7 @@ ${cta()}
 ${nav()}
 </main>
 ${hubNav("ko")}`;
-    return { status: 200, tag: "hiking:stamps", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [crumbs(["도장첩", seo.path])] }) };
+    return { status: 200, tag: "hiking:stamps", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, hubCard(ORIGIN, seo.path)), jsonLd: [crumbs(["도장첩", seo.path])] }) };
 }
 
 /** 배낭 — 산행 등급 여덟 · 산 와펜(100대 명산, 권역별) · 핀. 화면(PackPage)의 방문자 모습과 같은 글 */
@@ -256,7 +264,7 @@ ${cta()}
 ${nav()}
 </main>
 ${hubNav("ko")}`;
-    return { status: 200, tag: "hiking:pack", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [crumbs(["배낭", seo.path])] }) };
+    return { status: 200, tag: "hiking:pack", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, hubCard(ORIGIN, seo.path)), jsonLd: [crumbs(["배낭", seo.path])] }) };
 }
 
 /** 용어 사전 — 묶음별로 말과 한 줄 뜻. 화면(TermsPage)과 같은 글(shared/hikingTerms) */
@@ -278,7 +286,7 @@ ${nav()}
 </main>
 ${hubNav("ko")}`;
     const set = { "@context": "https://schema.org", "@type": "DefinedTermSet", name: HIKING_TERMS_H1, url: `${ORIGIN}${seo.path}`, hasDefinedTerm: HIKING_TERMS.map((t) => ({ "@type": "DefinedTerm", name: t.term, description: t.short, url: `${ORIGIN}${hikingTermPath(t.id)}` })) };
-    return { status: 200, tag: "hiking:terms", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [set, crumbs([HIKING_TERMS_H1, seo.path])] }) };
+    return { status: 200, tag: "hiking:terms", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, hubCard(ORIGIN, seo.path)), jsonLd: [set, crumbs([HIKING_TERMS_H1, seo.path])] }) };
 }
 function term(t: HikingTerm): HikingRender {
     const seo = hikingTermSeo(t);
@@ -300,7 +308,7 @@ ${nav()}
 </main>
 ${hubNav("ko")}`;
     const ld = { "@context": "https://schema.org", "@type": "DefinedTerm", name: t.term, ...(t.also?.length ? { alternateName: t.also } : {}), description: `${t.short} ${t.body}`, url: `${ORIGIN}${seo.path}`, inDefinedTermSet: `${ORIGIN}${HIKING_TERMS_PATH}` };
-    return { status: 200, tag: `hiking:term:${t.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [ld, crumbs([HIKING_TERMS_H1, HIKING_TERMS_PATH], [t.term, seo.path])] }) };
+    return { status: 200, tag: `hiking:term:${t.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, hubCard(ORIGIN, seo.path)), jsonLd: [ld, crumbs([HIKING_TERMS_H1, HIKING_TERMS_PATH], [t.term, seo.path])] }) };
 }
 /** 준비물 — 묶음별로 무엇을 · 왜. 화면(ChecklistPage)과 같은 글 */
 function checklist(): HikingRender {
@@ -322,7 +330,7 @@ ${nav()}
 </main>
 ${hubNav("ko")}`;
     const list = { "@context": "https://schema.org", "@type": "ItemList", name: HIKING_CHECKLIST_H1, itemListElement: HIKING_CHECKLIST[0].items.map((it, i) => ({ "@type": "ListItem", position: i + 1, name: it.name })) };
-    return { status: 200, tag: "hiking:checklist", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [list, crumbs([HIKING_CHECKLIST_H1, seo.path])] }) };
+    return { status: 200, tag: "hiking:checklist", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, hubCard(ORIGIN, seo.path)), jsonLd: [list, crumbs([HIKING_CHECKLIST_H1, seo.path])] }) };
 }
 
 /**
