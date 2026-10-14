@@ -34,6 +34,7 @@ export const FISH: readonly FishKind[] = [
     { id: "gamseongdom", name: "감성돔", water: "sea", unit: "cm", tiers: jja(30, 40, 50, 60) },
     { id: "chamdom", name: "참돔", water: "sea", unit: "cm", tiers: jja(40, 50, 70, 80) },
     { id: "doldom", name: "돌돔", water: "sea", unit: "cm", tiers: jja(30, 40, 50, 60) },
+    { id: "bengedom", name: "벵에돔", water: "sea", unit: "cm", tiers: jja(30, 40, 50) },
     { id: "ureok", name: "우럭", water: "sea", unit: "cm", tiers: named([["3짜", 30], ["개우럭", 40], ["5짜", 50]]) },
     { id: "gwangeo", name: "광어", water: "sea", unit: "cm", tiers: named([["5짜", 50], ["7짜", 70], ["대광어", 80]]) },
     { id: "nongeo", name: "농어", water: "sea", unit: "cm", tiers: named([["5짜", 50], ["7짜", 70], ["따오기", 80], ["미터급", 100]]) },
@@ -121,7 +122,7 @@ export function fishRecords<C extends { species: string; day: string; lengthCm?:
 
 /** 어탁첩 — 바다 · 민물. 한 칸 = 한 어종의 어탁 */
 export const FISH_BOOKS = [
-    { id: "sea", name: "바다 어탁첩", note: "바다에서 만나는 열다섯 어종", fish: FISH.filter((f) => f.water === "sea") },
+    { id: "sea", name: "바다 어탁첩", note: "바다에서 만나는 열여섯 어종", fish: FISH.filter((f) => f.water === "sea") },
     { id: "fresh", name: "민물 어탁첩", note: "저수지 · 강에서 만나는 여섯 어종", fish: FISH.filter((f) => f.water === "fresh") },
 ] as const;
 
