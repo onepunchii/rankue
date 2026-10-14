@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { FISH_INFO, cleanFishInfo, fishInfoOf, hasFishInfo } from "./fishingFishInfo";
+import { FISH_GUIDE_NAME, FISH_INFO, FISH_REG_NAMES, cleanFishInfo, fishInfoOf, hasFishInfo } from "./fishingFishInfo";
+import { existsSync } from "node:fs";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { FISH } from "./fishingFish";
@@ -51,5 +52,28 @@ describe("어종 정보의 틀", () => {
         expect(journal).toContain('data-testid="fishing-journal-day"');
         expect(journal).toContain("사진은 나만 봐요. 잡은 곳은 적은 이름만 남고 위치는 재지 않아요.");
         expect(read("client/src/fishing/FishingPage.tsx")).toContain("<CatchJournal list={list} today={today} onFish={setFishOpen} onRemove={askRemove} />");
+    });
+    it("어류 도감(오너 자료 374종) — 목록의 종마다 글 파일이 있고, 사진 주소는 싣지 않고, 출처에 라이선스가 있다", () => {
+        const index = JSON.parse(read("client/public/fishing/guide/index.json")) as { key: string; name: string }[];
+        expect(index.length).toBe(374);
+        for (const g of index) expect(existsSync(resolve(__dirname, `../client/public/fishing/guide/g/${g.key}.json`)), g.name).toBe(true);
+        const one = JSON.parse(read(`client/public/fishing/guide/g/${index.find((g) => g.name === "감성돔")!.key}.json`));
+        expect(one.image).toBeUndefined();
+        expect(one.sources[0]).toMatchObject({ name: "한국어 위키백과", license: "CC BY-SA 4.0" });
+        expect(one.sources[0].url).toMatch(/^https:\/\/ko\.wikipedia\.org\//);
+        // 우리 어종의 도감 이름 · 금어기 표 이름이 실제로 있다(우럭 = 조피볼락 · 광어 = 넙치 · 문어 = 참문어/대문어)
+        const names = new Set(index.map((g) => g.name));
+        for (const [id, n] of Object.entries(FISH_GUIDE_NAME)) if (n) expect(names.has(n), id).toBe(true);
+        const regs = JSON.parse(read("client/public/fishing/guide/regs.json")) as { basis: string; rows: { name: string; kind: string; rule: string }[] };
+        expect(regs.basis).toContain("수산자원관리법 시행령");
+        expect(regs.rows.length).toBe(67);
+        for (const [id, list] of Object.entries(FISH_REG_NAMES)) for (const n of list) expect(regs.rows.some((r) => r.name === n), `${id} ${n}`).toBe(true);
+        expect(regs.rows.find((r) => r.name === "감성돔" && r.kind === "min")?.rule).toBe("25센티미터 이하");
+        expect(read("client/public/fishing/guide/regs.json")).not.toContain("센터미터");
+        // 규칙 Q&A 는 확인이 더 필요한 부분을 같이 싣고, 화면은 '법률 자문이 아니에요'를 적는다
+        const rules = JSON.parse(read("client/public/fishing/guide/rules.json")) as { review: string[]; who: string }[];
+        expect(rules.length).toBe(74);
+        expect(rules.every((r) => r.review.length > 0)).toBe(true);
+        expect(read("client/src/fishing/Guide.tsx")).toContain("법률 자문이 아니에요.");
     });
 });

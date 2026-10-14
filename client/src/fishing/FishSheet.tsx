@@ -20,6 +20,8 @@ import { fishInfoOf, hasFishInfo, type FishInfo } from "@shared/fishingFishInfo"
 import { goodSpots, rangeText, type IndexMap } from "@shared/fishingPort";
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
 import { INDEX_TONE, INK, PAPER, PhotoZoom, SEAL, Seal, art } from "./ink";
+import { OurGuideStory, RegBox, useRegs } from "./Guide";
+import { FISH_GUIDE_NAME, FISH_REG_NAMES } from "@shared/fishingFishInfo";
 
 const UNIT_NOUN: Readonly<Record<FishUnit, string>> = { cm: "길이", count: "마릿수", kg: "무게", ji: "굵기" };
 const UNIT_WORD: Readonly<Record<FishUnit, string>> = { cm: "길이로 겨뤄요", count: "하루 마릿수로 겨뤄요", kg: "무게로 겨뤄요", ji: "굵기(손가락 너비)로 겨뤄요" };
@@ -91,10 +93,11 @@ function Story({ info, month }: { info: FishInfo; month: number }) {
     );
 }
 
-export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap }: {
+export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap, onRules }: {
     fish: FishKind; rec: FishRecord<FishingCatch> | null; list: readonly FishingCatch[]; today: string;
-    onClose: () => void; onAdd: () => void; /** 홈의 지도를 이 어종으로 */ onMap: () => void;
+    onClose: () => void; onAdd: () => void; /** 홈의 지도를 이 어종으로 */ onMap: () => void; /** 낚시 규칙 화면으로 */ onRules: () => void;
 }) {
+    const { data: regs } = useRegs();
     const info = fishInfoOf(fish.id);
     const month = Number(today.slice(5, 7));
     const mine = list.filter((c) => fishByName(c.species)?.id === fish.id);
@@ -151,6 +154,9 @@ export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap }: {
                         </p>
                     </div>
                 </div>
+
+                {/* 금어기 · 금지체장 — 적기 전에 보이게 사다리 바로 아래(법이 정한 값 · 출처와 같이) */}
+                {(FISH_REG_NAMES[fish.id] ?? []).length > 0 && <div className="mt-3"><RegBox names={FISH_REG_NAMES[fish.id]} regs={regs} label={fish.name} onRules={onRules} /></div>}
 
                 {/* 2. 내 기록 — 사진이 먼저 */}
                 <Head title="내 기록" aside={mine.length ? `${mine.length}줄 · 처음 만난 날 ${fishingDayLabel(rec?.first ?? mine[mine.length - 1].day, today)}` : undefined} />
@@ -232,11 +238,12 @@ export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap }: {
                     </>
                 )}
 
-                {/* 5. 어종 이야기 — 받은 자료만 */}
+                {/* 5. 어종 이야기 — 받은 자료만(어류 도감 글 · 그 밖에 받은 칸) */}
                 <Head title="어종 이야기" />
-                {info && hasFishInfo(info) ? <Story info={info} month={month} /> : (
+                {FISH_GUIDE_NAME[fish.id] && <OurGuideStory fish={fish} />}
+                {info && hasFishInfo(info) ? <div className={FISH_GUIDE_NAME[fish.id] ? "mt-3" : undefined}><Story info={info} month={month} /></div> : FISH_GUIDE_NAME[fish.id] ? null : (
                     <p className="rounded-2xl px-4 py-5 text-[13.5px] leading-relaxed [word-break:keep-all]" style={{ border: "1px dashed #FFFFFF2E", color: C.dim }} data-testid="fishing-fish-story-empty">
-                        어종 이야기는 준비 중이에요.<br />제철 · 낚시 방법 · 미끼 · 금어기가 여기에 실려요.
+                        도감에 아직 이 어종의 글이 없어요.<br />받은 자료가 오면 여기에 실려요.
                     </p>
                 )}
             </div>

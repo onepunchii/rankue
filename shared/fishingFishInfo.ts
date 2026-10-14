@@ -77,3 +77,21 @@ export function cleanFishInfo(raw: unknown): FishInfo {
 
 /** 채워진 칸이 있는가 */
 export const hasFishInfo = (info: FishInfo | null | undefined): boolean => !!info && Object.keys(info).some((k) => k !== "sources");
+
+/**
+ * 우리 어종(어탁이 있는 스물둘) → 어류 도감의 이름(client/public/fishing/guide — 오너가 준 374종).
+ * 낚시꾼의 이름과 도감의 이름이 다른 것: 우럭 = 조피볼락 · 광어 = 넙치 · 고등어 = 참고등어. null 은 도감에 글이 없는 것.
+ */
+export const FISH_GUIDE_NAME: Readonly<Record<string, string | null>> = {
+    gamseongdom: "감성돔", chamdom: "참돔", doldom: "돌돔", bengedom: null, ureok: "조피볼락", gwangeo: "넙치", nongeo: "농어", bollak: "볼락",
+    godeungeo: "참고등어", busiri: "부시리", samchi: "삼치", galchi: "갈치", jukkumi: "주꾸미", gabojingeo: null, munui: null, muneo: "문어",
+    bungeo: "붕어", ingeo: "잉어", bass: null, ssogari: "쏘가리", megi: "메기", songeo: "송어",
+};
+/**
+ * 우리 어종 → 금어기 · 금지체장 표(수산자원관리법 시행령 별표 1 · 2)의 이름. 표의 이름 그대로 — 문어는 금어기가 참문어 · 금지체장이 대문어다.
+ * 부시리는 표에 없다(방어는 다른 종이라 잇지 않는다). 민물 어종은 이 표에 없다(내수면은 따로).
+ */
+export const FISH_REG_NAMES: Readonly<Record<string, readonly string[]>> = {
+    gamseongdom: ["감성돔"], chamdom: ["참돔"], doldom: ["돌돔"], ureok: ["조피볼락"], gwangeo: ["넙치"], nongeo: ["농어"], bollak: ["볼락"],
+    godeungeo: ["고등어"], samchi: ["삼치"], galchi: ["갈치"], jukkumi: ["주꾸미"], muneo: ["참문어", "대문어"],
+};

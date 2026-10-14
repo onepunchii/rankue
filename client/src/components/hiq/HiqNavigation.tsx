@@ -98,8 +98,8 @@ export function HiqNavigation() {
         ? [
             { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard", also: ["/fishing/log"] },
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
-            { id: "trip", text: "출조", icon: LucideMap, path: "/fishing/trip", also: ["/fishing/points"] },
-            { id: "book", text: "어탁첩", icon: LucideStamp, path: "/fishing/book" },
+            { id: "trip", text: "출조", icon: LucideMap, path: "/fishing/trip", also: ["/fishing/points", "/fishing/rules"] },
+            { id: "book", text: "어탁첩", icon: LucideStamp, path: "/fishing/book", also: ["/fishing/guide"] },
             { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
         ]
         : isHiking

@@ -4,6 +4,12 @@
 > 틀은 `shared/fishingFishInfo.ts`, 화면은 `client/src/fishing/FishSheet.tsx`(어종 한 장).
 > **이 문서에 적힌 예시의 글은 자리 글이다 — 어종의 사실이 아니다.**
 
+## 받은 것(10/14)
+
+오너가 준 자료가 들어갔다 — 어류 도감 374종(한국어 위키백과 CC BY-SA 4.0 + 해양생물자원관), 금어기 · 금지체장 67줄(수산자원관리법 시행령 별표 1 · 2, 2026-06-23 개정본), 낚시 규칙 Q&A 74.
+만드는 법: `npx tsx server/scripts/fishing-build-guides.ts [자료 폴더]` → `client/public/fishing/guide/`. 우리 어종과 도감 · 표의 이름 잇기는 `shared/fishingFishInfo` 의 `FISH_GUIDE_NAME` · `FISH_REG_NAMES`.
+도감에 없는 우리 어종: 벵에돔 · 갑오징어 · 무늬오징어 · 배스(+ 고등어는 '참고등어'로 이음). 아래 형식(FISH_INFO)은 제철 · 미끼처럼 도감에 없는 칸을 더 받을 때 쓴다.
+
 ## 어디에 보이는가
 
 어종 한 장은 어탁첩의 칸 · 홈의 대표 기록어 · 어탁 벽 · 지도의 "○○ 한 장"을 누르면 열린다. 위에서부터:

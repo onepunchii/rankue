@@ -35,6 +35,7 @@ import { SEA_LEGEND, SPOT_DOT, SeaChart, seaWashColor, seaWashLine, type ChartSp
 import { TideCurve } from "./TideCurve";
 import { FishSheet } from "./FishSheet";
 import { CatchJournal } from "./CatchJournal";
+import { GuideBook, GuideSheet, RulesPage, type GuideRow } from "./Guide";
 import { INDEX_TONE, INK, PAPER, SEAL, Seal, art } from "./ink";
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
 import { BOAT_SOURCE, cleanBoatQuery, type FishingBoat } from "@shared/fishingBoats";
@@ -43,10 +44,10 @@ import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@s
 import { bestOf, durationKo, goodSpots, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type IndexMap, type IndexSpot, type PortBrief } from "@shared/fishingPort";
 
 const KEY = ["/api/hiq/fishing/catches"];
-type Tab = "home" | "trip" | "book" | "log" | "points";
+type Tab = "home" | "trip" | "book" | "log" | "points" | "guide" | "rules";
 /** 화면마다 주소가 있다 — 홈은 공용 홈 주소(/dashboard)에서 종목이 낚시일 때 그려진다 */
-const TAB_PATH: Readonly<Record<Tab, string>> = { home: "/dashboard", trip: "/fishing/trip", book: "/fishing/book", log: "/fishing/log", points: "/fishing/points" };
-const TAB_TITLE: Readonly<Record<Tab, string>> = { home: "랭큐 낚시", trip: "출조", book: "어탁첩", log: "내 조과", points: "낚시터" };
+const TAB_PATH: Readonly<Record<Tab, string>> = { home: "/dashboard", trip: "/fishing/trip", book: "/fishing/book", log: "/fishing/log", points: "/fishing/points", guide: "/fishing/guide", rules: "/fishing/rules" };
+const TAB_TITLE: Readonly<Record<Tab, string>> = { home: "랭큐 낚시", trip: "출조", book: "어탁첩", log: "내 조과", points: "낚시터", guide: "어류 도감", rules: "낚시 규칙" };
 /** 표지 그림(client/public/fishing/art) — 등산의 표지와 같은 손(판화)으로 그린 새벽 바다. 그림에는 글자가 없다 */
 /** 바다 일곱 곳의 표지(같은 손의 판화) */
 const seaCover = (id: string) => `/fishing/art/sea-${id}.webp`;
@@ -126,6 +127,8 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
     // 열어 둔 어종 한 장 · 홈의 지도를 그 어종으로 돌리라는 말(누를 때마다 새 것)
     const [fishOpen, setFishOpen] = useState<string | null>(null);
     const [mapFish, setMapFish] = useState<{ name: string; n: number } | null>(null);
+    // 도감에서 연 어종(어탁이 없는 것)
+    const [guideOpen, setGuideOpen] = useState<GuideRow | null>(null);
     // 방금 오른 단계 — 승급 창
     const [promoted, setPromoted] = useState<FishRecord<FishingCatch> | null>(null);
     // 출조 탭 — 바다를 볼까 민물을 볼까(고른 것을 기억한다)
@@ -277,6 +280,11 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                                 <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">낚시터 · 낚시어선 찾기</span><span className="mt-0.5 block text-[13px]" style={{ color: C.dim }}>유료 낚시터의 요금 · 신고된 배의 정원</span></span>
                                 <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#F3ECDD66" }} />
                             </button>
+                            <button type="button" onClick={() => setTab("rules")} className="mt-2 flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-rules">
+                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold" style={{ background: "#C8372D", color: "#FFF4EC", transform: "rotate(-4deg)", borderRadius: 6 }}>규칙</span>
+                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">금어기 · 금지체장 · 낚시 규칙</span><span className="mt-0.5 block text-[13px]" style={{ color: C.dim }}>법이 정한 기간과 크기 · 낚시하는 사람이 묻는 것</span></span>
+                                <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#F3ECDD66" }} />
+                            </button>
                         </FsSection>
                     </>
                 )}
@@ -311,6 +319,15 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             );
                         })}
                         <div className="px-5 pt-6">{addButton("조과 적고 어탁 받기", "fishing-book-add")}</div>
+                        <FsSection title="어류 도감" aside="374종">
+                            <button type="button" onClick={() => setTab("guide")} className="flex w-full items-center gap-3.5 overflow-hidden rounded-2xl px-3.5 py-3 text-left active:opacity-85" style={{ background: PAPER, color: INK, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }} data-testid="fishing-to-guide">
+                                <span className="relative h-[56px] w-[92px] shrink-0" aria-hidden>
+                                    {["galchi", "ssogari", "doldom"].map((id, i) => <img key={id} src={art(id)} alt="" width={640} height={400} loading="lazy" decoding="async" className="absolute h-9 w-[58px] object-contain" style={{ left: i * 17, top: i % 2 ? 18 : 2, mixBlendMode: "multiply", transform: `rotate(${i * 7 - 7}deg)` }} />)}
+                                </span>
+                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">바다 · 민물 어류 374종</span><span className="mt-0.5 block text-[13px] [word-break:keep-all]" style={{ color: "#0F283899" }}>생김새 · 사는 곳 · 금어기를 가나다로 찾아요</span></span>
+                                <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#0F283859" }} />
+                            </button>
+                        </FsSection>
                         <p className="px-5 pt-3 text-[12.5px] leading-relaxed break-keep" style={{ color: C.dim }}>칸을 누르면 그 어종의 한 장이 열려요 — 낙관의 단계 · 내 사진 · 오늘 좋은 곳. 단계(월척 · 런커 · 5짜 …)에 오르면 붉은 낙관이 붙어요.</p>
                     </div>
                 )}
@@ -323,6 +340,14 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             : <CatchJournal list={list} today={today} onFish={setFishOpen} onRemove={askRemove} />}
                     </FsSection>
                 )}
+
+                {tab === "guide" && (
+                    <>
+                        <FsCover src={FS_COVER_BOOK} at="50% 34%" line="바다 · 민물 어류 374종 — 어탁이 있는 어종은 내 기록과 이어져요" />
+                        <div className="px-5 pt-5"><GuideBook onOurs={(f) => setFishOpen(f.id)} onOther={setGuideOpen} /></div>
+                    </>
+                )}
+                {tab === "rules" && <div className="px-5 pt-5"><RulesPage /></div>}
 
                 {tab === "points" && <div className="px-5"><PointsAndBoats today={today} onPick={(p) => { setPreset({ place: p.name, spot: "pay" }); setAdding(true); }} /></div>}
 
@@ -351,9 +376,13 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                     <FishSheet fish={f} rec={records.find((r) => r.fish.id === f.id) ?? null} list={list} today={today}
                         onClose={() => setFishOpen(null)}
                         onAdd={() => { setPreset({ place: "", species: f.name }); setAdding(true); }}
-                        onMap={() => { setFishOpen(null); keep(FISH_KEY, f.name); setMapFish({ name: f.name, n: Date.now() }); if (tab !== "home") setTab("home"); }} />
+                        onMap={() => { setFishOpen(null); keep(FISH_KEY, f.name); setMapFish({ name: f.name, n: Date.now() }); if (tab !== "home") setTab("home"); }}
+                        onRules={() => { setFishOpen(null); setTab("rules"); }} />
                 );
             })()}
+            {guideOpen && !adding && (
+                <GuideSheet row={guideOpen} onClose={() => setGuideOpen(null)} onAdd={(species) => { setPreset({ place: "", species }); setAdding(true); }} onRules={() => { setGuideOpen(null); setTab("rules"); }} />
+            )}
 
             {promoted && (
                 <div role="dialog" aria-modal="true" aria-label="새 어탁" className="fixed inset-0 z-[70] flex flex-col items-center justify-center px-6" style={{ background: "#0B1E2DF2" }} data-testid="fishing-promoted" onClick={() => setPromoted(null)}>
