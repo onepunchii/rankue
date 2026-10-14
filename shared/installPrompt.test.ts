@@ -129,7 +129,7 @@ describe("isInAppBrowser — 동작 선택에만 쓴다(문구가 아니라)", (
         const uses = sheet.split("\n").filter((l) => /\binApp\b/.test(l) && !/inApp: isInAppBrowser\(ua\)|inApp=\{env\.inApp\}|inApp: boolean/.test(l));
         expect(uses.map((l) => l.trim())).toEqual([
             // golf 는 더 받지 않는다 — 골프 시트에서만 빼던 '화면 켜 두기' 줄을 아예 걷어냈다(2026-10-06 검토: 웹도 되는 것이었다)
-            "function InstallPanel({ tone, device, inApp, plan, tooSoon, onDismiss, onStore }: {",
+            "function InstallPanel({ tone, device, inApp, plan, tooSoon, onDismiss, onStore, reason }: {",
             'const storeTarget = inApp ? undefined : "_blank";',
         ]);
         // window.open 은 인앱 웹뷰에서 막힌다 — 스토어는 늘 링크(<a href>)로 연다
@@ -555,7 +555,9 @@ describe("앱에서 열기 — 눌렀을 때 받아 바로 연다", () => {
         expect(fn).toContain("ready.current = { url, until: Date.now() + Math.max(0, (Number(issued.expiresInSec) || 0) - 10) * 1000 };");
         // 주소는 ref 에만 — 저장소에 들어가는 것은 닫은 기록과 방문 기록 둘뿐이다
         expect(sheet).toContain("const ready = useRef<{ url: string; until: number } | null>(null);");
-        expect(sheet.match(/\.setItem\(/g)).toHaveLength(2);
+        // + '알림' 판을 이번 방문에 보였다는 표시(2026-10-14 — shared/alertReach)
+        expect(sheet.match(/\.setItem\(/g)).toHaveLength(3);
+        expect(sheet).toContain('sessionStorage.setItem(ALERT_INSTALL_SESSION_KEY, "1");');
         expect(sheet).toContain("localStorage.setItem(RECORD_KEY, serializePromptRecord(r));");
         expect(sheet).toContain("sessionStorage.setItem(VISIT_KEY, JSON.stringify(v));");
         expect(sheet).not.toMatch(/console\.(log|info|warn|error)\(/);
@@ -632,8 +634,9 @@ describe("PC 의 QR — 휴대폰이 열면 그 기기의 스토어 단추가 �
         expect(wipe).toBeGreaterThan(0);
         expect(force).toBeGreaterThan(wipe);
         // PC 에서는 두 스토어 링크를 같이 준다
-        expect(sheet).toContain("<a href={IOS_STORE} target=\"_blank\" rel=\"noopener noreferrer\" onClick={onStoreClick}");
-        expect(sheet).toContain("<a href={ANDROID_STORE} target=\"_blank\" rel=\"noopener noreferrer\" onClick={onStoreClick}");
+        // ('알림' 판이면 그 자리의 유입 값 — iosHref · androidHref)
+        expect(sheet).toContain("<a href={iosHref} target=\"_blank\" rel=\"noopener noreferrer\" onClick={onStoreClick}");
+        expect(sheet).toContain("<a href={androidHref} target=\"_blank\" rel=\"noopener noreferrer\" onClick={onStoreClick}");
     });
 });
 
@@ -650,7 +653,9 @@ describe("화면(AppInstallSheet) — 소스 검사", () => {
             "https://play.google.com/store/apps/details?id=com.rankue.app&referrer=utm_source%3Drankue%26utm_medium%3Dinstall_sheet",
         );
         // 기기마다 자기 스토어
-        expect(sheet).toContain('const storeHref = device === "ios" ? IOS_STORE : ANDROID_STORE;');
+        // 기본은 install_sheet, '알림' 판은 부른 자리의 값(golf_alert · alert_strip)
+        expect(sheet).toContain("const iosHref = reason ? iosStoreUrl(reason.source) : IOS_STORE, androidHref = reason ? androidStoreUrl(reason.source) : ANDROID_STORE;");
+        expect(sheet).toContain('const storeHref = device === "ios" ? iosHref : androidHref;');
         expect(sheet).toContain('const storeLabel = t(device === "ios" ? "installSheet.storeIos" : "installSheet.storeAndroid");');
     });
 
@@ -661,8 +666,9 @@ describe("화면(AppInstallSheet) — 소스 검사", () => {
         expect(tryOpen).toContain("loginSheetOpen: isLoginSheetOpen(),");
         expect(tryOpen).toContain("quietSince: quiet || null,");
         expect(tryOpen).toContain("if (!ok) return;");
-        // 여는 길은 이 함수 하나다
-        expect(sheet.match(/setOpen\(true\)/g)).toHaveLength(1);
+        // 여는 길은 이 함수와 '알림' 판(사람이 알림을 켠 순간) 둘이다 — '알림' 판도 가입 팝업이 떠 있으면 열지 않는다
+        expect(sheet.match(/setOpen\(true\)/g)).toHaveLength(2);
+        expect(sheet).toContain("if (!r || env.inert || isLoginSheetOpen()) return;");
         expect(tryOpen).toContain("setOpen(true);");
         expect(sheet).toContain("const loginOpen = useLoginSheetOpen();");
         expect(sheet).toMatch(/if \(loginOpen && openRef\.current\) \{\s*openRef\.current = false;\s*setOpen\(false\);\s*\}/);
@@ -846,7 +852,7 @@ describe("화면(AppInstallSheet) — 소스 검사", () => {
         expect(sheet).toContain('src="/icon-192.png"');
         expect(sheet).toMatch(/width=\{56\}\s*height=\{56\}/);
         expect(sheet).toContain("h-14 w-14 shrink-0 rounded-[14px] border");
-        expect(sheet).toContain('{t("installSheet.title")}');
+        expect(sheet).toContain('{reason?.title ?? t("installSheet.title")}');
         expect(dictValue("ko", "installSheet.title")).toBe("랭큐를 앱으로");
         expect(sheet).toContain('const BTN = "flex h-12 w-full items-center justify-center gap-2 rounded-[12px]');
         // 층(2026-10-06 검토): 예전 단언은 "z 를 올리지 않는다"였다 — 그런데 화면에 떠 있는 단추(골프 조인 목록의 '조인 만들기' FAB, z-60)가

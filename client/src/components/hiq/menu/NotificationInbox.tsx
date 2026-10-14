@@ -12,6 +12,7 @@ import { cn } from "@/lib/utils";
 import { useT, type Locale } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
 import { useSport } from "@/contexts/SportContext";
+import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
 import { INTL_TAG } from "@/components/hiq/chat/ChatRoom";
 import { NOTIF_GROUPS, notifGroup, type NotifGroup } from "@shared/notificationGroup";
 
@@ -297,6 +298,9 @@ export function NotificationInbox({ open, onClose }: NotificationInboxProps) {
                                 </button>
                             </div>
                         </div>
+
+                        {/* 켜 둔 알림이 웹에서는 울리지 않는다는 한 줄(2026-10-14) — 서랍이 설치 팝업보다 위층이라 누르면 서랍을 먼저 닫는다 */}
+                        <AlertAppStrip tone={currentSport === "GOLF" ? "dark" : "light"} className="mx-4 mb-2.5" onOpen={onClose} />
 
                         {/* 묶음 칩 — 누르면 서버에 group 을 넘겨 다시 받는다(받아놓고 화면에서 거르지 않는다) */}
                         <div className="px-4 pb-2.5 flex gap-1.5 overflow-x-auto scrollbar-hide shrink-0">

@@ -1,3 +1,4 @@
+import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
 import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -97,6 +98,8 @@ export default function GolfDashboard() {
 
             {/* Header & Identity */}
             <GolfHeader member={me} />
+            {/* 켜 둔 알림이 웹에서는 울리지 않는다는 한 줄(2026-10-14) — 앱 밖 · 알림을 켜 두었고 푸시가 닿지 않는 회원만 */}
+            <AlertAppStrip className="mb-4" />
             {/* 진행 중 라운드·긴급티는 회원의 것이다 — 비로그인에게는 두 카드가 스스로 숨는다(부르지도 않는다) */}
             <ActiveRoundCard />
             <HotDealTicker />

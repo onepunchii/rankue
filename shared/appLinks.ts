@@ -19,6 +19,7 @@ export type AppLinkSource =
     | "desktop_side_panel"
     | "web_landing"
     | "golf_alert"       // 골프 알림을 브라우저에서 켠 직후 — 푸시는 앱에서만 울린다(2026-10-05)
+    | "alert_strip"      // 켜 둔 알림이 웹에서 울리지 않는다는 골프 홈 · 알림함의 띠(2026-10-14) — components/hiq/AlertAppStrip
     | "share";          // 유저가 친구에게 직접 보낸 링크
 
 export const iosStoreUrl = (source: AppLinkSource) =>

@@ -326,6 +326,17 @@ router.get("/alerts/mine", requireAuth, asyncHandler(async (req: AuthRequest, re
     return sendSuccess(res, ((r.rows ?? r) as any[]).map((a) => ({ region: a.region, cities: Array.isArray(a.cities) ? a.cities : [], filters: a.filters ?? {} })));
 }));
 
+// 알림이 닿는가(2026-10-14 오너: "웹 가입자가 앱으로 연결이 잘 안 되네") — 켜 둔 관심 골프장 · 지역 알림 수와, 이 회원에게 푸시가 닿는지.
+// 웹 회원의 골프 홈 · 알림함 띠가 쓴다(shared/alertReach). 토큰 값은 내보내지 않는다 — 있는지만.
+router.get("/alerts/reach", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const r: any = await db.execute(sql`
+        select (select count(*)::int from golf_course_watches where member_id = ${req.userId}::uuid) as watches,
+               (select count(*)::int from golf_area_alerts where member_id = ${req.userId}::uuid) as areas,
+               coalesce((select p.push_token is not null from hiq_members m left join profiles p on p.id = m.profile_id where m.id = ${req.userId}::uuid), false) as push`);
+    const row = ((r.rows ?? r) as any[])[0] ?? {};
+    return sendSuccess(res, { watches: Number(row.watches) || 0, areas: Number(row.areas) || 0, push: row.push === true });
+}));
+
 router.put("/alerts/:region", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const region = String(req.params.region).normalize("NFC");
     if (!isGolfRegion(region)) return sendError(res, 404, "지역을 찾을 수 없어요");

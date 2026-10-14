@@ -131,7 +131,7 @@ export function WatchSheet({ slug, name, open, onOpenChange, myWatch }: SheetPro
         onSuccess: () => {
             onOpenChange(false);
             if (myWatch) toast({ title: "조건을 바꿨어요" });
-            else void announceAlertOn("관심 등록했어요");
+            else void announceAlertOn("관심 등록했어요", undefined, `${name ?? ""} 취소티`.trim());
         },
         onError: (e: any) => toast({ variant: "destructive", title: e?.message || "등록하지 못했어요" }),
     });
@@ -234,7 +234,7 @@ export function WatchButton({ slug, myWatch, watchers, size = "lg", name, classN
         // 목록의 별: 한 번에 등록(전부 받기). 이미 켜진 별은 조건을 고치러 들어간다.
         if (size === "sm" && !on) {
             watch.mutate({}, {
-                onSuccess: () => { void announceAlertOn("관심 골프장으로 등록했어요", `${name ?? "관심 골프장"} — 티타임이 올라오면 알려 드려요`); },
+                onSuccess: () => { void announceAlertOn("관심 골프장으로 등록했어요", `${name ?? "관심 골프장"} — 티타임이 올라오면 알려 드려요`, `${name ?? ""} 취소티`.trim()); },
                 onError: (err: any) => toast({ variant: "destructive", title: err?.message || "등록하지 못했어요" }),
             });
             return;

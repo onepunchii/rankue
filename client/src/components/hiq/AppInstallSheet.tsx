@@ -44,6 +44,7 @@ import { isNativeApp } from "@/lib/nativeBridge";
 import { apiRequest } from "@/lib/queryClient";
 import { cn } from "@/lib/utils";
 import { androidStoreUrl, iosStoreUrl, type AppLinkSource } from "@shared/appLinks";
+import { ALERT_INSTALL_SESSION_KEY } from "@shared/alertReach";
 import { isKakaoOnlyAccount } from "@shared/kakaoLogin";
 import type { HandoffIssue } from "@shared/loginHandoff";
 import {
@@ -253,9 +254,30 @@ const OPEN_GUARD_MS = 600;
 /** '앱에서 열기'의 지금 상태 — idle 평소 · issuing 주소를 받는 중 · waiting 열어 보고 기다리는 중 · stuck 화면이 그대로다 · error 못 받았다 */
 type OpenPhase = "idle" | "issuing" | "waiting" | "stuck" | "error";
 
+/**
+ * '알림' 판(2026-10-14 오너: "취소티 알림이나 알림이 필요한 버튼을 누르면 앱 다운로드 배너") — 알림을 켠 그 순간 · 알림 띠를 누른 때 바로 뜬다.
+ * 기다림 · 쉬는 기간을 보지 않고, 한 방문에 한 번(띠를 사람이 눌렀을 때는 force). 제목은 무엇의 알림인지, 스토어 링크의 유입 자리는 부른 곳의 이름.
+ * 닫아도 평소 팝업의 쉬는 기간에는 넣지 않는다(사람이 부른 것이다). 앱 안에서는 부르지 않는다(false — 부른 쪽이 토스트로 대신한다).
+ */
+export interface AlertReason { title: string; source: AppLinkSource; /** 사람이 띠를 눌렀다 — 이번 방문에 이미 보였어도 연다 */ force?: boolean }
+let alertReason: AlertReason | null = null;
+const alertSubs = new Set<() => void>();
+export function openInstallForAlert(r: AlertReason): boolean {
+    if (isNativeApp() || alertSubs.size === 0) return false;
+    let shown = false;
+    try { shown = sessionStorage.getItem(ALERT_INSTALL_SESSION_KEY) === "1"; } catch { /* 저장소를 못 쓰는 환경 */ }
+    if (shown && !r.force) return false;
+    try { sessionStorage.setItem(ALERT_INSTALL_SESSION_KEY, "1"); } catch { /* 저장소를 못 쓰는 환경 */ }
+    alertReason = r;
+    alertSubs.forEach((f) => f());
+    return true;
+}
+
 /** 시트 안쪽 — 열릴 때마다 새로 붙는다(끌어내린 거리 · '앱에서 열기' 상태가 다음 열림에 남지 않는다). */
-function InstallPanel({ tone, device, inApp, plan, tooSoon, onDismiss, onStore }: {
+function InstallPanel({ tone, device, inApp, plan, tooSoon, onDismiss, onStore, reason }: {
     tone: SheetTone; device: InstallDevice; inApp: boolean; plan: SheetPlan;
+    /** '알림' 판이면 그 까닭 — 제목 · 설명 · 스토어 링크의 유입 자리가 바뀐다 */
+    reason?: AlertReason | null;
     /** 방금 떴다 — 이 누름은 팝업을 보고 누른 것이 아니다 */
     tooSoon: () => boolean;
     onDismiss: () => void; onStore: () => void;
@@ -371,7 +393,8 @@ function InstallPanel({ tone, device, inApp, plan, tooSoon, onDismiss, onStore }
         onStore();
     };
 
-    const storeHref = device === "ios" ? IOS_STORE : ANDROID_STORE;
+    const iosHref = reason ? iosStoreUrl(reason.source) : IOS_STORE, androidHref = reason ? androidStoreUrl(reason.source) : ANDROID_STORE;
+    const storeHref = device === "ios" ? iosHref : androidHref;
     const storeLabel = t(device === "ios" ? "installSheet.storeIos" : "installSheet.storeAndroid");
     // 인앱 브라우저(카카오톡 · 네이버 · 인스타그램…)는 새 창을 막거나 버린다 — 그 자리에서 연다. OS 가 스토어 주소를 스토어 앱으로 넘긴다
     const storeTarget = inApp ? undefined : "_blank";
@@ -470,10 +493,10 @@ function InstallPanel({ tone, device, inApp, plan, tooSoon, onDismiss, onStore }
                         className={cn("h-14 w-14 shrink-0 rounded-[14px] border", c.icon)}
                     />
                     <div className="min-w-0 text-left">
-                        <SheetTitle className={cn("text-[20px] font-bold leading-snug break-keep", c.title)}>{t("installSheet.title")}</SheetTitle>
+                        <SheetTitle className={cn("text-[20px] font-bold leading-snug break-keep", c.title)}>{reason?.title ?? t("installSheet.title")}</SheetTitle>
                         {/* 설명은 꼭 SheetDescription 으로 — 없으면 Radix Dialog 가 콘솔에 경고를 낸다 */}
                         <SheetDescription className={cn("mt-0.5 text-[13.5px] leading-relaxed break-keep", c.desc)}>
-                            {t(plan.qr ? "installSheet.descDesktop" : "installSheet.desc")}
+                            {reason ? t("alertApp.sheetDesc") : t(plan.qr ? "installSheet.descDesktop" : "installSheet.desc")}
                         </SheetDescription>
                     </div>
                 </div>
@@ -495,10 +518,10 @@ function InstallPanel({ tone, device, inApp, plan, tooSoon, onDismiss, onStore }
                         </div>
                         <div className="mt-4">{perkList}</div>
                         <div className="mt-4 grid grid-cols-2 gap-2">
-                            <a href={IOS_STORE} target="_blank" rel="noopener noreferrer" onClick={onStoreClick} className={cn(BTN, "border px-2 text-[13.5px]", c.secondary)}>
+                            <a href={iosHref} target="_blank" rel="noopener noreferrer" onClick={onStoreClick} className={cn(BTN, "border px-2 text-[13.5px]", c.secondary)}>
                                 <span className="truncate">{t("installSheet.storeIos")}</span>
                             </a>
-                            <a href={ANDROID_STORE} target="_blank" rel="noopener noreferrer" onClick={onStoreClick} className={cn(BTN, "border px-2 text-[13.5px]", c.secondary)}>
+                            <a href={androidHref} target="_blank" rel="noopener noreferrer" onClick={onStoreClick} className={cn(BTN, "border px-2 text-[13.5px]", c.secondary)}>
                                 <span className="truncate">{t("installSheet.storeAndroid")}</span>
                             </a>
                         </div>
@@ -564,6 +587,22 @@ export function AppInstallSheet({ path }: { path: string }) {
 
     const [open, setOpen] = useState(false);
     const openRef = useRef(false);
+    // '알림' 판 — openInstallForAlert 가 부르면 바로 뜬다(가입 팝업이 떠 있으면 그것이 먼저다)
+    const [reason, setReason] = useState<AlertReason | null>(null);
+    const reasonRef = useRef<AlertReason | null>(null);
+    useEffect(() => {
+        const on = () => {
+            const r = alertReason; alertReason = null;
+            if (!r || env.inert || isLoginSheetOpen()) return;
+            reasonRef.current = r; setReason(r);
+            setVisit({ ...getVisit(), shown: true });
+            openRef.current = true;
+            openedAt.current = Date.now();
+            setOpen(true);
+        };
+        alertSubs.add(on);
+        return () => { alertSubs.delete(on); };
+    }, [env]);
     /** 뜬 때 — 직후의 누름을 거른다(OPEN_GUARD_MS) */
     const openedAt = useRef(0);
     const tooSoon = useCallback(() => Date.now() - openedAt.current < OPEN_GUARD_MS, []);
@@ -620,7 +659,9 @@ export function AppInstallSheet({ path }: { path: string }) {
     const dismiss = useCallback(() => {
         if (!openRef.current) return;
         openRef.current = false;
-        setRecord(recordAfterDismiss(getRecord(), Date.now()));
+        // '알림' 판은 사람이 부른 것 — 평소 팝업의 쉬는 기간에 넣지 않는다
+        if (!reasonRef.current) setRecord(recordAfterDismiss(getRecord(), Date.now()));
+        reasonRef.current = null;
         setOpen(false);
     }, []);
     /** 사람이 닫았다 — 방금 뜬 팝업에 손가락이 닿은 것이면 닫지 않는다(화면을 떠나서 닫히는 쪽은 dismiss 를 바로 부른다) */
@@ -722,6 +763,7 @@ export function AppInstallSheet({ path }: { path: string }) {
                     tooSoon={tooSoon}
                     onDismiss={userDismiss}
                     onStore={storeClicked}
+                    reason={open ? reason : null}
                 />
             </SheetContent>
         </Sheet>

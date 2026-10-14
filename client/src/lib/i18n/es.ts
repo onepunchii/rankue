@@ -3760,6 +3760,10 @@ const es: Dict = {
   "handoff.welcomeAccount": "Sesión iniciada como {name}",
   // 앱 설치 팝업(2026-10-06) — components/hiq/AppInstallSheet. 좋은 점은 코드에서 확인된 것만(ko.ts 주석)
   "installSheet.title": "Rankue, en app",
+  "alertApp.strip": "{n} alertas que activaste no suenan en la web",
+  "alertApp.stripAction": "Descarga la app para recibirlas en el móvil",
+  "alertApp.sheetDesc": "Las notificaciones push suenan en la app de Rankue. Descarga la app e inicia sesión con la misma cuenta, y tu móvil te avisará en cuanto haya algo nuevo. En la web solo quedan en tu bandeja.",
+  "alertApp.close": "Cerrar",
   "installSheet.desc": "Las mismas pantallas que la web, más lo que solo hace la app.",
   "installSheet.descDesktop": "La app se descarga en el móvil.",
   "installSheet.perkPush": "Las notificaciones push solo llegan en la app",

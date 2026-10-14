@@ -3768,6 +3768,10 @@ export const ko: Dict = {
   // 좋은 점 두 줄은 코드에서 확인된 것만: 웹 푸시 없음(main.tsx) · 홈 화면 아이콘. 화면 켜 두기는 웹도 브라우저 Wake Lock 으로 되므로
   // (hooks/useKeepAwake 의 웹 갈래) 적지 않는다 — '앱에서만 되는 것'이 아니다(2026-10-06 검토).
   "installSheet.title": "랭큐를 앱으로",
+  "alertApp.strip": "켜 둔 알림 {n}개가 웹에서는 울리지 않아요",
+  "alertApp.stripAction": "앱 받고 휴대폰으로 받기",
+  "alertApp.sheetDesc": "푸시 알림은 랭큐 앱에서 울려요. 앱을 받고 같은 계정으로 들어가면 올라오는 대로 휴대폰이 알려 줘요. 웹에서는 알림함에만 남아요.",
+  "alertApp.close": "닫기",
   "installSheet.desc": "웹과 같은 화면에, 앱에서만 되는 것을 더했어요.",
   "installSheet.descDesktop": "앱은 휴대폰에서 받을 수 있어요.",
   "installSheet.perkPush": "푸시 알림은 앱에서만 울려요",

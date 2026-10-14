@@ -88,7 +88,7 @@ function AreaAlertSheet({ open, onOpenChange, region, city, intent, regions, min
                 onOpenChange(false);
                 // 새로 켰으면 그 알림이 어떻게 닿는지까지(브라우저엔 푸시가 없다 — AlertReach)
                 if (existing) toast({ title: "조건을 바꿨어요" });
-                else void announceAlertOn(`${label} 알림을 켰어요`);
+                else void announceAlertOn(`${label} 알림을 켰어요`, undefined, `${label} 티타임`);
             },
             onError: (e: any) => toast({ variant: "destructive", title: e?.message || "저장하지 못했어요" }),
         });
