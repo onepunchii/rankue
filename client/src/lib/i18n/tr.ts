@@ -3761,6 +3761,9 @@ const tr: Dict = {
   // 앱 설치 팝업(2026-10-06) — components/hiq/AppInstallSheet. 좋은 점은 코드에서 확인된 것만(ko.ts 주석)
   "installSheet.title": "Rankue, uygulama olarak",
   "alertApp.strip": "Açtığın {n} bildirim web'de çalmıyor",
+  "alertApp.stripCrews": "{n} ekibinin sohbet · buluşma bildirimleri web'de çalmıyor",
+  "alertApp.crewJoin": "Ekip haberleri ve sohbet bildirimleri uygulamada çalar",
+  "alertApp.activityJoin": "Buluşma hatırlatmaları uygulamada çalar",
   "alertApp.stripAction": "Telefona bildirim için uygulamayı al",
   "alertApp.sheetDesc": "Anlık bildirimler Rankue uygulamasında çalar. Uygulamayı indirip aynı hesapla giriş yaparsan yeni bir şey olduğunda telefonun hemen haber verir. Web'de yalnızca gelen kutusunda kalır.",
   "alertApp.close": "Kapat",

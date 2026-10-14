@@ -1,3 +1,4 @@
+import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
 import { Suspense, lazy, useState, useCallback, useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
@@ -210,6 +211,8 @@ function HiqDashboardBilliards() {
 
             {/* Header / Profile */}
             <DashboardHeader member={member} />
+            {/* 크루 채팅 · 모임 알림이 웹에서는 울리지 않는다는 한 줄(2026-10-14) — 앱 밖 · 푸시가 닿지 않는 회원만 */}
+            <AlertAppStrip tone="light" className="mb-3" />
 
             {/* 진행 중 경기 이어하기 — 이탈한 경기로 돌아갈 유일한 입구.
                 이게 없어서 앱을 껐다 켜면 경기가 영구히 미완료로 남았다(완주율 33% 실측). */}

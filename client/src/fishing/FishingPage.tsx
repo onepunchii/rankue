@@ -13,6 +13,7 @@
  * 글자 · 숫자는 전부 화면이 얹는다(그림에는 글자가 없다). 색은 남색 바다 + 한지 + 먹 + 낙관의 붉은색 — 골프의 포스터 · 등산의 자수와 겹치지 않는다.
  * ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지. 한국어만.
  */
+import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -196,6 +197,8 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
             <main className="mx-auto max-w-[720px]">
                 {tab === "home" && (
                     <>
+                        {/* 크루 채팅 · 모임 알림이 웹에서는 울리지 않는다는 한 줄(2026-10-14) — 앱 밖 · 푸시가 닿지 않는 회원만 */}
+                        <div className="px-5 empty:hidden [&:has(>*)]:pt-3"><AlertAppStrip /></div>
                         {/* 표지 위의 내 기록 — 등산 홈과 같은 짜임(인사 · 대표 한 장 · 숫자 셋 · 단추 셋) */}
                         <div className="relative overflow-hidden" data-testid="fishing-hero">
                             <img src={FS_HERO} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 60%" }} draggable={false} decoding="async" />

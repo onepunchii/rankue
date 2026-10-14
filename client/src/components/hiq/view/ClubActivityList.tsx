@@ -1,3 +1,4 @@
+import { openInstallForAlert } from "@/components/hiq/AppInstallSheet";
 import { lazy, Suspense, useMemo, useState } from "react";
 import { useQuery, useMutation, useInfiniteQuery } from "@tanstack/react-query";
 import { differenceInCalendarDays, format } from "date-fns";
@@ -129,6 +130,8 @@ export function ClubActivityList({
         mutationFn: async (activityId: string) => apiRequest(`${activitiesKey}/${activityId}/join`, { method: "POST" }),
         onSuccess: () => {
             toast({ title: t("clubActivityListView.joinSuccessTitle"), description: t("clubActivityListView.joinSuccessDesc") });
+            // 모임 알림(전날 · 시작 전)은 앱에서 울린다 — 브라우저면 이번 방문에 한 번 앱을 권한다(2026-10-14)
+            openInstallForAlert({ title: t("alertApp.activityJoin"), source: "crew_alert" });
             invalidate();
         },
         onError: (err: Error) => toast({ title: t("clubActivityListView.joinFailTitle"), description: err.message, variant: "destructive" }),

@@ -1,6 +1,6 @@
 /**
  * 켜 둔 알림이 웹에서는 울리지 않는다는 띠 한 줄(2026-10-14 오너: "웹 가입자가 앱으로 연결이 잘 안 되네" → "응 진행").
- * 골프 홈 · 알림함 위에 둔다. 누르면 설치 팝업이 '알림' 판으로 뜬다(아이폰 · 안드로이드 스토어, PC 는 QR, 로그인한 휴대폰은 '앱에서 열기').
+ * 네 종목의 홈 · 알림함 위에 둔다(골프 알림 · 크루 채팅 · 모임 알림). 누르면 설치 팝업이 '알림' 판으로 뜬다(아이폰 · 안드로이드 스토어, PC 는 QR, 로그인한 휴대폰은 '앱에서 열기').
  * 보이는 때는 shared/alertReach 의 alertStripPlan 이 정한다(앱 밖 · 켜 둔 알림이 있고 · 푸시가 닿지 않을 때, 닫으면 사흘).
  * 모든 종목이 같이 쓰는 알림함에도 놓이므로 글은 t() 로(다섯 언어).
  */
@@ -24,7 +24,7 @@ export function AlertAppStrip({ tone = "dark", className, onOpen }: { tone?: "da
     const { data } = useQuery<AlertReach | null>({ queryKey: ["/api/hiq/golf-courses/alerts/reach"], enabled: isLoggedIn && !native, staleTime: 5 * 60_000 });
     const plan = alertStripPlan(data, { native, closedAt, now: Date.now() });
     if (!plan.show) return null;
-    const text = t("alertApp.strip").replace("{n}", String(plan.count));
+    const text = t(plan.kind === "alerts" ? "alertApp.strip" : "alertApp.stripCrews").replace("{n}", String(plan.count));
     const close = () => { const now = Date.now(); try { localStorage.setItem(ALERT_STRIP_KEY, String(now)); } catch { /* 저장소를 못 쓰면 이 화면에서만 닫힌다 */ } setClosedAt(now); };
     const dark = tone === "dark";
     return (

@@ -3769,6 +3769,9 @@ export const ko: Dict = {
   // (hooks/useKeepAwake 의 웹 갈래) 적지 않는다 — '앱에서만 되는 것'이 아니다(2026-10-06 검토).
   "installSheet.title": "랭큐를 앱으로",
   "alertApp.strip": "켜 둔 알림 {n}개가 웹에서는 울리지 않아요",
+  "alertApp.stripCrews": "크루 {n}곳의 채팅 · 모임 알림이 웹에서는 울리지 않아요",
+  "alertApp.crewJoin": "크루 소식과 채팅 알림은 앱에서 울려요",
+  "alertApp.activityJoin": "모임 알림은 앱에서 울려요",
   "alertApp.stripAction": "앱 받고 휴대폰으로 받기",
   "alertApp.sheetDesc": "푸시 알림은 랭큐 앱에서 울려요. 앱을 받고 같은 계정으로 들어가면 올라오는 대로 휴대폰이 알려 줘요. 웹에서는 알림함에만 남아요.",
   "alertApp.close": "닫기",

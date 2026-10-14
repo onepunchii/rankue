@@ -1,3 +1,4 @@
+import { openInstallForAlert } from "@/components/hiq/AppInstallSheet";
 import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { useQuery, useMutation } from "@tanstack/react-query";
@@ -242,6 +243,9 @@ export default function HiqClubDetail() {
                 description: data.role === 'pending' ? t("clubDetail.joinPendingDesc") : t("clubDetail.joinDoneDesc")
             });
             invalidateLists();
+            // 크루 채팅 · 모임 알림은 앱에서 울린다 — 브라우저면 이번 방문에 한 번 앱을 권한다(2026-10-14 오너: "당구 · 등산 및 낚시도 앱 유도")
+            void queryClient.invalidateQueries({ queryKey: ["/api/hiq/golf-courses/alerts/reach"] });
+            openInstallForAlert({ title: t("alertApp.crewJoin"), source: "crew_alert" });
         },
         onError: (err: Error) => {
             toast({ title: t("clubDetail.joinFailed"), description: err.message, variant: "destructive" });

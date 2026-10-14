@@ -3761,6 +3761,9 @@ const en: Dict = {
   // 앱 설치 팝업(2026-10-06) — components/hiq/AppInstallSheet. 좋은 점은 코드에서 확인된 것만(ko.ts 주석)
   "installSheet.title": "Rankue, as an app",
   "alertApp.strip": "{n} alerts you turned on don't ring on the web",
+  "alertApp.stripCrews": "Chat and meetup alerts from your {n} crews don't ring on the web",
+  "alertApp.crewJoin": "Crew news and chat alerts ring in the app",
+  "alertApp.activityJoin": "Meetup reminders ring in the app",
   "alertApp.stripAction": "Get the app for phone alerts",
   "alertApp.sheetDesc": "Push alerts ring in the Rankue app. Get the app and sign in with the same account, and your phone will tell you as soon as something comes up. On the web they only stay in your inbox.",
   "alertApp.close": "Close",

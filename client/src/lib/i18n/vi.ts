@@ -3761,6 +3761,9 @@ const vi: Dict = {
   // 앱 설치 팝업(2026-10-06) — components/hiq/AppInstallSheet. 좋은 점은 코드에서 확인된 것만(ko.ts 주석)
   "installSheet.title": "Dùng Rankue bằng ứng dụng",
   "alertApp.strip": "{n} thông báo bạn đã bật không reo trên web",
+  "alertApp.stripCrews": "Thông báo trò chuyện · buổi gặp của {n} nhóm không reo trên web",
+  "alertApp.crewJoin": "Tin nhóm và thông báo trò chuyện reo trong ứng dụng",
+  "alertApp.activityJoin": "Nhắc buổi gặp reo trong ứng dụng",
   "alertApp.stripAction": "Tải ứng dụng để nhận trên điện thoại",
   "alertApp.sheetDesc": "Thông báo đẩy chỉ reo trong ứng dụng Rankue. Hãy tải ứng dụng và đăng nhập bằng cùng tài khoản để điện thoại báo ngay khi có tin mới. Trên web, thông báo chỉ nằm trong hộp thư.",
   "alertApp.close": "Đóng",

@@ -6,6 +6,7 @@
  * 등산을 쓸 수 있는 회원만 여기에 온다(SportContext 가 허용되지 않은 사람을 당구로 돌린다).
  * ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상, 굵기는 semibold 까지.
  */
+import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
@@ -53,6 +54,8 @@ export default function HikingHome() {
             <SportHeader sport="HIKING" />
 
             <main className="mx-auto max-w-[720px]">
+                {/* 크루 채팅 · 모임 알림이 웹에서는 울리지 않는다는 한 줄(2026-10-14) — 앱 밖 · 푸시가 닿지 않는 회원만 */}
+                <div className="px-5 empty:hidden [&:has(>*)]:pt-3"><AlertAppStrip /></div>
                 {/* 표지 위의 내 진행 */}
                 <div className="relative overflow-hidden">
                     <img src={HIKING_HERO} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 58%" }} draggable={false} decoding="async" />
