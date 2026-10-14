@@ -46,4 +46,10 @@ describe("어종 정보의 틀", () => {
         // 어종의 사실을 화면 코드에 적지 않는다 — 제철 · 미끼 같은 글은 FISH_INFO 에서만 온다
         expect(sheet).not.toMatch(/크릴|지렁이|찌낚시|루어낚시|원투낚시/);
     });
+    it("내 조과는 출조 일지다 — 나간 날마다 한 장, 사진은 나만 본다고 적는다", () => {
+        const journal = read("client/src/fishing/CatchJournal.tsx");
+        expect(journal).toContain('data-testid="fishing-journal-day"');
+        expect(journal).toContain("사진은 나만 봐요. 잡은 곳은 적은 이름만 남고 위치는 재지 않아요.");
+        expect(read("client/src/fishing/FishingPage.tsx")).toContain("<CatchJournal list={list} today={today} onFish={setFishOpen} onRemove={askRemove} />");
+    });
 });

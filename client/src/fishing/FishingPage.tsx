@@ -34,6 +34,7 @@ import { SEA_AREAS, SEA_CAUTION, SEA_SOURCE, seaHeadline, seaNotes, seaWord, typ
 import { SEA_LEGEND, SPOT_DOT, SeaChart, seaWashColor, seaWashLine, type ChartSpot } from "./SeaChart";
 import { TideCurve } from "./TideCurve";
 import { FishSheet } from "./FishSheet";
+import { CatchJournal } from "./CatchJournal";
 import { INDEX_TONE, INK, PAPER, SEAL, Seal, art } from "./ink";
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
 import { BOAT_SOURCE, cleanBoatQuery, type FishingBoat } from "@shared/fishingBoats";
@@ -152,6 +153,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
         );
     }
 
+    const askRemove = (id: string) => { void appConfirm({ title: "이 기록을 지울까요?", message: "지우면 되돌릴 수 없어요.", tone: "danger", confirmText: "지우기", cancelText: "그대로" }).then((ok) => { if (ok) remove.mutate(id); }); };
     const row = (c: FishingCatch) => {
         const fish = fishByName(c.species);
         const v = fish ? fishValue(fish, c) : c.lengthCm;
@@ -168,7 +170,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                     {c.note ? <span className="mt-0.5 block truncate text-[13px]" style={{ color: C.soft }}>{c.note}</span> : null}
                 </span>
                 <button type="button" aria-label="이 기록 지우기" data-testid="fishing-catch-delete"
-                    onClick={() => { void appConfirm({ title: "이 기록을 지울까요?", message: "지우면 되돌릴 수 없어요.", tone: "danger", confirmText: "지우기", cancelText: "그대로" }).then((ok) => { if (ok) remove.mutate(c.id); }); }}
+                    onClick={() => askRemove(c.id)}
                     className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full active:bg-[#FFFFFF14]"><LucideX className="h-4 w-4" style={{ color: C.dim }} /></button>
             </li>
         );
@@ -306,10 +308,10 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                 )}
 
                 {tab === "log" && (
-                    <FsSection title="내 조과" aside={list.length ? `${list.length}줄 · ${trips}번 출조` : undefined}>
+                    <FsSection title="출조 일지" aside={list.length ? `${list.length}줄` : undefined}>
                         {addButton("조과 적기", "fishing-log-add")}
-                        {list.length === 0 ? <p className="mt-3 rounded-2xl bg-[#FFFFFF0A] px-5 py-8 text-center text-[14px]" style={{ color: C.soft }}>아직 적은 조과가 없어요.</p>
-                            : <ul className={`mt-3 ${LIST}`}>{list.map(row)}</ul>}
+                        {list.length === 0 ? <p className="mt-3 rounded-2xl px-5 py-8 text-center text-[14px] [word-break:keep-all]" style={{ border: "1px dashed #FFFFFF2E", color: C.soft }}>아직 적은 조과가 없어요. 나간 날마다 종이 한 장으로 남아요.</p>
+                            : <CatchJournal list={list} today={today} onFish={setFishOpen} onRemove={askRemove} />}
                     </FsSection>
                 )}
 

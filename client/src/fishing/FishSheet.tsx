@@ -19,7 +19,7 @@ import { fishByName, fishValue, fishValueText, type FishKind, type FishRecord, t
 import { fishInfoOf, hasFishInfo, type FishInfo } from "@shared/fishingFishInfo";
 import { goodSpots, rangeText, type IndexMap } from "@shared/fishingPort";
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
-import { INDEX_TONE, INK, PAPER, SEAL, Seal, art } from "./ink";
+import { INDEX_TONE, INK, PAPER, PhotoZoom, SEAL, Seal, art } from "./ink";
 
 const UNIT_NOUN: Readonly<Record<FishUnit, string>> = { cm: "길이", count: "마릿수", kg: "무게", ji: "굵기" };
 const UNIT_WORD: Readonly<Record<FishUnit, string>> = { cm: "길이로 겨뤄요", count: "하루 마릿수로 겨뤄요", kg: "무게로 겨뤄요", ji: "굵기(손가락 너비)로 겨뤄요" };
@@ -247,12 +247,7 @@ export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap }: {
                 </button>
             </div>
 
-            {zoom && (
-                <div role="dialog" aria-modal="true" aria-label="사진" className="fixed inset-0 z-[80] flex items-center justify-center" style={{ background: "#000000F2" }} onClick={() => setZoom(null)} data-testid="fishing-fish-zoom">
-                    <img src={zoom} alt={`${fish.name} 사진`} className="max-h-full max-w-full object-contain" />
-                    <button type="button" aria-label="닫기" className="absolute right-4 flex h-10 w-10 items-center justify-center rounded-full" style={{ top: "calc(12px + env(safe-area-inset-top))", background: "#FFFFFF24", color: "#FFFFFF" }}><LucideX className="h-5 w-5" /></button>
-                </div>
-            )}
+            {zoom && <PhotoZoom src={zoom} alt={`${fish.name} 사진`} onClose={() => setZoom(null)} />}
         </div>
     );
 }
