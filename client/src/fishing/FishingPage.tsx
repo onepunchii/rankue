@@ -59,7 +59,7 @@ function PaperBand({ id, at = "50% 50%" }: { id: "market" | "reservoir" | "boats
         </div>
     );
 }
-const FS_HERO = "/fishing/art/hero.webp", FS_COVER_TRIP = "/fishing/art/cover-trip.webp", FS_COVER_BOOK = "/fishing/art/cover-book.webp";
+const FS_HERO = "/fishing/art/hero.webp", FS_COVER_TRIP = "/fishing/art/cover-trip.webp", FS_COVER_BOOK = "/fishing/art/cover-book.webp", FS_COVER_FRESH = "/fishing/art/cover-fresh.webp", FS_COVER_LOG = "/fishing/art/cover-log.webp";
 /** 조과 적기에 미리 들어가는 것 — 낚시터에서 왔으면 그 이름, 정출에서 왔으면 그 날 · 출조지 · 정출 */
 interface Preset { place: string; spot?: FishingSpotId | null; day?: string; tripId?: string; /** 어종 한 장에서 왔으면 그 어종 */ species?: string }
 /** 기록이 없는 사람에게 먼저 보여 주는 예시 — 지어낸 기록이고 화면에 '예시'라고 적는다 */
@@ -128,6 +128,8 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
     const [mapFish, setMapFish] = useState<{ name: string; n: number } | null>(null);
     // 방금 오른 단계 — 승급 창
     const [promoted, setPromoted] = useState<FishRecord<FishingCatch> | null>(null);
+    // 출조 탭 — 바다를 볼까 민물을 볼까(고른 것을 기억한다)
+    const [water, setWater] = useState<"sea" | "fresh">(() => { try { return localStorage.getItem(WATER_KEY) === "fresh" ? "fresh" : "sea"; } catch { return "sea"; } });
     const today = fishingKstDay(Date.now());
     const empty = !isLoading && list.length === 0;
     const records = useMemo(() => fishRecords(list), [list]);
@@ -259,10 +261,16 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
 
                 {tab === "trip" && (
                     <>
-                        <FsCover src={FS_COVER_TRIP} line="나가기 전에 보는 것 — 바다의 특보와 물때" />
-                        <Today today={today} list={list} />
-                        <MarketBoard />
-                        <ReservoirBoard />
+                        <FsCover src={water === "sea" ? FS_COVER_TRIP : FS_COVER_FRESH} at={water === "sea" ? undefined : "50% 26%"} line={water === "sea" ? "나가기 전에 보는 것 — 바다의 특보와 물때" : "나가기 전에 보는 것 — 저수지의 물높이"} />
+                        <div className="px-5 pt-5">
+                            <div className="flex rounded-full p-0.5" style={{ background: "#FFFFFF0F" }} role="group" aria-label="바다와 민물">
+                                {([["sea", "바다"], ["fresh", "민물"]] as const).map(([id, label]) => (
+                                    <button key={id} type="button" aria-pressed={water === id} onClick={() => { setWater(id); keep(WATER_KEY, id); }} data-testid={`fishing-water-${id}`}
+                                        className={cn("h-10 flex-1 rounded-full text-[14px]", water === id && "font-semibold")} style={water === id ? { background: C.brand, color: C.onBrand } : { color: C.soft }}>{label}</button>
+                                ))}
+                            </div>
+                        </div>
+                        {water === "sea" ? <><Today today={today} list={list} /><MarketBoard /></> : <ReservoirBoard />}
                         <FsSection title="낚시터 · 낚시어선" aside="1,151곳 · 3,993척">
                             <button type="button" onClick={() => setTab("points")} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-points">
                                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: "#FFFFFF14" }}><LucideMap className="h-5 w-5" style={{ color: C.sun }} /></span>
@@ -307,6 +315,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                     </div>
                 )}
 
+                {tab === "log" && <FsCover src={FS_COVER_LOG} at="50% 30%" line={list.length ? `${trips}번 나가 ${list.length}줄을 적었어요` : "나간 날마다 종이 한 장으로 남아요"} />}
                 {tab === "log" && (
                     <FsSection title="출조 일지" aside={list.length ? `${list.length}줄` : undefined}>
                         {addButton("조과 적기", "fishing-log-add")}
@@ -660,7 +669,7 @@ function TodayStrip({ today, sea, onOpen }: { today: string; sea: TideSea; onOpe
     );
 }
 
-const SEA_KEY = "rankue-fishing-sea", AREA_KEY = "rankue-fishing-area", PORT_KEY = "rankue-fishing-port";
+const SEA_KEY = "rankue-fishing-sea", AREA_KEY = "rankue-fishing-area", PORT_KEY = "rankue-fishing-port", WATER_KEY = "rankue-fishing-water";
 function readPort(): string | null { try { return fishingPort(localStorage.getItem(PORT_KEY))?.code ?? null; } catch { return null; } }
 function readSea(): TideSea { try { return localStorage.getItem(SEA_KEY) === "south" ? "south" : "west"; } catch { return "west"; } }
 function readArea(): string | null { try { const v = localStorage.getItem(AREA_KEY); return SEA_AREAS.some((a) => a.id === v) ? v : null; } catch { return null; } }
@@ -1283,6 +1292,9 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
     const [busy, setBusy] = useState(false);
     const [tideSea, setTideSea] = useState<TideSea>(readSea);
     const fileRef = useRef<HTMLInputElement>(null);
+    const kinds = useRef<HTMLDivElement>(null);
+    // 고른 어종의 칸이 줄 밖에 있으면 가운데로(어종 한 장에서 미리 골라 온 때)
+    useEffect(() => { kinds.current?.querySelector('[aria-pressed="true"]')?.scrollIntoView({ inline: "center", block: "nearest" }); }, [species]);
     const fish: FishKind | null = fishByName(species);
     // 민물이면 물때가 없다 — 민물 어종이거나 저수지 · 강에서 낚았을 때
     const fresh = fish?.water === "fresh" || spot === "lake" || spot === "river";
@@ -1331,27 +1343,46 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                 {/* 사진 — 없어도 된다. 갤러리에서 고른다 */}
                 <div>
                     <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => pick(e.target.files?.[0])} data-testid="fishing-photo-file" />
-                    {shot ? (
-                        <div className="relative overflow-hidden rounded-2xl" style={{ background: "#000000" }}>
-                            <img src={shot} alt="고른 사진" className="mx-auto block max-h-[220px] w-full object-contain" />
-                            <button type="button" onClick={() => { URL.revokeObjectURL(shot); setShot(null); setFile(null); if (fileRef.current) fileRef.current.value = ""; }} aria-label="사진 빼기" className="absolute right-2 top-2 flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "#000000A6" }}><LucideX className="h-4 w-4" /></button>
-                        </div>
-                    ) : (
-                        <button type="button" onClick={() => fileRef.current?.click()} className="flex h-[88px] w-full items-center justify-center gap-2.5 rounded-2xl border border-dashed text-[14px]" style={{ borderColor: "#FFFFFF33", color: C.soft }} data-testid="fishing-photo-pick">
-                            <LucideImage className="h-5 w-5" style={{ color: C.brand }} />사진 한 장(없어도 돼요)
-                        </button>
-                    )}
+                    <div className="relative mx-auto w-full max-w-[272px] rounded-[4px] p-2 pb-0" style={{ background: "#F6F0E2", color: INK, transform: "rotate(-1deg)", boxShadow: "0 8px 22px #00000059" }}>
+                        {shot ? (
+                            <>
+                                <img src={shot} alt="고른 사진" className="block aspect-[4/3] w-full object-cover" />
+                                <button type="button" onClick={() => { URL.revokeObjectURL(shot); setShot(null); setFile(null); if (fileRef.current) fileRef.current.value = ""; }} aria-label="사진 빼기" className="absolute right-3.5 top-3.5 flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "#000000A6", color: "#FFFFFF" }}><LucideX className="h-4 w-4" /></button>
+                                <p className="py-2.5 text-center text-[12.5px]" style={{ color: "#0F283899" }}>이 사진이 일지와 어종 한 장에 걸려요</p>
+                            </>
+                        ) : (
+                            <button type="button" onClick={() => fileRef.current?.click()} className="block w-full active:opacity-80" data-testid="fishing-photo-pick">
+                                <span className="flex aspect-[16/9] w-full flex-col items-center justify-center gap-1.5" style={{ background: "#0F28380F", border: "1px dashed #0F283859" }}>
+                                    <LucideImage className="h-6 w-6" style={{ color: "#0F2838B3" }} />
+                                    <span className="text-[14.5px] font-semibold">사진 올리기</span>
+                                </span>
+                                <span className="block py-2.5 text-center text-[12.5px]" style={{ color: "#0F283899" }}>없어도 돼요 · 사진은 나만 봐요</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 <div><span className="mb-1.5 block text-[13px]" style={{ color: C.soft }}>어종</span>
-                    {FISH_BOOKS.map((b) => (
-                        <div key={b.id} className="mb-2 flex flex-wrap gap-1.5">
-                            {b.fish.map((f) => (
-                                <button key={f.id} type="button" aria-pressed={species === f.name} onClick={() => { setSpecies(f.name); setValue(""); }} data-testid={`fishing-species-${f.name}`}
-                                    className={cn("h-9 rounded-full px-3 text-[13px]", species === f.name && "font-semibold")} style={species === f.name ? chipOn : chipOff}>{f.name}</button>
-                            ))}
-                        </div>
-                    ))}
+                    <div ref={kinds}>
+                        {FISH_BOOKS.map((b) => {
+                            const often = (id: string) => before.find((r) => r.fish.id === id)?.catches ?? 0;
+                            const order = [...b.fish].sort((x, y) => often(y.id) - often(x.id));
+                            return (
+                                <div key={b.id} className="-mx-4 mb-2 flex gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label={b.id === "sea" ? "바다 어종" : "민물 어종"}>
+                                    {order.map((f) => {
+                                        const on = species === f.name;
+                                        return (
+                                            <button key={f.id} type="button" aria-pressed={on} onClick={() => { setSpecies(f.name); setValue(""); }} data-testid={`fishing-species-${f.name}`}
+                                                className="w-[74px] shrink-0 rounded-xl px-1 pb-1.5 pt-1.5 text-center active:opacity-80" style={{ background: PAPER, color: INK, boxShadow: on ? `inset 0 0 0 2.5px ${C.brand}` : "inset 0 0 0 1px #0F28381F", opacity: species && fish && !on ? 0.62 : 1 }}>
+                                                <img src={art(f.id)} alt="" width={640} height={400} loading="lazy" decoding="async" className="mx-auto h-8 w-[58px] object-contain" style={{ mixBlendMode: "multiply" }} />
+                                                <span className={cn("mt-0.5 block truncate text-[12.5px]", on && "font-semibold")}>{f.name}</span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        })}
+                    </div>
                     <input value={species} onChange={(e) => setSpecies(e.target.value)} maxLength={20} placeholder="목록에 없으면 직접 적기" className={field} style={fieldStyle} data-testid="fishing-species" />
                 </div>
 

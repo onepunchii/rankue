@@ -47,7 +47,7 @@ describe("낚시 — 따로 선 종목", () => {
         expect(read("client/src/pages/hiq/dashboard.tsx")).toContain('<FishingHome view="home" />');
     });
     it("그림 — 표지 셋과 바다 일곱 곳의 표지가 다 있고(한 장 150KB 아래), 바다 지도는 종이 해도다", () => {
-        for (const n of ["hero", "cover-trip", "cover-book", "band-market", "band-reservoir", "band-boats", ...SEA_AREAS.map((a) => `sea-${a.id}`)]) {
+        for (const n of ["hero", "cover-trip", "cover-book", "cover-fresh", "cover-log", "band-market", "band-reservoir", "band-boats", ...SEA_AREAS.map((a) => `sea-${a.id}`)]) {
             const file = resolve(__dirname, `../client/public/fishing/art/${n}.webp`);
             expect(existsSync(file), n).toBe(true);
             expect(statSync(file).size, n).toBeLessThan(150_000);
