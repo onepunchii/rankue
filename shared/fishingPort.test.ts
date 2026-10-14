@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { durationKo, hhmm, hmToMin, indexOutlook, isFishingIndexStep, rangeText, tideFlowAt, tideRange, tideTurns, visibilityText, windDirKo, type PortIndexRow, type TidePoint } from "./fishingPort";
+import { bestOf, durationKo, goodSpots, hhmm, hmToMin, indexMapOf, indexOutlook, isFishingIndexStep, rangeText, tideFlowAt, tideRange, tideTurns, visibilityText, windDirKo, type IndexAllRow, type PortIndexRow, type TidePoint } from "./fishingPort";
 import { FISHING_PORTS, fishingPort, portsOfArea } from "./fishingStations";
 import { SEA_AREAS } from "./fishingSea";
 
@@ -80,6 +80,32 @@ describe("항구 목록", () => {
         expect(fishingPort("DT_9999")).toBeNull();
         // 큰 항구가 앞에 온다
         expect(portsOfArea("west-mid")[0].name).toBe("인천");
+    });
+});
+
+describe("낚시지수 지도", () => {
+    const row = (point: string, fish: string, part: "오전" | "오후" | "일", index: IndexAllRow["index"], over: Partial<IndexAllRow> = {}): IndexAllRow => ({ point, lat: 34, lng: 127, day: "2026-10-14", part, fish, index, wave: [0.2, 0.4], wind: [3, 5], wtemp: [20, 21], tide: "대조기", ...over });
+    const rows = [
+        row("연도", "감성돔", "오전", "좋음"), row("연도", "감성돔", "오후", "매우좋음", { wave: [0.1, 0.6] }), row("연도", "참돔", "오전", "보통"),
+        row("거문도", "감성돔", "오전", "좋음", { wave: [0.7, 1.0] }), row("거문도", "감성돔", "오후", "보통"),
+        row("가거도", "감성돔", "일", "매우나쁨"), row("먼바다", "종합", "오전", "나쁨"), row("연도", "감성돔", "오전", "나쁨", { day: "2026-10-15" }),
+    ];
+    const map = indexMapOf(rows, "2026-10-14", ["2026-10-14", "2026-10-15"]);
+    it("그날의 줄만 지점별로 모은다 — 어종마다 오전 · 오후, 파고는 합친 범위, '종합'은 어종으로 세지 않는다", () => {
+        expect(map.spots.map((s) => s.name).sort()).toEqual(["가거도", "거문도", "먼바다", "연도"]);
+        const yeondo = map.spots.find((s) => s.name === "연도")!;
+        expect(yeondo.fish).toEqual({ 감성돔: { am: "좋음", pm: "매우좋음" }, 참돔: { am: "보통", pm: null } });
+        expect(yeondo.wave).toEqual([0.1, 0.6]);
+        expect(map.spots.find((s) => s.name === "먼바다")!.fish).toEqual({});
+        // '일'은 오전 · 오후 둘 다
+        expect(map.spots.find((s) => s.name === "가거도")!.fish.감성돔).toEqual({ am: "매우나쁨", pm: "매우나쁨" });
+        expect(map.fishes).toEqual(["감성돔", "참돔"]);
+    });
+    it("좋은 곳 — 오전 · 오후 가운데 좋은 쪽으로, 좋음 이상만, 좋은 순", () => {
+        expect(bestOf({ am: "보통", pm: "좋음" })).toBe("좋음");
+        expect(bestOf({ am: null, pm: null })).toBeNull();
+        expect(goodSpots(map, "감성돔").map((g) => [g.spot.name, g.step])).toEqual([["연도", "매우좋음"], ["거문도", "좋음"]]);
+        expect(goodSpots(map, "참돔")).toEqual([]);
     });
 });
 

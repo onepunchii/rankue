@@ -125,3 +125,56 @@ export function visibilityText(m: number | null | undefined): string | null {
     return m >= 1000 ? `${(m / 1000).toFixed(m >= 10000 ? 0 : 1)}km` : `${Math.round(m / 10) * 10}m`;
 }
 
+/* ── 낚시지수 지도 — 지점 마흔아홉 곳에서 어종마다 오늘이 어떤가(국립해양조사원). 홈의 지도가 이것으로 "어디서 무엇이 좋은가"를 보여 준다 ── */
+
+export interface IndexSpot {
+    name: string; lat: number; lng: number;
+    /** 어종 → 오전 · 오후의 단계(없으면 null) */
+    fish: Record<string, { am: FishingIndexStep | null; pm: FishingIndexStep | null }>;
+    wave: [number, number] | null; wind: [number, number] | null; wtemp: [number, number] | null;
+    tide: string | null;
+}
+export interface IndexMap { day: string; days: string[]; /** 그날 지수가 매겨진 어종(많이 매겨진 순) */ fishes: string[]; spots: IndexSpot[] }
+/** 받아 둔 한 줄(지점 · 좌표가 붙은 지수) */
+export interface IndexAllRow extends PortIndexRow { point: string; lat: number; lng: number }
+
+/** 단계 → 0(매우나쁨)~4(매우좋음) */
+export const indexScore = (s: FishingIndexStep | null | undefined): number => (s ? FISHING_INDEX_STEPS.indexOf(s) : -1);
+/** 오전 · 오후 가운데 좋은 쪽 */
+export function bestOf(v: { am: FishingIndexStep | null; pm: FishingIndexStep | null } | null | undefined): FishingIndexStep | null {
+    if (!v) return null;
+    return indexScore(v.am) >= indexScore(v.pm) ? v.am ?? v.pm : v.pm;
+}
+
+/** 받아 둔 줄 → 그날의 지도. '종합'(대상어가 없는 먼 지점)은 어종으로 세지 않는다 */
+export function indexMapOf(rows: readonly IndexAllRow[], day: string, days: readonly string[]): IndexMap {
+    const by = new Map<string, IndexSpot>();
+    const count = new Map<string, number>();
+    const span = (a: [number, number] | null, b: [number, number] | null): [number, number] | null => (!a ? b : !b ? a : [Math.min(a[0], b[0]), Math.max(a[1], b[1])]);
+    for (const r of rows) {
+        if (r.day !== day || !Number.isFinite(r.lat) || !Number.isFinite(r.lng)) continue;
+        const s = by.get(r.point) ?? { name: r.point, lat: r.lat, lng: r.lng, fish: {}, wave: null, wind: null, wtemp: null, tide: null };
+        s.wave = span(s.wave, r.wave); s.wind = span(s.wind, r.wind); s.wtemp = span(s.wtemp, r.wtemp); s.tide = s.tide ?? r.tide;
+        if (r.fish && r.fish !== "종합") {
+            const f = s.fish[r.fish] ?? { am: null, pm: null };
+            if (r.part === "오전" || r.part === "일") f.am = r.index;
+            if (r.part === "오후" || r.part === "일") f.pm = r.index;
+            s.fish[r.fish] = f;
+        }
+        by.set(r.point, s);
+    }
+    const spots = [...by.values()];
+    for (const s of spots) for (const f of Object.keys(s.fish)) count.set(f, (count.get(f) ?? 0) + 1);
+    // '기타어종'은 맨 뒤로
+    const fishes = [...count.keys()].sort((a, b) => Number(a === "기타어종") - Number(b === "기타어종") || (count.get(b) ?? 0) - (count.get(a) ?? 0) || a.localeCompare(b, "ko"));
+    return { day, days: [...days], fishes, spots };
+}
+
+/** 그 어종이 오늘 좋은 곳 — 좋음 이상인 지점을 좋은 순으로(같으면 파고가 낮은 순) */
+export function goodSpots(map: IndexMap, fish: string, limit = 5): { spot: IndexSpot; step: FishingIndexStep }[] {
+    const out: { spot: IndexSpot; step: FishingIndexStep }[] = [];
+    for (const s of map.spots) { const step = bestOf(s.fish[fish]); if (step && indexScore(step) >= 3) out.push({ spot: s, step }); }
+    out.sort((a, b) => indexScore(b.step) - indexScore(a.step) || (a.spot.wave?.[1] ?? 9) - (b.spot.wave?.[1] ?? 9) || a.spot.name.localeCompare(b.spot.name, "ko"));
+    return out.slice(0, limit);
+}
+

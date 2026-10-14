@@ -12,7 +12,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { fishingPort, type FishingPort } from "../../shared/fishingStations.js";
-import { hmToMin, isFishingIndexStep, tideTurns, type PortBrief, type PortIndexRow, type PortNow, type PortSun } from "../../shared/fishingPort.js";
+import { hmToMin, indexMapOf, isFishingIndexStep, tideTurns, type IndexAllRow, type IndexMap, type PortBrief, type PortIndexRow, type PortNow, type PortSun } from "../../shared/fishingPort.js";
 import { fishingKstDay } from "../../shared/fishing.js";
 
 const KHOA = "https://apis.data.go.kr/1192136";
@@ -36,7 +36,9 @@ async function getJson(url: string, params: Record<string, string | number>, tim
 }
 /** 국립해양조사원 한 번 — 정상(00)이면 줄들, 자료 없음(03)이면 빈 배열, 그 밖은 null */
 async function khoa(service: string, params: Record<string, string | number>, timeoutMs = 4000): Promise<any[] | null> {
-    const j = await getJson(`${KHOA}/${service}`, { type: "json", pageNo: 1, ...params }, timeoutMs);
+    // 변수의 차례를 지킨다 — numOfRows 가 pageNo 보다 앞에 와야 한다(2026-10-14: 낚시지수를 pageNo 먼저로 불렀더니 5초 뒤 엉뚱한 꼴이 왔다)
+    const { pageNo = 1, ...rest } = params;
+    const j = await getJson(`${KHOA}/${service}`, { type: "json", ...rest, pageNo }, timeoutMs);
     const code = j?.header?.resultCode;
     if (code === "03") return [];
     if (code !== "00") return null;
@@ -157,3 +159,43 @@ export async function getPortBrief(code: string, wantDay: string | null, nowMs =
         index: port.index && rows.length ? { point: port.index.name, km: port.index.km, rows } : null,
     };
 }
+
+/**
+ * 낚시지수 지도 — 지점 마흔아홉 곳 · 엿새치 전부(1,400줄쯤 · 300줄씩 다섯 쪽). 세 시간마다 다시 받는다.
+ * 한 쪽씩 띄워서 받는다. 다 못 받았으면 받아 두지 않고 가진 것을 쓴다(반쪽 지도를 온 것처럼 보이지 않게).
+ */
+async function indexAll(nowMs: number): Promise<IndexAllRow[] | null> {
+    const have = await readObs<IndexAllRow[]>("indexall", "all");
+    if (have && nowMs - have.ms < INDEX_TTL_MS) return have.data;
+    const pair = (a: unknown, b: unknown): [number, number] | null => { const x = num(a), y = num(b); return x == null || y == null ? null : [Math.min(x, y), Math.max(x, y)]; };
+    const out: IndexAllRow[] = [];
+    for (let pageNo = 1; pageNo <= 8; pageNo++) {
+        const rows = await khoa("fcstFishingv2/GetFcstFishingApiServicev2", { gubun: "갯바위", numOfRows: 300, pageNo }, 5000);
+        if (!rows) return have?.data ?? null;
+        for (const r of rows) {
+            const day = String(r.predcYmd ?? ""), part = String(r.predcNoonSeCd ?? ""), point = String(r.seafsPstnNm ?? "").trim();
+            const lat = num(r.lat), lng = num(r.lot);
+            if (!point || lat == null || lng == null || !/^\d{4}-\d{2}-\d{2}$/.test(day) || !isFishingIndexStep(r.totalIndex)) continue;
+            if (part !== "오전" && part !== "오후" && part !== "일") continue;
+            out.push({ point, lat, lng, day, part, fish: String(r.seafsTgfshNm ?? "").trim().replace(/^-$/, "") || "종합", index: r.totalIndex, wave: pair(r.minWvhgt, r.maxWvhgt), wind: pair(r.minWspd, r.maxWspd), wtemp: pair(r.minWtem, r.maxWtem), tide: typeof r.tdlvHrCn === "string" && r.tdlvHrCn ? r.tdlvHrCn : null });
+        }
+        if (rows.length < 300) break;
+        await new Promise((r) => setTimeout(r, 150));
+    }
+    if (out.length < 200) return have?.data ?? null;
+    await saveObs("indexall", "all", out).catch(() => {});
+    return out;
+}
+
+export async function getIndexMap(wantDay: string | null, nowMs = Date.now()): Promise<IndexMap | null> {
+    if (!process.env.DATA_GO_KR_KEY) return null;
+    const rows = await indexAll(nowMs).catch(() => null);
+    if (!rows?.length) return null;
+    const today = fishingKstDay(nowMs);
+    const days = [...new Set(rows.map((r) => r.day))].filter((d) => d >= today).sort().slice(0, PORT_DAYS);
+    if (!days.length) return null;
+    const day = wantDay && days.includes(wantDay) ? wantDay : days[0];
+    const map = indexMapOf(rows, day, days);
+    return map.spots.length ? map : null;
+}
+

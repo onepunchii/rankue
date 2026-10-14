@@ -14,6 +14,7 @@ import { useLayoutEffect, useRef, useState } from "react";
 import { KOREA_MAP_PATHS } from "@/golf/data/koreaMapData";
 import { latLngToOutline } from "@/golf/lib/koreaOutline";
 import { SEA_AREAS, type SeaArea, type SeaState } from "@shared/fishingSea";
+import { FISHING_INDEX_STEPS, type FishingIndexStep } from "@shared/fishingPort";
 
 const VIEW = { x: -44, y: -6, w: 544, h: 692 } as const;
 const LAND = Object.values(KOREA_MAP_PATHS);
@@ -46,10 +47,19 @@ export const seaWashLine = (s: SeaState) => WASH[s].line;
 
 export interface SeaTemp { name: string; lat: number; lng: number; wtem: number }
 
-export function SeaChart({ areas, picked, onPick, temps, ports, port }: {
+/** 낚시지수의 점 — 좋을수록 크고 짙다(국립해양조사원의 다섯 단계). 나쁜 곳은 빈 점 */
+export const SPOT_DOT: Readonly<Record<FishingIndexStep, { r: number; fill: string; line: string }>> = {
+    매우좋음: { r: 6.4, fill: "#0F4A66", line: "#F3ECDD" }, 좋음: { r: 5, fill: "#3F86A8", line: "#F3ECDD" }, 보통: { r: 3.7, fill: "#9CBFCC", line: "#F3ECDD" },
+    나쁨: { r: 2.9, fill: "#F3ECDD", line: "#8AA0A8" }, 매우나쁨: { r: 2.4, fill: "#F3ECDD", line: "#B5C0C2" },
+};
+export interface ChartSpot { name: string; lat: number; lng: number; step: FishingIndexStep | null }
+
+export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spot, onSpot }: {
     areas: readonly SeaArea[]; picked: string | null; onPick: (id: string) => void; temps?: readonly SeaTemp[];
     /** 항구의 점 — 고른 항구(port)는 이름과 함께 도드라진다 */
     ports?: readonly { code: string; name: string; lat: number; lng: number }[]; port?: string | null;
+    /** 낚시지수의 점 — 고른 어종의 그날. 누르면 그 지점을 고른다. 이름은 고른 지점과 가장 좋은 몇 곳에만 적는다 */
+    spots?: readonly ChartSpot[]; spot?: string | null; onSpot?: (name: string) => void;
 }) {
     const ref = useRef<SVGSVGElement>(null);
     // 화면에서 12px 가 그림에서 몇 칸인가 — 실제 너비를 재서 글자를 키운다
@@ -117,6 +127,8 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port }: {
                     if (!z || !a) return null;
                     const [x, y] = latLngToOutline(z.at[0], z.at[1]);
                     const w = WASH[a.state];
+                    // 낚시지수의 점을 같이 그릴 때는 특보가 걸린 구역의 이름만 적는다 — 점의 이름과 겹치지 않게
+                    if (spots && spots.length > 0 && !w.word) return null;
                     return (
                         <g key={def.id}>
                             <text x={x} y={y} textAnchor="middle" fontSize={fs} fontWeight="600" fill={w.word ? w.ink : "#0F2838CC"} stroke="#F3ECDD" strokeWidth={fs * 0.22} paintOrder="stroke">{def.name}</text>
@@ -160,6 +172,44 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port }: {
                     })}
                 </g>
             )}
+
+            {/* 낚시지수의 점 — 나쁜 곳부터 그려 좋은 곳이 위에 온다 */}
+            {spots && spots.length > 0 && (() => {
+                const rank = (s: ChartSpot) => (s.step ? FISHING_INDEX_STEPS.indexOf(s.step) : -1);
+                const drawn = spots.filter((s) => s.step).sort((a, b) => rank(a) - rank(b));
+                // 이름을 적는 곳 — 가장 좋은 여섯 곳(서로 너무 가까우면 건너뛴다)과 고른 곳
+                const named: ChartSpot[] = [];
+                for (const s of [...drawn].reverse()) {
+                    if (rank(s) < 3 || named.length >= 6) break;
+                    const [x, y] = latLngToOutline(s.lat, s.lng);
+                    if (named.every((n) => { const [nx, ny] = latLngToOutline(n.lat, n.lng); return Math.abs(nx - x) > fs * 3.2 || Math.abs(ny - y) > fs * 1.25; })) named.push(s);
+                }
+                const picked = drawn.find((s) => s.name === spot) ?? null;
+                const place = (s: ChartSpot): [number, number] => { const [x, y] = latLngToOutline(s.lat, s.lng); return x > VIEW.x + VIEW.w - 6 ? [INSET.x + 30, INSET.y + 19] : [x, y]; };
+                const short = (n: string) => n.replace(/\(.*\)$/, "").replace(/(북동|남동|북서|남서|북북서|남남동|남남서|동북동|동남동|동측|서측|남측|북측)$/, "");
+                return (
+                    <g data-testid="fishing-chart-spots">
+                        {drawn.map((s) => {
+                            const [x, y] = place(s), d = SPOT_DOT[s.step!], on = s.name === spot;
+                            return (
+                                <g key={s.name} role="button" tabIndex={0} aria-label={`${s.name} ${s.step}`} aria-pressed={on} onClick={(e) => { e.stopPropagation(); onSpot?.(s.name); }}
+                                    onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSpot?.(s.name); } }} data-testid="fishing-chart-spot" data-step={s.step} style={{ cursor: "pointer", outline: "none" }}>
+                                    {/* 손가락이 닿는 자리는 점보다 넓게 */}
+                                    <circle cx={x} cy={y} r={11 * u} fill="transparent" />
+                                    {on && <circle cx={x} cy={y} r={(d.r + 4.5) * u} fill="none" stroke="#C8372D" strokeWidth={1.6 * u} />}
+                                    <circle cx={x} cy={y} r={d.r * u} fill={d.fill} stroke={d.line} strokeWidth={1.1 * u} />
+                                </g>
+                            );
+                        })}
+                        <g pointerEvents="none">
+                            {[...named.filter((s) => s.name !== spot), ...(picked ? [picked] : [])].map((s) => {
+                                const [x, y] = place(s), on = s.name === spot, left = x > VIEW.x + VIEW.w * 0.6;
+                                return <text key={s.name} x={x + (left ? -1 : 1) * (SPOT_DOT[s.step!].r + 3.5) * u} y={y + fs * 0.34} textAnchor={left ? "end" : "start"} fontSize={fs} fontWeight="600" fill={on ? "#8E2A14" : "#0F2838"} stroke="#F3ECDD" strokeWidth={fs * 0.24} paintOrder="stroke">{short(s.name)}</text>;
+                            })}
+                        </g>
+                    </g>
+                );
+            })()}
 
             {/* 방위표 */}
             <g transform={`translate(${VIEW.x + 30 * u} ${VIEW.y + VIEW.h - 30 * u}) scale(${u})`} pointerEvents="none">
