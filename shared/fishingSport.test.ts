@@ -65,4 +65,16 @@ describe("낚시 — 따로 선 종목", () => {
         expect(home).toContain("{isMember && !isGolf && !ownWorld && (");
         expect(home).toContain("{!isFishing && <QuickAction icon={<LucideCalendarPlus />}");
     });
+    it("바다의 픽셀 — 지점의 값을 거리로 섞은 어림이라고 적고, 닿는 거리 밖은 칠하지 않는다 · 칸을 누르면 그 바다의 한 장", () => {
+        const chart = read("client/src/fishing/SeaChart.tsx");
+        expect(chart).toContain('data-testid="fishing-chart-pixels"');
+        expect(chart).toContain("export const PIXEL_REACH_KM = 42;");
+        expect(chart).toContain("if (d > PIXEL_REACH_KM) continue;");
+        const page = read("client/src/fishing/FishingPage.tsx");
+        expect(page).toContain("바다의 칸은 그 값을 거리로 섞은 어림이고 지점에서 {PIXEL_REACH_KM}km 안만 칠했어요. 랭큐가 매긴 값이 아니에요.");
+        // 이 근처 내 기록은 위치가 아니라 적은 곳의 이름으로 찾는다(조과는 위치를 재지 않는다)
+        expect(page).toContain('data-testid="fishing-spot-mine"');
+        expect(page).not.toMatch(/navigator\.geolocation/);
+    });
 });
+

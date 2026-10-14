@@ -10,9 +10,9 @@
  * ⚠️ 구역의 네모는 **어림**이다(기상청 해상 광역의 실제 경계선이 아니다) — 화면에도 그렇게 적는다. 특보가 어디에 걸렸는지는 글(아래 줄)이 말한다.
  * ⚠️ 리터럴 색만.
  */
-import { useLayoutEffect, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { KOREA_MAP_PATHS } from "@/golf/data/koreaMapData";
-import { latLngToOutline } from "@/golf/lib/koreaOutline";
+import { latLngToOutline, outlineToLatLng } from "@/golf/lib/koreaOutline";
 import { SEA_AREAS, type SeaArea, type SeaState } from "@shared/fishingSea";
 import { FISHING_INDEX_STEPS, type FishingIndexStep } from "@shared/fishingPort";
 
@@ -54,12 +54,57 @@ export const SPOT_DOT: Readonly<Record<FishingIndexStep, { r: number; fill: stri
 };
 export interface ChartSpot { name: string; lat: number; lng: number; step: FishingIndexStep | null }
 
-export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spot, onSpot }: {
+/**
+ * 바다의 픽셀(2026-10-14 오너: "바다를 픽셀로 만들어서 … 해당 픽셀을 찍으면 그 바다 정보") — 지점의 낚시지수를 칸마다 거리로 섞어(가까울수록 무겁게)
+ * 다섯 단계 중 하나로 칠한다. 지점에서 멀수록 옅고, PIXEL_REACH_KM 밖은 칠하지 않는다(모르는 바다를 아는 척하지 않는다).
+ * 칸의 색은 **어림**이다 — 국립해양조사원이 매긴 것은 점(지점)뿐이다. 화면에 그렇게 적는다.
+ */
+export const PIXEL_REACH_KM = 42;
+const CELL = 11;
+const PIXEL: readonly string[] = ["#CDB487", "#E2D0A8", "#A9C9D3", "#4A8FB0", "#0F4A66"];
+const KM = (() => { const [, y1] = latLngToOutline(35, 127), [, y2] = latLngToOutline(36, 127); return Math.abs(y2 - y1) / 111; })();
+let SEA_CELLS: { x: number; y: number }[] | null = null;
+/** 그림 위의 바다 칸 — 뭍 윤곽선 안이거나 울릉 · 독도 칸이면 뺀다(한 번만 센다) */
+function seaCells(): { x: number; y: number }[] {
+    if (SEA_CELLS) return SEA_CELLS;
+    const out: { x: number; y: number }[] = [];
+    const ctx = typeof document === "undefined" ? null : document.createElement("canvas").getContext("2d");
+    const paths = ctx && typeof Path2D !== "undefined" ? LAND.map((d) => new Path2D(d)) : [];
+    for (let x = VIEW.x; x < VIEW.x + VIEW.w; x += CELL) for (let y = VIEW.y; y < VIEW.y + VIEW.h; y += CELL) {
+        const cx = x + CELL / 2, cy = y + CELL / 2;
+        if (cx > INSET.x - 4 && cx < INSET.x + INSET.w + 4 && cy > INSET.y - 4 && cy < INSET.y + INSET.h + 4) continue;
+        if (ctx && paths.some((p) => ctx.isPointInPath(p, cx, cy))) continue;
+        out.push({ x, y });
+    }
+    return (SEA_CELLS = out);
+}
+/** 칸의 단계(0 매우나쁨 … 4 매우좋음)와 가장 가까운 지점까지의 거리(km) — 닿는 지점이 없으면 null */
+export function pixelOf(spots: readonly { x: number; y: number; score: number }[], cx: number, cy: number): { score: number; km: number } | null {
+    let w = 0, sum = 0, near = Infinity;
+    for (const s of spots) {
+        const d = Math.hypot(s.x - cx, s.y - cy) / KM;
+        if (d > PIXEL_REACH_KM) continue;
+        near = Math.min(near, d);
+        const k = 1 / Math.max(4, d) ** 2;
+        w += k; sum += k * s.score;
+    }
+    return w ? { score: Math.round(sum / w), km: near } : null;
+}
+/** 위경도의 구역 이름(어림 — 구역의 네모로 본다) */
+export function zoneAt(lat: number, lng: number): string | null {
+    for (const def of SEA_AREAS) { const z = ZONES[def.id]; if (z && lat >= z.lat[0] && lat <= z.lat[1] && lng >= z.lng[0] && lng <= z.lng[1]) return def.name; }
+    return null;
+}
+export const PIXEL_LEGEND = PIXEL;
+
+export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spot, onSpot, pixels, cell, onCell }: {
     areas: readonly SeaArea[]; picked: string | null; onPick: (id: string) => void; temps?: readonly SeaTemp[];
     /** 항구의 점 — 고른 항구(port)는 이름과 함께 도드라진다 */
     ports?: readonly { code: string; name: string; lat: number; lng: number }[]; port?: string | null;
     /** 낚시지수의 점 — 고른 어종의 그날. 누르면 그 지점을 고른다. 이름은 고른 지점과 가장 좋은 몇 곳에만 적는다 */
     spots?: readonly ChartSpot[]; spot?: string | null; onSpot?: (name: string) => void;
+    /** 바다를 픽셀로 칠한다(spots 의 단계로) — 칸을 누르면 그 자리의 위경도를 돌려준다 */
+    pixels?: boolean; cell?: { lat: number; lng: number } | null; onCell?: (at: { lat: number; lng: number; km: number }) => void;
 }) {
     const ref = useRef<SVGSVGElement>(null);
     // 화면에서 12px 가 그림에서 몇 칸인가 — 실제 너비를 재서 글자를 키운다
@@ -75,6 +120,14 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
     }, []);
     const fs = 12.4 * u;
     const by = new Map(areas.map((a) => [a.id, a]));
+    // 픽셀 — 고른 어종의 점들로 칸마다 단계를 섞는다
+    const tiles = useMemo(() => {
+        if (!pixels || !spots?.length) return [];
+        const pts = spots.filter((s) => s.step).map((s) => { const [x, y] = latLngToOutline(s.lat, s.lng); return { x, y, score: FISHING_INDEX_STEPS.indexOf(s.step!) }; }).filter((p) => p.x < VIEW.x + VIEW.w - 6);
+        return seaCells().flatMap((c) => { const v = pixelOf(pts, c.x + CELL / 2, c.y + CELL / 2); return v ? [{ ...c, ...v }] : []; });
+    }, [pixels, spots]);
+    const cellXY = cell ? latLngToOutline(cell.lat, cell.lng) : null;
+    const pickedTile = cellXY ? tiles.find((t) => cellXY[0] >= t.x && cellXY[0] < t.x + CELL && cellXY[1] >= t.y && cellXY[1] < t.y + CELL) ?? null : null;
     // 위경도 눈금(위도 33~38 · 경도 125~130)
     const grid = [
         ...[33, 34, 35, 36, 37, 38].map((lat) => { const [, y] = latLngToOutline(lat, 127); return `M${VIEW.x} ${y} H${VIEW.x + VIEW.w}`; }),
@@ -100,10 +153,33 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
                     <g key={def.id} role="button" tabIndex={0} aria-pressed={on} aria-label={`${def.name} ${w.word ?? "특보 없음"}`} onClick={() => onPick(def.id)}
                         onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(def.id); } }}
                         data-testid={`fishing-sea-${def.id}`} data-state={a.state} style={{ cursor: "pointer", outline: "none" }}>
-                        <rect x={x1} y={y1} width={x2 - x1} height={y2 - y1} rx={16} fill={w.fill} stroke={on ? "#0F2838" : w.line} strokeWidth={(on ? 1.9 : 0.9) * u} strokeDasharray={on ? undefined : `${4 * u} ${3 * u}`} />
+                        <rect x={x1} y={y1} width={x2 - x1} height={y2 - y1} rx={16} fill={tiles.length && a.state === "clear" ? "transparent" : w.fill} stroke={on ? "#0F2838" : tiles.length && a.state === "clear" ? "transparent" : w.line} strokeWidth={(on ? 1.9 : 0.9) * u} strokeDasharray={on ? undefined : `${4 * u} ${3 * u}`} />
                     </g>
                 );
             })}
+
+            {/* 바다의 픽셀 — 칸 사이에 종이가 비치게 조금씩 띄운다. 지점에서 멀수록 옅다 */}
+            {tiles.length > 0 && (
+                <g data-testid="fishing-chart-pixels" style={{ cursor: "pointer" }} onClick={(e) => {
+                    const t = tiles[Number((e.target as SVGElement).getAttribute("data-i"))];
+                    if (!t) return;
+                    const at = outlineToLatLng(t.x + CELL / 2, t.y + CELL / 2);
+                    onCell?.({ ...at, km: Math.round(t.km) });
+                }}>
+                    {tiles.map((t, i) => <rect key={`${t.x}:${t.y}`} data-i={i} data-score={t.score} x={t.x + 0.8} y={t.y + 0.8} width={CELL - 1.6} height={CELL - 1.6} rx={1.6} fill={PIXEL[t.score]} opacity={t.km < PIXEL_REACH_KM * 0.35 ? 0.95 : t.km < PIXEL_REACH_KM * 0.68 ? 0.7 : 0.42} />)}
+                </g>
+            )}
+            {/* 픽셀 위에도 구역의 테두리가 보이게(특보가 걸린 구역은 그 색으로) */}
+            {tiles.length > 0 && (
+                <g pointerEvents="none">
+                    {SEA_AREAS.map((def) => {
+                        const z = ZONES[def.id], a = by.get(def.id);
+                        if (!z || !a || a.state === "clear") return null;
+                        const [x1, y1] = latLngToOutline(z.lat[1], z.lng[0]), [x2, y2] = latLngToOutline(z.lat[0], z.lng[1]);
+                        return <rect key={def.id} x={x1} y={y1} width={x2 - x1} height={y2 - y1} rx={16} fill="none" stroke={WASH[a.state].line} strokeWidth={1.6 * u} strokeDasharray={`${4 * u} ${3 * u}`} />;
+                    })}
+                </g>
+            )}
 
             {/* 뭍 — 그림자 · 종이색 · 빗금 */}
             <g fill="#0F283826" stroke="#0F283826" strokeWidth="5" strokeLinejoin="round" pointerEvents="none">{LAND.map((d, i) => <path key={i} d={d} />)}</g>
@@ -190,7 +266,7 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
                 return (
                     <g data-testid="fishing-chart-spots">
                         {drawn.map((s) => {
-                            const [x, y] = place(s), d = SPOT_DOT[s.step!], on = s.name === spot;
+                            const [x, y] = place(s), d0 = SPOT_DOT[s.step!], d = tiles.length ? { ...d0, r: Math.max(2.4, d0.r * 0.62) } : d0, on = s.name === spot;
                             return (
                                 <g key={s.name} role="button" tabIndex={0} aria-label={`${s.name} ${s.step}`} aria-pressed={on} onClick={(e) => { e.stopPropagation(); onSpot?.(s.name); }}
                                     onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onSpot?.(s.name); } }} data-testid="fishing-chart-spot" data-step={s.step} style={{ cursor: "pointer", outline: "none" }}>
@@ -210,6 +286,9 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
                     </g>
                 );
             })()}
+
+            {/* 고른 칸 — 붉은 테 */}
+            {pickedTile && <rect x={pickedTile.x - 1} y={pickedTile.y - 1} width={CELL + 2} height={CELL + 2} rx={2.4} fill="none" stroke="#C8372D" strokeWidth={2 * u} pointerEvents="none" data-testid="fishing-chart-cell" />}
 
             {/* 방위표 */}
             <g transform={`translate(${VIEW.x + 30 * u} ${VIEW.y + VIEW.h - 30 * u}) scale(${u})`} pointerEvents="none">
