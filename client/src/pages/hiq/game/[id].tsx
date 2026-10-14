@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from "react";
+import { CoachTour } from "@/components/hiq/CoachTour";
+import React, { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
 import { usePreventZoom } from "@/hooks/usePreventZoom";
 import { useKeepAwake } from "@/hooks/useKeepAwake";
@@ -35,6 +36,7 @@ export default function HiqScoreboard() {
         finishGame, discardGame, finishBusy, discardBusy, finishFailure, dismissFinishFailure, speak
     } = useGameScore(id || "");
 
+    const boardRef = useRef<HTMLDivElement>(null);
     // 경기 중엔 화면이 꺼지지 않게 — 폰을 테이블에 두고 쓰는 점수판이다.
     useKeepAwake(!!id && game?.status !== "finished");
 
@@ -119,7 +121,14 @@ export default function HiqScoreboard() {
 
     return (
         <LandscapeGuard>
-            <div className="h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
+            <div ref={boardRef} className="h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
+                {/* 첫 경기의 코치마크(2026-10-14) — 점수 · 이닝 · 되돌리기 · 종료. 상자(돌려 놓은 가로 화면) 안에 그린다. 첫 점수 전에만 */}
+                <CoachTour id="billiards-scoreboard" tone="billiards" inside={boardRef} when={!spectating && !canUndo && view.innings === 1 && game.status !== "finished"} steps={[
+                    { target: "bb-card", title: t("tour.bb.cardTitle"), body: t("tour.bb.cardBody") },
+                    { target: "bb-inning", title: t("tour.bb.inningTitle"), body: t("tour.bb.inningBody") },
+                    { target: "bb-undo", title: t("tour.bb.undoTitle"), body: t("tour.bb.undoBody") },
+                    { target: "bb-exit", title: t("tour.bb.exitTitle"), body: t("tour.bb.exitBody") },
+                ]} />
                 {/* 관전자는 카드를 누를 수 없다(점수·턴·순서 바꾸기 모두) */}
                 <div className={`flex-1 flex w-full relative z-0 ${spectating ? "pointer-events-none" : ""}`}>
                     <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>

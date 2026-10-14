@@ -782,7 +782,7 @@ describe("점수판 요청 줄 — 화면(종료 단추 · 확인창 · 실패 �
         expect(ask).toContain('role="alertdialog"');
         expect(ask).toContain('className="absolute inset-0 z-[60] flex items-center justify-center bg-black/55 px-5"');
         // 덮는 기준(relative)은 점수판의 뿌리 상자다
-        expect(box).toContain('<div className="h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">');
+        expect(box).toContain('<div ref={boardRef} className="h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">');
         expect(bar).toContain('<div className="h-16 bg-white border-t border-black/10 flex items-center justify-between px-8 shrink-0 z-50">');
 
         // 묻는 말은 예전 그대로 · 단추는 취소 → 확인 순서

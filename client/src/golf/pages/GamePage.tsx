@@ -1,3 +1,4 @@
+import { CoachTour } from "@/components/hiq/CoachTour";
 import { useRoute, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useState, useMemo, useEffect, useRef } from "react";
@@ -377,7 +378,7 @@ export default function GolfScorecard() {
                 <div className="h-16 px-3 flex items-center gap-2">
                     {/* 예전엔 1번 홀에서 이 버튼이 '게임을 종료하고 나가시겠습니까?' 였는데, 눌러도 경기는 안 끝나고
                         돌아올 길만 사라졌다. 이제 나가기·끝내기·접기를 한 곳에서 고른다. 홀 이동은 아래 버튼. */}
-                    <GolfBackButton onClick={() => setExitOpen(true)} label="나가기·끝내기" className="-ml-1" />
+                    <span data-tour="golf-exit" className="inline-flex shrink-0"><GolfBackButton onClick={() => setExitOpen(true)} label="나가기·끝내기" className="-ml-1" /></span>
                     <div className="flex-1 min-w-0">
                         <div className="flex items-baseline gap-2">
                             <span className="text-[20px] font-bold tracking-tight text-[#ffffff] tabular-nums">{currentHole + 1}번 홀</span>
@@ -424,7 +425,9 @@ export default function GolfScorecard() {
                 </div>
                 {/* 현장 인증 칩 — 한 줄짜리 조용한 상태. 이유는 칩 밑에 한 번만 잠깐 */}
                 <div className="px-4 pb-2.5 flex items-center justify-between gap-2">
+                    <span data-tour="golf-onsite" className="inline-flex min-w-0">
                     <OnSiteChip matchId={session.id} view={onSite.view} onRetry={() => { void onSite.retry(); }} manualAt={onSite.manualAt} />
+                    </span>
                     {isHost && scan?.available && session.status === "playing" && (
                         <button type="button" onClick={() => setScanOpen(true)} data-testid="scan-open" data-track-as="golf-scan-open"
                             className="shrink-0 h-8 px-3 rounded-full inline-flex items-center gap-1.5 bg-[#FFFFFF0F] text-[12.5px] text-[#FFFFFFCC] active:bg-[#FFFFFF1F]">
@@ -439,7 +442,7 @@ export default function GolfScorecard() {
             {/* Score Cards Area - Only in Group Mode */}
             {/* 아래 여백(pb-32)은 고정 단추 줄을 피하는 몫 — 예전엔 ScoreCard 안의 pb-40 이라 밑의 안내 줄이 떠 보였다 */}
             {!(session.strokeMode === 'solo' || session.players.length === 1) && (
-                <div className="pt-3 pb-32">
+                <div className="pt-3 pb-32" data-tour="golf-score">
                     <ScoreCard
                         players={playersAdapter}
                         playerScores={playerScoresAdapter}
@@ -512,7 +515,7 @@ export default function GolfScorecard() {
                 const scores = player?.scores || Array(18).fill(0);
 
                 return (
-                    <div className="px-4 mt-2">
+                    <div className="px-4 mt-2" data-tour="golf-score">
                         {/* 종이 스코어카드처럼 — 윗단에 그림 띠(골프장 · 날짜), 그 아래 칸(components/RoundArt) */}
                         <div className="overflow-hidden rounded-2xl bg-[#FFFFFF08] ring-1 ring-inset ring-[#FFFFFF0F]">
                             <ScorecardBand
@@ -559,7 +562,14 @@ export default function GolfScorecard() {
 
 
             {/* 아래 단추 — 이전 홀 · 다음 홀(18번 홀이면 라운드 끝내기) */}
-            <div className="fixed bottom-0 inset-x-0 z-40 bg-[#050505F2] border-t border-[#FFFFFF14] px-4 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
+            {/* 첫 라운드의 코치마크(2026-10-14) — 현장 인증이 '공식 기록'의 조건이라 맨 먼저. 1번 홀에서 한 번 */}
+            <CoachTour id="golf-round" tone="golf" when={session.status === "playing" && currentHole === 0} steps={[
+                { target: "golf-onsite", title: "현장 인증", body: "골프장에 있으면 시작 · 9번 · 18번 홀에서 조용히 위치를 확인해요. 인증된 라운드만 핸디캡 · 랭킹 · 도장에 들어가요." },
+                { target: "golf-score", title: "타수 적기", body: isHost ? "홀마다 타수를 눌러 적어요. 적은 점수는 동반자 화면에도 바로 보여요." : "방장이 적는 타수가 여기에 보여요." },
+                { target: "golf-next", title: "다음 홀로", body: "다 적었으면 넘어가요. 18번 홀에서는 이 자리가 '라운드 끝내기'가 돼요." },
+                { target: "golf-exit", title: "잠깐 나갈 때", body: "나가도 라운드는 그대로예요. 끝내기 · 접기도 여기서 골라요." },
+            ]} />
+            <div data-tour="golf-next" className="fixed bottom-0 inset-x-0 z-40 bg-[#050505F2] border-t border-[#FFFFFF14] px-4 pt-3" style={{ paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
                 <div className="max-w-md mx-auto flex gap-2">
                     <button
                         type="button"

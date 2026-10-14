@@ -1,10 +1,11 @@
+import { resetTours } from "@/components/hiq/CoachTour";
 import { useEffect, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { motion } from "framer-motion";
 import { SportBackHeader } from "@/components/hiq/SportHeader";
 import { useSport } from "@/contexts/SportContext";
-import { LucideChevronRight, LucideCheck, LucideLoader2, LucideGlobe, LucidePencil, LucideBadgeCheck, LucideShield, LucideLogOut, LucideBell, LucideFileText } from "@/lib/icons";
+import { LucideChevronRight, LucideCheck, LucideLoader2, LucideGlobe, LucidePencil, LucideBadgeCheck, LucideShield, LucideLogOut, LucideBell, LucideFileText, LucideInfo } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useT, LOCALES, type Locale } from "@/lib/i18n";
@@ -322,6 +323,17 @@ export default function HiqSettings() {
                             </button>
                         ))}
                     </div>
+                </section>
+
+                {/* 도움말 다시 보기(2026-10-14) — 화면마다 한 번 뜨는 코치마크를 다시 */}
+                <section className="rk-card p-5">
+                    <div className="flex items-center gap-2 mb-1">
+                        <LucideInfo className="w-4 h-4 text-brand" />
+                        <h2 className="text-[15px] font-bold">{t("tour.resetTitle")}</h2>
+                    </div>
+                    <p className="text-[12px] text-black/45 mb-4">{t("tour.resetDesc")}</p>
+                    <button type="button" onClick={() => { resetTours(); toast({ title: t("tour.resetDone") }); }} data-testid="tour-reset"
+                        className="w-full h-12 rounded-tile bg-black/[0.04] text-[14px] font-semibold text-black/70 active:scale-[0.98] transition-transform">{t("tour.resetAction")}</button>
                 </section>
 
                 {/* 알림 — 앱에서만. 상태와 복구 경로(거부했으면 설정 열기 — iOS 는 앱이 다시 물을 수 없다) */}

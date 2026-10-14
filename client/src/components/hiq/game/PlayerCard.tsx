@@ -111,7 +111,7 @@ export function PlayerCard({
             </div>
 
             {/* Global Touch Zones (Expanded to Cover Full Card) */}
-            <div className="absolute inset-0 z-[45] flex flex-col cursor-pointer touch-manipulation">
+            <div className="absolute inset-0 z-[45] flex flex-col cursor-pointer touch-manipulation" data-tour="bb-card">
                 {/* Top Zone (Increase) - Covers Top 50% */}
                 <div
                     className="absolute inset-x-0 top-0 h-[50%] active:bg-brand/[0.06] transition-colors"
@@ -244,6 +244,7 @@ export function PlayerCard({
                                     e.stopPropagation();
                                     onTurnClick && onTurnClick();
                                 }}
+                                data-tour="bb-inning"
                                 className={`rk-btn-primary ${compact ? 'h-12 px-3 gap-1.5' : 'h-16 px-8 gap-3'} rounded-2xl flex items-center justify-center whitespace-nowrap transition-all pointer-events-auto relative z-50`}
                             >
                                 <span className="text-sm font-semibold">

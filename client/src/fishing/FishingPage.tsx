@@ -13,6 +13,7 @@
  * 글자 · 숫자는 전부 화면이 얹는다(그림에는 글자가 없다). 색은 남색 바다 + 한지 + 먹 + 낙관의 붉은색 — 골프의 포스터 · 등산의 자수와 겹치지 않는다.
  * ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지. 한국어만.
  */
+import { CoachTour } from "@/components/hiq/CoachTour";
 import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
@@ -207,13 +208,19 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                                 {!FISHING_PUBLIC && <span className="absolute right-5 top-4 rounded-full px-2.5 py-1 text-[12px]" style={{ background: "#0B1E2DB3", color: C.sun }} data-testid="fishing-owner-only">운영자만 보는 중</span>}
                                 <p className="text-[14px] break-keep" style={{ color: "#F3ECDDE6", textShadow: "0 1px 10px #0B1E2D" }}>{name ? `${name} 님, ` : ""}{empty ? "첫 조과를 적어 볼까요?" : "다음은 어느 물로 나갈까요?"}</p>
                                 <div className="mt-3 flex gap-2">
-                                    <button type="button" onClick={() => setAdding(true)} className="flex h-12 flex-1 items-center justify-center rounded-xl text-[15px] font-semibold active:opacity-90" style={{ background: C.brand, color: C.onBrand }} data-testid="fishing-add">조과 적기</button>
+                                    <button type="button" onClick={() => setAdding(true)} className="flex h-12 flex-1 items-center justify-center rounded-xl text-[15px] font-semibold active:opacity-90" style={{ background: C.brand, color: C.onBrand }} data-testid="fishing-add" data-tour="fs-add">조과 적기</button>
                                     <button type="button" onClick={() => setTab("book")} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#FFFFFF1F] text-[15px] font-medium active:bg-[#FFFFFF2E]" data-testid="fishing-to-book">어탁첩</button>
                                     <button type="button" onClick={() => setTab("log")} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#FFFFFF1F] text-[15px] font-medium active:bg-[#FFFFFF2E]" data-testid="fishing-to-log">내 조과</button>
                                 </div>
                             </div>
                         </div>
 
+                        {/* 첫 방문의 코치마크(2026-10-14) — 어종 · 바다의 칸 · 조과 적기 */}
+                        <CoachTour id="fishing-home" tone="fishing" steps={[
+                            { target: "fs-fish", title: "어종을 고르면", body: "지도의 바다 칸이 그 어종의 오늘 낚시지수로 칠해져요." },
+                            { target: "fs-map", title: "칸을 누르면", body: "그 바다의 어종 사진 · 파고 · 바람 · 수온 · 물때가 한 장으로 떠요. 두 손가락으로 키울 수 있어요." },
+                            { target: "fs-add", title: "잡았으면", body: "사진 한 장과 길이만 적으면 어탁첩에 어탁이 찍혀요." },
+                        ]} />
                         {/* 지도 먼저 — 오늘 어느 바다에서 어떤 고기가 좋은가(2026-10-14 오너: "지도를 보면 아 오늘 물때와 물고기는 이렇구나") */}
                         <FishMapHome today={today} list={list} want={mapFish} onFish={(name) => { const f = fishByName(name); if (f) setFishOpen(f.id); }} onAdd={(place, species) => { setPreset({ place, species }); setAdding(true); }} onOpenTrip={() => setTab("trip")} />
 
@@ -565,7 +572,7 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
             </div>
             {/* 어종 — 고르면 지도의 점이 그 어종으로 바뀐다 */}
             {fishes.length > 0 && (
-                <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="어종">
+                <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="어종" data-tour="fs-fish">
                     {fishes.map((f) => (
                         <button key={f} type="button" aria-pressed={f === fish} onClick={() => { setFishPick(f); keep(FISH_KEY, f); }} data-testid="fishing-fishmap-fish"
                             className={cn(chip, f === fish && "font-semibold")} style={f === fish ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{f}</button>
@@ -583,6 +590,7 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
                         })}
                     </div>
                 )}
+                <div data-tour="fs-map">
                 <SeaChart areas={areas} picked={null} onPick={() => { /* 홈의 지도에서는 구역을 고르지 않는다 — 칸이나 점을 누른다 */ }} spots={spots} spot={spot} pixels cell={cell}
                     onSpot={(n) => { setCell(null); setSpot(n === spot ? null : n); }}
                     onCell={(at) => {
@@ -593,6 +601,7 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
                         if (!best) return;
                         setSpot(best.name); setCell({ lat: at.lat, lng: at.lng, km: Math.round(bestKm) });
                     }} />
+                </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3.5 py-2.5" style={{ borderColor: "#0F28381F" }}>
                     <span className="flex items-center gap-1 text-[12px]" style={{ color: "#0F2838B3" }} data-testid="fishing-pixel-legend">
                         나쁨{[0, 1, 2, 3, 4].map((k) => <i key={k} aria-hidden className="h-3 w-3 rounded-[2px]" style={{ background: PIXEL_LEGEND[k] }} />)}매우좋음

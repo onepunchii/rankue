@@ -9,6 +9,7 @@
  *  - 코스 선은 2022년 기록을 줄인 것이라 '길을 벗어났다'는 경보는 내지 않는다 — 이 코스에서 아주 멀 때만 알린다. 안내는 참고용이라고 적는다.
  * 등산을 쓸 수 있는 회원만 쓴다. ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상, 굵기는 semibold 까지.
  */
+import { CoachTour } from "@/components/hiq/CoachTour";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useRoute, useSearch } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -113,6 +114,13 @@ export default function TrailPage() {
         <HikingShell title={`${d.name} 산행`} backTo={hikingMountainPath(d.slug)} cta={null} nav={!active}
             right={active ? <button type="button" onClick={end} disabled={finish.isPending} className="h-9 rounded-full bg-[#FFFFFF1F] px-3.5 text-[13.5px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF2E] disabled:opacity-50" data-testid="trail-end">마치기</button> : undefined}>
             <div className="px-5 pb-6 pt-4" data-testid="trail-page" data-phase={done ? "done" : active ? trail.phase : "ready"}>
+                {/* 첫 산행의 코치마크(2026-10-14) — 걷기 전에 한 번: 길 띠 · 지도 · 시작 · 화면 */}
+                <CoachTour id="hiking-trail" tone="hiking" when={!active && !done && !!course} steps={[
+                    { target: "hk-ribbon", title: "길 띠", body: "코스의 높낮이예요. 걷기 시작하면 지금 내 자리가 이 위를 따라 움직이고, 앞의 갈림길 · 쉼터가 아래에 나와요." },
+                    { target: "hk-map", title: "코스 지도", body: "코스가 어느 쪽으로 나 있는지 보여 줘요. 걷기 전에는 옅은 선을 눌러 다른 코스로 바꿀 수 있어요." },
+                    { target: "hk-start", title: "산행 시작", body: "누르면 위치를 보기 시작해요. 정상 가까이(150m 안) 가면 '정상 인증' 단추가 떠요. 사진도 걷는 동안 남길 수 있어요." },
+                    { target: "hk-screen", title: bgWatchAvailable() ? "화면을 꺼도 돼요" : "화면을 켜 두세요", body: bgWatchAvailable() ? "이 앱은 화면을 꺼도 기록해요. 기록하는 동안 '산행 기록 중' 표시가 떠 있어요." : "지금은 화면이 켜져 있는 동안만 위치를 봐요. 오르는 동안 화면이 꺼지지 않게 해 주세요." },
+                ]} />
                 {!hikingOk ? (
                     <>
                         <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-4 text-[14.5px] leading-relaxed text-[#F4EFE3CC] break-keep">산행 중에는 코스의 높낮이 띠 위에 내 자리를 놓고, 앞에 있는 갈림길 · 위험 구간 · 대피소와 정상까지 남은 거리를 알려 드려요.</p>
@@ -177,13 +185,13 @@ export default function TrailPage() {
                         )}
 
                         {/* 길 띠 */}
-                        <div className="rounded-2xl bg-[#F4EFE3] px-2.5 pb-1.5 pt-2.5 text-[#0E2A33]" data-testid="trail-ribbon">
+                        <div className="rounded-2xl bg-[#F4EFE3] px-2.5 pb-1.5 pt-2.5 text-[#0E2A33]" data-testid="trail-ribbon" data-tour="hk-ribbon">
                             <CourseProfile line={course.line} pois={pois.map((p) => ({ id: p.id, kind: p.kind as HikingPoiKind, km: p.km }))} summitKm={course.summitKm} now={active && s && !s.far ? s.km : null} />
                         </div>
                         {/* 코스 지도 — 길 띠는 '코스의 어디쯤'을, 지도는 '코스가 어느 쪽에 있는지'를 보여 준다(코스에서 벗어났을 때 돌아갈 방향이 보인다).
                             걷기 전에는 옅은 선을 눌러 코스를 바꿀 수 있고, 걷는 동안에는 바꾸지 않는다 */}
-                        <CourseMap className="mt-3" courses={d.courseList} index={Math.max(0, d.courseList.findIndex((c) => c.id === course.id))} onPick={active ? undefined : (k) => setCourseId(d.courseList[k]?.id ?? null)}
-                            pois={d.pois} summit={summit} here={active ? trail.here : null} live={active} />
+                        <div data-tour="hk-map"><CourseMap className="mt-3" courses={d.courseList} index={Math.max(0, d.courseList.findIndex((c) => c.id === course.id))} onPick={active ? undefined : (k) => setCourseId(d.courseList[k]?.id ?? null)}
+                            pois={d.pois} summit={summit} here={active ? trail.here : null} live={active} /></div>
 
                         {!active ? (
                             <>
@@ -195,9 +203,9 @@ export default function TrailPage() {
                                         </div>
                                     ))}
                                 </div>
-                                <button type="button" onClick={start} data-track-as="hiking-trail-start" data-testid="trail-start"
+                                <button type="button" onClick={start} data-track-as="hiking-trail-start" data-testid="trail-start" data-tour="hk-start"
                                     className="mt-4 h-14 w-full rounded-2xl bg-[#F28C6A] text-[17px] font-semibold text-[#2A1208] active:bg-[#E67C59]">산행 시작</button>
-                                <ul className="mt-4 space-y-1.5 text-[13px] leading-snug text-[#F4EFE399]">
+                                <ul className="mt-4 space-y-1.5 text-[13px] leading-snug text-[#F4EFE399]" data-tour="hk-screen">
                                     <li className="break-keep">· {bgWatchAvailable()
                                         ? "화면을 꺼도 위치를 보고, 앞에 있는 갈림길 · 위험 구간 · 대피소를 알려 드려요. 기록하는 동안 '산행 기록 중' 표시가 떠 있어요."
                                         : "화면을 켜 둔 동안 위치를 보고, 앞에 있는 갈림길 · 위험 구간 · 대피소를 알려 드려요."}</li>

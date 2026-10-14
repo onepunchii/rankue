@@ -63,6 +63,7 @@ export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo
                     size="icon"
                     onClick={onUndo}
                     disabled={!canUndo}
+                    data-tour="bb-undo"
                     className={`w-14 h-14 rounded-2xl bg-black/[0.04] ${canUndo ? 'text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]' : 'text-black/25'}`}
                 >
                     <LucideUndo2 className="w-6 h-6" />
@@ -105,6 +106,7 @@ export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo
                 <Button
                     onClick={onExit}
                     disabled={exiting}
+                    data-tour="bb-exit"
                     aria-busy={exiting || undefined}
                     className="h-12 px-6 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white transition-all text-xs font-semibold disabled:opacity-40"
                 >
