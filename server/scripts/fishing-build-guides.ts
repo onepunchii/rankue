@@ -10,7 +10,7 @@
  * 출처(위키백과 문서 주소 · 라이선스)는 종마다 남긴다 — CC BY-SA 는 출처와 라이선스를 밝혀야 한다.
  */
 import { createHash } from "node:crypto";
-import { mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -24,6 +24,8 @@ interface RawQa { slug: string; question: string; shortAnswer: string; body: str
 
 // 받은 표의 오타 하나("센터미터")만 고친다 — 그 밖의 글은 그대로
 const clean = (s: unknown): string => String(s ?? "").replace(/센터미터/g, "센티미터").replace(/\r/g, "").replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+/** 공용의 "No machine-readable author provided. X assumed …" 꼴은 X 만 */
+const author = (s: string) => { const m = /No machine-readable author provided\.?\s*(.+?) assumed/i.exec(s); return clean(m ? m[1] : s).replace(/\s*\(based on.*$/i, "") || "작가 표기 없음"; };
 const keyOf = (id: string) => (/^\d+$/.test(id) ? id : `w${createHash("sha1").update(id).digest("hex").slice(0, 10)}`);
 const https = (u: unknown) => (typeof u === "string" && /^https:\/\/[^\s]+$/.test(u) ? u : undefined);
 
@@ -35,8 +37,11 @@ const qa = JSON.parse(readFileSync(join(SRC, "out/fishing/fishing_rules_qa.json"
 const regs = (["closedSeason", "minimumSize"] as const).flatMap((k) => regsRaw[k].rows.map((r) => ({ kind: k === "closedSeason" ? "closed" : "min", group: clean(r.group), name: clean(r.nameKo), rule: clean(r.rule) })));
 const regNames = new Set(regs.map((r) => r.name));
 
-rmSync(OUT, { recursive: true, force: true });
+// 글 파일만 새로 쓴다 — 사진(img/ · photos.json)은 fishing-guide-photos.py 가 받아 둔 것을 그대로 쓴다
+rmSync(join(OUT, "g"), { recursive: true, force: true });
 mkdirSync(join(OUT, "g"), { recursive: true });
+type Photo = { w: number; h: number; author: string; license: string; licenseUrl: string | null; page: string | null };
+const photos: Record<string, Photo> = existsSync(join(OUT, "photos.json")) ? JSON.parse(readFileSync(join(OUT, "photos.json"), "utf8")) : {};
 const keys = new Set<string>();
 const index = guides.map((g) => {
     const key = keyOf(g.id);
@@ -49,10 +54,11 @@ const index = guides.map((g) => {
         faq: g.faq.map((f) => ({ q: clean(f.q), a: clean(f.a) })).filter((f) => f.q && f.a),
         thin: !!g.thin,
         sources: g.sources.map((s) => ({ name: clean(s.name), title: s.title ? clean(s.title) : undefined, url: https(s.url), license: s.license ? clean(s.license) : undefined })),
+        photo: photos[key] && existsSync(join(OUT, "img", `${key}.webp`)) ? { ...photos[key], author: author(photos[key].author), licenseUrl: https(photos[key].licenseUrl) ?? null, page: https(photos[key].page) ?? null } : undefined,
     };
     writeFileSync(join(OUT, "g", `${key}.json`), JSON.stringify(one));
     const first = one.intro.split(/(?<=다\.)\s/)[0] ?? one.intro;
-    return { key, name: one.name, line: first.length > 70 ? `${first.slice(0, 68)}…` : first, thin: one.thin, reg: regNames.has(one.name) };
+    return { key, name: one.name, line: first.length > 70 ? `${first.slice(0, 68)}…` : first, thin: one.thin, reg: regNames.has(one.name), photo: one.photo ? { a: one.photo.author, l: one.photo.license, p: one.photo.page } : null };
 }).sort((a, b) => a.name.localeCompare(b.name, "ko"));
 writeFileSync(join(OUT, "index.json"), JSON.stringify(index));
 writeFileSync(join(OUT, "regs.json"), JSON.stringify({
@@ -66,5 +72,5 @@ const BUSINESS = /낚시터업|낚시어선업|신고확인증|출입항 신고|
 const rules = qa.map((x) => ({ slug: clean(x.slug), q: clean(x.question), short: clean(x.shortAnswer), body: clean(x.body), review: x.needsReview.map(clean).filter(Boolean), laws: x.legal.map(clean), who: BUSINESS.test(x.question) ? "business" : "angler" }));
 writeFileSync(join(OUT, "rules.json"), JSON.stringify(rules));
 
-console.log(`도감 ${index.length}종(얇은 글 ${index.filter((x) => x.thin).length}) · 금어기/금지체장 ${regs.length}줄(도감과 이어진 종 ${index.filter((x) => x.reg).length}) · 규칙 ${rules.length}(낚시인 ${rules.filter((r) => r.who === "angler").length} · 사업자 ${rules.filter((r) => r.who === "business").length}) → ${OUT}`);
+console.log(`도감 ${index.length}종(얇은 글 ${index.filter((x) => x.thin).length} · 사진 ${index.filter((x) => x.photo).length}) · 금어기/금지체장 ${regs.length}줄(도감과 이어진 종 ${index.filter((x) => x.reg).length}) · 규칙 ${rules.length}(낚시인 ${rules.filter((r) => r.who === "angler").length} · 사업자 ${rules.filter((r) => r.who === "business").length}) → ${OUT}`);
 for (const r of rules.filter((r) => r.who === "angler")) console.log("  낚시인:", r.q);

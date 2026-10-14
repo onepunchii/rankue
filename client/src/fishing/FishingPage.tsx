@@ -36,6 +36,7 @@ import { TideCurve } from "./TideCurve";
 import { FishSheet } from "./FishSheet";
 import { CatchJournal } from "./CatchJournal";
 import { GuideBook, GuideSheet, RulesPage, type GuideRow } from "./Guide";
+import { SeaPopup } from "./SeaPopup";
 import { INDEX_TONE, INK, PAPER, SEAL, Seal, art } from "./ink";
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
 import { BOAT_SOURCE, cleanBoatQuery, type FishingBoat } from "@shared/fishingBoats";
@@ -598,8 +599,14 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
             </div>
 
             {/* 고른 지점 — 없으면 그 어종이 좋은 곳 세 군데 */}
-            {picked && fish ? <SpotPanel spot={picked} fish={fish} day={map?.day ?? day} cell={cell} list={list} today={today} areas={areas} onAdd={() => onAdd(picked.name.replace(/\(.*\)$/, ""), fishByName(fish)?.name)} onClose={() => { setSpot(null); setCell(null); }} />
-                : fish && map ? (
+            {/* 고른 칸 · 점 — 아래에서 올라오는 한 장(팝업) */}
+            {picked && fish && (
+                <SeaPopup spot={picked} fish={fish} day={map?.day ?? day} today={today} cell={cell} list={list} areas={areas}
+                    onClose={() => { setSpot(null); setCell(null); }}
+                    onAdd={(species) => { const place = picked.name.replace(/\(.*\)$/, ""); setSpot(null); setCell(null); onAdd(place, species); }}
+                    onFish={(name) => onFish(name)} />
+            )}
+            {fish && map ? (
                     <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-3.5 pb-1 pt-3" data-testid="fishing-good">
                         <div className="flex items-baseline justify-between gap-3">
                             <p className="min-w-0 text-[13px] [word-break:keep-all]" style={{ color: C.soft }}>{good.length ? `${fish} — 좋은 곳` : `${fish} — 좋음 이상인 곳이 없어요`}<span style={{ color: C.dim }}> · 점을 눌러도 돼요</span></p>
@@ -621,76 +628,6 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
                 ) : null}
             <p className="mt-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>점은 국립해양조사원이 어종 · 지점마다 매긴 바다낚시지수예요(물때 · 파고 · 수온 · 바람). 바다의 칸은 그 값을 거리로 섞은 어림이고 지점에서 {PIXEL_REACH_KM}km 안만 칠했어요. 랭큐가 매긴 값이 아니에요. 테두리 색은 기상청 풍랑특보예요.</p>
         </section>
-    );
-}
-
-/** 고른 지점의 한 장 — 어종마다 오전 · 오후, 파고 · 바람 · 수온, 가까운 항구의 만조 · 간조. 여기서 바로 조과를 적는다 */
-function SpotPanel({ spot, fish, day, cell, list, today, areas, onAdd, onClose }: {
-    spot: IndexSpot; fish: string; day: string; onAdd: () => void; onClose: () => void;
-    /** 픽셀을 눌러 왔으면 그 칸(그 칸에서 이 지점까지 km) */ cell?: { lat: number; lng: number; km: number } | null;
-    list?: readonly FishingCatch[]; today?: string; areas?: readonly SeaArea[];
-}) {
-    const port = nearestPort(spot.lat, spot.lng);
-    const at = cell ?? { lat: spot.lat, lng: spot.lng, km: 0 };
-    const zone = zoneAt(at.lat, at.lng);
-    const zoneDef = zone ? SEA_AREAS.find((a) => a.name === zone) : null;
-    const zoneState = zoneDef ? areas?.find((a) => a.id === zoneDef.id) ?? null : null;
-    // 이 근처 내 기록 — 위치를 재지 않으니 **적은 곳의 이름**이 근처 지명(낚시지수 지점 · 조위 관측소)과 같은 줄을 찾는다
-    const nearNames = useMemo(() => {
-        const out = new Set<string>();
-        const km = (lat: number, lng: number) => Math.hypot((lng - at.lng) * 88.8, (lat - at.lat) * 111);
-        for (const p of FISHING_PORTS) if (km(p.lat, p.lng) <= 30) out.add(p.name);
-        out.add(spot.name.replace(/\(.*\)$/, "").replace(/(북동|남동|북서|남서|북북서|남남동|남남서|동북동|동남동|동측|서측|남측|북측)$/, ""));
-        return [...out].filter((n) => n.length >= 2);
-    }, [at.lat, at.lng, spot.name]);
-    const mineNear = (list ?? []).filter((c) => nearNames.some((n) => c.place.replace(/\s+/g, "").includes(n)));
-    const { data: brief } = useQuery<PortBrief | null>({ queryKey: port ? portKey(port.code, day) : ["/api/hiq/fishing/ports", "none"], queryFn: () => apiRequest(`/api/hiq/fishing/ports/${port!.code}?day=${day}`), enabled: !!port, staleTime: 5 * 60_000 });
-    const names = [fish, ...Object.keys(spot.fish).filter((f) => f !== fish)];
-    const pill = (st: FishingIndexStep | null, key: string) => (st ? <span key={key} className="flex h-7 w-[64px] items-center justify-center rounded-full text-[12.5px]" style={{ background: INDEX_TONE[st].bg, color: INDEX_TONE[st].text }}>{st}</span> : <span key={key} className="w-[64px] text-center text-[12.5px]" style={{ color: C.dim }}>–</span>);
-    const facts = [spot.wave ? `파고 ${rangeText(spot.wave)}m` : null, spot.wind ? `바람 ${rangeText(spot.wind)}m/s` : null, spot.wtemp ? `수온 ${rangeText(spot.wtemp)}°` : null, spot.tide].filter(Boolean);
-    return (
-        <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-3.5 pb-3.5 pt-3" style={{ boxShadow: `inset 0 0 0 1px ${C.brand}66` }} data-testid="fishing-spot">
-            <div className="flex items-center gap-2">
-                <p className="min-w-0 flex-1 truncate text-[17px] font-semibold tracking-tight">{spot.name}</p>
-                <button type="button" onClick={onClose} aria-label="닫기" className="-mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full active:bg-[#FFFFFF14]"><LucideX className="h-4 w-4" style={{ color: C.dim }} /></button>
-            </div>
-            {(zone || cell) && (
-                <p className="mt-0.5 text-[13px] [word-break:keep-all]" style={{ color: C.dim }} data-testid="fishing-spot-zone">
-                    {[zone ? `${zone} 쪽 바다` : null, zoneState && zoneState.state !== "clear" ? seaWord(zoneState) : null, cell && cell.km > 0 ? `고른 칸에서 ${cell.km}km` : null].filter(Boolean).join(" · ")}
-                </p>
-            )}
-            {facts.length > 0 && <p className="mt-0.5 text-[13px] tabular-nums [word-break:keep-all]" style={{ color: C.soft }}>{facts.join(" · ")}</p>}
-            <div className="mt-2.5 grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1.5">
-                <span />
-                <span className="w-[64px] text-center text-[12px]" style={{ color: C.dim }}>오전</span>
-                <span className="w-[64px] text-center text-[12px]" style={{ color: C.dim }}>오후</span>
-                {names.filter((f) => spot.fish[f]).map((f) => [
-                    <span key={f} className={cn("truncate text-[14px]", f === fish && "font-semibold")} style={{ color: f === fish ? C.foam : C.soft }}>{f}</span>,
-                    pill(spot.fish[f].am, `${f}am`), pill(spot.fish[f].pm, `${f}pm`),
-                ])}
-            </div>
-            {port && brief && brief.turns.length > 0 && (
-                <p className="mt-3 rounded-xl px-3 py-2 text-[13px] tabular-nums [word-break:keep-all]" style={{ background: "#FFFFFF0A", color: C.soft }} data-testid="fishing-spot-tide">
-                    <span style={{ color: C.dim }}>{port.name}({port.km}km)의 물높이</span> · {brief.turns.map((t) => `${t.kind === "high" ? "만조" : "간조"} ${hhmm(t.min)}`).join(" · ")}
-                </p>
-            )}
-            {/* 이 근처 내 기록 */}
-            {list && (
-                <div className="mt-3 rounded-xl px-3 py-2.5" style={{ background: "#FFFFFF0A" }} data-testid="fishing-spot-mine">
-                    <p className="text-[13px]" style={{ color: C.dim }}>이 근처에서 적은 내 조과{mineNear.length ? ` ${mineNear.length}줄` : ""}</p>
-                    {mineNear.length === 0 ? <p className="mt-0.5 text-[13px] [word-break:keep-all]" style={{ color: C.soft }}>{nearNames.slice(0, 3).join(" · ")} 이름으로 적은 조과가 아직 없어요</p> : (
-                        <ul className="mt-1 space-y-1">
-                            {mineNear.slice(0, 3).map((c) => { const f = fishByName(c.species); const v = f ? fishValue(f, c) : c.lengthCm; return (
-                                <li key={c.id} className="flex items-baseline gap-2 text-[13.5px]"><span className="min-w-0 flex-1 truncate" style={{ color: C.soft }}>{[today ? fishingDayLabel(c.day, today) : c.day, c.place].join(" · ")}</span><span className="shrink-0 font-semibold tabular-nums">{c.species} {v != null ? fishValueText(f?.unit ?? "cm", v) : `${c.count}수`}</span></li>
-                            ); })}
-                        </ul>
-                    )}
-                </div>
-            )}
-            <button type="button" onClick={onAdd} className="mt-3 flex h-11 w-full items-center justify-center gap-1.5 rounded-xl text-[14px] font-semibold active:opacity-90" style={{ background: C.brand, color: C.onBrand }} data-testid="fishing-spot-add">
-                <LucidePlus weight="bold" className="h-4 w-4" />여기서 낚았어요 — 조과 적기
-            </button>
-        </div>
     );
 }
 

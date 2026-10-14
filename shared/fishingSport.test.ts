@@ -72,9 +72,17 @@ describe("낚시 — 따로 선 종목", () => {
         expect(chart).toContain("if (d > PIXEL_REACH_KM) continue;");
         const page = read("client/src/fishing/FishingPage.tsx");
         expect(page).toContain("바다의 칸은 그 값을 거리로 섞은 어림이고 지점에서 {PIXEL_REACH_KM}km 안만 칠했어요. 랭큐가 매긴 값이 아니에요.");
-        // 이 근처 내 기록은 위치가 아니라 적은 곳의 이름으로 찾는다(조과는 위치를 재지 않는다)
-        expect(page).toContain('data-testid="fishing-spot-mine"');
-        expect(page).not.toMatch(/navigator\.geolocation/);
+        // 칸을 누르면 팝업 — 이 근처 내 기록은 위치가 아니라 적은 곳의 이름으로 찾는다(조과는 위치를 재지 않는다)
+        const popup = read("client/src/fishing/SeaPopup.tsx");
+        expect(page).toContain("<SeaPopup spot={picked}");
+        expect(popup).toContain('data-testid="fishing-spot-mine"');
+        expect(popup).toContain("랭큐가 매긴 값이 아니에요.");
+        // 사진 밑에 작가 · 라이선스(위키미디어 공용 — CC BY · BY-SA 의 표시 의무)
+        expect(popup).toContain("<PhotoCredit key={c.name}");
+        for (const f of [page, popup, chart]) expect(f).not.toMatch(/navigator\.geolocation|upload\.wikimedia\.org/);
+        // 확대 · 단추 그림
+        expect(chart).toContain("useBoxZoom(HOME, HOME, VIEW.w / 6)");
+        for (const n of ["wave", "wind", "temp", "tide", "storm"]) expect(existsSync(resolve(__dirname, `../client/public/fishing/art/icon-${n}.webp`)), n).toBe(true);
     });
 });
 

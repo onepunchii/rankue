@@ -75,5 +75,15 @@ describe("어종 정보의 틀", () => {
         expect(rules.length).toBe(74);
         expect(rules.every((r) => r.review.length > 0)).toBe(true);
         expect(read("client/src/fishing/Guide.tsx")).toContain("법률 자문이 아니에요.");
+        // 사진 — 우리 쪽에 줄여 둔 사본만, 사진마다 작가 · 라이선스가 있고 자유 라이선스만
+        const withPhoto = (JSON.parse(read("client/public/fishing/guide/index.json")) as { key: string; photo: { a: string; l: string; p: string | null } | null }[]).filter((g) => g.photo);
+        expect(withPhoto.length).toBeGreaterThan(300);
+        for (const g of withPhoto) {
+            expect(existsSync(resolve(__dirname, `../client/public/fishing/guide/img/${g.key}.webp`)), g.key).toBe(true);
+            expect(existsSync(resolve(__dirname, `../client/public/fishing/guide/img/${g.key}-s.webp`)), g.key).toBe(true);
+            expect(g.photo!.a, g.key).toBeTruthy();
+            expect(g.photo!.l, g.key).toMatch(/^(CC0|CC BY(-SA)? \d\.\d( [a-z]{2})?|Public domain|No restrictions)$/);
+            expect(g.photo!.a, g.key).not.toMatch(/machine-readable/);
+        }
     });
 });

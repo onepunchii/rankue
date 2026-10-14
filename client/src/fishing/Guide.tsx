@@ -17,8 +17,17 @@ import { FISH, type FishKind } from "@shared/fishingFish";
 import { FISH_GUIDE_NAME, FISH_REG_NAMES } from "@shared/fishingFishInfo";
 import { INK, PAPER, SEAL, art } from "./ink";
 
-export interface GuideRow { key: string; name: string; line: string; thin: boolean; reg: boolean }
-export interface Guide { key: string; name: string; intro: string; sections: { h: string; b: string }[]; id: string[]; faq: { q: string; a: string }[]; thin: boolean; sources: { name: string; title?: string; url?: string; license?: string }[] }
+/** 사진의 작가 · 라이선스 · 파일 문서(위키미디어 공용) — 사진 밑에 적는다 */
+export interface GuidePhotoCredit { a: string; l: string; p: string | null }
+export interface GuideRow { key: string; name: string; line: string; thin: boolean; reg: boolean; photo: GuidePhotoCredit | null }
+export interface Guide { key: string; name: string; intro: string; sections: { h: string; b: string }[]; id: string[]; faq: { q: string; a: string }[]; thin: boolean; sources: { name: string; title?: string; url?: string; license?: string }[]; photo?: { w: number; h: number; author: string; license: string; licenseUrl: string | null; page: string | null } }
+/** 도감 사진 — 640px 한 장 · 목록용 120px */
+export const guidePhoto = (key: string, small = false) => `/fishing/guide/img/${key}${small ? "-s" : ""}.webp`;
+/** 사진 한 줄의 출처 — "사진: 작가 · CC BY-SA 3.0 · 위키미디어 공용" */
+export function PhotoCredit({ author, license, page, dark }: { author: string; license: string; page: string | null; dark?: boolean }) {
+    const body = `사진: ${author} · ${license} · 위키미디어 공용`;
+    return <p className="text-[12px] leading-snug [word-break:keep-all]" style={{ color: dark ? "#F3ECDD80" : "#0F283899" }}>{page ? <a href={page} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">{body}</a> : body}</p>;
+}
 export interface RegRow { kind: "closed" | "min"; group: string; name: string; rule: string }
 export interface Regs { basis: string; titles: { closed: string; min: string }; rows: RegRow[] }
 export interface RuleQa { slug: string; q: string; short: string; body: string; review: string[]; laws: string[]; who: "angler" | "business" }
@@ -104,6 +113,12 @@ export function GuideStory({ guide }: { guide: Guide }) {
     const more = guide.sections.length > 2 || guide.id.length > 0 || guide.faq.length > 0;
     return (
         <div className="overflow-hidden rounded-2xl" style={SHEET} data-testid="fishing-guide-story">
+            {guide.photo && (
+                <figure className="m-0" data-testid="fishing-guide-photo">
+                    <img src={guidePhoto(guide.key)} alt={`${guideName(guide.name)} 사진`} width={guide.photo.w} height={guide.photo.h} loading="lazy" decoding="async" className="block max-h-[260px] w-full object-cover" style={{ background: "#0F2838" }} />
+                    <figcaption className="px-3.5 pt-2"><PhotoCredit author={guide.photo.author} license={guide.photo.license} page={guide.photo.page} /></figcaption>
+                </figure>
+            )}
             <p className="px-3.5 pb-3 pt-3.5 text-[15px] leading-relaxed [word-break:keep-all]">{guide.intro}</p>
             {shown.map((s) => (
                 <div key={s.h} className="flex gap-3 px-3.5 py-3" style={{ borderTop: RULE }}>
@@ -215,8 +230,9 @@ export function GuideBook({ onOurs, onOther }: { onOurs: (fish: FishKind) => voi
                                 return (
                                     <li key={r.key} style={{ borderTop: i ? RULE : undefined }}>
                                         <button type="button" onClick={() => (ours ? onOurs(ours) : onOther(r))} className="flex min-h-[60px] w-full items-center gap-3 px-3.5 py-2.5 text-left active:bg-[#0F28380A]" data-testid="fishing-guide-row" data-ours={ours ? ours.id : undefined}>
-                                            <span className="flex h-9 w-[50px] shrink-0 items-center justify-center">
-                                                {ours ? <img src={art(ours.id)} alt="" width={640} height={400} loading="lazy" decoding="async" className="h-9 w-[50px] object-contain" style={{ mixBlendMode: "multiply" }} /> : <span className="text-[17px] font-semibold" style={{ color: "#0F283840" }}>{r.name.slice(0, 1)}</span>}
+                                            <span className="flex h-11 w-[56px] shrink-0 items-center justify-center overflow-hidden rounded-lg" style={{ background: r.photo ? "#0F2838" : "transparent" }}>
+                                                {r.photo ? <img src={guidePhoto(r.key, true)} alt="" width={120} height={80} loading="lazy" decoding="async" className="h-full w-full object-cover" />
+                                                    : ours ? <img src={art(ours.id)} alt="" width={640} height={400} loading="lazy" decoding="async" className="h-9 w-[50px] object-contain" style={{ mixBlendMode: "multiply" }} /> : <span className="text-[17px] font-semibold" style={{ color: "#0F283840" }}>{r.name.slice(0, 1)}</span>}
                                             </span>
                                             <span className="min-w-0 flex-1">
                                                 <span className="flex items-center gap-1.5"><span className="truncate text-[15.5px] font-semibold">{guideName(r.name)}</span>{r.reg && <span className="shrink-0 rounded-[4px] px-1.5 py-px text-[12px]" style={{ border: `1px solid ${SEAL}`, color: SEAL }}>금어기</span>}</span>
@@ -231,7 +247,7 @@ export function GuideBook({ onOurs, onOther }: { onOurs: (fish: FishKind) => voi
                     )}
             </div>
             <p className="mt-2.5 px-1 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>
-                {list ? `${list.length}종 · ` : ""}글은 한국어 위키백과(CC BY-SA 4.0)와 국립해양생물자원관 해양생물종정보를 바탕으로 했어요. 종마다 출처가 적혀 있어요.
+                {list ? `${list.length}종 · ` : ""}글은 한국어 위키백과(CC BY-SA 4.0)와 국립해양생물자원관 해양생물종정보를 바탕으로 했어요. 사진은 위키미디어 공용의 자유 라이선스 사진이고, 종마다 작가 · 라이선스가 적혀 있어요.
             </p>
         </div>
     );
