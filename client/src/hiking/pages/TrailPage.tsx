@@ -35,6 +35,9 @@ import { kstYmd, sunTimes, sunsetNotice } from "@shared/hikingSun";
 import { bgWatchAvailable } from "../trail/bgWatch";
 import { setVoiceOn, speakLine, voiceOn } from "../trail/speak";
 import { MY_TRIPS_KEY, dropKeptTrail, keepTrail, readKeptTrail, useTrail } from "../trail/useTrail";
+import { locationMessage } from "@shared/hikingShare";
+import { Capacitor } from "@capacitor/core";
+import { Share } from "@capacitor/share";
 
 /** 앞에 알려 줄 지점 — 국가지점번호 · 그 밖의 표지는 '다음'에 넣지 않는다(국가지점번호는 아래에 따로) */
 const NEXT_KINDS: readonly HikingPoiKind[] = ["SIGN", "DANGER", "SHELTER", "WATER", "TOILET", "VIEW", "PEAK", "CULTURAL", "WILD"];
@@ -100,6 +103,16 @@ export default function TrailPage() {
     }, [s, active, voice]);
     const toggleVoice = () => { const on = !voice; setVoice(on); setVoiceOn(on); if (on) speakLine("음성 안내를 켰어요."); };
     // 가까운 국가지점번호 — 구조를 부를 때 알려 줄 번호
+    const [sent, setSent] = useState<"idle" | "copied">("idle");
+    const sendHere = async () => {
+        if (!trail.here || !d) return;
+        const text = locationMessage({ mountain: d.name, lat: trail.here.lat, lng: trail.here.lng, atMs: Date.now(), gridNo: grid?.no ?? null });
+        if (Capacitor.isNativePlatform()) { await Share.share({ title: "내 위치", text }).catch(() => undefined); return; }
+        if (navigator.share) {
+            try { await navigator.share({ title: "내 위치", text }); return; } catch (e) { if (e instanceof Error && e.name === "AbortError") return; }
+        }
+        try { await navigator.clipboard.writeText(text); setSent("copied"); window.setTimeout(() => setSent("idle"), 4000); } catch { window.prompt("이 글을 복사해 보내세요", text); }
+    };
     const grid = useMemo(() => {
         if (!s || !d || !course) return null;
         const near = d.pois.filter((p) => p.kind === "GRID" && p.courseId === course.id && p.km != null && gridNumber(p.note ?? p.name)).map((p) => ({ no: gridNumber(p.note ?? p.name)!, awayM: Math.round(Math.abs(p.km! - s.km) * 1000) })).sort((a, b) => a.awayM - b.awayM)[0];
@@ -282,6 +295,11 @@ export default function TrailPage() {
                                 {/* 산행 중 사진 — 올리면 그 산의 화면에 보인다(사진마다 비공개로 돌릴 수 있다). 위치 정보는 지운다 */}
                                 <div className="mt-5"><MyPhotos key={`trail-photos:${d.id}`} mountainId={d.id} name={d.name} compact /></div>
 
+                                <button type="button" onClick={() => { void sendHere(); }} disabled={!trail.here} data-track-as="hiking-trail-send-location" data-testid="trail-send-location"
+                                    className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#FFFFFF14] text-[15px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24] disabled:opacity-40">
+                                    {sent === "copied" ? "위치를 복사했어요 — 붙여 넣어 보내세요" : "내 위치 보내기"}
+                                </button>
+                                <p className="mt-1.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">지금 자리를 카카오맵 링크로 카카오톡 · 문자에 보내요. 서버에는 남지 않아요.</p>
                                 {grid && (
                                     <p className="mt-4 rounded-2xl bg-[#FFFFFF0A] px-4 py-3 text-[13.5px] leading-snug text-[#F4EFE3CC] break-keep" data-testid="trail-grid">
                                         가까운 국가지점번호 <span className="font-semibold tabular-nums text-[#F4EFE3]">{grid.no}</span> · {aheadText(grid.awayM)} 거리. 도움을 청할 때 이 번호를 알려 주면 자리를 찾기 쉬워요.
