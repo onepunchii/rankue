@@ -15,6 +15,10 @@ import { distM, eleAtKm, walkMinutes, type LinePoint } from "./hikingGeo.js";
 
 /** 이보다 멀면 '이 코스 위가 아니다'로 본다(m) */
 export const TRAIL_FAR_M = 250;
+/** 경로 이탈(2026-10-15 오너 "50m") — 위치가 30m 안으로 또렷할 때만 잰다. 연속 두 번이어야 알린다(화면이 센다) */
+export const TRAIL_OFF_M = 50;
+export const TRAIL_OFF_ACCURACY_M = 30;
+export const TRAIL_OFF_STREAK = 2;
 /** 이보다 흐린 위치(정확도 반경, m)는 자리를 옮기지 않는다 */
 export const TRAIL_MAX_ACCURACY_M = 120;
 /** 겹쳐 지나는 길(올라간 길로 내려올 때)에서 앞 자리와 이어지는 쪽을 고르는 여유(m) */
@@ -108,6 +112,8 @@ export interface TrailState {
     coarse: boolean;
     /** 이 코스에서 멀다 */
     far: boolean;
+    /** 코스에서 50m 넘게 벗어났다 — 돌아갈 방향과 거리 */
+    off: { m: number; dir: string } | null;
     /** 정상까지(가는 방향에 정상이 있을 때만) */
     toSummitM: number | null;
     climbToSummitM: number | null;
@@ -120,6 +126,30 @@ export interface TrailState {
     next: TrailNext[];
 }
 
+export function pointAtKm(line: readonly LinePoint[], km: number): [number, number] | null {
+    if (line.length === 0) return null;
+    for (let i = 0; i < line.length - 1; i++) {
+        const a = line[i], b = line[i + 1];
+        if (km <= b[3] || i === line.length - 2) {
+            const t = b[3] > a[3] ? Math.max(0, Math.min(1, (km - a[3]) / (b[3] - a[3]))) : 0;
+            return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
+        }
+    }
+    return [line[0][0], line[0][1]];
+}
+
+export function bearingDeg(aLat: number, aLng: number, bLat: number, bLng: number): number {
+    const r = Math.PI / 180;
+    const y = Math.sin((bLng - aLng) * r) * Math.cos(bLat * r);
+    const x = Math.cos(aLat * r) * Math.sin(bLat * r) - Math.sin(aLat * r) * Math.cos(bLat * r) * Math.cos((bLng - aLng) * r);
+    return ((Math.atan2(y, x) / r) + 360) % 360;
+}
+
+const COMPASS = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"] as const;
+export const compass = (deg: number): string => COMPASS[Math.round((((deg % 360) + 360) % 360) / 45) % 8];
+
+export const offStreak = (prev: number, off: boolean): number => (off ? prev + 1 : 0);
+
 /** 지금 한 점 → 길 띠의 상태. 선이 비면 null */
 export function trailState(input: TrailInput): TrailState | null {
     const { line, pois, summitKm, summit, fix, prev, kinds } = input;
@@ -131,6 +161,9 @@ export function trailState(input: TrailInput): TrailState | null {
     const moved = prev ? on.km - prev.km : 0;
     const dir: 1 | -1 = prev ? (moved > DIR_MIN_KM ? 1 : moved < -DIR_MIN_KM ? -1 : prev.dir) : 1;
     const far = !coarse && on.offM > TRAIL_FAR_M;
+    const sharp = !coarse && (fix.accuracy == null || (Number.isFinite(fix.accuracy) && fix.accuracy <= TRAIL_OFF_ACCURACY_M));
+    const back = sharp && on.offM > TRAIL_OFF_M ? pointAtKm(line, on.km) : null;
+    const off = back ? { m: on.offM, dir: compass(bearingDeg(fix.lat, fix.lng, back[0], back[1])) } : null;
     const ahead = (km: number) => (dir === 1 ? km - on.km : on.km - km);
     const summitAhead = summitKm != null && ahead(summitKm) > 0 ? ahead(summitKm) : null;
     const climbToSummitM = summitAhead != null ? climbBetween(line, on.km, summitKm!) : null;
@@ -140,7 +173,7 @@ export function trailState(input: TrailInput): TrailState | null {
         .slice(0, 3)
         .map((poi): TrailNext => ({ poi, aheadM: Math.round(ahead(poi.km) * 1000), climbM: climbBetween(line, on.km, poi.km) }));
     return {
-        km: on.km, offM: on.offM, ele: on.ele, totalKm, dir, coarse, far,
+        km: on.km, offM: on.offM, ele: on.ele, totalKm, dir, coarse, far, off,
         toSummitM: summitAhead != null ? Math.round(summitAhead * 1000) : null,
         climbToSummitM,
         minutesToSummit: summitAhead != null ? walkMinutes(summitAhead, climbToSummitM ?? 0) : null,

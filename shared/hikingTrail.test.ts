@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { withKm, type LinePoint } from "./hikingGeo";
+import { TRAIL_OFF_M, compass, offStreak, pointAtKm } from "./hikingTrail";
 import { TRAIL_BG_DISTANCE_M, TRAIL_BG_MIN_GAP_MS, TRAIL_BG_NOTICE, trailFixDue, TRAIL_FAR_M, aheadText, cleanTrip, climbBetween, emptyTally, projectOnLine, spokenDistance, tallyStep, trailSpeech, trailState, type TrailPoi } from "./hikingTrail";
 
 // 북쪽으로 곧게 2km 오르는 길 — 500m 마다 한 점, 높이 200 → 600 → 500
@@ -235,3 +236,24 @@ describe("걸은 길 · 좌표는 저장하지 않는다", () => {
         expect(read("client/src/hiking/pages/TrailPage.tsx")).toContain("nav={!active}");
     });
 });
+
+describe("경로 이탈(50m)", () => {
+    const fix = (lng: number, accuracy: number | null) => trailState({ line: LINE, pois: [], summitKm: null, fix: { lat: 37.009, lng, accuracy } })!;
+    it("또렷한 위치에서 50m 넘게 벗어나면 돌아갈 방향과 거리", () => {
+        const s = fix(127.0008, 10);
+        expect(s.offM).toBeGreaterThan(TRAIL_OFF_M);
+        expect(s.off).toEqual({ m: s.offM, dir: "서" });
+        expect(fix(127.0002, 10).off).toBeNull();
+    });
+    it("위치가 30m 보다 흐리면 판정하지 않는다", () => {
+        expect(fix(127.0008, 45).off).toBeNull();
+        expect(fix(127.0008, null).off).not.toBeNull();
+    });
+    it("방위 · 코스 위 자리 · 연속 횟수", () => {
+        expect([compass(0), compass(44), compass(91), compass(181), compass(359)]).toEqual(["북", "북동", "동", "남", "북"]);
+        const p = pointAtKm(LINE, LINE[2][3])!;
+        expect(p[0]).toBeCloseTo(37.009, 6);
+        expect([offStreak(0, true), offStreak(1, true), offStreak(2, false)]).toEqual([1, 2, 0]);
+    });
+});
+

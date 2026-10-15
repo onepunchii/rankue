@@ -21,7 +21,7 @@ import { durationText } from "@shared/hikingGeo";
 import { heightText, hikingMountainPath } from "@shared/hikingMountains";
 import { courseFacts } from "@shared/hikingPage";
 import { HIKING_POI_NAME, gridNumber, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
-import { aheadText, trailSpeech, type TrailPoi } from "@shared/hikingTrail";
+import { TRAIL_OFF_STREAK, aheadText, offStreak, trailSpeech, type TrailPoi } from "@shared/hikingTrail";
 import { CourseProfile } from "../components/CourseParts";
 import { HikingShell, HkSkel } from "../components/HikingShell";
 import { HikingCta } from "../components/MountainParts";
@@ -90,6 +90,21 @@ export default function TrailPage() {
     };
 
     const s = trail.state;
+    // 경로 이탈(50m) — 또렷한 위치에서 연속 두 번이어야 알린다. 알리는 순간에 한 번만 진동 · 말
+    const [offCount, setOffCount] = useState(0);
+    const offRef = useRef(0);
+    useEffect(() => { if (!active) { offRef.current = 0; setOffCount(0); } }, [active]);
+    useEffect(() => {
+        if (!active || !s || s.coarse) return;
+        const next = offStreak(offRef.current, !!s.off);
+        offRef.current = next;
+        setOffCount(next);
+        if (next === TRAIL_OFF_STREAK && s.off) {
+            try { navigator.vibrate?.([200, 120, 200]); } catch { /* 진동을 못 하는 기기 */ }
+            if (voiceOn()) speakLine(`코스에서 약 ${s.off.m}미터 벗어났어요. 코스는 ${s.off.dir}쪽이에요.`);
+        }
+    }, [active, s]);
+    const offNow = active && offCount >= TRAIL_OFF_STREAK && s?.off ? s.off : null;
     // 음성 안내 — 가까운 갈림길 · 위험 구간 · 대피소, 정상, 코스에서 멀어짐을 말로(짧게 · 드물게 — shared/hikingTrail.trailSpeech). 기본은 끔
     const [voice, setVoice] = useState(voiceOn);
     const said = useRef<Set<string>>(new Set());
@@ -170,6 +185,11 @@ export default function TrailPage() {
                             </div>
                         )}
 
+                        {offNow && (
+                            <p className="mb-2 rounded-xl px-3.5 py-2.5 text-[14px] font-semibold leading-snug break-keep" style={{ background: "#E0533B29", color: "#FFD4CC", boxShadow: "inset 0 0 0 1px #E0533B" }} role="alert" data-testid="trail-off">
+                                코스에서 약 {offNow.m}m 벗어났어요 · 코스는 {offNow.dir}쪽
+                            </p>
+                        )}
                         {/* 위치의 상태 한 줄 */}
                         {active && (
                             <p className="mb-2 flex items-center gap-2 text-[13.5px]" role="status" data-testid="trail-status">
