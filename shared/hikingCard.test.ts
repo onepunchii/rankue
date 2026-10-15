@@ -56,8 +56,8 @@ describe("검색용 화면 · 사이트맵 · 화면이 같은 카드를 쓴다"
     const seo = read("server/seo/hiking.ts");
     it("산 화면의 미리보기 그림은 그 산의 카드 — 세 곳이 같은 주소", () => {
         expect(seo).toContain("const card = { url: hikingMountainCardUrl(ORIGIN, d.slug), width: HUB_CARD_SIZE, height: HUB_CARD_SIZE, alt: mountainCardAlt(d) };");
-        // 본문에도 같은 그림 한 장(제목 바로 밑) — 골프장 검색용 화면과 같은 꼴. 여덟 가지 화면 전부
-        expect(seo.match(/body: withCard\(/g)?.length).toBe(8);
+        // 본문에도 같은 그림 한 장(제목 바로 밑) — 골프장 검색용 화면과 같은 꼴. 열 가지 화면 전부(해외 명산 목록 · 코스 포함)
+        expect(seo.match(/body: withCard\(/g)?.length).toBe(10);
         expect(seo).toContain("body: withCard(body, card), jsonLd, image: card })");
         expect(mountainCardAlt({ slug: "설악산", name: "설악산", heightM: 1708, sido: "강원특별자치도", sigungu: "양양군", courses: 9, minKm: 0.9, maxKm: 11, lists: ["kfs100"] })).toBe("설악산 등산 카드 — 높이 1,708m · 강원 양양군 · 등산코스 9개");
         expect(mountainCardAlt({ slug: "x", name: "이름뿐인 산", heightM: null, sido: null, sigungu: null, courses: 0, minKm: null, maxKm: null, lists: [] })).toBe("이름뿐인 산 등산 카드");

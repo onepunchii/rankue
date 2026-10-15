@@ -80,7 +80,7 @@ describe("새 공개 주소의 네 곳 · 표지", () => {
         expect(seo).toContain("...HIKING_TERMS.map((t) => page(hikingTermPath(t.id), { changefreq: \"monthly\", priority: \"0.5\" })),");
         const app = read("client/src/App.tsx");
         for (const p of ["/hiking/terms", "/hiking/terms/:id", "/hiking/checklist"]) expect(app, p).toContain(`<Route path="${p}"`);
-        expect(read("vercel.json")).toContain("|/terms(?:/[^/]+)?|/checklist)?)/?");
+        expect(read("vercel.json")).toContain("|/terms(?:/[^/]+)?|/checklist|/abroad(?:/[^/]+)?)?)/?");
     });
     it("표지 그림 두 장", () => {
         for (const n of ["cover-terms", "cover-checklist"]) expect(existsSync(root(`client/public/hiking/art/${n}.webp`)), n).toBe(true);

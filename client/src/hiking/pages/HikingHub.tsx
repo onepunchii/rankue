@@ -13,6 +13,7 @@ import { useSeo } from "@/hooks/useSeo";
 import { HIKING_REGIONS, hikingGroup, hikingListPath, hikingRegionPath, inHikingGroup } from "@shared/hikingMountains";
 import { HIKING_H1, HIKING_TAGLINE, OSM_NOTE, hikingHubSeo } from "@shared/hikingPage";
 import { HIKING_CHECKLIST_H1, HIKING_CHECKLIST_PATH, HIKING_TERMS, HIKING_TERMS_H1, HIKING_TERMS_PATH } from "@shared/hikingTerms";
+import { HIKING_ABROAD, HIKING_ABROAD_H1, HIKING_ABROAD_PATH } from "@shared/hikingAbroad";
 import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { BundleNotebook } from "../components/BundleNotebook";
 import { MountainMap } from "../components/MountainMap";
@@ -119,8 +120,9 @@ export default function HikingHub() {
                         <HkSection title="산행 길잡이" aside="읽을거리">
                             <ul className="grid grid-cols-2 gap-2.5" data-testid="hub-guides">
                                 {[{ href: HIKING_CHECKLIST_PATH, name: HIKING_CHECKLIST_H1, sub: "철마다 배낭에 넣을 것", art: "/hiking/art/cover-checklist.webp", pos: "50% 80%" },
-                                    { href: HIKING_TERMS_PATH, name: HIKING_TERMS_H1, sub: `들머리 · 안부 · 알바 … ${HIKING_TERMS.length}가지`, art: "/hiking/art/cover-terms.webp", pos: "30% 62%" }].map((c) => (
-                                    <li key={c.href}>
+                                    { href: HIKING_TERMS_PATH, name: HIKING_TERMS_H1, sub: `들머리 · 안부 · 알바 … ${HIKING_TERMS.length}가지`, art: "/hiking/art/cover-terms.webp", pos: "30% 62%" },
+                                    { href: HIKING_ABROAD_PATH, name: HIKING_ABROAD_H1, sub: `후지산 · 백두산 · 키나발루 … ${HIKING_ABROAD.length}곳`, art: "/hiking/art/cover-list-highest50.webp", pos: "50% 45%", wide: true }].map((c) => (
+                                    <li key={c.href} className={"wide" in c ? "col-span-2" : undefined}>
                                         <Link href={c.href} className="relative block h-[104px] overflow-hidden rounded-2xl bg-[#0E2A33] active:opacity-80">
                                             <img src={c.art} alt="" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: c.pos }} loading="lazy" decoding="async" draggable={false} />
                                             <span className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2626,#0B1F26E6)" }} aria-hidden />
