@@ -1,6 +1,7 @@
 import { openInstallForAlert } from "@/components/hiq/AppInstallSheet";
 import { useState, useEffect, useRef } from "react";
 import { useRoute, useLocation } from "wouter";
+import { CoachTour, tourToneOf } from "@/components/hiq/CoachTour";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -420,16 +421,18 @@ export default function HiqClubDetail() {
                         <LucideShare2 />
                     </IconButton>
                     {isAdmin ? (
-                        <div className="relative">
+                        <div className="relative" data-tour="cd-menu">
                             <IconButton label={hasPending ? `${t("clubDetail.settings")} · ${t("crewUi.rolePending")}` : t("clubDetail.settings")} onClick={() => openSettings()}>
                                 <LucideSettings />
                             </IconButton>
                             {hasPending && <span className="absolute top-2 right-2 w-2.5 h-2.5 rounded-full bg-brand ring-2 ring-surface-1 pointer-events-none" aria-hidden="true" />}
                         </div>
                     ) : (isMember || isPending) ? (
-                        <IconButton label={t("crewMgmt.more")} onClick={() => setIsMenuOpen(true)}>
-                            <LucideMoreVertical />
-                        </IconButton>
+                        <span data-tour="cd-menu" className="inline-flex">
+                            <IconButton label={t("crewMgmt.more")} onClick={() => setIsMenuOpen(true)}>
+                                <LucideMoreVertical />
+                            </IconButton>
+                        </span>
                     ) : null}
                 </div>
             </header>
@@ -568,12 +571,18 @@ export default function HiqClubDetail() {
             {/* 3. 크루 탭바(홈·게시판·사진첩·채팅) — 60px·아이콘 22px·글자 12px. 예전 80px·24px 은 작은 화면에서 본문을 너무 먹었다.
                 left-0 right-0 이라 데스크톱 프레임 규칙(index.css .rk-frame)이 프레임 폭에 맞춘다.
                 하단 여백은 인라인으로 — 전역 .fixed.bottom-0 규칙이 pb 클래스를 덮어쓴다. */}
+            {/* 크루 화면의 첫 안내(2026-10-15) — 탭 · 채팅 · 메뉴. 크루의 종목 톤으로. 메뉴는 크루원 · 운영진에게만 있어 그 밖에는 건너뛴다 */}
+            <CoachTour id="crew-detail" tone={tourToneOf(crew.sportCategory)} steps={[
+                { target: "cd-tabs", title: t("tour.cd.tabsTitle"), body: t("tour.cd.tabsBody") },
+                { target: "cd-chat", title: t("tour.cd.chatTitle"), body: t("tour.cd.chatBody") },
+                { target: "cd-menu", title: t("tour.cd.menuTitle"), body: isAdmin ? t("tour.cd.menuAdminBody") : t("tour.cd.menuMemberBody") },
+            ]} />
             <nav
                 className="fixed bottom-0 left-0 right-0 z-50 bg-surface-1 border-t border-surface-line"
                 style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
                 aria-label={crew.name}
             >
-                <div className="max-w-md mx-auto flex items-stretch" style={{ height: NAV_H }}>
+                <div className="max-w-md mx-auto flex items-stretch" style={{ height: NAV_H }} data-tour="cd-tabs">
                 {[
                     { id: 'home', label: 'clubDetail.tabHome', icon: LucideHome },
                     { id: 'board', label: 'clubDetail.tabBoard', icon: LucideFileText },
@@ -587,6 +596,7 @@ export default function HiqClubDetail() {
                             key={tab.id}
                             type="button"
                             aria-current={isActive ? "page" : undefined}
+                            data-tour={tab.id === 'chatroom' ? "cd-chat" : undefined}
                             onClick={() => { if (tab.id === 'chatroom') setLocation(`/chat/crew/${id}`); else setActiveTab(tab.id as CrewTab); }}
                             className={cn(
                                 "flex-1 flex flex-col items-center justify-center gap-1 relative active:bg-surface-3",

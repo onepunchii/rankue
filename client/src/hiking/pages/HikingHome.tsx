@@ -29,6 +29,7 @@ import { useHikingStamps } from "../stamps/useHikingStamps";
 import { MY_TRIPS_KEY, type MyTrip } from "../trail/useTrail";
 import { durationText } from "@shared/hikingGeo";
 import { HIKING_HERO } from "../theme";
+import { CoachTour } from "@/components/hiq/CoachTour";
 
 const TILT = [-4, 3, -2, 5];
 
@@ -62,7 +63,7 @@ export default function HikingHome() {
                     <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1F2633 0%,#0B1F26D9 62%,#0B1F26 100%)" }} aria-hidden />
                     <div className="relative px-5 pb-5 pt-[104px]">
                         <p className="text-[14px] text-[#F4EFE3CC] break-keep">{name ? `${name} 님, ` : ""}{verified.length ? "다음은 어느 산으로 갈까요?" : "첫 산을 골라 볼까요?"}</p>
-                        <Link href={HIKING_PACK_PATH} className="mt-3 block active:opacity-80" data-testid="hk-home-grade"><GradeCard state={s.grade} heightSum={s.heightSum} /></Link>
+                        <Link href={HIKING_PACK_PATH} className="mt-3 block active:opacity-80" data-testid="hk-home-grade" data-tour="hh-grade"><GradeCard state={s.grade} heightSum={s.heightSum} /></Link>
                         <div className="mt-2.5 flex rounded-2xl bg-[#0B1F26B3] py-3.5 backdrop-blur-sm" style={{ boxShadow: "inset 0 0 0 1px #FFFFFF1F" }} data-testid="hk-home-summary">
                             {([[verified.length, "오른 산"], [`${kfsGot}/${kfs.length || 100}`, "100대 명산"], [kfsGot + s.awards.filter((a) => a.kind === "patch" || a.kind === "grand").length, "와펜"]] as const).map(([n, label]) => (
                                 <div key={label} className="flex-1 text-center">
@@ -72,7 +73,7 @@ export default function HikingHome() {
                             ))}
                         </div>
                         <div className="mt-3 flex gap-2">
-                            <Link href="/hiking" className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#F28C6A] text-[15px] font-semibold text-[#2A1208] active:bg-[#E67C59]" data-track-as="hiking-home-find">산 찾기</Link>
+                            <Link href="/hiking" className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#F28C6A] text-[15px] font-semibold text-[#2A1208] active:bg-[#E67C59]" data-track-as="hiking-home-find" data-tour="hh-find">산 찾기</Link>
                             <Link href={HIKING_STAMPS_PATH} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#FFFFFF1F] text-[15px] font-medium active:bg-[#FFFFFF2E]">도장첩</Link>
                             <Link href={HIKING_PACK_PATH} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#FFFFFF1F] text-[15px] font-medium active:bg-[#FFFFFF2E]">배낭</Link>
                         </div>
@@ -104,7 +105,7 @@ export default function HikingHome() {
                         <SeasonNow mountains={s.famous} done={s.done} mine />
 
                         <HkSection title="내 산 지도" aside={verified.length ? `깃발 ${s.done.size}개` : "오른 산에 깃발이 꽂혀요"}>
-                            <MountainMap mountains={s.famous} done={s.done} />
+                            <div data-tour="hh-map"><MountainMap mountains={s.famous} done={s.done} /></div>
                         </HkSection>
 
                         {trips.length > 0 && (
@@ -159,6 +160,12 @@ export default function HikingHome() {
                     </>
                 )}
             </main>
+            {/* 등산 홈의 첫 안내(2026-10-15) — 산 찾기 · 내 등급 · 내 산 지도. 지도는 불러온 뒤에 그려져서 다 불러온 다음에 띄운다 */}
+            <CoachTour id="hiking-home" tone="hiking" when={!s.isLoading} steps={[
+                { target: "hh-find", title: "산 찾기", body: "가 볼 산을 골라요. 산을 열면 코스의 높낮이와 날씨, 길 위의 갈림길을 볼 수 있어요." },
+                { target: "hh-grade", title: "내 산행 등급", body: "오른 산과 높이가 쌓이면 등급이 올라가요. 누르면 배낭이 열려요." },
+                { target: "hh-map", title: "내 산 지도", body: "오른 산마다 지도에 깃발이 꽂혀요. 100대 명산을 하나씩 채워 가요." },
+            ]} />
             <HiqNavigation />
         </div>
     );

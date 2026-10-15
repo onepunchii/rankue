@@ -7,6 +7,7 @@ import { useSport } from "@/contexts/SportContext";
 import { useT } from "@/lib/i18n";
 import { CREW_TEXT, IconButton } from "@/components/hiq/crew-ui";
 import { SportHeader } from "@/components/hiq/SportHeader";
+import { CoachTour, tourToneOf } from "@/components/hiq/CoachTour";
 
 // Sub-components
 import { MyCrewList } from "@/components/hiq/club/MyCrewList";
@@ -39,13 +40,14 @@ export default function HiqClub() {
                         <button
                             type="button"
                             onClick={handleCreate}
+                            data-tour="cl-create"
                             className="h-11 px-4 -mr-1 rounded-pill bg-brand/10 text-brand text-[13px] font-semibold inline-flex items-center gap-1 active:bg-brand/20"
                         >
                             <LucidePlus className="w-4 h-4" />
                             {t("club.create")}
                         </button>
                     </header>
-                    <MyCrewList currentSport={sport} onCreate={handleCreate} />
+                    <div data-tour="cl-mine"><MyCrewList currentSport={sport} onCreate={handleCreate} /></div>
                 </section>
 
                 {/* 둘러보기 — 검색 + 내 주변 */}
@@ -53,7 +55,7 @@ export default function HiqClub() {
                     <header className="flex items-center min-h-11">
                         <h2 className={CREW_TEXT.section}>{t("club.discover")}</h2>
                     </header>
-                    <label className="flex items-center gap-2 h-11 pl-3.5 rounded-tile bg-surface-1 border border-surface-line focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 transition-colors">
+                    <label data-tour="cl-search" className="flex items-center gap-2 h-11 pl-3.5 rounded-tile bg-surface-1 border border-surface-line focus-within:border-brand focus-within:ring-2 focus-within:ring-brand/20 transition-colors">
                         <LucideSearch className="w-4 h-4 shrink-0 text-ink-3" aria-hidden="true" />
                         <input
                             type="search"
@@ -76,6 +78,12 @@ export default function HiqClub() {
                 <AppInstallCard />
             </div>
 
+            {/* 크루 목록의 첫 안내(2026-10-15) — 고른 종목의 톤으로 */}
+            <CoachTour id="crew-list" tone={tourToneOf(sport)} steps={[
+                { target: "cl-mine", title: t("tour.cl.mineTitle"), body: t("tour.cl.mineBody") },
+                { target: "cl-search", title: t("tour.cl.searchTitle"), body: t("tour.cl.searchBody") },
+                { target: "cl-create", title: t("tour.cl.createTitle"), body: t("tour.cl.createBody") },
+            ]} />
             <HiqNavigation />
         </div>
     );

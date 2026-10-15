@@ -33,6 +33,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { GuestJoinCta, useGuestGate } from "@/components/hiq/GuestGate";
 import { GUEST_SAMPLE } from "@shared/guestSample";
 import { useT } from "@/lib/i18n";
+import { CoachTour } from "@/components/hiq/CoachTour";
 
 import { useLocation, useSearch } from "wouter";
 
@@ -233,6 +234,13 @@ function HiqDashboardBilliards() {
 
             {/* 내 실전 기록 — 맨 위(2026-10-04 오너: "3쿠션·4구 RP 카드와 전적 카드는 중복 — 실전 핸디 카드에 통합해 맨 위로").
                 머리 아래 기록 띠(랭킹 점수·전적·최근 5경기) + 닮은 프로·비교표. 공식 경기가 없으면 첫 경기 안내. */}
+            {/* 당구 홈의 첫 안내(2026-10-15) — 내 기록 · 점수판 · 당구 게임. 불러오기가 끝난 뒤에만 그려지는 자리라 when 이 필요 없다 */}
+            <CoachTour id="billiards-home" tone="billiards" steps={[
+                { target: "bh-record", title: t("tour.bh.recordTitle"), body: t("tour.bh.recordBody") },
+                { target: "bh-board", title: t("tour.bh.boardTitle"), body: t("tour.bh.boardBody") },
+                { target: "bh-game", title: t("tour.bh.gameTitle"), body: t("tour.bh.gameBody") },
+            ]} />
+            <div data-tour="bh-record">
             <RealHandicapCard
                 onStartMatch={() => handleStartGameClick("match")}
                 onOpenRpGuide={() => toggleModal('rpGuide', true)}
@@ -241,6 +249,7 @@ function HiqDashboardBilliards() {
                 onPreview={() => setGuide("scoreboard")}
                 sample={sample}
             />
+            </div>
             {/* 예시 카드 바로 아래 가입 안내 한 줄 — 비로그인에게만. 가입하면 지금 보던 홈으로 돌아온다 */}
             {sample && (
                 <GuestJoinCta
@@ -252,7 +261,7 @@ function HiqDashboardBilliards() {
 
             {/* 홈 구역(2026-10-04 오너: "빠른 실행보다 각 섹션별로 — 점수판 / 당구 게임 / 기타").
                 점수판 구역은 입구 셋(점수판·혼자 연습·PIN으로 합류)만 — 기록은 위 카드로 모였다. */}
-            <section className="mt-10 mb-10">
+            <section className="mt-10 mb-10" data-tour="bh-board">
                 <HomeSectionHeader title={t("home.secScoreboard")} desc={t("home.secScoreboardDesc")} onGuide={() => setGuide("scoreboard")} />
                 <ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={handleJoinGameClick} sample={sample} />
             </section>
@@ -260,7 +269,7 @@ function HiqDashboardBilliards() {
             {/* 당구 게임(예전 이름 온라인게임) — 온라인 대전 배너(내 등급 · 랭킹 · 대시보드) · 혼자 치기 · 같이 치기 · 내 온라인 실력(닮은 프로 + 내 다마수).
                 홈이 온라인게임의 입구다(2026-10-04) — 게임·멀티방·랭킹을 닫으면 ?sec=game 으로 이 구역에 돌아온다.
                 배너는 2026-10-12 오너: "혼자 치기 카드 위에 배너 카드를 만들어서 … 대시보드 랭킹 들어가게". */}
-            <section id="home-game" className="mb-10 scroll-mt-4">
+            <section id="home-game" className="mb-10 scroll-mt-4" data-tour="bh-game">
                 <HomeSectionHeader title={t("home.secOnline")} desc={t("home.secOnlineDesc")} onGuide={() => setGuide("online")} />
                 <div className="space-y-3">
                     <OnlineHubBanner />

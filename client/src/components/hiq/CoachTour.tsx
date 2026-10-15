@@ -25,6 +25,9 @@ import { useBackToClose } from "@/hooks/useBackToClose";
 import { trailOpen } from "@/lib/trail";
 
 export type TourTone = "golf" | "billiards" | "hiking" | "fishing";
+/** 종목을 가리지 않는 화면(크루 · 채팅)은 그 종목의 톤을 입는다 — useSport().sport 나 크루의 sportCategory 를 넘긴다. 모르는 값은 당구 */
+export const tourToneOf = (sport: string | null | undefined): TourTone =>
+    sport === "GOLF" ? "golf" : sport === "HIKING" ? "hiking" : sport === "FISHING" ? "fishing" : "billiards";
 export interface TourStep { /** 비출 곳 — data-tour 값 */ target: string; title: string; body: string }
 
 const KEY = (id: string) => `rankue_tour_${id}`;

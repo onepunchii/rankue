@@ -38,6 +38,28 @@ describe("코치마크", () => {
         expect(fish).toContain('<CoachTour id="fishing-home" tone="fishing"');
         for (const tag of ["fs-fish", "fs-map", "fs-add"]) expect(fish, tag).toContain(`data-tour="${tag}"`);
     });
+    it("홈 세 곳 · 크루 두 곳(2026-10-15) — 홈은 세 단계까지, 크루는 그 종목의 톤", () => {
+        const homes: [string, string, string[]][] = [
+            ["client/src/golf/pages/Dashboard.tsx", '<CoachTour id="golf-home" tone="golf"', ["gh-play", "gh-stamps", "gh-courses"]],
+            ["client/src/hiking/pages/HikingHome.tsx", '<CoachTour id="hiking-home" tone="hiking" when={!s.isLoading}', ["hh-find", "hh-grade", "hh-map"]],
+            ["client/src/pages/hiq/dashboard.tsx", '<CoachTour id="billiards-home" tone="billiards"', ["bh-record", "bh-board", "bh-game"]],
+            ["client/src/pages/hiq/club.tsx", '<CoachTour id="crew-list" tone={tourToneOf(sport)}', ["cl-mine", "cl-search", "cl-create"]],
+            ["client/src/pages/hiq/club-detail.tsx", '<CoachTour id="crew-detail" tone={tourToneOf(crew.sportCategory)}', ["cd-tabs", "cd-chat", "cd-menu"]],
+        ];
+        for (const [f, call, tags] of homes) {
+            const src = read(f);
+            expect(src, f).toContain(call);
+            for (const tag of tags) expect(src, `${f} ${tag}`).toMatch(new RegExp(`data-tour=(\\{[^}]*)?"${tag}"`));
+        }
+        const keys = ["recordTitle", "recordBody", "boardTitle", "boardBody", "gameTitle", "gameBody"].map((k) => `tour.bh.${k}`)
+            .concat(["mineTitle", "mineBody", "searchTitle", "searchBody", "createTitle", "createBody"].map((k) => `tour.cl.${k}`))
+            .concat(["tabsTitle", "tabsBody", "chatTitle", "chatBody", "menuTitle", "menuAdminBody", "menuMemberBody"].map((k) => `tour.cd.${k}`));
+        for (const l of ["ko", "en", "vi", "tr", "es"]) {
+            const f = read(`client/src/lib/i18n/${l}.ts`);
+            for (const k of keys) expect(f, `${l} ${k}`).toContain(`"${k}":`);
+        }
+        expect(tour).toContain('sport === "GOLF" ? "golf" : sport === "HIKING" ? "hiking" : sport === "FISHING" ? "fishing" : "billiards"');
+    });
     it("문구는 다섯 언어(당구 점수판 · 설정은 모든 언어 화면) — 단추 이름은 실제 이름과 같게", () => {
         const keys = ["tour.skip", "tour.next", "tour.done", "tour.resetTitle", "tour.resetDesc", "tour.resetAction", "tour.resetDone",
             "tour.bb.cardTitle", "tour.bb.cardBody", "tour.bb.inningTitle", "tour.bb.inningBody", "tour.bb.undoTitle", "tour.bb.undoBody", "tour.bb.exitTitle", "tour.bb.exitBody"];

@@ -11,6 +11,7 @@ import { useGameStats } from "@/hooks/useGameStats";
 import { useAuth } from "@/hooks/useAuth";
 import { GuestJoinCta } from "@/components/hiq/GuestGate";
 import { GUEST_SAMPLE } from "@shared/guestSample";
+import { CoachTour } from "@/components/hiq/CoachTour";
 
 // Components
 import { GolfHeader } from "../components/dashboard/GolfHeader";
@@ -120,16 +121,18 @@ export default function GolfDashboard() {
             )}
 
             {/* Main Actions */}
-            <QuickActions
-                onOpenGameMode={() => setIsGameModeOpen(true)}
-                onOpenJoin={() => matchLogic.setIsJoinOpen(true)}
-            />
+            <div data-tour="gh-play">
+                <QuickActions
+                    onOpenGameMode={() => setIsGameModeOpen(true)}
+                    onOpenJoin={() => matchLogic.setIsJoinOpen(true)}
+                />
+            </div>
 
             {/* 도장깨기(2026-10-12 오너: "도장깨기가 우리 골프 콘텐츠의 핵심") — 도장첩 책장의 입구. 방문자에게는 예시 인물의 진행을 보여 준다 */}
-            <StampHomeEntry />
+            <div data-tour="gh-stamps"><StampHomeEntry /></div>
 
             {/* 전국 골프장(2026-09-24) — 골프장 목록·지역·부킹/조인/긴급 허브의 입구 */}
-            <CourseHomeEntry />
+            <div data-tour="gh-courses"><CourseHomeEntry /></div>
 
             {/* Dashboard Widgets */}
             <StatsChart
@@ -143,6 +146,13 @@ export default function GolfDashboard() {
             />
             <GolfRankingCard />
             <MyCrewCard />
+
+            {/* 골프 홈의 첫 안내(2026-10-15) — 라운드 · 도장깨기 · 전국 골프장 세 입구만 */}
+            <CoachTour id="golf-home" tone="golf" steps={[
+                { target: "gh-play", title: "라운드 시작", body: "새 라운드를 만들어 스코어를 적거나, 동반자가 알려 준 핀 번호로 같은 라운드에 들어가요." },
+                { target: "gh-stamps", title: "도장깨기", body: "골프장 도장을 도장첩에 모아요. 현장 인증된 라운드마다 그 골프장 도장이 찍혀요." },
+                { target: "gh-courses", title: "전국 골프장", body: "지역별 골프장과 부킹 · 조인 · 긴급티 글을 한곳에서 찾아요." },
+            ]} />
 
             {/* Modals & Sheets */}
             <GameModeSheet
