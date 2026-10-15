@@ -25,6 +25,7 @@ import { MountainPatch } from "../stamps/MountainPatch";
 import { HIKING_PACK_PATH, HIKING_STAMPS_PATH, PatchArt, PinArt, hikingBookPath } from "../stamps/StampParts";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { YearReport } from "../components/YearReport";
+import { YearGoal } from "../components/YearGoal";
 
 export default function PackPage() {
     // 예시(?example=1) — 와펜 · 핀 · 등급 휘장을 다 단 배낭(2026-10-13 오너: "도장첩 예시에 배낭도 예시로 보여지게"). 예시 책장에서 들어온다
@@ -75,6 +76,7 @@ export default function PackPage() {
 
                         {/* 올해의 산행 — 등산을 쓰는 회원의 것만. 올해 기록이 없으면 그리지 않는다 */}
                         {s.mine && <YearReport summits={s.summits} nameOf={(id) => s.famous.find((m) => m.id === id)?.name} heightOf={(id) => s.famous.find((m) => m.id === id)?.heightM} />}
+                        {s.mine && <YearGoal summits={s.summits} heightOf={(id) => s.famous.find((m) => m.id === id)?.heightM} kfsDone={s.famous.filter((m) => m.lists.includes("kfs100") && s.done.has(m.id)).length} />}
 
                         <HkSection title={HIKING_PACK_LABEL.grade} aside={`여덟 등급 · 맨 위는 산 ${HIKING_GRADES[HIKING_GRADES.length - 1].min}곳`}>
                             <GradeLadder state={s.grade} earnedOn={gradeOn} preview={!s.mine} />
