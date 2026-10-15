@@ -32,6 +32,7 @@ export interface RailItem {
     readonly caption?: string | null;
     /** 버튼 껍데기(흰 원·테두리·그림자) 없이 아이콘만 — 아이콘이 스스로 원을 그릴 때(길 찾기의 길 칩). */
     readonly bare?: boolean;
+    readonly tour?: string;
 }
 
 export interface ToolRailProps {
@@ -76,6 +77,7 @@ export const ToolRail = memo(function ToolRail({ groups, size = "md", className 
                             type="button"
                             aria-label={item.label}
                             title={item.label}
+                            data-tour={item.tour}
                             aria-pressed={item.toggle ? !!item.active : undefined}
                             disabled={item.disabled}
                             onClick={(e) => {

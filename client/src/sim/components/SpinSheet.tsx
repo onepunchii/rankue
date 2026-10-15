@@ -33,6 +33,7 @@ export interface SpinSheetProps {
     disabled?: boolean;
     onSpin: (a: number, b: number) => void;
     onElevation: (theta: number) => void;
+    onHelp?: () => void;
 }
 
 const DOUBLE_TAP_MS = 300;
@@ -266,6 +267,11 @@ export const SpinSheet = memo(function SpinSheet(p: SpinSheetProps) {
                             );
                         })}
                     </div>
+                    {p.onHelp && (
+                        <button type="button" onClick={p.onHelp} className="h-11 px-3 shrink-0 rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3">
+                            {t("sim.guide.open")}
+                        </button>
+                    )}
                     <button
                         type="button" onClick={() => p.onOpenChange(false)}
                         className="h-11 px-4 shrink-0 rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3"

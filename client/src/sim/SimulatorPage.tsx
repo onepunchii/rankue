@@ -79,7 +79,8 @@ import { MATCH_LIST_QUERY_KEY } from "./match/queryKeys";
 import { endReasonText, shouldOpenMatch } from "./match/matchView";
 import { ResignConfirm } from "./components/ResignConfirm";
 import { GuestPathGate } from "./components/GuestPathGate";
-import { CoachHint, COACH_PREF_KEY } from "./components/CoachHint";
+import { ControlsGuide } from "./components/ControlsGuide";
+import { CoachTour, tourDone } from "@/components/hiq/CoachTour";
 import { setActiveMatchScreen } from "./match/liveMatchCall";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
 import { MatchEndRapport } from "./match/MatchEndRapport";
@@ -280,11 +281,14 @@ export function SimulatorPage() {
     drillRef.current = drill;
     const [matchLoad, setMatchLoad] = useState<"idle" | "loading" | "error" | "notMine">("idle");
     const [resignOpen, setResignOpen] = useState(false);
-    // 첫 세션 안내: 기기에 저장된 적 없으면 첫 aim 단계에서 한 번
-    const [coachOpen, setCoachOpen] = useState(() => { try { return safeLocalStorage()?.getItem(COACH_PREF_KEY) !== "1"; } catch { return false; } });
-    // 기록 표 아래 '조작법 다시 보기'로 연 것 — 이때는 대전 중에도 띄운다(첫 안내만 혼자 치기에서 저절로 뜬다).
-    const [coachAsked, setCoachAsked] = useState(false);
-    const closeCoach = useCallback(() => { setCoachOpen(false); setCoachAsked(false); try { safeLocalStorage()?.setItem(COACH_PREF_KEY, "1"); } catch { /* 저장 불가 */ } }, []);
+    const [coachReplay, setCoachReplay] = useState(0);
+    const [guideOpen, setGuideOpen] = useState(false);
+    const controlSteps = useMemo(() => [
+        { target: "sim-spin", title: t("tour.sim.spinTitle"), body: t("tour.sim.spinBody") },
+        { target: "sim-elev", title: t("tour.sim.elevTitle"), body: t("tour.sim.elevBody") },
+        { target: "sim-power", title: t("tour.sim.powerTitle"), body: t("tour.sim.powerBody") },
+        { target: "sim-shot", title: t("tour.sim.shotTitle"), body: t("tour.sim.shotBody") },
+    ], [t]);
     const [realityOpen, setRealityOpen] = useState(() => { try { return safeLocalStorage()?.getItem(REALITY_PREF_KEY) !== "1"; } catch { return false; } });
     const closeReality = useCallback(() => { setRealityOpen(false); try { safeLocalStorage()?.setItem(REALITY_PREF_KEY, "1"); } catch { /* 저장 불가 */ } }, []);
     const [turnChip, setTurnChip] = useState(false);
@@ -1544,9 +1548,9 @@ export function SimulatorPage() {
     // ── 툴바 묶음: 조준 도구 / 토글·동작 / 나가기(대전은 기권). 되돌리기는 독, 공유는 왼쪽 위 알약 — 툴바는 최대 9개 ──
     // 길 찾기 화면엔 당점·큐 각이 없다 — 해법이 값을 준다(2026-09-08 오너)
     const railAim: RailItem[] = pathView ? [] : [
-        { id: "spin", label: t("sim.controls.spin"), icon: <SpinIcon a={sim.input.a} b={sim.input.b} />, onPress: () => openSpinSheet("spin"), disabled: !aiming },
+        { id: "spin", label: t("sim.controls.spin"), icon: <SpinIcon a={sim.input.a} b={sim.input.b} />, onPress: () => openSpinSheet("spin"), disabled: !aiming, tour: "sim-spin" },
         {
-            id: "elevation", label: t("sim.rail.elevation"), icon: <ElevationIcon />, onPress: () => openSpinSheet("elevation"),
+            id: "elevation", label: t("sim.rail.elevation"), icon: <ElevationIcon />, onPress: () => openSpinSheet("elevation"), tour: "sim-elev",
             active: thetaDeg > 0, caption: thetaDeg > 0 ? `${thetaDeg}°` : null, disabled: !aiming,
         },
     ];
@@ -1721,7 +1725,7 @@ export function SimulatorPage() {
                     >
                         {/* 툴바는 남는 높이가 없으면(compact 로도) 줄어들며 스크롤된다 — 큐 슬라이더(최소 높이)·±·샷은 항상 보인다 */}
                         <ToolRail groups={railGroups} size={compact ? "sm" : "md"} className="shrink min-h-0 overflow-y-auto overscroll-contain" />
-                        {pathView ? <div className="flex-1" /> : <PowerRail V0={sim.input.V0} disabled={!aiming} onChange={onPower} compact={compact} className="flex-1" />}
+                        {pathView ? <div className="flex-1" /> : <PowerRail V0={sim.input.V0} disabled={!aiming} onChange={onPower} compact={compact} className="flex-1" tour="sim-power" />}
                         {/* ± 0.05 m/s: 36 px 원 두 개, 사이 8 px(탭 대상 간격 규칙) */}
                         <div className={cn("shrink-0 flex gap-2", pathView && "hidden")}>
                             <HoldButton label={t("sim.controls.powerDown")} disabled={!aiming} onTick={onPowerDown} className="h-9 w-9 rounded-pill">
@@ -1732,7 +1736,7 @@ export function SimulatorPage() {
                             </HoldButton>
                         </div>
                         {!pathView && !(isMatch && sim.phase === "finished") && (
-                            <ShotButton phase={sim.phase} onShoot={onShoot} onRestart={onRestart} compact={compact} className="shrink-0" />
+                            <ShotButton phase={sim.phase} onShoot={onShoot} onRestart={onRestart} compact={compact} className="shrink-0" tour="sim-shot" />
                         )}
                     </div>
 
@@ -1844,8 +1848,8 @@ export function SimulatorPage() {
                             />
                         </div>
                     )}
-                    {coachOpen && !pathView && sim.phase === "aim" && (sim.mode === "solo" || coachAsked) && <CoachHint onClose={closeCoach} />}
-                    {!coachOpen && realityOpen && reality && sim.phase === "aim" && <RealityHint onClose={closeReality} />}
+                    <CoachTour id="sim-controls" tone="billiards" when={!pathView && sim.phase === "aim"} replay={coachReplay} steps={controlSteps} />
+                    {realityOpen && reality && sim.phase === "aim" && tourDone("sim-controls") && <RealityHint onClose={closeReality} />}
                     {/* 결과 배너: 두께 독 위, 오른쪽 열 왼쪽 — 테이블 아래쪽 가운데 */}
                     <div className="absolute left-0 right-[60px] top-0 z-[3] pointer-events-none" style={{ bottom: DOCK_HEIGHT + 8 }}>
                         {/* 길 찾기는 점수를 세는 화면이 아니라 결과 배너(득점 +1)를 띄우지 않는다(2026-09-08 오너) */}
@@ -1999,7 +2003,9 @@ export function SimulatorPage() {
                 open={spinSheet.open} tab={spinSheet.tab} onOpenChange={onSpinSheetOpen} onTab={onSpinSheetTab}
                 a={sim.input.a} b={sim.input.b} theta={sim.input.theta} cueBallId={sim.cueBallId} disabled={!aiming}
                 onSpin={onSpin} onElevation={onElevation}
+                onHelp={() => { setSpinSheet((x) => ({ ...x, open: false })); setGuideOpen(true); }}
             />
+            <ControlsGuide open={guideOpen} onOpenChange={setGuideOpen} />
             <SolverSheet
                 titleKey={pathView ? "sim.path.title" : undefined}
                 descKey={pathView ? "sim.path.desc" : undefined}
@@ -2017,7 +2023,7 @@ export function SimulatorPage() {
             <ResignConfirm open={resignOpen} onOpenChange={setResignOpen} busy={exiting} onConfirm={() => { void onResign(); }} />
             <InningSheet
                 open={sheetOpen} onOpenChange={setSheetOpen} log={log} completed={completed} session={sim.session} names={names} phase={sim.phase}
-                onHelp={pathView ? undefined : () => { setSheetOpen(false); setCoachAsked(true); setCoachOpen(true); }}
+                onHelp={pathView ? undefined : () => { setSheetOpen(false); setCoachReplay((n) => n + 1); }}
             />
             <EndDialog
                 open={endOpen} onOpenChange={(o) => { if (!o) setEndDismissed(true); }}

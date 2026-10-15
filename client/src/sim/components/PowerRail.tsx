@@ -24,6 +24,7 @@ interface Props {
     onChange: (V0: number) => void;
     compact?: boolean;
     className?: string;
+    tour?: string;
 }
 
 /** 큐대 엄지 높이(px). 트랙 높이 − 이 값 = 엄지 이동 거리. compact 는 CUE_PX_SM. */
@@ -58,11 +59,11 @@ function CueStick({ height }: { height: number }) {
     );
 }
 
-export const PowerRail = memo(function PowerRail({ V0, disabled, onChange, compact, className }: Props) {
+export const PowerRail = memo(function PowerRail({ V0, disabled, onChange, compact, className, tour }: Props) {
     const { t } = useT();
     const cuePx = compact ? CUE_PX_SM : CUE_PX;
     return (
-        <div className={cn("flex flex-col items-center gap-1 w-11 py-2 rounded-pill bg-surface-1 border border-surface-line rk-shadow", className)}>
+        <div data-tour={tour} className={cn("flex flex-col items-center gap-1 w-11 py-2 rounded-pill bg-surface-1 border border-surface-line rk-shadow", className)}>
             <span className="shrink-0 rk-num text-[12px] leading-none font-semibold text-ink-1 whitespace-nowrap" title={`${formatSpeed(V0)} m/s`}>
                 {powerPercent(V0)}%
             </span>

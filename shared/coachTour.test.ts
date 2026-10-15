@@ -60,6 +60,23 @@ describe("코치마크", () => {
         }
         expect(tour).toContain('sport === "GOLF" ? "golf" : sport === "HIKING" ? "hiking" : sport === "FISHING" ? "fishing" : "billiards"');
     });
+    it("온라인게임 조작부 — 당점 · 큐 각 · 세기 · 샷을 짚고, 설명 시트로 이어진다(2026-10-15)", () => {
+        const page = read("client/src/sim/SimulatorPage.tsx");
+        expect(page).toContain('<CoachTour id="sim-controls" tone="billiards" when={!pathView && sim.phase === "aim"} replay={coachReplay} steps={controlSteps} />');
+        for (const tag of ["sim-spin", "sim-elev", "sim-power", "sim-shot"]) expect(page, tag).toContain(`"${tag}"`);
+        expect(page).toContain("onHelp={() => { setSpinSheet((x) => ({ ...x, open: false })); setGuideOpen(true); }}");
+        expect(page).toContain('<ControlsGuide open={guideOpen} onOpenChange={setGuideOpen} />');
+        expect(page).not.toContain("CoachHint");
+        expect(read("client/src/sim/components/ToolRail.tsx")).toContain("data-tour={item.tour}");
+        expect(read("client/src/sim/components/PowerRail.tsx")).toContain("data-tour={tour}");
+        expect(read("client/src/sim/components/ShotButton.tsx")).toContain("data-tour={tour}");
+        const keys = ["tour.sim.spinTitle", "tour.sim.spinBody", "tour.sim.elevTitle", "tour.sim.elevBody", "tour.sim.powerTitle", "tour.sim.powerBody", "tour.sim.shotTitle", "tour.sim.shotBody",
+            "sim.guide.open", "sim.guide.title", "sim.guide.spinTitle", "sim.guide.spinBody", "sim.guide.elevTitle", "sim.guide.elevBody", "sim.guide.powerTitle", "sim.guide.powerBody"];
+        for (const l of ["ko", "en", "vi", "tr", "es"]) {
+            const f = read(`client/src/lib/i18n/${l}.ts`);
+            for (const k of keys) expect(f, `${l} ${k}`).toContain(`"${k}":`);
+        }
+    });
     it("문구는 다섯 언어(당구 점수판 · 설정은 모든 언어 화면) — 단추 이름은 실제 이름과 같게", () => {
         const keys = ["tour.skip", "tour.next", "tour.done", "tour.resetTitle", "tour.resetDesc", "tour.resetAction", "tour.resetDone",
             "tour.bb.cardTitle", "tour.bb.cardBody", "tour.bb.inningTitle", "tour.bb.inningBody", "tour.bb.undoTitle", "tour.bb.undoBody", "tour.bb.exitTitle", "tour.bb.exitBody"];

@@ -17,11 +17,12 @@ interface Props {
     /** 짧은 화면: 56 px 원. */
     compact?: boolean;
     className?: string;
+    tour?: string;
 }
 
 const CIRCLE = "rounded-pill flex items-center justify-center font-semibold";
 
-export const ShotButton = memo(function ShotButton({ phase, onShoot, onRestart, compact, className }: Props) {
+export const ShotButton = memo(function ShotButton({ phase, onShoot, onRestart, compact, className, tour }: Props) {
     const { t } = useT();
     const circle = cn(CIRCLE, compact ? "h-14 w-14" : "h-16 w-16");
     if (phase === "finished") {
@@ -33,7 +34,7 @@ export const ShotButton = memo(function ShotButton({ phase, onShoot, onRestart, 
     }
     const aiming = phase === "aim";
     return (
-        <button type="button" onClick={onShoot} disabled={!aiming} aria-label={t("sim.controls.shoot")} className={cn("flex flex-col items-center", className)}>
+        <button type="button" onClick={onShoot} disabled={!aiming} aria-label={t("sim.controls.shoot")} data-tour={tour} className={cn("flex flex-col items-center", className)}>
             <span className={cn(circle, aiming ? "bg-brand text-brand-fg text-[17px] active:bg-brand-strong" : "bg-surface-3 text-ink-4")}>
                 {aiming ? t("sim.controls.shoot") : ""}
             </span>

@@ -106,10 +106,11 @@ function localBox(el: HTMLElement, box: HTMLElement): Box {
     return { left: x, top: y, width: el.offsetWidth, height: el.offsetHeight };
 }
 
-export function CoachTour({ id, steps, tone, when = true, delay = 800, inside }: {
+export function CoachTour({ id, steps, tone, when = true, delay = 800, inside, replay }: {
     id: string; steps: readonly TourStep[]; tone: TourTone; /** 띄워도 되는 때(예: 경기 시작 전) */ when?: boolean; delay?: number;
     /** 이 상자 안에 그린다(위치를 가진 상자 — position: relative). 돌려 놓은 화면 · 높은 층의 상자 안에서 쓴다 */
     inside?: React.RefObject<HTMLElement | null>;
+    replay?: number;
 }) {
     const { t } = useT();
     const [i, setI] = useState(-1);
@@ -118,6 +119,15 @@ export function CoachTour({ id, steps, tone, when = true, delay = 800, inside }:
     const cardRef = useRef<HTMLDivElement>(null);
     const open = i >= 0 && i < steps.length;
     const look = LOOK[tone];
+    const seenReplay = useRef(replay ?? 0);
+
+    useEffect(() => {
+        if (replay === undefined || replay === seenReplay.current) return;
+        seenReplay.current = replay;
+        if (!when) return;
+        const first = steps.findIndex((s) => findTarget(s.target));
+        if (first >= 0) setI(first);
+    }, [replay, when, steps]);
 
     // 시작 — 때가 되고, 처음이고, 다른 창이 없고, 첫 단추가 화면에 있을 때
     useEffect(() => {
