@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { rankColumn, rankRows, RANK_LIMIT } from "./fishingRank";
 
 describe("어종 랭킹", () => {
@@ -15,5 +17,10 @@ describe("어종 랭킹", () => {
         const many = Array.from({ length: 80 }, (_, i) => ({ member_id: String(i), name: `n${i}`, value: i + 1, day: "2026-10-01", thumb_url: null }));
         expect(rankRows(many, null)).toHaveLength(RANK_LIMIT);
         expect([rankColumn("cm"), rankColumn("kg"), rankColumn("ji"), rankColumn("count")]).toEqual(["length_cm", "weight_kg", "ji", "fish_count"]);
+    });
+    it("서버 쿼리 — fishing_catches.member_id 는 text, hiq_members.id 는 uuid 라 맞춰 비교한다(2026-10-15 운영 500)", () => {
+        const routes = readFileSync(resolve(__dirname, "../server/routes/modules/fishing.ts"), "utf8");
+        expect(routes).toContain("join hiq_members m on m.id::text = c.member_id");
+        expect(routes).not.toContain("m.id = c.member_id");
     });
 });

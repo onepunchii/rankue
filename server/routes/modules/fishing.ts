@@ -121,7 +121,7 @@ router.get("/ranking", requireAuth, gate, asyncHandler(async (req: AuthRequest, 
     const rows = rowsOf(await db.execute(sql`
         select * from (
             select distinct on (c.member_id) c.member_id, coalesce(nullif(p.nickname, ''), m.name) as name, c.${col} as value, c.fished_on as day, c.thumb_url
-            from fishing_catches c join hiq_members m on m.id = c.member_id left join profiles p on p.id = m.profile_id
+            from fishing_catches c join hiq_members m on m.id::text = c.member_id left join profiles p on p.id = m.profile_id
             where c.is_public and c.species = ${fish.name} and c.${col} is not null
             order by c.member_id, c.${col} desc, c.fished_on asc
         ) best order by value desc, day asc limit 200`));
