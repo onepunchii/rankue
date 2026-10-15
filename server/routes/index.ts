@@ -29,6 +29,7 @@ import hikingRouter from "./modules/hiking.js";
 import fishingRouter from "./modules/fishing.js";
 import hikingWishesRouter from "./modules/hikingWishes.js";
 import hikingGoalsRouter from "./modules/hikingGoals.js";
+import hikingMarksRouter from "./modules/hikingMarks.js";
 import tourNewsRouter from "./modules/tourNews.js";
 import listingsRouter from "./modules/listings.js";
 import appMetaRouter from "./modules/appMeta.js";
@@ -51,6 +52,7 @@ router.use("/fishing", fishingRouter);
 // 가고 싶은 산(2026-10-13) — 같은 주소 아래에 따로 선 작은 라우터(회원만)
 router.use("/hiking", hikingWishesRouter);
 router.use("/hiking", hikingGoalsRouter);
+router.use("/hiking", hikingMarksRouter);
 
 // 2. Crew (/crews)
 router.use("/crews", crewRouter);

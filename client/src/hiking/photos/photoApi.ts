@@ -101,3 +101,10 @@ export const setHikingPhotoPublic = (id: string, isPublic: boolean): Promise<{ p
 export const appealHikingPhoto = (id: string): Promise<{ appealed: boolean }> =>
     apiRequest(`/api/hiq/hiking/photos/${id}/appeal`, { method: "POST", body: JSON.stringify({}) });
 export const deleteHikingPhoto = (id: string): Promise<{ removed: boolean }> => apiRequest(`/api/hiq/hiking/photos/${id}`, { method: "DELETE" });
+
+/** 내 표시 지점의 사진 — 작은 한 장만 올리고 주소를 돌려준다(위치 꼬리표는 캔버스로 다시 그리며 떨어진다) */
+export async function uploadMarkPhoto(file: File): Promise<string> {
+    if (!file.type.startsWith("image/") && !isHeic(file)) throw new HikingPhotoError("사진 파일을 골라 주세요.");
+    const { img, done } = await loadImage(file);
+    try { return await putBlob(encode(img, HIKING_THUMB_LONG, 0.78).dataUrl, HIKING_THUMB_CATEGORY); } finally { done(); }
+}

@@ -36,6 +36,7 @@ import { bgWatchAvailable } from "../trail/bgWatch";
 import { setVoiceOn, speakLine, voiceOn } from "../trail/speak";
 import { MY_TRIPS_KEY, dropKeptTrail, keepTrail, readKeptTrail, useTrail } from "../trail/useTrail";
 import { locationMessage } from "@shared/hikingShare";
+import { MyMarks } from "../components/MyMarks";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 
@@ -312,6 +313,7 @@ export default function TrailPage() {
                                 </button>
                                 {voice && <p className="mt-1.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">갈림길 · 위험 구간 · 대피소가 가까워질 때와 정상에서 말로 알려요.</p>}
 
+                                <MyMarks mountainId={d.id} here={trail.here} />
                                 {/* 산행 중 사진 — 올리면 그 산의 화면에 보인다(사진마다 비공개로 돌릴 수 있다). 위치 정보는 지운다 */}
                                 <div className="mt-5"><MyPhotos key={`trail-photos:${d.id}`} mountainId={d.id} name={d.name} compact /></div>
 
