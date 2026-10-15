@@ -15,7 +15,7 @@ describe("낚시는 아직 닫혀 있다", () => {
         expect(lib).not.toMatch(/010|@/);
         // 길마다 문지기를 거친다
         const routes = readFileSync(resolve(__dirname, "../server/routes/modules/fishing.ts"), "utf8");
-        expect(routes.match(/requireAuth, gate,/g)).toHaveLength(15);
+        expect(routes.match(/requireAuth, gate,/g)).toHaveLength(21);
         // 정출판은 그 크루에 든 사람만 — 목록 · 만들기 · 한 판 · 조과 붙이기 넷 다 크루를 확인한다
         expect(routes.match(/await inCrew\(req\.userId!/g)).toHaveLength(4);
         // 조과에 붙는 사진은 이 회원이 우리 저장소에 올린 것만
@@ -26,7 +26,9 @@ describe("낚시는 아직 닫혀 있다", () => {
 describe("조과 한 줄 다듬기", () => {
     it("앞뒤 공백을 걷고, 길이는 소수 한 자리로", () => {
         const c = ok();
-        expect(c).toEqual({ ok: true, value: { day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: 92.5, count: 12, weightKg: null, ji: null, released: false, photoUrl: null, thumbUrl: null, note: "물때 8물", tideSea: null } });
+        expect(c).toEqual({ ok: true, value: { day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: 92.5, count: 12, weightKg: null, ji: null, released: false, photoUrl: null, thumbUrl: null, note: "물때 8물", tideSea: null, lat: null, lng: null, isPublic: false } });
+        expect(ok({ lat: 34.74, lng: 127.74 })).toMatchObject({ ok: true, value: { lat: 34.74, lng: 127.74 } });
+        expect(ok({ lat: 51.5, lng: -0.1 })).toMatchObject({ ok: true, value: { lat: null, lng: null } });
         // 물때를 세는 바다는 두 값만 받는다
         expect([ok({ tideSea: "south" }), ok({ tideSea: "east" })].map((r) => (r.ok ? r.value.tideSea : "x"))).toEqual(["south", null]);
         expect(ok({ weightKg: "1.234", ji: "4", released: true })).toMatchObject({ ok: true, value: { weightKg: 1.23, ji: 4, released: true } });

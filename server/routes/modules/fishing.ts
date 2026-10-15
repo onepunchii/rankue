@@ -28,6 +28,10 @@ import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
 import { fishingAllowed } from "../../lib/fishingAccess.js";
 import { getSeaNow } from "../../services/fishingSea.js";
 import { getIndexMap, getPortBrief } from "../../services/fishingPort.js";
+import { nearestWeather, type CatchWeather } from "../../../shared/fishingSpot.js";
+import { rankColumn, rankRows, type FishingRankBoard, type FishingRankSpecies } from "../../../shared/fishingRank.js";
+import { fishByName } from "../../../shared/fishingFish.js";
+import { GEAR_MAX, addLineChange, cleanGear, cleanLineChange, type FishingGear, type LineChange } from "../../../shared/fishingGear.js";
 import { getMarketWeek } from "../../services/fishingMarket.js";
 import { cleanBoatQuery, type FishingBoat } from "../../../shared/fishingBoats.js";
 import { getReservoirs, searchReservoirs } from "../../services/fishingReservoir.js";
@@ -51,8 +55,79 @@ const view = (r: any): FishingCatch => ({
     lengthCm: r.length_cm == null ? null : Number(r.length_cm), count: Number(r.fish_count) || 1,
     weightKg: r.weight_kg == null ? null : Number(r.weight_kg), ji: r.ji == null ? null : Number(r.ji), released: r.released === true,
     photoUrl: r.photo_url ?? null, thumbUrl: r.thumb_url ?? null, note: r.note ?? null, tideSea: r.tide_sea === "west" || r.tide_sea === "south" ? r.tide_sea : null,
+    lat: r.lat == null ? null : Number(r.lat), lng: r.lng == null ? null : Number(r.lng), weather: (r.weather ?? null) as CatchWeather | null, isPublic: r.is_public === true,
     createdAt: new Date(r.created_at).toISOString(),
 });
+
+/** 그날 · 그 자리의 바다 — 가까운 낚시지수 지점(40km 안). 못 받으면 기록은 그대로 적는다 */
+async function seaAt(day: string, lat: number, lng: number): Promise<CatchWeather | null> {
+    try {
+        const map = await getIndexMap(day);
+        return map && map.day === day ? nearestWeather(map.spots, lat, lng) : null;
+    } catch (e) {
+        console.warn("[fishing] 그날 바다를 못 받았다", e instanceof Error ? e.message : e);
+        return null;
+    }
+}
+
+const gearView = (r: any): FishingGear => ({
+    id: String(r.id), kind: r.kind, name: String(r.name), brand: r.brand ?? null, spec: r.spec ?? null, note: r.note ?? null,
+    lineLog: Array.isArray(r.line_log) ? (r.line_log as LineChange[]) : [], createdAt: new Date(r.created_at).toISOString(),
+});
+
+router.get("/gear", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const rows = rowsOf(await db.execute(sql`select * from fishing_gear where member_id = ${req.userId!} order by kind, created_at desc limit ${GEAR_MAX}`));
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, rows.map(gearView));
+}));
+
+router.post("/gear", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const g = cleanGear(req.body);
+    if (!g.ok) return sendError(res, 400, g.error);
+    const [{ n }] = rowsOf(await db.execute(sql`select count(*)::int as n from fishing_gear where member_id = ${req.userId!}`));
+    if (Number(n) >= GEAR_MAX) return sendError(res, 400, `장비는 ${GEAR_MAX}개까지 적을 수 있어요`);
+    const v = g.value;
+    const [row] = rowsOf(await db.execute(sql`insert into fishing_gear (member_id, kind, name, brand, spec, note) values (${req.userId!}, ${v.kind}, ${v.name}, ${v.brand}, ${v.spec}, ${v.note}) returning *`));
+    return sendSuccess(res, gearView(row));
+}));
+
+router.post("/gear/:id/line", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "장비를 찾을 수 없어요");
+    const c = cleanLineChange(req.body, fishingKstDay(Date.now()));
+    if (!c.ok) return sendError(res, 400, c.error);
+    const [cur] = rowsOf(await db.execute(sql`select * from fishing_gear where id = ${req.params.id}::uuid and member_id = ${req.userId!} and kind = 'reel'`));
+    if (!cur) return sendError(res, 404, "릴을 찾을 수 없어요");
+    const log = addLineChange(Array.isArray(cur.line_log) ? cur.line_log : [], c.value);
+    const [row] = rowsOf(await db.execute(sql`update fishing_gear set line_log = ${JSON.stringify(log)}::jsonb where id = ${req.params.id}::uuid and member_id = ${req.userId!} returning *`));
+    return sendSuccess(res, gearView(row));
+}));
+
+router.delete("/gear/:id", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "장비를 찾을 수 없어요");
+    const gone = rowsOf(await db.execute(sql`delete from fishing_gear where id = ${req.params.id}::uuid and member_id = ${req.userId!} returning id`));
+    if (!gone.length) return sendError(res, 404, "장비를 찾을 수 없어요");
+    return sendSuccess(res, { id: req.params.id });
+}));
+
+router.get("/ranking/species", requireAuth, gate, asyncHandler(async (_req: AuthRequest, res: any) => {
+    const rows = rowsOf(await db.execute(sql`select species, count(distinct member_id)::int as people from fishing_catches where is_public group by species order by people desc, species limit 60`));
+    return sendSuccess(res, rows.map((r): FishingRankSpecies => ({ species: String(r.species), people: Number(r.people) })));
+}));
+
+router.get("/ranking", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const fish = fishByName(typeof req.query.species === "string" ? req.query.species : "");
+    if (!fish) return sendError(res, 400, "어종을 골라 주세요");
+    const col = sql.raw(rankColumn(fish.unit));
+    const rows = rowsOf(await db.execute(sql`
+        select * from (
+            select distinct on (c.member_id) c.member_id, coalesce(nullif(p.nickname, ''), m.name) as name, c.${col} as value, c.fished_on as day, c.thumb_url
+            from fishing_catches c join hiq_members m on m.id = c.member_id left join profiles p on p.id = m.profile_id
+            where c.is_public and c.species = ${fish.name} and c.${col} is not null
+            order by c.member_id, c.${col} desc, c.fished_on asc
+        ) best order by value desc, day asc limit 200`));
+    const board: FishingRankBoard = { species: fish.name, unit: fish.unit, rows: rankRows(rows, req.userId ?? null) };
+    return sendSuccess(res, board);
+}));
 
 router.get("/catches", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
     const rows = rowsOf(await db.execute(sql`select * from fishing_catches where member_id = ${req.userId!} order by fished_on desc, created_at desc limit 500`));
@@ -75,9 +150,10 @@ router.post("/catches", requireAuth, gate, asyncHandler(async (req: AuthRequest,
     if (v.photoUrl || v.thumbUrl) {
         if (!isOwnFishingPhotoUrl(v.photoUrl, req.userId!, FISHING_PHOTO_CATEGORY) || !isOwnFishingPhotoUrl(v.thumbUrl, req.userId!, FISHING_THUMB_CATEGORY)) return sendError(res, 400, "사진 주소가 올바르지 않아요");
     }
+    const weather = v.lat != null && v.lng != null ? await seaAt(v.day, v.lat, v.lng) : null;
     const [row] = rowsOf(await db.execute(sql`
-        insert into fishing_catches (member_id, fished_on, place, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url, thumb_url, note, trip_id, tide_sea)
-        values (${req.userId!}, ${v.day}, ${v.place}, ${v.spot}, ${v.species}, ${v.lengthCm}, ${v.count}, ${v.weightKg}, ${v.ji}, ${v.released}, ${v.photoUrl}, ${v.thumbUrl}, ${v.note}, ${tripId}::uuid, ${v.tideSea ?? null}) returning *`));
+        insert into fishing_catches (member_id, fished_on, place, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url, thumb_url, note, trip_id, tide_sea, lat, lng, weather, is_public)
+        values (${req.userId!}, ${v.day}, ${v.place}, ${v.spot}, ${v.species}, ${v.lengthCm}, ${v.count}, ${v.weightKg}, ${v.ji}, ${v.released}, ${v.photoUrl}, ${v.thumbUrl}, ${v.note}, ${tripId}::uuid, ${v.tideSea ?? null}, ${v.lat ?? null}, ${v.lng ?? null}, ${weather ? JSON.stringify(weather) : null}::jsonb, ${v.isPublic === true}) returning *`));
     return sendSuccess(res, view(row));
 }));
 

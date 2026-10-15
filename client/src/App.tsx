@@ -229,9 +229,9 @@ function HikingAlbumRoute() { return <Suspense fallback={hikingFallback}><Hiking
 function HikingHubRoute() { return <Suspense fallback={hikingFallback}><HikingHub /></Suspense>; }
 // 낚시(2026-10-14) — 네 번째 종목의 첫 뼈대. 지금은 운영자에게만 보인다(/me 의 fishingAccess). 검색용 화면 · 사이트맵은 아직 없다
 const FishingPage = lazy(() => import("@/fishing/FishingPage"));
-const fishingView = (view: "home" | "trip" | "book" | "log" | "points" | "guide" | "rules") => function FishingView() { return <Suspense fallback={<div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />}><FishingPage view={view} /></Suspense>; };
+const fishingView = (view: "home" | "trip" | "book" | "log" | "points" | "guide" | "rules" | "rank" | "gear" | "tank") => function FishingView() { return <Suspense fallback={<div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />}><FishingPage view={view} /></Suspense>; };
 // 주소마다 한 번만 만든다(그릴 때마다 새 컴포넌트가 되면 화면이 통째로 다시 붙는다)
-const FishingRoute = fishingView("home"), FishingBookRoute = fishingView("book"), FishingLogRoute = fishingView("log"), FishingPointsRoute = fishingView("points"), FishingTripRoute = fishingView("trip"), FishingGuideRoute = fishingView("guide"), FishingRulesRoute = fishingView("rules");
+const FishingRoute = fishingView("home"), FishingBookRoute = fishingView("book"), FishingLogRoute = fishingView("log"), FishingPointsRoute = fishingView("points"), FishingTripRoute = fishingView("trip"), FishingGuideRoute = fishingView("guide"), FishingRulesRoute = fishingView("rules"), FishingRankRoute = fishingView("rank"), FishingGearRoute = fishingView("gear"), FishingTankRoute = fishingView("tank");
 function HikingListRoute() { return <Suspense fallback={hikingFallback}><HikingListPage /></Suspense>; }
 function HikingMountainRoute() { return <Suspense fallback={hikingFallback}><HikingMountainPage /></Suspense>; }
 // 크루 도장첩(2026-10-12 크루 도장깨기) — 골프 크루의 도장 · 깃발. 크루 홈처럼 로그인 없이 열린다
@@ -432,6 +432,9 @@ function AppRoutes() {
       <Route path="/fishing/points" component={FishingPointsRoute} />
       <Route path="/fishing/guide" component={FishingGuideRoute} />
       <Route path="/fishing/rules" component={FishingRulesRoute} />
+      <Route path="/fishing/rank" component={FishingRankRoute} />
+      <Route path="/fishing/gear" component={FishingGearRoute} />
+      <Route path="/fishing/tank" component={FishingTankRoute} />
       <Route path="/hiking" component={HikingHubRoute} />
       <Route path="/hiking/regions/:id" component={HikingListRoute} />
       <Route path="/hiking/lists/:id" component={HikingListRoute} />

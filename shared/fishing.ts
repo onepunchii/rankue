@@ -13,6 +13,7 @@
  *
  * ⚠️ 서버가 부른다 — 상대 임포트는 ./x.js.
  */
+import { cleanCoord, type CatchWeather } from "./fishingSpot.js";
 
 /** 전면 공개 스위치 — 지금은 닫혀 있다(운영자만) */
 export const FISHING_PUBLIC = false;
@@ -68,13 +69,19 @@ export interface FishingCatch {
     note: string | null;
     /** 그날의 물때를 어느 바다 식으로 세는가(서해 7물때 · 남해/동해/제주 8물때). 민물이거나 옛 줄이면 없다 — 물때 이름은 날짜로 그때그때 센다(shared/fishingTide) */
     tideSea?: "west" | "south" | null;
+    lat?: number | null;
+    lng?: number | null;
+    weather?: CatchWeather | null;
+    isPublic?: boolean;
     createdAt: string;
 }
-export type FishingCatchInput = Omit<FishingCatch, "id" | "createdAt">;
+export type FishingCatchInput = Omit<FishingCatch, "id" | "createdAt" | "weather">;
 
 const text = (v: unknown, max: number): string => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
 /** 받은 값을 다듬는다 — 꼴이 틀리면 까닭(사람에게 보일 말)을 준다. today: 한국 날짜(YYYY-MM-DD) */
+const coordOf = (o: Record<string, unknown>) => { const c = cleanCoord(o.lat, o.lng); return { lat: c?.lat ?? null, lng: c?.lng ?? null }; };
+
 export function cleanCatch(raw: unknown, today: string): { ok: true; value: FishingCatchInput } | { ok: false; error: string } {
     const o = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
     const day = text(o.day, 10);
@@ -96,7 +103,7 @@ export function cleanCatch(raw: unknown, today: string): { ok: true; value: Fish
     const ji = o.ji == null || o.ji === "" ? null : Math.round(Number(o.ji));
     if (ji != null && !(ji >= 1 && ji <= 10)) return { ok: false, error: "갈치 굵기는 1~10지로 적어 주세요" };
     const url = (v: unknown) => (typeof v === "string" && v ? v : null);
-    return { ok: true, value: { day, place, spot, species, lengthCm: len, count, weightKg: kg, ji, released: o.released === true, photoUrl: url(o.photoUrl), thumbUrl: url(o.thumbUrl), note, tideSea: o.tideSea === "west" || o.tideSea === "south" ? o.tideSea : null } };
+    return { ok: true, value: { day, place, spot, species, lengthCm: len, count, weightKg: kg, ji, released: o.released === true, photoUrl: url(o.photoUrl), thumbUrl: url(o.thumbUrl), note, tideSea: o.tideSea === "west" || o.tideSea === "south" ? o.tideSea : null, ...coordOf(o), isPublic: o.isPublic === true } };
 }
 
 export interface FishingSummary {

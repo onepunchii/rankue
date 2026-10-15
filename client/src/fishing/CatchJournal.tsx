@@ -13,6 +13,7 @@ import { FISHING_COLORS as C, fishingDayLabel, fishingSpotName, type FishingCatc
 import { fishByName, fishTier, fishValue, fishValueText } from "@shared/fishingFish";
 import { tideOf, tideWeekday } from "@shared/fishingTide";
 import { INK, PAPER, PhotoZoom, Seal, art } from "./ink";
+import { sameSpot, weatherLine } from "@shared/fishingSpot";
 
 const RULE = "1px dashed #0F283826";
 const photoOf = (c: FishingCatch) => c.photoUrl ?? c.thumbUrl;
@@ -111,6 +112,7 @@ export function CatchJournal({ list, today, onFish, onRemove }: { list: readonly
                                                         <span className="min-w-0 flex-1">
                                                             <span className="block truncate text-[15px] font-semibold">{c.species}{c.released ? <span className="ml-1.5 text-[12.5px] font-normal" style={{ color: "#0F283899" }}>방류</span> : null}</span>
                                                             {c.note ? <span className="mt-0.5 line-clamp-2 text-[13px] leading-snug [word-break:keep-all]" style={{ color: "#0F2838B3" }}>{c.note}</span> : null}
+                                                            {(() => { const sea = weatherLine(c.weather); const again = sameSpot(list, c).length; return sea || again ? <span className="mt-0.5 block text-[12.5px] leading-snug [word-break:keep-all]" style={{ color: "#0F283899" }} data-testid="catch-sea">{[sea, again ? `같은 자리 기록 ${again}개` : null].filter(Boolean).join(" · ")}</span> : null; })()}
                                                         </span>
                                                         <span className="shrink-0 text-[15px] font-semibold tabular-nums">{valueText(c)}</span>
                                                         {tier && <Seal text={tier.name} size={30} />}

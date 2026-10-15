@@ -14,8 +14,13 @@
  * ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지. 한국어만.
  */
 import { CoachTour } from "@/components/hiq/CoachTour";
+import { getDevicePosition } from "@/hooks/useNativeBridge";
+import { cleanCoord } from "@shared/fishingSpot";
+import { FishingRanking } from "./FishingRanking";
+import { FishingGear } from "./FishingGear";
+const FishingAquarium = lazy(() => import("./FishingAquarium").then((m) => ({ default: m.FishingAquarium })));
 import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -47,10 +52,10 @@ import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@s
 import { bestOf, durationKo, goodSpots, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type IndexMap, type IndexSpot, type PortBrief } from "@shared/fishingPort";
 
 const KEY = ["/api/hiq/fishing/catches"];
-type Tab = "home" | "trip" | "book" | "log" | "points" | "guide" | "rules";
+type Tab = "home" | "trip" | "book" | "log" | "points" | "guide" | "rules" | "rank" | "gear" | "tank";
 /** 화면마다 주소가 있다 — 홈은 공용 홈 주소(/dashboard)에서 종목이 낚시일 때 그려진다 */
-const TAB_PATH: Readonly<Record<Tab, string>> = { home: "/dashboard", trip: "/fishing/trip", book: "/fishing/book", log: "/fishing/log", points: "/fishing/points", guide: "/fishing/guide", rules: "/fishing/rules" };
-const TAB_TITLE: Readonly<Record<Tab, string>> = { home: "랭큐 낚시", trip: "출조", book: "어탁첩", log: "내 조과", points: "낚시터", guide: "어류 도감", rules: "낚시 규칙" };
+const TAB_PATH: Readonly<Record<Tab, string>> = { home: "/dashboard", trip: "/fishing/trip", book: "/fishing/book", log: "/fishing/log", points: "/fishing/points", guide: "/fishing/guide", rules: "/fishing/rules", rank: "/fishing/rank", gear: "/fishing/gear", tank: "/fishing/tank" };
+const TAB_TITLE: Readonly<Record<Tab, string>> = { home: "랭큐 낚시", trip: "출조", book: "어탁첩", log: "내 조과", points: "낚시터", guide: "어류 도감", rules: "낚시 규칙", rank: "어종 랭킹", gear: "내 장비", tank: "내 수조" };
 /** 표지 그림(client/public/fishing/art) — 등산의 표지와 같은 손(판화)으로 그린 새벽 바다. 그림에는 글자가 없다 */
 /** 바다 일곱 곳의 표지(같은 손의 판화) */
 const seaCover = (id: string) => `/fishing/art/sea-${id}.webp`;
@@ -96,6 +101,8 @@ function Eotak({ rec, today, big, sample }: { rec: FishRecord<FishingCatch>; tod
         </div>
     );
 }
+
+const PHOTO_TIPS = ["가로로 찍어요 — 물고기가 옆으로 길게 누우면 길이가 잘 보여요", "물고기가 화면의 80% 넘게 차도록 가까이", "자나 계측판을 옆에 두면 길이가 믿음을 얻어요 · 화면을 다시 찍은 사진은 피해요"];
 
 /** 사진을 줄여 올린다 — 캔버스로 다시 그리니 위치 꼬리표가 따라가지 않는다. 큰 것과 작은 것 두 장 */
 async function uploadPhoto(file: File): Promise<{ photoUrl: string; thumbUrl: string }> {
@@ -260,6 +267,18 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                         )}
 
 
+                        <button type="button" onClick={() => setTab("rank")} className="mx-5 mt-2 flex min-h-[56px] w-[calc(100%-40px)] items-center justify-between rounded-2xl bg-[#FFFFFF0A] px-4 text-left text-[15px] font-semibold active:opacity-80" data-testid="fishing-rank-entry">
+                            <span>어종 랭킹<span className="ml-2 text-[13px] font-normal" style={{ color: C.dim }}>공개한 조과로 겨뤄요</span></span>
+                            <span style={{ color: C.sun }}>보기</span>
+                        </button>
+                        <button type="button" onClick={() => setTab("gear")} className="mx-5 mt-2 flex min-h-[56px] w-[calc(100%-40px)] items-center justify-between rounded-2xl bg-[#FFFFFF0A] px-4 text-left text-[15px] font-semibold active:opacity-80" data-testid="fishing-gear-entry">
+                            <span>내 장비<span className="ml-2 text-[13px] font-normal" style={{ color: C.dim }}>대 · 릴 · 줄 · 채비</span></span>
+                            <span style={{ color: C.sun }}>보기</span>
+                        </button>
+                        <button type="button" onClick={() => setTab("tank")} className="mx-5 mt-2 flex min-h-[56px] w-[calc(100%-40px)] items-center justify-between rounded-2xl bg-[#FFFFFF0A] px-4 text-left text-[15px] font-semibold active:opacity-80" data-testid="fishing-tank-entry">
+                            <span>내 수조<span className="ml-2 text-[13px] font-normal" style={{ color: C.dim }}>잡은 어종이 헤엄쳐요</span></span>
+                            <span style={{ color: C.sun }}>보기</span>
+                        </button>
                         <FsSection title="어탁 벽" aside={empty ? "예시" : <button type="button" onClick={() => setTab("book")} style={{ color: C.sun }}>어탁첩 보기</button>}>
                             <div className="grid grid-cols-2 gap-2.5">{shown.slice(0, 6).map((r) => <button key={r.fish.id} type="button" onClick={() => setFishOpen(r.fish.id)} className="block text-left active:opacity-85" aria-label={`${r.fish.name} 한 장`} data-testid="fishing-wall-open"><Eotak rec={r} today={today} sample={empty} /></button>)}</div>
                             <p className="mt-2 text-[12.5px] break-keep" style={{ color: C.dim }}>{empty ? "조과를 적으면 어종마다 어탁이 한 장씩 걸려요. 단계에 오르면 붉은 낙관이 찍혀요." : "어종마다 가장 큰 한 마리가 걸려요."}</p>
@@ -273,6 +292,15 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                     </>
                 )}
 
+                {tab === "tank" && (
+                    <div className="px-5 pt-4 pb-6"><Suspense fallback={<div className="h-[56vh] rounded-2xl bg-[#0B3A52]" aria-busy="true" />}><FishingAquarium list={list} /></Suspense></div>
+                )}
+                {tab === "gear" && (
+                    <div className="px-5 pt-4 pb-6"><FishingGear today={today} /></div>
+                )}
+                {tab === "rank" && (
+                    <div className="px-5 pt-4 pb-6"><FishingRanking /></div>
+                )}
                 {tab === "trip" && (
                     <>
                         <FsCover src={water === "sea" ? FS_COVER_TRIP : FS_COVER_FRESH} at={water === "sea" ? undefined : "50% 26%"} line={water === "sea" ? "나가기 전에 보는 것 — 바다의 특보와 물때" : "나가기 전에 보는 것 — 저수지의 물높이"} />
@@ -1307,9 +1335,21 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
     const [value, setValue] = useState("");
     const [count, setCount] = useState("1");
     const [released, setReleased] = useState(false);
+    const [isPublic, setIsPublic] = useState(false);
     const [note, setNote] = useState("");
     const [file, setFile] = useState<File | null>(null);
     const [shot, setShot] = useState<string | null>(null);
+    const [portrait, setPortrait] = useState(false);
+    const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
+    const [locating, setLocating] = useState<"idle" | "busy" | "denied" | "far">("idle");
+    const takeHere = async () => {
+        if (here) { setHere(null); setLocating("idle"); return; }
+        setLocating("busy");
+        const r = await getDevicePosition({ prompt: true, highAccuracy: true, timeoutMs: 10000, maximumAgeMs: 60_000 }).catch(() => null);
+        const fix = r?.status === "granted" ? r.fix : null;
+        const c = fix ? cleanCoord(fix.lat, fix.lng) : null;
+        if (c) { setHere(c); setLocating("idle"); } else setLocating(fix ? "far" : "denied");
+    };
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
     const [tideSea, setTideSea] = useState<TideSea>(readSea);
@@ -1334,7 +1374,7 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
     const submit = async () => {
         if (busy) return;
         // 어종이 자랑하는 값은 그 단위의 칸으로 간다 — 마릿수 어종은 마릿수 칸 하나로
-        const body: Record<string, unknown> = { day, place, spot, species, note, released, tideSea: dayTide ? tideSea : null, count: unit === "count" ? (value || count) : count, lengthCm: unit === "cm" ? value : "", weightKg: unit === "kg" ? value : "", ji: unit === "ji" ? value : "" };
+        const body: Record<string, unknown> = { day, place, spot, species, note, released, tideSea: dayTide ? tideSea : null, count: unit === "count" ? (value || count) : count, lengthCm: unit === "cm" ? value : "", weightKg: unit === "kg" ? value : "", ji: unit === "ji" ? value : "", lat: here?.lat ?? null, lng: here?.lng ?? null, isPublic };
         const c = cleanCatch(body, today);
         if (!c.ok) { setError(c.error); return; }
         setError(null); setBusy(true);
@@ -1368,9 +1408,10 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                     <div className="relative mx-auto w-full max-w-[272px] rounded-[4px] p-2 pb-0" style={{ background: "#F6F0E2", color: INK, transform: "rotate(-1deg)", boxShadow: "0 8px 22px #00000059" }}>
                         {shot ? (
                             <>
-                                <img src={shot} alt="고른 사진" className="block aspect-[4/3] w-full object-cover" />
-                                <button type="button" onClick={() => { URL.revokeObjectURL(shot); setShot(null); setFile(null); if (fileRef.current) fileRef.current.value = ""; }} aria-label="사진 빼기" className="absolute right-3.5 top-3.5 flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "#000000A6", color: "#FFFFFF" }}><LucideX className="h-4 w-4" /></button>
+                                <img src={shot} alt="고른 사진" className="block aspect-[4/3] w-full object-cover" onLoad={(e) => setPortrait(e.currentTarget.naturalHeight > e.currentTarget.naturalWidth)} />
+                                <button type="button" onClick={() => { URL.revokeObjectURL(shot); setShot(null); setPortrait(false); setFile(null); if (fileRef.current) fileRef.current.value = ""; }} aria-label="사진 빼기" className="absolute right-3.5 top-3.5 flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "#000000A6", color: "#FFFFFF" }}><LucideX className="h-4 w-4" /></button>
                                 <p className="py-2.5 text-center text-[12.5px]" style={{ color: "#0F283899" }}>이 사진이 일지와 어종 한 장에 걸려요</p>
+                                {portrait && <p className="pb-2.5 text-center text-[12.5px] font-semibold" style={{ color: "#C8372D" }} data-testid="fishing-photo-portrait">세로 사진이에요 · 가로로 찍으면 물고기가 더 크게 걸려요</p>}
                             </>
                         ) : (
                             <button type="button" onClick={() => fileRef.current?.click()} className="block w-full active:opacity-80" data-testid="fishing-photo-pick">
@@ -1382,6 +1423,11 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                             </button>
                         )}
                     </div>
+                    {!shot && (
+                        <ul className="mx-auto mt-3 w-full max-w-[272px] space-y-1.5 text-[12.5px] leading-snug" style={{ color: C.dim }} data-testid="fishing-photo-guide">
+                            {PHOTO_TIPS.map((tip) => <li key={tip} className="flex gap-2 break-keep"><span aria-hidden style={{ color: C.sun }}>·</span>{tip}</li>)}
+                        </ul>
+                    )}
                 </div>
 
                 <div><span className="mb-1.5 block text-[13px]" style={{ color: C.soft }}>어종</span>
@@ -1463,7 +1509,17 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                 </button>
                 <label className="block"><span className="mb-1.5 block text-[13px]" style={{ color: C.soft }}>한마디</span>
                     <input value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="물때 · 채비 · 날씨 같은 것" className={field} style={fieldStyle} data-testid="fishing-note" /></label>
-                <p className="text-[12px] leading-relaxed" style={{ color: C.dim }}>{preset?.tripId ? "이 조과는 정출판에 올라가 크루가 같이 봐요. 위치는 재지 않아요." : "잡은 곳은 적은 이름만 남고 위치는 재지 않아요. 사진은 나만 봐요."}</p>
+                <button type="button" onClick={() => setIsPublic((v) => !v)} className="flex h-12 w-full items-center justify-between rounded-xl px-3.5 text-[14.5px]" style={{ background: "#FFFFFF0F", color: C.soft }} aria-pressed={isPublic} data-testid="fishing-public">
+                    <span>랭킹에 올리기<span className="ml-1.5 text-[12.5px]" style={{ color: C.dim }}>이름 · 값 · 날짜 · 사진</span></span>
+                    <span className="flex h-6 w-11 items-center rounded-full p-0.5" style={{ background: isPublic ? C.brand : "#FFFFFF24" }}><i className="h-5 w-5 rounded-full bg-[#FFFFFF] transition-transform" style={{ transform: isPublic ? "translateX(20px)" : "none" }} /></span>
+                </button>
+                <button type="button" onClick={() => { void takeHere(); }} disabled={locating === "busy"} className="flex h-12 w-full items-center justify-between rounded-xl px-3.5 text-[14.5px]" style={{ background: "#FFFFFF0F", color: C.soft }} aria-pressed={!!here} data-testid="fishing-here">
+                    <span>{here ? "잡은 자리를 남겨요" : locating === "busy" ? "자리를 찾는 중…" : "지금 자리 남기기"}</span>
+                    <span className="flex h-6 w-11 items-center rounded-full p-0.5" style={{ background: here ? C.brand : "#FFFFFF24" }}><i className="h-5 w-5 rounded-full bg-[#FFFFFF] transition-transform" style={{ transform: here ? "translateX(20px)" : "none" }} /></span>
+                </button>
+                {locating === "denied" && <p className="text-[12.5px]" style={{ color: "#FF9C9C" }}>위치를 받지 못했어요. 설정에서 위치를 허락하면 남길 수 있어요.</p>}
+                {locating === "far" && <p className="text-[12.5px]" style={{ color: "#FF9C9C" }}>한국 안의 자리만 남겨요.</p>}
+                <p className="text-[12px] leading-relaxed" style={{ color: C.dim }}>{here ? "자리를 남기면 그날 가까운 바다의 수온 · 파고 · 바람 · 물때가 함께 적히고, 같은 자리의 기록끼리 묶여요. 자리는 나만 봐요." : preset?.tripId ? "이 조과는 정출판에 올라가 크루가 같이 봐요. 자리는 남기지 않으면 재지 않아요." : "잡은 곳은 적은 이름만 남아요. 자리는 직접 켤 때만 재요. 사진은 나만 봐요."}</p>
                 {error && <p role="alert" className="rounded-xl bg-[#FF6E6E1F] px-3.5 py-3 text-[13px] text-[#FF9C9C]" data-testid="fishing-error">{error}</p>}
             </div>
             <div className="shrink-0 border-t px-4 pt-3" style={{ borderColor: C.line, paddingBottom: "calc(12px + env(safe-area-inset-bottom))" }}>
