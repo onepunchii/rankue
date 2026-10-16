@@ -334,6 +334,8 @@ export const tr: Record<string, string> = {
   "notif.hikingPhoto.hidden.body": "Dağ fotoğrafın birkaç şikayetten sonra gizlendi. Sorun olmadığını düşünüyorsan o dağın sayfasındaki “Dağ fotoğraflarım” bölümünde aç ve “İtiraz et”e dokun — ekibimiz tekrar inceleyecek.",
   "notif.fishingCatch.hidden.title": "Av kaydın gizlendi",
   "notif.fishingCatch.hidden.body": "Av kaydın birkaç şikayetten sonra gizlendi. Sorun olmadığını düşünüyorsan balıkçılık günlüğünde aç ve “İtiraz et”e dokun — ekibimiz tekrar inceleyecek.",
+  "notif.fishingCatch.rankVoid.title": "Bir av kaydı sıralamadan çıkarıldı",
+  "notif.fishingCatch.rankVoid.body": "{species} kaydın çok büyük göründüğü için sıralamadan çıkarıldı. Günlüğünde ve akvaryumunda duruyor. Yanlış girdiysen silip yeniden kaydet.",
   // 조인·부킹 글 가림·내림(2026-10-01) — 골프 글은 이의제기 칸이 없어 채팅 '운영자 문의'로 안내한다(storage/adminGolfListings)
   "notif.golfListing.hidden.title": "⚠️ Golf ilanın gizlendi",
   "notif.golfListing.hidden.body": "{course} {tee} ilanın birkaç şikâyetten sonra gizlendi. Artık listede görünmüyor ve yeni başvuru almıyor. Bir hata olduğunu düşünüyorsan Sohbet'teki “Destek” üzerinden bize yaz.",

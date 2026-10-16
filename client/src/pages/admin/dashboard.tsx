@@ -38,6 +38,7 @@ import BilliardsCupView from "./BilliardsCupView";
 import HikingSummitsView from "./HikingSummitsView";
 import HikingMountainsView from "./HikingMountainsView";
 import HikingOverviewView from "./HikingOverviewView";
+import FishingRankAuditView from "./FishingRankAuditView";
 // 굿즈 · 배지(2026-10-16) — 네 종목 목록(골프 · 등산 도장첩 표 포함)을 끌어와서 따로 불러온다(첫 화면 묶음을 무겁게 하지 않게)
 const GoodsView = lazy(() => import("./GoodsView"));
 import CrewsView from "./CrewsView";
@@ -67,10 +68,10 @@ type GlobalStats = {
 };
 
 type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
-    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-overview" | "hiking-summits" | "hiking-mountains" | "hiking-photos" | "fishing-catches";
+    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-overview" | "hiking-summits" | "hiking-mountains" | "hiking-photos" | "fishing-catches" | "fishing-rank";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos", "fishing-catches"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos", "fishing-catches", "fishing-rank"] as const;
 
 // --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
 // 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
@@ -114,6 +115,7 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
     // 낚시(2026-10-17 어드민 전수 조사 · 공개 전) — 조과 검수(신고 · 가림 · 이의제기)
     { title: "낚시", items: [
         { id: "fishing-catches", label: "조과 검수", icon: LucideCamera },
+        { id: "fishing-rank", label: "랭킹 점검", icon: LucideTrophy },
     ] },
     { title: "콘텐츠", items: [
         { id: "crews", label: "크루 현황", icon: LucideUsersRound },
@@ -487,6 +489,7 @@ export default function AdminDashboard() {
                     {tab === "hiking-mountains" && <HikingMountainsView />}
                     {tab === "hiking-photos" && <GolfPhotosView kind="hiking" onOpenMember={setOpenMemberId} />}
                     {tab === "fishing-catches" && <GolfPhotosView kind="fishing" onOpenMember={setOpenMemberId} />}
+                    {tab === "fishing-rank" && <FishingRankAuditView onOpenMember={setOpenMemberId} />}
                     {tab === "goods" && <Suspense fallback={<p className="text-[13px] text-black/45">불러오는 중…</p>}><GoodsView /></Suspense>}
 
                     <MemberDetailSheet member={openMember} onClose={() => setOpenMemberId(null)} />
@@ -514,6 +517,7 @@ function getTabTitle(tab: string) {
         case "hiking-mountains": return "산 자료";
         case "hiking-photos": return "산행 사진";
         case "fishing-catches": return "조과 검수";
+        case "fishing-rank": return "랭킹 점검";
         case "search-trend": return "검색 수요";
         case "members": return "회원 관리";
         case "leads": return "입점 문의";
@@ -546,6 +550,7 @@ const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     "billiards-online": "끝난 온라인 대전 전부 — 판을 열어 샷 흐름을 보고, 레이팅을 옮긴 판은 무효로 합니다(바뀌는 레이팅을 먼저 미리 봅니다).",
     "billiards-cup": "다음 대회는 지금 성적이 이대로면 누가 나가는지 · 열린 대회는 대진표에서 기한 늘리기 · 결과 정하기 · 바꾸기 · 지금 굴리기.",
     "billiards-case": "받은 큐 · 초크 · 장갑을 지금 기록과 맞춰 봅니다 — 지운 경기 · 무효로 한 판으로 받은 것만 거둘 수 있어요.",
+    "fishing-rank": "어종마다 큰 순 100줄 — 맨 위 단계를 훨씬 넘는 값을 보고 랭킹에서만 뺍니다(일지 · 수족관은 그대로, 올린 사람에게 안내).",
     "fishing-catches": "남이 볼 수 있었던 조과(랭킹 · 크루 정출판) 전부 — 자유 입력 어종 · 사진을 보고 가리기 · 이의제기 판정 · 지우기. 나만 보는 기록은 싣지 않습니다.",
     "hiking-photos": "산 페이지에 바로 뜨는 공개 산행 사진 전부 — 가리기 · 다시 보이기 · 이의제기 판정 · 지우기(신고 큐와 같은 처리 기록).",
     "hiking-mountains": "100대 명산 점검표 — 코스가 정상 150m 안을 지나는가. 산을 열어 코스 위 가장 높은 곳을 보고 정상 자리 · 높이 · 정상 이름을 고칩니다(다시 적재해도 남음).",

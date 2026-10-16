@@ -62,6 +62,8 @@ const view = (r: any): FishingCatch => ({
     createdAt: new Date(r.created_at).toISOString(),
     // 신고로 가려진 내 조과(2026-10-17) — 랭킹 · 정출판 · 수족관에서 빠졌다. 가린 뒤에 낸 이의제기만 '냈음'으로
     hidden: r.hidden_at != null,
+    // 운영자가 랭킹에서만 뺀 기록(값이 지나치게 큼 — 2026-10-17 어드민 › 낚시 › 랭킹 점검). 일지 · 수족관에는 그대로
+    rankVoid: r.rank_void?.reason ? String(r.rank_void.reason) : null,
     appealed: r.hidden_at != null && r.appeal_at != null && new Date(r.appeal_at).getTime() >= new Date(r.hidden_at).getTime(),
 });
 /** 보는 사람이 차단한 회원의 조과는 뺀다(c 는 fishing_catches — member_id 가 글자다) */
@@ -120,7 +122,7 @@ router.delete("/gear/:id", requireAuth, gate, asyncHandler(async (req: AuthReque
 }));
 
 router.get("/ranking/species", requireAuth, gate, asyncHandler(async (_req: AuthRequest, res: any) => {
-    const rows = rowsOf(await db.execute(sql`select species, count(distinct member_id)::int as people from fishing_catches where is_public and hidden_at is null group by species order by people desc, species limit 60`));
+    const rows = rowsOf(await db.execute(sql`select species, count(distinct member_id)::int as people from fishing_catches where is_public and hidden_at is null and rank_void is null group by species order by people desc, species limit 60`));
     return sendSuccess(res, rows.map((r): FishingRankSpecies => ({ species: String(r.species), people: Number(r.people) })));
 }));
 
@@ -132,7 +134,7 @@ router.get("/ranking", requireAuth, gate, asyncHandler(async (req: AuthRequest, 
         select * from (
             select distinct on (c.member_id) c.id::text as id, c.member_id, coalesce(nullif(p.nickname, ''), m.name) as name, c.${col} as value, c.fished_on as day, c.thumb_url
             from fishing_catches c join hiq_members m on m.id::text = c.member_id left join profiles p on p.id = m.profile_id
-            where c.is_public and c.hidden_at is null and c.species = ${fish.name} and c.${col} is not null ${notBlockedBy(req.userId)}
+            where c.is_public and c.hidden_at is null and c.rank_void is null and c.species = ${fish.name} and c.${col} is not null ${notBlockedBy(req.userId)}
             order by c.member_id, c.${col} desc, c.fished_on asc
         ) best order by value desc, day asc limit 200`));
     const board: FishingRankBoard = { species: fish.name, unit: fish.unit, rows: rankRows(rows, req.userId ?? null) };

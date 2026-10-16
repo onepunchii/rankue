@@ -3,6 +3,8 @@
  *
  * GET /admin/fishing/catches?filter=public|hidden|appealed|all&course=&days=   남이 볼 수 있었던 조과 전부(storage/adminFishingCatches — 라운드 사진과 같은 모양)
  * POST /admin/fishing/catches/:id/hide { hidden } · /:id/appeal { decision, note } · DELETE /:id     신고 큐와 같은 실행기(targetType 'fishing_catch')
+ * GET /admin/fishing/ranking/species · GET /admin/fishing/ranking?species=   랭킹 점검 — 어종마다 큰 순 100줄(뺀 것 · 가린 것도), 다시 볼 것(shared/fishingRankAudit)
+ * POST /admin/fishing/catches/:id/rank-void { reason, notify } · /:id/rank-restore { reason }   랭킹에서만 빼기 · 되돌리기(일지 · 수족관은 그대로)
  * 까닭 · 처리는 신고 큐의 처리 기록에 쌓이고, 올린 사람에게 낚시 알림함으로 결과가 간다(services/moderation).
  */
 import { Router } from "express";
@@ -14,6 +16,14 @@ import { listAdminFishingCatches } from "../../storage/adminFishingCatches.js";
 import { parsePhotoListQuery } from "../../storage/adminGolfPhotos.js";
 import { get as getCatch } from "../../storage/fishingCatches.js";
 import type { ModerationAction } from "../../lib/reportQueue.js";
+import { sql } from "drizzle-orm";
+import { db } from "../../db.js";
+import { storage } from "../../storage/index.js";
+import { notificationService } from "../../services/notificationService.js";
+import { msg } from "../../lib/i18n.js";
+import { FISH, fishByName } from "../../../shared/fishingFish.js";
+import { rankColumn } from "../../../shared/fishingRank.js";
+import { rankReview, type AdminRankBoard, type AdminRankRow, type AdminRankSpecies } from "../../../shared/fishingRankAudit.js";
 
 const router = Router();
 router.use(checkSuperAdmin);
@@ -51,5 +61,73 @@ router.post("/catches/:id/appeal", asyncHandler(async (req: any, res: any) => {
 }));
 
 router.delete("/catches/:id", asyncHandler(async (req: any, res: any) => act(req, res, "delete", "fishing_catch_delete")));
+
+// ── 랭킹 점검 ─────────────────────────────────────────────────────────────
+const rowsOf = (r: any) => (r.rows ?? r) as any[];
+const reasonOf = (req: any) => (typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 200) : "");
+const adminNameOf = async (req: any) => String(((await storage.getProfile(req.adminProfileId).catch(() => null)) as any)?.nickname ?? "관리자").slice(0, 40);
+
+router.get("/ranking/species", asyncHandler(async (_req: any, res: any) => {
+    const rows = rowsOf(await db.execute(sql`select species, count(distinct member_id)::int as people,
+            max(length_cm) as cm, max(fish_count) as cnt, max(weight_kg) as kg, max(ji) as ji
+        from fishing_catches where is_public group by species`).catch(() => ({ rows: [] })));
+    const by = new Map(rows.map((r) => [String(r.species), r]));
+    // 랭킹이 있는 어종(shared/fishingFish)만 — 자유 입력 어종은 랭킹이 없다
+    const out: AdminRankSpecies[] = [];
+    for (const f of FISH) {
+        const r = by.get(f.name);
+        if (!r) continue;
+        const best = Number(f.unit === "cm" ? r.cm : f.unit === "count" ? r.cnt : f.unit === "kg" ? r.kg : r.ji);
+        out.push({ species: f.name, people: Number(r.people) || 0, review: rankReview(f.name, Number.isFinite(best) ? best : null) ? 1 : 0 });
+    }
+    res.set("Cache-Control", "no-store");
+    return sendSuccess(res, out.sort((a, b) => b.review - a.review || b.people - a.people));
+}));
+
+router.get("/ranking", asyncHandler(async (req: any, res: any) => {
+    const fish = fishByName(typeof req.query.species === "string" ? req.query.species : "");
+    if (!fish) return sendError(res, 400, "어종을 골라 주세요");
+    const col = sql.raw(rankColumn(fish.unit));
+    const rows = rowsOf(await db.execute(sql`
+        select c.id::text as id, c.member_id, coalesce(m.name, '회원') as name, c.${col} as value, c.fished_on as day, c.place, c.thumb_url, c.rank_void, (c.hidden_at is not null) as hidden
+        from fishing_catches c left join hiq_members m on m.id::text = c.member_id
+        where c.is_public and c.species = ${fish.name} and c.${col} is not null
+        order by c.${col} desc, c.fished_on asc limit 100`));
+    const out: AdminRankBoard = {
+        species: fish.name, unit: fish.unit,
+        rows: rows.map((r): AdminRankRow => ({
+            catchId: String(r.id), memberId: String(r.member_id), name: String(r.name), value: Number(r.value), day: String(r.day), place: String(r.place ?? ""), thumbUrl: r.thumb_url ?? null,
+            review: rankReview(fish.name, Number(r.value)), voided: r.rank_void ? { at: String(r.rank_void.at ?? ""), reason: String(r.rank_void.reason ?? ""), by: String(r.rank_void.by ?? "관리자") } : null, hidden: r.hidden === true,
+        })),
+    };
+    res.set("Cache-Control", "no-store");
+    return sendSuccess(res, out);
+}));
+
+router.post("/catches/:id/rank-void", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? ""), reason = reasonOf(req);
+    if (!UUID.test(id)) return sendError(res, 404, GONE);
+    if (!reason) return sendError(res, 400, "빼는 까닭을 적어 주세요");
+    const mark = { at: new Date().toISOString(), reason, by: await adminNameOf(req) };
+    const [r] = rowsOf(await db.execute(sql`update fishing_catches set rank_void = ${JSON.stringify(mark)}::jsonb where id = ${id}::uuid and rank_void is null returning member_id, species`));
+    if (!r) return sendError(res, 409, "이미 뺐거나 없는 기록이에요");
+    // 올린 사람에게 — 잘못 적었다면 지우고 다시 적으라고(낚시 알림함). 알림 실패가 조치를 실패로 만들지 않는다
+    if (req.body?.notify !== false) {
+        await notificationService.sendAndSaveNotification({
+            memberId: String(r.member_id), title: "notif.fishingCatch.rankVoid.title", body: msg("notif.fishingCatch.rankVoid.body", { species: String(r.species) }),
+            category: "FISHING", type: "MODERATION", params: { url: "/fishing/log" },
+        }).catch((e: unknown) => console.error("[Notify] 랭킹에서 뺌:", e));
+    }
+    return sendSuccess(res, { ok: true });
+}));
+
+router.post("/catches/:id/rank-restore", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? ""), reason = reasonOf(req);
+    if (!UUID.test(id)) return sendError(res, 404, GONE);
+    if (!reason) return sendError(res, 400, "되돌리는 까닭을 적어 주세요");
+    const done = rowsOf(await db.execute(sql`update fishing_catches set rank_void = null where id = ${id}::uuid and rank_void is not null returning id`));
+    if (!done.length) return sendError(res, 409, "랭킹에서 뺀 기록이 아니에요");
+    return sendSuccess(res, { ok: true });
+}));
 
 export default router;

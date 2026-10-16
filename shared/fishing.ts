@@ -78,6 +78,8 @@ export interface FishingCatch {
     hidden?: boolean;
     /** 가린 뒤에 이의제기를 냈다 */
     appealed?: boolean;
+    /** 운영자가 랭킹에서만 뺀 까닭(값이 지나치게 큼) — 일지 · 수족관에는 그대로 */
+    rankVoid?: string | null;
 }
 export type FishingCatchInput = Omit<FishingCatch, "id" | "createdAt" | "weather">;
 

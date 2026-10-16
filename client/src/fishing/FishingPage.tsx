@@ -1641,14 +1641,27 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
  */
 function HiddenCatches({ list, today }: { list: readonly FishingCatch[]; today: string }) {
     const hidden = list.filter((c) => c.hidden);
+    // 운영자가 랭킹에서만 뺀 기록(값이 지나치게 큼) — 위반이 아니라 잘못 적었을 수 있는 값이다. 일지 · 수족관에는 그대로
+    const voided = list.filter((c) => !c.hidden && c.rankVoid);
     const [open, setOpen] = useState<string | null>(null);
     const [text, setText] = useState("");
     const appeal = useMutation({
         mutationFn: (id: string) => apiRequest(`/api/hiq/fishing/catches/${id}/appeal`, { method: "POST", body: { text } }),
         onSuccess: () => { setOpen(null); setText(""); void queryClient.invalidateQueries({ queryKey: KEY }); },
     });
-    if (!hidden.length) return null;
+    if (!hidden.length && !voided.length) return null;
     return (
+        <>
+        {voided.length > 0 && (
+            <div className="mt-3 rounded-2xl px-4 py-3.5" style={{ background: "#FFFFFF0A", border: "1px solid #FFFFFF24" }} data-testid="fishing-rank-voided">
+                <p className="text-[14px] font-semibold" style={{ color: C.foam }}>랭킹에서 뺀 기록 {voided.length}줄</p>
+                <p className="mt-0.5 text-[13px] leading-snug [word-break:keep-all]" style={{ color: C.soft }}>값이 너무 커서 랭킹에서만 뺐어요. 일지와 수족관에는 그대로 있어요. 잘못 적었다면 지우고 다시 적어 주세요.</p>
+                <ul className="mt-2 space-y-1">
+                    {voided.map((c) => <li key={c.id} className="text-[13px]" style={{ color: C.dim }}><span className="font-semibold" style={{ color: C.foam }}>{c.species}</span> {fishingDayLabel(c.day, today)} · {c.rankVoid}</li>)}
+                </ul>
+            </div>
+        )}
+        {hidden.length > 0 && (
         <div className="mt-3 rounded-2xl px-4 py-3.5" style={{ background: "#F2B13A1A", border: "1px solid #F2B13A55" }} data-testid="fishing-hidden-catches">
             <p className="text-[14px] font-semibold" style={{ color: C.foam }}>신고로 가려진 기록 {hidden.length}줄</p>
             <p className="mt-0.5 text-[13px] leading-snug [word-break:keep-all]" style={{ color: C.soft }}>랭킹 · 정출판 · 수족관에서 빠졌어요. 문제가 없다고 생각되면 이의제기를 내 주세요 — 운영자가 다시 봐요.</p>
@@ -1675,5 +1688,7 @@ function HiddenCatches({ list, today }: { list: readonly FishingCatch[]; today: 
                 ))}
             </ul>
         </div>
+        )}
+        </>
     );
 }

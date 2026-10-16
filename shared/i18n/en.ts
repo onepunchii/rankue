@@ -334,6 +334,8 @@ export const en: Record<string, string> = {
   "notif.hikingPhoto.hidden.body": "Your hiking photo was hidden after several reports. If you think it's fine, open it under “My hiking photos” on that mountain's page and tap “Appeal” — our team will review it again.",
   "notif.fishingCatch.hidden.title": "Your catch was hidden",
   "notif.fishingCatch.hidden.body": "Your catch record was hidden after several reports. If you think it's fine, open it in your fishing log and tap “Appeal” — our team will review it again.",
+  "notif.fishingCatch.rankVoid.title": "A catch was taken off the ranking",
+  "notif.fishingCatch.rankVoid.body": "Your {species} record looked too large, so we took it off the ranking. It stays in your log and tank. If it was a typo, delete it and log it again.",
   // 조인·부킹 글 가림·내림(2026-10-01) — 골프 글은 이의제기 칸이 없어 채팅 '운영자 문의'로 안내한다(storage/adminGolfListings)
   "notif.golfListing.hidden.title": "⚠️ Your golf listing was hidden",
   "notif.golfListing.hidden.body": "Your {course} {tee} listing was hidden after several reports. It no longer shows in the list and can't take new requests. If you think this is a mistake, let us know via “Support” in Chat.",

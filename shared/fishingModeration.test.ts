@@ -8,8 +8,8 @@ const routes = read("server/routes/modules/fishing.ts");
 
 describe("낚시 조과 신고 · 가림(공개 전 필수, 2026-10-17)", () => {
     it("남이 보는 길은 가려진 조과를 뺀다 — 랭킹 어종 칩 · 랭킹 · 정출판 · 크루 수족관 · 수족관 물고기", () => {
-        expect(routes).toMatch(/from fishing_catches where is_public and hidden_at is null group by species/);
-        expect(routes).toMatch(/where c\.is_public and c\.hidden_at is null and c\.species = \$\{fish\.name\}/);
+        expect(routes).toMatch(/from fishing_catches where is_public and hidden_at is null and rank_void is null group by species/);
+        expect(routes).toMatch(/where c\.is_public and c\.hidden_at is null and c\.rank_void is null and c\.species = \$\{fish\.name\}/);
         expect(routes).toMatch(/and \(c\.hidden_at is null or c\.member_id = \$\{viewerId\}\) \$\{notBlockedBy\(viewerId\)\}/);
         expect(routes).toMatch(/c\.member_id = m\.id::text and c\.hidden_at is null\) as species/);
         expect(routes).toMatch(/from fishing_catches where member_id = \$\{memberId\} and hidden_at is null`/);
