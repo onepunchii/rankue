@@ -119,7 +119,8 @@
       "schedule": "40 12 * * *"
     },
     { "path": "/api/cron/golf-weather", "schedule": "5,25,45 * * * *" },
-    { "path": "/api/cron/golf-open-tees", "schedule": "15,35,55 * * * *" }
+    { "path": "/api/cron/golf-open-tees", "schedule": "15,35,55 * * * *" },
+    { "path": "/api/cron/fishing-warm", "schedule": "50 * * * *" }
   ],
   "env": {
     "VERCEL": "true"

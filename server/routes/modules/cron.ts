@@ -266,6 +266,18 @@ async function handleGolfOpenTees(req: any, res: any) {
 router.get("/golf-open-tees", asyncHandler(handleGolfOpenTees));
 router.post("/golf-open-tees", asyncHandler(handleGolfOpenTees));
 
+// 낚시 공공자료 데우기(2026-10-17 어드민 › 낚시 › 공공자료 — "크론이 없다 · 조과 저장이 낚시지수를 다시 받느라 늦다") — 매시 50분.
+// 낚시지수 지도(세 시간마다 새로) · 바다 특보(15분)를 받아 둔다. 낡지 않았으면 읽기만 하고 끝난다. 못 받은 것이 있으면 hiq_cron_runs 에 한 줄.
+async function handleFishingWarm(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { warmFishingFeeds } = await import("../../services/fishingWarm.js");
+    return sendSuccess(res, await warmFishingFeeds());
+}
+router.get("/fishing-warm", asyncHandler(handleFishingWarm));
+router.post("/fishing-warm", asyncHandler(handleFishingWarm));
+
 /** 알림함 보존 기간(오너 결정 2026-09-23). 읽은 것도 안 읽은 것도 이 날짜가 지나면 지운다. */
 const NOTIFICATION_KEEP_DAYS = 7;
 

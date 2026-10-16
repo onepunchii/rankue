@@ -11,6 +11,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { kma } from "./golfWeather.js";
 import { seaBoard, seaIssued, seaReadable, type SeaNow } from "../../shared/fishingSea.js";
+import { noteFeed } from "./fishingFeedHealth.js";
 
 const PWN_URL = "https://apis.data.go.kr/1360000/WthrWrnInfoService/getPwnStatus";
 const FRESH_MS = 15 * 60_000;
@@ -28,6 +29,7 @@ async function read(): Promise<{ data: Saved; ms: number } | null> {
 
 async function fetchPwn(timeoutMs: number): Promise<Saved | null> {
     const r = await kma(PWN_URL, { numOfRows: 10 }, timeoutMs);
+    await noteFeed("kma:pwn", r.code === "00", r.code ? `결과 코드 ${r.code}` : "응답 없음");
     const it = r.code === "00" ? r.items[0] : null;
     if (!it || typeof it.t6 !== "string" || !seaReadable(it.t6)) return null;
     return { t6: it.t6, t7: typeof it.t7 === "string" ? it.t7 : "", tmFc: String(it.tmFc ?? "") };

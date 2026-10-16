@@ -12,6 +12,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { MARKET_FISH, marketDays, marketWeek, type MarketWeek } from "../../shared/fishingMarket.js";
 import { fishingKstDay } from "../../shared/fishing.js";
+import { noteFeed } from "./fishingFeedHealth.js";
 
 const URL0 = "https://apis.data.go.kr/1192000/select0040List/getselect0040List";
 const FRESH_MS = 6 * 3600_000;
@@ -27,14 +28,16 @@ async function dayCount(ask: string, day: string, timeoutMs: number): Promise<nu
     for (const [k, v] of Object.entries({ type: "json", numOfRows: 1, pageNo: 1, baseDt: day.replace(/-/g, ""), mprcStdCodeNm: ask })) u.searchParams.set(k, String(v));
     try {
         const r = await fetch(`${u.toString()}&serviceKey=${/%[0-9A-Fa-f]{2}/.test(key) ? key : encodeURIComponent(key)}`, { signal: AbortSignal.timeout(timeoutMs) });
-        if (r.status === 429) return "limit";
+        if (r.status === 429) { await noteFeed("mof:market", false, "호출 제한(429)"); return "limit"; }
         const j: any = await r.json().catch(() => null);
-        if (["22", "23"].includes(String(j?.OpenAPI_ServiceResponse?.cmmMsgHeader?.returnReasonCode ?? ""))) return "limit";
+        if (["22", "23"].includes(String(j?.OpenAPI_ServiceResponse?.cmmMsgHeader?.returnReasonCode ?? ""))) { await noteFeed("mof:market", false, "호출 제한"); return "limit"; }
         const h = j?.responseJson?.header;
-        if (h?.resultCode === "03") return 0;
+        if (h?.resultCode === "03") { await noteFeed("mof:market", true); return 0; }
         const n = Number(h?.totalCount);
-        return h?.resultCode === "00" && Number.isFinite(n) ? n : null;
-    } catch { return null; }
+        const ok = h?.resultCode === "00" && Number.isFinite(n);
+        await noteFeed("mof:market", ok, ok ? null : h?.resultCode ? `결과 코드 ${h.resultCode}` : "응답 없음");
+        return ok ? n : null;
+    } catch { await noteFeed("mof:market", false, "응답 없음(시간 초과)"); return null; }
 }
 
 export async function getMarketWeek(nowMs = Date.now()): Promise<MarketWeek | null> {

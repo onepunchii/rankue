@@ -6,7 +6,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 
-export type CronJob = "hiking_eve" | "golf_eve" | "cup_roll";
+export type CronJob = "hiking_eve" | "golf_eve" | "cup_roll" | "fishing_warm";
 export interface CronRunRow { job: CronJob; at: string; ok: boolean; result: Record<string, unknown> | null }
 
 export async function recordCronRun(job: CronJob, ok: boolean, result: unknown): Promise<void> {

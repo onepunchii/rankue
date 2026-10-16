@@ -74,7 +74,8 @@ const notBlockedBy = (viewerId: string | null | undefined) => (viewerId && UUID.
 /** 그날 · 그 자리의 바다 — 가까운 낚시지수 지점(40km 안). 못 받으면 기록은 그대로 적는다 */
 async function seaAt(day: string, lat: number, lng: number): Promise<CatchWeather | null> {
     try {
-        const map = await getIndexMap(day);
+        // 받아 둔 지도만(cachedOnly) — 조과 저장이 공공자료를 기다리지 않게(2026-10-17). 지도는 매시 크론이 데운다
+        const map = await getIndexMap(day, Date.now(), { cachedOnly: true });
         return map && map.day === day ? nearestWeather(map.spots, lat, lng) : null;
     } catch (e) {
         console.warn("[fishing] 그날 바다를 못 받았다", e instanceof Error ? e.message : e);

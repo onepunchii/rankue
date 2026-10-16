@@ -12,6 +12,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { RESERVOIR_MAX, isReservoirCode, reservoirView, shortCounty, xmlItems, type ReservoirRef, type ReservoirView } from "../../shared/fishingReservoir.js";
 import { fishingKstDay } from "../../shared/fishing.js";
+import { noteFeed } from "./fishingFeedHealth.js";
 
 const BASE = "https://apis.data.go.kr/B552149/reserviorWaterLevel";
 const LIST_TTL_MS = 7 * 86_400_000;
@@ -25,8 +26,9 @@ async function getXml(path: string, params: Record<string, string | number>, tim
     for (const [k, v] of Object.entries(params)) u.searchParams.set(k, String(v));
     try {
         const r = await fetch(`${u.toString()}&serviceKey=${/%[0-9A-Fa-f]{2}/.test(key) ? key : encodeURIComponent(key)}`, { signal: AbortSignal.timeout(timeoutMs) });
+        await noteFeed("krc:reservoir", r.ok, r.ok ? null : `HTTP ${r.status}`);
         return r.ok ? await r.text() : null;
-    } catch { return null; }
+    } catch { await noteFeed("krc:reservoir", false, "응답 없음(시간 초과)"); return null; }
 }
 async function readObs<T>(kind: string, key: string): Promise<{ data: T; ms: number } | null> {
     const [row] = rowsOf(await db.execute(sql`select data, (extract(epoch from fetched_at) * 1000)::bigint as ms from fishing_obs where kind = ${kind} and key = ${key}`));

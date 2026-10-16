@@ -5,6 +5,7 @@
  * POST /admin/fishing/catches/:id/hide { hidden } · /:id/appeal { decision, note } · DELETE /:id     신고 큐와 같은 실행기(targetType 'fishing_catch')
  * GET /admin/fishing/ranking/species · GET /admin/fishing/ranking?species=   랭킹 점검 — 어종마다 큰 순 100줄(뺀 것 · 가린 것도), 다시 볼 것(shared/fishingRankAudit)
  * POST /admin/fishing/catches/:id/rank-void { reason, notify } · /:id/rank-restore { reason }   랭킹에서만 빼기 · 되돌리기(일지 · 수족관은 그대로)
+ * GET /admin/fishing/feeds · POST /admin/fishing/feeds/warm    공공자료 상태판(받아 둔 곳 · 출처마다 성공/실패) · 지금 받기(매시 크론과 같은 일)
  * 까닭 · 처리는 신고 큐의 처리 기록에 쌓이고, 올린 사람에게 낚시 알림함으로 결과가 간다(services/moderation).
  */
 import { Router } from "express";
@@ -24,6 +25,8 @@ import { msg } from "../../lib/i18n.js";
 import { FISH, fishByName } from "../../../shared/fishingFish.js";
 import { rankColumn } from "../../../shared/fishingRank.js";
 import { rankReview, type AdminRankBoard, type AdminRankRow, type AdminRankSpecies } from "../../../shared/fishingRankAudit.js";
+import { FISHING_FEEDS, SOURCE_LABEL, feedState, type FishingFeeds } from "../../../shared/fishingFeeds.js";
+import { recentCronRuns } from "../../storage/cronRuns.js";
 
 const router = Router();
 router.use(checkSuperAdmin);
@@ -128,6 +131,37 @@ router.post("/catches/:id/rank-restore", asyncHandler(async (req: any, res: any)
     const done = rowsOf(await db.execute(sql`update fishing_catches set rank_void = null where id = ${id}::uuid and rank_void is not null returning id`));
     if (!done.length) return sendError(res, 409, "랭킹에서 뺀 기록이 아니에요");
     return sendSuccess(res, { ok: true });
+}));
+
+// ── 공공자료 상태판 ───────────────────────────────────────────────────────
+const TS = (col: string) => sql.raw(`to_char(${col} at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`);
+
+router.get("/feeds", asyncHandler(async (_req: any, res: any) => {
+    const now = Date.now();
+    const kinds = rowsOf(await db.execute(sql`select kind, count(*)::int as keys, ${TS("max(fetched_at)")} as newest, ${TS("min(fetched_at)")} as oldest from fishing_obs where kind <> 'health' group by kind`).catch(() => ({ rows: [] })));
+    const [sea] = rowsOf(await db.execute(sql`select ${TS("fetched_at")} as newest from fishing_sea_status where id = 'pwn'`).catch(() => ({ rows: [] })));
+    const health = new Map(rowsOf(await db.execute(sql`select key, data from fishing_obs where kind = 'health'`).catch(() => ({ rows: [] }))).map((r) => [String(r.key), r.data ?? {}]));
+    const byKind = new Map(kinds.map((k) => [String(k.kind), k]));
+    const out: FishingFeeds = {
+        keyPresent: !!process.env.DATA_GO_KR_KEY,
+        feeds: FISHING_FEEDS.map((f) => {
+            const k = f.kind === "sea" ? (sea ? { keys: 1, newest: sea.newest, oldest: sea.newest } : null) : byKind.get(f.kind);
+            const newest = k?.newest ? String(k.newest) : null;
+            return {
+                id: f.id, label: f.label, use: f.use, ttlMin: f.ttlMin, keys: Number(k?.keys) || 0, newestAt: newest, oldestAt: k?.oldest ? String(k.oldest) : null,
+                state: feedState(newest ? Date.parse(newest) : null, f.ttlMin, now),
+                sources: f.sources.map((src) => { const h = health.get(src) ?? {}; return { source: src, label: SOURCE_LABEL[src] ?? src, okAt: h.okAt ?? null, failAt: h.failAt ?? null, fails: Number(h.fails) || 0, lastError: h.lastError ?? null }; }),
+            };
+        }),
+        warmFails: (await recentCronRuns("fishing_warm", 10)).map((r) => ({ at: r.at, error: String(r.result?.error ?? "") })),
+    };
+    res.set("Cache-Control", "no-store");
+    return sendSuccess(res, out);
+}));
+
+router.post("/feeds/warm", asyncHandler(async (_req: any, res: any) => {
+    const { warmFishingFeeds } = await import("../../services/fishingWarm.js");
+    return sendSuccess(res, await warmFishingFeeds());
 }));
 
 export default router;

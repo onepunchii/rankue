@@ -14,6 +14,7 @@ import { db } from "../db.js";
 import { fishingPort, type FishingPort } from "../../shared/fishingStations.js";
 import { hmToMin, indexMapOf, isFishingIndexStep, tideTurns, type IndexAllRow, type IndexMap, type PortBrief, type PortIndexRow, type PortNow, type PortSun } from "../../shared/fishingPort.js";
 import { fishingKstDay } from "../../shared/fishing.js";
+import { noteFeed, type FeedSource } from "./fishingFeedHealth.js";
 
 const KHOA = "https://apis.data.go.kr/1192136";
 const KASI = "https://apis.data.go.kr/B090041/openapi/service/RiseSetInfoService/getLCRiseSetInfo";
@@ -40,6 +41,8 @@ async function khoa(service: string, params: Record<string, string | number>, ti
     const { pageNo = 1, ...rest } = params;
     const j = await getJson(`${KHOA}/${service}`, { type: "json", ...rest, pageNo }, timeoutMs);
     const code = j?.header?.resultCode;
+    // 받기 기록(어드민 › 낚시 › 공공자료) — 00 · 03(자료 없음)은 성공, 그 밖은 실패와 그 까닭
+    await noteFeed(`khoa:${service.split("/")[0]}` as FeedSource, code === "00" || code === "03", code ? `결과 코드 ${code}${j?.header?.resultMsg ? ` · ${String(j.header.resultMsg).slice(0, 60)}` : ""}` : "응답 없음(시간 초과 · 꼴이 다름)");
     if (code === "03") return [];
     if (code !== "00") return null;
     const item = j.body?.items?.item;
@@ -82,6 +85,7 @@ async function sunDay(port: FishingPort, day: string): Promise<PortSun | null> {
     const have = await readObs<PortSun>("sun", key);
     if (have?.data) return have.data;
     const j = await getJson(KASI, { locdate: ymd(day), longitude: port.lng.toFixed(2), latitude: port.lat.toFixed(2), dnYn: "Y", _type: "json" }, 4000);
+    await noteFeed("kasi:riseSet", !!j?.response?.body, j ? null : "응답 없음");
     const item = j?.response?.body?.items?.item;
     const it = Array.isArray(item) ? item[0] : item;
     if (!it) return null;
@@ -164,9 +168,11 @@ export async function getPortBrief(code: string, wantDay: string | null, nowMs =
  * 낚시지수 지도 — 지점 마흔아홉 곳 · 엿새치 전부(1,400줄쯤 · 300줄씩 다섯 쪽). 세 시간마다 다시 받는다.
  * 한 쪽씩 띄워서 받는다. 다 못 받았으면 받아 두지 않고 가진 것을 쓴다(반쪽 지도를 온 것처럼 보이지 않게).
  */
-async function indexAll(nowMs: number): Promise<IndexAllRow[] | null> {
+async function indexAll(nowMs: number, cachedOnly = false): Promise<IndexAllRow[] | null> {
     const have = await readObs<IndexAllRow[]>("indexall", "all");
     if (have && nowMs - have.ms < INDEX_TTL_MS) return have.data;
+    // 조과를 적을 때는 받으러 가지 않는다 — 다섯 쪽을 받느라 저장이 늦어졌다(2026-10-17). 받아 둔 것(낡았어도)만, 데우기는 매시 크론이 한다
+    if (cachedOnly) return have?.data ?? null;
     const pair = (a: unknown, b: unknown): [number, number] | null => { const x = num(a), y = num(b); return x == null || y == null ? null : [Math.min(x, y), Math.max(x, y)]; };
     const out: IndexAllRow[] = [];
     for (let pageNo = 1; pageNo <= 8; pageNo++) {
@@ -187,9 +193,9 @@ async function indexAll(nowMs: number): Promise<IndexAllRow[] | null> {
     return out;
 }
 
-export async function getIndexMap(wantDay: string | null, nowMs = Date.now()): Promise<IndexMap | null> {
+export async function getIndexMap(wantDay: string | null, nowMs = Date.now(), opts: { cachedOnly?: boolean } = {}): Promise<IndexMap | null> {
     if (!process.env.DATA_GO_KR_KEY) return null;
-    const rows = await indexAll(nowMs).catch(() => null);
+    const rows = await indexAll(nowMs, opts.cachedOnly === true).catch(() => null);
     if (!rows?.length) return null;
     const today = fishingKstDay(nowMs);
     const days = [...new Set(rows.map((r) => r.day))].filter((d) => d >= today).sort().slice(0, PORT_DAYS);
