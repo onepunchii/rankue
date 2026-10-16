@@ -4037,5 +4037,10 @@ const es: Dict = {
   "inv.meFail": "No se pudo cargar tu código",
   "inv.retry": "Reintentar",
   "inv.cardOnly": "Guardar la imagen",
+  "gift.title": "Ha llegado un regalo",
+  "gift.from": "Un regalo de Rankue",
+  "gift.open": "Ver",
+  "gift.close": "Cerrar",
+  "gift.missing": "No se encontró el regalo",
 };
 export default es;

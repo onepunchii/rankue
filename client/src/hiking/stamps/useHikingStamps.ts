@@ -82,14 +82,20 @@ export function useHikingStamps(opts: { example?: boolean } = {}): HikingStamps 
             ? exampleSummits(hikingBooks(famous).flatMap((b) => b.slots.map((x) => x.id)), Date.now())
             : member ? my.data?.summits ?? [] : [];
         const stamps = mountainStamps(summits);
-        const states = hikingBookStates(hikingBooks(famous), stamps);
-        const awards = example ? exampleAwards(states, stamps) : member ? my.data?.awards ?? [] : [];
+        const computed = hikingBookStates(hikingBooks(famous), stamps);
+        const awards = example ? exampleAwards(computed, stamps) : member ? my.data?.awards ?? [] : [];
         const by = new Map(stamps.map((s) => [s.mountainId, s]));
         const aw = new Map(awards.map((a) => [a.id, a]));
+        // 어드민이 증정한 와펜(2026-10-16) — 받은 기록에만 있다. 도장으로 다시 계산한 '다 채움'에 더해 '받음'으로 그린다
+        const states = example ? computed : computed.map((st) => (!st.done && aw.has(hikingAwardId("patch", st.book.id)) ? { ...st, done: true } : st));
         const verified = stamps.filter((x) => x.verified);
         const heights = new Map(famous.map((m) => [m.id, m.heightM]));
+        // 증정한 등급 — 실제로 오른 등급보다 높으면 그 등급으로(오른 산의 수 · 다음까지는 실제 값)
+        const real = hikingGrade(verified.length);
+        const grantedAt = example ? -1 : Math.max(-1, ...HIKING_GRADES.map((g, i) => (aw.has(hikingAwardId("grade", g.id)) ? i : -1)));
+        const grade = grantedAt > real.index ? { ...real, grade: HIKING_GRADES[grantedAt], index: grantedAt, next: HIKING_GRADES[grantedAt + 1] ?? null, left: HIKING_GRADES[grantedAt + 1] ? Math.max(0, HIKING_GRADES[grantedAt + 1].min - real.count) : 0, ratio: 1 } : real;
         return {
-            grade: hikingGrade(verified.length), heightSum: summitHeightSum(verified.map((x) => x.mountainId), (id) => heights.get(id)),
+            grade, heightSum: summitHeightSum(verified.map((x) => x.mountainId), (id) => heights.get(id)),
             mine, example, member, isLoading: hub.isLoading || (member && !example && my.isLoading), famous,
             states, stamps, stampOf: (id) => by.get(id),
             done: new Set(stamps.filter((s) => s.verified).map((s) => s.mountainId)), summits, awards, award: (kind, key) => aw.get(hikingAwardId(kind, key)),

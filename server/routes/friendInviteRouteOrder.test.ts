@@ -37,5 +37,9 @@ describe("친구 초대 — 길 순서", () => {
         expect(firstRoute(router.stack, "get", "/invite/123456")).toBe("/invite/:code");
         // 사고의 모양 — 옛 주소 /invite/me 는 게임 초대 코드가 받는다(그래서 /friend-invite 로 옮겼다)
         expect(firstRoute(router.stack, "get", "/invite/me")).toBe("/invite/:code");
+        // 받은 선물 · 어드민 굿즈(2026-10-16)도 다른 길에 가로채이지 않는다
+        expect(firstRoute(router.stack, "get", "/gifts/11111111-1111-4111-8111-111111111111")).toBe("/gifts/:id");
+        expect(firstRoute(router.stack, "post", "/admin/goods/grant")).toBe("/grant");
+        expect(firstRoute(router.stack, "get", "/admin/goods/member/abc")).toBe("/member/:id");
     }, 30_000);
 });

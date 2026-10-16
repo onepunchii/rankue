@@ -4047,4 +4047,9 @@ export const ko: Dict = {
   "inv.meFail": "초대 코드를 받지 못했어요",
   "inv.retry": "다시 받기",
   "inv.cardOnly": "카드 그림만 저장",
+  "gift.title": "선물이 도착했어요",
+  "gift.from": "랭큐가 보낸 선물",
+  "gift.open": "보러 가기",
+  "gift.close": "닫기",
+  "gift.missing": "선물을 찾을 수 없어요",
 };

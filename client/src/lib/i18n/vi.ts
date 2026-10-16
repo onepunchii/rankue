@@ -4037,5 +4037,10 @@ const vi: Dict = {
   "inv.meFail": "Không tải được mã mời",
   "inv.retry": "Thử lại",
   "inv.cardOnly": "Lưu ảnh thẻ",
+  "gift.title": "Bạn có quà",
+  "gift.from": "Quà từ Rankue",
+  "gift.open": "Xem ngay",
+  "gift.close": "Đóng",
+  "gift.missing": "Không tìm thấy quà",
 };
 export default vi;

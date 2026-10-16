@@ -108,7 +108,8 @@ export default function StampShelf() {
                             const books = s.states.filter((x) => x.book.kind === kind);
                             if (books.length === 0) return null;
                             const grand = HIKING_GRANDS.find((g) => g.kind === kind);
-                            const all = books.every((b) => b.done);
+                            // 큰 와펜 — 다 채웠거나 어드민이 증정했으면(2026-10-16 · 받은 기록)
+                            const all = books.every((b) => b.done) || (!!grand && !!s.award("grand", grand.id));
                             return (
                                 <HkSection key={kind} title={HIKING_SERIES[kind]} aside={`${books.length}권 · ${new Set(books.flatMap((b) => b.slots.map((x) => x.m.id))).size}곳`}>
                                     <ul className="space-y-2.5">

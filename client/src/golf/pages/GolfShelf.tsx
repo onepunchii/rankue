@@ -81,7 +81,7 @@ export default function GolfShelf() {
                     </StampSection>
 
                     <StampSection title="엘리트 트로피" sample={sample} aside="찍은 엘리트 골프장 수">
-                        <TrophyShelf stamped={summary.stamped} />
+                        <TrophyShelf stamped={summary.stamped} granted={sample ? undefined : (at) => !!awards.of("trophy", String(at))} />
                         <div className="mt-3" data-testid="shelf-next-trophy">
                             {summary.nextTrophy ? (
                                 <>

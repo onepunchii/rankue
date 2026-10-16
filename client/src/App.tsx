@@ -173,6 +173,14 @@ function SimulatorLazy() {
 // 큐 케이스(2026-10-16) — 당구의 수집(큐 · 초크 · 장갑 + 옛 온라인 장식장). 어두운 벨벳 화면이라 프레임 없이, 불러오는 동안도 같은 색.
 const CueCasePage = lazy(() => import("@/pages/hiq/cue-case"));
 const InvitePage = lazy(() => import("@/pages/hiq/invite"));
+const GiftPage = lazy(() => import("@/pages/hiq/gift"));
+function GiftRoute() {
+  return (
+    <Suspense fallback={<div className="min-h-[100dvh] bg-[#0d1626]" aria-busy="true" />}>
+      <GiftPage />
+    </Suspense>
+  );
+}
 function InviteRoute() {
   return (
     <Suspense fallback={<div className="min-h-[100dvh] bg-[#FF2E8A]" aria-busy="true" />}>
@@ -409,6 +417,8 @@ function AppRoutes() {
       <Route path="/r/:id" component={SharedResult} />
       {/* 친구 초대 링크(2026-10-16) — 로그인 불필요. 이 기기에 초대 표시를 남긴다(InviteClaimer 가 가입 뒤에 낸다) */}
       <Route path="/i/:code" component={InviteRoute} />
+      {/* 받은 선물(2026-10-16) — 어드민이 증정한 굿즈의 받은 화면. 알림을 누르면 온다(본인 것만 — 서버가 가린다) */}
+      <Route path="/gift/:id" component={GiftRoute} />
 
       {/* HiQ 기능 페이지들 — 데스크탑에서는 DesktopFrame 이 중앙 448px로 고정한다 */}
       <Route path="/register" component={FramedRegister} />

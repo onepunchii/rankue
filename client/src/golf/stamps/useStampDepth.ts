@@ -13,7 +13,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { apiRequest } from "@/lib/queryClient";
 import { markerTiersDue, type MarkerTier, type SlotDepth } from "@shared/golfStampDepth";
-import { seasonTagOf, type SeasonTagYear } from "@shared/golfStampExtras";
+import { seasonTagOf, type SeasonTagYear, SEASON_TAG_TIERS, seasonTagKey } from "@shared/golfStampExtras";
 import {
     GOLF_DEPTH_FULL_SAMPLE, GOLF_DEPTH_SAMPLE, GOLF_MARKER_TIER_FULL_SAMPLE, GOLF_SPECIAL_FULL_SAMPLE, GOLF_SPECIAL_SAMPLE, GOLF_TAG_FULL_SAMPLE, GOLF_TAG_SAMPLE,
 } from "@shared/golfStampSample";
@@ -73,8 +73,16 @@ export function useStampDepth(opts: { guest?: "person" | "full" } = {}): StampDe
         // 자개가 블랙보다 위 — 둘 다면 자개
         const tiers = new Map<string, MarkerTier>();
         for (const d of markerTiersDue(all)) if (d.tier === "pearl" || !tiers.has(d.key)) tiers.set(d.key, d.tier);
+        // 어드민이 증정한 블랙 · 자개(2026-10-16) — 받은 기록에만 있다. 자개가 위
+        for (const a of awards.list) if ((a.kind === "pearl" || a.kind === "black") && (a.kind === "pearl" || !tiers.has(a.key))) tiers.set(a.key, a.kind);
         const year = kstYear();
-        const tags = data?.tags?.length ? data.tags : [seasonTagOf(year, 0)];
+        const base = data?.tags?.length ? data.tags : [seasonTagOf(year, 0)];
+        // 증정한 시즌 태그 — 그해의 가죽을 올린다(라운드 수 · 다음까지는 실제 값 그대로)
+        const tags = base.map((t) => {
+            const granted = SEASON_TAG_TIERS.filter((x) => !!awards.of("tag", seasonTagKey(t.year, x.id)));
+            const top = granted[granted.length - 1];
+            return top && (!t.tier || top.at > t.tier.at) ? { ...t, tier: top } : t;
+        });
         return {
             sample: false, all, of: (k) => all.get(k), tier: (bookId) => tiers.get(bookId) ?? null, tags,
             hasSpecial: (k) => !!awards.of("special", k), specialAward: (k) => awards.of("special", k), year,

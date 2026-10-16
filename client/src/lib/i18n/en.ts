@@ -4037,5 +4037,10 @@ const en: Dict = {
   "inv.meFail": "Couldn't load your invite code",
   "inv.retry": "Try again",
   "inv.cardOnly": "Save the card image",
+  "gift.title": "A gift has arrived",
+  "gift.from": "A gift from Rankue",
+  "gift.open": "Go see it",
+  "gift.close": "Close",
+  "gift.missing": "Gift not found",
 };
 export default en;

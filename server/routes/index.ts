@@ -16,6 +16,7 @@ import notificationRouter from "./modules/notification.js";
 import simRouter from "./modules/sim.js";
 import cueCaseRouter from "./modules/cueCase.js";
 import inviteRouter from "./modules/invite.js";
+import giftsRouter from "./modules/gifts.js";
 import simMatchRouter from "./modules/simMatch.js";
 import simCupRouter from "./modules/simCup.js";
 import simDrillRouter from "./modules/simDrill.js";
@@ -97,6 +98,7 @@ router.use("/", gameRouter);
 router.use("/", simRouter);
 router.use("/", cueCaseRouter);
 router.use("/", inviteRouter);
+router.use("/", giftsRouter);
 router.use("/", simMatchRouter);
 router.use("/", simCupRouter);   // 월대회(2026-10-12) — /sim/cup
 router.use("/", simDrillRouter);

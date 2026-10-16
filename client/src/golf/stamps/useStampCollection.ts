@@ -14,7 +14,8 @@
 import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { bookStates, stampSummary, type BookState, type StampLike, type StampSummary } from "@shared/golfStampBooks";
+import { STAMP_ALL_OPEN, STAMP_TROPHY_STEPS, bookStates, stampSummary, type BookState, type StampLike, type StampSummary } from "@shared/golfStampBooks";
+import { useStampAwards } from "./useStampAwards";
 import { GOLF_STAMP_FULL_SAMPLE, GOLF_STAMP_SAMPLE, type SampleStamp } from "@shared/golfStampSample";
 import { PASSPORT_STATS_KEY, fetchPassportStats, type PassportStatsResponse, type ServerStamp } from "../hooks/usePassportData";
 import { stampDate } from "./stampDate";
@@ -59,10 +60,16 @@ export function useStampCollection(opts: { guest?: "person" | "full" } = {}): St
         enabled: !!member,
     });
 
+    // 어드민이 증정한 볼마커 · 트로피(2026-10-16) — 받은 기록에만 있다. 도장으로 다시 계산한 '다 채움'에 더해 '받음'으로 그린다
+    const awards = useStampAwards({ enabled: !!member });
     const mine = useMemo(() => {
-        const states = bookStates<ShownStamp>((data?.stamps ?? []).map(shownStamp), (data?.recordStamps ?? []).map(shownStamp));
-        return { states, summary: stampSummary(states) };
-    }, [data]);
+        const raw = bookStates<ShownStamp>((data?.stamps ?? []).map(shownStamp), (data?.recordStamps ?? []).map(shownStamp));
+        const states = raw.map((s) => (!s.done && awards.of("book", s.book.id) ? { ...s, done: true } : s));
+        const sum = stampSummary(states);
+        const allOpenDone = sum.allOpenDone || !!awards.of("all", STAMP_ALL_OPEN);
+        const trophies = STAMP_TROPHY_STEPS.filter((at) => sum.stamped >= at || !!awards.of("trophy", String(at))).length;
+        return { states, summary: { ...sum, allOpenDone, markers: sum.doneBooks.length + (allOpenDone ? 1 : 0), trophies } };
+    }, [data, awards]);
 
     const full = opts.guest === "full";
     return {

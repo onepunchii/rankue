@@ -178,7 +178,7 @@ export function TrophyPiece({ index, size, earned }: { index: number; size: numb
  * 트로피 선반 — 다섯 개가 늘 한 줄. 선반의 너비를 재서 칸과 그림의 크기를 정한다(360 폭에서 옆으로 넘치지 않게).
  * 그림은 가장자리가 비어 있어 칸보다 크게 그리고 옆 칸과 겹친다.
  */
-export function TrophyShelf({ stamped }: { stamped: number }) {
+export function TrophyShelf({ stamped, granted }: { stamped: number; /** 어드민이 증정한 트로피(2026-10-16) — 받은 기록에만 있다 */ granted?: (at: number) => boolean }) {
     const ref = useRef<HTMLDivElement>(null);
     const [inner, setInner] = useState(310);
     useLayoutEffect(() => {
@@ -196,7 +196,7 @@ export function TrophyShelf({ stamped }: { stamped: number }) {
         <div className="relative rounded-2xl bg-[#0C0C0C] border border-[#FFFFFF14] px-3.5 pt-2.5 pb-5 overflow-hidden" data-testid="trophy-shelf">
             <div ref={ref} className="flex justify-around">
                 {TROPHIES.map((t, i) => {
-                    const earned = stamped >= t.at;
+                    const earned = stamped >= t.at || !!granted?.(t.at);
                     return (
                         <div key={t.at} className="text-center" style={{ width: COL }}>
                             <div style={{ margin: `0 ${(COL - SIZE) / 2}px` }}><TrophyPiece index={i} size={SIZE} earned={earned} /></div>

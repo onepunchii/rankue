@@ -7,6 +7,7 @@ import { randomInt } from "crypto";
 import { hashPassword } from "../../services/hiqService.js";
 import { checkSuperAdmin, adminLog } from "../../middleware/adminAuth.js";
 import { adminActionLabel, type AdminActionRow } from "../../../shared/adminActions.js";
+import adminGoodsRouter from "./adminGoods.js";
 import { cleanRejectReason } from "../../lib/partnerApply.js";
 import adminGolfRouter from "./adminGolf/index.js";
 import adminVisitorsRouter from "./adminVisitors.js";
@@ -26,6 +27,8 @@ const router = Router();
 router.use("/golf", adminGolfRouter);
 // 방문자 발자국(2026-10-08) — 전부 조회(GET). 가드는 adminVisitors.ts 가 건다
 router.use("/visitors", adminVisitorsRouter);
+// 굿즈 · 배지 증정(2026-10-16)
+router.use("/goods", adminGoodsRouter);
 
 // /partner/login 과 같은 쿠키 옵션 — 모든 가드가 signedCookies 로 읽으므로 서명이 빠지면 안 된다.
 const PARTNER_COOKIE_OPTS = {

@@ -59,7 +59,7 @@ describe("등산 도장첩의 예시 — 다 모은 모습", () => {
         const hook = read("client/src/hiking/stamps/useHikingStamps.ts");
         expect(hook).toContain("const my = useQuery<MyStampsResponse>({ queryKey: MY_STAMPS_KEY, enabled: member && !example });");
         // 받은 것도 만든다(다 모은 모습) — 순번은 0 으로 두고 화면은 예시일 때 순번을 적지 않는다
-        expect(hook).toContain("const awards = example ? exampleAwards(states, stamps) : member ? my.data?.awards ?? [] : [];");
+        expect(hook).toContain("const awards = example ? exampleAwards(computed, stamps) : member ? my.data?.awards ?? [] : [];");
         expect(hook).toContain("out.push({ id: hikingAwardId(kind, key), kind, key, serial: 0, earnedAt: new Date(at).toISOString() });");
         expect(hook).toContain("? exampleSummits(hikingBooks(famous).flatMap((b) => b.slots.map((x) => x.id)), Date.now())");
         const shelf = read("client/src/hiking/pages/StampShelf.tsx");

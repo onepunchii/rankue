@@ -4037,5 +4037,10 @@ const tr: Dict = {
   "inv.meFail": "Davet kodun yüklenemedi",
   "inv.retry": "Tekrar dene",
   "inv.cardOnly": "Kart görselini kaydet",
+  "gift.title": "Bir hediye geldi",
+  "gift.from": "Rankue'dan bir hediye",
+  "gift.open": "Gör",
+  "gift.close": "Kapat",
+  "gift.missing": "Hediye bulunamadı",
 };
 export default tr;
