@@ -6,6 +6,7 @@
  * GET /admin/fishing/ranking/species · GET /admin/fishing/ranking?species=   랭킹 점검 — 어종마다 큰 순 100줄(뺀 것 · 가린 것도), 다시 볼 것(shared/fishingRankAudit)
  * POST /admin/fishing/catches/:id/rank-void { reason, notify } · /:id/rank-restore { reason }   랭킹에서만 빼기 · 되돌리기(일지 · 수족관은 그대로)
  * GET /admin/fishing/feeds · POST /admin/fishing/feeds/warm    공공자료 상태판(받아 둔 곳 · 출처마다 성공/실패) · 지금 받기(매시 크론과 같은 일)
+ * GET /admin/fishing/decor-audit · POST /admin/fishing/decor/:memberId/take-back { itemIds, reason }   장식 맞춰 보기 · 받쳐 주지 않는 것만 거두기(shared/fishingDecorAudit)
  * 까닭 · 처리는 신고 큐의 처리 기록에 쌓이고, 올린 사람에게 낚시 알림함으로 결과가 간다(services/moderation).
  */
 import { Router } from "express";
@@ -27,6 +28,9 @@ import { rankColumn } from "../../../shared/fishingRank.js";
 import { rankReview, type AdminRankBoard, type AdminRankRow, type AdminRankSpecies } from "../../../shared/fishingRankAudit.js";
 import { FISHING_FEEDS, SOURCE_LABEL, feedState, type FishingFeeds } from "../../../shared/fishingFeeds.js";
 import { recentCronRuns } from "../../storage/cronRuns.js";
+import { DECOR, decorItem, decorProgress } from "../../../shared/fishingDecor.js";
+import { canTakeBackDecor, type DecorAuditMember, type DecorAuditSweep } from "../../../shared/fishingDecorAudit.js";
+import { decorCatchesOf } from "../../storage/fishingCatches.js";
 
 const router = Router();
 router.use(checkSuperAdmin);
@@ -162,6 +166,52 @@ router.get("/feeds", asyncHandler(async (_req: any, res: any) => {
 router.post("/feeds/warm", asyncHandler(async (_req: any, res: any) => {
     const { warmFishingFeeds } = await import("../../services/fishingWarm.js");
     return sendSuccess(res, await warmFishingFeeds());
+}));
+
+// ── 장식 맞춰 보기 ────────────────────────────────────────────────────────
+const LIMITED_DECOR = DECOR.filter((d) => typeof d.limit === "number");
+
+async function decorAudit(memberId: string, name: string): Promise<DecorAuditMember> {
+    const list = await decorCatchesOf(memberId);
+    const prog = decorProgress(list);
+    const awards = rowsOf(await db.execute(sql`select item_id, serial, to_char(earned_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as earned from fishing_decor_awards where member_id = ${memberId} order by earned_at`));
+    const granted = new Set(rowsOf(await db.execute(sql`select item from hiq_goods_grants where member_id::text = ${memberId} and sport = 'fishing' and revoked_at is null`).catch(() => ({ rows: [] }))).map((g) => String(g.item)));
+    const rows = awards.filter((a) => decorItem(String(a.item_id))).map((a) => {
+        const id = String(a.item_id);
+        return { itemId: id, name: decorItem(id)!.name, serial: Number(a.serial) || 0, earnedAt: String(a.earned), granted: granted.has(id), supported: prog[id]?.done === true };
+    });
+    const holdsLimited = rows.some((r) => LIMITED_DECOR.some((d) => d.id === r.itemId));
+    return {
+        memberId, name, rows, unsupported: rows.filter(canTakeBackDecor).length,
+        evidence: holdsLimited ? { yearSpecies: prog.goldanchor?.cur ?? 0, photos: list.filter((c) => c.photo).length, days: new Set(list.map((c) => c.day)).size, catches: list.length } : null,
+    };
+}
+
+router.get("/decor-audit", asyncHandler(async (_req: any, res: any) => {
+    const holders = rowsOf(await db.execute(sql`select a.member_id, coalesce(m.name, '회원') as name, m.phone, count(*)::int as n
+        from fishing_decor_awards a left join hiq_members m on m.id::text = a.member_id group by a.member_id, m.name, m.phone order by count(*) desc limit 300`).catch(() => ({ rows: [] })));
+    const members: DecorAuditMember[] = [];
+    for (const h of holders) members.push(await decorAudit(String(h.member_id), String(h.phone ?? "").startsWith("del-") ? "탈퇴한 회원" : String(h.name)));
+    members.sort((a, b) => b.unsupported - a.unsupported || Number(!!b.evidence) - Number(!!a.evidence) || b.rows.length - a.rows.length);
+    const given = new Map(rowsOf(await db.execute(sql`select item_id, count(*)::int as n from fishing_decor_awards group by item_id`).catch(() => ({ rows: [] }))).map((r) => [String(r.item_id), Number(r.n) || 0]));
+    const out: DecorAuditSweep = { members, limited: LIMITED_DECOR.map((d) => ({ itemId: d.id, name: d.name, given: given.get(d.id) ?? 0, limit: d.limit! })) };
+    res.set("Cache-Control", "no-store");
+    return sendSuccess(res, out);
+}));
+
+router.post("/decor/:memberId/take-back", asyncHandler(async (req: any, res: any) => {
+    const memberId = String(req.params.memberId ?? ""), reason = reasonOf(req);
+    const ids: string[] = Array.isArray(req.body?.itemIds) ? req.body.itemIds.filter((x: unknown): x is string => typeof x === "string").slice(0, 60) : [];
+    if (!UUID.test(memberId)) return sendError(res, 404, "회원을 찾을 수 없어요");
+    if (!reason) return sendError(res, 400, "거두는 까닭을 적어 주세요");
+    if (!ids.length) return sendError(res, 400, "거둘 것을 골라 주세요");
+    // 다시 맞춰 보고 받쳐 주지 않는 것만(증정 아님) — 화면이 보낸 목록을 그대로 믿지 않는다
+    const a = await decorAudit(memberId, "");
+    const allowed = new Set(a.rows.filter(canTakeBackDecor).map((r) => r.itemId));
+    const take = [...new Set(ids)].filter((id) => allowed.has(id));
+    if (!take.length) return sendError(res, 409, "지금 기록이 받쳐 주는 장식은 거둘 수 없어요");
+    for (const id of take) await db.execute(sql`delete from fishing_decor_awards where member_id = ${memberId} and item_id = ${id}`);
+    return sendSuccess(res, { ok: true, taken: take });
 }));
 
 export default router;

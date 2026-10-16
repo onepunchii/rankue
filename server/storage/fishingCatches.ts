@@ -6,6 +6,7 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
+import type { DecorCatch } from "../../shared/fishingDecor.js";
 
 const rows = async <T>(q: ReturnType<typeof sql>): Promise<T[]> => { const r: any = await db.execute(q); return (r.rows ?? r) as T[]; };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -88,4 +89,11 @@ export async function reportableAuthor(id: string, reporterId: string): Promise<
     if (!c.crewId) return null;
     const [m] = await rows<any>(sql`select 1 from hiq_crew_members where crew_id = ${c.crewId}::uuid and member_id = ${reporterId}::uuid and role <> 'pending'`);
     return m ? c.memberId : null;
+}
+
+/** 수족관 장식의 재료 — 그 사람의 조과(가린 것은 빼고). 수족관(routes/modules/fishing tankOf)과 어드민 장식 맞춰 보기가 같은 것을 쓴다 */
+export async function decorCatchesOf(memberId: string): Promise<DecorCatch[]> {
+    // 신고로 가려진 조과는 수족관(물고기 · 장식)에 들지 않는다(2026-10-17)
+    return (await rows<any>(sql`select fished_on, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url is not null as photo, trip_id from fishing_catches where member_id = ${memberId} and hidden_at is null`))
+        .map((r) => ({ day: String(r.fished_on), spot: r.spot ?? null, species: String(r.species), released: r.released === true, photo: r.photo === true, tripId: r.trip_id ? String(r.trip_id) : null, lengthCm: r.length_cm == null ? null : Number(r.length_cm), count: Number(r.fish_count) || 1, weightKg: r.weight_kg == null ? null : Number(r.weight_kg), ji: r.ji == null ? null : Number(r.ji) }));
 }

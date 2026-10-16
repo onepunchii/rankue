@@ -39,7 +39,7 @@ import { getReservoirs, searchReservoirs } from "../../services/fishingReservoir
 import { RESERVOIR_MAX, RESERVOIR_STARTERS, cleanCountyQuery, isReservoirCode, type ReservoirRef } from "../../../shared/fishingReservoir.js";
 import { FISHING_PHOTO_CATEGORY, FISHING_THUMB_CATEGORY, cleanCatch, fishingKstDay, isOwnFishingPhotoUrl, type FishingCatch, type FishingPlace } from "../../../shared/fishing.js";
 import { deleteBlobs } from "../../utils/blob.js";
-import { appealCatch } from "../../storage/fishingCatches.js";
+import { appealCatch, decorCatchesOf } from "../../storage/fishingCatches.js";
 
 const router = Router();
 const rowsOf = (r: any) => (r.rows ?? r) as any[];
@@ -357,11 +357,7 @@ router.get("/places", requireAuth, gate, asyncHandler(async (req: AuthRequest, r
 
 /* ── 수족관 꾸미기(shared/fishingDecor) — 장식은 조과 기록으로만. 받은 것은 fishing_decor_awards, 자리는 fishing_tanks ── */
 
-async function decorCatches(memberId: string): Promise<DecorCatch[]> {
-    // 신고로 가려진 조과는 수족관(물고기 · 장식)에 들지 않는다(2026-10-17)
-    return rowsOf(await db.execute(sql`select fished_on, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url is not null as photo, trip_id from fishing_catches where member_id = ${memberId} and hidden_at is null`))
-        .map((r) => ({ day: String(r.fished_on), spot: r.spot ?? null, species: String(r.species), released: r.released === true, photo: r.photo === true, tripId: r.trip_id ? String(r.trip_id) : null, lengthCm: r.length_cm == null ? null : Number(r.length_cm), count: Number(r.fish_count) || 1, weightKg: r.weight_kg == null ? null : Number(r.weight_kg), ji: r.ji == null ? null : Number(r.ji) }));
-}
+const decorCatches = decorCatchesOf;
 /** 조건을 채운 장식을 받은 기록에 넣는다 — 몇 번째 주인(serial)은 max + 1, 한정은 그 수를 넘지 않게(겹치면 다시) */
 async function awardDecor(memberId: string, list: readonly DecorCatch[]): Promise<Map<string, { serial: number; earnedAt: string }>> {
     const have = new Map(rowsOf(await db.execute(sql`select item_id, serial, earned_at from fishing_decor_awards where member_id = ${memberId}`))

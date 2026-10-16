@@ -12,7 +12,9 @@ describe("낚시 조과 신고 · 가림(공개 전 필수, 2026-10-17)", () => 
         expect(routes).toMatch(/where c\.is_public and c\.hidden_at is null and c\.rank_void is null and c\.species = \$\{fish\.name\}/);
         expect(routes).toMatch(/and \(c\.hidden_at is null or c\.member_id = \$\{viewerId\}\) \$\{notBlockedBy\(viewerId\)\}/);
         expect(routes).toMatch(/c\.member_id = m\.id::text and c\.hidden_at is null\) as species/);
-        expect(routes).toMatch(/from fishing_catches where member_id = \$\{memberId\} and hidden_at is null`/);
+        // 수족관 재료는 storage/fishingCatches decorCatchesOf 하나(어드민 장식 맞춰 보기도 같은 것)
+        expect(read("server/storage/fishingCatches.ts")).toMatch(/from fishing_catches where member_id = \$\{memberId\} and hidden_at is null`/);
+        expect(routes).toContain("const decorCatches = decorCatchesOf;");
     });
     it("보는 사람이 차단한 회원의 조과는 랭킹 · 정출판에서 빠진다", () => {
         expect(routes).toMatch(/b\.blocker_id = \$\{viewerId\}::uuid and b\.blocked_id::text = c\.member_id/);
