@@ -50,6 +50,10 @@ import { RESERVOIR_MAX, RESERVOIR_SOURCE, cleanCountyQuery, isReservoirCode, res
 import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@shared/fishingStations";
 import { bestOf, durationKo, goodSpots, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type IndexMap, type IndexSpot, type PortBrief } from "@shared/fishingPort";
 import { FishingAquarium } from "./FishingAquarium";
+import { TankFull } from "./tank/TankFull";
+import { TANK_KEY, placeLocal, readDecorSeen, useMyTank, writeDecorSeen } from "./tank/tankData";
+import { isNightKst, type TankMode } from "./tank/engine";
+import { DECOR_SLOTS, SLOT_KIND, decorHow, decorImage, decorItem, type CrewTankRow, type DecorSlot, type TankFishRow, type TankView } from "@shared/fishingDecor";
 
 const KEY = ["/api/hiq/fishing/catches"];
 type Tab = "home" | "trip" | "book" | "log" | "points" | "guide" | "rules" | "rank" | "gear" | "tank";
@@ -155,10 +159,34 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
     const sealMap = useMemo(() => new Map(records.filter((r) => r.tier).map((r) => [r.fish.id, r.tier!.name] as const)), [records]);
     const name = String(me?.nickname ?? me?.name ?? "");
     const top = shown[0] ?? null;
+    // 수족관 — 물고기(어종 · 마릿수)와 놓인 장식. 크게 보기(전체 화면)는 이 화면 위에 뜬다
+    const tankFish = useMemo<TankFishRow[]>(() => { const by = new Map<string, number>(); for (const c of list) by.set(c.species, (by.get(c.species) ?? 0) + Math.max(1, c.count || 1)); return [...by].map(([species, count]) => ({ species, count })); }, [list]);
+    const { data: tank } = useMyTank(allowed);
+    const [full, setFull] = useState<{ mode: TankMode; decor: DecorSlot | null } | null>(null);
+    const place = (slot: DecorSlot, item: string | null) => {
+        const cur = queryClient.getQueryData<TankView>(TANK_KEY);
+        if (!cur) return;
+        queryClient.setQueryData(TANK_KEY, placeLocal(cur, slot, item));
+        void apiRequest("/api/hiq/fishing/tank/layout", { method: "POST", body: { slot, item } })
+            .then((r: { layout: TankView["layout"]; placed: TankView["placed"] }) => { const now = queryClient.getQueryData<TankView>(TANK_KEY); if (now) queryClient.setQueryData(TANK_KEY, { ...now, layout: r.layout, placed: r.placed }); })
+            .catch(() => queryClient.invalidateQueries({ queryKey: TANK_KEY }));
+    };
+    const fishLine = (id: string) => { const r = records.find((x) => x.fish.id === id); return r ? `${r.catches}번 적음${r.value != null ? ` · 가장 큰 것 ${fishValueText(r.fish.unit, r.value)}` : ""}${r.next && r.gap != null ? ` · ${r.next.name}까지 ${fishValueText(r.fish.unit, r.gap)}` : ""}` : null; };
+    // 새로 받은 장식 — 한 번 크게 보여 준다(이 기기에서 이미 본 것은 빼고)
+    const [revealDecor, setRevealDecor] = useState<{ id: string; more: number } | null>(null);
+    useEffect(() => {
+        const got = (tank?.items ?? []).filter((x) => x.have);
+        if (!got.length) return;
+        const seen = readDecorSeen() ?? new Set<string>();
+        const fresh = got.filter((x) => !seen.has(x.id)).sort((a, b) => String(b.earnedAt).localeCompare(String(a.earnedAt)) || (decorItem(b.id)?.kind === "big" ? 1 : 0) - (decorItem(a.id)?.kind === "big" ? 1 : 0));
+        // 맨 처음 열 때 받아 둔 고운 모래 하나뿐이면 조용히 넘긴다
+        if (fresh.length && !(fresh.length === 1 && fresh[0].id === "floor-sand")) setRevealDecor({ id: fresh[0].id, more: fresh.length - 1 });
+        writeDecorSeen(got.map((x) => x.id));
+    }, [tank]);
 
     const remove = useMutation({
         mutationFn: (id: string) => apiRequest(`/api/hiq/fishing/catches/${id}`, { method: "DELETE" }),
-        onSuccess: () => queryClient.invalidateQueries({ queryKey: KEY }),
+        onSuccess: () => { void queryClient.invalidateQueries({ queryKey: KEY }); void queryClient.invalidateQueries({ queryKey: TANK_KEY }); },
     });
 
     if (!meLoading && !allowed) {
@@ -237,7 +265,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                         <div id="fishing-today-block" className="scroll-mt-16"><Today today={today} list={list} /></div>
                         {/* 내 수족관 — 잡은 어종이 헤엄치는 작은 창. 누르면 수족관 */}
                         <FsSection title="내 수족관" aside={<button type="button" onClick={() => setTab("tank")} style={{ color: C.sun }}>수족관 가기</button>} testid="fishing-home-tank">
-                            <div data-tour="fs-tank"><FishingAquarium list={empty ? [] : list} mini onOpen={() => setTab("tank")} /></div>
+                            <div data-tour="fs-tank"><FishingAquarium fish={empty ? [] : tankFish} placed={tank?.placed} mini onOpen={() => setTab("tank")} /></div>
                             <p className="mt-2 text-[12.5px] break-keep" style={{ color: C.dim }}>{empty ? "조과를 적으면 그 어종이 어탁 그림 그대로 헤엄쳐요." : `어종 ${records.length}/${FISH.length} · 낙관 ${seals}개 — 누르면 수족관`}</p>
                         </FsSection>
                         {/* 바다 도구함 — 참고 자료를 한 곳에(위판장 · 저수지 · 낚시터 · 어선 · 규칙 · 도감) */}
@@ -266,7 +294,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                 {(tab === "tank" || tab === "book") && (
                     <div data-testid="fishing-book">
                         {/* 수조 — 맨 위에 크게. 물고기를 누르면 그 어종의 한 장 */}
-                        <div className="px-5 pt-4"><FishingAquarium list={empty ? [] : list} seals={sealMap} onFish={setFishOpen} /></div>
+                        <div className="px-5 pt-4"><FishingAquarium fish={empty ? [] : tankFish} seals={sealMap} placed={tank?.placed} onFish={setFishOpen} onFull={(mode) => setFull({ mode, decor: null })} /></div>
                         {/* 내 기록 — 대표 기록어 · 숫자 셋 */}
                         <FsSection title="내 기록" aside={empty ? "예시" : <button type="button" onClick={() => setTab("log")} style={{ color: C.sun }}>일지 보기</button>} testid="fishing-mine">
                                 {top && (
@@ -416,6 +444,11 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                     }} />
             )}
 
+            {full && (
+                <TankFull title={name ? `${name}님의 수족관` : "내 수족관"} fish={empty ? [] : tankFish} seals={sealMap} placed={tank?.placed ?? {}} sample={empty} mine
+                    items={tank?.items} owned={tank?.owned} initialMode={full.mode} startDecor={full.decor}
+                    onClose={() => setFull(null)} onFish={setFishOpen} info={fishLine} onPlace={place} />
+            )}
             {fishOpen && !adding && (() => {
                 const f = FISH.find((x) => x.id === fishOpen);
                 if (!f) return null;
@@ -431,6 +464,25 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                 <GuideSheet row={guideOpen} onClose={() => setGuideOpen(null)} onAdd={(species) => { setPreset({ place: "", species }); setAdding(true); }} onRules={() => { setGuideOpen(null); setTab("rules"); }} />
             )}
 
+            {revealDecor && !promoted && (() => {
+                const d = decorItem(revealDecor.id);
+                if (!d) return null;
+                const slot = DECOR_SLOTS.find((s) => SLOT_KIND[s] === d.kind && s !== "left" && s !== "right") ?? "center";
+                return (
+                    <div role="dialog" aria-modal="true" aria-label="새 장식" className="fixed inset-0 z-[70] flex flex-col items-center justify-center px-6" style={{ background: "#0B1E2DF2" }} data-testid="fishing-decor-reveal" onClick={() => setRevealDecor(null)}>
+                        <p className="text-[14px]" style={{ color: C.soft }}>새 장식{revealDecor.more > 0 ? ` · 외 ${revealDecor.more}개` : ""}</p>
+                        <p className="mt-1 text-center text-[26px] font-semibold tracking-tight">{d.name}</p>
+                        <div className="mt-5 flex aspect-[5/4] w-full max-w-[300px] items-center justify-center rounded-2xl p-6" style={{ background: PAPER, transform: "rotate(-1.5deg)", boxShadow: "0 18px 40px #00000066" }}>
+                            <img src={decorImage(d.id)} alt="" className="max-h-full max-w-full object-contain" style={{ mixBlendMode: "multiply" }} />
+                        </div>
+                        <p className="mt-5 text-center text-[14px] break-keep" style={{ color: C.soft }}>{decorHow(d)} — 채웠어요{d.limit ? ` · 선착순 ${d.limit}명 중 한 사람` : ""}</p>
+                        <div className="mt-6 flex w-full max-w-[340px] gap-2">
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setRevealDecor(null); }} className="h-12 flex-1 rounded-xl text-[15px] font-semibold" style={{ background: "#FFFFFF14", color: C.foam }}>나중에</button>
+                            <button type="button" onClick={(e) => { e.stopPropagation(); setRevealDecor(null); setFull({ mode: isNightKst() ? "night" : "paper", decor: slot }); }} className="h-12 flex-[1.4] rounded-xl text-[15px] font-semibold" style={{ background: C.brand, color: C.onBrand }} data-testid="fishing-decor-reveal-place">수족관에 놓기</button>
+                        </div>
+                    </div>
+                );
+            })()}
             {promoted && (
                 <div role="dialog" aria-modal="true" aria-label="새 어탁" className="fixed inset-0 z-[70] flex flex-col items-center justify-center px-6" style={{ background: "#0B1E2DF2" }} data-testid="fishing-promoted" onClick={() => setPromoted(null)}>
                     <p className="text-[14px]" style={{ color: C.soft }}>{promoted.tier ? "승급" : "새 어탁"}</p>
@@ -1046,9 +1098,51 @@ export function FishingCrewTrips({ crewId, isMember }: { crewId: string; isMembe
     if (!isMember) return <p className="rounded-2xl px-5 py-6 text-center text-[13.5px]" style={{ background: C.card, color: C.soft }} data-testid="fishing-trips-locked">정출판은 크루원만 봐요.</p>;
     return (
         <div style={{ color: C.foam }} data-fishing="1">
+            <CrewTanks crewId={crewId} />
             <Crew crewId={crewId} meId={String(me?.id ?? "")} today={today} onAdd={setPreset} />
             {preset && <CatchSheet today={today} preset={preset} before={records} onClose={() => setPreset(null)} onSaved={() => { /* 판은 조과 창이 다시 받아 온다 */ }} />}
         </div>
+    );
+}
+
+/**
+ * 크루원 수족관(2026-10-16 오너가 고른 '크루원 구경 + 카드 공유') — 같은 낚시 크루의 수족관을 들여다본다.
+ * 어종 · 마릿수 · 장식만 나간다(잡은 곳 · 날은 서버가 보내지 않는다). 보기만 — 먹이는 줄 수 있다(그 기기에서만).
+ */
+function CrewTanks({ crewId }: { crewId: string }) {
+    const { data } = useQuery<CrewTankRow[]>({ queryKey: ["/api/hiq/fishing/crews", crewId, "tanks"], enabled: !!crewId, staleTime: 60_000 });
+    const [open, setOpen] = useState<CrewTankRow | null>(null);
+    const { data: view } = useQuery<TankView>({ queryKey: ["/api/hiq/fishing/tank/member", open?.memberId ?? "", { crewId }], enabled: !!open });
+    const seals = useMemo(() => new Map(view?.seals ?? []), [view]);
+    const rows = (data ?? []).filter((r) => r.species > 0 || r.me);
+    if (!rows.length) return null;
+    return (
+        <section className="mb-6" data-testid="fishing-crew-tanks">
+            <div className="flex items-baseline justify-between">
+                <h3 className="text-[15px] font-semibold">크루원 수족관</h3>
+                <span className="text-[12px]" style={{ color: C.dim }}>어종과 장식만 보여요</span>
+            </div>
+            <div className="-mx-1 mt-2 flex gap-2 overflow-x-auto px-1 pb-1">
+                {rows.map((r) => {
+                    const top = r.top ? fishByName(r.top) : null;
+                    return (
+                        <button key={r.memberId} type="button" onClick={() => setOpen(r)} className="w-[136px] shrink-0 overflow-hidden rounded-2xl text-left active:opacity-85" style={{ background: C.card, boxShadow: `inset 0 0 0 1px ${C.line}` }} data-testid={`fishing-crew-tank-${r.memberId}`}>
+                            <span className="relative block h-[72px] overflow-hidden" style={{ background: "linear-gradient(#173553 0%, #164564 30%, #0C2A40 100%)" }}>
+                                <span className="absolute inset-x-0 top-[18px] h-px" style={{ background: "#A8D8F2" , opacity: 0.6 }} />
+                                {top && <img src={art(top.id)} alt="" className="absolute left-1/2 top-[26px] h-[40px] -translate-x-1/2 object-contain" style={{ filter: "invert(1) sepia(0.3) brightness(1.05)", mixBlendMode: "screen", opacity: 0.9 }} loading="lazy" />}
+                            </span>
+                            <span className="block px-3 pb-2.5 pt-2">
+                                <span className="block truncate text-[14px] font-semibold">{r.me ? "나" : r.name}</span>
+                                <span className="mt-0.5 block text-[12px] tabular-nums" style={{ color: C.soft }}>어종 {r.species} · 장식 {r.decor}</span>
+                            </span>
+                        </button>
+                    );
+                })}
+            </div>
+            {open && view && (
+                <TankFull title={open.me ? "내 수족관" : `${view.name}님의 수족관`} fish={view.fish} seals={seals} placed={view.placed} sample={view.fish.length === 0} mine={false} owned={view.owned} onClose={() => setOpen(null)} />
+            )}
+        </section>
     );
 }
 
@@ -1393,6 +1487,7 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
             const all = [saved, ...(queryClient.getQueryData<FishingCatch[]>(KEY) ?? [])];
             queryClient.setQueryData(KEY, all);
             void queryClient.invalidateQueries({ queryKey: KEY });
+            void queryClient.invalidateQueries({ queryKey: TANK_KEY }); // 새 장식이 열렸을 수 있다
             onSaved(saved, all);
             onClose();
         } catch (e: any) {

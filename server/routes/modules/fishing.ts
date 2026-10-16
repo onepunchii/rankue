@@ -30,7 +30,8 @@ import { getSeaNow } from "../../services/fishingSea.js";
 import { getIndexMap, getPortBrief } from "../../services/fishingPort.js";
 import { nearestWeather, type CatchWeather } from "../../../shared/fishingSpot.js";
 import { rankColumn, rankRows, type FishingRankBoard, type FishingRankSpecies } from "../../../shared/fishingRank.js";
-import { fishByName } from "../../../shared/fishingFish.js";
+import { fishByName, fishRecords } from "../../../shared/fishingFish.js";
+import { DECOR, DECOR_SLOTS, SLOT_KIND, cleanLayout, decorItem, decorProgress, resolveLayout, type CrewTankRow, type DecorCatch, type DecorLayout, type DecorRow, type TankView } from "../../../shared/fishingDecor.js";
 import { GEAR_MAX, addLineChange, cleanGear, cleanLineChange, type FishingGear, type LineChange } from "../../../shared/fishingGear.js";
 import { getMarketWeek } from "../../services/fishingMarket.js";
 import { cleanBoatQuery, type FishingBoat } from "../../../shared/fishingBoats.js";
@@ -326,6 +327,117 @@ router.get("/places", requireAuth, gate, asyncHandler(async (req: AuthRequest, r
         regions: rowsOf(regions).map((r) => ({ sido: String(r.sido), n: Number(r.n) })),
         items: list.map((r): FishingPlace => ({ id: String(r.id), name: String(r.name), kind: r.kind ?? null, sido: r.sido ?? null, sigungu: r.sigungu ?? null, address: r.address ?? null, species: Array.isArray(r.species) ? r.species.map(String) : [], fee: r.fee ?? null, tel: r.tel ?? null, dataDate: r.data_date ?? null })),
     });
+}));
+
+/* ── 수족관 꾸미기(shared/fishingDecor) — 장식은 조과 기록으로만. 받은 것은 fishing_decor_awards, 자리는 fishing_tanks ── */
+
+async function decorCatches(memberId: string): Promise<DecorCatch[]> {
+    return rowsOf(await db.execute(sql`select fished_on, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url is not null as photo, trip_id from fishing_catches where member_id = ${memberId}`))
+        .map((r) => ({ day: String(r.fished_on), spot: r.spot ?? null, species: String(r.species), released: r.released === true, photo: r.photo === true, tripId: r.trip_id ? String(r.trip_id) : null, lengthCm: r.length_cm == null ? null : Number(r.length_cm), count: Number(r.fish_count) || 1, weightKg: r.weight_kg == null ? null : Number(r.weight_kg), ji: r.ji == null ? null : Number(r.ji) }));
+}
+/** 조건을 채운 장식을 받은 기록에 넣는다 — 몇 번째 주인(serial)은 max + 1, 한정은 그 수를 넘지 않게(겹치면 다시) */
+async function awardDecor(memberId: string, list: readonly DecorCatch[]): Promise<Map<string, { serial: number; earnedAt: string }>> {
+    const have = new Map(rowsOf(await db.execute(sql`select item_id, serial, earned_at from fishing_decor_awards where member_id = ${memberId}`))
+        .map((r) => [String(r.item_id), { serial: Number(r.serial), earnedAt: new Date(r.earned_at).toISOString() }] as const));
+    const prog = decorProgress(list);
+    for (const d of DECOR) {
+        if (have.has(d.id) || !prog[d.id]?.done) continue;
+        const cap = d.limit ?? 2_147_483_647;
+        for (let attempt = 0; attempt < 5; attempt++) {
+            try {
+                const [row] = rowsOf(await db.execute(sql`
+                    insert into fishing_decor_awards (member_id, item_id, serial)
+                    select ${memberId}, ${d.id}, coalesce(max(serial), 0) + 1 from fishing_decor_awards where item_id = ${d.id}
+                    having coalesce(max(serial), 0) < ${cap}
+                    on conflict (member_id, item_id) do nothing
+                    returning serial, earned_at`));
+                if (row) have.set(d.id, { serial: Number(row.serial), earnedAt: new Date(row.earned_at).toISOString() });
+                break;
+            } catch (e: any) {
+                if (e?.code === "23505" && attempt < 4) continue;
+                throw e;
+            }
+        }
+    }
+    return have;
+}
+function tankFish(list: readonly DecorCatch[]) {
+    const by = new Map<string, number>();
+    for (const c of list) { const n = c.species.trim(); if (n) by.set(n, (by.get(n) ?? 0) + Math.max(1, c.count || 1)); }
+    const fish = [...by.entries()].map(([species, count]) => ({ species, count }));
+    const seals = fishRecords(list).filter((r) => r.tier).map((r) => [r.fish.id, r.tier!.name] as [string, string]);
+    return { fish, seals };
+}
+async function tankOf(memberId: string, mine: boolean): Promise<TankView> {
+    const list = await decorCatches(memberId);
+    const [have, [meRow], [tank]] = await Promise.all([
+        awardDecor(memberId, list),
+        db.select({ name: hiqMembers.name }).from(hiqMembers).where(eq(hiqMembers.id, memberId)).limit(1),
+        db.execute(sql`select layout from fishing_tanks where member_id = ${memberId}`).then(rowsOf),
+    ]);
+    const owned = new Set(have.keys());
+    const layout = cleanLayout(tank?.layout ?? {}, owned);
+    const { fish, seals } = tankFish(list);
+    let items: DecorRow[] | null = null;
+    if (mine) {
+        const owners = new Map(rowsOf(await db.execute(sql`select item_id, count(*)::int as n from fishing_decor_awards group by item_id`)).map((r) => [String(r.item_id), Number(r.n)] as const));
+        const prog = decorProgress(list);
+        items = DECOR.map((d) => ({ id: d.id, cur: prog[d.id].cur, need: prog[d.id].need, have: owned.has(d.id), serial: have.get(d.id)?.serial ?? null, owners: owners.get(d.id) ?? 0, earnedAt: have.get(d.id)?.earnedAt ?? null }));
+    }
+    return { mine, name: String(meRow?.name ?? "회원"), fish, seals, layout, placed: resolveLayout(layout, owned), owned: owned.size, items };
+}
+
+router.get("/tank", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, await tankOf(req.userId!, true));
+}));
+
+/** 한 칸 바꾸기 — item: 장식 id · "" = 비움 · null = 알아서 */
+router.post("/tank/layout", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const slot = String(req.body?.slot ?? "");
+    if (!(DECOR_SLOTS as readonly string[]).includes(slot)) return sendError(res, 400, "자리를 찾을 수 없어요");
+    const item = req.body?.item;
+    if (item !== null && item !== "") {
+        const d = decorItem(typeof item === "string" ? item : "");
+        if (!d || d.kind !== SLOT_KIND[slot as keyof typeof SLOT_KIND]) return sendError(res, 400, "그 자리에 놓을 수 없는 장식이에요");
+        const [own] = rowsOf(await db.execute(sql`select 1 from fishing_decor_awards where member_id = ${req.userId!} and item_id = ${d.id}`));
+        if (!own) return sendError(res, 403, "아직 받지 않은 장식이에요");
+    }
+    const owned = new Set(rowsOf(await db.execute(sql`select item_id from fishing_decor_awards where member_id = ${req.userId!}`)).map((r) => String(r.item_id)));
+    const [cur] = rowsOf(await db.execute(sql`select layout from fishing_tanks where member_id = ${req.userId!}`));
+    const next: Record<string, string> = { ...cleanLayout(cur?.layout ?? {}, owned) };
+    // 같은 장식을 다른 칸에 두었으면 그 칸은 '알아서'로
+    if (typeof item === "string" && item) for (const k of Object.keys(next)) if (next[k] === item) delete next[k];
+    if (item === null) delete next[slot]; else next[slot] = String(item);
+    const layout: DecorLayout = cleanLayout(next, owned);
+    await db.execute(sql`insert into fishing_tanks (member_id, layout, updated_at) values (${req.userId!}, ${JSON.stringify(layout)}::jsonb, now())
+        on conflict (member_id) do update set layout = excluded.layout, updated_at = now()`);
+    return sendSuccess(res, { layout, placed: resolveLayout(layout, owned) });
+}));
+
+/** 크루원 수족관 — 같은 낚시 크루의 사람만. 잡은 곳 · 날은 나가지 않는다(어종과 마릿수 · 장식만) */
+router.get("/crews/:crewId/tanks", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const crewId = String(req.params.crewId ?? "");
+    if (!(await inCrew(req.userId!, crewId))) return sendError(res, 403, "그 크루의 사람만 볼 수 있어요");
+    const rows = rowsOf(await db.execute(sql`
+        select m.id::text as id, m.name,
+            (select count(distinct c.species)::int from fishing_catches c where c.member_id = m.id::text) as species,
+            (select count(*)::int from fishing_decor_awards a where a.member_id = m.id::text) as decor,
+            (select c.species from fishing_catches c where c.member_id = m.id::text group by c.species order by sum(c.fish_count) desc, c.species limit 1) as top
+        from hiq_crew_members cm join hiq_members m on m.id = cm.member_id
+        where cm.crew_id = ${crewId}::uuid and cm.role <> 'pending'
+        order by species desc, m.name limit 60`));
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, rows.map((r): CrewTankRow => ({ memberId: String(r.id), name: String(r.name ?? "회원"), species: Number(r.species) || 0, decor: Number(r.decor) || 0, me: String(r.id) === req.userId, top: r.top ? String(r.top) : null })));
+}));
+
+router.get("/tank/member/:memberId", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const memberId = String(req.params.memberId ?? ""), crewId = String(req.query.crewId ?? "");
+    if (!UUID.test(memberId)) return sendError(res, 404, "수족관을 찾을 수 없어요");
+    if (memberId === req.userId) return sendSuccess(res, await tankOf(memberId, true));
+    if (!(await inCrew(req.userId!, crewId)) || !(await inCrew(memberId, crewId))) return sendError(res, 403, "같은 크루의 수족관만 볼 수 있어요");
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, await tankOf(memberId, false));
 }));
 
 export default router;

@@ -44,16 +44,23 @@ describe("낚시 — 따로 선 종목", () => {
         expect(page).not.toContain("fixed right-4");
         expect(page).toContain('data-testid="fishing-add" data-tour="fs-add">조과 적기</button>');
         // 수족관 = 헤엄치는 어탁(three 를 더 쓰지 않는다) + 어탁첩. 홈에는 미리보기 한 칸과 바다 도구함
-        const tank = read("client/src/fishing/FishingAquarium.tsx");
-        expect(tank).not.toContain('from "three"');
-        expect(tank).toContain("export function isNightKst(ms = Date.now()): boolean {");
+        const tank = read("client/src/fishing/FishingAquarium.tsx"), engine = read("client/src/fishing/tank/engine.ts"), full = read("client/src/fishing/tank/TankFull.tsx");
+        for (const f of [tank, engine, full]) { expect(f).not.toContain('from "three"'); expect(f).not.toContain("roundRect("); }
+        expect(engine).toContain("export function isNightKst(ms = Date.now()): boolean {");
         // 수조의 동작 — 물을 누르면 먹이 셋 · 물고기를 누르면 놀란 뒤 그 어종의 한 장 · 처음 보는 어종은 위에서 물보라와 함께
-        expect(tank).toContain("foodRef.current.push(...[-9, 0, 9].map((dx, i) => ({ x: x + dx, y: y + (i === 1 ? -4 : 0), born: now })));");
-        expect(tank).toContain("window.setTimeout(() => onFish?.(hit.id), 320);");
+        expect(engine).toContain("this.food.push(...[-14, 0, 14].map((dx, i) => ({ x: wx + dx, y: y + (i === 1 ? -6 : 0), born: t })));");
+        expect(tank).toContain("window.setTimeout(() => onFish?.(hit), 320);");
         expect(tank).toContain('const SEEN_KEY = "rankue.fishing.tank.seen";');
-        expect(tank).not.toContain("roundRect(");
+        // 전체 화면(2026-10-16 오너: "전체 화면 · 축소 확대 · 진짜 큰 수족관이나 바다 느낌") — 끌기 · 두 손가락 · 휠, 뒤로 = 닫기, 아래를 가린 만큼 세상을 올려 본다
+        expect(full).toContain('canvas.addEventListener("wheel", wheel, { passive: false });');
+        expect(full).toContain('window.history.pushState({ ...(window.history.state ?? {}), rkTank: 1 }, "");');
+        expect(full).toContain("const z = clamp(c.z, min, max), hw = vw / (2 * z), hh = vh / (2 * z), H = WORLD_H + padRef.current / z;");
+        expect(full).toContain('style={{ touchAction: "none", cursor: "grab" }}');
+        // 설치 팝업이 전체 화면 위에 뜨지 않는다(role=dialog 를 보고 쉰다 — AppInstallSheet screenBusy)
+        expect(full).toContain('role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[55]');
         expect(page).toContain('{(tab === "tank" || tab === "book") && (');
-        expect(page).toContain('<FishingAquarium list={empty ? [] : list} mini onOpen={() => setTab("tank")} />');
+        expect(page).toContain('<FishingAquarium fish={empty ? [] : tankFish} placed={tank?.placed} mini onOpen={() => setTab("tank")} />');
+        expect(page).toContain("void queryClient.invalidateQueries({ queryKey: TANK_KEY }); // 새 장식이 열렸을 수 있다");
         expect(page).toContain('testid="fishing-tools"');
         const ctx = read("client/src/contexts/SportContext.tsx");
         expect(ctx).toContain('else if (sport === "FISHING") document.documentElement.setAttribute("data-skin", "fishing");');
