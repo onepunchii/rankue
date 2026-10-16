@@ -8,6 +8,8 @@
  * - 동반자 얼굴이 찍혀 있을 수 있다: 썸네일은 늦게 불러오고(lazy), 큰 사진은 시트를 열 때만, 내려받기 단추·원본 링크는 두지 않는다.
  * - 목록(사진 주소·이름·이의제기 글)은 브라우저 저장소에 남기지 않는다 — 쿼리 캐시가 localStorage 에 영속화되므로(lib/queryClient)
  *   캐시 수명을 0 으로 두고 화면을 떠날 때 지운다(신고 큐 ModerationView 와 같은 방식).
+ * - 2026-10-17 어드민 › 등산 › 산행 사진도 이 화면을 쓴다(kind="hiking" — 서버 server/storage/adminHikingPhotos 가 같은 모양으로 준다).
+ *   다른 것은 주소와 말(골프장 → 산 · 라운드 사진 → 산행 사진 · 앨범 → 사진첩)뿐, 산행 사진에는 라운드 줄이 없다.
  */
 import { useEffect, useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -20,6 +22,13 @@ import { LucideRefreshCw, LucideChevronRight, LucideExternalLink, LucideImage } 
 import { FilterChips, SearchBox, EmptyState, Panel, Pill, kstDateTime, kstDate, agoLabel, daysSince, ADMIN_STICKY_TOP, SHEET_SAFE_TOP } from "../adminUtils";
 
 export const GOLF_PHOTOS_KEY = ["/api/hiq/admin/golf/photos"] as const;
+export const HIKING_PHOTOS_KEY = ["/api/hiq/admin/hiking/photos"] as const;
+type Kind = "golf" | "hiking";
+/** 종목마다 다른 것 — 주소와 말 */
+const KIND: Record<Kind, { key: readonly [string]; place: string; page: string; photo: string; privateNote: string; album: string; search: string; unknown: string; face: string }> = {
+    golf: { key: GOLF_PHOTOS_KEY, place: "골프장", page: "골프장 페이지", photo: "라운드 사진", privateNote: "비공개 — 그 라운드 앨범에만", album: "앨범", search: "골프장 이름", unknown: "골프장 미상", face: "동반자 얼굴이 나온 사진이 있을 수 있습니다." },
+    hiking: { key: HIKING_PHOTOS_KEY, place: "산", page: "산 페이지", photo: "산행 사진", privateNote: "비공개 — 올린 사람의 사진첩에만", album: "사진첩", search: "산 이름", unknown: "산 미상", face: "함께 오른 사람의 얼굴이 나온 사진이 있을 수 있습니다." },
+};
 /** 신고 큐 — 이 화면의 조치가 큐의 신고를 닫으므로 함께 새로 읽는다(사이드바 숫자 포함) */
 const REPORT_KEYS = [["/api/hiq/admin/reports"], ["/api/hiq/admin/reports/count"]] as const;
 /** 대시보드가 ?tab= 을 읽어 그 탭을 연다(dashboard.tsx DEEP_LINK_TABS) */
@@ -37,8 +46,10 @@ interface AdminPhoto {
     width: number | null;
     height: number | null;
     holeNo: number | null;
+    /** 골프장 — 산행 사진이면 산 */
     course: { slug: string | null; name: string | null; path: string | null };
-    round: { id: string; at: string | null };
+    /** 라운드 — 산행 사진에는 없다 */
+    round: { id: string; at: string | null } | null;
     uploader: { id: string; name: string };
     isPublic: boolean;
     hiddenAt: string | null;
@@ -64,21 +75,21 @@ const FILTERS: { id: Filter; label: string }[] = [
     { id: "appealed", label: "이의제기" },
     { id: "all", label: "전체" },
 ];
-const EMPTY: Record<Filter, string> = {
-    public: "골프장 페이지에 공개 중인 사진이 없습니다.",
+const emptyOf = (k: Kind): Record<Filter, string> => ({
+    public: `${KIND[k].page}에 공개 중인 사진이 없습니다.`,
     hidden: "가린 사진이 없습니다.",
     appealed: "판단을 기다리는 이의제기가 없습니다.",
-    all: "올라온 라운드 사진이 없습니다.",
-};
-const HINT: Record<Filter, string> = {
-    public: "지금 골프장 페이지에 보이는 사진입니다. 최근에 올라온 것부터.",
+    all: `올라온 ${KIND[k].photo}이 없습니다.`,
+});
+const hintOf = (k: Kind): Record<Filter, string> => ({
+    public: `지금 ${KIND[k].page}에 보이는 사진입니다. 최근에 올라온 것부터.`,
     hidden: "신고 누적(서로 다른 3명) 또는 운영자가 가린 사진입니다. 올린 사람에게만 보입니다.",
     appealed: "가린 사진에 올린 사람이 이의제기했습니다. 오래 기다린 것부터 — 받아들이거나 거절하면 결과 알림이 갑니다.",
-    all: "공개·비공개(앨범만)·가린 사진 전부. 최근에 올라온 것부터.",
-};
+    all: `공개·비공개(${KIND[k].album}만)·가린 사진 전부. 최근에 올라온 것부터.`,
+});
 
 type Tone = "primary" | "neutral" | "danger";
-const ACTION_UI: Record<Action, { label: string; confirm: string; confirmText: string; done: string; tone: Tone }> = {
+const actionUiOf = (k: Kind): Record<Action, { label: string; confirm: string; confirmText: string; done: string; tone: Tone }> => ({
     appeal_approve: {
         label: "이의제기 받아들이기", confirmText: "받아들이기", tone: "primary", done: "이의제기를 받아들였습니다",
         confirm: "이의제기를 받아들일까요? (사진이 다시 보이고 열린 신고는 기각으로 닫힙니다. 올린 사람에게 결과 알림이 갑니다)",
@@ -89,17 +100,17 @@ const ACTION_UI: Record<Action, { label: string; confirm: string; confirmText: s
     },
     blind: {
         label: "가리기", confirmText: "가리기", tone: "neutral", done: "가렸습니다",
-        confirm: "이 사진을 가릴까요? (골프장 페이지·앨범에서 내려가고, 올린 사람에게 안내와 이의제기 버튼이 갑니다)",
+        confirm: `이 사진을 가릴까요? (${KIND[k].page}·${KIND[k].album}에서 내려가고, 올린 사람에게 안내와 이의제기 버튼이 갑니다)`,
     },
     unblind: {
         label: "다시 보이기", confirmText: "보이기", tone: "neutral", done: "다시 보이게 했습니다",
-        confirm: "이 사진을 다시 보이게 할까요? (공개 사진이면 골프장 페이지에 다시 뜨고, 올린 사람에게 안내가 갑니다)",
+        confirm: `이 사진을 다시 보이게 할까요? (공개 사진이면 ${KIND[k].page}에 다시 뜨고, 올린 사람에게 안내가 갑니다)`,
     },
     delete: {
         label: "지우기", confirmText: "지우기", tone: "danger", done: "지웠습니다",
         confirm: "이 사진을 지울까요? (원본·썸네일 파일까지 지워 되돌릴 수 없습니다. 올린 사람에게 삭제 안내가 갑니다)",
     },
-};
+});
 const TONE_CLS: Record<Tone, string> = {
     primary: "bg-brand text-white hover:bg-brand-strong",
     neutral: "bg-white border border-black/10 text-[rgba(0,0,0,0.87)] hover:bg-black/[0.03]",
@@ -135,7 +146,8 @@ function useDebounced<T>(value: T, ms: number): T {
     return v;
 }
 
-export default function GolfPhotosView({ onOpenMember }: { onOpenMember?: (id: string) => void }) {
+export default function GolfPhotosView({ onOpenMember, kind = "golf" }: { onOpenMember?: (id: string) => void; kind?: Kind }) {
+    const K = KIND[kind], KEY = K.key, UI = actionUiOf(kind), EMPTY = emptyOf(kind), HINT = hintOf(kind);
     const { toast } = useToast();
     const qc = useQueryClient();
     const [, setLocation] = useLocation();
@@ -151,17 +163,17 @@ export default function GolfPhotosView({ onOpenMember }: { onOpenMember?: (id: s
     const [note, setNote] = useState("");
 
     const { data, isLoading, isError, error, refetch, isFetching, isPlaceholderData } = useQuery<PhotoPage>({
-        queryKey: [...GOLF_PHOTOS_KEY, { filter, course: course || undefined, days: days || undefined, offset, limit: PAGE }],
+        queryKey: [...KEY, { filter, course: course || undefined, days: days || undefined, offset, limit: PAGE }],
         gcTime: 0,
         staleTime: 0,
         placeholderData: (prev) => prev, // 쪽을 넘길 때 빈 화면으로 깜빡이지 않게
     });
     // 화면을 떠나면 캐시에서 지운다 → 영속화된 localStorage 스냅샷에서도 빠진다.
-    useEffect(() => () => { qc.removeQueries({ queryKey: GOLF_PHOTOS_KEY }); }, [qc]);
+    useEffect(() => () => { qc.removeQueries({ queryKey: KEY }); }, [qc, KEY]);
 
     const act = useMutation({
         mutationFn: async (v: { photo: AdminPhoto; action: Action; note?: string }) => {
-            const base = `${GOLF_PHOTOS_KEY[0]}/${v.photo.id}`;
+            const base = `${KEY[0]}/${v.photo.id}`;
             switch (v.action) {
                 case "blind":
                 case "unblind":
@@ -177,19 +189,19 @@ export default function GolfPhotosView({ onOpenMember }: { onOpenMember?: (id: s
             }
         },
         onSuccess: (_r, v) => {
-            toast({ title: ACTION_UI[v.action].done });
+            toast({ title: UI[v.action].done });
             setSelected(null);
         },
-        onError: (e: any, v) => toast({ title: `${ACTION_UI[v.action].label} 실패`, description: e?.message ?? "", variant: "destructive" }),
+        onError: (e: any, v) => toast({ title: `${UI[v.action].label} 실패`, description: e?.message ?? "", variant: "destructive" }),
         onSettled: () => {
-            qc.invalidateQueries({ queryKey: GOLF_PHOTOS_KEY });
+            qc.invalidateQueries({ queryKey: KEY });
             for (const k of REPORT_KEYS) qc.invalidateQueries({ queryKey: k });
         },
     });
 
     const run = async (photo: AdminPhoto, action: Action) => {
-        const ui = ACTION_UI[action];
-        const who = `\n\n${photo.course.name ?? "골프장 미상"} · 올린 사람 ${photo.uploader.name}`;
+        const ui = UI[action];
+        const who = `\n\n${photo.course.name ?? K.unknown} · 올린 사람 ${photo.uploader.name}`;
         if (!(await appConfirm({ message: `${ui.confirm}${who}`, tone: ui.tone === "danger" ? "danger" : "default", confirmText: ui.confirmText }))) return;
         const memo = note.trim();
         act.mutate({ photo, action, ...(memo && action.startsWith("appeal_") ? { note: memo } : {}) });
@@ -202,7 +214,7 @@ export default function GolfPhotosView({ onOpenMember }: { onOpenMember?: (id: s
 
     return (
         <div className="space-y-3">
-            {/* 도구 줄: 거르기 칩 · 골프장 검색 · 기간 · 새로고침 */}
+            {/* 도구 줄: 거르기 칩 · 골프장(산) 검색 · 기간 · 새로고침 */}
             <div className={`${ADMIN_STICKY_TOP} z-10 -mx-4 md:mx-0 px-4 md:px-0 py-2 bg-surface-0/95 backdrop-blur space-y-2 md:space-y-0 md:flex md:items-center md:gap-3`}>
                 <div className="min-w-0 md:flex-1">
                     <FilterChips value={filter} onChange={setFilter} options={FILTERS.map((f) => ({
@@ -210,7 +222,7 @@ export default function GolfPhotosView({ onOpenMember }: { onOpenMember?: (id: s
                     }))} />
                 </div>
                 <div className="flex gap-2">
-                    <SearchBox value={search} onChange={setSearch} placeholder="골프장 이름" className="flex-1 min-w-0 md:w-60 md:flex-none" />
+                    <SearchBox value={search} onChange={setSearch} placeholder={K.search} className="flex-1 min-w-0 md:w-60 md:flex-none" />
                     <select value={days} onChange={(e) => setDays(e.target.value as Days)} aria-label="올린 기간"
                         className="h-10 shrink-0 px-2 rounded-xl bg-white border border-black/10 text-[13px] font-bold text-black/65 outline-none">
                         <option value="">전체 기간</option>
@@ -245,7 +257,7 @@ export default function GolfPhotosView({ onOpenMember }: { onOpenMember?: (id: s
             ) : (
                 // 조건을 바꾼 직후엔 앞 목록을 흐리게 둔다(새 목록이 올 때까지 — 다른 칩의 사진을 지금 것으로 오해하지 않게)
                 <ul className={`grid grid-cols-3 md:grid-cols-6 gap-x-2 gap-y-3 transition-opacity ${isPlaceholderData ? "opacity-50" : ""}`}>
-                    {items.map((p) => <PhotoTile key={p.id} photo={p} onOpen={() => open(p)} />)}
+                    {items.map((p) => <PhotoTile key={p.id} photo={p} unknown={K.unknown} onOpen={() => open(p)} />)}
                 </ul>
             )}
 
@@ -264,10 +276,11 @@ export default function GolfPhotosView({ onOpenMember }: { onOpenMember?: (id: s
             )}
 
             <p className="text-[12px] text-black/40 leading-relaxed">
-                동반자 얼굴이 나온 사진이 있을 수 있습니다. 확인만 하고 내려받거나 밖으로 옮기지 마세요.
+                {K.face} 확인만 하고 내려받거나 밖으로 옮기지 마세요.
             </p>
 
             <PhotoSheet
+                kind={kind}
                 photo={selected}
                 busy={act.isPending}
                 note={note}
@@ -281,11 +294,11 @@ export default function GolfPhotosView({ onOpenMember }: { onOpenMember?: (id: s
     );
 }
 
-function PhotoTile({ photo: p, onOpen }: { photo: AdminPhoto; onOpen: () => void }) {
+function PhotoTile({ photo: p, unknown, onOpen }: { photo: AdminPhoto; unknown: string; onOpen: () => void }) {
     const st = statusOf(p);
     return (
         <li className="min-w-0">
-            <button onClick={onOpen} aria-label={`${p.course.name ?? "골프장 미상"} · ${p.uploader.name} 사진 열기`}
+            <button onClick={onOpen} aria-label={`${p.course.name ?? unknown} · ${p.uploader.name} 사진 열기`}
                 className="group block w-full text-left">
                 <span className="relative block aspect-square rounded-xl overflow-hidden bg-black/[0.06] ring-1 ring-inset ring-black/[0.06]">
                     {p.thumbUrl ? (
@@ -305,7 +318,7 @@ function PhotoTile({ photo: p, onOpen }: { photo: AdminPhoto; onOpen: () => void
                         </span>
                     )}
                 </span>
-                <span className="mt-1.5 block truncate text-[12.5px] font-bold text-[rgba(0,0,0,0.87)]">{p.course.name ?? "골프장 미상"}</span>
+                <span className="mt-1.5 block truncate text-[12.5px] font-bold text-[rgba(0,0,0,0.87)]">{p.course.name ?? unknown}</span>
                 {/* 시각을 앞에 — 폰 3칸에서 잘려도 '얼마나 기다렸나'는 보이게 */}
                 <span className="block truncate text-[12px] text-black/45 tabular-nums">
                     <span className={isOverdue(p) ? "font-bold text-red-600" : ""}>{timeLabel(p)}</span> · {p.uploader.name}
@@ -324,7 +337,8 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
     );
 }
 
-function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMember, onOpenQueue }: {
+function PhotoSheet({ kind, photo: p, busy, note, onNote, onClose, onAction, onOpenMember, onOpenQueue }: {
+    kind: Kind;
     photo: AdminPhoto | null;
     busy: boolean;
     note: string;
@@ -334,6 +348,7 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
     onOpenMember?: (id: string) => void;
     onOpenQueue: () => void;
 }) {
+    const K = KIND[kind], UI = actionUiOf(kind);
     const st = p ? statusOf(p) : null;
     const appealOpen = !!p?.appeal?.open;
     const decide = (p?.actions ?? []).filter((a) => a === "appeal_approve" || a === "appeal_reject");
@@ -349,11 +364,11 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
                     <>
                         <div className="shrink-0 bg-white border-b border-black/[0.07] px-5 pt-5 pb-4 pr-12">
                             <SheetTitle className="flex items-center gap-2 text-[17px] font-bold text-[rgba(0,0,0,0.87)]">
-                                <span className="truncate">{p.course.name ?? "골프장 미상"}</span>
+                                <span className="truncate">{p.course.name ?? K.unknown}</span>
                                 <Pill tone={st.tone}>{st.label}</Pill>
                             </SheetTitle>
                             <SheetDescription className="mt-0.5 text-[12.5px] text-black/50 tabular-nums">
-                                라운드 사진{p.holeNo ? ` · ${p.holeNo}번 홀` : ""} · {kstDateTime(p.createdAt)} 올림
+                                {K.photo}{p.holeNo ? ` · ${p.holeNo}번 홀` : ""} · {kstDateTime(p.createdAt)} 올림
                             </SheetDescription>
                         </div>
 
@@ -364,7 +379,7 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
                                     <img src={p.thumbUrl} alt="" aria-hidden draggable={false} className="absolute inset-0 w-full h-full object-contain" />
                                 )}
                                 {p.url ? (
-                                    <img src={p.url} alt={`${p.course.name ?? "골프장"} 라운드 사진`} loading="lazy" decoding="async" draggable={false}
+                                    <img src={p.url} alt={`${p.course.name ?? K.place} ${K.photo}`} loading="lazy" decoding="async" draggable={false}
                                         className="absolute inset-0 w-full h-full object-contain" />
                                 ) : !p.thumbUrl && (
                                     <span className="absolute inset-0 flex items-center justify-center text-[13px] text-black/45">사진 주소를 확인할 수 없습니다</span>
@@ -391,9 +406,9 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
                                         </button>
                                     ) : <span className="font-bold">{p.uploader.name}</span>}
                                 </Row>
-                                <Row label="골프장">
+                                <Row label={K.place}>
                                     <span className="flex items-center gap-2 min-w-0">
-                                        <span className="truncate">{p.course.name ?? "골프장 미상"}</span>
+                                        <span className="truncate">{p.course.name ?? K.unknown}</span>
                                         {p.course.path && (
                                             <a href={p.course.path} target="_blank" rel="noopener noreferrer"
                                                 className="shrink-0 inline-flex items-center gap-0.5 text-[12.5px] font-bold text-brand hover:underline">
@@ -403,13 +418,15 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
                                     </span>
                                 </Row>
                                 <Row label="공개">
-                                    {p.isPublic ? "공개 — 골프장 페이지에 실림" : "비공개 — 그 라운드 앨범에만"}
+                                    {p.isPublic ? `공개 — ${K.page}에 실림` : K.privateNote}
                                     {p.hiddenAt && <span className="block text-[12.5px] text-amber-800 tabular-nums">가림 · {kstDateTime(p.hiddenAt)}</span>}
                                 </Row>
-                                <Row label="라운드">
-                                    <span className="tabular-nums">{kstDate(p.round.at)}</span>
-                                    <span className="ml-1.5 font-mono text-[12px] text-black/40">#{p.round.id.slice(0, 8)}</span>
-                                </Row>
+                                {p.round && (
+                                    <Row label="라운드">
+                                        <span className="tabular-nums">{kstDate(p.round.at)}</span>
+                                        <span className="ml-1.5 font-mono text-[12px] text-black/40">#{p.round.id.slice(0, 8)}</span>
+                                    </Row>
+                                )}
                                 <Row label="신고">
                                     {p.reportCount === 0 ? <span className="text-black/45">없음</span> : (
                                         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -447,8 +464,8 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
                                     <div className="grid grid-cols-2 gap-2">
                                         {[...decide, ...content].map((a, i, all) => (
                                             <button data-admin-write key={a} disabled={busy} onClick={() => onAction(a)}
-                                                className={`h-10 rounded-xl text-[13.5px] font-bold transition-colors active:scale-[0.99] disabled:opacity-40 ${all.length === 1 ? "col-span-2" : ""} ${TONE_CLS[ACTION_UI[a].tone]}`}>
-                                                {ACTION_UI[a].label}
+                                                className={`h-10 rounded-xl text-[13.5px] font-bold transition-colors active:scale-[0.99] disabled:opacity-40 ${all.length === 1 ? "col-span-2" : ""} ${TONE_CLS[UI[a].tone]}`}>
+                                                {UI[a].label}
                                             </button>
                                         ))}
                                     </div>
@@ -457,7 +474,7 @@ function PhotoSheet({ photo: p, busy, note, onNote, onClose, onAction, onOpenMem
                                     <div className="flex items-center gap-3">
                                         <button data-admin-write disabled={busy} onClick={() => onAction("delete")}
                                             className={`h-10 px-5 rounded-xl text-[13.5px] font-bold transition-colors active:scale-[0.99] disabled:opacity-40 ${TONE_CLS.danger}`}>
-                                            {ACTION_UI.delete.label}
+                                            {UI.delete.label}
                                         </button>
                                         <span className="text-[12px] text-black/45 leading-snug">원본·썸네일 파일까지 지워 되돌릴 수 없습니다</span>
                                     </div>

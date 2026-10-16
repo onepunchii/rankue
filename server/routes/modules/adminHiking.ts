@@ -8,6 +8,8 @@
  * GET /admin/hiking/mountains?view=kfs100|kept|all&q=        산 자료 — 정상 자리 · 높이 · 코스가 정상을 지나는가(가장 가까운 거리) · 인증 수 · 고친 칸
  * GET /admin/hiking/mountains/:id                         한 산 — 코스 선(그리기용) · 정상 후보(코스마다 가장 높은 점)
  * POST /admin/hiking/mountains/:id { lat, lng, heightM, peakName, reason }  고치기 — admin_keep 에 적혀 다시 적재해도 남는다, 코스의 정상 자리(summit_km)도 다시 셈
+ * GET /admin/hiking/photos?filter=public|hidden|appealed|all&course=&days=   산행 사진 전부(storage/adminHikingPhotos — 골프 라운드 사진과 같은 모양)
+ * POST /admin/hiking/photos/:id/hide { hidden } · /:id/appeal { decision, note } · DELETE /:id   신고 큐와 같은 실행기(targetType 'hiking_photo')
  * 운영자가 '굿즈 · 배지'로 증정한 것은 거두지 않는다(증정 기록이 따로 있다). 까닭은 작업 기록에 남는다(가드).
  */
 import { Router } from "express";
@@ -18,6 +20,12 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { sendError, sendSuccess } from "../../utils/response.js";
 import { storage } from "../../storage/index.js";
 import { allMountains, forgetMountainCache } from "../../storage/hiking.js";
+import { listAdminHikingPhotos } from "../../storage/adminHikingPhotos.js";
+import { parsePhotoListQuery } from "../../storage/adminGolfPhotos.js";
+import { applyModerationAction } from "../../services/moderation.js";
+import { adminLog } from "../../middleware/adminAuth.js";
+import * as hikingPhotos from "../../storage/hikingPhotos.js";
+import type { ModerationAction } from "../../lib/reportQueue.js";
 import { listSummits, syncHikingAwards } from "../../storage/hikingStamps.js";
 import { isWithdrawnMember } from "../../../shared/chatSupport.js";
 import { goodsItem } from "../../../shared/goods.js";
@@ -205,5 +213,41 @@ router.post("/mountains/:id", asyncHandler(async (req: any, res: any) => {
     forgetMountainCache();
     return sendSuccess(res, { ok: true, changed: Object.keys(changes), movedM: Number.isFinite(moved) ? Math.round(moved) : null, onCourse });
 }));
+
+// ── 산행 사진 ─────────────────────────────────────────────────────────────
+const PHOTO_GONE = "사진을 찾을 수 없습니다. 이미 지워졌을 수 있습니다.";
+
+router.get("/photos", asyncHandler(async (req: any, res: any) => {
+    res.setHeader("Cache-Control", "no-store");
+    return sendSuccess(res, await listAdminHikingPhotos(parsePhotoListQuery(req.query ?? {})));
+}));
+
+/** 조치 하나 — 골프 라운드 사진과 같은 길(신고 큐의 실행기 · 신고가 없는 사진에도) */
+async function photoAct(req: any, res: any, action: ModerationAction, logName: string, note: string | null = null) {
+    const id = String(req.params.id ?? "");
+    if (!UUID.test(id)) return sendError(res, 404, PHOTO_GONE);
+    if (!(await hikingPhotos.get(id))) return sendError(res, 404, PHOTO_GONE);
+    const result = await applyModerationAction({ targetType: "hiking_photo", targetId: id, action, adminProfileId: req.signedCookies?.hiq_partner_auth ?? null, allowUnreported: true, note });
+    if (!result.ok) return sendError(res, result.status, result.status === 404 ? PHOTO_GONE : result.message);
+    adminLog(req, logName, { id, action, closedReports: result.closed, ...(note ? { note } : {}) });
+    return sendSuccess(res, { id, action, closedReports: result.closed });
+}
+
+router.post("/photos/:id/hide", asyncHandler(async (req: any, res: any) => {
+    const hidden = req.body?.hidden;
+    if (typeof hidden !== "boolean") return sendError(res, 400, "가릴지 다시 보일지 골라 주세요");
+    return photoAct(req, res, hidden ? "blind" : "unblind", hidden ? "hiking_photo_hide" : "hiking_photo_unhide");
+}));
+
+router.post("/photos/:id/appeal", asyncHandler(async (req: any, res: any) => {
+    const decision = req.body?.decision;
+    if (decision !== "approve" && decision !== "reject") return sendError(res, 400, "받아들일지 거절할지 골라 주세요");
+    const raw = req.body?.note;
+    if (raw != null && typeof raw !== "string") return sendError(res, 400, "메모는 글로 적어 주세요");
+    const note = typeof raw === "string" ? raw.trim().slice(0, 500) || null : null;
+    return photoAct(req, res, decision === "approve" ? "appeal_approve" : "appeal_reject", `hiking_photo_appeal_${decision}`, note);
+}));
+
+router.delete("/photos/:id", asyncHandler(async (req: any, res: any) => photoAct(req, res, "delete", "hiking_photo_delete")));
 
 export default router;
