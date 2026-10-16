@@ -31,9 +31,9 @@ import { CASE_SECTIONS, CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, fetchCueCase, read
 const LOCALES: readonly CaseLocale[] = ["ko", "en", "es", "vi", "tr"];
 const asLocale = (l: string): CaseLocale => (LOCALES as readonly string[]).includes(l) ? (l as CaseLocale) : "en";
 const EMPTY: CaseItemView = { done: false, at: null, got: null, bars: [], soon: false, holders: 0, serial: null };
-const GROUP_KEY: Record<CueGroup, string> = { real: "case.group.real", online: "case.group.online", common: "case.group.common", both: "case.group.both", crew: "case.group.crew", stage2: "case.group.stage2" };
+const GROUP_KEY: Record<CueGroup, string> = { real: "case.group.real", online: "case.group.online", common: "case.group.common", both: "case.group.both", crew: "case.group.crew", stage2: "case.group.stage2", limited: "case.group.limited" };
 /** 크루 · 원정은 아직 열리지 않아 한 칸에 모은다 */
-const TAB_GROUPS: readonly CueGroup[] = ["real", "online", "common", "both", "crew"];
+const TAB_GROUPS: readonly CueGroup[] = ["limited", "real", "online", "common", "both", "crew"];
 
 export default function CueCasePage() {
     const { t, locale } = useT();
@@ -182,18 +182,31 @@ export default function CueCasePage() {
                                 const list = CUES.filter((c) => c.group === g || (g === "crew" && c.group === "stage2"));
                                 return (
                                     <button key={g} type="button" aria-pressed={group === g} onClick={() => setGroup(g)} data-testid={`cue-case-group-${g}`}
-                                        className={cn("h-9 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold", group === g ? "border-[color:var(--cc-gold)] bg-[color:var(--cc-gold)]/15 text-[color:var(--cc-gold)]" : "border-white/12 text-white/70")}>
+                                        className={cn("h-9 shrink-0 rounded-full border px-3.5 text-[13px] font-semibold", g === "limited" && group !== g && "border-[color:var(--cc-gold)]/45 text-[color:var(--cc-gold)]", group === g ? (g === "limited" ? "cc-tab-limited" : "border-[color:var(--cc-gold)] bg-[color:var(--cc-gold)]/15 text-[color:var(--cc-gold)]") : g !== "limited" && "border-white/12 text-white/70")}>
                                         {t(GROUP_KEY[g])} <span className="rk-num font-medium opacity-75">{owned(list)}/{list.length}</span>
                                     </button>
                                 );
                             })}
                         </div>
                         <p className="mt-2.5 px-1 text-[12.5px] leading-relaxed text-white/55 break-keep">{t(`case.groupDesc.${group}`)}</p>
-                        <ol className="mt-3 space-y-3.5" data-testid="cue-case-cues">
-                            {CUES.filter((c) => c.group === group || (group === "crew" && c.group === "stage2")).map((c, i) => (
-                                <CueRow key={c.id} item={c} view={it(c.id)} l={l} isNew={fresh.includes(c)} onOpen={() => setPick(c)} tour={i === 0 ? "cc-row" : undefined} />
-                            ))}
-                        </ol>
+                        {(() => {
+                            // 칸마다 '모은 큐'를 위에, '아직'을 아래에(2026-10-16 오너가 고른 A + C) — 같은 묶음 안에서는 조건 순서 그대로
+                            const list = CUES.filter((c) => c.group === group || (group === "crew" && c.group === "stage2"));
+                            const got = list.filter((c) => it(c.id).done), yet = list.filter((c) => !it(c.id).done);
+                            return (
+                                <div className="mt-3" data-testid="cue-case-cues">
+                                    {got.length > 0 && <p className="mb-2 px-1 text-[12px] font-bold tracking-[0.04em] text-[color:var(--cc-gold)]" data-testid="cue-case-owned-head">{t("case.ownedSec").replace("{n}", String(got.length))}</p>}
+                                    <ol className="space-y-3.5">
+                                        {got.map((c, i) => <CueRow key={c.id} item={c} view={it(c.id)} l={l} isNew={fresh.includes(c)} onOpen={() => setPick(c)} tour={i === 0 ? "cc-row" : undefined} />)}
+                                    </ol>
+                                    {got.length > 0 && yet.length > 0 && <i className="my-4 block h-px bg-[color:var(--cc-gold)]/18" aria-hidden />}
+                                    {yet.length > 0 && <p className="mb-2 px-1 text-[12px] font-bold tracking-[0.04em] text-white/55" data-testid="cue-case-locked-head">{t("case.lockedSec").replace("{n}", String(yet.length))}</p>}
+                                    <ol className="space-y-3.5">
+                                        {yet.map((c, i) => <CueRow key={c.id} item={c} view={it(c.id)} l={l} isNew={false} onOpen={() => setPick(c)} tour={got.length === 0 && i === 0 ? "cc-row" : undefined} />)}
+                                    </ol>
+                                </div>
+                            );
+                        })()}
                     </section>
                 )}
 
@@ -383,21 +396,23 @@ function CueRow({ item, view, l, isNew, onOpen, tour }: { item: CaseItem; view: 
     return (
         <li data-item={item.id} data-done={view.done ? "1" : "0"} data-tour={tour}>
             <button type="button" onClick={onOpen} className="block w-full text-left active:opacity-85" aria-label={itemName(item, view, l, t)}>
-                <span className="cc-slot block">
+                <span className={cn("cc-slot block", view.done ? "cc-lit" : "cc-empty")}>
                     <img src={caseImage(item)} alt="" loading="lazy" decoding="async" draggable={false} className={cn(view.done ? "cc-own" : item.hidden ? "cc-secret" : "cc-ghost", view.soon && "cc-soon", isNew && "cc-in")} />
+                    {!view.done && <LockMark small />}
                 </span>
                 <span className="mt-1.5 flex items-baseline gap-2 px-1">
-                    <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-white">
+                    <span className={cn("min-w-0 flex-1 truncate text-[14px] font-semibold", view.done ? "text-white" : "text-white/60")}>
                         {itemName(item, view, l, t)}
                         <StarRow n={difficulty(item)} size={11} className="ml-1.5" />
                         {item.online && <span className="ml-1.5 align-[1px] text-[11.5px] font-semibold text-[#46e4e0]">{t("case.onlineMark")}</span>}
                         {isNew && <span className="ml-1.5 rounded-full bg-[color:var(--cc-gold)] px-1.5 py-[1px] align-[1px] text-[11.5px] font-bold text-[#2d1a08]">{t("case.new")}</span>}
                     </span>
                     <span className="rk-num flex shrink-0 items-center gap-1.5 text-[12px] text-white/50">
-                        {view.done && view.serial ? <span className="cc-serial cc-serial-sm" data-testid="cue-case-row-serial">{serialText(view.serial)}</span>
+                        {view.done && view.serial ? <span className="cc-serial cc-serial-sm" data-testid="cue-case-row-serial">{serialText(view.serial)}{item.limit ? <span className="ml-0.5 font-semibold opacity-70">/{item.limit}</span> : null}</span>
                             : view.done && view.at ? fmtDate(view.at, locale)
                                 : view.soon ? t("case.soon")
-                                    : view.holders > 0 ? t("case.rowHolders").replace("{n}", String(view.holders)) : ""}
+                                    : item.limit ? <span className={cn("font-semibold", view.holders >= item.limit ? "text-white/45" : "text-[color:var(--cc-gold)]")} data-testid="cue-case-row-left">{view.holders >= item.limit ? t("case.soldOut") : t("case.limitedLeft").replace("{n}", String(item.limit - view.holders)).replace("{m}", String(item.limit))}</span>
+                                        : view.holders > 0 ? t("case.rowHolders").replace("{n}", String(view.holders)) : ""}
                     </span>
                 </span>
                 {!view.done && <span className="mt-0.5 block px-1 text-[12.5px] leading-snug text-white/55 break-keep">{cueHow(item, l)}</span>}
@@ -417,7 +432,7 @@ function TileGrid({ list, it, l, fresh, onOpen, current = null }: { list: readon
                 return (
                     <li key={x.id} data-item={x.id} data-done={v.done ? "1" : "0"}>
                         <button type="button" onClick={() => onOpen(x)} className="block w-full text-center active:opacity-85" aria-label={itemName(x, v, l, t)}>
-                            <span className={cn("cc-tile block", current === x.id && "ring-1 ring-[color:var(--cc-gold)]/70")}>
+                            <span className={cn("cc-tile block", v.done ? "cc-lit" : "cc-empty", current === x.id && "ring-1 ring-[color:var(--cc-gold)]/70")}>
                                 <img src={caseImage(x)} alt="" loading="lazy" decoding="async" draggable={false} className={cn(v.done ? "cc-own" : "cc-ghost", v.soon && "cc-soon")} />
                                 {fresh.includes(x) && <span className="absolute right-1 top-1 rounded-full bg-[color:var(--cc-gold)] px-1.5 text-[11px] font-bold text-[#2d1a08]">{t("case.new")}</span>}
                             </span>
@@ -475,7 +490,7 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
             <p className="mt-2 flex items-center gap-2 text-[12.5px] text-white/60" data-testid="cue-case-difficulty">
                 <span>{t("case.difficulty")}</span><StarRow n={difficulty(item)} size={16} />
             </p>
-            {!view.soon && <OwnerPlate view={view} />}
+            {!view.soon && <OwnerPlate view={view} limit={item.limit} />}
             <p className="mt-2 text-[13.5px] leading-relaxed text-white/75 break-keep" data-testid="cue-case-how">{cueHow(item, l, view.done)}</p>
             {view.done && view.at ? (
                 <p className="rk-num mt-3 text-[13px] text-white/60">{t("case.got").replace("{date}", fmtDate(view.at, locale))}</p>
@@ -501,19 +516,22 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
  * 주인 패(2026-10-16 오너: "가진 사람도 중요하네 … 총 몇 명이 가지고 넘버링처럼") — 놋쇠 번호판 + 가진 사람 수.
  * 받았으면 내 번호(몇 번째 주인), 아직이면 받으면 받을 번호. 번호는 한 번 정하면 바뀌지 않는다(서버가 적힌 순서로 매긴다).
  */
-function OwnerPlate({ view }: { view: CaseItemView }) {
+function OwnerPlate({ view, limit }: { view: CaseItemView; limit?: number }) {
     const { t } = useT();
     const mine = view.done && view.serial;
     const next = view.holders + 1;
+    const soldOut = !!limit && !view.done && view.holders >= limit;
     return (
         <div className="mt-4 flex items-center gap-3 rounded-2xl bg-black/30 px-3.5 py-3 ring-1 ring-[color:var(--cc-gold)]/25" data-testid="cue-case-owner-plate">
-            <span className={cn("cc-serial rk-num", !mine && "cc-serial-next")}>{serialText(mine ? view.serial! : next)}</span>
+            <span className={cn("cc-serial rk-num", !mine && "cc-serial-next")}>{soldOut ? t("case.soldOut") : serialText(mine ? view.serial! : next)}{limit && !soldOut ? <span className="ml-1 text-[12px] font-semibold opacity-70">/{limit}</span> : null}</span>
             <span className="min-w-0 flex-1">
-                <span className="block text-[15px] font-semibold text-white">
-                    {view.holders > 0 ? t("case.holders").replace("{n}", String(view.holders)) : t("case.holdersNone")}
+                <span className="block text-[15px] font-semibold text-white break-keep">
+                    {limit ? t("case.limitedTaken").replace("{n}", String(view.holders)).replace("{m}", String(limit))
+                        : view.holders > 0 ? t("case.holders").replace("{n}", String(view.holders)) : t("case.holdersNone")}
                 </span>
                 <span className="mt-0.5 block text-[12.5px] leading-snug text-white/60 break-keep">
-                    {mine ? (view.serial === 1 ? t("case.serialFirst") : t("case.serialMine").replace("{n}", String(view.serial))) : t("case.serialNext").replace("{no}", serialText(next))}
+                    {mine ? (view.serial === 1 ? t("case.serialFirst") : t("case.serialMine").replace("{n}", String(view.serial)))
+                        : soldOut ? t("case.soldOutDesc") : t("case.serialNext").replace("{no}", serialText(next))}
                 </span>
             </span>
         </div>
@@ -521,10 +539,10 @@ function OwnerPlate({ view }: { view: CaseItemView }) {
 }
 
 /** 잠김 표시 — 자리 오른쪽 위의 작은 자물쇠 */
-function LockMark() {
+function LockMark({ small = false }: { small?: boolean }) {
     return (
-        <span className="absolute right-2 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-full bg-black/60 text-white/80 ring-1 ring-white/15" aria-hidden="true">
-            <LucideLock weight="fill" className="h-3.5 w-3.5" />
+        <span className={cn("absolute top-1/2 flex -translate-y-1/2 items-center justify-center rounded-full bg-black/65 text-white/80 ring-1 ring-white/15", small ? "right-1.5 h-6 w-6" : "right-2 h-7 w-7")} aria-hidden="true">
+            <LucideLock weight="fill" className={small ? "h-3 w-3" : "h-3.5 w-3.5"} />
         </span>
     );
 }

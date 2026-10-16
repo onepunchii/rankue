@@ -10,7 +10,7 @@
  * 한 번 받은 것은 저장소의 받은 기록(고치지도 지우지도 않는다)이 지킨다 — 여기의 계산은 '지금 기록으로 보면'이다.
  * 달 · 철 · 시각은 한국 시계다(월대회 · 이달의 랭킹과 같다).
  */
-import { CASE_ITEMS, REAL_RUN_4C, REAL_TO_ONLINE, SOON, PEOPLE_STEPS, type CaseItem, type Season } from "./cueCase.js";
+import { CASE_ITEMS, REAL_RUN_4C, REAL_TO_ONLINE, SOON, PEOPLE_STEPS, type CaseItem, type LimitedRule, type Season } from "./cueCase.js";
 import { TIERS, PLACEMENT_MATCHES, type TierId } from "./sim/rank.js";
 import { realTierRank, type RealTierId } from "./realTier.js";
 
@@ -257,6 +257,22 @@ export function evaluateCase(input: CaseInput): Record<string, ItemState> {
         return state(at, [count(by.get(nowMonth.slice(0, 4))?.size ?? 0, 12)]);
     })();
 
+    // 한정판 — 조건은 여기서, 99자루 상한은 저장소가 번호를 줄 때 지킨다(다 나가면 더 적지 않는다)
+    const limited = (k: LimitedRule): ItemState => {
+        if (k === "doubleMaster") {
+            const on = tierAt("master"), realOk = input.realTier === "master";
+            return state(realOk && on !== null ? Math.max(on, real.length ? real[real.length - 1].at : on) : null, [count(realOk ? 1 : 0, 1, "real"), count(on !== null ? 1 : 0, 1, "online")]);
+        }
+        if (k === "thousand") return state(latestOf(nth(realAt, 1000), nth(onAt, 300)), [count(real.length, 1000, "real"), count(online.length, 300, "online")]);
+        if (k === "tripleCup") { const wins = input.cups.filter((c) => c.rank === 1).map((c) => c.at).sort((a, b) => a - b); return state(nth(wins, 3), [count(wins.length, 3, "online")]); }
+        if (k === "legendRun") return state(latestOf(realRunAt(15), onRun(15)), [count(realRunBest, 15, "real"), count(onRunBest, 15, "online")]);
+        // 다섯 나라 — 내 나라와 다른 나라(내 나라를 모르면 나라가 적힌 상대 모두)를 처음 만난 때 순서로
+        const seen = new Map<string, number>();
+        for (const g of online) if (g.oppCountry && g.oppCountry !== input.country && !seen.has(g.oppCountry)) seen.set(g.oppCountry, g.at);
+        const times = [...seen.values()].sort((a, b) => a - b);
+        return state(nth(times, 5), [count(times.length, 5, "online")]);
+    };
+
     const out: Record<string, ItemState> = {};
     for (const x of CASE_ITEMS) out[x.id] = SOON.has(x.id) ? { done: false, at: null, bars: [], soon: true } : judge(x);
     return out;
@@ -298,6 +314,7 @@ export function evaluateCase(input: CaseInput): Record<string, ItemState> {
             case "gloveFirst": return state(input.joinedAt);
             case "gloveYear": return gloveYear;
             case "gloveCup": return state([...input.cupEntries].sort((a, b) => a - b)[0] ?? null);
+            case "limited": return limited(r.s);
             default: return { done: false, at: null, bars: [], soon: true };
         }
     }

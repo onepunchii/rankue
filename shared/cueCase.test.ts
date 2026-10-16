@@ -10,9 +10,9 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const LOCALES: CaseLocale[] = ["ko", "en", "es", "vi", "tr"];
 
 describe("목록", () => {
-    it("기획서의 수 — 큐 77(실전 20 · 온라인 24 · 공통 19 · 양쪽 7 · 크루 6 · 2단계 1) · 초크 16 · 장갑 16 · 페넌트 8", () => {
+    it("기획서의 수 — 큐 77(실전 20 · 온라인 24 · 공통 19 · 양쪽 7 · 크루 6 · 2단계 1) + 한정판 5 · 초크 16 · 장갑 16 · 페넌트 8", () => {
         const by = (g: string) => CUES.filter((c) => c.group === g).length;
-        expect([CUES.length, by("real"), by("online"), by("common"), by("both"), by("crew"), by("stage2")]).toEqual([77, 20, 24, 19, 7, 6, 1]);
+        expect([CUES.length, by("real"), by("online"), by("common"), by("both"), by("crew"), by("stage2"), by("limited")]).toEqual([82, 20, 24, 19, 7, 6, 1, 5]);
         expect([CHALKS.length, GLOVES.length, PENNANTS.length]).toEqual([16, 16, 8]);
     });
     it("id 는 겹치지 않는다 — 실전과 온라인에 같은 이름(50판 · 하이런 · 역전)이 있어 칸마다 머리말이 다르다", () => {
@@ -48,6 +48,12 @@ describe("목록", () => {
         expect(ko.filter((n) => /판 큐$|^하이런|^온라인 하이런|^대전 \d|^뱅크샷 \d|^\d+승$|^온라인 첫 승$|^첫 큐$/.test(n))).toEqual([]);
         expect(CUES.find((c) => c.id === "cue-first")!.name.ko).toBe("민무늬 메이플");
         expect(CUES.find((c) => c.id === "cue-traveller")!.name.ko).toBe("나침반");
+    });
+    it("한정판(2026-10-16 오너: \"따로 새로 · 모두 99자루\") — 다섯 자루 · 99 · ★5 · 저장소가 마지막 번호 뒤로는 적지 않는다", () => {
+        const lt = CUES.filter((c) => c.group === "limited");
+        expect(lt.map((c) => c.id)).toEqual(["cue-lt-double-master", "cue-lt-thousand", "cue-lt-triple-cup", "cue-lt-legend-run", "cue-lt-five-nations"]);
+        for (const c of lt) { expect(c.limit).toBe(99); expect(difficulty(c)).toBe(5); expect(SOON.has(c.id)).toBe(false); }
+        expect(read("server/storage/cueCase.repo.ts")).toContain("having coalesce(max(serial), 0) < ${cap}");
     });
     it("난이도 별 1~5 — 모든 것에 있고, 같은 갈래에서는 어려울수록 많다", () => {
         for (const x of CASE_ITEMS) expect([1, 2, 3, 4, 5], x.id).toContain(difficulty(x));
@@ -144,6 +150,14 @@ describe("판정", () => {
         expect(evaluateCase(base({ real: [realGame(1, { at: T0 + 40 * 60_000, startedAt: T0 - 10 * 60_000 })] }))["cue-jjajang"].done).toBe(true); // 11:50 → 12:40
         expect(evaluateCase(base({ online: [onlineGame(1, { innings: 3, target: 5 })] }))["cue-triple-three"].done).toBe(true);
         expect(evaluateCase(base({ online: [onlineGame(1, { innings: 3, target: 4 })] }))["cue-triple-three"].done).toBe(false);
+    });
+    it("한정판 판정 — 삼관왕은 우승 세 번째 때, 다섯 나라는 내 나라 말고 다섯 번째 나라를 만난 때", () => {
+        const cups = [1, 2, 3].map((i) => ({ rank: 1, at: T0 + i * H }));
+        expect(evaluateCase(base({ cups: cups.slice(0, 2) }))["cue-lt-triple-cup"]).toMatchObject({ done: false, bars: [{ have: 2, need: 3 }] });
+        expect(evaluateCase(base({ cups }))["cue-lt-triple-cup"].at).toBe(T0 + 3 * H);
+        const nations = ["KR", "VN", "TR", "ES", "US", "JP"].map((c, i) => onlineGame(i + 1, { oppCountry: c, opp: `p${i}` }));
+        expect(evaluateCase(base({ online: nations.slice(0, 5) }))["cue-lt-five-nations"].done).toBe(false); // KR 는 내 나라
+        expect(evaluateCase(base({ online: nations }))["cue-lt-five-nations"].at).toBe(T0 + 6 * H);
     });
     it("열지 않은 것은 '곧' — 기록이 있어도 받지 않는다", () => {
         const s = evaluateCase(base({ real: Array.from({ length: 5 }, (_, i) => realGame(i + 1)) }));
@@ -249,15 +263,24 @@ describe("연결", () => {
         expect(page).toContain('data-testid="cue-case-row-serial"');
         expect(read("client/src/components/hiq/cueCase/cueCaseApi.ts")).toContain('export const serialText = (n: number): string => `No.${n < 1000 ? String(n).padStart(3, "0") : String(n)}`;');
     });
+    it("획득 · 미획득(2026-10-16 오너가 고른 A + C) — 받은 자리는 금테에 불, 아직은 점선 빈 홈 + 자물쇠, 칸마다 모은 큐가 위", () => {
+        const page = read("client/src/pages/hiq/cue-case.tsx");
+        expect(page).toContain('<span className={cn("cc-slot block", view.done ? "cc-lit" : "cc-empty")}>');
+        expect(page).toContain('const got = list.filter((c) => it(c.id).done), yet = list.filter((c) => !it(c.id).done);');
+        expect(page).toContain('data-testid="cue-case-owned-head"');
+        const css = read("client/src/index.css");
+        expect(css).toContain(".cue-case .cc-slot.cc-lit,");
+        expect(css).toContain("outline: 1.5px dashed rgba(160, 180, 210, 0.24);");
+    });
     it("문구가 다섯 언어에 있고 자리 표시를 지킨다", () => {
-        const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"], "case.serialMine": ["{n}"], "case.serialNext": ["{no}"], "case.rowHolders": ["{n}"] };
+        const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"], "case.serialMine": ["{n}"], "case.serialNext": ["{no}"], "case.rowHolders": ["{n}"], "case.limitedLeft": ["{n}", "{m}"], "case.limitedTaken": ["{n}", "{m}"], "case.ownedSec": ["{n}"], "case.lockedSec": ["{n}"] };
         const page = read("client/src/pages/hiq/cue-case.tsx") + read("client/src/components/hiq/cueCase/CueCaseEntry.tsx") + read("client/src/components/hiq/cueCase/CrewCueRack.tsx");
         const used = [...new Set([...page.matchAll(/t\(["`](case\.[a-zA-Z.]+)["`]\)/g)].map((m) => m[1]))];
         expect(used.length).toBeGreaterThan(40);
         for (const l of LOCALES) {
             const f = read(`client/src/lib/i18n/${l}.ts`);
             for (const k of used) expect(f, `${l} ${k}`).toContain(`"${k}":`);
-            for (const g of ["real", "online", "common", "both", "crew", "stage2"]) expect(f, `${l} group ${g}`).toContain(`"case.group.${g}":`);
+            for (const g of ["real", "online", "common", "both", "crew", "stage2", "limited"]) expect(f, `${l} group ${g}`).toContain(`"case.group.${g}":`);
             for (const s of ["cue", "chalk", "glove", "medals"]) expect(f, `${l} sec ${s}`).toContain(`"case.sec.${s}":`);
             for (const [k, ph] of Object.entries(need)) {
                 const v = (f.match(new RegExp(`"${k.replace(/\./g, "\\.")}": "([^"]+)"`)) ?? [])[1] ?? "";

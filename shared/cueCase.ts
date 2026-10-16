@@ -16,7 +16,7 @@ export type CaseLocale = "ko" | "en" | "es" | "vi" | "tr";
 export type Names = Readonly<Record<CaseLocale, string>>;
 export type CaseKind = "cue" | "chalk" | "glove" | "pennant";
 /** 큐가 속한 칸 — 화면의 탭 */
-export type CueGroup = "real" | "online" | "common" | "both" | "crew" | "stage2";
+export type CueGroup = "real" | "online" | "common" | "both" | "crew" | "stage2" | "limited";
 
 /** 실전 공식 1판 = 온라인 대전 3판 */
 export const REAL_TO_ONLINE = 3;
@@ -38,7 +38,10 @@ export type Rule =
     | { k: "stores"; n: number }
     | { k: "seasonPeople"; s: Season; n: number } | { k: "world" } | { k: "sameOpp"; n: number } | { k: "crewBattle" }
     | { k: "glove"; m: number } | { k: "gloveFirst" } | { k: "gloveYear" } | { k: "gloveCrew"; n: number } | { k: "gloveCup" }
-    | { k: "pennant"; s: "games100" | "games500" | "cup5" | "cup20" | "battle10" | "regular" | "crewOfMonth" | "stores5" };
+    | { k: "pennant"; s: "games100" | "games500" | "cup5" | "cup20" | "battle10" | "regular" | "crewOfMonth" | "stores5" }
+    | { k: "limited"; s: LimitedRule };
+/** 한정판 다섯(2026-10-16 오너: "열기 어려운 채는 수량 한정 넘버링 — 따로 새로 · 모두 99자루") */
+export type LimitedRule = "doubleMaster" | "thousand" | "tripleCup" | "legendRun" | "fiveNations";
 export type Season = "spring" | "summer" | "autumn" | "winter";
 
 export interface CaseItem {
@@ -55,11 +58,15 @@ export interface CaseItem {
     hidden?: boolean;
     /** 온라인에서 받는 것 — 그림에 청록 네온 링, 화면에 '온라인' */
     online?: boolean;
+    /** 한정판 — 이 수만큼만 번호가 나가고, 다 나가면 다시 열리지 않는다(완판) */
+    limit?: number;
 }
 
 const N = (ko: string, en: string, es: string, vi: string, tr: string): Names => ({ ko, en, es, vi, tr });
 /** id 는 칸마다 머리말이 다르다(실전 cue- · 온라인 cue-on- · 크루 cue-crew-) — 실전과 온라인에 같은 이름(50판 · 하이런 · 역전)이 있다 */
-const CUE_PREFIX: Readonly<Record<CueGroup, string>> = { real: "cue-", online: "cue-on-", common: "cue-", both: "cue-", crew: "cue-crew-", stage2: "cue-" };
+const CUE_PREFIX: Readonly<Record<CueGroup, string>> = { real: "cue-", online: "cue-on-", common: "cue-", both: "cue-", crew: "cue-crew-", stage2: "cue-", limited: "cue-lt-" };
+/** 한정판 한 자루의 수 — 모두 99(오너 10/16) */
+export const LIMITED_COUNT = 99;
 const cue = (group: CueGroup, id: string, img: string, name: Names, rule: Rule, extra: Partial<CaseItem> = {}): CaseItem => ({ id: `${CUE_PREFIX[group]}${id}`, kind: "cue", group, img, name, rule, ...(group === "online" ? { online: true } : {}), ...extra });
 
 export const CUES: readonly CaseItem[] = [
@@ -144,6 +151,12 @@ export const CUES: readonly CaseItem[] = [
     cue("crew", "founder", "crew-founder", N("창립의 열쇠", "Founder's Key", "Llave fundadora", "Chìa khóa sáng lập", "Kurucu Anahtarı"), { k: "crew", s: "founder" }),
     cue("crew", "battle", "crew-battle", N("맞선 깃발", "Crossed Flags", "Banderas cruzadas", "Cờ bắt chéo", "Çapraz Bayraklar"), { k: "crew", s: "battle" }),
     cue("crew", "hundred", "crew-hundred", N("금빛 매듭", "Golden Knot", "Nudo dorado", "Nút thắt vàng", "Altın Düğüm"), { k: "crew", s: "hundred" }),
+    // ── 한정판 5 — 자루마다 99개, 선착순 번호, 다 나가면 완판 ──────
+    cue("limited", "double-master", "lt-double-master", N("더블 마스터", "Double Master", "Doble Maestro", "Song bậc thầy", "Çifte Usta"), { k: "limited", s: "doubleMaster" }, { limit: LIMITED_COUNT, online: false }),
+    cue("limited", "thousand", "lt-thousand", N("천 판의 장인", "Master of a Thousand", "Maestro de mil", "Bậc thầy nghìn trận", "Bin Maçın Ustası"), { k: "limited", s: "thousand" }, { limit: LIMITED_COUNT }),
+    cue("limited", "triple-cup", "lt-triple-cup", N("삼관왕", "Triple Crown", "Triple corona", "Ba vương miện", "Üçlü Taç"), { k: "limited", s: "tripleCup" }, { limit: LIMITED_COUNT }),
+    cue("limited", "legend-run", "lt-legend-run", N("레전드 런", "Legend Run", "Serie legendaria", "Chuỗi huyền thoại", "Efsane Seri"), { k: "limited", s: "legendRun" }, { limit: LIMITED_COUNT }),
+    cue("limited", "five-nations", "lt-five-nations", N("다섯 나라", "Five Nations", "Cinco naciones", "Năm quốc gia", "Beş Ülke"), { k: "limited", s: "fiveNations" }, { limit: LIMITED_COUNT }),
     // ── 2단계(매장 QR) 1 ─────────────────────────────────────
     cue("stage2", "traveller", "traveller", N("나침반", "Compass Rose", "Rosa de los vientos", "La bàn", "Pusula Gülü"), { k: "stores", n: 5 }),
 ];
@@ -236,6 +249,7 @@ export function difficulty(x: Pick<CaseItem, "rule">): Stars {
         case "gloveCrew": return 3;
         case "gloveCup": return 2;
         case "pennant": return r.s === "games500" || r.s === "cup20" || r.s === "crewOfMonth" ? 5 : r.s === "battle10" || r.s === "regular" ? 4 : 3;
+        case "limited": return 5;
     }
 }
 
@@ -243,7 +257,7 @@ export const CASE_ITEMS: readonly CaseItem[] = [...CUES, ...CHALKS, ...GLOVES, .
 const BY_ID = new Map(CASE_ITEMS.map((x) => [x.id, x]));
 export const caseItem = (id: string): CaseItem | null => BY_ID.get(id) ?? null;
 export const caseImage = (x: Pick<CaseItem, "kind" | "img">) => `/billiards/case/${x.kind}/${x.img}.webp`;
-export const CUE_GROUPS: readonly CueGroup[] = ["real", "online", "common", "both", "crew", "stage2"];
+export const CUE_GROUPS: readonly CueGroup[] = ["limited", "real", "online", "common", "both", "crew", "stage2"];
 
 /**
  * 아직 받는 길을 열지 않은 것 — 목록 · 그림 · 조건 글만 먼저 보이고 '곧 열려요'.
@@ -337,6 +351,13 @@ export function cueHow(x: CaseItem, l: CaseLocale, earned = false): string {
         case "gloveYear": return T(l, N("열두 달 장갑을 한 해에 다 받기", "Earn all twelve month gloves in one year", "Consigue los doce guantes en un año", "Nhận đủ 12 găng trong một năm", "Bir yılda on iki eldiveni de kazan"));
         case "gloveCrew": return T(l, N(`크루와 함께 정모 날 ${n}번`, `${n} meetup days with your crew`, `${n} quedadas con tu crew`, `${n} ngày gặp mặt cùng nhóm`, `Ekibinle ${n} buluşma günü`));
         case "gloveCup": return T(l, N("월대회에 나가기", "Enter a monthly cup", "Participa en una copa mensual", "Tham gia cúp tháng", "Aylık kupaya katıl"));
+        case "limited": return T(l, ({
+            doubleMaster: N("실전 마스터 등급 + 온라인 마스터 등급", "Master tier in real games + master tier online", "Rango maestro real + rango maestro online", "Hạng bậc thầy thực tế + hạng bậc thầy online", "Gerçekte usta seviyesi + online usta seviyesi"),
+            thousand: N("실전 공식 경기 1,000판 + 온라인 대전 300판", "1,000 official real games + 300 online matches", "1.000 partidas reales oficiales + 300 online", "1.000 trận thực tế chính thức + 300 trận online", "1.000 resmi gerçek maç + 300 online maç"),
+            tripleCup: N("월대회 우승 3번", "Win the monthly cup three times", "Gana la copa mensual tres veces", "Vô địch cúp tháng ba lần", "Aylık kupayı üç kez kazan"),
+            legendRun: N(`실전 하이런 3쿠션 15 · 4구 ${15 * REAL_RUN_4C} + 온라인 하이런 15`, `Real high run 15 (four-ball ${15 * REAL_RUN_4C}) + online high run 15`, `Serie real 15 (cuatro bolas ${15 * REAL_RUN_4C}) + serie online 15`, `Chuỗi thực tế 15 (4 bi ${15 * REAL_RUN_4C}) + chuỗi online 15`, `Gerçek 15 seri (dört top ${15 * REAL_RUN_4C}) + online 15 seri`),
+            fiveNations: N("서로 다른 다섯 나라의 회원과 레이팅 대전", "Rated matches against members from five different countries", "Partidas con rating contra socios de cinco países", "Trận tính điểm với thành viên từ năm quốc gia", "Beş farklı ülkeden üyelerle puanlı maç"),
+        })[r.s]);
         case "pennant": return T(l, ({
             games100: N("크루 안 경기 100판", "100 games among crewmates", "100 partidas entre miembros", "100 trận nội bộ nhóm", "Ekip içi 100 maç"),
             games500: N("크루 안 경기 500판", "500 games among crewmates", "500 partidas entre miembros", "500 trận nội bộ nhóm", "Ekip içi 500 maç"),

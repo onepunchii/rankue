@@ -1097,9 +1097,28 @@ body {
     filter: drop-shadow(0 3px 3px rgba(0, 0, 0, 0.7));
   }
   .cue-case .cc-ghost {
-    /* 못 받은 것 — 무늬는 보이되 빛을 뺀다(무엇을 받게 될지 보여야 갖고 싶다). 벨벳 그늘에 잠긴 듯 어둡게 */
-    filter: grayscale(0.7) brightness(0.58) contrast(1.15);
-    opacity: 0.85;
+    /* 못 받은 것 — 흐린 모양만(2026-10-16 오너가 고른 A: "획득과 미획득이 잘 구별이 안 간다"). 원래 무늬는 눌러서 팝업에서 본다 */
+    filter: grayscale(1) brightness(0.5);
+    opacity: 0.32;
+  }
+  .cue-case .cc-slot.cc-lit,
+  .cue-case .cc-tile.cc-lit {
+    /* 받은 자리 — 금테에 불이 켜진다 */
+    background: radial-gradient(70% 140% at 50% 50%, rgba(232, 196, 106, 0.2) 0%, rgba(13, 22, 38, 0) 70%), linear-gradient(180deg, #0a1220 0%, #121f35 100%);
+    box-shadow: inset 0 0 0 1.5px rgba(232, 196, 106, 0.55), 0 0 14px rgba(232, 196, 106, 0.16);
+  }
+  .cue-case .cc-slot.cc-empty,
+  .cue-case .cc-tile.cc-empty {
+    /* 아직 — 점선 빈 홈 */
+    background: rgba(0, 0, 0, 0.12);
+    box-shadow: none;
+    outline: 1.5px dashed rgba(160, 180, 210, 0.24);
+    outline-offset: -1.5px;
+  }
+  .cue-case .cc-tab-limited {
+    background: linear-gradient(180deg, #f2d595 0%, #c99a4b 100%);
+    border-color: transparent;
+    color: #2d1a08;
   }
   .cue-case .cc-secret {
     /* 숨은 것 — 모양만(흰 실루엣을 아주 옅게, 위쪽 그늘로 파인 듯이) */

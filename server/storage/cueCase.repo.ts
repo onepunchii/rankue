@@ -49,11 +49,14 @@ export interface CueCaseView {
  * 받은 때는 UTC 글자로 넘긴다 — 날 sql 에 Date 를 그대로 넣으면 9시간 밀린다(chat 리뷰 때의 함정).
  */
 async function insertAward(memberId: string, itemId: string, earnedAt: Date): Promise<{ itemId: string; earned: number; created: number; serial: number } | null> {
+    // 한정판은 그 수까지만 — 마지막 번호가 나가면 더 적지 않는다(완판). 같은 때 둘이 마지막 번호를 잡아도 고유 묶음 때문에 한 사람만 들어간다
+    const cap = caseItem(itemId)?.limit ?? 2_147_483_647;
     for (let attempt = 0; attempt < 5; attempt++) {
         try {
             const rows = (await db.execute(sql`
                 insert into hiq_cue_case_awards (member_id, item_id, earned_at, serial)
                 select ${memberId}, ${itemId}, (${earnedAt.toISOString()}::timestamptz at time zone 'UTC'), coalesce(max(serial), 0) + 1 from hiq_cue_case_awards where item_id = ${itemId}
+                having coalesce(max(serial), 0) < ${cap}
                 on conflict (member_id, item_id) do nothing
                 returning item_id, extract(epoch from earned_at) * 1000 as earned, extract(epoch from created_at) * 1000 as created, serial`)).rows as Record<string, unknown>[];
             const r = rows[0];
