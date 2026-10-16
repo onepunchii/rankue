@@ -347,8 +347,8 @@ describe("등산은 등산의 것으로 · 화면의 글", () => {
     it("약속한 것만 적는다 — 어디에 보이는지 · 얼굴 이야기 · 위치 정보", () => {
         expect(HIKING_PHOTO_LABEL.face).toBe("공개 사진은 이 산의 화면에 보여요. 같이 간 사람의 얼굴이 나온 사진은 비공개로 두세요.");
         // 올리는 순간 공개다 — 얼굴 이야기는 올리기 단추 밑에도 있다
-        expect(HIKING_PHOTO_LABEL.faceShort).toBe("같이 간 사람의 얼굴이 나온 사진은 비공개로 두세요.");
-        expect(read("client/src/hiking/photos/MyPhotos.tsx")).toContain('data-testid="hk-photo-face">{HIKING_PHOTO_LABEL.faceShort}</p>');
+        expect(HIKING_PHOTO_LABEL.faceShort).toBe("얼굴이 나온 사진은 비공개로 두세요.");
+        expect(read("client/src/hiking/photos/MyPhotos.tsx")).toContain('data-testid="hk-photo-face">{HIKING_PHOTO_LABEL.faceShort} {HIKING_PHOTO_LABEL.note}</p>');
         expect(HIKING_PHOTO_LABEL.where).toContain("이 산의 화면에 보여요");
         expect(HIKING_PHOTO_LABEL.where).toContain("비공개로 돌릴 수 있어요");
         expect(HIKING_PHOTO_LABEL.note).toContain("위치 정보는 올릴 때 지워요");

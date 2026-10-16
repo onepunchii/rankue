@@ -131,7 +131,7 @@ export function MyPhotos({ mountainId, name, compact }: { mountainId: string; na
                 </ul>
             )}
             <button type="button" disabled={add.isPending || full} onClick={choose} data-track-as="hiking-photo-add" data-testid="hk-photo-add"
-                className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#FFFFFF14] text-[15px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24] disabled:opacity-50 ${shown.length > 0 ? "mt-2.5" : ""}`}>
+                className={`flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#F6D9A81A] text-[15px] font-medium text-[#F6D9A8] shadow-[inset_0_0_0_1px_#F6D9A84D] active:bg-[#F6D9A82E] disabled:opacity-50 ${shown.length > 0 ? "mt-2.5" : ""}`}>
                 <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M4 8h3l1.6-2.4h6.8L17 8h3v11H4Z" /><circle cx="12" cy="13.2" r="3.4" /></svg>
                 {add.isPending ? "사진을 올리는 중…" : compact && photos.length > 0 ? `${HIKING_PHOTO_LABEL.add} · ${photos.length}장` : HIKING_PHOTO_LABEL.add}
             </button>
@@ -139,8 +139,7 @@ export function MyPhotos({ mountainId, name, compact }: { mountainId: string; na
             {full && <p className="mt-2 text-[13px] text-[#F4EFE399] break-keep">{HIKING_PHOTO_LABEL.full}</p>}
             {/* 어디에 보이는지는 산행 중 화면에서도 말한다 — 올리는 순간 남에게 보이기 때문이다 */}
             <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE399] break-keep" data-testid="hk-photo-where">{HIKING_PHOTO_LABEL.where}</p>
-            {!compact && <p className="mt-1 text-[12.5px] leading-snug text-[#F4EFE399] break-keep" data-testid="hk-photo-face">{HIKING_PHOTO_LABEL.faceShort}</p>}
-            {!compact && <p className="mt-1 text-[12.5px] leading-snug text-[#F4EFE373] break-keep">{HIKING_PHOTO_LABEL.note}</p>}
+            {!compact && <p className="mt-1 text-[12.5px] leading-snug text-[#F4EFE373] break-keep" data-testid="hk-photo-face">{HIKING_PHOTO_LABEL.faceShort} {HIKING_PHOTO_LABEL.note}</p>}
 
             {open && (
                 <PhotoStage photos={photos} index={at} onIndex={(i) => { setNote(null); setOpenId(photos[i]?.id ?? null); }} onClose={close} label={`${name} 내 산행 사진`}

@@ -318,17 +318,21 @@ export default function TrailPage() {
                                 <div className="mt-5"><MyPhotos key={`trail-photos:${d.id}`} mountainId={d.id} name={d.name} compact /></div>
 
                                 <button type="button" onClick={() => { void sendHere(); }} disabled={!trail.here} data-track-as="hiking-trail-send-location" data-testid="trail-send-location"
-                                    className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#FFFFFF14] text-[15px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24] disabled:opacity-40">
+                                    className="mt-4 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#7FA39A29] text-[15px] font-medium text-[#F4EFE3] shadow-[inset_0_0_0_1px_#7FA39A66] active:bg-[#7FA39A40] disabled:opacity-40">
+                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#7FA39A" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0c0 5.4-6.5 11-6.5 11Z" /><circle cx="12" cy="10" r="2.4" /></svg>
                                     {sent === "copied" ? "위치를 복사했어요 — 붙여 넣어 보내세요" : "내 위치 보내기"}
                                 </button>
-                                <p className="mt-1.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">지금 자리를 카카오맵 링크로 카카오톡 · 문자에 보내요. 서버에는 남지 않아요.</p>
+                                <p className="mt-1.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">카카오톡 · 문자로 지금 위치를 보내요. 서버에는 남지 않아요.</p>
                                 {grid && (
                                     <p className="mt-4 rounded-2xl bg-[#FFFFFF0A] px-4 py-3 text-[13.5px] leading-snug text-[#F4EFE3CC] break-keep" data-testid="trail-grid">
                                         가까운 국가지점번호 <span className="font-semibold tabular-nums text-[#F4EFE3]">{grid.no}</span> · {aheadText(grid.awayM)} 거리. 도움을 청할 때 이 번호를 알려 주면 자리를 찾기 쉬워요.
                                     </p>
                                 )}
-                                <p className="mt-4 text-[12.5px] leading-snug text-[#F4EFE373] break-keep">안내는 참고용이에요 — 현장의 표지와 통제를 따라 주세요. 위치는 이 기기에서만 쓰고, 화면이 켜져 있는 동안만 봐요.</p>
-                                <button type="button" onClick={end} disabled={finish.isPending} className="mt-3 h-12 w-full rounded-xl bg-[#FFFFFF14] text-[15px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24] disabled:opacity-50" data-testid="trail-end-bottom">산행 마치기</button>
+                                <button type="button" onClick={end} disabled={finish.isPending} className="mt-6 flex h-12 w-full items-center justify-center gap-2 rounded-xl bg-[#F28C6A] text-[15px] font-semibold text-[#2A1208] active:opacity-85 disabled:opacity-50" data-testid="trail-end-bottom">
+                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 21V4M5 4h11l-2 4 2 4H5" /></svg>
+                                    산행 마치기
+                                </button>
+                                <p className="mt-2 text-center text-[12.5px] leading-snug text-[#F4EFE373] break-keep">안내는 참고용이에요. 현장 표지를 따라 주세요.</p>
                             </>
                         )}
                     </>
