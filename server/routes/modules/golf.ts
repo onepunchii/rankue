@@ -1201,8 +1201,10 @@ router.post("/scan/record", requireAuth, asyncHandler(async (req: AuthRequest, r
     // 스코어카드로 올린 라운드는 공식이다(오너 10/13: "스코어카드도 인증 구장으로 인증"). 처음엔 '읽은 줄과 4칸 넘게 다르면 미인증'을 붙였는데
     // 오너의 실제 카드가 그 조건에 걸려 미인증으로 남았다 — 걷어냈다. 고친 칸 수는 기록만 남긴다(나중에 기준을 세울 때 볼 숫자).
     const official = !!club;
-    console.info("[GolfScan] record", JSON.stringify({ edits: scanEditCount(ticket.r[d.row], d.strokes), official }));
-    const out = await storage.golf.recordScannedRound(req.userId!, { courseId: club?.id ?? null, courseName, front: same ? ticket.f : null, back: same ? ticket.b : null, scores: d.strokes, day: ticket.d, official });
+    const edits = scanEditCount(ticket.r[d.row], d.strokes);
+    console.info("[GolfScan] record", JSON.stringify({ edits, official }));
+    // 읽은 줄 · 고친 칸 수 · 카드의 날을 라운드에 남긴다 — 어드민 '골프 › 라운드'의 스코어카드 감사가 본다(2026-10-17)
+    const out = await storage.golf.recordScannedRound(req.userId!, { courseId: club?.id ?? null, courseName, front: same ? ticket.f : null, back: same ? ticket.b : null, scores: d.strokes, day: ticket.d, official, scan: { read: ticket.r[d.row], edits, cardDay: ticket.d } });
     return sendSuccess(res, out);
 }));
 

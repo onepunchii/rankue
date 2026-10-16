@@ -5,18 +5,21 @@ import { adminLog } from "../../../middleware/adminAuth.js";
 import { storage } from "../../../storage/index.js";
 import {
     abandonStaleWaiting, deleteRoundHistory, listRounds, parseListQuery, readGolfStats, recountMembers,
-    resetGolfStatsIfNoOfficial, roundCounts, roundDetail, staleWaitingRounds, summarizePlayers, CLEANUP_WAITING_HOURS,
+    resetGolfStatsIfNoOfficial, roundCounts, roundDetail, setRoundOnSite, staleWaitingRounds, summarizePlayers, CLEANUP_WAITING_HOURS,
 } from "../../../storage/adminGolfRounds.js";
+import { cleanReason } from "../../../../shared/golfScanAudit.js";
 
 /**
  * 골프 관리 — 라운드(2026-10-01 오너: "골프 부분이 어드민에 많이 빠져 있다 — 넣을 수 있는 거 다 넣자").
  * index.ts 가 checkSuperAdmin 뒤에 /api/hiq/admin/golf/rounds 로 붙인다. 읽기·셈은 storage/adminGolfRounds.ts.
  *
- *   GET  /                 목록 — status · stale=1 · days · q · limit/offset. 상태 칩 숫자(counts)를 같이 준다
+ *   GET  /                 목록 — status · stale=1 · days · q · source(scan|match) · onsite(onsite|unverified|legacy) · limit/offset. 상태 칩 숫자(counts)를 같이 준다
  *   POST /cleanup-stale    { dryRun, ids? } 24시간 넘게 시작 안 한 **대기방만** 접는다. dryRun 이 false 가 아니면 미리 보기만
  *   GET  /:id              상세 — 점수판·정산(읽기 전용)·현장 확인·사진 수·기록
  *   POST /:id/abandon      대기·진행 중 방 접기(기록은 남지 않는다)
  *   POST /:id/void         끝난 라운드의 기록 무효화 — 평균·등급·랭킹·여권 도장에서 뺀다. 되돌릴 수 없다
+ *   POST /:id/onsite       { to: boolean, reason } 끝난 판의 공식 ↔ 미인증(2026-10-17 골프 ① — 스코어카드 라운드 감사). 그 판의 기록 전부를 한 값으로,
+ *                          평균 · 등급 · 도장을 다시 센다. 이미 받은 볼마커 · 트로피는 그대로. 바꾼 기록은 golf_match_sessions.admin_onsite 에 쌓인다
  *   POST /:id/finish       멈춘 라운드를 기록으로 끝내기 — 사용자 '라운드 끝내기'와 같은 길. 현장 인증 규칙(9/30) 전에
  *                          시작한 라운드는 옛 기록(on_site NULL)으로 둔다 — 기존 도장을 인정한 원칙과 같다(2026-10-01 오너)
  *
@@ -82,7 +85,8 @@ router.post("/:id/finish", asyncHandler(async (req: any, res: any) => {
     const session = await storage.golf.getGolfMatchSession(req.params.id);
     if (!session) return sendError(res, 404, "라운드를 찾을 수 없습니다.");
     if (session.status !== "playing") return sendError(res, 409, "진행 중인 라운드만 기록으로 끝낼 수 있습니다.");
-    const detail = await roundDetail(req.params.id);
+    // 상세는 라운드 행을 받는다(10/17 고침 — id 글자를 넘겨 늘 '18홀 다 적은 회원 없음'으로 거절됐다)
+    const detail = await roundDetail(session);
     if (!detail?.actions.finish) return sendError(res, 409, "18홀을 다 적은 회원이 없습니다 — 기록할 게 없어 '접기'를 쓰세요.");
     // 사용자 '라운드 끝내기'와 같은 저장소 함수 — 18홀을 다 적은 회원만 기록, 정산 저장, 현장 판정까지 한 트랜잭션
     const done: any = await storage.golf.finishGolfMatchSession(req.params.id);
@@ -99,6 +103,30 @@ router.post("/:id/finish", asyncHandler(async (req: any, res: any) => {
     }
     adminLog(req, "golf.round.finish", { sessionId: req.params.id, recorded: recorded.length, legacy });
     return sendSuccess(res, { id: req.params.id, status: "finished", recordedMemberIds: recorded, legacy });
+}));
+
+const adminNameOf = async (req: any) => String(((await storage.getProfile(req.adminProfileId).catch(() => null)) as any)?.nickname ?? "관리자").slice(0, 40);
+
+router.post("/:id/onsite", asyncHandler(async (req: any, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "라운드를 찾을 수 없습니다.");
+    const to = req.body?.to;
+    if (typeof to !== "boolean") return sendError(res, 400, "공식인지 미인증인지 골라 주세요.");
+    const reason = cleanReason(req.body?.reason);
+    if (!reason) return sendError(res, 400, "바꾸는 까닭을 적어 주세요.");
+    const at = new Date().toISOString();
+    const r = await setRoundOnSite(req.params.id, to, { at, by: await adminNameOf(req), reason });
+    if (!r) return sendError(res, 404, "라운드를 찾을 수 없습니다.");
+    if (!r.members.length) return sendError(res, 409, "기록이 있는 끝난 라운드만 바꿀 수 있습니다.");
+    // 커밋 뒤 — 평균 · 등급 · 도장(updateGolfStats 가 도장첩 받은 것까지 적는다). 공식이 하나도 안 남으면 기본값으로
+    const before = await readGolfStats(r.members);
+    const recount = await recountMembers(r.members, (mid) => storage.golf.updateGolfStats(mid), resetGolfStatsIfNoOfficial);
+    const after = await readGolfStats(r.members);
+    const members = r.members.map((id) => {
+        const b = before.get(id) ?? null, a = after.get(id) ?? null;
+        return { id, name: a?.name || b?.name || "", before: b && { avg: b.avg, grade: b.grade, rounds: b.rounds }, after: a && { avg: a.avg, grade: a.grade, rounds: a.rounds }, error: recount.get(id)?.error ?? null };
+    });
+    adminLog(req, "golf.round.onsite", { sessionId: req.params.id, from: r.from, to, reason, members: members.map((m) => ({ id: m.id, avgBefore: m.before?.avg ?? null, avgAfter: m.after?.avg ?? null, error: m.error })) });
+    return sendSuccess(res, { sessionId: req.params.id, from: r.from, to, members });
 }));
 
 router.post("/:id/void", asyncHandler(async (req: any, res: any) => {

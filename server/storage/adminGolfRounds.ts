@@ -22,6 +22,10 @@ import {
 } from "../../shared/golfMatch.js";
 import { sessionOnSite, type OnSiteBucket, type VerdictReason } from "../../shared/golfOnSite.js";
 import { isUndefinedCheckinTable, realMemberIds } from "./golfCheckins.js";
+import {
+    editedHoles, onSiteTargets, parseOnSiteLog, parseScanMeta, scanFlags,
+    type OnSiteChange, type RoundSource, type ScanFlag, type ScanMeta,
+} from "../../shared/golfScanAudit.js";
 import { courseCoordsFor } from "./golf.repo.js";
 
 export type RoundStatus = "waiting" | "playing" | "finished" | "abandoned";
@@ -116,6 +120,10 @@ export interface RoundListFilters {
     /** 끝난·접은 라운드를 이 날수 안에 만든 것만(0 = 전부). 대기·진행 중 방은 날짜와 무관하게 늘 보인다 */
     days: number;
     q: string;
+    /** 출처 — scan(스코어카드) · match(점수판) · null 전부 */
+    source: RoundSource | null;
+    /** 끝난 라운드의 현장 인증 — 그 갈래의 기록이 있는 판만. 고르면 끝난 판만 남는다 */
+    onsite: "onsite" | "unverified" | "legacy" | null;
     limit: number;
     offset: number;
 }
@@ -133,6 +141,8 @@ export function parseListQuery(q: Record<string, unknown>): RoundListFilters {
         stale: q.stale === "1" || q.stale === "true" || q.stale === true,
         days: intIn(q.days, 0, 0, 3650),
         q: typeof q.q === "string" ? q.q.trim().slice(0, 60) : "",
+        source: q.source === "scan" || q.source === "match" ? q.source : null,
+        onsite: q.onsite === "onsite" || q.onsite === "unverified" || q.onsite === "legacy" ? q.onsite : null,
         limit: intIn(q.limit, 30, 1, 100),
         offset: intIn(q.offset, 0, 0, 100_000),
     };
@@ -197,6 +207,12 @@ function baseWhere(f: RoundListFilters): SQL {
             or m.name ilike ${like} or s.id::text = ${f.q.toLowerCase()}
             or exists (select 1 from jsonb_array_elements(s.players) p where p->>'name' ilike ${like}))`);
     }
+    if (f.source === "scan") parts.push(sql`s.source = 'scan'`);
+    if (f.source === "match") parts.push(sql`s.source is distinct from 'scan'`);
+    if (f.onsite) {
+        const cond = f.onsite === "onsite" ? sql`h.on_site is true` : f.onsite === "unverified" ? sql`h.on_site is false` : sql`h.on_site is null`;
+        parts.push(sql`exists (select 1 from hiq_game_history h where h.golf_session_id = s.id and h.sport_category = 'GOLF' and ${cond})`);
+    }
     return sql.join(parts, sql` and `);
 }
 
@@ -224,9 +240,17 @@ export interface AdminRoundRow {
     finishedAt: string | null;
     onSite: OnSiteView;
     historyCount: number;
+    /** 스코어카드로 올린 라운드면 'scan' */
+    source: "scan" | null;
+    /** 스코어카드 라운드의 다시 볼 것(shared/golfScanAudit — 목록에선 타수 표시는 빼고) */
+    scanFlags: ScanFlag[];
 }
 
-export interface RoundCounts { total: number; waiting: number; playing: number; finished: number; abandoned: number; stale: number }
+export interface RoundCounts { total: number; waiting: number; playing: number; finished: number; abandoned: number; stale: number; scan: number; scanUnverified: number }
+
+/** 같은 사람이 같은 한국 날짜에 올린 스코어카드 수(별칭 s). timestamp 칸은 UTC 벽시계라 +9시간 */
+const SAME_DAY_SQL = sql`(case when s.source = 'scan' then (select count(*) from golf_match_sessions x
+    where x.source = 'scan' and x.host_id = s.host_id and (x.created_at + interval '9 hours')::date = (s.created_at + interval '9 hours')::date) else 0 end)::int`;
 
 export async function listRounds(f: RoundListFilters): Promise<{ items: AdminRoundRow[]; total: number; hasMore: boolean }> {
     const where = [baseWhere(f)];
@@ -238,7 +262,8 @@ export async function listRounds(f: RoundListFilters): Promise<{ items: AdminRou
                s.game_mode, s.stroke_mode, s.host_id, m.name as host_name, s.players,
                ${iso(sql`s.created_at`)} as created_at, ${iso(sql`s.started_at`)} as started_at,
                ${iso(sql`s.updated_at`)} as updated_at, ${iso(sql`s.finished_at`)} as finished_at,
-               ${STALE_SQL} as is_stale,
+               ${STALE_SQL} as is_stale, s.source, s.scan_meta, ${SAME_DAY_SQL} as same_day,
+               to_char(s.created_at + interval '9 hours', 'YYYY-MM-DD') as created_day,
                (count(*) over ())::int as total_count
         from golf_match_sessions s
         left join hiq_members m on m.id = s.host_id
@@ -279,6 +304,11 @@ export async function listRounds(f: RoundListFilters): Promise<{ items: AdminRou
             finishedAt: r.finished_at ?? null,
             onSite,
             historyCount: h.n,
+            source: r.source === "scan" ? "scan" : null,
+            scanFlags: r.source === "scan" ? (() => {
+                const meta = parseScanMeta(r.scan_meta);
+                return scanFlags({ edits: meta?.edits ?? null, sameDay: Number(r.same_day) || 0, cardDay: meta?.cardDay ?? null, uploadedDay: String(r.created_day ?? "") });
+            })() : [],
         };
     });
     return { items, total: rows.length > 0 ? Number(rows[0].total_count) : 0, hasMore: rows.length > f.limit };
@@ -292,12 +322,15 @@ export async function roundCounts(f: RoundListFilters): Promise<RoundCounts> {
                count(*) filter (where s.status = 'playing')::int as playing,
                count(*) filter (where s.status = 'finished')::int as finished,
                count(*) filter (where s.status = 'abandoned')::int as abandoned,
-               count(*) filter (where ${STALE_SQL})::int as stale
+               count(*) filter (where ${STALE_SQL})::int as stale,
+               count(*) filter (where s.source = 'scan')::int as scan,
+               count(*) filter (where s.source = 'scan' and exists (select 1 from hiq_game_history h
+                   where h.golf_session_id = s.id and h.sport_category = 'GOLF' and h.on_site is false))::int as scan_unverified
         from golf_match_sessions s
         left join hiq_members m on m.id = s.host_id
         where ${baseWhere(f)}`)).rows as Record<string, unknown>[];
     const n = (k: string) => Number(r?.[k] ?? 0);
-    return { total: n("total"), waiting: n("waiting"), playing: n("playing"), finished: n("finished"), abandoned: n("abandoned"), stale: n("stale") };
+    return { total: n("total"), waiting: n("waiting"), playing: n("playing"), finished: n("finished"), abandoned: n("abandoned"), stale: n("stale"), scan: n("scan"), scanUnverified: n("scan_unverified") };
 }
 
 /** 경기별 골프 기록 수와 현장 인증 갈래(한 번에 — 경기마다 따로 읽지 않는다) */
@@ -378,7 +411,11 @@ export interface AdminRoundDetail {
     history: { id: string; memberId: string; name: string | null; score: number; onSite: boolean | null; isWinner: boolean; at: string }[];
     /** 18홀을 다 적은 실제 회원이 있는데 끝난 경기에 기록이 하나도 없다 — 무효화했거나 회원이 탈퇴한 경우 */
     missingHistory: boolean;
-    actions: { abandon: boolean; void: boolean; finish: boolean };
+    /** 스코어카드 라운드면 그 기록 — 읽은 값 · 고친 홀 · 같은 날 올린 장수 · 다시 볼 것 */
+    scan: null | { meta: ScanMeta; edited: { hole: number; read: number; saved: number }[]; sameDay: number; flags: ScanFlag[]; uploadedDay: string };
+    /** 운영자가 공식/미인증을 바꾼 기록(오래된 것부터) */
+    onSiteLog: OnSiteChange[];
+    actions: { abandon: boolean; void: boolean; finish: boolean; toOfficial: boolean; toUnverified: boolean };
 }
 
 const isoOf = (v: Date | string | null | undefined): string | null => {
@@ -397,7 +434,7 @@ export async function roundDetail(session: any): Promise<AdminRoundDetail> {
     const parKnown: boolean[] = Array.isArray(session.parKnown) ? session.parKnown : [];
     const members = realMemberIds(players);
 
-    const [hostRow, history, checkins, photos, course] = await Promise.all([
+    const [hostRow, history, checkins, photos, course, extra] = await Promise.all([
         db.select({ name: hiqMembers.name }).from(hiqMembers).where(eq(hiqMembers.id, session.hostId)).limit(1),
         db.select({
             id: hiqGameHistory.id, memberId: hiqGameHistory.memberId, name: hiqMembers.name, score: hiqGameHistory.score,
@@ -409,6 +446,7 @@ export async function roundDetail(session: any): Promise<AdminRoundDetail> {
         checkinsWithNames(id),
         photoCounts(id),
         courseCoordsFor(session.courseId, session.courseName).catch(() => null),
+        roundExtra(id),
     ]);
 
     const recordedIds = new Set(history.map((h) => String(h.memberId)));
@@ -441,6 +479,23 @@ export async function roundDetail(session: any): Promise<AdminRoundDetail> {
             legacy: history.filter((h) => h.onSite == null).length,
         })
         : null;
+
+    // 한 판은 한 값(동반자 규칙) — 바꿀 쪽은 그 값으로. 값이 섞였으면(옛 수동 수정) 어느 쪽이든 고를 수 있게
+    const values = new Set(history.map((h) => (h.onSite === true ? "t" : h.onSite === false ? "f" : "n")));
+    const current: boolean | null = values.size === 1 ? (values.has("t") ? true : values.has("f") ? false : null) : null;
+    const targets = values.size > 1 ? { toOfficial: true, toUnverified: true } : onSiteTargets(current);
+    const finishedWithHistory = session.status === "finished" && history.length > 0;
+    const mine = cards.find((c) => c.memberId === String(session.hostId)) ?? cards[0];
+    const scan = extra.source === "scan" && extra.meta ? {
+        meta: extra.meta,
+        edited: editedHoles(extra.meta.read, mine?.scores ?? []),
+        sameDay: extra.sameDay,
+        uploadedDay: extra.createdDay,
+        flags: scanFlags({
+            edits: extra.meta.edits, sameDay: extra.sameDay, cardDay: extra.meta.cardDay, uploadedDay: extra.createdDay,
+            strokes: mine?.strokes ?? null, relative: mine?.relative ?? null, parKnown: parKnown.length === 18 && parKnown.every(Boolean),
+        }),
+    } : null;
 
     return {
         id,
@@ -485,13 +540,51 @@ export async function roundDetail(session: any): Promise<AdminRoundDetail> {
             onSite: h.onSite ?? null, isWinner: !!h.isWinner, at: isoOf(h.createdAt) ?? "",
         })),
         missingHistory: session.status === "finished" && history.length === 0 && cards.some((c) => c.isMember && c.complete),
+        scan,
+        onSiteLog: extra.log,
         actions: {
+            toOfficial: finishedWithHistory && targets.toOfficial,
+            toUnverified: finishedWithHistory && targets.toUnverified,
             abandon: session.status === "waiting" || session.status === "playing",
             void: session.status === "finished" && history.length > 0,
             // 멈춘 라운드를 기록으로 끝내기(2026-10-01) — 진행 중이고 18홀을 다 적은 회원이 하나라도 있을 때만
             finish: session.status === "playing" && cards.some((c) => c.isMember && c.complete),
         },
     };
+}
+
+/** 상세에만 쓰는 칸 — drizzle 스키마에 없는 출처 · 스캔 기록 · 운영자 전환(migrations/golf_round_source.sql). 칸이 아직 없으면 빈 값 */
+async function roundExtra(sessionId: string): Promise<{ source: string | null; meta: ScanMeta | null; log: OnSiteChange[]; sameDay: number; createdDay: string }> {
+    try {
+        const [r] = (await db.execute(sql`
+            select s.source, s.scan_meta, s.admin_onsite, ${SAME_DAY_SQL} as same_day, to_char(s.created_at + interval '9 hours', 'YYYY-MM-DD') as created_day
+            from golf_match_sessions s where s.id = ${sessionId}::uuid`)).rows as Record<string, unknown>[];
+        return { source: (r?.source as string) ?? null, meta: parseScanMeta(r?.scan_meta), log: parseOnSiteLog(r?.admin_onsite), sameDay: Number(r?.same_day) || 0, createdDay: String(r?.created_day ?? "") };
+    } catch (e) {
+        if ((e as any)?.code === "42703" || (e as any)?.cause?.code === "42703") return { source: null, meta: null, log: [], sameDay: 0, createdDay: "" };
+        throw e;
+    }
+}
+
+/**
+ * 공식 ↔ 미인증 바꾸기(골프 ①) — 끝난 판의 골프 기록 전부를 한 값으로. 바꾼 기록을 admin_onsite 에 쌓는다. 한 트랜잭션.
+ * 평균 · 등급 · 도장 다시 세기는 부르는 쪽(라우트)이 커밋 뒤에 한다. 바꾼 회원 id 를 돌려준다(없으면 빈 배열 — 끝난 판이 아니거나 기록이 없다).
+ */
+export async function setRoundOnSite(sessionId: string, to: boolean, change: { at: string; by: string; reason: string }): Promise<{ members: string[]; from: boolean | null } | null> {
+    return db.transaction(async (tx) => {
+        const [s] = (await tx.execute(sql`select status from golf_match_sessions where id = ${sessionId}::uuid for update`)).rows as Record<string, unknown>[];
+        if (!s) return null;
+        if (s.status !== "finished") return { members: [], from: null };
+        const before = (await tx.execute(sql`select member_id::text as member_id, on_site from hiq_game_history
+            where golf_session_id = ${sessionId}::uuid and sport_category = 'GOLF'`)).rows as Record<string, unknown>[];
+        if (!before.length) return { members: [], from: null };
+        const vals = new Set(before.map((b) => (b.on_site === true ? "t" : b.on_site === false ? "f" : "n")));
+        const from = vals.size === 1 ? (vals.has("t") ? true : vals.has("f") ? false : null) : null;
+        await tx.execute(sql`update hiq_game_history set on_site = ${to} where golf_session_id = ${sessionId}::uuid and sport_category = 'GOLF'`);
+        const entry = JSON.stringify([{ at: change.at, by: change.by, reason: change.reason, from, to }]);
+        await tx.execute(sql`update golf_match_sessions set admin_onsite = coalesce(admin_onsite, '[]'::jsonb) || ${entry}::jsonb where id = ${sessionId}::uuid`);
+        return { members: Array.from(new Set(before.map((b) => String(b.member_id)))), from };
+    });
 }
 
 async function checkinsWithNames(sessionId: string): Promise<{ memberId: string; name: string | null; verified: boolean; bucket: string; source: string; createdAt: Date }[]> {

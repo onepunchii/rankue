@@ -76,12 +76,17 @@ describe("현장 인증 요약", () => {
 
 describe("parseListQuery", () => {
     it("기본값과 상한", () => {
-        expect(parseListQuery({})).toEqual({ status: null, stale: false, days: 0, q: "", limit: 30, offset: 0 });
+        expect(parseListQuery({})).toEqual({ status: null, stale: false, days: 0, q: "", source: null, onsite: null, limit: 30, offset: 0 });
         expect(parseListQuery({ limit: "999", offset: "-5", days: "abc" })).toMatchObject({ limit: 100, offset: 0, days: 0 });
     });
     it("모르는 상태는 거르지 않는다, stale 은 1·true 만", () => {
         expect(parseListQuery({ status: "playing", stale: "1" })).toMatchObject({ status: "playing", stale: true });
         expect(parseListQuery({ status: "deleted", stale: "yes" })).toMatchObject({ status: null, stale: false });
+    });
+    it("출처 · 인증은 아는 값만(2026-10-17 골프 ①)", () => {
+        expect(parseListQuery({ source: "scan", onsite: "unverified" })).toMatchObject({ source: "scan", onsite: "unverified" });
+        expect(parseListQuery({ source: "match", onsite: "legacy" })).toMatchObject({ source: "match", onsite: "legacy" });
+        expect(parseListQuery({ source: "photo", onsite: "yes" })).toMatchObject({ source: null, onsite: null });
     });
     it("검색어는 다듬고 60자까지", () => {
         expect(parseListQuery({ q: "  동강  " }).q).toBe("동강");

@@ -9,9 +9,13 @@
  * - 조치: 접기(대기·진행 중 — 기록은 남지 않는다), 기록 무효화(끝난 라운드 — 모든 참가 회원의 평균·등급·랭킹·도장에서 빠진다),
  *   '오래된 대기방 정리'(하루 넘게 시작 안 한 대기방만. 미리 보기로 개수를 보고 그 방들만 접는다 — 진행 중 방은 점수가 있어 건드리지 않는다).
  * - 이름·점수가 실린다: 쿼리 캐시가 localStorage 에 영속화되므로(lib/queryClient) 캐시 수명을 0 으로 두고 화면을 떠날 때 지운다.
+ * - 2026-10-17 골프 ①(어드민 전수 조사 — "스캔 라운드가 곧바로 공식이 된다 · 출처 · 인증 필터가 없다"): 출처(스코어카드 · 점수판) · 인증 고르기,
+ *   스코어카드 라운드의 '다시 볼 것' 표시(shared/golfScanAudit — 판정이 아니라 표시) · 읽은 값과 고친 홀 · 공식 ↔ 미인증 바꾸기(사유 · 기록).
  * 서버: server/routes/modules/adminGolf/rounds.ts · server/storage/adminGolfRounds.ts
  */
 import { useEffect, useState } from "react";
+import { Input } from "@/components/ui/input";
+import { SCAN_FLAG_LABEL, type OnSiteChange, type ScanFlag, type ScanMeta } from "@shared/golfScanAudit";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -28,6 +32,8 @@ const PAGE = 30;
 type RoundStatus = "waiting" | "playing" | "finished" | "abandoned";
 type Chip = "all" | RoundStatus | "stale";
 type Days = "7" | "30" | "90" | "";
+type SourcePick = "" | "scan" | "match";
+type OnsitePick = "" | "onsite" | "unverified" | "legacy";
 type Tone = "brand" | "alert" | "warn" | "neutral" | "info";
 
 type OnSiteView =
@@ -53,8 +59,10 @@ interface RoundRow {
     finishedAt: string | null;
     onSite: OnSiteView;
     historyCount: number;
+    source?: "scan" | null;
+    scanFlags?: ScanFlag[];
 }
-interface RoundCounts { total: number; waiting: number; playing: number; finished: number; abandoned: number; stale: number }
+interface RoundCounts { total: number; waiting: number; playing: number; finished: number; abandoned: number; stale: number; scan?: number; scanUnverified?: number }
 interface RoundsPage { items: RoundRow[]; total: number; hasMore: boolean; offset: number; limit: number; counts: RoundCounts }
 
 type VerdictReason = "ok" | "too-fast" | "no-course" | "no-checkin" | "far" | "no-fix";
@@ -87,8 +95,11 @@ interface RoundDetail {
     photos: { total: number; public: number; hidden: number };
     history: { id: string; memberId: string; name: string | null; score: number; onSite: boolean | null; isWinner: boolean; at: string }[];
     missingHistory: boolean;
-    actions: { abandon: boolean; void: boolean; finish: boolean };
+    scan?: null | { meta: ScanMeta; edited: { hole: number; read: number; saved: number }[]; sameDay: number; flags: ScanFlag[]; uploadedDay: string };
+    onSiteLog?: OnSiteChange[];
+    actions: { abandon: boolean; void: boolean; finish: boolean; toOfficial?: boolean; toUnverified?: boolean };
 }
+interface OnSiteResult { from: boolean | null; to: boolean; members: { id: string; name: string; before: { avg: number | null; grade: string | null; rounds: number } | null; after: { avg: number | null; grade: string | null; rounds: number } | null; error: string | null }[] }
 interface StatSnap { avg: number | null; best: number | null; grade: string | null; rounds: number }
 interface VoidResult {
     sessionId: string;
@@ -136,7 +147,9 @@ const SOURCE_UI: Record<string, string> = {
 };
 const DANGER_BTN = "bg-white border border-red-500/30 text-red-600 hover:bg-red-500/[0.06]";
 
-function onSiteUi(v: OnSiteView): { label: string; tone: Tone } {
+function onSiteUi(v: OnSiteView, scan = false): { label: string; tone: Tone } {
+    // 스코어카드 라운드의 '공식'은 위치 확인이 아니라 명부 골프장이라서다(10/13 결정) — 이름을 갈라 적는다
+    if (scan && v.source === "history" && v.verdict === "onsite") return { label: "공식 · 카드", tone: "brand" };
     if (v.source === "history") {
         return {
             onsite: { label: "현장 인증", tone: "brand" as Tone },
@@ -155,7 +168,7 @@ const ninesOf = (r: { frontCourseName: string | null; backCourseName: string | n
     [r.frontCourseName, r.backCourseName].filter(Boolean).join(" · ");
 const modeOf = (r: { gameMode: string; solo: boolean }) => (r.gameMode === "skins" ? "스킨스" : r.solo ? "스트로크 · 혼자" : "스트로크");
 const peopleOf = (r: { members: number; guests: number }) => `회원 ${r.members}${r.guests ? ` · 게스트 ${r.guests}` : ""}`;
-const avgText = (s: StatSnap | null) => (s && s.avg ? `${s.avg.toFixed(1)}타` : "없음");
+const avgText = (s: { avg: number | null } | null) => (s && s.avg ? `${s.avg.toFixed(1)}타` : "없음");
 const points = (n: number, signed = false) => `${n < 0 ? "−" : signed && n > 0 ? "+" : ""}${Math.abs(n).toLocaleString()}P`;
 
 function useDebounced<T>(value: T, ms: number): T {
@@ -173,9 +186,11 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
     const [chip, setChip] = useState<Chip>("all");
     const [search, setSearch] = useState("");
     const [days, setDays] = useState<Days>("30");
+    const [source, setSource] = useState<SourcePick>("");
+    const [onsite, setOnsite] = useState<OnsitePick>("");
     const q = useDebounced(search.trim(), 300);
     // 쪽 번호는 조건에 묶는다 — 조건이 바뀌면 첫 쪽부터
-    const sig = `${chip}|${q}|${days}`;
+    const sig = `${chip}|${q}|${days}|${source}|${onsite}`;
     const [page, setPage] = useState({ sig, offset: 0 });
     const offset = page.sig === sig ? page.offset : 0;
     const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -183,7 +198,7 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
 
     const status = chip === "all" || chip === "stale" ? undefined : chip;
     const { data, isLoading, isError, error, refetch, isFetching } = useQuery<RoundsPage>({
-        queryKey: [...GOLF_ROUNDS_KEY, { status, stale: chip === "stale" ? 1 : undefined, days: days || undefined, q: q || undefined, limit: PAGE, offset }],
+        queryKey: [...GOLF_ROUNDS_KEY, { status, stale: chip === "stale" ? 1 : undefined, days: days || undefined, q: q || undefined, source: source || undefined, onsite: onsite || undefined, limit: PAGE, offset }],
         gcTime: 0,
         staleTime: 0,
         placeholderData: (prev) => prev, // 쪽·칩을 바꿀 때 빈 화면으로 깜빡이지 않게
@@ -247,7 +262,32 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
                         <LucideRefreshCw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
                     </button>
                 </div>
+                <div className="flex gap-2">
+                    <select value={source} onChange={(e) => setSource(e.target.value as SourcePick)} aria-label="출처" data-testid="rounds-source"
+                        className={`h-9 min-w-0 flex-1 px-2 rounded-xl border text-[13px] font-bold outline-none ${source ? "bg-brand/[0.06] border-brand/30 text-brand" : "bg-white border-black/10 text-black/65"}`}>
+                        <option value="">모든 출처</option>
+                        <option value="scan">스코어카드로 올린 것</option>
+                        <option value="match">점수판으로 친 것</option>
+                    </select>
+                    <select value={onsite} onChange={(e) => setOnsite(e.target.value as OnsitePick)} aria-label="현장 인증" data-testid="rounds-onsite"
+                        className={`h-9 min-w-0 flex-1 px-2 rounded-xl border text-[13px] font-bold outline-none ${onsite ? "bg-brand/[0.06] border-brand/30 text-brand" : "bg-white border-black/10 text-black/65"}`}>
+                        <option value="">모든 인증</option>
+                        <option value="onsite">공식 · 현장 인증</option>
+                        <option value="unverified">미인증</option>
+                        <option value="legacy">옛 기록</option>
+                    </select>
+                </div>
             </div>
+
+            {source === "scan" && counts && (
+                <Panel className="px-4 py-3" >
+                    <p className="text-[13px] font-bold text-black/70" data-testid="rounds-scan-summary">
+                        스코어카드 라운드 <span className="tabular-nums text-brand">{(counts.scan ?? 0).toLocaleString()}</span>
+                        <span className="text-black/45"> · 미인증 <span className="tabular-nums">{(counts.scanUnverified ?? 0).toLocaleString()}</span></span>
+                    </p>
+                    <p className="mt-1 text-[12px] leading-snug break-keep text-black/45">골프장이 명부에 있으면 올리는 순간 공식이 됩니다(10/13 결정). 붉은 표시는 판정이 아니라 다시 볼 것 — 열어서 읽은 값과 고친 홀을 보고, 필요하면 사유를 적어 미인증으로 내립니다.</p>
+                </Panel>
+            )}
 
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
@@ -280,7 +320,7 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
                     <ul className="md:hidden rounded-2xl bg-white border border-black/[0.08] divide-y divide-black/[0.05] overflow-hidden">
                         {items.map((r) => {
                             const st = STATUS_UI[r.status] ?? STATUS_UI.abandoned;
-                            const os = onSiteUi(r.onSite);
+                            const os = onSiteUi(r.onSite, r.source === "scan");
                             const nines = ninesOf(r);
                             return (
                                 <li key={r.id}>
@@ -289,6 +329,7 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
                                             <span className="flex items-center gap-1.5">
                                                 <Pill tone={st.tone}>{st.label}</Pill>
                                                 {r.stale && <Pill tone="alert">멈춘 방</Pill>}
+                                                {r.source === "scan" && <Pill tone="info">스코어카드</Pill>}
                                                 <span className="ml-auto shrink-0 text-[12px] text-black/40 tabular-nums">{agoLabel(r.updatedAt)}</span>
                                             </span>
                                             <span className="mt-1.5 block font-bold text-[14.5px] text-[rgba(0,0,0,0.87)] truncate">
@@ -299,6 +340,7 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
                                             </span>
                                             <span className="mt-1.5 flex items-center gap-1.5">
                                                 <Pill tone={os.tone}>{os.label}</Pill>
+                                                {(r.scanFlags?.length ?? 0) > 0 && <Pill tone="alert">다시 볼 것 {r.scanFlags!.length}</Pill>}
                                                 {r.status === "finished" && <span className="text-[12px] text-black/45 tabular-nums">기록 {r.historyCount}건</span>}
                                                 <span className="ml-auto text-[11.5px] text-black/35 tabular-nums">{kstDateTime(r.createdAt)}</span>
                                             </span>
@@ -330,12 +372,12 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
                             <tbody>
                                 {items.map((r) => {
                                     const st = STATUS_UI[r.status] ?? STATUS_UI.abandoned;
-                                    const os = onSiteUi(r.onSite);
+                                    const os = onSiteUi(r.onSite, r.source === "scan");
                                     const nines = ninesOf(r);
                                     return (
                                         <tr key={r.id} onClick={() => setSelectedId(r.id)} className="border-b border-black/[0.05] hover:bg-brand/[0.03] cursor-pointer">
                                             <td className="px-4 py-3 whitespace-nowrap">
-                                                <span className="flex items-center gap-1"><Pill tone={st.tone}>{st.label}</Pill>{r.stale && <Pill tone="alert">멈춤</Pill>}</span>
+                                                <span className="flex items-center gap-1"><Pill tone={st.tone}>{st.label}</Pill>{r.stale && <Pill tone="alert">멈춤</Pill>}{r.source === "scan" && <Pill tone="info">카드</Pill>}</span>
                                             </td>
                                             <td className="px-3 py-3 max-w-[220px]">
                                                 <div className="font-bold text-[rgba(0,0,0,0.87)] truncate">{courseOf(r)}</div>
@@ -344,7 +386,9 @@ export default function GolfRoundsView({ onOpenMember }: { onOpenMember?: (id: s
                                             <td className="px-3 py-3 text-black/70 whitespace-nowrap">{r.host.name ?? "?"}</td>
                                             <td className="px-3 py-3 text-black/60 whitespace-nowrap tabular-nums">{peopleOf(r)}</td>
                                             <td className="px-3 py-3 text-right tabular-nums text-black/60">{r.holesEntered}<span className="text-black/30">/18</span></td>
-                                            <td className="px-3 py-3 whitespace-nowrap"><Pill tone={os.tone}>{os.label}</Pill></td>
+                                            <td className="px-3 py-3 whitespace-nowrap">
+                                                <span className="flex items-center gap-1"><Pill tone={os.tone}>{os.label}</Pill>{(r.scanFlags?.length ?? 0) > 0 && <span title={r.scanFlags!.map((f) => SCAN_FLAG_LABEL[f]).join(" · ")}><Pill tone="alert">다시 볼 것 {r.scanFlags!.length}</Pill></span>}</span>
+                                            </td>
                                             <td className="px-3 py-3 text-right tabular-nums text-black/60">{r.status === "finished" ? r.historyCount : <span className="text-black/25">-</span>}</td>
                                             <td className="px-3 py-3 tabular-nums text-[12.5px] text-black/50 whitespace-nowrap">{kstDateTime(r.createdAt)}</td>
                                             <td className="px-3 py-3 tabular-nums text-[12.5px] text-black/50 whitespace-nowrap">{agoLabel(r.updatedAt)}</td>
@@ -503,7 +547,28 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
         onError: (e: any) => toast({ title: "끝내기 실패", description: e?.message ?? "", variant: "destructive" }),
         onSettled: () => qc.invalidateQueries({ queryKey: GOLF_ROUNDS_KEY }),
     });
-    const busy = abandon.isPending || voidRound.isPending || finish.isPending;
+    const [reason, setReason] = useState("");
+    useEffect(() => { setReason(""); }, [id]);
+    const setOnSite = useMutation({
+        mutationFn: async (v: { sid: string; to: boolean }) => apiRequest(`${BASE}/${v.sid}/onsite`, { method: "POST", body: { to: v.to, reason: reason.trim() } }) as Promise<OnSiteResult>,
+        onSuccess: (r) => {
+            const members = Array.isArray(r?.members) ? r.members : [];
+            const lines = members.map((m) => `${m.name || "?"} 평균 ${avgText(m.before)} → ${avgText(m.after)}`).join(" · ");
+            toast({ title: r?.to ? "공식으로 바꿨습니다" : "미인증으로 내렸습니다", description: lines || undefined, variant: members.some((m) => m.error) ? "destructive" : undefined });
+            setReason("");
+        },
+        onError: (e: any) => toast({ title: "바꾸지 못했습니다", description: e?.message ?? "", variant: "destructive" }),
+        onSettled: () => qc.invalidateQueries({ queryKey: GOLF_ROUNDS_KEY }),
+    });
+    const askOnSite = async (r: RoundDetail, to: boolean) => {
+        const n = new Set(r.history.map((h) => h.memberId)).size;
+        const message = to
+            ? `이 라운드를 공식으로 올릴까요?\n\n${courseOf(r)} · ${kstDate(r.finishedAt ?? r.createdAt)}\n참가 회원 ${n}명의 평균 · 등급 · 랭킹 · 여권 도장에 들어갑니다. 새로 받을 볼마커 · 트로피가 있으면 받습니다.\n\n까닭: ${reason.trim()}`
+            : `이 라운드를 미인증으로 내릴까요?\n\n${courseOf(r)} · ${kstDate(r.finishedAt ?? r.createdAt)}\n참가 회원 ${n}명의 평균 · 등급 · 랭킹 · 여권 도장에서 빠집니다(점수는 남습니다). 이미 받은 볼마커 · 트로피는 그대로입니다. 다시 공식으로 올릴 수 있습니다.\n\n까닭: ${reason.trim()}`;
+        if (!(await appConfirm({ message, tone: to ? "default" : "danger", confirmText: to ? "공식으로" : "미인증으로" }))) return;
+        setOnSite.mutate({ sid: r.id, to });
+    };
+    const busy = abandon.isPending || voidRound.isPending || finish.isPending || setOnSite.isPending;
     const askFinish = async (r: RoundDetail) => {
         const done = r.players.filter((p) => !p.isGuest && p.holesPlayed >= 18).length;
         const message = `이 라운드를 끝내고 기록으로 남길까요?\n\n${courseOf(r)} · 방장 ${r.host.name ?? "?"}\n`
@@ -608,13 +673,15 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
                                 )}
                             </Section>
 
+                            {d.scan && <ScanSection scan={d.scan} />}
+
                             <Section title="현장 인증" right={<span className="text-[11.5px] text-black/40">좌표는 저장하지 않습니다</span>}>
                                 <Panel className="overflow-hidden">
                                     <div className="px-4 py-3 flex flex-wrap items-center gap-2">
                                         {d.status === "finished" && d.onSite.recorded
-                                            ? <Pill tone={onSiteUi({ source: "history", verdict: d.onSite.recorded }).tone}>{onSiteUi({ source: "history", verdict: d.onSite.recorded }).label}</Pill>
+                                            ? <Pill tone={onSiteUi({ source: "history", verdict: d.onSite.recorded }, !!d.scan).tone}>{onSiteUi({ source: "history", verdict: d.onSite.recorded }, !!d.scan).label}</Pill>
                                             : <Pill tone={d.onSite.verdict.onSite ? "brand" : "neutral"}>{d.onSite.verdict.onSite ? "지금까지 인증" : "아직 인증 없음"}</Pill>}
-                                        <span className="text-[12.5px] text-black/55">{VERDICT_UI[d.onSite.verdict.reason] ?? d.onSite.verdict.reason}</span>
+                                        <span className="text-[12.5px] text-black/55">{d.scan ? (d.onSite.courseKnown ? "스코어카드로 올림 — 명부의 골프장이라 공식으로 셉니다" : "스코어카드로 올림") : VERDICT_UI[d.onSite.verdict.reason] ?? d.onSite.verdict.reason}</span>
                                     </div>
                                     {checkins.length > 0 ? (
                                         <ul className="border-t border-black/[0.05] divide-y divide-black/[0.04]">
@@ -629,8 +696,33 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
                                                 </li>
                                             ))}
                                         </ul>
-                                    ) : (
+                                    ) : d.scan ? null : (
                                         <p className="border-t border-black/[0.05] px-4 py-2.5 text-[12.5px] text-black/45">위치 확인 기록이 없습니다.</p>
+                                    )}
+                                    {(d.onSiteLog?.length ?? 0) > 0 && (
+                                        <ul className="border-t border-black/[0.05] px-4 py-2 space-y-1" data-testid="round-onsite-log">
+                                            {d.onSiteLog!.map((c, i) => (
+                                                <li key={`${c.at}-${i}`} className="text-[12px] leading-snug text-black/60">
+                                                    <span className="tabular-nums text-black/40">{kstDateTime(c.at)}</span> · {c.by} · <b className={c.to ? "text-brand" : "text-amber-700"}>{c.to ? "공식으로" : "미인증으로"}</b> — {c.reason}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    )}
+                                    {(d.actions.toOfficial || d.actions.toUnverified) && (
+                                        <div data-admin-write className="border-t border-black/[0.05] px-4 py-3 space-y-2" data-testid="round-onsite-switch">
+                                            <Input value={reason} maxLength={200} onChange={(e) => setReason(e.target.value)} placeholder="바꾸는 까닭(작업 기록에 남아요)" className="h-9 text-[13px]" />
+                                            <div className="flex flex-wrap gap-2">
+                                                {d.actions.toUnverified && (
+                                                    <button data-admin-write disabled={busy || reason.trim().length < 2} onClick={() => askOnSite(d, false)}
+                                                        className={`h-9 px-4 rounded-xl text-[13px] font-bold transition-colors disabled:opacity-40 ${DANGER_BTN}`}>미인증으로 내리기</button>
+                                                )}
+                                                {d.actions.toOfficial && (
+                                                    <button data-admin-write disabled={busy || reason.trim().length < 2} onClick={() => askOnSite(d, true)}
+                                                        className="h-9 px-4 rounded-xl text-[13px] font-bold bg-brand text-white hover:bg-brand-strong disabled:opacity-40">공식으로 올리기</button>
+                                                )}
+                                            </div>
+                                            <p className="text-[11.5px] leading-snug break-keep text-black/40">이 판의 기록 전부(동반자 포함)가 한 값으로 바뀌고 평균 · 등급 · 도장을 다시 셉니다. 이미 받은 볼마커 · 트로피는 그대로입니다.</p>
+                                        </div>
                                     )}
                                 </Panel>
                             </Section>
@@ -677,7 +769,7 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
                                 ) : (
                                     <Panel className="divide-y divide-black/[0.05] overflow-hidden">
                                         {history.map((h) => {
-                                            const os = onSiteUi({ source: "history", verdict: h.onSite === true ? "onsite" : h.onSite === false ? "unverified" : "legacy" });
+                                            const os = onSiteUi({ source: "history", verdict: h.onSite === true ? "onsite" : h.onSite === false ? "unverified" : "legacy" }, !!d.scan);
                                             return (
                                                 <div key={h.id} className="flex items-center gap-2 px-4 py-2.5 text-[13.5px]">
                                                     <span className="min-w-0 flex-1 flex items-center gap-1.5">
@@ -733,6 +825,32 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
                 )}
             </SheetContent>
         </Sheet>
+    );
+}
+
+/** 스코어카드 라운드 — 카드의 날 · 올린 날 · 고친 홀 · 같은 날 올린 장수 · 다시 볼 것(shared/golfScanAudit) */
+function ScanSection({ scan }: { scan: NonNullable<RoundDetail["scan"]> }) {
+    const m = scan.meta;
+    return (
+        <Section title="스코어카드" right={scan.flags.length ? <span className="flex flex-wrap justify-end gap-1">{scan.flags.map((f) => <Pill key={f} tone="alert">{SCAN_FLAG_LABEL[f]}</Pill>)}</span> : <span className="text-[11.5px] text-black/40">다시 볼 것 없음</span>}>
+            <Panel className="px-4 py-3 space-y-2" >
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2" data-testid="round-scan">
+                    <Stat label="카드의 날">{m.cardDay ?? "못 읽음"}</Stat>
+                    <Stat label="올린 날">{scan.uploadedDay || "-"}</Stat>
+                    <Stat label="고친 칸">{m.edits == null ? "모름" : `${m.edits}칸`}</Stat>
+                    <Stat label="그날 올린 카드">{scan.sameDay}장</Stat>
+                </div>
+                {m.backfill ? (
+                    <p className="text-[12px] leading-snug break-keep text-black/45">10/17 전에 올린 카드라 읽은 값이 남아 있지 않습니다(고친 칸을 알 수 없음).</p>
+                ) : scan.edited.length > 0 ? (
+                    <p className="text-[12.5px] leading-snug text-black/60">
+                        읽은 값과 다른 홀 — {scan.edited.map((e) => <span key={e.hole} className="mr-2 inline-block tabular-nums"><b>{e.hole}번</b> {e.read || "·"}→<b className="text-amber-700">{e.saved || "·"}</b></span>)}
+                    </p>
+                ) : (
+                    <p className="text-[12.5px] text-black/50">읽은 값 그대로 올렸습니다.</p>
+                )}
+            </Panel>
+        </Section>
     );
 }
 

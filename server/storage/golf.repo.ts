@@ -1742,7 +1742,7 @@ export class GolfRepository {
      * 그 뒤 두 가지만 고친다 — 기록의 날을 카드의 날짜로(day), 공식 여부를 official 로(카드에서 읽은 그대로일 때만 — 판정은 부르는 쪽).
      * 같은 날 · 같은 타수의 골프 기록이 이미 있으면 받지 않는다(같은 카드를 두 번 올림).
      */
-    async recordScannedRound(memberId: string, input: { courseId: string | null; courseName: string; front: string | null; back: string | null; scores: number[]; day: string | null; official: boolean }): Promise<{ id: string; official: boolean }> {
+    async recordScannedRound(memberId: string, input: { courseId: string | null; courseName: string; front: string | null; back: string | null; scores: number[]; day: string | null; official: boolean; scan?: { read: number[]; edits: number; cardDay: string | null } }): Promise<{ id: string; official: boolean }> {
         if (!isCompleteRound(input.scores)) throw badRequest("18홀이 모두 있어야 기록할 수 있어요");
         const total = input.scores.reduce((a, b) => a + b, 0);
         const day = input.day ?? new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
@@ -1760,6 +1760,10 @@ export class GolfRepository {
         const when = input.day ? new Date(`${input.day}T12:00:00+09:00`) : null;
         await db.update(hiqGameHistory).set({ onSite: input.official, ...(when ? { createdAt: when } : {}) }).where(eq(hiqGameHistory.golfSessionId, session.id));
         if (when) await db.update(golfMatchSessions).set({ startedAt: when, finishedAt: when, holesDoneAt: when }).where(eq(golfMatchSessions.id, session.id));
+        // 출처 표시(migrations/golf_round_source.sql) — 어드민 스코어카드 감사가 본다. 적다 실패해도 기록은 남긴다
+        const meta = input.scan ? { read: input.scan.read.slice(0, 18).map((v) => Math.max(0, Math.floor(Number(v) || 0))), edits: input.scan.edits, cardDay: input.scan.cardDay } : {};
+        await db.execute(sql`update golf_match_sessions set source = 'scan', scan_meta = ${JSON.stringify(meta)}::jsonb where id = ${session.id}::uuid`)
+            .catch((e) => console.warn("[golf] scan source", String((e as Error)?.message ?? e).slice(0, 120)));
         // 끝낼 때는 미인증으로 세었다 — 공식이면 평균 · 등급 · 도장을 다시 센다
         if (input.official) await this.recountGolfStats([memberId]);
         return { id: session.id, official: input.official };
