@@ -386,6 +386,24 @@ router.post("/game/:id/finish", requireAuth, asyncHandler(async (req: AuthReques
             : storage.checkAndUpdateHandicap(pid, game.gameType as any)
     ));
 
+    // 큐 케이스(2026-10-16) — 끝내는 순간에만 아는 다마로 두 자루를 바로 적는다(열 때는 그때의 다마를 모른다).
+    //  다마 오름: 공식 경기 뒤 다마가 올랐다 · 다마 넘김: 이 경기 전의 내 다마보다 높은 목표로 이겼다. 실패해도 종료는 그대로.
+    if (!wasAlreadyFinished && game.isRanked && game.gameMode === "match" && (game.gameType === "3c" || game.gameType === "4c")) {
+        try {
+            const at = new Date();
+            await Promise.all(boundIds.map(async (pid, i) => {
+                const u = handicapUpdates[i] as { oldHandi?: number; newHandi?: number } | null | undefined;
+                const oldHandi = Number(u?.oldHandi ?? 0), newHandi = Number(u?.newHandi ?? 0);
+                if (oldHandi > 0 && newHandi > oldHandi) await storage.cueCase.awardNow(pid, "cue-dama-up", at);
+                const slot = [game.player1Id, game.player2Id, game.player3Id, game.player4Id].indexOf(pid) + 1;
+                const target = Number((game as any)[`player${slot}Target`] ?? 0);
+                // 4구 목표가 다마 표의 끝(50)을 넘으면 예전 큰 눈금으로 적은 판이다 — 다마 산정처럼 뺀다(늘 '넘김'이 된다)
+                const onScale = game.gameType !== "4c" || target <= 50;
+                if (game.winnerId === pid && oldHandi > 0 && onScale && target > oldHandi) await storage.cueCase.awardNow(pid, "cue-over-target", at);
+            }));
+        } catch (e) { console.error("[CueCase] 경기 끝 기록:", e); }
+    }
+
     // Keep the existing response shape (the client reads handicapUpdate1 / handicapUpdate2).
     // P0: 경기 종료 → 상대 플레이어들에게 결과 알림 (이번 호출이 실제로 종료시켰을 때만)
     try {

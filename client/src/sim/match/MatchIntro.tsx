@@ -4,6 +4,7 @@ import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import type { TierId } from "@shared/sim/rank";
 import { TierEmblem } from "../rank/TierEmblem";
+import { caseImage, caseItem, type CaseLocale } from "@shared/cueCase";
 
 /**
  * 대전 시작 인사 화면(2026-09-15 오너: 라포 3번). 첫 샷 전에 몇 초 떴다 사라진다.
@@ -16,7 +17,7 @@ import { TierEmblem } from "../rank/TierEmblem";
  */
 export const INTRO_MS = 3500;
 
-export function MatchIntro({ matchId, names, targets, myIndex, handicap, tiers, visible, onDismiss }: {
+export function MatchIntro({ matchId, names, targets, myIndex, handicap, tiers, cues, visible, onDismiss }: {
     matchId: string;
     names: readonly string[];
     /** [호스트 다마수, 게스트 다마수] */
@@ -26,10 +27,12 @@ export function MatchIntro({ matchId, names, targets, myIndex, handicap, tiers, 
     handicap?: boolean;
     /** [호스트, 게스트]의 온라인 대전 등급(2026-10-12) — 이름 위에 배지. 배치 전인 사람은 없다(자리는 비워 두어 두 칸의 높이를 맞춘다). */
     tiers?: readonly [TierId | null, TierId | null];
+    /** [호스트, 게스트]의 대표 큐(큐 케이스, 2026-10-16) — 두 자루가 가운데에서 마주 본다. 둘 다 없으면 안 그린다 */
+    cues?: readonly [string | null, string | null];
     visible: boolean;
     onDismiss: () => void;
 }) {
-    const { t } = useT();
+    const { t, locale } = useT();
     // 몇 번째 만남인지 — 끝난 대전 화면과 같은 엔드포인트를 쓴다(진행 중에도 답한다).
     const { data } = useQuery<{ headToHead: { wins: number; losses: number; total: number } | null }>({
         queryKey: [`/api/hiq/sim/matches/${matchId}/rapport`],
@@ -78,6 +81,23 @@ export function MatchIntro({ matchId, names, targets, myIndex, handicap, tiers, 
                     );
                 })}
             </div>
+            {(cues?.[0] || cues?.[1]) && (
+                // 두 사람의 대표 큐 — 이음쇠 쪽이 가운데에서 마주 본다(오른쪽 큐는 뒤집는다). 없는 사람은 나무 색 큐대
+                <div className="flex w-[min(340px,86vw)] items-start gap-2.5" data-testid="intro-cues">
+                    {[0, 1].map((i) => {
+                        const x = cues?.[i] ? caseItem(cues[i]!) : null;
+                        return (
+                            <div key={i} className="min-w-0 flex-1">
+                                <div className="relative h-[16px]" style={i === 1 ? { transform: "scaleX(-1)" } : undefined}>
+                                    {x ? <img src={caseImage(x)} alt="" decoding="async" draggable={false} className="absolute inset-0 h-full w-full object-contain" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.7))" }} />
+                                        : <span className="absolute inset-x-0 inset-y-[4px] rounded-full" style={{ background: "linear-gradient(180deg,#6b432a,#4e2e19 60%,#3a2112)" }} />}
+                                </div>
+                                <p className={cn("mt-1.5 truncate text-[11px] font-semibold text-white/60", i === 0 ? "text-left" : "text-right")}>{x ? x.name[(["ko", "en", "es", "vi", "tr"].includes(locale) ? locale : "en") as CaseLocale] : ""}</p>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
             <div className="flex flex-col items-center gap-1">
                 {h && h.total > 0 && (
                     <span className="rk-num text-[13.5px] font-semibold text-white">

@@ -221,6 +221,8 @@ export interface ShareCardOptions {
     readonly date?: string;
     /** 테스트·워커용 캔버스 팩토리. 기본 document.createElement("canvas") */
     readonly createCanvas?: () => HTMLCanvasElement;
+    /** 친 사람의 대표 큐(큐 케이스, 2026-10-16) — 오른쪽 위, 종목 알약과 같은 줄의 벨벳 홈에 눕힌다. 다 불러온 그림만(없으면 안 그린다) */
+    readonly cueSkin?: CanvasImageSource | null;
 }
 
 function ballColour(id: string): BallColour {
@@ -283,6 +285,17 @@ function drawFrame(ctx: CanvasRenderingContext2D, L: CardLayout, o: ShareCardOpt
     ctx.fill();
     ctx.fillStyle = BRAND_FG;
     ctx.fillText(o.badge, L.badge.x + badgeW / 2, L.badge.y + L.badge.h / 2 + 1);
+
+    if (o.cueSkin) {
+        // 대표 큐 — 큐 케이스와 같은 벨벳 홈(남색)에 하대를 눕힌다. 그림은 1000×80(가로 = 길이)
+        const w = Math.min(440, L.card.w - PAD * 2 - badgeW - 24), h = L.badge.h;
+        const x = L.card.x + L.card.w - PAD - w, y = L.badge.y;
+        roundedRect(ctx, x, y, w, h, h / 2);
+        ctx.fillStyle = "#0d1626";
+        ctx.fill();
+        const iw = w - 28, ih = iw * 80 / 1000;
+        ctx.drawImage(o.cueSkin, x + 14, y + (h - ih) / 2, iw, ih);
+    }
 
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";

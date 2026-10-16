@@ -69,6 +69,8 @@ import { WatchList } from "./watch/WatchList";
 import WatchPage from "./watch/WatchPage";
 import { RankPage } from "./rank/RankPage";
 import { shelfPath } from "./rank/shelfApi";
+import { cueSkinUrl, useCaseSummary } from "@/components/hiq/cueCase/cueCaseApi";
+import { cueSkin } from "./render/cueSkin";
 import { CupPage } from "./cup/CupPage";
 import { CUP_PATH } from "./cup/cupApi";
 import { sanitizeCode, parseJoinParams } from "./matchApi";
@@ -211,6 +213,9 @@ interface View {
     assist: boolean;
     /** 상대가 지금 겨누는 각도(대전 대기 중에만). 여기에 상대 큐대만 얹는다 — 조준선·길은 안 준다. */
     opponentAim: number | null;
+    /** 큐대 손잡이 그림 — 내 것 · 상대 것(큐 케이스의 대표 큐, 2026-10-16). 없으면 나무 색 */
+    mySkin: string | null;
+    oppSkin: string | null;
 }
 
 export function SimulatorPage() {
@@ -673,21 +678,26 @@ export function SimulatorPage() {
      * 서버가 이미 AIM_FRESH_MS 로 걸러 주므로(상대가 앱을 닫으면 null 이 온다) 여기선 화면 상태만 본다.
      */
     const opponentAim = sim.phase === "waiting" ? sim.match?.opponentAim?.phi ?? null : null;
+    // 큐대 손잡이(2026-10-16 오너: "이거 다 좋네") — 큐 케이스의 대표 큐. 대전이면 서버가 준 두 사람의 것(상대가 겨눌 땐 상대 큐가 보인다),
+    // 혼자 치기 · 연습이면 내 큐 케이스의 것. 겉모습만 바뀐다 — 큐 길이 · 굵기 · 힘 · 조준은 그대로다.
+    const caseSummary = useCaseSummary(!!member);
+    const mySkin = cueSkinUrl(sim.match ? sim.match.cues[sim.match.myIndex] : caseSummary.data?.hero);
+    const oppSkin = sim.match ? cueSkinUrl(sim.match.cues[sim.match.myIndex === 0 ? 1 : 0]) : null;
     /** 직전 프레임에 그린 상대 큐 각도(따라가는 중간값). 값이 없어지면 null 로 비워 큐대를 지운다. */
     const oppAimRef = useRef<number | null>(null);
 
     // rAF 루프가 읽는 뷰 — 렌더마다 갱신(할당만, 재렌더 없음)
     const viewRef = useRef<View>({
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist, opponentAim,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist, opponentAim, mySkin, oppSkin,
     });
     viewRef.current = {
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
-        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist, opponentAim,
+        table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist, opponentAim, mySkin, oppSkin,
     };
     useEffect(() => {
         dirtyRef.current = true;
-    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview, cameraView, assist, opponentAim]);
+    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview, cameraView, assist, opponentAim, mySkin, oppSkin]);
 
     const { frameAt } = sim;
     useEffect(() => {
@@ -718,6 +728,7 @@ export function SimulatorPage() {
                             : pullbackFor(v.input.V0) * Math.max(0, 1 - (performance.now() - strokeRef.current) / STROKE_MS),
                     visible: v.phase === "aim" || opp !== null,
                     ballId: v.cueBallId,
+                    skin: opp ? v.oppSkin : v.mySkin,
                 },
                 // 큐볼은 큐 스틱이 가리키므로 링을 두르지 않는다 — 8px 남짓한 공에 링이 겹치면 속이 빈 공처럼 보였다(실측).
                 highlightBallId: v.placing ?? undefined,
@@ -1258,8 +1269,10 @@ export function SimulatorPage() {
             replayText: replayShortText(url),
             replayUrl: url,
             filename: fileNameFor(result),
+            // 내 대표 큐(큐 케이스) — 그림이 이미 불러와져 있을 때만(큐대에 쓰느라 불러 둔다)
+            cueSkin: cueSkin(mySkin),
         });
-    }, [share, sim.config, sim.session, sim.outcomeLast, sim.phase, sim.match?.myIndex, t]);
+    }, [share, sim.config, sim.session, sim.outcomeLast, sim.phase, sim.match?.myIndex, t, mySkin]);
     const onShareShot = useCallback(() => shareLast(false), [shareLast]);
     const onShareEnd = useCallback(() => shareLast(true), [shareLast]);
 
@@ -1723,7 +1736,7 @@ export function SimulatorPage() {
                     >
                         {/* 툴바는 남는 높이가 없으면(compact 로도) 줄어들며 스크롤된다 — 큐 슬라이더(최소 높이)·±·샷은 항상 보인다 */}
                         <ToolRail groups={railGroups} size={compact ? "sm" : "md"} className="shrink min-h-0 overflow-y-auto overscroll-contain" />
-                        {pathView ? <div className="flex-1" /> : <PowerRail V0={sim.input.V0} disabled={!aiming} onChange={onPower} compact={compact} className="flex-1" tour="sim-power" />}
+                        {pathView ? <div className="flex-1" /> : <PowerRail V0={sim.input.V0} disabled={!aiming} onChange={onPower} compact={compact} className="flex-1" tour="sim-power" skin={mySkin} />}
                         {/* ± 0.05 m/s: 36 px 원 두 개, 사이 8 px(탭 대상 간격 규칙) */}
                         <div className={cn("shrink-0 flex gap-2", pathView && "hidden")}>
                             <HoldButton label={t("sim.controls.powerDown")} disabled={!aiming} onTick={onPowerDown} className="h-9 w-9 rounded-pill">
@@ -1860,6 +1873,7 @@ export function SimulatorPage() {
                             targets={[sim.session.players[0]?.target ?? 0, sim.session.players[1]?.target ?? 0]}
                             handicap={sim.match.handicap}
                             tiers={sim.match.tiers}
+                            cues={sim.match.cues}
                             visible={introFor === sim.match.id}
                             onDismiss={() => setIntroFor(null)}
                         />
@@ -2023,6 +2037,7 @@ export function SimulatorPage() {
                     <MatchEndRapport
                         matchId={sim.match.id}
                         myIndex={sim.match.myIndex}
+                        cues={[sim.match.cues[sim.match.myIndex], sim.match.cues[sim.match.myIndex === 0 ? 1 : 0]]}
                         onRematch={(id) => { setEndDismissed(true); navigate(`/online-game?match=${id}`, { replace: true }); }}
                     />
                 ) : undefined}

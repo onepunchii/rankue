@@ -88,19 +88,31 @@ export type MatchWithNames = HiqSimMatch & {
      */
     hostRating?: number | null; hostRated?: number;
     guestRating?: number | null; guestRated?: number;
+    /** 두 선수의 대표 큐(큐 케이스, 2026-10-16) — 큐대 손잡이 그림. 받은 큐가 없으면 null(기본 큐대) */
+    hostCue?: string | null; guestCue?: string | null;
 };
 
 type NamedRow = {
     m: HiqSimMatch; hostName: string; guestName: string | null; hostCountry: string | null; guestCountry: string | null;
     hostRating: number | null; hostRated: number | null; guestRating: number | null; guestRated: number | null;
+    hostCue: string | null; guestCue: string | null;
 };
 /** withNames() 의 한 줄 → 대전 행 + 이름 · 국가 · 레이팅 */
 function named(r: NamedRow): MatchWithNames {
     return {
         ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null,
         hostRating: r.hostRating ?? null, hostRated: Number(r.hostRated ?? 0), guestRating: r.guestRating ?? null, guestRated: Number(r.guestRated ?? 0),
+        hostCue: r.hostCue ?? null, guestCue: r.guestCue ?? null,
     };
 }
+
+/**
+ * 한 사람의 대표 큐(큐 케이스 · 2026-10-16 오너: "이거 다 좋네" — 큐 케이스와 게임의 대표 큐는 하나). storage.cueCase 의 규칙과 같다:
+ * 고른 큐(받은 것일 때만), 없으면 가장 최근에 받은 큐. 둘 다 (회원, …) 인덱스 조회 한 번씩이라 대전 폴링에 얹어도 가볍다.
+ */
+const heroCueSql = (member: ReturnType<typeof sql>) => sql<string | null>`coalesce(
+    (select p.hero_item from hiq_cue_case_prefs p join hiq_cue_case_awards a on a.member_id = p.member_id and a.item_id = p.hero_item where p.member_id = ${member}),
+    (select a.item_id from hiq_cue_case_awards a where a.member_id = ${member} and a.item_id like 'cue-%' order by a.earned_at desc, a.item_id limit 1))`;
 
 function randomCode(): string {
     // 6자리, 앞자리 0 허용 안 함(입력 혼동 방지)
@@ -143,6 +155,8 @@ export class SimMatchRepository {
                 guestCountry: guestProfile.countryCode,
                 hostRating: hostLadder.rating, hostRated: hostLadder.matches,
                 guestRating: guestLadder.rating, guestRated: guestLadder.matches,
+                hostCue: heroCueSql(sql`${hiqSimMatches.hostId}`),
+                guestCue: heroCueSql(sql`${hiqSimMatches.guestId}`),
             }).from(hiqSimMatches)
                 .innerJoin(hiqMembers, eq(hiqMembers.id, hiqSimMatches.hostId))
                 .leftJoin(guest, eq(guest.id, hiqSimMatches.guestId))

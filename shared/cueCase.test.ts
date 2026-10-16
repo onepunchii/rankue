@@ -43,8 +43,13 @@ describe("목록", () => {
         for (const h of hidden) expect(cueHow(h, "ko")).toBe("받는 순간 조건이 공개돼요");
         expect(cueHow(CUES.find((c) => c.id === "cue-run-10")!, "ko")).toBe("실전 공식 경기 하이런 3쿠션 10 · 4구 20");
     });
-    it("아직 열지 않은 것 — 다마 이력이 필요한 셋 · 사군자 · 크루 · 원정 · 페넌트", () => {
-        expect(SOON.size).toBe(3 + 4 + 6 + 1 + 1 + 1 + 8);
+    it("아직 열지 않은 것 — 끝내기 · 사군자 · 크루 · 원정 · 페넌트(다마 넘김 · 오름은 경기 끝에 바로 적는다)", () => {
+        expect(SOON.size).toBe(1 + 4 + 6 + 1 + 1 + 1 + 8);
+        expect(SOON.has("cue-dama-up") || SOON.has("cue-over-target")).toBe(false);
+        const route = read("server/routes/modules/game.ts");
+        expect(route).toContain('if (oldHandi > 0 && newHandi > oldHandi) await storage.cueCase.awardNow(pid, "cue-dama-up", at);');
+        expect(route).toContain('if (game.winnerId === pid && oldHandi > 0 && onScale && target > oldHandi) await storage.cueCase.awardNow(pid, "cue-over-target", at);');
+        expect(route).toContain('} catch (e) { console.error("[CueCase] 경기 끝 기록:", e); }');
         for (const id of SOON) expect(CASE_ITEMS.some((x) => x.id === id), id).toBe(true);
     });
 });
@@ -154,6 +159,27 @@ describe("연결", () => {
         expect(page).toContain("<ShelfPage embedded memberId={memberId}");
         expect(page).toContain('aria-label={t("common.back")}');
         expect(read("client/src/pages/hiq/dashboard.tsx")).toContain("<CueCaseEntry />");
+    });
+    it("게임 큐대(2026-10-16 오너: \"이거 다 좋네\") — 대표 큐가 손잡이에, 상대가 겨눌 땐 상대 큐, 세기 막대 · 대전 시작 · 끝 · 공유 카드", () => {
+        expect(read("client/src/sim/render/Renderer.ts")).toContain("readonly skin?: string | null;");
+        const page = read("client/src/sim/SimulatorPage.tsx");
+        expect(page).toContain("skin: opp ? v.oppSkin : v.mySkin,");
+        expect(page).toContain("const mySkin = cueSkinUrl(sim.match ? sim.match.cues[sim.match.myIndex] : caseSummary.data?.hero);");
+        expect(page).toContain('tour="sim-power" skin={mySkin} />');
+        expect(page).toContain("cues={sim.match.cues}");
+        expect(page).toContain("cueSkin: cueSkin(mySkin),");
+        expect(read("client/src/sim/render/Canvas2DRenderer.ts")).toContain("ctx.drawImage(skin, 0, -buttW / 2, len * 0.45, buttW);");
+        expect(read("client/src/sim/render/ThreeRenderer.ts")).toContain("this.applyCueSkin(cue.skin);");
+        expect(read("client/src/sim/components/PowerRail.tsx")).toContain('preserveAspectRatio="xMidYMid slice" transform="translate(6 98) rotate(-90)"');
+        expect(read("client/src/sim/match/MatchIntro.tsx")).toContain('data-testid="intro-cues"');
+        expect(read("client/src/sim/match/MatchEndRapport.tsx")).toContain('data-testid="match-end-cues"');
+        // 서버: 대전 정보에 두 사람의 대표 큐 — 큐 케이스와 같은 규칙(고른 큐, 없으면 가장 최근에 받은 큐)
+        const repo = read("server/storage/simMatch.repo.ts");
+        expect(repo).toContain("hostCue: heroCueSql(sql`${hiqSimMatches.hostId}`),");
+        expect(repo).toContain("order by a.earned_at desc, a.item_id limit 1");
+        expect(read("server/storage/cueCase.repo.ts")).toContain(".sort((a, b) => ((items[b.id].at ?? 0) - (items[a.id].at ?? 0)) || (a.id < b.id ? -1 : 1));");
+        expect(read("server/routes/modules/simMatch.ts")).toContain("cues: [cueIdOf(m.hostCue), m.guestId ? cueIdOf(m.guestCue) : null] as const,");
+        expect(read("client/src/sim/matchApi.ts")).toContain("cues: Array.isArray(raw.cues) ? [cueOrNull(raw.cues[0]), cueOrNull(raw.cues[1])] : [null, null],");
     });
     it("문구가 다섯 언어에 있고 자리 표시를 지킨다", () => {
         const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"] };

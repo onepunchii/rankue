@@ -16,6 +16,11 @@ export interface CueFrame {
     readonly pullback: number;
     readonly visible: boolean;
     readonly ballId?: string;
+    /**
+     * 큐대 손잡이 그림(큐 케이스의 대표 큐, 2026-10-16) — 지금 겨누는 사람의 것. 없으면 예전의 나무 색.
+     * 겉모습만 바뀐다(길이 · 굵기 · 놓이는 자리는 그대로). 그림은 ./cueSkin 이 한 번만 부른다.
+     */
+    readonly skin?: string | null;
 }
 
 /**

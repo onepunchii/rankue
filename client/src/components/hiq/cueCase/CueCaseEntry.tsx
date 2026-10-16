@@ -3,16 +3,12 @@
  * 받은 수는 GET /cue-case/summary(받은 기록만 읽는 가벼운 답). 한 번도 안 열었으면 '열어 보세요' — 옛 기록으로 이미 들어와 있을 수 있다.
  * 비로그인은 빈 자리 둘과 "큐 77자루 …" — 눌러 들어가면 큐 케이스가 가입을 권한다.
  */
-import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
-import { apiRequest } from "@/lib/queryClient";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
 import { CUES, caseImage, caseItem } from "@shared/cueCase";
-import { cueCasePath } from "./cueCaseApi";
+import { cueCasePath, readCaseSeen, useCaseSummary } from "./cueCaseApi";
 
-interface Summary { opened: boolean; cue: number; chalk: number; glove: number; hero: string | null }
-const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 /** 빈 자리에 비치는 모양 — 늘 같은 두 자루(바뀌면 홈이 매번 달라 보인다) */
 const GHOSTS = ["cue-najeon-crane", "cue-on-tier-diamond"].map((id) => caseItem(id) ?? CUES[0]);
 
@@ -20,16 +16,11 @@ export function CueCaseEntry() {
     const { t } = useT();
     const [, setLocation] = useLocation();
     const { member } = useAuth();
-    const q = useQuery({
-        queryKey: ["cue-case-summary"],
-        queryFn: async (): Promise<Summary> => {
-            const r = (await apiRequest("/api/hiq/cue-case/summary")) as Record<string, unknown>;
-            return { opened: r.opened === true, cue: num(r.cue), chalk: num(r.chalk), glove: num(r.glove), hero: typeof r.hero === "string" ? r.hero : null };
-        },
-        enabled: !!member, staleTime: 60_000, retry: false,
-    });
+    const q = useCaseSummary(!!member);
     const s = q.data;
     const hero = s?.hero ? caseItem(s.hero) : null;
+    // 이 기기에서 큐 케이스를 마지막으로 연 뒤에 들어온 것이 있으면 '새로'
+    const fresh = !!s?.latest && s.latest > readCaseSeen();
     const sub = !member ? t("case.entryGuest")
         : s?.opened ? t("case.entryCounts").replace("{c}", String(s.cue)).replace("{k}", String(s.chalk)).replace("{g}", String(s.glove))
             : t("case.entryOpen");
@@ -38,7 +29,10 @@ export function CueCaseEntry() {
             className="cue-case cc-entry mt-4 block w-full overflow-hidden rounded-[24px] px-4 pb-4 pt-4 text-left active:opacity-95">
             <span className="relative flex items-center gap-2 px-1.5">
                 <span className="min-w-0 flex-1">
-                    <span className="block text-[16px] font-semibold tracking-tight text-[#f4ead6]">{t("case.entryTitle")}</span>
+                    <span className="flex items-center gap-1.5 text-[16px] font-semibold tracking-tight text-[#f4ead6]">
+                        {t("case.entryTitle")}
+                        {fresh && <span className="rounded-full bg-[#e8c46a] px-1.5 py-[1px] text-[11.5px] font-bold text-[#2d1a08]" data-testid="cue-case-entry-new">{t("case.new")}</span>}
+                    </span>
                     <span className="rk-num mt-0.5 block truncate text-[12.5px] text-[#e8c46a]">{sub}</span>
                 </span>
                 <span className="shrink-0 text-[18px] font-semibold text-[#f4ead6]/60" aria-hidden>›</span>

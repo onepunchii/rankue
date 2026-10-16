@@ -10,6 +10,7 @@ import type { RatingChange } from "@shared/sim/rating";
 import { MatchRatingCard } from "./MatchRatingCard";
 import { useLocation } from "wouter";
 import { CUP_PATH } from "../cup/cupApi";
+import { caseImage, caseItem, type CaseLocale } from "@shared/cueCase";
 
 /**
  * 끝난 대전 화면에 붙는 "상대가 누구였나" 묶음(2026-09-15 오너: "라포를 느낄 방안").
@@ -44,8 +45,13 @@ interface RematchState {
     rematch: { mine: boolean; theirs: boolean; matchId: string | null } | null;
 }
 
-export function MatchEndRapport({ matchId, myIndex, onRematch }: { matchId: string; myIndex: number; onRematch: (newMatchId: string) => void }) {
-    const { t } = useT();
+export function MatchEndRapport({ matchId, myIndex, onRematch, cues }: {
+    matchId: string; myIndex: number; onRematch: (newMatchId: string) => void;
+    /** [내 것, 상대 것]의 대표 큐(큐 케이스, 2026-10-16) — 상대 칸 맨 위에 두 자루를 나란히. 둘 다 없으면 안 그린다 */
+    cues?: readonly [string | null, string | null];
+}) {
+    const { t, locale } = useT();
+    const cueLocale = (["ko", "en", "es", "vi", "tr"].includes(locale) ? locale : "en") as CaseLocale;
     const { toast } = useToast();
     const [, setLocation] = useLocation();
     const [added, setAdded] = useState(false);
@@ -119,6 +125,25 @@ export function MatchEndRapport({ matchId, myIndex, onRematch }: { matchId: stri
         )}
         {info.rating && <MatchRatingCard rating={info.rating} />}
         <div className="rounded-tile border border-surface-line px-4 py-3">
+            {cues && (cues[0] || cues[1]) && (
+                // 두 사람의 큐 — 큐 케이스의 대표 큐. 이음쇠가 가운데에서 마주 본다(상대 큐는 뒤집는다)
+                <div className="mb-3 grid grid-cols-2 gap-2.5" data-testid="match-end-cues">
+                    {[0, 1].map((i) => {
+                        const x = cues[i] ? caseItem(cues[i]!) : null;
+                        return (
+                            <div key={i} className="min-w-0">
+                                <div className="relative h-7 overflow-hidden rounded-full bg-black/45" style={{ boxShadow: "inset 0 2px 5px rgba(0,0,0,0.7)" }}>
+                                    {x ? <img src={caseImage(x)} alt="" decoding="async" draggable={false} className="absolute inset-x-1.5 top-1/2 h-[18px] w-[calc(100%-12px)] -translate-y-1/2 object-contain" style={i === 1 ? { transform: "translateY(-50%) scaleX(-1)" } : undefined} />
+                                        : <span className="absolute inset-x-2 inset-y-[10px] rounded-full" style={{ background: "linear-gradient(180deg,#6b432a,#4e2e19 60%,#3a2112)" }} />}
+                                </div>
+                                <p className={cn("mt-1 truncate text-[11.5px] font-semibold text-ink-3", i === 1 && "text-right")}>
+                                    {i === 0 ? t("sim.intro.me") : name}{x ? ` · ${x.name[cueLocale]}` : ""}
+                                </p>
+                            </div>
+                        );
+                    })}
+                </div>
+            )}
             <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[13px] font-semibold text-ink-1 truncate">{name}</span>
                 {h && h.total > 0 && (

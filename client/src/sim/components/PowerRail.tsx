@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useId } from "react";
 import * as SliderPrimitive from "@radix-ui/react-slider";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
@@ -25,6 +25,8 @@ interface Props {
     compact?: boolean;
     className?: string;
     tour?: string;
+    /** 큐대 손잡이 그림(큐 케이스의 대표 큐, 2026-10-16) — 없으면 나무 색 */
+    skin?: string | null;
 }
 
 /** 큐대 엄지 높이(px). 트랙 높이 − 이 값 = 엄지 이동 거리. compact 는 CUE_PX_SM. */
@@ -48,18 +50,30 @@ const CUE_TIP = "#2F4A66";
 const CUE_EDGE = "rgba(0,0,0,0.35)";
 
 /** 팁이 위. 세로 100 × 가로 20 뷰박스(높이는 px 로 늘여 그린다), 손잡이 쪽이 살짝 굵다. */
-function CueStick({ height }: { height: number }) {
+const BUTT_PATH = "M6.8 56h6.4L14 98H6z";
+function CueStick({ height, skin }: { height: number; skin?: string | null }) {
+    const clip = `cue-butt-${useId().replace(/:/g, "")}`;
     return (
         <svg width="20" height={height} viewBox={`0 0 20 ${CUE_PX}`} preserveAspectRatio="none" aria-hidden="true" className="block">
             <rect x="8" y="1" width="4" height="3" rx="1" fill={CUE_TIP} stroke={CUE_EDGE} strokeWidth="0.5" />
             <rect x="8" y="4" width="4" height="6" fill={CUE_FERRULE} stroke={CUE_EDGE} strokeWidth="0.5" />
             <path d="M8 10h4l1.2 46H6.8z" fill={CUE_SHAFT} stroke={CUE_EDGE} strokeWidth="0.5" />
-            <path d="M6.8 56h6.4L14 98H6z" fill={CUE_BUTT} stroke={CUE_EDGE} strokeWidth="0.5" />
+            <path d={BUTT_PATH} fill={CUE_BUTT} />
+            {skin && (
+                // 대표 큐의 손잡이 — 그림의 범퍼(왼쪽)가 아래 끝, 이음쇠(오른쪽)가 가운데. 비율은 그대로 두고 가운데를 보인다(slice)
+                <>
+                    <clipPath id={clip}><path d={BUTT_PATH} /></clipPath>
+                    <g clipPath={`url(#${clip})`}>
+                        <image href={skin} x="0" y="0" width="42" height="8" preserveAspectRatio="xMidYMid slice" transform="translate(6 98) rotate(-90)" data-testid="power-cue-skin" />
+                    </g>
+                </>
+            )}
+            <path d={BUTT_PATH} fill="none" stroke={CUE_EDGE} strokeWidth="0.5" />
         </svg>
     );
 }
 
-export const PowerRail = memo(function PowerRail({ V0, disabled, onChange, compact, className, tour }: Props) {
+export const PowerRail = memo(function PowerRail({ V0, disabled, onChange, compact, className, tour, skin }: Props) {
     const { t } = useT();
     const cuePx = compact ? CUE_PX_SM : CUE_PX;
     return (
@@ -86,7 +100,7 @@ export const PowerRail = memo(function PowerRail({ V0, disabled, onChange, compa
                     className="flex w-full items-start justify-center focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/40 rounded-pill"
                     style={{ height: cuePx }}
                 >
-                    <CueStick height={cuePx} />
+                    <CueStick height={cuePx} skin={skin} />
                 </SliderPrimitive.Thumb>
             </SliderPrimitive.Root>
         </div>

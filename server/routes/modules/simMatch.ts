@@ -35,6 +35,7 @@ import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCH
 import { countWatchers } from "../../../shared/sim/watchers.js";
 import { LOOKALIKE_MIN_MATCHES, nearestPros, nextPro, proTier, type LookalikeResponse } from "../../../shared/proCompare.js";
 import type { MatchWithNames } from "../../storage/simMatch.repo.js";
+import { caseItem } from "../../../shared/cueCase.js";
 import { startTurnSeenAt } from "../../storage/simMatch.repo.js";
 import { rollCups } from "../../services/simCupService.js";
 
@@ -230,6 +231,9 @@ function tierIdOf(rating: number | null | undefined, rated: number | undefined):
     return typeof rating === "number" && (rated ?? 0) >= PLACEMENT_MATCHES ? tierFor(rating).id : null;
 }
 
+/** 목록에 있는 큐만 보낸다 — 지운 id 가 남아 있어도 화면은 기본 큐대 */
+const cueIdOf = (id: string | null | undefined): string | null => (id && caseItem(id)?.kind === "cue" ? id : null);
+
 function publicMatch(m: MatchWithNames, viewerId: string) {
     const myIndex = m.hostId === viewerId ? 0 : m.guestId === viewerId ? 1 : -1;
     return {
@@ -246,6 +250,8 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         hostCountry: m.hostCountry ?? null, guestCountry: m.guestCountry ?? null,
         /** [방장, 게스트]의 온라인 대전 등급(이 종목, 2026-10-12) — 방 목록 · 대전 시작 · 대전 화면의 이름 옆 배지. 배치 전이면 null. */
         tiers: [tierIdOf(m.hostRating, m.hostRated), m.guestId ? tierIdOf(m.guestRating, m.guestRated) : null] as const,
+        /** [방장, 게스트]의 대표 큐(큐 케이스 id, 2026-10-16) — 큐대 손잡이에 입힌다. 겉모습만 다르다(성능 차이 없음). 없으면 null */
+        cues: [cueIdOf(m.hostCue), m.guestId ? cueIdOf(m.guestCue) : null] as const,
         myIndex, turn: m.turn, shots: m.shots, version: m.version,
         state: m.state as SessionState | null, balls: m.balls as BallState[] | null,
         winnerIndex: m.winnerId === null ? null : m.winnerId === m.hostId ? 0 : 1,

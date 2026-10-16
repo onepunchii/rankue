@@ -38,6 +38,7 @@ import {
     Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, BoxGeometry } from "three";
 import type { BallState } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
+import { cueSkin, cueSkinVersion } from "./cueSkin";
 import { feltColors } from "./felt";
 import { ZOOM_MIN, type RenderFrame, type Renderer, type RendererView, type SafeInsets, type Viewport, ZOOM_MAX } from "./Renderer";
 import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
@@ -322,6 +323,11 @@ export class ThreeRenderer implements Renderer {
     private readonly cueBody = new Group();
     private readonly cueGeos: BufferGeometry[] = [];
     private readonly cueMats: MeshStandardMaterial[] = [];
+    /** 손잡이 토막의 재질 — 대표 큐 그림을 감는다(2026-10-16). 지금 감긴 그림 주소와 그 질감 */
+    private cueButtMat: MeshStandardMaterial | null = null;
+    private cueSkinUrl: string | null = null;
+    private cueSkinTex: CanvasTexture | null = null;
+    private cueSkinSeen = -1;
 
     // 강조 링
     private readonly ringGroup = new Group();
@@ -492,6 +498,7 @@ export class ThreeRenderer implements Renderer {
         }
         for (const e of this.active) e.shadowMat.dispose();
         for (const e of this.pool) e.shadowMat.dispose();
+        this.cueSkinTex?.dispose();
         for (const g of this.cueGeos) g.dispose();
         for (const m of this.cueMats) m.dispose();
         this.clothMat.dispose();
@@ -579,6 +586,8 @@ export class ThreeRenderer implements Renderer {
     }
 
     needsFrame(): boolean {
+        // 손잡이 그림이 막 불러와졌으면 한 번 더 그린다(조준을 안 움직여도 그림이 감기게)
+        if (this.cueSkinUrl !== null && this.cueSkinTex === null && cueSkinVersion() !== this.cueSkinSeen) return true;
         return this.view === "player" && (this.cameraMoving || this.zoom !== this.zoomTarget);
     }
 
@@ -731,6 +740,8 @@ export class ThreeRenderer implements Renderer {
                 ? cueElevation(cb.r[0], cb.r[1], cue.phi, cue.pullback, R, this.table.width, this.table.length, RAIL_TOP, balls, cb.id)
                 : 0;
             this.cueBody.position.y = cueGap(R, cue.pullback);
+            this.cueSkinSeen = cueSkinVersion();
+            this.applyCueSkin(cue.skin);
         } else {
             this.cueGroup.visible = false;
         }
@@ -1141,9 +1152,45 @@ export class ThreeRenderer implements Renderer {
         part(tipR, tipR, CUE_FERRULE_L, CUE_FERRULE_L / 2, CUE_FERRULE);
         part(midR, tipR, shaftL, CUE_FERRULE_L + shaftL / 2, CUE_SHAFT);
         part(buttR, midR, buttL, CUE_LENGTH * 0.55 + buttL / 2, CUE_BUTT);
+        this.cueButtMat = this.cueMats[this.cueMats.length - 1] ?? null;
         this.cueGroup.add(this.cueBody);
         // 회전 순서: 먼저 로컬 x 로 뒤를 들고(올림각), 그 다음 z 로 조준 방향을 돌린다 — 기본 순서(XYZ)면 올림각이 조준과 무관한 세계 x 축으로 걸린다
         this.cueGroup.rotation.order = "ZXY";
+    }
+
+    /**
+     * 손잡이에 대표 큐 그림을 감는다. 그림은 옆에서 본 모습(가로 = 길이, 세로 = 지름)이라 원통의 반 바퀴에 한 번,
+     * 나머지 반 바퀴에 위아래를 뒤집어 한 번 더 그려 이음매가 없게 한다. 원통의 위(+y)가 큐 끝(범퍼)이다.
+     * 그림 가장자리의 투명한 띠는 잘라 낸다(검은 줄이 생긴다). 불러오기 전 · 없음이면 예전의 나무 색.
+     */
+    private applyCueSkin(url: string | null | undefined): void {
+        const m = this.cueButtMat;
+        if (!m) return;
+        const want = url ?? null;
+        const img = cueSkin(want);
+        if (want === this.cueSkinUrl && (img === null) === (this.cueSkinTex === null)) return;
+        this.cueSkinTex?.dispose();
+        this.cueSkinTex = null;
+        this.cueSkinUrl = want;
+        if (!img || typeof document === "undefined") {
+            m.map = null; m.color.setHex(CUE_BUTT); m.needsUpdate = true;
+            return;
+        }
+        const W = 128, Hh = 512, cv = document.createElement("canvas");
+        cv.width = W; cv.height = Hh;
+        const c = cv.getContext("2d");
+        if (!c) return;
+        c.fillStyle = "#3a2414";
+        c.fillRect(0, 0, W, Hh);
+        const sy = 10, sh = 60; // 1000×80 에서 위아래 10px 를 뗀다
+        c.setTransform(0, Hh / 1000, (W / 2) / sh, 0, 0, 0);
+        c.drawImage(img, 0, sy, 1000, sh, 0, 0, 1000, sh);
+        c.setTransform(0, Hh / 1000, -(W / 2) / sh, 0, W, 0);
+        c.drawImage(img, 0, sy, 1000, sh, 0, 0, 1000, sh);
+        const tex = new CanvasTexture(cv);
+        tex.colorSpace = SRGBColorSpace;
+        this.cueSkinTex = tex;
+        m.map = tex; m.color.setHex(0xffffff); m.needsUpdate = true;
     }
 
     private readInsets(): SafeInsets {

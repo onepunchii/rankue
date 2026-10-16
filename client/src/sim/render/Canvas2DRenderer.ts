@@ -17,6 +17,7 @@
  */
 import type { TableSpec } from "@shared/sim/params";
 import { feltColors } from "./felt";
+import { cueSkin, cueSkinVersion } from "./cueSkin";
 import type { RenderFrame, Renderer, SafeInsets, Viewport } from "./Renderer";
 import { computeLayout, NO_INSETS, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, readPalette, rgba, scaleColor, type Palette } from "./tokens";
@@ -117,6 +118,8 @@ export class Canvas2DRenderer implements Renderer {
     private staticCanvas: HTMLCanvasElement | null = null;
     private observer: ResizeObserver | null = null;
     private lastFrame: RenderFrame | null = null;
+    /** 마지막으로 그린 때의 손잡이 그림 판 — 그림이 늦게 불러와지면 다음 프레임을 한 번 더 그린다 */
+    private skinSeen = -1;
     private cssW = 0;
     private cssH = 0;
     /** 색별 스프라이트. 스프라이트 한 변(CSS px)은 spriteSide. */
@@ -242,8 +245,14 @@ export class Canvas2DRenderer implements Renderer {
     }
 
     // ── 동적 층 ───────────────────────────────────────────────────────────
+    /** 손잡이 그림이 막 불러와졌으면 한 번 더 그린다(조준을 안 움직여도 그림이 들어가게) */
+    needsFrame(): boolean {
+        return !!this.lastFrame?.cue?.skin && cueSkinVersion() !== this.skinSeen;
+    }
+
     draw(frame: RenderFrame): void {
         this.lastFrame = frame;
+        this.skinSeen = cueSkinVersion();
         const ctx = this.ctx;
         const L = this.layout;
         if (!ctx || !L || !this.staticCanvas) return;
@@ -267,7 +276,7 @@ export class Canvas2DRenderer implements Renderer {
             ctx.beginPath();
             ctx.rect(ins.left, ins.top, Math.max(0, L.container.width - ins.left - ins.right), Math.max(0, L.container.height - ins.top - ins.bottom));
             ctx.clip();
-            this.drawCue(ctx, L, cb.r[0], cb.r[1], cue.phi, cue.pullback);
+            this.drawCue(ctx, L, cb.r[0], cb.r[1], cue.phi, cue.pullback, cueSkin(cue.skin));
             ctx.restore();
         }
 
@@ -342,7 +351,7 @@ export class Canvas2DRenderer implements Renderer {
     }
 
     /** 큐대: 공 뒤(−phi)에 놓인 테이퍼 막대. 좌표는 모두 숫자 지역변수로만 계산한다. */
-    private drawCue(ctx: CanvasRenderingContext2D, L: TableLayout, bx: number, by: number, phi: number, pullback: number): void {
+    private drawCue(ctx: CanvasRenderingContext2D, L: TableLayout, bx: number, by: number, phi: number, pullback: number, skin: HTMLImageElement | null = null): void {
         const s = L.scale;
         const pb = pullback < 0 ? 0 : pullback > 1 ? 1 : pullback;
         // 화면 방향: 테이블 y 가 화면 아래로 뒤집히므로 sin 부호만 반전
@@ -388,6 +397,15 @@ export class Canvas2DRenderer implements Renderer {
         ctx.closePath();
         ctx.fillStyle = CUE_BUTT;
         ctx.fill();
+        if (skin) {
+            // 대표 큐의 손잡이 — 그림의 왼쪽(범퍼)이 큐 끝(ex), 오른쪽(이음쇠)이 가운데(mx). 손잡이 모양(가늘어지는 사다리꼴)으로 자른다
+            ctx.save();
+            ctx.clip();
+            ctx.translate(ex, ey);
+            ctx.rotate(Math.atan2(my - ey, mx - ex));
+            ctx.drawImage(skin, 0, -buttW / 2, len * 0.45, buttW);
+            ctx.restore();
+        }
         ctx.strokeStyle = CUE_EDGE;
         ctx.stroke();
 

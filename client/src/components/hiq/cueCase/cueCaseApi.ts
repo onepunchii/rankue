@@ -2,8 +2,9 @@
  * 큐 케이스 — 서버의 답을 읽는 곳(2026-10-16). GET /api/hiq/cue-case[?memberId=] · POST /api/hiq/cue-case/hero.
  * 화면 주소는 /cue-case[?m=<회원 id>][&sec=cue|chalk|glove|medals]. 옛 장식장 주소(/online-game?shelf=1)는 여기로 돌려보낸다.
  */
+import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
-import { CASE_ITEMS } from "@shared/cueCase";
+import { CASE_ITEMS, caseImage, caseItem } from "@shared/cueCase";
 import type { Bar } from "@shared/cueCaseRules";
 
 export type CaseSection = "cue" | "chalk" | "glove" | "medals";
@@ -71,3 +72,16 @@ export function readCaseSeen(): number {
 export function writeCaseSeen(ms: number): void {
     try { if (ms > readCaseSeen()) localStorage.setItem(CASE_SEEN_KEY, String(ms)); } catch { /* 저장소를 못 쓰는 기기 */ }
 }
+
+/* ── 홈 입구 띠 · 게임 큐대 — 받은 수와 대표 큐(GET /cue-case/summary, 받은 기록만 읽는다) ── */
+export interface CaseSummary { opened: boolean; cue: number; chalk: number; glove: number; hero: string | null; latest: number | null }
+export const CASE_SUMMARY_KEY = ["cue-case-summary"] as const;
+const n0 = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
+export async function fetchCaseSummary(): Promise<CaseSummary> {
+    const r = rec(await apiRequest("/api/hiq/cue-case/summary"));
+    const hero = typeof r.hero === "string" && caseItem(r.hero)?.kind === "cue" ? r.hero : null;
+    return { opened: r.opened === true, cue: n0(r.cue), chalk: n0(r.chalk), glove: n0(r.glove), hero, latest: typeof r.latest === "number" && Number.isFinite(r.latest) ? r.latest : null };
+}
+export const useCaseSummary = (enabled: boolean) => useQuery({ queryKey: CASE_SUMMARY_KEY, queryFn: fetchCaseSummary, enabled, staleTime: 60_000, retry: false });
+/** 큐 id → 큐대 손잡이 그림 주소(목록에 없으면 null) */
+export const cueSkinUrl = (id: string | null | undefined): string | null => { const x = id ? caseItem(id) : null; return x && x.kind === "cue" ? caseImage(x) : null; };

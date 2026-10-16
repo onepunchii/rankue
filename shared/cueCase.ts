@@ -207,12 +207,13 @@ export const CUE_GROUPS: readonly CueGroup[] = ["real", "online", "common", "bot
 
 /**
  * 아직 받는 길을 열지 않은 것 — 목록 · 그림 · 조건 글만 먼저 보이고 '곧 열려요'.
- *  - 끝내기 · 다마 넘김 · 다마 오름: 조건을 오너와 다시 맞출 것(다마 이력이 기록에 없다 — 그때의 다마를 모른다).
+ *  - 끝내기: '남은 점수를 한 번에'의 뜻을 오너와 맞출 것(이긴 사람은 늘 마지막 이닝에 남은 점수를 친다).
+ *  (다마 넘김 · 다마 오름은 2026-10-16 부터 경기를 끝내는 순간에 적는다 — server/routes/modules/game.ts. 그 전 경기는 그때의 다마를 몰라 세지 않는다.)
  *  - 사군자: '한 해의 네 철'의 뜻을 오너와 맞출 것.
  *  - 크루 · 페넌트 · 크루 초크 · 크루 장갑: 기획 6장(크루 단계). 원정: 2단계(매장 QR).
  */
 export const SOON: ReadonlySet<string> = new Set([
-    "cue-finisher", "cue-over-target", "cue-dama-up",
+    "cue-finisher",
     "cue-plum", "cue-orchid", "cue-chrysanthemum", "cue-bamboo",
     "cue-crew-cup-win", "cue-crew-cup-runner", "cue-crew-regular", "cue-crew-founder", "cue-crew-battle", "cue-crew-hundred",
     "cue-traveller", "chalk-crew", "glove-crew",
@@ -241,8 +242,8 @@ export function cueHow(x: CaseItem, l: CaseLocale, earned = false): string {
             shutout: N("상대를 0점으로 이기기", "Win with your opponent on zero", "Gana con el rival en cero", "Thắng khi đối thủ 0 điểm", "Rakibi sıfırda bırakarak kazan"),
             comeback: N("목표의 절반 넘게 뒤지다 이기기", "Win after trailing by over half the target", "Gana tras ir perdiendo por más de media meta", "Thắng sau khi bị dẫn hơn nửa mục tiêu", "Hedefin yarısından fazla gerideyken kazan"),
             noMiss: N("빈 이닝 없이 경기 마치기(3이닝 이상)", "Finish a game with no empty inning (3+ innings)", "Termina sin entradas vacías (3+ entradas)", "Kết thúc trận không lượt trắng (từ 3 lượt)", "Boş ıstakasız bir maç bitir (3+ ıstaka)"),
-            overTarget: N("내 다마보다 높은 목표로 이기기", "Win with a target above your handicap", "Gana con un objetivo sobre tu hándicap", "Thắng với mục tiêu cao hơn điểm chấp", "Handikabından yüksek hedefle kazan"),
-            damaUp: N("실전 다마가 오르기", "Your real handicap goes up", "Tu hándicap real sube", "Điểm chấp thực tế tăng", "Gerçek handikabın yükselsin"),
+            overTarget: N("내 다마보다 높은 목표로 이기기(10월 16일 경기부터)", "Win with a target above your handicap (games from Oct 16)", "Gana con una meta sobre tu hándicap (desde el 16 oct)", "Thắng với mục tiêu cao hơn điểm chấp (từ 16/10)", "Handikabından yüksek hedefle kazan (16 Ekim'den itibaren)"),
+            damaUp: N("공식 경기 뒤 실전 다마가 오르기(10월 16일 경기부터)", "Your real handicap goes up after an official game (from Oct 16)", "Tu hándicap real sube tras una partida oficial (desde el 16 oct)", "Điểm chấp thực tế tăng sau trận chính thức (từ 16/10)", "Resmi maçtan sonra gerçek handikabın yükselsin (16 Ekim'den itibaren)"),
         })[r.s]);
         case "realRegular": return T(l, N(`같은 회원과 공식 경기 ${n}판`, `${n} official games with the same member`, `${n} partidas con el mismo socio`, `${n} trận với cùng một thành viên`, `Aynı üyeyle ${n} resmi maç`));
         case "realNewFace": return T(l, N(`실전에서 처음 만난 회원 ${n}명`, `Meet ${n} new members in real games`, `Conoce ${n} socios nuevos en partidas reales`, `Gặp ${n} thành viên mới ở trận thực tế`, `Gerçek maçlarda ${n} yeni üyeyle tanış`));

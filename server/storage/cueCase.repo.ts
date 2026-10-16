@@ -23,6 +23,9 @@ const ms = (v: unknown) => (v instanceof Date ? v.getTime() : n(v));
 const arr = (v: unknown): number[] => (Array.isArray(v) ? v.map((x) => n(x)) : []);
 const inList = (ids: readonly string[]) => sql.join(ids.map((id) => sql`${id}`), sql`, `);
 const HOLDERS_MS = 5 * 60_000;
+/** 홈 띠가 판정을 다시 돌리는 간격(인스턴스마다) */
+const SYNC_MS = 15 * 60_000;
+const syncedAt = new Map<string, number>();
 let holders: { at: number; by: Map<string, number> } | null = null;
 
 export interface CueCaseItemView { done: boolean; at: number | null; got: number | null; bars: Bar[]; soon?: boolean; holders: number }
@@ -212,7 +215,7 @@ export class CueCaseRepository {
                 : { done: !hasLedger && s.done, at: !hasLedger ? s.at : null, got: null, bars: s.bars, ...(s.soon ? { soon: true } : {}), holders: counts.get(x.id) ?? 0 };
         }
 
-        // 대표 큐 — 고른 것(받은 큐만), 없으면 가진 사람이 가장 적은 큐(같으면 최근)
+        // 대표 큐 — 고른 것(받은 큐만), 없으면 가장 최근에 받은 큐. 대전 화면(simMatch.repo heroCueSql) · 홈 띠와 같은 규칙이다 — 큐 케이스와 게임의 대표 큐는 하나
         let hero: string | null = null;
         try {
             const [p] = await db.select({ heroItem: hiqCueCasePrefs.heroItem }).from(hiqCueCasePrefs).where(eq(hiqCueCasePrefs.memberId, memberId)).limit(1);
@@ -220,7 +223,7 @@ export class CueCaseRepository {
         } catch (e) { if (!missingTable(e)) throw e; }
         if (!hero) {
             const owned = CASE_ITEMS.filter((x) => x.kind === "cue" && items[x.id].done)
-                .sort((a, b) => (items[a.id].holders - items[b.id].holders) || ((items[b.id].at ?? 0) - (items[a.id].at ?? 0)));
+                .sort((a, b) => ((items[b.id].at ?? 0) - (items[a.id].at ?? 0)) || (a.id < b.id ? -1 : 1));
             hero = owned[0]?.id ?? null;
         }
 
@@ -236,13 +239,20 @@ export class CueCaseRepository {
     }
 
     /**
-     * 홈 입구 띠의 한 줄 — 받은 기록만 센다(판정은 큐 케이스를 열 때). 아직 한 번도 안 열었으면 opened=false(띠가 '열어 보세요'를 쓴다).
+     * 홈 입구 띠 · 게임 큐대의 한 줄 — 받은 수 · 대표 큐 · 가장 최근에 적은 때(띠의 '새로'). 판정은 SYNC_MS 마다 한 번 같이 돌린다.
      * 대표 큐는 고른 것, 없으면 가장 최근에 받은 큐.
      */
     async summary(memberId: string): Promise<{ opened: boolean; cue: number; chalk: number; glove: number; hero: string | null; latest: number | null }> {
+        // 판정도 가끔 돌린다 — 처음 한 번(받은 기록이 없을 때)과 그 뒤 SYNC_MS 마다. 그래야 큐 케이스를 안 연 사람도
+        // 게임 큐대 · 홈 띠에 받은 큐가 들어온다. 실패해도 띠는 받은 기록만으로 그린다.
+        const last = syncedAt.get(memberId) ?? 0;
+        if (Date.now() - last > SYNC_MS) {
+            syncedAt.set(memberId, Date.now());
+            try { await this.view(memberId, memberId, Date.now()); } catch (e) { console.error("[CueCase] 요약 판정:", e); }
+        }
         try {
             const rows = (await db.execute(sql`
-                select item_id, extract(epoch from created_at) * 1000 as created from hiq_cue_case_awards where member_id = ${memberId} order by earned_at desc`)).rows as Record<string, unknown>[];
+                select item_id, extract(epoch from created_at) * 1000 as created from hiq_cue_case_awards where member_id = ${memberId} order by earned_at desc, item_id`)).rows as Record<string, unknown>[];
             const ids = rows.map((r) => String(r.item_id)).filter((id) => caseItem(id));
             const kind = (k: string) => ids.filter((id) => caseItem(id)!.kind === k).length;
             const [p] = await db.select({ heroItem: hiqCueCasePrefs.heroItem }).from(hiqCueCasePrefs).where(eq(hiqCueCasePrefs.memberId, memberId)).limit(1);
@@ -252,6 +262,17 @@ export class CueCaseRepository {
             if (!missingTable(e)) throw e;
             return { opened: false, cue: 0, chalk: 0, glove: 0, hero: null, latest: null };
         }
+    }
+
+    /**
+     * 그 자리에서만 알 수 있는 것을 바로 적는다(2026-10-16) — 경기를 끝내는 순간의 다마(바뀌기 전 · 뒤)는 기록에 남지 않아서
+     * 열 때 다시 판정할 수 없다. 다마 오름 · 다마 넘김이 이 길로만 들어온다. 이미 있으면 그대로(받은 때도 안 바꾼다).
+     */
+    async awardNow(memberId: string, itemId: string, at: Date): Promise<void> {
+        if (!caseItem(itemId)) return;
+        try {
+            await db.insert(hiqCueCaseAwards).values({ memberId, itemId, earnedAt: at }).onConflictDoNothing();
+        } catch (e) { if (!missingTable(e)) throw e; }
     }
 
     /** 대표 큐 고르기 — 받은 큐만. 고르면 true */

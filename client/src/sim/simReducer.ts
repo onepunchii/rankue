@@ -238,6 +238,8 @@ export interface MatchState {
     readonly countries: readonly [string | null, string | null];
     /** 두 자리의 온라인 대전 등급(배치 전이면 null) — 이름 옆 배지. 대전 중에는 바뀌지 않아 메타 비교에는 넣지 않는다. */
     readonly tiers: readonly [TierId | null, TierId | null];
+    /** 두 자리의 대표 큐(큐 케이스 id, 없으면 null) — 큐대 손잡이 그림. 대전 중에는 바뀌지 않아 메타 비교에는 넣지 않는다. */
+    readonly cues: readonly [string | null, string | null];
 }
 
 /** 서버 대전 행 → 메타. myIndex 는 시작할 때 정한 값(행의 myIndex 가 -1 이면 안 된다). */
@@ -260,6 +262,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         chatSeq: m.chatSeq ?? 0,
         countries: [m.hostCountry ?? null, m.guestCountry ?? null] as const,
         tiers: [m.tiers?.[0] ?? null, m.tiers?.[1] ?? null] as const,
+        cues: [m.cues?.[0] ?? null, m.cues?.[1] ?? null] as const,
         claimableAt: m.claimableAt,
         turnSeenAt: m.turnSeenAt ?? null,
         endReason: m.endReason,

@@ -270,6 +270,8 @@ export function evaluateCase(input: CaseInput): Record<string, ItemState> {
                 if (r.s === "shutout") return state(real.find((g) => g.won && g.oppScore !== null && g.oppScore <= 0)?.at ?? null);
                 if (r.s === "comeback") return state(real.find((g) => g.won && g.maxDeficit > 0.5)?.at ?? null);
                 if (r.s === "noMiss") return state(real.find((g) => g.innings.length >= 3 && g.innings.every((p) => p > 0))?.at ?? null);
+                // 다마 넘김 · 다마 오름은 경기를 끝내는 순간 서버가 받은 기록에 바로 적는다 — 여기서는 판정하지 않는다
+                if (r.s === "overTarget" || r.s === "damaUp") return state(null);
                 return { done: false, at: null, bars: [], soon: true };
             }
             case "realRegular": { const p = bestPair((e) => (e.real ? 1 : 0), r.n); return state(p.at, [count(p.best, r.n, "real")]); }

@@ -20,7 +20,7 @@ import { LucideChevronLeft } from "@/lib/icons";
 import { RealMedal } from "@/components/hiq/RealMedal";
 import { ShelfPage } from "@/sim/rank/ShelfPage";
 import { CASE_ITEMS, CHALKS, CUES, GLOVES, PEOPLE_STEPS, caseImage, caseItem, cueHow, type CaseItem, type CaseLocale, type CueGroup } from "@shared/cueCase";
-import { CASE_SECTIONS, CUE_CASE_QUERY_KEY, fetchCueCase, readCaseSeen, saveHero, writeCaseSeen, type CaseItemView, type CaseSection, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
+import { CASE_SECTIONS, CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, fetchCueCase, readCaseSeen, saveHero, writeCaseSeen, type CaseItemView, type CaseSection, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
 
 const LOCALES: readonly CaseLocale[] = ["ko", "en", "es", "vi", "tr"];
 const asLocale = (l: string): CaseLocale => (LOCALES as readonly string[]).includes(l) ? (l as CaseLocale) : "en";
@@ -44,7 +44,7 @@ export default function CueCasePage() {
     const qc = useQueryClient();
     const q = useQuery({ queryKey: [...CUE_CASE_QUERY_KEY, memberId ?? "me"], queryFn: () => fetchCueCase(memberId), enabled: !!member, staleTime: 20_000, retry: false });
     // 열면 받은 기록이 늘 수 있다 — 홈 입구 띠의 수를 다시 받게
-    useEffect(() => { if (q.data?.member.mine) void qc.invalidateQueries({ queryKey: ["cue-case-summary"] }); }, [q.data, qc]);
+    useEffect(() => { if (q.data?.member.mine) void qc.invalidateQueries({ queryKey: CASE_SUMMARY_KEY }); }, [q.data, qc]);
     const d: CueCaseView | undefined = q.data;
     const items = d?.items ?? {};
     const it = (id: string) => items[id] ?? EMPTY;
@@ -372,7 +372,7 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
     const qc = useQueryClient();
     const pickHero = useMutation({
         mutationFn: () => saveHero(item.id),
-        onSuccess: () => { void qc.invalidateQueries({ queryKey: CUE_CASE_QUERY_KEY }); onClose(); },
+        onSuccess: () => { void qc.invalidateQueries({ queryKey: CUE_CASE_QUERY_KEY }); void qc.invalidateQueries({ queryKey: CASE_SUMMARY_KEY }); onClose(); },
     });
     const kindLabel = item.kind === "cue" ? t(GROUP_KEY[item.group ?? "real"]) : t(`case.count.${item.kind}`);
     return (
