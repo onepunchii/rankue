@@ -33,6 +33,15 @@ describe("목록", () => {
         }
         expect(total).toBeLessThan(2 * 1024 * 1024);
     });
+    it("큐 케이스 그림(아이콘) — 들어가는 길 셋(홈 배너 칸 · 랭킹/대시보드 줄 · 큐 케이스 머리)이 같은 그림, 가볍다", () => {
+        const p = resolve(root, "client/public/billiards/case/icon-case.webp");
+        const b = readFileSync(p);
+        expect(b.subarray(8, 12).toString("ascii")).toBe("WEBP");
+        expect(b.length).toBeLessThan(20 * 1024);
+        expect(read("client/src/sim/rank/ShelfLink.tsx")).toContain('export const CASE_ICON_SRC = "/billiards/case/icon-case.webp";');
+        expect(read("client/src/components/hiq/dashboard/OnlineHubBanner.tsx")).toContain("<Tile icon={CASE_ICON_SRC} title={t(\"home.hubShelf\")}");
+        expect(read("client/src/components/hiq/cueCase/CueCaseEntry.tsx")).toContain('const CASE_ICON = "/billiards/case/icon-case.webp";');
+    });
     it("이름 · 받는 법이 다섯 언어에 있다 — 숨은 큐는 받기 전에 조건을 감춘다", () => {
         for (const x of CASE_ITEMS) for (const l of LOCALES) {
             expect(x.name[l].trim(), `${x.id} ${l}`).not.toBe("");

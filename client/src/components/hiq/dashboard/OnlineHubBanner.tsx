@@ -28,7 +28,7 @@ import { TIERS } from "@shared/sim/rank";
 import { useOnlineRecord } from "@/sim/entry/useOnlineRecord";
 import { hubStateOf, otherGame, type HubGame, type HubState } from "@/sim/rank/hubState";
 import { RANK_TROPHY_SRC, TIER_GLOW, TierEmblem } from "@/sim/rank/TierEmblem";
-import { SHELF_ICON_SRC } from "@/sim/rank/ShelfLink";
+import { CASE_ICON_SRC } from "@/sim/rank/ShelfLink";
 import { isShelfNew, readShelfSeen, shelfPath } from "@/sim/rank/shelfApi";
 import { CUP_ICON_SRC } from "@/sim/cup/CupArt";
 import { CUP_PATH, timeLeft } from "@/sim/cup/cupApi";
@@ -212,7 +212,7 @@ export function OnlineHubBanner() {
                 {hero}
                 <div className="grid grid-cols-2">
                     <Tile icon={RANK_TROPHY_SRC} title={t("sim.rank.title")} sub={loading ? " " : rankSub} onClick={() => go(rankUrl)} trackAs="홈 배너 랭킹" className="border-r" />
-                    <Tile icon={SHELF_ICON_SRC} title={t("home.hubShelf")} sub={loading ? " " : shelfSub} onClick={() => go(shelfPath())} trackAs="홈 배너 장식장" dot={shelfNew} testId="hub-shelf" />
+                    <Tile icon={CASE_ICON_SRC} title={t("home.hubShelf")} sub={loading ? " " : shelfSub} onClick={() => go(shelfPath())} trackAs="홈 배너 장식장" dot={shelfNew} testId="hub-shelf" />
                     <Tile icon={CUP_ICON_SRC} title={t("home.hubCup")} sub={loading ? " " : cupSub} onClick={() => go(CUP_PATH)} trackAs="홈 배너 월대회" dot={!!myCup && !myCup.waiting} testId="hub-cup" className="border-r" />
                     <Tile icon={HUB_DASH_ICON_SRC} title={t("home.hubDash")} sub={loading ? " " : dashSub} onClick={() => go(DASH_URL)} trackAs="홈 배너 대시보드" />
                 </div>

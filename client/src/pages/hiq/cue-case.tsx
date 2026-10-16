@@ -118,6 +118,7 @@ export default function CueCasePage() {
                     <button type="button" onClick={back} aria-label={t("common.back")} data-testid="cue-case-back" className="-ml-2 flex h-11 w-11 items-center justify-center rounded-full text-[color:var(--cc-ink)] active:bg-white/10">
                         <LucideChevronLeft weight="bold" className="h-5 w-5" aria-hidden />
                     </button>
+                    <img src="/billiards/case/icon-case.webp" width={30} height={30} alt="" aria-hidden="true" decoding="async" draggable={false} className="h-[30px] w-[30px] shrink-0 object-contain" />
                     <h1 className="flex-1 truncate text-[17px] font-semibold tracking-tight">{t("case.title")}</h1>
                     {d?.member.mine && (
                         <button type="button" onClick={() => { void shareCard(); }} disabled={sharing} data-testid="cue-case-share" data-track-as="큐 케이스 카드 공유"

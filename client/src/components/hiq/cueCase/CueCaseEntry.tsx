@@ -9,6 +9,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { CUES, caseImage, caseItem } from "@shared/cueCase";
 import { cueCasePath, readCaseSeen, useCaseSummary } from "./cueCaseApi";
 
+const CASE_ICON = "/billiards/case/icon-case.webp";
 /** 빈 자리에 비치는 모양 — 늘 같은 두 자루(바뀌면 홈이 매번 달라 보인다) */
 const GHOSTS = ["cue-najeon-crane", "cue-on-tier-diamond"].map((id) => caseItem(id) ?? CUES[0]);
 
@@ -27,7 +28,8 @@ export function CueCaseEntry() {
     return (
         <button type="button" onClick={() => setLocation(cueCasePath())} data-testid="cue-case-entry" data-track-as="홈 큐 케이스"
             className="cue-case cc-entry mt-4 block w-full overflow-hidden rounded-[24px] px-4 pb-4 pt-4 text-left active:opacity-95">
-            <span className="relative flex items-center gap-2 px-1.5">
+            <span className="relative flex items-center gap-2.5 px-1">
+                <img src={CASE_ICON} width={44} height={44} alt="" aria-hidden="true" decoding="async" draggable={false} className="h-11 w-11 shrink-0 object-contain" style={{ filter: "drop-shadow(0 3px 4px rgba(0,0,0,0.55))" }} />
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 text-[16px] font-semibold tracking-tight text-[#f4ead6]">
                         {t("case.entryTitle")}
