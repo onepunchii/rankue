@@ -5,6 +5,7 @@ import listings from "./listings.js";
 import rounds from "./rounds.js";
 import photos from "./photos.js";
 import courses from "./courses.js";
+import pars from "./pars.js";
 
 /**
  * 골프 관리 콘솔 API(2026-10-01 오너: "골프 부분이 어드민에 많이 빠져 있다 — 넣을 수 있는 거 다 넣자").
@@ -20,5 +21,6 @@ router.use("/listings", listings);
 router.use("/rounds", rounds);
 router.use("/photos", photos);
 router.use("/courses", courses);
+router.use("/pars", pars);
 
 export default router;

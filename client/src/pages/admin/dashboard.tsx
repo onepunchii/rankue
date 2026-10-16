@@ -16,7 +16,7 @@ import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideCheckCircle, LucideLogOut, LucideArrowLeft, LucideChevronLeft,
     LucideBell, LucideCreditCard, LucideShieldAlert, LucideMenu, LucideUsersRound, LucideMail, LucideFlag, GameController,
-    LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin, LucideTrendingUp, LucideFootprints, LucideHistory, LucideGift, LucideTrophy, LucideRefreshCw } from "@/lib/icons";
+    LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin, LucideTrendingUp, LucideFootprints, LucideHistory, LucideGift, LucideTrophy, LucideRefreshCw, LucideLock } from "@/lib/icons";
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
 import MembersView from "./MembersView";
@@ -56,6 +56,7 @@ import GolfListingsView from "./golf/GolfListingsView";
 import GolfRoundsView from "./golf/GolfRoundsView";
 import GolfPhotosView from "./golf/GolfPhotosView";
 import GolfCoursesView from "./golf/GolfCoursesView";
+import GolfParWatchView from "./golf/GolfParWatchView";
 import { KpiTile, Panel, Pill, SHEET_SAFE_TOP, agoLabel } from "./adminUtils";
 
 /** 배열이 아닌 응답에도 화면이 죽지 않게(빈 목록으로) */
@@ -70,10 +71,10 @@ type GlobalStats = {
 };
 
 type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
-    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-overview" | "hiking-summits" | "hiking-mountains" | "hiking-photos" | "fishing-catches" | "fishing-rank" | "fishing-feeds" | "fishing-decor";
+    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "golf-pars" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-overview" | "hiking-summits" | "hiking-mountains" | "hiking-photos" | "fishing-catches" | "fishing-rank" | "fishing-feeds" | "fishing-decor";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos", "fishing-catches", "fishing-rank", "fishing-feeds", "fishing-decor"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-pars", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos", "fishing-catches", "fishing-rank", "fishing-feeds", "fishing-decor"] as const;
 
 // --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
 // 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
@@ -133,6 +134,7 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
         { id: "golf-rounds", label: "라운드", icon: LucideFlagTriangleRight },
         { id: "golf-photos", label: "라운드 사진", icon: LucideCamera },
         { id: "golf-courses", label: "골프장 데이터", icon: LucideMapPin },
+        { id: "golf-pars", label: "파 자동 반영", icon: LucideLock },
         { id: "golf-orders", label: "골프 회원권", icon: LucideFlag },
     ] },
     // 운영(2026-10-16) — 관리자가 바꾼 것의 기록
@@ -479,6 +481,7 @@ export default function AdminDashboard() {
                     {tab === "golf-rounds" && <GolfRoundsView onOpenMember={setOpenMemberId} />}
                     {tab === "golf-photos" && <GolfPhotosView onOpenMember={setOpenMemberId} />}
                     {tab === "golf-courses" && <GolfCoursesView />}
+                    {tab === "golf-pars" && <GolfParWatchView />}
                     {tab === "notices" && <NoticesView />}
                     {tab === "search-trend" && <SearchTrendView />}
                     {tab === "visitors" && <VisitorsView onOpenMember={setOpenMemberId} />}
@@ -540,6 +543,7 @@ function getTabTitle(tab: string) {
         case "golf-rounds": return "라운드";
         case "golf-photos": return "라운드 사진";
         case "golf-courses": return "골프장 데이터";
+        case "golf-pars": return "파 자동 반영";
         case "online-game": return "온라인게임 이용 현황";
         case "claims": return "매장 클레임";
         case "registrations": return "신규 매장 등록";
@@ -583,6 +587,7 @@ const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     "golf-rounds": "랭큐매치 · 스코어카드 라운드 — 멈춘 방 정리, 출처 · 인증 고르기, 카드 라운드 다시 보기 · 공식 ↔ 미인증, 잘못된 기록 무효화.",
     "golf-photos": "라운드 사진 — 공개 사진 가리기·지우기, 이의제기 처리.",
     "golf-courses": "골프장 페이지의 빈칸(로고·홈페이지·전화·파)과 홀별 파 입력.",
+    "golf-pars": "스코어카드 두 장이 같으면 명부의 파가 바뀝니다 — 바뀐 기록 · 카드가 본 코스(맞춘 사람) · 잠그기 · 되돌리기.",
     "online-game": "지금 → 오늘 → 기간(직전 대비) → 깔때기·재방문·품질 순서로 봅니다. 한국 시각 기준.",
     notices: "앱 공지 — 쓰기·고치기·가리기.",
 };

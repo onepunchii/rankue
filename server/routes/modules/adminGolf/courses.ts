@@ -42,6 +42,8 @@ import { GOLF_LOGO_MAX_BYTES, GOLF_LOGO_MAX_PX, cleanRemoteImageUrl, golfLogoBlo
 import { fetchRemoteImage, type RemoteImageResult } from "../../../lib/remoteImage.js";
 import { stripImageMetadata } from "../../../utils/imageMeta.js";
 import { deleteBlobs } from "../../../utils/blob.js";
+import { noteParChange } from "../../../services/golfScanRound.js";
+import { storage } from "../../../storage/index.js";
 
 const router = Router();
 
@@ -104,6 +106,9 @@ router.put("/nines/:rowId/pars", asyncHandler(async (req: any, res: any) => {
     }
     if (!r.ok) return sendError(res, 400, "저장하지 못했습니다");
     if (!r.unchanged) {
+        // 파 바뀐 기록(어드민 '골프 › 파 자동 반영')에도 — 카드가 바꾼 것과 한 줄로 본다
+        const before = Array.isArray(r.before) && r.before.length === 9 ? r.before.join("") : null;
+        await noteParChange({ clubId: r.nine.clubId, courseId: rowId, courseName: r.nine.name, kind: "admin", from: before, to: check.pars.join(""), by: String(((await storage.getProfile(req.adminProfileId).catch(() => null)) as any)?.nickname ?? "관리자").slice(0, 40) });
         adminLog(req, "golf.course.pars", {
             rowId, clubId: r.nine.clubId, name: r.nine.name, before: r.before, after: r.nine.pars,
             checked: body.expectedOld !== undefined, force: body.force === true, pagesUpdated: r.pagesUpdated,

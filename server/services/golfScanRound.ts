@@ -80,21 +80,46 @@ export async function saveSeenCourse(v: { clubId: string; name: string; pars: re
  * 서로 다른 회원 SCAN_PROMOTE_MEMBERS 사람의 카드가 같은 코스 · 같은 파를 말했으면 공용 명부를 고친다 — 없는 코스는 더하고, 파가 다르면 바꾼다
  * (오너 10/14). 같은 사람이 여러 번 올린 것은 한 사람으로 센다. 무엇을 무엇으로 바꿨는지는 서버 기록에 남긴다.
  */
-export async function promoteSeenCourse(clubId: string, key: string, name: string, pars: readonly number[]): Promise<"added" | "fixed" | null> {
+export async function promoteSeenCourse(clubId: string, key: string, name: string, pars: readonly number[]): Promise<"added" | "fixed" | "blocked" | null> {
     const [agree] = rowsOf(await db.execute(sql`select count(distinct member_id)::int as n from golf_scan_courses where club_id = ${clubId} and course_key = ${key} and pars_key = ${pars.join("")}`));
-    if ((Number(agree?.n) || 0) < SCAN_PROMOTE_MEMBERS) return null;
+    const members = Number(agree?.n) || 0;
+    if (members < SCAN_PROMOTE_MEMBERS) return null;
     const list = await db.select({ id: rankueGolfCourses.id, name: rankueGolfCourses.name, pars: rankueGolfCourses.pars }).from(rankueGolfCourses).where(eq(rankueGolfCourses.clubId, clubId));
     const cur = list.find((c) => courseKey(c.name) === key);
     if (!cur) {
-        await db.insert(rankueGolfCourses).values({ clubId, name, pars: [...pars] });
+        const [made] = await db.insert(rankueGolfCourses).values({ clubId, name, pars: [...pars] }).returning({ id: rankueGolfCourses.id });
         console.info("[GolfScan] promote added", JSON.stringify({ clubId, name, pars: pars.join("") }));
+        await noteParChange({ clubId, courseId: made?.id ?? null, courseName: name, kind: "added", from: null, to: pars.join(""), members });
         return "added";
     }
     const old = Array.isArray(cur.pars) ? cur.pars.map(Number) : [];
     if (old.length === 9 && old.every((p, i) => p === pars[i])) return null;
+    // 운영자가 잠근 코스는 카드가 바꾸지 못한다(2026-10-17 어드민 '골프 › 파 자동 반영'). 막은 일은 같은 값마다 한 번만 적는다
+    if (await parLocked(cur.id)) {
+        const [seen] = rowsOf(await db.execute(sql`select 1 as ok from golf_par_changes where course_id = ${cur.id}::uuid and kind = 'blocked' and to_pars = ${pars.join("")} limit 1`).catch(() => ({ rows: [{ ok: 1 }] })));
+        if (!seen) await noteParChange({ clubId, courseId: cur.id, courseName: cur.name, kind: "blocked", from: old.join(""), to: pars.join(""), members });
+        return "blocked";
+    }
     await db.update(rankueGolfCourses).set({ pars: [...pars], updatedAt: new Date() }).where(eq(rankueGolfCourses.id, cur.id));
     console.info("[GolfScan] promote fixed", JSON.stringify({ clubId, name: cur.name, from: old.join(""), to: pars.join("") }));
+    await noteParChange({ clubId, courseId: cur.id, courseName: cur.name, kind: "fixed", from: old.join(""), to: pars.join(""), members });
     return "fixed";
+}
+
+/** 잠금 칸(migrations/golf_par_watch.sql)을 못 읽으면 잠기지 않은 것으로 — 옛 길 그대로 */
+async function parLocked(courseId: string): Promise<boolean> {
+    try {
+        const [r] = rowsOf(await db.execute(sql`select par_lock is not null as locked from rankue_golf_courses where id = ${courseId}::uuid`));
+        return r?.locked === true;
+    } catch { return false; }
+}
+
+/** 파가 바뀐 기록 한 줄 — 적다 실패해도 바꾸기는 깨지지 않는다(어드민 '파 자동 반영'이 읽는다) */
+export async function noteParChange(v: { clubId: string; courseId: string | null; courseName: string; kind: string; from: string | null; to: string | null; members?: number | null; by?: string | null; reason?: string | null }): Promise<void> {
+    try {
+        await db.execute(sql`insert into golf_par_changes (club_id, course_id, course_name, kind, from_pars, to_pars, members, by, reason)
+            values (${v.clubId}, ${v.courseId}, ${v.courseName.slice(0, 40)}, ${v.kind}, ${v.from}, ${v.to}, ${v.members ?? null}, ${v.by ?? null}, ${v.reason ?? null})`);
+    } catch (e) { console.warn("[GolfScan] par change note", String((e as any)?.message ?? e).slice(0, 120)); }
 }
 
 export interface ResolvedCard {
