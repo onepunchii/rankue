@@ -10,6 +10,9 @@
  * GET /admin/billiards/online/:id/void-preview                     무효로 하면 레이팅이 바뀌는 사람(계산만)
  * POST /admin/billiards/online/:id/void { reason }                 무효 — canceled · end_reason 'void'(오래 멈춘 판 정리와 같은 길) → 레이팅 다시 계산
  * POST /admin/billiards/online/:id/restore { reason }              되살리기 — 원래 끝난 까닭으로 → 레이팅 다시 계산
+ * GET /admin/billiards/case-audit                                   큐 케이스 맞춰 보기 — 받은 기록마다 지금 기록이 받쳐 주는가(shared/cueCaseAudit) · 한정판 번호 현황
+ * GET /admin/billiards/case/:memberId                              한 사람 맞춰 보기
+ * POST /admin/billiards/case/:memberId/take-back { itemIds, reason } 받쳐 주지 않는 줄만 거둔다(다시 판정해서 확인)
  * 지우기는 예전 길(DELETE /admin/games/:id — RP · 에버리지를 되돌린다)을 그대로 쓴다. 까닭은 작업 기록에 남는다.
  */
 import { Router } from "express";
@@ -22,6 +25,7 @@ import { gameFlags, pairDayKey, type AdminGameRow } from "../../../shared/billia
 import { CASE_ITEMS, INVITE_PICK_LIMIT, invitePicks } from "../../../shared/cueCase.js";
 import { inviteFlags, type AdminInviteRow, type AdminInviterRow, type AdminInviteStock, type AdminInvites } from "../../../shared/inviteAdmin.js";
 import { isWithdrawnMember } from "../../../shared/chatSupport.js";
+import type { CaseAuditMember, CaseAuditSweep } from "../../../shared/cueCaseAudit.js";
 import { isRatedMatch, onlineFlags, type AdminOnlineDetail, type AdminOnlineRow, type AdminRatingChange, type AdminRatingRow } from "../../../shared/simMatchFlags.js";
 import { storage } from "../../storage/index.js";
 
@@ -316,6 +320,50 @@ router.post("/online/:id/restore", asyncHandler(async (req: any, res: any) => {
     const s = await storage.simMatch.recomputeRatings(false);
     await storage.simMatch.ratedDeltas(true).catch(() => undefined);
     return sendSuccess(res, { ok: true, changes: await namedChanges(s.changes) });
+}));
+
+// ── 큐 케이스 맞춰 보기 ──────────────────────────────────────────────────────
+const LIMITED = CASE_ITEMS.filter((x) => typeof x.limit === "number");
+const AUDIT_MAX = 300;
+
+router.get("/case-audit", asyncHandler(async (_req: any, res: any) => {
+    await storage.simMatch.ratedDeltas(true).catch(() => undefined); // 방금 무효로 한 판도 바로 빠지게 — 1분 재료를 새로
+    const ids = rowsOf(await db.execute(sql`select member_id, count(*)::int as n from hiq_cue_case_awards group by member_id order by count(*) desc`).catch(() => ({ rows: [] })));
+    const members: CaseAuditMember[] = [];
+    for (const r of ids.slice(0, AUDIT_MAX)) {
+        const a = await storage.cueCase.audit(String(r.member_id), Date.now());
+        if (a) members.push(a);
+    }
+    members.sort((a, b) => b.unsupported - a.unsupported || b.rows.length - a.rows.length);
+    const given = rowsOf(await db.execute(sql`select item_id, count(*)::int as n from hiq_cue_case_awards where item_id = any(${`{${LIMITED.map((x) => x.id).join(",")}}`}::text[]) group by item_id`).catch(() => ({ rows: [] })));
+    const byItem = new Map(given.map((g) => [String(g.item_id), Number(g.n) || 0]));
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, {
+        members, scanned: members.length, total: ids.length,
+        limited: LIMITED.map((x) => ({ itemId: x.id, given: byItem.get(x.id) ?? 0, limit: x.limit! })),
+    } satisfies CaseAuditSweep);
+}));
+
+router.get("/case/:memberId", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.memberId ?? "");
+    if (!UUID.test(id)) return sendError(res, 404, "회원을 찾을 수 없어요");
+    await storage.simMatch.ratedDeltas(true).catch(() => undefined);
+    const a = await storage.cueCase.audit(id, Date.now());
+    if (!a) return sendError(res, 404, "회원을 찾을 수 없어요");
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, a);
+}));
+
+router.post("/case/:memberId/take-back", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.memberId ?? ""), reason = reasonOf(req);
+    const itemIds = Array.isArray(req.body?.itemIds) ? req.body.itemIds.filter((x: unknown) => typeof x === "string").slice(0, 200) : [];
+    if (!UUID.test(id)) return sendError(res, 404, "회원을 찾을 수 없어요");
+    if (!reason) return sendError(res, 400, "거두는 까닭을 적어 주세요");
+    if (!itemIds.length) return sendError(res, 400, "거둘 것을 골라 주세요");
+    await storage.simMatch.ratedDeltas(true).catch(() => undefined);
+    const taken = await storage.cueCase.takeBack(id, itemIds, Date.now());
+    if (!taken.length) return sendError(res, 409, "지금 기록이 받쳐 주는 것은 거둘 수 없어요");
+    return sendSuccess(res, { ok: true, taken });
 }));
 
 export default router;

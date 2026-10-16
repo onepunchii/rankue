@@ -15,6 +15,7 @@ import { CASE_ITEMS, caseItem, invitePicks, isLive } from "../../shared/cueCase.
 import { deficitFromInnings, deficitFromShots, evaluateCase, kstMonthKey, type Bar, type OnlineGame, type RealGame } from "../../shared/cueCaseRules.js";
 import { bestRealTier } from "../../shared/realTier.js";
 import { START_RATING } from "../../shared/sim/rank.js";
+import { awardOrigin, canTakeBack, type CaseAuditMember, type CaseAuditRow } from "../../shared/cueCaseAudit.js";
 import type { MatchDelta } from "../../shared/simMonthly.js";
 
 const missingTable = (e: unknown) => (e as { code?: string } | null)?.code === "42P01";
@@ -207,12 +208,7 @@ export class CueCaseRepository {
         if (!who || isWithdrawnMember(who)) return null;
         const mine = viewerId === memberId;
         const country = (who.country as string | null) ?? null;
-        const [online, real, inv] = await Promise.all([this.online(memberId), this.real(memberId), inviteTimes(memberId)]);
-        const awards = (await db.execute(sql`
-            select kind, rank, extract(epoch from created_at) * 1000 as at from hiq_sim_awards
-            where member_id = ${memberId} and (kind = 'cup' or (kind = 'month_rank' and rank = 1))`)).rows as Record<string, unknown>[];
-        const entries = (await db.execute(sql`
-            select extract(epoch from c.starts_at) * 1000 as at from hiq_sim_cup_entries e join hiq_sim_cups c on c.id = e.cup_id where e.member_id = ${memberId}`)).rows as Record<string, unknown>[];
+        const { online, real, inv, awards, states } = await this.judge(who, nowMs);
 
         let ledger: { item_id: string; earned: number; created: number; serial: number | null }[] = [];
         let hasLedger = true;
@@ -226,16 +222,6 @@ export class CueCaseRepository {
             hasLedger = false;
         }
         if (!mine && online.length === 0 && real.length === 0 && ledger.length === 0) return null;
-
-        const states = evaluateCase({
-            nowMs, joinedAt: ms(who.createdAt), country,
-            cups: awards.filter((a) => a.kind === "cup").map((a) => ({ rank: n(a.rank), at: n(a.at) })),
-            monthTops: awards.filter((a) => a.kind === "month_rank").map((a) => n(a.at)),
-            cupEntries: entries.map((e) => n(e.at)),
-            realTier: bestRealTier({ handi3c: who.handi3c as number | null, handi4c: who.handi4c as number | null })?.tier.id ?? null,
-            online, real,
-            invites: inv.invites, invitedAt: inv.invitedAt,
-        });
 
         // 새로 채운 것만 더한다 — 이미 있는 줄은 그대로(받은 때도 바꾸지 않는다)
         const have = new Map(ledger.map((l) => [l.item_id, l]));
@@ -280,6 +266,64 @@ export class CueCaseRepository {
             handi: { "3c": (who.handi3c as number | null) ?? null, "4c": (who.handi4c as number | null) ?? null },
             invite: mine ? { count: inv.invites.length, picks: invitePicks(inv.invites.length, CASE_ITEMS.filter((x) => x.rule.k === "invitePick" && items[x.id].done).length) } : null,
         };
+    }
+
+    /** 판정 재료와 판정 — 큐 케이스(view)와 어드민 맞춰 보기(audit)가 같은 것을 쓴다(적지 않는다) */
+    private async judge(who: { id: unknown; country: unknown; createdAt: unknown; handi3c: unknown; handi4c: unknown }, nowMs: number) {
+        const memberId = String(who.id);
+        const [online, real, inv] = await Promise.all([this.online(memberId), this.real(memberId), inviteTimes(memberId)]);
+        const awards = (await db.execute(sql`
+            select kind, rank, extract(epoch from created_at) * 1000 as at from hiq_sim_awards
+            where member_id = ${memberId} and (kind = 'cup' or (kind = 'month_rank' and rank = 1))`)).rows as Record<string, unknown>[];
+        const entries = (await db.execute(sql`
+            select extract(epoch from c.starts_at) * 1000 as at from hiq_sim_cup_entries e join hiq_sim_cups c on c.id = e.cup_id where e.member_id = ${memberId}`)).rows as Record<string, unknown>[];
+        const states = evaluateCase({
+            nowMs, joinedAt: ms(who.createdAt), country: (who.country as string | null) ?? null,
+            cups: awards.filter((a) => a.kind === "cup").map((a) => ({ rank: n(a.rank), at: n(a.at) })),
+            monthTops: awards.filter((a) => a.kind === "month_rank").map((a) => n(a.at)),
+            cupEntries: entries.map((e) => n(e.at)),
+            realTier: bestRealTier({ handi3c: who.handi3c as number | null, handi4c: who.handi4c as number | null })?.tier.id ?? null,
+            online, real,
+            invites: inv.invites, invitedAt: inv.invitedAt,
+        });
+        return { online, real, inv, awards, states };
+    }
+
+    /**
+     * 어드민 › 당구 › 큐 케이스(2026-10-16) — 받은 기록 한 줄마다 지금 기록이 받쳐 주는가(shared/cueCaseAudit). 적지 않는다.
+     * 증정한 것은 hiq_goods_grants(회수하지 않은 것)로 가린다.
+     */
+    async audit(memberId: string, nowMs: number): Promise<CaseAuditMember | null> {
+        const [who] = await db.select({ id: hiqMembers.id, name: hiqMembers.name, country: hiqMembers.country, phone: hiqMembers.phone, createdAt: hiqMembers.createdAt, handi3c: hiqMembers.handi3c, handi4c: hiqMembers.handi4c })
+            .from(hiqMembers).where(eq(hiqMembers.id, memberId)).limit(1);
+        if (!who) return null;
+        const { states } = await this.judge(who, nowMs);
+        const ledger = (await db.execute(sql`
+            select item_id, serial, to_char(earned_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as earned_iso from hiq_cue_case_awards where member_id = ${memberId} order by earned_at, item_id`)).rows as Record<string, unknown>[];
+        let granted = new Set<string>();
+        try {
+            granted = new Set(((await db.execute(sql`select item from hiq_goods_grants where member_id = ${memberId}::uuid and sport = 'billiards' and revoked_at is null`)).rows as Record<string, unknown>[]).map((r) => String(r.item)));
+        } catch (e) { if (!missingTable(e)) throw e; }
+        const rows: CaseAuditRow[] = ledger.filter((l) => caseItem(String(l.item_id))).map((l) => {
+            // 판정이 '곧 열려요'로 답하는 물건(받는 길이 아직 없다)도 다시 판정할 수 없는 줄로 본다
+            const id = String(l.item_id), first = awardOrigin(id, granted.has(id)), origin = first === "earned" && states[id]?.soon ? "moment" : first;
+            return { itemId: id, serial: l.serial == null ? null : n(l.serial), earnedAt: String(l.earned_iso), origin, supported: origin === "earned" ? states[id]?.done === true : null };
+        });
+        return { memberId, name: isWithdrawnMember(who) ? "탈퇴한 회원" : String(who.name), rows, unsupported: rows.filter(canTakeBack).length };
+    }
+
+    /** 맞춰 보기에서 '받쳐 주지 않는' 줄만 거둔다 — 다시 판정해서 확인한다. 대표 큐였으면 대표를 비운다 */
+    async takeBack(memberId: string, itemIds: readonly string[], nowMs: number): Promise<string[]> {
+        const a = await this.audit(memberId, nowMs);
+        if (!a) return [];
+        const allowed = new Set(a.rows.filter(canTakeBack).map((r) => r.itemId));
+        const ids = [...new Set(itemIds)].filter((id) => allowed.has(id));
+        if (!ids.length) return [];
+        await db.execute(sql`delete from hiq_cue_case_awards where member_id = ${memberId} and item_id in (${inList(ids)})`);
+        await db.execute(sql`update hiq_cue_case_prefs set hero_item = null where member_id = ${memberId} and hero_item in (${inList(ids)})`).catch(() => undefined);
+        holders = null;
+        syncedAt.delete(memberId);
+        return ids;
     }
 
     /**
