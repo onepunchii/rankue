@@ -128,7 +128,7 @@ describe("서버: 이달의 랭킹은 읽기만 한다 — 통산 레이팅을 �
     const read = (f: string) => readFileSync(resolve(__dirname, "..", f), "utf8");
     it("재료는 전체 다시 계산(recomputeRatings)과 같은 순서로 읽고, 그 판에 남은 변화가 있으면 그것을 쓴다", () => {
         const repo = read("server/storage/simMatch.repo.ts");
-        const fn = repo.slice(repo.indexOf("private async finishedForReplay()"), repo.indexOf("async recomputeRatings(dryRun: boolean)"));
+        const fn = repo.slice(repo.indexOf("private async finishedForReplay()"), repo.indexOf("async recomputeRatings(dryRun: boolean, "));
         expect(fn).toContain("order by coalesce(m.finished_at, m.last_shot_at, m.created_at) asc, m.id asc");
         expect(fn).toContain("(m.rating_result->>'delta') as stored_delta");
         // 재료는 한 곳(ratedDeltas)에서 읽는다 — 장식장(storage/simShelf.repo)도 같은 것을 쓴다

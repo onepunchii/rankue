@@ -845,7 +845,9 @@ export class SimMatchRepository {
      * hiq_sim_match_ratings 를 새로 채운다. dryRun 이면 계산만 하고 쓰지 않는다(어드민이 숫자를 보고 누른다).
      * 규칙은 applyElo 와 같다(rating.ts). 같은 두 사람 24시간 창도 대전의 끝난 시각 기준으로 똑같이 센다.
      */
-    async recomputeRatings(dryRun: boolean) {
+    async recomputeRatings(dryRun: boolean, opts: { exclude?: readonly string[] } = {}) {
+        // exclude — 이 판들을 빼고 계산(어드민 무효 미리보기). 무효로 한 판은 이미 finished 가 아니라 여기 오지 않는다
+        const exclude = new Set(opts.exclude ?? []);
         const matches = (await db.execute(sql`
             select m.id, m.host_id, m.guest_id, m.game_type, m.handicap, m.winner_id, m.end_reason,
                    extract(epoch from coalesce(m.finished_at, m.last_shot_at, m.created_at)) * 1000 as ended_ms,
@@ -860,8 +862,9 @@ export class SimMatchRepository {
         const keyOf = (id: string, g: string) => `${id}|${g}`;
         const recentPairs = new Map<string, number[]>(); // pair|game → 반영된 판의 끝난 시각들
         let rated = 0;
-        const skipped = { manual: 0, tooShort: 0, noGuest: 0 };
+        const skipped = { manual: 0, tooShort: 0, noGuest: 0, excluded: 0 };
         for (const r of matches) {
+            if (exclude.has(String(r.id))) { skipped.excluded++; continue; }
             const hostId = String(r.host_id), guestId = String(r.guest_id), game = String(r.game_type);
             const winnerId = r.winner_id ? String(r.winner_id) : null;
             const winner = winnerId === null ? null : winnerId === hostId ? 0 : 1;
@@ -889,6 +892,17 @@ export class SimMatchRepository {
         }
 
         const beforeRows = (await db.execute(sql`select count(*)::int as n from hiq_sim_match_ratings`)).rows as { n: number }[];
+        // 지금 표와 다른 줄 — 적용하면 이 사람들의 레이팅이 이렇게 바뀐다(차이가 큰 순)
+        const current = (await db.execute(sql`select member_id, game_type, rating, matches from hiq_sim_match_ratings`)).rows as Record<string, unknown>[];
+        const now = new Map(current.map((c) => [keyOf(String(c.member_id), String(c.game_type)), { rating: Number(c.rating), matches: Number(c.matches) }]));
+        const changes: { memberId: string; gameType: string; before: number | null; after: number | null; matchesBefore: number; matchesAfter: number }[] = [];
+        for (const k of new Set([...now.keys(), ...table.keys()])) {
+            const b = now.get(k), a = table.get(k);
+            if (b && a && b.rating === a.rating && b.matches === a.matches) continue;
+            const [memberId, gameType] = k.split("|");
+            changes.push({ memberId, gameType, before: b?.rating ?? null, after: a?.rating ?? null, matchesBefore: b?.matches ?? 0, matchesAfter: a?.matches ?? 0 });
+        }
+        changes.sort((x, y) => Math.abs((y.after ?? START_RATING) - (y.before ?? START_RATING)) - Math.abs((x.after ?? START_RATING) - (x.before ?? START_RATING)));
         const summary = {
             dryRun,
             finishedMatches: matches.length,
@@ -898,6 +912,7 @@ export class SimMatchRepository {
             rowsBefore: Number(beforeRows[0]?.n ?? 0),
             top: [...table.entries()].sort((a, b) => b[1].rating - a[1].rating).slice(0, 5)
                 .map(([k, v]) => ({ memberId: k.split("|")[0], gameType: k.split("|")[1], rating: v.rating, matches: v.matches, wins: v.wins })),
+            changes,
         };
         if (dryRun) return summary;
 

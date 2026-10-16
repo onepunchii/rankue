@@ -2274,7 +2274,7 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
   shots: integer("shots").default(0).notNull(),
   version: integer("version").default(0).notNull(),
   winnerId: uuid("winner_id").references(() => hiqMembers.id),
-  /** finished 사유: target | inningCap | resign | claim(무응답 승리) */
+  /** finished 사유: target | inningCap | resign | claim(무응답 승리) | timeout. canceled 사유: stale(오래 멈춤) | cup | void(운영자 무효 — adminVoid) */
   endReason: text("end_reason"),
   engineVersion: text("engine_version").notNull(),
   paramsHash: text("params_hash").notNull(),
@@ -2335,6 +2335,11 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
    * (routes/modules/simMatch joinAndStart 가 막는다). 평소 대전은 null. '한 판 더'로 만든 새 대전은 대회 판이 아니다 — 이 칸을 물려받지 않는다.
    */
   cupGameId: uuid("cup_game_id"),
+  /**
+   * 운영자 무효(2026-10-16 어드민 › 당구 › 온라인 대전): { at, reason, by, prevEndReason, restored? }. 무효로 한 판은 status 'canceled' ·
+   * end_reason 'void' 로 닫는다(오래 멈춘 판 정리와 같은 길 — 끝난 판을 읽는 곳은 전부 status 'finished' 만 본다). 되살리면 이 칸의 prevEndReason 으로.
+   */
+  adminVoid: jsonb("admin_void"),
   finishedAt: timestamp("finished_at"),
 }, (t) => ({
   idxCode: index("idx_sim_matches_code").on(t.code, t.status),

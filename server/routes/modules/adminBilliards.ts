@@ -4,6 +4,12 @@
  * GET /admin/billiards/games?days=7&type=3c|4c&flagged=1&q=   끝난 당구 경기(매치 · 대회) — 선수 · 점수 · 하이런 · 이닝 · 이상 표시(shared/billiardsGameFlags)
  * GET /admin/billiards/invites                                    친구 초대 — 초대한 사람 순위 · 초대로 든 가입(다시 볼 것 표시 · shared/inviteAdmin)
  * POST /admin/billiards/invites/:inviteeId/cancel { reason, takeBack } 초대 하나 취소(표시만) — takeBack 이면 줄어든 수만큼 보상(단계 · 고른 한정 큐)도 거둔다
+ * GET /admin/billiards/online?days&type&q&member=                 끝난 온라인 대전(무효로 한 판 포함) — 점수 · 샷 수 · 레이팅 변화 · 다시 볼 것(shared/simMatchFlags)
+ * GET /admin/billiards/online/ratings                              온라인 레이팅 표(3쿠션 · 4구)
+ * GET /admin/billiards/online/:id                                  한 판의 샷(이닝 · 점수 · 앱/서버 어긋남) · 채팅 건수(글은 싣지 않는다)
+ * GET /admin/billiards/online/:id/void-preview                     무효로 하면 레이팅이 바뀌는 사람(계산만)
+ * POST /admin/billiards/online/:id/void { reason }                 무효 — canceled · end_reason 'void'(오래 멈춘 판 정리와 같은 길) → 레이팅 다시 계산
+ * POST /admin/billiards/online/:id/restore { reason }              되살리기 — 원래 끝난 까닭으로 → 레이팅 다시 계산
  * 지우기는 예전 길(DELETE /admin/games/:id — RP · 에버리지를 되돌린다)을 그대로 쓴다. 까닭은 작업 기록에 남는다.
  */
 import { Router } from "express";
@@ -16,6 +22,7 @@ import { gameFlags, pairDayKey, type AdminGameRow } from "../../../shared/billia
 import { CASE_ITEMS, INVITE_PICK_LIMIT, invitePicks } from "../../../shared/cueCase.js";
 import { inviteFlags, type AdminInviteRow, type AdminInviterRow, type AdminInviteStock, type AdminInvites } from "../../../shared/inviteAdmin.js";
 import { isWithdrawnMember } from "../../../shared/chatSupport.js";
+import { isRatedMatch, onlineFlags, type AdminOnlineDetail, type AdminOnlineRow, type AdminRatingChange, type AdminRatingRow } from "../../../shared/simMatchFlags.js";
 import { storage } from "../../storage/index.js";
 
 const router = Router();
@@ -159,6 +166,156 @@ router.post("/invites/:inviteeId/cancel", asyncHandler(async (req: any, res: any
         if (taken.length) await db.execute(sql`update hiq_cue_case_prefs set hero_item = null where member_id = ${inviter}::uuid and hero_item = any(${`{${taken.join(",")}}`}::text[])`).catch(() => undefined);
     }
     return sendSuccess(res, { ok: true, inviterId: inviter, taken });
+}));
+
+// ── 온라인 대전 ─────────────────────────────────────────────────────────────
+const shownName = (name: unknown, phone: unknown) => (isWithdrawnMember({ phone }) ? "탈퇴한 회원" : String(name ?? "회원"));
+const ENDED = sql.raw("coalesce(m.finished_at, m.last_shot_at, m.created_at)");
+
+router.get("/online", asyncHandler(async (req: any, res: any) => {
+    const days = Math.min(365, Math.max(1, Number(req.query.days) || 30));
+    const type = req.query.type === "3c" || req.query.type === "4c" ? req.query.type : null;
+    const member = typeof req.query.member === "string" && UUID.test(req.query.member) ? req.query.member : null;
+    const term = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 30) : "";
+    const like = `%${term.replace(/[%_\\]/g, "")}%`;
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    const rows = rowsOf(await db.execute(sql`
+        select m.id, m.game_type, m.handicap, m.aim_assist, m.end_reason, m.winner_id, m.host_id, m.guest_id, m.mismatches, m.rating_result, m.cup_game_id, m.admin_void,
+            m.host_target, m.guest_target, m.state -> 'players' as ps,
+            to_char(${ENDED}, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as ended_iso, to_char(${ENDED} + interval '9 hours', 'YYYY-MM-DD') as kst_day,
+            h.name as host_name, h.phone as host_phone, g.name as guest_name, g.phone as guest_phone,
+            (select count(*)::int from hiq_sim_match_shots s where s.match_id = m.id and s.player_index = 0) as s0,
+            (select count(*)::int from hiq_sim_match_shots s where s.match_id = m.id and s.player_index = 1) as s1
+        from hiq_sim_matches m left join hiq_members h on h.id = m.host_id left join hiq_members g on g.id = m.guest_id
+        where m.guest_id is not null and (m.status = 'finished' or (m.status = 'canceled' and m.end_reason = 'void'))
+          and ${ENDED} >= (${since}::timestamptz at time zone 'UTC')
+          and (${type}::text is null or m.game_type = ${type})
+          and (${member}::uuid is null or m.host_id = ${member}::uuid or m.guest_id = ${member}::uuid)
+          and (${term} = '' or h.name ilike ${like} or g.name ilike ${like})
+        order by ${ENDED} desc limit 400`));
+    const base = rows.map((r) => {
+        const voided = r.end_reason === "void";
+        const endReason = voided ? (r.admin_void?.prevEndReason ?? null) : (r.end_reason ?? null);
+        const winner: 0 | 1 | null = !r.winner_id ? null : String(r.winner_id) === String(r.host_id) ? 0 : 1;
+        const input = { handicap: r.handicap === true, hasGuest: true, shots: [Number(r.s0) || 0, Number(r.s1) || 0] as const, endReason, winner, mismatches: Number(r.mismatches) || 0 };
+        return { r, voided, endReason, winner, input, rated: isRatedMatch(input) };
+    });
+    // 같은 두 사람 · 같은 한국 날짜의 레이팅 판 수(무효로 한 판은 빼고)
+    const pair = new Map<string, number>();
+    const pairKey = (r: any) => `${r.kst_day}|${[String(r.host_id), String(r.guest_id)].sort().join("|")}`;
+    for (const x of base) if (x.rated && !x.voided) pair.set(pairKey(x.r), (pair.get(pairKey(x.r)) ?? 0) + 1);
+    const out: AdminOnlineRow[] = base.map(({ r, voided, endReason, winner, input, rated }) => {
+        const ps = Array.isArray(r.ps) ? r.ps : [];
+        const players = [0, 1].map((i) => ({
+            id: String(i === 0 ? r.host_id : r.guest_id),
+            name: i === 0 ? shownName(r.host_name, r.host_phone) : shownName(r.guest_name, r.guest_phone),
+            score: Number(ps[i]?.score) || 0, target: Number(ps[i]?.target) || Number(i === 0 ? r.host_target : r.guest_target) || 0,
+            innings: Number(ps[i]?.innings) || 0, highRun: Number(ps[i]?.highRun) || 0, shots: input.shots[i], winner: winner === i,
+        }));
+        const av = r.admin_void;
+        return {
+            id: String(r.id), endedAt: String(r.ended_iso), gameType: r.game_type === "4c" ? "4c" : "3c", handicap: r.handicap === true, rated,
+            reality: r.aim_assist === false, endReason, delta: typeof r.rating_result?.delta === "number" ? r.rating_result.delta : null,
+            mismatches: input.mismatches, cup: !!r.cup_game_id, players,
+            flags: voided ? [] : onlineFlags(input, rated ? pair.get(pairKey(r)) ?? 0 : 0),
+            voided: voided ? { at: String(av?.at ?? ""), reason: String(av?.reason ?? ""), by: String(av?.by ?? "관리자") } : null,
+        };
+    });
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, out);
+}));
+
+router.get("/online/ratings", asyncHandler(async (_req: any, res: any) => {
+    const rows = rowsOf(await db.execute(sql`
+        select r.member_id, r.game_type, r.rating, r.matches, r.wins, to_char(r.updated_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as updated_iso, m.name, m.phone
+        from hiq_sim_match_ratings r left join hiq_members m on m.id = r.member_id order by r.rating desc, r.matches desc limit 500`));
+    const out: AdminRatingRow[] = rows.map((r) => ({
+        memberId: String(r.member_id), name: shownName(r.name, r.phone), gameType: r.game_type === "4c" ? "4c" : "3c",
+        rating: Number(r.rating) || 0, matches: Number(r.matches) || 0, wins: Number(r.wins) || 0, updatedAt: String(r.updated_iso ?? ""),
+    }));
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, out);
+}));
+
+router.get("/online/:id", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? "");
+    if (!UUID.test(id)) return sendError(res, 404, "대전을 찾을 수 없어요");
+    const shots = rowsOf(await db.execute(sql`
+        select idx, player_index, inning, points, cushions, (client_hash is not null and client_hash <> hash) as mismatch,
+            to_char(created_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as at
+        from hiq_sim_match_shots where match_id = ${id}::uuid order by idx limit 2000`));
+    const [c] = rowsOf(await db.execute(sql`select count(*)::int as n from hiq_sim_match_chats where match_id = ${id}::uuid`));
+    const out: AdminOnlineDetail = {
+        shots: shots.map((s) => ({ idx: Number(s.idx), player: Number(s.player_index) === 1 ? 1 : 0, inning: s.inning == null ? null : Number(s.inning), points: Number(s.points) || 0, cushions: Number(s.cushions) || 0, mismatch: s.mismatch === true, at: String(s.at) })),
+        chats: Number(c?.n) || 0,
+    };
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, out);
+}));
+
+async function namedChanges(changes: readonly Omit<AdminRatingChange, "name">[]): Promise<AdminRatingChange[]> {
+    const ids = [...new Set(changes.map((c) => c.memberId))].filter((x) => UUID.test(x));
+    const names = new Map<string, string>();
+    if (ids.length) for (const m of rowsOf(await db.execute(sql`select id, name, phone from hiq_members where id = any(${`{${ids.join(",")}}`}::uuid[])`))) names.set(String(m.id), shownName(m.name, m.phone));
+    return changes.slice(0, 50).map((c) => ({ ...c, name: names.get(c.memberId) ?? "회원" }));
+}
+
+/** 무효 · 되살리기를 할 수 있는 판인가 — 월대회 판은 대진이 걸려 있어 여기서 건드리지 않는다 */
+async function voidable(id: string, want: "finished" | "void"): Promise<string | null> {
+    const [m] = rowsOf(await db.execute(sql`select status, end_reason, guest_id, cup_game_id from hiq_sim_matches where id = ${id}::uuid`));
+    if (!m) return "대전을 찾을 수 없어요";
+    if (m.cup_game_id) return "월대회 판은 대진이 걸려 있어 여기서 무효로 할 수 없어요";
+    if (want === "finished" && !(m.status === "finished" && m.guest_id)) return m.end_reason === "void" ? "이미 무효로 한 판이에요" : "끝난 대전만 무효로 할 수 있어요";
+    if (want === "void" && !(m.status === "canceled" && m.end_reason === "void")) return "무효로 한 판이 아니에요";
+    return null;
+}
+
+router.get("/online/:id/void-preview", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? "");
+    if (!UUID.test(id)) return sendError(res, 404, "대전을 찾을 수 없어요");
+    const no = await voidable(id, "finished");
+    if (no) return sendError(res, 409, no);
+    const s = await storage.simMatch.recomputeRatings(true, { exclude: [id] });
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, { changes: await namedChanges(s.changes) });
+}));
+
+const adminNameOf = async (req: any) => String(((await storage.getProfile(req.adminProfileId).catch(() => null)) as any)?.nickname ?? "관리자").slice(0, 40);
+const reasonOf = (req: any) => (typeof req.body?.reason === "string" ? req.body.reason.trim().slice(0, 200) : "");
+
+router.post("/online/:id/void", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? ""), reason = reasonOf(req);
+    if (!UUID.test(id)) return sendError(res, 404, "대전을 찾을 수 없어요");
+    if (!reason) return sendError(res, 400, "무효로 하는 까닭을 적어 주세요");
+    const no = await voidable(id, "finished");
+    if (no) return sendError(res, 409, no);
+    const by = await adminNameOf(req);
+    // 오른쪽 식은 바뀌기 전 값을 읽는다 — prevEndReason 은 원래 끝난 까닭
+    const done = rowsOf(await db.execute(sql`update hiq_sim_matches
+        set status = 'canceled', end_reason = 'void',
+            admin_void = jsonb_build_object('at', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), 'reason', ${reason}::text, 'by', ${by}::text, 'prevEndReason', end_reason)
+        where id = ${id}::uuid and status = 'finished' and cup_game_id is null returning id`));
+    if (!done.length) return sendError(res, 409, "끝난 대전만 무효로 할 수 있어요");
+    const s = await storage.simMatch.recomputeRatings(false);
+    await storage.simMatch.ratedDeltas(true).catch(() => undefined);
+    return sendSuccess(res, { ok: true, changes: await namedChanges(s.changes) });
+}));
+
+router.post("/online/:id/restore", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? ""), reason = reasonOf(req);
+    if (!UUID.test(id)) return sendError(res, 404, "대전을 찾을 수 없어요");
+    if (!reason) return sendError(res, 400, "되살리는 까닭을 적어 주세요");
+    const no = await voidable(id, "void");
+    if (no) return sendError(res, 409, no);
+    const by = await adminNameOf(req);
+    const done = rowsOf(await db.execute(sql`update hiq_sim_matches
+        set status = 'finished', end_reason = admin_void ->> 'prevEndReason',
+            admin_void = admin_void || jsonb_build_object('restoredAt', to_char(now() at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), 'restoreReason', ${reason}::text, 'restoredBy', ${by}::text)
+        where id = ${id}::uuid and status = 'canceled' and end_reason = 'void' returning id`));
+    if (!done.length) return sendError(res, 409, "무효로 한 판이 아니에요");
+    const s = await storage.simMatch.recomputeRatings(false);
+    await storage.simMatch.ratedDeltas(true).catch(() => undefined);
+    return sendSuccess(res, { ok: true, changes: await namedChanges(s.changes) });
 }));
 
 export default router;
