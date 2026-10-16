@@ -20,14 +20,19 @@ export interface GolfPushHistoryItem {
     audience: "golf";
 }
 
-export async function getGolfPushHistory(limit = 20): Promise<GolfPushHistoryItem[]> {
+/** 등산 회원 묶음 발송(2026-10-16, category 'HIKING')도 같은 방식으로 — 줄에 audience: 'hiking' */
+export async function getHikingPushHistory(limit = 20): Promise<(Omit<GolfPushHistoryItem, "audience"> & { audience: "hiking" })[]> {
+    return (await getGolfPushHistory(limit, "HIKING")).map((r) => ({ ...r, audience: "hiking" as const }));
+}
+
+export async function getGolfPushHistory(limit = 20, category: "GOLF" | "HIKING" = "GOLF"): Promise<GolfPushHistoryItem[]> {
     const rows = (await db.execute(sql`
         select title, body, params->>'url' as url,
                to_char(date_trunc('minute', min(created_at)), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as sent_at,
                count(*)::int as recipients,
                count(*) filter (where is_read)::int as read_count
         from hiq_notifications
-        where category = 'GOLF' and type = 'broadcast' and created_at >= now() - interval '90 days'
+        where category = ${category} and type = 'broadcast' and created_at >= now() - interval '90 days'
         group by title, body, params->>'url', date_trunc('minute', created_at)
         order by min(created_at) desc
         limit ${limit}`)).rows as Record<string, unknown>[];

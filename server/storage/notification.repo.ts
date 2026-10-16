@@ -155,6 +155,20 @@ export class NotificationRepository {
      * 흔적: 핸디캡을 적었거나 · 골프 글을 올렸거나 · 조인을 신청했거나 · 골프 기록이 있거나 · 골프 크루에 있거나.
      * ⚠️ golf_handicap 은 기본값이 0 이라 "is not null" 로 세면 전 회원이 걸린다 — 실제로 적은 사람(> 0)만 본다.
      */
+    /**
+     * 어드민 푸시의 '등산 회원' 묶음(2026-10-16) — 주 종목이 등산이거나, 정상 기록이 있거나, 산악회에 든 회원. 알림함에 남으니 기기 토큰은 묻지 않는다.
+     */
+    async listHikingPushMembers(limit = 3000): Promise<string[]> {
+        const rows = (await db.execute(sql`
+            select m.id from hiq_members m
+            where m.phone not like 'deleted:%' and (
+                m.primary_sport = 'HIKING'
+                or exists (select 1 from hiking_summits s where s.member_id = m.id)
+                or exists (select 1 from hiq_crew_members cm join hiq_crews c on c.id = cm.crew_id where cm.member_id = m.id and cm.role <> 'pending' and c.sport_category = 'HIKING')
+            ) limit ${limit}`)) as any;
+        return ((rows.rows ?? rows) as any[]).map((r) => String(r.id));
+    }
+
     async listGolfPushMembers(excludeIds: readonly string[], limit = 300): Promise<string[]> {
         const rows = await db.select({ id: hiqMembers.id })
             .from(hiqMembers)

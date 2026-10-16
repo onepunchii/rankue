@@ -52,6 +52,8 @@ vi.mock("../../utils/blob.js", () => ({
     deleteBlobs: async () => { m.log.push("deleteBlobs"); },
     isOnOwnBlobHost: () => true, isOwnedBlobUrl: () => false, ownBlobHost: () => null,
 }));
+// 낚시 · 등산 정리(2026-10-16) — 순서만 적는다
+vi.mock("../../storage/withdrawPurge.js", () => ({ purgeFishingHiking: async () => { m.log.push("purgeFishingHiking"); return { blobs: [], removed: {} }; } }));
 vi.mock("./auth.js", () => ({ attemptKey: () => "k", checkRateLimit: async () => ({ ok: true }), registerFailure: async () => undefined, clearAttempts: async () => undefined }));
 vi.mock("../../middleware/terms.js", () => ({
     requireTermsAccepted: (_req: unknown, _res: unknown, next: () => void) => next(),
@@ -259,7 +261,7 @@ describe("(다) 언제 — 가려지기 전에 읽고, 탈퇴가 끝난 뒤에 �
         // 개인 자료: 프로필 사진 → 라운드 사진 → 산행 사진(2026-10-13) — 줄을 지운 뒤 그 파일을 지운다
         expect(m.storage.hikingPhotos.deleteAllByMember).toHaveBeenCalledWith(ME);
         expect(m.log).toEqual([
-            "read", "deleteAccount", "deleteBlobs", "deletePhotos", "deleteBlobs", "deleteHikingPhotos", "deleteBlobs",
+            "read", "deleteAccount", "deleteBlobs", "deletePhotos", "deleteBlobs", "deleteHikingPhotos", "deleteBlobs", "purgeFishingHiking", "deleteBlobs",
             `send:${R1}`, `send:${R2}`,
             "clearCookie:hiq_user_id", "clearCookie:hiq_partner_auth", "respond",
         ]);
@@ -269,7 +271,7 @@ describe("(다) 언제 — 가려지기 전에 읽고, 탈퇴가 끝난 뒤에 �
         const out = await withdraw();
         expect(out.status).toBe(200);
         expect(m.send).not.toHaveBeenCalled();
-        expect(m.log).toEqual(["read", "deleteAccount", "deleteBlobs", "deletePhotos", "deleteBlobs", "deleteHikingPhotos", "deleteBlobs", "clearCookie:hiq_user_id", "clearCookie:hiq_partner_auth", "respond"]);
+        expect(m.log).toEqual(["read", "deleteAccount", "deleteBlobs", "deletePhotos", "deleteBlobs", "deleteHikingPhotos", "deleteBlobs", "purgeFishingHiking", "deleteBlobs", "clearCookie:hiq_user_id", "clearCookie:hiq_partner_auth", "respond"]);
     });
 
     it("산행 사진을 못 지워도 탈퇴는 끝난다", async () => {

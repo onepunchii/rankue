@@ -1,4 +1,7 @@
+import { sql } from "drizzle-orm";
+import { db } from "../db.js";
 import { storage } from "../storage/index.js";
+import { scrubAdminDetail } from "../../shared/adminActions.js";
 import { sendError } from "../utils/response.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ADMIN_VIEW_ONLY_CODE, ADMIN_VIEW_ONLY_MESSAGE, isConsoleRole, isSuperAdminRole, viewOnlyAllows } from "../../shared/adminRole.js";
@@ -25,8 +28,32 @@ export const checkSuperAdmin = asyncHandler(async (req: any, res: any, next: any
     if (!isSuperAdminRole(profile.role) && !viewOnlyAllows(req.method, String(req.originalUrl ?? req.url ?? ""))) {
         return sendError(res, 403, ADMIN_VIEW_ONLY_MESSAGE, ADMIN_VIEW_ONLY_CODE);
     }
+    if (req.method !== "GET" && req.method !== "HEAD") recordOnReply(req, res, { id: profile.id, name: String(profile.nickname ?? "관리자") });
     next();
 });
+
+/**
+ * 관리자 작업 기록(2026-10-16 — 지우기 · 무효 · 수정이 서버 로그에만 남았다). 바꾸는 요청이 **답하기 직전에** 한 줄을 적는다(hiq_admin_actions).
+ * 서버리스라 답한 뒤에 적으면 잘릴 수 있어 답을 한 번 기다리게 한다(쓰기 한 번 — 수 ms). 적기가 실패해도 답은 그대로 간다.
+ * 한 요청에 가드가 두 번 걸려도(골프 라우터) 한 줄만. 남기지 않는 칸(PIN · 전화 · 계좌 …)은 shared/adminActions 가 지운다.
+ */
+function recordOnReply(req: any, res: any, admin: { id: string; name: string }) {
+    if (req.__adminRecorded) return;
+    req.__adminRecorded = true;
+    const send = res.json.bind(res);
+    res.json = (body: unknown) => {
+        const path = String(req.originalUrl ?? req.url ?? "").split("?")[0];
+        const detail = scrubAdminDetail({ params: req.params, query: req.query, body: req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body) ? req.body : null });
+        let write: Promise<unknown>;
+        try {
+            write = Promise.resolve(db.execute(sql`insert into hiq_admin_actions (admin_profile_id, admin_name, method, path, status, detail)
+                values (${admin.id}::uuid, ${admin.name}, ${String(req.method)}, ${path.slice(0, 300)}, ${Number(res.statusCode) || 200}, ${JSON.stringify(detail)}::jsonb)`));
+        } catch (e) { write = Promise.reject(e); }
+        write.catch((e: any) => { if ((e?.code ?? e?.cause?.code) !== "42P01") console.warn("[admin] action log failed:", e?.message); })
+            .finally(() => send(body));
+        return res;
+    };
+}
 
 /** 감사 로그 한 줄(서버 로그) — admin.ts 의 console.info("[admin] …") 와 같은 꼴. 누가 했는지 파트너 쿠키로 남긴다 */
 export function adminLog(req: any, action: string, detail: Record<string, unknown>) {

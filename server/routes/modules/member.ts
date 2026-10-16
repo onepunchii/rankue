@@ -10,6 +10,7 @@ import { GOLF_PHOTO_CATEGORIES } from "../../../shared/golfPhoto.js";
 import { HIKING_PHOTO_CATEGORIES } from "../../../shared/hikingPhotos.js";
 import { FISHING_PHOTO_CATEGORIES } from "../../../shared/fishing.js";
 import { removeAllWishes } from "../../storage/hikingWishes.js";
+import { purgeFishingHiking } from "../../storage/withdrawPurge.js";
 import { storage, getRecentOpponents, searchUsers } from "../../storage/index.js";
 import { localeOf, msg } from "../../lib/i18n.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
@@ -497,6 +498,8 @@ router.delete("/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any
     // 산행 사진(2026-10-13)도 같다 — 공개로 산의 화면에 떠 있던 것까지 줄과 파일을 지운다. 못 지워도 탈퇴는 그대로 간다
     await deleteBlobs(await storage.hikingPhotos.deleteAllByMember(req.userId!).catch((e) => { console.error("[DeleteAccount] 산행 사진:", e); return []; }));
     await removeAllWishes(req.userId!).catch((e) => console.error("[DeleteAccount] 가고 싶은 산:", e));
+    // 낚시 조과(좌표) · 사진 · 장비 · 장식, 등산 표시 지점(위경도) · 정상 · 산행 · 목표 · 와펜(2026-10-16 — 회원 행이 남아 cascade 가 돌지 않았다)
+    await deleteBlobs((await purgeFishingHiking(req.userId!).catch((e) => { console.error("[DeleteAccount] 낚시 · 등산:", e); return { blobs: [] as string[] }; })).blobs);
     // 탈퇴가 **끝난 뒤에** 그 신청자들에게 알린다 — 글 내리기(golf.ts DELETE /bookings/:id)와 같은 함수·같은 문구다.
     // 예전엔 아무 말도 가지 않아, 확정자는 '내 신청'에서 글이 사라지고 연락처가 비워진 것을 티타임까지 몰랐다.
     // 알림이 실패하거나 늦어도 탈퇴는 이미 끝났다 — 응답을 막지 않는다(상한까지만 기다린다. 서버리스라 응답 전에 await).

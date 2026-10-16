@@ -22,16 +22,18 @@ const SPORT: Record<string, { label: string; tone: "brand" | "info" | "warn" }> 
     MIXED: { label: "당구·골프", tone: "warn" },
     // 산악회(2026-10-13) — 이름표가 없으면 아래 대체값 때문에 '당구'로 찍힌다. '전체'에서만 보인다(종목 칩은 당구 · 골프 둘).
     HIKING: { label: "등산", tone: "warn" },
+    // 낚시(2026-10-16 어드민 조사 — 이름표가 없어 '당구'로 찍혔다)
+    FISHING: { label: "낚시", tone: "info" },
 };
 
 export default function CrewsView() {
     const { data: crews = [], isLoading } = useQuery<AdminCrew[]>({ queryKey: ["/api/hiq/admin/crews"] });
-    const [sport, setSport] = useState<"ALL" | "BILLIARDS" | "GOLF">("ALL");
+    const [sport, setSport] = useState<"ALL" | "BILLIARDS" | "GOLF" | "HIKING" | "FISHING">("ALL");
     const [q, setQ] = useState("");
     const [sort, setSort] = useState<"members" | "new" | "pending">("members");
     const [limit, setLimit] = useState(60);
 
-    const inSport = (c: AdminCrew, s: typeof sport) => s === "ALL" || c.sportCategory === s || c.sportCategory === "MIXED";
+    const inSport = (c: AdminCrew, s: typeof sport) => s === "ALL" || c.sportCategory === s || (c.sportCategory === "MIXED" && (s === "BILLIARDS" || s === "GOLF"));
     const rows = useMemo(() => {
         const s = q.trim();
         const list = crews.filter((c) => inSport(c, sport) && (!s || [c.name, c.leaderName, c.storeName, c.region].some((v) => v?.includes(s))));
@@ -55,6 +57,8 @@ export default function CrewsView() {
                     { id: "ALL", label: "전체", count: crews.length },
                     { id: "BILLIARDS", label: "당구", count: crews.filter((c) => inSport(c, "BILLIARDS")).length },
                     { id: "GOLF", label: "골프", count: crews.filter((c) => inSport(c, "GOLF")).length },
+                    { id: "HIKING", label: "등산", count: crews.filter((c) => inSport(c, "HIKING")).length },
+                    { id: "FISHING", label: "낚시", count: crews.filter((c) => inSport(c, "FISHING")).length },
                 ]} />
                 <div className="flex gap-2 sm:ml-auto">
                     <SearchBox value={q} onChange={(v) => { setQ(v); setLimit(60); }} placeholder="크루·리더·장소·지역" className="flex-1 sm:w-60" />

@@ -24,7 +24,7 @@ import { FilterChips, SearchBox, Panel, Pill, EmptyState, daysSince, isKstToday,
 import { appConfirm } from "@/components/AppDialog";
 import { isGolfQuietHour, GOLF_PUSH_FROM_HOUR, GOLF_PUSH_UNTIL_HOUR } from "@shared/golfPushQuiet";
 
-type Audience = "all" | "today" | "active7" | "dormant" | "new7" | "app" | "golf" | "pick";
+type Audience = "all" | "today" | "active7" | "dormant" | "new7" | "app" | "golf" | "hiking" | "pick";
 const AUDIENCE: { id: Audience; label: string; test?: (m: AdminMember) => boolean }[] = [
     { id: "all", label: "전체" },
     { id: "today", label: "오늘 접속", test: (m) => isKstToday(m.lastSeenAt) },
@@ -34,6 +34,8 @@ const AUDIENCE: { id: Audience; label: string; test?: (m: AdminMember) => boolea
     { id: "app", label: "앱 설치", test: (m) => m.platform === "ios" || m.platform === "android" },
     // 서버가 고르는 묶음(목록에 골프 흔적이 없다) — test 가 없고 인원은 golf-audience 가 센다
     { id: "golf", label: "골프 알림 받는 회원" },
+    // 등산(2026-10-16) — 주 종목 등산 · 정상 기록 · 산악회. 등산 알림함에 들어간다(서버가 category HIKING 으로)
+    { id: "hiking", label: "등산 회원" },
     { id: "pick", label: "직접 고르기" },
 ];
 
@@ -54,10 +56,19 @@ const GOLF_URL_PRESETS: { label: string; url: string }[] = [
     { label: "내 예약", url: "/golf/my-bookings" },
 ];
 
-type PushHistory = { title: string; body: string; url: string | null; sentAt: string; recipients: number; readCount: number; audience?: "golf" };
+// 등산(2026-10-16) — App.tsx 의 등산 주소
+const HIKING_URL_PRESETS: { label: string; url: string }[] = [
+    { label: "등산 홈", url: "/hiking" },
+    { label: "도장첩", url: "/hiking/stamps" },
+    { label: "사진첩", url: "/hiking/album" },
+    { label: "준비물", url: "/hiking/checklist" },
+];
+
+type PushHistory = { title: string; body: string; url: string | null; sentAt: string; recipients: number; readCount: number; audience?: "golf" | "hiking" };
 type GolfAudience = { count: number; capped: boolean; quiet: boolean };
 const HISTORY_KEY = ["/api/hiq/admin/push/history"] as const;
 export const GOLF_AUDIENCE_KEY = ["/api/hiq/admin/push/golf-audience"] as const;
+export const HIKING_AUDIENCE_KEY = ["/api/hiq/admin/push/hiking-audience"] as const;
 const CHUNK = 500;
 /** "밤 9시~아침 8시" — 숫자는 shared/golfPushQuiet 에서(긴급 조인과 같은 값) */
 const GOLF_QUIET_LABEL = `밤 ${GOLF_PUSH_UNTIL_HOUR - 12}시~아침 ${GOLF_PUSH_FROM_HOUR}시`;
@@ -68,6 +79,7 @@ export default function PushView() {
     const membersData = useQuery<AdminMember[]>({ queryKey: ADMIN_MEMBERS_KEY }).data;
     const historyQ = useQuery<PushHistory[]>({ queryKey: HISTORY_KEY });
     const { data: golfAudience } = useQuery<GolfAudience>({ queryKey: GOLF_AUDIENCE_KEY });
+    const { data: hikingAudience } = useQuery<GolfAudience>({ queryKey: HIKING_AUDIENCE_KEY });
     // 응답이 배열이 아니면(세션 만료·옛 캐시) .filter 에서 화면 전체가 흰 화면이 된다 — 받는 자리에서 배열로
     const members = useMemo(() => (Array.isArray(membersData) ? membersData : []), [membersData]);
     const history = Array.isArray(historyQ.data) ? historyQ.data : [];
@@ -86,23 +98,26 @@ export default function PushView() {
     }, []);
     const golfQuiet = isGolfQuietHour(now);
     const golfCount = typeof golfAudience?.count === "number" ? golfAudience.count : undefined;
-    const inboxOnly = audience === "golf" && golfQuiet;
+    const hikingCount = typeof hikingAudience?.count === "number" ? hikingAudience.count : undefined;
+    const inboxOnly = (audience === "golf" || audience === "hiking") && golfQuiet;
 
     const counts = useMemo(() => Object.fromEntries(AUDIENCE.map((a) => [a.id,
         a.id === "all" ? members.length
             : a.id === "pick" ? picked.length
                 : a.id === "golf" ? golfCount
-                    : members.filter(a.test!).length])) as Record<Audience, number | undefined>, [members, picked, golfCount]);
+                    : a.id === "hiking" ? hikingCount
+                        : members.filter(a.test!).length])) as Record<Audience, number | undefined>, [members, picked, golfCount, hikingCount]);
 
     // "all"·"golf" 는 서버가 명단을 고른다 — 화면은 묶음 이름만 보낸다
-    const targets: string[] | "all" | "golf" = useMemo(() => {
+    const targets: string[] | "all" | "golf" | "hiking" = useMemo(() => {
         if (audience === "all") return "all";
         if (audience === "golf") return "golf";
+        if (audience === "hiking") return "hiking";
         if (audience === "pick") return picked;
         const a = AUDIENCE.find((x) => x.id === audience)!;
         return members.filter(a.test!).map((m) => m.id);
     }, [audience, picked, members]);
-    const targetCount = targets === "all" ? members.length : targets === "golf" ? golfCount ?? 0 : targets.length;
+    const targetCount = targets === "all" ? members.length : targets === "golf" ? golfCount ?? 0 : targets === "hiking" ? hikingCount ?? 0 : targets.length;
 
     const pickList = useMemo(() => {
         const s = pickSearch.trim();
@@ -114,14 +129,14 @@ export default function PushView() {
 
     const send = async () => {
         const label = AUDIENCE.find((a) => a.id === audience)!.label;
-        const quietNote = targets === "golf" && isGolfQuietHour(Date.now())
+        const quietNote = (targets === "golf" || targets === "hiking") && isGolfQuietHour(Date.now())
             ? `\n\n지금은 골프 알림 조용한 시간이라 기기 알림 없이 알림함에만 들어갑니다.`
             : "";
         if (!(await appConfirm({ message: `'${label}' ${targetCount.toLocaleString()}명에게 알림을 보냅니다.\n\n${form.title}\n${form.body}${quietNote}\n\n보낸 알림은 되돌릴 수 없습니다.`, tone: "danger", confirmText: "보내기" }))) return;
         const payload = { title: form.title.trim(), body: form.body.trim(), url: form.url.trim() || undefined };
         try {
             let sent = 0, total = 0, quiet = false;
-            if (targets === "all" || targets === "golf") {
+            if (targets === "all" || targets === "golf" || targets === "hiking") {
                 setSending({ done: 0, total: targetCount });
                 const r: any = await apiRequest("/api/hiq/admin/push", { method: "POST", body: { ...payload, memberIds: targets } });
                 sent = r.sent; total = r.total; quiet = r.quiet === true;
@@ -225,6 +240,15 @@ export default function PushView() {
                         <div className="flex gap-1.5 flex-wrap items-center mb-2">
                             <span className="mr-0.5 text-[11.5px] font-bold text-black/40">골프</span>
                             {GOLF_URL_PRESETS.map((p) => (
+                                <button key={p.url} onClick={() => setForm({ ...form, url: p.url })}
+                                    className={`h-8 px-3 rounded-full text-[12.5px] font-bold ${form.url === p.url ? "bg-black/80 text-white" : "bg-black/[0.05] text-black/55"}`}>
+                                    {p.label}
+                                </button>
+                            ))}
+                        </div>
+                        <div className="flex gap-1.5 flex-wrap items-center mb-2">
+                            <span className="mr-0.5 text-[11.5px] font-bold text-black/40">등산</span>
+                            {HIKING_URL_PRESETS.map((p) => (
                                 <button key={p.url} onClick={() => setForm({ ...form, url: p.url })}
                                     className={`h-8 px-3 rounded-full text-[12.5px] font-bold ${form.url === p.url ? "bg-black/80 text-white" : "bg-black/[0.05] text-black/55"}`}>
                                     {p.label}

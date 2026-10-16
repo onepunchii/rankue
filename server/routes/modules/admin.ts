@@ -6,6 +6,7 @@ import { SUGGESTION_REPLY_TYPE } from "../../lib/suggestionBox.js";
 import { randomInt } from "crypto";
 import { hashPassword } from "../../services/hiqService.js";
 import { checkSuperAdmin, adminLog } from "../../middleware/adminAuth.js";
+import { adminActionLabel, type AdminActionRow } from "../../../shared/adminActions.js";
 import { cleanRejectReason } from "../../lib/partnerApply.js";
 import adminGolfRouter from "./adminGolf/index.js";
 import adminVisitorsRouter from "./adminVisitors.js";
@@ -14,7 +15,7 @@ import { getMemberActivityForAdmin } from "../../storage/adminMemberActivity.js"
 import { activityDaysOf } from "../../../shared/memberActivity.js";
 import { isSuperAdminRole } from "../../../shared/adminRole.js";
 import { checkSubAdminRequest, subAdminBlockedMessage } from "../../lib/subAdmin.js";
-import { getGolfPushHistory } from "../../storage/adminGolfPush.js";
+import { getGolfPushHistory, getHikingPushHistory } from "../../storage/adminGolfPush.js";
 import { isGolfQuietHour } from "../../../shared/golfPushQuiet.js";
 
 const router = Router();
@@ -57,6 +58,28 @@ router.post("/search-trend", checkSuperAdmin, asyncHandler(async (req: any, res:
 router.get("/whoami", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
     res.set("Cache-Control", "private, no-store");
     return sendSuccess(res, { role: req.adminRole, canWrite: isSuperAdminRole(req.adminRole) });
+}));
+
+/**
+ * 관리자 작업 기록(2026-10-16) — 바꾸는 요청마다 가드가 적은 줄(hiq_admin_actions). 최근 것부터 100줄, before(ISO)로 더 앞을.
+ * q 는 주소 · 관리자 이름에서 찾는다. 남기지 않는 칸은 적을 때 이미 지웠다.
+ */
+router.get("/actions", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { db: adb } = await import("../../db.js");
+    const { sql: q } = await import("drizzle-orm");
+    const before = typeof req.query.before === "string" && !Number.isNaN(Date.parse(req.query.before)) ? new Date(req.query.before).toISOString() : null;
+    const term = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 60) : "";
+    const like = `%${term.replace(/[%_\\]/g, "")}%`;
+    let rows: any[] = [];
+    try {
+        rows = ((await adb.execute(q`
+            select id, to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, admin_name, method, path, status, detail
+            from hiq_admin_actions
+            where (${before}::timestamptz is null or created_at < ${before}::timestamptz) and (${term} = '' or path ilike ${like} or admin_name ilike ${like})
+            order by created_at desc limit 100`)) as any).rows ?? [];
+    } catch (e: any) { if ((e?.code ?? e?.cause?.code) !== "42P01") throw e; }
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, rows.map((r): AdminActionRow => ({ id: String(r.id), at: String(r.at), adminName: String(r.admin_name ?? "관리자"), method: String(r.method), path: String(r.path), label: adminActionLabel(String(r.method), String(r.path)), status: Number(r.status) || 0, detail: r.detail ?? null })));
 }));
 
 router.get("/stats", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
@@ -364,6 +387,13 @@ router.delete("/notices/:id", checkSuperAdmin, asyncHandler(async (req: any, res
  */
 const GOLF_AUDIENCE_MAX = 5000;
 
+// GET /admin/push/hiking-audience — '등산 회원' 묶음의 인원(2026-10-16)
+router.get("/push/hiking-audience", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    const ids = await storage.notifs.listHikingPushMembers();
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, { count: ids.length, quiet: isGolfQuietHour(Date.now()) });
+}));
+
 // GET /admin/push/golf-audience — 그 묶음의 인원과 지금이 골프 조용한 시간인지(보내기 전에 화면이 보여 준다)
 router.get("/push/golf-audience", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
     const ids = await storage.notifs.listGolfPushMembers([], GOLF_AUDIENCE_MAX);
@@ -384,12 +414,16 @@ router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     const url = /^\/[A-Za-z0-9_\-./?=&%]*$/.test(rawUrl) && !rawUrl.startsWith("//") ? rawUrl.slice(0, 200) : "";
 
     const golf = req.body?.memberIds === "golf";
+    // 등산 회원(2026-10-16) — 'admin' 으로 저장하면 등산 알림함에 안 뜬다(알림함이 종목별) → category 'HIKING'
+    const hiking = req.body?.memberIds === "hiking";
     let memberIds: string[];
     if (req.body?.memberIds === "all") {
         const all = await storage.getAllMembersForAdmin();
         memberIds = (all as any[]).map((m) => m.id);
     } else if (golf) {
         memberIds = await storage.notifs.listGolfPushMembers([], GOLF_AUDIENCE_MAX);
+    } else if (hiking) {
+        memberIds = await storage.notifs.listHikingPushMembers();
     } else if (Array.isArray(req.body?.memberIds)) {
         const UUID_RE = /^[0-9a-f-]{36}$/i;
         memberIds = req.body.memberIds.filter((id: any) => typeof id === "string" && UUID_RE.test(id)).slice(0, 500);
@@ -398,8 +432,8 @@ router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
     }
     if (!memberIds.length) return sendError(res, 400, "받는 사람이 없습니다");
 
-    const quiet = golf && isGolfQuietHour(Date.now());
-    const category = golf ? "GOLF" : "admin";
+    const quiet = (golf || hiking) && isGolfQuietHour(Date.now());
+    const category = golf ? "GOLF" : hiking ? "HIKING" : "admin";
     const params = url ? { url } : undefined;
     const { notificationService } = await import("../../services/notificationService.js");
     let sent = 0;
@@ -420,16 +454,16 @@ router.post("/push", checkSuperAdmin, asyncHandler(async (req: any, res: any) =>
             console.warn(`[admin push] ${memberId} 실패:`, (e as Error)?.message);
         }
     }
-    const audience = golf ? "golf" : req.body?.memberIds === "all" ? "all" : "pick";
+    const audience = golf ? "golf" : hiking ? "hiking" : req.body?.memberIds === "all" ? "all" : "pick";
     adminLog(req, "푸시 발송", { audience, title, url: url || null, total: memberIds.length, sent, quiet });
-    return sendSuccess(res, { sent, total: memberIds.length, ...(golf ? { audience: "golf", quiet } : {}) });
+    return sendSuccess(res, { sent, total: memberIds.length, ...(golf ? { audience: "golf", quiet } : hiking ? { audience: "hiking", quiet } : {}) });
 }));
 
 // GET /admin/push/history — 최근 90일 어드민 발송 기록(받은 사람·읽은 사람). storage.admin.getPushHistory 주석.
 // 골프 묶음 발송(category 'GOLF')은 storage/adminGolfPush 가 같은 방식으로 따로 읽어 시각순으로 합친다(그 줄엔 audience: 'golf').
 router.get("/push/history", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
-    const [main, golf] = await Promise.all([storage.admin.getPushHistory(20), getGolfPushHistory(20)]);
-    const merged = [...main, ...golf].sort((a, b) => (a.sentAt < b.sentAt ? 1 : a.sentAt > b.sentAt ? -1 : 0)).slice(0, 20);
+    const [main, golf, hiking] = await Promise.all([storage.admin.getPushHistory(20), getGolfPushHistory(20), getHikingPushHistory(20)]);
+    const merged = [...main, ...golf, ...hiking].sort((a, b) => (a.sentAt < b.sentAt ? 1 : a.sentAt > b.sentAt ? -1 : 0)).slice(0, 20);
     return sendSuccess(res, merged);
 }));
 

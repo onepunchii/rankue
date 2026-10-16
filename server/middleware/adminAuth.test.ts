@@ -3,8 +3,10 @@ import { describe, it, expect, vi, beforeAll, afterAll, beforeEach } from "vites
 import express from "express";
 import type { AddressInfo } from "node:net";
 
-const m = vi.hoisted(() => ({ getProfile: vi.fn() }));
+const m = vi.hoisted(() => ({ getProfile: vi.fn(), logged: [] as unknown[] }));
 vi.mock("../storage/index.js", () => ({ storage: { getProfile: m.getProfile } }));
+// 작업 기록(2026-10-16) — 쓰기는 가짜로 받아 둔다
+vi.mock("../db.js", () => ({ db: { execute: async (q: unknown) => { m.logged.push(q); return { rows: [] }; } } }));
 
 import { checkSuperAdmin } from "./adminAuth";
 
@@ -34,6 +36,7 @@ beforeAll(async () => {
 afterAll(() => new Promise<void>((resolve) => server.close(() => resolve())));
 beforeEach(() => {
     reached = [];
+    m.logged = [];
     m.getProfile.mockReset().mockImplementation(async (id: string) => PROFILES[id]);
 });
 
@@ -99,5 +102,17 @@ describe("그 밖 — 콘솔에 들어오지 못한다", () => {
         expect((await call("p-admin", "GET", "/stats")).status).toBe(200);
         m.getProfile.mockImplementation(async (id: string) => (id === "p-admin" ? { id, role: "user" } : PROFILES[id]));
         expect((await call("p-admin", "GET", "/stats")).status).toBe(403);
+    });
+});
+
+describe("작업 기록(2026-10-16) — 가드를 지난 바꾸는 요청마다 한 줄", () => {
+    it("읽기는 남기지 않고, 고치기는 한 줄씩 · 막힌 고치기도 남긴다", async () => {
+        for (const p of READS) await call("p-super", "GET", p);
+        expect(m.logged).toHaveLength(0);
+        await call("p-super", "POST", "/members/abc/status");
+        await call("p-super", "DELETE", "/games/abc");
+        expect(m.logged).toHaveLength(2);
+        await call("p-admin", "DELETE", "/games/abc"); // 보기 전용 — 가드가 막는다(기록 전에 막혀 남지 않는다)
+        expect(m.logged).toHaveLength(2);
     });
 });

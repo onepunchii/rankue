@@ -16,7 +16,7 @@ import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideCheckCircle, LucideLogOut, LucideArrowLeft, LucideChevronLeft,
     LucideBell, LucideCreditCard, LucideShieldAlert, LucideMenu, LucideUsersRound, LucideMail, LucideFlag, GameController,
-    LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin, LucideTrendingUp, LucideFootprints } from "@/lib/icons";
+    LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin, LucideTrendingUp, LucideFootprints, LucideHistory } from "@/lib/icons";
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
 import MembersView from "./MembersView";
@@ -29,6 +29,7 @@ import SuggestionsView, { type Suggestion, SUGGESTIONS_KEY } from "./Suggestions
 import NoticesView from "./NoticesView";
 import SearchTrendView from "./SearchTrendView";
 import VisitorsView from "./VisitorsView";
+import AdminActionsView from "./AdminActionsView";
 import CrewsView from "./CrewsView";
 import GolfOrdersView, { GOLF_ORDERS_KEY } from "./GolfOrdersView";
 import { StoresView, BillingView } from "./StoresView";
@@ -56,10 +57,10 @@ type GlobalStats = {
 };
 
 type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
-    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors";
+    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions"] as const;
 
 // --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
 // 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
@@ -98,6 +99,10 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
         { id: "golf-photos", label: "라운드 사진", icon: LucideCamera },
         { id: "golf-courses", label: "골프장 데이터", icon: LucideMapPin },
         { id: "golf-orders", label: "골프 회원권", icon: LucideFlag },
+    ] },
+    // 운영(2026-10-16) — 관리자가 바꾼 것의 기록
+    { title: "운영", items: [
+        { id: "actions", label: "작업 기록", icon: LucideHistory },
     ] },
 ];
 
@@ -441,6 +446,7 @@ export default function AdminDashboard() {
                     {tab === "notices" && <NoticesView />}
                     {tab === "search-trend" && <SearchTrendView />}
                     {tab === "visitors" && <VisitorsView onOpenMember={setOpenMemberId} />}
+                    {tab === "actions" && <AdminActionsView />}
 
                     <MemberDetailSheet member={openMember} onClose={() => setOpenMemberId(null)} />
                 </div>
@@ -455,6 +461,7 @@ function getTabTitle(tab: string) {
         case "dashboard": return "대시보드";
         case "today": return "오늘 접속";
         case "visitors": return "방문자 발자국";
+        case "actions": return "작업 기록";
         case "search-trend": return "검색 수요";
         case "members": return "회원 관리";
         case "leads": return "입점 문의";
@@ -483,6 +490,7 @@ const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     dashboard: "밀린 일과 오늘 접속을 먼저 봅니다.",
     today: "한국 시간 0시부터 앱을 연 회원 — 1분마다 새로 읽습니다.",
     visitors: "웹과 앱에서 사람들이 어디로 들어와 무엇을 보고 누르는지 — 1분마다 새로 읽습니다.",
+    actions: "관리자가 바꾼 것 — 누가 · 언제 · 무엇을. 막힌 요청도 함께 남습니다.",
     members: "누르면 상세 — 정보 수정·경기 기록·알림·PIN·정지.",
     push: "받는 사람을 고르고, 미리보기로 확인한 뒤 보냅니다.",
     moderation: "신고는 접수 후 24시간 안에 처리해 주세요.",
