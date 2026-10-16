@@ -43,21 +43,22 @@ async function codeOf(memberId: string): Promise<string> {
     }
     throw new Error("invite code: could not allocate");
 }
-const countOf = async (memberId: string) => Number(rowsOf(await db.execute(sql`select count(*)::int as n from hiq_referrals where inviter_id = ${memberId}::uuid`))[0]?.n) || 0;
+// 운영자가 취소한 초대(canceled_at — 어드민 › 당구 › 친구 초대)는 세지 않는다. 줄은 남아 있어 같은 사람이 다시 넣지는 못한다
+const countOf = async (memberId: string) => Number(rowsOf(await db.execute(sql`select count(*)::int as n from hiq_referrals where inviter_id = ${memberId}::uuid and canceled_at is null`))[0]?.n) || 0;
 
 router.get("/friend-invite/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const me = req.userId!;
     const [code, count, [mine], [who], used] = await Promise.all([
         codeOf(me),
         countOf(me),
-        db.execute(sql`select m.name from hiq_referrals r left join hiq_members m on m.id = r.inviter_id where r.invitee_id = ${me}::uuid`).then(rowsOf),
+        db.execute(sql`select m.name, r.canceled_at from hiq_referrals r left join hiq_members m on m.id = r.inviter_id where r.invitee_id = ${me}::uuid`).then(rowsOf),
         db.select({ createdAt: hiqMembers.createdAt }).from(hiqMembers).where(eq(hiqMembers.id, me)).limit(1),
         db.execute(sql`select count(*)::int as n from hiq_cue_case_awards where member_id = ${me} and item_id = any(${`{${PICKS.join(",")}}`}::text[])`).then((r) => Number(rowsOf(r)[0]?.n) || 0),
     ]);
     const joined = who?.createdAt ? new Date(who.createdAt).getTime() : 0;
     const body: InviteMe = {
         code, url: inviteUrl(code), count, picks: invitePicks(count, used),
-        invitedBy: mine ? String(mine.name ?? "회원") : null,
+        invitedBy: mine && !mine.canceled_at ? String(mine.name ?? "회원") : null,
         canClaim: !mine && Date.now() - joined <= INVITE_CLAIM_DAYS * 86_400_000,
     };
     res.setHeader("Cache-Control", "private, no-store");

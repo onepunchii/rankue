@@ -49,7 +49,7 @@ export interface CueCaseView {
 async function inviteTimes(memberId: string): Promise<{ invites: number[]; invitedAt: number | null }> {
     try {
         const rows = (await db.execute(sql`
-            select 'out' as side, extract(epoch from created_at) * 1000 as at from hiq_referrals where inviter_id = ${memberId}::uuid
+            select 'out' as side, extract(epoch from created_at) * 1000 as at from hiq_referrals where inviter_id = ${memberId}::uuid and canceled_at is null
             union all select 'in', extract(epoch from created_at) * 1000 from hiq_referrals where invitee_id = ${memberId}::uuid`)).rows as Record<string, unknown>[];
         return { invites: rows.filter((r) => r.side === "out").map((r) => n(r.at)), invitedAt: rows.find((r) => r.side === "in") ? n(rows.find((r) => r.side === "in")!.at) : null };
     } catch (e) {
