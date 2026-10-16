@@ -181,9 +181,17 @@ describe("연결", () => {
         expect(read("server/routes/modules/simMatch.ts")).toContain("cues: [cueIdOf(m.hostCue), m.guestId ? cueIdOf(m.guestCue) : null] as const,");
         expect(read("client/src/sim/matchApi.ts")).toContain("cues: Array.isArray(raw.cues) ? [cueOrNull(raw.cues[0]), cueOrNull(raw.cues[1])] : [null, null],");
     });
+    it("크루 큐 랙(기획 6.2) — 당구 크루 홈에 크루원의 대표 큐, 승인 대기는 빼고 당구 크루만", () => {
+        const repo = read("server/storage/cueCase.repo.ts");
+        expect(repo).toContain(`if (!crew || crew.sport_category !== "BILLIARDS") return null;`);
+        expect(repo).toContain("where cm.crew_id = ${crewId} and cm.role <> 'pending'");
+        expect(read("server/routes/modules/cueCase.ts")).toContain('router.get("/cue-case/crew/:crewId", requireAuth');
+        expect(read("client/src/components/hiq/tabs/CrewHomeTab.tsx")).toContain("{!isGolf && !ownWorld && <CrewCueRack crewId={crew.id} />}");
+        expect(read("client/src/sim/match/MatchIntro.tsx")).toContain('data-testid="intro-cues"');
+    });
     it("문구가 다섯 언어에 있고 자리 표시를 지킨다", () => {
-        const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"] };
-        const page = read("client/src/pages/hiq/cue-case.tsx") + read("client/src/components/hiq/cueCase/CueCaseEntry.tsx");
+        const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"] };
+        const page = read("client/src/pages/hiq/cue-case.tsx") + read("client/src/components/hiq/cueCase/CueCaseEntry.tsx") + read("client/src/components/hiq/cueCase/CrewCueRack.tsx");
         const used = [...new Set([...page.matchAll(/t\(["`](case\.[a-zA-Z.]+)["`]\)/g)].map((m) => m[1]))];
         expect(used.length).toBeGreaterThan(40);
         for (const l of LOCALES) {

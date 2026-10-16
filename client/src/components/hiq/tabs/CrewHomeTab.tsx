@@ -1,5 +1,6 @@
 import { useState, memo, useMemo, useEffect, lazy, Suspense } from "react";
 import { Link } from "wouter";
+import { CrewCueRack } from "@/components/hiq/cueCase/CrewCueRack";
 import {
     LucideCalendar, LucideMapPin, LucideVote, LucideChevronRight, LucidePlus,
     LucideChevronDown, LucideUsers, LucideLogOut, LucideTrophy, LucidePhone, LucideStore,
@@ -260,6 +261,8 @@ export const CrewHomeTab = memo(({
                 {/* 3. 크루 도장깨기(2026-10-12) — 골프 크루만. 같은 라운드에서 크루원 둘 이상이 현장 인증한 골프장이 크루 도장이 된다.
                     제 바탕을 가진 한 칸이라 당구 · 골프 어느 테마에서도 같은 모습이다(client/src/golf/stamps/CrewStampParts) */}
                 {isGolf && <CrewStampEntry crewId={crew.id} crew={{ name: crew.name, emblem: crew.emblem }} />}
+                {/* 당구 크루 — 크루 큐 랙(2026-10-16, 큐 케이스 기획 6.2): 크루원 각자의 대표 큐가 벽에 나란히. 당구 크루가 아니면 서버가 404 라 안 그린다 */}
+                {!isGolf && !ownWorld && <CrewCueRack crewId={crew.id} />}
                 {/* 산악회 — 함께 오른 산(같은 날 두 사람 이상이 정상에서 인증한 산) */}
                 {isHiking && <Suspense fallback={null}><CrewSummits crewId={crew.id} isMember={isMember} /></Suspense>}
                 {/* 산악회 — 우리 산악회가 가고 싶은 산(회원 여럿이 담아 둔 산). 회원만 본다(서버도 회원이 아니면 403) — 한 곳도 없으면 아무것도 안 그린다 */}

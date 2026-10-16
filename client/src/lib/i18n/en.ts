@@ -3928,5 +3928,12 @@ const en: Dict = {
   "case.entryGuest": "Collect 77 cues, chalk and gloves",
   "case.entryCounts": "Cues {c} · chalk {k} · gloves {g}",
   "case.entryOpen": "Your past games may have filled it — take a look",
+  "case.rackTitle": "Crew cue rack",
+  "case.rackOwned": "Crew cues {n}/{m}",
+  "case.rackHint": "Each member's signature cue hangs here — tap to open their cue case",
+  "case.rackEmpty": "No cues yet — one official game or rated online match hangs the first",
+  "case.rackCount": "{n} cues",
+  "case.rackMore": "Show all ({n})",
+  "case.rackLess": "Show less",
 };
 export default en;

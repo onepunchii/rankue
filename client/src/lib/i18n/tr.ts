@@ -3928,5 +3928,12 @@ const tr: Dict = {
   "case.entryGuest": "77 ıstaka, tebeşir ve eldiven topla",
   "case.entryCounts": "Istaka {c} · tebeşir {k} · eldiven {g}",
   "case.entryOpen": "Geçmiş maçların doldurmuş olabilir — bir bak",
+  "case.rackTitle": "Ekip ıstaka rafı",
+  "case.rackOwned": "Ekip ıstakaları {n}/{m}",
+  "case.rackHint": "Her üyenin imza ıstakası burada — çantasını açmak için dokun",
+  "case.rackEmpty": "Henüz ıstaka yok — bir resmi ya da online maç ilkini asar",
+  "case.rackCount": "{n} ıstaka",
+  "case.rackMore": "Tümünü gör ({n})",
+  "case.rackLess": "Daha az",
 };
 export default tr;

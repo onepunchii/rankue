@@ -82,20 +82,25 @@ export function MatchIntro({ matchId, names, targets, myIndex, handicap, tiers, 
                 })}
             </div>
             {(cues?.[0] || cues?.[1]) && (
-                // 두 사람의 대표 큐 — 이음쇠 쪽이 가운데에서 마주 본다(오른쪽 큐는 뒤집는다). 없는 사람은 나무 색 큐대
-                <div className="flex w-[min(340px,86vw)] items-start gap-2.5" data-testid="intro-cues">
-                    {[0, 1].map((i) => {
-                        const x = cues?.[i] ? caseItem(cues[i]!) : null;
-                        return (
-                            <div key={i} className="min-w-0 flex-1">
-                                <div className="relative h-[16px]" style={i === 1 ? { transform: "scaleX(-1)" } : undefined}>
-                                    {x ? <img src={caseImage(x)} alt="" decoding="async" draggable={false} className="absolute inset-0 h-full w-full object-contain" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.7))" }} />
-                                        : <span className="absolute inset-x-0 inset-y-[4px] rounded-full" style={{ background: "linear-gradient(180deg,#6b432a,#4e2e19 60%,#3a2112)" }} />}
+                // 두 사람의 대표 큐 — 한 벨벳 홈에 나란히, 이음쇠가 가운데에서 마주 본다(오른쪽 큐는 뒤집는다). 없는 사람은 나무 색 큐대
+                <div className="w-[min(340px,86vw)]" data-testid="intro-cues">
+                    <div className="flex items-center gap-1.5 rounded-full bg-black/45 px-3 py-2" style={{ boxShadow: "inset 0 3px 7px rgba(0,0,0,0.75), 0 1px 0 rgba(255,255,255,0.05)" }}>
+                        {[0, 1].map((i) => {
+                            const x = cues?.[i] ? caseItem(cues[i]!) : null;
+                            return (
+                                <div key={i} className="relative h-[22px] min-w-0 flex-1" style={i === 1 ? { transform: "scaleX(-1)" } : undefined}>
+                                    {x ? <img src={caseImage(x)} alt="" decoding="async" draggable={false} className="absolute inset-0 h-full w-full object-contain" style={{ filter: "drop-shadow(0 2px 3px rgba(0,0,0,0.75))" }} />
+                                        : <span className="absolute inset-x-0 inset-y-[6px] rounded-full" style={{ background: "linear-gradient(180deg,#6b432a,#4e2e19 60%,#3a2112)" }} />}
                                 </div>
-                                <p className={cn("mt-1.5 truncate text-[11px] font-semibold text-white/60", i === 0 ? "text-left" : "text-right")}>{x ? x.name[(["ko", "en", "es", "vi", "tr"].includes(locale) ? locale : "en") as CaseLocale] : ""}</p>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
+                    <div className="mt-1.5 flex justify-between gap-3 px-1">
+                        {[0, 1].map((i) => {
+                            const x = cues?.[i] ? caseItem(cues[i]!) : null;
+                            return <span key={i} className={cn("min-w-0 truncate text-[11px] font-semibold text-white/60", i === 1 && "text-right")}>{x ? x.name[(["ko", "en", "es", "vi", "tr"].includes(locale) ? locale : "en") as CaseLocale] : ""}</span>;
+                        })}
+                    </div>
                 </div>
             )}
             <div className="flex flex-col items-center gap-1">

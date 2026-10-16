@@ -3,6 +3,7 @@
  *
  * GET  /cue-case?memberId=   한 사람의 큐 케이스(안 주면 내 것). 열 때 새로 채운 것을 받은 기록에 더한다.
  * GET  /cue-case/summary     홈 입구 띠 — 받은 수 · 대표 큐.
+ * GET  /cue-case/crew/:id    크루 큐 랙 — 당구 크루 홈 벽.
  * POST /cue-case/hero        { itemId } 대표 큐 고르기 — 받은 큐만.
  * 남의 것도 볼 수 있다(랭킹 · 프로필이 보여 주는 이름 · 전적에서 나온 것). 탈퇴했거나 아무 기록도 없는 회원은 404.
  */
@@ -29,6 +30,15 @@ router.get("/cue-case", requireAuth, asyncHandler(async (req: AuthRequest, res: 
 router.get("/cue-case/summary", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     res.setHeader("Cache-Control", "private, no-store");
     return sendSuccess(res, await storage.cueCase.summary(req.userId!));
+}));
+
+/** GET /cue-case/crew/:crewId — 크루 큐 랙(당구 크루 홈). 크루원 이름 · 대표 큐 · 모은 큐 수와 크루가 모은 서로 다른 큐 수 */
+router.get("/cue-case/crew/:crewId", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.crewId)) return sendError(res, 404, "err.cueCase.notFound");
+    const rack = await storage.cueCase.crewRack(req.params.crewId);
+    if (!rack) return sendError(res, 404, "err.cueCase.notFound");
+    res.setHeader("Cache-Control", "private, no-store");
+    return sendSuccess(res, rack);
 }));
 
 const heroBody = z.object({ itemId: z.string().min(1).max(64) });

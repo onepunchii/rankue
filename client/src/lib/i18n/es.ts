@@ -3928,5 +3928,12 @@ const es: Dict = {
   "case.entryGuest": "Colecciona 77 tacos, tizas y guantes",
   "case.entryCounts": "Tacos {c} · tizas {k} · guantes {g}",
   "case.entryOpen": "Tus partidas pasadas quizá ya lo llenaron: échale un vistazo",
+  "case.rackTitle": "Taquera del crew",
+  "case.rackOwned": "Tacos del crew {n}/{m}",
+  "case.rackHint": "Aquí cuelga el taco insignia de cada miembro: toca para ver su estuche",
+  "case.rackEmpty": "Aún no hay tacos: una partida oficial u online cuelga el primero",
+  "case.rackCount": "{n} tacos",
+  "case.rackMore": "Ver todos ({n})",
+  "case.rackLess": "Ver menos",
 };
 export default es;

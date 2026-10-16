@@ -3928,5 +3928,12 @@ const vi: Dict = {
   "case.entryGuest": "Sưu tầm 77 cây cơ, phấn và găng tay",
   "case.entryCounts": "Cơ {c} · phấn {k} · găng {g}",
   "case.entryOpen": "Các trận trước có thể đã lấp đầy — mở xem nhé",
+  "case.rackTitle": "Giá cơ của nhóm",
+  "case.rackOwned": "Cơ của nhóm {n}/{m}",
+  "case.rackHint": "Cơ đại diện của từng thành viên được treo ở đây — chạm để xem hộp cơ",
+  "case.rackEmpty": "Chưa có cơ nào — một trận chính thức hoặc online là có cây đầu tiên",
+  "case.rackCount": "{n} cơ",
+  "case.rackMore": "Xem tất cả ({n})",
+  "case.rackLess": "Thu gọn",
 };
 export default vi;

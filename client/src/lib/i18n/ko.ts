@@ -3938,4 +3938,11 @@ export const ko: Dict = {
   "case.entryGuest": "큐 77자루 · 초크 · 장갑을 모아 보세요",
   "case.entryCounts": "큐 {c} · 초크 {k} · 장갑 {g}",
   "case.entryOpen": "지난 경기로 들어온 것이 있을 거예요 — 열어 보세요",
+  "case.rackTitle": "크루 큐 랙",
+  "case.rackOwned": "크루가 모은 큐 {n}/{m}",
+  "case.rackHint": "크루원 각자 고른 대표 큐가 걸려요. 누르면 그 사람의 큐 케이스",
+  "case.rackEmpty": "아직 걸린 큐가 없어요. 공식 경기나 온라인 대전 한 판이면 첫 큐가 걸려요",
+  "case.rackCount": "큐 {n}",
+  "case.rackMore": "모두 보기 ({n}명)",
+  "case.rackLess": "접기",
 };

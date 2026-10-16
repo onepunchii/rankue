@@ -275,6 +275,39 @@ export class CueCaseRepository {
         } catch (e) { if (!missingTable(e)) throw e; }
     }
 
+    /**
+     * 크루 큐 랙(기획 6.2) — 당구 크루 홈 벽에 크루원 각자의 대표 큐가 나란히 걸린다. 새 그림 없이 큐 케이스의 것을 쓴다.
+     * 승인 대기 · 탈퇴한 회원은 빼고, 대표 큐 규칙은 큐 케이스 · 게임과 같다(고른 것, 없으면 가장 최근에 받은 큐).
+     * owned = 크루가 모은 서로 다른 큐의 수(크루 전체 수집률). 당구 크루가 아니면 null.
+     */
+    async crewRack(crewId: string): Promise<{ members: { id: string; name: string; cue: string | null; cues: number }[]; owned: number } | null> {
+        const [crew] = (await db.execute(sql`select sport_category from hiq_crews where id = ${crewId}`)).rows as { sport_category: string }[];
+        if (!crew || crew.sport_category !== "BILLIARDS") return null;
+        try {
+            const rows = (await db.execute(sql`
+                select m.id, m.name, m.phone,
+                       coalesce(
+                         (select p.hero_item from hiq_cue_case_prefs p join hiq_cue_case_awards a on a.member_id = p.member_id and a.item_id = p.hero_item where p.member_id = m.id),
+                         (select a.item_id from hiq_cue_case_awards a where a.member_id = m.id and a.item_id like 'cue-%' order by a.earned_at desc, a.item_id limit 1)) as hero,
+                       (select count(*) from hiq_cue_case_awards a where a.member_id = m.id and a.item_id like 'cue-%')::int as cues
+                from hiq_crew_members cm join hiq_members m on m.id = cm.member_id
+                where cm.crew_id = ${crewId} and cm.role <> 'pending'
+                order by cues desc, cm.joined_at`)).rows as Record<string, unknown>[];
+            const [own] = (await db.execute(sql`
+                select count(distinct a.item_id)::int as n from hiq_cue_case_awards a
+                join hiq_crew_members cm on cm.member_id = a.member_id and cm.crew_id = ${crewId} and cm.role <> 'pending'
+                where a.item_id like 'cue-%'`)).rows as { n: number }[];
+            const members = rows.filter((r) => !isWithdrawnMember({ phone: r.phone })).map((r) => {
+                const hero = typeof r.hero === "string" && caseItem(r.hero)?.kind === "cue" ? r.hero : null;
+                return { id: String(r.id), name: String(r.name ?? ""), cue: hero, cues: n(r.cues) };
+            });
+            return { members, owned: n(own?.n) };
+        } catch (e) {
+            if (!missingTable(e)) throw e;
+            return { members: [], owned: 0 };
+        }
+    }
+
     /** 대표 큐 고르기 — 받은 큐만. 고르면 true */
     async setHero(memberId: string, itemId: string): Promise<boolean> {
         const x = caseItem(itemId);
