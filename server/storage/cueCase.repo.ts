@@ -28,7 +28,7 @@ const SYNC_MS = 15 * 60_000;
 const syncedAt = new Map<string, number>();
 let holders: { at: number; by: Map<string, number> } | null = null;
 
-export interface CueCaseItemView { done: boolean; at: number | null; got: number | null; bars: Bar[]; soon?: boolean; holders: number }
+export interface CueCaseItemView { done: boolean; at: number | null; got: number | null; bars: Bar[]; soon?: boolean; holders: number; /** 내가 몇 번째 주인인가(받은 것만) */ serial?: number | null }
 export interface CueCaseView {
     member: { id: string; name: string; country: string | null; mine: boolean };
     hero: string | null;
@@ -41,6 +41,30 @@ export interface CueCaseView {
     online: boolean;
     /** 실전 다마(메달 칸의 둥근 다마 메달) */
     handi: { "3c": number | null; "4c": number | null };
+}
+
+/**
+ * 받은 기록 한 줄 — 번호(serial)는 그 물건의 지금 가장 큰 번호 + 1. 이미 있으면 아무것도 안 한다(null).
+ * 같은 때 둘이 같은 번호를 잡으면(고유 묶음 23505 — item_id+serial) 다시 센다. 번호는 한 번 정하면 바꾸지 않는다.
+ * 받은 때는 UTC 글자로 넘긴다 — 날 sql 에 Date 를 그대로 넣으면 9시간 밀린다(chat 리뷰 때의 함정).
+ */
+async function insertAward(memberId: string, itemId: string, earnedAt: Date): Promise<{ itemId: string; earned: number; created: number; serial: number } | null> {
+    for (let attempt = 0; attempt < 5; attempt++) {
+        try {
+            const rows = (await db.execute(sql`
+                insert into hiq_cue_case_awards (member_id, item_id, earned_at, serial)
+                select ${memberId}, ${itemId}, (${earnedAt.toISOString()}::timestamptz at time zone 'UTC'), coalesce(max(serial), 0) + 1 from hiq_cue_case_awards where item_id = ${itemId}
+                on conflict (member_id, item_id) do nothing
+                returning item_id, extract(epoch from earned_at) * 1000 as earned, extract(epoch from created_at) * 1000 as created, serial`)).rows as Record<string, unknown>[];
+            const r = rows[0];
+            return r ? { itemId: String(r.item_id), earned: n(r.earned), created: n(r.created), serial: n(r.serial) } : null;
+        } catch (e) {
+            const code = (e as { code?: string } | null)?.code;
+            if (code === "23505" && attempt < 4) continue;
+            throw e;
+        }
+    }
+    return null;
 }
 
 export class CueCaseRepository {
@@ -172,13 +196,13 @@ export class CueCaseRepository {
         const entries = (await db.execute(sql`
             select extract(epoch from c.starts_at) * 1000 as at from hiq_sim_cup_entries e join hiq_sim_cups c on c.id = e.cup_id where e.member_id = ${memberId}`)).rows as Record<string, unknown>[];
 
-        let ledger: { item_id: string; earned: number; created: number }[] = [];
+        let ledger: { item_id: string; earned: number; created: number; serial: number | null }[] = [];
         let hasLedger = true;
         try {
             ledger = ((await db.execute(sql`
-                select item_id, extract(epoch from earned_at) * 1000 as earned, extract(epoch from created_at) * 1000 as created
+                select item_id, extract(epoch from earned_at) * 1000 as earned, extract(epoch from created_at) * 1000 as created, serial
                 from hiq_cue_case_awards where member_id = ${memberId}`)).rows as Record<string, unknown>[])
-                .map((r) => ({ item_id: String(r.item_id), earned: n(r.earned), created: n(r.created) }));
+                .map((r) => ({ item_id: String(r.item_id), earned: n(r.earned), created: n(r.created), serial: r.serial == null ? null : n(r.serial) }));
         } catch (e) {
             if (!missingTable(e)) throw e;
             hasLedger = false;
@@ -198,11 +222,11 @@ export class CueCaseRepository {
         const have = new Map(ledger.map((l) => [l.item_id, l]));
         const fresh = CASE_ITEMS.filter((x) => isLive(x) && states[x.id]?.done && !have.has(x.id));
         if (hasLedger && fresh.length > 0) {
-            const wrote = await db.insert(hiqCueCaseAwards)
-                .values(fresh.map((x) => ({ memberId, itemId: x.id, earnedAt: new Date(states[x.id].at ?? nowMs) })))
-                .onConflictDoNothing()
-                .returning({ itemId: hiqCueCaseAwards.itemId, earnedAt: hiqCueCaseAwards.earnedAt, createdAt: hiqCueCaseAwards.createdAt });
-            for (const w of wrote as { itemId: string; earnedAt: Date; createdAt: Date }[]) have.set(w.itemId, { item_id: w.itemId, earned: ms(w.earnedAt), created: ms(w.createdAt) });
+            // 받은 때가 이른 것부터 번호를 받는다(옛 기록으로 한꺼번에 들어와도 순서가 선다)
+            for (const x of [...fresh].sort((a, b) => (states[a.id].at ?? nowMs) - (states[b.id].at ?? nowMs))) {
+                const w = await insertAward(memberId, x.id, new Date(states[x.id].at ?? nowMs));
+                if (w) have.set(w.itemId, { item_id: w.itemId, earned: w.earned, created: w.created, serial: w.serial });
+            }
         }
         const counts = await this.holderCounts(fresh.length > 0);
 
@@ -211,7 +235,7 @@ export class CueCaseRepository {
             const s = states[x.id] ?? { done: false, at: null, bars: [] };
             const l = have.get(x.id);
             items[x.id] = l
-                ? { done: true, at: l.earned, got: l.created, bars: s.bars, holders: counts.get(x.id) ?? 1 }
+                ? { done: true, at: l.earned, got: l.created, bars: s.bars, holders: counts.get(x.id) ?? 1, serial: l.serial }
                 : { done: !hasLedger && s.done, at: !hasLedger ? s.at : null, got: null, bars: s.bars, ...(s.soon ? { soon: true } : {}), holders: counts.get(x.id) ?? 0 };
         }
 
@@ -271,7 +295,7 @@ export class CueCaseRepository {
     async awardNow(memberId: string, itemId: string, at: Date): Promise<void> {
         if (!caseItem(itemId)) return;
         try {
-            await db.insert(hiqCueCaseAwards).values({ memberId, itemId, earnedAt: at }).onConflictDoNothing();
+            await insertAward(memberId, itemId, at);
         } catch (e) { if (!missingTable(e)) throw e; }
     }
 

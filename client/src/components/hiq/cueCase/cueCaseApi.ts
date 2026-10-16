@@ -9,7 +9,7 @@ import type { Bar } from "@shared/cueCaseRules";
 
 export type CaseSection = "cue" | "chalk" | "glove" | "medals";
 export const CASE_SECTIONS: readonly CaseSection[] = ["cue", "chalk", "glove", "medals"];
-export interface CaseItemView { done: boolean; at: number | null; got: number | null; bars: Bar[]; soon: boolean; holders: number }
+export interface CaseItemView { done: boolean; at: number | null; got: number | null; bars: Bar[]; soon: boolean; holders: number; /** 내가 몇 번째 주인인가(받은 것만) */ serial: number | null }
 export interface CueCaseView {
     member: { id: string; name: string; country: string | null; mine: boolean };
     hero: string | null;
@@ -47,7 +47,7 @@ export function parseCueCase(raw: unknown): CueCaseView {
         out[x.id] = {
             done: v.done === true, at: num(v.at), got: num(v.got),
             bars: (Array.isArray(v.bars) ? v.bars.map(bar) : []).filter((b): b is Bar => b !== null),
-            soon: v.soon === true, holders: Math.max(0, num(v.holders) ?? 0),
+            soon: v.soon === true, holders: Math.max(0, num(v.holders) ?? 0), serial: v.done === true ? num(v.serial) : null,
         };
     }
     const hero = typeof o.hero === "string" && out[o.hero]?.done ? o.hero : null;
@@ -85,3 +85,6 @@ export async function fetchCaseSummary(): Promise<CaseSummary> {
 export const useCaseSummary = (enabled: boolean) => useQuery({ queryKey: CASE_SUMMARY_KEY, queryFn: fetchCaseSummary, enabled, staleTime: 60_000, retry: false });
 /** 큐 id → 큐대 손잡이 그림 주소(목록에 없으면 null) */
 export const cueSkinUrl = (id: string | null | undefined): string | null => { const x = id ? caseItem(id) : null; return x && x.kind === "cue" ? caseImage(x) : null; };
+
+/** 번호 글자 — "No.007"(천 넘으면 그대로) */
+export const serialText = (n: number): string => `No.${n < 1000 ? String(n).padStart(3, "0") : String(n)}`;

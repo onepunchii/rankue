@@ -25,11 +25,12 @@ import { shareBlob } from "@/sim/share/useShare";
 import { canvasToBlob } from "@/sim/share/shareCard";
 import { renderCaseCard } from "@/components/hiq/cueCase/caseCard";
 import { CASE_ITEMS, CHALKS, CUES, GLOVES, PEOPLE_STEPS, caseImage, caseItem, cueHow, difficulty, type CaseItem, type CaseLocale, type CueGroup } from "@shared/cueCase";
+import { serialText } from "@/components/hiq/cueCase/cueCaseApi";
 import { CASE_SECTIONS, CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, fetchCueCase, readCaseSeen, saveHero, writeCaseSeen, type CaseItemView, type CaseSection, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
 
 const LOCALES: readonly CaseLocale[] = ["ko", "en", "es", "vi", "tr"];
 const asLocale = (l: string): CaseLocale => (LOCALES as readonly string[]).includes(l) ? (l as CaseLocale) : "en";
-const EMPTY: CaseItemView = { done: false, at: null, got: null, bars: [], soon: false, holders: 0 };
+const EMPTY: CaseItemView = { done: false, at: null, got: null, bars: [], soon: false, holders: 0, serial: null };
 const GROUP_KEY: Record<CueGroup, string> = { real: "case.group.real", online: "case.group.online", common: "case.group.common", both: "case.group.both", crew: "case.group.crew", stage2: "case.group.stage2" };
 /** 크루 · 원정은 아직 열리지 않아 한 칸에 모은다 */
 const TAB_GROUPS: readonly CueGroup[] = ["real", "online", "common", "both", "crew"];
@@ -89,7 +90,7 @@ export default function CueCasePage() {
             const canvas = await renderCaseCard({
                 plate: t("case.ownerTitle").replace("{name}", d.member.name),
                 counts: ([["cue", CUES], ["chalk", CHALKS], ["glove", GLOVES]] as const).map(([k, list]) => [t(`case.count.${k}`), `${list.filter((x) => it(x.id).done).length}/${list.length}`] as const),
-                cues: owned, cueName: (x) => x.name[l], more: (n) => t("case.newMore").replace("{n}", String(n)),
+                cues: owned, cueName: (x) => { const sn = it(x.id).serial; return sn ? `${x.name[l]} · ${serialText(sn)}` : x.name[l]; }, more: (n) => t("case.newMore").replace("{n}", String(n)),
                 footer: t("case.cardFooter"), url: "rankue.co.kr/cue-case",
             });
             const blob = await canvasToBlob(canvas);
@@ -392,8 +393,11 @@ function CueRow({ item, view, l, isNew, onOpen, tour }: { item: CaseItem; view: 
                         {item.online && <span className="ml-1.5 align-[1px] text-[11.5px] font-semibold text-[#46e4e0]">{t("case.onlineMark")}</span>}
                         {isNew && <span className="ml-1.5 rounded-full bg-[color:var(--cc-gold)] px-1.5 py-[1px] align-[1px] text-[11.5px] font-bold text-[#2d1a08]">{t("case.new")}</span>}
                     </span>
-                    <span className="rk-num shrink-0 text-[12px] text-white/50">
-                        {view.done && view.at ? fmtDate(view.at, locale) : view.soon ? t("case.soon") : ""}
+                    <span className="rk-num flex shrink-0 items-center gap-1.5 text-[12px] text-white/50">
+                        {view.done && view.serial ? <span className="cc-serial cc-serial-sm" data-testid="cue-case-row-serial">{serialText(view.serial)}</span>
+                            : view.done && view.at ? fmtDate(view.at, locale)
+                                : view.soon ? t("case.soon")
+                                    : view.holders > 0 ? t("case.rowHolders").replace("{n}", String(view.holders)) : ""}
                     </span>
                 </span>
                 {!view.done && <span className="mt-0.5 block px-1 text-[12.5px] leading-snug text-white/55 break-keep">{cueHow(item, l)}</span>}
@@ -470,11 +474,11 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
             <h2 className="mt-0.5 text-[20px] font-bold tracking-tight text-white">{itemName(item, view, l, t)}</h2>
             <p className="mt-2 flex items-center gap-2 text-[12.5px] text-white/60" data-testid="cue-case-difficulty">
                 <span>{t("case.difficulty")}</span><StarRow n={difficulty(item)} size={16} />
-                <span className="rk-num text-white/45">{view.holders > 0 ? t("case.holders").replace("{n}", String(view.holders)) : t("case.holdersNone")}</span>
             </p>
+            {!view.soon && <OwnerPlate view={view} />}
             <p className="mt-2 text-[13.5px] leading-relaxed text-white/75 break-keep" data-testid="cue-case-how">{cueHow(item, l, view.done)}</p>
             {view.done && view.at ? (
-                <p className="rk-num mt-3 text-[13px] text-white/60">{t("case.got").replace("{date}", fmtDate(view.at, locale))}{view.holders === 1 ? ` · ${t("case.holdersOnly")}` : ""}</p>
+                <p className="rk-num mt-3 text-[13px] text-white/60">{t("case.got").replace("{date}", fmtDate(view.at, locale))}</p>
             ) : view.soon ? (
                 <p className="mt-3 text-[13px] text-white/60">{t("case.soonDesc")}</p>
             ) : (
@@ -490,6 +494,29 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
                         className="mt-4 h-12 w-full rounded-full bg-[color:var(--cc-gold)] text-[14px] font-semibold text-[#2d1a08] active:opacity-90 disabled:opacity-60">{t("case.heroPick")}</button>
             )}
         </Sheet>
+    );
+}
+
+/**
+ * 주인 패(2026-10-16 오너: "가진 사람도 중요하네 … 총 몇 명이 가지고 넘버링처럼") — 놋쇠 번호판 + 가진 사람 수.
+ * 받았으면 내 번호(몇 번째 주인), 아직이면 받으면 받을 번호. 번호는 한 번 정하면 바뀌지 않는다(서버가 적힌 순서로 매긴다).
+ */
+function OwnerPlate({ view }: { view: CaseItemView }) {
+    const { t } = useT();
+    const mine = view.done && view.serial;
+    const next = view.holders + 1;
+    return (
+        <div className="mt-4 flex items-center gap-3 rounded-2xl bg-black/30 px-3.5 py-3 ring-1 ring-[color:var(--cc-gold)]/25" data-testid="cue-case-owner-plate">
+            <span className={cn("cc-serial rk-num", !mine && "cc-serial-next")}>{serialText(mine ? view.serial! : next)}</span>
+            <span className="min-w-0 flex-1">
+                <span className="block text-[15px] font-semibold text-white">
+                    {view.holders > 0 ? t("case.holders").replace("{n}", String(view.holders)) : t("case.holdersNone")}
+                </span>
+                <span className="mt-0.5 block text-[12.5px] leading-snug text-white/60 break-keep">
+                    {mine ? (view.serial === 1 ? t("case.serialFirst") : t("case.serialMine").replace("{n}", String(view.serial))) : t("case.serialNext").replace("{no}", serialText(next))}
+                </span>
+            </span>
+        </div>
     );
 }
 

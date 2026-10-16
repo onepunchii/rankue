@@ -11,6 +11,7 @@ import {
   date,
   varchar,
   index,
+  uniqueIndex,
   primaryKey,
   bigint, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
@@ -2469,9 +2470,12 @@ export const hiqCueCaseAwards = pgTable("hiq_cue_case_awards", {
   itemId: text("item_id").notNull(),
   earnedAt: timestamp("earned_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  /** 몇 번째 주인인가(2026-10-16 오너: "총 몇 명이 가지고 넘버링처럼") — 적힌 순서. 한 번 정하면 바꾸지 않는다(migrations/cue_case_serial.sql) */
+  serial: integer("serial"),
 }, (t) => ({
   uniq: unique("hiq_cue_case_awards_member_item_unique").on(t.memberId, t.itemId),
   idxItem: index("hiq_cue_case_awards_item_idx").on(t.itemId),
+  uniqSerial: uniqueIndex("hiq_cue_case_awards_item_serial_unique").on(t.itemId, t.serial),
 }));
 
 /** 큐 케이스 — 대표 큐(맨 위에 크게 · 나중에 크루 큐 랙). 받은 큐 가운데서만 고른다 */

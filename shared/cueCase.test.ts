@@ -168,7 +168,7 @@ describe("연결", () => {
         expect(sql).toContain("constraint hiq_cue_case_awards_member_item_unique unique (member_id, item_id)");
         expect(sql).toContain("create table if not exists hiq_cue_case_prefs");
         const repo = read("server/storage/cueCase.repo.ts");
-        expect(repo).toContain(".onConflictDoNothing()");
+        expect(repo).toContain("on conflict (member_id, item_id) do nothing");
         expect(repo).not.toMatch(/\.update\(hiqCueCaseAwards\)|delete\(hiqCueCaseAwards\)/);
         // 온라인은 이달의 랭킹 · 장식장과 같은 목록(레이팅 반영 대전)
         expect(read("server/storage/index.ts")).toContain("public cueCase = new CueCaseRepository(() => this.simMatch.ratedDeltas());");
@@ -235,8 +235,22 @@ describe("연결", () => {
         const keys = ["plate", "hero", "month", "secs", "groups", "row", "share", "people", "chalk", "glove", "realMedal", "onlineShelf"].flatMap((k) => [`tour.cc.${k}Title`, `tour.cc.${k}Body`]);
         for (const l of LOCALES) { const f = read(`client/src/lib/i18n/${l}.ts`); for (const k of keys) expect(f, `${l} ${k}`).toContain(`"${k}":`); }
     });
+    it("넘버링(2026-10-16 오너: \"총 몇 명이 가지고 넘버링처럼\") — 받은 순서의 번호, 한 번 정하면 그대로", () => {
+        const mig = read("migrations/cue_case_serial.sql");
+        expect(mig).toContain("alter table hiq_cue_case_awards add column if not exists serial integer;");
+        expect(mig).toContain("create unique index if not exists hiq_cue_case_awards_item_serial_unique on hiq_cue_case_awards (item_id, serial);");
+        const repo = read("server/storage/cueCase.repo.ts");
+        expect(repo).toContain("coalesce(max(serial), 0) + 1 from hiq_cue_case_awards where item_id = ${itemId}");
+        expect(repo).toContain('if (code === "23505" && attempt < 4) continue;');
+        expect(repo).toContain("::timestamptz at time zone 'UTC')");
+        expect(repo).not.toMatch(/update hiq_cue_case_awards|set serial/);
+        const page = read("client/src/pages/hiq/cue-case.tsx");
+        expect(page).toContain('data-testid="cue-case-owner-plate"');
+        expect(page).toContain('data-testid="cue-case-row-serial"');
+        expect(read("client/src/components/hiq/cueCase/cueCaseApi.ts")).toContain('export const serialText = (n: number): string => `No.${n < 1000 ? String(n).padStart(3, "0") : String(n)}`;');
+    });
     it("문구가 다섯 언어에 있고 자리 표시를 지킨다", () => {
-        const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"] };
+        const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"], "case.serialMine": ["{n}"], "case.serialNext": ["{no}"], "case.rowHolders": ["{n}"] };
         const page = read("client/src/pages/hiq/cue-case.tsx") + read("client/src/components/hiq/cueCase/CueCaseEntry.tsx") + read("client/src/components/hiq/cueCase/CrewCueRack.tsx");
         const used = [...new Set([...page.matchAll(/t\(["`](case\.[a-zA-Z.]+)["`]\)/g)].map((m) => m[1]))];
         expect(used.length).toBeGreaterThan(40);
