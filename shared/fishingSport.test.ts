@@ -47,6 +47,11 @@ describe("낚시 — 따로 선 종목", () => {
         const tank = read("client/src/fishing/FishingAquarium.tsx");
         expect(tank).not.toContain('from "three"');
         expect(tank).toContain("export function isNightKst(ms = Date.now()): boolean {");
+        // 수조의 동작 — 물을 누르면 먹이 셋 · 물고기를 누르면 놀란 뒤 그 어종의 한 장 · 처음 보는 어종은 위에서 물보라와 함께
+        expect(tank).toContain("foodRef.current.push(...[-9, 0, 9].map((dx, i) => ({ x: x + dx, y: y + (i === 1 ? -4 : 0), born: now })));");
+        expect(tank).toContain("window.setTimeout(() => onFish?.(hit.id), 320);");
+        expect(tank).toContain('const SEEN_KEY = "rankue.fishing.tank.seen";');
+        expect(tank).not.toContain("roundRect(");
         expect(page).toContain('{(tab === "tank" || tab === "book") && (');
         expect(page).toContain('<FishingAquarium list={empty ? [] : list} mini onOpen={() => setTab("tank")} />');
         expect(page).toContain('testid="fishing-tools"');
