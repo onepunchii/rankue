@@ -37,6 +37,7 @@ import BilliardsCaseView from "./BilliardsCaseView";
 import BilliardsCupView from "./BilliardsCupView";
 import HikingSummitsView from "./HikingSummitsView";
 import HikingMountainsView from "./HikingMountainsView";
+import HikingOverviewView from "./HikingOverviewView";
 // 굿즈 · 배지(2026-10-16) — 네 종목 목록(골프 · 등산 도장첩 표 포함)을 끌어와서 따로 불러온다(첫 화면 묶음을 무겁게 하지 않게)
 const GoodsView = lazy(() => import("./GoodsView"));
 import CrewsView from "./CrewsView";
@@ -66,10 +67,10 @@ type GlobalStats = {
 };
 
 type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
-    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-summits" | "hiking-mountains" | "hiking-photos";
+    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-overview" | "hiking-summits" | "hiking-mountains" | "hiking-photos";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-summits", "hiking-mountains", "hiking-photos"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos"] as const;
 
 // --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
 // 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
@@ -105,6 +106,7 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
     ] },
     // 등산(2026-10-17 어드민 전수 조사) — 정상 인증 감사 · 취소, 산 자료(정상 자리 고치기 · 다시 적재해도 남음)
     { title: "등산", items: [
+        { id: "hiking-overview", label: "등산 현황", icon: LucideBarChart3 },
         { id: "hiking-summits", label: "정상 인증", icon: LucideMapPin },
         { id: "hiking-mountains", label: "산 자료", icon: LucideTrendingUp },
         { id: "hiking-photos", label: "산행 사진", icon: LucideCamera },
@@ -476,6 +478,7 @@ export default function AdminDashboard() {
                     {tab === "billiards-cup" && <BilliardsCupView />}
                     {tab === "billiards-case" && <BilliardsCaseView onOpenMember={setOpenMemberId} />}
                     {tab === "billiards-invites" && <BilliardsInvitesView onOpenMember={setOpenMemberId} />}
+                    {tab === "hiking-overview" && <HikingOverviewView />}
                     {tab === "hiking-summits" && <HikingSummitsView onOpenMember={setOpenMemberId} />}
                     {tab === "hiking-mountains" && <HikingMountainsView />}
                     {tab === "hiking-photos" && <GolfPhotosView kind="hiking" onOpenMember={setOpenMemberId} />}
@@ -501,6 +504,7 @@ function getTabTitle(tab: string) {
         case "billiards-cup": return "월대회";
         case "billiards-case": return "큐 케이스";
         case "billiards-invites": return "친구 초대";
+        case "hiking-overview": return "등산 현황";
         case "hiking-summits": return "정상 인증";
         case "hiking-mountains": return "산 자료";
         case "hiking-photos": return "산행 사진";
@@ -538,6 +542,7 @@ const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     "billiards-case": "받은 큐 · 초크 · 장갑을 지금 기록과 맞춰 봅니다 — 지운 경기 · 무효로 한 판으로 받은 것만 거둘 수 있어요.",
     "hiking-photos": "산 페이지에 바로 뜨는 공개 산행 사진 전부 — 가리기 · 다시 보이기 · 이의제기 판정 · 지우기(신고 큐와 같은 처리 기록).",
     "hiking-mountains": "100대 명산 점검표 — 코스가 정상 150m 안을 지나는가. 산을 열어 코스 위 가장 높은 곳을 보고 정상 자리 · 높이 · 정상 이름을 고칩니다(다시 적재해도 남음).",
+    "hiking-overview": "정상 인증 · 기록 · 산행 · 사진의 합계와 30일, 많이 오른 산, 산악회, 산행 전날 저녁 브리핑이 나갔는지.",
     "hiking-summits": "정상 인증 전부 — 하루에 너무 많은 곳 · 산과 산 사이를 너무 빨리 옮긴 인증을 골라 보고, 필요하면 인증을 취소하고 와펜을 거둡니다.",
     "billiards-invites": "초대로 든 가입 전부 — 경기 없는 가입 · 한 시간에 몰린 초대를 다시 보고, 필요하면 초대를 취소하고 보상을 거둡니다.",
     "billiards-games": "끝난 당구 경기 전부 — 이상 표시(한 이닝 고득점 · 평소의 몇 배 · 같은 둘이 하루 여러 판)로 다시 볼 것을 고릅니다.",

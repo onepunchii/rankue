@@ -10,6 +10,8 @@
  * POST /admin/hiking/mountains/:id { lat, lng, heightM, peakName, reason }  고치기 — admin_keep 에 적혀 다시 적재해도 남는다, 코스의 정상 자리(summit_km)도 다시 셈
  * GET /admin/hiking/photos?filter=public|hidden|appealed|all&course=&days=   산행 사진 전부(storage/adminHikingPhotos — 골프 라운드 사진과 같은 모양)
  * POST /admin/hiking/photos/:id/hide { hidden } · /:id/appeal { decision, note } · DELETE /:id   신고 큐와 같은 실행기(targetType 'hiking_photo')
+ * GET /admin/hiking/overview                              현황 — 합계 · 30일 · 많이 오른 산 · 산악회(다음 산행 · 함께 정상) · 전날 브리핑 실행 기록
+ * GET /admin/hiking/eve-preview                           오늘 저녁 브리핑에 무엇이 갈지(보내지 않고 세기만 — services/hikingEve dry)
  * 운영자가 '굿즈 · 배지'로 증정한 것은 거두지 않는다(증정 기록이 따로 있다). 까닭은 작업 기록에 남는다(가드).
  */
 import { Router } from "express";
@@ -26,6 +28,9 @@ import { applyModerationAction } from "../../services/moderation.js";
 import { adminLog } from "../../middleware/adminAuth.js";
 import * as hikingPhotos from "../../storage/hikingPhotos.js";
 import type { ModerationAction } from "../../lib/reportQueue.js";
+import { crewSummits } from "../../storage/hikingStamps.js";
+import { recentCronRuns } from "../../storage/cronRuns.js";
+import { fillDays, type HikingOverview } from "../../../shared/hikingOverview.js";
 import { listSummits, syncHikingAwards } from "../../storage/hikingStamps.js";
 import { isWithdrawnMember } from "../../../shared/chatSupport.js";
 import { goodsItem } from "../../../shared/goods.js";
@@ -249,5 +254,65 @@ router.post("/photos/:id/appeal", asyncHandler(async (req: any, res: any) => {
 }));
 
 router.delete("/photos/:id", asyncHandler(async (req: any, res: any) => photoAct(req, res, "delete", "hiking_photo_delete")));
+
+// ── 현황 ─────────────────────────────────────────────────────────────────
+const safeRows = async (q: ReturnType<typeof sql>) => { try { return rowsOf(await db.execute(q)); } catch (e: any) { if (["42P01", "42703"].includes(e?.code ?? e?.cause?.code)) return []; throw e; } };
+const kstToday = () => new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10);
+
+router.get("/overview", asyncHandler(async (_req: any, res: any) => {
+    const [[t], [p], [a], [mem], [cr]] = await Promise.all([
+        safeRows(sql`select count(*) filter (where verified)::int as summits, count(distinct member_id) filter (where verified)::int as summit_members,
+            count(*) filter (where not verified)::int as records,
+            (select count(*)::int from hiking_trips) as trips, (select count(*) filter (where reached_summit)::int from hiking_trips) as reached from hiking_summits`),
+        safeRows(sql`select count(*)::int as photos, count(*) filter (where is_public and hidden_at is null)::int as public, count(*) filter (where hidden_at is not null)::int as hidden from hiking_photos`),
+        safeRows(sql`select count(*)::int as n from hiking_awards`),
+        safeRows(sql`select count(*)::int as n from hiq_members where primary_sport = 'HIKING' and phone not like 'del-%'`),
+        safeRows(sql`select count(*)::int as crews, (select count(*)::int from hiq_crew_members cm join hiq_crews c2 on c2.id = cm.crew_id where c2.sport_category = 'HIKING' and cm.role <> 'pending') as members from hiq_crews where sport_category = 'HIKING'`),
+    ]);
+    const since = new Date(Date.now() - 31 * 86_400_000).toISOString();
+    const KDAY = (col: string) => sql.raw(`to_char(${col} + interval '9 hours', 'YYYY-MM-DD')`);
+    const [sd, td, pd] = await Promise.all([
+        safeRows(sql`select ${KDAY("at")} as day, count(*) filter (where verified)::int as summits, count(*) filter (where not verified)::int as records from hiking_summits where at >= (${since}::timestamptz at time zone 'UTC') group by 1`),
+        safeRows(sql`select ${KDAY("started_at")} as day, count(*)::int as n from hiking_trips where started_at >= (${since}::timestamptz at time zone 'UTC') group by 1`),
+        safeRows(sql`select ${KDAY("created_at")} as day, count(*)::int as n from hiking_photos where created_at >= (${since}::timestamptz at time zone 'UTC') group by 1`),
+    ]);
+    const merged = new Map<string, { day: string; summits: number; records: number; trips: number; photos: number }>();
+    const at = (day: string) => { let x = merged.get(day); if (!x) { x = { day, summits: 0, records: 0, trips: 0, photos: 0 }; merged.set(day, x); } return x; };
+    for (const r of sd) { const x = at(String(r.day)); x.summits = Number(r.summits) || 0; x.records = Number(r.records) || 0; }
+    for (const r of td) at(String(r.day)).trips = Number(r.n) || 0;
+    for (const r of pd) at(String(r.day)).photos = Number(r.n) || 0;
+    const mountains = await safeRows(sql`select s.mountain_id as id, hm.name, hm.slug, count(*) filter (where s.verified)::int as summits, count(*) filter (where not s.verified)::int as records
+        from hiking_summits s join hiking_mountains hm on hm.id = s.mountain_id where s.at >= (${since}::timestamptz at time zone 'UTC')
+        group by 1, 2, 3 order by count(*) filter (where s.verified) desc, count(*) desc limit 10`);
+    const crews = await safeRows(sql`select c.id, c.name,
+            (select count(*)::int from hiq_crew_members cm where cm.crew_id = c.id and cm.role <> 'pending') as members,
+            (select json_build_object('title', a.title, 'at', to_char(a.activity_date, 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), 'mountain', hm.name)
+               from hiq_crew_activities a left join hiking_mountains hm on hm.slug = a.mountain_slug
+               where a.crew_id = c.id and a.activity_date >= now() at time zone 'UTC' order by a.activity_date limit 1) as next,
+            (select to_char(max(a.activity_date), 'YYYY-MM-DD"T"HH24:MI:SS"Z"') from hiq_crew_activities a where a.crew_id = c.id and a.activity_date < now() at time zone 'UTC') as last_at
+        from hiq_crews c where c.sport_category = 'HIKING' order by members desc, c.created_at limit 60`);
+    const together = await Promise.all(crews.map((c) => crewSummits(String(c.id)).then((x) => x.length).catch(() => 0)));
+    const eve = await recentCronRuns("hiking_eve", 10);
+    const out: HikingOverview = {
+        totals: {
+            summits: Number(t?.summits) || 0, summitMembers: Number(t?.summit_members) || 0, records: Number(t?.records) || 0, trips: Number(t?.trips) || 0, reachedTrips: Number(t?.reached) || 0,
+            photos: Number(p?.photos) || 0, publicPhotos: Number(p?.public) || 0, hiddenPhotos: Number(p?.hidden) || 0, awards: Number(a?.n) || 0, primaryMembers: Number(mem?.n) || 0,
+            crews: Number(cr?.crews) || 0, crewMembers: Number(cr?.members) || 0,
+        },
+        days: fillDays([...merged.values()], kstToday(), 30, (day) => ({ day, summits: 0, records: 0, trips: 0, photos: 0 })),
+        mountains: mountains.map((m) => ({ id: String(m.id), name: String(m.name), slug: String(m.slug), summits: Number(m.summits) || 0, records: Number(m.records) || 0 })),
+        crews: crews.map((c, i) => ({ id: String(c.id), name: String(c.name), members: Number(c.members) || 0, next: c.next ? { title: String(c.next.title), at: String(c.next.at), mountain: c.next.mountain ?? null } : null, lastAt: c.last_at ?? null, together: together[i] })),
+        eveRuns: eve.map((r) => ({ at: r.at, ok: r.ok, trips: Number(r.result?.trips) || 0, people: Number(r.result?.people) || 0, sent: Number(r.result?.sent) || 0, failed: Number(r.result?.failed) || 0, error: typeof r.result?.error === "string" ? r.result.error : null })),
+    };
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, out);
+}));
+
+router.get("/eve-preview", asyncHandler(async (_req: any, res: any) => {
+    const { runHikingEve } = await import("../../services/hikingEve.js");
+    const r = await runHikingEve(Date.now(), { dry: true, force: true });
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, r);
+}));
 
 export default router;

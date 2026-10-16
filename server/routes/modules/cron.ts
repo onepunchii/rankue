@@ -41,23 +41,33 @@ router.get("/reminders", asyncHandler(async (req: any, res: any) => {
 // 월대회 굴리기(2026-10-12) — 기한이 지난 판의 기권을 가리고, 기한 하루 전인 판을 알린다. 매시 도는 리마인더에 얹는다(크론 항목을 늘리지 않는다).
 // 치르는 중인 대회가 없으면 표 하나를 읽고 끝난다. 여기서 터져도 리마인더의 응답은 깨지 않는다.
 async function cupQuietly(): Promise<unknown> {
+    const { recordCronRun, errorText } = await import("../../storage/cronRuns.js");
     try {
         const { rollCups, remindDue } = await import("../../services/simCupService.js");
         const rolled = await rollCups(Date.now());
-        return { ...rolled, reminded: await remindDue(Date.now()) };
+        const out = { ...rolled, reminded: await remindDue(Date.now()) };
+        // 치르는 중인 대회가 있을 때만 적는다(실행 기록 — 어드민 현황)
+        if (out.cups > 0 || out.reminded > 0) await recordCronRun("cup_roll", true, out);
+        return out;
     } catch (e) {
         console.error("[CupRoll]", e);
+        await recordCronRun("cup_roll", false, { error: errorText(e) });
         return { error: true };
     }
 }
 
 // 산행 전날 저녁 브리핑(2026-10-13) — 내일 산악회 산행에 가는 사람에게(services/hikingEve). 골프의 것과 같은 시간대, 같은 크론에 얹는다.
+// 보낼 시간(due)에 돈 것과 실패만 hiq_cron_runs 에 적는다 — 어드민 › 등산 › 현황이 '어젯밤 브리핑이 나갔나'를 본다
 async function hikingEveQuietly(): Promise<unknown> {
+    const { recordCronRun, errorText } = await import("../../storage/cronRuns.js");
     try {
         const { runHikingEve } = await import("../../services/hikingEve.js");
-        return await runHikingEve();
+        const out = await runHikingEve();
+        if (out.due) await recordCronRun("hiking_eve", out.failed === 0, out);
+        return out;
     } catch (e) {
         console.error("[HikingEve]", e);
+        await recordCronRun("hiking_eve", false, { error: errorText(e) });
         return { error: true };
     }
 }
@@ -72,11 +82,15 @@ async function handleHikingEve(req: any, res: any) {
 }
 
 async function golfEveQuietly(): Promise<unknown> {
+    const { recordCronRun, errorText } = await import("../../storage/cronRuns.js");
     try {
         const { runGolfRoundEve } = await import("../../services/golfRoundEve.js");
-        return await runGolfRoundEve();
+        const out = await runGolfRoundEve();
+        if (out.due) await recordCronRun("golf_eve", out.failed === 0, out);
+        return out;
     } catch (e) {
         console.error("[GolfRoundEve]", e);
+        await recordCronRun("golf_eve", false, { error: errorText(e) });
         return { error: true };
     }
 }
