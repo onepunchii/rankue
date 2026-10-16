@@ -18,9 +18,8 @@ import { getDevicePosition } from "@/hooks/useNativeBridge";
 import { cleanCoord } from "@shared/fishingSpot";
 import { FishingRanking } from "./FishingRanking";
 import { FishingGear } from "./FishingGear";
-const FishingAquarium = lazy(() => import("./FishingAquarium").then((m) => ({ default: m.FishingAquarium })));
 import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
-import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -50,12 +49,14 @@ import { BOAT_SOURCE, cleanBoatQuery, type FishingBoat } from "@shared/fishingBo
 import { RESERVOIR_MAX, RESERVOIR_SOURCE, cleanCountyQuery, isReservoirCode, reservoirTrend, type ReservoirRef, type ReservoirView } from "@shared/fishingReservoir";
 import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@shared/fishingStations";
 import { bestOf, durationKo, goodSpots, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type IndexMap, type IndexSpot, type PortBrief } from "@shared/fishingPort";
+import { FishingAquarium } from "./FishingAquarium";
 
 const KEY = ["/api/hiq/fishing/catches"];
 type Tab = "home" | "trip" | "book" | "log" | "points" | "guide" | "rules" | "rank" | "gear" | "tank";
 /** 화면마다 주소가 있다 — 홈은 공용 홈 주소(/dashboard)에서 종목이 낚시일 때 그려진다 */
 const TAB_PATH: Readonly<Record<Tab, string>> = { home: "/dashboard", trip: "/fishing/trip", book: "/fishing/book", log: "/fishing/log", points: "/fishing/points", guide: "/fishing/guide", rules: "/fishing/rules", rank: "/fishing/rank", gear: "/fishing/gear", tank: "/fishing/tank" };
-const TAB_TITLE: Readonly<Record<Tab, string>> = { home: "랭큐 낚시", trip: "출조", book: "어탁첩", log: "내 조과", points: "낚시터", guide: "어류 도감", rules: "낚시 규칙", rank: "어종 랭킹", gear: "내 장비", tank: "내 수조" };
+// 2026-10-16 오너가 고른 정리안: 오늘 바다(홈) · 크루 · 수족관(메인 — 수조 + 어탁첩) · 일지 · 채팅. 출조는 '바다 도구함'(홈의 맨 아래에서 들어간다)
+const TAB_TITLE: Readonly<Record<Tab, string>> = { home: "랭큐 낚시", trip: "바다 도구함", book: "수족관", log: "일지", points: "낚시터", guide: "어류 도감", rules: "낚시 규칙", rank: "어종 랭킹", gear: "내 장비", tank: "수족관" };
 /** 표지 그림(client/public/fishing/art) — 등산의 표지와 같은 손(판화)으로 그린 새벽 바다. 그림에는 글자가 없다 */
 /** 바다 일곱 곳의 표지(같은 손의 판화) */
 const seaCover = (id: string) => `/fishing/art/sea-${id}.webp`;
@@ -151,6 +152,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
     const near = useMemo(() => nearestPromotion(records), [records]);
     const trips = useMemo(() => new Set(list.map((c) => c.day)).size, [list]);
     const seals = useMemo(() => records.filter((r) => r.tier).length, [records]);
+    const sealMap = useMemo(() => new Map(records.filter((r) => r.tier).map((r) => [r.fish.id, r.tier!.name] as const)), [records]);
     const name = String(me?.nickname ?? me?.name ?? "");
     const top = shown[0] ?? null;
 
@@ -216,8 +218,8 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                                 <p className="text-[14px] break-keep" style={{ color: "#F3ECDDE6", textShadow: "0 1px 10px #0B1E2D" }}>{name ? `${name} 님, ` : ""}{empty ? "첫 조과를 적어 볼까요?" : "다음은 어느 물로 나갈까요?"}</p>
                                 <div className="mt-3 flex gap-2">
                                     <button type="button" onClick={() => setAdding(true)} className="flex h-12 flex-1 items-center justify-center rounded-xl text-[15px] font-semibold active:opacity-90" style={{ background: C.brand, color: C.onBrand }} data-testid="fishing-add" data-tour="fs-add">조과 적기</button>
-                                    <button type="button" onClick={() => setTab("book")} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#FFFFFF1F] text-[15px] font-medium active:bg-[#FFFFFF2E]" data-testid="fishing-to-book">어탁첩</button>
-                                    <button type="button" onClick={() => setTab("log")} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#FFFFFF1F] text-[15px] font-medium active:bg-[#FFFFFF2E]" data-testid="fishing-to-log">내 조과</button>
+                                    <button type="button" onClick={() => setTab("tank")} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#FFFFFF1F] text-[15px] font-medium active:bg-[#FFFFFF2E]" data-testid="fishing-to-tank">수족관</button>
+                                    <button type="button" onClick={() => setTab("log")} className="flex h-12 flex-1 items-center justify-center rounded-xl bg-[#FFFFFF1F] text-[15px] font-medium active:bg-[#FFFFFF2E]" data-testid="fishing-to-log">일지</button>
                                 </div>
                             </div>
                         </div>
@@ -227,12 +229,46 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             { target: "fs-fish", title: "어종을 고르면", body: "지도의 바다 칸이 그 어종의 오늘 낚시지수로 칠해져요." },
                             { target: "fs-map", title: "칸을 누르면", body: "그 바다의 어종 사진 · 파고 · 바람 · 수온 · 물때가 한 장으로 떠요. 두 손가락으로 키울 수 있어요." },
                             { target: "fs-add", title: "잡았으면", body: "사진 한 장과 길이만 적으면 어탁첩에 어탁이 찍혀요." },
+                            { target: "fs-tank", title: "내 수족관", body: "잡은 어종이 어탁 그림 그대로 헤엄쳐요. 낮엔 한지, 해가 지면 밤바다." },
                         ]} />
                         {/* 지도 먼저 — 오늘 어느 바다에서 어떤 고기가 좋은가(2026-10-14 오너: "지도를 보면 아 오늘 물때와 물고기는 이렇구나") */}
-                        <FishMapHome today={today} list={list} want={mapFish} onFish={(name) => { const f = fishByName(name); if (f) setFishOpen(f.id); }} onAdd={(place, species) => { setPreset({ place, species }); setAdding(true); }} onOpenTrip={() => setTab("trip")} />
+                        <FishMapHome today={today} list={list} want={mapFish} onFish={(name) => { const f = fishByName(name); if (f) setFishOpen(f.id); }} onAdd={(place, species) => { setPreset({ place, species }); setAdding(true); }} onOpenTrip={() => document.getElementById("fishing-today-block")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
+                        {/* 나가기 전에 보는 것 — 바다의 특보 · 내 항구 · 물때(예전 출조 탭의 것) */}
+                        <div id="fishing-today-block" className="scroll-mt-16"><Today today={today} list={list} /></div>
+                        {/* 내 수족관 — 잡은 어종이 헤엄치는 작은 창. 누르면 수족관 */}
+                        <FsSection title="내 수족관" aside={<button type="button" onClick={() => setTab("tank")} style={{ color: C.sun }}>수족관 가기</button>} testid="fishing-home-tank">
+                            <div data-tour="fs-tank"><FishingAquarium list={empty ? [] : list} mini onOpen={() => setTab("tank")} /></div>
+                            <p className="mt-2 text-[12.5px] break-keep" style={{ color: C.dim }}>{empty ? "조과를 적으면 그 어종이 어탁 그림 그대로 헤엄쳐요." : `어종 ${records.length}/${FISH.length} · 낙관 ${seals}개 — 누르면 수족관`}</p>
+                        </FsSection>
+                        {/* 바다 도구함 — 참고 자료를 한 곳에(위판장 · 저수지 · 낚시터 · 어선 · 규칙 · 도감) */}
+                        <FsSection title="바다 도구함" testid="fishing-tools">
+                            <div className="grid grid-cols-2 gap-2.5">
+                                {([
+                                    ["trip", "위판장 · 저수지", "많이 오른 어종 · 물높이", "/fishing/art/band-market.webp", "fishing-tool-trip"],
+                                    ["points", "낚시터 · 낚시어선", "1,151곳 · 3,993척", "/fishing/art/band-boats.webp", "fishing-to-points"],
+                                    ["rules", "낚시 규칙", "금어기 · 금지체장", null, "fishing-to-rules"],
+                                    ["guide", "어류 도감", "바다 · 민물 374종", "/fishing/art/cover-book.webp", "fishing-to-guide"],
+                                ] as const).map(([to, title, sub, img, id]) => (
+                                    <button key={to} type="button" onClick={() => setTab(to)} className="relative flex h-[108px] flex-col justify-end overflow-hidden rounded-2xl px-3.5 pb-3 text-left active:opacity-85" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid={id}>
+                                        {img ? <img src={img} alt="" width={640} height={640} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-55" draggable={false} />
+                                            : <span className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center text-[13px] font-semibold" style={{ background: "#C8372D", color: "#FFF4EC", transform: "rotate(-4deg)", borderRadius: 6 }} aria-hidden>규칙</span>}
+                                        <span className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1E2D00 20%,#0B1E2DE6 100%)" }} aria-hidden />
+                                        <span className="relative block text-[15px] font-semibold">{title}</span>
+                                        <span className="relative mt-0.5 block text-[12.5px]" style={{ color: C.dim }}>{sub}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </FsSection>
 
+                    </>
+                )}
+
+                {(tab === "tank" || tab === "book") && (
+                    <div data-testid="fishing-book">
+                        {/* 수조 — 맨 위에 크게. 물고기를 누르면 그 어종의 한 장 */}
+                        <div className="px-5 pt-4"><FishingAquarium list={empty ? [] : list} seals={sealMap} onFish={setFishOpen} /></div>
                         {/* 내 기록 — 대표 기록어 · 숫자 셋 */}
-                        <FsSection title="내 기록" aside={empty ? "예시" : <button type="button" onClick={() => setTab("log")} style={{ color: C.sun }}>내 조과 보기</button>} testid="fishing-mine">
+                        <FsSection title="내 기록" aside={empty ? "예시" : <button type="button" onClick={() => setTab("log")} style={{ color: C.sun }}>일지 보기</button>} testid="fishing-mine">
                                 {top && (
                                     <button type="button" onClick={() => setFishOpen(top.fish.id)} className="flex w-full items-center gap-3.5 rounded-2xl px-3.5 py-3 text-left active:opacity-80" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="fishing-top">
                                         <span className="flex h-[56px] w-[72px] shrink-0 items-center justify-center rounded-lg" style={{ background: PAPER }}><img src={art(top.fish.id)} alt="" className="h-11 w-[62px] object-contain" style={{ mixBlendMode: "multiply" }} /></span>
@@ -267,70 +303,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                         )}
 
 
-                        <button type="button" onClick={() => setTab("rank")} className="mx-5 mt-2 flex min-h-[56px] w-[calc(100%-40px)] items-center justify-between rounded-2xl bg-[#FFFFFF0A] px-4 text-left text-[15px] font-semibold active:opacity-80" data-testid="fishing-rank-entry">
-                            <span>어종 랭킹<span className="ml-2 text-[13px] font-normal" style={{ color: C.dim }}>공개한 조과로 겨뤄요</span></span>
-                            <span style={{ color: C.sun }}>보기</span>
-                        </button>
-                        <button type="button" onClick={() => setTab("gear")} className="mx-5 mt-2 flex min-h-[56px] w-[calc(100%-40px)] items-center justify-between rounded-2xl bg-[#FFFFFF0A] px-4 text-left text-[15px] font-semibold active:opacity-80" data-testid="fishing-gear-entry">
-                            <span>내 장비<span className="ml-2 text-[13px] font-normal" style={{ color: C.dim }}>대 · 릴 · 줄 · 채비</span></span>
-                            <span style={{ color: C.sun }}>보기</span>
-                        </button>
-                        <button type="button" onClick={() => setTab("tank")} className="mx-5 mt-2 flex min-h-[56px] w-[calc(100%-40px)] items-center justify-between rounded-2xl bg-[#FFFFFF0A] px-4 text-left text-[15px] font-semibold active:opacity-80" data-testid="fishing-tank-entry">
-                            <span>내 수조<span className="ml-2 text-[13px] font-normal" style={{ color: C.dim }}>잡은 어종이 헤엄쳐요</span></span>
-                            <span style={{ color: C.sun }}>보기</span>
-                        </button>
-                        <FsSection title="어탁 벽" aside={empty ? "예시" : <button type="button" onClick={() => setTab("book")} style={{ color: C.sun }}>어탁첩 보기</button>}>
-                            <div className="grid grid-cols-2 gap-2.5">{shown.slice(0, 6).map((r) => <button key={r.fish.id} type="button" onClick={() => setFishOpen(r.fish.id)} className="block text-left active:opacity-85" aria-label={`${r.fish.name} 한 장`} data-testid="fishing-wall-open"><Eotak rec={r} today={today} sample={empty} /></button>)}</div>
-                            <p className="mt-2 text-[12.5px] break-keep" style={{ color: C.dim }}>{empty ? "조과를 적으면 어종마다 어탁이 한 장씩 걸려요. 단계에 오르면 붉은 낙관이 찍혀요." : "어종마다 가장 큰 한 마리가 걸려요."}</p>
-                        </FsSection>
 
-                        {!empty && (
-                            <FsSection title="최근 조과" aside={<button type="button" onClick={() => setTab("log")} style={{ color: C.sun }}>전부 {list.length}줄</button>}>
-                                <ul className={LIST}>{list.slice(0, 3).map(row)}</ul>
-                            </FsSection>
-                        )}
-                    </>
-                )}
-
-                {tab === "tank" && (
-                    <div className="px-5 pt-4 pb-6"><Suspense fallback={<div className="h-[56vh] rounded-2xl bg-[#0B3A52]" aria-busy="true" />}><FishingAquarium list={list} /></Suspense></div>
-                )}
-                {tab === "gear" && (
-                    <div className="px-5 pt-4 pb-6"><FishingGear today={today} /></div>
-                )}
-                {tab === "rank" && (
-                    <div className="px-5 pt-4 pb-6"><FishingRanking /></div>
-                )}
-                {tab === "trip" && (
-                    <>
-                        <FsCover src={water === "sea" ? FS_COVER_TRIP : FS_COVER_FRESH} at={water === "sea" ? undefined : "50% 26%"} line={water === "sea" ? "나가기 전에 보는 것 — 바다의 특보와 물때" : "나가기 전에 보는 것 — 저수지의 물높이"} />
-                        <div className="px-5 pt-5">
-                            <div className="flex rounded-full p-0.5" style={{ background: "#FFFFFF0F" }} role="group" aria-label="바다와 민물">
-                                {([["sea", "바다"], ["fresh", "민물"]] as const).map(([id, label]) => (
-                                    <button key={id} type="button" aria-pressed={water === id} onClick={() => { setWater(id); keep(WATER_KEY, id); }} data-testid={`fishing-water-${id}`}
-                                        className={cn("h-10 flex-1 rounded-full text-[14px]", water === id && "font-semibold")} style={water === id ? { background: C.brand, color: C.onBrand } : { color: C.soft }}>{label}</button>
-                                ))}
-                            </div>
-                        </div>
-                        {water === "sea" ? <><Today today={today} list={list} /><MarketBoard /></> : <ReservoirBoard />}
-                        <FsSection title="낚시터 · 낚시어선" aside="1,151곳 · 3,993척">
-                            <button type="button" onClick={() => setTab("points")} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-points">
-                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: "#FFFFFF14" }}><LucideMap className="h-5 w-5" style={{ color: C.sun }} /></span>
-                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">낚시터 · 낚시어선 찾기</span><span className="mt-0.5 block text-[13px]" style={{ color: C.dim }}>유료 낚시터의 요금 · 신고된 배의 정원</span></span>
-                                <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#F3ECDD66" }} />
-                            </button>
-                            <button type="button" onClick={() => setTab("rules")} className="mt-2 flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-rules">
-                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold" style={{ background: "#C8372D", color: "#FFF4EC", transform: "rotate(-4deg)", borderRadius: 6 }}>규칙</span>
-                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">금어기 · 금지체장 · 낚시 규칙</span><span className="mt-0.5 block text-[13px]" style={{ color: C.dim }}>법이 정한 기간과 크기 · 낚시하는 사람이 묻는 것</span></span>
-                                <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#F3ECDD66" }} />
-                            </button>
-                        </FsSection>
-                    </>
-                )}
-
-                {tab === "book" && (
-                    <div data-testid="fishing-book">
-                        <FsCover src={FS_COVER_BOOK} at="50% 34%" line={records.length ? `어종 ${records.length}/${FISH.length} · 낙관 ${seals}개` : "조과를 적으면 그 어종의 칸에 어탁이 찍혀요"} />
                         {FISH_BOOKS.map((b) => {
                             const got = new Map(records.map((r) => [r.fish.id, r]));
                             const n = b.fish.filter((f) => got.has(f.id)).length;
@@ -368,7 +341,38 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             </button>
                         </FsSection>
                         <p className="px-5 pt-3 text-[12.5px] leading-relaxed break-keep" style={{ color: C.dim }}>칸을 누르면 그 어종의 한 장이 열려요 — 낙관의 단계 · 내 사진 · 오늘 좋은 곳. 단계(월척 · 런커 · 5짜 …)에 오르면 붉은 낙관이 붙어요.</p>
+                        <div className="mx-5 mt-3 grid grid-cols-1 gap-2">
+                            <button type="button" onClick={() => setTab("rank")} className="flex min-h-[56px] w-full items-center justify-between rounded-2xl bg-[#FFFFFF0A] px-4 text-left text-[15px] font-semibold active:opacity-80" data-testid="fishing-rank-entry">
+                                <span>어종 랭킹<span className="ml-2 text-[13px] font-normal" style={{ color: C.dim }}>공개한 조과로 겨뤄요</span></span>
+                                <span style={{ color: C.sun }}>보기</span>
+                            </button>
+                        </div>
                     </div>
+                )}
+                {tab === "gear" && (
+                    <div className="px-5 pt-4 pb-6"><FishingGear today={today} /></div>
+                )}
+                {tab === "rank" && (
+                    <div className="px-5 pt-4 pb-6"><FishingRanking /></div>
+                )}
+                {tab === "trip" && (
+                    <>
+                        <FsCover src={FS_COVER_TRIP} line="바다 도구함 — 위판장 · 저수지 · 낚시터 · 어선 · 규칙" />
+                        <MarketBoard />
+                        <ReservoirBoard />
+                        <FsSection title="낚시터 · 낚시어선" aside="1,151곳 · 3,993척">
+                            <button type="button" onClick={() => setTab("points")} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-points">
+                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: "#FFFFFF14" }}><LucideMap className="h-5 w-5" style={{ color: C.sun }} /></span>
+                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">낚시터 · 낚시어선 찾기</span><span className="mt-0.5 block text-[13px]" style={{ color: C.dim }}>유료 낚시터의 요금 · 신고된 배의 정원</span></span>
+                                <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#F3ECDD66" }} />
+                            </button>
+                            <button type="button" onClick={() => setTab("rules")} className="mt-2 flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-rules">
+                                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold" style={{ background: "#C8372D", color: "#FFF4EC", transform: "rotate(-4deg)", borderRadius: 6 }}>규칙</span>
+                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">금어기 · 금지체장 · 낚시 규칙</span><span className="mt-0.5 block text-[13px]" style={{ color: C.dim }}>법이 정한 기간과 크기 · 낚시하는 사람이 묻는 것</span></span>
+                                <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#F3ECDD66" }} />
+                            </button>
+                        </FsSection>
+                    </>
                 )}
 
                 {tab === "log" && <FsCover src={FS_COVER_LOG} at="50% 30%" line={list.length ? `${trips}번 나가 ${list.length}줄을 적었어요` : "나간 날마다 종이 한 장으로 남아요"} />}
@@ -377,6 +381,10 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                         {addButton("조과 적기", "fishing-log-add")}
                         {list.length === 0 ? <p className="mt-3 rounded-2xl px-5 py-8 text-center text-[14px] [word-break:keep-all]" style={{ border: "1px dashed #FFFFFF2E", color: C.soft }}>아직 적은 조과가 없어요. 나간 날마다 종이 한 장으로 남아요.</p>
                             : <CatchJournal list={list} today={today} onFish={setFishOpen} onRemove={askRemove} />}
+                        <button type="button" onClick={() => setTab("gear")} className="mt-3 flex min-h-[56px] w-full items-center justify-between rounded-2xl bg-[#FFFFFF0A] px-4 text-left text-[15px] font-semibold active:opacity-80" data-testid="fishing-gear-entry">
+                            <span>내 장비<span className="ml-2 text-[13px] font-normal" style={{ color: C.dim }}>대 · 릴 · 줄 · 채비</span></span>
+                            <span style={{ color: C.sun }}>보기</span>
+                        </button>
                     </FsSection>
                 )}
 

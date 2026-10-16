@@ -45,6 +45,7 @@ export const LucideBarChart3 = ((Ph as any).ChartBar ?? F) as Ph.Icon;
 export const LucideBeer = ((Ph as any).BeerStein ?? F) as Ph.Icon;
 export const LucideBell = ((Ph as any).Bell ?? F) as Ph.Icon;
 export const LucideBookOpen = ((Ph as any).BookOpen ?? F) as Ph.Icon;
+export const LucideFish = ((Ph as any).Fish ?? F) as Ph.Icon;
 export const LucideBriefcase = ((Ph as any).Briefcase ?? F) as Ph.Icon;
 export const LucideBuilding = ((Ph as any).Buildings ?? F) as Ph.Icon;
 export const LucideCalculator = ((Ph as any).Calculator ?? F) as Ph.Icon;

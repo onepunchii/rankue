@@ -36,11 +36,20 @@ describe("낚시 — 따로 선 종목", () => {
         expect(page).not.toContain("<nav ");
         expect(page).not.toContain("<header className=\"sticky");
         const nav = read("client/src/components/hiq/HiqNavigation.tsx");
-        expect(nav).toContain('{ id: "trip", text: "출조", icon: LucideMap, path: "/fishing/trip", also: ["/fishing/points", "/fishing/rules"] },');
+        // 2026-10-16 오너가 고른 정리안 — 오늘 바다 · 크루 · 수족관(메인) · 일지 · 채팅. 출조는 홈의 '바다 도구함'으로
+        expect(nav).toContain('{ id: "home", text: "오늘 바다", icon: LucideHome, path: "/dashboard", also: ["/fishing/trip", "/fishing/points", "/fishing/rules"] },');
+        expect(nav).toContain('{ id: "tank", text: "수족관", icon: LucideFish, path: "/fishing/tank", also: ["/fishing/book", "/fishing/guide", "/fishing/rank"] },');
+        expect(nav).toContain('{ id: "log", text: "일지", icon: LucideBookOpen, path: "/fishing/log", also: ["/fishing/gear"] },');
         // 조과 적기는 탭 · 떠 있는 단추에 두지 않는다(오너: "네비게이션바에 + 빼고") — 홈 표지의 단추다
         expect(page).not.toContain("fixed right-4");
         expect(page).toContain('data-testid="fishing-add" data-tour="fs-add">조과 적기</button>');
-        expect(nav).toContain('{ id: "book", text: "어탁첩", icon: LucideStamp, path: "/fishing/book", also: ["/fishing/guide"] },');
+        // 수족관 = 헤엄치는 어탁(three 를 더 쓰지 않는다) + 어탁첩. 홈에는 미리보기 한 칸과 바다 도구함
+        const tank = read("client/src/fishing/FishingAquarium.tsx");
+        expect(tank).not.toContain('from "three"');
+        expect(tank).toContain("export function isNightKst(ms = Date.now()): boolean {");
+        expect(page).toContain('{(tab === "tank" || tab === "book") && (');
+        expect(page).toContain('<FishingAquarium list={empty ? [] : list} mini onOpen={() => setTab("tank")} />');
+        expect(page).toContain('testid="fishing-tools"');
         const ctx = read("client/src/contexts/SportContext.tsx");
         expect(ctx).toContain('else if (sport === "FISHING") document.documentElement.setAttribute("data-skin", "fishing");');
         expect(read("client/src/index.css")).toContain(':root[data-sport="GOLF"][data-skin="fishing"] {');

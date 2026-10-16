@@ -11,7 +11,9 @@ import {
     LucideCalendarDays,
     LucideCalendarCheck,
     LucideMap,
-    LucideStamp
+    LucideStamp,
+    LucideFish,
+    LucideBookOpen
 } from "@/lib/icons";
 import { useSport } from "@/contexts/SportContext";
 import { useQuery } from "@tanstack/react-query";
@@ -96,10 +98,12 @@ export function HiqNavigation() {
          * 낚시는 한국어 전용이라 '출조' · '어탁첩'은 번역 키로 두지 않는다(text).
          */
         ? [
-            { id: "home", label: "hiqNavigation.home", icon: LucideHome, path: "/dashboard", also: ["/fishing/log"] },
+            // 2026-10-16 오너가 고른 정리안: 오늘 바다 · 크루 · 수족관(가운데 · 메인 — 수조 + 어탁첩 + 랭킹 + 도감) · 일지 · 채팅.
+            // 예전 '출조'는 홈 맨 아래의 '바다 도구함'(위판장 · 저수지 · 낚시터 · 어선 · 규칙)으로 들어갔다 — 그 화면에서는 홈 탭이 켜진다.
+            { id: "home", text: "오늘 바다", icon: LucideHome, path: "/dashboard", also: ["/fishing/trip", "/fishing/points", "/fishing/rules"] },
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
-            { id: "trip", text: "출조", icon: LucideMap, path: "/fishing/trip", also: ["/fishing/points", "/fishing/rules"] },
-            { id: "book", text: "어탁첩", icon: LucideStamp, path: "/fishing/book", also: ["/fishing/guide"] },
+            { id: "tank", text: "수족관", icon: LucideFish, path: "/fishing/tank", also: ["/fishing/book", "/fishing/guide", "/fishing/rank"] },
+            { id: "log", text: "일지", icon: LucideBookOpen, path: "/fishing/log", also: ["/fishing/gear"] },
             { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
         ]
         : isHiking
