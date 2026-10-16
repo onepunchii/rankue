@@ -1,16 +1,17 @@
 /**
  * 친구 초대 — 서버의 답 · 링크로 온 기기의 표시(2026-10-16, 규칙 shared/invite).
- * GET /api/hiq/invite/me · GET /api/hiq/invite/code/:code(로그인 없이) · POST /api/hiq/invite/claim · POST /api/hiq/cue-case/invite-pick
+ * GET /api/hiq/friend-invite/me · GET /api/hiq/friend-invite/code/:code(로그인 없이) · POST /api/hiq/friend-invite/claim
+ * (게임 초대 코드의 /invite/:code 와 겹치지 않게 /friend-invite) · POST /api/hiq/cue-case/invite-pick
  */
 import { apiRequest } from "@/lib/queryClient";
 import { INVITE_MARK_KEY, cleanInviteCode, parseInviteMark, type InviteCard, type InviteMark, type InviteMe } from "@shared/invite";
 
-export const INVITE_ME_KEY = ["/api/hiq/invite/me"] as const;
-export const inviteCardKey = (code: string) => ["/api/hiq/invite/code", code] as const;
+export const INVITE_ME_KEY = ["/api/hiq/friend-invite/me"] as const;
+export const inviteCardKey = (code: string) => ["/api/hiq/friend-invite/code", code] as const;
 
-export const fetchInviteMe = (): Promise<InviteMe> => apiRequest("/api/hiq/invite/me");
-export const fetchInviteCard = (code: string): Promise<InviteCard> => apiRequest(`/api/hiq/invite/code/${encodeURIComponent(code)}`);
-export const claimInvite = (code: string): Promise<{ ok: true; welcome: string; inviter: string }> => apiRequest("/api/hiq/invite/claim", { method: "POST", body: { code } });
+export const fetchInviteMe = (): Promise<InviteMe> => apiRequest("/api/hiq/friend-invite/me");
+export const fetchInviteCard = (code: string): Promise<InviteCard> => apiRequest(`/api/hiq/friend-invite/code/${encodeURIComponent(code)}`);
+export const claimInvite = (code: string): Promise<{ ok: true; welcome: string; inviter: string }> => apiRequest("/api/hiq/friend-invite/claim", { method: "POST", body: { code } });
 export const pickInviteCue = (itemId: string): Promise<{ itemId: string; serial: number }> => apiRequest("/api/hiq/cue-case/invite-pick", { method: "POST", body: { itemId } });
 
 /* ── 링크로 온 기기의 표시 — 가입 · 로그인한 뒤 InviteClaimer 가 서버에 낸다 ── */

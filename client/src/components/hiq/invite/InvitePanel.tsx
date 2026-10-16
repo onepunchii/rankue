@@ -122,6 +122,14 @@ export function InvitePanel({ view, l, onReveal, focus = false }: { view: CueCas
                 <button type="button" onClick={() => { void share(); }} disabled={!me || sharing} className="mt-3 h-12 w-full rounded-full text-[15px] font-bold text-white active:opacity-90 disabled:opacity-60" style={{ background: PINK, boxShadow: "0 4px 0 #7A0F4C" }} data-testid="cue-case-invite-share" data-tour="cc-invite-share" data-track-as="친구 초대 카드 공유">
                     {sharing ? t("inv.sharing") : t("inv.share")}
                 </button>
+                {q.isError ? (
+                    <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-white/[0.06] px-3.5 py-2.5" data-testid="cue-case-invite-me-fail">
+                        <p className="text-[12.5px] text-white/75">{t("inv.meFail")}</p>
+                        <button type="button" onClick={() => { void q.refetch(); }} className="h-9 shrink-0 rounded-full border border-white/20 px-3.5 text-[13px] font-semibold text-white/90">{t("inv.retry")}</button>
+                    </div>
+                ) : (
+                    <p className="mt-1.5 text-center text-[12px] text-white/55 break-keep" data-testid="cue-case-invite-share-hint">{t("inv.shareHint")}</p>
+                )}
                 {me && (
                     <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-black/30 px-3.5 py-2.5">
                         <p className="text-[12.5px] text-white/60">{t("inv.code")} <span className="rk-num ml-1 text-[15px] font-bold tracking-[0.18em] text-white" data-testid="cue-case-invite-code">{me.code}</span></p>

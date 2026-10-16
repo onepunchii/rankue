@@ -1,10 +1,11 @@
 /**
  * 친구 초대(2026-10-16, 규칙 shared/invite · 보상 shared/cueCase 의 invite · invited · invitePick).
  *
- * GET  /invite/me          내 코드 · 링크 · 초대한 수 · 한정 큐 고르기 남은 수 · 내가 누구의 초대로 왔는지 · 아직 코드를 넣을 수 있는지
- * GET  /invite/code/:code  링크를 연 사람에게(로그인 없이) — 초대한 사람의 이름 · 대표 큐
- * POST /invite/claim       { code } 새로 가입한 사람이 초대를 낸다(가입한 지 7일 안 · 한 번만). 받는 즉시 환영 초크,
+ * GET  /friend-invite/me          내 코드 · 링크 · 초대한 수 · 한정 큐 고르기 남은 수 · 내가 누구의 초대로 왔는지 · 아직 코드를 넣을 수 있는지
+ * GET  /friend-invite/code/:code  링크를 연 사람에게(로그인 없이) — 초대한 사람의 이름 · 대표 큐
+ * POST /friend-invite/claim       { code } 새로 가입한 사람이 초대를 낸다(가입한 지 7일 안 · 한 번만). 받는 즉시 환영 초크,
  *                          초대한 사람에게는 단계(1 · 3 · 10명) 보상과 알림. 30명마다 한정 큐 고르기가 하나씩 생긴다(고르기는 /cue-case/invite-pick).
+ * 주소가 /friend-invite 인 까닭: 게임 초대 코드(game.ts 의 GET /invite/:code)가 먼저 걸려 있어 /invite/me 를 가로챘다(2026-10-16 오너 "버튼이 비활성화").
  * 표: hiq_invite_codes(한 사람 코드 하나) · hiq_referrals(초대로 센 가입 — invitee 가 열쇠라 한 사람은 한 번만). 더하기만.
  */
 import { Router } from "express";
@@ -44,7 +45,7 @@ async function codeOf(memberId: string): Promise<string> {
 }
 const countOf = async (memberId: string) => Number(rowsOf(await db.execute(sql`select count(*)::int as n from hiq_referrals where inviter_id = ${memberId}::uuid`))[0]?.n) || 0;
 
-router.get("/invite/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.get("/friend-invite/me", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const me = req.userId!;
     const [code, count, [mine], [who], used] = await Promise.all([
         codeOf(me),
@@ -64,7 +65,7 @@ router.get("/invite/me", requireAuth, asyncHandler(async (req: AuthRequest, res:
 }));
 
 /** 링크를 연 사람에게 — 이름과 대표 큐만(로그인 없이). 대표 큐 규칙은 큐 케이스 · 게임과 같다(고른 것, 없으면 가장 최근에 받은 큐) */
-router.get("/invite/code/:code", asyncHandler(async (req: any, res: any) => {
+router.get("/friend-invite/code/:code", asyncHandler(async (req: any, res: any) => {
     const code = cleanInviteCode(req.params.code);
     if (!code) return sendError(res, 404, "err.invite.code");
     const [row] = rowsOf(await db.execute(sql`
@@ -79,7 +80,7 @@ router.get("/invite/code/:code", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, { name: String(row.name ?? "회원"), hero } satisfies InviteCard);
 }));
 
-router.post("/invite/claim", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+router.post("/friend-invite/claim", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const me = req.userId!, now = Date.now();
     const code = cleanInviteCode(req.body?.code);
     if (!code) return sendError(res, 404, "err.invite.code");
