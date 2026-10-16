@@ -169,6 +169,16 @@ function SimulatorLazy() {
   );
 }
 
+// 큐 케이스(2026-10-16) — 당구의 수집(큐 · 초크 · 장갑 + 옛 온라인 장식장). 어두운 벨벳 화면이라 프레임 없이, 불러오는 동안도 같은 색.
+const CueCasePage = lazy(() => import("@/pages/hiq/cue-case"));
+function CueCaseRoute() {
+  return (
+    <Suspense fallback={<div className="min-h-[100dvh] bg-[#0d1626]" aria-busy="true" />}>
+      <CueCasePage />
+    </Suspense>
+  );
+}
+
 // 당구 용어 사전(2026-09-24) — 본문(shared/billiardsTerms.ts)이 길어 메인 청크에서 뺀다. 페이지가 자체 max-w-2xl 레이아웃이라 프레임 없이.
 const BilliardsTermsHub = lazy(() => import("@/pages/billiards-terms"));
 const BilliardsTerm = lazy(() => import("@/pages/billiards-term"));
@@ -527,6 +537,7 @@ function AppRoutes() {
       <Route path="/hiq/dashboard" component={FramedDashboard} />
       {/* 시뮬레이터 v2 — 엔진·렌더러가 무거워 별도 청크로 지연 로드 */}
       <Route path="/online-game" component={SimulatorLazy} />
+      <Route path="/cue-case" component={CueCaseRoute} />
 
       {/* 404 페이지 */}
       <Route component={NotFound} />

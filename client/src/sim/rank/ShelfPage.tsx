@@ -38,6 +38,8 @@ export interface ShelfPageProps {
     onCup?: () => void;
     /** 이 기기에서 마지막으로 본 달을 읽고 적는 곳(시험에서 바꿔 끼운다) */
     seen?: { read: () => string; write: (month: string) => void };
+    /** 큐 케이스의 '메달 · 배지' 칸 안에 넣을 때(2026-10-16) — 머리(장식장 그림 · 닫기)와 바깥 여백 없이 선반만 */
+    embedded?: boolean;
 }
 
 type Pick = { kind: "medal"; rank: MedalRank } | { kind: "tier"; tier: TierId } | { kind: "cup"; medal: CupMedal };
@@ -64,7 +66,7 @@ function ShelfRow({ title, count, children, foot }: { title: string; count?: str
     );
 }
 
-export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay, onCup, seen = deviceSeen }: ShelfPageProps) {
+export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay, onCup, seen = deviceSeen, embedded = false }: ShelfPageProps) {
     const { t, locale } = useT();
     const q = useQuery({ queryKey: [...SHELF_QUERY_KEY, memberId ?? "me"], queryFn: () => api.get(memberId), staleTime: 15_000, retry: false });
     const d: Shelf | undefined = q.data;
@@ -108,8 +110,8 @@ export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay,
     const slot = "flex-1 min-w-0 flex flex-col items-center justify-end";
 
     return (
-        <div className="rank-hall w-full max-w-[420px] mx-auto pb-8" data-testid="shelf-page">
-            <header className="hall-top relative px-5 pt-4">
+        <div className={cn("rank-hall w-full", !embedded && "max-w-[420px] mx-auto pb-8")} data-testid="shelf-page">
+            {!embedded && <header className="hall-top relative px-5 pt-4">
                 <button type="button" onClick={onClose} className="absolute right-5 top-4 h-11 px-4 rounded-pill border border-white/25 bg-black/40 text-[13px] font-semibold text-white/90 active:bg-black/60">
                     {t("sim.common.close")}
                 </button>
@@ -120,9 +122,9 @@ export function ShelfPage({ onClose, memberId, api = defaultApi, onRank, onPlay,
                         <p className="text-[12.5px] font-medium text-white/70 mt-0.5 break-keep">{t("sim.shelf.sub")}</p>
                     </div>
                 </div>
-            </header>
+            </header>}
 
-            <div className="px-5 flex flex-col gap-4">
+            <div className={cn("flex flex-col gap-4", !embedded && "px-5")}>
                 {q.isPending && <p className="text-[13px] font-medium text-ink-4 min-h-11 flex items-center">{t("sim.shelf.loading")}</p>}
                 {q.isError && (
                     <div className="flex items-center justify-between gap-3 min-h-11" data-testid="shelf-failed">

@@ -2459,6 +2459,29 @@ export const hiqSimMonthCloses = pgTable("hiq_sim_month_closes", {
 export type HiqSimAward = typeof hiqSimAwards.$inferSelect;
 
 /**
+ * 큐 케이스 — 받은 기록(2026-10-16, 목록 shared/cueCase · 판정 shared/cueCaseRules). 한 사람에 한 물건 한 줄, **고치지도 지우지도 않는다**
+ * (골프 golf_stamp_awards 와 같다 — 등급이 내려가도 · 기록이 바뀌어도 받은 것은 남는다).
+ * earned_at = 조건이 처음 채워진 판이 끝난 때(옛 기록으로 채워진 것도 그때). created_at = 이 줄을 적은 때 — 화면의 '새로 받음'이 이것을 본다.
+ */
+export const hiqCueCaseAwards = pgTable("hiq_cue_case_awards", {
+  id: uuid("id").primaryKey().defaultRandom().notNull(),
+  memberId: uuid("member_id").references(() => hiqMembers.id, { onDelete: "cascade" }).notNull(),
+  itemId: text("item_id").notNull(),
+  earnedAt: timestamp("earned_at").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => ({
+  uniq: unique("hiq_cue_case_awards_member_item_unique").on(t.memberId, t.itemId),
+  idxItem: index("hiq_cue_case_awards_item_idx").on(t.itemId),
+}));
+
+/** 큐 케이스 — 대표 큐(맨 위에 크게 · 나중에 크루 큐 랙). 받은 큐 가운데서만 고른다 */
+export const hiqCueCasePrefs = pgTable("hiq_cue_case_prefs", {
+  memberId: uuid("member_id").primaryKey().references(() => hiqMembers.id, { onDelete: "cascade" }).notNull(),
+  heroItem: text("hero_item"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
  * 월대회(2026-10-12 오너 "추천대로") — 규칙은 shared/simCup. 그 달(month)의 성적으로 다음 달 1일에 연다.
  *  - status: running(치르는 중) · finished · skipped(출전자가 3명이 안 돼 열지 않았다 — 줄은 남겨 다시 열지 않는다).
  *  - rules: 열 때 쓴 조건({ minRating, minMatches, roundDays, match }) — 규칙이 나중에 바뀌어도 그 대회가 무엇으로 열렸는지 남는다.

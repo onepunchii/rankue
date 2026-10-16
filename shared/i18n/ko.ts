@@ -181,6 +181,8 @@ export const ko: Record<string, string> = {
   "err.sim.badBallSet": "공 구성이 올바르지 않습니다",
   "err.sim.sessionNotFound": "세션이 없습니다",
   "err.sim.shelfNotFound": "장식장을 찾을 수 없어요",
+  "err.cueCase.notFound": "큐 케이스를 찾을 수 없어요",
+  "err.cueCase.notOwned": "아직 받지 않은 큐예요",
   "err.sim.cupGameNotFound": "대진을 찾을 수 없어요",
   "err.sim.cupGameClosed": "이미 끝난 판이에요",
   "err.sim.cupNoOpponent": "아직 상대가 정해지지 않았어요",

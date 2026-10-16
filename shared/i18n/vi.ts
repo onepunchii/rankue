@@ -181,6 +181,8 @@ export const vi: Record<string, string> = {
   "err.sim.badBallSet": "Bộ bi không hợp lệ",
   "err.sim.sessionNotFound": "Không tìm thấy phiên chơi",
   "err.sim.shelfNotFound": "Không tìm thấy tủ trưng bày",
+  "err.cueCase.notFound": "Không tìm thấy hộp cơ",
+  "err.cueCase.notOwned": "Bạn chưa nhận cây cơ này",
   "err.sim.cupGameNotFound": "Không tìm thấy trận trong nhánh đấu",
   "err.sim.cupGameClosed": "Trận này đã kết thúc",
   "err.sim.cupNoOpponent": "Chưa xác định đối thủ",

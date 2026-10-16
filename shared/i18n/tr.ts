@@ -181,6 +181,8 @@ export const tr: Record<string, string> = {
   "err.sim.badBallSet": "Top seti geçersiz",
   "err.sim.sessionNotFound": "Oturum bulunamadı",
   "err.sim.shelfNotFound": "Vitrin bulunamadı",
+  "err.cueCase.notFound": "Istaka çantası bulunamadı",
+  "err.cueCase.notOwned": "Bu ıstakayı henüz kazanmadın",
   "err.sim.cupGameNotFound": "Eşleşme bulunamadı",
   "err.sim.cupGameClosed": "Bu maç kapandı",
   "err.sim.cupNoOpponent": "Rakibin henüz belli değil",

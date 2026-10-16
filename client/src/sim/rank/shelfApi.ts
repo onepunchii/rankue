@@ -47,8 +47,8 @@ export interface Shelf {
 
 export const SHELF_QUERY_KEY = ["sim-shelf"] as const;
 export const shelfUrl = (memberId?: string | null): string => (memberId ? `/api/hiq/sim/shelf?memberId=${encodeURIComponent(memberId)}` : "/api/hiq/sim/shelf");
-/** 화면 주소 — /online-game?shelf=1[&m=<회원 id>] */
-export const shelfPath = (memberId?: string | null): string => (memberId ? `/online-game?shelf=1&m=${encodeURIComponent(memberId)}` : "/online-game?shelf=1");
+/** 화면 주소 — 2026-10-16 부터 큐 케이스의 '메달 · 배지' 칸(/cue-case?sec=medals[&m=]). 옛 /online-game?shelf=1 은 SimulatorPage 가 여기로 돌려보낸다 */
+export const shelfPath = (memberId?: string | null): string => (memberId ? `/cue-case?m=${encodeURIComponent(memberId)}&sec=medals` : "/cue-case?sec=medals");
 
 const num = (v: unknown, d = 0): number => (typeof v === "number" && Number.isFinite(v) ? v : typeof v === "string" && v !== "" && Number.isFinite(Number(v)) ? Number(v) : d);
 const numOrNull = (v: unknown): number | null => (v === null || v === undefined ? null : num(v));

@@ -20,6 +20,7 @@ import { OngoingGameBanner } from "@/components/hiq/dashboard/OngoingGameBanner"
 import { SimMatchBanner } from "@/components/hiq/dashboard/SimMatchBanner";
 import { HomeSectionHeader, ScoreboardActions, ExploreActions } from "@/components/hiq/dashboard/QuickActions";
 import { OnlineHubBanner } from "@/components/hiq/dashboard/OnlineHubBanner";
+import { CueCaseEntry } from "@/components/hiq/cueCase/CueCaseEntry";
 import { OnlineGameCard } from "@/components/hiq/dashboard/OnlineGameCard";
 import { LookalikeProCard } from "@/components/hiq/dashboard/LookalikeProCard";
 import { HomeGuideDialog, type HomeGuideTopic } from "@/components/hiq/dashboard/HomeGuideDialog";
@@ -258,6 +259,8 @@ function HiqDashboardBilliards() {
                     desc={t("guestHome.recordCtaDesc")}
                 />
             )}
+            {/* 큐 케이스(2026-10-16) — 실전 · 온라인에서 모은 큐 · 초크 · 장갑. 내 기록 바로 아래가 자리다(기록이 쌓이면 여기에 들어온다) */}
+            <CueCaseEntry />
 
             {/* 홈 구역(2026-10-04 오너: "빠른 실행보다 각 섹션별로 — 점수판 / 당구 게임 / 기타").
                 점수판 구역은 입구 셋(점수판·혼자 연습·PIN으로 합류)만 — 기록은 위 카드로 모였다. */}

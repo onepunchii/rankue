@@ -20,6 +20,7 @@ import { SimRepository } from "./sim.repo.js";
 import { SimMatchRepository } from "./simMatch.repo.js";
 import { SimDrillRepository } from "./simDrill.repo.js";
 import { SimShelfRepository } from "./simShelf.repo.js";
+import { CueCaseRepository } from "./cueCase.repo.js";
 import { SimCupRepository } from "./simCup.repo.js";
 
 class Storage {
@@ -46,6 +47,7 @@ class Storage {
     public simDrill = new SimDrillRepository();
     // 장식장(2026-10-12) — 달마다 받은 메달 · 등급 배지. 재료(레이팅에 반영된 판)는 simMatch 가 준다
     public simShelf = new SimShelfRepository((fresh) => this.simMatch.ratedDeltas(fresh));
+    public cueCase = new CueCaseRepository(() => this.simMatch.ratedDeltas());
     // 월대회(2026-10-12) — 달이 마감되면 그 달의 성적으로 대진을 연다. 대전 표는 simMatch 를 거쳐서만 읽고 닫는다
     public simCup = new SimCupRepository(
         (fresh) => this.simMatch.ratedDeltas(fresh),

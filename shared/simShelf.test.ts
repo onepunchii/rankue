@@ -200,15 +200,16 @@ describe("서버: 달마다 한 번만 주고, 준 것은 고치지 않는다", 
 describe("화면: 장식장", () => {
     const client = (p: string) => readFileSync(resolve(__dirname, "../client/src", p), "utf8");
 
-    it("들어가는 길: /online-game?shelf=1 — 랭킹 · 대시보드에서 왔으면 닫을 때 온 곳으로 돌아간다", () => {
+    it("들어가는 길: 2026-10-16 큐 케이스 안으로 — 랭킹 · 대시보드의 줄은 큐 케이스의 메달 · 배지 칸을 열고, 옛 주소(?shelf=1)는 그리로 돌려보낸다", () => {
         const page = client("sim/SimulatorPage.tsx");
         expect(page).toContain('const shelfView = params.get("shelf") === "1";');
-        expect(page).toContain("const openShelf = (memberId?: string) => { shelfFromInside.current = true; navigate(shelfPath(memberId)); };");
-        expect(page).toContain("if (shelfFromInside.current) { shelfFromInside.current = false; window.history.back(); } else navigate(ENTRY_PATH, { replace: true });");
-        // 다른 사람의 장식장으로 넘어가면 화면을 새로 그린다(고른 것 · 새로 받음 표시가 남지 않게)
-        expect(page).toContain('key={shelfMember ?? "me"}');
+        expect(page).toContain("const openShelf = (memberId?: string) => navigate(shelfPath(memberId));");
+        expect(page).toContain("useEffect(() => { if (shelfView) navigate(shelfPath(shelfMember), { replace: true }); }, [shelfView, shelfMember, navigate]);");
+        // 장식장은 이제 시뮬레이터 위에 덮지 않는다 — 큐 케이스가 따로 선 화면으로 그린다
+        expect(page).not.toContain("<ShelfPage");
         expect(page).toContain("initialScope={rankScope} onShelf={openShelf} onCup={openCup} />");
         expect(page).toContain("onShelf={() => openShelf()}");
+        expect(client("pages/hiq/cue-case.tsx")).toContain("<ShelfPage embedded memberId={memberId}");
     });
 
     it("그림: 장식장 그림이 있고 가볍다", () => {

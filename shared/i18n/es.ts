@@ -181,6 +181,8 @@ export const es: Record<string, string> = {
   "err.sim.badBallSet": "El conjunto de bolas no es válido",
   "err.sim.sessionNotFound": "No se encontró la sesión",
   "err.sim.shelfNotFound": "No se encontró la vitrina",
+  "err.cueCase.notFound": "No se encontró el estuche",
+  "err.cueCase.notOwned": "Aún no has ganado este taco",
   "err.sim.cupGameNotFound": "No se encontró el cruce",
   "err.sim.cupGameClosed": "Este cruce ya está cerrado",
   "err.sim.cupNoOpponent": "Tu rival aún no está definido",

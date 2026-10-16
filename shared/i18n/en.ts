@@ -181,6 +181,8 @@ export const en: Record<string, string> = {
   "err.sim.badBallSet": "Invalid set of balls",
   "err.sim.sessionNotFound": "Session not found",
   "err.sim.shelfNotFound": "Trophy shelf not found",
+  "err.cueCase.notFound": "Cue case not found",
+  "err.cueCase.notOwned": "You haven't earned this cue yet",
   "err.sim.cupGameNotFound": "Bracket game not found",
   "err.sim.cupGameClosed": "This game is already closed",
   "err.sim.cupNoOpponent": "Your opponent isn't decided yet",

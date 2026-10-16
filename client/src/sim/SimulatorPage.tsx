@@ -68,7 +68,6 @@ import { RoomList } from "./match/RoomList";
 import { WatchList } from "./watch/WatchList";
 import WatchPage from "./watch/WatchPage";
 import { RankPage } from "./rank/RankPage";
-import { ShelfPage } from "./rank/ShelfPage";
 import { shelfPath } from "./rank/shelfApi";
 import { CupPage } from "./cup/CupPage";
 import { CUP_PATH } from "./cup/cupApi";
@@ -242,12 +241,12 @@ export function SimulatorPage() {
     const rankGame = params.get("g") === "4c" ? "4c" as const : params.get("g") === "3c" ? "3c" as const : undefined;
     // ?rank=1&s=all: 통산 탭으로 바로(홈 배너 · 대시보드의 '내 등급'에서). 없으면 이달 탭(2026-10-12 이달의 랭킹).
     const rankScope = params.get("s") === "all" ? "all" as const : params.get("s") === "month" ? "month" as const : undefined;
-    // ?shelf=1[&m=<회원 id>]: 장식장(2026-10-12) — 달마다 받은 메달 · 등급 배지. m 이 없으면 내 것.
+    // ?shelf=1[&m=<회원 id>]: 옛 장식장 주소(2026-10-12). 2026-10-16 장식장을 **큐 케이스** 안으로 합쳤다(오너: "2번도 합치자") —
+    // 알림 · 북마크로 들어온 옛 주소는 큐 케이스의 '메달 · 배지' 칸으로 돌려보낸다(shelfPath). 큐 케이스는 따로 선 화면이라 닫으면 온 곳으로 돌아간다.
     const shelfView = params.get("shelf") === "1";
     const shelfMember = params.get("m");
-    // 이 화면 안에서(랭킹 · 대시보드) 장식장으로 갔는가 — 닫을 때 온 곳으로 돌아간다. 홈 배너 · 링크로 바로 열었으면 입구로 나간다.
-    const shelfFromInside = useRef(false);
-    const openShelf = (memberId?: string) => { shelfFromInside.current = true; navigate(shelfPath(memberId)); };
+    const openShelf = (memberId?: string) => navigate(shelfPath(memberId));
+    useEffect(() => { if (shelfView) navigate(shelfPath(shelfMember), { replace: true }); }, [shelfView, shelfMember, navigate]);
     // ?cup=1: 월대회(2026-10-12) — 대진표 · 내 경기 · 다음 대회의 출전 조건.
     const cupView = params.get("cup") === "1";
     const cupFromInside = useRef(false);
@@ -1513,7 +1512,6 @@ export function SimulatorPage() {
     const showDash = dashView && sim.phase === "setup";
     const showRooms = roomsView && sim.phase === "setup";
     const showRank = rankView && sim.phase === "setup";
-    const showShelf = shelfView && sim.phase === "setup";
     const showCup = cupView && sim.phase === "setup";
     const showEntry = entryView && sim.phase === "setup" && !setupOpen;
     // 회원은 입구 화면 대신 홈 당구 게임 구역으로(2026-10-04 오너: "온라인게임 페이지로 안 가게, 홈에서 다").
@@ -1927,18 +1925,6 @@ export function SimulatorPage() {
             {showRank && (
                 <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
                     <RankPage onClose={() => navigate(ENTRY_PATH, { replace: true })} initial={rankGame ? { gameType: rankGame } : undefined} initialScope={rankScope} onShelf={openShelf} onCup={openCup} />
-                </div>
-            )}
-            {showShelf && (
-                <div className="sim-dark fixed inset-0 z-[5] overflow-y-auto bg-[var(--surface-0)]" style={{ paddingTop: "env(safe-area-inset-top)", paddingBottom: "env(safe-area-inset-bottom)" }}>
-                    <ShelfPage
-                        key={shelfMember ?? "me"}
-                        memberId={shelfMember}
-                        onClose={() => { if (shelfFromInside.current) { shelfFromInside.current = false; window.history.back(); } else navigate(ENTRY_PATH, { replace: true }); }}
-                        onRank={() => navigate("/online-game?rank=1")}
-                        onPlay={() => navigate("/online-game?rooms=1")}
-                        onCup={openCup}
-                    />
                 </div>
             )}
             {showCup && (

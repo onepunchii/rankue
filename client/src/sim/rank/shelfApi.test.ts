@@ -66,8 +66,9 @@ describe("장식장 응답 읽기", () => {
     it("주소: 내 것은 id 없이, 남의 것은 그 회원 id 로", async () => {
         expect(shelfUrl()).toBe("/api/hiq/sim/shelf");
         expect(shelfUrl("abc-1")).toBe("/api/hiq/sim/shelf?memberId=abc-1");
-        expect(shelfPath()).toBe("/online-game?shelf=1");
-        expect(shelfPath("abc-1")).toBe("/online-game?shelf=1&m=abc-1");
+        // 2026-10-16 장식장은 큐 케이스의 '메달 · 배지' 칸으로 옮겼다
+        expect(shelfPath()).toBe("/cue-case?sec=medals");
+        expect(shelfPath("abc-1")).toBe("/cue-case?m=abc-1&sec=medals");
         const request = vi.fn(async () => raw);
         const s = await createShelfApi(request).get("abc-1");
         expect(request).toHaveBeenCalledWith("/api/hiq/sim/shelf?memberId=abc-1");
