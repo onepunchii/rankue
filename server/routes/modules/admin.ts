@@ -9,6 +9,7 @@ import { checkSuperAdmin, adminLog } from "../../middleware/adminAuth.js";
 import { adminActionLabel, type AdminActionRow } from "../../../shared/adminActions.js";
 import adminGoodsRouter from "./adminGoods.js";
 import adminBilliardsRouter from "./adminBilliards.js";
+import adminHikingRouter from "./adminHiking.js";
 import { cleanRejectReason } from "../../lib/partnerApply.js";
 import adminGolfRouter from "./adminGolf/index.js";
 import adminVisitorsRouter from "./adminVisitors.js";
@@ -32,6 +33,7 @@ router.use("/visitors", adminVisitorsRouter);
 router.use("/goods", adminGoodsRouter);
 // 당구(2026-10-16) — 실전 경기 전체 · 이상 표시
 router.use("/billiards", adminBilliardsRouter);
+router.use("/hiking", adminHikingRouter);
 
 // /partner/login 과 같은 쿠키 옵션 — 모든 가드가 signedCookies 로 읽으므로 서명이 빠지면 안 된다.
 const PARTNER_COOKIE_OPTS = {
