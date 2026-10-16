@@ -60,11 +60,12 @@ function CueStick({ height, skin }: { height: number; skin?: string | null }) {
             <path d="M8 10h4l1.2 46H6.8z" fill={CUE_SHAFT} stroke={CUE_EDGE} strokeWidth="0.5" />
             <path d={BUTT_PATH} fill={CUE_BUTT} />
             {skin && (
-                // 대표 큐의 손잡이 — 그림의 범퍼(왼쪽)가 아래 끝, 이음쇠(오른쪽)가 가운데. 비율은 그대로 두고 가운데를 보인다(slice)
+                // 대표 큐의 손잡이 — 그림의 범퍼(왼쪽)가 아래 끝, 이음쇠(오른쪽)가 가운데. 손잡이를 통째로 넣는다(2026-10-16 오너: "아래부분이 잘려 보인다" —
+                // 가운데만 보이던 slice 를 none 으로). 이 막대의 큐는 실제보다 굵게 그린 것이라 무늬가 길이 쪽으로 조금 줄어든다.
                 <>
                     <clipPath id={clip}><path d={BUTT_PATH} /></clipPath>
                     <g clipPath={`url(#${clip})`}>
-                        <image href={skin} x="0" y="0" width="42" height="8" preserveAspectRatio="xMidYMid slice" transform="translate(6 98) rotate(-90)" data-testid="power-cue-skin" />
+                        <image href={skin} x="0" y="0" width="42" height="8" preserveAspectRatio="none" transform="translate(6 98) rotate(-90)" data-testid="power-cue-skin" />
                     </g>
                 </>
             )}

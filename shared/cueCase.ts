@@ -64,26 +64,26 @@ const cue = (group: CueGroup, id: string, img: string, name: Names, rule: Rule, 
 
 export const CUES: readonly CaseItem[] = [
     // ── 실전 전용 20 ─────────────────────────────────────────
-    cue("real", "first", "games-10", N("첫 큐", "First Cue", "Primer taco", "Cơ đầu tiên", "İlk Istaka"), { k: "realGames", n: 1 }),
-    cue("real", "games-50", "games-50", N("50판 큐", "50 Games", "50 partidas", "50 trận", "50 Maç"), { k: "realGames", n: 50 }),
-    cue("real", "games-100", "games-100", N("100판 큐", "100 Games", "100 partidas", "100 trận", "100 Maç"), { k: "realGames", n: 100 }),
-    cue("real", "games-300", "games-300", N("300판 큐", "300 Games", "300 partidas", "300 trận", "300 Maç"), { k: "realGames", n: 300 }),
-    cue("real", "games-500", "games-500", N("500판 큐", "500 Games", "500 partidas", "500 trận", "500 Maç"), { k: "realGames", n: 500 }),
-    cue("real", "games-1000", "games-1000", N("천 판 큐", "1,000 Games", "1000 partidas", "1.000 trận", "1.000 Maç"), { k: "realGames", n: 1000 }),
-    cue("real", "run-5", "run-5", N("하이런 5", "High Run 5", "Serie 5", "Chuỗi 5", "Seri 5"), { k: "realRun", n: 5 }),
-    cue("real", "run-10", "run-10", N("하이런 10", "High Run 10", "Serie 10", "Chuỗi 10", "Seri 10"), { k: "realRun", n: 10 }),
-    cue("real", "run-15", "run-15", N("하이런 15", "High Run 15", "Serie 15", "Chuỗi 15", "Seri 15"), { k: "realRun", n: 15 }),
-    cue("real", "run-20", "run-20", N("하이런 20", "High Run 20", "Serie 20", "Chuỗi 20", "Seri 20"), { k: "realRun", n: 20 }),
-    cue("real", "finisher", "finisher", N("끝내기", "Finisher", "Remate", "Kết liễu", "Bitirici"), { k: "realScene", s: "finisher" }),
-    cue("real", "shutout", "shutout", N("완봉", "Shutout", "Blanqueada", "Trắng lưới", "Sıfırlama"), { k: "realScene", s: "shutout" }),
-    cue("real", "comeback", "comeback", N("대역전", "Comeback", "Remontada", "Lội ngược dòng", "Geri Dönüş"), { k: "realScene", s: "comeback" }),
-    cue("real", "no-miss", "no-miss", N("공타 제로", "No Empty Inning", "Sin entrada vacía", "Không lượt trắng", "Boş Istaka Yok"), { k: "realScene", s: "noMiss" }),
-    cue("real", "over-target", "over-target", N("다마 넘김", "Above My Handicap", "Sobre mi hándicap", "Vượt điểm chấp", "Handikap Üstü"), { k: "realScene", s: "overTarget" }),
-    cue("real", "dama-up", "dama-up", N("다마 오름", "Handicap Up", "Sube el hándicap", "Lên điểm chấp", "Handikap Yükseldi"), { k: "realScene", s: "damaUp" }),
-    cue("real", "regular", "regular", N("단골", "Regular Partner", "Compañero fijo", "Bạn quen", "Sabit Rakip"), { k: "realRegular", n: 30 }),
-    cue("real", "new-face", "new-face", N("새 얼굴", "New Faces", "Caras nuevas", "Gương mặt mới", "Yeni Yüzler"), { k: "realNewFace", n: 10 }),
-    cue("real", "jjajang", "jjajang", N("짜장면 타임", "Noodle Break", "Pausa de fideos", "Giờ mì đen", "Erişte Molası"), { k: "hidden", s: "jjajang" }, { hidden: true }),
-    cue("real", "dawn", "dawn", N("새벽 큐", "Dawn Cue", "Taco del alba", "Cơ rạng sáng", "Şafak Istakası"), { k: "hidden", s: "dawn" }, { hidden: true }),
+    cue("real", "first", "games-10", N("민무늬 메이플", "Plain Maple", "Arce liso", "Phong trơn", "Düz Akçaağaç"), { k: "realGames", n: 1 }),
+    cue("real", "games-50", "games-50", N("체리 포인트", "Cherry Points", "Puntas de cerezo", "Mũi gỗ anh đào", "Kiraz Uçlar"), { k: "realGames", n: 50 }),
+    cue("real", "games-100", "games-100", N("월넛 다이아", "Walnut Diamond", "Diamante de nogal", "Kim cương óc chó", "Ceviz Elmas"), { k: "realGames", n: 100 }),
+    cue("real", "games-300", "games-300", N("레드 진주 점", "Red Pearl Dots", "Perlas en rojo", "Chấm ngọc đỏ", "Kırmızı İnci Noktalar"), { k: "realGames", n: 300 }),
+    cue("real", "games-500", "games-500", N("흑단 금테", "Ebony Gold Band", "Ébano anillo dorado", "Mun viền vàng", "Abanoz Altın Bant"), { k: "realGames", n: 500 }),
+    cue("real", "games-1000", "games-1000", N("흑단 금세공", "Ebony Filigree", "Ébano filigrana", "Mun chạm vàng", "Abanoz Telkari"), { k: "realGames", n: 1000 }),
+    cue("real", "run-5", "run-5", N("작은 불꽃", "Spark Flame", "Llama pequeña", "Ngọn lửa nhỏ", "Küçük Alev"), { k: "realRun", n: 5 }),
+    cue("real", "run-10", "run-10", N("타오르는 불꽃", "Wildfire", "Llamarada", "Lửa bùng", "Yangın"), { k: "realRun", n: 10 }),
+    cue("real", "run-15", "run-15", N("푸른 번개", "Blue Lightning", "Rayo azul", "Sét xanh", "Mavi Şimşek"), { k: "realRun", n: 15 }),
+    cue("real", "run-20", "run-20", N("보랏빛 벼락", "Violet Thunderbolt", "Relámpago violeta", "Tia sét tím", "Mor Yıldırım"), { k: "realRun", n: 20 }),
+    cue("real", "finisher", "finisher", N("흑단 화살", "Ebony Arrow", "Flecha de ébano", "Mũi tên mun", "Abanoz Ok"), { k: "realScene", s: "finisher" }),
+    cue("real", "shutout", "shutout", N("진주 방패", "Pearl Shield", "Escudo de nácar", "Khiên xà cừ", "İnci Kalkan"), { k: "realScene", s: "shutout" }),
+    cue("real", "comeback", "comeback", N("노을 지그재그", "Sunset Zigzag", "Zigzag atardecer", "Zigzag hoàng hôn", "Gün Batımı Zikzak"), { k: "realScene", s: "comeback" }),
+    cue("real", "no-miss", "no-miss", N("백자 결", "White Birdseye", "Ojo de pájaro blanco", "Vân mắt chim trắng", "Beyaz Kuş Gözü"), { k: "realScene", s: "noMiss" }),
+    cue("real", "over-target", "over-target", N("초록 V무늬", "Green Chevron", "Galón verde", "Chữ V xanh lá", "Yeşil Şerit"), { k: "realScene", s: "overTarget" }),
+    cue("real", "dama-up", "dama-up", N("푸른 구슬", "Blue Beads", "Cuentas azules", "Hạt cườm xanh", "Mavi Boncuklar"), { k: "realScene", s: "damaUp" }),
+    cue("real", "regular", "regular", N("가죽 리벳", "Leather & Rivets", "Cuero y remaches", "Da đinh tán", "Deri Perçin"), { k: "realRegular", n: 30 }),
+    cue("real", "new-face", "new-face", N("점 고리", "Ring of Dots", "Anillo de puntos", "Vòng chấm", "Nokta Halkası"), { k: "realNewFace", n: 10 }),
+    cue("real", "jjajang", "jjajang", N("교차 젓가락", "Crossed Chopsticks", "Palillos cruzados", "Đũa bắt chéo", "Çapraz Çubuklar"), { k: "hidden", s: "jjajang" }, { hidden: true }),
+    cue("real", "dawn", "dawn", N("새벽달", "Dawn Moon", "Luna del alba", "Trăng rạng sáng", "Şafak Ayı"), { k: "hidden", s: "dawn" }, { hidden: true }),
     // ── 온라인 전용 24 ───────────────────────────────────────
     cue("online", "tier-iron", "tier-iron", N("아이언", "Iron", "Hierro", "Sắt", "Demir"), { k: "onTier", tier: "iron" }),
     cue("online", "tier-bronze", "tier-bronze", N("브론즈", "Bronze", "Bronce", "Đồng", "Bronz"), { k: "onTier", tier: "bronze" }),
@@ -96,30 +96,30 @@ export const CUES: readonly CaseItem[] = [
     cue("online", "cup-runnerup", "cup-runnerup", N("월대회 준우승", "Cup Runner-up", "Subcampeón", "Á quân cúp", "Kupa İkincisi"), { k: "onCup", place: 2 }),
     cue("online", "cup-semi", "cup-semi", N("월대회 4강", "Cup Semi-finalist", "Semifinalista", "Bán kết cúp", "Kupa Yarı Finalisti"), { k: "onCup", place: 4 }),
     cue("online", "month-top", "month-top", N("이달의 1위", "Player of the Month", "Número 1 del mes", "Số 1 của tháng", "Ayın Birincisi"), { k: "onMonthTop" }),
-    cue("online", "first-win", "online-first-win", N("온라인 첫 승", "First Online Win", "Primera victoria online", "Trận thắng online đầu", "İlk Online Galibiyet"), { k: "onWins", n: 1 }),
-    cue("online", "games-50", "on-games-50", N("대전 50판", "50 Online Matches", "50 partidas online", "50 trận online", "50 Online Maç"), { k: "onGames", n: 50 }),
-    cue("online", "games-300", "on-games-300", N("대전 300판", "300 Online Matches", "300 partidas online", "300 trận online", "300 Online Maç"), { k: "onGames", n: 300 }),
-    cue("online", "wins-100", "online-100", N("100승", "100 Wins", "100 victorias", "100 trận thắng", "100 Galibiyet"), { k: "onWins", n: 100 }),
-    cue("online", "run-5", "on-run-5", N("온라인 하이런 5", "Online High Run 5", "Serie online 5", "Chuỗi online 5", "Online Seri 5"), { k: "onRun", n: 5 }),
-    cue("online", "run-10", "on-run-10", N("온라인 하이런 10", "Online High Run 10", "Serie online 10", "Chuỗi online 10", "Online Seri 10"), { k: "onRun", n: 10 }),
-    cue("online", "run-15", "on-run-15", N("온라인 하이런 15", "Online High Run 15", "Serie online 15", "Chuỗi online 15", "Online Seri 15"), { k: "onRun", n: 15 }),
-    cue("online", "bank-first", "bank-first", N("첫 뱅크샷", "First Bank Shot", "Primer tiro de banda", "Cú băng đầu tiên", "İlk Bant Vuruşu"), { k: "bank", n: 1 }),
-    cue("online", "bank-50", "bank-50", N("뱅크샷 50", "50 Bank Shots", "50 tiros de banda", "50 cú băng", "50 Bant Vuruşu"), { k: "bank", n: 50 }),
-    cue("online", "five-cushion", "five-cushion", N("다섯 쿠션", "Five Cushions", "Cinco bandas", "Năm băng", "Beş Bant"), { k: "fiveCushion" }),
-    cue("online", "streak", "online-streak", N("5연승", "Five in a Row", "Cinco seguidas", "5 trận thắng liền", "Üst Üste Beş"), { k: "streak", n: 5 }),
-    cue("online", "comeback", "on-comeback", N("온라인 역전승", "Online Comeback", "Remontada online", "Lội ngược dòng online", "Online Geri Dönüş"), { k: "onComeback" }),
-    cue("online", "rival", "rival", N("맞수", "Rival", "Rival", "Kình địch", "Ezeli Rakip"), { k: "rival", n: 10 }),
+    cue("online", "first-win", "online-first-win", N("청록 별", "Teal Star", "Estrella turquesa", "Ngôi sao xanh ngọc", "Turkuaz Yıldız"), { k: "onWins", n: 1 }),
+    cue("online", "games-50", "on-games-50", N("다섯 고리", "Five Rings", "Cinco anillos", "Năm vòng", "Beş Halka"), { k: "onGames", n: 50 }),
+    cue("online", "games-300", "on-games-300", N("금속 그립", "Steel Grip", "Empuñadura de acero", "Tay cầm thép", "Çelik Kavrama"), { k: "onGames", n: 300 }),
+    cue("online", "wins-100", "online-100", N("네온 회로", "Neon Circuit", "Circuito neón", "Mạch neon", "Neon Devre"), { k: "onWins", n: 100 }),
+    cue("online", "run-5", "on-run-5", N("청록 불씨", "Teal Ember", "Brasa turquesa", "Tàn lửa xanh ngọc", "Turkuaz Kor"), { k: "onRun", n: 5 }),
+    cue("online", "run-10", "on-run-10", N("청록 불꽃", "Teal Flame", "Llama turquesa", "Lửa xanh ngọc", "Turkuaz Alev"), { k: "onRun", n: 10 }),
+    cue("online", "run-15", "on-run-15", N("보라 전격", "Violet Surge", "Descarga violeta", "Luồng điện tím", "Mor Akım"), { k: "onRun", n: 15 }),
+    cue("online", "bank-first", "bank-first", N("뱅크 궤적", "Bank Line", "Trayectoria de banda", "Đường băng", "Bant İzi"), { k: "bank", n: 1 }),
+    cue("online", "bank-50", "bank-50", N("금선 별빛", "Gold Starburst", "Estallido dorado", "Tia sao vàng", "Altın Yıldız Patlaması"), { k: "bank", n: 50 }),
+    cue("online", "five-cushion", "five-cushion", N("다섯 꺾임", "Five Rails", "Cinco quiebres", "Năm khúc gãy", "Beş Kırılma"), { k: "fiveCushion" }),
+    cue("online", "streak", "online-streak", N("청록 메달리온", "Teal Medallion", "Medallón turquesa", "Huy chương xanh ngọc", "Turkuaz Madalyon"), { k: "streak", n: 5 }),
+    cue("online", "comeback", "on-comeback", N("청록 지그재그", "Teal Zigzag", "Zigzag turquesa", "Zigzag xanh ngọc", "Turkuaz Zikzak"), { k: "onComeback" }),
+    cue("online", "rival", "rival", N("마주 선 별", "Facing Stars", "Estrellas enfrentadas", "Hai ngôi sao đối mặt", "Karşılıklı Yıldızlar"), { k: "rival", n: 10 }),
     // ── 공통(합산) 19 ────────────────────────────────────────
-    cue("common", "spring", "spring", N("봄 큐", "Spring Cue", "Taco de primavera", "Cơ mùa xuân", "Bahar Istakası"), { k: "season", s: "spring" }),
-    cue("common", "summer", "summer", N("여름 큐", "Summer Cue", "Taco de verano", "Cơ mùa hạ", "Yaz Istakası"), { k: "season", s: "summer" }),
-    cue("common", "autumn", "autumn", N("가을 큐", "Autumn Cue", "Taco de otoño", "Cơ mùa thu", "Sonbahar Istakası"), { k: "season", s: "autumn" }),
-    cue("common", "winter", "winter", N("겨울 큐", "Winter Cue", "Taco de invierno", "Cơ mùa đông", "Kış Istakası"), { k: "season", s: "winter" }),
+    cue("common", "spring", "spring", N("벚꽃 가지", "Cherry Blossom Branch", "Rama de cerezo", "Cành anh đào", "Kiraz Dalı"), { k: "season", s: "spring" }),
+    cue("common", "summer", "summer", N("청록 파도", "Teal Wave", "Ola turquesa", "Sóng xanh ngọc", "Turkuaz Dalga"), { k: "season", s: "summer" }),
+    cue("common", "autumn", "autumn", N("단풍잎", "Maple Leaves", "Hojas de arce", "Lá phong", "Akçaağaç Yaprakları"), { k: "season", s: "autumn" }),
+    cue("common", "winter", "winter", N("눈 덮인 솔", "Snowy Pine", "Pino nevado", "Thông phủ tuyết", "Karlı Çam"), { k: "season", s: "winter" }),
     cue("common", "plum", "kr-plum", N("매(梅)", "Plum Blossom", "Ciruelo", "Hoa mai", "Erik Çiçeği"), { k: "sagunja", s: "spring" }),
     cue("common", "orchid", "kr-orchid", N("난(蘭)", "Orchid", "Orquídea", "Hoa lan", "Orkide"), { k: "sagunja", s: "summer" }),
     cue("common", "chrysanthemum", "kr-chrysanthemum", N("국(菊)", "Chrysanthemum", "Crisantemo", "Hoa cúc", "Kasımpatı"), { k: "sagunja", s: "autumn" }),
     cue("common", "bamboo", "kr-bamboo", N("죽(竹)", "Bamboo", "Bambú", "Trúc", "Bambu"), { k: "sagunja", s: "winter" }),
-    cue("common", "triple-three", "triple-three", N("333", "333", "333", "333", "333"), { k: "hidden", s: "triple3" }, { hidden: true }),
-    cue("common", "anniversary", "anniversary", N("가입 1주년", "One Year Together", "Un año juntos", "Một năm bên nhau", "Birlikte Bir Yıl"), { k: "hidden", s: "anniversary" }, { hidden: true }),
+    cue("common", "triple-three", "triple-three", N("세 마름모", "Three Diamonds", "Tres rombos", "Ba hình thoi", "Üç Baklava"), { k: "hidden", s: "triple3" }, { hidden: true }),
+    cue("common", "anniversary", "anniversary", N("리본 별", "Ribbon Star", "Estrella con lazo", "Sao ruy băng", "Kurdeleli Yıldız"), { k: "hidden", s: "anniversary" }, { hidden: true }),
     cue("common", "dancheong", "kr-dancheong", N("단청", "Dancheong", "Dancheong", "Dancheong", "Dancheong"), { k: "people", n: 1 }),
     cue("common", "munsal", "kr-munsal", N("한옥 문살", "Hanok Lattice", "Celosía hanok", "Song cửa Hanok", "Hanok Kafesi"), { k: "people", n: 3 }),
     cue("common", "lantern", "kr-lantern", N("청사초롱", "Silk Lantern", "Farol de seda", "Đèn lồng lụa", "İpek Fener"), { k: "people", n: 5 }),
@@ -138,14 +138,14 @@ export const CUES: readonly CaseItem[] = [
     cue("both", "silla-crown", "kr-silla-crown", N("신라 금관", "Silla Gold Crown", "Corona de oro Silla", "Vương miện vàng Silla", "Silla Altın Tacı"), { k: "both", s: "gloves12" }),
     cue("both", "baekho", "kr-baekho", N("백호", "White Tiger", "Tigre blanco", "Bạch hổ", "Beyaz Kaplan"), { k: "both", s: "gold" }),
     // ── 크루 6 ───────────────────────────────────────────────
-    cue("crew", "cup-win", "crew-champion", N("크루 대회 우승", "Crew Cup Winner", "Campeón de crew", "Vô địch giải nhóm", "Ekip Kupası Şampiyonu"), { k: "crew", s: "cupWin" }),
-    cue("crew", "cup-runner", "crew-runnerup", N("크루 대회 준우승", "Crew Cup Runner-up", "Subcampeón de crew", "Á quân giải nhóm", "Ekip Kupası İkincisi"), { k: "crew", s: "cupRunner" }),
-    cue("crew", "regular", "crew-regular", N("크루 개근", "Crew Regular", "Fiel al crew", "Chuyên cần nhóm", "Ekip Müdavimi"), { k: "crew", s: "regular" }),
-    cue("crew", "founder", "crew-founder", N("창립 멤버", "Founding Member", "Miembro fundador", "Thành viên sáng lập", "Kurucu Üye"), { k: "crew", s: "founder" }),
-    cue("crew", "battle", "crew-battle", N("크루 대항전", "Crew Battle", "Duelo de crews", "Đối kháng nhóm", "Ekip Savaşı"), { k: "crew", s: "battle" }),
-    cue("crew", "hundred", "crew-hundred", N("크루 백 판", "100 Crew Games", "100 partidas de crew", "100 trận trong nhóm", "100 Ekip Maçı"), { k: "crew", s: "hundred" }),
+    cue("crew", "cup-win", "crew-champion", N("붉은 월계관", "Crimson Laurel", "Laurel carmesí", "Vòng nguyệt quế đỏ", "Kızıl Defne"), { k: "crew", s: "cupWin" }),
+    cue("crew", "cup-runner", "crew-runnerup", N("은빛 월계관", "Silver Laurel", "Laurel plateado", "Vòng nguyệt quế bạc", "Gümüş Defne"), { k: "crew", s: "cupRunner" }),
+    cue("crew", "regular", "crew-regular", N("삼각 깃발", "Pennant Flags", "Banderines", "Cờ tam giác", "Flama Bayraklar"), { k: "crew", s: "regular" }),
+    cue("crew", "founder", "crew-founder", N("창립의 열쇠", "Founder's Key", "Llave fundadora", "Chìa khóa sáng lập", "Kurucu Anahtarı"), { k: "crew", s: "founder" }),
+    cue("crew", "battle", "crew-battle", N("맞선 깃발", "Crossed Flags", "Banderas cruzadas", "Cờ bắt chéo", "Çapraz Bayraklar"), { k: "crew", s: "battle" }),
+    cue("crew", "hundred", "crew-hundred", N("금빛 매듭", "Golden Knot", "Nudo dorado", "Nút thắt vàng", "Altın Düğüm"), { k: "crew", s: "hundred" }),
     // ── 2단계(매장 QR) 1 ─────────────────────────────────────
-    cue("stage2", "traveller", "traveller", N("원정", "Traveller", "Viajero", "Lữ khách", "Gezgin"), { k: "stores", n: 5 }),
+    cue("stage2", "traveller", "traveller", N("나침반", "Compass Rose", "Rosa de los vientos", "La bàn", "Pusula Gülü"), { k: "stores", n: 5 }),
 ];
 
 const chalk = (id: string, img: string, name: Names, rule: Rule, extra: Partial<CaseItem> = {}): CaseItem => ({ id: `chalk-${id}`, kind: "chalk", img, name, rule, ...extra });
@@ -198,6 +198,46 @@ export const PENNANTS: readonly CaseItem[] = [
     pennant("crew-of-month", "crewOfMonth", N("이달의 크루", "Crew of the Month", "Crew del mes", "Nhóm của tháng", "Ayın Ekibi")),
     pennant("store-trips", "stores5", N("매장 원정 5곳", "Five Hall Tour", "Gira de 5 salas", "Chinh phục 5 quán", "Beş Salon Turu")),
 ];
+
+export type Stars = 1 | 2 | 3 | 4 | 5;
+/**
+ * 난이도 별(2026-10-16 오너: "팝업에 달성하기 어려운 거 별 다는 거 어때? 소유욕 더 생기고") — 조건이 얼마나 어려운가. 가진 사람 수(희귀함)와는 따로다.
+ * 기준: ★1 첫 판이면 · ★2 몇 주 · ★3 한두 달 꾸준히 · ★4 실력이나 오래 · ★5 손꼽히는 몇 사람.
+ */
+export function difficulty(x: Pick<CaseItem, "rule">): Stars {
+    const r = x.rule;
+    const by = (n: number, steps: readonly (readonly [number, Stars])[]): Stars => { let v: Stars = 1; for (const [min, st] of steps) if (n >= min) v = st; return v; };
+    switch (r.k) {
+        case "realGames": return by(r.n, [[1, 1], [50, 2], [100, 2], [300, 3], [500, 4], [1000, 5]]);
+        case "realRun": return by(r.n, [[5, 2], [10, 3], [15, 4], [20, 5]]);
+        case "realScene": return r.s === "overTarget" || r.s === "damaUp" || r.s === "finisher" ? 2 : 3;
+        case "realRegular": return 3;
+        case "realNewFace": return 2;
+        case "hidden": return r.s === "triple3" ? 4 : r.s === "dawn" ? 3 : 2;
+        case "onTier": return ({ iron: 1, bronze: 1, silver: 2, gold: 3, platinum: 4, diamond: 5, master: 5 } as const)[r.tier];
+        case "onCup": return r.place === 1 ? 5 : r.place === 2 ? 4 : 3;
+        case "onMonthTop": return 4;
+        case "onWins": return by(r.n, [[1, 1], [100, 4]]);
+        case "onGames": return by(r.n, [[1, 1], [50, 2], [300, 4]]);
+        case "onRun": return by(r.n, [[5, 2], [10, 4], [15, 5]]);
+        case "bank": return by(r.n, [[1, 1], [50, 3]]);
+        case "fiveCushion": case "streak": case "onComeback": case "rival": return 3;
+        case "season": return 2;
+        case "sagunja": return 4;
+        case "people": return by(r.n, [[1, 1], [5, 2], [20, 3], [50, 4], [100, 5]]);
+        case "both": return r.s === "firstWins" ? 2 : r.s === "sameMonth" ? 3 : r.s === "games100" || r.s === "gloves12" ? 5 : 4;
+        case "crew": return r.s === "founder" ? 1 : r.s === "battle" ? 2 : r.s === "cupWin" || r.s === "hundred" ? 4 : 3;
+        case "stores": return 3;
+        case "seasonPeople": case "world": case "crewBattle": return 2;
+        case "sameOpp": return 4;
+        case "glove": return 2;
+        case "gloveFirst": return 1;
+        case "gloveYear": return 5;
+        case "gloveCrew": return 3;
+        case "gloveCup": return 2;
+        case "pennant": return r.s === "games500" || r.s === "cup20" || r.s === "crewOfMonth" ? 5 : r.s === "battle10" || r.s === "regular" ? 4 : 3;
+    }
+}
 
 export const CASE_ITEMS: readonly CaseItem[] = [...CUES, ...CHALKS, ...GLOVES, ...PENNANTS];
 const BY_ID = new Map(CASE_ITEMS.map((x) => [x.id, x]));

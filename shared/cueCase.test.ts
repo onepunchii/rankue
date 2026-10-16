@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { CASE_ITEMS, CHALKS, CUES, GLOVES, PENNANTS, SOON, caseImage, cueHow, type CaseLocale } from "./cueCase";
+import { CASE_ITEMS, CHALKS, CUES, GLOVES, PENNANTS, SOON, caseImage, cueHow, difficulty, type CaseLocale } from "./cueCase";
 import { deficitFromInnings, deficitFromShots, evaluateCase, kstMonthKey, seasonOf, type CaseInput, type OnlineGame, type RealGame } from "./cueCaseRules";
 
 // 큐 케이스(2026-10-16) — 당구의 수집. 기획 docs/01-plan/features/billiards-cue-case.md
@@ -41,6 +41,20 @@ describe("목록", () => {
         expect(read("client/src/sim/rank/ShelfLink.tsx")).toContain('export const CASE_ICON_SRC = "/billiards/case/icon-case.webp";');
         expect(read("client/src/components/hiq/dashboard/OnlineHubBanner.tsx")).toContain("<Tile icon={CASE_ICON_SRC} title={t(\"home.hubShelf\")}");
         expect(read("client/src/components/hiq/cueCase/CueCaseEntry.tsx")).toContain('const CASE_ICON = "/billiards/case/icon-case.webp";');
+    });
+    it("큐마다 제 이름(2026-10-16 오너: \"첫큐 50큐 뭐가 무슨 큐인지 모르겠어\") — 조건 이름이 아니라 무늬 이름, 겹치지 않는다", () => {
+        const ko = CUES.map((c) => c.name.ko);
+        expect(new Set(ko).size).toBe(ko.length);
+        expect(ko.filter((n) => /판 큐$|^하이런|^온라인 하이런|^대전 \d|^뱅크샷 \d|^\d+승$|^온라인 첫 승$|^첫 큐$/.test(n))).toEqual([]);
+        expect(CUES.find((c) => c.id === "cue-first")!.name.ko).toBe("민무늬 메이플");
+        expect(CUES.find((c) => c.id === "cue-traveller")!.name.ko).toBe("나침반");
+    });
+    it("난이도 별 1~5 — 모든 것에 있고, 같은 갈래에서는 어려울수록 많다", () => {
+        for (const x of CASE_ITEMS) expect([1, 2, 3, 4, 5], x.id).toContain(difficulty(x));
+        const s = (id: string) => difficulty(CASE_ITEMS.find((x) => x.id === id)!);
+        expect([s("cue-first"), s("cue-games-300"), s("cue-games-1000")]).toEqual([1, 3, 5]);
+        expect(s("cue-on-tier-master")).toBeGreaterThan(s("cue-on-tier-silver"));
+        expect(s("chalk-stonewall")).toBe(5);
     });
     it("이름 · 받는 법이 다섯 언어에 있다 — 숨은 큐는 받기 전에 조건을 감춘다", () => {
         for (const x of CASE_ITEMS) for (const l of LOCALES) {
@@ -179,7 +193,7 @@ describe("연결", () => {
         expect(page).toContain("cueSkin: cueSkin(mySkin),");
         expect(read("client/src/sim/render/Canvas2DRenderer.ts")).toContain("ctx.drawImage(skin, 0, -buttW / 2, len * 0.45, buttW);");
         expect(read("client/src/sim/render/ThreeRenderer.ts")).toContain("this.applyCueSkin(cue.skin);");
-        expect(read("client/src/sim/components/PowerRail.tsx")).toContain('preserveAspectRatio="xMidYMid slice" transform="translate(6 98) rotate(-90)"');
+        expect(read("client/src/sim/components/PowerRail.tsx")).toContain('preserveAspectRatio="none" transform="translate(6 98) rotate(-90)"');
         expect(read("client/src/sim/match/MatchIntro.tsx")).toContain('data-testid="intro-cues"');
         expect(read("client/src/sim/match/MatchEndRapport.tsx")).toContain('data-testid="match-end-cues"');
         // 서버: 대전 정보에 두 사람의 대표 큐 — 큐 케이스와 같은 규칙(고른 큐, 없으면 가장 최근에 받은 큐)
@@ -208,6 +222,18 @@ describe("연결", () => {
         const card = read("client/src/components/hiq/cueCase/caseCard.ts");
         expect(card).toContain("export const CASE_CARD_W = 1080;");
         expect(card).toContain("const ih = Math.min(sh - 8, (sw - 40) * 80 / 1000), iw = ih * 1000 / 80;");
+    });
+    it("코치마크(2026-10-16 오너: \"큐케이스도 코치마크 · 세부도\") — 내 케이스에서만, 전체 한 번 + 초크 · 장갑 · 메달 칸", () => {
+        const page = read("client/src/pages/hiq/cue-case.tsx");
+        expect(page).toContain('{d?.member.mine && sec === "cue" && <CoachTour id="cue-case" tone="billiards" when={!reveal} steps={[');
+        for (const id of ["cue-case-chalk", "cue-case-glove", "cue-case-medals"]) expect(page).toContain(`<CoachTour id="${id}" tone="billiards"`);
+        expect(page).toContain('tour={i === 0 ? "cc-row" : undefined}');
+        for (const tag of ["cc-plate", "cc-hero", "cc-month", "cc-secs", "cc-groups", "cc-share", "cc-people", "cc-tiles", "cc-real-medal", "cc-online-shelf"]) expect(page, tag).toMatch(new RegExp(`data-tour=(\\{[^}]*)?"${tag}"`));
+        // 잠긴 큐도 팝업에선 원래 무늬(숨은 큐만 모양) · 난이도 별 · 가진 사람 수
+        expect(page).toContain('className={view.done || !item.hidden ? "cc-own" : "cc-secret"}');
+        expect(page).toContain('data-testid="cue-case-difficulty"');
+        const keys = ["plate", "hero", "month", "secs", "groups", "row", "share", "people", "chalk", "glove", "realMedal", "onlineShelf"].flatMap((k) => [`tour.cc.${k}Title`, `tour.cc.${k}Body`]);
+        for (const l of LOCALES) { const f = read(`client/src/lib/i18n/${l}.ts`); for (const k of keys) expect(f, `${l} ${k}`).toContain(`"${k}":`); }
     });
     it("문구가 다섯 언어에 있고 자리 표시를 지킨다", () => {
         const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"] };

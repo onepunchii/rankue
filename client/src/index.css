@@ -1069,8 +1069,8 @@ body {
   }
   .cue-case .cc-ghost {
     /* 못 받은 것 — 무늬는 보이되 빛을 뺀다(무엇을 받게 될지 보여야 갖고 싶다). 벨벳 그늘에 잠긴 듯 어둡게 */
-    filter: grayscale(1) brightness(0.42) contrast(1.2);
-    opacity: 0.8;
+    filter: grayscale(0.7) brightness(0.58) contrast(1.15);
+    opacity: 0.85;
   }
   .cue-case .cc-secret {
     /* 숨은 것 — 모양만(흰 실루엣을 아주 옅게, 위쪽 그늘로 파인 듯이) */
