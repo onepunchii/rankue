@@ -564,7 +564,7 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
         const n = new Set(r.history.map((h) => h.memberId)).size;
         const message = to
             ? `이 라운드를 공식으로 올릴까요?\n\n${courseOf(r)} · ${kstDate(r.finishedAt ?? r.createdAt)}\n참가 회원 ${n}명의 평균 · 등급 · 랭킹 · 여권 도장에 들어갑니다. 새로 받을 볼마커 · 트로피가 있으면 받습니다.\n\n까닭: ${reason.trim()}`
-            : `이 라운드를 미인증으로 내릴까요?\n\n${courseOf(r)} · ${kstDate(r.finishedAt ?? r.createdAt)}\n참가 회원 ${n}명의 평균 · 등급 · 랭킹 · 여권 도장에서 빠집니다(점수는 남습니다). 이미 받은 볼마커 · 트로피는 그대로입니다. 다시 공식으로 올릴 수 있습니다.\n\n까닭: ${reason.trim()}`;
+            : `이 라운드를 미인증으로 내릴까요?\n\n${courseOf(r)} · ${kstDate(r.finishedAt ?? r.createdAt)}\n참가 회원 ${n}명의 평균 · 등급 · 랭킹 · 여권 도장에서 빠집니다(점수는 남습니다). 이미 받은 볼마커 · 트로피는 그대로입니다('보상 맞춰 보기'에서 거둘 수 있어요). 다시 공식으로 올릴 수 있습니다.\n\n까닭: ${reason.trim()}`;
         if (!(await appConfirm({ message, tone: to ? "default" : "danger", confirmText: to ? "공식으로" : "미인증으로" }))) return;
         setOnSite.mutate({ sid: r.id, to });
     };
@@ -721,7 +721,7 @@ function RoundSheet({ id, onClose, onOpenMember }: { id: string | null; onClose:
                                                         className="h-9 px-4 rounded-xl text-[13px] font-bold bg-brand text-white hover:bg-brand-strong disabled:opacity-40">공식으로 올리기</button>
                                                 )}
                                             </div>
-                                            <p className="text-[11.5px] leading-snug break-keep text-black/40">이 판의 기록 전부(동반자 포함)가 한 값으로 바뀌고 평균 · 등급 · 도장을 다시 셉니다. 이미 받은 볼마커 · 트로피는 그대로입니다.</p>
+                                            <p className="text-[11.5px] leading-snug break-keep text-black/40">이 판의 기록 전부(동반자 포함)가 한 값으로 바뀌고 평균 · 등급 · 도장을 다시 셉니다. 이미 받은 볼마커 · 트로피는 그대로입니다('보상 맞춰 보기'에서 거둘 수 있어요).</p>
                                         </div>
                                     )}
                                 </Panel>

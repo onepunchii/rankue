@@ -71,10 +71,17 @@ async function insertAward(memberId: string, d: StampAwardDue): Promise<StampAwa
  * 회원의 인증 도장에서 받았어야 할 것 가운데 아직 안 적은 것을 적는다. 새로 적은 것을 돌려준다(받은 순서).
  * 받을 것이 없으면 표를 읽지도 않는다.
  */
+/**
+ * 받았어야 할 것 전부(받은 순서) — 적을 때(syncStampAwards)와 어드민 맞춰 보기(golf.repo golfAwardsDue)가 같이 쓴다.
+ * 업적 핀(shared/golfPins)도 같은 표에 같은 방식으로 적는다 — kind 'pin', 순번은 그 핀을 받은 순서
+ * extra — 볼마커 등급(black · pearl) · 시즌 태그(tag) · 한정 볼마커(special). 부르는 쪽(golf.repo)이 판정해서 넘긴다
+ */
+export function allStampAwardsDue(stamps: readonly DatedStamp[], pins: readonly PinDue[] = [], extra: readonly StampAwardDue[] = []): StampAwardDue[] {
+    return [...stampAwardsDue(stamps), ...pins.map((p): StampAwardDue => ({ kind: "pin", key: p.id, earnedAt: p.earnedAt })), ...extra].sort((a, b) => a.earnedAt - b.earnedAt);
+}
+
 export async function syncStampAwards(memberId: string, stamps: readonly DatedStamp[], pins: readonly PinDue[] = [], extra: readonly StampAwardDue[] = []): Promise<StampAwardRow[]> {
-    // 업적 핀(shared/golfPins)도 같은 표에 같은 방식으로 적는다 — kind 'pin', 순번은 그 핀을 받은 순서
-    // extra — 볼마커 등급(black · pearl) · 시즌 태그(tag) · 한정 볼마커(special). 부르는 쪽(golf.repo)이 판정해서 넘긴다
-    const due = [...stampAwardsDue(stamps), ...pins.map((p): StampAwardDue => ({ kind: "pin", key: p.id, earnedAt: p.earnedAt })), ...extra].sort((a, b) => a.earnedAt - b.earnedAt);
+    const due = allStampAwardsDue(stamps, pins, extra);
     if (due.length === 0) return [];
     try {
         const have = new Set((await db.select({ kind: golfStampAwards.kind, key: golfStampAwards.key }).from(golfStampAwards).where(eq(golfStampAwards.memberId, memberId)))

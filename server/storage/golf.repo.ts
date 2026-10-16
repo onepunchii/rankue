@@ -39,11 +39,11 @@ import { resolveGolfRegionCode, expandRegionCodes, legacyRegionKeywords, passpor
 import { golfRegionCodeByCourseId } from "../../shared/golfCourseRegions.js";
 import { courseNameKey } from "../../shared/golfCourse.js";
 import { collectStamps, makeStampResolver, type StampAgg } from "./golfStamps.js";
-import { syncStampAwards, type StampAwardRow } from "./golfStampAwards.js";
+import { allStampAwardsDue, syncStampAwards, type StampAwardRow } from "./golfStampAwards.js";
 import { syncCrewStampsForMember } from "./golfCrewStamps.js";
 import type { DatedStamp } from "../../shared/golfStampAwards.js";
 import { stampOneLeft } from "../../shared/golfStampOneLeft.js";
-import { pinsDue, type PinRound } from "../../shared/golfPins.js";
+import { pinsDue, type PinDue, type PinRound } from "../../shared/golfPins.js";
 import { STAMP_BOOKS, slotForStamp } from "../../shared/golfStampBooks.js";
 import { markerTiersDue, stampDepths, type SlotDepth } from "../../shared/golfStampDepth.js";
 import { seasonTagYears, seasonTagsDue, specialMarkersDue, type SeasonTagYear } from "../../shared/golfStampExtras.js";
@@ -1058,15 +1058,33 @@ export class GolfRepository {
      * 도장은 여권과 같은 셈(getGolfPassportStats)이다. 규칙 shared/golfStampAwards, 저장 storage/golfStampAwards.
      */
     async syncStampAwards(memberId: string): Promise<StampAwardRow[]> {
+        const { stamps, pins, extra } = await this.stampAwardInputs(memberId, false);
+        const fresh = await syncStampAwards(memberId, stamps, pins, extra);
+        await this.nudgeStampOneLeft(memberId, stamps);
+        return fresh;
+    }
+
+    /**
+     * 지금 기록으로 받았어야 할 것 전부(적지 않는다) — 어드민 '골프 › 보상 맞춰 보기'(2026-10-17 골프 ③)가 받은 기록과 견준다.
+     * 받을 때(syncStampAwards)와 같은 판정이다. 읽다 실패하면 던진다 — 빈 판정으로 '받쳐 주지 않음'을 만들지 않게.
+     */
+    async golfAwardsDue(memberId: string): Promise<StampAwardDue[]> {
+        const { stamps, pins, extra } = await this.stampAwardInputs(memberId, true);
+        return allStampAwardsDue(stamps, pins, extra);
+    }
+
+    /** 받을 것의 재료 — 인증 도장 · 업적 핀 · 볼마커 등급 · 시즌 태그 · 한정 볼마커. strict 면 읽기 실패를 던진다(감사), 아니면 빈 값으로(받기) */
+    private async stampAwardInputs(memberId: string, strict: boolean): Promise<{ stamps: DatedStamp[]; pins: PinDue[]; extra: StampAwardDue[] }> {
+        const soft = <T,>(label: string, empty: T) => (e: unknown): T => { if (strict) throw e; console.error(`[golf] ${label}`, e); return empty; };
         const stats = await this.getGolfPassportStats(memberId);
         const stamps = stats.stamps.map((s) => ({ clubId: s.clubId, name: s.name, firstDate: s.firstDate }));
         // 업적 핀 — 인증 라운드(횟수 · 타수)와 도장으로 판정한다. 읽다 실패해도 도장첩의 기록은 적는다
         const [rounds, shots] = await Promise.all([
-            this.getGolfPinRounds(memberId).catch((e) => { console.error("[golf] pinRounds", e); return [] as PinRound[]; }),
-            this.getGolfPinPhotoTimes(memberId).catch((e) => { console.error("[golf] pinPhotos", e); return [] as Date[]; }),
+            this.getGolfPinRounds(memberId).catch(soft("pinRounds", [] as PinRound[])),
+            this.getGolfPinPhotoTimes(memberId).catch(soft("pinPhotos", [] as Date[])),
         ]);
         // 도장의 깊이(코스 조각 · 금테 · 사철) → 볼마커 등급 · 첫 금테 핀 · 시즌 태그 · 한정 볼마커. 코스 이름을 못 읽으면 조각 없이(두 번 방문 = 금테) 판정한다
-        const nineNames = await this.getStampNineNames().catch((e) => { console.error("[golf] stampNines", e); return {} as Record<string, string[]>; });
+        const nineNames = await this.getStampNineNames().catch(soft("stampNines", {} as Record<string, string[]>));
         const depths = stampDepths(rounds.map((r) => ({ at: r.at, clubId: r.clubId ?? null, name: r.clubName ?? "", nines: r.nines })), nineNames);
         const golds = Array.from(depths.values()).map((d) => d.goldAt).filter((t): t is number => t != null);
         const pins = pinsDue(rounds, stamps, shots, golds);
@@ -1076,9 +1094,7 @@ export class GolfRepository {
             ...specialMarkersDue(rounds.map((r) => ({ at: r.at, elite: !!slotForStamp({ clubId: r.clubId ?? null, name: r.clubName ?? "" }), strokes: r.strokes, pars: r.pars })), depths, stamps)
                 .map((d): StampAwardDue => ({ kind: "special", key: d.key, earnedAt: d.earnedAt })),
         ];
-        const fresh = await syncStampAwards(memberId, stamps, pins, extra);
-        await this.nudgeStampOneLeft(memberId, stamps);
-        return fresh;
+        return { stamps, pins, extra };
     }
 
     /**

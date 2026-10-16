@@ -236,7 +236,10 @@ describe("판정에 쓰는 자료 — 인증 라운드만", () => {
 
     it("도장첩의 기록과 같은 곳에서 같이 적는다 — 읽다 실패해도 도장첩의 기록은 적는다. 열 번째 사진을 올린 순간에도 맞춘다", () => {
         const sync = repo.slice(repo.indexOf("async syncStampAwards(memberId: string)"), repo.indexOf("async getGolfPinRounds(memberId: string)"));
-        expect(sync).toContain('this.getGolfPinRounds(memberId).catch((e) => { console.error("[golf] pinRounds", e); return [] as PinRound[]; }),');
+        // 받을 때는 읽기 실패를 빈 값으로(strict false) — 어드민 맞춰 보기(golfAwardsDue)만 던진다(2026-10-17 골프 ③에서 판정을 한 함수로 뽑음)
+        expect(sync).toContain("const { stamps, pins, extra } = await this.stampAwardInputs(memberId, false);");
+        expect(sync).toContain('const soft = <T,>(label: string, empty: T) => (e: unknown): T => { if (strict) throw e; console.error(`[golf] ${label}`, e); return empty; };');
+        expect(sync).toContain('this.getGolfPinRounds(memberId).catch(soft("pinRounds", [] as PinRound[])),');
         expect(sync).toContain("const pins = pinsDue(rounds, stamps, shots, golds);");
         expect(sync).toContain("const fresh = await syncStampAwards(memberId, stamps, pins, extra);");
         const routes = read("server/routes/modules/golf.ts");
