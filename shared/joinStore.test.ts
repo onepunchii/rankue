@@ -90,7 +90,7 @@ describe("화면이 그 규칙대로 이어져 있는가(소스)", () => {
     // QR 로 들어온 지 몇 초 뒤(두 번째 화면) 설치 팝업이 가입 한 줄 위로 올라왔다(하니스에서 발견) — 앱부터 깔면 표시가 사라진다
     it("설치 팝업은 QR 로 온 비로그인의 가입이 끝날 때까지 뜨지 않는다", () => {
         const sheet = code(client("components/hiq/AppInstallSheet.tsx"));
-        expect(sheet).toContain("busy: live.current.authLoading || screenBusy() || (!live.current.loggedIn && !!joinStoreSlug()),");
+        expect(sheet).toContain("busy: live.current.authLoading || screenBusy() || (!live.current.loggedIn && (!!joinStoreSlug() || !!readInviteMark())),");
     });
 
     it("서버: 새 회원 행을 만들 때만 쓴다 · 전화번호 가입은 PIN 을 정했고 기본 매장으로 오던 가입만 옮긴다", () => {

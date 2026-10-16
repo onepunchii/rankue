@@ -10,7 +10,7 @@
  * 한 번 받은 것은 저장소의 받은 기록(고치지도 지우지도 않는다)이 지킨다 — 여기의 계산은 '지금 기록으로 보면'이다.
  * 달 · 철 · 시각은 한국 시계다(월대회 · 이달의 랭킹과 같다).
  */
-import { CASE_ITEMS, REAL_RUN_4C, REAL_TO_ONLINE, SOON, PEOPLE_STEPS, type CaseItem, type LimitedRule, type Season } from "./cueCase.js";
+import { CASE_ITEMS, INVITE_PICK_EVERY, REAL_RUN_4C, REAL_TO_ONLINE, SOON, PEOPLE_STEPS, type CaseItem, type LimitedRule, type Season } from "./cueCase.js";
 import { TIERS, PLACEMENT_MATCHES, type TierId } from "./sim/rank.js";
 import { realTierRank, type RealTierId } from "./realTier.js";
 
@@ -74,6 +74,9 @@ export interface CaseInput {
     realTier: RealTierId | null;
     online: readonly OnlineGame[];
     real: readonly RealGame[];
+    /** 친구 초대 — 내 초대로 새로 가입한 때들 · 내가 친구의 초대로 가입한 때(없으면 비움) */
+    invites?: readonly number[];
+    invitedAt?: number | null;
 }
 
 export interface Bar { side: "real" | "online" | "all"; have: number; need: number }
@@ -315,6 +318,10 @@ export function evaluateCase(input: CaseInput): Record<string, ItemState> {
             case "gloveYear": return gloveYear;
             case "gloveCup": return state([...input.cupEntries].sort((a, b) => a - b)[0] ?? null);
             case "limited": return limited(r.s);
+            case "invite": { const t = [...(input.invites ?? [])].sort((a, b) => a - b); return state(nth(t, r.n), [count(t.length, r.n)]); }
+            case "invited": return state(input.invitedAt ?? null);
+            // 고를 때만 들어온다 — 판정은 '30명까지 남은 수' 막대만
+            case "invitePick": return { done: false, at: null, bars: [count((input.invites ?? []).length % INVITE_PICK_EVERY, INVITE_PICK_EVERY)] };
             default: return { done: false, at: null, bars: [], soon: true };
         }
     }

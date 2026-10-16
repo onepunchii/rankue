@@ -10,10 +10,10 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 const LOCALES: CaseLocale[] = ["ko", "en", "es", "vi", "tr"];
 
 describe("목록", () => {
-    it("기획서의 수 — 큐 77(실전 20 · 온라인 24 · 공통 19 · 양쪽 7 · 크루 6 · 2단계 1) + 한정판 5 · 초크 16 · 장갑 16 · 페넌트 8", () => {
+    it("기획서의 수 — 큐 77(실전 20 · 온라인 24 · 공통 19 · 양쪽 7 · 크루 6 · 2단계 1) + 한정판 5 + 친구 초대(10명 큐 · 고르는 한정 12) · 초크 16+2 · 장갑 16+1 · 페넌트 8", () => {
         const by = (g: string) => CUES.filter((c) => c.group === g).length;
-        expect([CUES.length, by("real"), by("online"), by("common"), by("both"), by("crew"), by("stage2"), by("limited")]).toEqual([82, 20, 24, 19, 7, 6, 1, 5]);
-        expect([CHALKS.length, GLOVES.length, PENNANTS.length]).toEqual([16, 16, 8]);
+        expect([CUES.length, by("real"), by("online"), by("common"), by("both"), by("crew"), by("stage2"), by("limited")]).toEqual([95, 20, 24, 20, 7, 6, 1, 17]);
+        expect([CHALKS.length, GLOVES.length, PENNANTS.length]).toEqual([18, 17, 8]);
     });
     it("id 는 겹치지 않는다 — 실전과 온라인에 같은 이름(50판 · 하이런 · 역전)이 있어 칸마다 머리말이 다르다", () => {
         const ids = CASE_ITEMS.map((x) => x.id);
@@ -50,9 +50,14 @@ describe("목록", () => {
         expect(CUES.find((c) => c.id === "cue-traveller")!.name.ko).toBe("나침반");
     });
     it("한정판(2026-10-16 오너: \"따로 새로 · 모두 99자루\") — 다섯 자루 · 99 · ★5 · 저장소가 마지막 번호 뒤로는 적지 않는다", () => {
-        const lt = CUES.filter((c) => c.group === "limited");
+        const lt = CUES.filter((c) => c.group === "limited" && c.rule.k === "limited");
         expect(lt.map((c) => c.id)).toEqual(["cue-lt-double-master", "cue-lt-thousand", "cue-lt-triple-cup", "cue-lt-legend-run", "cue-lt-five-nations"]);
         for (const c of lt) { expect(c.limit).toBe(99); expect(difficulty(c)).toBe(5); expect(SOON.has(c.id)).toBe(false); }
+        // 친구 초대 한정(2026-10-16 오너: "모두 선택 가능하고 각각 10개 넘버링") — 만화 6 + 고급 6, 맨 앞, 디자인마다 10자루, 판정으로는 안 들어온다
+        const inv = CUES.filter((c) => c.rule.k === "invitePick");
+        expect(inv.map((c) => c.id.replace("cue-lt-inv-", ""))).toEqual(["jelly", "octopus", "cheer", "doodle", "bubble", "melty", "pearl", "aurora", "phoenix", "thirty", "galaxy", "rings"]);
+        expect(CUES.filter((c) => c.group === "limited").slice(0, 12)).toEqual(inv);
+        for (const c of inv) { expect(c.limit).toBe(10); expect(c.group).toBe("limited"); expect(difficulty(c)).toBe(5); }
         expect(read("server/storage/cueCase.repo.ts")).toContain("having coalesce(max(serial), 0) < ${cap}");
     });
     it("난이도 별 1~5 — 모든 것에 있고, 같은 갈래에서는 어려울수록 많다", () => {

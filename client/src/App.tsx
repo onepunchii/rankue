@@ -88,6 +88,7 @@ import StoreRegister from "@/pages/store-register";
 import BriefingPage from "@/pages/briefing";
 import StoreDetail from "@/pages/store-detail";
 import SharedResult from "@/pages/hiq/shared-result";
+import { InviteClaimer } from "@/components/hiq/invite/InviteClaimer";
 
 import { StoreProvider } from "./contexts/StoreContext";
 import { I18nProvider, useT } from "@/lib/i18n";
@@ -171,6 +172,14 @@ function SimulatorLazy() {
 
 // 큐 케이스(2026-10-16) — 당구의 수집(큐 · 초크 · 장갑 + 옛 온라인 장식장). 어두운 벨벳 화면이라 프레임 없이, 불러오는 동안도 같은 색.
 const CueCasePage = lazy(() => import("@/pages/hiq/cue-case"));
+const InvitePage = lazy(() => import("@/pages/hiq/invite"));
+function InviteRoute() {
+  return (
+    <Suspense fallback={<div className="min-h-[100dvh] bg-[#FF2E8A]" aria-busy="true" />}>
+      <InvitePage />
+    </Suspense>
+  );
+}
 function CueCaseRoute() {
   return (
     <Suspense fallback={<div className="min-h-[100dvh] bg-[#0d1626]" aria-busy="true" />}>
@@ -398,6 +407,8 @@ function AppRoutes() {
       <Route path="/store/:slug" component={StoreDetail} />
       {/* 공유 링크로 열리는 공개 경기 결과 — 로그인 불필요 */}
       <Route path="/r/:id" component={SharedResult} />
+      {/* 친구 초대 링크(2026-10-16) — 로그인 불필요. 이 기기에 초대 표시를 남긴다(InviteClaimer 가 가입 뒤에 낸다) */}
+      <Route path="/i/:code" component={InviteRoute} />
 
       {/* HiQ 기능 페이지들 — 데스크탑에서는 DesktopFrame 이 중앙 448px로 고정한다 */}
       <Route path="/register" component={FramedRegister} />
@@ -582,6 +593,8 @@ function App() {
             <AppDialogHost />
             {/* 주 종목 한 번 묻기(2026-10-01) — 가입 직후·기존 회원 다음 접속 때 한 번. 고른 종목으로 앱이 시작한다 */}
             <PrimarySportGate />
+            {/* 친구 초대 내기(2026-10-16) — 초대 링크로 온 기기에서 로그인하면 한 번 서버에 낸다. 받으면 '환영해요'(다른 창이 닫힌 뒤) */}
+            <InviteClaimer />
             {/* 친구·크루 접속 배너(2026-10-01) — 앱을 보고 있을 때만, 폰은 울리지 않는다 */}
             <PresenceArrivals />
             {/* 네이티브 앱 전용 안내(업데이트·알림 권한 사전 설명). 웹에선 아무것도 그리지 않는다. */}

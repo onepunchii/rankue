@@ -5,6 +5,7 @@
  * GET  /cue-case/summary     홈 입구 띠 — 받은 수 · 대표 큐.
  * GET  /cue-case/crew/:id    크루 큐 랙 — 당구 크루 홈 벽.
  * POST /cue-case/hero        { itemId } 대표 큐 고르기 — 받은 큐만.
+ * POST /cue-case/invite-pick { itemId } 친구 30명마다 한정 큐 한 자루 고르기(디자인마다 10자루 · 선착순 번호).
  * 남의 것도 볼 수 있다(랭킹 · 프로필이 보여 주는 이름 · 전적에서 나온 것). 탈퇴했거나 아무 기록도 없는 회원은 404.
  */
 import { Router } from "express";
@@ -48,6 +49,15 @@ router.post("/cue-case/hero", requireAuth, asyncHandler(async (req: AuthRequest,
     const ok = await storage.cueCase.setHero(req.userId!, body.data.itemId);
     if (!ok) return sendError(res, 403, "err.cueCase.notOwned");
     return sendSuccess(res, { hero: body.data.itemId });
+}));
+
+const PICK_ERR = { item: [400, "err.cueCase.notOwned"], none: [403, "err.cueCase.pickNone"], have: [409, "err.cueCase.pickHave"], soldOut: [409, "err.cueCase.soldOut"] } as const;
+router.post("/cue-case/invite-pick", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const body = heroBody.safeParse(req.body);
+    if (!body.success) return sendError(res, 400, "err.cueCase.notOwned");
+    const out = await storage.cueCase.pickInvite(req.userId!, body.data.itemId, Date.now());
+    if (!out.ok) { const [status, key] = PICK_ERR[out.reason]; return sendError(res, status, key); }
+    return sendSuccess(res, { itemId: body.data.itemId, serial: out.serial });
 }));
 
 export default router;

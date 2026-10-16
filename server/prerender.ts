@@ -1,6 +1,7 @@
 import type { Express, Request } from "express";
 import { storage } from "./storage/index.js";
 import { db } from "./db.js";
+import { cleanInviteCode } from "../shared/invite.js";
 import { storeListings } from "../shared/schema.js";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../shared/aboutContent.js";
@@ -2803,6 +2804,39 @@ ${list}
   <h1>${esc(typeLabel)} 경기 결과</h1>
   <p>${esc(scoreLine)}</p>
   ${innings ? `<p>총 ${esc(innings)}이닝</p>` : ""}
+  <nav><a href="/">랭큐 시작하기</a> <a href="/about">랭큐 소개</a></nav>
+</main>`,
+      }),
+    );
+  });
+
+  // 친구 초대 링크(/i/:code, 2026-10-16) — 카톡 · 문자 미리보기: "OO님이 랭큐로 초대했어요" + 초대 카드 그림. 색인은 하지 않는다
+  app.get("/i/:code", async (req, res, next) => {
+    if (!isBot(req)) return next();
+    const code = cleanInviteCode(req.params.code);
+    let name: string | null = null;
+    if (code) {
+      try {
+        const rows = (await db.execute(sql`select m.name from hiq_invite_codes c join hiq_members m on m.id = c.member_id where c.code = ${code}`)) as any;
+        const r = (rows.rows ?? rows)[0];
+        name = r?.name ? String(r.name) : null;
+      } catch (e) {
+        console.warn("[prerender] invite failed:", (e as Error)?.message);
+      }
+    }
+    const title = name ? `${name}님이 랭큐로 초대했어요` : "친구가 랭큐로 초대했어요";
+    res.setHeader("X-Prerender", "invite");
+    noStore(res);
+    res.send(
+      page({
+        title,
+        desc: "가입하면 환영 초크를 드려요. 손안의 당구 점수판, 랭큐 — 경기를 기록하고 에버리지를 쌓고 온라인 3쿠션으로 겨뤄요.",
+        canonical: `${ORIGIN}/i/${encodeURIComponent(code ?? "")}`,
+        noindex: true,
+        image: { url: `${ORIGIN}/billiards/case/invite-og.png`, width: 1200, height: 630, alt: title },
+        body: `<main>
+  <h1>${esc(title)}</h1>
+  <p>가입하면 환영 초크를 드려요.</p>
   <nav><a href="/">랭큐 시작하기</a> <a href="/about">랭큐 소개</a></nav>
 </main>`,
       }),

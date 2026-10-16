@@ -11,7 +11,7 @@ import { db } from "../db.js";
 import { and, eq, sql } from "drizzle-orm";
 import { hiqCueCaseAwards, hiqCueCasePrefs, hiqMembers } from "../../shared/schema.js";
 import { isWithdrawnMember } from "../../shared/chatSupport.js";
-import { CASE_ITEMS, caseItem, isLive } from "../../shared/cueCase.js";
+import { CASE_ITEMS, caseItem, invitePicks, isLive } from "../../shared/cueCase.js";
 import { deficitFromInnings, deficitFromShots, evaluateCase, kstMonthKey, type Bar, type OnlineGame, type RealGame } from "../../shared/cueCaseRules.js";
 import { bestRealTier } from "../../shared/realTier.js";
 import { START_RATING } from "../../shared/sim/rank.js";
@@ -41,6 +41,21 @@ export interface CueCaseView {
     online: boolean;
     /** 실전 다마(메달 칸의 둥근 다마 메달) */
     handi: { "3c": number | null; "4c": number | null };
+    /** 친구 초대 — 내 초대로 가입한 사람 · 한정 큐를 고를 수 있는 수(내 것만) */
+    invite: { count: number; picks: { total: number; left: number } } | null;
+}
+
+/** 친구 초대 — 내 초대로 가입한 때들 · 내가 초대로 온 때(표가 없으면 비움) */
+async function inviteTimes(memberId: string): Promise<{ invites: number[]; invitedAt: number | null }> {
+    try {
+        const rows = (await db.execute(sql`
+            select 'out' as side, extract(epoch from created_at) * 1000 as at from hiq_referrals where inviter_id = ${memberId}::uuid
+            union all select 'in', extract(epoch from created_at) * 1000 from hiq_referrals where invitee_id = ${memberId}::uuid`)).rows as Record<string, unknown>[];
+        return { invites: rows.filter((r) => r.side === "out").map((r) => n(r.at)), invitedAt: rows.find((r) => r.side === "in") ? n(rows.find((r) => r.side === "in")!.at) : null };
+    } catch (e) {
+        if (missingTable(e)) return { invites: [], invitedAt: null };
+        throw e;
+    }
 }
 
 /**
@@ -192,7 +207,7 @@ export class CueCaseRepository {
         if (!who || isWithdrawnMember(who)) return null;
         const mine = viewerId === memberId;
         const country = (who.country as string | null) ?? null;
-        const [online, real] = await Promise.all([this.online(memberId), this.real(memberId)]);
+        const [online, real, inv] = await Promise.all([this.online(memberId), this.real(memberId), inviteTimes(memberId)]);
         const awards = (await db.execute(sql`
             select kind, rank, extract(epoch from created_at) * 1000 as at from hiq_sim_awards
             where member_id = ${memberId} and (kind = 'cup' or (kind = 'month_rank' and rank = 1))`)).rows as Record<string, unknown>[];
@@ -219,6 +234,7 @@ export class CueCaseRepository {
             cupEntries: entries.map((e) => n(e.at)),
             realTier: bestRealTier({ handi3c: who.handi3c as number | null, handi4c: who.handi4c as number | null })?.tier.id ?? null,
             online, real,
+            invites: inv.invites, invitedAt: inv.invitedAt,
         });
 
         // 새로 채운 것만 더한다 — 이미 있는 줄은 그대로(받은 때도 바꾸지 않는다)
@@ -262,6 +278,7 @@ export class CueCaseRepository {
             hero, items, month: { key: monthKey, cells, need: 12 }, people,
             online: online.length > 0 || awards.length > 0,
             handi: { "3c": (who.handi3c as number | null) ?? null, "4c": (who.handi4c as number | null) ?? null },
+            invite: mine ? { count: inv.invites.length, picks: invitePicks(inv.invites.length, CASE_ITEMS.filter((x) => x.rule.k === "invitePick" && items[x.id].done).length) } : null,
         };
     }
 
@@ -295,6 +312,24 @@ export class CueCaseRepository {
      * 그 자리에서만 알 수 있는 것을 바로 적는다(2026-10-16) — 경기를 끝내는 순간의 다마(바뀌기 전 · 뒤)는 기록에 남지 않아서
      * 열 때 다시 판정할 수 없다. 다마 오름 · 다마 넘김이 이 길로만 들어온다. 이미 있으면 그대로(받은 때도 안 바꾼다).
      */
+    /**
+     * 친구 초대 한정 큐 고르기(2026-10-16 오너: "모두 선택 가능하고 각각 10개 넘버링 · 선택 팝업") — 30명마다 한 자루.
+     * 남은 고르기가 없으면 · 이미 가진 디자인이면 · 다 나갔으면(10자루) 들어가지 않는다. 번호는 insertAward 가 선착순으로.
+     */
+    async pickInvite(memberId: string, itemId: string, nowMs: number): Promise<{ ok: true; serial: number } | { ok: false; reason: "item" | "none" | "have" | "soldOut" }> {
+        const item = caseItem(itemId);
+        if (!item || item.rule.k !== "invitePick") return { ok: false, reason: "item" };
+        const { invites } = await inviteTimes(memberId);
+        const picked = ((await db.execute(sql`select item_id from hiq_cue_case_awards where member_id = ${memberId}`)).rows as { item_id: string }[]).map((r) => String(r.item_id));
+        if (picked.includes(itemId)) return { ok: false, reason: "have" };
+        const used = picked.filter((id) => caseItem(id)?.rule.k === "invitePick").length;
+        if (invitePicks(invites.length, used).left <= 0) return { ok: false, reason: "none" };
+        const w = await insertAward(memberId, itemId, new Date(nowMs));
+        if (!w) return { ok: false, reason: "soldOut" };
+        holders = null; // 남은 자루 수가 바로 보이게
+        return { ok: true, serial: w.serial };
+    }
+
     async awardNow(memberId: string, itemId: string, at: Date): Promise<void> {
         if (!caseItem(itemId)) return;
         try {

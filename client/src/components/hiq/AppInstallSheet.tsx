@@ -37,6 +37,7 @@ import { isLoginSheetOpen, useLoginSheetOpen } from "@/components/hiq/LoginSheet
 import { useSport } from "@/contexts/SportContext";
 import { useAuth } from "@/hooks/useAuth";
 import { joinStoreSlug } from "@/lib/joinStore";
+import { readInviteMark } from "@/components/hiq/invite/inviteApi";
 import { useBackToClose } from "@/hooks/useBackToClose";
 import { useT } from "@/lib/i18n";
 import { LucideBellRing, LucideDownload, LucideExternalLink, LucideLoader2, LucideSmartphone, X } from "@/lib/icons";
@@ -636,7 +637,8 @@ export function AppInstallSheet({ path }: { path: string }) {
             // 매장 QR 로 온 비로그인(가입 매장 표시가 남아 있다 — lib/joinStore)에게는 가입이 끝날 때까지 띄우지 않는다(2026-10-07):
             // 표시는 이 브라우저의 저장소에 있어, 여기서 앱부터 깔고 앱에서 가입하면 '어느 매장에서 왔는지'가 사라진다.
             // 가입이 끝나면 표시가 지워지고, 그때부터는 로그인한 사람용 팝업('앱에서 열기' — 로그인을 그대로 넘겨준다)이 뜬다.
-            busy: live.current.authLoading || screenBusy() || (!live.current.loggedIn && !!joinStoreSlug()),
+            // 친구 초대 링크로 온 비로그인도 같은 까닭으로 가입까지 쉰다(2026-10-16 — 앱에서 가입하면 초대 표시가 끊긴다)
+            busy: live.current.authLoading || screenBusy() || (!live.current.loggedIn && (!!joinStoreSlug() || !!readInviteMark())),
             // PC(QR 판)만: 옆 패널의 설치 구역이 보이면 스스로 띄우지 않는다. 가로로 든 아이패드(스토어 단추 판)는 해당 없다
             otherInstallVisible: env.device === "desktop" && sidePanelInstallVisible(),
             ...getRecord(),

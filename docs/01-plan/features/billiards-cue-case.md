@@ -205,3 +205,15 @@
 4. 양쪽 큐 일곱의 조건.
 5. 크루 페넌트 여덟 · 크루 큐 여섯의 조건.
 6. 빼거나 다시 그릴 디자인.
+
+## 친구 초대 (2026-10-16 저녁)
+
+오너: "한정판 가장 상위에 친구초대 · 해당 큐대로 친구초대 하기 버튼 · 바이럴에 중요해서 진짜 가지고 싶은 디자인 · 제일 중요한 아이템".
+고른 것: **가입만 센다 · 단계 1명 초크 · 3명 장갑 · 10명 큐 + 초대받은 사람 환영 초크 · 30명마다 한정 큐 한 자루를 고른다 — 만화 6 + 고급 6 = 12종, 디자인마다 10자루**("모두 선택 가능하고 각각 10개 넘버링 · 선택 팝업").
+고급 시안 여섯 → 오너 "캐릭터 · 튀는 색 · 유머러스 · 스펀지 만화 느낌" → 만화 시안 여섯(남의 캐릭터가 아니라 그 결만). 둘 다 보관(features/billiards-cue-case/kept), 둘 다 고르기 목록에 들어갔다.
+
+- 규칙 shared/invite.ts(코드 여섯 글자 · 가입한 지 7일 안 · 한 사람 한 번 · 초대한 사람이 먼저 가입) · 보상 shared/cueCase.ts(invite · invited · invitePick).
+- 표 hiq_invite_codes · hiq_referrals(migrations/invite.sql, 운영 적용). API server/routes/modules/invite.ts + POST /cue-case/invite-pick.
+- 링크 /i/:code(로그인 없이) → 그 기기에 표시(rankue.invite, 30일) → 로그인하면 InviteClaimer 가 낸다 → '환영해요'. 앱에서 가입하면 표시가 끊겨 큐 케이스의 '초대받으셨나요?'로 코드를 넣는다. 그 사이 설치 팝업은 쉰다(매장 QR 과 같은 까닭).
+- 카톡 미리보기: prerender /i/:code + vercel.json 봇 경로 + billiards/case/invite-og.png. 공유 카드 components/hiq/invite/inviteCard.ts(대표 큐 · 코드).
+- 그림: tools/gen-invite.mjs(고급) · gen-invite-toon.mjs(만화 + 단계 아이템) → export.py(오로라 전복만 둥근 막대로 따로 자름).

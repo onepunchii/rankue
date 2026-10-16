@@ -18,6 +18,8 @@ export interface CueCaseView {
     people: number;
     online: boolean;
     handi: { "3c": number | null; "4c": number | null };
+    /** 친구 초대(내 것만) — 초대한 수 · 한정 큐 고르기 */
+    invite: { count: number; picks: { total: number; left: number } } | null;
 }
 
 export const CUE_CASE_QUERY_KEY = ["cue-case"] as const;
@@ -58,6 +60,10 @@ export function parseCueCase(raw: unknown): CueCaseView {
         people: Math.max(0, num(o.people) ?? 0),
         online: o.online === true,
         handi: { "3c": num(handi["3c"]), "4c": num(handi["4c"]) },
+        invite: (() => {
+            const v = rec(o.invite), p = rec(v.picks);
+            return o.invite && typeof o.invite === "object" ? { count: Math.max(0, num(v.count) ?? 0), picks: { total: Math.max(0, num(p.total) ?? 0), left: Math.max(0, num(p.left) ?? 0) } } : null;
+        })(),
     };
 }
 

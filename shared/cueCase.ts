@@ -39,7 +39,11 @@ export type Rule =
     | { k: "seasonPeople"; s: Season; n: number } | { k: "world" } | { k: "sameOpp"; n: number } | { k: "crewBattle" }
     | { k: "glove"; m: number } | { k: "gloveFirst" } | { k: "gloveYear" } | { k: "gloveCrew"; n: number } | { k: "gloveCup" }
     | { k: "pennant"; s: "games100" | "games500" | "cup5" | "cup20" | "battle10" | "regular" | "crewOfMonth" | "stores5" }
-    | { k: "limited"; s: LimitedRule };
+    | { k: "limited"; s: LimitedRule }
+    /** 친구 초대(2026-10-16) — 내 초대 링크 · 코드로 **새로 가입한** 사람 수(가입만 센다 — 오너) · 친구의 초대로 가입했다 */
+    | { k: "invite"; n: number } | { k: "invited" }
+    /** 친구 30명마다 한 자루를 고른다(디자인마다 10자루) — 판정으로는 안 들어오고 고를 때만 들어온다 */
+    | { k: "invitePick" };
 /** 한정판 다섯(2026-10-16 오너: "열기 어려운 채는 수량 한정 넘버링 — 따로 새로 · 모두 99자루") */
 export type LimitedRule = "doubleMaster" | "thousand" | "tripleCup" | "legendRun" | "fiveNations";
 export type Season = "spring" | "summer" | "autumn" | "winter";
@@ -65,6 +69,15 @@ export interface CaseItem {
 const N = (ko: string, en: string, es: string, vi: string, tr: string): Names => ({ ko, en, es, vi, tr });
 /** id 는 칸마다 머리말이 다르다(실전 cue- · 온라인 cue-on- · 크루 cue-crew-) — 실전과 온라인에 같은 이름(50판 · 하이런 · 역전)이 있다 */
 const CUE_PREFIX: Readonly<Record<CueGroup, string>> = { real: "cue-", online: "cue-on-", common: "cue-", both: "cue-", crew: "cue-crew-", stage2: "cue-", limited: "cue-lt-" };
+/** 친구 초대 단계(2026-10-16 오너: 1명 초크 · 3명 장갑 · 10명 큐 · 30명 한정) */
+export const INVITE_STEPS = [1, 3, 10, 30] as const;
+/** 초대 한정 — 30명마다 한 자루를 고르고, 디자인마다 10자루(오너: "모두 선택 가능하고 각각 10개 넘버링") */
+export const INVITE_PICK_EVERY = INVITE_STEPS[3];
+export const INVITE_PICK_LIMIT = 10;
+export const invitePicks = (invites: number, used: number): { total: number; left: number } => {
+    const total = Math.floor(Math.max(0, invites) / INVITE_PICK_EVERY);
+    return { total, left: Math.max(0, total - used) };
+};
 /** 한정판 한 자루의 수 — 모두 99(오너 10/16) */
 export const LIMITED_COUNT = 99;
 const cue = (group: CueGroup, id: string, img: string, name: Names, rule: Rule, extra: Partial<CaseItem> = {}): CaseItem => ({ id: `${CUE_PREFIX[group]}${id}`, kind: "cue", group, img, name, rule, ...(group === "online" ? { online: true } : {}), ...extra });
@@ -136,6 +149,8 @@ export const CUES: readonly CaseItem[] = [
     cue("common", "hahoe", "kr-hahoe", N("하회탈", "Hahoe Mask", "Máscara Hahoe", "Mặt nạ Hahoe", "Hahoe Maskesi"), { k: "people", n: 50 }),
     cue("common", "turtleship", "kr-turtleship", N("거북선", "Turtle Ship", "Barco tortuga", "Thuyền rùa", "Kaplumbağa Gemisi"), { k: "people", n: 100 }),
     cue("common", "jogakbo", "kr-jogakbo", N("조각보", "Jogakbo Patchwork", "Retazos jogakbo", "Vải chắp Jogakbo", "Jogakbo Yama"), { k: "people", n: 200 }),
+    // 친구 초대 10명 — 초대 묶음은 만화 그림(맨 위 한정 '말랑 큐볼'과 같은 큐볼 친구들)
+    cue("common", "invite-10", "invite-10", N("큐볼 삼총사", "Cue Ball Trio", "Trío de bolas", "Bộ ba bi cái", "Top Üçlüsü"), { k: "invite", n: 10 }),
     // ── 양쪽(둘 다) 7 ────────────────────────────────────────
     cue("both", "saekdong", "kr-saekdong", N("색동", "Saekdong Stripes", "Rayas saekdong", "Sọc Saekdong", "Saekdong Çizgileri"), { k: "both", s: "firstWins" }),
     cue("both", "minhwa-tiger", "kr-minhwa-tiger", N("민화 호랑이", "Folk Tiger", "Tigre popular", "Hổ tranh dân gian", "Halk Kaplanı"), { k: "both", s: "sameMonth" }),
@@ -151,7 +166,23 @@ export const CUES: readonly CaseItem[] = [
     cue("crew", "founder", "crew-founder", N("창립의 열쇠", "Founder's Key", "Llave fundadora", "Chìa khóa sáng lập", "Kurucu Anahtarı"), { k: "crew", s: "founder" }),
     cue("crew", "battle", "crew-battle", N("맞선 깃발", "Crossed Flags", "Banderas cruzadas", "Cờ bắt chéo", "Çapraz Bayraklar"), { k: "crew", s: "battle" }),
     cue("crew", "hundred", "crew-hundred", N("금빛 매듭", "Golden Knot", "Nudo dorado", "Nút thắt vàng", "Altın Düğüm"), { k: "crew", s: "hundred" }),
-    // ── 한정판 5 — 자루마다 99개, 선착순 번호, 다 나가면 완판 ──────
+    // ── 한정판 6 — 자루마다 99개, 선착순 번호, 다 나가면 완판 ──────
+    // 맨 위 — 친구 30명 초대(2026-10-16 오너: "바이럴에 중요해서 진짜 가지고 싶은 디자인 · 제일 중요한 아이템")
+    // → 만화풍 여섯 + 고급 공예풍 여섯, 30명마다 하나를 골라 갖는다(디자인마다 10자루 · No.01~10)
+    ...([
+        ["jelly", N("말랑 큐볼", "Jelly Cue Ball", "Bola de gelatina", "Bi thạch dẻo", "Jöle Top")],
+        ["octopus", N("문어 포옹", "Octopus Hug", "Abrazo de pulpo", "Cái ôm bạch tuộc", "Ahtapot Sarılması")],
+        ["cheer", N("응원단", "Cheer Squad", "Porra animadora", "Đội cổ vũ", "Tezahürat Ekibi")],
+        ["doodle", N("형광 낙서", "Neon Doodles", "Garabatos neón", "Hình vẽ neon", "Neon Karalamalar")],
+        ["bubble", N("물방울 수조", "Bubble Tank", "Pecera de burbujas", "Bể bong bóng", "Baloncuk Akvaryum")],
+        ["melty", N("녹는 딸기바", "Melty Strawberry", "Fresa derretida", "Kem dâu tan chảy", "Eriyen Çilek")],
+        ["pearl", N("백진주 별자리", "Pearl Constellation", "Constelación de perla", "Chòm sao ngọc trai", "İnci Takımyıldızı")],
+        ["aurora", N("오로라 전복", "Aurora Abalone", "Abulón aurora", "Bào ngư cực quang", "Aurora Deniz Kulağı")],
+        ["phoenix", N("나전 봉황", "Pearl Phoenix", "Fénix de nácar", "Phượng hoàng khảm xà cừ", "Sedef Anka")],
+        ["thirty", N("서른 빛 띠", "Thirty Lights", "Treinta luces", "Ba mươi sắc", "Otuz Işık")],
+        ["galaxy", N("은하수", "Milky Way", "Vía Láctea", "Dải Ngân Hà", "Samanyolu")],
+        ["rings", N("이어진 고리", "Linked Rings", "Anillos enlazados", "Vòng nối kết", "Bağlı Halkalar")],
+    ] as const).map(([k, name]) => cue("limited", `inv-${k}`, `lt-inv-${k}`, name, { k: "invitePick" }, { limit: INVITE_PICK_LIMIT })),
     cue("limited", "double-master", "lt-double-master", N("더블 마스터", "Double Master", "Doble Maestro", "Song bậc thầy", "Çifte Usta"), { k: "limited", s: "doubleMaster" }, { limit: LIMITED_COUNT, online: false }),
     cue("limited", "thousand", "lt-thousand", N("천 판의 장인", "Master of a Thousand", "Maestro de mil", "Bậc thầy nghìn trận", "Bin Maçın Ustası"), { k: "limited", s: "thousand" }, { limit: LIMITED_COUNT }),
     cue("limited", "triple-cup", "lt-triple-cup", N("삼관왕", "Triple Crown", "Triple corona", "Ba vương miện", "Üçlü Taç"), { k: "limited", s: "tripleCup" }, { limit: LIMITED_COUNT }),
@@ -181,6 +212,9 @@ export const CHALKS: readonly CaseItem[] = [
     chalk("world", "first-trip", N("세계 원정 초크", "World Tour Chalk", "Tiza gira mundial", "Phấn chinh phục thế giới", "Dünya Turu Tebeşiri"), { k: "world" }, { online: true }),
     chalk("gold", "regular-gold", N("금 초크", "Gold Chalk", "Tiza de oro", "Phấn vàng", "Altın Tebeşir"), { k: "sameOpp", n: 100 }),
     chalk("crew", "crew", N("크루 초크", "Crew Chalk", "Tiza de crew", "Phấn nhóm", "Ekip Tebeşiri"), { k: "crewBattle" }),
+    // 친구 초대 — 첫 초대 · 초대받은 사람의 환영 초크
+    chalk("invite", "invite-1", N("안녕 초크", "Hello Chalk", "Tiza Hola", "Phấn Xin chào", "Merhaba Tebeşiri"), { k: "invite", n: INVITE_STEPS[0] }),
+    chalk("welcome", "welcome", N("환영 초크", "Welcome Chalk", "Tiza de bienvenida", "Phấn chào mừng", "Hoş Geldin Tebeşiri"), { k: "invited" }),
 ];
 
 const MONTH_NAMES: readonly Names[] = [
@@ -198,6 +232,7 @@ export const GLOVES: readonly CaseItem[] = [
     glove("year-gold", "year-gold", N("연간 개근 금장갑", "Golden Glove of the Year", "Guante de oro del año", "Găng vàng chuyên cần", "Yılın Altın Eldiveni"), { k: "gloveYear" }),
     glove("crew", "crew", N("크루 장갑", "Crew Glove", "Guante de crew", "Găng tay nhóm", "Ekip Eldiveni"), { k: "gloveCrew", n: 10 }),
     glove("cup-entry", "cup-entry", N("월대회 출전 장갑", "Cup Entry Glove", "Guante de copa", "Găng dự cúp", "Kupa Katılım Eldiveni"), { k: "gloveCup" }, { online: true }),
+    glove("invite", "invite-3", N("셋이 장갑", "Trio Glove", "Guante trío", "Găng bộ ba", "Üçlü Eldiven"), { k: "invite", n: INVITE_STEPS[1] }),
 ];
 
 const pennant = (id: string, s: Extract<Rule, { k: "pennant" }>["s"], name: Names): CaseItem => ({ id: `pennant-${id}`, kind: "pennant", img: id, name, rule: { k: "pennant", s } });
@@ -250,6 +285,9 @@ export function difficulty(x: Pick<CaseItem, "rule">): Stars {
         case "gloveCup": return 2;
         case "pennant": return r.s === "games500" || r.s === "cup20" || r.s === "crewOfMonth" ? 5 : r.s === "battle10" || r.s === "regular" ? 4 : 3;
         case "limited": return 5;
+        case "invite": return by(r.n, [[1, 1], [3, 2], [10, 3], [30, 5]]);
+        case "invitePick": return 5;
+        case "invited": return 1;
     }
 }
 
@@ -358,6 +396,11 @@ export function cueHow(x: CaseItem, l: CaseLocale, earned = false): string {
             legendRun: N(`실전 하이런 3쿠션 15 · 4구 ${15 * REAL_RUN_4C} + 온라인 하이런 15`, `Real high run 15 (four-ball ${15 * REAL_RUN_4C}) + online high run 15`, `Serie real 15 (cuatro bolas ${15 * REAL_RUN_4C}) + serie online 15`, `Chuỗi thực tế 15 (4 bi ${15 * REAL_RUN_4C}) + chuỗi online 15`, `Gerçek 15 seri (dört top ${15 * REAL_RUN_4C}) + online 15 seri`),
             fiveNations: N("서로 다른 다섯 나라의 회원과 레이팅 대전", "Rated matches against members from five different countries", "Partidas con rating contra socios de cinco países", "Trận tính điểm với thành viên từ năm quốc gia", "Beş farklı ülkeden üyelerle puanlı maç"),
         })[r.s]);
+        case "invite": return T(l, n === 1
+            ? N("친구 한 명이 내 초대 링크로 가입", "A friend joins with your invite link", "Un amigo se une con tu enlace", "Một người bạn tham gia qua link mời của bạn", "Bir arkadaşın davet bağlantınla katılsın")
+            : N(`친구 ${n}명이 내 초대 링크로 가입`, `${n} friends join with your invite link`, `${n} amigos se unen con tu enlace`, `${n} người bạn tham gia qua link mời của bạn`, `${n} arkadaşın davet bağlantınla katılsın`));
+        case "invitePick": return T(l, N(`친구 ${INVITE_PICK_EVERY}명을 초대할 때마다 열두 디자인 가운데 하나를 골라요(디자인마다 ${INVITE_PICK_LIMIT}자루)`, `Every ${INVITE_PICK_EVERY} friends you invite, pick one of twelve designs (${INVITE_PICK_LIMIT} of each)`, `Cada ${INVITE_PICK_EVERY} amigos invitados, elige uno de doce diseños (${INVITE_PICK_LIMIT} de cada uno)`, `Cứ mời ${INVITE_PICK_EVERY} người bạn, chọn một trong mười hai mẫu (mỗi mẫu ${INVITE_PICK_LIMIT} cây)`, `Davet ettiğin her ${INVITE_PICK_EVERY} arkadaşta on iki tasarımdan birini seç (her birinden ${INVITE_PICK_LIMIT})`));
+        case "invited": return T(l, N("친구의 초대 링크로 가입", "Join with a friend's invite link", "Únete con el enlace de un amigo", "Tham gia qua link mời của bạn bè", "Bir arkadaşının davet bağlantısıyla katıl"));
         case "pennant": return T(l, ({
             games100: N("크루 안 경기 100판", "100 games among crewmates", "100 partidas entre miembros", "100 trận nội bộ nhóm", "Ekip içi 100 maç"),
             games500: N("크루 안 경기 500판", "500 games among crewmates", "500 partidas entre miembros", "500 trận nội bộ nhóm", "Ekip içi 500 maç"),

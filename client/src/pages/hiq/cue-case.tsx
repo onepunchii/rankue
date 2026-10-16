@@ -24,6 +24,7 @@ import { useToast } from "@/hooks/use-toast";
 import { shareBlob } from "@/sim/share/useShare";
 import { canvasToBlob } from "@/sim/share/shareCard";
 import { renderCaseCard } from "@/components/hiq/cueCase/caseCard";
+import { InvitePanel } from "@/components/hiq/invite/InvitePanel";
 import { CASE_ITEMS, CHALKS, CUES, GLOVES, PEOPLE_STEPS, caseImage, caseItem, cueHow, difficulty, type CaseItem, type CaseLocale, type CueGroup } from "@shared/cueCase";
 import { serialText } from "@/components/hiq/cueCase/cueCaseApi";
 import { CASE_SECTIONS, CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, fetchCueCase, readCaseSeen, saveHero, writeCaseSeen, type CaseItemView, type CaseSection, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
@@ -159,6 +160,8 @@ export default function CueCasePage() {
                 {d && monthGlove && (
                     <MonthGlove glove={monthGlove} view={it(monthGlove.id)} cells={d.month.cells} need={d.month.need} month={month!} onOpen={() => setPick(monthGlove)} />
                 )}
+                {/* 친구 초대 — 내 케이스에만(2026-10-16) */}
+                {d?.member.mine && <InvitePanel view={d} l={l} onReveal={(list) => setReveal(list)} />}
                 {isGuest && (
                     <div className="mt-5 rounded-[22px] border border-[color:var(--cc-gold)]/30 bg-white/[0.04] px-4 py-4" data-testid="cue-case-guest">
                         <p className="text-[15px] font-semibold text-white">{t("case.guestTitle")}</p>
