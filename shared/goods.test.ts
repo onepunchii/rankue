@@ -90,4 +90,14 @@ describe("선물 도착 화면 2차(2026-10-16 오너: '디자인을 더 완벽�
         expect(g).toContain('data-testid="gift-wrapped"');
         expect(read("client/src/index.css")).toContain(".gift-wrap-opening .gift-lid { animation: gift-lid-off");
     });
+    it("3차(10/17 오너: '리본이 어색 · 전체 리본') — 리본 · 매듭 없이 종목마다의 잠금, 뚜껑이 들리기 전에 풀린다", () => {
+        const g = read("client/src/pages/hiq/gift.tsx"), css = read("client/src/index.css");
+        expect(g).not.toMatch(/gift-bow|ribbonTop|knot:/);
+        // 당구 걸쇠 · 등산 버클은 젖혀지고(gift-flip), 골프 봉인 · 낚시 봉함지는 닫힌 동안 한 장(gift-whole) → 이음매에서 갈라진다(gift-half)
+        expect(g).toContain("function Closure(");
+        expect(g).toContain('const split = sport === "golf" || sport === "fishing";');
+        for (const c of ["gift-flip", "gift-press", "gift-whole", "gift-half"]) expect(g + css).toContain(c);
+        const delay = (sel: string) => Number(css.match(new RegExp(`${sel.replace(/[.]/g, "\\.")} \\{ animation: [\\w-]+ [\\d.]+s ([\\d.]+)s`))?.[1]);
+        expect(delay(".gift-wrap-opening .gift-flip")).toBeLessThan(delay(".gift-wrap-opening .gift-lid"));
+    });
 });
