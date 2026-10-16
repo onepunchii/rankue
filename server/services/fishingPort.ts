@@ -169,15 +169,37 @@ export async function getPortBrief(code: string, wantDay: string | null, nowMs =
  * 한 쪽씩 띄워서 받는다. 다 못 받았으면 받아 두지 않고 가진 것을 쓴다(반쪽 지도를 온 것처럼 보이지 않게).
  */
 async function indexAll(nowMs: number, cachedOnly = false): Promise<IndexAllRow[] | null> {
+    return (await loadIndexAll(nowMs, cachedOnly)).data;
+}
+
+/** 다섯 쪽을 다 받는 데 쓰는 시간 — 함수 한도(10초) 안에서 끝나고 기록할 틈을 남긴다(10/17 18:50 크론이 한 쪽에 걸려 한도에 닿았다) */
+const INDEX_FETCH_BUDGET_MS = 7_500;
+
+/**
+ * 낚시지수 지도를 읽거나 새로 받는다. fresh = 지금 쓸 만한 것(정해진 때 안에 받아 둔 것이거나 방금 받은 것).
+ * 받다 실패하면 가진 것(낡았어도)을 data 로, fresh 는 false — 매시 데우기가 '못 받음'을 남긴다(가진 것으로 화면은 그린다).
+ * 한 쪽이 실패하면 시간이 남았을 때 한 번 더 받는다.
+ */
+export async function loadIndexAll(nowMs: number, cachedOnly = false): Promise<{ data: IndexAllRow[] | null; fresh: boolean; ageMs: number | null }> {
+    const t0 = Date.now();
     const have = await readObs<IndexAllRow[]>("indexall", "all");
-    if (have && nowMs - have.ms < INDEX_TTL_MS) return have.data;
+    const ageMs = have ? nowMs - have.ms : null;
+    if (have && nowMs - have.ms < INDEX_TTL_MS) return { data: have.data, fresh: true, ageMs };
+    const stale = { data: have?.data ?? null, fresh: false, ageMs };
     // 조과를 적을 때는 받으러 가지 않는다 — 다섯 쪽을 받느라 저장이 늦어졌다(2026-10-17). 받아 둔 것(낡았어도)만, 데우기는 매시 크론이 한다
-    if (cachedOnly) return have?.data ?? null;
+    if (cachedOnly) return stale;
     const pair = (a: unknown, b: unknown): [number, number] | null => { const x = num(a), y = num(b); return x == null || y == null ? null : [Math.min(x, y), Math.max(x, y)]; };
     const out: IndexAllRow[] = [];
+    const left = () => INDEX_FETCH_BUDGET_MS - (Date.now() - t0);
     for (let pageNo = 1; pageNo <= 8; pageNo++) {
-        const rows = await khoa("fcstFishingv2/GetFcstFishingApiServicev2", { gubun: "갯바위", numOfRows: 300, pageNo }, 5000);
-        if (!rows) return have?.data ?? null;
+        let rows: any[] | null = null;
+        for (let attempt = 0; attempt < 2 && !rows; attempt++) {
+            const wait = Math.min(5000, left());
+            if (wait < 1500) break;
+            if (attempt) await new Promise((r) => setTimeout(r, 300));
+            rows = await khoa("fcstFishingv2/GetFcstFishingApiServicev2", { gubun: "갯바위", numOfRows: 300, pageNo }, wait);
+        }
+        if (!rows) return stale;
         for (const r of rows) {
             const day = String(r.predcYmd ?? ""), part = String(r.predcNoonSeCd ?? ""), point = String(r.seafsPstnNm ?? "").trim();
             const lat = num(r.lat), lng = num(r.lot);
@@ -188,9 +210,9 @@ async function indexAll(nowMs: number, cachedOnly = false): Promise<IndexAllRow[
         if (rows.length < 300) break;
         await new Promise((r) => setTimeout(r, 150));
     }
-    if (out.length < 200) return have?.data ?? null;
+    if (out.length < 200) return stale;
     await saveObs("indexall", "all", out).catch(() => {});
-    return out;
+    return { data: out, fresh: true, ageMs: 0 };
 }
 
 export async function getIndexMap(wantDay: string | null, nowMs = Date.now(), opts: { cachedOnly?: boolean } = {}): Promise<IndexMap | null> {

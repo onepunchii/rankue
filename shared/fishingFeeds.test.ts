@@ -26,7 +26,14 @@ describe("낚시 공공자료 상태판", () => {
 
     it("조과 저장은 공공자료를 기다리지 않는다 — 받아 둔 지도만(낡았어도)", () => {
         expect(read("server/routes/modules/fishing.ts")).toMatch(/getIndexMap\(day, Date\.now\(\), \{ cachedOnly: true \}\)/);
-        expect(read("server/services/fishingPort.ts")).toMatch(/if \(cachedOnly\) return have\?\.data \?\? null;/);
+        expect(read("server/services/fishingPort.ts")).toMatch(/const stale = \{ data: have\?\.data \?\? null, fresh: false, ageMs \};[\s\S]{0,200}if \(cachedOnly\) return stale;/);
+    });
+
+    it("데우기는 '새로 받았는가'로 성공을 본다 · 다섯 쪽은 함수 한도 안에서(한 쪽은 한 번 더)", () => {
+        const port = read("server/services/fishingPort.ts");
+        expect(port).toContain("const INDEX_FETCH_BUDGET_MS = 7_500;");
+        expect(port).toMatch(/for \(let attempt = 0; attempt < 2 && !rows; attempt\+\+\)/);
+        expect(read("server/services/fishingWarm.ts")).toContain("const out = { index: idx.fresh && !!idx.data?.length, sea: !!sea, ms: Date.now() - t0 };");
     });
 
     it("매시 50분에 미리 받는다 — 크론이 있고, 못 받으면 실행 기록에 남긴다", () => {
