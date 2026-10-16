@@ -3984,7 +3984,7 @@ const vi: Dict = {
   "inv.next": "Còn {n} người nữa",
   "inv.stepN": "{n}",
   "inv.ladderPick": "1 trong 12 mẫu",
-  "inv.share": "Gửi thẻ mời",
+  "inv.share": "Mời bạn bè",
   "inv.sharing": "Đang vẽ thẻ…",
   "inv.code": "Mã của tôi",
   "inv.copy": "Sao chép link",
@@ -4031,10 +4031,11 @@ const vi: Dict = {
   "inv.homeNudgeSub": "12 mẫu · mỗi mẫu 10 cây",
   "tour.cc.inviteTitle": "Phần thưởng mời bạn",
   "tour.cc.inviteBody": "Khi bạn bè đăng ký qua link mời, bạn mở phấn ở mốc 1, găng ở mốc 3, cơ ở mốc 10 — cứ 30 người bạn chọn một trong mười hai cơ giới hạn. Mỗi mẫu chỉ 10 cây.",
-  "tour.cc.inviteShareTitle": "Gửi thẻ mời",
-  "tour.cc.inviteShareBody": "Gửi link mời và thẻ qua tin nhắn. Thẻ có cây cơ đại diện hiện tại của bạn. Khi bạn bè đăng ký qua link, họ nhận Phấn chào mừng và số người bạn đã mời tăng thêm một.",
-  "inv.shareHint": "Cây cơ đại diện của bạn có trên thẻ · gửi qua tin nhắn",
+  "tour.cc.inviteShareTitle": "Mời bạn bè",
+  "tour.cc.inviteShareBody": "Gửi link mời qua tin nhắn. Bạn bè thấy bản xem trước thẻ mời; khi đăng ký qua link, họ nhận Phấn chào mừng và số người bạn đã mời tăng thêm một.",
+  "inv.shareHint": "Gửi link qua tin nhắn — bản xem trước hiện thẻ mời",
   "inv.meFail": "Không tải được mã mời",
   "inv.retry": "Thử lại",
+  "inv.cardOnly": "Lưu ảnh thẻ",
 };
 export default vi;

@@ -3984,7 +3984,7 @@ const es: Dict = {
   "inv.next": "{n} más para el siguiente",
   "inv.stepN": "{n}",
   "inv.ladderPick": "1 de 12 limitados",
-  "inv.share": "Enviar tarjeta de invitación",
+  "inv.share": "Invitar amigos",
   "inv.sharing": "Dibujando la tarjeta…",
   "inv.code": "Mi código",
   "inv.copy": "Copiar enlace",
@@ -4031,10 +4031,11 @@ const es: Dict = {
   "inv.homeNudgeSub": "12 diseños · 10 de cada uno",
   "tour.cc.inviteTitle": "Recompensas por invitar",
   "tour.cc.inviteBody": "Cuando tus amigos se registran con tu enlace desbloqueas una tiza con 1, un guante con 3 y un taco con 10 — y cada 30 amigos eliges uno de doce tacos limitados. Solo 10 de cada diseño.",
-  "tour.cc.inviteShareTitle": "Enviar tarjeta de invitación",
-  "tour.cc.inviteShareBody": "Envía tu enlace y tarjeta por mensaje. La tarjeta muestra tu taco destacado. Cuando un amigo se registra con el enlace, recibe la tiza de bienvenida y tu cuenta de invitados sube uno.",
-  "inv.shareHint": "Tu taco destacado va en la tarjeta · envíala por mensaje",
+  "tour.cc.inviteShareTitle": "Invitar amigos",
+  "tour.cc.inviteShareBody": "Envía tu enlace de invitación por mensaje. Tu amigo ve una vista previa de la tarjeta; al registrarse recibe la tiza de bienvenida y tu cuenta sube uno.",
+  "inv.shareHint": "Envía tu enlace — la vista previa muestra la tarjeta",
   "inv.meFail": "No se pudo cargar tu código",
   "inv.retry": "Reintentar",
+  "inv.cardOnly": "Guardar la imagen",
 };
 export default es;

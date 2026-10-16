@@ -3984,7 +3984,7 @@ const tr: Dict = {
   "inv.next": "Sonrakine {n} kişi",
   "inv.stepN": "{n}",
   "inv.ladderPick": "12 sınırlıdan 1",
-  "inv.share": "Davet kartı gönder",
+  "inv.share": "Arkadaş davet et",
   "inv.sharing": "Kart hazırlanıyor…",
   "inv.code": "Kodum",
   "inv.copy": "Bağlantıyı kopyala",
@@ -4031,10 +4031,11 @@ const tr: Dict = {
   "inv.homeNudgeSub": "12 tasarım · her birinden 10",
   "tour.cc.inviteTitle": "Davet ödülleri",
   "tour.cc.inviteBody": "Arkadaşların davet bağlantınla kaydoldukça 1'de tebeşir, 3'te eldiven, 10'da ıstaka açılır — her 30 arkadaşta on iki sınırlı ıstakadan birini seçersin. Her tasarımdan yalnızca 10 tane.",
-  "tour.cc.inviteShareTitle": "Davet kartı gönder",
-  "tour.cc.inviteShareBody": "Davet bağlantını ve kartını mesajla gönder. Kartta şu anki ana ıstakan görünür. Bir arkadaşın bağlantıyla kaydolunca Hoş Geldin Tebeşiri alır, davet sayın bir artar.",
-  "inv.shareHint": "Ana ıstakan kartta yer alır · mesajla gönder",
+  "tour.cc.inviteShareTitle": "Arkadaş davet et",
+  "tour.cc.inviteShareBody": "Davet bağlantını mesajla gönderir. Arkadaşın davet kartı önizlemesini görür; kaydolunca Hoş Geldin Tebeşiri alır, davet sayın bir artar.",
+  "inv.shareHint": "Bağlantını mesajla gönderir — önizlemede davet kartı görünür",
   "inv.meFail": "Davet kodun yüklenemedi",
   "inv.retry": "Tekrar dene",
+  "inv.cardOnly": "Kart görselini kaydet",
 };
 export default tr;

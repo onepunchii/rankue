@@ -92,3 +92,14 @@ describe("친구 초대 — 다듬기(2026-10-16 저녁)", () => {
         expect(page).toContain('if (!seen) localStorage.setItem("rankue_tour_cue-case-invite", "1");');
     });
 });
+
+describe("친구 초대 — 버튼 하나(2026-10-16 오너: '링크까지 같이 · 버튼 하나로')", () => {
+    it("파일 없이 링크와 글만 보낸다 — 받는 쪽에 초대 카드 미리보기가 붙는다 · 공유창이 없으면 복사", () => {
+        const api = read("client/src/components/hiq/invite/inviteApi.ts");
+        expect(api).toContain("await Share.share({ title: o.title, text: o.text, url: o.url, dialogTitle: o.title });");
+        expect(api).toContain('return (await copyText(`${o.text}\\n${o.url}`)) ? "copied" : "failed";');
+        const panel = read("client/src/components/hiq/invite/InvitePanel.tsx");
+        expect(panel).toContain('onClick={() => { void sendLink(); }}');
+        expect(panel).toContain('data-testid="cue-case-invite-card"');
+    });
+});

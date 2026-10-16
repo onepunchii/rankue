@@ -33,3 +33,30 @@ export function finalRefusal(e: unknown): boolean {
     const status = (e as { status?: number } | null)?.status;
     return status === 400 || status === 404 || status === 409;
 }
+
+/**
+ * 초대 링크 보내기(2026-10-16 오너: "초대 카드 보내기 하면 이미지만 · 링크까지 같이 · 버튼 하나로") — 파일을 붙이면 카톡 등이 글(링크)을 버린다.
+ * 그래서 **링크와 글만** 보낸다 → 받는 쪽에 링크 미리보기(초대 카드 그림 · "OO님이 랭큐로 초대했어요")가 저절로 붙는다(server/prerender /i/:code).
+ * 앱 = 시스템 공유창, 웹 = Web Share, 둘 다 없으면 링크를 복사한다.
+ */
+export type LinkShareOutcome = "shared" | "copied" | "dismissed" | "failed";
+export async function shareInviteLink(o: { title: string; text: string; url: string }): Promise<LinkShareOutcome> {
+    const { Capacitor } = await import("@capacitor/core");
+    const { isDismissal, copyText } = await import("@/sim/share/useShare");
+    try {
+        if (Capacitor.isNativePlatform()) {
+            const { Share } = await import("@capacitor/share");
+            await Share.share({ title: o.title, text: o.text, url: o.url, dialogTitle: o.title });
+            return "shared";
+        }
+        const n = typeof navigator !== "undefined" ? navigator : null;
+        if (n && typeof n.share === "function") {
+            await n.share({ title: o.title, text: o.text, url: o.url });
+            return "shared";
+        }
+    } catch (e) {
+        if (isDismissal(e)) return "dismissed";
+        // 공유창이 실패하면 복사로 넘어간다
+    }
+    return (await copyText(`${o.text}\n${o.url}`)) ? "copied" : "failed";
+}

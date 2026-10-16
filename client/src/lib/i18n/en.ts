@@ -3984,7 +3984,7 @@ const en: Dict = {
   "inv.next": "{n} more to the next",
   "inv.stepN": "{n}",
   "inv.ladderPick": "1 of 12 limited",
-  "inv.share": "Send an invite card",
+  "inv.share": "Invite friends",
   "inv.sharing": "Drawing the card…",
   "inv.code": "My code",
   "inv.copy": "Copy link",
@@ -4031,10 +4031,11 @@ const en: Dict = {
   "inv.homeNudgeSub": "12 limited designs · 10 of each",
   "tour.cc.inviteTitle": "Invite rewards",
   "tour.cc.inviteBody": "When friends sign up with your invite link you unlock a chalk at 1, a glove at 3 and a cue at 10 — and every 30 friends you pick one of twelve limited cues. Only 10 of each design.",
-  "tour.cc.inviteShareTitle": "Send an invite card",
-  "tour.cc.inviteShareBody": "Send your invite link and card by message. The card shows your current featured cue. When a friend signs up with the link, they get the Welcome Chalk and your invite count goes up by one.",
-  "inv.shareHint": "Your featured cue goes on the card · send it by message",
+  "tour.cc.inviteShareTitle": "Invite friends",
+  "tour.cc.inviteShareBody": "Sends your invite link by message. Your friend sees an invite card preview; when they sign up with it, they get the Welcome Chalk and your invite count goes up by one.",
+  "inv.shareHint": "Sends your link by message — the preview shows the invite card",
   "inv.meFail": "Couldn't load your invite code",
   "inv.retry": "Try again",
+  "inv.cardOnly": "Save the card image",
 };
 export default en;

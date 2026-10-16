@@ -19,7 +19,7 @@ import { canvasToBlob } from "@/sim/share/shareCard";
 import { CUES, INVITE_PICK_LIMIT, INVITE_STEPS, caseImage, caseItem, type CaseItem, type CaseLocale } from "@shared/cueCase";
 import { cleanInviteCode } from "@shared/invite";
 import { CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, saveHero, serialText, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
-import { INVITE_ME_KEY, claimInvite, fetchInviteMe, pickInviteCue } from "./inviteApi";
+import { INVITE_ME_KEY, claimInvite, fetchInviteMe, pickInviteCue, shareInviteLink } from "./inviteApi";
 import { renderInviteCard } from "./inviteCard";
 
 const PINK = "#FF4FA3";
@@ -67,9 +67,21 @@ export function InvitePanel({ view, l, onReveal, focus = false }: { view: CueCas
             toast({ title: t("case.shareFail"), variant: "destructive" });
         } finally { setSharing(false); }
     };
+    // 버튼 하나 — 링크와 글을 보낸다(받는 쪽에 초대 카드 미리보기가 붙는다). 공유창이 없으면 복사
+    const sendLink = async () => {
+        if (!me || sharing) return;
+        setSharing(true);
+        try {
+            const title = t("inv.cardTitle").replace("{name}", view.member.name);
+            const out = await shareInviteLink({ title, text: t("inv.shareText").replace("{name}", view.member.name), url: me.url });
+            if (out === "copied") toast({ title: t("inv.copied") });
+            else if (out === "failed") toast({ title: me.url });
+        } finally { setSharing(false); }
+    };
     const copy = async () => {
         if (!me) return;
-        try { await navigator.clipboard.writeText(me.url); toast({ title: t("inv.copied") }); } catch { toast({ title: me.url }); }
+        const { copyText } = await import("@/sim/share/useShare");
+        toast({ title: (await copyText(me.url)) ? t("inv.copied") : me.url });
     };
     const claim = useMutation({
         mutationFn: (c: string) => claimInvite(c),
@@ -119,8 +131,8 @@ export function InvitePanel({ view, l, onReveal, focus = false }: { view: CueCas
                     </button>
                 )}
 
-                <button type="button" onClick={() => { void share(); }} disabled={!me || sharing} className="mt-3 h-12 w-full rounded-full text-[15px] font-bold text-white active:opacity-90 disabled:opacity-60" style={{ background: PINK, boxShadow: "0 4px 0 #7A0F4C" }} data-testid="cue-case-invite-share" data-tour="cc-invite-share" data-track-as="친구 초대 카드 공유">
-                    {sharing ? t("inv.sharing") : t("inv.share")}
+                <button type="button" onClick={() => { void sendLink(); }} disabled={!me || sharing} className="mt-3 h-12 w-full rounded-full text-[15px] font-bold text-white active:opacity-90 disabled:opacity-60" style={{ background: PINK, boxShadow: "0 4px 0 #7A0F4C" }} data-testid="cue-case-invite-share" data-tour="cc-invite-share" data-track-as="친구 초대 링크 보내기">
+                    {t("inv.share")}
                 </button>
                 {q.isError ? (
                     <div className="mt-2 flex items-center justify-between gap-2 rounded-xl bg-white/[0.06] px-3.5 py-2.5" data-testid="cue-case-invite-me-fail">
@@ -131,9 +143,13 @@ export function InvitePanel({ view, l, onReveal, focus = false }: { view: CueCas
                     <p className="mt-1.5 text-center text-[12px] text-white/55 break-keep" data-testid="cue-case-invite-share-hint">{t("inv.shareHint")}</p>
                 )}
                 {me && (
-                    <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl bg-black/30 px-3.5 py-2.5">
-                        <p className="text-[12.5px] text-white/60">{t("inv.code")} <span className="rk-num ml-1 text-[15px] font-bold tracking-[0.18em] text-white" data-testid="cue-case-invite-code">{me.code}</span></p>
-                        <button type="button" onClick={() => { void copy(); }} className="h-9 rounded-full border border-white/20 px-3.5 text-[13px] font-semibold text-white/85 active:bg-white/10" data-testid="cue-case-invite-copy">{t("inv.copy")}</button>
+                    <div className="mt-2.5 flex items-center justify-between gap-2 px-1">
+                        <button type="button" onClick={() => { void copy(); }} className="flex items-center gap-1.5 text-[12.5px] text-white/60 active:opacity-70" data-testid="cue-case-invite-copy">
+                            {t("inv.code")} <span className="rk-num text-[14px] font-bold tracking-[0.16em] text-white" data-testid="cue-case-invite-code">{me.code}</span>
+                        </button>
+                        <button type="button" onClick={() => { void share(); }} disabled={sharing} className="text-[12.5px] font-semibold underline-offset-2 active:opacity-70 disabled:opacity-50" style={{ color: PINK }} data-testid="cue-case-invite-card">
+                            {sharing ? t("inv.sharing") : t("inv.cardOnly")}
+                        </button>
                     </div>
                 )}
                 {me?.invitedBy && <p className="mt-2.5 text-center text-[12.5px] text-white/55" data-testid="cue-case-invited-by">{t("inv.invitedBy").replace("{name}", me.invitedBy)}</p>}
