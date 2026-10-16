@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle, LucideFootprints } from "@/lib/icons";
 import MemberGamesDialog from "./MemberGamesDialog";
 import MemberActivitySheet from "./MemberActivitySheet";
+import MemberSportsSection from "./MemberSportsSection";
 import { MemberAvatar, PlatformIcon, CountryFlag, Pill, kstDate, lastSeenLabel, lastSeenTone, isRealPhone, phoneLabel, isKstToday, SHEET_SAFE_TOP, SportChip } from "./adminUtils";
 import { TODAY_ACTIVE_KEY } from "./TodayActiveView";
 import { appConfirm, appAlert } from "@/components/AppDialog";
@@ -457,6 +458,8 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                 </section>
 
                                 <GolfSection golf={golfQ.data} isLoading={golfQ.isLoading} isError={golfQ.isError} onRetry={() => void golfQ.refetch()} />
+
+                                <MemberSportsSection key={m.id} memberId={m.id} />
 
                                 <section>
                                     <h3 className="text-[12px] font-black text-black/45 mb-2">{access.canWrite ? "정보 수정" : "정보"}</h3>

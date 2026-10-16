@@ -15,6 +15,7 @@ import { cleanRejectReason } from "../../lib/partnerApply.js";
 import adminGolfRouter from "./adminGolf/index.js";
 import adminVisitorsRouter from "./adminVisitors.js";
 import { getMemberGolfForAdmin, setBookingManagerRole, setSubAdminRole } from "../../storage/adminMemberGolf.js";
+import { getMemberSportsForAdmin } from "../../storage/adminMemberSports.js";
 import { getMemberActivityForAdmin } from "../../storage/adminMemberActivity.js";
 import { activityDaysOf } from "../../../shared/memberActivity.js";
 import { isSuperAdminRole } from "../../../shared/adminRole.js";
@@ -237,6 +238,17 @@ router.get("/members/:id/golf", checkSuperAdmin, asyncHandler(async (req: any, r
     const golf = await getMemberGolfForAdmin(req.params.id);
     if (!golf) return sendError(res, 404, "회원을 찾을 수 없습니다");
     return sendSuccess(res, golf);
+}));
+
+/**
+ * GET /admin/members/:id/sports — 회원 상세 시트의 '종목' 칸(2026-10-17 어드민 전수 조사: 기반의 "회원 상세에 종목 칸" + 낚시 ⑤).
+ * 당구 큐 케이스 · 초대 · 온라인 레이팅, 골프 보상, 등산 · 낚시 기록 수와 최근 조과(좌표 없이). 조회만 — 보기 전용 관리자도 본다.
+ */
+router.get("/members/:id/sports", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    if (!MEMBER_ID_RE.test(req.params.id)) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    const sports = await getMemberSportsForAdmin(req.params.id);
+    if (!sports) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    return sendSuccess(res, sports);
 }));
 
 /**
