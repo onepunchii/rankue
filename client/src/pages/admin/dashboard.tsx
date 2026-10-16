@@ -16,7 +16,7 @@ import {
     LucideLayoutDashboard, LucideStore, LucideUsers, LucidePhone,
     LucideGlobe, LucideCheckCircle, LucideLogOut, LucideArrowLeft, LucideChevronLeft,
     LucideBell, LucideCreditCard, LucideShieldAlert, LucideMenu, LucideUsersRound, LucideMail, LucideFlag, GameController,
-    LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin, LucideTrendingUp, LucideFootprints, LucideHistory, LucideGift } from "@/lib/icons";
+    LucideZap, LucideMegaphone, LucideUserPlus, LucideBarChart3, LucideCalendarCheck, LucideFlagTriangleRight, LucideCamera, LucideMapPin, LucideTrendingUp, LucideFootprints, LucideHistory, LucideGift, LucideTrophy } from "@/lib/icons";
 import OnlineGameView from "./OnlineGameView";
 import ModerationView from "./ModerationView";
 import MembersView from "./MembersView";
@@ -34,6 +34,7 @@ import BilliardsGamesView from "./BilliardsGamesView";
 import BilliardsInvitesView from "./BilliardsInvitesView";
 import BilliardsOnlineView from "./BilliardsOnlineView";
 import BilliardsCaseView from "./BilliardsCaseView";
+import BilliardsCupView from "./BilliardsCupView";
 // 굿즈 · 배지(2026-10-16) — 네 종목 목록(골프 · 등산 도장첩 표 포함)을 끌어와서 따로 불러온다(첫 화면 묶음을 무겁게 하지 않게)
 const GoodsView = lazy(() => import("./GoodsView"));
 import CrewsView from "./CrewsView";
@@ -63,10 +64,10 @@ type GlobalStats = {
 };
 
 type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
-    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-case" | "billiards-invites";
+    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-case", "billiards-invites"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites"] as const;
 
 // --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
 // 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
@@ -92,10 +93,11 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
         { id: "stores", label: "매장 리스트", icon: LucideStore },
         { id: "billing", label: "결제 관리", icon: LucideCreditCard },
     ] },
-    // 당구(2026-10-16 어드민 전수 조사) — 실전 경기 전체 · 이상 표시, 온라인 대전(상세 · 무효 · 레이팅 표), 큐 케이스 맞춰 보기, 친구 초대(한정 큐를 노린 가짜 가입)
+    // 당구(2026-10-16 어드민 전수 조사) — 실전 경기 전체 · 이상 표시, 온라인 대전(상세 · 무효 · 레이팅 표), 월대회 운영, 큐 케이스 맞춰 보기, 친구 초대(한정 큐를 노린 가짜 가입)
     { title: "당구", items: [
         { id: "billiards-games", label: "실전 경기", icon: LucideFlagTriangleRight },
         { id: "billiards-online", label: "온라인 대전", icon: GameController },
+        { id: "billiards-cup", label: "월대회", icon: LucideTrophy },
         { id: "billiards-case", label: "큐 케이스", icon: LucideGift },
         { id: "billiards-invites", label: "친구 초대", icon: LucideUserPlus },
     ] },
@@ -463,6 +465,7 @@ export default function AdminDashboard() {
                     {tab === "actions" && <AdminActionsView />}
                     {tab === "billiards-games" && <BilliardsGamesView onOpenMember={setOpenMemberId} />}
                     {tab === "billiards-online" && <BilliardsOnlineView onOpenMember={setOpenMemberId} />}
+                    {tab === "billiards-cup" && <BilliardsCupView />}
                     {tab === "billiards-case" && <BilliardsCaseView onOpenMember={setOpenMemberId} />}
                     {tab === "billiards-invites" && <BilliardsInvitesView onOpenMember={setOpenMemberId} />}
                     {tab === "goods" && <Suspense fallback={<p className="text-[13px] text-black/45">불러오는 중…</p>}><GoodsView /></Suspense>}
@@ -484,6 +487,7 @@ function getTabTitle(tab: string) {
         case "goods": return "굿즈 · 배지";
         case "billiards-games": return "실전 경기";
         case "billiards-online": return "온라인 대전";
+        case "billiards-cup": return "월대회";
         case "billiards-case": return "큐 케이스";
         case "billiards-invites": return "친구 초대";
         case "search-trend": return "검색 수요";
@@ -516,6 +520,7 @@ const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     visitors: "웹과 앱에서 사람들이 어디로 들어와 무엇을 보고 누르는지 — 1분마다 새로 읽습니다.",
     actions: "관리자가 바꾼 것 — 누가 · 언제 · 무엇을. 막힌 요청도 함께 남습니다.",
     "billiards-online": "끝난 온라인 대전 전부 — 판을 열어 샷 흐름을 보고, 레이팅을 옮긴 판은 무효로 합니다(바뀌는 레이팅을 먼저 미리 봅니다).",
+    "billiards-cup": "다음 대회는 지금 성적이 이대로면 누가 나가는지 · 열린 대회는 대진표에서 기한 늘리기 · 결과 정하기 · 바꾸기 · 지금 굴리기.",
     "billiards-case": "받은 큐 · 초크 · 장갑을 지금 기록과 맞춰 봅니다 — 지운 경기 · 무효로 한 판으로 받은 것만 거둘 수 있어요.",
     "billiards-invites": "초대로 든 가입 전부 — 경기 없는 가입 · 한 시간에 몰린 초대를 다시 보고, 필요하면 초대를 취소하고 보상을 거둡니다.",
     "billiards-games": "끝난 당구 경기 전부 — 이상 표시(한 이닝 고득점 · 평소의 몇 배 · 같은 둘이 하루 여러 판)로 다시 볼 것을 고릅니다.",

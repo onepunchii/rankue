@@ -2548,6 +2548,8 @@ export const hiqSimCupGames = pgTable("hiq_sim_cup_games", {
   decidedAt: timestamp("decided_at"),
   /** 기한 하루 전 알림을 보낸 때(한 번만) */
   remindedAt: timestamp("reminded_at"),
+  /** 운영 기록(2026-10-16 어드민 › 당구 › 월대회) — [{ at, by, action: extend|decide|change, reason, text }] · shared/simCupAdmin */
+  adminNote: jsonb("admin_note"),
 }, (t) => ({
   uniq: unique().on(t.cupId, t.kind, t.round, t.slot),
 }));
