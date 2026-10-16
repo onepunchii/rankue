@@ -92,6 +92,9 @@ const TTL_MS = 10 * 60_000;
 let cache: { at: number; list: MountainSummary[]; bySlug: Map<string, MountainSummary>; byId: Map<string, MountainSummary>; days: Map<string, string> } | null = null;
 let loading: Promise<MountainSummary[]> | null = null;
 
+/** 이 서버의 산 간직을 비운다 — 어드민이 산 자료를 고친 뒤(다른 서버는 TTL 안에 따라온다) */
+export function forgetMountainCache(): void { cache = null; }
+
 /** 산 요약 전부 — 명산 먼저(100대 명산의 순번), 그다음 높은 산부터 */
 export async function allMountains(): Promise<MountainSummary[]> {
     if (cache && Date.now() - cache.at < TTL_MS) return cache.list;

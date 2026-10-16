@@ -227,7 +227,8 @@ async function main() {
     const client = await pool.connect();
     try {
         await client.query("begin");
-        for (const x of moved) await client.query(`update hiking_mountains set lat = $2, lng = $3, updated_at = now() where id = $1`, [x.id, x.lat, x.lng]);
+        // 어드민에서 정상 자리를 고친 산(admin_keep.coords, 2026-10-17)은 옮기지 않는다
+        for (const x of moved) await client.query(`update hiking_mountains set lat = $2, lng = $3, updated_at = now() where id = $1 and not (coalesce(admin_keep, '{}'::jsonb) ? 'coords')`, [x.id, x.lat, x.lng]);
         await upsert("hiking_courses", [["id", "text"], ["mountain_id", "text"], ["frtrl_id", "text"], ["seq", "integer"], ["km", "numeric"], ["gain_m", "integer"], ["loss_m", "integer"], ["min_m", "integer"], ["max_m", "integer"],
             ["loop", "boolean"], ["summit_km", "numeric"], ["line", "jsonb"], ["surface", "jsonb"]], "id", courseRows, 60, client);
         await upsert("hiking_pois", [["id", "text"], ["mountain_id", "text"], ["frtrl_id", "text"], ["type", "text"], ["name", "text"], ["note", "text"], ["lat", "double precision"], ["lng", "double precision"],

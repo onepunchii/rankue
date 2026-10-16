@@ -58,11 +58,14 @@ function parseGpx(file: string): [number, number, number][] {
     return out;
 }
 
-async function upsert(table: string, cols: readonly [string, string][], key: string, rows: Record<string, unknown>[], size: number, touch = true) {
+/** keep: 칸 → admin_keep 의 열쇠 — 그 열쇠가 있는 줄은 그 칸을 덮지 않는다(어드민에서 고친 값) */
+async function upsert(table: string, cols: readonly [string, string][], key: string, rows: Record<string, unknown>[], size: number, touch = true, keep: Readonly<Record<string, string>> = {}) {
     const names = cols.map(([c]) => c);
     for (let i = 0; i < rows.length; i += size) {
         const batch = rows.slice(i, i + size);
-        const set = names.filter((c) => c !== key).map((c) => `${c} = excluded.${c}`).concat(touch ? ["updated_at = now()"] : []).join(", ");
+        const set = names.filter((c) => c !== key)
+            .map((c) => (keep[c] ? `${c} = case when coalesce(${table}.admin_keep, '{}'::jsonb) ? '${keep[c]}' then ${table}.${c} else excluded.${c} end` : `${c} = excluded.${c}`))
+            .concat(touch ? ["updated_at = now()"] : []).join(", ");
         await pool.query(
             `insert into ${table} (${names.join(", ")}) select ${names.join(", ")} from jsonb_to_recordset($1::jsonb) as x(${cols.map(([c, t]) => `${c} ${t}`).join(", ")})
              on conflict (${key}) do update set ${set}`,
@@ -76,6 +79,16 @@ async function main() {
     // 정상 자리 바로잡기(shared/hikingSummitFix — 공식 목록 · 코스 기록으로 판정한 14곳)를 읽은 자료 위에 덮어쓴다.
     // 이 자리로 '정상을 지나는 코스'를 다시 고르므로, 코스가 없던 100대 명산에 코스가 붙는다.
     const master: any[] = (json(join(contentDir, "mountains_master.json")) as any[]).map(applySummitFix);
+    // 어드민에서 고친 칸(hiking_mountains.admin_keep, 2026-10-17)은 받은 자료보다 먼저다 — 이 자리로 '정상을 지나는 코스'도 고른다
+    const kept = await pool.query(`select id, lat, lng, height_m, peak_name, admin_keep from hiking_mountains where admin_keep is not null`).then((r) => r.rows).catch(() => [] as any[]);
+    for (const k of kept) {
+        const m = master.find((x) => x.id === k.id);
+        if (!m) continue;
+        if (k.admin_keep?.coords && k.lat != null && k.lng != null) { m.lat = Number(k.lat); m.lon = Number(k.lng); }
+        if (k.admin_keep?.height && k.height_m != null) m.elevationM = Number(k.height_m);
+        if (k.admin_keep?.peak) m.peakName = k.peak_name ?? null;
+    }
+    if (kept.length) console.log("어드민에서 고친 산:", kept.length);
     console.log("정상 자리 고침:", HIKING_SUMMIT_FIXES.filter((f) => master.some((m) => m.id === f.id && m.lat === f.lat && m.lon === f.lng)).length, "/", HIKING_SUMMIT_FIXES.length);
     const guides: any[] = json(join(contentDir, "mountain_guides.json"));
     const bundles: any[] = json(join(contentDir, "mountain_pois.json"));
@@ -225,7 +238,8 @@ async function main() {
 
     await upsert("hiking_mountains", [["id", "text"], ["slug", "text"], ["name", "text"], ["peak_name", "text"], ["aliases", "jsonb"], ["lat", "double precision"], ["lng", "double precision"], ["height_m", "integer"],
         ["sido", "text"], ["sigungu", "text"], ["dong", "text"], ["region", "text"], ["tier", "integer"], ["lists", "jsonb"], ["traits", "jsonb"], ["guide", "jsonb"],
-        ["course_count", "integer"], ["course_min_km", "numeric"], ["course_max_km", "numeric"], ["poi_counts", "jsonb"]], "id", mountainRows, 300);
+        ["course_count", "integer"], ["course_min_km", "numeric"], ["course_max_km", "numeric"], ["poi_counts", "jsonb"]], "id", mountainRows, 300, true,
+        { lat: "coords", lng: "coords", height_m: "height", peak_name: "peak" });
     await upsert("hiking_courses", [["id", "text"], ["mountain_id", "text"], ["frtrl_id", "text"], ["seq", "integer"], ["km", "numeric"], ["gain_m", "integer"], ["loss_m", "integer"], ["min_m", "integer"], ["max_m", "integer"],
         ["loop", "boolean"], ["summit_km", "numeric"], ["line", "jsonb"]], "id", courseRows, 60);
     await upsert("hiking_pois", [["id", "text"], ["mountain_id", "text"], ["frtrl_id", "text"], ["type", "text"], ["name", "text"], ["note", "text"], ["lat", "double precision"], ["lng", "double precision"],

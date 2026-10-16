@@ -5,6 +5,9 @@
  * GET /admin/hiking/summits/:id/revoke-preview            인증을 취소하면 거둘 와펜 · 핀 · 등급(계산만)
  * POST /admin/hiking/summits/:id/revoke { reason }        인증 취소 — '인증 없는 기록'으로 내리고(admin_void), 남은 기록이 받쳐 주지 않는 받은 것을 거둔다
  * POST /admin/hiking/summits/:id/restore { reason }       되살리기 — 다시 인증으로, 받을 것을 다시 적는다(번호는 새로)
+ * GET /admin/hiking/mountains?view=kfs100|kept|all&q=        산 자료 — 정상 자리 · 높이 · 코스가 정상을 지나는가(가장 가까운 거리) · 인증 수 · 고친 칸
+ * GET /admin/hiking/mountains/:id                         한 산 — 코스 선(그리기용) · 정상 후보(코스마다 가장 높은 점)
+ * POST /admin/hiking/mountains/:id { lat, lng, heightM, peakName, reason }  고치기 — admin_keep 에 적혀 다시 적재해도 남는다, 코스의 정상 자리(summit_km)도 다시 셈
  * 운영자가 '굿즈 · 배지'로 증정한 것은 거두지 않는다(증정 기록이 따로 있다). 까닭은 작업 기록에 남는다(가드).
  */
 import { Router } from "express";
@@ -14,12 +17,13 @@ import { checkSuperAdmin } from "../../middleware/adminAuth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { sendError, sendSuccess } from "../../utils/response.js";
 import { storage } from "../../storage/index.js";
-import { allMountains } from "../../storage/hiking.js";
+import { allMountains, forgetMountainCache } from "../../storage/hiking.js";
 import { listSummits, syncHikingAwards } from "../../storage/hikingStamps.js";
 import { isWithdrawnMember } from "../../../shared/chatSupport.js";
 import { goodsItem } from "../../../shared/goods.js";
 import { hikingAwardsDue, hikingAwardId, type Summit } from "../../../shared/hikingStamps.js";
 import { summitFlags, type AdminHikingAwardLoss, type AdminSummitRow, type MountainSpot } from "../../../shared/hikingSummitFlags.js";
+import { distM, nearestOnLine, summitCandidates, summitKmOn, validSpot, type AdminKeep, type AdminMountainDetail, type AdminMountainRow, type KeepField, type LinePoint } from "../../../shared/hikingMountainEdit.js";
 
 const router = Router();
 router.use(checkSuperAdmin);
@@ -113,6 +117,93 @@ router.post("/summits/:id/restore", asyncHandler(async (req: any, res: any) => {
     if (!done.length) return sendError(res, 409, "그날 그 산의 인증이 이미 있어요");
     const fresh = await syncHikingAwards(s.member_id, await allMountains(), (await listSummits(s.member_id)).map((x) => ({ mountainId: x.mountainId, at: x.at, verified: x.verified })));
     return sendSuccess(res, { ok: true, awarded: fresh.length });
+}));
+
+// ── 산 자료 ─────────────────────────────────────────────────────────────
+const MOUNTAIN_COLS = sql`m.id, m.slug, m.name, m.peak_name, m.height_m, m.lat, m.lng, m.sido, m.sigungu, m.lists, m.course_count, m.admin_keep,
+    (select count(*)::int from hiking_summits s where s.mountain_id = m.id and s.verified) as summits`;
+const kfsNo = (lists: unknown) => (Array.isArray(lists) ? (lists as any[]).find((l) => l?.list === "kfs100")?.no ?? null : null);
+
+async function linesOf(ids: readonly string[]): Promise<Map<string, { id: string; km: number; line: LinePoint[]; summitKm: number | null }[]>> {
+    const out = new Map<string, { id: string; km: number; line: LinePoint[]; summitKm: number | null }[]>();
+    if (!ids.length) return out;
+    for (const c of rowsOf(await db.execute(sql`select id, mountain_id, km, summit_km, line from hiking_courses where mountain_id = any(${`{${ids.map((x) => `"${x.replace(/"/g, "")}"`).join(",")}}`}::text[])`))) {
+        const l = out.get(String(c.mountain_id)) ?? [];
+        l.push({ id: String(c.id), km: Number(c.km) || 0, line: Array.isArray(c.line) ? c.line : [], summitKm: c.summit_km == null ? null : Number(c.summit_km) });
+        out.set(String(c.mountain_id), l);
+    }
+    return out;
+}
+
+function mountainRow(r: any, lines: { line: LinePoint[] }[] | undefined): AdminMountainRow {
+    const lat = r.lat == null ? null : Number(r.lat), lng = r.lng == null ? null : Number(r.lng);
+    const near = lat == null || lng == null || !lines?.length ? null : Math.min(...lines.map((l) => nearestOnLine(l.line, lat, lng)?.offM ?? Infinity));
+    return {
+        id: String(r.id), slug: String(r.slug), name: String(r.name), peakName: r.peak_name ?? null, heightM: r.height_m == null ? null : Number(r.height_m), lat, lng,
+        place: [r.sido, r.sigungu].filter(Boolean).join(" "), kfs100: kfsNo(r.lists), courses: Number(r.course_count) || 0,
+        nearestM: near == null || !Number.isFinite(near) ? null : Math.round(near), summits: Number(r.summits) || 0, keep: (r.admin_keep ?? {}) as AdminKeep,
+    };
+}
+
+router.get("/mountains", asyncHandler(async (req: any, res: any) => {
+    const view = req.query.view === "kept" || req.query.view === "all" ? req.query.view : "kfs100";
+    const term = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 30) : "";
+    const like = `%${term.replace(/[%_\\]/g, "")}%`;
+    const rows = rowsOf(await db.execute(sql`select ${MOUNTAIN_COLS} from hiking_mountains m
+        where (${term} <> '' and (m.name ilike ${like} or m.slug ilike ${like} or m.peak_name ilike ${like}))
+           or (${term} = '' and ((${view} = 'kfs100' and m.lists @> '[{"list":"kfs100"}]'::jsonb) or (${view} = 'kept' and m.admin_keep is not null) or ${view} = 'all'))
+        order by (m.lists @> '[{"list":"kfs100"}]'::jsonb) desc, m.tier, m.height_m desc nulls last limit ${term ? 60 : view === "all" ? 60 : 120}`));
+    const lines = await linesOf(rows.map((r) => String(r.id)));
+    const out = rows.map((r) => mountainRow(r, lines.get(String(r.id)))).sort((a, b) => (a.kfs100 ?? 999) - (b.kfs100 ?? 999));
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, out);
+}));
+
+router.get("/mountains/:id", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? "").slice(0, 80);
+    const [r] = rowsOf(await db.execute(sql`select ${MOUNTAIN_COLS} from hiking_mountains m where m.id = ${id}`));
+    if (!r) return sendError(res, 404, "산을 찾을 수 없어요");
+    const lines = (await linesOf([id])).get(id) ?? [];
+    const row = mountainRow(r, lines);
+    // 그리기용 — 코스마다 120점 안으로 줄인다
+    const thin = (l: LinePoint[]) => { const step = Math.max(1, Math.ceil(l.length / 120)); return l.filter((_, i) => i % step === 0 || i === l.length - 1).map((p) => [p[0], p[1], Math.round(p[2])] as [number, number, number]); };
+    const out: AdminMountainDetail = {
+        ...row,
+        lines: lines.map((l) => ({ id: l.id, km: l.km, line: thin(l.line), nearestM: row.lat == null || row.lng == null ? null : Math.round(nearestOnLine(l.line, row.lat, row.lng)?.offM ?? 0), summitKm: l.summitKm })),
+        candidates: summitCandidates(lines.map((l) => l.line), row.heightM),
+    };
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, out);
+}));
+
+router.post("/mountains/:id", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? "").slice(0, 80), reason = reasonOf(req);
+    if (!reason) return sendError(res, 400, "고치는 까닭을 적어 주세요");
+    const [r] = rowsOf(await db.execute(sql`select id, lat, lng, height_m, peak_name, admin_keep from hiking_mountains where id = ${id}`));
+    if (!r) return sendError(res, 404, "산을 찾을 수 없어요");
+    const spot = validSpot(req.body?.lat, req.body?.lng);
+    if (!spot.ok) return sendError(res, 400, spot.why);
+    const height = req.body?.heightM == null || req.body?.heightM === "" ? null : Math.round(Number(req.body.heightM));
+    if (height !== null && (!Number.isFinite(height) || height < 1 || height > 2000)) return sendError(res, 400, "높이는 1 ~ 2,000m 로 적어 주세요");
+    const peak = typeof req.body?.peakName === "string" ? req.body.peakName.trim().slice(0, 30) || null : (r.peak_name ?? null);
+    const by = await adminNameOf(req), at = new Date().toISOString();
+    const moved = r.lat == null || r.lng == null ? Infinity : distM(Number(r.lat), Number(r.lng), spot.lat, spot.lng);
+    const changes: Partial<Record<KeepField, { at: string; by: string; reason: string; was: string }>> = {};
+    if (moved > 1) changes.coords = { at, by, reason, was: r.lat == null ? "없음" : `${r.lat}, ${r.lng}` };
+    if (height !== null && height !== (r.height_m == null ? null : Number(r.height_m))) changes.height = { at, by, reason, was: r.height_m == null ? "없음" : `${r.height_m}m` };
+    if (peak !== (r.peak_name ?? null)) changes.peak = { at, by, reason, was: r.peak_name ?? "없음" };
+    if (!Object.keys(changes).length) return sendError(res, 400, "지금 값과 같아요");
+    await db.execute(sql`update hiking_mountains set lat = ${spot.lat}, lng = ${spot.lng}, height_m = ${height ?? r.height_m ?? null}, peak_name = ${peak},
+        admin_keep = coalesce(admin_keep, '{}'::jsonb) || ${JSON.stringify(changes)}::jsonb, updated_at = now() where id = ${id}`);
+    // 코스의 정상 자리 — 적재와 같은 셈(150m 안일 때만)
+    let onCourse = 0;
+    if (changes.coords) for (const l of (await linesOf([id])).get(id) ?? []) {
+        const km = summitKmOn(l.line, spot.lat, spot.lng);
+        if (km !== null) onCourse++;
+        if (km !== l.summitKm) await db.execute(sql`update hiking_courses set summit_km = ${km}, updated_at = now() where id = ${l.id}`);
+    }
+    forgetMountainCache();
+    return sendSuccess(res, { ok: true, changed: Object.keys(changes), movedM: Number.isFinite(moved) ? Math.round(moved) : null, onCourse });
 }));
 
 export default router;
