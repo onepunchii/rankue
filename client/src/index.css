@@ -1180,6 +1180,15 @@ body {
     filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.75));
     animation: cc-pan 16s ease-in-out infinite alternate;
   }
+  /* 한정 큐를 고른 순간(2026-10-16) — 빛살 · 색종이 · 미끄러져 들어오는 큐 */
+  .cc-picked { background: radial-gradient(circle at 50% 45%, #3a0f2fee 0%, #0b0612f2 70%); }
+  .cc-picked-rays { background: repeating-conic-gradient(from 0deg, #ff4fa31f 0deg 9deg, transparent 9deg 18deg); animation: cc-rays 18s linear infinite; }
+  @keyframes cc-rays { to { transform: translate(-50%, -50%) rotate(360deg); } }
+  .cc-confetti { animation: cc-fall 2.8s linear infinite; }
+  @keyframes cc-fall { 0% { transform: translateY(0) rotate(0deg); opacity: 1; } 100% { transform: translateY(110vh) rotate(540deg); opacity: 0.6; } }
+  .cc-picked-cue { animation: cc-picked-in 0.9s cubic-bezier(.2,.9,.2,1.15) both; }
+  @keyframes cc-picked-in { 0% { transform: translateX(-60%) rotate(-8deg) scale(0.9); opacity: 0; } 100% { transform: none; opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .cc-picked-rays, .cc-confetti, .cc-picked-cue { animation: none; } .cc-confetti { display: none; } }
   @keyframes cc-pan {
     from { transform: translate(0, -50%); }
     to { transform: translate(calc(-100% + var(--cc-loupe-w, 328px)), -50%); }

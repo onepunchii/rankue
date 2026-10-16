@@ -71,6 +71,15 @@ export default function CueCasePage() {
     }, [d, fresh, items]);
 
     const [pick, setPick] = useState<CaseItem | null>(null);
+    // 큐 케이스 안내(전체)를 이미 본 사람 — 친구 초대 칸 안내는 그런 사람에게만 따로(처음 여는 사람은 전체 안내에 들어 있다)
+    const [tourSeen] = useState(() => {
+        try {
+            const seen = localStorage.getItem("rankue_tour_cue-case") !== null;
+            // 처음 여는 사람은 전체 안내에서 친구 초대 칸을 본다 — 따로 한 번 더 띄우지 않게 적어 둔다
+            if (!seen) localStorage.setItem("rankue_tour_cue-case-invite", "1");
+            return seen;
+        } catch { return false; }
+    });
     const [group, setGroup] = useState<CueGroup>("real");
     const setSec = (s: CaseSection) => {
         const p = new URLSearchParams(params);
@@ -161,7 +170,7 @@ export default function CueCasePage() {
                     <MonthGlove glove={monthGlove} view={it(monthGlove.id)} cells={d.month.cells} need={d.month.need} month={month!} onOpen={() => setPick(monthGlove)} />
                 )}
                 {/* 친구 초대 — 내 케이스에만(2026-10-16) */}
-                {d?.member.mine && <InvitePanel view={d} l={l} onReveal={(list) => setReveal(list)} />}
+                {d?.member.mine && <InvitePanel view={d} l={l} onReveal={(list) => setReveal(list)} focus={params.get("invite") === "1"} />}
                 {isGuest && (
                     <div className="mt-5 rounded-[22px] border border-[color:var(--cc-gold)]/30 bg-white/[0.04] px-4 py-4" data-testid="cue-case-guest">
                         <p className="text-[15px] font-semibold text-white">{t("case.guestTitle")}</p>
@@ -273,7 +282,13 @@ export default function CueCasePage() {
                 { target: "cc-secs", title: t("tour.cc.secsTitle"), body: t("tour.cc.secsBody") },
                 { target: "cc-groups", title: t("tour.cc.groupsTitle"), body: t("tour.cc.groupsBody") },
                 { target: "cc-row", title: t("tour.cc.rowTitle"), body: t("tour.cc.rowBody") },
+                { target: "cc-invite", title: t("tour.cc.inviteTitle"), body: t("tour.cc.inviteBody") },
                 { target: "cc-share", title: t("tour.cc.shareTitle"), body: t("tour.cc.shareBody") },
+            ]} />}
+            {/* 친구 초대 칸(2026-10-16) — 큐 케이스 안내를 이미 본 사람에게 한 번 더, 이 칸만 */}
+            {d?.member.mine && sec === "cue" && tourSeen && <CoachTour id="cue-case-invite" tone="billiards" when={!reveal} delay={600} steps={[
+                { target: "cc-invite", title: t("tour.cc.inviteTitle"), body: t("tour.cc.inviteBody") },
+                { target: "cc-invite-share", title: t("tour.cc.inviteShareTitle"), body: t("tour.cc.inviteShareBody") },
             ]} />}
             {d?.member.mine && sec === "chalk" && <CoachTour id="cue-case-chalk" tone="billiards" delay={500} steps={[
                 { target: "cc-people", title: t("tour.cc.peopleTitle"), body: t("tour.cc.peopleBody") },

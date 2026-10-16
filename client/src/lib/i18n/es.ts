@@ -4022,5 +4022,16 @@ const es: Dict = {
   "inv.landBad": "Código de invitación no encontrado",
   "inv.landBrowse": "Explorar Rankue",
   "inv.landOpenCase": "Ver mi estuche",
+  "inv.pickedTitle": "¡Taco limitado conseguido!",
+  "inv.pickedSerial": "Dueño n.º {n} de {m}",
+  "inv.pickedHero": "Usar como mi taco",
+  "inv.pickedHeroDone": "Ya es tu taco",
+  "inv.pickedShare": "Presúmelo a tus amigos",
+  "inv.homeNudge": "Invita amigos y gana tacos limitados",
+  "inv.homeNudgeSub": "12 diseños · 10 de cada uno",
+  "tour.cc.inviteTitle": "Invita amigos",
+  "tour.cc.inviteBody": "Cuando tus amigos se unen con tu enlace desbloqueas tiza, guante y taco — y cada 30 amigos eliges uno de doce tacos limitados. Solo 10 de cada diseño.",
+  "tour.cc.inviteShareTitle": "Invita con tu taco",
+  "tour.cc.inviteShareBody": "Envía una tarjeta con tu taco y tu enlace. Tu amigo recibe la tiza de bienvenida al unirse.",
 };
 export default es;

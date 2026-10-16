@@ -4022,5 +4022,16 @@ const tr: Dict = {
   "inv.landBad": "Davet kodu bulunamadı",
   "inv.landBrowse": "Rankue'yu keşfet",
   "inv.landOpenCase": "Istaka çantamı gör",
+  "inv.pickedTitle": "Sınırlı ıstaka senin",
+  "inv.pickedSerial": "{m} taneden {n}. sahip",
+  "inv.pickedHero": "Ana ıstakam yap",
+  "inv.pickedHeroDone": "Artık ana ıstakan",
+  "inv.pickedShare": "Arkadaşlarına göster",
+  "inv.homeNudge": "Arkadaş davet et, sınırlı ıstaka kazan",
+  "inv.homeNudgeSub": "12 tasarım · her birinden 10",
+  "tour.cc.inviteTitle": "Arkadaş davet et",
+  "tour.cc.inviteBody": "Arkadaşların bağlantınla katıldıkça tebeşir, eldiven ve ıstaka açılır — her 30 arkadaşta on iki sınırlı ıstakadan birini seçersin. Her tasarımdan yalnızca 10 tane.",
+  "tour.cc.inviteShareTitle": "Istakanla davet et",
+  "tour.cc.inviteShareBody": "Istakanın olduğu davet kartını ve bağlantını gönderir. Arkadaşın katılınca Hoş Geldin Tebeşiri alır.",
 };
 export default tr;

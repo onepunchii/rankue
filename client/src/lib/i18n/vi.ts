@@ -4022,5 +4022,16 @@ const vi: Dict = {
   "inv.landBad": "Không tìm thấy mã mời",
   "inv.landBrowse": "Khám phá Rankue",
   "inv.landOpenCase": "Xem hộp cơ",
+  "inv.pickedTitle": "Đã có cây cơ giới hạn",
+  "inv.pickedSerial": "Chủ thứ {n} trên {m}",
+  "inv.pickedHero": "Đặt làm cơ đại diện",
+  "inv.pickedHeroDone": "Đã là cơ đại diện",
+  "inv.pickedShare": "Khoe với bạn bè",
+  "inv.homeNudge": "Mời bạn, nhận cơ giới hạn",
+  "inv.homeNudgeSub": "12 mẫu · mỗi mẫu 10 cây",
+  "tour.cc.inviteTitle": "Mời bạn bè",
+  "tour.cc.inviteBody": "Khi bạn bè tham gia qua link của bạn, bạn mở phấn, găng và cơ — cứ 30 người bạn chọn một trong mười hai cơ giới hạn. Mỗi mẫu chỉ 10 cây.",
+  "tour.cc.inviteShareTitle": "Mời bằng cây cơ của bạn",
+  "tour.cc.inviteShareBody": "Gửi thẻ mời có cây cơ của bạn cùng link. Bạn bè nhận Phấn chào mừng khi tham gia.",
 };
 export default vi;

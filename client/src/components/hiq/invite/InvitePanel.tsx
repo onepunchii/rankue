@@ -8,7 +8,7 @@
  *  - 가입한 지 7일 안이고 초대로 세지 않았으면 '초대받으셨나요?' 코드 넣기(앱을 깔고 앱에서 가입하면 링크의 표시가 끊긴다)
  * 만화 묶음이라 이 칸만 핫핑크가 들어간다. 그 밖은 큐 케이스의 금 · 벨벳 그대로.
  */
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
@@ -18,7 +18,7 @@ import { shareBlob } from "@/sim/share/useShare";
 import { canvasToBlob } from "@/sim/share/shareCard";
 import { CUES, INVITE_PICK_LIMIT, INVITE_STEPS, caseImage, caseItem, type CaseItem, type CaseLocale } from "@shared/cueCase";
 import { cleanInviteCode } from "@shared/invite";
-import { CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
+import { CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, saveHero, serialText, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
 import { INVITE_ME_KEY, claimInvite, fetchInviteMe, pickInviteCue } from "./inviteApi";
 import { renderInviteCard } from "./inviteCard";
 
@@ -32,7 +32,7 @@ const LADDER = [
     { n: INVITE_STEPS[3], item: caseItem("cue-lt-inv-jelly")! },
 ];
 
-export function InvitePanel({ view, l, onReveal }: { view: CueCaseView; l: CaseLocale; onReveal: (items: CaseItem[]) => void }) {
+export function InvitePanel({ view, l, onReveal, focus = false }: { view: CueCaseView; l: CaseLocale; onReveal: (items: CaseItem[]) => void; focus?: boolean }) {
     const { t } = useT();
     const { toast } = useToast();
     const qc = useQueryClient();
@@ -41,6 +41,11 @@ export function InvitePanel({ view, l, onReveal }: { view: CueCaseView; l: CaseL
     const [sharing, setSharing] = useState(false);
     const [picking, setPicking] = useState(false);
     const [code, setCode] = useState("");
+    // 방금 고른 한정 큐 — 축하 화면(번호 · 대표 큐로 · 자랑하기)
+    const [picked, setPicked] = useState<{ item: CaseItem; serial: number } | null>(null);
+    // 홈의 '친구 초대하고 한정 큐 받기'로 왔으면 이 칸으로
+    const box = useRef<HTMLElement>(null);
+    useEffect(() => { if (focus) window.setTimeout(() => box.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 350); }, [focus]);
     const count = me?.count ?? view.invite?.count ?? 0;
     const left = me?.picks.left ?? view.invite?.picks.left ?? 0;
     const next = INVITE_STEPS.find((s) => s > count) ?? null;
@@ -48,12 +53,12 @@ export function InvitePanel({ view, l, onReveal }: { view: CueCaseView; l: CaseL
     const nextPick = count >= INVITE_STEPS[3] ? Math.ceil((count + 1) / INVITE_STEPS[3]) * INVITE_STEPS[3] : null;
     const toNext = (next ?? nextPick ?? 0) - count;
 
-    const share = async () => {
+    const share = async (hero: string | null = view.hero) => {
         if (!me || sharing) return;
         setSharing(true);
         try {
             const title = t("inv.cardTitle").replace("{name}", view.member.name);
-            const canvas = await renderInviteCard({ title, sub: t("inv.cardSub"), codeLabel: t("inv.cardCode"), code: me.code, url: me.url, hero: view.hero, gift: caseItem("chalk-welcome")!.name[l] });
+            const canvas = await renderInviteCard({ title, sub: t("inv.cardSub"), codeLabel: t("inv.cardCode"), code: me.code, url: me.url, hero, gift: caseItem("chalk-welcome")!.name[l] });
             const blob = await canvasToBlob(canvas);
             if (!blob) throw new Error("blob");
             const out = await shareBlob(blob, { title, text: `${t("inv.shareText").replace("{name}", view.member.name)}\n${me.url}`, filename: `rankue-invite-${me.code}.png`, url: me.url, copied: false });
@@ -78,7 +83,7 @@ export function InvitePanel({ view, l, onReveal }: { view: CueCaseView; l: CaseL
     const clean = cleanInviteCode(code);
 
     return (
-        <section className="mt-5 overflow-hidden rounded-[24px] ring-1 ring-[#FF4FA3]/35" style={{ background: "linear-gradient(160deg, #2A0F24 0%, #160A1C 55%, #0E0A18 100%)" }} aria-label={t("inv.title")} data-testid="cue-case-invite" data-tour="cc-invite">
+        <section ref={box} className="mt-5 scroll-mt-4 overflow-hidden rounded-[24px] ring-1 ring-[#FF4FA3]/35" style={{ background: "linear-gradient(160deg, #2A0F24 0%, #160A1C 55%, #0E0A18 100%)" }} aria-label={t("inv.title")} data-testid="cue-case-invite" data-tour="cc-invite">
             <div className="px-4 pb-4 pt-4">
                 <div className="flex items-baseline justify-between gap-2">
                     <h2 className="text-[16px] font-semibold text-white">{t("inv.title")}</h2>
@@ -114,7 +119,7 @@ export function InvitePanel({ view, l, onReveal }: { view: CueCaseView; l: CaseL
                     </button>
                 )}
 
-                <button type="button" onClick={() => { void share(); }} disabled={!me || sharing} className="mt-3 h-12 w-full rounded-full text-[15px] font-bold text-white active:opacity-90 disabled:opacity-60" style={{ background: PINK, boxShadow: "0 4px 0 #7A0F4C" }} data-testid="cue-case-invite-share" data-track-as="친구 초대 카드 공유">
+                <button type="button" onClick={() => { void share(); }} disabled={!me || sharing} className="mt-3 h-12 w-full rounded-full text-[15px] font-bold text-white active:opacity-90 disabled:opacity-60" style={{ background: PINK, boxShadow: "0 4px 0 #7A0F4C" }} data-testid="cue-case-invite-share" data-tour="cc-invite-share" data-track-as="친구 초대 카드 공유">
                     {sharing ? t("inv.sharing") : t("inv.share")}
                 </button>
                 {me && (
@@ -136,23 +141,24 @@ export function InvitePanel({ view, l, onReveal }: { view: CueCaseView; l: CaseL
                     </div>
                 )}
             </div>
-            {picking && <PickSheet view={view} l={l} left={left} onClose={() => setPicking(false)} onPicked={(x) => { setPicking(false); onReveal([x]); }} />}
+            {picking && <PickSheet view={view} l={l} left={left} onClose={() => setPicking(false)} onPicked={(x, serial) => { setPicking(false); setPicked({ item: x, serial }); }} />}
+            {picked && <PickedCelebration item={picked.item} serial={picked.serial} l={l} hero={view.hero} sharing={sharing} onShare={() => { void share(picked.item.id); }} onClose={() => setPicked(null)} />}
         </section>
     );
 }
 
 /** 고르기 팝업 — 열두 디자인, 남은 자루 · 완판 · 가진 것. 누르면 한 번 더 묻는다(고르면 바꿀 수 없다) */
-function PickSheet({ view, l, left, onClose, onPicked }: { view: CueCaseView; l: CaseLocale; left: number; onClose: () => void; onPicked: (x: CaseItem) => void }) {
+function PickSheet({ view, l, left, onClose, onPicked }: { view: CueCaseView; l: CaseLocale; left: number; onClose: () => void; onPicked: (x: CaseItem, serial: number) => void }) {
     const { t } = useT();
     const { toast } = useToast();
     const qc = useQueryClient();
     const [sure, setSure] = useState<CaseItem | null>(null);
     useBackToClose(true, () => (sure ? setSure(null) : onClose()));
     const pick = useMutation({
-        mutationFn: (x: CaseItem) => pickInviteCue(x.id).then(() => x),
-        onSuccess: (x) => {
+        mutationFn: (x: CaseItem) => pickInviteCue(x.id).then((r) => ({ x, serial: r.serial })),
+        onSuccess: ({ x, serial }) => {
             void qc.invalidateQueries({ queryKey: INVITE_ME_KEY }); void qc.invalidateQueries({ queryKey: CUE_CASE_QUERY_KEY }); void qc.invalidateQueries({ queryKey: CASE_SUMMARY_KEY });
-            onPicked(x);
+            onPicked(x, serial);
         },
         onError: (e: any) => { setSure(null); void qc.invalidateQueries({ queryKey: CUE_CASE_QUERY_KEY }); toast({ title: typeof e?.message === "string" && e.message ? e.message : t("inv.pickFail"), variant: "destructive" }); },
     });
@@ -196,6 +202,51 @@ function PickSheet({ view, l, left, onClose, onPicked }: { view: CueCaseView; l:
                 ) : (
                     <div className="px-5 pt-2"><button type="button" onClick={onClose} className="h-12 w-full rounded-full border border-white/15 text-[14px] font-semibold text-white/85">{t("inv.later")}</button></div>
                 )}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * 한정 큐를 고른 순간(2026-10-16 — 이 묶음의 가장 큰 순간). 빛살 · 색종이 · 벨벳 자리로 미끄러져 들어오는 큐 · 놋쇠 번호판 "No.008 / 10".
+ * 바로 대표 큐로 할 수 있고(게임 큐대 · 초대 카드에 들어간다), 이 큐가 들어간 초대 카드로 자랑할 수 있다. 동작 줄이기면 멈춘 한 장.
+ */
+function PickedCelebration({ item, serial, l, hero, sharing, onShare, onClose }: { item: CaseItem; serial: number; l: CaseLocale; hero: string | null; sharing: boolean; onShare: () => void; onClose: () => void }) {
+    const { t } = useT();
+    const qc = useQueryClient();
+    useBackToClose(true, onClose);
+    const makeHero = useMutation({
+        mutationFn: () => saveHero(item.id),
+        onSuccess: () => { void qc.invalidateQueries({ queryKey: CUE_CASE_QUERY_KEY }); void qc.invalidateQueries({ queryKey: CASE_SUMMARY_KEY }); },
+    });
+    const isHero = hero === item.id || makeHero.isSuccess;
+    const bits = Array.from({ length: 26 }, (_, i) => i);
+    const COLORS = ["#FF4FA3", "#FFE14D", "#7CF2C8", "#8FB8FF", "#FFFFFF"];
+    return (
+        <div role="dialog" aria-modal="true" aria-label={t("inv.pickedTitle")} className="cc-picked fixed inset-0 z-[70] flex items-center justify-center overflow-hidden px-5" onClick={onClose} data-testid="cue-case-picked">
+            <div aria-hidden className="cc-picked-rays pointer-events-none absolute left-1/2 top-1/2 h-[160vmax] w-[160vmax] -translate-x-1/2 -translate-y-1/2" />
+            {bits.map((i) => (
+                <span key={i} aria-hidden className="cc-confetti pointer-events-none absolute top-[-4%] block h-3 w-2 rounded-[2px]"
+                    style={{ left: `${(i * 37.7) % 100}%`, background: COLORS[i % COLORS.length], animationDelay: `${(i % 9) * 0.17}s`, animationDuration: `${2.4 + (i % 5) * 0.35}s` }} />
+            ))}
+            <div className="cue-case relative w-full max-w-[400px] rounded-[28px] px-5 pb-5 pt-6 text-center" onClick={(e) => e.stopPropagation()} style={{ background: "linear-gradient(180deg, #2A0F24, #120A1C)", boxShadow: `0 0 0 2px ${PINK}, 0 0 60px ${PINK}66` }}>
+                <p className="text-[13px] font-bold tracking-[0.06em]" style={{ color: PINK }}>{t("case.group.limited")}</p>
+                <h2 className="mt-1 text-[22px] font-bold tracking-tight text-white">{t("inv.pickedTitle")}</h2>
+                <span className="cc-slot cc-lit mt-5 block"><img src={caseImage(item)} alt={item.name[l]} className="cc-own cc-picked-cue" draggable={false} /></span>
+                <p className="mt-3 text-[18px] font-bold text-white" data-testid="cue-case-picked-name">{item.name[l]}</p>
+                <div className="mx-auto mt-3 w-fit rounded-md px-5 py-1.5" style={{ background: "linear-gradient(180deg, #f6dfa8, #d6a956 45%, #b0823a 60%, #e2bf78)", color: "#3a230f", boxShadow: "0 3px 10px rgba(0,0,0,0.55)" }}>
+                    <span className="rk-num text-[20px] font-bold tracking-[0.04em]" data-testid="cue-case-picked-serial">{serialText(serial)}<span className="text-[14px] opacity-70"> / {item.limit ?? INVITE_PICK_LIMIT}</span></span>
+                </div>
+                <p className="mt-2 text-[12.5px] text-white/60">{t("inv.pickedSerial").replace("{n}", String(serial)).replace("{m}", String(item.limit ?? INVITE_PICK_LIMIT))}</p>
+                <div className="mt-5 space-y-2">
+                    <button type="button" onClick={() => makeHero.mutate()} disabled={isHero || makeHero.isPending} className="h-12 w-full rounded-full text-[15px] font-bold disabled:opacity-80" style={isHero ? { background: "#FFFFFF14", color: "#e8c46a" } : { background: "#FFE14D", color: "#1A0B14" }} data-testid="cue-case-picked-hero">
+                        {isHero ? t("inv.pickedHeroDone") : t("inv.pickedHero")}
+                    </button>
+                    <button type="button" onClick={onShare} disabled={sharing} className="h-12 w-full rounded-full text-[15px] font-bold text-white disabled:opacity-60" style={{ background: PINK }} data-testid="cue-case-picked-share">
+                        {sharing ? t("inv.sharing") : t("inv.pickedShare")}
+                    </button>
+                    <button type="button" onClick={onClose} className="h-11 w-full rounded-full text-[14px] font-semibold text-white/70">{t("sim.common.close")}</button>
+                </div>
             </div>
         </div>
     );

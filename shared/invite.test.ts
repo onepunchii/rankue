@@ -79,3 +79,16 @@ describe("친구 초대 — 서버 · 화면", () => {
         expect(read("client/src/App.tsx")).toContain('<Route path="/i/:code" component={InviteRoute} />');
     });
 });
+
+describe("친구 초대 — 다듬기(2026-10-16 저녁)", () => {
+    it("고른 순간은 번호판까지 · 홈에서 초대 칸으로 바로 · 안내는 한 번", () => {
+        const panel = read("client/src/components/hiq/invite/InvitePanel.tsx");
+        expect(panel).toContain('data-testid="cue-case-picked-serial">{serialText(serial)}');
+        expect(panel).toContain("function PickedCelebration(");
+        expect(read("client/src/index.css")).toContain(".cc-picked-rays, .cc-confetti, .cc-picked-cue { animation: none; }");
+        expect(read("client/src/components/hiq/cueCase/CueCaseEntry.tsx")).toContain('onClick={() => setLocation("/cue-case?invite=1")}');
+        const page = read("client/src/pages/hiq/cue-case.tsx");
+        expect(page).toContain('<CoachTour id="cue-case-invite"');
+        expect(page).toContain('if (!seen) localStorage.setItem("rankue_tour_cue-case-invite", "1");');
+    });
+});

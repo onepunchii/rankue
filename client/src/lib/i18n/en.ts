@@ -4022,5 +4022,16 @@ const en: Dict = {
   "inv.landBad": "Invite code not found",
   "inv.landBrowse": "Explore Rankue",
   "inv.landOpenCase": "See my cue case",
+  "inv.pickedTitle": "Limited cue secured",
+  "inv.pickedSerial": "Owner No.{n} of {m}",
+  "inv.pickedHero": "Make it my cue",
+  "inv.pickedHeroDone": "It's your cue now",
+  "inv.pickedShare": "Show it off to friends",
+  "inv.homeNudge": "Invite friends, earn limited cues",
+  "inv.homeNudgeSub": "12 limited designs · 10 of each",
+  "tour.cc.inviteTitle": "Invite friends",
+  "tour.cc.inviteBody": "When friends join with your link you unlock a chalk, a glove and a cue — and every 30 friends you pick one of twelve limited cues. Only 10 of each design.",
+  "tour.cc.inviteShareTitle": "Invite with your cue",
+  "tour.cc.inviteShareBody": "Sends an invite card with your cue plus your link. Your friend gets the Welcome Chalk when they join.",
 };
 export default en;
