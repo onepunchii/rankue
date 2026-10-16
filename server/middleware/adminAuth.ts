@@ -1,7 +1,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { storage } from "../storage/index.js";
-import { scrubAdminDetail } from "../../shared/adminActions.js";
+import { ADMIN_RESULT_MAX, scrubAdminDetail, scrubAdminResults } from "../../shared/adminActions.js";
 import { sendError } from "../utils/response.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { ADMIN_VIEW_ONLY_CODE, ADMIN_VIEW_ONLY_MESSAGE, isConsoleRole, isSuperAdminRole, viewOnlyAllows } from "../../shared/adminRole.js";
@@ -43,7 +43,9 @@ function recordOnReply(req: any, res: any, admin: { id: string; name: string }) 
     const send = res.json.bind(res);
     res.json = (body: unknown) => {
         const path = String(req.originalUrl ?? req.url ?? "").split("?")[0];
-        const detail = scrubAdminDetail({ params: req.params, query: req.query, body: req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body) ? req.body : null });
+        const sent = scrubAdminDetail({ params: req.params, query: req.query, body: req.body && typeof req.body === "object" && !Buffer.isBuffer(req.body) ? req.body : null }) as Record<string, unknown>;
+        // 라우트가 adminLog 로 남긴 '무엇이 바뀌었나'(전 · 후 …)도 같은 줄에(2026-10-17 골프 ④ — 서버 로그에만 있었다)
+        const detail = Array.isArray(req.__adminResults) && req.__adminResults.length ? { ...sent, result: scrubAdminResults(req.__adminResults) } : sent;
         let write: Promise<unknown>;
         try {
             write = Promise.resolve(db.execute(sql`insert into hiq_admin_actions (admin_profile_id, admin_name, method, path, status, detail)
@@ -58,4 +60,9 @@ function recordOnReply(req: any, res: any, admin: { id: string; name: string }) 
 /** 감사 로그 한 줄(서버 로그) — admin.ts 의 console.info("[admin] …") 와 같은 꼴. 누가 했는지 파트너 쿠키로 남긴다 */
 export function adminLog(req: any, action: string, detail: Record<string, unknown>) {
     console.info("[admin]", action, JSON.stringify({ ...detail, by: req.signedCookies?.hiq_partner_auth ?? null }));
+    // 답하기 전에 부르면(라우트가 다 그렇다) 그 요청의 작업 기록 줄에 붙는다 — recordOnReply
+    if (req && typeof req === "object") {
+        const list: unknown[] = Array.isArray(req.__adminResults) ? req.__adminResults : (req.__adminResults = []);
+        if (list.length < ADMIN_RESULT_MAX) list.push({ action, ...detail });
+    }
 }

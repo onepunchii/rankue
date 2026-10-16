@@ -8,7 +8,7 @@ vi.mock("../storage/index.js", () => ({ storage: { getProfile: m.getProfile } })
 // 작업 기록(2026-10-16) — 쓰기는 가짜로 받아 둔다
 vi.mock("../db.js", () => ({ db: { execute: async (q: unknown) => { m.logged.push(q); return { rows: [] }; } } }));
 
-import { checkSuperAdmin } from "./adminAuth";
+import { adminLog, checkSuperAdmin } from "./adminAuth";
 
 const PROFILES: Record<string, { id: string; role: string }> = {
     "p-super": { id: "p-super", role: "super_admin" },
@@ -28,6 +28,8 @@ beforeAll(async () => {
     app.use((req: any, _res, next) => { const who = req.headers["x-test-profile"]; req.signedCookies = who ? { hiq_partner_auth: who } : {}; next(); });
     const router = express.Router();
     router.use(checkSuperAdmin);
+    // 라우트가 adminLog 로 '바뀐 것'을 남기는 꼴(골프 ④)
+    router.post("/test-changed", (req: any, res) => { adminLog(req, "test.changed", { before: [4, 4, 3], after: [4, 5, 3], members: [{ id: "a", avgBefore: 90, avgAfter: 91 }] }); res.json({ success: true }); });
     router.all("*", (req: any, res) => { reached.push({ method: req.method, path: req.originalUrl, role: req.adminRole, profileId: req.adminProfileId }); res.json({ success: true }); });
     app.use("/api/hiq/admin", router);
     await new Promise<void>((resolve) => { server = app.listen(0, "127.0.0.1", () => resolve()); });
@@ -114,5 +116,11 @@ describe("작업 기록(2026-10-16) — 가드를 지난 바꾸는 요청마다 
         expect(m.logged).toHaveLength(2);
         await call("p-admin", "DELETE", "/games/abc"); // 보기 전용 — 가드가 막는다(기록 전에 막혀 남지 않는다)
         expect(m.logged).toHaveLength(2);
+    });
+    it("라우트가 adminLog 로 남긴 '바뀐 것'(전 · 후 · 회원 목록)이 같은 줄에 붙는다(2026-10-17 골프 ④)", async () => {
+        await call("p-super", "POST", "/test-changed");
+        expect(m.logged).toHaveLength(1);
+        const text = JSON.stringify((m.logged[0] as any).queryChunks ?? m.logged[0]);
+        expect(text).toContain('\\"result\\":[{\\"action\\":\\"test.changed\\",\\"before\\":[4,4,3],\\"after\\":[4,5,3],\\"members\\":[{\\"id\\":\\"a\\",\\"avgBefore\\":90,\\"avgAfter\\":91}]}]');
     });
 });

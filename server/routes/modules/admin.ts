@@ -6,7 +6,7 @@ import { SUGGESTION_REPLY_TYPE } from "../../lib/suggestionBox.js";
 import { randomInt } from "crypto";
 import { hashPassword } from "../../services/hiqService.js";
 import { checkSuperAdmin, adminLog } from "../../middleware/adminAuth.js";
-import { adminActionLabel, type AdminActionRow } from "../../../shared/adminActions.js";
+import { ACTION_SPORT_PATHS, adminActionLabel, parseActionSport, type AdminActionRow } from "../../../shared/adminActions.js";
 import adminGoodsRouter from "./adminGoods.js";
 import adminBilliardsRouter from "./adminBilliards.js";
 import adminHikingRouter from "./adminHiking.js";
@@ -81,12 +81,17 @@ router.get("/actions", checkSuperAdmin, asyncHandler(async (req: any, res: any) 
     const before = typeof req.query.before === "string" && !Number.isNaN(Date.parse(req.query.before)) ? new Date(req.query.before).toISOString() : null;
     const term = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 60) : "";
     const like = `%${term.replace(/[%_\\]/g, "")}%`;
+    // 종목 칩(2026-10-17 골프 ④) — 주소 머리로. 굿즈 증정 · 회수는 보낸 값의 sport 로
+    const sport = parseActionSport(req.query.sport);
+    const sportCond = sport
+        ? q`(${q.join(ACTION_SPORT_PATHS[sport].map((p) => q`path like ${`${p}%`}`), q` or `)} or (path like '/api/hiq/admin/goods/%' and detail->'body'->>'sport' = ${sport}))`
+        : q`true`;
     let rows: any[] = [];
     try {
         rows = ((await adb.execute(q`
             select id, to_char(created_at at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') as at, admin_name, method, path, status, detail
             from hiq_admin_actions
-            where (${before}::timestamptz is null or created_at < ${before}::timestamptz) and (${term} = '' or path ilike ${like} or admin_name ilike ${like})
+            where (${before}::timestamptz is null or created_at < ${before}::timestamptz) and (${term} = '' or path ilike ${like} or admin_name ilike ${like}) and ${sportCond}
             order by created_at desc limit 100`)) as any).rows ?? [];
     } catch (e: any) { if ((e?.code ?? e?.cause?.code) !== "42P01") throw e; }
     res.set("Cache-Control", "private, no-store");

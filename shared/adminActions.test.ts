@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import fs from "node:fs";
-import { adminActionLabel, scrubAdminDetail } from "./adminActions";
+import { actionSport, adminActionLabel, parseActionSport, scrubAdminDetail, scrubAdminResults } from "./adminActions";
 
 const read = (p: string) => fs.readFileSync(p, "utf8");
 
@@ -15,6 +15,25 @@ describe("관리자 작업 기록(2026-10-16)", () => {
         expect(out.body.name).toBe("김랭큐");
         expect(out.body.key).toBe("gangwon"); // 골프 보상의 열쇠(key)는 비밀이 아니다
         expect(String(out.body.note)).toMatch(/…\(300자\)$/);
+    });
+    it("'바뀐 것'은 셋까지 · 조금 더 깊게 · 비밀 칸은 지운다(골프 ④)", () => {
+        const r = scrubAdminResults([{ action: "a", before: [1, 2], members: [{ id: "x", list: [1] }], phone: "010" }, { action: "b" }, { action: "c" }, { action: "d" }]) as any[];
+        expect(r).toHaveLength(3);
+        expect(r[0]).toEqual({ action: "a", before: [1, 2], members: [{ id: "x", list: [1] }], phone: "•••" });
+    });
+    it("종목 칩 — 주소 머리로, 굿즈는 보낸 값의 sport 로 · 새 메뉴 이름표", () => {
+        expect(actionSport("/api/hiq/admin/golf/rounds/x/onsite")).toBe("golf");
+        expect(actionSport("/api/hiq/admin/membership/orders/1/status")).toBe("golf");
+        expect(actionSport("/api/hiq/admin/billiards/online/x/void")).toBe("billiards");
+        expect(actionSport("/api/hiq/admin/games/x")).toBe("billiards");
+        expect(actionSport("/api/hiq/admin/goods/grant", { body: { sport: "hiking" } })).toBe("hiking");
+        expect(actionSport("/api/hiq/admin/goods/grant", { body: { sport: "x" } })).toBeNull();
+        expect(actionSport("/api/hiq/admin/push")).toBeNull();
+        expect(parseActionSport("fishing")).toBe("fishing");
+        expect(parseActionSport("tennis")).toBeNull();
+        expect(adminActionLabel("POST", "/api/hiq/admin/golf/pars/changes/12/revert")).toBe("카드가 바꾼 파 되돌리기");
+        expect(adminActionLabel("POST", "/api/hiq/admin/fishing/decor/x/take-back")).toBe("수족관 장식 거두기");
+        expect(adminActionLabel("POST", "/api/hiq/admin/hiking/summits/x/revoke")).toBe("정상 인증 취소");
     });
     it("주소 → 이름표(모르면 null)", () => {
         expect(adminActionLabel("DELETE", "/api/hiq/admin/games/abc")).toBe("실전 경기 지우기");

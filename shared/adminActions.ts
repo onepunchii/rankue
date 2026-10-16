@@ -8,20 +8,29 @@
 const SECRET = /^pin|pin$|password|passcode|secret|token|phone|^tel$|account|bank|cookie/i;
 const MAX_STR = 160, MAX_ARR = 20, MAX_DEPTH = 3, MAX_KEYS = 30;
 
-export function scrubAdminDetail(v: unknown, depth = 0): unknown {
+export function scrubAdminDetail(v: unknown, depth = 0, maxDepth = MAX_DEPTH): unknown {
     if (v == null || typeof v === "number" || typeof v === "boolean") return v ?? null;
     if (typeof v === "string") return v.length > MAX_STR ? `${v.slice(0, MAX_STR)}…(${v.length}자)` : v;
-    if (depth >= MAX_DEPTH) return "…";
+    if (depth >= maxDepth) return "…";
     if (Array.isArray(v)) {
-        const head = v.slice(0, MAX_ARR).map((x) => scrubAdminDetail(x, depth + 1));
+        const head = v.slice(0, MAX_ARR).map((x) => scrubAdminDetail(x, depth + 1, maxDepth));
         return v.length > MAX_ARR ? [...head, `…외 ${v.length - MAX_ARR}개`] : head;
     }
     if (typeof v === "object") {
         const out: Record<string, unknown> = {};
-        for (const [k, x] of Object.entries(v as Record<string, unknown>).slice(0, MAX_KEYS)) out[k] = SECRET.test(k) ? "•••" : scrubAdminDetail(x, depth + 1);
+        for (const [k, x] of Object.entries(v as Record<string, unknown>).slice(0, MAX_KEYS)) out[k] = SECRET.test(k) ? "•••" : scrubAdminDetail(x, depth + 1, maxDepth);
         return out;
     }
     return String(v);
+}
+
+/**
+ * 라우트가 adminLog 로 남긴 '무엇이 바뀌었나'(전 · 후 · 다시 센 평균 …) — 2026-10-17 어드민 전수 조사 골프 ④ "콘솔에서 이력을 볼 수 없다".
+ * 예전엔 서버 로그에만 갔다. 이제 같은 요청의 작업 기록 줄(detail.result)에 같이 붙는다. 한 요청에 셋까지, 조금 더 깊게(전 · 후 배열 · 회원 목록).
+ */
+export const ADMIN_RESULT_MAX = 3;
+export function scrubAdminResults(list: readonly { action: string; [k: string]: unknown }[]): unknown {
+    return scrubAdminDetail(list.slice(0, ADMIN_RESULT_MAX), 0, 5);
 }
 
 /** 주소 → 사람이 읽는 이름(모르는 주소는 null — 화면이 방법 · 주소를 그대로 보인다) */
@@ -69,7 +78,51 @@ const LABELS: readonly (readonly [string, RegExp, string])[] = [
     ["PATCH", /^\/admin\/golf\/courses\/[^/]+$/, "골프장 정보 고치기"],
     ["POST", /^\/admin\/goods\/grant$/, "굿즈 증정"],
     ["POST", /^\/admin\/goods\/revoke$/, "증정 회수"],
+    // 2026-10-16~17 종목 메뉴
+    ["POST", /^\/admin\/golf\/rounds\/[^/]+\/onsite$/, "라운드 공식 ↔ 미인증"],
+    ["POST", /^\/admin\/golf\/pars\/courses\/[^/]+\/lock$/, "코스 파 잠그기"],
+    ["POST", /^\/admin\/golf\/pars\/courses\/[^/]+\/unlock$/, "코스 파 잠금 풀기"],
+    ["POST", /^\/admin\/golf\/pars\/changes\/[^/]+\/revert$/, "카드가 바꾼 파 되돌리기"],
+    ["POST", /^\/admin\/golf\/awards\/[^/]+\/take-back$/, "골프 보상 거두기"],
+    ["POST", /^\/admin\/billiards\/invites\/[^/]+\/cancel$/, "친구 초대 취소"],
+    ["POST", /^\/admin\/billiards\/online\/[^/]+\/void$/, "온라인 대전 무효"],
+    ["POST", /^\/admin\/billiards\/online\/[^/]+\/restore$/, "온라인 대전 되살리기"],
+    ["POST", /^\/admin\/billiards\/case\/[^/]+\/take-back$/, "큐 케이스 거두기"],
+    ["POST", /^\/admin\/billiards\/cups\/[^/]+\/sync$/, "월대회 지금 굴리기"],
+    ["POST", /^\/admin\/billiards\/cups\/games\/[^/]+\/extend$/, "월대회 기한 늘리기"],
+    ["POST", /^\/admin\/billiards\/cups\/games\/[^/]+\/decide$/, "월대회 결과 정하기"],
+    ["POST", /^\/admin\/billiards\/cups\/games\/[^/]+\/change$/, "월대회 결과 바꾸기"],
+    ["POST", /^\/admin\/hiking\/summits\/[^/]+\/revoke$/, "정상 인증 취소"],
+    ["POST", /^\/admin\/hiking\/summits\/[^/]+\/restore$/, "정상 인증 되살리기"],
+    ["POST", /^\/admin\/hiking\/mountains\/[^/]+$/, "산 자료 고치기"],
+    ["POST", /^\/admin\/hiking\/photos\/[^/]+\/hide$/, "산행 사진 가리기"],
+    ["POST", /^\/admin\/hiking\/photos\/[^/]+\/appeal$/, "산행 사진 이의제기 판정"],
+    ["DELETE", /^\/admin\/hiking\/photos\/[^/]+$/, "산행 사진 지우기"],
+    ["POST", /^\/admin\/fishing\/catches\/[^/]+\/hide$/, "조과 가리기"],
+    ["POST", /^\/admin\/fishing\/catches\/[^/]+\/appeal$/, "조과 이의제기 판정"],
+    ["DELETE", /^\/admin\/fishing\/catches\/[^/]+$/, "조과 지우기"],
+    ["POST", /^\/admin\/fishing\/catches\/[^/]+\/rank-void$/, "조과 랭킹에서 빼기"],
+    ["POST", /^\/admin\/fishing\/catches\/[^/]+\/rank-restore$/, "조과 랭킹 되돌리기"],
+    ["POST", /^\/admin\/fishing\/feeds\/warm$/, "낚시 공공자료 지금 받기"],
+    ["POST", /^\/admin\/fishing\/decor\/[^/]+\/take-back$/, "수족관 장식 거두기"],
 ];
+
+/** 작업 기록의 종목 칩(2026-10-17 골프 ④) — 주소로 가른다. 굿즈 증정 · 회수는 보낸 값의 sport 로 */
+export type ActionSport = "billiards" | "golf" | "hiking" | "fishing";
+export const ACTION_SPORTS: readonly ActionSport[] = ["billiards", "golf", "hiking", "fishing"];
+/** 서버 질의(LIKE)와 화면이 같이 쓰는 주소 머리 */
+export const ACTION_SPORT_PATHS: Readonly<Record<ActionSport, readonly string[]>> = {
+    billiards: ["/api/hiq/admin/billiards/", "/api/hiq/admin/games/", "/api/hiq/admin/sim/"],
+    golf: ["/api/hiq/admin/golf/", "/api/hiq/admin/membership/"],
+    hiking: ["/api/hiq/admin/hiking/"],
+    fishing: ["/api/hiq/admin/fishing/"],
+};
+export function actionSport(path: string, detail?: unknown): ActionSport | null {
+    for (const s of ACTION_SPORTS) if (ACTION_SPORT_PATHS[s].some((p) => path.startsWith(p))) return s;
+    const sport = (detail as any)?.body?.sport;
+    return path.startsWith("/api/hiq/admin/goods/") && ACTION_SPORTS.includes(sport) ? sport : null;
+}
+export const parseActionSport = (v: unknown): ActionSport | null => (typeof v === "string" && (ACTION_SPORTS as readonly string[]).includes(v) ? (v as ActionSport) : null);
 export function adminActionLabel(method: string, path: string): string | null {
     const p = path.split("?")[0].replace(/^\/api\/hiq/, "");
     const m = method.toUpperCase();
