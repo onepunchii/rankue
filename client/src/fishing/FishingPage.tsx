@@ -407,6 +407,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                 {tab === "log" && (
                     <FsSection title="출조 일지" aside={list.length ? `${list.length}줄` : undefined}>
                         {addButton("조과 적기", "fishing-log-add")}
+                        <HiddenCatches list={list} today={today} />
                         {list.length === 0 ? <p className="mt-3 rounded-2xl px-5 py-8 text-center text-[14px] [word-break:keep-all]" style={{ border: "1px dashed #FFFFFF2E", color: C.soft }}>아직 적은 조과가 없어요. 나간 날마다 종이 한 장으로 남아요.</p>
                             : <CatchJournal list={list} today={today} onFish={setFishOpen} onRemove={askRemove} />}
                         <button type="button" onClick={() => setTab("gear")} className="mt-3 flex min-h-[56px] w-full items-center justify-between rounded-2xl bg-[#FFFFFF0A] px-4 text-left text-[15px] font-semibold active:opacity-80" data-testid="fishing-gear-entry">
@@ -1630,6 +1631,49 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                     {busy ? "적는 중…" : "적고 어탁 찍기"}
                 </button>
             </div>
+        </div>
+    );
+}
+
+/**
+ * 신고로 가려진 내 조과(2026-10-17 어드민 › 낚시 › 조과 검수) — 서로 다른 3명이 신고하면 서버가 가린다(랭킹 · 정출판 · 수족관에서 빠진다).
+ * 일지 맨 위에 그 줄들을 보여 주고, 문제가 없다고 생각하면 이의제기를 한 번 낸다(운영자가 다시 본다 — 신고 큐 '판단 필요').
+ */
+function HiddenCatches({ list, today }: { list: readonly FishingCatch[]; today: string }) {
+    const hidden = list.filter((c) => c.hidden);
+    const [open, setOpen] = useState<string | null>(null);
+    const [text, setText] = useState("");
+    const appeal = useMutation({
+        mutationFn: (id: string) => apiRequest(`/api/hiq/fishing/catches/${id}/appeal`, { method: "POST", body: { text } }),
+        onSuccess: () => { setOpen(null); setText(""); void queryClient.invalidateQueries({ queryKey: KEY }); },
+    });
+    if (!hidden.length) return null;
+    return (
+        <div className="mt-3 rounded-2xl px-4 py-3.5" style={{ background: "#F2B13A1A", border: "1px solid #F2B13A55" }} data-testid="fishing-hidden-catches">
+            <p className="text-[14px] font-semibold" style={{ color: C.foam }}>신고로 가려진 기록 {hidden.length}줄</p>
+            <p className="mt-0.5 text-[13px] leading-snug [word-break:keep-all]" style={{ color: C.soft }}>랭킹 · 정출판 · 수족관에서 빠졌어요. 문제가 없다고 생각되면 이의제기를 내 주세요 — 운영자가 다시 봐요.</p>
+            <ul className="mt-2 space-y-2">
+                {hidden.map((c) => (
+                    <li key={c.id} className="rounded-xl px-3 py-2.5" style={{ background: "#00000026" }}>
+                        <div className="flex items-center gap-2">
+                            <span className="min-w-0 flex-1 truncate text-[14px] font-semibold" style={{ color: C.foam }}>{c.species}<span className="ml-1.5 text-[13px] font-normal" style={{ color: C.dim }}>{fishingDayLabel(c.day, today)} · {c.place}</span></span>
+                            {c.appealed ? <span className="shrink-0 text-[13px]" style={{ color: C.sun }}>이의제기 냈어요</span>
+                                : open !== c.id ? <button type="button" onClick={() => { setOpen(c.id); setText(""); }} className="h-9 shrink-0 rounded-full px-3 text-[13px] font-semibold" style={{ background: C.brand, color: C.onBrand }}>이의제기</button> : null}
+                        </div>
+                        {open === c.id && (
+                            <div className="mt-2 space-y-2">
+                                <textarea value={text} onChange={(e) => setText(e.target.value.slice(0, 300))} rows={2} placeholder="왜 문제가 없는지 짧게 적어 주세요"
+                                    className="w-full resize-none rounded-lg px-3 py-2 text-[14px] outline-none" style={{ background: "#FFFFFF14", color: C.foam }} />
+                                <div className="flex justify-end gap-2">
+                                    <button type="button" onClick={() => setOpen(null)} className="h-9 rounded-full px-3 text-[13px]" style={{ color: C.soft }}>닫기</button>
+                                    <button type="button" disabled={text.trim().length < 2 || appeal.isPending} onClick={() => appeal.mutate(c.id)} className="h-9 rounded-full px-4 text-[13px] font-semibold disabled:opacity-40" style={{ background: C.brand, color: C.onBrand }}>{appeal.isPending ? "보내는 중…" : "보내기"}</button>
+                                </div>
+                                {appeal.isError && <p className="text-[13px]" style={{ color: "#F59A8B" }}>{(appeal.error as any)?.message || "보내지 못했어요"}</p>}
+                            </div>
+                        )}
+                    </li>
+                ))}
+            </ul>
         </div>
     );
 }

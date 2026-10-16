@@ -220,10 +220,11 @@ describe("(가-2) 검토 중인 회원 신고에 다른 사유로 다시 신고 
 describe("(나) 다른 대상 — 예전 그대로 동일인 중복을 무시한다", () => {
     const others = hiqReports.targetType.enumValues.filter((t) => t !== "member");
 
-    // 산행 사진(hiking_photo, 2026-10-13)이 더해져 열한 가지다
-    it("member 말고 열한 가지가 있다", () => {
-        expect(others).toHaveLength(11);
+    // 산행 사진(hiking_photo, 2026-10-13) · 낚시 조과(fishing_catch, 2026-10-17)가 더해져 열두 가지다
+    it("member 말고 열두 가지가 있다", () => {
+        expect(others).toHaveLength(12);
         expect(others).toContain("hiking_photo");
+        expect(others).toContain("fishing_catch");
         expect(hiqReports.targetType.enumValues).toContain("member");
     });
 

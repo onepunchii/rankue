@@ -332,6 +332,8 @@ export const vi: Record<string, string> = {
   // 산행 사진 자동 가림(2026-10-13) — 서로 다른 3명 신고. 등산 알림함으로 간다
   "notif.hikingPhoto.hidden.title": "Ảnh leo núi của bạn đã bị ẩn",
   "notif.hikingPhoto.hidden.body": "Ảnh leo núi của bạn đã bị ẩn sau nhiều báo cáo. Nếu bạn thấy không có vấn đề, hãy mở ảnh trong mục “Ảnh leo núi của tôi” trên trang của ngọn núi đó và nhấn “Khiếu nại” — đội ngũ sẽ xem xét lại.",
+  "notif.fishingCatch.hidden.title": "Bản ghi cá của bạn đã bị ẩn",
+  "notif.fishingCatch.hidden.body": "Bản ghi cá của bạn đã bị ẩn sau nhiều báo cáo. Nếu bạn thấy không có vấn đề, hãy mở bản ghi trong nhật ký câu cá và nhấn “Khiếu nại” — đội ngũ sẽ xem xét lại.",
   // 조인·부킹 글 가림·내림(2026-10-01) — 골프 글은 이의제기 칸이 없어 채팅 '운영자 문의'로 안내한다(storage/adminGolfListings)
   "notif.golfListing.hidden.title": "⚠️ Tin golf của bạn đã bị ẩn",
   "notif.golfListing.hidden.body": "Tin {course} {tee} của bạn đã bị ẩn sau nhiều báo cáo. Tin không còn hiện trong danh sách và không nhận đăng ký mới. Nếu bạn thấy đây là nhầm lẫn, hãy báo cho chúng tôi qua “Hỗ trợ” trong Trò chuyện.",

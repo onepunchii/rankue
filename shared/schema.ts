@@ -1788,7 +1788,8 @@ export const hiqReports = pgTable("hiq_reports", {
     // player_cheer 추가(2026-09-13): 선수 응원글도 신고 대상.
     // golf_photo 추가(2026-09-30): 골프장 페이지에 바로 뜨는 공개 라운드 사진(golf_round_photos).
     // hiking_photo 추가(2026-10-13): 산의 화면에 바로 뜨는 공개 산행 사진(hiking_photos — 등산의 표는 여기 틀을 두지 않는다, storage/hikingPhotos).
-    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "member", "golf_booking", "player_cheer", "golf_photo", "hiking_photo"],
+    // fishing_catch 추가(2026-10-17): 낚시 조과(fishing_catches — 표는 raw SQL, storage/fishingCatches).
+    enum: ["community_post", "community_comment", "crew_post", "crew_comment", "crew_photo", "crew_photo_comment", "crew_chat", "member", "golf_booking", "player_cheer", "golf_photo", "hiking_photo", "fishing_catch"],
   }).notNull(),
   targetId: uuid("target_id").notNull(),
   reporterId: uuid("reporter_id").references(() => hiqMembers.id).notNull(),

@@ -153,6 +153,12 @@ async function deleteReportedContent(targetType: ReportTargetType, id: string): 
             if (gone) await deleteBlobs([gone.url, gone.thumbUrl]);
             return;
         }
+        case "fishing_catch": {
+            // 낚시 조과 — 줄과 사진 파일(있으면)을 함께
+            const gone = await storage.fishingCatches.remove(id);
+            if (gone) await deleteBlobs([gone.url, gone.thumbUrl].filter((x): x is string => !!x));
+            return;
+        }
         case "crew_post": {
             const post = await storage.crews.getCrewPost(id);
             if (!post) return;

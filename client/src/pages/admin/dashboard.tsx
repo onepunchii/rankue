@@ -67,10 +67,10 @@ type GlobalStats = {
 };
 
 type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
-    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-overview" | "hiking-summits" | "hiking-mountains" | "hiking-photos";
+    | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-overview" | "hiking-summits" | "hiking-mountains" | "hiking-photos" | "fishing-catches";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos", "fishing-catches"] as const;
 
 // --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
 // 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
@@ -110,6 +110,10 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
         { id: "hiking-summits", label: "정상 인증", icon: LucideMapPin },
         { id: "hiking-mountains", label: "산 자료", icon: LucideTrendingUp },
         { id: "hiking-photos", label: "산행 사진", icon: LucideCamera },
+    ] },
+    // 낚시(2026-10-17 어드민 전수 조사 · 공개 전) — 조과 검수(신고 · 가림 · 이의제기)
+    { title: "낚시", items: [
+        { id: "fishing-catches", label: "조과 검수", icon: LucideCamera },
     ] },
     { title: "콘텐츠", items: [
         { id: "crews", label: "크루 현황", icon: LucideUsersRound },
@@ -482,6 +486,7 @@ export default function AdminDashboard() {
                     {tab === "hiking-summits" && <HikingSummitsView onOpenMember={setOpenMemberId} />}
                     {tab === "hiking-mountains" && <HikingMountainsView />}
                     {tab === "hiking-photos" && <GolfPhotosView kind="hiking" onOpenMember={setOpenMemberId} />}
+                    {tab === "fishing-catches" && <GolfPhotosView kind="fishing" onOpenMember={setOpenMemberId} />}
                     {tab === "goods" && <Suspense fallback={<p className="text-[13px] text-black/45">불러오는 중…</p>}><GoodsView /></Suspense>}
 
                     <MemberDetailSheet member={openMember} onClose={() => setOpenMemberId(null)} />
@@ -508,6 +513,7 @@ function getTabTitle(tab: string) {
         case "hiking-summits": return "정상 인증";
         case "hiking-mountains": return "산 자료";
         case "hiking-photos": return "산행 사진";
+        case "fishing-catches": return "조과 검수";
         case "search-trend": return "검색 수요";
         case "members": return "회원 관리";
         case "leads": return "입점 문의";
@@ -540,6 +546,7 @@ const TAB_SUBTITLE: Partial<Record<Tab, string>> = {
     "billiards-online": "끝난 온라인 대전 전부 — 판을 열어 샷 흐름을 보고, 레이팅을 옮긴 판은 무효로 합니다(바뀌는 레이팅을 먼저 미리 봅니다).",
     "billiards-cup": "다음 대회는 지금 성적이 이대로면 누가 나가는지 · 열린 대회는 대진표에서 기한 늘리기 · 결과 정하기 · 바꾸기 · 지금 굴리기.",
     "billiards-case": "받은 큐 · 초크 · 장갑을 지금 기록과 맞춰 봅니다 — 지운 경기 · 무효로 한 판으로 받은 것만 거둘 수 있어요.",
+    "fishing-catches": "남이 볼 수 있었던 조과(랭킹 · 크루 정출판) 전부 — 자유 입력 어종 · 사진을 보고 가리기 · 이의제기 판정 · 지우기. 나만 보는 기록은 싣지 않습니다.",
     "hiking-photos": "산 페이지에 바로 뜨는 공개 산행 사진 전부 — 가리기 · 다시 보이기 · 이의제기 판정 · 지우기(신고 큐와 같은 처리 기록).",
     "hiking-mountains": "100대 명산 점검표 — 코스가 정상 150m 안을 지나는가. 산을 열어 코스 위 가장 높은 곳을 보고 정상 자리 · 높이 · 정상 이름을 고칩니다(다시 적재해도 남음).",
     "hiking-overview": "정상 인증 · 기록 · 산행 · 사진의 합계와 30일, 많이 오른 산, 산악회, 산행 전날 저녁 브리핑이 나갔는지.",

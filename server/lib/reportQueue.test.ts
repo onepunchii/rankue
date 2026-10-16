@@ -245,11 +245,13 @@ describe("다른 곳과 목록이 맞다", () => {
         const community = readFileSync(new URL("../routes/modules/community.ts", import.meta.url), "utf8");
         const golf = readFileSync(new URL("../routes/modules/golf.ts", import.meta.url), "utf8");
         const hiking = readFileSync(new URL("../routes/modules/hiking.ts", import.meta.url), "utf8");
+        const fishing = readFileSync(new URL("../routes/modules/fishing.ts", import.meta.url), "utf8");
         const repo = readFileSync(new URL("../storage/admin.repo.ts", import.meta.url), "utf8");
         const communityAppeals = JSON.parse(community.match(/router\.post\("\/appeals"[\s\S]*?if \(!(\[[^\]]+\])\.includes\(targetType\)\)/)![1]) as string[];
         for (const t of APPEALABLE_TARGETS) {
             const route = t === "golf_photo" ? golf.includes(`router.post("/photos/:photoId/appeal"`)
                 : t === "hiking_photo" ? hiking.includes(`router.post("/photos/:id/appeal"`)
+                : t === "fishing_catch" ? fishing.includes(`router.post("/catches/:id/appeal"`)
                 : communityAppeals.includes(t);
             expect(route, `${t} 이의제기 접수 경로`).toBe(true);
             expect(repo, `${t} 큐 SQL appeal_at`).toContain(`WHEN '${t}' THEN`);

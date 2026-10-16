@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { FISH_UNIT_LABEL } from "@shared/fishingFish";
 import type { FishingRankBoard, FishingRankSpecies } from "@shared/fishingRank";
+import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
 
 const MEDAL = ["#E8B64C", "#C9D1D9", "#D08A5B"];
 
@@ -47,10 +48,15 @@ export function FishingRanking() {
                             <span className="block text-[12.5px] tabular-nums text-[#F3ECDD80]">{r.day}</span>
                         </span>
                         <span className="shrink-0 text-[17px] font-semibold tabular-nums text-[#F3ECDD]">{r.value}{board ? FISH_UNIT_LABEL[board.unit] : ""}</span>
+                        {/* 남의 줄 — 신고 · 차단(서로 다른 3명이 신고하면 서버가 가린다, 신고 대상 fishing_catch) */}
+                        {!r.mine && r.catchId ? (
+                            <UgcActionMenu targetType="fishing_catch" targetId={r.catchId} authorId={r.memberId} authorName={r.name}
+                                className="-mr-1.5 h-10 w-8 rounded-full text-[#F3ECDD80] hover:text-[#F3ECDD] active:bg-[#FFFFFF1A]" iconClassName="h-5 w-5" />
+                        ) : <span className="w-6 shrink-0" aria-hidden />}
                     </li>
                 ))}
             </ol>
-            <p className="mt-2 text-[12.5px] leading-relaxed text-[#F3ECDD80] break-keep">사람마다 가장 좋은 한 줄만 올라가요. 이름 · 값 · 날짜 · 사진만 보이고, 잡은 곳과 자리는 보이지 않아요.</p>
+            <p className="mt-2 text-[12.5px] leading-relaxed text-[#F3ECDD80] break-keep">사람마다 가장 좋은 한 줄만 올라가요. 이름 · 값 · 날짜 · 사진만 보이고, 잡은 곳과 자리는 보이지 않아요. 이상한 기록은 ⋯ 에서 신고할 수 있어요.</p>
         </div>
     );
 }

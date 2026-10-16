@@ -74,6 +74,10 @@ export interface FishingCatch {
     weather?: CatchWeather | null;
     isPublic?: boolean;
     createdAt: string;
+    /** 신고로 가려졌다(2026-10-17) — 랭킹 · 정출판 · 수족관에서 빠지고 내 일지에만 남는다 */
+    hidden?: boolean;
+    /** 가린 뒤에 이의제기를 냈다 */
+    appealed?: boolean;
 }
 export type FishingCatchInput = Omit<FishingCatch, "id" | "createdAt" | "weather">;
 

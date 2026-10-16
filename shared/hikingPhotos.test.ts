@@ -230,8 +230,9 @@ describe("신고 · 자동 가림 · 이의제기 · 운영자 큐", () => {
         expect(TARGET_LABEL[T]).toBe("산행 사진");
         const community = read("server/routes/modules/community.ts");
         expect(JSON.parse(community.match(/const REPORT_TARGETS = (\[[^\]]+\])/)![1])).toContain(T);
-        expect(read("client/src/components/hiq/community/ReportDialog.tsx")).toContain('| "hiking_photo";');
-        expect(read("shared/schema.ts")).toContain('"golf_photo", "hiking_photo"],');
+        // 뒤에 다른 대상(낚시 조과, 10/17)이 붙어도 선다 — 들어 있는가만 본다
+        expect(read("client/src/components/hiq/community/ReportDialog.tsx")).toMatch(/\| "hiking_photo"[;\s]/);
+        expect(read("shared/schema.ts")).toContain('"golf_photo", "hiking_photo"');
     });
     it("볼 수 있었던 사람만 신고한다 — 비공개 사진은 신고 대상이 아니다", () => {
         const fn = cut(read("server/routes/modules/community.ts"), "async function reportTargetAuthor", 'router.post("/reports"');

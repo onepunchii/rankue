@@ -38,6 +38,8 @@ import { cleanBoatQuery, type FishingBoat } from "../../../shared/fishingBoats.j
 import { getReservoirs, searchReservoirs } from "../../services/fishingReservoir.js";
 import { RESERVOIR_MAX, RESERVOIR_STARTERS, cleanCountyQuery, isReservoirCode, type ReservoirRef } from "../../../shared/fishingReservoir.js";
 import { FISHING_PHOTO_CATEGORY, FISHING_THUMB_CATEGORY, cleanCatch, fishingKstDay, isOwnFishingPhotoUrl, type FishingCatch, type FishingPlace } from "../../../shared/fishing.js";
+import { deleteBlobs } from "../../utils/blob.js";
+import { appealCatch } from "../../storage/fishingCatches.js";
 
 const router = Router();
 const rowsOf = (r: any) => (r.rows ?? r) as any[];
@@ -58,7 +60,14 @@ const view = (r: any): FishingCatch => ({
     photoUrl: r.photo_url ?? null, thumbUrl: r.thumb_url ?? null, note: r.note ?? null, tideSea: r.tide_sea === "west" || r.tide_sea === "south" ? r.tide_sea : null,
     lat: r.lat == null ? null : Number(r.lat), lng: r.lng == null ? null : Number(r.lng), weather: (r.weather ?? null) as CatchWeather | null, isPublic: r.is_public === true,
     createdAt: new Date(r.created_at).toISOString(),
+    // 신고로 가려진 내 조과(2026-10-17) — 랭킹 · 정출판 · 수족관에서 빠졌다. 가린 뒤에 낸 이의제기만 '냈음'으로
+    hidden: r.hidden_at != null,
+    appealed: r.hidden_at != null && r.appeal_at != null && new Date(r.appeal_at).getTime() >= new Date(r.hidden_at).getTime(),
 });
+/** 보는 사람이 차단한 회원의 조과는 뺀다(c 는 fishing_catches — member_id 가 글자다) */
+const notBlockedBy = (viewerId: string | null | undefined) => (viewerId && UUID.test(viewerId)
+    ? sql`and not exists (select 1 from hiq_blocks b where b.blocker_id = ${viewerId}::uuid and b.blocked_id::text = c.member_id)`
+    : sql``);
 
 /** 그날 · 그 자리의 바다 — 가까운 낚시지수 지점(40km 안). 못 받으면 기록은 그대로 적는다 */
 async function seaAt(day: string, lat: number, lng: number): Promise<CatchWeather | null> {
@@ -111,7 +120,7 @@ router.delete("/gear/:id", requireAuth, gate, asyncHandler(async (req: AuthReque
 }));
 
 router.get("/ranking/species", requireAuth, gate, asyncHandler(async (_req: AuthRequest, res: any) => {
-    const rows = rowsOf(await db.execute(sql`select species, count(distinct member_id)::int as people from fishing_catches where is_public group by species order by people desc, species limit 60`));
+    const rows = rowsOf(await db.execute(sql`select species, count(distinct member_id)::int as people from fishing_catches where is_public and hidden_at is null group by species order by people desc, species limit 60`));
     return sendSuccess(res, rows.map((r): FishingRankSpecies => ({ species: String(r.species), people: Number(r.people) })));
 }));
 
@@ -121,9 +130,9 @@ router.get("/ranking", requireAuth, gate, asyncHandler(async (req: AuthRequest, 
     const col = sql.raw(rankColumn(fish.unit));
     const rows = rowsOf(await db.execute(sql`
         select * from (
-            select distinct on (c.member_id) c.member_id, coalesce(nullif(p.nickname, ''), m.name) as name, c.${col} as value, c.fished_on as day, c.thumb_url
+            select distinct on (c.member_id) c.id::text as id, c.member_id, coalesce(nullif(p.nickname, ''), m.name) as name, c.${col} as value, c.fished_on as day, c.thumb_url
             from fishing_catches c join hiq_members m on m.id::text = c.member_id left join profiles p on p.id = m.profile_id
-            where c.is_public and c.species = ${fish.name} and c.${col} is not null
+            where c.is_public and c.hidden_at is null and c.species = ${fish.name} and c.${col} is not null ${notBlockedBy(req.userId)}
             order by c.member_id, c.${col} desc, c.fished_on asc
         ) best order by value desc, day asc limit 200`));
     const board: FishingRankBoard = { species: fish.name, unit: fish.unit, rows: rankRows(rows, req.userId ?? null) };
@@ -160,9 +169,20 @@ router.post("/catches", requireAuth, gate, asyncHandler(async (req: AuthRequest,
 
 router.delete("/catches/:id", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
     if (!UUID.test(req.params.id)) return sendError(res, 404, "기록을 찾을 수 없어요");
-    const gone = rowsOf(await db.execute(sql`delete from fishing_catches where id = ${req.params.id}::uuid and member_id = ${req.userId!} returning id`));
+    const gone = rowsOf(await db.execute(sql`delete from fishing_catches where id = ${req.params.id}::uuid and member_id = ${req.userId!} returning id, photo_url, thumb_url`));
     if (!gone.length) return sendError(res, 404, "기록을 찾을 수 없어요");
+    // 사진 파일도 함께(2026-10-17) — 줄만 지우면 주소를 아는 사람에게 사진이 계속 열린다(우리 저장소의 것만 지운다)
+    await deleteBlobs([gone[0].photo_url, gone[0].thumb_url].filter((x: unknown): x is string => typeof x === "string" && !!x));
     return sendSuccess(res, { id: req.params.id });
+}));
+
+/** 가려진 내 조과의 이의제기 — 운영자가 다시 본다(신고 큐 '판단 필요'). 한 번에 300자 */
+router.post("/catches/:id/appeal", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    if (!UUID.test(req.params.id)) return sendError(res, 404, "기록을 찾을 수 없어요");
+    const text = typeof req.body?.text === "string" ? req.body.text.replace(/\s+/g, " ").trim().slice(0, 300) : "";
+    if (text.length < 2) return sendError(res, 400, "이의제기 내용을 적어 주세요");
+    if (!(await appealCatch(req.userId!, req.params.id, text))) return sendError(res, 404, "가려진 내 기록만 이의제기할 수 있어요");
+    return sendSuccess(res, { appealed: true });
 }));
 
 /** 오늘의 바다 — 받아 둔 특보 현황(15분보다 낡았으면 그 자리에서 다시 받는다). 받지 못했으면 null(화면은 판을 그리지 않는다) */
@@ -247,7 +267,7 @@ async function inCrew(memberId: string, crewId: string): Promise<boolean> {
     return (await myCrews(memberId)).some((c) => String(c.id) === crewId);
 }
 /** 정출에 붙은 조과들 — 이름과 함께(그 크루의 사람에게만 나간다) */
-async function tripCatches(tripIds: readonly string[]): Promise<Map<string, (TripCatch & { id: string; weightKg: number | null; ji: number | null; released: boolean; thumbUrl: string | null; photoUrl: string | null })[]>> {
+async function tripCatches(tripIds: readonly string[], viewerId: string): Promise<Map<string, (TripCatch & { id: string; weightKg: number | null; ji: number | null; released: boolean; thumbUrl: string | null; photoUrl: string | null })[]>> {
     const out = new Map<string, any[]>();
     // 아래에서 글자로 이어 붙이는 값이다 — uuid 꼴만 남긴다
     tripIds = tripIds.filter((id) => UUID.test(id));
@@ -255,7 +275,10 @@ async function tripCatches(tripIds: readonly string[]): Promise<Map<string, (Tri
     const rows = rowsOf(await db.execute(sql`
         select c.id, c.trip_id, c.member_id, coalesce(m.name, '회원') as name, c.species, c.length_cm, c.fish_count, c.weight_kg, c.ji, c.released, c.thumb_url, c.photo_url
         from fishing_catches c left join hiq_members m on m.id::text = c.member_id
-        where c.trip_id = any(${sql.raw(`array[${tripIds.map((id) => `'${id}'`).join(",")}]::uuid[]`)}) order by c.created_at`));
+        where c.trip_id = any(${sql.raw(`array[${tripIds.map((id) => `'${id}'`).join(",")}]::uuid[]`)})
+          -- 가려진 조과는 올린 사람에게만 · 보는 사람이 차단한 회원의 것은 빼고(2026-10-17)
+          and (c.hidden_at is null or c.member_id = ${viewerId}) ${notBlockedBy(viewerId)}
+        order by c.created_at`));
     for (const r of rows) {
         const list = out.get(String(r.trip_id)) ?? [];
         list.push({ id: String(r.id), memberId: String(r.member_id), name: String(r.name), species: String(r.species), lengthCm: r.length_cm == null ? null : Number(r.length_cm), count: Number(r.fish_count) || 1, weightKg: r.weight_kg == null ? null : Number(r.weight_kg), ji: r.ji == null ? null : Number(r.ji), released: r.released === true, thumbUrl: r.thumb_url ?? null, photoUrl: r.photo_url ?? null });
@@ -275,7 +298,7 @@ router.get("/trips", requireAuth, gate, asyncHandler(async (req: AuthRequest, re
     if (!(await inCrew(req.userId!, crewId))) return sendError(res, 403, "그 크루의 사람만 볼 수 있어요");
     const trips = rowsOf(await db.execute(sql`select * from fishing_trips where crew_id = ${crewId}::uuid order by fished_on desc, created_at desc limit 60`)).map(tripView);
     // UUID 는 위에서 꼴을 확인한 값만 들어간다(tripView 의 id 는 DB 가 준 uuid)
-    const catches = await tripCatches(trips.map((t) => t.id).filter((id) => UUID.test(id)));
+    const catches = await tripCatches(trips.map((t) => t.id).filter((id) => UUID.test(id)), req.userId!);
     const year = fishingKstDay(Date.now()).slice(0, 4);
     const boards = trips.map((t) => ({ trip: t, board: tripBoard(catches.get(t.id) ?? []) }));
     res.setHeader("Cache-Control", "no-store");
@@ -300,7 +323,7 @@ router.get("/trips/:id", requireAuth, gate, asyncHandler(async (req: AuthRequest
     const [row] = rowsOf(await db.execute(sql`select * from fishing_trips where id = ${req.params.id}::uuid`));
     if (!row) return sendError(res, 404, "정출을 찾을 수 없어요");
     if (!(await inCrew(req.userId!, String(row.crew_id)))) return sendError(res, 403, "그 크루의 사람만 볼 수 있어요");
-    const catches = (await tripCatches([String(row.id)])).get(String(row.id)) ?? [];
+    const catches = (await tripCatches([String(row.id)], req.userId!)).get(String(row.id)) ?? [];
     res.setHeader("Cache-Control", "no-store");
     return sendSuccess(res, { trip: tripView(row), board: tripBoard(catches), catches });
 }));
@@ -332,7 +355,8 @@ router.get("/places", requireAuth, gate, asyncHandler(async (req: AuthRequest, r
 /* ── 수족관 꾸미기(shared/fishingDecor) — 장식은 조과 기록으로만. 받은 것은 fishing_decor_awards, 자리는 fishing_tanks ── */
 
 async function decorCatches(memberId: string): Promise<DecorCatch[]> {
-    return rowsOf(await db.execute(sql`select fished_on, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url is not null as photo, trip_id from fishing_catches where member_id = ${memberId}`))
+    // 신고로 가려진 조과는 수족관(물고기 · 장식)에 들지 않는다(2026-10-17)
+    return rowsOf(await db.execute(sql`select fished_on, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url is not null as photo, trip_id from fishing_catches where member_id = ${memberId} and hidden_at is null`))
         .map((r) => ({ day: String(r.fished_on), spot: r.spot ?? null, species: String(r.species), released: r.released === true, photo: r.photo === true, tripId: r.trip_id ? String(r.trip_id) : null, lengthCm: r.length_cm == null ? null : Number(r.length_cm), count: Number(r.fish_count) || 1, weightKg: r.weight_kg == null ? null : Number(r.weight_kg), ji: r.ji == null ? null : Number(r.ji) }));
 }
 /** 조건을 채운 장식을 받은 기록에 넣는다 — 몇 번째 주인(serial)은 max + 1, 한정은 그 수를 넘지 않게(겹치면 다시) */
@@ -421,9 +445,9 @@ router.get("/crews/:crewId/tanks", requireAuth, gate, asyncHandler(async (req: A
     if (!(await inCrew(req.userId!, crewId))) return sendError(res, 403, "그 크루의 사람만 볼 수 있어요");
     const rows = rowsOf(await db.execute(sql`
         select m.id::text as id, m.name,
-            (select count(distinct c.species)::int from fishing_catches c where c.member_id = m.id::text) as species,
+            (select count(distinct c.species)::int from fishing_catches c where c.member_id = m.id::text and c.hidden_at is null) as species,
             (select count(*)::int from fishing_decor_awards a where a.member_id = m.id::text) as decor,
-            (select c.species from fishing_catches c where c.member_id = m.id::text group by c.species order by sum(c.fish_count) desc, c.species limit 1) as top
+            (select c.species from fishing_catches c where c.member_id = m.id::text and c.hidden_at is null group by c.species order by sum(c.fish_count) desc, c.species limit 1) as top
         from hiq_crew_members cm join hiq_members m on m.id = cm.member_id
         where cm.crew_id = ${crewId}::uuid and cm.role <> 'pending'
         order by species desc, m.name limit 60`));

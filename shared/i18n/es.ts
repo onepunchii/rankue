@@ -332,6 +332,8 @@ export const es: Record<string, string> = {
   // 산행 사진 자동 가림(2026-10-13) — 서로 다른 3명 신고. 등산 알림함으로 간다
   "notif.hikingPhoto.hidden.title": "Tu foto de montaña fue ocultada",
   "notif.hikingPhoto.hidden.body": "Tu foto de montaña se ocultó tras varias denuncias. Si crees que no hay problema, ábrela en «Mis fotos de montaña», en la página de esa montaña, y toca «Apelar»: nuestro equipo la revisará de nuevo.",
+  "notif.fishingCatch.hidden.title": "Tu captura fue ocultada",
+  "notif.fishingCatch.hidden.body": "Tu registro de captura se ocultó tras varias denuncias. Si crees que no hay problema, ábrelo en tu diario de pesca y toca «Apelar»: nuestro equipo lo revisará de nuevo.",
   // 조인·부킹 글 가림·내림(2026-10-01) — 골프 글은 이의제기 칸이 없어 채팅 '운영자 문의'로 안내한다(storage/adminGolfListings)
   "notif.golfListing.hidden.title": "⚠️ Tu publicación de golf fue ocultada",
   "notif.golfListing.hidden.body": "Ocultamos tu publicación de {course} {tee} tras varias denuncias. Ya no aparece en la lista y no recibe nuevas solicitudes. Si crees que es un error, avísanos desde «Soporte» en Chat.",

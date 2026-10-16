@@ -17,6 +17,7 @@ import {
 import { eq, and, desc, sql, lt, gte, inArray, isNull } from "drizzle-orm";
 import { reasonLabel } from "../lib/reportQueue.js";
 import { hideByReports as hideHikingPhotoByReports } from "./hikingPhotos.js";
+import { hideByReports as hideFishingCatchByReports } from "./fishingCatches.js";
 
 /** 신고 한 건의 상세(detail) 길이 상한 — 검토 중인 회원 신고에 다른 사유를 덧붙일 때 끝없이 자라지 않게 묶는다(한 번의 상세는 라우트가 500자로 자른다) */
 const REPORT_DETAIL_MAX = 1000;
@@ -364,6 +365,10 @@ export class CommunityRepository {
                 // 산행 사진도 올리면 그 산의 화면에 바로 뜬다(2026-10-13 오너) — 라운드 사진과 같은 규칙으로 3명이면 가린다.
                 // 지우지 않고 가린다: 올린 사람은 '내 산행 사진'에서 가려진 사진을 보고 이의제기하거나 지울 수 있고, 운영자는 풀 수 있다.
                 const memberId = await hideHikingPhotoByReports(opts.targetId);
+                if (memberId) { autoBlinded = true; authorId = memberId; }
+            } else if (opts.targetType === "fishing_catch") {
+                // 낚시 조과도 같은 규칙(2026-10-17) — 3명이면 가린다. 지우지 않는다: 올린 사람은 일지에서 '가려짐'을 보고 이의제기하거나 지울 수 있다
+                const memberId = await hideFishingCatchByReports(opts.targetId);
                 if (memberId) { autoBlinded = true; authorId = memberId; }
             } else if (opts.targetType === "community_comment") {
                 const comment = await this.getCommentRaw(opts.targetId);

@@ -53,6 +53,7 @@ import {
 import { SUGGESTION_ALERT_TYPE, SUGGESTION_ALERT_WINDOW_MIN, attachReplies, type SuggestionReplyView } from "../lib/suggestionBox.js";
 import { GolfPhotoRepository } from "./golfPhoto.repo.js";
 import * as hikingPhotos from "./hikingPhotos.js";
+import * as fishingCatches from "./fishingCatches.js";
 import { coursePath } from "../../shared/golfCourse.js";
 
 // --- 신고 큐 타입(2026-09-11, SX1) ---
@@ -475,6 +476,9 @@ export class AdminRepository {
                            -- 줄을 통째로 읽는다(to_jsonb): 칸이 아직 없어도 이 질의는 선다 - 모든 신고가 지나는 큐라 배포 순서에 기대지 않는다. 없으면 null
                            WHEN 'hiking_photo' THEN (SELECT (to_jsonb(hp) ->> 'appeal_at')::timestamp FROM hiking_photos hp
                                                       WHERE hp.id = g.target_id AND (to_jsonb(hp) ->> 'hidden_at') IS NOT NULL)
+                           -- 낚시 조과 이의제기(10/17, migrations/fishing_catches_v6.sql) — 산행 사진과 같이 줄을 통째로 읽는다(칸이 없어도 선다)
+                           WHEN 'fishing_catch' THEN (SELECT (to_jsonb(fc) ->> 'appeal_at')::timestamp FROM fishing_catches fc
+                                                       WHERE fc.id = g.target_id AND (to_jsonb(fc) ->> 'hidden_at') IS NOT NULL)
                        END AS appeal_at
                 FROM g
             ), q AS (
@@ -770,6 +774,23 @@ export class AdminRepository {
             });
         });
 
+        // 낚시 조과(2026-10-17) — 어종 · 크기 · 자리 · 사진. 가림 = hidden_at. '원문 열기'는 큰 사진(없으면 없음)
+        job("fishing_catch", async (ids) => {
+            const rows = await fishingCatches.getMany(ids);
+            for (const r of rows) put("fishing_catch", r.id, {
+                title: [r.species, r.lengthCm ? `${r.lengthCm}cm` : null, r.count > 1 ? `${r.count}마리` : null].filter(Boolean).join(" · "),
+                text: [r.place, r.note].filter(Boolean).join("\n") || null,
+                images: r.thumbUrl || r.url ? [r.thumbUrl || r.url!] : [],
+                isBlinded: !!r.hiddenAt,
+                blindReason: r.hiddenAt ? "신고 누적 또는 운영자 가림" : null,
+                appealText: r.appealText, appealAt: r.appealAt,
+                authorId: r.memberId,
+                meta: ["낚시 조과", r.day, r.isPublic ? "공개(랭킹)" : r.tripId ? "크루 정출판" : "비공개"].filter(Boolean).join(" · "),
+                link: r.url,
+                createdAt: r.createdAt,
+            });
+        });
+
         job("crew_post", async (ids) => {
             const rows = await db.select({
                 id: hiqCrewPosts.id,
@@ -949,6 +970,8 @@ export class AdminRepository {
                 return this.golfPhotos.setHidden(targetId, blinded);
             case "hiking_photo":
                 return hikingPhotos.setHidden(targetId, blinded);
+            case "fishing_catch":
+                return fishingCatches.setHidden(targetId, blinded);
             default:
                 return false;
         }

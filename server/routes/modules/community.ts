@@ -228,11 +228,11 @@ router.post("/posts/:id/like", requireAuth, asyncHandler(async (req: AuthRequest
     return sendSuccess(res, result);
 }));
 
-// --- 신고 (커뮤니티·회원·골프 매물·라운드 사진·산행 사진) ---
+// --- 신고 (커뮤니티·회원·골프 매물·라운드 사진·산행 사진·낚시 조과) ---
 
 // 크루 콘텐츠(crew_*)는 크루 신고 주소(POST /crews/:id/reports)로만 받는다 — 거기서 대상이 그 크루 것인지,
 // 신고자가 크루원인지 확인한다. 여기서도 받으면 그 확인을 우회한다(검토 code:R6). 화면(ReportDialog)은 이미 crew_* 를 크루 주소로 보낸다.
-const REPORT_TARGETS = ["community_post", "community_comment", "member", "golf_booking", "player_cheer", "golf_photo", "hiking_photo"];
+const REPORT_TARGETS = ["community_post", "community_comment", "member", "golf_booking", "player_cheer", "golf_photo", "hiking_photo", "fishing_catch"];
 const REPORT_REASONS = ["abuse", "gambling", "trade", "privacy", "spam", "other"];
 
 // 신고 대상이 실제로 있는지 확인하고 작성자를 돌려준다. null = 없는 대상.
@@ -270,6 +270,9 @@ async function reportTargetAuthor(targetType: string, id: string, reporterId: st
             const ph = await storage.hikingPhotos.get(id);
             return ph && ph.isPublic ? ph.memberId : null;
         }
+        // 낚시 조과(2026-10-17) — 공개 조과는 누구나, 정출에 붙인 조과는 그 크루원만(볼 수 있었던 사람만)
+        case "fishing_catch":
+            return storage.fishingCatches.reportableAuthor(id, reporterId);
         default:
             return null;
     }
@@ -328,6 +331,21 @@ router.post("/reports", requireAuth, asyncHandler(async (req: AuthRequest, res: 
                 params: { url: path ?? "/hiking" },
             });
         } catch (e) { console.error("[Notify] 산행 사진 가림:", e); }
+        return sendSuccess(res, { reported: true });
+    }
+
+    // 낚시 조과가 가려지면 낚시 알림함으로 — 일지에서 그 기록을 열어 이의제기를 한 번 누르면 된다
+    if (result.autoBlinded && result.authorId && targetType === "fishing_catch") {
+        try {
+            await notificationService.sendAndSaveNotification({
+                memberId: result.authorId,
+                title: "notif.fishingCatch.hidden.title",
+                body: "notif.fishingCatch.hidden.body",
+                category: "FISHING",
+                type: "MODERATION",
+                params: { url: storage.fishingCatches.FISHING_CATCH_PAGE },
+            });
+        } catch (e) { console.error("[Notify] 낚시 조과 가림:", e); }
         return sendSuccess(res, { reported: true });
     }
 

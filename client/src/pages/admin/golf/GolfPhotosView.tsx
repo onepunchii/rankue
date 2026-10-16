@@ -23,11 +23,14 @@ import { FilterChips, SearchBox, EmptyState, Panel, Pill, kstDateTime, kstDate, 
 
 export const GOLF_PHOTOS_KEY = ["/api/hiq/admin/golf/photos"] as const;
 export const HIKING_PHOTOS_KEY = ["/api/hiq/admin/hiking/photos"] as const;
-type Kind = "golf" | "hiking";
+export const FISHING_CATCHES_KEY = ["/api/hiq/admin/fishing/catches"] as const;
+type Kind = "golf" | "hiking" | "fishing";
 /** 종목마다 다른 것 — 주소와 말 */
-const KIND: Record<Kind, { key: readonly [string]; place: string; page: string; photo: string; privateNote: string; album: string; search: string; unknown: string; face: string }> = {
+const KIND: Record<Kind, { key: readonly [string]; place: string; page: string; photo: string; privateNote: string; album: string; search: string; unknown: string; face: string; noPhoto?: string; unit?: string }> = {
     golf: { key: GOLF_PHOTOS_KEY, place: "골프장", page: "골프장 페이지", photo: "라운드 사진", privateNote: "비공개 — 그 라운드 앨범에만", album: "앨범", search: "골프장 이름", unknown: "골프장 미상", face: "동반자 얼굴이 나온 사진이 있을 수 있습니다." },
     hiking: { key: HIKING_PHOTOS_KEY, place: "산", page: "산 페이지", photo: "산행 사진", privateNote: "비공개 — 올린 사람의 사진첩에만", album: "사진첩", search: "산 이름", unknown: "산 미상", face: "함께 오른 사람의 얼굴이 나온 사진이 있을 수 있습니다." },
+    // 낚시 조과(2026-10-17) — 사진이 없는 기록도 있다(어종 글자만 신고될 수 있다). 남이 볼 수 있었던 것만 서버가 싣는다
+    fishing: { key: FISHING_CATCHES_KEY, place: "어종", page: "낚시 랭킹", photo: "낚시 조과", privateNote: "크루 정출판에만", album: "정출판", search: "어종 · 자리 · 이름", unknown: "어종 미상", face: "함께 간 사람의 얼굴이 나온 사진이 있을 수 있습니다.", noPhoto: "사진 없음", unit: "줄" },
 };
 /** 신고 큐 — 이 화면의 조치가 큐의 신고를 닫으므로 함께 새로 읽는다(사이드바 숫자 포함) */
 const REPORT_KEYS = [["/api/hiq/admin/reports"], ["/api/hiq/admin/reports/count"]] as const;
@@ -50,6 +53,8 @@ interface AdminPhoto {
     course: { slug: string | null; name: string | null; path: string | null };
     /** 라운드 — 산행 사진에는 없다 */
     round: { id: string; at: string | null } | null;
+    /** 기록 한 줄(낚시 조과 — 자리 · 날 · 어디에 보였나 · 메모) */
+    detail?: string;
     uploader: { id: string; name: string };
     isPublic: boolean;
     hiddenAt: string | null;
@@ -238,7 +243,7 @@ export default function GolfPhotosView({ onOpenMember, kind = "golf" }: { onOpen
 
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                 <p className="text-[13px] font-bold text-black/60">
-                    {FILTERS.find((f) => f.id === filter)?.label} <span className="text-brand tabular-nums">{(pageData?.total ?? 0).toLocaleString()}</span>장
+                    {FILTERS.find((f) => f.id === filter)?.label} <span className="text-brand tabular-nums">{(pageData?.total ?? 0).toLocaleString()}</span>{K.unit ?? "장"}
                 </p>
                 <p className="text-[12.5px] text-black/45">{HINT[filter]}</p>
             </div>
@@ -257,7 +262,7 @@ export default function GolfPhotosView({ onOpenMember, kind = "golf" }: { onOpen
             ) : (
                 // 조건을 바꾼 직후엔 앞 목록을 흐리게 둔다(새 목록이 올 때까지 — 다른 칩의 사진을 지금 것으로 오해하지 않게)
                 <ul className={`grid grid-cols-3 md:grid-cols-6 gap-x-2 gap-y-3 transition-opacity ${isPlaceholderData ? "opacity-50" : ""}`}>
-                    {items.map((p) => <PhotoTile key={p.id} photo={p} unknown={K.unknown} onOpen={() => open(p)} />)}
+                    {items.map((p) => <PhotoTile key={p.id} photo={p} unknown={K.unknown} noPhoto={K.noPhoto} onOpen={() => open(p)} />)}
                 </ul>
             )}
 
@@ -294,7 +299,7 @@ export default function GolfPhotosView({ onOpenMember, kind = "golf" }: { onOpen
     );
 }
 
-function PhotoTile({ photo: p, unknown, onOpen }: { photo: AdminPhoto; unknown: string; onOpen: () => void }) {
+function PhotoTile({ photo: p, unknown, noPhoto, onOpen }: { photo: AdminPhoto; unknown: string; noPhoto?: string; onOpen: () => void }) {
     const st = statusOf(p);
     return (
         <li className="min-w-0">
@@ -306,7 +311,7 @@ function PhotoTile({ photo: p, unknown, onOpen }: { photo: AdminPhoto; unknown: 
                             className="absolute inset-0 w-full h-full object-cover transition-transform group-hover:scale-[1.03]" />
                     ) : (
                         <span className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-[12px] text-black/40">
-                            <LucideImage className="w-5 h-5" />주소 확인 불가
+                            <LucideImage className="w-5 h-5" />{noPhoto ?? "주소 확인 불가"}
                         </span>
                     )}
                     {st.label !== "공개" && (
@@ -382,7 +387,7 @@ function PhotoSheet({ kind, photo: p, busy, note, onNote, onClose, onAction, onO
                                     <img src={p.url} alt={`${p.course.name ?? K.place} ${K.photo}`} loading="lazy" decoding="async" draggable={false}
                                         className="absolute inset-0 w-full h-full object-contain" />
                                 ) : !p.thumbUrl && (
-                                    <span className="absolute inset-0 flex items-center justify-center text-[13px] text-black/45">사진 주소를 확인할 수 없습니다</span>
+                                    <span className="absolute inset-0 flex items-center justify-center text-[13px] text-black/45">{K.noPhoto ?? "사진 주소를 확인할 수 없습니다"}</span>
                                 )}
                             </div>
 
@@ -421,6 +426,7 @@ function PhotoSheet({ kind, photo: p, busy, note, onNote, onClose, onAction, onO
                                     {p.isPublic ? `공개 — ${K.page}에 실림` : K.privateNote}
                                     {p.hiddenAt && <span className="block text-[12.5px] text-amber-800 tabular-nums">가림 · {kstDateTime(p.hiddenAt)}</span>}
                                 </Row>
+                                {p.detail && <Row label="기록"><span className="break-words">{p.detail}</span></Row>}
                                 {p.round && (
                                     <Row label="라운드">
                                         <span className="tabular-nums">{kstDate(p.round.at)}</span>
