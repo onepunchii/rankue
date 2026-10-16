@@ -4052,4 +4052,6 @@ export const ko: Dict = {
   "gift.open": "보러 가기",
   "gift.close": "닫기",
   "gift.missing": "선물을 찾을 수 없어요",
+  "gift.tap": "눌러서 열어 보세요",
+  "gift.sign": "랭큐 운영팀",
 };

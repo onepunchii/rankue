@@ -4042,5 +4042,7 @@ const vi: Dict = {
   "gift.open": "Xem ngay",
   "gift.close": "Đóng",
   "gift.missing": "Không tìm thấy quà",
+  "gift.tap": "Chạm để mở",
+  "gift.sign": "Đội ngũ Rankue",
 };
 export default vi;

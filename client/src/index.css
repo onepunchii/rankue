@@ -1180,6 +1180,42 @@ body {
     filter: drop-shadow(0 6px 6px rgba(0, 0, 0, 0.75));
     animation: cc-pan 16s ease-in-out infinite alternate;
   }
+  /* 선물 도착(2026-10-16 2차) — 포장 → 리본 · 뚜껑이 날아가고 → 진열이 떠오른다 */
+  .gift-wrap-idle { animation: gift-bob 2.6s ease-in-out infinite; }
+  @keyframes gift-bob { 0%, 100% { transform: translateY(0) rotate(0deg); } 45% { transform: translateY(-6px) rotate(-1.2deg); } 55% { transform: translateY(-6px) rotate(1.2deg); } }
+  .gift-wrap-opening .gift-bow { animation: gift-bow-off 0.55s cubic-bezier(.4,0,.2,1) forwards; }
+  .gift-wrap-opening .gift-lid { animation: gift-lid-off 0.7s 0.12s cubic-bezier(.3,0,.2,1) forwards; }
+  .gift-wrap-opening { animation: gift-box-out 0.5s 0.45s ease-in forwards; }
+  @keyframes gift-bow-off { to { transform: translate(-50%, -120px) rotate(-30deg) scale(0.6); opacity: 0; } }
+  @keyframes gift-lid-off { 40% { transform: translateY(-60px) rotate(-10deg); } to { transform: translate(90px, -200px) rotate(28deg); opacity: 0; } }
+  @keyframes gift-box-out { to { transform: translateY(40px) scale(0.86); opacity: 0; filter: blur(2px); } }
+  .gift-burst { opacity: 0; background: radial-gradient(circle, #FFFFFFE6 0%, #FFF3C8AA 18%, transparent 55%), repeating-conic-gradient(from 0deg, #FFF3C866 0deg 6deg, transparent 6deg 18deg); -webkit-mask: radial-gradient(circle, #000 0%, #000 30%, transparent 70%); mask: radial-gradient(circle, #000 0%, #000 30%, transparent 70%); }
+  .gift-wrap-opening .gift-burst { animation: gift-burst 0.9s 0.3s ease-out forwards; }
+  @keyframes gift-burst { 0% { opacity: 0; transform: translate(-50%, -50%) scale(0.3) rotate(0deg); } 40% { opacity: 1; } 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.4) rotate(40deg); } }
+  .gift-ring { background: currentColor; opacity: 0.5; animation: gift-ring 1.8s ease-out infinite; }
+  @keyframes gift-ring { 0% { box-shadow: 0 0 0 0 currentColor; opacity: 0.6; } 100% { box-shadow: 0 0 0 26px transparent; opacity: 0; } }
+  .gift-rise { animation: gift-rise 0.9s cubic-bezier(.2,.9,.25,1.1) both; }
+  @keyframes gift-rise { 0% { transform: translateY(60px) scale(0.82); opacity: 0; filter: blur(6px); } 100% { transform: none; opacity: 1; filter: none; } }
+  .gift-pop { animation: gift-pop 0.9s 0.25s cubic-bezier(.2,1.4,.3,1) both; }
+  @keyframes gift-pop { 0% { transform: scale(0.4) rotate(-12deg); opacity: 0; } 100% { transform: rotate(var(--r, 0deg)); opacity: 1; } }
+  .gift-cue { animation: gift-cue 1s 0.3s cubic-bezier(.2,.9,.2,1.05) both; }
+  @keyframes gift-cue { 0% { transform: translate(-70%, -50%); opacity: 0; } 100% { transform: translate(0, -50%); opacity: 1; } }
+  .gift-unroll .gift-scroll { transform-origin: top; animation: gift-unroll 1.1s cubic-bezier(.3,.8,.2,1) both; }
+  @keyframes gift-unroll { 0% { transform: scaleY(0.02); } 100% { transform: scaleY(1); } }
+  .gift-tag { animation: gift-swing 2.8s 0.8s ease-in-out infinite; }
+  @keyframes gift-swing { 0%, 100% { transform: rotate(9deg); } 50% { transform: rotate(3deg); } }
+  .gift-fade { animation: gift-fade 0.7s 0.35s ease-out both; }
+  @keyframes gift-fade { from { transform: translateY(12px); opacity: 0; } to { transform: none; opacity: 1; } }
+  .gift-halo { animation: gift-halo 3.2s ease-in-out infinite; }
+  @keyframes gift-halo { 0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(0.96); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); } }
+  .gift-spark { animation: gift-spark 2.2s ease-in-out infinite; opacity: 0; }
+  @keyframes gift-spark { 0%, 100% { opacity: 0; transform: scale(0.4) rotate(0deg); } 50% { opacity: 0.95; transform: scale(1) rotate(45deg); } }
+  .gift-lamp { animation: gift-lamp 6s ease-in-out infinite; }
+  @keyframes gift-lamp { 0%, 100% { opacity: 0.9; } 50% { opacity: 1; } }
+  .gift-mist { animation: gift-mist 14s linear infinite; }
+  @keyframes gift-mist { from { transform: translateX(-20%); } to { transform: translateX(20%); } }
+  @media (prefers-reduced-motion: reduce) { .gift-ring, .gift-burst, .gift-wrap-idle, .gift-rise, .gift-pop, .gift-cue, .gift-unroll .gift-scroll, .gift-tag, .gift-fade, .gift-halo, .gift-spark, .gift-lamp, .gift-mist { animation: none; } .gift-spark { display: none; } }
+
   /* 한정 큐를 고른 순간(2026-10-16) — 빛살 · 색종이 · 미끄러져 들어오는 큐 */
   .cc-picked { background: radial-gradient(circle at 50% 45%, #3a0f2fee 0%, #0b0612f2 70%); }
   .cc-picked-rays { background: repeating-conic-gradient(from 0deg, #ff4fa31f 0deg 9deg, transparent 9deg 18deg); animation: cc-rays 18s linear infinite; }

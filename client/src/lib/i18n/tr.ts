@@ -4042,5 +4042,7 @@ const tr: Dict = {
   "gift.open": "Gör",
   "gift.close": "Kapat",
   "gift.missing": "Hediye bulunamadı",
+  "gift.tap": "Açmak için dokun",
+  "gift.sign": "Rankue ekibi",
 };
 export default tr;

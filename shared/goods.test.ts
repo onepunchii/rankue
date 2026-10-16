@@ -81,3 +81,13 @@ describe("증정 받은 것이 화면에 '받음'으로(골프 · 등산은 도�
         expect(read("client/src/hiking/pages/StampShelf.tsx")).toContain('const all = books.every((b) => b.done) || (!!grand && !!s.award("grand", grand.id));');
     });
 });
+
+describe("선물 도착 화면 2차(2026-10-16 오너: '디자인을 더 완벽하게')", () => {
+    it("포장 → 열기 → 종목의 진열 · 동작 줄이기면 처음부터 열린 모습", () => {
+        const g = read("client/src/pages/hiq/gift.tsx");
+        expect(g).toContain('const [stage, setStage] = useState<"wrapped" | "opening" | "open">(still ? "open" : "wrapped");');
+        for (const sport of ["billiards", "golf", "hiking", "fishing"]) expect(g).toContain(`${sport}: {`);
+        expect(g).toContain('data-testid="gift-wrapped"');
+        expect(read("client/src/index.css")).toContain(".gift-wrap-opening .gift-lid { animation: gift-lid-off");
+    });
+});

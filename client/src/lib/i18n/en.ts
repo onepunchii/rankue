@@ -4042,5 +4042,7 @@ const en: Dict = {
   "gift.open": "Go see it",
   "gift.close": "Close",
   "gift.missing": "Gift not found",
+  "gift.tap": "Tap to open",
+  "gift.sign": "The Rankue team",
 };
 export default en;
