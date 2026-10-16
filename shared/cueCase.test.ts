@@ -189,6 +189,17 @@ describe("연결", () => {
         expect(read("client/src/components/hiq/tabs/CrewHomeTab.tsx")).toContain("{!isGolf && !ownWorld && <CrewCueRack crewId={crew.id} />}");
         expect(read("client/src/sim/match/MatchIntro.tsx")).toContain('data-testid="intro-cues"');
     });
+    it("카드로 공유 — 내 큐 케이스만, 샷 카드와 같은 길(shareBlob)로 내보낸다", () => {
+        const page = read("client/src/pages/hiq/cue-case.tsx");
+        expect(page).toContain('{d?.member.mine && (');
+        expect(page).toContain('data-testid="cue-case-share"');
+        expect(page).toContain("const out = await shareBlob(blob,");
+        const share = read("client/src/sim/share/useShare.ts");
+        expect(share).toContain("return shareBlob(blob, { title: meta.title, text, filename, url, copied }, deps);");
+        const card = read("client/src/components/hiq/cueCase/caseCard.ts");
+        expect(card).toContain("export const CASE_CARD_W = 1080;");
+        expect(card).toContain("const ih = Math.min(sh - 8, (sw - 40) * 80 / 1000), iw = ih * 1000 / 80;");
+    });
     it("문구가 다섯 언어에 있고 자리 표시를 지킨다", () => {
         const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"] };
         const page = read("client/src/pages/hiq/cue-case.tsx") + read("client/src/components/hiq/cueCase/CueCaseEntry.tsx") + read("client/src/components/hiq/cueCase/CrewCueRack.tsx");

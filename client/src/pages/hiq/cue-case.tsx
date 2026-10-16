@@ -19,6 +19,10 @@ import { useGuestGate } from "@/components/hiq/GuestGate";
 import { LucideChevronLeft } from "@/lib/icons";
 import { RealMedal } from "@/components/hiq/RealMedal";
 import { ShelfPage } from "@/sim/rank/ShelfPage";
+import { useToast } from "@/hooks/use-toast";
+import { shareBlob } from "@/sim/share/useShare";
+import { canvasToBlob } from "@/sim/share/shareCard";
+import { renderCaseCard } from "@/components/hiq/cueCase/caseCard";
 import { CASE_ITEMS, CHALKS, CUES, GLOVES, PEOPLE_STEPS, caseImage, caseItem, cueHow, type CaseItem, type CaseLocale, type CueGroup } from "@shared/cueCase";
 import { CASE_SECTIONS, CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, fetchCueCase, readCaseSeen, saveHero, writeCaseSeen, type CaseItemView, type CaseSection, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
 
@@ -73,6 +77,32 @@ export default function CueCasePage() {
     };
     const back = () => (window.history.length > 1 ? window.history.back() : setLocation("/dashboard"));
 
+    // 카드로 공유(2026-10-16) — 가죽 뚜껑 · 명판 · 받은 큐(대표 큐가 맨 위)를 그림 한 장으로. 샷 카드와 같은 길로 내보낸다
+    const { toast } = useToast();
+    const [sharing, setSharing] = useState(false);
+    const shareCard = async () => {
+        if (!d || sharing) return;
+        setSharing(true);
+        try {
+            const owned = CUES.filter((x) => it(x.id).done).sort((a, b) => (a.id === d.hero ? -1 : b.id === d.hero ? 1 : (it(b.id).at ?? 0) - (it(a.id).at ?? 0)));
+            const canvas = await renderCaseCard({
+                plate: t("case.ownerTitle").replace("{name}", d.member.name),
+                counts: ([["cue", CUES], ["chalk", CHALKS], ["glove", GLOVES]] as const).map(([k, list]) => [t(`case.count.${k}`), `${list.filter((x) => it(x.id).done).length}/${list.length}`] as const),
+                cues: owned, cueName: (x) => x.name[l], more: (n) => t("case.newMore").replace("{n}", String(n)),
+                footer: t("case.cardFooter"), url: "rankue.co.kr/cue-case",
+            });
+            const blob = await canvasToBlob(canvas);
+            if (!blob) throw new Error("blob");
+            const url = "https://www.rankue.co.kr/cue-case";
+            const out = await shareBlob(blob, { title: t("case.ownerTitle").replace("{name}", d.member.name), text: `${t("case.shareText").replace("{n}", String(owned.length))}\n${url}`, filename: `rankue-cue-case-${new Date().toISOString().slice(0, 10)}.png`, url, copied: false });
+            if (!out.ok) toast({ title: t("case.shareFail"), variant: "destructive" });
+        } catch {
+            toast({ title: t("case.shareFail"), variant: "destructive" });
+        } finally {
+            setSharing(false);
+        }
+    };
+
     const owned = (list: readonly CaseItem[]) => list.filter((x) => it(x.id).done).length;
     const hero = d?.hero ? caseItem(d.hero) : null;
     const name = d?.member.name ?? "";
@@ -89,6 +119,12 @@ export default function CueCasePage() {
                         <LucideChevronLeft weight="bold" className="h-5 w-5" aria-hidden />
                     </button>
                     <h1 className="flex-1 truncate text-[17px] font-semibold tracking-tight">{t("case.title")}</h1>
+                    {d?.member.mine && (
+                        <button type="button" onClick={() => { void shareCard(); }} disabled={sharing} data-testid="cue-case-share" data-track-as="큐 케이스 카드 공유"
+                            className="h-9 shrink-0 rounded-full border border-[color:var(--cc-gold)]/40 px-3.5 text-[13px] font-semibold text-[color:var(--cc-gold)] active:bg-white/10 disabled:opacity-60">
+                            {t("case.share")}
+                        </button>
+                    )}
                 </header>
 
                 {/* 가죽 뚜껑 — 놋쇠 명판과 모은 수 */}

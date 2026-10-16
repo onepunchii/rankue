@@ -166,13 +166,21 @@ export async function shareShot(result: SimResult, meta: ShareMeta, deps: ShareD
         blob = null;
     }
     if (!blob) return { ok: copied, method: copied ? "clipboard" : null, copied, url };
+    return shareBlob(blob, { title: meta.title, text, filename, url, copied }, deps);
+}
 
+/**
+ * 그려 둔 그림 한 장을 내보낸다 — 네이티브 공유 → Web Share(파일) → 다운로드. 샷 카드 · 큐 케이스 카드(2026-10-16)가 같이 쓴다.
+ * copied: 앞에서 링크를 복사했는가(실패해도 복사는 성공으로 남긴다).
+ */
+export async function shareBlob(blob: Blob, o: { title: string; text: string; filename: string; url: string; copied: boolean }, deps: ShareDeps = defaultShareDeps()): Promise<ShareOutcome> {
+    const { title, text, filename, url, copied } = o;
     // 3. 네이티브
     if (deps.isNative()) {
         try {
             const base64 = await deps.blobToBase64(blob);
             const uri = await deps.writeCacheFile(filename, base64);
-            await deps.nativeShare({ title: meta.title, text, files: [uri] });
+            await deps.nativeShare({ title, text, files: [uri] });
             return { ok: true, method: "native", copied, url };
         } catch (e) {
             if (isDismissal(e)) return { ok: true, method: "native", copied, url };
@@ -185,7 +193,7 @@ export async function shareShot(result: SimResult, meta: ShareMeta, deps: ShareD
     if (web) {
         try {
             const file = deps.makeFile(blob, filename);
-            const withText: WebShareData = { files: [file], title: meta.title, text };
+            const withText: WebShareData = { files: [file], title, text };
             const filesOnly: WebShareData = { files: [file] };
             const payload = web.canShare(withText) ? withText : web.canShare(filesOnly) ? filesOnly : null;
             if (payload) {
