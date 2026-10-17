@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { OUTLINE_TO_STORE_REGION, packStoreDots, storeRegionCounts, unpackStoreDots } from "./storeDots";
+import { OUTLINE_TO_STORE_REGION, nearDistText, nearViewKm, packStoreDots, spreadBalls, storeRegionCounts, unpackStoreDots } from "./storeDots";
 
 const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 
@@ -57,5 +57,32 @@ describe("전국 당구장 지도 — 점 묶기", () => {
             const s = read(`client/src/lib/i18n/${lc}.ts`);
             for (const k of ["storeMap.title", "storeMap.count", "storeMap.sub", "storeMap.cta"]) expect(s, `${lc} ${k}`).toContain(`"${k}": "`);
         }
+    });
+});
+
+describe("매장 상세 '이 근처' 당구대", () => {
+    it("판의 크기 — 다섯째 곳까지 · 1.2 ~ 150km(제주 · 강원 고성처럼 다섯째가 100km 넘게 먼 곳)", () => {
+        expect(nearViewKm([{ distanceKm: 0 }, { distanceKm: 0.3 }])).toBe(1.2);
+        expect(nearViewKm([{ distanceKm: 1.2 }])).toBeCloseTo(1.416, 3);
+        expect(nearViewKm([{ distanceKm: 118 }])).toBeCloseTo(139.24, 2);
+        expect(nearViewKm([{ distanceKm: 400 }])).toBe(150);
+    });
+    it("겹친 번호 공은 비킨다 — 이 매장(가운데)과 같은 건물의 두 곳도 서로 · 가운데와 겹치지 않게", () => {
+        const r = 1;
+        const out = spreadBalls([[0, 0], [0, 0], [10, 10]], r, { x: 0, y: 0, r: 1.15 });
+        expect(out[2]).toEqual([10, 10]);
+        const all = [{ x: 0, y: 0, r: 1.15 }, ...out.map(([x, y]) => ({ x, y, r }))];
+        for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) expect(Math.hypot(all[i].x - all[j].x, all[i].y - all[j].y)).toBeGreaterThanOrEqual((all[i].r + all[j].r) * 0.98);
+    });
+    it("거리 글 — 50m 안 · 1km 아래는 100m 단위 · 10km 넘으면 정수", () => {
+        expect(nearDistText(0, "50m 안")).toBe("50m 안");
+        expect(nearDistText(0.4, "")).toBe("400m");
+        expect(nearDistText(0.96, "")).toBe("1.0km");
+        expect(nearDistText(1.2, "")).toBe("1.2km");
+        expect(nearDistText(32.4, "")).toBe("32km");
+    });
+    it("상세 화면에 붙어 있다 · 거리순 목록은 좌표를 같이 준다", () => {
+        expect(read("client/src/pages/store-listing.tsx")).toContain("<StoreNearTable");
+        expect(read("server/routes/modules/listings.ts")).toContain("...(nearby ? { lat: storeListings.latitude, lng: storeListings.longitude } : {}),");
     });
 });

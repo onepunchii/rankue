@@ -99,6 +99,8 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
             rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium,
             claimed: storeListings.claimed,
             distanceKm,
+            // 거리순일 때만 좌표를 같이 — 매장 상세의 '이 근처' 당구대가 가까운 다섯 곳을 번호 공으로 찍는다(2026-10-17)
+            ...(nearby ? { lat: storeListings.latitude, lng: storeListings.longitude } : {}),
         }).from(storeListings).where(where)
             .orderBy(...(nearby
                 ? [sql`${distanceKm} ASC NULLS LAST`]

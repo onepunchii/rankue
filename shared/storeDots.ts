@@ -59,3 +59,43 @@ export function storeRegionCounts(dots: readonly StoreDot[]): { region: string; 
     for (const d of dots) m.set(d.region, (m.get(d.region) ?? 0) + 1);
     return [...m].map(([region, count]) => ({ region, count })).sort((a, b) => b.count - a.count || a.region.localeCompare(b.region, "ko"));
 }
+
+/* ── 매장 상세 '이 근처' 당구대(client/src/components/hiq/stores/StoreTableMap — StoreNearTable)의 셈 ── */
+
+/** 축척 막대의 후보(km) */
+export const NICE_KM = [0.2, 0.5, 1, 2, 5, 10, 20, 50, 100];
+/** 판의 반높이(km) — 다섯째 곳까지 들어가게. 시골 · 섬은 다섯째가 100km 넘게 멀다(강원 고성 85km · 제주 118km) — 150km 까지 넓힌다 */
+export function nearViewKm(near: readonly { distanceKm: number | null }[]): number {
+    const far = Math.max(0, ...near.map((n) => n.distanceKm ?? 0));
+    return Math.min(150, Math.max(1.2, far * 1.18));
+}
+/**
+ * 번호 공이 겹치면 옆으로 민다(같은 건물의 두 곳 · 같은 읍의 세 곳). 놓인 공(이 매장 먼저)과 겹치면 원래 자리 둘레 여섯 방향 →
+ * 두 배 거리 순으로 빈자리를 찾는다. 자리를 지어내는 것이 아니라 표시만 비킨다 — 거리는 목록의 숫자가 말한다.
+ */
+export function spreadBalls(pts: readonly [number, number][], r: number, first: { x: number; y: number; r: number }): [number, number][] {
+    const placed = [first];
+    const out: [number, number][] = [];
+    for (const [x0, y0] of pts) {
+        const free = (x: number, y: number) => placed.every((p) => Math.hypot(p.x - x, p.y - y) >= (p.r + r) * 0.98);
+        let at: [number, number] = [x0, y0];
+        if (!free(x0, y0)) {
+            outer: for (const ring of [1, 2, 3]) {
+                for (let k = 0; k < 6; k++) {
+                    const a = (-90 + k * 60 + (ring - 1) * 30) * (Math.PI / 180);
+                    const x = x0 + Math.cos(a) * 2.05 * r * ring, y = y0 + Math.sin(a) * 2.05 * r * ring;
+                    if (free(x, y)) { at = [x, y]; break outer; }
+                }
+            }
+        }
+        placed.push({ x: at[0], y: at[1], r });
+        out.push(at);
+    }
+    return out;
+}
+/** 거리 글 — 50m 안 · 100m 단위(1km 아래) · km */
+export function nearDistText(km: number, within50: string): string {
+    if (km < 0.05) return within50;
+    if (Math.round(km * 10) < 10) return `${Math.round(km * 10) * 100}m`;
+    return km >= 10 ? `${Math.round(km)}km` : `${km.toFixed(1)}km`;
+}

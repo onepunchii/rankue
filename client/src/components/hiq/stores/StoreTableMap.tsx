@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { KOREA_MAP_PATHS } from "@/golf/data/koreaMapData";
 import { latLngToOutline } from "@/golf/lib/koreaOutline";
-import { OUTLINE_TO_STORE_REGION, storeRegionCounts, unpackStoreDots, type StoreDot } from "@shared/storeDots";
+import { NICE_KM, OUTLINE_TO_STORE_REGION, nearDistText, nearViewKm, spreadBalls, storeRegionCounts, unpackStoreDots, type StoreDot } from "@shared/storeDots";
 
 export const STORE_DOTS_KEY = ["/api/hiq/listings/dots"] as const;
 export function useStoreDots() {
@@ -185,5 +185,97 @@ export function StoreTableBanner({ onOpen, copy }: { onOpen: () => void; copy: {
                 </div>
             </Table>
         </button>
+    );
+}
+
+/* ── 매장 상세 '이 근처'(2026-10-17) — 이 매장을 가운데 둔 가로 당구대(2:1, 실제 대대의 비) ──
+ * 이 매장 = 빨간 공, 가까운 다섯 곳 = 번호 붙은 노란 공(아래 목록의 번호와 같다), 판 안의 그 밖 매장 = 상아색 공.
+ * 판의 크기는 다섯째 곳까지 들어가게(1.2 ~ 30km). 윤곽선은 그리지 않는다 — 이 크기에서는 시도 경계가 뜻이 없다. 거리는 직선이다.
+ * 자리 셈은 그 자리의 평면 어림(경도 1° = 111.32km · cos 위도, 위도 1° = 110.57km) — 30km 안에서는 충분히 맞다. */
+export interface NearStore { code: string; name: string; address: string; distanceKm: number | null; lat?: number | null; lng?: number | null }
+
+export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
+    code: string; lat: number; lng: number;
+    onOpen: (code: string) => void;
+    copy: { title: string; here: string; near: string; others: string; note: string; within50: string };
+}) {
+    const { dots } = useStoreDots();
+    const km = (n: number) => nearDistText(n, copy.within50);
+    const key = `/api/hiq/listings?lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}&limit=6`;
+    const q = useQuery<{ rows?: NearStore[] }>({ queryKey: [key], staleTime: 30 * 60_000 });
+    const near = (Array.isArray(q.data?.rows) ? q.data!.rows : []).filter((r) => r.code !== code && r.distanceKm != null).slice(0, 5);
+    if (!near.length) return null;
+    const R = nearViewKm(near);
+    const kx = 111.32 * Math.cos((lat * Math.PI) / 180), ky = 110.57;
+    const xy = (a: number, b: number): [number, number] => [(b - lng) * kx, (lat - a) * ky];
+    const inView = ([x, y]: [number, number]) => Math.abs(x) <= 2 * R && Math.abs(y) <= R;
+    // 판 안의 그 밖 매장 — 지도 점(소수 셋째 자리)이라 이 매장 · 다섯 곳과 겹치는 자리는 뺀다
+    const marked = near.filter((n) => n.lat != null && n.lng != null).map((n) => xy(n.lat!, n.lng!));
+    const close = (p: [number, number]) => Math.hypot(p[0], p[1]) < R * 0.03 || marked.some((m) => Math.hypot(m[0] - p[0], m[1] - p[1]) < R * 0.03);
+    const others = dots.map((d) => xy(d.lat, d.lng)).filter((p) => inView(p) && !close(p));
+    const bar = NICE_KM.filter((k) => k <= R * 0.7).pop() ?? 0.2;
+    const r = R * 0.05, ry = R * 0.105;
+    const shown = near.filter((n) => n.lat != null && n.lng != null && inView(xy(n.lat, n.lng)));
+    // 민 공이 판 밖으로 나가지 않게 — 레일 안쪽에 붙인다(표시만)
+    const spots = spreadBalls(shown.map((n) => xy(n.lat!, n.lng!)), ry, { x: 0, y: 0, r: ry * 1.15 })
+        .map(([x, y]): [number, number] => [Math.max(-2 * R + ry * 1.3, Math.min(2 * R - ry * 1.3, x)), Math.max(-R + ry * 1.3, Math.min(R - ry * 1.3, y))]);
+    return (
+        <div className="mb-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]" data-testid="store-near">
+            <p className="mb-2.5 text-[11.5px] font-bold text-black/40">{copy.title}</p>
+            <Table portrait={false} rail={9}>
+                <div className="relative" style={{ aspectRatio: "2 / 1" }}>
+                    <svg viewBox={`${-2 * R} ${-R} ${4 * R} ${2 * R}`} className="block h-full w-full" role="img" aria-label={`${copy.here} · ${copy.near} ${near.length}`}>
+                        <g fill="#00000040">{others.map(([x, y], i) => <circle key={`s${i}`} cx={x + r * 0.35} cy={y + r * 0.5} r={r} />)}</g>
+                        <g fill={IVORY} stroke="#0A3D28" strokeWidth={r * 0.18} opacity={0.85}>{others.map(([x, y], i) => <circle key={`o${i}`} cx={x} cy={y} r={r} />)}</g>
+                        {/* 번호가 큰 것부터 그려 작은 번호가 위에 오게 */}
+                        {shown.map((n, k) => ({ n, k })).reverse().map(({ n, k }) => {
+                            const i = near.indexOf(n);
+                            const [x, y] = spots[k];
+                            return (
+                                <g key={n.code}>
+                                    <circle cx={x + ry * 0.3} cy={y + ry * 0.45} r={ry} fill="#00000047" />
+                                    <circle cx={x} cy={y} r={ry} fill={YELLOW} stroke="#7A5A08" strokeWidth={ry * 0.1} />
+                                    <text x={x} y={y} dy="0.36em" textAnchor="middle" fontSize={ry * 1.15} fontWeight={700} fill="#3A2A04">{i + 1}</text>
+                                </g>
+                            );
+                        })}
+                        {/* 이 매장 — 빨간 공(가장 위) */}
+                        <circle cx={ry * 0.3} cy={ry * 0.5} r={ry * 1.15} fill="#00000052" />
+                        <circle cx={0} cy={0} r={ry * 1.15} fill="url(#near-red)" stroke="#6E120B" strokeWidth={ry * 0.1} />
+                        <defs>
+                            <radialGradient id="near-red" cx="35%" cy="30%" r="75%"><stop offset="0%" stopColor="#FFB4A8" /><stop offset="45%" stopColor="#D8352A" /><stop offset="100%" stopColor="#8C1810" /></radialGradient>
+                        </defs>
+                    </svg>
+                    {/* 축척 — 펠트 위 왼쪽 아래 */}
+                    {/* 상자는 왼쪽 10px 부터 오른쪽 끝까지 — 막대 폭은 펠트 폭에 대한 비율이라 (100% + 10px) 에 곱한다 */}
+                    <span className="pointer-events-none absolute bottom-2 left-2.5 right-0 flex flex-col items-start gap-1" aria-hidden data-testid="store-near-scale">
+                        {/* 공이 몰린 자리에 얹혀도 읽히게 어두운 패에 */}
+                        <span className="rounded-full px-1.5 py-0.5 text-[12px] font-semibold leading-none tabular-nums" style={{ color: IVORY, background: "#062B1CCC" }}>{km(bar)}</span>
+                        <span className="block h-[3px] rounded-full" style={{ width: `calc((100% + 10px) * ${(bar / (4 * R)).toFixed(4)})`, background: IVORY, boxShadow: "0 0 0 1px #062B1C99" }} />
+                    </span>
+                </div>
+            </Table>
+            <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-medium text-black/50">
+                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#D8352A" }} aria-hidden />{copy.here}</span>
+                <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: YELLOW, boxShadow: "0 0 0 1px #7A5A08" }} aria-hidden />{copy.near}</span>
+                <span className="flex items-center gap-1"><span className="inline-flex h-3 w-3 items-center justify-center rounded-[3px]" style={{ background: "#0F6E4A" }} aria-hidden><span className="h-[5px] w-[5px] rounded-full" style={{ background: IVORY }} /></span>{copy.others}</span>
+            </p>
+            <ol className="mt-3 divide-y divide-black/[0.06]">
+                {near.map((n, i) => (
+                    <li key={n.code}>
+                        <button type="button" onClick={() => onOpen(n.code)} className="flex w-full items-center gap-3 py-2.5 text-left active:opacity-70" data-testid="store-near-row">
+                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold" style={{ background: YELLOW, color: "#3A2A04", boxShadow: "inset 0 0 0 1px #7A5A0866" }}>{i + 1}</span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block truncate text-[14.5px] font-bold text-ink-1">{n.name}</span>
+                                <span className="mt-0.5 block truncate text-[12px] text-black/45">{n.address}</span>
+                            </span>
+                            <span className="shrink-0 text-[13px] font-bold tabular-nums text-brand">{km(n.distanceKm!)}</span>
+                            <span className="shrink-0 text-[16px] text-black/25" aria-hidden>›</span>
+                        </button>
+                    </li>
+                ))}
+            </ol>
+            <p className="mt-1 text-[12px] text-black/40">{copy.note}</p>
+        </div>
     );
 }
