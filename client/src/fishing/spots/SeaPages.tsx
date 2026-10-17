@@ -21,6 +21,8 @@ import { tideOf, TIDE_PHASE_TEXT, type TideSea } from "@shared/fishingTide";
 import { nearestPort, type PublicPlace } from "@shared/fishingPlaces";
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath, fishingSeaAreaPath, portByName, portSeo, portsOf, seaArt, seaAreaById, seaAreaSeo, seaHubSeo } from "@shared/fishingSeaPages";
 import { SeaChart, SEA_LEGEND, seaWashColor, seaWashLine } from "../SeaChart";
+import { fishingSeaCardUrl } from "@shared/ogCards";
+import { josa } from "@shared/briefingMeta";
 import { TideCurve } from "../TideCurve";
 import { PAPER } from "../ink";
 import { Row, Shell, useSpots } from "./SpotsPages";
@@ -30,6 +32,7 @@ const TONE: Readonly<Record<SeaState, { dot: string; text: string }>> = {
 };
 /** 해역 카드의 짧은 한 줄 — 카드 폭(약 150px)에 들어가게 */
 const seaShort = (a: SeaArea): string => (a.near ? `앞바다 ${a.near.kind}${a.near.level}` : a.far ? `먼바다만 ${a.far.kind}${a.far.level}` : a.pre ? `${a.pre.kind} 예비특보` : "지금 특보 없음");
+const ORIGIN = "https://www.rankue.co.kr";
 const useSea = () => useQuery<SeaNow | null>({ queryKey: ["/api/hiq/fishing/sea"], staleTime: 5 * 60_000 });
 const kstMinuteNow = () => Math.floor(((Date.now() + 9 * 3600_000) % 86_400_000) / 60_000);
 const kstToday = () => new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10);
@@ -52,7 +55,7 @@ export function SeaHub() {
     const [, setLocation] = useLocation();
     const { data } = useSea();
     const seo = seaHubSeo();
-    useSeo({ title: seo.title, description: seo.description, path: FISHING_SEA_PATH, locale: "ko", image: "https://www.rankue.co.kr/og.png" });
+    useSeo({ title: seo.title, description: seo.description, path: FISHING_SEA_PATH, locale: "ko", image: fishingSeaCardUrl(ORIGIN, "all") });
     const by = new Map((data?.areas ?? []).map((a) => [a.id, a]));
     return (
         <Shell title={FISHING_SEA_LABEL}>
@@ -107,7 +110,7 @@ export function SeaAreaPage({ id }: { id: string }) {
     const { data: fc } = useQuery<SeaFcst | null>({ queryKey: ["/api/hiq/fishing/sea/forecast", id], enabled: !!a, staleTime: 10 * 60_000 });
     const { data: spots } = useSpots();
     const seo = a ? seaAreaSeo(a) : null;
-    useSeo(seo ? { title: seo.title, description: seo.description, path: fishingSeaAreaPath(id), locale: "ko", image: "https://www.rankue.co.kr/og.png" } : null);
+    useSeo(seo ? { title: seo.title, description: seo.description, path: fishingSeaAreaPath(id), locale: "ko", image: fishingSeaCardUrl(ORIGIN, id) } : null);
     const seaSpots = useMemo(() => (spots?.items ?? []).filter((p) => p.kind === "바다" && nearestPort(FISHING_PORTS, p as PublicPlace)?.area === id), [spots, id]);
     if (!a || !seo) return <Shell title="바다"><p className="px-5 py-16 text-center text-[15px]" style={{ color: C.soft }}>없는 바다예요.</p></Shell>;
     const s = data?.areas.find((x) => x.id === id) ?? null;
@@ -180,8 +183,10 @@ export function PortPage({ name }: { name: string }) {
     const [day, setDay] = useState(today);
     const { data, isLoading } = useQuery<PortBrief | null>({ queryKey: ["/api/hiq/fishing/ports", port?.code ?? "none", day], queryFn: () => apiRequest(`/api/hiq/fishing/ports/${port!.code}?day=${day}`), enabled: !!port, staleTime: 5 * 60_000 });
     const { data: spots } = useSpots();
+    const { data: sea } = useSea();
+    const [, setLocation] = useLocation();
     const seo = port ? portSeo(port) : null;
-    useSeo(seo && port ? { title: seo.title, description: seo.description, path: fishingPortPath(port.name), locale: "ko", image: "https://www.rankue.co.kr/og.png" } : null);
+    useSeo(seo && port ? { title: seo.title, description: seo.description, path: fishingPortPath(port.name), locale: "ko", image: fishingSeaCardUrl(ORIGIN, port.name) } : null);
     const near = useMemo(() => (port ? (spots?.items ?? []).filter((p) => p.kind === "바다" && nearestPort(FISHING_PORTS, p as PublicPlace)?.code === port.code) : []), [spots, port]);
     if (!port || !seo) return <Shell title="물때"><p className="px-5 py-16 text-center text-[15px]" style={{ color: C.soft }}>없는 항구예요.</p></Shell>;
     const area = seaAreaById(port.area);
@@ -231,6 +236,16 @@ export function PortPage({ name }: { name: string }) {
                     <div className="flex flex-wrap gap-1.5">{[...new Set(data.index.rows.map((r) => r.fish))].slice(0, 8).map((f) => { const am = data.index!.rows.find((r) => r.fish === f && r.part === "오전")?.index, pm = data.index!.rows.find((r) => r.fish === f && r.part === "오후")?.index; return <span key={f} className="rounded-full px-3 py-1.5 text-[13px]" style={{ background: "#FFFFFF0F" }}>{f === "기타어종" ? "그 밖의 어종" : f} <span className="tabular-nums" style={{ color: C.soft }}>{[am, pm].filter(Boolean).join(" → ")}</span></span>; })}</div>
                 </section>
             )}
+            {/* 이 항구는 여기 — 그 바다의 특보 물감 위에 같은 바다의 항구 점, 이 항구는 이름과 함께. 다른 바다를 누르면 그 바다로 */}
+            {sea?.areas?.length ? (
+                <section className="px-5 pt-6" data-testid="port-map">
+                    <h2 className="mb-2.5 text-[17px] font-semibold">{josa(port.name, "은/는")} 여기</h2>
+                    <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
+                        <SeaChart areas={sea.areas} picked={port.area} onPick={(x) => setLocation(fishingSeaAreaPath(x))} ports={portsOf(port.area)} port={port.code} />
+                    </div>
+                    <p className="mt-2 text-[12px]" style={{ color: C.dim }}>점은 {area?.name ?? "같은 바다"}의 항구예요. 바다를 누르면 그 바다의 예보로 가요.</p>
+                </section>
+            ) : null}
             {near.length > 0 && (
                 <section className="px-5 pt-6" data-testid="port-spots">
                     <h2 className="mb-1 text-[17px] font-semibold">이 물때를 쓰는 바다 낚시터 <span className="text-[13px] font-normal tabular-nums" style={{ color: C.dim }}>{near.length}곳</span></h2>

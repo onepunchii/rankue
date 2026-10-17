@@ -47,6 +47,10 @@ describe("바다 · 항구 물때 공개 페이지", () => {
         expect(r).toContain('router.get("/sea", asyncHandler(');
         expect(r).toContain('router.get("/sea/forecast/:area", asyncHandler(');
         expect(r).toContain('router.get("/ports/:code", asyncHandler(');
+        // 화면의 공유 그림도 검색용 화면과 같은 카드 · 항구 화면에는 '여기' 해도
+        const sea = read("client/src/fishing/spots/SeaPages.tsx");
+        expect(sea).not.toContain("og.png");
+        expect(sea).toContain('data-testid="port-map"');
         // 항구 번호는 우리 표에 있는 것만 바깥 자료로 간다
         expect(r).toContain("FISHING_PORTS.some((p) => p.code === code)");
     });
