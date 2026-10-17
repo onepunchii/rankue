@@ -34,6 +34,8 @@ import { useHikingAccess } from "@/hooks/useHikingAccess";
 import { useSport } from "@/contexts/SportContext";
 import { useT } from "@/lib/i18n";
 import { HIKING_PUBLIC } from "@shared/hikingAccess";
+import { FISHING_PUBLIC } from "@shared/fishing";
+import { FISHING_SPOTS_PATH } from "@shared/fishingPlaces";
 import { HIKING_HUB_PATH } from "@shared/hikingMountains";
 
 export type HeaderSport = "BILLIARDS" | "GOLF" | "HIKING" | "FISHING";
@@ -84,6 +86,8 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
     const fishingOk = (member as { fishingAccess?: boolean } | null | undefined)?.fishingAccess === true;
     // 방문자의 등산 — 볼 수는 있지만(공개 허브) 등산 홈은 회원의 것이다
     const hikingGuest = HIKING_PUBLIC && isGuest && locale === "ko";
+    // 방문자의 낚시(2026-10-18 전면 공개) — 낚시 홈은 회원의 것이라 방문자는 공개 화면 '전국 낚시터'로
+    const fishingGuest = FISHING_PUBLIC && isGuest && locale === "ko";
     const [notifOpen, setNotifOpen] = useState(false);
     // 숫자 하나만 받는다(목록이 아니다). 종목을 붙여야 그 종목의 알림이 세어진다. 비로그인은 부르지 않는다 — 401 만 쌓인다.
     const { data: notifCount } = useQuery<{ unread: number }>({ queryKey: [UNREAD_COUNT_KEY, { sport }], refetchInterval: 60_000, staleTime: 30_000, enabled: !!member });
@@ -96,8 +100,8 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
         { id: "BILLIARDS", label: t("dashboardHeader.billiardsMode") },
         ...(golfVisible || sport === "GOLF" ? [{ id: "GOLF" as const, label: t("dashboardHeader.golfMode") }] : []),
         ...(hikingOk || hikingGuest || sport === "HIKING" ? [{ id: "HIKING" as const, label: "등산" }] : []),
-        // 낚시(네 번째 종목 · 2026-10-14) — 지금은 운영자에게만 보인다. 다른 종목과 같은 알약이다(고르면 그 자리에서 낚시 세계로 바뀐다)
-        ...(fishingOk || sport === "FISHING" ? [{ id: "FISHING" as const, label: "낚시" }] : []),
+        // 낚시(네 번째 종목 · 2026-10-14 · 10/18 전면 공개) — 다른 종목과 같은 알약이다(고르면 그 자리에서 낚시 세계로 바뀐다)
+        ...(fishingOk || fishingGuest || sport === "FISHING" ? [{ id: "FISHING" as const, label: "낚시" }] : []),
     ];
     const icon = "flex shrink-0 items-center justify-center rounded-full active:scale-95 transition-transform";
     const iconSize = { width: z.button, height: z.button };
@@ -115,7 +119,7 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
                                 <span key={s.id} className={`flex items-center rounded-full ${PILL_PAD} text-[13px] font-semibold`} style={{ height: z.pill, background: c.brand, color: c.onBrand }} aria-current="true">{s.label}</span>
                             ) : (
                                 // 고른 것과 같은 굵기의 자리를 미리 잡아 둔다(보이지 않는 겹 글자) — 종목을 바꿔도 알약의 폭이 달라지지 않는다
-                                <button key={s.id} type="button" onClick={() => (s.id === "HIKING" && !hikingOk ? setLocation(HIKING_HUB_PATH) : setSport(s.id))} className={`relative rounded-full ${PILL_PAD} text-[13px] active:opacity-70`} style={{ height: z.pill, color: c.soft }}
+                                <button key={s.id} type="button" onClick={() => (s.id === "HIKING" && !hikingOk ? setLocation(HIKING_HUB_PATH) : s.id === "FISHING" && !fishingOk ? setLocation(FISHING_SPOTS_PATH) : setSport(s.id))} className={`relative rounded-full ${PILL_PAD} text-[13px] active:opacity-70`} style={{ height: z.pill, color: c.soft }}
                                     data-testid={`sport-to-${s.id.toLowerCase()}`}>
                                     <span className="invisible font-semibold" aria-hidden>{s.label}</span>
                                     <span className="absolute inset-0 flex items-center justify-center">{s.label}</span>

@@ -7,9 +7,9 @@ const TODAY = "2026-10-14";
 const ok = (over: Record<string, unknown> = {}) => cleanCatch({ day: "2026-10-12", place: " 여수  국동항 ", spot: "boat", species: "갈치", count: "12", lengthCm: "92.46", note: " 물때 8물 ", ...over }, TODAY);
 const row = (over: Partial<FishingCatch>): FishingCatch => ({ id: "x", day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: null, count: 1, weightKg: null, ji: null, released: false, photoUrl: null, thumbUrl: null, note: null, createdAt: "2026-10-12T00:00:00.000Z", ...over });
 
-describe("낚시는 아직 닫혀 있다", () => {
-    it("전면 공개 스위치는 꺼져 있고, 문은 역할(슈퍼관리자)로만 연다 — 번호 · 이메일로 가르지 않는다", () => {
-        expect(FISHING_PUBLIC).toBe(false);
+describe("낚시는 열려 있다(10/18 전면 공개)", () => {
+    it("전면 공개 스위치는 켜져 있고, 그 전의 문은 역할(슈퍼관리자)로 열었다 — 번호 · 이메일로 가르지 않는다", () => {
+        expect(FISHING_PUBLIC).toBe(true); // 10/18 오너 전면 공개
         const lib = readFileSync(resolve(__dirname, "../server/lib/fishingAccess.ts"), "utf8");
         expect(lib).toContain("isSuperAdminRole(role)");
         expect(lib).not.toMatch(/010|@/);

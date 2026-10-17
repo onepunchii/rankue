@@ -38,6 +38,8 @@ import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js"
 import { renderGolfChecklist } from "./seo/golfGuide.js";
 import { GOLF_STAMPS_RE, renderGolfStamps } from "./seo/golfStamps.js";
 import { HIKING_RE, renderHiking } from "./seo/hiking.js";
+import { FISHING_SPOTS_RE, renderFishingSpots } from "./seo/fishing.js";
+import { allPlaces } from "./storage/fishingPlaces.js";
 import { allMountains, getMountainDetail, nearbyMountains } from "./storage/hiking.js";
 import { HIKING_HUB_PATH, HIKING_NAV_LABEL } from "../shared/hikingPage.js";
 import { STAMPS_HUB_PATH, STAMPS_NAV_LABEL } from "../shared/golfStampGuide.js";
@@ -2045,6 +2047,22 @@ ${list}
   // 등산(2026-10-13) — 허브 · 권역 · 목록 · 산 한 곳. 본문은 server/seo/hiking 이 화면과 같은 글(shared/hikingPage)로 쓴다.
   // 산 요약은 인스턴스가 10분 기억하고, 산 한 곳의 글 · 코스 · 지점만 그때 읽는다. 없는 산은 다음 라우트로(화면이 '없는 산이에요'를 그린다).
   // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  // 전국 낚시터(2026-10-18) — 허브 · 지역 · 종류 · 한 곳. 본문은 server/seo/fishing(화면과 같은 글 — shared/fishingPlaces). 없는 곳은 다음 라우트로.
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  app.get(FISHING_SPOTS_RE, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    try {
+      const r = await renderFishingSpots(req.path, await allPlaces());
+      if (!r) return next();
+      noStore(res);
+      res.setHeader("X-Prerender", r.tag);
+      res.status(r.status).send(r.html);
+    } catch (e) {
+      console.warn("[prerender] fishing:", (e as Error)?.message);
+      next();
+    }
+  });
+
   app.get(HIKING_RE, async (req, res, next) => {
     if (!isBot(req)) return next();
     try {

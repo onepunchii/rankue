@@ -16,7 +16,8 @@
 import { cleanCoord, type CatchWeather } from "./fishingSpot.js";
 
 /** 전면 공개 스위치 — 지금은 닫혀 있다(운영자만) */
-export const FISHING_PUBLIC = false;
+// 2026-10-18 오너: "낚시 전체를 공개" — 회원 누구나 낚시를 쓴다(방문자는 공개 화면 '전국 낚시터')
+export const FISHING_PUBLIC = true;
 export const FISHING_PATH = "/fishing";
 
 /** 바다 색 — 등산(청록 · 살구) · 골프(검정 · 라임) · 당구와 섞이지 않게 남색 바탕에 물빛 */

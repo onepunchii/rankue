@@ -31,6 +31,9 @@ import { getSeaNow } from "../../services/fishingSea.js";
 import { getSeaFcst } from "../../services/fishingSeaFcst.js";
 import { SEA_FCST_REG } from "../../../shared/fishingSeaFcst.js";
 import { getIndexMap, getPortBrief } from "../../services/fishingPort.js";
+import { allPlaces, placeById } from "../../storage/fishingPlaces.js";
+import { FISHING_PORTS } from "../../../shared/fishingStations.js";
+import { isPlaceId, nearbyPlaces, nearestPort } from "../../../shared/fishingPlaces.js";
 import { nearestWeather, type CatchWeather } from "../../../shared/fishingSpot.js";
 import { rankColumn, rankRows, type FishingRankBoard, type FishingRankSpecies } from "../../../shared/fishingRank.js";
 import { fishByName, fishRecords } from "../../../shared/fishingFish.js";
@@ -346,6 +349,34 @@ router.get("/trips/:id", requireAuth, gate, asyncHandler(async (req: AuthRequest
  * 낚시터 찾기 — 지역(시도) · 글자(이름 · 시군구 · 어종). 60곳까지, 지역별 곳 수를 같이 준다.
  * 실은 자료는 받은 것을 걸러 넣은 것이고(server/scripts/fishing-load-places), 요금 · 전화는 오래된 값일 수 있어 자료 기준일을 같이 준다.
  */
+/* ── 전국 낚시터 공개 페이지(2026-10-18 — 누구나 · 검색엔진도). 받은 칸만, 사람마다 같은 답이라 CDN 공개 캐시 ── */
+const publicCache = (res: any, sec = 600) => { res.setHeader("Cache-Control", "public, max-age=0, must-revalidate"); res.setHeader("CDN-Cache-Control", `public, s-maxage=${sec}, stale-while-revalidate=86400`); };
+/** 전부 — 허브 · 지역 · 종류 화면이 같이 쓴다(1,151줄, 한 번에) */
+router.get("/spots", asyncHandler(async (_req: any, res: any) => {
+    const all = await allPlaces();
+    publicCache(res);
+    return sendSuccess(res, { total: all.length, items: all.map((p) => ({ id: p.id, name: p.name, kind: p.kind, sido: p.sido, sigungu: p.sigungu, lat: p.lat, lng: p.lng, species: p.species, fee: p.fee })) });
+}));
+/** 한 곳 — 낚시터 · 가까운 낚시터 여섯 · 가까운 항구(바다 낚시터만) */
+router.get("/spots/:id", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? "");
+    if (!isPlaceId(id)) return sendError(res, 404, "낚시터를 찾을 수 없어요");
+    const [all, place] = await Promise.all([allPlaces(), placeById(id)]);
+    if (!place) return sendError(res, 404, "낚시터를 찾을 수 없어요");
+    const port = nearestPort(FISHING_PORTS, place);
+    publicCache(res);
+    return sendSuccess(res, { place, nearby: nearbyPlaces(all, place, 6), port: port ? { code: port.code, name: port.name, km: port.km, area: port.area } : null });
+}));
+/** 한 곳의 오늘 물때 — 가까운 항구의 만조 · 간조 · 지금 바다(바다 낚시터만). 못 받았으면 null */
+router.get("/spots/:id/tide", asyncHandler(async (req: any, res: any) => {
+    const place = isPlaceId(String(req.params.id ?? "")) ? await placeById(String(req.params.id)) : null;
+    const port = place ? nearestPort(FISHING_PORTS, place) : null;
+    if (!port) return sendSuccess(res, null);
+    const b = await getPortBrief(port.code, fishingKstDay(Date.now())).catch(() => null);
+    publicCache(res, 300);
+    return sendSuccess(res, b ? { port: { code: port.code, name: port.name, km: port.km }, turns: b.turns, now: b.now ?? null } : null);
+}));
+
 router.get("/places", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
     const q = String(req.query.q ?? "").trim().slice(0, 30);
     const sido = String(req.query.sido ?? "").trim().slice(0, 20);

@@ -16,6 +16,8 @@ import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
 import { golfGuideSitemapParts } from "./seo/golfGuide.js";
 import { golfStampsSitemapParts } from "./seo/golfStamps.js";
 import { hikingSitemapParts } from "./seo/hiking.js";
+import { fishingSitemapParts } from "./seo/fishing.js";
+import { allPlaces, placesUpdatedDay } from "./storage/fishingPlaces.js";
 import { allMountains, mountainUpdatedDays } from "./storage/hiking.js";
 import { golfTermsSitemapParts } from "./seo/golfTerms.js";
 import { FIND_FEATURES, findPath, findRegionCounts, hasFindTag } from "../shared/golfFind.js";
@@ -50,7 +52,7 @@ const ORIGIN = "https://www.rankue.co.kr";
 const APP_LANGS = ["en", "vi", "tr", "es"];
 const ABOUT_LANGS = ["en", "vi", "tr", "es", "ja", "zh"];
 
-export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs", "rankings", "terms", "tournaments", "pba-records", "hiking"] as const;
+export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs", "rankings", "terms", "tournaments", "pba-records", "hiking", "fishing"] as const;
 export type SitemapSection = (typeof SITEMAP_SECTIONS)[number];
 
 function esc(s: string): string {
@@ -319,6 +321,10 @@ const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
   rankings: rankingExtraSitemapParts, terms: async () => [...(await billiardsTermsSitemapParts()), ...golfTermsSitemapParts()],
   tournaments: tournamentsSitemapParts, "pba-records": pbaRecordsSitemapParts,
   // 등산(2026-10-13) — 허브 · 권역 · 목록 · 산(코스나 글이 있는 산만). 자료를 못 읽으면 빈 구역
+  fishing: async () => {
+    const all = await allPlaces().catch((e) => { console.warn("[sitemap] fishing:", (e as Error)?.message); return []; });
+    return fishingSitemapParts(all, await placesUpdatedDay().catch(() => null));
+  },
   hiking: async () => {
     const all = await allMountains().catch((e) => { console.warn("[sitemap] hiking:", (e as Error)?.message); return []; });
     return hikingSitemapParts(all, await mountainUpdatedDays().catch(() => new Map<string, string>()));

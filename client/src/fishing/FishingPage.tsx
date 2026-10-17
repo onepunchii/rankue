@@ -14,6 +14,8 @@
  * ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지. 한국어만.
  */
 import { CoachTour } from "@/components/hiq/CoachTour";
+import { goLogin } from "@/components/hiq/LoginGate";
+import { FISHING_SPOTS_PATH } from "@shared/fishingPlaces";
 import { getDevicePosition } from "@/hooks/useNativeBridge";
 import { cleanCoord } from "@shared/fishingSpot";
 import { FishingRanking } from "./FishingRanking";
@@ -203,6 +205,16 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
     });
 
     if (!meLoading && !allowed) {
+        // 방문자(2026-10-18 전면 공개) — 낚시 기록은 회원의 것: 가입 · 로그인, 아니면 누구나 보는 '전국 낚시터'로
+        if (!me) return (
+            <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-8 text-center" style={{ background: C.bg, color: C.foam }} data-testid="fishing-guest">
+                <img src={FS_HERO} alt="" width={880} height={880} className="h-40 w-40 rounded-3xl object-cover" draggable={false} />
+                <p className="mt-2 text-[17px] font-semibold">조과 기록 · 어탁 · 수족관은 가입하면 써요</p>
+                <p className="text-[13.5px] [word-break:keep-all]" style={{ color: C.soft }}>전국 낚시터 1,151곳은 가입 없이 지금 바로 볼 수 있어요.</p>
+                <button type="button" onClick={() => goLogin(setLocation, TAB_PATH[tab] === "/dashboard" ? "/fishing" : TAB_PATH[tab])} className="mt-2 h-12 w-full max-w-[300px] rounded-2xl text-[15px] font-semibold" style={{ background: C.brand, color: C.onBrand }}>가입 · 로그인</button>
+                <button type="button" onClick={() => setLocation(FISHING_SPOTS_PATH)} className="h-12 w-full max-w-[300px] rounded-2xl text-[15px] font-semibold" style={{ background: "#FFFFFF14" }}>전국 낚시터 보기</button>
+            </div>
+        );
         return (
             <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-8 text-center" style={{ background: C.bg, color: C.foam }}>
                 <p className="text-[15px]">낚시는 아직 준비 중이에요.</p>

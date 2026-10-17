@@ -329,7 +329,7 @@ describe("화면의 글 · 따로 선 세계", () => {
     });
 
     it("새 공개 주소의 네 곳 — 봇 경로 · 검색용 화면 · 화면 라우트 · 사이트맵과 허브 내비", () => {
-        expect(read("vercel.json")).toContain("|hiking(?:/(?:regions|lists|mountains)/[^/]+|/stamps|/pack|/terms(?:/[^/]+)?|/checklist|/abroad(?:/[^/]+)?)?)/?");
+        expect(read("vercel.json")).toContain("|hiking(?:/(?:regions|lists|mountains)/[^/]+|/stamps|/pack|/terms(?:/[^/]+)?|/checklist|/abroad(?:/[^/]+)?)?|fishing/");
         const pre = read("server/prerender.ts");
         expect(pre).toContain("app.get(HIKING_RE, async (req, res, next) => {");
         expect(pre).toContain("[[HIKING_HUB_PATH, HIKING_NAV_LABEL] as [string, string]]");
@@ -340,7 +340,7 @@ describe("화면의 글 · 따로 선 세계", () => {
         expect(seo).toContain("if (p === HIKING_STAMPS_PATH) return all.length ? stamps(all) : null;");
         expect(seo).toContain("if (p === HIKING_PACK_PATH) return all.length ? pack(all) : null;");
         const map = read("server/sitemap.ts");
-        expect(map).toContain('"pba-records", "hiking"] as const;');
+        expect(map).toContain('"pba-records", "hiking", "fishing"] as const;');
         expect(map).toContain("return hikingSitemapParts(all, await mountainUpdatedDays().catch(() => new Map<string, string>()));");
         // 표지 그림 아홉 장
         for (const n of ["hero", ...HIKING_REGIONS.map((r) => `cover-${r.id}`)]) expect(existsSync(resolve(root, `client/public/hiking/art/${n}.webp`)), n).toBe(true);

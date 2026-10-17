@@ -258,6 +258,10 @@ function HikingAlbumRoute() { return <Suspense fallback={hikingFallback}><Hiking
 function HikingHubRoute() { return <Suspense fallback={hikingFallback}><HikingHub /></Suspense>; }
 // 낚시(2026-10-14) — 네 번째 종목의 첫 뼈대. 지금은 운영자에게만 보인다(/me 의 fishingAccess). 검색용 화면 · 사이트맵은 아직 없다
 const FishingPage = lazy(() => import("@/fishing/FishingPage"));
+// 전국 낚시터 공개 화면(2026-10-18) — 누구나(로그인 없이). 검색용 화면은 server/seo/fishing
+const FishingSpots = lazy(() => import("@/fishing/spots/SpotsPages").then((m) => ({ default: m.SpotsHub })));
+const FishingSpot = lazy(() => import("@/fishing/spots/SpotsPages").then((m) => ({ default: m.SpotPage })));
+const spotFallback = <div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />;
 const fishingView = (view: "home" | "trip" | "book" | "log" | "points" | "guide" | "rules" | "rank" | "gear" | "tank") => function FishingView() { return <Suspense fallback={<div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />}><FishingPage view={view} /></Suspense>; };
 // 주소마다 한 번만 만든다(그릴 때마다 새 컴포넌트가 되면 화면이 통째로 다시 붙는다)
 const FishingRoute = fishingView("home"), FishingBookRoute = fishingView("book"), FishingLogRoute = fishingView("log"), FishingPointsRoute = fishingView("points"), FishingTripRoute = fishingView("trip"), FishingGuideRoute = fishingView("guide"), FishingRulesRoute = fishingView("rules"), FishingRankRoute = fishingView("rank"), FishingGearRoute = fishingView("gear"), FishingTankRoute = fishingView("tank");
@@ -458,6 +462,10 @@ function AppRoutes() {
       <Route path="/golf/stamps/:book" component={GolfStampBookRoute} />
       <Route path="/golf/shelf" component={GolfShelfRoute} />
       {/* 등산(2026-10-13) — 공개 화면. 검색용 화면은 server/seo/hiking, 봇 경로는 vercel.json */}
+      <Route path="/fishing/spots">{() => <Suspense fallback={spotFallback}><FishingSpots /></Suspense>}</Route>
+      <Route path="/fishing/spots/region/:sido">{(p: { sido: string }) => <Suspense fallback={spotFallback}><FishingSpots region={decodeURIComponent(p.sido)} /></Suspense>}</Route>
+      <Route path="/fishing/spots/type/:kind">{(p: { kind: string }) => <Suspense fallback={spotFallback}><FishingSpots type={p.kind} /></Suspense>}</Route>
+      <Route path="/fishing/spot/:id">{(p: { id: string }) => <Suspense fallback={spotFallback}><FishingSpot id={p.id} /></Suspense>}</Route>
       <Route path="/fishing" component={FishingRoute} />
       <Route path="/fishing/trip" component={FishingTripRoute} />
       <Route path="/fishing/book" component={FishingBookRoute} />
