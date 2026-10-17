@@ -104,3 +104,17 @@ export function hikingPoiTitle(p: { kind: HikingPoiKind; name: string; note?: st
     if (generic) return note && note !== name && note.length <= 30 ? note : name === "위험지역" || name === "위험구간" ? "위험 구간" : name;
     return note && note !== name && note.length <= 24 && p.kind === "WILD" ? `${name} · ${note}` : name;
 }
+
+/**
+ * 같은 자리의 같은 지점을 하나로(2026-10-17 리뷰 — 설악산 코스 1에 '대청봉'이 5.1km 에 두 줄, 칩은 '봉우리 2').
+ * 받은 파일에 겹쳐 실린 점이다: 종류와 보여 줄 이름이 같고 거리가 150m 안이면 앞의 것만 둔다. 거리 순으로 받은 목록을 그 차례 그대로 돌려준다.
+ */
+export function dedupeCoursePois<T extends { kind: HikingPoiKind; name: string; note?: string | null; km?: number | null }>(list: readonly T[]): T[] {
+    const out: T[] = [];
+    for (const p of list) {
+        const t = hikingPoiTitle(p);
+        if (out.some((q) => q.kind === p.kind && hikingPoiTitle(q) === t && q.km != null && p.km != null && Math.abs(q.km - p.km) <= 0.15)) continue;
+        out.push(p);
+    }
+    return out;
+}

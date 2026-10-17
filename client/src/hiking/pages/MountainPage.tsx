@@ -21,7 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { hikingMountainCardUrl } from "@shared/ogCards";
 import { heightText, hikingMountainPath, hikingRegion, hikingRegionPath, mountainPlace } from "@shared/hikingMountains";
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "@shared/hikingGuide";
-import { HIKING_POI_NAME, HIKING_POI_ORDER, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
+import { HIKING_POI_NAME, HIKING_POI_ORDER, dedupeCoursePois, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
 import { SURFACE_COPY, surfaceNote, surfaceShares } from "@shared/hikingSurface";
 import { COURSE_MAP_COPY } from "@shared/hikingCourseMap";
 import { COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, MOUNTAIN_LABEL, OSM_NOTE, courseFacts, courseShape, courseViaNote, kmRange, listNames, mountainSeo } from "@shared/hikingPage";
@@ -76,7 +76,7 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
     const f = courseFacts(c);
     const level = courseLevel(c);
     const slopes = useMemo(() => courseSlopes(c.line), [c.line]);
-    const on = useMemo(() => pois.filter((p) => p.courseId === c.id && p.km != null).sort((a, b) => a.km! - b.km!), [pois, c.id]);
+    const on = useMemo(() => dedupeCoursePois(pois.filter((p) => p.courseId === c.id && p.km != null).sort((a, b) => a.km! - b.km!)), [pois, c.id]);
     const kinds = POI_ORDER.filter((k) => on.some((p) => p.kind === k));
     const [kind, setKind] = useState<HikingPoiKind | null>(null);
     const [all, setAll] = useState(false);

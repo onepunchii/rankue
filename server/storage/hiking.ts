@@ -132,6 +132,8 @@ export async function mountainById(id: string): Promise<MountainSummary | null> 
     return cache?.byId.get(id) ?? null;
 }
 
+/** 이보다 가까우면 같은 정상으로 본다(km) */
+export const NEARBY_SAME_PEAK_KM = 0.3;
 /** 가까운 산 — 직선거리 순. 코스가 있거나 글이 있는 산만(빈 페이지로 보내지 않는다) */
 export function nearbyMountains(all: readonly MountainSummary[], m: { id: string; lat: number | null; lng: number | null }, n = 8, withinKm = 40): (MountainSummary & { km: number })[] {
     if (m.lat == null || m.lng == null) return [];
@@ -141,7 +143,8 @@ export function nearbyMountains(all: readonly MountainSummary[], m: { id: string
         // 위도 1도 ≈ 111km — 먼 산은 재지도 않는다
         if (Math.abs(x.lat - m.lat) > withinKm / 111) continue;
         const km = distM(m.lat, m.lng, x.lat, x.lng) / 1000;
-        if (km <= withinKm) out.push({ ...x, km: Math.round(km * 10) / 10 });
+        // 300m 안은 같은 정상이다(설악산 옆의 '대청봉 0km') — 가까운 산이 아니다
+        if (km >= NEARBY_SAME_PEAK_KM && km <= withinKm) out.push({ ...x, km: Math.round(km * 10) / 10 });
     }
     return out.sort((a, b) => a.km - b.km).slice(0, n);
 }

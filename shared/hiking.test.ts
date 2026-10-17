@@ -346,3 +346,26 @@ describe("화면의 글 · 따로 선 세계", () => {
         for (const n of ["hero", ...HIKING_REGIONS.map((r) => `cover-${r.id}`)]) expect(existsSync(resolve(root, `client/public/hiking/art/${n}.webp`)), n).toBe(true);
     });
 });
+
+describe("산 화면 리뷰(2026-10-17) — 겹친 지점 · 같은 정상 · 같은 이름의 명산", () => {
+    it("같은 자리의 같은 지점은 하나 — 종류 · 이름 · 150m 안", async () => {
+        const { dedupeCoursePois } = await import("./hikingPois");
+        const p = (kind: "PEAK" | "TOILET" | "SIGN", name: string, km: number, note: string | null = null) => ({ kind, name, note, km });
+        const out = dedupeCoursePois([p("TOILET", "남설악화장실", 0.3), p("PEAK", "대청봉", 5.1), p("PEAK", "대청봉", 5.12), p("PEAK", "중청봉", 5.2), p("PEAK", "대청봉", 7.4)]);
+        expect(out.map((x) => `${x.name}@${x.km}`)).toEqual(["남설악화장실@0.3", "대청봉@5.1", "중청봉@5.2", "대청봉@7.4"]);
+        // 이름이 같은 유형 이름이어도 설명이 다르면 다른 지점
+        expect(dedupeCoursePois([p("SIGN", "갈림길", 1, "돌탑삼거리"), p("SIGN", "갈림길", 1.05, "희운각")])).toHaveLength(2);
+        expect(read("client/src/hiking/pages/MountainPage.tsx")).toContain("dedupeCoursePois(pois.filter((p) => p.courseId === c.id");
+    });
+    it("가까운 산은 300m 밖부터 — 같은 정상(0km)을 늘어놓지 않는다", () => {
+        expect(read("server/storage/hiking.ts")).toContain("if (km >= NEARBY_SAME_PEAK_KM && km <= withinKm)");
+    });
+    it("산 한 줄의 이름 — 주소에 시군이 붙은 명산은 시군을 같이(지리산(통영)) · 사실은 덩어리 사이에서만 줄을 바꾼다", async () => {
+        const { mountainLabel } = await import("./hikingMountains");
+        expect(mountainLabel({ name: "지리산", slug: "지리산-통영", sigungu: "통영시" })).toBe("지리산(통영)");
+        expect(mountainLabel({ name: "지리산", slug: "지리산", sigungu: "산청군" })).toBe("지리산");
+        const row = read("client/src/hiking/components/MountainParts.tsx");
+        expect(row).toContain("{mountainLabel(m)}</span>");
+        expect(row).toContain('className="max-w-full truncate whitespace-nowrap">{f}{i < facts.length - 1 ? " ·" : ""}</span>');
+    });
+});

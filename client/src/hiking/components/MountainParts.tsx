@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { LucideChevronRight } from "@/lib/icons";
 import { WX_LABEL, type CourseWeather, type WxHalf } from "@shared/golfWeather";
-import { heightText, hikingMountainPath, mountainPlace } from "@shared/hikingMountains";
+import { heightText, hikingMountainPath, mountainLabel, mountainPlace } from "@shared/hikingMountains";
 import { HIKING_CTA, WEATHER_NOTE, kmRange } from "@shared/hikingPage";
 import { SUN_NOTE, kstClock, kstYmd, spanText, sunLine, sunTimes } from "@shared/hikingSun";
 import { SUMMIT_WX_COPY, summitFirstDay, summitWx, type SummitBase } from "@shared/hikingSummitWx";
@@ -32,7 +32,8 @@ export function Peak({ height, done, size = 34 }: { height: number | null; done?
 }
 
 export function MountainRow({ m, km, done }: { m: MountainSummary; km?: number; done?: boolean }) {
-    const facts = [heightText(m.heightM), mountainPlace(m), m.courses > 0 ? `코스 ${m.courses}개 ${kmRange(m.minKm, m.maxKm)}` : ""].filter(Boolean).join(" · ");
+    // 높이 · 자리 · 코스는 덩어리마다 끊지 않는다 — 좁으면 덩어리 사이에서 다음 줄로(2026-10-17 리뷰: "코스 3개 0.8~2...." 로 잘리던 것)
+    const facts = [heightText(m.heightM), mountainPlace(m), m.courses > 0 ? `코스 ${m.courses}개 ${kmRange(m.minKm, m.maxKm)}` : ""].filter(Boolean);
     return (
         <Link href={hikingMountainPath(m.slug)} className="flex min-h-[58px] items-center gap-3 py-2 active:opacity-70" data-testid={`mountain-row-${m.slug}`}>
             {/* 100대 명산은 그 산의 와펜을 앞머리에 — 오른 산은 산호빛 점을 붙인다 */}
@@ -44,10 +45,13 @@ export function MountainRow({ m, km, done }: { m: MountainSummary; km?: number; 
             ) : <Peak height={m.heightM} done={done} />}
             <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5">
-                    <span className="truncate text-[15.5px] font-semibold text-[#F4EFE3]">{m.name}</span>
+                    {/* 같은 이름의 명산(지리산 1,915m · 사량도 지리산 399m)이 섞이지 않게 — 주소에 시군이 붙은 산은 "지리산(통영)" */}
+                    <span className="truncate text-[15.5px] font-semibold text-[#F4EFE3]">{mountainLabel(m)}</span>
                     {m.lists.includes("kfs100") && <span className="shrink-0 rounded-full bg-[#F6D9A824] px-1.5 py-0.5 text-[12px] leading-none text-[#F6D9A8]">100대 명산</span>}
                 </span>
-                <span className="mt-0.5 block truncate text-[13px] text-[#F4EFE399]">{facts}</span>
+                <span className="mt-0.5 flex flex-wrap gap-x-1 text-[13px] leading-snug text-[#F4EFE399]">
+                    {facts.map((f, i) => <span key={i} className="max-w-full truncate whitespace-nowrap">{f}{i < facts.length - 1 ? " ·" : ""}</span>)}
+                </span>
             </span>
             {km != null && <span className="shrink-0 text-[13px] tabular-nums text-[#F4EFE38C]">{km}km</span>}
             <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
