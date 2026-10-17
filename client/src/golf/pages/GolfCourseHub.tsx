@@ -254,7 +254,8 @@ export default function GolfCourseHub() {
                 <h1 className="text-[28px] leading-[1.18] font-bold tracking-tight text-[#FFFFFF]">{headMain}</h1>
                 <p className="mt-1.5 h-[20px] text-[14px] text-[#FFFFFF73] tabular-nums">
                     {list.isSuccess && (
-                        <>{courseCount.toLocaleString()}곳 · 지금 티타임 <span className={listingCount ? "text-[#8BE84A] font-medium" : ""}>{listingCount.toLocaleString()}건</span></>
+                        // 조인 · 긴급 탭이면 그 수만 센다 — "지금 티타임 0건"이라 적으면 부킹 3,031건과 어긋나 보였다(2026-10-17 리뷰)
+                        <>{courseCount.toLocaleString()}곳 · 지금 {intent === "join" ? "조인" : intent === "urgent" ? "긴급 조인" : intent === "booking" ? "부킹" : "티타임"} <span className={listingCount ? "text-[#8BE84A] font-medium" : ""}>{listingCount.toLocaleString()}건</span></>
                     )}
                 </p>
             </div>

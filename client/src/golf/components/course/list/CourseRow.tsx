@@ -61,11 +61,14 @@ export function CourseRow({ c, km, myWatch }: { c: CourseListItem; km: number | 
                         <span className="text-[16px] font-semibold tracking-tight text-[#FFFFFF] truncate">{c.name}</span>
                         {live && <span className="w-1.5 h-1.5 rounded-full bg-[#64DD17] shrink-0" aria-label="지금 티타임" />}
                     </span>
-                    <span className="mt-0.5 block text-[13px] text-[#FFFFFF8C] truncate tabular-nums">{meta.join(" · ")}</span>
+                    {/* 어디 · 얼마 · 몇 홀 · 거리, 특징은 덩어리 사이에서만 줄바꿈(2026-10-17 리뷰 — 오른쪽 회원권 시세에 밀려 "용인 · 19.9만원~ · …" 로 홀 수가 잘렸다) */}
+                    <span className="mt-0.5 flex flex-wrap gap-x-1 text-[13px] text-[#FFFFFF8C] tabular-nums">
+                        {meta.map((m, i) => <span key={i} className="whitespace-nowrap">{m}{i < meta.length - 1 ? " ·" : ""}</span>)}
+                    </span>
                     {(live || traits.length > 0) && (
-                        <span className="mt-1 flex items-center gap-2 min-w-0">
+                        <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 min-w-0">
                             <LiveBadges counts={c.counts} />
-                            {traits.length > 0 && <span className="text-[12px] text-[#FFFFFF59] truncate">{traits.join(" · ")}</span>}
+                            {traits.length > 0 && <span className="flex flex-wrap gap-x-1 text-[12px] text-[#FFFFFF59]">{traits.map((x, i) => <span key={i} className="whitespace-nowrap">{x}{i < traits.length - 1 ? " ·" : ""}</span>)}</span>}
                         </span>
                     )}
                 </span>
