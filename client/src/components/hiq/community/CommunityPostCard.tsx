@@ -103,7 +103,7 @@ export const CommunityPostCard = ({ post, myId, showBoardChip, onClick, detail, 
                             <SkillBadge badge={post.author?.badge} />
                         </div>
                         <div className="flex items-center gap-1.5 mt-1">
-                            <time className="text-[11.5px] font-medium text-black/45 leading-none">
+                            <time className="text-[12px] font-medium text-black/45 leading-none">
                                 {formatDistanceToNow(new Date(post.createdAt), { addSuffix: true, locale: ko })}
                             </time>
                             {/* 내 언어가 아닌 글에만 언어 뱃지 — 전 글에 붙이면 정보가 0이 된다 */}
@@ -112,8 +112,8 @@ export const CommunityPostCard = ({ post, myId, showBoardChip, onClick, detail, 
                                     {post.language}
                                 </span>
                             )}
-                            {post.storeName && <span className="text-[11.5px] font-medium text-black/45 leading-none">· {post.storeName}</span>}
-                            {post.regionName && <span className="text-[11.5px] font-medium text-black/45 leading-none">· {post.regionName}</span>}
+                            {post.storeName && <span className="text-[12px] font-medium text-black/45 leading-none">· {post.storeName}</span>}
+                            {post.regionName && <span className="text-[12px] font-medium text-black/45 leading-none">· {post.regionName}</span>}
                         </div>
                     </div>
                 </div>
@@ -159,12 +159,12 @@ export const CommunityPostCard = ({ post, myId, showBoardChip, onClick, detail, 
             {(showBoardChip || !!post.tags?.length) && (
                 <div className="flex items-center gap-1.5 flex-wrap -mt-0.5">
                     {showBoardChip && (
-                        <span className="px-2 py-0.5 rounded-full bg-black/[0.05] text-[11px] font-semibold text-ink-3 leading-none">
+                        <span className="px-2 py-0.5 rounded-full bg-black/[0.05] text-[12px] font-semibold text-ink-3 leading-none">
                             {t(BOARD_KEYS[post.board])}
                         </span>
                     )}
                     {post.tags?.map(tag => (
-                        <span key={tag} className="px-2 py-0.5 rounded-full bg-[#F5B721]/15 text-[11px] font-semibold text-[#8a6a0a] leading-none">
+                        <span key={tag} className="px-2 py-0.5 rounded-full bg-[#F5B721]/15 text-[12px] font-semibold text-[#8a6a0a] leading-none">
                             #{tag}
                         </span>
                     ))}

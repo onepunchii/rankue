@@ -17,7 +17,7 @@ export const SkillBadge = ({ badge }: { badge: CommunitySkillBadge | null }) => 
     if (avg) parts.push(`${t("community.avg")} ${avg.toFixed(2)}`);
 
     return (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-brand/10 text-[10.5px] font-semibold text-brand leading-none">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-full bg-brand/10 text-[12px] font-semibold text-brand leading-none">
             {parts.join(" · ")}
         </span>
     );

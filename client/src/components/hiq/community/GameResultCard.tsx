@@ -13,7 +13,7 @@ export const GameResultCard = ({ card, compact }: { card: CommunityGameCard; com
         <div className="rounded-2xl bg-brand/[0.06] border border-brand/15 p-4">
             <div className="flex items-center justify-between mb-2.5">
                 <div className="flex items-center gap-1.5">
-                    <span className={`px-1.5 py-0.5 rounded-full text-[10.5px] font-bold leading-none ${card.isWinner ? "bg-brand text-white" : "bg-black/[0.08] text-black/55"}`}>
+                    <span className={`px-1.5 py-0.5 rounded-full text-[12px] font-bold leading-none ${card.isWinner ? "bg-brand text-white" : "bg-black/[0.08] text-black/55"}`}>
                         {card.isWinner ? t("community.win") : t("community.loss")}
                     </span>
                     <span className="text-[12px] font-semibold text-ink-2">{gameLabel}</span>
@@ -21,24 +21,24 @@ export const GameResultCard = ({ card, compact }: { card: CommunityGameCard; com
                         <span className="text-[12px] font-medium text-black/45">vs {card.opponentName}</span>
                     )}
                 </div>
-                <span className="text-[11px] font-medium text-black/40">{dateLabel} · {t("community.verifiedRecord")}</span>
+                <span className="text-[12px] font-medium text-black/40">{dateLabel} · {t("community.verifiedRecord")}</span>
             </div>
             <div className={`grid ${compact ? "grid-cols-3" : "grid-cols-4"} gap-2`}>
                 <div>
-                    <div className="text-[11px] font-medium text-black/45">{t("community.score")}</div>
+                    <div className="text-[12px] font-medium text-black/45">{t("community.score")}</div>
                     <div className="text-[17px] font-bold text-ink-1 tabular-nums">{card.score}</div>
                 </div>
                 <div>
-                    <div className="text-[11px] font-medium text-black/45">{t("community.innings")}</div>
+                    <div className="text-[12px] font-medium text-black/45">{t("community.innings")}</div>
                     <div className="text-[17px] font-bold text-ink-1 tabular-nums">{card.innings}</div>
                 </div>
                 <div>
-                    <div className="text-[11px] font-medium text-black/45">{t("community.avg")}</div>
+                    <div className="text-[12px] font-medium text-black/45">{t("community.avg")}</div>
                     <div className="text-[17px] font-bold text-brand tabular-nums">{card.average}</div>
                 </div>
                 {!compact && (
                     <div>
-                        <div className="text-[11px] font-medium text-black/45">{t("community.highRun")}</div>
+                        <div className="text-[12px] font-medium text-black/45">{t("community.highRun")}</div>
                         <div className="text-[17px] font-bold text-ink-1 tabular-nums">{card.highRun}</div>
                     </div>
                 )}

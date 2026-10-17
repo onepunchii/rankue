@@ -134,7 +134,7 @@ export default function HiqCommunityPost() {
                     <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-[13px] font-semibold text-ink-1 leading-none">{c.author?.name}</span>
                         <SkillBadge badge={c.author?.badge} />
-                        <time className="text-[11px] font-medium text-black/40 leading-none">
+                        <time className="text-[12px] font-medium text-black/40 leading-none">
                             {formatDistanceToNow(new Date(c.createdAt), { addSuffix: true, locale: ko })}
                         </time>
                     </div>
