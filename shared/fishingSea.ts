@@ -167,34 +167,34 @@ export const SEA_CAUTION = "출항은 해경과 선장의 안내를 따르세요
 
 /**
  * 지도 꼬리표 늘어놓기(2026-10-17 리뷰 — 남해서부의 꼬리표가 제주 꼬리표 밑에 깔려 보이지 않았다).
- * 센 특보부터, 같은 세기면 틀 끝에 밀려 자리가 묶인 것(제주 — 아래 끝)부터 놓는다. 먼저 놓인 것과 겹치면
- * 위아래 · 옆 가운데 **가장 가까운 빈자리**로 비킨다(멀리 튀어 다른 바다 옆에 붙지 않게). 틀(bounds) 밖으로는 나가지 않는다.
- * 빈자리가 없으면 처음 자리에 둔다. 좌표 단위는 부른 쪽의 것(지도 칸).
+ * 센 특보부터, 같은 세기면 틀 끝에 밀려 자리가 묶인 것(제주 — 아래 끝)부터 놓는다. 자리의 값 = 원래 자리에서 떨어진 거리 + 덮는 글의 넓이:
+ *   - 꼬리표끼리 · hard(지도 단추 · 특보 없는 구역의 이름)는 덮지 않는다
+ *   - soft(지점 이름)는 되도록 피하되, 피하려고 다른 바다까지 튀느니 조금 덮는다(남해서부가 남해동부로 건너가던 것)
+ * 위아래 한 칸 · 옆 1/4 폭씩 찾는다. 덮지 않을 자리가 없으면 가장 덜 겹치는 자리. 좌표 단위는 부른 쪽의 것(지도 칸).
  */
 export interface TagBox { id: string; cx: number; cy: number; w: number; h: number; rank: number }
-export function layoutTags(tags: readonly TagBox[], bounds: { x0: number; y0: number; x1: number; y1: number }, gap: number, /** 이미 그려진 글(특보 없는 구역의 이름 등) — 꼬리표가 덮지 않는다 */ fixed: readonly { x0: number; y0: number; x1: number; y1: number }[] = []): Map<string, { cx: number; cy: number }> {
+type Rect = { x0: number; y0: number; x1: number; y1: number };
+export function layoutTags(tags: readonly TagBox[], bounds: Rect, gap: number, hard: readonly Rect[] = [], soft: readonly Rect[] = []): Map<string, { cx: number; cy: number }> {
     const out = new Map<string, { cx: number; cy: number }>();
-    const placed: { x0: number; y0: number; x1: number; y1: number }[] = [...fixed];
+    const placed: Rect[] = [...hard];
     const clampX = (t: TagBox, x: number) => Math.min(bounds.x1 - t.w / 2, Math.max(bounds.x0 + t.w / 2, x));
     const clampY = (t: TagBox, y: number) => Math.min(bounds.y1 - t.h / 2, Math.max(bounds.y0 + t.h / 2, y));
-    const boxOf = (t: TagBox, cx: number, cy: number) => ({ x0: cx - t.w / 2, y0: cy - t.h / 2, x1: cx + t.w / 2, y1: cy + t.h / 2 });
-    const hits = (b: { x0: number; y0: number; x1: number; y1: number }) => placed.some((p) => b.x0 < p.x1 + gap && b.x1 + gap > p.x0 && b.y0 < p.y1 + gap && b.y1 + gap > p.y0);
-    const inside = (b: { x0: number; y0: number; x1: number; y1: number }) => b.x0 >= bounds.x0 - 0.01 && b.x1 <= bounds.x1 + 0.01 && b.y0 >= bounds.y0 - 0.01 && b.y1 <= bounds.y1 + 0.01;
+    const boxOf = (t: TagBox, cx: number, cy: number): Rect => ({ x0: cx - t.w / 2, y0: cy - t.h / 2, x1: cx + t.w / 2, y1: cy + t.h / 2 });
+    const area = (b: Rect, list: readonly Rect[], g = 0) => list.reduce((n, p) => n + Math.max(0, Math.min(b.x1, p.x1 + g) - Math.max(b.x0, p.x0 - g)) * Math.max(0, Math.min(b.y1, p.y1 + g) - Math.max(b.y0, p.y0 - g)), 0);
+    const inside = (b: Rect) => b.x0 >= bounds.x0 - 0.01 && b.x1 <= bounds.x1 + 0.01 && b.y0 >= bounds.y0 - 0.01 && b.y1 <= bounds.y1 + 0.01;
     const order = tags.map((t) => ({ t, x: clampX(t, t.cx), y: clampY(t, t.cy) }))
         .map((o) => ({ ...o, pinned: Math.abs(o.x - o.t.cx) + Math.abs(o.y - o.t.cy) }))
         .sort((a, b) => b.t.rank - a.t.rank || b.pinned - a.pinned);
     for (const { t, x, y } of order) {
-        // 옆으로는 꼬리표 폭의 1/4 씩(반 폭씩이면 틈을 건너뛴다 — 남해서부가 제주와 남해동부 이름 사이 틈을 못 찾았다)
         const sy = t.h + gap, sx = t.w / 4 + gap;
         const cands: [number, number][] = [];
         for (let i = -3; i <= 3; i++) for (let j = -4; j <= 4; j++) cands.push([x + j * sx, y + i * sy]);
-        cands.sort((a, b) => Math.hypot(a[0] - x, (a[1] - y) * 1.6) - Math.hypot(b[0] - x, (b[1] - y) * 1.6));
-        const overlap = (b: { x0: number; y0: number; x1: number; y1: number }) => placed.reduce((n, p) => n + Math.max(0, Math.min(b.x1, p.x1) - Math.max(b.x0, p.x0)) * Math.max(0, Math.min(b.y1, p.y1) - Math.max(b.y0, p.y0)), 0);
         const ok = cands.filter(([cx, cy]) => inside(boxOf(t, cx, cy)));
-        // 빈자리가 없으면 가장 덜 겹치는 자리(가까운 것 먼저)
-        const at = ok.find(([cx, cy]) => !hits(boxOf(t, cx, cy)))
-            ?? ok.reduce<[number, number] | null>((best, c) => (best == null || overlap(boxOf(t, c[0], c[1])) < overlap(boxOf(t, best[0], best[1])) ? c : best), null)
-            ?? [x, y];
+        const cost = ([cx, cy]: [number, number]) => Math.hypot((cx - x) / t.h, ((cy - y) / t.h) * 1.6) + (area(boxOf(t, cx, cy), soft) / (t.w * t.h)) * 8;
+        const free = ok.filter(([cx, cy]) => area(boxOf(t, cx, cy), placed, gap) === 0);
+        const at = free.length
+            ? free.reduce((best, c) => (cost(c) < cost(best) ? c : best))
+            : ok.length ? ok.reduce((best, c) => (area(boxOf(t, c[0], c[1]), placed, gap) < area(boxOf(t, best[0], best[1]), placed, gap) ? c : best)) : [x, y] as [number, number];
         placed.push(boxOf(t, at[0], at[1]));
         out.set(t.id, { cx: at[0], cy: at[1] });
     }

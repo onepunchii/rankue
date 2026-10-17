@@ -155,6 +155,30 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
         ...lats.map((lat) => { const [, y] = latLngToOutline(lat, 127); return `M${VIEW.x} ${y} H${VIEW.x + VIEW.w}`; }),
         ...lngs.map((lng) => { const [x] = latLngToOutline(36, lng); return `M${x} ${VIEW.y} V${VIEW.y + VIEW.h}`; }),
     ].join(" ");
+    // 지점의 이름 — 키울수록 더 많이(서로 너무 가까우면 건너뛴다)와 고른 곳. 꼬리표가 이 이름을 덮지 않게 먼저 셈한다
+    const spotNames = (() => {
+        const rank = (s: ChartSpot) => (s.step ? FISHING_INDEX_STEPS.indexOf(s.step) : -1);
+        const drawn = (spots ?? []).filter((s) => s.step).sort((a, b) => rank(a) - rank(b));
+        const named: ChartSpot[] = [];
+        const most = z.zoom < 1.5 ? 6 : z.zoom < 3 ? 14 : 40;
+        for (const s of [...drawn].reverse()) {
+            if ((z.zoom < 1.5 && rank(s) < 3) || named.length >= most) break;
+            const [x, y] = latLngToOutline(s.lat, s.lng);
+            if (x < v.x || x > v.x + v.w || y < v.y || y > v.y + v.h) continue;
+            if (named.every((n) => { const [nx, ny] = latLngToOutline(n.lat, n.lng); return Math.abs(nx - x) > fs * 3.2 || Math.abs(ny - y) > fs * 1.25; })) named.push(s);
+        }
+        const pickedSpot = drawn.find((s) => s.name === spot) ?? null;
+        const place = (s: ChartSpot): [number, number] => { const [x, y] = latLngToOutline(s.lat, s.lng); return x > VIEW.x + VIEW.w - 6 ? [INSET.x + 30, INSET.y + 19] : [x, y]; };
+        const short = (n: string) => n.replace(/\(.*\)$/, "").replace(/(북동|남동|북서|남서|북북서|남남동|남남서|동북동|동남동|동측|서측|남측|북측)$/, "");
+        const dotR = (st: FishingIndexStep) => (tiles.length ? Math.max(2.4, SPOT_DOT[st].r * 0.62) : SPOT_DOT[st].r);
+        // 글이 차지하는 네모(지도 칸) — 점 옆에서 시작해 글자 수만큼
+        const boxes = [...named, ...(pickedSpot ? [pickedSpot] : [])].map((s) => {
+            const [x, y] = place(s), left = x > v.x + v.w * 0.6, off = (dotR(s.step!) + 3.5) * u, w = short(s.name).length * fs;
+            const x0 = left ? x - off - w : x - (dotR(s.step!) + 1) * u;
+            return { x0, y0: y - fs * 0.7, x1: left ? x + (dotR(s.step!) + 1) * u : x + off + w, y1: y + fs * 0.6 };
+        });
+        return { drawn, named, pickedSpot, place, short, dotR, boxes };
+    })();
     // 풍랑특보 꼬리표 — 센 특보부터 놓고 겹치면 비킨다(layoutTags). 경도 · 위도 숫자도 꼬리표 밑이면 뺀다
     const TAG_H = 38, RANK: Readonly<Record<SeaState, number>> = { alert: 4, warn: 3, far: 2, pre: 1, clear: 0 };
     const tagDefs = SEA_AREAS.flatMap((def) => {
@@ -172,7 +196,12 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
         const [x, y] = latLngToOutline(zz.at[0], zz.at[1]), hw = (def.name.length * fs) / 2 + 2 * u;
         return [{ x0: x - hw, y0: y - fs * 1.05, x1: x + hw, y1: y + fs * 0.3 }];
     }) : [];
-    const tagAt = layoutTags(tagDefs.map((t) => t.box), { x0: v.x + 6 * u, y0: v.y + 22 * u, x1: v.x + v.w - 6 * u, y1: v.y + v.h - 58 * u }, 4 * u, nameBoxes);
+    // 지도 위의 단추 — 키우기 · 줄이기(오른쪽 아래 40×80) · 키웠을 때 '전국 보기'(오른쪽 위)
+    const buttonBoxes = [
+        { x0: v.x + v.w - 56 * u, y0: v.y + v.h - 96 * u, x1: v.x + v.w, y1: v.y + v.h },
+        ...(z.zoom > 1.01 ? [{ x0: v.x + v.w - 96 * u, y0: v.y, x1: v.x + v.w, y1: v.y + 46 * u }] : []),
+    ];
+    const tagAt = layoutTags(tagDefs.map((t) => t.box), { x0: v.x + 6 * u, y0: v.y + 22 * u, x1: v.x + v.w - 6 * u, y1: v.y + v.h - 58 * u }, 4 * u, [...nameBoxes, ...buttonBoxes], spotNames.boxes);
     const underTag = (x: number, y: number) => tagDefs.some((t) => { const p = tagAt.get(t.def.id); return !!p && Math.abs(x - p.cx) < t.box.w / 2 + 14 * u && Math.abs(y - p.cy) < t.box.h / 2 + 8 * u; });
     // 축척 — 화면에서 56px 이상이 되는 둥근 km
     const scaleKm = [10, 20, 50, 100].find((km) => (km * KM) / u >= 56) ?? 100;
@@ -312,21 +341,7 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
 
                 {/* 낚시지수의 점 — 나쁜 곳부터 그려 좋은 곳이 위에 온다. 픽셀이 면을, 점이 자리를 말한다 */}
                 {spots && spots.length > 0 && (() => {
-                    const rank = (s: ChartSpot) => (s.step ? FISHING_INDEX_STEPS.indexOf(s.step) : -1);
-                    const drawn = spots.filter((s) => s.step).sort((a, b) => rank(a) - rank(b));
-                    // 이름을 적는 곳 — 키울수록 더 많이(서로 너무 가까우면 건너뛴다)와 고른 곳
-                    const named: ChartSpot[] = [];
-                    const most = z.zoom < 1.5 ? 6 : z.zoom < 3 ? 14 : 40;
-                    for (const s of [...drawn].reverse()) {
-                        if ((z.zoom < 1.5 && rank(s) < 3) || named.length >= most) break;
-                        const [x, y] = latLngToOutline(s.lat, s.lng);
-                        if (x < v.x || x > v.x + v.w || y < v.y || y > v.y + v.h) continue;
-                        if (named.every((n) => { const [nx, ny] = latLngToOutline(n.lat, n.lng); return Math.abs(nx - x) > fs * 3.2 || Math.abs(ny - y) > fs * 1.25; })) named.push(s);
-                    }
-                    const pickedSpot = drawn.find((s) => s.name === spot) ?? null;
-                    const place = (s: ChartSpot): [number, number] => { const [x, y] = latLngToOutline(s.lat, s.lng); return x > VIEW.x + VIEW.w - 6 ? [INSET.x + 30, INSET.y + 19] : [x, y]; };
-                    const short = (n: string) => n.replace(/\(.*\)$/, "").replace(/(북동|남동|북서|남서|북북서|남남동|남남서|동북동|동남동|동측|서측|남측|북측)$/, "");
-                    const dotR = (st: FishingIndexStep) => (tiles.length ? Math.max(2.4, SPOT_DOT[st].r * 0.62) : SPOT_DOT[st].r);
+                    const { drawn, named, pickedSpot, place, short, dotR } = spotNames;
                     return (
                         <g data-testid="fishing-chart-spots">
                             {drawn.map((s) => {

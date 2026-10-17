@@ -144,6 +144,8 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
     // 열어 둔 어종 한 장 · 홈의 지도를 그 어종으로 돌리라는 말(누를 때마다 새 것)
     const [fishOpen, setFishOpen] = useState<string | null>(null);
     const [mapFish, setMapFish] = useState<{ name: string; n: number } | null>(null);
+    // 고른 바다 · 항구 · 물때의 바다 — 홈의 지도(특보 · 항구 보기)와 아래 '오늘의 바다'가 같이 쓴다(2026-10-17 두 지도를 한 장으로)
+    const seaPicks = useSeaPicks();
     // 도감에서 연 어종(어탁이 없는 것)
     const [guideOpen, setGuideOpen] = useState<GuideRow | null>(null);
     // 방금 오른 단계 — 승급 창
@@ -262,9 +264,9 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             { target: "fs-tank", title: "내 수족관", body: "잡은 어종이 어탁 그림 그대로 헤엄쳐요. 낮엔 한지, 해가 지면 밤바다." },
                         ]} />
                         {/* 지도 먼저 — 오늘 어느 바다에서 어떤 고기가 좋은가(2026-10-14 오너: "지도를 보면 아 오늘 물때와 물고기는 이렇구나") */}
-                        <FishMapHome today={today} list={list} want={mapFish} onFish={(name) => { const f = fishByName(name); if (f) setFishOpen(f.id); }} onAdd={(place, species) => { setPreset({ place, species }); setAdding(true); }} onOpenTrip={() => document.getElementById("fishing-today-block")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
+                        <FishMapHome today={today} list={list} picks={seaPicks} want={mapFish} onFish={(name) => { const f = fishByName(name); if (f) setFishOpen(f.id); }} onAdd={(place, species) => { setPreset({ place, species }); setAdding(true); }} onOpenTrip={() => document.getElementById("fishing-today-block")?.scrollIntoView({ behavior: "smooth", block: "start" })} />
                         {/* 나가기 전에 보는 것 — 바다의 특보 · 내 항구 · 물때(예전 출조 탭의 것) */}
-                        <div id="fishing-today-block" className="scroll-mt-16"><Today today={today} list={list} /></div>
+                        <div id="fishing-today-block" className="scroll-mt-16"><Today today={today} list={list} picks={seaPicks} /></div>
                         {/* 내 수족관 — 잡은 어종이 헤엄치는 작은 창. 누르면 수족관 */}
                         <FsSection title="내 수족관" aside={<button type="button" onClick={() => setTab("tank")} style={{ color: C.sun }}>수족관 가기</button>} testid="fishing-home-tank">
                             <div data-tour="fs-tank"><FishingAquarium fish={empty ? [] : tankFish} placed={tank?.placed} mini onOpen={() => setTab("tank")} /></div>
@@ -634,8 +636,15 @@ function nearestPort(lat: number, lng: number): { code: string; name: string; km
  * 점은 국립해양조사원의 바다낚시지수(어종 · 지점마다 매긴 다섯 단계)다 — 랭큐가 매긴 값이 아니라고 적는다. 색 띠는 기상청 풍랑특보.
  * 점을 누르면 그 자리의 오전 · 오후 · 파고 · 바람 · 수온 · 가까운 항구의 만조/간조가 지도 아래에 뜬다(다른 화면으로 가지 않는다).
  */
-function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: string; /** 내 조과 — 고른 바다 근처의 기록을 찾는다 */ list: readonly FishingCatch[]; /** 어종 한 장의 '지도에서 보기' */ want: { name: string; n: number } | null; onFish: (name: string) => void; onAdd: (place: string, species?: string) => void; onOpenTrip: () => void }) {
+/** 홈 지도의 보기 — 낚시지수(어종 · 날짜 · 바다의 칸) | 특보 · 항구(구역 고르기 · 항구 점). 두 장이던 지도를 한 장으로(2026-10-17 오너) */
+const MAP_MODE_KEY = "rankue-fishing-map-mode";
+type MapMode = "index" | "sea";
+function readMapMode(): MapMode { try { return localStorage.getItem(MAP_MODE_KEY) === "sea" ? "sea" : "index"; } catch { return "index"; } }
+
+function FishMapHome({ today, list, picks, want, onFish, onAdd, onOpenTrip }: { today: string; /** 내 조과 — 고른 바다 근처의 기록을 찾는다 */ list: readonly FishingCatch[]; /** 고른 바다 · 항구('특보 · 항구' 보기에서 고른다 — 아래 '오늘의 바다'와 한 벌) */ picks: SeaPicks; /** 어종 한 장의 '지도에서 보기' */ want: { name: string; n: number } | null; onFish: (name: string) => void; onAdd: (place: string, species?: string) => void; onOpenTrip: () => void }) {
     const [day, setDay] = useState(today);
+    const [mode, setModeState] = useState<MapMode>(readMapMode);
+    const setMode = (m: MapMode) => { setModeState(m); keep(MAP_MODE_KEY, m); };
     const { data: map } = useQuery<IndexMap | null>({ queryKey: ["/api/hiq/fishing/index-map", day], queryFn: () => apiRequest(`/api/hiq/fishing/index-map?day=${day}`), staleTime: 10 * 60_000, placeholderData: (prev) => prev });
     const { data: sea } = useQuery<SeaNow | null>({ queryKey: ["/api/hiq/fishing/sea"], staleTime: 5 * 60_000 });
     const [fishPick, setFishPick] = useState<string | null>(() => { try { return localStorage.getItem(FISH_KEY); } catch { return null; } });
@@ -643,7 +652,7 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
     // 고른 픽셀(바다의 한 칸) — 그 자리에서 가장 가까운 지점을 같이 고른다
     const [cell, setCell] = useState<{ lat: number; lng: number; km: number } | null>(null);
     const box = useRef<HTMLElement>(null);
-    useEffect(() => { if (!want) return; setFishPick(want.name); setSpot(null); setCell(null); box.current?.scrollIntoView({ block: "start" }); }, [want]);
+    useEffect(() => { if (!want) return; setFishPick(want.name); setSpot(null); setCell(null); setModeState("index"); box.current?.scrollIntoView({ block: "start" }); }, [want]);
     const fishes = map?.fishes ?? [];
     const fish = fishPick && fishes.includes(fishPick) ? fishPick : fishes[0] ?? null;
     const areas = sea?.areas ?? [];
@@ -654,14 +663,28 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
     const tide = tideOf(day, readSea());
     const days = map?.days ?? [today];
     const chip = "h-9 shrink-0 rounded-full px-3 text-[13px]";
+    // 낚시지수를 못 받았으면 특보 보기만(지도가 아예 사라지지 않게)
+    const view: MapMode = !map ? "sea" : mode;
+    const sea0 = view === "sea";
+    const warned = areas.filter((a) => a.state === "warn" || a.state === "alert").length;
     return (
         <section ref={box} className="scroll-mt-16 px-5 pt-6" data-testid="fishing-fishmap">
             <div className="mb-3 flex items-baseline justify-between gap-3">
                 <h2 className="text-[18px] font-semibold tracking-tight">{day === today ? "오늘" : `${Number(day.slice(8))}일`} 어디서 무엇이</h2>
                 {tide && <button type="button" onClick={onOpenTrip} className="shrink-0 text-[12.5px]" style={{ color: C.sun }} data-testid="fishing-fishmap-tide">{tide.name} · {TIDE_PHASE_TEXT[tide.phase]}</button>}
             </div>
+            {/* 보기 — 낚시지수 | 특보 · 항구(같은 지도 한 장) */}
+            {map && areas.length > 0 && (
+                <div className="mb-2.5 inline-flex rounded-full bg-[#FFFFFF0F] p-[3px]" role="tablist" aria-label="지도 보기" data-testid="fishing-map-mode">
+                    {([["index", "낚시지수"], ["sea", warned ? `특보 ${warned} · 항구` : "특보 · 항구"]] as const).map(([m, label]) => (
+                        <button key={m} type="button" role="tab" aria-selected={view === m} onClick={() => { setMode(m); setSpot(null); setCell(null); }} data-testid={`fishing-map-mode-${m}`}
+                            className={cn("h-8 rounded-full px-3.5 text-[13px]", view === m && "font-semibold")}
+                            style={view === m ? { background: C.foam, color: "#0F2838" } : { color: C.soft }}>{label}</button>
+                    ))}
+                </div>
+            )}
             {/* 어종 — 고르면 지도의 점이 그 어종으로 바뀐다 */}
-            {fishes.length > 0 && (
+            {!sea0 && fishes.length > 0 && (
                 <div className="-mx-5 flex gap-1.5 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="어종" data-tour="fs-fish">
                     {fishes.map((f) => (
                         <button key={f} type="button" aria-pressed={f === fish} onClick={() => { setFishPick(f); keep(FISH_KEY, f); }} data-testid="fishing-fishmap-fish"
@@ -671,7 +694,7 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
             )}
             <div className="mt-2.5 overflow-hidden rounded-2xl" style={{ background: PAPER, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
                 {/* 날짜 — 오늘부터 엿새(종이 위의 먹 단추) */}
-                {days.length > 1 && (
+                {!sea0 && days.length > 1 && (
                     <div className="flex gap-1 overflow-x-auto px-2.5 pb-1 pt-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="날짜">
                         {days.map((d, i) => {
                             const on = d === (map?.day ?? day), weekend = ["토", "일"].includes(tideWeekday(d));
@@ -681,6 +704,10 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
                     </div>
                 )}
                 <div data-tour="fs-map">
+                {sea0 ? (
+                    // 특보 · 항구 — 구역을 누르면 그 바다를 고르고, 아래 '오늘의 바다'에 그 바다의 예보 · 항구가 열린다
+                    <SeaChart areas={areas} picked={picks.area} onPick={(id) => { picks.pickArea(id); setTimeout(() => document.getElementById("fishing-sea-picked")?.scrollIntoView({ behavior: "smooth", block: "nearest" }), 60); }} ports={FISHING_PORTS} port={picks.port} />
+                ) : (
                 <SeaChart areas={areas} picked={null} onPick={() => { /* 홈의 지도에서는 구역을 고르지 않는다 — 칸이나 점을 누른다 */ }} spots={spots} spot={spot} pixels cell={cell}
                     onSpot={(n) => { setCell(null); setSpot(n === spot ? null : n); }}
                     onCell={(at) => {
@@ -691,24 +718,33 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
                         if (!best) return;
                         setSpot(best.name); setCell({ lat: at.lat, lng: at.lng, km: Math.round(bestKm) });
                     }} />
+                )}
                 </div>
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3.5 py-2.5" style={{ borderColor: "#0F28381F" }}>
-                    <span className="flex items-center gap-1 text-[12px]" style={{ color: "#0F2838B3" }} data-testid="fishing-pixel-legend">
-                        나쁨{[0, 1, 2, 3, 4].map((k) => <i key={k} aria-hidden className="h-3 w-3 rounded-[2px]" style={{ background: PIXEL_LEGEND[k] }} />)}매우좋음
-                    </span>
-                    <span className="flex items-center gap-1.5 text-[12px]" style={{ color: "#0F2838B3" }}><i aria-hidden className="h-3 w-3 rounded-[4px]" style={{ background: seaWashColor("warn"), boxShadow: `inset 0 0 0 1px ${seaWashLine("warn")}` }} />풍랑특보</span>
+                    {sea0 ? SEA_LEGEND.map((l) => (
+                        <span key={l.state} className="flex items-center gap-1.5 text-[12px]" style={{ color: "#0F2838B3" }} data-testid="fishing-sea-legend">
+                            <i aria-hidden className="h-3 w-3 rounded-[4px]" style={{ background: seaWashColor(l.state), boxShadow: `inset 0 0 0 1px ${seaWashLine(l.state)}` }} />{l.text}
+                        </span>
+                    )) : (
+                        <>
+                            <span className="flex items-center gap-1 text-[12px]" style={{ color: "#0F2838B3" }} data-testid="fishing-pixel-legend">
+                                나쁨{[0, 1, 2, 3, 4].map((k) => <i key={k} aria-hidden className="h-3 w-3 rounded-[2px]" style={{ background: PIXEL_LEGEND[k] }} />)}매우좋음
+                            </span>
+                            <span className="flex items-center gap-1.5 text-[12px]" style={{ color: "#0F2838B3" }}><i aria-hidden className="h-3 w-3 rounded-[4px]" style={{ background: seaWashColor("warn"), boxShadow: `inset 0 0 0 1px ${seaWashLine("warn")}` }} />풍랑특보</span>
+                        </>
+                    )}
                 </div>
             </div>
 
             {/* 고른 지점 — 없으면 그 어종이 좋은 곳 세 군데 */}
             {/* 고른 칸 · 점 — 아래에서 올라오는 한 장(팝업) */}
-            {picked && fish && (
+            {!sea0 && picked && fish && (
                 <SeaPopup spot={picked} fish={fish} day={map?.day ?? day} today={today} cell={cell} list={list} areas={areas}
                     onClose={() => { setSpot(null); setCell(null); }}
                     onAdd={(species) => { const place = picked.name.replace(/\(.*\)$/, ""); setSpot(null); setCell(null); onAdd(place, species); }}
                     onFish={(name) => onFish(name)} />
             )}
-            {fish && map ? (
+            {!sea0 && fish && map ? (
                     <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-3.5 pb-1 pt-3" data-testid="fishing-good">
                         <div className="flex items-baseline justify-between gap-3">
                             <p className="min-w-0 text-[13px] [word-break:keep-all]" style={{ color: C.soft }}>{good.length ? `${fish} — 좋은 곳` : `${fish} — 좋음 이상인 곳이 없어요`}<span style={{ color: C.dim }}> · 점을 눌러도 돼요</span></p>
@@ -728,7 +764,9 @@ function FishMapHome({ today, list, want, onFish, onAdd, onOpenTrip }: { today: 
                         </ul>
                     </div>
                 ) : null}
-            <p className="mt-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>점은 국립해양조사원이 어종 · 지점마다 매긴 바다낚시지수예요(물때 · 파고 · 수온 · 바람). 바다의 칸은 그 값을 거리로 섞은 어림이고 지점에서 {PIXEL_REACH_KM}km 안만 칠했어요. 랭큐가 매긴 값이 아니에요. 테두리 색은 기상청 풍랑특보예요.</p>
+            {sea0
+                ? <p className="mt-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>바다를 누르면 아래 '오늘의 바다'에 그 바다의 예보와 항구가 열려요. 점은 항구예요. 구역의 네모는 어림이에요.</p>
+                : <p className="mt-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>점은 국립해양조사원이 어종 · 지점마다 매긴 바다낚시지수예요(물때 · 파고 · 수온 · 바람). 바다의 칸은 그 값을 거리로 섞은 어림이고 지점에서 {PIXEL_REACH_KM}km 안만 칠했어요. 랭큐가 매긴 값이 아니에요. 테두리 색은 기상청 풍랑특보예요.</p>}
         </section>
     );
 }
@@ -788,11 +826,12 @@ function readArea(): string | null { try { const v = localStorage.getItem(AREA_K
 const keep = (key: string, value: string) => { try { localStorage.setItem(key, value); } catch { /* 저장을 못 해도 화면은 바뀐다 */ } };
 
 /** 날마다 먼저 보는 묶음 — 오늘의 바다(특보) + 물때. 바다를 고르면 물때도 그 바다의 식으로 센다 */
-function Today({ today, list, onOpenTrip }: { today: string; list: readonly FishingCatch[]; /** 홈 — 바다 지도와 물때 한 줄만 그리고, 그 줄을 누르면 출조 탭으로 간다 */ onOpenTrip?: () => void }) {
+/** 고른 바다 · 항구 · 물때의 바다(기기에 남긴다) — 홈의 지도와 '오늘의 바다'가 한 벌을 같이 쓴다 */
+function useSeaPicks() {
     const [sea, setSea] = useState<TideSea>(readSea);
     const [area, setArea] = useState<string | null>(readArea);
-    const pickSea = (id: TideSea) => { setSea(id); keep(SEA_KEY, id); };
     const [port, setPort] = useState<string | null>(readPort);
+    const pickSea = (id: TideSea) => { setSea(id); keep(SEA_KEY, id); };
     const pickPort = (code: string) => { setPort(code); keep(PORT_KEY, code); };
     const pickArea = (id: string) => {
         setArea(id); keep(AREA_KEY, id);
@@ -800,6 +839,12 @@ function Today({ today, list, onOpenTrip }: { today: string; list: readonly Fish
         // 바다를 바꾸면 그 바다의 첫 항구로 — 고른 항구가 이미 그 바다에 있으면 그대로 둔다
         if (fishingPort(port)?.area !== id) { const first = portsOfArea(id)[0]; if (first) pickPort(first.code); }
     };
+    return { sea, pickSea, area, pickArea, port, pickPort };
+}
+type SeaPicks = ReturnType<typeof useSeaPicks>;
+
+function Today({ today, list, onOpenTrip, picks }: { today: string; list: readonly FishingCatch[]; /** 홈 — 바다 지도와 물때 한 줄만 그리고, 그 줄을 누르면 출조 탭으로 간다 */ onOpenTrip?: () => void; picks: SeaPicks }) {
+    const { sea, pickSea, area, pickArea, port, pickPort } = picks;
     return (
         <>
             <SeaBoard area={area} onArea={pickArea} port={port} onPort={pickPort} />
@@ -836,21 +881,23 @@ function SeaBoard({ area, onArea, port, onPort }: { area: string | null; onArea:
                 <h2 className="text-[18px] font-semibold tracking-tight">오늘의 바다</h2>
                 <p className="shrink-0 text-[12.5px]" style={{ color: C.dim }} data-testid="fishing-sea-sum">{warned ? `앞바다 풍랑특보 ${warned}곳` : "앞바다 풍랑특보 없음"}</p>
             </div>
-            {/* 종이 해도 — 구역을 누르면 그 바다를 고른다(등산의 '내 산 지도'와 같은 손) */}
-            <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
-                <SeaChart areas={data.areas} picked={area} onPick={onArea} ports={FISHING_PORTS} port={port} />
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 border-t px-3.5 py-2.5" style={{ borderColor: "#0F28381F" }}>
-                    {SEA_LEGEND.map((l) => (
-                        <span key={l.state} className="flex items-center gap-1.5 text-[12px]" style={{ color: "#0F2838B3" }}>
-                            <i aria-hidden className="h-3 w-3 rounded-[4px]" style={{ background: seaWashColor(l.state), boxShadow: `inset 0 0 0 1px ${seaWashLine(l.state)}` }} />{l.text}
-                        </span>
-                    ))}
-                </div>
+            {/* 바다 고르기 — 해역 일곱 곳을 칩으로(점 색 = 특보). 지도는 위의 홈 지도 한 장('특보 · 항구')이 맡는다(2026-10-17 오너: 두 지도를 한 장으로) */}
+            <div className="-mx-5 mb-2.5 flex gap-1.5 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="바다" data-testid="fishing-sea-areas">
+                {SEA_AREAS.map((def) => {
+                    const a = by.get(def.id), on = def.id === area;
+                    return (
+                        <button key={def.id} type="button" aria-pressed={on} onClick={() => onArea(def.id)} data-testid={`fishing-sea-chip-${def.id}`}
+                            className={cn("flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px]", on && "font-semibold")}
+                            style={on ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>
+                            <i aria-hidden className="h-2 w-2 rounded-full" style={{ background: a ? SEA_TONE[a.state].dot : "#8FB3C2" }} />{def.name}
+                        </button>
+                    );
+                })}
             </div>
             {/* 고른 바다 — 그 바다의 그림 위에 한 줄 */}
-            <div className="mt-2.5 overflow-hidden rounded-2xl bg-[#FFFFFF0A]">
+            <div className="overflow-hidden rounded-2xl bg-[#FFFFFF0A]">
                 {picked && pickedDef ? (
-                    <div data-testid="fishing-sea-picked">
+                    <div id="fishing-sea-picked" data-testid="fishing-sea-picked" className="scroll-mt-20">
                         <div className="relative h-[112px] overflow-hidden">
                             <img key={pickedDef.id} src={seaCover(pickedDef.id)} alt="" width={640} height={640} decoding="async" className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 46%" }} draggable={false} />
                             <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1E2D00 0%,#0B1E2D73 55%,#0B1E2DE6 100%)" }} aria-hidden />
@@ -871,7 +918,7 @@ function SeaBoard({ area, onArea, port, onPort }: { area: string | null; onArea:
                         </div>
                     </div>
                 ) : (
-                    <p className="px-3.5 pt-3.5 text-[13px]" style={{ color: C.soft }}>지도에서 자주 가는 바다를 누르면 그 바다부터 보여요.</p>
+                    <p className="px-3.5 pt-3.5 text-[13px]" style={{ color: C.soft }}>위에서 자주 가는 바다를 고르면 그 바다부터 보여요.</p>
                 )}
                 <p className="px-3.5 pb-3.5 text-[12px] leading-relaxed" style={{ color: C.dim, paddingTop: picked ? 0 : 10 }}>구역의 네모는 어림이에요. {SEA_SOURCE}{data.issued ? ` · ${data.issued} 발표` : ""}{data.stale ? " · 받아 온 지 오래됐어요" : ""}. {SEA_CAUTION}</p>
             </div>

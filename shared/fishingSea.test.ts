@@ -107,3 +107,25 @@ describe("지도 꼬리표 늘어놓기(2026-10-17 — 남해서부가 제주 �
         expect(src).toContain("!underTag(v.x + 14 * u, y - 7 * u)");
     });
 });
+
+describe("낚시 홈 지도 한 장(2026-10-17 오너 '한 장으로 합치기')", () => {
+    it("지점 이름(soft)은 피하되, 피하려고 멀리 튀지는 않는다 · 지도 단추(hard)는 덮지 않는다", async () => {
+        const { layoutTags } = await import("./fishingSea");
+        const B = { x0: 0, y0: 0, x1: 300, y1: 400 };
+        const label = { x0: 140, y0: 190, x1: 180, y1: 205 };
+        const btn = { x0: 250, y0: 300, x1: 300, y1: 400 };
+        const m = layoutTags([{ id: "a", cx: 160, cy: 200, w: 120, h: 38, rank: 2 }, { id: "b", cx: 260, cy: 350, w: 120, h: 38, rank: 2 }], B, 4, [btn], [label]);
+        const a = m.get("a")!, b = m.get("b")!;
+        expect(Math.hypot(a.cx - 160, a.cy - 200)).toBeLessThan(80);
+        expect(b.cx + 60 <= btn.x0 || b.cy + 19 <= btn.y0 || b.cy - 19 >= btn.y1).toBe(true);
+    });
+    it("홈에는 지도가 한 장 — 보기 단추(낚시지수 | 특보 · 항구), 아래 '오늘의 바다'는 지도 없이 바다 칩 + 고른 바다", () => {
+        const src = readFileSync(resolve(__dirname, "..", "client/src/fishing/FishingPage.tsx"), "utf8");
+        expect(src).toContain('data-testid="fishing-map-mode"');
+        expect(src).toContain('data-testid="fishing-sea-areas"');
+        const board = src.slice(src.indexOf("function SeaBoard("), src.indexOf("function SeaForecast("));
+        expect(board).not.toContain("<SeaChart");
+        expect(src.match(/<SeaChart /g)!.length).toBe(2); // 한 지도 안의 두 보기
+        expect(src).toContain("const seaPicks = useSeaPicks();");
+    });
+});
