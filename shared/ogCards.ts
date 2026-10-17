@@ -18,6 +18,9 @@ export const golfCourseCardUrl = (origin: string, slug: string) => `${origin}/og
  */
 export const HIKING_CARD_VERSION = 1;
 export const hikingMountainCardUrl = (origin: string, slug: string) => `${origin}/og/hiking-mountain/${encodeURIComponent(slug)}.png?v=${HIKING_CARD_VERSION}`;
+/** 낚시터 카드(2026-10-18) — 낚시터마다 한 장(server/services/fishingSpotCard). 프리렌더 · 사이트맵 · 화면의 useSeo 가 이 주소 하나를 쓴다. 그림을 바꾸면 버전을 올린다 */
+export const FISHING_CARD_VERSION = 1;
+export const fishingSpotCardUrl = (origin: string, id: string) => `${origin}/og/fishing-spot/${encodeURIComponent(id)}.png?v=${FISHING_CARD_VERSION}`;
 /** 당구장 카드 — 매장 코드는 영숫자 */
 export const storeCardUrl = (origin: string, code: string) => `${origin}/og/store/${encodeURIComponent(code)}.png?v=${CARD_VERSION}`;
 

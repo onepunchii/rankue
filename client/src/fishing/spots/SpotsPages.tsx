@@ -27,6 +27,7 @@ import {
     speciesKey, spotsHubSeo, spotsRegionSeo, spotsTypeSeo, type PlaceKindId, type PublicPlace,
 } from "@shared/fishingPlaces";
 import { art, PAPER, INK } from "../ink";
+import { fishingSpotCardUrl } from "@shared/ogCards";
 import { spreadBalls } from "@shared/storeDots";
 import { useRegs } from "../Guide";
 
@@ -214,7 +215,7 @@ export function SpotPage({ id }: { id: string }) {
     const { data: all } = useSpots();
     const p = data?.place ?? null;
     const seo = p ? placeSeo(p) : null;
-    useSeo(seo && p ? { title: seo.title, description: seo.description, path: fishingSpotPath(p.id), locale: "ko", image: "https://www.rankue.co.kr/og.png" } : null);
+    useSeo(seo && p ? { title: seo.title, description: seo.description, path: fishingSpotPath(p.id), locale: "ko", image: fishingSpotCardUrl("https://www.rankue.co.kr", p.id) } : null);
     if (isLoading) return <Shell title="낚시터"><div className="h-[60vh] animate-pulse" aria-busy="true" /></Shell>;
     if (!p || isError) return <Shell title="낚시터"><p className="px-5 py-16 text-center text-[15px]" style={{ color: C.soft }}>낚시터를 찾을 수 없어요.</p></Shell>;
     const k = placeKind(p.kind), fee = placeFeeText(p.fee), where = placeWhere(p);

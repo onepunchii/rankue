@@ -12,6 +12,7 @@
  * ⚠️ 서버가 부른다 — 상대 임포트는 ./x.js.
  */
 import { fishingSidoShort, type FishingPlace } from "./fishing.js";
+import { fishByName } from "./fishingFish.js";
 
 export const FISHING_SPOTS_PATH = "/fishing/spots";
 export const FISHING_SPOTS_LABEL = "전국 낚시터";
@@ -48,7 +49,8 @@ export const placeWhere = (p: Pick<FishingPlace, "sido" | "sigungu">) => [fishin
 export function placeFeeText(fee: string | null | undefined): string | null {
     const v = String(fee ?? "").trim();
     if (!v || v === "0" || v === "-") return null;
-    return /^\d{3,7}$/.test(v) ? `${Number(v).toLocaleString("ko-KR")}원` : v;
+    // 숫자만이면 원을 붙이고, 글 속의 네 자리 넘는 숫자는 쉼표만 찍는다("1일 10000원" → "1일 10,000원" — 뜻은 그대로)
+    return /^\d{3,7}$/.test(v) ? `${Number(v).toLocaleString("ko-KR")}원` : v.replace(/\d{4,7}/g, (d) => Number(d).toLocaleString("ko-KR"));
 }
 
 /** 어종 이름 다듬기 — 묶음 이름("돔류" · "볼락류")은 '류'를 떼어 우리 어종 · 도감 · 금어기를 찾는 데 쓴다(화면에는 받은 이름 그대로) */
@@ -109,3 +111,17 @@ export function placeCounts(all: readonly PublicPlace[]) {
     const sort = <K,>(m: Map<K, number>) => [...m].sort((a, b) => b[1] - a[1]);
     return { sido: sort(bySido), kind: sort(byKind), species: sort(bySpecies) };
 }
+
+/** 낚시터 카드에 싣는 글 · 그림(server/services/fishingSpotCard) — 받은 칸만. 어탁은 대상 어종 가운데 우리 어탁이 있는 첫 어종 */
+export function fishingSpotCardInput(p: PublicPlace): { name: string; place: string; detail: string; kind: string; fish: string | null } {
+    const k = placeKind(p.kind), fee = placeFeeText(p.fee);
+    const fish = p.species.map((n) => fishByName(speciesKey(n)) ?? fishByName(n)).find(Boolean) ?? null;
+    return {
+        name: p.name,
+        place: [placeWhere(p), k.label].filter(Boolean).join(" · "),
+        detail: [p.species.slice(0, 3).join(" · "), fee && fee.length <= 16 ? fee : null].filter(Boolean).join(" · "),
+        kind: k.id,
+        fish: fish?.id ?? null,
+    };
+}
+

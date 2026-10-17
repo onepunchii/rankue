@@ -9,6 +9,8 @@ import {
     placeSeo, placeWhere, spotsHubSeo, spotsRegionSeo, spotsTypeSeo, type PublicPlace,
 } from "../../shared/fishingPlaces.js";
 
+import { fishingSpotCardUrl } from "../../shared/ogCards.js";
+
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FishingRender { status: 200; tag: string; html: string }
 /** 낚시터의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
@@ -106,7 +108,10 @@ ${same.length && !near.length ? `  <section>\n    <h2>${esc(placeWhere(pl))}의 
 ${source()}${pl.dataDate ? `\n  <p>${esc(pl.dataDate)} 기준 자료</p>` : ""}
 </main>`;
         const ld: Record<string, unknown> = { "@context": "https://schema.org", "@type": "Place", name: pl.name, url: `${ORIGIN}${fishingSpotPath(pl.id)}`, ...(pl.address ? { address: { "@type": "PostalAddress", streetAddress: pl.address, addressRegion: pl.sido ?? undefined, addressLocality: pl.sigungu ?? undefined, addressCountry: "KR" } } : {}), ...(pl.lat != null && pl.lng != null ? { geo: { "@type": "GeoCoordinates", latitude: pl.lat, longitude: pl.lng } } : {}), ...(pl.tel ? { telephone: pl.tel } : {}) };
-        return { status: 200, tag: `fishing:spot:${pl.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${fishingSpotPath(pl.id)}`, body, jsonLd: [ld, crumbs([`${sido} 낚시터`, fishingRegionPath(sido)], [pl.name, fishingSpotPath(pl.id)])] }) };
+        // 낚시터 카드 — 머리의 og:image 와 본문 제목 밑 그림이 같은 한 장(산 · 골프장의 검색용 화면과 같은 꼴)
+        const card = { url: fishingSpotCardUrl(ORIGIN, pl.id), width: 1200, height: 1200, alt: `${pl.name} — ${placeWhere(pl)} ${k.label}` };
+        const withCard = body.replace("</h1>", `</h1>\n  <img src="${esc(card.url)}" width="1200" height="1200" alt="${esc(card.alt)}" loading="eager">`);
+        return { status: 200, tag: `fishing:spot:${pl.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${fishingSpotPath(pl.id)}`, body: withCard, image: card, jsonLd: [{ ...ld, image: card.url }, crumbs([`${sido} 낚시터`, fishingRegionPath(sido)], [pl.name, fishingSpotPath(pl.id)])] }) };
     }
     return null;
 }
@@ -119,6 +124,6 @@ export function fishingSitemapParts(all: readonly PublicPlace[], updated: string
         at(FISHING_SPOTS_PATH, "weekly", "0.8"),
         ...PLACE_KINDS.filter((k) => c.kind.some(([id]) => id === k.id)).map((k) => at(fishingTypePath(k.id), "weekly", "0.6")),
         ...c.sido.map(([s]) => at(fishingRegionPath(s), "weekly", "0.6")),
-        ...all.map((p) => at(fishingSpotPath(p.id), "monthly", p.species.length ? "0.5" : "0.4")),
+        ...all.map((p) => entry(`${ORIGIN}${fishingSpotPath(p.id)}`, { changefreq: "monthly", priority: p.species.length ? "0.5" : "0.4", lastmod: updated, image: fishingSpotCardUrl(ORIGIN, p.id) })),
     ];
 }

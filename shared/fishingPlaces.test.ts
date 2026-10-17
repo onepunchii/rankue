@@ -18,6 +18,7 @@ describe("전국 낚시터 공개 페이지(2026-10-18)", () => {
         expect(placeFeeText("30000")).toBe("30,000원");
         expect(placeFeeText("주간기준 25,000원/인당")).toBe("주간기준 25,000원/인당");
         expect(placeFeeText("0")).toBeNull();
+        expect(placeFeeText("1일 10000원")).toBe("1일 10,000원");
         expect(speciesKey("볼락류")).toBe("볼락");
         expect(sigunguShort("고양시덕양구")).toBe("고양");
         expect(sigunguShort("북구")).toBe("북구");
