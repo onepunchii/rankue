@@ -118,7 +118,8 @@ export default function CueCasePage() {
     const owned = (list: readonly CaseItem[]) => list.filter((x) => it(x.id).done).length;
     const hero = d?.hero ? caseItem(d.hero) : null;
     const name = d?.member.name ?? "";
-    const plate = d && !d.member.mine ? t("case.ownerTitle").replace("{name}", name) : t("case.mine");
+    // 이름을 못 받았으면 "님의 큐 케이스"로 비지 않게 — 내 것으로 적는다(2026-10-17 리뷰)
+    const plate = d && !d.member.mine && name.trim() ? t("case.ownerTitle").replace("{name}", name) : t("case.mine");
     const month = Number((d?.month.key ?? "").slice(5)) || null;
     const monthGlove = month ? GLOVES.find((g) => g.rule.k === "glove" && g.rule.m === month) ?? null : null;
 

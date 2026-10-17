@@ -92,3 +92,16 @@ describe("매장 상세 '이 근처' 당구대", () => {
         expect(read("server/routes/modules/listings.ts")).toContain("...(nearby ? { lat: storeListings.latitude, lng: storeListings.longitude } : {}),");
     });
 });
+
+describe("없는 주소 · 큐 케이스 명판(2026-10-17 리뷰)", () => {
+    it("404 는 개발 틀의 영어 문구가 아니라 다섯 언어 안내 + 홈 / 뒤로", () => {
+        const nf = read("client/src/pages/not-found.tsx");
+        expect(nf).not.toContain("Did you forget to add the page to the router?");
+        expect(nf).toContain('t("notFound.title")');
+        for (const lc of ["ko", "en", "es", "vi", "tr"]) {
+            const s = read(`client/src/lib/i18n/${lc}.ts`);
+            for (const k of ["notFound.title", "notFound.desc", "notFound.home", "notFound.back"]) expect(s, `${lc} ${k}`).toContain(`"${k}": "`);
+        }
+        expect(read("client/src/pages/hiq/cue-case.tsx")).toContain('!d.member.mine && name.trim() ? t("case.ownerTitle")');
+    });
+});

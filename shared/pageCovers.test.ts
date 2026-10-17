@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
-import { ALL_COVERS, PBA_COVER, STORES_COVER, STORE_COVERS, STORE_THRONE, coverSrc, golferCover, storeCover, umbCover } from "./pageCovers";
+import { ALL_COVERS, PBA_COVER, STORES_COVER, STORE_COVERS, STORE_THRONE, NOT_FOUND_ART, coverSrc, golferCover, storeCover, umbCover } from "./pageCovers";
 import { HUB_CARD_NAMES, HUB_CARD_SIZE, HUB_CARD_VERSION, HUB_STAMP_BOOKS, hubCard, hubCardName } from "./ogCards";
 import { STAMP_BOOKS } from "./golfStampBooks";
 import { GOLF_TOURS } from "./golfTours";
@@ -19,9 +19,11 @@ const pub = (p: string) => resolve(root, "client/public", p.replace(/^\//, ""));
 describe("표지 그림", () => {
     it("쓰는 그림이 다 있고 가볍다 — 폴더에 남는 파일이 없다", () => {
         const files = readdirSync(pub("/covers")).filter((f) => !f.startsWith(".")).sort();
-        // 표지 12장 + 매장 '명예의 전당'의 빈 왕관 한 장
-        expect(files).toEqual([...ALL_COVERS, "store-throne"].map((n) => `${n}.webp`).sort());
+        // 표지 12장 + 매장 '명예의 전당'의 빈 왕관 한 장 + 없는 주소(404)의 이정표 한 장
+        expect(files).toEqual([...ALL_COVERS, "store-throne", "not-found"].map((n) => `${n}.webp`).sort());
         expect(STORE_THRONE).toBe("/covers/store-throne.webp");
+        expect(NOT_FOUND_ART).toBe("/covers/not-found.webp");
+        expect(statSync(pub(NOT_FOUND_ART)).size).toBeLessThan(100_000);
         for (const n of ALL_COVERS) expect(statSync(pub(coverSrc(n))).size, n).toBeLessThan(100_000);
         expect(ALL_COVERS).toHaveLength(12);
     });

@@ -46,6 +46,8 @@ export function storeCover(code: string | null | undefined): string {
  * 아직 초대 대장이 없는 매장에서 의자 이모지 대신 놓는다.
  */
 export const STORE_THRONE = coverSrc("store-throne");
+/** 없는 주소(404) — 갈림길의 빈 이정표(2026-10-17, 그림 속 글자 없음). 종목을 가리지 않는 판화 */
+export const NOT_FOUND_ART = coverSrc("not-found");
 
 /** 쓰는 그림 전부 — 파일이 다 있는지 시험이 본다 */
 export const ALL_COVERS: readonly string[] = [...Object.values(UMB), "pba", ...Object.values(GOLF), ...STORE_COVERS];
