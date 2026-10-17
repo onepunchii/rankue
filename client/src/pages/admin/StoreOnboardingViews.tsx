@@ -339,11 +339,13 @@ export function LeadsView() {
                         <Pill tone={l.status === "NEW" ? "alert" : l.status === "REGISTERED" ? "brand" : "neutral"}>{LEAD_STATUS_LABEL[l.status] ?? l.status}</Pill>
                         <span className="ml-auto text-[12px] text-black/40 tabular-nums" title={kstDateTime(l.createdAt)}>{agoLabel(l.createdAt)}</span>
                     </div>
-                    <h3 className="text-[16px] font-bold">{l.ownerName} <span className="text-[13px] font-medium text-black/50">사장님</span></h3>
+                    {/* 매장 페이지의 '연락처만 남기기'(2026-10-18)는 이름이 없을 수 있고, 매장은 코드로 남는다(regionDetail '매장 코드 …') */}
+                    <h3 className="text-[16px] font-bold">{l.ownerName || l.storeName || "이름 안 남김"} <span className="text-[13px] font-medium text-black/50">{l.ownerName ? "사장님" : "매장 · 연락처만 남김"}</span></h3>
                     <p className="text-[13px] text-black/60 tabular-nums">{l.phoneNumber}</p>
                     <p className="text-[12.5px] text-black/45">{[l.region, l.regionDetail, l.storeName, l.businessNumber && `사업자 ${l.businessNumber}`].filter(Boolean).join(" · ") || "매장 정보 없음"}</p>
                     <div className="mt-3 flex gap-2 flex-wrap">
                         <CallButton phone={l.phoneNumber} />
+                        {(() => { const m = /^매장 코드 ([A-Za-z0-9_-]+)$/.exec(l.regionDetail ?? ""); return m ? <a href={`/stores/${encodeURIComponent(m[1])}`} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-lg border border-black/10 px-3 text-[13px] font-bold text-black/65">매장 페이지</a> : null; })()}
                         <div className="ml-auto flex gap-1.5">
                             {l.status !== "CONTACTED" && <Button data-admin-write size="sm" variant="outline" className="h-9" disabled={update.isPending} onClick={() => update.mutate({ id: l.id, status: "CONTACTED" })}>연락함</Button>}
                             {l.status !== "REGISTERED" && <Button data-admin-write size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={update.isPending} onClick={() => update.mutate({ id: l.id, status: "REGISTERED" })}>등록 완료</Button>}

@@ -52,6 +52,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "폐업·이전·영업시간 변경 등 다른 정보를 알려주세요.",
     suggestMsg: "수정할 내용", suggestContact: "회신 연락처 (선택)",
     suggestSubmit: "보내기", suggestDone: "제보 감사합니다! 확인 후 반영하겠습니다.",
+    guestTitle: "사장님이신가요?", guestDesc: "두 가지 중 편한 쪽으로 하세요.", guestAccount: "랭큐 계정으로 신청하기", guestAccountSub: "승인되면 그 계정에서 영업시간 · 요금 · 소개를 바로 고쳐요", guestOr: "또는", guestPhoneTitle: "연락처만 남기기", guestPhoneSub: "확인 전화를 드려요. 가입은 통화 뒤에 해도 돼요.", guestName: "성함 (선택)", guestSubmit: "연락처 남기기", guestDone: "받았어요. 확인 전화를 드릴게요!",
     notFound: "매장을 찾을 수 없습니다", loading: "불러오는 중...", error: "문제가 발생했습니다",
     callCta: "전화", directionsCta: "길찾기", shareCta: "공유", shareCopied: "링크를 복사했어요",
     close: "닫기",
@@ -78,6 +79,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "Closed, moved, or different hours? Let us know.",
     suggestMsg: "What should change", suggestContact: "Reply contact (optional)",
     suggestSubmit: "Send", suggestDone: "Thanks! We'll review and update.",
+    guestTitle: "Own this venue?", guestDesc: "Pick whichever is easier.", guestAccount: "Claim with a RANKUE account", guestAccountSub: "Once approved, edit hours, rates and the intro from that account", guestOr: "or", guestPhoneTitle: "Just leave a number", guestPhoneSub: "We'll call to confirm. You can sign up after the call.", guestName: "Name (optional)", guestSubmit: "Leave my number", guestDone: "Got it. We'll call you to confirm!",
     notFound: "Venue not found", loading: "Loading...", error: "Something went wrong",
     callCta: "Call", directionsCta: "Directions", shareCta: "Share", shareCopied: "Link copied",
     close: "Close",
@@ -104,6 +106,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "Đóng cửa, chuyển địa điểm hay đổi giờ? Hãy cho chúng tôi biết.",
     suggestMsg: "Nội dung cần sửa", suggestContact: "Liên hệ phản hồi (tùy chọn)",
     suggestSubmit: "Gửi", suggestDone: "Cảm ơn! Chúng tôi sẽ kiểm tra và cập nhật.",
+    guestTitle: "Bạn là chủ quán?", guestDesc: "Chọn cách nào tiện hơn.", guestAccount: "Gửi yêu cầu bằng tài khoản RANKUE", guestAccountSub: "Sau khi duyệt, sửa giờ mở cửa, giá và giới thiệu ngay trong tài khoản đó", guestOr: "hoặc", guestPhoneTitle: "Chỉ để lại số điện thoại", guestPhoneSub: "Chúng tôi sẽ gọi để xác nhận. Có thể đăng ký sau cuộc gọi.", guestName: "Họ tên (tùy chọn)", guestSubmit: "Để lại số", guestDone: "Đã nhận. Chúng tôi sẽ gọi để xác nhận!",
     notFound: "Không tìm thấy quán", loading: "Đang tải...", error: "Đã xảy ra lỗi",
     callCta: "Gọi", directionsCta: "Chỉ đường", shareCta: "Chia sẻ", shareCopied: "Đã sao chép liên kết",
     close: "Đóng",
@@ -130,6 +133,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "Kapandı, taşındı veya saatler mi değişti? Bize bildirin.",
     suggestMsg: "Değişmesi gereken", suggestContact: "Yanıt için iletişim (isteğe bağlı)",
     suggestSubmit: "Gönder", suggestDone: "Teşekkürler! İnceleyip güncelleyeceğiz.",
+    guestTitle: "Bu salon sizin mi?", guestDesc: "Hangisi kolaysa onu seçin.", guestAccount: "RANKUE hesabıyla başvur", guestAccountSub: "Onaylanınca saatleri, ücretleri ve tanıtımı o hesaptan düzenlersiniz", guestOr: "ya da", guestPhoneTitle: "Sadece numara bırakın", guestPhoneSub: "Onay için sizi arayacağız. Kaydı aramadan sonra yapabilirsiniz.", guestName: "Ad (isteğe bağlı)", guestSubmit: "Numaramı bırak", guestDone: "Aldık. Onay için sizi arayacağız!",
     notFound: "Salon bulunamadı", loading: "Yükleniyor...", error: "Bir sorun oluştu",
     callCta: "Ara", directionsCta: "Yol tarifi", shareCta: "Paylaş", shareCopied: "Bağlantı kopyalandı",
     close: "Kapat",
@@ -156,6 +160,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "¿Cerró, se mudó o cambió el horario? Cuéntanos.",
     suggestMsg: "Qué debería cambiar", suggestContact: "Contacto de respuesta (opcional)",
     suggestSubmit: "Enviar", suggestDone: "¡Gracias! Lo revisaremos.",
+    guestTitle: "¿Eres el dueño?", guestDesc: "Elige lo que te resulte más fácil.", guestAccount: "Solicitar con una cuenta RANKUE", guestAccountSub: "Al aprobarse, edita horario, tarifas y presentación desde esa cuenta", guestOr: "o", guestPhoneTitle: "Solo deja tu número", guestPhoneSub: "Te llamaremos para confirmar. Puedes registrarte después de la llamada.", guestName: "Nombre (opcional)", guestSubmit: "Dejar mi número", guestDone: "Recibido. ¡Te llamaremos para confirmar!",
     notFound: "Local no encontrado", loading: "Cargando...", error: "Algo salió mal",
     callCta: "Llamar", directionsCta: "Cómo llegar", shareCta: "Compartir", shareCopied: "Enlace copiado",
     close: "Cerrar",
@@ -187,10 +192,14 @@ export default function StoreListingPage() {
   // 답의 모양이 어긋나도(목록이 아닌 값) 화면이 죽지 않게 — 그때는 신청이 없는 것으로 본다(흰 화면의 흔한 원인이다)
   const myClaim = (Array.isArray(myApps?.applications) ? myApps.applications : []).find((a) => a.kind === "claim" && a.listingCode === code);
   /** 신청 창을 연다 — 비로그인은 가입·로그인 팝업부터. 로그인이 끝나면 이 주소에 ?claim=1 이 붙어 돌아와 창이 이어서 열린다 */
+  // 비로그인은 고르는 창부터(2026-10-18 사장님 모집 2번 — 9명이 눌렀는데 신청은 1건: 거의 모두 비회원이라 가입 팝업에서 멈췄다).
+  //   ① 계정으로 신청(10/7 결정 그대로 — 승인 · 권한은 계정으로만) ② 연락처만 남기기(입점 문의 접수함 partner_leads — 운영자가 확인 전화)
+  const [guestOpen, setGuestOpen] = useState(false);
   const openClaim = () => {
-    if (isGuest) { goLogin(setLocation, `${window.location.pathname}?claim=1`); return; }
+    if (isGuest) { setGuestOpen(true); return; }
     setClaimOpen(true);
   };
+  const claimWithAccount = () => { setGuestOpen(false); goLogin(setLocation, `${window.location.pathname}?claim=1`); };
   // 질의(?claim=1)만 바뀌어도 다시 본다 — 팝업 로그인은 화면을 옮기지 않고 주소에 표시만 붙인다
   const search = useSearch();
   useEffect(() => {
@@ -209,6 +218,14 @@ export default function StoreListingPage() {
     const phone = typeof member.phone === "string" && /^0\d{9,10}$/.test(member.phone) ? member.phone : "";
     setCPhone((v) => v || phone);
   }, [claimOpen, member]);
+  const [gPhone, setGPhone] = useState("");
+  const [gName, setGName] = useState("");
+  const guestPhoneOk = /^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(gPhone.replace(/\s/g, ""));
+  const leadMutation = useMutation({
+    mutationFn: async () => apiRequest("/api/hiq/partner/inquiry", { method: "POST", body: { listingCode: code, phoneNumber: gPhone.trim(), ownerName: gName.trim() } }),
+    onSuccess: () => { toast({ title: t.guestDone }); setGuestOpen(false); setGPhone(""); setGName(""); },
+    onError: (e: any) => toast({ title: e?.message || t.error, variant: "destructive" }),
+  });
   const [cName, setCName] = useState("");
   const [cPhone, setCPhone] = useState("");
   const [cMsg, setCMsg] = useState("");
@@ -535,6 +552,31 @@ export default function StoreListingPage() {
             </button>
           </>
         )}
+
+        {/* 비로그인 사장님 — 계정으로 신청하거나, 연락처만 남기거나 */}
+        <Dialog open={guestOpen} onOpenChange={setGuestOpen}>
+          <DialogContent className="bg-white text-ink-1 max-w-md w-[92%] rounded-[28px] p-6" data-testid="claim-guest">
+            <DialogTitle className="text-[19px] font-bold">{t.guestTitle}</DialogTitle>
+            <DialogDescription className="text-[12.5px] font-medium text-black/55">{t.guestDesc}</DialogDescription>
+            <button type="button" onClick={claimWithAccount} className="mt-2 w-full rounded-2xl bg-brand px-4 py-3.5 text-left text-white active:scale-[0.99] transition-transform" data-testid="claim-guest-account">
+              <span className="block text-[15px] font-bold">{t.guestAccount}</span>
+              <span className="mt-0.5 block text-[12.5px] font-medium text-white/80 break-keep">{t.guestAccountSub}</span>
+            </button>
+            <div className="my-1 flex items-center gap-3 text-[12px] font-semibold text-black/35"><i className="h-px flex-1 bg-black/10" aria-hidden />{t.guestOr}<i className="h-px flex-1 bg-black/10" aria-hidden /></div>
+            <div className="rounded-2xl bg-black/[0.03] p-4">
+              <p className="text-[15px] font-bold">{t.guestPhoneTitle}</p>
+              <p className="mt-0.5 text-[12.5px] font-medium text-black/55 break-keep">{t.guestPhoneSub}</p>
+              <div className="mt-3 flex flex-col gap-2">
+                <input value={gPhone} onChange={e => setGPhone(e.target.value)} maxLength={20} placeholder={t.claimPhone} inputMode="tel" autoComplete="tel"
+                  className="h-12 px-4 rounded-2xl bg-white text-[14.5px] font-medium outline-none ring-1 ring-black/10 focus:ring-brand/40" data-testid="claim-guest-phone" />
+                <input value={gName} onChange={e => setGName(e.target.value)} maxLength={30} placeholder={t.guestName} autoComplete="name"
+                  className="h-12 px-4 rounded-2xl bg-white text-[14.5px] font-medium outline-none ring-1 ring-black/10 focus:ring-brand/40" />
+                <button type="button" disabled={!guestPhoneOk || leadMutation.isPending} onClick={() => leadMutation.mutate()}
+                  className="h-12 rounded-full bg-ink-1 text-white text-[15px] font-bold disabled:opacity-40" data-testid="claim-guest-submit">{t.guestSubmit}</button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* 클레임 신청 */}
         <Dialog open={claimOpen} onOpenChange={setClaimOpen}>

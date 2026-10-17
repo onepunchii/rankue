@@ -340,9 +340,18 @@ describe("파트너(사장님) 신청 — 화면은 랭큐 계정으로 신청�
     const reg = code(client("pages/store-register.tsx"));
     const entry = code(client("pages/partner/login.tsx"));
 
-    it("매장 페이지: 비로그인이 '사장님이신가요?'를 누르면 로그인(팝업)부터 — 끝나면 신청 창이 이어서 열린다", () => {
-        const open = listing.slice(listing.indexOf("const openClaim = () => {"), listing.indexOf("const search = useSearch();"));
-        expect(open).toContain("if (isGuest) { goLogin(setLocation, `${window.location.pathname}?claim=1`); return; }");
+    it("매장 페이지: 비로그인이 '사장님이신가요?'를 누르면 고르는 창 — 계정으로 신청은 로그인(팝업)부터, 끝나면 신청 창이 이어서 열린다", () => {
+        const open = listing.slice(listing.indexOf("const [guestOpen, setGuestOpen]"), listing.indexOf("const search = useSearch();"));
+        // 10/18 사장님 모집 2번: 비로그인은 고르는 창부터(계정으로 신청 | 연락처만 남기기). 승인 · 권한은 그대로 계정으로만
+        expect(open).toContain("if (isGuest) { setGuestOpen(true); return; }");
+        expect(open).toContain("const claimWithAccount = () => { setGuestOpen(false); goLogin(setLocation, `${window.location.pathname}?claim=1`); };");
+        // 연락처만 남기기 = 입점 문의 접수함(로그인 없음 · 매장은 코드로 서버가 찾는다 · 권한은 생기지 않는다)
+        expect(listing).toContain('apiRequest("/api/hiq/partner/inquiry", { method: "POST", body: { listingCode: code, phoneNumber: gPhone.trim(), ownerName: gName.trim() } })');
+        const inq = readFileSync(resolve(__dirname, "../server/routes/modules/partner.ts"), "utf8");
+        const body = inq.slice(inq.indexOf('router.post("/inquiry"'), inq.indexOf('router.post("/subscription"'));
+        expect(body).toContain("storeName: l.name");
+        expect(body).toContain('if (l.claimed) return sendError(res, 409');
+        expect(body).not.toMatch(/setCookie|res\.cookie|issueOwnership|profiles/);
         expect(listing).toContain("onClick={openClaim}");
         expect(listing).not.toContain("onClick={() => setClaimOpen(true)}");
         // ?claim=1 은 로그인한 뒤에만 읽고, 주소에서 지운다

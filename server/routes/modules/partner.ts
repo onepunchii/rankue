@@ -6,6 +6,9 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { hasSocialLogin, isAdminRole } from "../../lib/adminRole.js";
 import { applicantOf, toMyApplications } from "../../lib/partnerApply.js";
+import { and, eq } from "drizzle-orm";
+import { db } from "../../db.js";
+import { partnerLeads, storeListings } from "../../../shared/schema.js";
 
 const router = Router();
 
@@ -213,7 +216,23 @@ router.post("/inquiry", asyncHandler(async (req: any, res: any) => {
     if (isSubmitLimited(req.ip || "?")) return sendError(res, 429, "잠시 후 다시 시도해주세요");
     const ownerName = String(req.body?.ownerName || "").trim().slice(0, 30);
     const phoneNumber = String(req.body?.phoneNumber || "").trim().slice(0, 20);
-    if (!ownerName || !/^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(phoneNumber.replace(/\s/g, ""))) {
+    const phoneOk = /^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(phoneNumber.replace(/\s/g, ""));
+    // 매장 페이지의 '연락처만 남기기'(2026-10-18 사장님 모집 2번) — 로그인 없이 번호 하나. 매장은 코드로 우리 표에서 찾아 적는다(보낸 글자를 믿지 않는다).
+    // 승인 · 권한은 그대로 계정으로만(10/7 결정) — 이것은 운영자가 확인 전화를 드릴 접수함일 뿐이다.
+    const listingCode = String(req.body?.listingCode || "").trim();
+    if (listingCode) {
+        if (!/^[A-Za-z0-9_-]{1,20}$/.test(listingCode) || !phoneOk) return sendError(res, 400, "올바른 연락처를 입력해주세요");
+        const [l] = await db.select({ code: storeListings.code, name: storeListings.name, region: storeListings.region, claimed: storeListings.claimed }).from(storeListings).where(eq(storeListings.code, listingCode));
+        if (!l) return sendError(res, 404, "매장을 찾을 수 없습니다");
+        if (l.claimed) return sendError(res, 409, "이미 사장님 인증이 완료된 매장입니다");
+        const regionDetail = `매장 코드 ${l.code}`;
+        // 같은 번호로 같은 매장을 또 남기면 한 줄만(두 번 눌러도 운영자 목록이 늘지 않게)
+        const [dup] = await db.select({ id: partnerLeads.id }).from(partnerLeads)
+            .where(and(eq(partnerLeads.phoneNumber, phoneNumber), eq(partnerLeads.regionDetail, regionDetail), eq(partnerLeads.status, "NEW"))).limit(1);
+        if (!dup) await storage.createPartnerLead({ ownerName, phoneNumber, storeName: l.name, region: l.region ?? null, regionDetail, businessNumber: null, businessLicenseFile: null });
+        return sendSuccess(res, { success: true });
+    }
+    if (!ownerName || !phoneOk) {
         return sendError(res, 400, "성함과 올바른 연락처를 입력해주세요");
     }
     await storage.createPartnerLead({
