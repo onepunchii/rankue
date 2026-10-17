@@ -29,6 +29,7 @@ import SuggestionsView, { type Suggestion, SUGGESTIONS_KEY } from "./Suggestions
 import NoticesView from "./NoticesView";
 import SearchTrendView from "./SearchTrendView";
 import VisitorsView from "./VisitorsView";
+import StoreDemandView from "./StoreDemandView";
 import AdminActionsView from "./AdminActionsView";
 import BilliardsGamesView from "./BilliardsGamesView";
 import BilliardsInvitesView from "./BilliardsInvitesView";
@@ -72,11 +73,11 @@ type GlobalStats = {
     newUsersToday?: number;
 };
 
-type Tab = "dashboard" | "today" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
+type Tab = "dashboard" | "today" | "store-demand" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
     | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "golf-pars" | "golf-awards" | "golf-actions" | "golf-feeds" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-overview" | "hiking-summits" | "hiking-mountains" | "hiking-photos" | "fishing-catches" | "fishing-rank" | "fishing-feeds" | "fishing-decor";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-pars", "golf-awards", "golf-actions", "golf-feeds", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos", "fishing-catches", "fishing-rank", "fishing-feeds", "fishing-decor"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "store-demand", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-pars", "golf-awards", "golf-actions", "golf-feeds", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos", "fishing-catches", "fishing-rank", "fishing-feeds", "fishing-decor"] as const;
 
 // --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
 // 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
@@ -96,6 +97,8 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
         { id: "moderation", label: "신고/제재", icon: LucideShieldAlert },
     ] },
     { title: "매장", items: [
+        // 손님이 찾는 매장(2026-10-18 오너: 사장님 모집) — 매장 페이지를 본 사람 · 길찾기 · 전화 + 사장님께 보여 드릴 리포트 카드
+        { id: "store-demand", label: "손님이 찾는 매장", icon: LucideTrendingUp },
         { id: "claims", label: "매장 클레임", icon: LucideStore },
         { id: "registrations", label: "신규 매장 등록", icon: LucideUserPlus },
         { id: "leads", label: "입점 문의", icon: LucidePhone },
@@ -473,6 +476,7 @@ export default function AdminDashboard() {
                     {tab === "push" && <PushView />}
                     {tab === "suggestions" && <SuggestionsView />}
                     {tab === "moderation" && <ModerationView />}
+                    {tab === "store-demand" && <StoreDemandView />}
                     {tab === "claims" && <ClaimsView />}
                     {tab === "registrations" && <RegistrationsView />}
                     {tab === "leads" && <LeadsView />}
@@ -556,6 +560,7 @@ function getTabTitle(tab: string) {
         case "golf-actions": return "골프 작업 기록";
         case "golf-feeds": return "외부 수집";
         case "online-game": return "온라인게임 이용 현황";
+        case "store-demand": return "손님이 찾는 매장";
         case "claims": return "매장 클레임";
         case "registrations": return "신규 매장 등록";
         case "crews": return "크루 현황";

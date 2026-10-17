@@ -14,6 +14,7 @@ import adminFishingRouter from "./adminFishing.js";
 import { cleanRejectReason } from "../../lib/partnerApply.js";
 import adminGolfRouter from "./adminGolf/index.js";
 import adminVisitorsRouter from "./adminVisitors.js";
+import adminStoreDemandRouter from "./adminStoreDemand.js";
 import { getMemberGolfForAdmin, setBookingManagerRole, setSubAdminRole } from "../../storage/adminMemberGolf.js";
 import { getMemberSportsForAdmin } from "../../storage/adminMemberSports.js";
 import { getMemberActivityForAdmin } from "../../storage/adminMemberActivity.js";
@@ -31,6 +32,8 @@ const router = Router();
 router.use("/golf", adminGolfRouter);
 // 방문자 발자국(2026-10-08) — 전부 조회(GET). 가드는 adminVisitors.ts 가 건다
 router.use("/visitors", adminVisitorsRouter);
+// 손님이 찾는 매장(2026-10-18) — 매장 페이지를 본 사람 · 길찾기 · 전화 + 사장님 리포트 카드. 전부 GET, 가드는 adminStoreDemand.ts 가 건다
+router.use("/store-demand", adminStoreDemandRouter);
 // 굿즈 · 배지 증정(2026-10-16)
 router.use("/goods", adminGoodsRouter);
 // 당구(2026-10-16) — 실전 경기 전체 · 이상 표시
