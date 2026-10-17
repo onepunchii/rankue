@@ -24,9 +24,12 @@ export function CueCaseEntry() {
     const hero = s?.hero ? caseItem(s.hero) : null;
     // 이 기기에서 큐 케이스를 마지막으로 연 뒤에 들어온 것이 있으면 '새로'
     const fresh = !!s?.latest && s.latest > readCaseSeen();
-    const sub = !member ? t("case.entryGuest")
-        : s?.opened ? t("case.entryCounts").replace("{c}", String(s.cue)).replace("{k}", String(s.chalk)).replace("{g}", String(s.glove))
-            : t("case.entryOpen");
+    // 받은 것이 없을 때(2026-10-17 리뷰): 요약이 이미 판정을 돌린 뒤라 opened=false 는 '아직 받은 것이 없다'는 뜻이다 —
+    // 예전 "지난 경기로 들어온 것이 있을 거예요"는 막 가입한 회원에게 사실이 아니었다. 첫 큐는 실전 한 판(cueCaseRules realGames n=1).
+    // 요약을 못 받았으면(불러오는 중 · 실패) 누구에게나 맞는 모으기 안내.
+    const sub = !member || !s ? t("case.entryGuest")
+        : s.opened ? t("case.entryCounts").replace("{c}", String(s.cue)).replace("{k}", String(s.chalk)).replace("{g}", String(s.glove))
+            : t("case.entryEmpty");
     return (
         <>
         <button type="button" onClick={() => setLocation(cueCasePath())} data-testid="cue-case-entry" data-track-as="홈 큐 케이스"
@@ -38,7 +41,7 @@ export function CueCaseEntry() {
                         {t("case.entryTitle")}
                         {fresh && <span className="rounded-full bg-[#e8c46a] px-1.5 py-[1px] text-[11.5px] font-bold text-[#2d1a08]" data-testid="cue-case-entry-new">{t("case.new")}</span>}
                     </span>
-                    <span className="rk-num mt-0.5 block truncate text-[12.5px] text-[#e8c46a]">{sub}</span>
+                    <span className="rk-num mt-0.5 line-clamp-2 break-keep text-[12.5px] leading-snug text-[#e8c46a]">{sub}</span>
                 </span>
                 <span className="shrink-0 text-[18px] font-semibold text-[#f4ead6]/60" aria-hidden>›</span>
             </span>

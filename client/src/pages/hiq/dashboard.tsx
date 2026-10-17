@@ -23,6 +23,7 @@ import { OnlineHubBanner } from "@/components/hiq/dashboard/OnlineHubBanner";
 import { CueCaseEntry } from "@/components/hiq/cueCase/CueCaseEntry";
 import { OnlineGameCard } from "@/components/hiq/dashboard/OnlineGameCard";
 import { LookalikeProCard } from "@/components/hiq/dashboard/LookalikeProCard";
+import { useStoreDots } from "@/components/hiq/stores/StoreTableMap";
 import { HomeGuideDialog, type HomeGuideTopic } from "@/components/hiq/dashboard/HomeGuideDialog";
 import { useRankPreview } from "@/components/hiq/dashboard/RankPreview";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
@@ -52,6 +53,8 @@ function HiqDashboardBilliards() {
     const [rankingSource, setRankingSource] = useState<'world' | 'pba' | 'store'>('world');
     // 랭킹 카드는 3명까지 보이고 펼치면 10명(2026-10-04) — 세 소스가 같은 접힘 상태를 쓴다
     const rankPreview = useRankPreview();
+    // 전국 당구장 수 — 둘러보기의 당구대 지도와 같은 캐시(STORE_DOTS_KEY)
+    const storeN = useStoreDots().dots.length;
     // 구역 머리 '설명' 창 — 점수판·온라인게임·둘러보기
     const [guide, setGuide] = useState<HomeGuideTopic | null>(null);
 
@@ -347,7 +350,10 @@ function HiqDashboardBilliards() {
                             onClick={() => setLocation("/stores")}
                             className="mt-3 w-full h-12 rounded-2xl bg-white text-[14px] font-semibold text-brand shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:scale-[0.99] transition-transform"
                         >
-                            {({ ko: "전국 당구장 1,197곳 찾아보기", en: "Browse 1,197 billiards halls", vi: "Xem 1.197 quán bi-a", tr: "1.197 bilardo salonuna göz at", es: "Explorar 1.197 salones" } as Record<string, string>)[locale] ?? "Browse billiards halls"} →
+                            {/* 수는 지도와 같은 값(매장 디렉터리 실제 수) — 못 받았으면 수 없이 */}
+                            {(storeN
+                                ? ({ ko: `전국 당구장 ${storeN.toLocaleString("ko-KR")}곳 찾아보기`, en: `Browse ${storeN.toLocaleString("en-US")} billiards halls`, vi: `Xem ${storeN.toLocaleString("vi-VN")} quán bi-a`, tr: `${storeN.toLocaleString("tr-TR")} bilardo salonuna göz at`, es: `Explorar ${storeN.toLocaleString("es-ES")} salones` } as Record<string, string>)
+                                : ({ ko: "전국 당구장 찾아보기", en: "Browse billiards halls", vi: "Xem quán bi-a", tr: "Bilardo salonlarına göz at", es: "Explorar salones" } as Record<string, string>))[locale] ?? "Browse billiards halls"} →
                         </button>
                     </>
                 )}

@@ -8,6 +8,7 @@ import { regionTitleKo, regionDescKo } from "@shared/storeMeta";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
+import { StoreTableMap } from "@/components/hiq/stores/StoreTableMap";
 
 interface PublicStore {
   slug: string;
@@ -27,7 +28,7 @@ interface Listing {
 }
 interface ListingsResponse { total: number; rows: Listing[]; regions: Array<{ region: string; count: number }> }
 
-const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string }> = {
+const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string; mapAll: (n: number) => string; mapIn: (r: string, n: number) => string; mapLegend: string; mapHint: string; mapByRegion: string; mapOthers: (n: number) => string }> = {
   ko: {
     title: "매장 찾기",
     subtitle: "전국 당구장을 지역·이름으로 찾아보세요",
@@ -47,6 +48,12 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     registerCta: "내 매장 등록하기",
     nearby: "내 주변",
     nearbyOn: "거리순",
+    mapAll: (n) => `전국 ${n.toLocaleString()}곳`,
+    mapIn: (r, n) => `${r} ${n.toLocaleString()}곳`,
+    mapLegend: "공 하나가 당구장 한 곳",
+    mapHint: "지도나 지역을 누르면 그 지역만",
+    mapByRegion: "지역별",
+    mapOthers: (n) => `그 밖 ${n.toLocaleString()}곳`,
   },
   en: {
     title: "Find a venue",
@@ -67,6 +74,12 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     registerCta: "Register my venue",
     nearby: "Near me",
     nearbyOn: "By distance",
+    mapAll: (n) => `${n.toLocaleString()} halls`,
+    mapIn: (r, n) => `${r} · ${n.toLocaleString()}`,
+    mapLegend: "Each ball is a hall",
+    mapHint: "Tap a region to see only its halls",
+    mapByRegion: "By region",
+    mapOthers: (n) => `${n.toLocaleString()} elsewhere`,
   },
   vi: {
     title: "Tìm quán",
@@ -87,6 +100,12 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     registerCta: "Đăng ký quán của tôi",
     nearby: "Gần tôi",
     nearbyOn: "Theo khoảng cách",
+    mapAll: (n) => `${n.toLocaleString()} quán`,
+    mapIn: (r, n) => `${r} · ${n.toLocaleString()}`,
+    mapLegend: "Mỗi bi là một quán",
+    mapHint: "Chạm vào một vùng để chỉ xem quán ở đó",
+    mapByRegion: "Theo vùng",
+    mapOthers: (n) => `${n.toLocaleString()} nơi khác`,
   },
   tr: {
     title: "Salon bul",
@@ -107,6 +126,12 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     registerCta: "Salonumu kaydet",
     nearby: "Yakınımda",
     nearbyOn: "Mesafeye göre",
+    mapAll: (n) => `${n.toLocaleString()} salon`,
+    mapIn: (r, n) => `${r} · ${n.toLocaleString()}`,
+    mapLegend: "Her top bir salon",
+    mapHint: "Yalnızca o bölgeyi görmek için bölgeye dokun",
+    mapByRegion: "Bölgeye göre",
+    mapOthers: (n) => `Diğer ${n.toLocaleString()}`,
   },
   es: {
     title: "Buscar local",
@@ -127,6 +152,12 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     registerCta: "Registrar mi local",
     nearby: "Cerca de mí",
     nearbyOn: "Por distancia",
+    mapAll: (n) => `${n.toLocaleString()} salones`,
+    mapIn: (r, n) => `${r} · ${n.toLocaleString()}`,
+    mapLegend: "Cada bola es una sala",
+    mapHint: "Toca una región para ver solo sus salas",
+    mapByRegion: "Por región",
+    mapOthers: (n) => `${n.toLocaleString()} en otras`,
   },
 };
 
@@ -236,6 +267,11 @@ export default function Stores() {
           placeholder={t.search}
           className="w-full h-12 px-4 rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] text-[15px] outline-none focus:ring-2 focus:ring-brand/25 mb-3"
         />
+
+        {/* 전국 당구장 지도(2026-10-17) — 위에서 본 당구대 위의 공. 시도를 누르면 아래 칩과 같은 지역 고르기 */}
+        {!dq && !nearbyOn && (
+          <StoreTableMap region={region} onPick={(r) => setRegion(r)} copy={{ all: t.mapAll, inRegion: t.mapIn, legend: t.mapLegend, hint: t.mapHint, byRegion: t.mapByRegion, others: t.mapOthers }} />
+        )}
 
         {/* 지역 칩 */}
         {regions.length > 0 && (

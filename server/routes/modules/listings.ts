@@ -7,6 +7,7 @@ import { applicantOf, isContactPhone, type Applicant } from "../../lib/partnerAp
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
+import { packStoreDots, type StoreDotsWire } from "../../../shared/storeDots.js";
 
 // 매장 디렉터리 공개 API — 지역 검색("김해 당구장") SEO 대상이라 비로그인 읽기.
 // 수정 제안·이용자 제보는 방문자가 앱 계정 없이도 보낼 수 있어야 해서 비로그인 허용.
@@ -111,6 +112,17 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
 }));
 
 // GET /listings/:code — 매장 상세 (공개 컬럼만 명시 — id·claimedStoreId 등 내부 식별자 미노출)
+// GET /listings/dots — 전국 당구장 지도(당구대 위의 공)에 찍을 점(shared/storeDots). 누구에게나 같은 답 → CDN 공개 캐시(위의 GET 규칙).
+// ⚠️ "/:code" 보다 먼저 — 'dots' 도 매장 코드 꼴이라 뒤에 두면 상세로 빠진다.
+let dotsCache: { at: number; data: StoreDotsWire } | null = null;
+router.get("/dots", asyncHandler(async (_req: any, res: Response) => {
+    if (!dotsCache || Date.now() - dotsCache.at > 30 * 60_000) {
+        const rows = await db.select({ lat: storeListings.latitude, lng: storeListings.longitude, region: storeListings.region }).from(storeListings);
+        dotsCache = { at: Date.now(), data: packStoreDots(rows) };
+    }
+    return sendSuccess(res, dotsCache.data);
+}));
+
 router.get("/:code", asyncHandler(async (req: any, res: Response) => {
     if (!CODE_RE.test(req.params.code)) return sendError(res, 404, "매장을 찾을 수 없습니다");
     const [row] = await db.select({

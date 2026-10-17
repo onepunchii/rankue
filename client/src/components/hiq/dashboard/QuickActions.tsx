@@ -27,6 +27,7 @@ import { useLocation } from "wouter";
 import { Target, LogIn, LucideMessageCircle, LucideStore, LucideInfo, LucideChevronRight } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 import { BallCluster } from "@/components/hiq/ui/BilliardBall";
+import { StoreTableBanner, useStoreDots } from "@/components/hiq/stores/StoreTableMap";
 import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
 import { BadgeTap } from "@/components/hiq/BadgeGuideSheet";
 import { realTierFor } from "@shared/realTier";
@@ -180,28 +181,51 @@ export function ScoreboardActions({ onStartGame, onJoinGame, sample }: {
 export function ExploreActions() {
     const { t } = useT();
     const [, setLocation] = useLocation();
+    // 2026-10-17: 매장 찾기는 전국 당구장 지도(가로 당구대 — StoreTableBanner)로. 지도를 못 받으면 예전 타일 둘로 돌아간다
+    const { dots, isLoading } = useStoreDots();
+    const map = isLoading || dots.length >= 50;
     const items = [
-        { to: "/stores", Icon: LucideStore, title: t("quickActions.storeTitle"), desc: t("quickActions.storeDesc") },
+        ...(map ? [] : [{ to: "/stores", Icon: LucideStore, title: t("quickActions.storeTitle"), desc: t("quickActions.storeDesc") }]),
         { to: "/community", Icon: LucideMessageCircle, title: t("quickActions.communityTitle"), desc: t("quickActions.communityDesc") },
     ];
     return (
-        <div className="grid grid-cols-2 gap-3">
-            {items.map(({ to, Icon, title, desc }) => (
-                <motion.button
-                    key={to}
-                    whileTap={{ scale: 0.97 }}
-                    onClick={() => setLocation(to)}
-                    className="h-[120px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-[18px] text-left transition-colors hover:bg-black/[0.015]"
-                >
-                    <div className="w-10 h-10 rounded-2xl bg-brand/10 flex items-center justify-center">
-                        <Icon className="w-[21px] h-[21px] text-brand" strokeWidth={2} />
-                    </div>
-                    <div>
-                        <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{title}</span>
-                        <span className="block text-[12.5px] font-medium text-black/50 mt-0.5 truncate">{desc}</span>
-                    </div>
-                </motion.button>
-            ))}
-        </div>
+        <>
+            {map && (
+                <div className="mb-3">
+                    <StoreTableBanner onOpen={() => setLocation("/stores")} copy={{ title: t("storeMap.title"), count: (n) => t("storeMap.count").replace("{n}", n.toLocaleString()), sub: t("storeMap.sub"), cta: t("storeMap.cta") }} />
+                </div>
+            )}
+            <div className={map ? "grid grid-cols-1" : "grid grid-cols-2 gap-3"}>
+                {items.map(({ to, Icon, title, desc }) => map ? (
+                    // 지도 아래의 커뮤니티 — 한 줄 띠(지도와 키를 다투지 않게)
+                    <motion.button key={to} whileTap={{ scale: 0.98 }} onClick={() => setLocation(to)}
+                        className="h-[72px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex items-center gap-3.5 px-[18px] text-left transition-colors hover:bg-black/[0.015]">
+                        <div className="w-10 h-10 shrink-0 rounded-2xl bg-brand/10 flex items-center justify-center">
+                            <Icon className="w-[21px] h-[21px] text-brand" strokeWidth={2} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{title}</span>
+                            <span className="block text-[12.5px] font-medium text-black/50 mt-0.5 truncate">{desc}</span>
+                        </div>
+                        <LucideChevronRight className="w-5 h-5 shrink-0 text-black/25" aria-hidden />
+                    </motion.button>
+                ) : (
+                    <motion.button
+                        key={to}
+                        whileTap={{ scale: 0.97 }}
+                        onClick={() => setLocation(to)}
+                        className="h-[120px] rounded-3xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col justify-between p-[18px] text-left transition-colors hover:bg-black/[0.015]"
+                    >
+                        <div className="w-10 h-10 rounded-2xl bg-brand/10 flex items-center justify-center">
+                            <Icon className="w-[21px] h-[21px] text-brand" strokeWidth={2} />
+                        </div>
+                        <div>
+                            <span className="block text-[15px] font-semibold text-ink-1 leading-tight">{title}</span>
+                            <span className="block text-[12.5px] font-medium text-black/50 mt-0.5 truncate">{desc}</span>
+                        </div>
+                    </motion.button>
+                ))}
+            </div>
+        </>
     );
 }
