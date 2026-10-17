@@ -57,3 +57,29 @@ describe("산 위 관측 · 지금", () => {
         expect(src).toMatch(/weather \? \{ \.\.\.weather, summit, obs, fire \} : \{ days: \[\], hours: \[\], summit: null, obs, fire \}/);
     });
 });
+
+describe("지금 산 위 — 산마다 관측소 하나, 관측소마다 산 하나", () => {
+    const at = new Date(Date.now() - 10 * 60_000).toISOString();
+    const o = (obsId: number, station: string, temp: number) => ({ obsId, station, at, temp, wind: 2, windDir: "N", humidity: 50, rain: 0 });
+    const m = (slug: string, name: string, sido: string, sigungu: string) => ({ slug, name, heightM: 600, lat: 37, lng: 127, sido, sigungu });
+    it("이름 + 시군이 맞는 짝만 · 한 관측소가 두 산에 걸리면 둘 다 뺀다 · 좌표 없는 산은 뺀다", async () => {
+        const { summitsNow } = await import("./hikingMountObs");
+        const rows = summitsNow(
+            [o(1, "서울 관악산", 15), o(2, "가평 매봉", 9), o(3, "평창 백석산", 11)],
+            [m("gwanak", "관악산", "서울특별시", "관악구"), m("mae-a", "매봉", "경기도", "가평군"), m("mae-b", "매봉", "경기도", "가평군"), { ...m("baek", "백석산", "강원특별자치도", "평창군"), lat: null }],
+            Date.now(),
+        );
+        expect(rows.map((r) => r.slug)).toEqual(["gwanak"]);
+    });
+    it("기온 색 — 끝은 고정 · 사이는 섞는다", async () => {
+        const { tempColor } = await import("./hikingMountObs");
+        expect(tempColor(-20)).toBe("#3d7fb8");
+        expect(tempColor(40)).toBe("#f28c6a");
+        expect(tempColor(20)).toBe("#f6d9a8");
+        expect(tempColor(5)).not.toBe(tempColor(15));
+    });
+    it("홈의 '지금 산 위' 길이 있다", () => {
+        expect(read("server/routes/modules/hiking.ts")).toContain('router.get("/summits-now"');
+        expect(read("client/src/hiking/pages/HikingHome.tsx")).toContain("<SummitsNow />");
+    });
+});

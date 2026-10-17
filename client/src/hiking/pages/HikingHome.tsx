@@ -17,6 +17,7 @@ import { LucideChevronRight } from "@/lib/icons";
 import { hikingMountainPath } from "@shared/hikingMountains";
 import { HkSection, HkSkel } from "../components/HikingShell";
 import { MountainMap } from "../components/MountainMap";
+import { SummitsNow } from "../components/SummitsNow";
 import { NearMe } from "../components/NearMe";
 import { WishShelf } from "../wish/WishParts";
 import { MountainRow } from "../components/MountainParts";
@@ -107,6 +108,8 @@ export default function HikingHome() {
                         <HkSection title="내 산 지도" aside={verified.length ? `깃발 ${s.done.size}개` : "오른 산에 깃발이 꽂혀요"}>
                             <div data-tour="hh-map"><MountainMap mountains={s.famous} done={s.done} /></div>
                         </HkSection>
+
+                        <SummitsNow />
 
                         {trips.length > 0 && (
                             <HkSection title="최근 산행" aside={`${trips.length}번`}>

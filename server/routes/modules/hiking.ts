@@ -24,7 +24,7 @@ import { getCourseWeather } from "../../services/golfWeather.js";
 import { mountObsAll } from "../../services/hikingMountObs.js";
 import { fireRiskAll } from "../../services/hikingFireRisk.js";
 import { fireFor } from "../../../shared/hikingFireRisk.js";
-import { obsFresh, stationFor } from "../../../shared/hikingMountObs.js";
+import { obsFresh, stationFor, summitsNow, type SummitNow } from "../../../shared/hikingMountObs.js";
 import { HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, hikingGroup, hikingRegion, inHikingGroup } from "../../../shared/hikingMountains.js";
 import { toMountainPoint, type MountainPoint } from "../../../shared/hikingNear.js";
 import { HIKING_NEARBY_RADIUS_KM, hikingNearbyNames, hikingNearbyWord, isHikingNearbyKind } from "../../../shared/hikingAround.js";
@@ -93,6 +93,24 @@ async function trailheadOf(slug: string, heightM: number | null): Promise<{ lat:
     trailheads.set(slug, { at: Date.now(), v });
     return v;
 }
+
+/**
+ * 지금 산 위(2026-10-17) — 산악기상관측소의 실측이 붙는 산 전부(이름 + 시군이 맞는 산, shared/hikingMountObs summitsNow). 홈의 '지금 산 위' 지도.
+ * 짝짓기는 인스턴스 메모리에 10분(관측과 같은 때) — 산 목록도 관측도 이미 메모리에 있어 가볍다.
+ */
+let summitsNowCache: { at: number; rows: SummitNow[] } | null = null;
+router.get("/summits-now", asyncHandler(async (_req: any, res: any) => {
+    const now = Date.now();
+    if (!summitsNowCache || now - summitsNowCache.at > 10 * 60_000) {
+        const [stations, mountains] = await Promise.all([mountObsAll().catch(() => null), allMountains()]);
+        const rows = stations ? summitsNow(stations, mountains, now) : [];
+        if (rows.length) summitsNowCache = { at: now, rows };
+        else if (!summitsNowCache) return sendSuccess(res, null);
+    }
+    const rows = summitsNowCache!.rows;
+    res.set("Cache-Control", "public, max-age=300, s-maxage=600, stale-while-revalidate=1200");
+    return sendSuccess(res, { at: rows.reduce((a, r) => (r.at > a ? r.at : a), ""), rows });
+}));
 
 /** 산의 날씨 — 들머리 자리의 격자(기상청 단기 · 중기), 들머리를 모르면 정상 좌표의 격자. 받아 둔 것이 낡았으면 그 자리에서 새로 받는다 */
 router.get("/mountains/:slug/weather", asyncHandler(async (req: any, res: any) => {

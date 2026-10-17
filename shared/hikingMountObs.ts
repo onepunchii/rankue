@@ -90,3 +90,52 @@ export function obsAdvice(o: Pick<MountObs, "temp" | "wind" | "rain">): string |
 
 /** 지금 보일 만한가 */
 export const obsFresh = (o: Pick<MountObs, "at">, nowMs: number) => nowMs - Date.parse(o.at) <= OBS_FRESH_MS;
+
+/** 지금 산 위 — 산 하나에 관측소 하나(이름 + 시군), 관측소 하나에 산 하나일 때만. 화면의 '지금 산 위' 지도가 쓴다(2026-10-17) */
+export interface SummitNow { slug: string; name: string; heightM: number | null; lat: number; lng: number; temp: number | null; wind: number | null; windDir: string | null; at: string; station: string }
+export function summitsNow(
+    stations: readonly MountObs[],
+    mountains: readonly { slug: string; name: string; heightM: number | null; lat: number | null; lng: number | null; sido?: string | null; sigungu?: string | null }[],
+    nowMs: number,
+): SummitNow[] {
+    // 관측소 이름의 산 이름 부분 → 관측소들(한 번에 찾게)
+    const byTail = new Map<string, MountObs[]>();
+    for (const o of stations) {
+        if (!obsFresh(o, nowMs)) continue;
+        const parts = o.station.trim().split(/\s+/);
+        if (parts.length < 2) continue;
+        const tail = squash(parts.slice(1).join(""));
+        byTail.set(tail, [...(byTail.get(tail) ?? []), o]);
+    }
+    const pairs: { m: (typeof mountains)[number]; o: MountObs }[] = [];
+    const used = new Map<number, number>();
+    for (const m of mountains) {
+        if (m.lat == null || m.lng == null) continue;
+        const cands = byTail.get(squash(m.name));
+        if (!cands) continue;
+        const hit = stationFor(cands, m);
+        if (!hit) continue;
+        pairs.push({ m, o: hit });
+        used.set(hit.obsId, (used.get(hit.obsId) ?? 0) + 1);
+    }
+    return pairs
+        .filter((p) => used.get(p.o.obsId) === 1)
+        .map(({ m, o }) => ({ slug: m.slug, name: m.name, heightM: m.heightM, lat: m.lat!, lng: m.lng!, temp: o.temp, wind: o.wind, windDir: o.windDir, at: o.at, station: o.station }));
+}
+
+/** 기온의 색 — 영하 10° 짙은 물빛 → 0° 하늘빛 → 10° 풀빛 → 20° 모래빛 → 30° 산호빛(등산 화면의 색) */
+const TEMP_STOPS: readonly [number, [number, number, number]][] = [
+    [-10, [0x3d, 0x7f, 0xb8]], [0, [0x8e, 0xc5, 0xff]], [10, [0xa8, 0xd8, 0xc0]], [20, [0xf6, 0xd9, 0xa8]], [30, [0xf2, 0x8c, 0x6a]],
+];
+export function tempColor(t: number): string {
+    const s = TEMP_STOPS;
+    if (t <= s[0][0]) return rgb(s[0][1]);
+    for (let i = 1; i < s.length; i++) {
+        if (t <= s[i][0]) {
+            const k = (t - s[i - 1][0]) / (s[i][0] - s[i - 1][0]);
+            return rgb(s[i - 1][1].map((v, j) => v + (s[i][1][j] - v) * k) as [number, number, number]);
+        }
+    }
+    return rgb(s[s.length - 1][1]);
+}
+const rgb = (c: readonly number[]) => `#${c.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
