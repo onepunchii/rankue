@@ -765,7 +765,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
 
   // 코스(파)
   let courseHtml = "";
-  const courses: { name?: string; par?: number; holes?: number }[] = Array.isArray(p.courses) ? p.courses : [];
+  const courses: { name?: string; par?: number; holes?: number; loop?: true }[] = Array.isArray(p.courses) ? p.courses : [];
   if (courses.length) {
     const holes = courses.reduce((a, c) => a + (Number(c.holes) || 0), 0);
     // 파 합계는 18홀일 때만 — 27홀 코스의 "파 108" 은 참이지만 아무도 그렇게 치지 않는다
@@ -773,7 +773,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
     courseHtml = `
   <h2>코스</h2>
   <ul>
-  ${courses.map((c) => `<li>${esc(c.name ?? "")}${[c.holes ? `${c.holes}홀` : "", c.par ? `파 ${c.par}` : ""].filter(Boolean).length ? ` — ${esc([c.holes ? `${c.holes}홀` : "", c.par ? `파 ${c.par}` : ""].filter(Boolean).join(" · "))}` : ""}</li>`).join("\n  ")}
+  ${courses.map((c) => `<li>${esc(c.name ?? "")}${[c.holes ? `${c.holes}홀` : "", c.par ? `파 ${c.par}` : ""].filter(Boolean).length ? ` — ${esc([c.holes ? `${c.holes}홀` : "", c.par ? `파 ${c.par}` : ""].filter(Boolean).join(" · "))}` : ""}${c.loop ? esc(" · 같은 9홀을 두 번 돌아요") : ""}</li>`).join("\n  ")}
   </ul>${courses.length > 1 && holes ? `\n  <p>${esc(`코스 ${courses.length}개 · 총 ${holes}홀${holes === 18 && par ? ` · 파 ${par}` : ""}`)}</p>` : ""}`;
   }
 

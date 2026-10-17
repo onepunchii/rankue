@@ -57,14 +57,14 @@ vi.mock("../db.js", () => {
             const g = s.pages.get(p[3] as string); if (!g || (g.club_id && s.clubs.has(g.club_id))) return rows([]); g.lat = p[0]; g.lng = p[1]; keep(g, p[2] as string); return rows([{ lat: g.lat, lng: g.lng }]);
         }
         // ── 홈페이지·전화·로고 ──
-        if (text.startsWith("select website, phone, logo from golf_course_pages where slug = $1")) { const g = s.pages.get(p[0] as string); return rows(g ? [{ website: g.website, phone: g.phone, logo: g.logo }] : []); }
-        if (text.startsWith("update golf_course_pages set ") && text.includes(" returning website, phone, logo")) {
+        if (text.startsWith("select website, phone, logo, holes from golf_course_pages where slug = $1")) { const g = s.pages.get(p[0] as string); return rows(g ? [{ website: g.website, phone: g.phone, logo: g.logo, holes: g.holes ?? null }] : []); }
+        if (text.startsWith("update golf_course_pages set ") && text.includes(" returning website, phone, logo, holes")) {
             // 시험에서는 한 칸씩만 고친다: set <칸> = $1[, admin_keep = …$2…], updated_at = now() where slug = $N
             const col = text.match(/^update golf_course_pages set (\w+) = \$1/)![1];
             const g = s.pages.get(p[p.length - 1] as string);
             g[col] = p[0];
             if (text.includes("admin_keep =")) keep(g, p[1] as string);
-            return rows([{ website: g.website, phone: g.phone, logo: g.logo }]);
+            return rows([{ website: g.website, phone: g.phone, logo: g.logo, holes: g.holes ?? null }]);
         }
         throw new Error("시험에 없는 쿼리: " + text.slice(0, 140));
     };

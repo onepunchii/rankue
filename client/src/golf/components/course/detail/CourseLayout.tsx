@@ -50,6 +50,8 @@ export function CourseLayout({ courses, parts, holes }: { courses: CourseDetail[
                             <div key={c.name} className="rounded-xl bg-[#FFFFFF08] border border-[#FFFFFF0F] px-3 py-2.5 min-w-0">
                                 <div className="text-[15px] font-semibold text-white truncate">{c.name}</div>
                                 <div className="mt-0.5 text-[12.5px] text-[#FFFFFF80] tabular-nums">{c.holes}홀 · 파{c.par}</div>
+                                {/* 같은 9홀을 두 번(삼삼CC) — 18홀 라운드는 이 코스를 두 바퀴 */}
+                                {c.loop && <div className="mt-1 text-[12px] text-[#8BE84A] break-keep" data-testid="course-loop">같은 9홀을 두 번 돌아요 · 18홀 파{c.par * 2}</div>}
                             </div>
                         ))}
                         {missing > 0 && (

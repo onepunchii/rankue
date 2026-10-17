@@ -111,7 +111,8 @@ describe("pageCoursesFromNines — 적재 스크립트와 같은 식", () => {
     });
     it("이름순은 운영 DB(C.UTF-8) 순서 — IN 이 OUT 앞, 대문자가 소문자 앞, 한글은 유니코드 순", () => {
         const names = ["west", "East", "서", "남", "동", "OUT", "IN", "레이크 B", "레이크 A"];
-        const rows = names.map((name) => ({ name, pars: P36 }));
+        // 코스마다 파를 다르게 — 같으면 '같은 코스가 두 번'(동 · East, OUT · IN)으로 합쳐진다(dedupeNines, 2026-10-17). 여기는 차례만 본다
+        const rows = names.map((name, i) => ({ name, pars: [...P36.slice(0, 8), i + 1] }));
         expect(pageCoursesFromNines(rows)!.map((c) => c.name)).toEqual(["East", "IN", "OUT", "west", "남", "동", "레이크 A", "레이크 B", "서"]);
     });
     it("여러 모양을 섞어도 대조용 식과 결과가 같다", () => {
@@ -124,10 +125,9 @@ describe("pageCoursesFromNines — 적재 스크립트와 같은 식", () => {
     });
     it("적재 스크립트의 식이 바뀌면 여기서 알린다 — 그땐 pageCoursesFromNines 도 같이 고칠 것", () => {
         const src = readFileSync(new URL("../server/scripts/golf-course-pages.ts", import.meta.url), "utf8");
+        // 2026-10-17 부터 적재 스크립트가 pageCoursesFromNines 를 그대로 부른다(식이 한 군데)
         expect(src).toContain("select club_id, name, pars from rankue_golf_courses order by name");
-        expect(src).toContain("r.pars.map(Number).filter((n: number) => n > 0)");
-        expect(src).toContain("if (!pars.length) continue;");
-        expect(src).toContain("{ name: r.name, par: pars.reduce((a, b) => a + b, 0), holes: pars.length }");
+        expect(src).toContain("const cs = pageCoursesFromNines(rows); if (cs) coursesByClub.set(club, cs);");
         expect(src).toContain("courses: clubId ? coursesByClub.get(clubId) ?? null : null");
     });
     it("compareCodePoints 는 UTF-16 이 아니라 코드 포인트로 잰다(보조 평면 글자)", () => {

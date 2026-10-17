@@ -28,6 +28,7 @@ import { COURSE_COORDS } from "../../client/src/golf/data/courseCoords";
 import { applyDbegl, readDbegl } from "./golf-course-dbegl";
 import { applyOfficialLogos } from "./golf-logos-official";
 import { UPLOADED_LOGO_SQL_RE } from "../../shared/golfLogo";
+import { pageCoursesFromNines, type PageCourse } from "../../shared/golfParEdit";
 // 라벨·이름 다듬기·시세 쓰기는 서버(매일 동기화 크론)도 쓴다 — 이 파일은 client 목록을 끌고 와서 서버가 못 임포트한다.
 import { normName, itemLabel, manText, writePrices, parseFeed, pricesFromFeed, syncMembershipPrices } from "../services/golfPriceSync.js";
 export { normName, itemLabel, manText, writePrices, parseFeed, pricesFromFeed, syncMembershipPrices };
@@ -158,13 +159,14 @@ export async function buildPages(tgmDir: string, opts: { dbeglFile?: string; log
     const rc: any = await db.execute(sql`select id, name, latitude, longitude from rankue_golf_clubs`);
     const rclubs = (rc.rows ?? rc) as any[];
     const rcs: any = await db.execute(sql`select club_id, name, pars from rankue_golf_courses order by name`);
-    const coursesByClub = new Map<string, { name: string; par: number; holes: number }[]>();
+    // 원장의 코스 줄 → 페이지 courses. 어드민 · 화면과 **같은 식**(pageCoursesFromNines — 같은 코스가 두 번 실린 것도 하나로, 2026-10-17)
+    const ninesByClub = new Map<string, { name: string; pars: unknown }[]>();
     for (const r of (rcs.rows ?? rcs) as any[]) {
-        const pars: number[] = Array.isArray(r.pars) ? r.pars.map(Number).filter((n: number) => n > 0) : [];
-        if (!pars.length) continue;
-        if (!coursesByClub.has(r.club_id)) coursesByClub.set(r.club_id, []);
-        coursesByClub.get(r.club_id)!.push({ name: r.name, par: pars.reduce((a, b) => a + b, 0), holes: pars.length });
+        if (!ninesByClub.has(r.club_id)) ninesByClub.set(r.club_id, []);
+        ninesByClub.get(r.club_id)!.push({ name: r.name, pars: r.pars });
     }
+    const coursesByClub = new Map<string, PageCourse[]>();
+    for (const [club, rows] of ninesByClub) { const cs = pageCoursesFromNines(rows); if (cs) coursesByClub.set(club, cs); }
     const clubIdFor = (c: Club): string | null => {
         const n = normName(displayName(c.names)); let best: any = null;
         for (const k of rclubs) {
@@ -323,7 +325,8 @@ export async function writePages(built: Awaited<ReturnType<typeof buildPages>>) 
                 course_ids = excluded.course_ids,
                 -- 원장 짝은 이름으로 찾는다. 어드민에서 이름을 고친 뒤 짝을 못 찾았다고 있던 짝을 끊지 않는다(새 짝을 찾았으면 그것으로)
                 club_id = coalesce(excluded.club_id, golf_course_pages.club_id),
-                kind = excluded.kind, holes = excluded.holes, parts = excluded.parts,
+                kind = excluded.kind, parts = excluded.parts,
+                holes = case when 'holes' = any(golf_course_pages.admin_keep) then golf_course_pages.holes else excluded.holes end,
                 courses = excluded.courses, intro = excluded.intro, info = excluded.info, fees = excluded.fees,
                 tgm_items = excluded.tgm_items,
                 -- 어드민에서 올린 로고(우리 저장소의 hiq/golf-logo/)는 다시 적재해도 남긴다(2026-10-07, shared/golfLogo.ts)

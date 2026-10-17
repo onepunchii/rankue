@@ -29,6 +29,7 @@ import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { isUrgentJoin, listingCapacity, distanceKm } from "../../../shared/golfJoin.js";
 import { GOLF_REGIONS, cityShort, listingIntents, pageHoles, type GolfIntent, type PublicListing } from "../../../shared/golfCourse.js";
+import { pageCoursesFromNines } from "../../../shared/golfParEdit.js";
 import { COURSE_GALLERY_LIMIT } from "../../../shared/golfPhoto.js";
 import { isNearbyKind, nearbySearchNames } from "../../../shared/golfAround.js";
 import { weatherPoint } from "../../../shared/golfWeatherZones.js";
@@ -101,7 +102,7 @@ async function loadSummary(): Promise<Summary> {
     if (inflight) return inflight;
     inflight = (async () => {
         const q = async (s: any) => { const r: any = await db.execute(s); return (r.rows ?? r) as any[]; };
-        const [pagesRaw, bookings, prices, watch] = await Promise.all([
+        const [pagesRaw, bookings, prices, watch, ninesRaw] = await Promise.all([
             // 이름·슬러그가 빈 줄은 페이지가 될 수 없다(프리렌더·사이트맵과 같은 기준)
             q(sql`select slug, name, region, city, address, lat, lng, course_ids, club_id, kind, holes, parts, courses, intro, info, fees, tgm_items, updated_at,
                          logo, grass, play, phone, website, fee_from, popularity, aliases
@@ -114,11 +115,16 @@ async function loadSummary(): Promise<Summary> {
                   order by datetime asc limit 5000`),
             q(sql`select slug, label, price, change, as_of from golf_membership_prices`),
             q(sql`select slug, count(*)::int n from golf_course_watches group by slug`),
+            // 코스 줄(원장) — 페이지 courses 를 그 자리에서 다시 셈한다(같은 코스가 두 번 실린 것을 하나로, 2026-10-17). 적재 · 어드민과 같은 식
+            q(sql`select club_id, name, pars from rankue_golf_courses`).catch(() => [] as any[]),
         ]);
+        const ninesByClub = new Map<string, { name: string; pars: unknown }[]>();
+        for (const n of ninesRaw) { const k = String(n.club_id); if (!ninesByClub.has(k)) ninesByClub.set(k, []); ninesByClub.get(k)!.push({ name: n.name, pars: n.pars }); }
+        const coursesOf = (r: any) => (r.club_id && ninesByClub.has(String(r.club_id)) ? pageCoursesFromNines(ninesByClub.get(String(r.club_id))!) : null) ?? r.courses;
         const pages: PageRow[] = pagesRaw.map((r) => ({
             slug: r.slug, name: r.name, region: r.region, city: r.city, address: r.address, lat: r.lat, lng: r.lng,
-            courseIds: (r.course_ids ?? []).map(Number), clubId: r.club_id, kind: r.kind, holes: pageHoles(r.holes, r.courses), parts: r.parts,
-            courses: r.courses, intro: r.intro, info: r.info, fees: r.fees, tgmItems: r.tgm_items ?? [], updatedAt: r.updated_at,
+            courseIds: (r.course_ids ?? []).map(Number), clubId: r.club_id, kind: r.kind, holes: pageHoles(r.holes, coursesOf(r)), parts: r.parts,
+            courses: coursesOf(r), intro: r.intro, info: r.info, fees: r.fees, tgmItems: r.tgm_items ?? [], updatedAt: r.updated_at,
             logo: r.logo, grass: r.grass ?? [], play: r.play ?? [], phone: r.phone, website: r.website,
             feeFrom: r.fee_from, popularity: Number(r.popularity) || 0, aliases: r.aliases ?? [],
         }));

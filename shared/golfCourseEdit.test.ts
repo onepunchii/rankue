@@ -29,7 +29,7 @@ describe("골프장 이름 규칙", () => {
     });
 
     it("'고친 칸'의 이름은 넷 — 이름 · 좌표 · 홈페이지 · 전화", () => {
-        expect([...ADMIN_KEEP_KEYS]).toEqual(["name", "coords", "website", "phone"]);
+        expect([...ADMIN_KEEP_KEYS]).toEqual(["name", "coords", "website", "phone", "holes"]);
     });
 });
 
@@ -134,3 +134,39 @@ describe("화면이 규칙대로 이어져 있는가(소스)", () => {
         expect(view).not.toContain("스크립트를 다시 돌리면 다시 채워집니다");
     });
 });
+
+describe("같은 코스가 두 번 · 홀 수 고치기(2026-10-17 — 파주CC · 삼삼CC · 안성W)", () => {
+    const P = (s: string) => s.split("").map(Number);
+    it("방위 이름의 한 · 영 짝 + 홀별 파가 같으면 하나(한글 이름) — 파주CC 36 → 18홀", async () => {
+        const { pageCoursesFromNines } = await import("./golfParEdit");
+        const cs = pageCoursesFromNines([{ name: "EAST", pars: P("443535444") }, { name: "WEST", pars: P("445344354") }, { name: "동", pars: P("443535444") }, { name: "서", pars: P("445344354") }])!;
+        expect(cs.map((c) => c.name)).toEqual(["동", "서"]);
+        expect(cs.reduce((a, c) => a + c.holes, 0)).toBe(18);
+    });
+    it("OUT · IN 의 홀별 파가 같으면 같은 9홀을 두 번(loop) — 삼삼CC · 다르면 진짜 18홀(안성W)", async () => {
+        const { pageCoursesFromNines } = await import("./golfParEdit");
+        const same = pageCoursesFromNines([{ name: "IN", pars: P("454434435") }, { name: "OUT", pars: P("454434435") }])!;
+        expect(same).toEqual([{ name: "OUT · IN", par: 36, holes: 9, loop: true }]);
+        const diff = pageCoursesFromNines([{ name: "IN", pars: P("453444435") }, { name: "OUT", pars: P("445443435") }])!;
+        expect(diff.map((c) => c.name)).toEqual(["IN", "OUT"]);
+    });
+    it("이름이 짝이 아니면 파가 같아도 합치지 않는다", async () => {
+        const { pageCoursesFromNines } = await import("./golfParEdit");
+        expect(pageCoursesFromNines([{ name: "LAKE", pars: P("443535444") }, { name: "HILL", pars: P("443535444") }])!).toHaveLength(2);
+    });
+    it("홀 수 칸 — 9 ~ 90 정수 · 비우면 모름", async () => {
+        const { cleanHoles } = await import("./golfParEdit");
+        expect(cleanHoles("18")).toEqual({ ok: true, value: 18 });
+        expect(cleanHoles("")).toEqual({ ok: true, value: null });
+        expect(cleanHoles(5).ok).toBe(false);
+        expect(cleanHoles("18.5").ok).toBe(false);
+    });
+    it("적재 · 어드민 · 화면이 같은 식을 쓴다 · 어드민에서 홀 수를 고친다", () => {
+        const load = readFileSync(resolve(__dirname, "../server/scripts/golf-course-pages.ts"), "utf8");
+        expect(load).toContain("pageCoursesFromNines(rows)");
+        expect(readFileSync(resolve(__dirname, "../server/routes/modules/golfCourses.ts"), "utf8")).toContain("pageCoursesFromNines(ninesByClub.get(String(r.club_id))!)");
+        expect(readFileSync(resolve(__dirname, "../server/routes/modules/adminGolf/courses.ts"), "utf8")).toContain('const PAGE_FIELDS: PageField[] = ["website", "phone", "logo", "holes"];');
+        expect(readFileSync(resolve(__dirname, "../client/src/pages/admin/golf/GolfCoursesView.tsx"), "utf8")).toContain('data-testid="admin-course-holes"');
+    });
+});
+

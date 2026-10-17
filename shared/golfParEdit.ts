@@ -85,7 +85,37 @@ export function compareCodePoints(a: string, b: string): number {
     return A.length - B.length;
 }
 
-export interface PageCourse { name: string; par: number; holes: number }
+export interface PageCourse { name: string; par: number; holes: number; /** 같은 9홀을 두 번 도는 OUT · IN(2026-10-17 — 삼삼CC) */ loop?: true }
+
+/**
+ * 원장에 같은 코스가 두 번 실린 것을 하나로(2026-10-17 리뷰).
+ *   - 방위 이름의 한 · 영 짝(EAST · 동, WEST · 서 …)이고 홀별 파가 똑같으면 → 한 코스(한글 이름을 남긴다) — 파주CC
+ *   - OUT · IN(전반 · 후반) 둘의 홀별 파가 똑같으면 → 같은 9홀을 두 번 도는 곳(loop) — 삼삼CC. 파가 다르면(골프존카운티 안성W) 진짜 18홀이다
+ * 이름이 짝이 **아니면** 파가 같아도 합치지 않는다(파 줄이 우연히 같은 다른 코스일 수 있다).
+ */
+const DIR: Readonly<Record<string, string>> = { EAST: "동", 동: "동", WEST: "서", 서: "서", SOUTH: "남", 남: "남", NORTH: "북", 북: "북" };
+const HALF: Readonly<Record<string, "out" | "in">> = { OUT: "out", 전반: "out", 아웃: "out", IN: "in", 후반: "in", 인: "in" };
+const nameKey = (n: string) => n.normalize("NFC").replace(/\s+/g, "").replace(/(코스|COURSE)$/i, "").toUpperCase();
+const parsOf = (v: unknown): number[] => (Array.isArray(v) ? v.map(Number).filter((n) => n > 0) : []);
+export function dedupeNines<T extends { name: string; pars: unknown }>(rows: readonly T[]): (T & { loop?: true })[] {
+    const out: (T & { loop?: true })[] = [];
+    const same = (a: unknown, b: unknown) => { const x = parsOf(a), y = parsOf(b); return x.length > 0 && x.length === y.length && x.every((n, i) => n === y[i]); };
+    for (const r of rows) {
+        const d = DIR[nameKey(String(r.name))];
+        if (d) {
+            const i = out.findIndex((o) => DIR[nameKey(String(o.name))] === d && same(o.pars, r.pars));
+            if (i >= 0) { if (/[가-힣]/.test(String(r.name)) && !/[가-힣]/.test(String(out[i].name))) out[i] = r; continue; }
+        }
+        out.push(r);
+    }
+    const oi = out.findIndex((o) => HALF[nameKey(String(o.name))] === "out");
+    const ii = out.findIndex((o) => HALF[nameKey(String(o.name))] === "in");
+    if (oi >= 0 && ii >= 0 && parsOf(out[oi].pars).length === 9 && same(out[oi].pars, out[ii].pars)) {
+        const merged = { ...out[oi], name: `${out[oi].name} · ${out[ii].name}`, loop: true as const };
+        return out.filter((_, k) => k !== ii).map((o, k) => (k === (oi < ii ? oi : oi - 1) ? merged : o));
+    }
+    return out;
+}
 
 /**
  * 골프장 페이지 courses 칸 — 적재 스크립트 buildPages 와 **같은 식**(바꾸면 거기도 같이):
@@ -95,10 +125,10 @@ export interface PageCourse { name: string; par: number; holes: number }
 export function pageCoursesFromNines(rows: readonly { name: string; pars: unknown }[]): PageCourse[] | null {
     const out: PageCourse[] = [];
     const sorted = [...rows].sort((a, b) => compareCodePoints(String(a.name), String(b.name)));
-    for (const r of sorted) {
+    for (const r of dedupeNines(sorted)) {
         const pars: number[] = Array.isArray(r.pars) ? r.pars.map(Number).filter((n: number) => n > 0) : [];
         if (!pars.length) continue;
-        out.push({ name: r.name, par: pars.reduce((a, b) => a + b, 0), holes: pars.length });
+        out.push({ name: r.name, par: pars.reduce((a, b) => a + b, 0), holes: pars.length, ...(r.loop ? { loop: true as const } : {}) });
     }
     return out.length ? out : null;
 }
@@ -145,7 +175,15 @@ export const COURSE_LIST_MAX = 2000;
  * 어드민에서 고친 골프장 페이지 칸(golf_course_pages.admin_keep 에 적는 이름).
  * 적재 스크립트가 원본 자료로 페이지를 다시 쓸 때 이 칸들은 건드리지 않는다 — 고친 값이 다음 적재에 조용히 되돌아가지 않게(2026-10-07).
  */
-export const ADMIN_KEEP_KEYS = ["name", "coords", "website", "phone"] as const;
+export const ADMIN_KEEP_KEYS = ["name", "coords", "website", "phone", "holes"] as const;
+
+/** 골프장 홀 수(어드민에서 고친다, 2026-10-17 — 명부가 9 · 18 로 틀린 곳: 골프존카운티 안성W · 오투리조트 · 용인CC). 9 ~ 90 의 정수, 비우면 모름 */
+export function cleanHoles(v: unknown): { ok: true; value: number | null } | { ok: false; error: string } {
+    if (v === null || v === "") return { ok: true, value: null };
+    const n = Number(v);
+    if (!Number.isInteger(n) || n < 9 || n > 90) return { ok: false, error: "홀 수는 9에서 90 사이의 정수로 적어 주세요" };
+    return { ok: true, value: n };
+}
 export type AdminKeepKey = (typeof ADMIN_KEEP_KEYS)[number];
 
 // ── 골프장 이름 ────────────────────────────────────────────────────

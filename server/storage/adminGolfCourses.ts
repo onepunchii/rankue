@@ -331,7 +331,7 @@ export async function addNine(clubId: string, name: string, pars: number[]): Pro
     });
 }
 
-type PageFields = { website: string | null; phone: string | null; logo: string | null };
+type PageFields = { website: string | null; phone: string | null; logo: string | null; /** 홀 수(2026-10-17 — 명부가 틀린 곳을 고친다) */ holes: number | null };
 export type PageField = keyof PageFields;
 export type PagePatchResult =
     | { ok: true; before: PageFields; after: PageFields; changed: PageField[] }
@@ -340,9 +340,9 @@ export type PagePatchResult =
 
 /** 페이지 칸 고치기 — 바꿀 칸만. expected 에 적힌 칸은 지금 값이 그것과 같을 때만 쓴다. */
 export async function patchCoursePage(slug: string, changes: Partial<PageFields>, expected?: Partial<PageFields>): Promise<PagePatchResult> {
-    const COLS: PageField[] = ["website", "phone", "logo"];
-    const pick = (r: any): PageFields => ({ website: r.website ?? null, phone: r.phone ?? null, logo: r.logo ?? null });
-    const [cur] = await q(sql`select website, phone, logo from golf_course_pages where slug = ${slug}`);
+    const COLS: PageField[] = ["website", "phone", "logo", "holes"];
+    const pick = (r: any): PageFields => ({ website: r.website ?? null, phone: r.phone ?? null, logo: r.logo ?? null, holes: r.holes == null ? null : Number(r.holes) });
+    const [cur] = await q(sql`select website, phone, logo, holes from golf_course_pages where slug = ${slug}`);
     if (!cur) return { ok: false, reason: "gone" };
     const sets: SQL[] = [];
     const conds: SQL[] = [sql`slug = ${slug}`];
@@ -351,18 +351,18 @@ export async function patchCoursePage(slug: string, changes: Partial<PageFields>
         if (!(k in changes)) continue;
         // 칸 이름은 위의 고정 목록에서만 온다(사용자 입력이 아니다)
         sets.push(sql`${sql.raw(k)} = ${changes[k] ?? null}`);
-        if (expected && k in expected) conds.push(sql`${sql.raw(k)} is not distinct from ${expected[k] ?? null}::text`);
+        if (expected && k in expected) conds.push(k === "holes" ? sql`holes is not distinct from ${expected[k] ?? null}::int` : sql`${sql.raw(k)} is not distinct from ${expected[k] ?? null}::text`);
         changed.push(k);
     }
     if (!sets.length) return { ok: true, before: pick(cur), after: pick(cur), changed: [] };
-    // 홈페이지·전화를 고쳤으면(지운 것 포함) 다시 적재해도 그 값이 남게 적어 둔다. 로고는 따로다(올린 로고는 주소 꼴로 남긴다 — shared/golfLogo.ts)
+    // 홈페이지·전화·홀 수를 고쳤으면(지운 것 포함) 다시 적재해도 그 값이 남게 적어 둔다. 로고는 따로다(올린 로고는 주소 꼴로 남긴다 — shared/golfLogo.ts)
     const keep = changed.filter((k) => k !== "logo");
     if (keep.length) sets.push(keepSql(keep as AdminKeepKey[]));
     sets.push(sql`updated_at = now()`);
     const [row] = await q(sql`update golf_course_pages set ${sql.join(sets, sql`, `)} where ${sql.join(conds, sql` and `)}
-                              returning website, phone, logo`);
+                              returning website, phone, logo, holes`);
     if (!row) {
-        const [now] = await q(sql`select website, phone, logo from golf_course_pages where slug = ${slug}`);
+        const [now] = await q(sql`select website, phone, logo, holes from golf_course_pages where slug = ${slug}`);
         return now ? { ok: false, reason: "changed", current: pick(now) } : { ok: false, reason: "gone" };
     }
     return { ok: true, before: pick(cur), after: pick(row), changed };

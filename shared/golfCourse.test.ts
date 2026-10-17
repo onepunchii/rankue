@@ -77,7 +77,7 @@ describe("골프장 홀 수 · 코스 · 가까운 골프장(2026-10-17 리뷰)"
         const { readFileSync } = await import("node:fs");
         const { resolve } = await import("node:path");
         const rd = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
-        expect(rd("server/routes/modules/golfCourses.ts")).toContain("holes: pageHoles(r.holes, r.courses)");
+        expect(rd("server/routes/modules/golfCourses.ts")).toContain("holes: pageHoles(r.holes, coursesOf(r))");
         const layout = rd("client/src/golf/components/course/detail/CourseLayout.tsx");
         expect(layout).toContain("`${holes}홀 · 파는 ${totalHoles}홀만`");
         expect(layout).toContain("파 확인 중");

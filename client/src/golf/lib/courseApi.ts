@@ -61,7 +61,8 @@ export interface CourseDetail {
     spot?: { lat: number; lng: number; approx: boolean } | null;
     parts: { courseId: number; kind: string; holes: number | null }[] | null;
     /** 랭큐매치 코스별 파 */
-    courses: { name: string; par: number; holes: number }[] | null;
+    /** loop: 같은 9홀을 두 번 도는 OUT · IN(shared/golfParEdit dedupeNines) */
+    courses: { name: string; par: number; holes: number; loop?: true }[] | null;
     /** TGM 소개문 */
     intro: string | null;
     /** 코스 가이드(2026-10-12) — 서버가 걸러 담아 둔 값. 없는 골프장 · 옛 응답에는 없다 */

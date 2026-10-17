@@ -27,7 +27,7 @@ import { distanceKm } from "@shared/golfJoin";
 import { ONSITE_RADIUS_KM } from "@shared/golfOnSite";
 import {
     MISSING_KEYS, MISSING_LABEL, NINE, NINE_SUM_MIN, NINE_SUM_MAX, NINE_NAME_MAX,
-    isParValue, isUnusualNineSum, cleanNineName, nineNameKey, cleanWebsite, cleanPhone,
+    isParValue, isUnusualNineSum, cleanNineName, nineNameKey, cleanWebsite, cleanPhone, cleanHoles, pageCoursesFromNines,
     checkKoreaCoords, parseLatLngText, parseParsText, cleanCourseName, COURSE_NAME_MAX,
     type MissingKey, type PageCourse, type LogoOrigin,
 } from "@shared/golfParEdit";
@@ -354,7 +354,7 @@ function CourseSheet({ slug, onClose }: { slug: string | null; onClose: () => vo
                         <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 space-y-5">
                             <NinesSection d={d} />
                             <Section title="골프장 이름"><NameEditor d={d} /></Section>
-                            <Section title="홈페이지 · 전화"><ContactEditor d={d} /></Section>
+                            <Section title="홈페이지 · 전화 · 홀 수"><ContactEditor d={d} /></Section>
                             <Section title="로고"><LogoEditor d={d} /></Section>
                             <Section title={d.club ? "좌표" : "골프장 페이지 좌표"} meta={d.club ? `현장 인증 반경 ${ONSITE_RADIUS_KM}km` : undefined}><CoordsEditor d={d} /></Section>
                             <p className="text-[11.5px] leading-relaxed text-black/40">
@@ -729,13 +729,20 @@ function ContactEditor({ d }: { d: Detail }) {
     const qc = useQueryClient();
     const [website, setWebsite] = useState(d.website ?? "");
     const [phone, setPhone] = useState(d.phone ?? "");
-    useEffect(() => { setWebsite(d.website ?? ""); setPhone(d.phone ?? ""); }, [d.slug, d.website, d.phone]);
+    // 홀 수(2026-10-17) — 명부가 틀린 곳(안성W 9 → 18 · 오투리조트 18 → 27 · 용인CC 9 → 18)을 공식 홈페이지를 보고 고친다. 다시 적재해도 남는다
+    const holesText = d.holes == null ? "" : String(d.holes);
+    const [holes, setHoles] = useState(holesText);
+    useEffect(() => { setWebsite(d.website ?? ""); setPhone(d.phone ?? ""); setHoles(d.holes == null ? "" : String(d.holes)); }, [d.slug, d.website, d.phone, d.holes]);
     const w = cleanWebsite(website);
     const p = cleanPhone(phone);
+    const h = cleanHoles(holes.trim());
     const wDirty = website !== (d.website ?? "");
     const pDirty = phone !== (d.phone ?? "");
-    const dirty = wDirty || pDirty;
-    const valid = (!wDirty || w.ok) && (!pDirty || p.ok);
+    const hDirty = holes.trim() !== holesText;
+    const dirty = wDirty || pDirty || hDirty;
+    const valid = (!wDirty || w.ok) && (!pDirty || p.ok) && (!hDirty || h.ok);
+    // 코스 줄의 홀 합(같은 코스가 두 번 실린 것은 하나로 센 값) — 홀 수와 다르면 알려 준다
+    const ninesHoles = (pageCoursesFromNines(d.nines) ?? []).reduce((a, c) => a + c.holes, 0);
     // 지금 들어 있는 값이 꼴에 안 맞으면(앞뒤 공백·http 없는 주소) 알려 준다 — 그 주소로는 링크가 깨진다
     const wStoredBad = !!d.website && !wDirty && !cleanWebsite(d.website).ok;
     const pStoredBad = !!d.phone && !pDirty && !cleanPhone(d.phone).ok;
@@ -743,7 +750,7 @@ function ContactEditor({ d }: { d: Detail }) {
     const save = useMutation({
         mutationFn: (body: Record<string, unknown>) => apiRequest(`${API}/${encodeURIComponent(d.slug)}`, { method: "PATCH", body }),
         onSuccess: (_r, body) => {
-            const what = ["website" in body ? "홈페이지" : null, "phone" in body ? "전화" : null].filter(Boolean).join("·");
+            const what = ["website" in body ? "홈페이지" : null, "phone" in body ? "전화" : null, "holes" in body ? "홀 수" : null].filter(Boolean).join("·");
             toast({ title: `${what}를 저장했습니다` });
             void qc.invalidateQueries({ queryKey: GOLF_COURSES_KEY });
         },
@@ -759,6 +766,7 @@ function ContactEditor({ d }: { d: Detail }) {
         const expected: Record<string, string | null> = {};
         if (wDirty && w.ok) { body.website = w.value; expected.website = d.website; }
         if (pDirty && p.ok) { body.phone = p.value; expected.phone = d.phone; }
+        if (hDirty && h.ok) { body.holes = h.value; (expected as Record<string, unknown>).holes = d.holes; }
         body.expected = expected;
         const clearingSite = wDirty && w.ok && !w.value && !!d.website;
         const clearing = [clearingSite ? "홈페이지 주소" : null, pDirty && p.ok && !p.value && d.phone ? "전화번호" : null].filter(Boolean);
@@ -786,9 +794,18 @@ function ContactEditor({ d }: { d: Detail }) {
                 {pDirty && !p.ok && <span className="mt-1 block text-[11.5px] font-bold text-red-600">{p.error}</span>}
                 {pStoredBad && <span className="mt-1 block text-[11.5px] font-bold text-amber-700">지금 번호에 공백 등 꼴에 맞지 않는 글자가 있습니다 — 고쳐 주세요</span>}
             </label>
+            <label className="block">
+                <span className="text-[12px] font-bold text-black/50">홀 수 <span className="font-medium text-black/40">— 공식 홈페이지의 홀 수(비우면 모름)</span></span>
+                <input value={holes} onChange={(e) => setHoles(e.target.value.replace(/[^0-9]/g, ""))} placeholder="18" inputMode="numeric" autoComplete="off" data-testid="admin-course-holes"
+                    className={cn("mt-1 tabular-nums", field, hDirty && !h.ok ? "border-red-400" : "border-black/10")} />
+                {hDirty && !h.ok && <span className="mt-1 block text-[11.5px] font-bold text-red-600">{h.error}</span>}
+                {!hDirty && ninesHoles > 0 && d.holes != null && ninesHoles !== d.holes && (
+                    <span className="mt-1 block text-[11.5px] font-bold text-amber-700" data-testid="admin-course-holes-mismatch">코스 줄의 홀 합은 {ninesHoles}홀입니다 — 공식 홈페이지를 보고 어느 쪽이 맞는지 확인해 주세요</span>
+                )}
+            </label>
             {dirty && (
                 <div className="flex gap-2 pt-0.5">
-                    <button onClick={() => { setWebsite(d.website ?? ""); setPhone(d.phone ?? ""); }} disabled={save.isPending}
+                    <button onClick={() => { setWebsite(d.website ?? ""); setPhone(d.phone ?? ""); setHoles(holesText); }} disabled={save.isPending}
                         className="flex-1 h-9 rounded-lg border border-black/10 bg-white text-[13px] font-bold text-black/60 disabled:opacity-50">되돌리기</button>
                     <button data-admin-write onClick={() => void onSave()} disabled={!valid || save.isPending}
                         className="flex-1 h-9 rounded-lg bg-brand text-white text-[13px] font-bold hover:bg-brand-strong disabled:opacity-40">

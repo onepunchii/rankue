@@ -36,7 +36,7 @@ import {
 } from "../../../storage/adminGolfCourses.js";
 import {
     MISSING_KEYS, NINES_PER_CLUB_MAX, NINE_SUM_MIN, NINE_SUM_MAX, COURSE_LIST_MAX, type MissingKey,
-    checkNinePars, isExpectedParsShape, cleanNineName, cleanWebsite, cleanPhone, checkKoreaCoords, cleanCourseName, logoOrigin,
+    checkNinePars, isExpectedParsShape, cleanNineName, cleanWebsite, cleanPhone, cleanHoles, checkKoreaCoords, cleanCourseName, logoOrigin,
 } from "../../../../shared/golfParEdit.js";
 import { GOLF_LOGO_MAX_BYTES, GOLF_LOGO_MAX_PX, cleanRemoteImageUrl, golfLogoBlobPath, isUploadedLogo } from "../../../../shared/golfLogo.js";
 import { fetchRemoteImage, type RemoteImageResult } from "../../../lib/remoteImage.js";
@@ -202,14 +202,14 @@ router.put("/:slug/name", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, { slug, name: r.after, aliases: r.aliases, club: r.club, unchanged: r.unchanged });
 }));
 
-const PAGE_FIELDS: PageField[] = ["website", "phone", "logo"];
+const PAGE_FIELDS: PageField[] = ["website", "phone", "logo", "holes"];
 router.patch("/:slug", asyncHandler(async (req: any, res: any) => {
     const slug = String(req.params.slug).normalize("NFC");
     const body = isPlainObject(req.body) ? req.body : {};
     const unknown = Object.keys(body).filter((k) => !PAGE_FIELDS.includes(k as PageField) && k !== "expected");
     if (unknown.length) return sendError(res, 400, `고칠 수 없는 칸입니다: ${unknown.join(", ")}`);
 
-    const changes: Partial<Record<PageField, string | null>> = {};
+    const changes: Partial<{ website: string | null; phone: string | null; logo: string | null; holes: number | null }> = {};
     if ("website" in body) {
         const w = cleanWebsite(body.website);
         if (!w.ok) return sendError(res, 400, w.error);
@@ -224,15 +224,21 @@ router.patch("/:slug", asyncHandler(async (req: any, res: any) => {
         if (body.logo !== null) return sendError(res, 400, "여기서는 로고를 내리기만 합니다 — 올리기는 POST /:slug/logo");
         changes.logo = null;
     }
+    if ("holes" in body) {
+        const h = cleanHoles(body.holes);
+        if (!h.ok) return sendError(res, 400, h.error);
+        changes.holes = h.value;
+    }
     if (!Object.keys(changes).length) return sendError(res, 400, "고칠 칸이 없습니다");
 
-    let expected: Partial<Record<PageField, string | null>> | undefined;
+    let expected: Partial<{ website: string | null; phone: string | null; logo: string | null; holes: number | null }> | undefined;
     if (body.expected !== undefined) {
         if (!isPlainObject(body.expected)) return sendError(res, 400, "고치기 전 값(expected)의 모양이 잘못됐습니다");
         expected = {};
         for (const [k, v] of Object.entries(body.expected)) {
-            if (!PAGE_FIELDS.includes(k as PageField) || (v !== null && typeof v !== "string")) return sendError(res, 400, "고치기 전 값(expected)의 모양이 잘못됐습니다");
-            expected[k as PageField] = v;
+            const okType = k === "holes" ? v === null || (typeof v === "number" && Number.isInteger(v)) : v === null || typeof v === "string";
+            if (!PAGE_FIELDS.includes(k as PageField) || !okType) return sendError(res, 400, "고치기 전 값(expected)의 모양이 잘못됐습니다");
+            (expected as any)[k] = v;
         }
     }
 
