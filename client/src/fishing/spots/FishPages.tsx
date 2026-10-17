@@ -7,7 +7,7 @@
  *
  * **어종 정보를 지어 쓰지 않는다** — 받은 칸만 그린다(shared/fishingFishPages 머리말). ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
@@ -17,7 +17,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { FISHING_COLORS as C } from "@shared/fishing";
 import { fishValueText, type FishKind } from "@shared/fishingFish";
 import { FISH_GUIDE_NAME, FISH_REG_NAMES } from "@shared/fishingFishInfo";
-import { goodSpots, rangeText, type IndexMap } from "@shared/fishingPort";
+import { bestOf, goodSpots, rangeText, type IndexMap } from "@shared/fishingPort";
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
 import { FISHING_SPOTS_PATH } from "@shared/fishingPlaces";
 import { josa } from "@shared/briefingMeta";
@@ -26,6 +26,7 @@ import { fishingFishCardUrl } from "@shared/ogCards";
 import { INDEX_TONE, INK, PAPER, Seal, art } from "../ink";
 import { OurGuideStory, RegBox, useRegs } from "../Guide";
 import { PaperMap, Row, Shell, useSpots } from "./SpotsPages";
+import { PIXEL_LEGEND, SeaChart, type ChartSpot } from "../SeaChart";
 
 const SHEET = { color: INK, background: `radial-gradient(120% 70% at 20% 0%, #F6F0E2 0%, ${PAPER} 55%, #E7DEC9 100%)`, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" } as const;
 const RULE = "1px dashed #0F283826";
@@ -80,6 +81,7 @@ export function FishPage({ name }: { name: string }) {
     const [, setLocation] = useLocation();
     const { member } = useAuth();
     const today = kstToday();
+    const [picked, setPicked] = useState<string | null>(null);
     const { data: spots } = useSpots();
     const { data: regs } = useRegs();
     const sea = f?.water === "sea";
@@ -90,6 +92,8 @@ export function FishPage({ name }: { name: string }) {
     useSeo(f && seo ? { title: seo.title, description: seo.description, path: fishingFishPath(f.name), locale: "ko", image: fishingFishCardUrl("https://www.rankue.co.kr", f.id) } : null);
     if (!f || !seo) return <Shell title={FISHING_FISH_LABEL}><p className="px-5 py-16 text-center text-[15px]" style={{ color: C.soft }}>없는 어종이에요.</p><div className="px-5"><Link href={FISHING_FISH_PATH} className="flex h-11 items-center justify-center rounded-xl text-[14px]" style={{ background: "#FFFFFF0F", color: C.soft }}>낚시 어종 보기</Link></div></Shell>;
     const indexed = !!map?.fishes.includes(f.name);
+    // 오늘 이 어종의 바다 — 앱의 낚시지수 지도와 같은 그림(지점의 단계를 거리로 섞은 칸, 42km 밖은 칠하지 않는다)
+    const chart: ChartSpot[] = map && indexed ? map.spots.map((x) => ({ name: x.name, lat: x.lat, lng: x.lng, step: bestOf(x.fish[f.name]) })) : [];
     const good = map && indexed ? goodSpots(map, f.name, 5) : [];
     const week = market?.fish.find((x) => x.id === f.id) ?? null;
     const md = (d: string) => `${Number(d.slice(5, 7))}.${Number(d.slice(8))}`;
@@ -126,16 +130,23 @@ export function FishPage({ name }: { name: string }) {
             {indexed && map && (
                 <section className="px-5 pt-7" data-testid="fish-good">
                     <H2 aside="국립해양조사원 바다낚시지수">오늘 {f.name} 좋은 곳</H2>
+                    <div className="mb-3 overflow-hidden rounded-2xl" style={{ background: PAPER, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }} data-testid="fish-index-map">
+                        <SeaChart areas={[]} picked={null} onPick={() => {}} spots={chart} spot={picked} onSpot={(n) => setPicked(n === picked ? null : n)} pixels />
+                        <div className="flex items-center gap-1 border-t px-3.5 py-2.5 text-[12px]" style={{ borderColor: "#0F28381F", color: "#0F2838B3" }}>
+                            나쁨{[0, 1, 2, 3, 4].map((k) => <i key={k} aria-hidden className="h-3 w-3 rounded-[2px]" style={{ background: PIXEL_LEGEND[k] }} />)}매우좋음
+                            <span className="ml-auto">점을 누르면 이름이 보여요</span>
+                        </div>
+                    </div>
                     <div className="rounded-2xl bg-[#FFFFFF0A] px-3.5">
                         {good.length === 0 ? <p className="py-4 text-[14px]" style={{ color: C.soft }}>오늘은 좋음 이상인 곳이 없어요</p> : (
                             <ul className="divide-y divide-[#FFFFFF14]">
                                 {good.map((g, i) => (
-                                    <li key={g.spot.name} className="flex min-h-[52px] items-center gap-3 py-2">
+                                    <li key={g.spot.name}><button type="button" className="flex min-h-[52px] w-full items-center gap-3 py-2 text-left" onClick={() => { setPicked(g.spot.name); document.querySelector('[data-testid="fish-index-map"]')?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }} aria-pressed={picked === g.spot.name}>
                                         <span className="w-4 shrink-0 text-center text-[13px] tabular-nums" style={{ color: C.dim }}>{i + 1}</span>
                                         <span className="min-w-0 flex-1"><span className="block truncate text-[15.5px] font-semibold">{g.spot.name}</span>
                                             <span className="mt-0.5 block truncate text-[13px] tabular-nums" style={{ color: C.dim }}>{[g.spot.wave ? `파고 ${rangeText(g.spot.wave)}m` : null, g.spot.wtemp ? `수온 ${rangeText(g.spot.wtemp)}°` : null].filter(Boolean).join(" · ")}</span></span>
                                         <span className="flex h-7 shrink-0 items-center rounded-full px-2.5 text-[12.5px]" style={{ background: INDEX_TONE[g.step].bg, color: INDEX_TONE[g.step].text }}>{g.step}</span>
-                                    </li>
+                                    </button></li>
                                 ))}
                             </ul>
                         )}

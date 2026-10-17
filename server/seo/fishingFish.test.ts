@@ -93,5 +93,9 @@ describe("낚시 어종 공개 페이지", () => {
         expect(r).toContain('router.get("/market", asyncHandler(');
         expect(r).toContain('router.get("/index-map", asyncHandler(');
         expect(read("server/ogImage.ts")).toContain('app.get("/og/fishing-fish/:id.png"');
+        // 바다 어종은 오늘의 낚시지수 지도(앱과 같은 그림)를 같이 그린다 — 그 어종의 단계로
+        const page = read("client/src/fishing/spots/FishPages.tsx");
+        expect(page).toContain('data-testid="fish-index-map"');
+        expect(page).toContain("step: bestOf(x.fish[f.name])");
     });
 });
