@@ -9,7 +9,7 @@ import { db } from "../db.js";
 /** 출처 이름 — 화면(어드민 공공자료)이 이 이름으로 묶는다 */
 export type FeedSource =
     | "khoa:fcstFishingv2" | "khoa:surveyTideLevel" | "khoa:surveyWaterTemp" | "khoa:surveyAirTemp" | "khoa:twRecent" | "khoa:surveySeafog"
-    | "kasi:riseSet" | "kma:pwn" | "mof:market" | "krc:reservoir";
+    | "kasi:riseSet" | "kma:pwn" | "kma:seaFcst" | "mof:market" | "krc:reservoir";
 
 export async function noteFeed(source: FeedSource, ok: boolean, why: string | null = null): Promise<void> {
     try {

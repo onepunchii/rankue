@@ -22,6 +22,7 @@ export const FISHING_FEEDS: readonly FishingFeedDef[] = [
     { id: "tide", label: "조위 예측", use: "물때 · 만조 · 간조", kind: "tide", ttlMin: null, sources: ["khoa:surveyTideLevel"] },
     { id: "sun", label: "해 뜨고 지는 때", use: "항구 브리핑 · 출조 시간", kind: "sun", ttlMin: null, sources: ["kasi:riseSet"] },
     { id: "sea", label: "바다 특보", use: "오늘 바다 맨 위의 풍랑 · 폭풍해일 주의보", kind: "sea", ttlMin: 15, sources: ["kma:pwn"] },
+    { id: "seafcst", label: "바다 예보(반나절)", use: "오늘 바다 — 고른 해역의 물결 · 바람 · 날씨", kind: "seafcst", ttlMin: 60, sources: ["kma:seaFcst"] },
     { id: "market", label: "위판 · 경매 건수", use: "제철 어종(어시장 경매)", kind: "market", ttlMin: 24 * 60, sources: ["mof:market"] },
     { id: "resv", label: "저수지 물높이", use: "민물 — 저수지 물이 얼마나 찼나", kind: "resv", ttlMin: 360, sources: ["krc:reservoir"] },
 ];
@@ -29,7 +30,7 @@ export const FISHING_FEEDS: readonly FishingFeedDef[] = [
 export const SOURCE_LABEL: Readonly<Record<string, string>> = {
     "khoa:fcstFishingv2": "해양조사원 · 낚시지수", "khoa:surveyTideLevel": "해양조사원 · 조위", "khoa:surveyWaterTemp": "해양조사원 · 수온",
     "khoa:surveyAirTemp": "해양조사원 · 기온", "khoa:twRecent": "해양조사원 · 부이", "khoa:surveySeafog": "해양조사원 · 해무",
-    "kasi:riseSet": "천문연구원 · 출몰시각", "kma:pwn": "기상청 · 특보", "mof:market": "해양수산부 · 위판", "krc:reservoir": "농어촌공사 · 저수지",
+    "kasi:riseSet": "천문연구원 · 출몰시각", "kma:pwn": "기상청 · 특보", "kma:seaFcst": "기상청 · 해상예보", "mof:market": "해양수산부 · 위판", "krc:reservoir": "농어촌공사 · 저수지",
 };
 
 export type FeedState = "fresh" | "stale" | "empty";

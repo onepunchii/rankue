@@ -5,6 +5,7 @@
  *   DELETE /api/hiq/fishing/catches/:id  내 줄 지우기
  *   GET    /api/hiq/fishing/places       낚시터 찾기(지역 · 글자)
  *   GET    /api/hiq/fishing/sea          오늘의 바다 — 해역 일곱 곳의 풍랑특보(기상청)
+ *   GET    /api/hiq/fishing/sea/forecast/:area  고른 해역의 반나절 바다 예보(기상청 해상예보)
  *   GET    /api/hiq/fishing/reservoirs         민물 — 고른 저수지들의 저수율(?codes= 여섯 곳까지 · 없으면 처음 보이는 여섯 곳)
  *   GET    /api/hiq/fishing/reservoirs/search  시군 이름으로 저수지 찾기(?county=)
  *   GET    /api/hiq/fishing/boats        낚시어선 명부 찾기(?q= 지역 · 항 · 배 이름) — 신고 정보 그대로
@@ -27,6 +28,8 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
 import { fishingAllowed } from "../../lib/fishingAccess.js";
 import { getSeaNow } from "../../services/fishingSea.js";
+import { getSeaFcst } from "../../services/fishingSeaFcst.js";
+import { SEA_FCST_REG } from "../../../shared/fishingSeaFcst.js";
 import { getIndexMap, getPortBrief } from "../../services/fishingPort.js";
 import { nearestWeather, type CatchWeather } from "../../../shared/fishingSpot.js";
 import { rankColumn, rankRows, type FishingRankBoard, type FishingRankSpecies } from "../../../shared/fishingRank.js";
@@ -192,6 +195,14 @@ router.post("/catches/:id/appeal", requireAuth, gate, asyncHandler(async (req: A
 router.get("/sea", requireAuth, gate, asyncHandler(async (_req: AuthRequest, res: any) => {
     res.setHeader("Cache-Control", "private, max-age=120");
     return sendSuccess(res, await getSeaNow().catch(() => null));
+}));
+
+/** 바다 예보 — 고른 해역의 반나절 예보(기상청 해상예보, shared/fishingSeaFcst). 못 받았으면 null(화면은 그 줄을 그리지 않는다) */
+router.get("/sea/forecast/:area", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const area = String(req.params.area ?? "");
+    if (!SEA_FCST_REG[area]) return sendError(res, 404, "없는 바다예요");
+    res.setHeader("Cache-Control", "private, max-age=600");
+    return sendSuccess(res, await getSeaFcst(area).catch(() => null));
 }));
 
 /**

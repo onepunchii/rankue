@@ -68,18 +68,8 @@ export function stationFor<T extends { station: string }>(
     return hits.length === 1 ? hits[0] : null;
 }
 
-const DIR_KO: Readonly<Record<string, string>> = {
-    N: "북", NNE: "북북동", NE: "북동", ENE: "동북동", E: "동", ESE: "동남동", SE: "남동", SSE: "남남동",
-    S: "남", SSW: "남남서", SW: "남서", WSW: "서남서", W: "서", WNW: "서북서", NW: "북서", NNW: "북북서",
-};
-/** 바람이 불어오는 쪽 — "북서풍" */
-export const windDirKo = (d: string | null): string | null => (d && DIR_KO[d] ? `${DIR_KO[d]}풍` : null);
-/** 화살표를 돌릴 각도(바람이 불어 가는 쪽, 북=0°) */
-export function windArrowDeg(d: string | null): number | null {
-    const order = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"];
-    const i = d ? order.indexOf(d) : -1;
-    return i < 0 ? null : (i * 22.5 + 180) % 360;
-}
+// 방위 이름 · 화살 각도는 바다 예보와 같이 쓴다(shared/windDir)
+export { windArrowDeg, windDirKo } from "./windDir.js";
 
 /** 체감온도(기상청 겨울철 식 — 10°C 이하 · 풍속 1.3m/s 이상에서만) */
 export function windChill(t: number | null, ms: number | null): number | null {
