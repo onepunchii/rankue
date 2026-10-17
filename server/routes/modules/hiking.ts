@@ -22,6 +22,8 @@ import { distM } from "../../../shared/hikingGeo.js";
 import { judgeSummit, summitHint } from "../../../shared/hikingStamps.js";
 import { getCourseWeather } from "../../services/golfWeather.js";
 import { mountObsAll } from "../../services/hikingMountObs.js";
+import { fireRiskAll } from "../../services/hikingFireRisk.js";
+import { fireFor } from "../../../shared/hikingFireRisk.js";
 import { obsFresh, stationFor } from "../../../shared/hikingMountObs.js";
 import { HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, hikingGroup, hikingRegion, inHikingGroup } from "../../../shared/hikingMountains.js";
 import { toMountainPoint, type MountainPoint } from "../../../shared/hikingNear.js";
@@ -101,16 +103,20 @@ router.get("/mountains/:slug/weather", asyncHandler(async (req: any, res: any) =
     const base = await trailheadOf(m.slug, m.heightM);
     const at = base ?? (m.lat != null && m.lng != null ? { lat: m.lat, lng: m.lng } : null);
     // 산 위 관측(산악기상관측소 — 이름 · 시군이 둘 다 맞는 산에만, shared/hikingMountObs). 예보와 같이 받는다 — 못 받아도 예보는 그대로
-    const [weather, stations] = await Promise.all([
+    // 산불 위험(시군구 — shared/hikingFireRisk)도 같이. 12시간 넘은 분석은 싣지 않는다
+    const [weather, stations, fires] = await Promise.all([
         at ? getCourseWeather({ lat: at.lat, lng: at.lng }, { fetch: true }).catch((e) => { console.error("[HikingWeather]", e); return null; }) : Promise.resolve(null),
         mountObsAll().catch(() => null),
+        fireRiskAll().catch(() => null),
     ]);
     const hit = stations ? stationFor(stations, m) : null;
     const obs = hit && obsFresh(hit, Date.now()) ? hit : null;
-    res.set("Cache-Control", weather || obs ? "public, max-age=300, s-maxage=600, stale-while-revalidate=1800" : "no-store");
+    const fireHit = fires ? fireFor(fires, m) : null;
+    const fire = fireHit && Date.now() - Date.parse(fireHit.at) < 12 * 3600_000 ? fireHit : null;
+    res.set("Cache-Control", weather || obs || fire ? "public, max-age=300, s-maxage=600, stale-while-revalidate=1800" : "no-store");
     const summit: SummitBase | null = weather && base && m.heightM != null ? { heightM: m.heightM, baseM: base.m } : null;
-    if (!weather && !obs) return sendSuccess(res, null);
-    return sendSuccess(res, weather ? { ...weather, summit, obs } : { days: [], hours: [], summit: null, obs });
+    if (!weather && !obs && !fire) return sendSuccess(res, null);
+    return sendSuccess(res, weather ? { ...weather, summit, obs, fire } : { days: [], hours: [], summit: null, obs, fire });
 }));
 
 // ── 산 근처의 맛집 · 카페(2026-10-13) ─────────────────────────────────────

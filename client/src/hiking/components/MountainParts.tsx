@@ -15,6 +15,7 @@ import { HIKING_CTA, WEATHER_NOTE, kmRange } from "@shared/hikingPage";
 import { SUN_NOTE, kstClock, kstYmd, spanText, sunLine, sunTimes } from "@shared/hikingSun";
 import { SUMMIT_WX_COPY, summitFirstDay, summitWx, type SummitBase } from "@shared/hikingSummitWx";
 import { obsAdvice, windArrowDeg, windChill, windDirKo, type MountObs } from "@shared/hikingMountObs";
+import { FIRE_GRADE_LABEL, FIRE_SOURCE, fireHighShare, type FireGrade, type FireRisk } from "@shared/hikingFireRisk";
 import { mountainWeatherKey, type MountainSummary } from "../lib/api";
 import { MountainPatch } from "../stamps/MountainPatch";
 
@@ -74,11 +75,11 @@ const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 /** 산의 날씨 — 오늘부터 이레. 정상 좌표의 격자 예보다(산 위는 더 춥다는 한 줄을 붙인다) */
 export function MountainWeather({ slug }: { slug: string }) {
     // summit: 정상의 날씨를 어림할 바탕(정상 · 들머리의 높이) — 서버가 들머리를 구한 산에만 붙는다. 그때 예보는 들머리 자리의 것이다
-    const { data, isLoading } = useQuery<(CourseWeather & { summit?: SummitBase | null; obs?: MountObs | null }) | null>({ queryKey: mountainWeatherKey(slug), staleTime: 10 * 60_000 });
+    const { data, isLoading } = useQuery<(CourseWeather & { summit?: SummitBase | null; obs?: MountObs | null; fire?: FireRisk | null }) | null>({ queryKey: mountainWeatherKey(slug), staleTime: 10 * 60_000 });
     if (isLoading) return <div className="h-[104px] animate-pulse rounded-2xl bg-[#FFFFFF0F]" aria-busy="true" />;
     if (!data?.days?.length) {
         // 예보는 못 받았어도 산 위에서 잰 값이 있으면 그것만이라도
-        if (data?.obs) return <div data-testid="mountain-weather"><MountainObsCard obs={data.obs} /></div>;
+        if (data?.obs || data?.fire) return <div data-testid="mountain-weather">{data.fire && <FireBand fire={data.fire} />}{data.obs && <MountainObsCard obs={data.obs} />}</div>;
         return <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-4 text-[14px] text-[#F4EFE399]">지금은 날씨를 받아 오지 못했어요.</p>;
     }
     const days = data.days.slice(0, 7);
@@ -106,6 +107,7 @@ export function MountainWeather({ slug }: { slug: string }) {
                     <p className="mt-0.5 text-[20px] font-semibold tabular-nums leading-none" style={{ color: wetOf(today) ? "#8EC5FF" : "#F4EFE3" }}>{popOf(today) > 0 ? `${popOf(today)}%` : "0%"}</p>
                 </div>
             </div>
+            {data.fire && <FireBand fire={data.fire} />}
             {data.obs && <MountainObsCard obs={data.obs} />}
             {data.summit && <SummitWeather hours={data.hours ?? []} heightM={data.summit.heightM} baseM={data.summit.baseM} />}
             {/* 엿새 — 한 줄씩, 기온의 폭을 막대로 */}
@@ -131,7 +133,38 @@ export function MountainWeather({ slug }: { slug: string }) {
                     })}
                 </ul>
             )}
-            <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{WEATHER_NOTE}</p>
+            <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{WEATHER_NOTE}{data.fire ? ` 산불 위험은 ${FIRE_SOURCE}(시군구 전체의 값)예요.` : ""}</p>
+        </div>
+    );
+}
+
+const FIRE_TONE: Readonly<Record<FireGrade, { fg: string; bg: string; line: string }>> = {
+    low: { fg: "#A8D8C0", bg: "#FFFFFF0A", line: "#FFFFFF14" },
+    mid: { fg: "#F6D9A8", bg: "#F6D9A814", line: "#F6D9A833" },
+    high: { fg: "#F28C6A", bg: "#F28C6A1F", line: "#F28C6A4D" },
+    very: { fg: "#FF7A66", bg: "#FF6B5729", line: "#FF6B5766" },
+};
+
+/**
+ * 산불 위험(2026-10-17) — 그 산 시군구의 산불위험지수(산림청 국립산림과학원, 3시간마다 분석). 등급은 면적 비율로 가장 넓은 것.
+ * 입산 통제 여부는 이 자료가 말하지 않는다 — 적지 않는다.
+ */
+function FireBand({ fire }: { fire: FireRisk }) {
+    const t = FIRE_TONE[fire.grade];
+    const k = new Date(Date.parse(fire.at) + 9 * 3600_000);
+    const hi = fireHighShare(fire);
+    return (
+        <div className="mt-2.5 flex items-center gap-3 rounded-2xl px-4 py-3" style={{ background: t.bg, boxShadow: `inset 0 0 0 1px ${t.line}` }} data-testid="mountain-fire">
+            <svg width="22" height="22" viewBox="0 0 24 24" aria-hidden className="shrink-0">
+                <path d="M12 2.5c.6 3.2 3.6 4.6 3.6 8.4 0 .9-.2 1.6-.6 2.3.9-.3 1.8-1.2 2.1-2.4 1.6 1.7 2.4 3.6 2.4 5.3A7.5 7.5 0 0 1 12 23.5a7.5 7.5 0 0 1-7.5-7.4c0-3.6 2.4-5.6 3.6-8 .3 1.4 1 2.3 1.9 2.8C10 7.9 9.9 5.2 12 2.5Z" fill={t.fg} opacity="0.9" />
+            </svg>
+            <div className="min-w-0 flex-1">
+                <p className="text-[14px] text-[#F4EFE3]">산불 위험 <b className="font-semibold" style={{ color: t.fg }}>{FIRE_GRADE_LABEL[fire.grade]}</b>{fire.mean != null && <span className="text-[13px] tabular-nums text-[#F4EFE399]"> · 지수 {Math.round(fire.mean)}</span>}</p>
+                <p className="mt-0.5 truncate text-[12px] text-[#F4EFE380]">
+                    {fire.sigun} 전체 · {k.getUTCHours()}시 분석{hi > 0 && fire.grade !== "high" && fire.grade !== "very" ? ` · 높음 이상 ${hi}%` : ""}
+                </p>
+            </div>
+            {(fire.grade === "high" || fire.grade === "very") && <span className="shrink-0 rounded-full px-2.5 py-1 text-[12px] font-semibold" style={{ background: t.fg, color: "#2A1208" }}>불씨 조심</span>}
         </div>
     );
 }

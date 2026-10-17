@@ -54,6 +54,6 @@ describe("산 위 관측 · 지금", () => {
         const src = read("server/routes/modules/hiking.ts");
         expect(src).toContain("const hit = stations ? stationFor(stations, m) : null;");
         expect(src).toContain("const obs = hit && obsFresh(hit, Date.now()) ? hit : null;");
-        expect(src).toMatch(/weather \? \{ \.\.\.weather, summit, obs \} : \{ days: \[\], hours: \[\], summit: null, obs \}/);
+        expect(src).toMatch(/weather \? \{ \.\.\.weather, summit, obs, fire \} : \{ days: \[\], hours: \[\], summit: null, obs, fire \}/);
     });
 });
