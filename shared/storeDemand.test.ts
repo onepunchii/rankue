@@ -46,6 +46,27 @@ describe("손님이 찾는 매장", () => {
         // 바꾸는 길이 없다(보기 전용 관리자도 본다)
         expect(route).not.toMatch(/router\.(post|patch|put|delete)\(/);
     });
+    it("인증한 사장님은 자기 매장 숫자만 — 대시보드 '내 매장 페이지'와 리포트 카드(매장 코드를 받지 않는다)", () => {
+        const r = read("server/routes/modules/partner.ts");
+        const stats = r.slice(r.indexOf('router.get("/page-stats"'), r.indexOf('router.get("/page-report.png"'));
+        const png = r.slice(r.indexOf('router.get("/page-report.png"'), r.indexOf("// GET /partner/members"));
+        for (const b of [stats, png]) {
+            expect(b).toContain("requirePartner");
+            expect(b).toContain("await ownListingCode(store.id)");
+            expect(b).not.toContain("req.params");
+            expect(b).not.toContain("req.query");
+        }
+        expect(png).toContain("renderStoreReportPng(r, { owner: true })");
+        expect(stats).not.toContain("phone");
+        const dash = read("client/src/pages/partner/dashboard.tsx");
+        expect(dash).toContain('queryKey: ["/api/hiq/partner/page-stats"]');
+        expect(dash).toContain('src="/api/hiq/partner/page-report.png"');
+    });
+    it("인증하면 받는 것 셋은 다섯 언어 모두 — 지금 되는 것만 적는다", () => {
+        const page = read("client/src/pages/store-listing.tsx");
+        for (const k of ["perkTitle", "perk1", "perk2", "perk3", "claimHint"]) expect(page.match(new RegExp(`\\b${k}: "`, "g"))?.length, k).toBe(5);
+        expect(page.match(/<ClaimPerks t=\{t\} \/>/g)?.length).toBe(2);
+    });
     it("어드민 메뉴 '매장' 묶음 맨 앞 · 알림에서 바로 열린다", () => {
         const dash = read("client/src/pages/admin/dashboard.tsx");
         expect(dash).toContain('{ id: "store-demand", label: "손님이 찾는 매장"');

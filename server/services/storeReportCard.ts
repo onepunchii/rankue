@@ -1,6 +1,7 @@
 /**
  * 사장님 리포트 카드 — 1200×1500 PNG(2026-10-18 오너: 당구장 사장님 모집 제안). 어드민 '손님이 찾는 매장'에서 받아
  * 사장님께 전화 · 방문 때 보여 드리는 한 장이다. **공개 카드가 아니다** — 어드민 쿠키로만 열린다(routes/modules/adminStoreDemand).
+ * 인증한 사장님은 자기 매장 것만 대시보드에서 받는다(owner — 아래 줄이 신청 권유 대신 매장 QR, routes/modules/partner /page-report.png).
  *
  *   위(420)   그 매장의 당구대 그림(storeCard 의 tableSvg — 같은 코드 = 같은 그림) + 'RANKUE 매장 리포트' · 기간
  *   가운데    동네 · 이름 · 큰 숫자 셋(본 사람 · 길찾기 · 전화 · 주소 · 네이버 비율) · 날마다 본 사람 막대(가장 많은 날에 숫자)
@@ -40,7 +41,7 @@ function bars(daily: StoreReport["daily"], width: number, height: number): El {
     );
 }
 
-function tree(r: StoreReport): El {
+function tree(r: StoreReport, owner: boolean): El {
     const room = W - PAD * 2;
     const name = nameLines(r.name, room, 120, 100);
     const art = `data:image/svg+xml;base64,${Buffer.from(tableSvg(r.code, W, ART_H)).toString("base64")}`;
@@ -68,7 +69,8 @@ function tree(r: StoreReport): El {
         ),
         // 아래 — 인증하면
         h("div", { position: "absolute", left: PAD, bottom: 64, width: room, flexDirection: "column", borderTop: `2px solid ${LINE}`, paddingTop: 30 },
-            h("div", { fontSize: 34, fontWeight: 700 }, "사장님 인증하면 — 영업시간 · 요금 · 소개를 직접 고치세요"),
+            // 인증한 사장님이 받은 카드(사장님 대시보드)는 신청 권유 대신 매장 QR 한 줄
+            h("div", { fontSize: 34, fontWeight: 700 }, owner ? "매장 QR로 가입한 손님은 우리 매장 회원이 돼요" : "사장님 인증하면 — 영업시간 · 요금 · 소개를 직접 고치세요"),
             h("div", { marginTop: 12, justifyContent: "space-between", alignItems: "flex-end" },
                 h("div", { fontSize: 30, color: GOLD, fontWeight: 700 }, `rankue.co.kr/stores/${r.code}`),
                 h("div", { fontSize: 22, color: MUTED }, "본 사람 = 브라우저 하나 · 랭큐 방문 기록")),
@@ -76,8 +78,8 @@ function tree(r: StoreReport): El {
     );
 }
 
-export async function renderStoreReportPng(r: StoreReport): Promise<Buffer> {
+export async function renderStoreReportPng(r: StoreReport, opts: { owner?: boolean } = {}): Promise<Buffer> {
     const { satori, Resvg } = await engines();
-    const svg = await satori(tree(r) as any, { width: W, height: H, fonts: fonts() });
+    const svg = await satori(tree(r, opts.owner === true) as any, { width: W, height: H, fonts: fonts() });
     return new Resvg(svg, { fitTo: { mode: "width", value: W } }).render().asPng();
 }

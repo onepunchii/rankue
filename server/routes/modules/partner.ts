@@ -9,6 +9,8 @@ import { applicantOf, toMyApplications } from "../../lib/partnerApply.js";
 import { and, eq } from "drizzle-orm";
 import { db } from "../../db.js";
 import { partnerLeads, storeListings } from "../../../shared/schema.js";
+import { storeReport } from "../../storage/storeDemand.js";
+import { renderStoreReportPng } from "../../services/storeReportCard.js";
 
 const router = Router();
 
@@ -315,6 +317,37 @@ router.get("/stats", requirePartner, asyncHandler(async (req: any, res: any) => 
 
     const stats = await storage.getAdminStats(store.id);
     return sendSuccess(res, stats);
+}));
+
+/** 인증한 사장님의 디렉토리 매장 코드(store_listings.claimed_store_id = 이 매장) — 없으면 null */
+async function ownListingCode(storeId: string): Promise<string | null> {
+    const [l] = await db.select({ code: storeListings.code }).from(storeListings).where(eq(storeListings.claimedStoreId, storeId)).limit(1);
+    return l?.code ?? null;
+}
+
+// GET /partner/page-stats — 내 매장 페이지를 본 사람(2026-10-18 사장님 모집 3번: 인증하면 받는 것). 셈은 어드민 '손님이 찾는 매장'과 같다(shared/storeDemand)
+router.get("/page-stats", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    const code = await ownListingCode(store.id);
+    if (!code) return sendSuccess(res, null);
+    const r = await storeReport(code, 30);
+    if (!r) return sendSuccess(res, null);
+    res.setHeader("Cache-Control", "private, max-age=300");
+    return sendSuccess(res, { code: r.code, days: r.days, from: r.from, to: r.to, views: r.views, visitors: r.visitors, naver: r.naver, directions: r.directions, calls: r.calls, addressTaps: r.addressTaps, daily: r.daily });
+}));
+
+// GET /partner/page-report.png — 내 매장의 리포트 카드(자기 매장 것만 — 다른 매장 코드를 받지 않는다)
+router.get("/page-report.png", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    const code = await ownListingCode(store.id);
+    const r = code ? await storeReport(code, 30) : null;
+    if (!r) return sendError(res, 404, "매장 페이지가 없습니다.");
+    const png = await renderStoreReportPng(r, { owner: true });
+    res.setHeader("Content-Type", "image/png");
+    res.setHeader("Cache-Control", "private, max-age=300");
+    return res.send(png);
 }));
 
 // GET /partner/members

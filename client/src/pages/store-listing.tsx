@@ -52,7 +52,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "폐업·이전·영업시간 변경 등 다른 정보를 알려주세요.",
     suggestMsg: "수정할 내용", suggestContact: "회신 연락처 (선택)",
     suggestSubmit: "보내기", suggestDone: "제보 감사합니다! 확인 후 반영하겠습니다.",
-    guestTitle: "사장님이신가요?", guestDesc: "두 가지 중 편한 쪽으로 하세요.", guestAccount: "랭큐 계정으로 신청하기", guestAccountSub: "승인되면 그 계정에서 영업시간 · 요금 · 소개를 바로 고쳐요", guestOr: "또는", guestPhoneTitle: "연락처만 남기기", guestPhoneSub: "확인 전화를 드려요. 가입은 통화 뒤에 해도 돼요.", guestName: "성함 (선택)", guestSubmit: "연락처 남기기", guestDone: "받았어요. 확인 전화를 드릴게요!",
+    perkTitle: "인증하면", perk1: "영업시간 · 요금 · 소개를 직접 고쳐요", perk2: "이 페이지를 본 사람 · 길찾기 수를 달마다 봐요", perk3: "매장 QR로 가입한 손님은 우리 매장 회원이 돼요", claimHint: "인증하면 이 페이지를 본 사람 수를 볼 수 있어요", guestTitle: "사장님이신가요?", guestDesc: "두 가지 중 편한 쪽으로 하세요.", guestAccount: "랭큐 계정으로 신청하기", guestAccountSub: "승인되면 그 계정에서 영업시간 · 요금 · 소개를 바로 고쳐요", guestOr: "또는", guestPhoneTitle: "연락처만 남기기", guestPhoneSub: "확인 전화를 드려요. 가입은 통화 뒤에 해도 돼요.", guestName: "성함 (선택)", guestSubmit: "연락처 남기기", guestDone: "받았어요. 확인 전화를 드릴게요!",
     notFound: "매장을 찾을 수 없습니다", loading: "불러오는 중...", error: "문제가 발생했습니다",
     callCta: "전화", directionsCta: "길찾기", shareCta: "공유", shareCopied: "링크를 복사했어요",
     close: "닫기",
@@ -79,7 +79,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "Closed, moved, or different hours? Let us know.",
     suggestMsg: "What should change", suggestContact: "Reply contact (optional)",
     suggestSubmit: "Send", suggestDone: "Thanks! We'll review and update.",
-    guestTitle: "Own this venue?", guestDesc: "Pick whichever is easier.", guestAccount: "Claim with a RANKUE account", guestAccountSub: "Once approved, edit hours, rates and the intro from that account", guestOr: "or", guestPhoneTitle: "Just leave a number", guestPhoneSub: "We'll call to confirm. You can sign up after the call.", guestName: "Name (optional)", guestSubmit: "Leave my number", guestDone: "Got it. We'll call you to confirm!",
+    perkTitle: "Once verified", perk1: "Edit hours, rates and the intro yourself", perk2: "See how many people viewed this page and asked for directions each month", perk3: "Guests who sign up via your venue QR become your members", claimHint: "Verify to see how many people view this page", guestTitle: "Own this venue?", guestDesc: "Pick whichever is easier.", guestAccount: "Claim with a RANKUE account", guestAccountSub: "Once approved, edit hours, rates and the intro from that account", guestOr: "or", guestPhoneTitle: "Just leave a number", guestPhoneSub: "We'll call to confirm. You can sign up after the call.", guestName: "Name (optional)", guestSubmit: "Leave my number", guestDone: "Got it. We'll call you to confirm!",
     notFound: "Venue not found", loading: "Loading...", error: "Something went wrong",
     callCta: "Call", directionsCta: "Directions", shareCta: "Share", shareCopied: "Link copied",
     close: "Close",
@@ -106,7 +106,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "Đóng cửa, chuyển địa điểm hay đổi giờ? Hãy cho chúng tôi biết.",
     suggestMsg: "Nội dung cần sửa", suggestContact: "Liên hệ phản hồi (tùy chọn)",
     suggestSubmit: "Gửi", suggestDone: "Cảm ơn! Chúng tôi sẽ kiểm tra và cập nhật.",
-    guestTitle: "Bạn là chủ quán?", guestDesc: "Chọn cách nào tiện hơn.", guestAccount: "Gửi yêu cầu bằng tài khoản RANKUE", guestAccountSub: "Sau khi duyệt, sửa giờ mở cửa, giá và giới thiệu ngay trong tài khoản đó", guestOr: "hoặc", guestPhoneTitle: "Chỉ để lại số điện thoại", guestPhoneSub: "Chúng tôi sẽ gọi để xác nhận. Có thể đăng ký sau cuộc gọi.", guestName: "Họ tên (tùy chọn)", guestSubmit: "Để lại số", guestDone: "Đã nhận. Chúng tôi sẽ gọi để xác nhận!",
+    perkTitle: "Sau khi xác minh", perk1: "Tự sửa giờ mở cửa, giá và giới thiệu", perk2: "Xem mỗi tháng có bao nhiêu người xem trang và tìm đường", perk3: "Khách đăng ký qua mã QR của quán trở thành hội viên của quán", claimHint: "Xác minh để xem số người đã xem trang này", guestTitle: "Bạn là chủ quán?", guestDesc: "Chọn cách nào tiện hơn.", guestAccount: "Gửi yêu cầu bằng tài khoản RANKUE", guestAccountSub: "Sau khi duyệt, sửa giờ mở cửa, giá và giới thiệu ngay trong tài khoản đó", guestOr: "hoặc", guestPhoneTitle: "Chỉ để lại số điện thoại", guestPhoneSub: "Chúng tôi sẽ gọi để xác nhận. Có thể đăng ký sau cuộc gọi.", guestName: "Họ tên (tùy chọn)", guestSubmit: "Để lại số", guestDone: "Đã nhận. Chúng tôi sẽ gọi để xác nhận!",
     notFound: "Không tìm thấy quán", loading: "Đang tải...", error: "Đã xảy ra lỗi",
     callCta: "Gọi", directionsCta: "Chỉ đường", shareCta: "Chia sẻ", shareCopied: "Đã sao chép liên kết",
     close: "Đóng",
@@ -133,7 +133,7 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "Kapandı, taşındı veya saatler mi değişti? Bize bildirin.",
     suggestMsg: "Değişmesi gereken", suggestContact: "Yanıt için iletişim (isteğe bağlı)",
     suggestSubmit: "Gönder", suggestDone: "Teşekkürler! İnceleyip güncelleyeceğiz.",
-    guestTitle: "Bu salon sizin mi?", guestDesc: "Hangisi kolaysa onu seçin.", guestAccount: "RANKUE hesabıyla başvur", guestAccountSub: "Onaylanınca saatleri, ücretleri ve tanıtımı o hesaptan düzenlersiniz", guestOr: "ya da", guestPhoneTitle: "Sadece numara bırakın", guestPhoneSub: "Onay için sizi arayacağız. Kaydı aramadan sonra yapabilirsiniz.", guestName: "Ad (isteğe bağlı)", guestSubmit: "Numaramı bırak", guestDone: "Aldık. Onay için sizi arayacağız!",
+    perkTitle: "Doğrulayınca", perk1: "Saatleri, ücretleri ve tanıtımı kendiniz düzenleyin", perk2: "Her ay bu sayfayı kaç kişinin görüp yol tarifi aldığını görün", perk3: "Salon QR kodunuzla kaydolan misafirler salon üyeniz olur", claimHint: "Bu sayfayı kaç kişinin gördüğünü görmek için doğrulayın", guestTitle: "Bu salon sizin mi?", guestDesc: "Hangisi kolaysa onu seçin.", guestAccount: "RANKUE hesabıyla başvur", guestAccountSub: "Onaylanınca saatleri, ücretleri ve tanıtımı o hesaptan düzenlersiniz", guestOr: "ya da", guestPhoneTitle: "Sadece numara bırakın", guestPhoneSub: "Onay için sizi arayacağız. Kaydı aramadan sonra yapabilirsiniz.", guestName: "Ad (isteğe bağlı)", guestSubmit: "Numaramı bırak", guestDone: "Aldık. Onay için sizi arayacağız!",
     notFound: "Salon bulunamadı", loading: "Yükleniyor...", error: "Bir sorun oluştu",
     callCta: "Ara", directionsCta: "Yol tarifi", shareCta: "Paylaş", shareCopied: "Bağlantı kopyalandı",
     close: "Kapat",
@@ -160,12 +160,26 @@ const L: Record<Locale, Record<string, string>> = {
     suggestDesc: "¿Cerró, se mudó o cambió el horario? Cuéntanos.",
     suggestMsg: "Qué debería cambiar", suggestContact: "Contacto de respuesta (opcional)",
     suggestSubmit: "Enviar", suggestDone: "¡Gracias! Lo revisaremos.",
-    guestTitle: "¿Eres el dueño?", guestDesc: "Elige lo que te resulte más fácil.", guestAccount: "Solicitar con una cuenta RANKUE", guestAccountSub: "Al aprobarse, edita horario, tarifas y presentación desde esa cuenta", guestOr: "o", guestPhoneTitle: "Solo deja tu número", guestPhoneSub: "Te llamaremos para confirmar. Puedes registrarte después de la llamada.", guestName: "Nombre (opcional)", guestSubmit: "Dejar mi número", guestDone: "Recibido. ¡Te llamaremos para confirmar!",
+    perkTitle: "Al verificar", perk1: "Edita tú mismo horario, tarifas y presentación", perk2: "Ve cada mes cuántas personas vieron la página y pidieron cómo llegar", perk3: "Quien se registra con el QR de tu local se vuelve socio de tu local", claimHint: "Verifica para ver cuántas personas ven esta página", guestTitle: "¿Eres el dueño?", guestDesc: "Elige lo que te resulte más fácil.", guestAccount: "Solicitar con una cuenta RANKUE", guestAccountSub: "Al aprobarse, edita horario, tarifas y presentación desde esa cuenta", guestOr: "o", guestPhoneTitle: "Solo deja tu número", guestPhoneSub: "Te llamaremos para confirmar. Puedes registrarte después de la llamada.", guestName: "Nombre (opcional)", guestSubmit: "Dejar mi número", guestDone: "Recibido. ¡Te llamaremos para confirmar!",
     notFound: "Local no encontrado", loading: "Cargando...", error: "Algo salió mal",
     callCta: "Llamar", directionsCta: "Cómo llegar", shareCta: "Compartir", shareCopied: "Enlace copiado",
     close: "Cerrar",
   },
 };
+
+/** 인증하면 받는 것 — 셋 다 지금 되는 것만(2026-10-18 사장님 모집 3번: 매장 페이지 숫자는 사장님 대시보드 '내 매장 페이지') */
+function ClaimPerks({ t }: { t: Record<string, string> }) {
+  return (
+    <div className="rounded-2xl bg-brand/[0.06] px-3.5 py-3" data-testid="claim-perks">
+      <p className="text-[12px] font-bold text-brand">{t.perkTitle}</p>
+      <ul className="mt-1.5 space-y-1">
+        {[t.perk1, t.perk2, t.perk3].map((x) => (
+          <li key={x} className="flex gap-2 text-[13px] font-medium leading-snug text-black/70 break-keep"><span aria-hidden className="mt-[7px] h-1.5 w-1.5 shrink-0 rounded-full bg-brand" />{x}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
 
 export default function StoreListingPage() {
   const { locale } = useT();
@@ -544,6 +558,9 @@ export default function StoreListingPage() {
                 {t.claimCta}
               </button>
             )}
+            {!s.claimed && myClaim?.status !== "pending" && (
+              <p className="-mt-1 mb-2 text-center text-[12px] font-medium text-black/45 break-keep">{t.claimHint}</p>
+            )}
             <button
               onClick={() => setSuggestOpen(true)}
               className="w-full py-3 rounded-2xl text-[13.5px] font-semibold text-black/50 hover:bg-black/[0.03]"
@@ -558,6 +575,7 @@ export default function StoreListingPage() {
           <DialogContent className="bg-white text-ink-1 max-w-md w-[92%] rounded-[28px] p-6" data-testid="claim-guest">
             <DialogTitle className="text-[19px] font-bold">{t.guestTitle}</DialogTitle>
             <DialogDescription className="text-[12.5px] font-medium text-black/55">{t.guestDesc}</DialogDescription>
+            <ClaimPerks t={t} />
             <button type="button" onClick={claimWithAccount} className="mt-2 w-full rounded-2xl bg-brand px-4 py-3.5 text-left text-white active:scale-[0.99] transition-transform" data-testid="claim-guest-account">
               <span className="block text-[15px] font-bold">{t.guestAccount}</span>
               <span className="mt-0.5 block text-[12.5px] font-medium text-white/80 break-keep">{t.guestAccountSub}</span>
@@ -583,6 +601,7 @@ export default function StoreListingPage() {
           <DialogContent className="bg-white text-ink-1 max-w-md w-[92%] rounded-[28px] p-6">
             <DialogTitle className="text-[19px] font-bold">{t.claimTitle}</DialogTitle>
             <DialogDescription className="text-[12.5px] font-medium text-black/55">{t.claimDesc}</DialogDescription>
+            <ClaimPerks t={t} />
             {/* 어느 계정으로 신청되는지 — 승인되면 그 계정에 '내 매장 관리'가 열린다 */}
             {member && (
               <p className="text-[12.5px] font-semibold text-brand bg-brand/[0.08] rounded-xl px-3 py-2 break-keep">{t.claimAccount.replace("{name}", member.name || "RANKUE")}</p>

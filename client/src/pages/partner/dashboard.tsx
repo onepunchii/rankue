@@ -31,6 +31,9 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import html2canvas from "html2canvas";
 import { LucideLock as LockIcon } from "@/lib/icons";
 import { isNativeApp } from "@/lib/nativeBridge";
+import { demandRangeText, intentsOf, naverShare } from "@shared/storeDemand";
+
+type PageStats = { code: string; days: number; from: string | null; to: string | null; views: number; visitors: number; naver: number; directions: number; calls: number; addressTaps: number; daily: { day: string; visitors: number }[] };
 
 type StoreMember = {
     id: string;
@@ -189,6 +192,9 @@ export default function PartnerDashboard() {
     }, [isStoreError, setLocation]);
 
     const { data: stats } = useQuery<StoreStats>({ queryKey: ["/api/hiq/partner/stats"], enabled: !!store });
+    // 내 매장 페이지를 본 사람(2026-10-18 사장님 모집 3번 — 인증하면 받는 것). 디렉토리 페이지가 연결된 매장만 값이 온다
+    const { data: pageStats } = useQuery<PageStats | null>({ queryKey: ["/api/hiq/partner/page-stats"], enabled: !!store?.listing });
+    const [reportOpen, setReportOpen] = useState(false);
     const { data: members = [], isLoading: membersLoading } = useQuery<StoreMember[]>({ queryKey: MEMBERS_KEY, enabled: !!store });
     const { data: tournaments = [], isLoading: tournamentsLoading } = useQuery<StoreTournament[]>({
         queryKey: ["/api/hiq/partner/tournaments"],
@@ -451,6 +457,22 @@ export default function PartnerDashboard() {
                                     <span className="text-[13.5px]"><b className="text-brand text-[22px] font-black">{store.listing.crewMemberTotal}</b> <span className="text-black/50">크루 멤버</span></span>
                                 </div>
                             )}
+                            {/* 지난 30일 — 랭큐 매장 페이지를 본 사람 · 가게로 가려고 누른 것(방문자 발자국 그대로) */}
+                            {pageStats && (
+                                <div className="mt-3 rounded-xl bg-black/[0.03] p-3.5" data-testid="partner-page-stats">
+                                    <p className="text-[12px] font-bold text-black/50">{demandRangeText(pageStats.from, pageStats.to) || "지난 30일"} · 매장 페이지를 본 사람</p>
+                                    <div className="mt-1 flex items-end gap-4 tabular-nums">
+                                        <span className="shrink-0 whitespace-nowrap"><b className="text-[26px] font-black">{pageStats.visitors.toLocaleString("ko-KR")}</b><span className="ml-0.5 text-[13px] font-bold text-black/45">명</span></span>
+                                        <span className="min-w-0 pb-1 text-[12.5px] text-black/55 break-keep">길찾기 · 전화 · 주소 <b className="text-black/80">{intentsOf(pageStats)}</b>번{naverShare(pageStats) != null ? ` · 네이버 ${naverShare(pageStats)}%` : ""}</span>
+                                    </div>
+                                    {pageStats.daily.length > 1 && (
+                                        <div className="mt-2.5 flex h-[38px] items-end gap-[3px]" aria-hidden>
+                                            {pageStats.daily.map((d) => <i key={d.day} className="flex-1 rounded-t-[3px] bg-brand" style={{ height: `${Math.max(3, Math.round((d.visitors / Math.max(1, ...pageStats.daily.map((x) => x.visitors))) * 38))}px`, opacity: d.visitors ? 0.9 : 0.18 }} />)}
+                                        </div>
+                                    )}
+                                    <button onClick={() => setReportOpen(true)} className="mt-3 h-10 w-full rounded-xl border border-brand/30 bg-white text-[13.5px] font-bold text-brand" data-testid="partner-report-open">리포트 카드 보기</button>
+                                </div>
+                            )}
                             {missing.length > 0 ? (
                                 <button onClick={() => setLocation("/partner/settings")} className="mt-3 w-full rounded-xl bg-[#E02D2D]/[0.06] px-3.5 py-3 text-left">
                                     <p className="text-[13px] font-bold text-[#C42424]">비어 있는 정보 {missing.length}개 — 손님이 페이지에서 못 봐요</p>
@@ -680,6 +702,16 @@ export default function PartnerDashboard() {
                     </>
                 )}
             </main>
+
+            {/* 내 매장 리포트 카드 — 길게 눌러 저장(앱 안에서는 내려받기 단추가 안 듣는 기기가 있다) */}
+            <Sheet open={reportOpen} onOpenChange={setReportOpen}>
+                <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-3xl bg-white p-4" style={{ paddingBottom: "max(16px, env(safe-area-inset-bottom))" }}>
+                    <SheetTitle className="text-[16px] font-bold">내 매장 리포트 카드</SheetTitle>
+                    <SheetDescription className="text-[12.5px] text-black/55">랭큐 매장 페이지를 본 사람 · 길찾기 · 전화 · 주소 누름이에요. 그림을 길게 눌러 저장하거나 아래 단추로 받으세요.</SheetDescription>
+                    {reportOpen && <img src="/api/hiq/partner/page-report.png" alt="내 매장 리포트 카드" width={1200} height={1500} className="mt-3 w-full rounded-2xl bg-[#062A1E]" data-testid="partner-report-img" />}
+                    <a href="/api/hiq/partner/page-report.png" download="rankue-report.png" className="mt-3 flex h-11 items-center justify-center rounded-xl bg-brand text-[14px] font-bold text-white">그림 받기</a>
+                </SheetContent>
+            </Sheet>
 
             {/* 아래 탭 — 엄지가 닿는 곳 */}
             <nav className="fixed bottom-0 inset-x-0 z-40 bg-white/95 backdrop-blur border-t border-black/[0.07]" style={{ paddingBottom: "env(safe-area-inset-bottom)" }}>
