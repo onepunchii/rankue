@@ -15,11 +15,14 @@ export function CourseLayout({ courses, parts, holes }: { courses: CourseDetail[
     const totalHoles = cs.reduce((n, c) => n + c.holes, 0);
     const totalPar = cs.reduce((n, c) => n + c.par, 0);
     const partSum = ps.reduce((n, p) => n + (p.holes ?? 0), 0);
+    // 코스별 파를 아는 홀이 골프장 홀보다 적으면(진양밸리 27홀 중 CREEK · HILL 18홀) 모르는 몫을 숨기지 않는다 —
+    // "18홀 · 파72"만 적으면 27홀짜리가 18홀로 읽힌다(2026-10-17 리뷰). 모르는 코스의 파는 지어 넣지 않는다.
+    const missing = holes != null && totalHoles > 0 && holes > totalHoles ? holes - totalHoles : 0;
 
     return (
         <Section
             id="course" title="코스"
-            aside={cs.length ? <span className="text-[13px] text-[#FFFFFF80] tabular-nums">{totalHoles || holes}홀 · 파{totalPar}</span> : undefined}
+            aside={cs.length ? <span className="text-[13px] text-[#FFFFFF80] tabular-nums">{missing ? `${holes}홀 · 파는 ${totalHoles}홀만` : `${totalHoles || holes}홀 · 파${totalPar}`}</span> : undefined}
         >
             <Card className="p-4 space-y-4">
                 {showParts && (
@@ -49,6 +52,12 @@ export function CourseLayout({ courses, parts, holes }: { courses: CourseDetail[
                                 <div className="mt-0.5 text-[12.5px] text-[#FFFFFF80] tabular-nums">{c.holes}홀 · 파{c.par}</div>
                             </div>
                         ))}
+                        {missing > 0 && (
+                            <div className="rounded-xl border border-dashed border-[#FFFFFF26] px-3 py-2.5 min-w-0" data-testid="course-par-missing">
+                                <div className="text-[15px] font-semibold text-[#FFFFFF99]">나머지 {missing}홀</div>
+                                <div className="mt-0.5 text-[12.5px] text-[#FFFFFF66]">파 확인 중</div>
+                            </div>
+                        )}
                     </div>
                 )}
             </Card>

@@ -28,7 +28,7 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { isUrgentJoin, listingCapacity, distanceKm } from "../../../shared/golfJoin.js";
-import { GOLF_REGIONS, cityShort, listingIntents, type GolfIntent, type PublicListing } from "../../../shared/golfCourse.js";
+import { GOLF_REGIONS, cityShort, listingIntents, pageHoles, type GolfIntent, type PublicListing } from "../../../shared/golfCourse.js";
 import { COURSE_GALLERY_LIMIT } from "../../../shared/golfPhoto.js";
 import { isNearbyKind, nearbySearchNames } from "../../../shared/golfAround.js";
 import { weatherPoint } from "../../../shared/golfWeatherZones.js";
@@ -117,7 +117,7 @@ async function loadSummary(): Promise<Summary> {
         ]);
         const pages: PageRow[] = pagesRaw.map((r) => ({
             slug: r.slug, name: r.name, region: r.region, city: r.city, address: r.address, lat: r.lat, lng: r.lng,
-            courseIds: (r.course_ids ?? []).map(Number), clubId: r.club_id, kind: r.kind, holes: r.holes, parts: r.parts,
+            courseIds: (r.course_ids ?? []).map(Number), clubId: r.club_id, kind: r.kind, holes: pageHoles(r.holes, r.courses), parts: r.parts,
             courses: r.courses, intro: r.intro, info: r.info, fees: r.fees, tgmItems: r.tgm_items ?? [], updatedAt: r.updated_at,
             logo: r.logo, grass: r.grass ?? [], play: r.play ?? [], phone: r.phone, website: r.website,
             feeFrom: r.fee_from, popularity: Number(r.popularity) || 0, aliases: r.aliases ?? [],

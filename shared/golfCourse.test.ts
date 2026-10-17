@@ -63,3 +63,25 @@ describe("courseDescription — 이름으로 시작, 강한 숫자 먼저", () =
         expect(d).toContain("지금 올라온 티타임 3건.");
     });
 });
+
+describe("골프장 홀 수 · 코스 · 가까운 골프장(2026-10-17 리뷰)", () => {
+    it("명부 홀 수가 9 아래면 틀린 값 — 코스 자료의 합, 그것도 없으면 모름", async () => {
+        const { pageHoles } = await import("./golfCourse");
+        expect(pageHoles(27, [{ holes: 9 }, { holes: 9 }])).toBe(27);
+        expect(pageHoles(1, [{ holes: 9 }, { holes: 9 }])).toBe(18);
+        expect(pageHoles(1, [])).toBeNull();
+        expect(pageHoles(null, [{ holes: 9 }])).toBe(9);
+        expect(pageHoles("36", null)).toBe(36);
+    });
+    it("화면 · 검색용 화면이 같은 값을 쓴다(불러오는 곳 한 군데) · 파를 모르는 홀은 숨기지 않는다 · 회원권 시세엔 이름표", async () => {
+        const { readFileSync } = await import("node:fs");
+        const { resolve } = await import("node:path");
+        const rd = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
+        expect(rd("server/routes/modules/golfCourses.ts")).toContain("holes: pageHoles(r.holes, r.courses)");
+        const layout = rd("client/src/golf/components/course/detail/CourseLayout.tsx");
+        expect(layout).toContain("`${holes}홀 · 파는 ${totalHoles}홀만`");
+        expect(layout).toContain("파 확인 중");
+        expect(rd("client/src/golf/components/course/detail/NearbyCourses.tsx")).toContain("회원권 {manwonText(n.price.price)}");
+        expect(rd("client/src/golf/components/course/detail/WeatherCard.tsx")).toContain("w-[72px] shrink-0 flex items-baseline gap-1.5 whitespace-nowrap");
+    });
+});

@@ -159,14 +159,14 @@ export function NearbyCourses({ items, lat, lng }: { items: Near[]; lat: number 
                                     <CourseLogo logo={n.logo} name={n.name} size="sm" />
                                     <span className="flex-1 min-w-0">
                                         <span className="block text-[15px] font-medium text-white truncate">{n.name}</span>
-                                        <span className="block text-[12.5px] text-[#FFFFFF80] truncate tabular-nums">
-                                            {[cityShort(n.city), n.km != null ? `${n.km}km` : "", n.holes ? `${n.holes}홀` : ""].filter(Boolean).join(" · ")}
+                                        {/* 자리 · 거리 · 홀은 덩어리 사이에서만 줄바꿈, 회원권 시세는 이름표를 붙여 아래 줄에(2026-10-17 리뷰:
+                                            오른쪽의 '2억 6,500만원'이 무엇인지 안 적혀 있었고, 그 칸에 밀려 "진천 · 11.9k…" 로 잘렸다) */}
+                                        <span className="mt-0.5 flex flex-wrap gap-x-1 text-[12.5px] text-[#FFFFFF80] tabular-nums">
+                                            {(() => { const f = [cityShort(n.city), n.km != null ? `${n.km}km` : "", n.holes ? `${n.holes}홀` : ""].filter(Boolean); return f.map((x, i) => <span key={i} className="whitespace-nowrap">{x}{i < f.length - 1 ? " ·" : ""}</span>); })()}
                                         </span>
+                                        {n.price && <span className="mt-0.5 block text-[12.5px] text-[#FFFFFF99] tabular-nums" data-testid="near-membership">회원권 {manwonText(n.price.price)}</span>}
                                     </span>
-                                    <span className="shrink-0 text-right">
-                                        {live > 0 && <span className="block text-[13px] font-medium text-[#8BE84A] tabular-nums">티타임 {live}</span>}
-                                        {n.price && <span className="block text-[12.5px] text-[#FFFFFF99] tabular-nums">{manwonText(n.price.price)}</span>}
-                                    </span>
+                                    {live > 0 && <span className="shrink-0 text-right text-[13px] font-medium text-[#8BE84A] tabular-nums">티타임 {live}</span>}
                                     <LucideChevronRight weight="bold" className="w-4 h-4 shrink-0 text-[#FFFFFF33]" />
                                 </Link>
                             </li>

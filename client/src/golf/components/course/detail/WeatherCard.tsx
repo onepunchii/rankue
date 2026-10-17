@@ -214,7 +214,8 @@ function DayRow({ day, today, active, onPick }: { day: WxDay; today: string; act
     const dow = dowOf(day.date);
     const body = (
         <>
-            <span className="w-[62px] shrink-0 flex items-baseline gap-1.5">
+            {/* "내일 10/18" 이 62px 에 안 들어가 "내 / 일" 로 꺾였다(2026-10-17 리뷰) — 넓히고 줄을 안 바꾼다 */}
+            <span className="w-[72px] shrink-0 flex items-baseline gap-1.5 whitespace-nowrap">
                 <span className="text-[15px] font-medium" style={{ color: dowColor(dow) ?? "#FFFFFFE6" }}>{dayName(day.date, today)}</span>
                 <span className="text-[12px] tabular-nums text-[#FFFFFF59]">{md(day.date)}</span>
             </span>

@@ -34,6 +34,16 @@ export function cityShort(city: string | null | undefined): string {
 }
 
 /** 주소 한 조각을 URL 에 쓸 꼴로 — 한글은 그대로 두고 링크 만들 때 encodeURIComponent 한다. */
+/**
+ * 골프장의 홀 수(2026-10-17 리뷰) — 명부의 홀 수가 9 아래면(더스타휴 · 양평TPC '1홀') 틀린 값이다: 코스별 파 자료의 홀 합으로,
+ * 그것도 없으면 모름(null). 9 이상이면 명부 그대로 — 코스 자료가 일부만 있는 곳(진양밸리 27홀 중 18홀)은 명부가 맞다.
+ */
+export function pageHoles(holes: unknown, courses: unknown): number | null {
+    const n = Number(holes);
+    if (Number.isFinite(n) && n >= 9) return Math.round(n);
+    const sum = (Array.isArray(courses) ? courses : []).reduce((a: number, c: any) => a + (Number(c?.holes) > 0 ? Number(c.holes) : 0), 0);
+    return sum >= 9 ? sum : null;
+}
 export function coursePath(slug: string): string { return `/golf/course/${encodeURIComponent(slug)}`; }
 export function listPath(opts: { intent?: GolfIntent | null; region?: string | null; city?: string | null } = {}): string {
     const base = opts.intent ? `/golf/${opts.intent}` : "/golf/courses";
