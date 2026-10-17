@@ -14,6 +14,7 @@ import { heightText, hikingMountainPath, mountainPlace } from "@shared/hikingMou
 import { HIKING_CTA, WEATHER_NOTE, kmRange } from "@shared/hikingPage";
 import { SUN_NOTE, kstClock, kstYmd, spanText, sunLine, sunTimes } from "@shared/hikingSun";
 import { SUMMIT_WX_COPY, summitFirstDay, summitWx, type SummitBase } from "@shared/hikingSummitWx";
+import { obsAdvice, windArrowDeg, windChill, windDirKo, type MountObs } from "@shared/hikingMountObs";
 import { mountainWeatherKey, type MountainSummary } from "../lib/api";
 import { MountainPatch } from "../stamps/MountainPatch";
 
@@ -73,9 +74,13 @@ const DOW = ["일", "월", "화", "수", "목", "금", "토"];
 /** 산의 날씨 — 오늘부터 이레. 정상 좌표의 격자 예보다(산 위는 더 춥다는 한 줄을 붙인다) */
 export function MountainWeather({ slug }: { slug: string }) {
     // summit: 정상의 날씨를 어림할 바탕(정상 · 들머리의 높이) — 서버가 들머리를 구한 산에만 붙는다. 그때 예보는 들머리 자리의 것이다
-    const { data, isLoading } = useQuery<(CourseWeather & { summit?: SummitBase | null }) | null>({ queryKey: mountainWeatherKey(slug), staleTime: 10 * 60_000 });
+    const { data, isLoading } = useQuery<(CourseWeather & { summit?: SummitBase | null; obs?: MountObs | null }) | null>({ queryKey: mountainWeatherKey(slug), staleTime: 10 * 60_000 });
     if (isLoading) return <div className="h-[104px] animate-pulse rounded-2xl bg-[#FFFFFF0F]" aria-busy="true" />;
-    if (!data?.days?.length) return <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-4 text-[14px] text-[#F4EFE399]">지금은 날씨를 받아 오지 못했어요.</p>;
+    if (!data?.days?.length) {
+        // 예보는 못 받았어도 산 위에서 잰 값이 있으면 그것만이라도
+        if (data?.obs) return <div data-testid="mountain-weather"><MountainObsCard obs={data.obs} /></div>;
+        return <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-4 text-[14px] text-[#F4EFE399]">지금은 날씨를 받아 오지 못했어요.</p>;
+    }
     const days = data.days.slice(0, 7);
     const today = days[0], rest = days.slice(1);
     const temps = days.flatMap((d) => [d.tmx, d.tmn]).filter((v): v is number => v != null);
@@ -101,6 +106,7 @@ export function MountainWeather({ slug }: { slug: string }) {
                     <p className="mt-0.5 text-[20px] font-semibold tabular-nums leading-none" style={{ color: wetOf(today) ? "#8EC5FF" : "#F4EFE3" }}>{popOf(today) > 0 ? `${popOf(today)}%` : "0%"}</p>
                 </div>
             </div>
+            {data.obs && <MountainObsCard obs={data.obs} />}
             {data.summit && <SummitWeather hours={data.hours ?? []} heightM={data.summit.heightM} baseM={data.summit.baseM} />}
             {/* 엿새 — 한 줄씩, 기온의 폭을 막대로 */}
             {rest.length > 0 && (
@@ -126,6 +132,61 @@ export function MountainWeather({ slug }: { slug: string }) {
                 </ul>
             )}
             <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{WEATHER_NOTE}</p>
+        </div>
+    );
+}
+
+/** 바람이 불어 가는 쪽을 가리키는 화살 — 북이 위 */
+function WindArrow({ deg }: { deg: number }) {
+    return (
+        <svg width="15" height="15" viewBox="0 0 16 16" aria-hidden style={{ transform: `rotate(${deg}deg)` }} className="shrink-0">
+            <path d="M8 14 V3 M4 7 L8 3 L12 7" fill="none" stroke="#F6D9A8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+    );
+}
+
+/**
+ * 산 위 관측 · 지금(2026-10-17) — 산림청 산악기상관측소의 실측(10분마다). 이름과 시군이 둘 다 맞는 산에만 서버가 붙인다(shared/hikingMountObs).
+ * 어림한 정상 날씨(SummitWeather)와 섞지 않는다 — 관측소 이름 · 잰 때를 그대로 적는다.
+ */
+function MountainObsCard({ obs }: { obs: MountObs }) {
+    const k = new Date(Date.parse(obs.at) + 9 * 3600_000);
+    const hhmm = `${String(k.getUTCHours()).padStart(2, "0")}:${String(k.getUTCMinutes()).padStart(2, "0")}`;
+    const ago = Math.max(0, Math.round((Date.now() - Date.parse(obs.at)) / 60_000));
+    const chill = windChill(obs.temp, obs.wind);
+    const deg = windArrowDeg(obs.windDir);
+    const tip = obsAdvice(obs);
+    return (
+        <div className="mt-2.5 rounded-2xl px-4 pb-3.5 pt-3.5" style={{ background: "linear-gradient(160deg,#16303A,#0E2A33 70%)", boxShadow: "inset 0 0 0 1px #F28C6A33" }} data-testid="mountain-obs">
+            <div className="flex items-center gap-2">
+                <span className="relative flex h-2.5 w-2.5 shrink-0" aria-hidden>
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#F28C6A] opacity-60" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#F28C6A]" />
+                </span>
+                <p className="min-w-0 flex-1 truncate text-[14px] font-semibold text-[#F4EFE3]">산 위에서 잰 날씨 <span className="font-normal text-[#F4EFE399]">· 지금</span></p>
+                <p className="shrink-0 text-[12.5px] tabular-nums text-[#F4EFE399]">{hhmm}{ago >= 1 ? ` · ${ago}분 전` : ""}</p>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-[#FFFFFF0A] px-2 py-2.5 text-center">
+                    <p className="text-[12px] text-[#F6D9A8]">기온</p>
+                    <p className="mt-1 text-[24px] font-semibold tabular-nums leading-none text-[#F4EFE3]">{obs.temp != null ? `${Math.round(obs.temp * 10) / 10}°` : "–"}</p>
+                    <p className="mt-1.5 text-[12px] tabular-nums text-[#8EC5FF]">{chill != null && obs.temp != null && chill < obs.temp ? `체감 ${Math.round(chill)}°` : "\u00A0"}</p>
+                </div>
+                <div className="rounded-xl bg-[#FFFFFF0A] px-2 py-2.5 text-center">
+                    <p className="text-[12px] text-[#F6D9A8]">바람</p>
+                    <p className="mt-1 text-[24px] font-semibold tabular-nums leading-none text-[#F4EFE3]">
+                        {obs.wind != null ? obs.wind.toFixed(1) : "–"}<span className="ml-0.5 text-[12.5px] font-normal text-[#F4EFE399]">m/s</span>
+                    </p>
+                    <p className="mt-1.5 flex items-center justify-center gap-1 truncate text-[12px] text-[#F4EFE3B3]">{deg != null && <WindArrow deg={deg} />}{windDirKo(obs.windDir) ?? "\u00A0"}</p>
+                </div>
+                <div className="rounded-xl bg-[#FFFFFF0A] px-2 py-2.5 text-center">
+                    <p className="text-[12px] text-[#F6D9A8]">습도</p>
+                    <p className="mt-1 text-[24px] font-semibold tabular-nums leading-none text-[#F4EFE3]">{obs.humidity != null ? `${Math.round(obs.humidity)}%` : "–"}</p>
+                    <p className="mt-1.5 text-[12px] tabular-nums text-[#F4EFE399]">{obs.rain != null && obs.rain > 0 ? `강수 ${obs.rain}mm` : "\u00A0"}</p>
+                </div>
+            </div>
+            {tip && <p className="mt-2.5 rounded-xl bg-[#F28C6A1F] px-3 py-2 text-[13px] leading-snug text-[#F6D9A8] break-keep" data-testid="mountain-obs-tip">{tip}</p>}
+            <p className="mt-2 text-[12px] leading-snug text-[#F4EFE366] break-keep">{obs.station} 관측소에서 10분마다 잰 값이에요 · 산림청 국립산림과학원 산악기상정보</p>
         </div>
     );
 }

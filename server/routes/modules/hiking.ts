@@ -21,6 +21,8 @@ import { requireTermsAccepted } from "../../middleware/terms.js";
 import { distM } from "../../../shared/hikingGeo.js";
 import { judgeSummit, summitHint } from "../../../shared/hikingStamps.js";
 import { getCourseWeather } from "../../services/golfWeather.js";
+import { mountObsAll } from "../../services/hikingMountObs.js";
+import { obsFresh, stationFor } from "../../../shared/hikingMountObs.js";
 import { HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, hikingGroup, hikingRegion, inHikingGroup } from "../../../shared/hikingMountains.js";
 import { toMountainPoint, type MountainPoint } from "../../../shared/hikingNear.js";
 import { HIKING_NEARBY_RADIUS_KM, hikingNearbyNames, hikingNearbyWord, isHikingNearbyKind } from "../../../shared/hikingAround.js";
@@ -98,10 +100,17 @@ router.get("/mountains/:slug/weather", asyncHandler(async (req: any, res: any) =
     // 들머리를 모르는 산(코스가 없거나 높이 자료를 못 믿는 산)은 예전대로 정상 좌표의 격자, 정상 칸은 없다(shared/hikingSummitWx).
     const base = await trailheadOf(m.slug, m.heightM);
     const at = base ?? (m.lat != null && m.lng != null ? { lat: m.lat, lng: m.lng } : null);
-    const weather = at ? await getCourseWeather({ lat: at.lat, lng: at.lng }, { fetch: true }).catch((e) => { console.error("[HikingWeather]", e); return null; }) : null;
-    res.set("Cache-Control", weather ? "public, max-age=300, s-maxage=600, stale-while-revalidate=1800" : "no-store");
+    // 산 위 관측(산악기상관측소 — 이름 · 시군이 둘 다 맞는 산에만, shared/hikingMountObs). 예보와 같이 받는다 — 못 받아도 예보는 그대로
+    const [weather, stations] = await Promise.all([
+        at ? getCourseWeather({ lat: at.lat, lng: at.lng }, { fetch: true }).catch((e) => { console.error("[HikingWeather]", e); return null; }) : Promise.resolve(null),
+        mountObsAll().catch(() => null),
+    ]);
+    const hit = stations ? stationFor(stations, m) : null;
+    const obs = hit && obsFresh(hit, Date.now()) ? hit : null;
+    res.set("Cache-Control", weather || obs ? "public, max-age=300, s-maxage=600, stale-while-revalidate=1800" : "no-store");
     const summit: SummitBase | null = weather && base && m.heightM != null ? { heightM: m.heightM, baseM: base.m } : null;
-    return sendSuccess(res, weather ? { ...weather, summit } : null);
+    if (!weather && !obs) return sendSuccess(res, null);
+    return sendSuccess(res, weather ? { ...weather, summit, obs } : { days: [], hours: [], summit: null, obs });
 }));
 
 // ── 산 근처의 맛집 · 카페(2026-10-13) ─────────────────────────────────────
