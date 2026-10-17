@@ -84,6 +84,8 @@ const LABELS: readonly (readonly [string, RegExp, string])[] = [
     ["POST", /^\/admin\/golf\/pars\/courses\/[^/]+\/unlock$/, "코스 파 잠금 풀기"],
     ["POST", /^\/admin\/golf\/pars\/changes\/[^/]+\/revert$/, "카드가 바꾼 파 되돌리기"],
     ["POST", /^\/admin\/golf\/awards\/[^/]+\/take-back$/, "골프 보상 거두기"],
+    ["POST", /^\/admin\/golf\/feeds\/open-tees\/run$/, "남은 티 지금 받기"],
+    ["POST", /^\/admin\/golf\/feeds\/weather\/run$/, "골프장 날씨 지금 받기"],
     ["POST", /^\/admin\/billiards\/invites\/[^/]+\/cancel$/, "친구 초대 취소"],
     ["POST", /^\/admin\/billiards\/online\/[^/]+\/void$/, "온라인 대전 무효"],
     ["POST", /^\/admin\/billiards\/online\/[^/]+\/restore$/, "온라인 대전 되살리기"],
