@@ -16,7 +16,7 @@ import { KOREA_MAP_PATHS } from "@/golf/data/koreaMapData";
 import { latLngToOutline, outlineToLatLng } from "@/golf/lib/koreaOutline";
 import { useBoxZoom } from "@/hiking/lib/useBoxZoom";
 import { LucideMinus, LucidePlus } from "@/lib/icons";
-import { SEA_AREAS, type SeaArea, type SeaState } from "@shared/fishingSea";
+import { SEA_AREAS, layoutTags, type SeaArea, type SeaState } from "@shared/fishingSea";
 import { FISHING_INDEX_STEPS, type FishingIndexStep } from "@shared/fishingPort";
 import type { KmBox } from "@shared/hikingCourseMap";
 
@@ -155,6 +155,25 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
         ...lats.map((lat) => { const [, y] = latLngToOutline(lat, 127); return `M${VIEW.x} ${y} H${VIEW.x + VIEW.w}`; }),
         ...lngs.map((lng) => { const [x] = latLngToOutline(36, lng); return `M${x} ${VIEW.y} V${VIEW.y + VIEW.h}`; }),
     ].join(" ");
+    // 풍랑특보 꼬리표 — 센 특보부터 놓고 겹치면 비킨다(layoutTags). 경도 · 위도 숫자도 꼬리표 밑이면 뺀다
+    const TAG_H = 38, RANK: Readonly<Record<SeaState, number>> = { alert: 4, warn: 3, far: 2, pre: 1, clear: 0 };
+    const tagDefs = SEA_AREAS.flatMap((def) => {
+        const zz = ZONES[def.id], a = by.get(def.id), w = a ? WASH[a.state] : null;
+        if (!zz || !a || !w?.tag) return [];
+        const [ax, ay] = latLngToOutline(zz.at[0], zz.at[1]);
+        if (ax < v.x - 40 * u || ax > v.x + v.w + 40 * u || ay < v.y - 30 * u || ay > v.y + v.h + 30 * u) return [];
+        const tw = Math.max(def.name.length, w.tag.length) * 12.6 + 34;
+        return [{ def, a, w, tw, box: { id: def.id, cx: ax, cy: ay, w: tw * u, h: TAG_H * u, rank: RANK[a.state] } }];
+    });
+    // 구역 고르기에서 특보 없는 구역의 이름(아래 글)은 이미 놓인 것으로 — 꼬리표가 그 글을 덮지 않게
+    const nameBoxes = zoneMode ? SEA_AREAS.flatMap((def) => {
+        const zz = ZONES[def.id], a = by.get(def.id);
+        if (!zz || !a || a.state !== "clear") return [];
+        const [x, y] = latLngToOutline(zz.at[0], zz.at[1]), hw = (def.name.length * fs) / 2 + 2 * u;
+        return [{ x0: x - hw, y0: y - fs * 1.05, x1: x + hw, y1: y + fs * 0.3 }];
+    }) : [];
+    const tagAt = layoutTags(tagDefs.map((t) => t.box), { x0: v.x + 6 * u, y0: v.y + 22 * u, x1: v.x + v.w - 6 * u, y1: v.y + v.h - 58 * u }, 4 * u, nameBoxes);
+    const underTag = (x: number, y: number) => tagDefs.some((t) => { const p = tagAt.get(t.def.id); return !!p && Math.abs(x - p.cx) < t.box.w / 2 + 14 * u && Math.abs(y - p.cy) < t.box.h / 2 + 8 * u; });
     // 축척 — 화면에서 56px 이상이 되는 둥근 km
     const scaleKm = [10, 20, 50, 100].find((km) => (km * KM) / u >= 56) ?? 100;
 
@@ -336,13 +355,10 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
 
                 {/* 풍랑특보의 꼬리표 — 구역 이름 + 특보(화면 크기 그대로) */}
                 <g pointerEvents="none" data-testid="fishing-chart-tags">
-                    {SEA_AREAS.map((def) => {
-                        const zz = ZONES[def.id], a = by.get(def.id), w = a ? WASH[a.state] : null;
-                        if (!zz || !a || !w?.tag) return null;
-                        const [ax, ay] = latLngToOutline(zz.at[0], zz.at[1]);
-                        const tw = Math.max(def.name.length, w.tag.length) * 12.6 + 34, th = 38;
-                        if (ax < v.x - 40 * u || ax > v.x + v.w + 40 * u || ay < v.y - 30 * u || ay > v.y + v.h + 30 * u) return null;
-                        const x = Math.min(v.x + v.w - (tw / 2 + 6) * u, Math.max(v.x + (tw / 2 + 6) * u, ax)), y = Math.min(v.y + v.h - (th / 2 + 58) * u, Math.max(v.y + (th / 2 + 22) * u, ay));
+                    {tagDefs.map(({ def, a, w, tw }) => {
+                        const th = TAG_H, p = tagAt.get(def.id);
+                        if (!p || !w.tag) return null;
+                        const x = p.cx, y = p.cy;
                         return (
                             <g key={def.id} transform={`translate(${x} ${y}) scale(${u})`} data-state={a.state}>
                                 <rect x={-tw / 2} y={-th / 2} width={tw} height={th} rx={8} fill="#FBF7EE" stroke={w.line} strokeWidth="1.3" />
@@ -358,8 +374,8 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
 
                 {/* 경위도 숫자 · 축척 · 방위표 — 화면 가장자리에 붙는다 */}
                 <g pointerEvents="none" fontSize={fs * 0.97} fill="#1F5A78B3">
-                    {lngs.map((lng) => { const [x] = latLngToOutline(36, lng); return x > v.x + 30 * u && x < v.x + v.w - 30 * u ? <text key={lng} x={x} y={v.y + 14 * u} textAnchor="middle" stroke="#EFE8D8" strokeWidth={fs * 0.2} paintOrder="stroke">{lng}°</text> : null; })}
-                    {lats.map((lat) => { const [, y] = latLngToOutline(lat, 127); return y > v.y + 70 * u && y < v.y + v.h - 16 * u ? <text key={lat} x={v.x + 4 * u} y={y - 3 * u} stroke="#EFE8D8" strokeWidth={fs * 0.2} paintOrder="stroke">{lat}°</text> : null; })}
+                    {lngs.map((lng) => { const [x] = latLngToOutline(36, lng); return x > v.x + 30 * u && x < v.x + v.w - 30 * u && !underTag(x, v.y + 10 * u) ? <text key={lng} x={x} y={v.y + 14 * u} textAnchor="middle" stroke="#EFE8D8" strokeWidth={fs * 0.2} paintOrder="stroke">{lng}°</text> : null; })}
+                    {lats.map((lat) => { const [, y] = latLngToOutline(lat, 127); return y > v.y + 70 * u && y < v.y + v.h - 16 * u && !underTag(v.x + 14 * u, y - 7 * u) ? <text key={lat} x={v.x + 4 * u} y={y - 3 * u} stroke="#EFE8D8" strokeWidth={fs * 0.2} paintOrder="stroke">{lat}°</text> : null; })}
                 </g>
                 <g transform={`translate(${v.x + 48 * u} ${v.y + 46 * u})`} pointerEvents="none" data-testid="fishing-chart-scale">
                     <rect x={0} y={-3 * u} width={scaleKm * KM} height={4 * u} fill="#F3ECDD" stroke="#0F283899" strokeWidth={0.8 * u} />

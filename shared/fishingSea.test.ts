@@ -1,4 +1,6 @@
 import { describe, it, expect } from "vitest";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import { SEA_AREAS, SEA_COLS, parsePre, parsePwn, seaBoard, seaHeadline, seaIssued, seaNotes, seaReadable, seaWord, splitZones } from "./fishingSea";
 
 // 2026-10-14 01:30 발표를 그대로(공공데이터포털 getPwnStatus 의 t6 · t7)
@@ -75,5 +77,33 @@ describe("해역 일곱 곳의 지금", () => {
     it("발표 시각", () => {
         expect(seaIssued(202610140130)).toBe("10월 14일 01:30");
         expect(seaIssued("")).toBeNull();
+    });
+});
+
+describe("지도 꼬리표 늘어놓기(2026-10-17 — 남해서부가 제주 밑에 깔리던 것)", () => {
+    const B = { x0: 0, y0: 0, x1: 300, y1: 400 };
+    const box = (id: string, cx: number, cy: number, rank = 2) => ({ id, cx, cy, w: 120, h: 38, rank });
+    const rects = (m: Map<string, { cx: number; cy: number }>) => [...m.values()].map(({ cx, cy }) => ({ x0: cx - 60, y0: cy - 19, x1: cx + 60, y1: cy + 19 }));
+    const anyOverlap = (rs: { x0: number; y0: number; x1: number; y1: number }[]) => rs.some((a, i) => rs.some((b, j) => i < j && a.x0 < b.x1 && a.x1 > b.x0 && a.y0 < b.y1 && a.y1 > b.y0));
+    it("겹치지 않게 · 틀 안에 · 멀리 튀지 않게(제주는 아래 끝에 묶여 먼저, 남해서부가 비킨다)", async () => {
+        const { layoutTags } = await import("./fishingSea");
+        const m = layoutTags([box("south-west", 150, 370), box("jeju", 140, 395)], B, 4);
+        expect(anyOverlap(rects(m))).toBe(false);
+        for (const r of rects(m)) { expect(r.x0).toBeGreaterThanOrEqual(-0.01); expect(r.y1).toBeLessThanOrEqual(400.01); }
+        // 제주는 아래 끝 그대로, 남해서부는 한 칸 위쯤(멀리 위로 튀지 않는다)
+        expect(m.get("jeju")!.cy).toBeCloseTo(381, 0);
+        expect(Math.abs(m.get("south-west")!.cy - 381)).toBeLessThan(60);
+    });
+    it("센 특보가 먼저 자리를 갖는다 · 이미 그려진 글(구역 이름)은 덮지 않는다", async () => {
+        const { layoutTags } = await import("./fishingSea");
+        const m = layoutTags([box("a", 150, 200, 1), box("b", 150, 200, 3)], B, 4, [{ x0: 200, y0: 150, x1: 260, y1: 170 }]);
+        expect(m.get("b")).toEqual({ cx: 150, cy: 200 });
+        const all = [...rects(m), { x0: 200, y0: 150, x1: 260, y1: 170 }];
+        expect(anyOverlap(all)).toBe(false);
+    });
+    it("지도가 꼬리표를 한 번에 늘어놓는다", () => {
+        const src = readFileSync(resolve(__dirname, "..", "client/src/fishing/SeaChart.tsx"), "utf8");
+        expect(src).toContain("const tagAt = layoutTags(tagDefs.map((t) => t.box)");
+        expect(src).toContain("!underTag(v.x + 14 * u, y - 7 * u)");
     });
 });
