@@ -61,6 +61,8 @@ export default function BookingList() {
     // 되짚기 응답이 늦게 왔을 때 "사용자가 그 사이 직접 날짜를 골랐는지" 를 본다.
     // 골랐으면 덮어쓰지 않는다 — 응답이 몇 초 뒤 도착해 화면이 혼자 튀는 걸 막는다.
     const userPickedDate = useRef(false);
+    // 조인/부킹을 사람이 직접 골랐는가 — 안 골랐으면 조인이 빈 날엔 부킹을 먼저 보여 준다(2026-10-17 오너: "조인에 내용이 없으니 부킹이 우선")
+    const userPickedView = useRef(false);
     // 주소(경로·질의)를 구독한다 — 같은 화면에서 주소만 바뀌는 이동(하단 '조인' 탭, 푸시 클릭)을 알아채려고.
     const [routePath, setLocation] = useLocation();
     const routeSearch = useSearch();
@@ -159,7 +161,7 @@ export default function BookingList() {
         // 새 주소로 왔을 때만 가드를 푼다 — 이 effect 는 자정에 weekDates 가 새로 만들어져도 돌기 때문에, 무조건 풀면
         // 사용자가 고른 날짜가 옛 딥링크의 날짜로 되돌아간다.
         const route = `${routePath}?${routeSearch}`;
-        if (lastRouteRef.current !== route) { lastRouteRef.current = route; userPickedDate.current = false; }
+        if (lastRouteRef.current !== route) { lastRouteRef.current = route; userPickedDate.current = false; userPickedView.current = false; }
         const params = new URLSearchParams(window.location.search);
         const dateParam = params.get('date');
         const viewParam = params.get('view');
@@ -174,6 +176,7 @@ export default function BookingList() {
             const rest = params.toString();
             window.history.replaceState(window.history.state, "", window.location.pathname + (rest ? `?${rest}` : ""));
             setViewType('JOIN');
+            userPickedView.current = true; // 조인을 올리러 온 것 — 부킹으로 돌리지 않는다
             setIsCreateModalOpen(true);
         }
 
@@ -197,7 +200,7 @@ export default function BookingList() {
                 // (아직 첫 칩(오늘)에 있을 때만 옮긴다).
                 if (cancelled || !b?.datetime) return;
                 if (userPickedDate.current) return;
-                if (b.listingType === 'JOIN') setViewType('JOIN');
+                if (b.listingType === 'JOIN') { setViewType('JOIN'); userPickedView.current = true; }
                 const idx = weekDates.findIndex(d => d.fullDate === kstDateKey(b.datetime));
                 if (idx !== -1) { setSelectedDate(idx); return; }
                 // 30일 띠 밖이면 화면에 띄울 자리가 없다 — 조용히 오늘을 보여 주는 대신 그렇다고 말한다.
@@ -239,6 +242,14 @@ export default function BookingList() {
     }, [myCrewsData]);
 
     const theme = viewType === 'JOIN' ? THEME_COLORS.JOIN : THEME_COLORS.BOOKING;
+
+    // 조인으로 열었는데 그 날 조인을 다 받아 보니 하나도 없으면 부킹으로(직접 '조인'을 누르지 않았을 때만 — 한 번 누르면 그대로 둔다).
+    // 조인 보기는 조인만 받아 오므로(useBookingData) '받기가 끝났고 비었다'로 판단한다
+    useEffect(() => {
+        if (viewType !== 'JOIN' || userPickedView.current || isLoading || isError || !weekDates[selectedDate]) return;
+        const day = weekDates[selectedDate].fullDate;
+        if (!(bookings as any[]).some((b) => kstDateKey(b.datetime) === day)) setViewType('BOOKING');
+    }, [viewType, bookings, isLoading, isError, selectedDate, weekDates]);
 
     // ⚡ Performance Optimization: Memoized filtering and sorting
     const filteredTimes = useMemo(() => {
@@ -511,7 +522,7 @@ export default function BookingList() {
                             {(['BOOKING', 'JOIN'] as const).map(type => (
                                 <button
                                     key={type}
-                                    onClick={() => setViewType(type)}
+                                    onClick={() => { userPickedView.current = true; setViewType(type); }}
                                     className={cn(
                                         "px-3 h-full rounded-full text-xs font-black transition-all flex items-center justify-center whitespace-nowrap min-w-[54px]",
                                         viewType === type ? (type === 'BOOKING' ? "bg-[#64DD17] text-[#051907]" : "bg-[#FF6B00] text-white") : "text-white/40 hover:text-white"

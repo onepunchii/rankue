@@ -197,9 +197,8 @@ export interface NearStore { code: string; name: string; address: string; distan
 export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
     code: string; lat: number; lng: number;
     onOpen: (code: string) => void;
-    copy: { title: string; here: string; near: string; others: string; note: string; within50: string };
+    copy: { title: string; here: string; near: string; note: string; within50: string };
 }) {
-    const { dots } = useStoreDots();
     const km = (n: number) => nearDistText(n, copy.within50);
     const key = `/api/hiq/listings?lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}&limit=6`;
     const q = useQuery<{ rows?: NearStore[] }>({ queryKey: [key], staleTime: 30 * 60_000 });
@@ -209,12 +208,9 @@ export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
     const kx = 111.32 * Math.cos((lat * Math.PI) / 180), ky = 110.57;
     const xy = (a: number, b: number): [number, number] => [(b - lng) * kx, (lat - a) * ky];
     const inView = ([x, y]: [number, number]) => Math.abs(x) <= 2 * R && Math.abs(y) <= R;
-    // 판 안의 그 밖 매장 — 지도 점(소수 셋째 자리)이라 이 매장 · 다섯 곳과 겹치는 자리는 뺀다
-    const marked = near.filter((n) => n.lat != null && n.lng != null).map((n) => xy(n.lat!, n.lng!));
-    const close = (p: [number, number]) => Math.hypot(p[0], p[1]) < R * 0.03 || marked.some((m) => Math.hypot(m[0] - p[0], m[1] - p[1]) < R * 0.03);
-    const others = dots.map((d) => xy(d.lat, d.lng)).filter((p) => inView(p) && !close(p));
+    // 그 밖의 매장(상아 공)은 그리지 않는다 — 오너 10/17 "흰공은 빼자": 이 매장과 가까운 다섯 곳만
     const bar = NICE_KM.filter((k) => k <= R * 0.7).pop() ?? 0.2;
-    const r = R * 0.05, ry = R * 0.105;
+    const ry = R * 0.105;
     const shown = near.filter((n) => n.lat != null && n.lng != null && inView(xy(n.lat, n.lng)));
     // 민 공이 판 밖으로 나가지 않게 — 레일 안쪽에 붙인다(표시만)
     const spots = spreadBalls(shown.map((n) => xy(n.lat!, n.lng!)), ry, { x: 0, y: 0, r: ry * 1.15 }, { hw: 2 * R - ry * 1.3, hh: R - ry * 1.3 });
@@ -224,8 +220,6 @@ export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
             <Table portrait={false} rail={9}>
                 <div className="relative" style={{ aspectRatio: "2 / 1" }}>
                     <svg viewBox={`${-2 * R} ${-R} ${4 * R} ${2 * R}`} className="block h-full w-full" role="img" aria-label={`${copy.here} · ${copy.near} ${near.length}`}>
-                        <g fill="#00000040">{others.map(([x, y], i) => <circle key={`s${i}`} cx={x + r * 0.35} cy={y + r * 0.5} r={r} />)}</g>
-                        <g fill={IVORY} stroke="#0A3D28" strokeWidth={r * 0.18} opacity={0.85}>{others.map(([x, y], i) => <circle key={`o${i}`} cx={x} cy={y} r={r} />)}</g>
                         {/* 번호가 큰 것부터 그려 작은 번호가 위에 오게 */}
                         {shown.map((n, k) => ({ n, k })).reverse().map(({ n, k }) => {
                             const i = near.indexOf(n);
@@ -257,7 +251,6 @@ export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
             <p className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[12px] font-medium text-black/50">
                 <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: "#D8352A" }} aria-hidden />{copy.here}</span>
                 <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 rounded-full" style={{ background: YELLOW, boxShadow: "0 0 0 1px #7A5A08" }} aria-hidden />{copy.near}</span>
-                <span className="flex items-center gap-1"><span className="inline-flex h-3 w-3 items-center justify-center rounded-[3px]" style={{ background: "#0F6E4A" }} aria-hidden><span className="h-[5px] w-[5px] rounded-full" style={{ background: IVORY }} /></span>{copy.others}</span>
             </p>
             <ol className="mt-3 divide-y divide-black/[0.06]">
                 {near.map((n, i) => (

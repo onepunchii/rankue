@@ -422,7 +422,7 @@ export default function StoreListingPage() {
               <StoreNearTable
                 code={s.code} lat={Number(s.latitude)} lng={Number(s.longitude)}
                 onOpen={(c) => { setLocation(`/stores/${c}`); try { window.scrollTo(0, 0); } catch { /* 스크롤 못 하는 환경 */ } }}
-                copy={{ title: t.nearTitle, here: t.nearHere, near: t.nearNear, others: t.nearOthers, note: t.nearNote, within50: t.nearWithin50 }}
+                copy={{ title: t.nearTitle, here: t.nearHere, near: t.nearNear, note: t.nearNote, within50: t.nearWithin50 }}
               />
             )}
 

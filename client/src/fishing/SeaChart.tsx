@@ -181,7 +181,8 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
     })();
     // 풍랑특보 꼬리표 — 센 특보부터 놓고 겹치면 비킨다(layoutTags). 경도 · 위도 숫자도 꼬리표 밑이면 뺀다
     const TAG_H = 38, RANK: Readonly<Record<SeaState, number>> = { alert: 4, warn: 3, far: 2, pre: 1, clear: 0 };
-    const tagDefs = SEA_AREAS.flatMap((def) => {
+    // 낚시지수 보기(pixels)에는 꼬리표를 달지 않는다 — 특보는 '특보 · 항구' 보기에 있다(오너 10/17). 번진 물감 색은 남긴다
+    const tagDefs = pixels ? [] : SEA_AREAS.flatMap((def) => {
         const zz = ZONES[def.id], a = by.get(def.id), w = a ? WASH[a.state] : null;
         if (!zz || !a || !w?.tag) return [];
         const [ax, ay] = latLngToOutline(zz.at[0], zz.at[1]);
