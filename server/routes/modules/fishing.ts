@@ -34,7 +34,7 @@ import { getIndexMap, getPortBrief } from "../../services/fishingPort.js";
 import { nearestWeather, type CatchWeather } from "../../../shared/fishingSpot.js";
 import { rankColumn, rankRows, type FishingRankBoard, type FishingRankSpecies } from "../../../shared/fishingRank.js";
 import { fishByName, fishRecords } from "../../../shared/fishingFish.js";
-import { DECOR, DECOR_SLOTS, SLOT_KIND, cleanLayout, decorItem, decorProgress, resolveLayout, type CrewTankRow, type DecorCatch, type DecorLayout, type DecorRow, type TankView } from "../../../shared/fishingDecor.js";
+import { cleanHiddenSpecies, DECOR, DECOR_SLOTS, SLOT_KIND, cleanLayout, decorItem, decorProgress, resolveLayout, type CrewTankRow, type DecorCatch, type DecorLayout, type DecorRow, type TankView } from "../../../shared/fishingDecor.js";
 import { GEAR_MAX, addLineChange, cleanGear, cleanLineChange, type FishingGear, type LineChange } from "../../../shared/fishingGear.js";
 import { getMarketWeek } from "../../services/fishingMarket.js";
 import { cleanBoatQuery, type FishingBoat } from "../../../shared/fishingBoats.js";
@@ -407,18 +407,22 @@ async function tankOf(memberId: string, mine: boolean): Promise<TankView> {
     const [have, [meRow], [tank]] = await Promise.all([
         awardDecor(memberId, list),
         db.select({ name: hiqMembers.name }).from(hiqMembers).where(eq(hiqMembers.id, memberId)).limit(1),
-        db.execute(sql`select layout from fishing_tanks where member_id = ${memberId}`).then(rowsOf),
+        db.execute(sql`select layout, hidden_species from fishing_tanks where member_id = ${memberId}`).then(rowsOf),
     ]);
     const owned = new Set(have.keys());
     const layout = cleanLayout(tank?.layout ?? {}, owned);
-    const { fish, seals } = tankFish(list);
+    // 수조에서 뺀 어종(2026-10-18) — 헤엄치는 물고기에서만 뺀다(조과 · 낙관 · 장식 조건은 그대로)
+    const hidden = cleanHiddenSpecies(tank?.hidden_species);
+    const all = tankFish(list);
+    const fish = all.fish.filter((f) => !hidden.includes(f.species));
+    const seals = all.seals;
     let items: DecorRow[] | null = null;
     if (mine) {
         const owners = new Map(rowsOf(await db.execute(sql`select item_id, count(*)::int as n from fishing_decor_awards group by item_id`)).map((r) => [String(r.item_id), Number(r.n)] as const));
         const prog = decorProgress(list);
         items = DECOR.map((d) => ({ id: d.id, cur: prog[d.id].cur, need: prog[d.id].need, have: owned.has(d.id), serial: have.get(d.id)?.serial ?? null, owners: owners.get(d.id) ?? 0, earnedAt: have.get(d.id)?.earnedAt ?? null }));
     }
-    return { mine, name: String(meRow?.name ?? "회원"), fish, seals, layout, placed: resolveLayout(layout, owned), owned: owned.size, items };
+    return { mine, name: String(meRow?.name ?? "회원"), fish, seals, layout, placed: resolveLayout(layout, owned), owned: owned.size, items, ...(mine ? { hidden } : {}) };
 }
 
 router.get("/tank", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -447,6 +451,21 @@ router.post("/tank/layout", requireAuth, gate, asyncHandler(async (req: AuthRequ
     await db.execute(sql`insert into fishing_tanks (member_id, layout, updated_at) values (${req.userId!}, ${JSON.stringify(layout)}::jsonb, now())
         on conflict (member_id) do update set layout = excluded.layout, updated_at = now()`);
     return sendSuccess(res, { layout, placed: resolveLayout(layout, owned) });
+}));
+
+/** 수조에서 한 어종 빼기 · 다시 넣기 — { species, hidden: boolean }. 내가 적은 어종만 */
+router.post("/tank/hide", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+    const species = String(req.body?.species ?? "").trim();
+    const hide = req.body?.hidden === true;
+    if (!species || species.length > 40) return sendError(res, 400, "어종을 찾을 수 없어요");
+    const [had] = rowsOf(await db.execute(sql`select 1 from fishing_catches where member_id = ${req.userId!} and species = ${species} and hidden_at is null limit 1`));
+    if (!had) return sendError(res, 404, "수조에 없는 어종이에요");
+    const [cur] = rowsOf(await db.execute(sql`select hidden_species from fishing_tanks where member_id = ${req.userId!}`));
+    const now = cleanHiddenSpecies(cur?.hidden_species);
+    const next = cleanHiddenSpecies(hide ? [...now, species] : now.filter((x) => x !== species));
+    await db.execute(sql`insert into fishing_tanks (member_id, hidden_species, updated_at) values (${req.userId!}, ${next}::text[], now())
+        on conflict (member_id) do update set hidden_species = excluded.hidden_species, updated_at = now()`);
+    return sendSuccess(res, { hidden: next });
 }));
 
 /** 크루원 수족관 — 같은 낚시 크루의 사람만. 잡은 곳 · 날은 나가지 않는다(어종과 마릿수 · 장식만) */

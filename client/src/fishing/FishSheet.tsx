@@ -93,9 +93,11 @@ function Story({ info, month }: { info: FishInfo; month: number }) {
     );
 }
 
-export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap, onRules }: {
+export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap, onRules, tank }: {
     fish: FishKind; rec: FishRecord<FishingCatch> | null; list: readonly FishingCatch[]; today: string;
     onClose: () => void; onAdd: () => void; /** 홈의 지도를 이 어종으로 */ onMap: () => void; /** 낚시 규칙 화면으로 */ onRules: () => void;
+    /** 내가 잡은 어종이면 — 수조에서 빼기 · 다시 넣기(2026-10-18) */
+    tank?: { hidden: boolean; toggle: (hidden: boolean) => void } | null;
 }) {
     const { data: regs } = useRegs();
     const info = fishInfoOf(fish.id);
@@ -119,6 +121,12 @@ export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap, onRul
             <div className="h-[env(safe-area-inset-top)] shrink-0" aria-hidden />
             <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4" style={{ borderColor: C.line }}>
                 <h2 className="flex-1 text-[16px] font-semibold">어종 한 장</h2>
+                {tank && (
+                    <button type="button" onClick={() => tank.toggle(!tank.hidden)} className="h-9 shrink-0 rounded-full px-3.5 text-[13px] font-semibold active:opacity-80"
+                        style={tank.hidden ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }} data-testid="fishing-fish-tank-toggle" aria-pressed={!tank.hidden}>
+                        {tank.hidden ? "수조에 다시 넣기" : "수조에서 빼기"}
+                    </button>
+                )}
                 <button type="button" onClick={onClose} aria-label="닫기" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#FFFFFF0F] active:bg-[#FFFFFF1F]" data-testid="fishing-fish-close"><LucideX className="h-5 w-5" /></button>
             </header>
 

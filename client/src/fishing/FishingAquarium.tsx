@@ -97,12 +97,16 @@ export function FishingAquarium({ fish, seals, placed, onFish, mini = false, onO
     useEffect(() => { engineRef.current?.setDecor(placed ?? {}); }, [placed]);
 
     const tap = (e: React.PointerEvent<HTMLCanvasElement>) => {
-        if (mini) { onOpen?.(); return; }
+        // 홈의 작은 수조 — 물고기를 누르면 그 어종의 한 장(내 사진 · 기록), 물을 누르면 수족관으로(2026-10-18 오너: "물고기 눌렀을 때 내가 등록했던 사진")
         const engine = engineRef.current;
-        if (!engine) return;
+        if (!engine) { if (mini) onOpen?.(); return; }
         const r = e.currentTarget.getBoundingClientRect(), cam = camRef.current;
         const wx = cam.x + (e.clientX - r.left - r.width / 2) / cam.z, wy = cam.y + (e.clientY - r.top - r.height / 2) / cam.z;
         const hit = sample ? null : engine.fishAt(wx, wy);
+        if (mini) {
+            if (hit && onFish) { engine.excite(hit); window.setTimeout(() => onFish(hit), 260); } else onOpen?.();
+            return;
+        }
         if (hit) {
             // 놀라서 꼬리를 튕기며 앞으로 튄다 — 그 뒤에 그 어종의 한 장
             engine.excite(hit);

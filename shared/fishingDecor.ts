@@ -228,6 +228,13 @@ export interface TankView {
     placed: Record<DecorSlot, string | null>;
     owned: number;
     items: DecorRow[] | null;
+    /** 수조에서 뺀 어종 이름(2026-10-18) — 내 수족관에만 실린다. 남의 수족관은 뺀 어종이 fish 에서 이미 빠져 있다 */
+    hidden?: string[];
+}
+/** 수조에서 뺄 어종 목록 다듬기 — 빈칸 · 겹침 · 40자 넘는 이름은 버리고 60개까지 */
+export function cleanHiddenSpecies(v: unknown): string[] {
+    if (!Array.isArray(v)) return [];
+    return [...new Set(v.filter((x): x is string => typeof x === "string").map((x) => x.trim()).filter((x) => x && x.length <= 40))].slice(0, 60);
 }
 /** 크루원 수족관 목록의 한 줄 */
 export interface CrewTankRow { memberId: string; name: string; species: number; decor: number; me: boolean; /** 가장 많이 잡은 어종(타일의 어탁) */ top: string | null }

@@ -67,6 +67,8 @@ export interface ChartSpot { name: string; lat: number; lng: number; step: Fishi
  */
 export const PIXEL_REACH_KM = 42;
 const PIXEL: readonly string[] = ["#CDB487", "#E2D0A8", "#A9C9D3", "#4A8FB0", "#0F4A66"];
+/** 칸의 무게 — 매우나쁨 · 나쁨은 종이에 스치듯, 좋음 · 매우좋음은 또렷하게 */
+const PIXEL_WEIGHT: readonly number[] = [0.32, 0.45, 0.8, 1, 1];
 export const PIXEL_LEGEND = PIXEL;
 const KM = (() => { const [, y1] = latLngToOutline(35, 127), [, y2] = latLngToOutline(36, 127); return Math.abs(y2 - y1) / 111; })();
 /** 키운 만큼 칸을 잘게 — 세 단계 */
@@ -112,7 +114,8 @@ export function zoneAt(lat: number, lng: number): { id: string; name: string } |
     return null;
 }
 
-export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spot, onSpot, pixels, cell, onCell }: {
+export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spot, onSpot, pixels, cell, onCell, me }: {
+    /** 내 위치(기기에서 잰 값 — 저장 · 전송하지 않는다) */ me?: { lat: number; lng: number } | null;
     areas: readonly SeaArea[]; picked: string | null; onPick: (id: string) => void; temps?: readonly SeaTemp[];
     /** 항구의 점 — 고른 항구(port)는 이름과 함께 도드라진다 */
     ports?: readonly { code: string; name: string; lat: number; lng: number }[]; port?: string | null;
@@ -247,7 +250,8 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
 
                 {/* 풍랑특보 — 번진 물감 + 빗금(어림 자리) */}
                 <g pointerEvents="none" data-testid="fishing-chart-storms">
-                    {SEA_AREAS.map((def) => {
+                    {/* 낚시지수 보기에서는 물감을 깔지 않는다 — 잘 잡히는 파랑이 먼저 보여야 한다(2026-10-18 오너). 특보는 '특보 · 항구' 보기에 */}
+                    {!pixels && SEA_AREAS.map((def) => {
                         const zz = ZONES[def.id], a = by.get(def.id);
                         if (!zz || !a || a.state === "clear") return null;
                         const [x1, y1] = latLngToOutline(zz.lat[1], zz.lng[0]), [x2, y2] = latLngToOutline(zz.lat[0], zz.lng[1]);
@@ -274,7 +278,9 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
                         const at = outlineToLatLng(t.x + size / 2, t.y + size / 2);
                         onCell?.({ ...at, km: Math.round(t.km) });
                     }}>
-                        {tiles.map((t, i) => <rect key={`${t.x}:${t.y}`} data-i={i} data-score={t.score} x={t.x + size * 0.07} y={t.y + size * 0.07} width={size * 0.86} height={size * 0.86} rx={size * 0.15} fill={PIXEL[t.score]} opacity={t.km < PIXEL_REACH_KM * 0.35 ? 0.95 : t.km < PIXEL_REACH_KM * 0.68 ? 0.7 : 0.42} />)}
+                        {/* 좋은 칸이 위에 · 진하게, 나쁜 칸은 옅게 — 눈이 먼저 가는 곳이 '잘 잡히는 곳'이게(2026-10-18 오너) */}
+                        {tiles.map((t, i) => ({ t, i })).sort((a, b) => a.t.score - b.t.score).map(({ t, i }) => <rect key={`${t.x}:${t.y}`} data-i={i} data-score={t.score} x={t.x + size * 0.07} y={t.y + size * 0.07} width={size * 0.86} height={size * 0.86} rx={size * 0.15} fill={PIXEL[t.score]}
+                            opacity={(t.km < PIXEL_REACH_KM * 0.35 ? 1 : t.km < PIXEL_REACH_KM * 0.68 ? 0.78 : 0.5) * PIXEL_WEIGHT[t.score]} />)}
                     </g>
                 )}
 
@@ -368,6 +374,15 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
 
                 {/* 고른 칸 — 붉은 테 */}
                 {pickedTile && <rect x={pickedTile.x - size * 0.06} y={pickedTile.y - size * 0.06} width={size * 1.12} height={size * 1.12} rx={size * 0.2} fill="none" stroke="#C8372D" strokeWidth={2 * u} pointerEvents="none" data-testid="fishing-chart-cell" />}
+
+                {/* 내 위치 — 붉은 점 + 옅은 원(화면 크기 그대로) */}
+                {me && (() => { const [mx, my] = latLngToOutline(me.lat, me.lng); return (
+                    <g pointerEvents="none" data-testid="fishing-chart-me">
+                        <circle cx={mx} cy={my} r={14 * u} fill="#C8372D2E" />
+                        <circle cx={mx} cy={my} r={5.5 * u} fill="#C8372D" stroke="#FBF7EE" strokeWidth={2 * u} />
+                        <text x={mx - 9 * u} y={my + 17 * u} textAnchor="end" fontSize={fs} fontWeight="600" fill="#8E2A14" stroke="#EFE8D8" strokeWidth={fs * 0.24} paintOrder="stroke">나</text>
+                    </g>
+                ); })()}
 
                 {/* 풍랑특보의 꼬리표 — 구역 이름 + 특보(화면 크기 그대로) */}
                 <g pointerEvents="none" data-testid="fishing-chart-tags">

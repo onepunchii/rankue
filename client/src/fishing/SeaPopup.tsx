@@ -9,16 +9,16 @@
  *  5. 여기서 낚았어요 — 조과 적기
  * 지수는 국립해양조사원이 매긴 값이라고 적는다(랭큐가 매긴 값이 아니다). ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지.
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { LucidePlus, LucideX } from "@/lib/icons";
-import { cn } from "@/lib/utils";
 import { FISHING_COLORS as C, fishingDayLabel, type FishingCatch } from "@shared/fishing";
 import { fishByName, fishValue, fishValueText } from "@shared/fishingFish";
 import { FISH_GUIDE_NAME } from "@shared/fishingFishInfo";
 import { hhmm, rangeText, windDirKo, type FishingIndexStep, type IndexSpot, type PortBrief } from "@shared/fishingPort";
 import { tideOf, TIDE_PHASE_TEXT } from "@shared/fishingTide";
+import { seaVerdict } from "@shared/fishingPort";
 import type { SeaArea } from "@shared/fishingSea";
 import { FISHING_PORTS } from "@shared/fishingStations";
 import { INK, PAPER, art } from "./ink";
@@ -32,7 +32,6 @@ const STEP_TONE: Readonly<Record<FishingIndexStep, { bg: string; text: string }>
 const short = (n: string) => n.replace(/\(.*\)$/, "").replace(/(북동|남동|북서|남서|북북서|남남동|남남서|동북동|동남동|동측|서측|남측|북측)$/, "");
 const kmBetween = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => Math.hypot((a.lng - b.lng) * 88.8, (a.lat - b.lat) * 111);
 
-type Cond = "wave" | "wind" | "temp" | "tide";
 
 function Pill({ step, label }: { step: FishingIndexStep | null; label: string }) {
     const t = step ? STEP_TONE[step] : null;
@@ -44,7 +43,8 @@ function Pill({ step, label }: { step: FishingIndexStep | null; label: string })
     );
 }
 
-export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, onAdd, onFish }: {
+export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, onAdd, onFish, fromMe = null }: {
+    /** 내 위치에서의 거리(km) — 내 위치를 켰을 때만 */ fromMe?: number | null;
     spot: IndexSpot; fish: string; day: string; today: string;
     /** 픽셀을 눌러 왔으면 그 칸 */ cell: { lat: number; lng: number; km: number } | null;
     list: readonly FishingCatch[]; areas: readonly SeaArea[];
@@ -62,7 +62,6 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
     }, [spot]);
     const { data: brief } = useQuery<PortBrief | null>({ queryKey: port ? ["/api/hiq/fishing/ports", port.code, day] : ["/api/hiq/fishing/ports", "none"], queryFn: () => apiRequest(`/api/hiq/fishing/ports/${port!.code}?day=${day}`), enabled: !!port, staleTime: 5 * 60_000 });
     const { data: guide } = useGuideIndex();
-    const [cond, setCond] = useState<Cond>("wave");
 
     // 어종 카드 — 고른 어종이 먼저. 사진은 도감(위키미디어 공용)에서, 없으면 우리 어탁
     const names = [fish, ...Object.keys(spot.fish).filter((f) => f !== fish)].filter((f) => spot.fish[f]);
@@ -85,12 +84,15 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
     const sea = zone?.id.startsWith("west") ? "west" : "south";
     const tide = tideOf(day, sea);
     const buoy = brief?.now?.buoy ?? null;
-    const conds: { id: Cond; icon: string; label: string; value: string }[] = [
-        { id: "wave", icon: "wave", label: "파고", value: spot.wave ? `${rangeText(spot.wave)}m` : "–" },
-        { id: "wind", icon: "wind", label: "바람", value: spot.wind ? `${rangeText(spot.wind)}m/s` : "–" },
-        { id: "temp", icon: "temp", label: "수온", value: spot.wtemp ? `${rangeText(spot.wtemp)}°` : brief?.now?.wtemp != null ? `${brief.now.wtemp.toFixed(1)}°` : "–" },
-        { id: "tide", icon: "tide", label: "물때", value: tide?.name ?? spot.tide ?? "–" },
+    // 네 칸 — 예보 범위(국립해양조사원) + 그 아래 지금 잰 값(가까운 부이 · 관측소). 누르는 단추가 아니라 한눈 표(예전엔 누르면 같은 값을 한 번 더 적었다)
+    const conds: { id: string; icon: string; label: string; value: string; now: string | null }[] = [
+        { id: "wave", icon: "wave", label: "파고", value: spot.wave ? `${rangeText(spot.wave)}m` : "–", now: buoy?.wave != null ? `지금 ${buoy.wave.toFixed(1)}m · ${buoy.name}` : null },
+        { id: "wind", icon: "wind", label: "바람", value: spot.wind ? `${rangeText(spot.wind)}m/s` : "–", now: buoy?.wind != null ? `지금 ${[windDirKo(buoy.windDir), `${buoy.wind.toFixed(1)}m/s`].filter(Boolean).join(" ")}` : null },
+        { id: "temp", icon: "temp", label: "수온", value: spot.wtemp ? `${rangeText(spot.wtemp)}°` : brief?.now?.wtemp != null ? `${brief.now.wtemp.toFixed(1)}°` : "–", now: brief?.now?.wtemp != null && port ? `지금 ${brief.now.wtemp.toFixed(1)}° · ${port.name}` : null },
+        { id: "tide", icon: "tide", label: "물때", value: tide?.name ?? spot.tide ?? "–", now: tide ? TIDE_PHASE_TEXT[tide.phase] : null },
     ];
+    const verdict = seaVerdict(spot.fish[fish], spot, tag);
+    const VERDICT_TONE = { good: { bg: "#0F4A66", text: "#F3ECDD" }, mid: { bg: "#A9C9D333", text: "#F3ECDD" }, bad: { bg: "#E2D0A81F", text: "#F8DDB0" } } as const;
     const dayWord = day === today ? "오늘" : fishingDayLabel(day, today);
 
     return (
@@ -110,14 +112,21 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                     )}
                     <div className="absolute inset-x-4 bottom-3">
                         <p className="text-[24px] font-semibold leading-tight tracking-tight">{short(spot.name)}</p>
-                        <p className="mt-0.5 text-[13px] [word-break:keep-all]" style={{ color: "#F3ECDDCC" }}>{[zone ? `${zone.name} 쪽 바다` : null, cell && cell.km > 0 ? `고른 칸에서 ${cell.km}km` : null, dayWord].filter(Boolean).join(" · ")}</p>
+                        <p className="mt-0.5 text-[13px] [word-break:keep-all]" style={{ color: "#F3ECDDCC" }}>{[zone ? `${zone.name} 쪽 바다` : null, fromMe != null ? `나에게서 ${fromMe}km` : cell && cell.km > 0 ? `고른 칸에서 ${cell.km}km` : null, dayWord].filter(Boolean).join(" · ")}</p>
                     </div>
                 </div>
 
                 <div className="flex-1 overflow-y-auto pb-4">
+                    {/* 그날의 한 줄 평 — 고른 어종 */}
+                    <div className="mx-4 mt-3.5 rounded-2xl px-3.5 py-3" style={{ background: VERDICT_TONE[verdict.tone].bg, color: VERDICT_TONE[verdict.tone].text }} data-testid="fishing-sea-verdict" data-tone={verdict.tone}>
+                        <p className="text-[12.5px] opacity-80">{dayWord} {fish === "기타어종" ? "그 밖의 어종" : fish}</p>
+                        <p className="mt-0.5 text-[17px] font-semibold leading-snug">{verdict.head}</p>
+                        {verdict.why && <p className="mt-0.5 text-[13.5px] [word-break:keep-all] opacity-90">{verdict.why}</p>}
+                    </div>
                     {/* 2. 어종 카드 */}
                     <p className="px-4 pb-2 pt-4 text-[13px]" style={{ color: C.dim }}>{dayWord} 이 바다의 어종 · 국립해양조사원 낚시지수</p>
-                    <div className="flex gap-2.5 overflow-x-auto px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="fishing-sea-popup-fish">
+                    {/* 고른 카드의 테두리(바깥 2.5px)가 가로 줄에 잘리지 않게 위아래로 숨 쉴 틈(2026-10-18 오너 "테두리가 짤려보임") */}
+                    <div className="flex gap-2.5 overflow-x-auto px-4 pb-1.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="fishing-sea-popup-fish">
                         {cards.map((c) => {
                             const on = c.name === fish, v = spot.fish[c.name];
                             return (
@@ -138,41 +147,26 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                         })}
                     </div>
 
-                    {/* 3. 파고 · 바람 · 수온 · 물때 단추 */}
-                    <div className="mt-4 grid grid-cols-2 gap-2 px-4" role="group" aria-label="바다의 상태">
+                    {/* 3. 파고 · 바람 · 수온 · 물때 — 예보 + 지금 잰 값 */}
+                    <div className="mt-4 grid grid-cols-2 gap-2 px-4" aria-label="바다의 상태" data-testid="fishing-sea-conds">
                         {conds.map((c) => (
-                            <button key={c.id} type="button" aria-pressed={cond === c.id} onClick={() => setCond(c.id)} data-testid={`fishing-sea-cond-${c.id}`}
-                                className={cn("flex min-h-[60px] items-center gap-2.5 rounded-2xl px-2.5 py-2 text-left transition-colors")}
-                                style={cond === c.id ? { background: "#F3ECDD", color: INK, boxShadow: `0 0 0 2px ${C.brand}` } : { background: "#FFFFFF0D", color: C.foam, boxShadow: "inset 0 0 0 1px #FFFFFF1A" }}>
+                            <div key={c.id} className="flex min-h-[64px] items-center gap-2.5 rounded-2xl px-2.5 py-2" style={{ background: "#FFFFFF0D", boxShadow: "inset 0 0 0 1px #FFFFFF1A" }} data-testid={`fishing-sea-cond-${c.id}`}>
                                 <img src={`/fishing/art/icon-${c.icon}.webp`} alt="" width={128} height={128} className="h-10 w-10 shrink-0" />
                                 <span className="min-w-0">
-                                    <span className="block text-[12px]" style={{ color: cond === c.id ? "#0F283899" : C.dim }}>{c.label}</span>
+                                    <span className="block text-[12px]" style={{ color: C.dim }}>{c.label}</span>
                                     <span className="block truncate text-[15.5px] font-semibold tabular-nums">{c.value}</span>
+                                    {c.now && <span className="block text-[12px] leading-snug tabular-nums [word-break:keep-all]" style={{ color: C.soft }}>{c.now}</span>}
                                 </span>
-                            </button>
+                            </div>
                         ))}
                     </div>
-                    <div className="mx-4 mt-2.5 rounded-2xl px-3.5 py-3 text-[14px] leading-relaxed [word-break:keep-all]" style={{ background: "#FFFFFF0A", color: C.soft }} data-testid="fishing-sea-cond-detail">
-                        {cond === "wave" && <>
-                            <p><span className="font-semibold" style={{ color: C.foam }}>파고 {spot.wave ? `${rangeText(spot.wave)}m` : "예보 없음"}</span> — {dayWord}의 예보 범위(국립해양조사원)</p>
-                            {buoy?.wave != null && <p className="mt-1">지금 {buoy.name} 부이({buoy.km}km) <span className="font-semibold tabular-nums" style={{ color: C.foam }}>{buoy.wave.toFixed(1)}m</span>{buoy.at ? ` · ${buoy.at.slice(11, 16)} 관측` : ""}</p>}
-                        </>}
-                        {cond === "wind" && <>
-                            <p><span className="font-semibold" style={{ color: C.foam }}>바람 {spot.wind ? `${rangeText(spot.wind)}m/s` : "예보 없음"}</span> — {dayWord}의 예보 범위</p>
-                            {buoy?.wind != null && <p className="mt-1">지금 {buoy.name} 부이 <span className="font-semibold tabular-nums" style={{ color: C.foam }}>{[windDirKo(buoy.windDir), `${buoy.wind.toFixed(1)}m/s`].filter(Boolean).join(" ")}</span></p>}
-                        </>}
-                        {cond === "temp" && <>
-                            <p><span className="font-semibold" style={{ color: C.foam }}>수온 {spot.wtemp ? `${rangeText(spot.wtemp)}°` : "예보 없음"}</span> — {dayWord}의 예보 범위</p>
-                            {brief?.now?.wtemp != null && port && <p className="mt-1">지금 {port.name} 관측소 <span className="font-semibold tabular-nums" style={{ color: C.foam }}>{brief.now.wtemp.toFixed(1)}°</span></p>}
-                        </>}
-                        {cond === "tide" && <>
-                            <p><span className="font-semibold" style={{ color: C.foam }}>{tide ? `${tide.name} · ${TIDE_PHASE_TEXT[tide.phase]}` : spot.tide ?? "물때"}</span>{spot.tide ? ` · ${spot.tide}` : ""}</p>
-                            {port && brief && brief.turns.length > 0 && (
-                                <p className="mt-1.5 flex flex-wrap gap-1.5">{brief.turns.map((t) => <span key={`${t.kind}${t.min}`} className="rounded-full px-2.5 py-1 text-[12.5px] tabular-nums" style={{ background: t.kind === "high" ? "#3F86A833" : "#FFFFFF14", color: C.foam }}>{t.kind === "high" ? "만조" : "간조"} {hhmm(t.min)}</span>)}</p>
-                            )}
-                            {port && <p className="mt-1 text-[12.5px]" style={{ color: C.dim }}>{port.name}({port.km}km)의 예측 조위</p>}
-                        </>}
-                    </div>
+                    {/* 물때 시간표 — 만조 · 간조(가까운 조위 관측소의 예보) */}
+                    {port && brief && brief.turns.length > 0 && (
+                        <div className="mx-4 mt-2.5 rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0A" }} data-testid="fishing-sea-turns">
+                            <p className="text-[12.5px]" style={{ color: C.dim }}>{dayWord} 만조 · 간조 — {port.name}({port.km}km){spot.tide ? ` · ${spot.tide}` : ""}</p>
+                            <p className="mt-1.5 flex flex-wrap gap-1.5">{brief.turns.map((t) => <span key={`${t.kind}${t.min}`} className="rounded-full px-2.5 py-1 text-[13px] font-semibold tabular-nums" style={{ background: t.kind === "high" ? "#3F86A84D" : "#FFFFFF14", color: C.foam }}>{t.kind === "high" ? "만조" : "간조"} {hhmm(t.min)}</span>)}</p>
+                        </div>
+                    )}
 
                     {/* 4. 이 근처 내 기록 */}
                     <div className="mx-4 mt-2.5 rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0A" }} data-testid="fishing-spot-mine">

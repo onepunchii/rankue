@@ -59,7 +59,7 @@ describe("낚시 — 따로 선 종목", () => {
         // 설치 팝업이 전체 화면 위에 뜨지 않는다(role=dialog 를 보고 쉰다 — AppInstallSheet screenBusy)
         expect(full).toContain('role="dialog" aria-modal="true" aria-label={title} className="fixed inset-0 z-[55]');
         expect(page).toContain('{(tab === "tank" || tab === "book") && (');
-        expect(page).toContain('<FishingAquarium fish={empty ? [] : tankFish} placed={tank?.placed} mini onOpen={() => setTab("tank")} />');
+        expect(page).toContain('<FishingAquarium fish={empty ? [] : tankFish} placed={tank?.placed} mini onOpen={() => setTab("tank")} onFish={setFishOpen} />');
         expect(page).toContain("void queryClient.invalidateQueries({ queryKey: TANK_KEY }); // 새 장식이 열렸을 수 있다");
         expect(page).toContain('testid="fishing-tools"');
         const ctx = read("client/src/contexts/SportContext.tsx");

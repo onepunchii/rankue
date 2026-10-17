@@ -20,7 +20,7 @@ describe("수족관 꾸미기 — 서버", () => {
         // 판정에 쓰는 줄에도 잡은 곳 · 좌표는 없다. 내보내는 것은 어종 · 마릿수 · 낙관 · 장식뿐
         const pick = route.slice(route.indexOf("async function decorCatches"), route.indexOf("/** 조건을 채운 장식을"));
         expect(pick).not.toMatch(/\bplace\b|\blat\b|\blng\b|note/);
-        expect(route).toContain('return { mine, name: String(meRow?.name ?? "회원"), fish, seals, layout, placed: resolveLayout(layout, owned), owned: owned.size, items };');
+        expect(route).toContain('return { mine, name: String(meRow?.name ?? "회원"), fish, seals, layout, placed: resolveLayout(layout, owned), owned: owned.size, items, ...(mine ? { hidden } : {}) };');
     });
     it("마이그레이션은 더하기만", () => {
         const m = read("migrations/fishing_decor.sql");
@@ -39,5 +39,32 @@ describe("수족관 꾸미기 — 화면", () => {
     it("새 장식은 한 번 크게 · 첫 고운 모래 하나뿐이면 조용히", () => {
         const page = read("client/src/fishing/FishingPage.tsx");
         expect(page).toContain('if (fresh.length && !(fresh.length === 1 && fresh[0].id === "floor-sand")) setRevealDecor({ id: fresh[0].id, more: fresh.length - 1 });');
+    });
+});
+
+describe("수조에서 빼기 · 지도 · 팝업(2026-10-18 오너 낚시 UX)", () => {
+    it("뺀 어종 목록 다듬기 · 서버는 헤엄치는 물고기에서만 뺀다 · 내가 적은 어종만 뺄 수 있다", async () => {
+        const { cleanHiddenSpecies } = await import("./fishingDecor");
+        expect(cleanHiddenSpecies(["감성돔", " 감성돔 ", "", 3, "우럭"])).toEqual(["감성돔", "우럭"]);
+        expect(cleanHiddenSpecies(null)).toEqual([]);
+        const route = fs.readFileSync(new URL("../server/routes/modules/fishing.ts", import.meta.url), "utf8");
+        expect(route).toContain("const fish = all.fish.filter((f) => !hidden.includes(f.species));");
+        expect(route).toContain('router.post("/tank/hide", requireAuth, gate,');
+        expect(route).toContain("select 1 from fishing_catches where member_id = ${req.userId!} and species = ${species} and hidden_at is null limit 1");
+    });
+    it("한 줄 평 — 나은 반나절 · 발목 잡는 것 하나(특보 > 바람 > 물결) · '나가도 된다'는 말 없음", async () => {
+        const { seaVerdict } = await import("./fishingPort");
+        expect(seaVerdict({ am: "매우나쁨", pm: "나쁨" }, { wave: [0.1, 0.4], wind: [9.1, 17.5] }, "먼바다 풍랑특보")).toEqual({ head: "오후가 더 나아요 · 나쁨", why: "먼바다 풍랑특보가 걸려 있어요", tone: "bad" });
+        expect(seaVerdict({ am: "좋음", pm: "좋음" }, { wave: [0.3, 0.5], wind: [2, 11] }, null)).toMatchObject({ head: "좋음", why: "바람이 세요 — 최대 11.0m/s", tone: "good" });
+        expect(seaVerdict(undefined, { wave: null, wind: null }, null).head).toBe("지수가 없어요");
+    });
+    it("낚시지수 보기는 특보 물감 · 꼬리표 없이 · 좋은 칸이 위에 · 내 위치는 누를 때만", () => {
+        const chart = fs.readFileSync(new URL("../client/src/fishing/SeaChart.tsx", import.meta.url), "utf8");
+        expect(chart).toContain("{!pixels && SEA_AREAS.map((def) => {");
+        expect(chart).toContain("const tagDefs = pixels ? [] : SEA_AREAS.flatMap");
+        expect(chart).toContain("const PIXEL_WEIGHT: readonly number[] = [0.32, 0.45, 0.8, 1, 1];");
+        const page = fs.readFileSync(new URL("../client/src/fishing/FishingPage.tsx", import.meta.url), "utf8");
+        expect(page).toContain('data-testid="fishing-map-locate"');
+        expect(page).toContain("getDevicePosition({ prompt: true, highAccuracy: false");
     });
 });

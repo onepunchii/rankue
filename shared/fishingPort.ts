@@ -194,3 +194,18 @@ export function goodSpots(map: IndexMap, fish: string, limit = 5): { spot: Index
     return out.slice(0, limit);
 }
 
+/**
+ * 그날의 한 줄 평(2026-10-18 오너: "낚시꾼에게 더 적절한 콘텐츠") — 받은 값으로만: 어느 반나절이 나은가 + 발목을 잡는 것 하나(특보 > 바람 > 물결).
+ * '나가도 된다'고 말하지 않는다(shared/fishingSea 머리말) — 좋은 날도 지수가 좋다고만 적는다.
+ */
+const SCORE: Readonly<Record<FishingIndexStep, number>> = { 매우나쁨: 0, 나쁨: 1, 보통: 2, 좋음: 3, 매우좋음: 4 };
+export function seaVerdict(v: { am: FishingIndexStep | null; pm: FishingIndexStep | null } | undefined, spot: Pick<IndexSpot, "wave" | "wind">, tag: string | null): { head: string; why: string | null; tone: "good" | "mid" | "bad" } {
+    const am = v?.am ?? null, pm = v?.pm ?? null;
+    const best = [am, pm].filter(Boolean).sort((a, b) => SCORE[b!] - SCORE[a!])[0] ?? null;
+    const half = am && pm && SCORE[am] !== SCORE[pm] ? (SCORE[am] > SCORE[pm] ? "오전" : "오후") : null;
+    const head = best ? `${half ? `${half === "오전" ? "오전이" : "오후가"} 더 나아요 · ` : ""}${best}` : "지수가 없어요";
+    const windMax = spot.wind?.[1] ?? null, waveMax = spot.wave?.[1] ?? null;
+    const why = tag ? `${tag}가 걸려 있어요` : windMax != null && windMax >= 10 ? `바람이 세요 — 최대 ${windMax.toFixed(1)}m/s` : waveMax != null && waveMax >= 2 ? `물결이 높아요 — 최대 ${waveMax.toFixed(1)}m` : null;
+    const tone = best && SCORE[best] >= 3 ? "good" : best && SCORE[best] === 2 ? "mid" : "bad";
+    return { head, why, tone };
+}
