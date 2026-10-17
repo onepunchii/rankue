@@ -139,15 +139,15 @@ export function DealCard({ deal, onOpen }: { deal: Deal; onOpen: (d: Deal) => vo
                 when={closed ? undefined : isUrgent ? timeLeft(deal.datetime) : whenLabel(deal.datetime)}
                 badge={
                     tone === "urgent" ? (
-                        <span className="shrink-0 inline-flex items-center gap-1 h-[22px] px-2 rounded-md bg-[#FFFFFF] text-[#D94A00] text-[10.5px] font-black">
+                        <span className="shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-md bg-[#FFFFFF] text-[#D94A00] text-[12px] font-black">
                             <LucideTimer className="w-3 h-3" />긴급
                         </span>
                     ) : tone === "lime" ? (
-                        <span className="shrink-0 inline-flex items-center h-[22px] px-2 rounded-md bg-[#FFFFFF33] text-[#FFFFFF] text-[10.5px] font-black">
+                        <span className="shrink-0 inline-flex items-center h-6 px-2 rounded-md bg-[#FFFFFF33] text-[#FFFFFF] text-[12px] font-black">
                             {isJoin ? "조인" : "부킹"}
                         </span>
                     ) : (
-                        <span className="shrink-0 inline-flex items-center h-[22px] px-2 rounded-md bg-[#0000001F] text-[#FFFFFF99] text-[10.5px] font-black">
+                        <span className="shrink-0 inline-flex items-center h-6 px-2 rounded-md bg-[#0000001F] text-[#FFFFFF99] text-[12px] font-black">
                             마감
                         </span>
                     )
@@ -161,7 +161,7 @@ export function DealCard({ deal, onOpen }: { deal: Deal; onOpen: (d: Deal) => vo
                 <span className={cn("text-[15px] font-extrabold", closed ? "text-[#FFFFFF66]" : "text-[#FFFFFFB3]")}>원</span>
             </span>
             {/* 값이 싼 이유를 설명하는 줄이라 값 바로 밑에 붙인다 — 이게 없으면 '너무 싼데 뭔가 있나' 가 된다. */}
-            <span className="mt-1 block text-[11px] font-bold text-[#FFFFFFBF] break-keep">
+            <span className="mt-1 block text-[12px] font-bold text-[#FFFFFFBF] break-keep">
                 그린피 1인{isUrgent && " · 카트·캐디피는 현장에서 N빵이에요"}
             </span>
 
@@ -173,12 +173,12 @@ export function DealCard({ deal, onOpen }: { deal: Deal; onOpen: (d: Deal) => vo
             <span className="mt-2 flex items-center gap-2">
                 <span className="min-w-0 flex-1 flex items-baseline gap-1.5">
                     <span className={cn("min-w-0 truncate text-[12.5px] font-black", closed ? "text-[#FFFFFF99]" : "text-[#FFFFFF]")}>{name}</span>
-                    {deal.region && <span className="shrink-0 text-[11px] font-bold text-[#FFFFFFB3]">{deal.region}</span>}
+                    {deal.region && <span className="shrink-0 text-[12px] font-bold text-[#FFFFFFB3]">{deal.region}</span>}
                 </span>
                 <span className="shrink-0 flex items-center gap-2">
-                    <span className="text-[11.5px] font-bold text-[#FFFFFFCC] tabular-nums">{kstTime(deal.datetime)} 티오프</span>
+                    <span className="text-[12px] font-bold text-[#FFFFFFCC] tabular-nums">{kstTime(deal.datetime)} 티오프</span>
                     {left != null && !closed && (
-                        <span className="flex items-center gap-1 text-[11.5px] font-extrabold text-[#FFFFFF]">
+                        <span className="flex items-center gap-1 text-[12px] font-extrabold text-[#FFFFFF]">
                             <LucideUsers className="w-3 h-3" />{left}자리
                         </span>
                     )}
@@ -274,17 +274,17 @@ export function HotDealTicker() {
             >
                 <UrgentArt />
                 <span className="flex items-center h-[22px]">
-                    <span className="shrink-0 inline-flex items-center gap-1 h-[22px] px-2 rounded-md bg-[#FFFFFF33] text-[#FFFFFF] text-[10.5px] font-black">
+                    <span className="shrink-0 inline-flex items-center gap-1 h-6 px-2 rounded-md bg-[#FFFFFF33] text-[#FFFFFF] text-[12px] font-black">
                         <LucideTimer className="w-3 h-3" />긴급티
                     </span>
                 </span>
                 <span className="mt-2 block text-[15px] font-black text-[#FFFFFF] leading-none break-keep">지금 열린 긴급티가 없어요</span>
-                <span className="mt-1.5 block text-[11px] font-bold text-[#FFFFFFBF] break-keep">오늘 급하게 나온 자리가 여기에 떠요</span>
+                <span className="mt-1.5 block text-[12px] font-bold text-[#FFFFFFBF] break-keep">오늘 급하게 나온 자리가 여기에 떠요</span>
 
                 <span className="mt-3 block h-px bg-[#FFFFFF33]" />
 
                 <span className="mt-2.5 flex items-center gap-1.5">
-                    <span className="text-[11.5px] font-bold text-[#FFFFFFB3]">내가 먼저 올려도 돼요</span>
+                    <span className="text-[12px] font-bold text-[#FFFFFFB3]">내가 먼저 올려도 돼요</span>
                     <span className="ml-auto shrink-0 flex items-center gap-1 text-[12px] font-black text-[#FFFFFF]">
                         <LucidePlus className="w-3.5 h-3.5" />조인 만들기
                         <LucideChevronRight className="w-4 h-4 text-[#FFFFFF99]" />

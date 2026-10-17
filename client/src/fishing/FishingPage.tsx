@@ -276,12 +276,11 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                                 {([
                                     ["trip", "위판장 · 저수지", "많이 오른 어종 · 물높이", "/fishing/art/band-market.webp", "fishing-tool-trip"],
                                     ["points", "낚시터 · 낚시어선", "1,151곳 · 3,993척", "/fishing/art/band-boats.webp", "fishing-to-points"],
-                                    ["rules", "낚시 규칙", "금어기 · 금지체장", null, "fishing-to-rules"],
+                                    ["rules", "낚시 규칙", "금어기 · 금지체장", "/fishing/art/band-rules.webp", "fishing-to-rules"],
                                     ["guide", "어류 도감", "바다 · 민물 374종", "/fishing/art/cover-book.webp", "fishing-to-guide"],
                                 ] as const).map(([to, title, sub, img, id]) => (
                                     <button key={to} type="button" onClick={() => setTab(to)} className="relative flex h-[108px] flex-col justify-end overflow-hidden rounded-2xl px-3.5 pb-3 text-left active:opacity-85" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid={id}>
-                                        {img ? <img src={img} alt="" width={640} height={640} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-55" draggable={false} />
-                                            : <span className="absolute right-3 top-3 flex h-10 w-10 items-center justify-center text-[13px] font-semibold" style={{ background: "#C8372D", color: "#FFF4EC", transform: "rotate(-4deg)", borderRadius: 6 }} aria-hidden>규칙</span>}
+                                        <img src={img} alt="" width={640} height={640} loading="lazy" decoding="async" className="absolute inset-0 h-full w-full object-cover opacity-55" draggable={false} />
                                         <span className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1E2D00 20%,#0B1E2DE6 100%)" }} aria-hidden />
                                         <span className="relative block text-[15px] font-semibold">{title}</span>
                                         <span className="relative mt-0.5 block text-[12.5px]" style={{ color: C.dim }}>{sub}</span>

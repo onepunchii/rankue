@@ -129,6 +129,8 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                 2026-10-12 오너: "랭큐 프로암 빼주고 도장깨기 가이드나 골프 코스도 해당 우리가 만든 이미지 같이 들어가면 너무 좋을 거 같은데".
                 프로암 타일을 뺐다(화면은 남아 있다 — '준비 중' 안내라 홈의 한 칸을 줄 만하지 않다). 그 자리는 볼마커 장식장.
                 두 타일의 그림은 우리가 만든 것으로 바꿨다 — 여권은 종이에 찍힌 잉크 도장, 장식장은 볼마커(stamps/HomeTileArt). */}
+            {/* 2026-10-17 디자인 리뷰: 폭 360 에서 4/5 상자 + p-6 이면 제목이 오른쪽 끝에 닿고 아랫줄이 잘렸다(overflow-hidden 이라 상자가 자라지 않는다).
+                높이는 내용만큼(min-h), 좁은 화면만 여백 · 그림 · 제목을 한 단계 줄인다 */}
             <div className="grid grid-cols-2 gap-4 mb-4 relative z-10">
                 {/* 3. Golf Passport */}
                 <motion.button
@@ -138,14 +140,14 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                         desc: "라운드한 골프장이 내 여권에 도장으로 쌓여요. 가입하면 여권 화면에서 바로 이어집니다.",
                         from: "/golf/passport",
                     })}
-                    className="aspect-[4/5] rounded-[2rem] bg-white/[0.03] border border-white/10 p-6 flex flex-col justify-between items-start text-left hover:bg-white/[0.05] transition-colors group relative overflow-hidden backdrop-blur-sm shadow-xl"
+                    className="min-h-[196px] rounded-[2rem] bg-white/[0.03] border border-white/10 p-4 min-[400px]:p-6 flex flex-col justify-between items-start text-left hover:bg-white/[0.05] transition-colors group relative overflow-hidden backdrop-blur-sm shadow-xl"
                 >
-                    <div className="w-full h-32 flex items-center justify-center -mt-2">
+                    <div className="w-full h-28 min-[400px]:h-32 flex items-center justify-center -mt-1 [&>*]:scale-[0.84] min-[400px]:[&>*]:scale-100">
                         <PassportTileArt />
                     </div>
                     <div className="relative z-10 w-full">
-                        <h3 className="text-2xl font-extrabold text-white leading-none mb-1">GOLF<br />PASSPORT</h3>
-                        <p className="text-[12px] font-bold text-white/40 group-hover:text-[#64DD17] transition-colors">발자국 지도 · 도장 · 앨범</p>
+                        <h3 className="text-[21px] min-[400px]:text-2xl font-extrabold text-white leading-none mb-1.5">GOLF<br />PASSPORT</h3>
+                        <p className="text-[12px] font-bold text-white/40 group-hover:text-[#64DD17] transition-colors break-keep">발자국 지도 · 도장 · 앨범</p>
                     </div>
                 </motion.button>
 
@@ -153,14 +155,14 @@ export function QuickActions({ onOpenGameMode, onOpenJoin }: QuickActionsProps) 
                 <motion.button
                     whileTap={{ scale: 0.98 }}
                     onClick={() => setLocation('/golf/shelf')}
-                    className="aspect-[4/5] rounded-[2rem] bg-white/[0.03] border border-white/10 p-6 flex flex-col justify-between items-start text-left hover:bg-white/[0.05] transition-colors group relative overflow-hidden backdrop-blur-sm shadow-xl"
+                    className="min-h-[196px] rounded-[2rem] bg-white/[0.03] border border-white/10 p-4 min-[400px]:p-6 flex flex-col justify-between items-start text-left hover:bg-white/[0.05] transition-colors group relative overflow-hidden backdrop-blur-sm shadow-xl"
                 >
-                    <div className="w-full h-32 flex items-center justify-center -mt-2">
+                    <div className="w-full h-28 min-[400px]:h-32 flex items-center justify-center -mt-1 [&>*]:scale-[0.84] min-[400px]:[&>*]:scale-100">
                         <ShelfTileArt />
                     </div>
                     <div className="relative z-10 w-full">
-                        <h3 className="text-2xl font-extrabold text-white leading-none mb-1">볼마커<br />장식장</h3>
-                        <p className="text-[12px] font-bold text-white/40 group-hover:text-[#64DD17] transition-colors">도장첩을 다 채우면 하나씩</p>
+                        <h3 className="text-[21px] min-[400px]:text-2xl font-extrabold text-white leading-none mb-1.5">볼마커<br />장식장</h3>
+                        <p className="text-[12px] font-bold text-white/40 group-hover:text-[#64DD17] transition-colors break-keep">도장첩을 다 채우면 하나씩</p>
                     </div>
                 </motion.button>
             </div>

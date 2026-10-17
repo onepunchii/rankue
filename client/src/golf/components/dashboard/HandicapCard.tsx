@@ -13,10 +13,12 @@ interface HandicapCardProps {
 }
 
 export function HandicapCard({ member, avgScore, sample = false }: HandicapCardProps) {
-    // Priority: DB Average Score (Master) -> '-'
-    const displayScore = (avgScore && avgScore !== "0" && avgScore !== 0 && avgScore !== "-")
+    // Priority: DB Average Score (Master) -> 없음.
+    // 없을 때 '0.0' 을 크게 그리면 스크래치 골퍼로 읽힌다(2026-10-17 디자인 리뷰) — 빈 숫자 자리 + 어떻게 생기는지 한 줄
+    const has = (v: unknown) => v != null && v !== "" && v !== "0" && v !== 0 && v !== "-" && v !== "0.0";
+    const displayScore = has(avgScore)
         ? (typeof avgScore === 'number' ? avgScore.toFixed(1) : avgScore)
-        : (member?.golfAvgScore ? Number(member.golfAvgScore).toFixed(1) : '0.0');
+        : (has(member?.golfAvgScore) ? Number(member.golfAvgScore).toFixed(1) : null);
 
     return (
         <motion.div
@@ -30,10 +32,13 @@ export function HandicapCard({ member, avgScore, sample = false }: HandicapCardP
                 {sample && <SampleBadge tone="dark" className="mb-3" />}
                 <div className="flex items-baseline gap-2">
                     <span className="text-8xl font-black text-white tracking-tighter drop-shadow-2xl">
-                        {displayScore}
+                        {displayScore ?? <span className="text-white/20" aria-label="아직 없음">—</span>}
                     </span>
                     <span className="text-xl font-black text-[#64DD17] italic tracking-tighter">HDCP</span>
                 </div>
+                {displayScore == null && !sample && (
+                    <p className="mt-2 text-[12.5px] font-semibold text-white/45 break-keep" data-testid="golf-hdcp-empty">골프장에서 라운드를 기록하면 핸디캡이 생겨요</p>
+                )}
 
 
             </div>

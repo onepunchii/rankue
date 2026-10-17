@@ -73,7 +73,10 @@ describe("RANKUE MATCH · ENTER CODE 타일", () => {
     it("타일의 면과 제목은 그대로다 — 라임 면 · 어두운 면에 라임 테두리, 홈의 굵기(extrabold)", () => {
         expect(quick).toContain("bg-gradient-to-br from-[#64DD17] to-[#388E3C]");
         expect(quick).toContain("bg-[#1a1a1a] border border-[#64DD17]/30");
-        expect(quick.match(/<h3 className="text-2xl font-extrabold /g)!.length).toBe(4);
+        expect(quick.match(/<h3 className="text-2xl font-extrabold /g)!.length).toBe(2);
+        // 아래 줄 두 타일(여권 · 장식장)은 폭 360 에서 한 단계 작게 — 굵기는 그대로(2026-10-17, 제목이 상자 끝에 닿던 것)
+        expect(quick.match(/<h3 className="text-\[21px\] min-\[400px\]:text-2xl font-extrabold /g)!.length).toBe(2);
+        expect(quick.match(/className="min-h-\[196px\] rounded-\[2rem\] bg-white\/\[0\.03\]/g)!.length).toBe(2);
     });
 });
 

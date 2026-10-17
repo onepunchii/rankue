@@ -32,6 +32,9 @@ interface StatsChartProps {
 }
 
 export function StatsChart({ recentScores, stats, sample = false }: StatsChartProps) {
+    // 2026-10-17 디자인 리뷰: 라운드가 없으면 빈 검은 상자 + '0타 · 0.0'이 떴다 — 흐름은 두 번부터 그리고, 없는 값은 '–'
+    const none = !stats.totalRounds;
+    const trend = recentScores.length >= 2;
     const body = (
         <>
             {/* Header */}
@@ -49,6 +52,14 @@ export function StatsChart({ recentScores, stats, sample = false }: StatsChartPr
 
             <div className="bg-white/[0.03] border border-white/5 rounded-[2rem] p-6 backdrop-blur-sm transition-colors group-active:bg-white/[0.06]">
                 {/* Graph */}
+                {!trend ? (
+                    <div className="mb-6 flex h-32 w-full flex-col items-center justify-center gap-3" data-testid="golf-trend-empty">
+                        <svg viewBox="0 0 220 40" className="h-10 w-[70%]" aria-hidden>
+                            <path d="M4 30 C 40 30, 52 14, 84 18 S 130 34, 160 20 S 200 10, 216 12" fill="none" stroke="#64DD1766" strokeWidth="3" strokeDasharray="6 7" strokeLinecap="round" />
+                        </svg>
+                        <p className="text-center text-[13px] font-medium text-white/55 break-keep">{none ? "라운드를 두 번 기록하면 타수 흐름이 그려져요" : "한 번 더 기록하면 타수 흐름이 그려져요"}</p>
+                    </div>
+                ) : (
                 <div className="h-32 w-full mb-6">
                     <ResponsiveContainer width="100%" height="100%">
                         <AreaChart data={recentScores}>
@@ -70,14 +81,15 @@ export function StatsChart({ recentScores, stats, sample = false }: StatsChartPr
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>
+                )}
 
                 {/* Key Stats Grid */}
                 <div className="grid grid-cols-3 gap-4 border-t border-white/5 pt-4">
                     {/* 1. Best Score */}
                     <div className="flex flex-col items-center">
-                        <span className="text-[9px] font-bold text-white/40 uppercase mb-1 tracking-wider">Best Score</span>
+                        <span className="text-[12px] font-semibold text-white/45 mb-1">베스트</span>
                         <span className="text-xl font-black text-white">
-                            {stats.bestScore} <span className="text-xs text-[#64DD17] font-bold">타</span>
+                            {none || !stats.bestScore ? "–" : <>{stats.bestScore} <span className="text-[12px] text-[#64DD17] font-bold">타</span></>}
                         </span>
                     </div>
 
@@ -87,17 +99,17 @@ export function StatsChart({ recentScores, stats, sample = false }: StatsChartPr
                         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-px h-8 bg-white/10" />
                         <div className="absolute right-0 top-1/2 -translate-y-1/2 w-px h-8 bg-white/10" />
 
-                        <span className="text-[9px] font-bold text-white/40 uppercase mb-1 tracking-wider">핸디캡 (HDCP)</span>
+                        <span className="text-[12px] font-semibold text-white/45 mb-1">핸디캡</span>
                         <span className="text-xl font-black text-[#64DD17]">
-                            {stats.avgScore}
+                            {none ? "–" : stats.avgScore}
                         </span>
                     </div>
 
                     {/* 3. Total Rounds (Activity) */}
                     <div className="flex flex-col items-center">
-                        <span className="text-[9px] font-bold text-white/40 uppercase mb-1 tracking-wider">Rounds</span>
+                        <span className="text-[12px] font-semibold text-white/45 mb-1">라운드</span>
                         <span className="text-xl font-black text-white">
-                            {stats.totalRounds} <span className="text-xs text-white/40 font-bold">회</span>
+                            {stats.totalRounds} <span className="text-[12px] text-white/45 font-bold">회</span>
                         </span>
                     </div>
                 </div>
