@@ -74,6 +74,12 @@ describe("매장 상세 '이 근처' 당구대", () => {
         const all = [{ x: 0, y: 0, r: 1.15 }, ...out.map(([x, y]) => ({ x, y, r }))];
         for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) expect(Math.hypot(all[i].x - all[j].x, all[i].y - all[j].y)).toBeGreaterThanOrEqual((all[i].r + all[j].r) * 0.98);
     });
+    it("판 끝에 몰린 공도 판 안에서 서로 비킨다(제주 — 북쪽 끝에 3 · 4 · 5)", () => {
+        const box = { hw: 18, hh: 8 };
+        const out = spreadBalls([[0, -12], [0.2, -12], [0.4, -12.1]], 1, { x: 0, y: 0, r: 1.15 }, box);
+        for (const [x, y] of out) { expect(Math.abs(x)).toBeLessThanOrEqual(box.hw); expect(Math.abs(y)).toBeLessThanOrEqual(box.hh); }
+        for (let i = 0; i < out.length; i++) for (let j = i + 1; j < out.length; j++) expect(Math.hypot(out[i][0] - out[j][0], out[i][1] - out[j][1])).toBeGreaterThanOrEqual(1.96);
+    });
     it("거리 글 — 50m 안 · 1km 아래는 100m 단위 · 10km 넘으면 정수", () => {
         expect(nearDistText(0, "50m 안")).toBe("50m 안");
         expect(nearDistText(0.4, "")).toBe("400m");

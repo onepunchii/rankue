@@ -217,8 +217,7 @@ export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
     const r = R * 0.05, ry = R * 0.105;
     const shown = near.filter((n) => n.lat != null && n.lng != null && inView(xy(n.lat, n.lng)));
     // 민 공이 판 밖으로 나가지 않게 — 레일 안쪽에 붙인다(표시만)
-    const spots = spreadBalls(shown.map((n) => xy(n.lat!, n.lng!)), ry, { x: 0, y: 0, r: ry * 1.15 })
-        .map(([x, y]): [number, number] => [Math.max(-2 * R + ry * 1.3, Math.min(2 * R - ry * 1.3, x)), Math.max(-R + ry * 1.3, Math.min(R - ry * 1.3, y))]);
+    const spots = spreadBalls(shown.map((n) => xy(n.lat!, n.lng!)), ry, { x: 0, y: 0, r: ry * 1.15 }, { hw: 2 * R - ry * 1.3, hh: R - ry * 1.3 });
     return (
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]" data-testid="store-near">
             <p className="mb-2.5 text-[11.5px] font-bold text-black/40">{copy.title}</p>

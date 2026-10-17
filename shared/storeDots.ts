@@ -73,11 +73,15 @@ export function nearViewKm(near: readonly { distanceKm: number | null }[]): numb
  * 번호 공이 겹치면 옆으로 민다(같은 건물의 두 곳 · 같은 읍의 세 곳). 놓인 공(이 매장 먼저)과 겹치면 원래 자리 둘레 여섯 방향 →
  * 두 배 거리 순으로 빈자리를 찾는다. 자리를 지어내는 것이 아니라 표시만 비킨다 — 거리는 목록의 숫자가 말한다.
  */
-export function spreadBalls(pts: readonly [number, number][], r: number, first: { x: number; y: number; r: number }): [number, number][] {
+export function spreadBalls(pts: readonly [number, number][], r: number, first: { x: number; y: number; r: number }, box?: { hw: number; hh: number }): [number, number][] {
     const placed = [first];
     const out: [number, number][] = [];
-    for (const [x0, y0] of pts) {
-        const free = (x: number, y: number) => placed.every((p) => Math.hypot(p.x - x, p.y - y) >= (p.r + r) * 0.98);
+    // 판 안쪽(box: 가운데에서 반폭 · 반높이)으로 먼저 당기고, 빈자리도 판 안에서만 찾는다 — 당긴 뒤에 다시 겹치던 것(제주의 3 · 4)
+    const clamp = (x: number, y: number): [number, number] => box ? [Math.max(-box.hw, Math.min(box.hw, x)), Math.max(-box.hh, Math.min(box.hh, y))] : [x, y];
+    const inside = (x: number, y: number) => !box || (Math.abs(x) <= box.hw && Math.abs(y) <= box.hh);
+    for (const [xr, yr] of pts) {
+        const [x0, y0] = clamp(xr, yr);
+        const free = (x: number, y: number) => inside(x, y) && placed.every((p) => Math.hypot(p.x - x, p.y - y) >= (p.r + r) * 0.98);
         let at: [number, number] = [x0, y0];
         if (!free(x0, y0)) {
             outer: for (const ring of [1, 2, 3]) {
