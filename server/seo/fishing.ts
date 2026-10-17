@@ -13,6 +13,8 @@ import { fishingSpotCardUrl } from "../../shared/ogCards.js";
 import { FISHING_PORTS } from "../../shared/fishingStations.js";
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath } from "../../shared/fishingSeaPages.js";
 import { nearestPort } from "../../shared/fishingPlaces.js";
+import { fishingFishPath, placeFishId } from "../../shared/fishingFishPages.js";
+import { FISH } from "../../shared/fishingFish.js";
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FishingRender { status: 200; tag: string; html: string }
@@ -102,7 +104,7 @@ export async function renderFishingSpots(path: string, all: readonly PublicPlace
   <section>
     <h2>한눈에</h2>
     <dl>
-      <dt>대상 어종</dt><dd>${pl.species.length ? esc(pl.species.join(" · ")) : "등록된 어종이 없어요"}</dd>
+      <dt>대상 어종</dt><dd>${pl.species.length ? pl.species.map((s) => { const id = placeFishId(s); const f = id ? FISH.find((x) => x.id === id) : null; return f ? `<a href="${fishingFishPath(f.name)}">${esc(s)}</a>` : esc(s); }).join(" · ") : "등록된 어종이 없어요"}</dd>
       <dt>요금</dt><dd>${esc(fee ?? "등록 안 됨")}</dd>
       <dt>종류</dt><dd><a href="${fishingTypePath(k.id)}">${esc(k.label)}</a></dd>
 ${pl.tel ? `      <dt>연락처</dt><dd>${esc(pl.tel)}</dd>\n` : ""}${pl.address ? `      <dt>주소</dt><dd>${esc(pl.address)}</dd>\n` : ""}    </dl>

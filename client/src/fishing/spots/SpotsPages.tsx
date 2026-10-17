@@ -30,6 +30,7 @@ import { art, PAPER, INK } from "../ink";
 import { fishingSpotCardUrl } from "@shared/ogCards";
 import { spreadBalls } from "@shared/storeDots";
 import { FISHING_SEA_PATH, fishingPortPath, seaArt } from "@shared/fishingSeaPages";
+import { FISHING_FISH_PATH, fishingFishPath } from "@shared/fishingFishPages";
 import { useRegs } from "../Guide";
 
 type Lite = Pick<PublicPlace, "id" | "name" | "kind" | "sido" | "sigungu" | "lat" | "lng" | "species" | "fee">;
@@ -50,7 +51,7 @@ export function Shell({ title, children }: { title: string; children: React.Reac
 }
 
 /** 종이 지도 위의 점 — 낚시터마다 종류 색. 'here' 가 있으면 그 한 곳만 크게(나머지는 옅게) */
-function PaperMap({ items, here, height = 320 }: { items: readonly Lite[]; here?: Lite | null; height?: number }) {
+export function PaperMap({ items, here, height = 320 }: { items: readonly Lite[]; here?: Lite | null; height?: number }) {
     const pts = useMemo(() => items.filter((p) => p.lat != null && p.lng != null).map((p) => ({ p, xy: latLngToOutline(p.lat!, p.lng!) })), [items]);
     const h = here && here.lat != null && here.lng != null ? latLngToOutline(here.lat, here.lng) : null;
     return (
@@ -104,6 +105,12 @@ function LocalMap({ here, near }: { here: Lite; near: readonly Lite[] }) {
             </g>
         </svg>
     );
+}
+
+/** 이곳의 어종 카드의 틀 — 우리 어종이면 어종 한 장(/fishing/fish/<이름>)으로 간다(크기 · 그 어종의 다른 낚시터 · 도감) */
+function FishCardBox({ name, children }: { name: string | null; children: React.ReactNode }) {
+    const cls = "block w-[156px] shrink-0 overflow-hidden rounded-2xl", st = { background: PAPER, color: INK };
+    return name ? <Link href={fishingFishPath(name)} className={`${cls} active:opacity-85`} style={st} data-testid="spot-fish-card">{children}</Link> : <div className={cls} style={st} data-testid="spot-fish-card">{children}</div>;
 }
 
 export function Row({ p, km, no }: { p: Lite; km?: number | null; /** 이 근처 지도의 번호 */ no?: number }) {
@@ -191,6 +198,13 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
                     </Link>
                 </section>
             )}
+            <section className="px-5 pt-2.5">
+                <Link href={FISHING_FISH_PATH} className="flex items-center gap-3 overflow-hidden rounded-2xl p-2.5 active:opacity-85" style={{ background: "#FFFFFF0D", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="spots-fish-link">
+                    <span className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl" style={{ background: PAPER }}><img src={art("gamseongdom")} alt="" width={640} height={400} loading="lazy" className="h-full w-full object-contain p-1" style={{ mixBlendMode: "multiply" }} draggable={false} /></span>
+                    <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">낚시 어종 22종</span><span className="block text-[12.5px]" style={{ color: C.dim }}>어탁 · 낚시꾼이 부르는 크기 · 금어기 · 그 어종의 낚시터</span></span>
+                    <LucideChevronRight size={18} aria-hidden style={{ color: C.dim }} />
+                </Link>
+            </section>
             {/* 어종 */}
             {scopedCounts.species.length > 0 && (
                 <section className="px-5 pt-5">
@@ -276,8 +290,9 @@ export function SpotPage({ id }: { id: string }) {
                 <section className="px-5 pt-7" data-testid="spot-fish">
                     <h2 className="mb-2.5 text-[17px] font-semibold">이곳의 어종</h2>
                     <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                        {fishCards.map((f) => (
-                            <div key={f.name} className="w-[156px] shrink-0 overflow-hidden rounded-2xl" style={{ background: PAPER, color: INK }} data-testid="spot-fish-card">
+                        {fishCards.map((f) => {
+                            return (
+                            <FishCardBox key={f.name} name={f.ours?.name ?? null}>
                                 <div className="flex h-[86px] items-center justify-center px-2">
                                     {f.ours ? <img src={art(f.ours.id)} alt={`${f.name} 어탁`} width={640} height={400} loading="lazy" className="h-full w-full object-contain" style={{ mixBlendMode: "multiply" }} />
                                         : <span className="text-[12px]" style={{ color: "#0F283880" }}>어탁 준비 중</span>}
@@ -288,8 +303,9 @@ export function SpotPage({ id }: { id: string }) {
                                     {f.min && <p className="mt-0.5 text-[12px] leading-snug [word-break:keep-all]" style={{ color: "#0F2838B3" }}>금지체장 {f.min.split(".")[0]}</p>}
                                     {!f.closed && !f.min && <p className="mt-1 text-[12px]" style={{ color: "#0F283880" }}>법정 금어기 없음</p>}
                                 </div>
-                            </div>
-                        ))}
+                            </FishCardBox>
+                            );
+                        })}
                     </div>
                     {regs?.basis && <p className="mt-2 text-[12px] [word-break:keep-all]" style={{ color: C.dim }}>금어기 · 금지체장: {regs.basis}. 지자체 조례가 따로 있을 수 있어요.</p>}
                 </section>

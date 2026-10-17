@@ -15,7 +15,7 @@ describe("낚시는 열려 있다(10/18 전면 공개)", () => {
         expect(lib).not.toMatch(/010|@/);
         // 길마다 문지기를 거친다
         const routes = readFileSync(resolve(__dirname, "../server/routes/modules/fishing.ts"), "utf8");
-        expect(routes.match(/requireAuth, gate,/g)).toHaveLength(25); // 10/16 수족관 넷(내 수족관 · 자리 · 크루원 목록 · 크루원 수족관) · 10/17 가려진 조과의 이의제기 · 10/17 바다 예보 · 10/18 수조에서 빼기 · 10/18 특보 · 바다 예보 · 항구 브리핑은 공개 길로(-3, server/seo/fishingSea.test)
+        expect(routes.match(/requireAuth, gate,/g)).toHaveLength(23); // 10/18 위판 · 낚시지수 지도도 공개 길로(-2, server/seo/fishingFish.test) · 10/16 수족관 넷(내 수족관 · 자리 · 크루원 목록 · 크루원 수족관) · 10/17 가려진 조과의 이의제기 · 10/17 바다 예보 · 10/18 수조에서 빼기 · 10/18 특보 · 바다 예보 · 항구 브리핑은 공개 길로(-3, server/seo/fishingSea.test)
         // 정출판은 그 크루에 든 사람만 — 목록 · 만들기 · 한 판 · 조과 붙이기 넷 다 크루를 확인한다
         expect(routes.match(/await inCrew\(req\.userId!/g)).toHaveLength(6); // + 크루원 수족관 목록 · 한 사람의 수족관
         // 조과에 붙는 사진은 이 회원이 우리 저장소에 올린 것만

@@ -32,6 +32,9 @@ import { renderFishingSpotCardPng } from "./services/fishingSpotCard.js";
 import { placeById } from "./storage/fishingPlaces.js";
 import { fishingSpotCardInput, isPlaceId } from "../shared/fishingPlaces.js";
 import { fishingSeaCardInput } from "../shared/fishingSeaPages.js";
+import { allPlaces } from "./storage/fishingPlaces.js";
+import { fishCardInput, spotsOfFish } from "../shared/fishingFishPages.js";
+import { fishById } from "../shared/fishingFish.js";
 import { mountainBySlug } from "./storage/hiking.js";
 import { hikingMountainCardInput } from "../shared/hikingPage.js";
 
@@ -43,6 +46,7 @@ import { hikingMountainCardInput } from "../shared/hikingPage.js";
 //   /og/golf-round/:slug.png?d=&t=    라운드 브리핑 카드 (2026-10-05) — 그 날·그 티오프의 날씨. 예보가 없으면 404
 //   /og/store/:code.png               당구장 카드 (2026-09-30)
 //   /og/fishing-spot/:id.png          낚시터 카드 (2026-10-18) — 종류의 판화 위에 이름 · 자리 · 어종 · 어탁
+//   /og/fishing-fish/:id.png          낚시 어종 카드 (2026-10-18) — 판화 위에 어탁 · 크기 이름 · 낚시터 수
 //   /og/fishing-sea/:key.png          바다 · 항구 물때 카드 (2026-10-18) — 해역 그림 위에 이름 · 해역(그날 값은 넣지 않는다)
 //   /og/hiking-mountain/:slug.png     산 카드 (2026-10-13) — 권역의 표지 위에 산의 이름 · 높이 · 자리 · 코스. 우리 표에 있는 산만
 //   /og/golf-footprints/:memberId.png 골프 발자국 카드 (2026-09-30) — **비공개**: 서명(t)·만료가 맞아야 열린다
@@ -424,6 +428,23 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] fishing spot card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  // 낚시 어종 카드(2026-10-18) — 우리 표의 22종만(아니면 404). 판화 표지 + 그 어종의 어탁 · 크기 이름 · 낚시터 수
+  app.get("/og/fishing-fish/:id.png", async (req, res) => {
+    const f = fishById(String(req.params.id ?? ""));
+    if (!f) return res.status(404).type("text/plain").send("not found");
+    try {
+      const spots = spotsOfFish(await allPlaces().catch(() => []), f.id).length;
+      const png = await renderFishingSpotCardPng(fishCardInput(f, spots));
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] fishing fish card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });

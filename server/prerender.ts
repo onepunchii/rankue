@@ -41,6 +41,7 @@ import { HIKING_RE, renderHiking } from "./seo/hiking.js";
 import { FISHING_SPOTS_RE, renderFishingSpots } from "./seo/fishing.js";
 import { allPlaces } from "./storage/fishingPlaces.js";
 import { FISHING_SEA_RE, renderFishingSea } from "./seo/fishingSea.js";
+import { FISHING_FISH_RE, renderFishingFish } from "./seo/fishingFish.js";
 import { getSeaNow } from "./services/fishingSea.js";
 import { getSeaFcst } from "./services/fishingSeaFcst.js";
 import { getPortBrief } from "./services/fishingPort.js";
@@ -2053,6 +2054,22 @@ ${list}
   // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
   // 전국 낚시터(2026-10-18) — 허브 · 지역 · 종류 · 한 곳. 본문은 server/seo/fishing(화면과 같은 글 — shared/fishingPlaces). 없는 곳은 다음 라우트로.
   // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  // 낚시 어종(2026-10-18) — 허브 · 22종. 도감 글 · 금어기 표는 server/assets/fishing/fish-pages.json(오너가 준 자료 그대로). 없는 어종은 다음 라우트로
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다. 꼬리표는 영문 id
+  app.get(FISHING_FISH_RE, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    try {
+      const r = await renderFishingFish(req.path, () => allPlaces());
+      if (!r) return next();
+      noStore(res);
+      res.setHeader("X-Prerender", r.tag);
+      res.status(r.status).send(r.html);
+    } catch (e) {
+      console.warn("[prerender] fishing fish:", (e as Error)?.message);
+      next();
+    }
+  });
+
   // 바다 · 항구 물때(2026-10-18) — 허브 · 해역 · 항구. 특보 · 예보 · 조석은 4초까지만 기다린다(늦으면 그 칸 없이 — 항구 · 해역 · 낚시터 목록은 나간다)
   // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다. 꼬리표는 영문(항구는 관측소 번호) — 헤더에 한글을 넣지 않는다
   app.get(FISHING_SEA_RE, async (req, res, next) => {

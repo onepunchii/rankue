@@ -264,6 +264,8 @@ const FishingSpot = lazy(() => import("@/fishing/spots/SpotsPages").then((m) => 
 const FishingSeaHub = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.SeaHub })));
 const FishingSeaArea = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.SeaAreaPage })));
 const FishingPort = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.PortPage })));
+const FishingFishHub = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishHub })));
+const FishingFish = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishPage })));
 const spotFallback = <div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />;
 const fishingView = (view: "home" | "trip" | "book" | "log" | "points" | "guide" | "rules" | "rank" | "gear" | "tank") => function FishingView() { return <Suspense fallback={<div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />}><FishingPage view={view} /></Suspense>; };
 // 주소마다 한 번만 만든다(그릴 때마다 새 컴포넌트가 되면 화면이 통째로 다시 붙는다)
@@ -471,6 +473,8 @@ function AppRoutes() {
       <Route path="/fishing/spot/:id">{(p: { id: string }) => <Suspense fallback={spotFallback}><FishingSpot id={p.id} /></Suspense>}</Route>
       <Route path="/fishing/sea">{() => <Suspense fallback={spotFallback}><FishingSeaHub /></Suspense>}</Route>
       <Route path="/fishing/sea/:area">{(p: { area: string }) => <Suspense fallback={spotFallback}><FishingSeaArea id={decodeURIComponent(p.area)} /></Suspense>}</Route>
+      <Route path="/fishing/fish">{() => <Suspense fallback={spotFallback}><FishingFishHub /></Suspense>}</Route>
+      <Route path="/fishing/fish/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingFish name={decodeURIComponent(p.name)} /></Suspense>}</Route>
       <Route path="/fishing/port/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingPort name={decodeURIComponent(p.name)} /></Suspense>}</Route>
       <Route path="/fishing" component={FishingRoute} />
       <Route path="/fishing/trip" component={FishingTripRoute} />

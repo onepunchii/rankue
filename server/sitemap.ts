@@ -18,6 +18,7 @@ import { golfStampsSitemapParts } from "./seo/golfStamps.js";
 import { hikingSitemapParts } from "./seo/hiking.js";
 import { fishingSitemapParts } from "./seo/fishing.js";
 import { fishingSeaSitemapParts } from "./seo/fishingSea.js";
+import { fishingFishSitemapParts } from "./seo/fishingFish.js";
 import { allPlaces, placesUpdatedDay } from "./storage/fishingPlaces.js";
 import { allMountains, mountainUpdatedDays } from "./storage/hiking.js";
 import { golfTermsSitemapParts } from "./seo/golfTerms.js";
@@ -325,7 +326,7 @@ const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
   fishing: async () => {
     const all = await allPlaces().catch((e) => { console.warn("[sitemap] fishing:", (e as Error)?.message); return []; });
     // 바다 · 항구 물때(2026-10-18)는 낚시터를 못 읽어도 나간다(표가 코드에 있다)
-    return [...fishingSitemapParts(all, await placesUpdatedDay().catch(() => null)), ...fishingSeaSitemapParts(new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10))];
+    return [...fishingSitemapParts(all, await placesUpdatedDay().catch(() => null)), ...fishingSeaSitemapParts(new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)), ...fishingFishSitemapParts(await placesUpdatedDay().catch(() => null))];
   },
   hiking: async () => {
     const all = await allMountains().catch((e) => { console.warn("[sitemap] hiking:", (e as Error)?.message); return []; });

@@ -255,15 +255,16 @@ router.get("/reservoirs", requireAuth, gate, asyncHandler(async (req: AuthReques
 }));
 
 /** 위판장 소식 — 받아 둔 건수로 만든 한 주의 표. 받은 것이 없으면 null(화면은 구역을 그리지 않는다) */
-router.get("/market", requireAuth, gate, asyncHandler(async (_req: AuthRequest, res: any) => {
-    res.setHeader("Cache-Control", "private, max-age=900");
+// 2026-10-18 공개 — 위판 건수 · 낚시지수는 누구에게나 같은 공공 자료라 로그인 없이(어종 공개 페이지 /fishing/fish 가 쓴다), CDN 공개 캐시
+router.get("/market", asyncHandler(async (_req: any, res: any) => {
+    publicCache(res, 900);
     return sendSuccess(res, await getMarketWeek().catch(() => null));
 }));
 
 /** 낚시지수 지도 — 국립해양조사원이 지점 · 어종마다 매긴 단계. 못 받았으면 null(화면은 특보 지도만 그린다) */
-router.get("/index-map", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+router.get("/index-map", asyncHandler(async (req: any, res: any) => {
     const day = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.day ?? "")) ? String(req.query.day) : null;
-    res.setHeader("Cache-Control", "private, max-age=600");
+    publicCache(res, 600);
     return sendSuccess(res, await getIndexMap(day).catch(() => null));
 }));
 

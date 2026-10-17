@@ -36,7 +36,7 @@ describe("바다 · 항구 물때 공개 페이지", () => {
     it("주소 모양 — 봇 라우트(vercel.json) · 프리렌더 · 앱 라우트가 같은 길", () => {
         for (const p of ["/fishing/sea", "/fishing/sea/west-mid", "/fishing/port/%EC%9D%B8%EC%B2%9C", "/fishing/port/인천/"]) expect(FISHING_SEA_RE.test(p)).toBe(true);
         for (const p of ["/fishing/seas", "/fishing/port", "/fishing/sea/a/b"]) expect(FISHING_SEA_RE.test(p)).toBe(false);
-        expect(read("vercel.json")).toContain("|spot/[^/]+|sea(?:/[^/]+)?|port/[^/]+))/?");
+        expect(read("vercel.json")).toContain("|spot/[^/]+|sea(?:/[^/]+)?|port/[^/]+|");
         expect(read("server/prerender.ts")).toContain("app.get(FISHING_SEA_RE, async (req, res, next) => {");
         const app = read("client/src/App.tsx");
         expect(app).toContain('<Route path="/fishing/sea">');
