@@ -21,6 +21,10 @@ export interface FishingSpotCardInput {
     kind: string;
     /** 첫 대상 어종의 우리 어탁 id(gyotaku-<id>) — 없으면 얹지 않는다 */
     fish: string | null;
+    /** 표지를 종류 대신 해역 그림으로(sea-<해역 id> — 바다 · 항구 물때 카드, 2026-10-18. 글은 shared/fishingSeaPages 의 fishingSeaCardInput) */
+    cover?: string | null;
+    /** 오른쪽 위 알약(기본 '전국 낚시터') */
+    badge?: string | null;
 }
 
 const BG = "#0B1E2D", PAPER = "#F3ECDD", SUN = "#F4A963", MUTED = "rgba(243,236,221,0.66)";
@@ -55,7 +59,7 @@ function art(file: string): { uri: string; w: number; h: number } | null {
 function tree(p: FishingSpotCardInput): El {
     const room = CARD_SIZE - PAD * 2;
     const name = nameLines(p.name, room, 180, 140);
-    const cover = art(`cover-${KINDS.includes(p.kind) ? p.kind : "etc"}.png`);
+    const cover = (p.cover && /^sea-[a-z]+(?:-[a-z]+)?$/.test(p.cover) ? art(`${p.cover}.png`) : null) ?? art(`cover-${KINDS.includes(p.kind) ? p.kind : "etc"}.png`);
     const fish = p.fish && /^[a-z]+$/.test(p.fish) ? art(`gyotaku-${p.fish}.png`) : null;
     const fw = 460, fh = fish ? Math.round((fish.h / fish.w) * fw) : 0;
     return h("div", { width: CARD_SIZE, height: CARD_SIZE, flexDirection: "column", fontFamily: "Pretendard", color: PAPER, backgroundColor: BG, position: "relative" },
@@ -67,7 +71,7 @@ function tree(p: FishingSpotCardInput): El {
         h("div", { position: "absolute", left: 60, top: 52, width: CARD_SIZE - 120, justifyContent: "space-between", alignItems: "center" },
             h("div", { alignItems: "center", fontSize: 32, fontWeight: 800, letterSpacing: 2, color: "#FFFFFF" },
                 h("div", { width: 18, height: 18, borderRadius: 9, background: SUN, marginRight: 14 }), "RANKUE 낚시"),
-            h("div", { fontSize: 28, fontWeight: 700, color: "#2A1606", background: SUN, borderRadius: 999, padding: "8px 24px" }, "전국 낚시터"),
+            h("div", { fontSize: 28, fontWeight: 700, color: "#2A1606", background: SUN, borderRadius: 999, padding: "8px 24px" }, p.badge || "전국 낚시터"),
         ),
         // 어탁 — 한지 판 위의 먹 그림(표지의 아래 끝에 걸친다)
         fish ? h("div", { position: "absolute", right: 60, top: COVER_H - 250, width: fw + 48, height: fh + 48, background: PAPER, borderRadius: 18, justifyContent: "center", alignItems: "center", transform: "rotate(-3deg)", boxShadow: "0 18px 40px rgba(0,0,0,0.45)" },

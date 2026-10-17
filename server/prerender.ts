@@ -40,6 +40,10 @@ import { GOLF_STAMPS_RE, renderGolfStamps } from "./seo/golfStamps.js";
 import { HIKING_RE, renderHiking } from "./seo/hiking.js";
 import { FISHING_SPOTS_RE, renderFishingSpots } from "./seo/fishing.js";
 import { allPlaces } from "./storage/fishingPlaces.js";
+import { FISHING_SEA_RE, renderFishingSea } from "./seo/fishingSea.js";
+import { getSeaNow } from "./services/fishingSea.js";
+import { getSeaFcst } from "./services/fishingSeaFcst.js";
+import { getPortBrief } from "./services/fishingPort.js";
 import { allMountains, getMountainDetail, nearbyMountains } from "./storage/hiking.js";
 import { HIKING_HUB_PATH, HIKING_NAV_LABEL } from "../shared/hikingPage.js";
 import { STAMPS_HUB_PATH, STAMPS_NAV_LABEL } from "../shared/golfStampGuide.js";
@@ -2049,6 +2053,28 @@ ${list}
   // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
   // 전국 낚시터(2026-10-18) — 허브 · 지역 · 종류 · 한 곳. 본문은 server/seo/fishing(화면과 같은 글 — shared/fishingPlaces). 없는 곳은 다음 라우트로.
   // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다.
+  // 바다 · 항구 물때(2026-10-18) — 허브 · 해역 · 항구. 특보 · 예보 · 조석은 4초까지만 기다린다(늦으면 그 칸 없이 — 항구 · 해역 · 낚시터 목록은 나간다)
+  // ⚠️ vercel.json 봇 라우트에도 같은 경로가 있어야 봇이 여기까지 온다. 꼬리표는 영문(항구는 관측소 번호) — 헤더에 한글을 넣지 않는다
+  app.get(FISHING_SEA_RE, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    const within = <T,>(p: Promise<T>): Promise<T | null> => Promise.race([p.catch(() => null), new Promise<null>((r) => setTimeout(() => r(null), 4000))]);
+    try {
+      const r = await renderFishingSea(req.path, {
+        sea: () => within(getSeaNow()),
+        fcst: (area) => within(getSeaFcst(area)),
+        port: (code) => within(getPortBrief(code, null)),
+        places: async () => (await within(allPlaces())) ?? [],
+      });
+      if (!r) return next();
+      noStore(res);
+      res.setHeader("X-Prerender", r.tag);
+      res.status(r.status).send(r.html);
+    } catch (e) {
+      console.warn("[prerender] fishing sea:", (e as Error)?.message);
+      next();
+    }
+  });
+
   app.get(FISHING_SPOTS_RE, async (req, res, next) => {
     if (!isBot(req)) return next();
     try {

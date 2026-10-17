@@ -29,16 +29,17 @@ import {
 import { art, PAPER, INK } from "../ink";
 import { fishingSpotCardUrl } from "@shared/ogCards";
 import { spreadBalls } from "@shared/storeDots";
+import { FISHING_SEA_PATH, fishingPortPath, seaArt } from "@shared/fishingSeaPages";
 import { useRegs } from "../Guide";
 
 type Lite = Pick<PublicPlace, "id" | "name" | "kind" | "sido" | "sigungu" | "lat" | "lng" | "species" | "fee">;
 const LAND = Object.values(KOREA_MAP_PATHS);
 const VIEW = { x: 52, y: 20, w: 400, h: 620 };
 /** 종류의 색 — 지도의 점 · 칩 · 목록의 점(뜻 하나씩) */
-const KIND_TONE: Readonly<Record<PlaceKindId, string>> = { reservoir: "#3F86A8", sea: "#0F4A66", flat: "#7FA36A", etc: "#C98A4B", valley: "#5E8F6F" };
-const useSpots = () => useQuery<{ total: number; items: Lite[] }>({ queryKey: ["/api/hiq/fishing/spots"], staleTime: 10 * 60_000 });
+export const KIND_TONE: Readonly<Record<PlaceKindId, string>> = { reservoir: "#3F86A8", sea: "#0F4A66", flat: "#7FA36A", etc: "#C98A4B", valley: "#5E8F6F" };
+export const useSpots = () => useQuery<{ total: number; items: Lite[] }>({ queryKey: ["/api/hiq/fishing/spots"], staleTime: 10 * 60_000 });
 
-function Shell({ title, children }: { title: string; children: React.ReactNode }) {
+export function Shell({ title, children }: { title: string; children: React.ReactNode }) {
     return (
         <div className="min-h-[100dvh] pb-28" style={{ background: C.bg, color: C.foam }}>
             <SportBackHeader sport="FISHING" title={title} fallback={FISHING_SPOTS_PATH} inner="mx-auto max-w-[720px]" />
@@ -105,7 +106,7 @@ function LocalMap({ here, near }: { here: Lite; near: readonly Lite[] }) {
     );
 }
 
-function Row({ p, km, no }: { p: Lite; km?: number | null; /** 이 근처 지도의 번호 */ no?: number }) {
+export function Row({ p, km, no }: { p: Lite; km?: number | null; /** 이 근처 지도의 번호 */ no?: number }) {
     const k = placeKind(p.kind), fee = placeFeeText(p.fee);
     return (
         <Link href={fishingSpotPath(p.id)} className="flex min-h-[60px] items-center gap-3 py-2.5 active:opacity-70" data-testid="spot-row">
@@ -180,6 +181,16 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
                     </div>
                 </div>
             </section>
+            {/* 바다 · 항구 물때 — 저수지만 고른 화면에는 걸지 않는다 */}
+            {(!kind || kind.id === "sea") && (
+                <section className="px-5 pt-4">
+                    <Link href={FISHING_SEA_PATH} className="flex items-center gap-3 overflow-hidden rounded-2xl p-2.5 active:opacity-85" style={{ background: "#FFFFFF0D", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="spots-sea-link">
+                        <img src={seaArt("south-east")} alt="" width={640} height={640} loading="lazy" className="h-14 w-14 shrink-0 rounded-xl object-cover" draggable={false} />
+                        <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">오늘의 바다 · 물때</span><span className="block text-[12.5px]" style={{ color: C.dim }}>항구 51곳의 만조 · 간조 · 해역 특보</span></span>
+                        <LucideChevronRight size={18} aria-hidden style={{ color: C.dim }} />
+                    </Link>
+                </section>
+            )}
             {/* 어종 */}
             {scopedCounts.species.length > 0 && (
                 <section className="px-5 pt-5">
@@ -293,6 +304,7 @@ export function SpotPage({ id }: { id: string }) {
                         {tide.now?.wtemp != null && <p className="mt-2 text-[13px]" style={{ color: C.soft }}>지금 수온 {tide.now.wtemp.toFixed(1)}°{tide.now.buoy?.wave != null ? ` · 파고 ${tide.now.buoy.wave.toFixed(1)}m(${tide.now.buoy.name})` : ""}</p>}
                         <p className="mt-1.5 text-[12px]" style={{ color: C.dim }}>국립해양조사원 조석 예보 · 관측</p>
                     </div>
+                    <Link href={fishingPortPath(tide.port.name)} className="mt-2 flex h-11 items-center justify-between rounded-xl px-3.5 text-[14px]" style={{ background: "#FFFFFF0F", color: C.soft }} data-testid="spot-port-link">{tide.port.name} 물때표 — 물때 곡선 · 열흘<LucideChevronRight size={16} aria-hidden /></Link>
                 </section>
             )}
 

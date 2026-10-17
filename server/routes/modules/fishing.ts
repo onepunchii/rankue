@@ -48,6 +48,8 @@ import { deleteBlobs } from "../../utils/blob.js";
 import { appealCatch, decorCatchesOf } from "../../storage/fishingCatches.js";
 
 const router = Router();
+/** 누구에게나 같은 답(공공 자료 · 전국 낚시터) — 브라우저는 매번 묻고 CDN 이 들고 있는다 */
+const publicCache = (res: any, sec = 600) => { res.setHeader("Cache-Control", "public, max-age=0, must-revalidate"); res.setHeader("CDN-Cache-Control", `public, s-maxage=${sec}, stale-while-revalidate=86400`); };
 const rowsOf = (r: any) => (r.rows ?? r) as any[];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -195,16 +197,17 @@ router.post("/catches/:id/appeal", requireAuth, gate, asyncHandler(async (req: A
 }));
 
 /** 오늘의 바다 — 받아 둔 특보 현황(15분보다 낡았으면 그 자리에서 다시 받는다). 받지 못했으면 null(화면은 판을 그리지 않는다) */
-router.get("/sea", requireAuth, gate, asyncHandler(async (_req: AuthRequest, res: any) => {
-    res.setHeader("Cache-Control", "private, max-age=120");
+// 2026-10-18 전면 공개 — 특보 · 해상예보 · 항구 브리핑은 누구에게나 같은 공공 자료라 로그인 없이(공개 화면 /fishing/sea · /fishing/port 와 앱이 같이 쓴다), CDN 공개 캐시
+router.get("/sea", asyncHandler(async (_req: any, res: any) => {
+    publicCache(res, 120);
     return sendSuccess(res, await getSeaNow().catch(() => null));
 }));
 
 /** 바다 예보 — 고른 해역의 반나절 예보(기상청 해상예보, shared/fishingSeaFcst). 못 받았으면 null(화면은 그 줄을 그리지 않는다) */
-router.get("/sea/forecast/:area", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+router.get("/sea/forecast/:area", asyncHandler(async (req: any, res: any) => {
     const area = String(req.params.area ?? "");
     if (!SEA_FCST_REG[area]) return sendError(res, 404, "없는 바다예요");
-    res.setHeader("Cache-Control", "private, max-age=600");
+    publicCache(res, 600);
     return sendSuccess(res, await getSeaFcst(area).catch(() => null));
 }));
 
@@ -265,11 +268,12 @@ router.get("/index-map", requireAuth, gate, asyncHandler(async (req: AuthRequest
 }));
 
 /** 항구 브리핑 — 받아 둔 공공 자료를 엮은 한 장. 조석을 못 받았으면 null(화면은 '잠시 뒤에'를 적는다). 모르는 항구는 404 */
-router.get("/ports/:code", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
+router.get("/ports/:code", asyncHandler(async (req: any, res: any) => {
     const code = String(req.params.code ?? "");
-    if (!/^DT_\d{4}$/.test(code)) return sendError(res, 404, "항구를 찾을 수 없어요");
+    // 우리 항구 목록에 있는 관측소만(아무 번호로나 바깥 자료를 받으러 가지 않게)
+    if (!/^DT_\d{4}$/.test(code) || !FISHING_PORTS.some((p) => p.code === code)) return sendError(res, 404, "항구를 찾을 수 없어요");
     const day = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.day ?? "")) ? String(req.query.day) : null;
-    res.setHeader("Cache-Control", "private, max-age=300");
+    publicCache(res, 300);
     return sendSuccess(res, await getPortBrief(code, day).catch(() => null));
 }));
 
@@ -350,7 +354,6 @@ router.get("/trips/:id", requireAuth, gate, asyncHandler(async (req: AuthRequest
  * 실은 자료는 받은 것을 걸러 넣은 것이고(server/scripts/fishing-load-places), 요금 · 전화는 오래된 값일 수 있어 자료 기준일을 같이 준다.
  */
 /* ── 전국 낚시터 공개 페이지(2026-10-18 — 누구나 · 검색엔진도). 받은 칸만, 사람마다 같은 답이라 CDN 공개 캐시 ── */
-const publicCache = (res: any, sec = 600) => { res.setHeader("Cache-Control", "public, max-age=0, must-revalidate"); res.setHeader("CDN-Cache-Control", `public, s-maxage=${sec}, stale-while-revalidate=86400`); };
 /** 전부 — 허브 · 지역 · 종류 화면이 같이 쓴다(1,151줄, 한 번에) */
 router.get("/spots", asyncHandler(async (_req: any, res: any) => {
     const all = await allPlaces();

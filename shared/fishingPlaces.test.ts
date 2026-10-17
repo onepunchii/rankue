@@ -44,7 +44,7 @@ describe("전국 낚시터 공개 페이지(2026-10-18)", () => {
         expect(r).toContain('router.get("/spots/:id", asyncHandler(');
         expect(read("server/sitemap.ts")).toContain('"hiking", "fishing"] as const;');
         expect(read("server/prerender.ts")).toContain("app.get(FISHING_SPOTS_RE, async (req, res, next) => {");
-        expect(read("vercel.json")).toContain("|fishing/(?:spots(?:/(?:region|type)/[^/]+)?|spot/[^/]+))/?");
+        expect(read("vercel.json")).toContain("|fishing/(?:spots(?:/(?:region|type)/[^/]+)?|spot/[^/]+|");
         expect(read("client/src/App.tsx")).toContain('<Route path="/fishing/spot/:id">');
         expect(FISHING_SPOTS_PATH).toBe("/fishing/spots");
     });

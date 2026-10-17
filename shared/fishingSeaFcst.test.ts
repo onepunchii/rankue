@@ -51,7 +51,7 @@ describe("바다 예보(기상청 해상예보)", () => {
     });
 
     it("고른 바다 하나만 받는다 · 받기 결과는 상태판에", () => {
-        expect(read("server/routes/modules/fishing.ts")).toMatch(/router\.get\("\/sea\/forecast\/:area", requireAuth, gate,/);
+        expect(read("server/routes/modules/fishing.ts")).toMatch(/router\.get\("\/sea\/forecast\/:area", asyncHandler\(/); // 10/18 공개 길(/fishing/sea/<해역> 화면이 쓴다)
         expect(read("server/services/fishingSeaFcst.ts")).toContain('await noteFeed("kma:seaFcst", ok,');
         expect(read("shared/fishingFeeds.ts")).toContain('sources: ["kma:seaFcst"]');
     });

@@ -10,6 +10,9 @@ import {
 } from "../../shared/fishingPlaces.js";
 
 import { fishingSpotCardUrl } from "../../shared/ogCards.js";
+import { FISHING_PORTS } from "../../shared/fishingStations.js";
+import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath } from "../../shared/fishingSeaPages.js";
+import { nearestPort } from "../../shared/fishingPlaces.js";
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FishingRender { status: 200; tag: string; html: string }
@@ -89,6 +92,8 @@ export async function renderFishingSpots(path: string, all: readonly PublicPlace
         if (!pl) return null;
         const seo = placeSeo(pl), k = placeKind(pl.kind), fee = placeFeeText(pl.fee), sido = fishingSidoShort(pl.sido);
         const near = nearbyPlaces(all, pl, 6);
+        // 바다 낚시터는 가까운 항구의 물때표로 잇는다(화면의 '오늘 물때'와 같은 항구 — 40km 안)
+        const port = nearestPort(FISHING_PORTS, pl);
         const same = all.filter((x) => x.id !== pl.id && x.sido === pl.sido && x.sigungu === pl.sigungu).slice(0, 10);
         const body = `<main>
   <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${FISHING_SPOTS_PATH}">${esc(FISHING_SPOTS_LABEL)}</a> › <a href="${fishingRegionPath(sido)}">${esc(sido)} 낚시터</a> › ${esc(pl.name)}</nav>
@@ -103,6 +108,7 @@ export async function renderFishingSpots(path: string, all: readonly PublicPlace
 ${pl.tel ? `      <dt>연락처</dt><dd>${esc(pl.tel)}</dd>\n` : ""}${pl.address ? `      <dt>주소</dt><dd>${esc(pl.address)}</dd>\n` : ""}    </dl>
   </section>
 ${near.length ? `  <section>\n    <h2>가까운 낚시터</h2>\n    <ul>\n${near.map((x) => line(x, x.km)).join("\n")}\n    </ul>\n  </section>` : ""}
+${port ? `  <section>\n    <h2>오늘 물때</h2>\n    <p>가장 가까운 항구(${port.km}km): <a href="${fishingPortPath(port.name)}">${esc(port.name)} 물때표</a> · <a href="${FISHING_SEA_PATH}">${esc(FISHING_SEA_LABEL)}</a></p>\n  </section>` : ""}
 ${same.length && !near.length ? `  <section>\n    <h2>${esc(placeWhere(pl))}의 다른 낚시터</h2>\n    <ul>\n${same.map((x) => line(x)).join("\n")}\n    </ul>\n  </section>` : ""}
   <p><a href="${fishingRegionPath(sido)}">${esc(sido)} 낚시터 모두 보기</a> · <a href="${FISHING_SPOTS_PATH}">${esc(FISHING_SPOTS_LABEL)}</a></p>
 ${source()}${pl.dataDate ? `\n  <p>${esc(pl.dataDate)} 기준 자료</p>` : ""}

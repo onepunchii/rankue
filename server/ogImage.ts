@@ -31,6 +31,7 @@ import { renderHikingMountainCardPng } from "./services/hikingMountainCard.js";
 import { renderFishingSpotCardPng } from "./services/fishingSpotCard.js";
 import { placeById } from "./storage/fishingPlaces.js";
 import { fishingSpotCardInput, isPlaceId } from "../shared/fishingPlaces.js";
+import { fishingSeaCardInput } from "../shared/fishingSeaPages.js";
 import { mountainBySlug } from "./storage/hiking.js";
 import { hikingMountainCardInput } from "../shared/hikingPage.js";
 
@@ -42,6 +43,7 @@ import { hikingMountainCardInput } from "../shared/hikingPage.js";
 //   /og/golf-round/:slug.png?d=&t=    라운드 브리핑 카드 (2026-10-05) — 그 날·그 티오프의 날씨. 예보가 없으면 404
 //   /og/store/:code.png               당구장 카드 (2026-09-30)
 //   /og/fishing-spot/:id.png          낚시터 카드 (2026-10-18) — 종류의 판화 위에 이름 · 자리 · 어종 · 어탁
+//   /og/fishing-sea/:key.png          바다 · 항구 물때 카드 (2026-10-18) — 해역 그림 위에 이름 · 해역(그날 값은 넣지 않는다)
 //   /og/hiking-mountain/:slug.png     산 카드 (2026-10-13) — 권역의 표지 위에 산의 이름 · 높이 · 자리 · 코스. 우리 표에 있는 산만
 //   /og/golf-footprints/:memberId.png 골프 발자국 카드 (2026-09-30) — **비공개**: 서명(t)·만료가 맞아야 열린다
 //   /og/golf-stamp/:memberId/:book.png 도장첩 완성 카드 (2026-10-12) — **비공개**: 서명(t)·만료가 맞아야 열린다. 다 채운 권만
@@ -422,6 +424,23 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] fishing spot card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  // 바다 · 항구 물때 카드(2026-10-18) — 'all' · 해역 id · 항구 이름 가운데 우리 표에 있는 것만(아니면 404). 그날의 값은 넣지 않아 오래 캐시해도 된다
+  app.get("/og/fishing-sea/:key.png", async (req, res) => {
+    const key = String(req.params.key ?? "").normalize("NFC");
+    const input = key.length <= 40 ? fishingSeaCardInput(key) : null;
+    if (!input) return res.status(404).type("text/plain").send("not found");
+    try {
+      const png = await renderFishingSpotCardPng(input);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] fishing sea card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });
