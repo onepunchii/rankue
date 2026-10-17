@@ -15,6 +15,22 @@ export const hhmm = (min: number): string => `${String(Math.floor(min / 60) % 24
  * 만조 · 간조 — 앞뒤 90분 안에서 가장 높거나 낮은 점. 하루의 맨 끝(앞뒤가 30분도 안 남은 점)은 꼭대기인지 알 수 없어 세지 않는다.
  * 꼭대기와 그 앞뒤 창 끝의 차이가 1.5cm 는 돼야 한다 — 예측 곡선은 매끄러워 잔물결이 없고, 동해(물높이 차가 10~30cm)의 만조 · 간조도 찾아야 한다.
  */
+/**
+ * 공식 만조 · 간조(2026-10-17 — 국립해양조사원 조석예보(고, 저조) tideFcstHghLw, 분 단위). 극값 넷 남짓을 이웃과 견줘 갈래를 정한다
+ * (extrSe 의 뜻을 짐작하지 않는다) — 이웃보다 높으면 만조, 낮으면 간조, 어느 쪽도 아니면 뺀다.
+ */
+export function officialTurns(points: readonly TidePoint[]): TideTurn[] {
+    const p = [...points].filter((x) => Number.isFinite(x.min) && Number.isFinite(x.cm)).sort((a, b) => a.min - b.min);
+    const out: TideTurn[] = [];
+    for (let i = 0; i < p.length; i++) {
+        const near = [p[i - 1], p[i + 1]].filter(Boolean) as TidePoint[];
+        if (!near.length) continue;
+        const kind = near.every((n) => p[i].cm > n.cm) ? "high" : near.every((n) => p[i].cm < n.cm) ? "low" : null;
+        if (kind) out.push({ min: p[i].min, cm: Math.round(p[i].cm), kind });
+    }
+    return out;
+}
+
 export function tideTurns(points: readonly TidePoint[]): TideTurn[] {
     const p = [...points].filter((x) => Number.isFinite(x.min) && Number.isFinite(x.cm)).sort((a, b) => a.min - b.min);
     const out: TideTurn[] = [];

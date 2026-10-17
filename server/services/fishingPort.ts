@@ -12,7 +12,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { fishingPort, type FishingPort } from "../../shared/fishingStations.js";
-import { hmToMin, indexMapOf, isFishingIndexStep, tideTurns, type IndexAllRow, type IndexMap, type PortBrief, type PortIndexRow, type PortNow, type PortSun } from "../../shared/fishingPort.js";
+import { hmToMin, indexMapOf, isFishingIndexStep, officialTurns, tideTurns, type IndexAllRow, type IndexMap, type PortBrief, type PortIndexRow, type PortNow, type PortSun, type TideTurn } from "../../shared/fishingPort.js";
 import { fishingKstDay } from "../../shared/fishing.js";
 import { noteFeed, type FeedSource } from "./fishingFeedHealth.js";
 
@@ -60,6 +60,26 @@ async function saveObs(kind: string, key: string, data: unknown): Promise<void> 
 }
 const ymd = (day: string) => day.replace(/-/g, "");
 const clock = (s: unknown): string | null => { const m = String(s ?? "").match(/(\d{2}):(\d{2})/); return m ? `${m[1]}:${m[2]}` : null; };
+
+/**
+ * 그날의 공식 만조 · 간조(조석예보 고 · 저조, 2026-10-17) — 분 단위. 예보라 한 번 받으면 그대로 쓴다. 못 받으면 null(예측 조위의 꺾임으로 센다).
+ */
+async function tideTurnsOfficial(port: FishingPort, day: string): Promise<TideTurn[] | null> {
+    const key = `${port.code}:${day}`;
+    const have = await readObs<TideTurn[]>("tidehl", key);
+    if (have?.data?.length) return have.data;
+    const rows = await khoa("tideFcstHghLw/GetTideFcstHghLwApiService", { obsCode: port.code, reqDate: ymd(day), numOfRows: 10 }, 3000);
+    if (!rows?.length) return null;
+    const pts: { min: number; cm: number }[] = [];
+    for (const r of rows) {
+        const t = String(r.predcDt ?? "").match(/^(\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})/), cm = num(r.predcTdlvVl);
+        if (t && t[1] === day && cm != null) pts.push({ min: Number(t[2]) * 60 + Number(t[3]), cm });
+    }
+    const turns = officialTurns(pts);
+    if (turns.length < 2) return null;
+    await saveObs("tidehl", key, turns).catch(() => {});
+    return turns;
+}
 
 /** 그날의 예측 조위 — [분, cm] 10분 간격. 예측이라 한 번 받으면 그대로 쓴다 */
 async function tideDay(port: FishingPort, day: string): Promise<[number, number][] | null> {
@@ -148,17 +168,19 @@ export async function getPortBrief(code: string, wantDay: string | null, nowMs =
     const today = fishingKstDay(nowMs);
     const days = Array.from({ length: PORT_DAYS }, (_, i) => addDays(today, i));
     const day = wantDay && days.includes(wantDay) ? wantDay : today;
-    const [points, sun, index, now] = await Promise.all([
+    const [points, sun, index, now, official] = await Promise.all([
         tideDay(port, day).catch(() => null),
         sunDay(port, day).catch(() => null),
         port.index ? indexFor(port.index.name, nowMs).catch(() => null) : Promise.resolve(null),
         day === today ? nowFor(port, day, nowMs).catch(() => null) : Promise.resolve(null),
+        tideTurnsOfficial(port, day).catch(() => null),
     ]);
     if (!points || points.length < 12) return null;
     const rows = (index ?? []).filter((r) => r.day === day);
     return {
         port: { code: port.code, name: port.name, area: port.area }, day, days, points,
-        turns: tideTurns(points.map(([min, cm]) => ({ min, cm }))),
+        // 만조 · 간조는 공식 값(분 단위)이 있으면 그것, 없으면 예측 조위의 꺾임(10분 단위)으로
+        turns: official ?? tideTurns(points.map(([min, cm]) => ({ min, cm }))),
         sun, now,
         index: port.index && rows.length ? { point: port.index.name, km: port.index.km, rows } : null,
     };
