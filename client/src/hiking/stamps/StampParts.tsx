@@ -67,7 +67,7 @@ export function BookRow({ state, preview, example }: { state: HikingBookState; p
                 {!preview && <HkBar got={got} total={total} className="mt-2 max-w-[180px]" />}
             </span>
             <PatchArt art={book.art} size={66} earned={done} preview={preview} className="absolute right-3 top-1/2 -translate-y-1/2" />
-            <LucideChevronRight weight="bold" className="absolute right-1 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#F4EFE366]" aria-hidden />
+            <LucideChevronRight weight="bold" className="absolute right-1 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#F4EFE399]" aria-hidden />
         </Link>
     );
 }

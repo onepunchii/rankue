@@ -94,7 +94,7 @@ export function MountainNearbyPlaces({ slug, name }: { slug: string; name: strin
                                         <span className="block truncate text-[15px] font-semibold text-[#F4EFE3]">{p.name}</span>
                                         <span className="mt-0.5 block truncate text-[13px] text-[#F4EFE38C]">{[p.category, p.address].filter(Boolean).join(" · ")}</span>
                                     </span>
-                                    <LucideArrowUpRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
+                                    <LucideArrowUpRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE399]" aria-hidden />
                                 </a>
                             </li>
                         ))}

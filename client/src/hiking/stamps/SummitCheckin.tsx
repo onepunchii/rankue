@@ -75,7 +75,7 @@ export function SummitCheckin({ mountainId, name, stamp, hasSummit, region, patc
                     </button>
                 )}
             </div>
-            {!hasSummit && <p className="mt-2 text-[12.5px] text-[#0E2A3399] break-keep">이 산은 정상의 자리를 아직 몰라 인증할 수 없어요.</p>}
+            {!hasSummit && <p className="mt-2 text-[12.5px] text-[#0E2A33B3] break-keep">이 산은 정상의 자리를 아직 몰라 인증할 수 없어요.</p>}
             {msg && <p className="mt-2 text-[13.5px] leading-snug break-keep" style={{ color: msg.tone === "ok" ? "#2F6A0C" : "#A14A1E" }} role="status" data-testid="summit-msg">{msg.text}</p>}
             {/* 방금 받은 것 — 산 와펜 · 오른 등급 · 핀 · 다 채운 도장첩의 와펜 */}
             {justNow && (fresh.length > 0 || patch) && (
@@ -101,7 +101,7 @@ export function SummitCheckin({ mountainId, name, stamp, hasSummit, region, patc
                     </ul>
                 </div>
             )}
-            <p className="mt-2 text-[12px] leading-snug text-[#0E2A3380] break-keep">위치는 정상까지의 거리를 재는 데만 쓰고 저장하지 않아요.</p>
+            <p className="mt-2 text-[12px] leading-snug text-[#0E2A33A6] break-keep">위치는 정상까지의 거리를 재는 데만 쓰고 저장하지 않아요.</p>
         </div>
     );
 }

@@ -124,7 +124,7 @@ export default function HikingHome() {
                                                         <span className="block truncate text-[15.5px] font-semibold text-[#F4EFE3]">{m?.name ?? "산행"}{t.reachedSummit && <span className="ml-1.5 text-[12.5px] font-medium text-[#F6D9A8]">정상</span>}</span>
                                                         <span className="mt-0.5 block text-[13px] tabular-nums text-[#F4EFE399]">{stampDate(new Date(t.startedAt))} · {durationText(min)} · {t.km.toFixed(1)}km · 오른 높이 {t.gainM.toLocaleString("en-US")}m</span>
                                                     </span>
-                                                    <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
+                                                    <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE399]" aria-hidden />
                                                 </Link>
                                             </li>
                                         );

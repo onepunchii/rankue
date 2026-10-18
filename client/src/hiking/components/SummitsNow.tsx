@@ -40,7 +40,7 @@ function Pick({ kind, tag, row, value, tone, sub }: { kind: PickKind; tag: strin
             <p className="mt-1 truncate text-[14px] font-semibold text-[#F4EFE3]">{row.name}</p>
             <p className="mt-0.5 flex items-baseline gap-1.5">
                 <span className="text-[20px] font-semibold tabular-nums leading-none" style={{ color: tone }}>{value}</span>
-                {sub ? <span className="truncate text-[12px] text-[#F4EFE399]">{sub}</span> : row.heightM != null && <span className="text-[12px] tabular-nums text-[#F4EFE366]">{row.heightM.toLocaleString("ko-KR")}m</span>}
+                {sub ? <span className="truncate text-[12px] text-[#F4EFE399]">{sub}</span> : row.heightM != null && <span className="text-[12px] tabular-nums text-[#F4EFE399]">{row.heightM.toLocaleString("ko-KR")}m</span>}
             </p>
         </Link>
     );
@@ -145,7 +145,7 @@ export function SummitsNow() {
                     ))}
                 </div>
             </div>
-            <p className="mt-2 text-[12px] leading-snug text-[#F4EFE366] break-keep">산림청 산악기상관측소가 10분마다 잰 값이에요. 관측소 이름과 시군이 맞는 산에만 점을 찍어요 — 점이 없는 산은 관측소가 없는 곳이에요.</p>
+            <p className="mt-2 text-[12px] leading-snug text-[#F4EFE399] break-keep">산림청 산악기상관측소가 10분마다 잰 값이에요. 관측소 이름과 시군이 맞는 산에만 점을 찍어요 — 점이 없는 산은 관측소가 없는 곳이에요.</p>
         </HkSection>
     );
 }

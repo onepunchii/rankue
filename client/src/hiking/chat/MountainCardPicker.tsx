@@ -87,7 +87,7 @@ function MountainSearchBox({ onChoose, step, tid, idle, fill }: BoxProps) {
                 value={text} onChange={(e) => { setText(e.target.value); setSaid(null); }} onKeyDown={onKeyDown}
                 placeholder={COPY.placeholder} aria-label={COPY.searchLabel} data-testid={`${tid}-search`}
                 role="combobox" aria-autocomplete="list" aria-expanded={visible.length > 0} aria-controls={listId} aria-activedescendant={cursor >= 0 && visible[cursor] ? `${uid}-opt-${cursor}` : undefined}
-                className="h-12 w-full shrink-0 rounded-xl border border-[#FFFFFF1F] bg-[#FFFFFF0A] px-4 text-[15px] text-[#F4EFE3] outline-none placeholder:text-[#F4EFE366] focus:border-[#F28C6A]"
+                className="h-12 w-full shrink-0 rounded-xl border border-[#FFFFFF1F] bg-[#FFFFFF0A] px-4 text-[15px] text-[#F4EFE3] outline-none placeholder:text-[#F4EFE399] focus:border-[#F28C6A]"
             />
             <p className="mt-2 shrink-0 text-[12.5px] leading-snug text-[#F4EFE399] break-keep" role="status" aria-live="polite" data-testid={`${tid}-status`}>{status}</p>
             <div className={fill ? "mt-2 min-h-0 flex-1 overflow-y-auto" : visible.length > 0 ? "mt-2" : "hidden"}>

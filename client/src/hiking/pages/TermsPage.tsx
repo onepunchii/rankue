@@ -106,7 +106,7 @@ function TermRow({ id, term, short }: { id: string; term: string; short: string 
                 <span className="block text-[15.5px] font-semibold text-[#F4EFE3]">{term}</span>
                 <span className="mt-0.5 block text-[13.5px] leading-snug text-[#F4EFE399] break-keep">{short}</span>
             </span>
-            <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
+            <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE399]" aria-hidden />
         </Link>
     );
 }

@@ -92,7 +92,7 @@ export function CrewSummits({ crewId, isMember }: { crewId: string; isMember?: b
                                         <Pennant className="absolute right-[3px] top-[5px] scale-75" />
                                         {m.kfs100 ? <MountainPatch id={m.mountainId} region={m.region} size={56} earned /> : <span className="flex h-[63px] items-center"><Peak height={m.heightM} done size={48} /></span>}
                                         <span className="mt-1.5 w-full truncate text-[13.5px] font-semibold leading-tight">{mountainLabel(m, dup)}</span>
-                                        <span className="mt-0.5 text-[12px] tabular-nums leading-tight text-[#0E2A3399]">{dayText(m.firstDay)}</span>
+                                        <span className="mt-0.5 text-[12px] tabular-nums leading-tight text-[#0E2A33B3]">{dayText(m.firstDay)}</span>
                                         <span className="mt-1 rounded-full px-2 py-[3px] text-[12px] font-medium tabular-nums leading-none" style={{ background: "#1F556021", color: "#1F5560" }}>{m.times > 1 ? `${m.times}번 · ` : ""}{m.people}명</span>
                                     </Link>
                                 </li>

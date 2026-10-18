@@ -54,7 +54,7 @@ export function MountainRow({ m, km, done }: { m: MountainSummary; km?: number; 
                 </span>
             </span>
             {km != null && <span className="shrink-0 text-[13px] tabular-nums text-[#F4EFE38C]">{km}km</span>}
-            <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
+            <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE399]" aria-hidden />
         </Link>
     );
 }
@@ -126,7 +126,7 @@ export function MountainWeather({ slug }: { slug: string }) {
                             <li key={d.date} className={`flex h-11 items-center gap-2.5 ${i ? "border-t border-[#FFFFFF14]" : ""}`}>
                                 <span className="w-7 shrink-0 text-[14px]" style={{ color: dow === "일" ? "#FF9C8A" : dow === "토" ? "#8EC5FF" : "#F4EFE3" }}>{dow}</span>
                                 <span className="flex w-7 shrink-0 justify-center" role="img" aria-label={[d.am, d.pm].filter(Boolean).map((h) => WX_LABEL[h!.kind]).join(" → ")}><Sky h={d.pm ?? d.am} /></span>
-                                <span className="w-9 shrink-0 text-right text-[12.5px] tabular-nums" style={{ color: wet ? "#8EC5FF" : "#F4EFE366" }}>{pop > 0 ? `${pop}%` : "–"}</span>
+                                <span className="w-9 shrink-0 text-right text-[12.5px] tabular-nums" style={{ color: wet ? "#8EC5FF" : "#F4EFE399" }}>{pop > 0 ? `${pop}%` : "–"}</span>
                                 <span className="w-8 shrink-0 text-right text-[13.5px] tabular-nums text-[#F4EFE399]">{d.tmn != null ? `${Math.round(d.tmn)}°` : ""}</span>
                                 <span className="relative h-1.5 min-w-0 flex-1 rounded-full bg-[#FFFFFF14]" aria-hidden>
                                     {d.tmn != null && d.tmx != null && <span className="absolute inset-y-0 rounded-full" style={{ left: `${l}%`, right: `${100 - r}%`, minWidth: 6, background: "linear-gradient(90deg,#8EC5FF,#F6D9A8 55%,#F28C6A)" }} />}
@@ -223,7 +223,7 @@ function MountainObsCard({ obs }: { obs: MountObs }) {
                 </div>
             </div>
             {tip && <p className="mt-2.5 rounded-xl bg-[#F28C6A1F] px-3 py-2 text-[13px] leading-snug text-[#F6D9A8] break-keep" data-testid="mountain-obs-tip">{tip}</p>}
-            <p className="mt-2 text-[12px] leading-snug text-[#F4EFE366] break-keep">{obs.station} 관측소에서 10분마다 잰 값이에요 · 산림청 국립산림과학원 산악기상정보</p>
+            <p className="mt-2 text-[12px] leading-snug text-[#F4EFE399] break-keep">{obs.station} 관측소에서 10분마다 잰 값이에요 · 산림청 국립산림과학원 산악기상정보</p>
         </div>
     );
 }
@@ -261,7 +261,7 @@ function SummitWeather({ hours, heightM, baseM }: { hours: CourseWeather["hours"
                     <li key={s.hour} className="rounded-xl bg-[#0E2A33] px-2 py-3 text-center" style={{ boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid={`summit-slot-${s.hour}`}>
                         <p className="text-[12.5px] text-[#F6D9A8]">{s.label}</p>
                         {s.tmp == null ? (
-                            <p className="mt-2 pb-[22px] text-[13px] text-[#F4EFE366]">{SUMMIT_WX_COPY.passed}</p>
+                            <p className="mt-2 pb-[22px] text-[13px] text-[#F4EFE399]">{SUMMIT_WX_COPY.passed}</p>
                         ) : (
                             <>
                                 <span className="mt-1.5 flex justify-center" role="img" aria-label={s.kind ? WX_LABEL[s.kind] : undefined}><Sky h={s.kind ? { kind: s.kind, pop: s.pop ?? 0 } : null} size={24} /></span>
@@ -269,7 +269,7 @@ function SummitWeather({ hours, heightM, baseM }: { hours: CourseWeather["hours"
                                 <p className="mt-1.5 text-[12px] tabular-nums text-[#F4EFE399]">
                                     {s.feel != null && s.feel < s.tmp ? <span className="text-[#8EC5FF]">{SUMMIT_WX_COPY.feel} {s.feel}°</span> : <>{SUMMIT_WX_COPY.below} {s.below}°</>}
                                 </p>
-                                <p className="mt-0.5 text-[12px] tabular-nums text-[#F4EFE366]">{s.wsd != null ? `바람 ${Math.round(s.wsd)}m/s` : "\u00A0"}</p>
+                                <p className="mt-0.5 text-[12px] tabular-nums text-[#F4EFE399]">{s.wsd != null ? `바람 ${Math.round(s.wsd)}m/s` : "\u00A0"}</p>
                             </>
                         )}
                     </li>

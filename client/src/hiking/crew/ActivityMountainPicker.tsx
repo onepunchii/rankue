@@ -268,7 +268,7 @@ export function ActivityMountainPicker({ picked, storedSlug, read, onFill, onRes
                         value={text} onChange={(e) => setText(e.target.value)} onKeyDown={onKeyDown}
                         placeholder={COPY.placeholder} aria-label={COPY.searchLabel} data-testid="activity-mountain-search"
                         role="combobox" aria-autocomplete="list" aria-expanded={visible.length > 0} aria-controls={listId} aria-activedescendant={active >= 0 && visible[active] ? `${uid}-opt-${active}` : undefined}
-                        className="mt-2.5 h-12 w-full rounded-xl border border-[#FFFFFF1F] bg-[#FFFFFF0A] px-4 text-[15px] text-[#F4EFE3] outline-none placeholder:text-[#F4EFE366] focus:border-[#F28C6A]"
+                        className="mt-2.5 h-12 w-full rounded-xl border border-[#FFFFFF1F] bg-[#FFFFFF0A] px-4 text-[15px] text-[#F4EFE3] outline-none placeholder:text-[#F4EFE399] focus:border-[#F28C6A]"
                     />
                     <ul id={listId} role="listbox" aria-label={COPY.listLabel} className={visible.length > 0 ? "mt-2 overflow-hidden rounded-xl bg-[#FFFFFF0A]" : "hidden"}>
                         {visible.map((m, i) => (

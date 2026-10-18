@@ -90,7 +90,7 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
             <div className="flex items-start gap-3 px-4 pb-3 pt-3.5" style={{ background: "linear-gradient(180deg,#E9E2D0,#F4EFE3)" }}>
                 <div className="min-w-0 flex-1">
                     <p className="text-[16.5px] font-semibold leading-tight tracking-tight">코스 {c.seq} · {courseShape(c)}</p>
-                    <p className="mt-0.5 text-[13px] tabular-nums text-[#0E2A3399]">해발 {c.minM.toLocaleString("en-US")}~{c.maxM.toLocaleString("en-US")}m</p>
+                    <p className="mt-0.5 text-[13px] tabular-nums text-[#0E2A33B3]">해발 {c.minM.toLocaleString("en-US")}~{c.maxM.toLocaleString("en-US")}m</p>
                 </div>
                 <span className="shrink-0 rounded-full px-2.5 py-1.5 text-[12.5px] font-semibold leading-none" style={LEVEL_STYLE[level.id]} title={level.note} data-testid="course-level" data-level={level.id}>{level.label}</span>
             </div>
@@ -101,13 +101,13 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
                     <li key={k} className="flex-1 px-1">
                         <svg width="18" height="18" viewBox="0 0 24 24" className="mx-auto text-[#1F5560]" aria-hidden><path d={icon} fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" /></svg>
                         <span className="mt-0.5 block whitespace-nowrap text-[16.5px] font-semibold tabular-nums leading-tight">{v}</span>
-                        <span className="text-[12px] text-[#0E2A3399]">{k}</span>
+                        <span className="text-[12px] text-[#0E2A33B3]">{k}</span>
                     </li>
                 ))}
             </ul>
             {/* 높낮이 */}
             <div className="px-3 pt-3"><CourseProfile line={c.line} pois={on} summitKm={c.summitKm} /></div>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-1.5 text-[12px] text-[#0E2A3399]" aria-label="선의 색">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-1.5 text-[12px] text-[#0E2A33B3]" aria-label="선의 색">
                 {SLOPE_LABEL.map((label, k) => (k === 0 || (k === 1 ? slopes.steepKm > 0 : slopes.veryKm > 0)) && (
                     <span key={label} className="flex items-center gap-1.5"><span className="h-[3px] w-4 rounded-full" style={{ background: SLOPE_COLOR[k] }} aria-hidden />{label}{k === 1 && slopes.steepKm > 0 ? ` ${slopes.steepKm}km` : k === 2 && slopes.veryKm > 0 ? ` ${slopes.veryKm}km` : ""}</span>
                 ))}
@@ -118,18 +118,18 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
                 <dl className="min-w-0 flex-1 self-center text-[13px]">
                     {([["내리막", `${slopes.lossM.toLocaleString("en-US")}m`], ["가장 높은 곳", `${c.maxM.toLocaleString("en-US")}m`], ["출발하는 높이", `${Math.round(c.line[0]?.[2] ?? c.minM).toLocaleString("en-US")}m`], ...(c.summitKm != null ? [["정상까지", `${(Math.round(c.summitKm * 10) / 10).toString()}km`]] : [])] as [string, string][]).map(([k, v]) => (
                         <div key={k} className="flex items-baseline justify-between gap-2 border-b border-[#0E2A3312] py-1.5 last:border-b-0">
-                            <dt className="text-[#0E2A3399]">{k}</dt><dd className="font-semibold tabular-nums">{v}</dd>
+                            <dt className="text-[#0E2A33B3]">{k}</dt><dd className="font-semibold tabular-nums">{v}</dd>
                         </div>
                     ))}
                 </dl>
             </div>
-            <p className="px-4 pt-1.5 text-[12px] leading-snug text-[#0E2A3380] break-keep">흰 점에서 출발해 검은 점까지 · 위가 북쪽{c.summitKm != null ? " · 세모가 정상" : ""}</p>
+            <p className="px-4 pt-1.5 text-[12px] leading-snug text-[#0E2A33A6] break-keep">흰 점에서 출발해 검은 점까지 · 위가 북쪽{c.summitKm != null ? " · 세모가 정상" : ""}</p>
             {surface.length > 0 && (
                 // 어떤 길을 걷나 — 조사한 구간의 종류를 길이의 몫으로. 색 옆에 이름과 퍼센트를 늘 적는다
                 <div className="mt-3 border-t border-[#0E2A331A] px-4 pt-3" data-testid="course-surface">
                     <div className="flex items-baseline justify-between gap-2">
                         <p className="text-[14.5px] font-semibold">{SURFACE_COPY.title}</p>
-                        <p className="shrink-0 text-[12px] text-[#0E2A3380]">{SURFACE_COPY.source}</p>
+                        <p className="shrink-0 text-[12px] text-[#0E2A33A6]">{SURFACE_COPY.source}</p>
                     </div>
                     <div className="mt-2 flex h-3 gap-[2px] overflow-hidden rounded-full" role="img" aria-label={surface.map((s) => `${s.label} ${s.pct}%`).join(", ")}>
                         {surface.map((s) => <span key={s.id} className="h-full first:rounded-l-full last:rounded-r-full" style={{ width: `${s.pct}%`, minWidth: 3, background: SURFACE_COLOR[s.id] }} />)}
@@ -165,10 +165,10 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
                             <span className="absolute bottom-3 top-3 w-[2px] rounded-full bg-[#0E2A331F]" style={{ left: 55 }} aria-hidden />
                             {list.map((p) => (
                                 <li key={p.id} className="relative flex items-center gap-0 py-1.5">
-                                    <span className="w-[46px] shrink-0 text-right text-[12.5px] tabular-nums text-[#0E2A3399]">{p.km!.toFixed(1)}km</span>
+                                    <span className="w-[46px] shrink-0 text-right text-[12.5px] tabular-nums text-[#0E2A33B3]">{p.km!.toFixed(1)}km</span>
                                     <span className="relative z-[1] mx-[5px] h-[10px] w-[10px] shrink-0 rounded-full" style={{ background: POI_COLOR[p.kind], boxShadow: "0 0 0 2.5px #F4EFE3" }} aria-hidden />
                                     <span className="ml-1.5 min-w-0 flex-1 truncate text-[14px]">{hikingPoiTitle(p)}</span>
-                                    {p.altM != null && <span className="shrink-0 pl-2 text-[12.5px] tabular-nums text-[#0E2A3399]">{p.altM.toLocaleString("en-US")}m</span>}
+                                    {p.altM != null && <span className="shrink-0 pl-2 text-[12.5px] tabular-nums text-[#0E2A33B3]">{p.altM.toLocaleString("en-US")}m</span>}
                                 </li>
                             ))}
                         </ol>
@@ -484,7 +484,7 @@ export default function MountainPage() {
                         <div className="px-4 pb-3.5">
                             {my.mine
                                 ? <SummitCheckin key={`checkin:${d.id}`} mountainId={d.id} name={d.name} stamp={mine} hasSummit={d.lat != null && d.lng != null} region={d.region} patch={kfs} />
-                                : <p className="mt-3 border-t border-[#0E2A331A] pt-3 text-[13px] leading-snug text-[#0E2A3399] break-keep">{kfs ? "인증하면 이 산의 와펜이 배낭에 달리고, 산행 등급이 올라요." : d.tier === 1 && region ? `${region.name} 도장첩의 한 칸이에요. 다 채우면 와펜을 받아요.` : "오른 산이 늘수록 산행 등급이 올라요."}</p>}
+                                : <p className="mt-3 border-t border-[#0E2A331A] pt-3 text-[13px] leading-snug text-[#0E2A33B3] break-keep">{kfs ? "인증하면 이 산의 와펜이 배낭에 달리고, 산행 등급이 올라요." : d.tier === 1 && region ? `${region.name} 도장첩의 한 칸이에요. 다 채우면 와펜을 받아요.` : "오른 산이 늘수록 산행 등급이 올라요."}</p>}
                         </div>
                     </div>
                 </div>
@@ -558,7 +558,7 @@ export default function MountainPage() {
                     </HkSection>
                 )}
 
-                <p className="px-5 pt-6 text-[12px] leading-relaxed text-[#F4EFE366] break-keep">{OSM_NOTE}</p>
+                <p className="px-5 pt-6 text-[12px] leading-relaxed text-[#F4EFE399] break-keep">{OSM_NOTE}</p>
             </div>
         </HikingShell>
     );

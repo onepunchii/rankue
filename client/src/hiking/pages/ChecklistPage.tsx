@@ -50,12 +50,12 @@ export default function ChecklistPage() {
                                 return (
                                     <li key={it.id} className={i ? "border-t border-[#FFFFFF14]" : ""}>
                                         <button type="button" onClick={() => toggle(it.id)} aria-pressed={on} data-testid={`pack-item-${it.id}`} className="flex min-h-[60px] w-full items-center gap-3 px-1.5 py-2.5 text-left active:opacity-70">
-                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: on ? "#F28C6A" : "transparent", boxShadow: on ? undefined : "inset 0 0 0 1.5px #F4EFE366" }} aria-hidden>
+                                            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full" style={{ background: on ? "#F28C6A" : "transparent", boxShadow: on ? undefined : "inset 0 0 0 1.5px #F4EFE399" }} aria-hidden>
                                                 {on && <svg width="14" height="14" viewBox="0 0 14 14"><path d="M3 7.4 L6 10.2 L11 4.4" fill="none" stroke="#2A1208" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>}
                                             </span>
                                             <span className="min-w-0 flex-1">
                                                 <span className="block text-[15.5px] font-semibold" style={{ color: on ? "#F4EFE380" : "#F4EFE3", textDecoration: on ? "line-through" : undefined }}>{it.name}</span>
-                                                <span className="mt-0.5 block text-[13.5px] leading-snug break-keep" style={{ color: on ? "#F4EFE366" : "#F4EFE399" }}>{it.why}</span>
+                                                <span className="mt-0.5 block text-[13.5px] leading-snug break-keep" style={{ color: on ? "#F4EFE399" : "#F4EFE399" }}>{it.why}</span>
                                             </span>
                                         </button>
                                     </li>

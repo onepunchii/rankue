@@ -137,7 +137,7 @@ export default function HikingHub() {
                         </HkSection>
 
                         {!my.mine && <div className="px-5 pt-8"><HikingCta /></div>}
-                        <p className="px-5 pt-6 text-[12px] leading-relaxed text-[#F4EFE366] break-keep">{OSM_NOTE}</p>
+                        <p className="px-5 pt-6 text-[12px] leading-relaxed text-[#F4EFE399] break-keep">{OSM_NOTE}</p>
                     </>
                 )}
             </div>

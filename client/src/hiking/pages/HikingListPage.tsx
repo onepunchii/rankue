@@ -111,7 +111,7 @@ export default function HikingListPage() {
                         <HkSection title={`산 ${shown.length.toLocaleString("en-US")}곳`} aside={group?.id === "kfs100" ? "목록의 순서" : "명산 먼저 · 높은 순"}>
                             <input
                                 type="search" value={q} onChange={(e) => { setQ(e.target.value); setN(PAGE); }} placeholder="산 이름 · 시군으로 찾기" aria-label="산 이름 · 시군으로 찾기" data-testid="hiking-list-search"
-                                className="mb-3 h-12 w-full rounded-xl border border-[#FFFFFF1F] bg-[#FFFFFF0A] px-4 text-[15px] text-[#F4EFE3] outline-none placeholder:text-[#F4EFE366] focus:border-[#F28C6A]"
+                                className="mb-3 h-12 w-full rounded-xl border border-[#FFFFFF1F] bg-[#FFFFFF0A] px-4 text-[15px] text-[#F4EFE3] outline-none placeholder:text-[#F4EFE399] focus:border-[#F28C6A]"
                             />
                             {shown.length === 0 ? (
                                 <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-6 text-center text-[14px] text-[#F4EFE399]">찾는 산이 없어요.</p>
@@ -127,7 +127,7 @@ export default function HikingListPage() {
                             )}
                         </HkSection>
                         <div className="px-5 pt-8"><HikingCta /></div>
-                        <p className="px-5 pt-6 text-[12px] leading-relaxed text-[#F4EFE366] break-keep">{OSM_NOTE}</p>
+                        <p className="px-5 pt-6 text-[12px] leading-relaxed text-[#F4EFE399] break-keep">{OSM_NOTE}</p>
                     </>
                 )}
             </div>

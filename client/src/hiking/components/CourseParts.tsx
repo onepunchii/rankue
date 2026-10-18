@@ -124,7 +124,7 @@ export function CourseTrace({ line, summitKm, pois = [], className }: {
             <circle cx={a[0]} cy={a[1]} r="5.5" fill="#F4EFE3" stroke="#0E2A33" strokeWidth="2" />
             <circle cx={b[0]} cy={b[1]} r="5.5" fill="#0E2A33" stroke="#F4EFE3" strokeWidth="1.5" />
             {t && <path d={`M${t[0] - 7} ${t[1] + 4} L${t[0]} ${t[1] - 8} L${t[0] + 7} ${t[1] + 4} Z`} fill="#F28C6A" stroke="#0E2A33" strokeWidth="1.2" strokeLinejoin="round" />}
-            <g transform={`translate(${S - 16} 16)`} aria-hidden><path d="M0 7 L0 -7 M-3.5 -2.5 L0 -7 L3.5 -2.5" fill="none" stroke="#0E2A3399" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></g>
+            <g transform={`translate(${S - 16} 16)`} aria-hidden><path d="M0 7 L0 -7 M-3.5 -2.5 L0 -7 L3.5 -2.5" fill="none" stroke="#0E2A33B3" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" /></g>
         </svg>
     );
 }

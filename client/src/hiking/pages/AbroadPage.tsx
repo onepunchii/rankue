@@ -78,7 +78,7 @@ function CourseRow({ c }: { c: AbroadCourse }) {
                 <span className="mt-0.5 block text-[13px] text-[#F4EFE399]">{c.country} · {ABROAD_LEVEL_NAME[c.level]}</span>
                 <span className="mt-1 block text-[13.5px] leading-snug text-[#F4EFE3B3] break-keep">{c.short}</span>
             </span>
-            <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
+            <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE399]" aria-hidden />
         </Link>
     );
 }
@@ -147,7 +147,7 @@ function CourseView({ c, hikingOk }: { c: AbroadCourse; hikingOk: boolean }) {
                         <li key={s.url} className={i ? "border-t border-[#FFFFFF14]" : ""}>
                             <a href={s.url} target="_blank" rel="noopener noreferrer" className="flex min-h-[48px] items-center gap-3 py-2.5 active:opacity-70">
                                 <span className="min-w-0 flex-1 text-[14.5px] text-[#F4EFE3]">{s.label}</span>
-                                <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
+                                <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE399]" aria-hidden />
                             </a>
                         </li>
                     ))}
