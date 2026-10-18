@@ -143,7 +143,7 @@ export const RankingListCard = ({ rankings, activeTab, onTabChange, currentMembe
                                         <span className={cn("font-semibold text-[15px] truncate", isMe ? "text-brand" : "text-ink-1")}>
                                             {member.name}
                                         </span>
-                                        {isMe && <span className="shrink-0 px-1.5 py-px rounded-full text-[11px] font-bold text-white bg-brand">{t("rankingListCard.me")}</span>}
+                                        {isMe && <span className="shrink-0 px-1.5 py-px rounded-full text-[12px] font-bold text-white bg-brand">{t("rankingListCard.me")}</span>}
                                     </div>
                                     <span className="block text-[12px] font-medium text-black/40 tabular-nums mt-0.5">{t("rankingListCard.avgPrefix")} {formatAvg(member.average)}</span>
                                 </div>

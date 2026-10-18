@@ -80,7 +80,7 @@ function RoomRow({ m, onJoin }: { m: MatchPublic; onJoin: () => void }) {
                 <span className="flex items-center gap-2 min-w-0">
                     {/* 방제가 있으면 방제가 얼굴, 방장 이름은 아랫줄로 */}
                     <span className="text-[14px] font-semibold text-ink-1 truncate">{m.title || m.hostName}</span>
-                    <span className="text-[11px] font-medium text-black/40 shrink-0">{roomAge(m.createdAt, Date.now(), t)}</span>
+                    <span className="text-[12px] font-medium text-black/40 shrink-0">{roomAge(m.createdAt, Date.now(), t)}</span>
                 </span>
                 <span className="block text-[12px] font-medium text-black/50 truncate mt-0.5">
                     {m.title ? <>{m.hostName} · </> : null}
@@ -204,7 +204,7 @@ export function OnlineGameCard() {
                     <button type="button" onClick={openDrills} className={cell}>
                         <span className="w-9 h-9 shrink-0 rounded-xl bg-brand/10 flex items-center justify-center"><Crosshair className="w-[19px] h-[19px] text-brand" /></span>
                         <span className="min-w-0">
-                            <span className="block text-[11.5px] font-semibold text-black/50 truncate">{t("sim.drill.title")}</span>
+                            <span className="block text-[12px] font-semibold text-black/50 truncate">{t("sim.drill.title")}</span>
                             <span className="block text-[14px] font-bold text-ink-1 tabular-nums leading-tight truncate">
                                 {/* 비로그인은 드릴을 받지 않았다 — '시작 전'(거짓 빈 값) 대신 가입하면 되는 일을 적는다 */}
                                 {drill ? `${drill.successes}/${drill.total}` : gate.isGuest ? t("guestHome.drillJoin") : t("home.drillStart")}
@@ -214,7 +214,7 @@ export function OnlineGameCard() {
                     <button type="button" onClick={() => setLocation("/online-game?path=1")} className={cell}>
                         <span className="w-9 h-9 shrink-0 rounded-xl bg-brand/10 flex items-center justify-center"><LucidePath className="w-[19px] h-[19px] text-brand" /></span>
                         <span className="min-w-0">
-                            <span className="block text-[11.5px] font-semibold text-black/50 truncate">{t("sim.path.title")}</span>
+                            <span className="block text-[12px] font-semibold text-black/50 truncate">{t("sim.path.title")}</span>
                             <span className="block text-[14px] font-bold text-ink-1 leading-tight truncate">{t("sim.path.threeOnly")}</span>
                         </span>
                     </button>

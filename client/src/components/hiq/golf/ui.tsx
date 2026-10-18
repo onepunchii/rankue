@@ -23,7 +23,7 @@ export function GSection({ emoji, title, meta, desc, children }: { emoji: string
                 </h3>
                 {meta && <div className="min-w-0 truncate text-[12px] font-semibold text-ink-3">{meta}</div>}
             </div>
-            {desc && <p className="text-[11.5px] font-medium text-ink-3 leading-snug -mt-1.5 mb-3">{desc}</p>}
+            {desc && <p className="text-[12px] font-medium text-ink-3 leading-snug -mt-1.5 mb-3">{desc}</p>}
             {children}
         </section>
     );
@@ -34,7 +34,7 @@ export function GTile({ emoji, value, label, accent }: { emoji: string; value: s
         <div className="rounded-2xl bg-surface-3 px-2 py-3 text-center min-w-0">
             <div className="text-[16px] leading-none">{emoji}</div>
             <div className={cn("text-[19px] font-bold tabular-nums mt-1.5 leading-none", accent ? "text-brand" : "text-ink-1")}>{value}</div>
-            <div className="text-[10.5px] font-semibold text-ink-3 mt-1.5 truncate">{label}</div>
+            <div className="text-[12px] font-semibold text-ink-3 mt-1.5 truncate">{label}</div>
         </div>
     );
 }
@@ -55,7 +55,7 @@ export function GList({ children, className }: { children: ReactNode; className?
 
 /** 순위 변동 배지 — ▲n 라임 / ▼n 빨강 / 신규 */
 export function GMove({ move, newLabel }: { move: number | null; newLabel: string }) {
-    if (move === null) return <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/15 text-[10px] font-bold text-brand leading-none">{newLabel}</span>;
-    if (move === 0) return <span className="shrink-0 w-8 text-center text-[11px] font-semibold text-ink-4">–</span>;
+    if (move === null) return <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/15 text-[12px] font-bold text-brand leading-none">{newLabel}</span>;
+    if (move === 0) return <span className="shrink-0 w-8 text-center text-[12px] font-semibold text-ink-4">–</span>;
     return <span className={cn("shrink-0 w-8 text-center text-[12px] font-bold tabular-nums", move > 0 ? "text-brand" : "text-red-400")}>{move > 0 ? `▲${move}` : `▼${-move}`}</span>;
 }

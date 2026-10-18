@@ -170,7 +170,7 @@ export default function HiqGolfRanking() {
                 ))}
             </div>
             <div className="flex items-center justify-between mb-4">
-                <span className="text-[11.5px] font-medium text-ink-4 truncate">{t(meta.world ? "golf.worldNote" : "golf.tourNote")}{editionLabel ? ` · ${editionLabel}` : ""}</span>
+                <span className="text-[12px] font-medium text-ink-4 leading-snug break-keep">{t(meta.world ? "golf.worldNote" : "golf.tourNote")}{editionLabel ? ` · ${editionLabel}` : ""}</span>
                 <div className="flex bg-brand/[0.12] p-1 rounded-full h-9 shrink-0">
                     {views.map(v => (
                         <button
@@ -186,7 +186,7 @@ export default function HiqGolfRanking() {
             {/* ─── 국가 랭킹(세계 랭킹) ─── */}
             {view === "nations" && (
                 <div className="flex flex-col gap-1.5 relative z-10">
-                    <p className="text-[11.5px] font-medium text-ink-4 px-1 mb-0.5">{t("golf.nationsDesc")}</p>
+                    <p className="text-[12px] font-medium text-ink-4 px-1 mb-0.5">{t("golf.nationsDesc")}</p>
                     {(nationsData?.nations || []).map((n, idx) => {
                         const isKr = n.fed === homeFed;
                         const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
@@ -198,7 +198,7 @@ export default function HiqGolfRanking() {
                                 <span className="text-[19px] leading-none shrink-0">{flagEmoji(iocToAlpha2(n.fed))}</span>
                                 <div className="flex-1 min-w-0">
                                     <span className={cn("block text-[14.5px] font-semibold truncate", isKr ? "text-brand" : "text-ink-1")}>{regionName(iocToAlpha2(n.fed), locale)}</span>
-                                    <span className="block text-[11.5px] font-medium text-ink-3 truncate mt-0.5">
+                                    <span className="block text-[12px] font-medium text-ink-3 truncate mt-0.5">
                                         {t("golf.playersCount").replace("{n}", String(n.players))}
                                         {n.top20Count > 0 ? ` · ${t("golf.top20Count").replace("{n}", String(n.top20Count))}` : ""}
                                         {" · "}{n.bestRank}{t("umb.rankSuffix")} {n.bestPlayer}
@@ -206,7 +206,7 @@ export default function HiqGolfRanking() {
                                 </div>
                                 <div className="text-right shrink-0">
                                     <div className="font-bold text-[16px] tabular-nums text-ink-1">{n.top5Points.toFixed(1)}</div>
-                                    <div className="text-[10px] font-semibold text-ink-3">{t("golf.top5Sum")}</div>
+                                    <div className="text-[12px] font-semibold text-ink-3">{t("golf.top5Sum")}</div>
                                 </div>
                             </div>
                         );
@@ -234,7 +234,7 @@ export default function HiqGolfRanking() {
                         ))}
                     </div>
                     {statList && (
-                        <p className="text-[11.5px] font-medium text-ink-4 px-1 mb-2">
+                        <p className="text-[12px] font-medium text-ink-4 px-1 mb-2">
                             {statList.rows[0]?.label}{statList.rows[0]?.unit ? ` (${statList.rows[0].unit})` : ""} · {t("golf.statSeason").replace("{season}", statList.season)}
                         </p>
                     )}
@@ -245,7 +245,7 @@ export default function HiqGolfRanking() {
                                 className={cn("flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-left transition-colors bg-surface-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-surface-3")}
                             >
                                 <span className={cn("w-10 shrink-0 text-center font-bold text-[15px] tabular-nums", i < 3 ? "text-brand" : "text-ink-3")}>{r.rank}</span>
-                                <span className="flex-1 min-w-0 truncate font-semibold text-[14px] text-ink-1">{r.playerName}</span>
+                                <span className="flex-1 min-w-0 line-clamp-2 leading-snug [overflow-wrap:anywhere] font-semibold text-[14px] text-ink-1">{r.playerName}</span>
                                 <span className="shrink-0 text-right font-bold text-[15px] tabular-nums text-ink-1">{formatStatValue(r.value, r.unit)}</span>
                             </button>
                         ))}
@@ -284,9 +284,9 @@ export default function HiqGolfRanking() {
                             {movers.map(m => (
                                 <button key={m.playerId} onClick={() => setOpenId(m.playerId)} className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-surface-1 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                                     <span className="text-[16px] leading-none">{flagEmoji(iocToAlpha2(m.country))}</span>
-                                    <span className="text-[13px] font-semibold text-ink-1 max-w-[110px] truncate">{golferName(m, locale)}</span>
+                                    <span className="text-[13px] font-semibold text-ink-1 max-w-[160px] truncate">{golferName(m, locale)}</span>
                                     <span className="text-[12px] font-bold text-brand tabular-nums">▲{m.move}</span>
-                                    <span className="text-[11.5px] font-medium text-ink-3 tabular-nums">{m.rank}{t("umb.rankSuffix")}</span>
+                                    <span className="text-[12px] font-medium text-ink-3 tabular-nums">{m.rank}{t("umb.rankSuffix")}</span>
                                 </button>
                             ))}
                         </div>
@@ -296,8 +296,8 @@ export default function HiqGolfRanking() {
                 <div className="flex flex-col gap-1.5 relative z-10">
                     {!isLoading && total > 0 && (
                         <div className="flex items-center justify-between px-1 mb-0.5">
-                            <p className="text-[11.5px] font-medium text-ink-4 tabular-nums">{t("golf.totalPlayers").replace("{n}", total.toLocaleString())}</p>
-                            <p className="text-[11.5px] font-medium text-ink-4">{valueLabel}</p>
+                            <p className="text-[12px] font-medium text-ink-4 tabular-nums">{t("golf.totalPlayers").replace("{n}", total.toLocaleString())}</p>
+                            <p className="text-[12px] font-medium text-ink-4">{valueLabel}</p>
                         </div>
                     )}
                     {isLoading && <div className="rk-card p-8 text-center text-[13.5px] font-medium text-ink-3">{t("golf.loading")}</div>}
@@ -315,7 +315,7 @@ export default function HiqGolfRanking() {
                             >
                                 <span className={cn("w-10 shrink-0 text-center font-bold text-[15px] tabular-nums", isKr ? "text-brand" : "text-ink-3")}>{r.rank}</span>
                                 <span className="text-[17px] leading-none shrink-0">{flagEmoji(iocToAlpha2(r.country))}</span>
-                                <span className={cn("flex-1 min-w-0 truncate font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{golferName(r, locale)}</span>
+                                <span className={cn("flex-1 min-w-0 line-clamp-2 leading-snug [overflow-wrap:anywhere] font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{golferName(r, locale)}</span>
                                 {/* 세계 랭킹은 출처가 지난주 순위를 주고, 투어 랭킹은 우리 직전 스냅샷과 비교 — 직전이 없으면(첫 회차) 변동 칸을 비운다 */}
                                 {meta.world || data?.prevEdition ? <GMove move={r.move} newLabel={t("golf.new")} /> : <span className="w-8 shrink-0" />}
                                 <span className="w-14 shrink-0 text-right font-bold text-[15px] tabular-nums text-ink-1">{formatRankValue(tour, r.points)}</span>
@@ -332,7 +332,7 @@ export default function HiqGolfRanking() {
                     )}
                     {/* 투어 소식(2026-10-05) — 고른 투어의 네이버 뉴스 검색 결과 다섯 줄. 한국어 화면에서만 */}
                     {locale === "ko" && NEWS_TOPIC[tour] && <TourNews key={tour} topic={NEWS_TOPIC[tour]!} className="mt-3" />}
-                    <a href={meta.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-center text-[11px] font-medium text-ink-4 py-3">
+                    <a href={meta.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-center text-[12px] font-medium text-ink-4 py-3">
                         {t("golf.source").replace("{name}", meta.sourceName)}
                     </a>
                 </div>

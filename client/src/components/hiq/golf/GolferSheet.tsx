@@ -58,7 +58,7 @@ function PersonRow({ pos, name, rank, points, me, onClick, unitLabel, t }: {
             <span className={cn("flex-1 min-w-0 truncate text-[13.5px] font-semibold", me ? "text-brand" : "text-ink-1")}>{name}</span>
             <span className="shrink-0 text-right">
                 <span className={cn("block text-[13px] font-bold tabular-nums leading-none", me ? "text-brand" : "text-ink-1")}>{t("golf.world")} {rank}{t("umb.rankSuffix")}</span>
-                <span className="block text-[10.5px] font-semibold tabular-nums text-ink-3 mt-1">{points} {unitLabel}</span>
+                <span className="block text-[12px] font-semibold tabular-nums text-ink-3 mt-1">{points} {unitLabel}</span>
             </span>
         </button>
     );
@@ -168,7 +168,7 @@ export const GolferBody = ({ tour, playerId, onNavigate, standalone }: GolferBod
             <div className="flex flex-col gap-2 -mt-3">
                 <div className="rounded-2xl bg-brand text-brand-fg px-4 py-4 flex items-end justify-between gap-3">
                     <div className="min-w-0">
-                        <div className="text-[11.5px] font-semibold opacity-75 truncate">{meta.world ? "🌍" : "🏌️"} {t(meta.labelKey)} · {t("golf.asOf").replace("{date}", data.edition)}</div>
+                        <div className="text-[12px] font-semibold opacity-75 leading-snug break-keep">{meta.world ? "🌍" : "🏌️"} {t(meta.labelKey)} · {t("golf.asOf").replace("{date}", data.edition)}</div>
                         <div className="flex items-center gap-2 mt-2">
                             {p.inLatest && p.rank !== null ? (
                                 <span className="text-[38px] font-bold leading-none tabular-nums">{p.rank}<span className="text-[17px] font-semibold ml-0.5">{rankSuffix}</span></span>
@@ -183,7 +183,7 @@ export const GolferBody = ({ tour, playerId, onNavigate, standalone }: GolferBod
                     {p.points !== null && (
                         <div className="text-right shrink-0">
                             <div className="text-[26px] font-bold leading-none tabular-nums">{formatRankValue(tour, p.points)}</div>
-                            <div className="text-[11px] font-semibold opacity-75 mt-1.5">{valueLabel}</div>
+                            <div className="text-[12px] font-semibold opacity-75 mt-1.5">{valueLabel}</div>
                         </div>
                     )}
                 </div>
@@ -207,7 +207,7 @@ export const GolferBody = ({ tour, playerId, onNavigate, standalone }: GolferBod
                             {(["rank", "points"] as const).map(m => (
                                 <button
                                     key={m} onClick={() => setMetric(m)}
-                                    className={cn("h-7 px-2.5 rounded-full text-[11.5px] font-semibold transition-colors", metric === m ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-3")}
+                                    className={cn("h-7 px-2.5 rounded-full text-[12px] font-semibold transition-colors", metric === m ? "bg-brand text-brand-fg" : "bg-surface-3 text-ink-3")}
                                 >
                                     {t(m === "rank" ? "umb.metricRank" : "umb.metricPoints")}
                                 </button>
@@ -218,8 +218,8 @@ export const GolferBody = ({ tour, playerId, onNavigate, standalone }: GolferBod
                     <div className="h-44 w-full min-w-0">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 0, left: -14 }}>
-                                <XAxis dataKey="label" tick={{ fontSize: 10, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} interval="preserveStartEnd" minTickGap={40} />
-                                <YAxis reversed={metric === "rank"} domain={["dataMin", "dataMax"]} tick={{ fontSize: 10, fill: AXIS }} tickLine={false} axisLine={false} width={40} allowDecimals={metric === "points"} />
+                                <XAxis dataKey="label" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} interval="preserveStartEnd" minTickGap={40} />
+                                <YAxis reversed={metric === "rank"} domain={["dataMin", "dataMax"]} tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={false} width={40} allowDecimals={metric === "points"} />
                                 {metric === "rank" && data.bestRank !== null && data.bestRank <= 10 && <ReferenceArea y1={1} y2={10} fill={BRAND} fillOpacity={0.08} />}
                                 <Tooltip
                                     formatter={(v: any) => [metric === "rank" ? `${v}${rankSuffix}` : formatRankValue(tour, Number(v)), ""]}
@@ -242,7 +242,7 @@ export const GolferBody = ({ tour, playerId, onNavigate, standalone }: GolferBod
                                 <div key={h.key} className="rounded-2xl bg-surface-3 px-2 py-3 text-center min-w-0">
                                     <div className="text-[16px] leading-none">{h.emoji}</div>
                                     <div className="text-[17px] font-bold tabular-nums text-ink-1 mt-1.5 leading-none">{formatStatValue(h.s!.value, h.s!.unit)}</div>
-                                    <div className="text-[10.5px] font-semibold text-ink-3 mt-1.5 truncate">{h.short} · <span className="text-brand">{h.s!.rank}{rankSuffix}</span></div>
+                                    <div className="text-[12px] font-semibold text-ink-3 mt-1.5 truncate">{h.short} · <span className="text-brand">{h.s!.rank}{rankSuffix}</span></div>
                                 </div>
                             ))}
                         </div>
@@ -289,7 +289,7 @@ export const GolferBody = ({ tour, playerId, onNavigate, standalone }: GolferBod
 
             <PlayerCheers category={tour} playerUmbId={playerId} basePath={GOLF_API} />
 
-            <a href={meta.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-center text-[11px] font-medium text-ink-4 hover:text-ink-3 transition-colors">
+            <a href={meta.sourceUrl} target="_blank" rel="noopener noreferrer" className="text-center text-[12px] font-medium text-ink-4 hover:text-ink-3 transition-colors">
                 {t("golf.source").replace("{name}", meta.sourceName)}
             </a>
         </div>

@@ -79,7 +79,7 @@ export function LookalikeProCard() {
                     {t("sim.entry.handicapTitle")}
                     {handi && <span className="ml-1.5 rk-num text-ink-3 font-semibold">{handi.target}{t("sim.entry.handicapUnit")}</span>}
                 </span>
-                <span className="block mt-0.5 text-[11.5px] font-semibold text-ink-4 rk-num truncate">
+                <span className="block mt-0.5 text-[12px] font-semibold text-ink-4 rk-num truncate">
                     {handi?.fromRecord ? fill(t("home.handiAvgShort"), { avg: handi.avg.toFixed(3) }) : t("home.handiDefault")}
                 </span>
             </span>
@@ -111,7 +111,7 @@ export function LookalikeProCard() {
         return (
             <section className="rk-card rounded-3xl p-4">
                 {head}
-                <p className="text-[11.5px] text-ink-4 mt-2.5">{t("home.online4cNote")}</p>
+                <p className="text-[12px] text-ink-4 mt-2.5">{t("home.online4cNote")}</p>
                 <CardActions primary={{ label: t("lookalike.playOnline"), icon: GameController, onClick: play }} />
             </section>
         );
@@ -180,7 +180,7 @@ export function LookalikeProCard() {
                 ]}
             />
             {/* 재미로 — 머리 자리를 탭이 써서 비교표 아래로 옮겼다 */}
-            <p className="text-[11.5px] text-ink-4 mt-2">{t("lookalike.funShort")}</p>
+            <p className="text-[12px] text-ink-4 mt-2">{t("lookalike.funShort")}</p>
             <CardActions
                 primary={{ label: t("lookalike.playOnline"), icon: GameController, onClick: play }}
                 onPro={() => openPro(pro.memCode)}

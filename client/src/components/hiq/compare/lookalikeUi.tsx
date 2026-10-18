@@ -60,7 +60,7 @@ export function TierLadder({ tier, pos }: { tier: number; pos: number }) {
             </div>
             <div className="grid grid-cols-5 gap-1 mt-1.5">
                 {[0, 1, 2, 3, 4].map((i) => (
-                    <span key={i} className={cn("text-center text-[10px] leading-tight font-semibold break-keep", i === tier ? "text-brand" : "text-ink-4")}>
+                    <span key={i} className={cn("text-center text-[12px] leading-tight font-semibold break-keep", i === tier ? "text-brand" : "text-ink-4")}>
                         {t(`lookalike.tierShort${i}`)}
                     </span>
                 ))}
@@ -81,7 +81,7 @@ export function ProTwinHeader({ pro, tier, pos, extra, onOpen }: { pro: CompareP
                     <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 h-4 rounded-full bg-surface-1 text-brand text-[9px] font-bold leading-4 shadow-sm whitespace-nowrap">{pro.league}</span>
                 </PlayerPhoto>
                 <span className="flex-1 min-w-0">
-                    <span className="block text-[11.5px] font-semibold text-ink-3">{t("lookalike.twin")}</span>
+                    <span className="block text-[12px] font-semibold text-ink-3">{t("lookalike.twin")}</span>
                     <span className="flex items-center gap-1 min-w-0">
                         <span className="text-[19px] font-bold leading-tight truncate">{name}</span>
                         <span className="text-[14px] shrink-0">{flagEmoji(pro.nationCode ?? "")}</span>
@@ -148,7 +148,7 @@ export function CompareTable({ cols, rows }: { cols: TableCol[]; rows: { label: 
                     <tr className="border-b border-surface-line">
                         <th className="w-[22%]" />
                         {cols.map((c, i) => (
-                            <th key={i} className={cn("py-1.5 text-right text-[11.5px] font-bold truncate max-w-0", tone(c.tone))}>{c.label}</th>
+                            <th key={i} className={cn("py-1.5 text-right text-[12px] font-bold truncate max-w-0", tone(c.tone))}>{c.label}</th>
                         ))}
                     </tr>
                 </thead>
@@ -184,7 +184,7 @@ export function CompareTable({ cols, rows }: { cols: TableCol[]; rows: { label: 
                             )}
                             <span className="flex flex-col items-center gap-1 min-w-0">
                                 {c.avatar}
-                                <span className={cn("block max-w-full truncate text-[11.5px] font-bold leading-tight", tone(c.tone))}>
+                                <span className={cn("block max-w-full truncate text-[12px] font-bold leading-tight", tone(c.tone))}>
                                     {c.tag && <span className="font-semibold opacity-80">{c.tag} </span>}{c.label}
                                 </span>
                             </span>
@@ -214,7 +214,7 @@ export function NextCell({ value, gap }: { value: string; gap?: number | null })
     return (
         <span className="inline-flex flex-col items-center leading-tight">
             {value}
-            {gap != null && gap > 0 && <span className="text-brand text-[10.5px] font-bold">+{gapText(gap)}</span>}
+            {gap != null && gap > 0 && <span className="text-brand text-[12px] font-bold">+{gapText(gap)}</span>}
         </span>
     );
 }
@@ -268,12 +268,12 @@ export function RecordStrip({ cells }: { cells: StripCell[] }) {
             {cells.map((c, i) => {
                 const body = (
                     <>
-                        <span className="flex items-center gap-1 text-[11px] font-semibold text-ink-3 min-w-0">
+                        <span className="flex items-center gap-1 text-[12px] font-semibold text-ink-3 min-w-0">
                             <span className="truncate">{c.label}</span>
                             {c.hint && <HelpCircle className="w-3 h-3 shrink-0 text-ink-4" aria-hidden="true" />}
                         </span>
                         <span className="block mt-1.5 h-[18px] text-[16px] leading-[18px] font-bold text-ink-1 rk-num truncate">{c.value}</span>
-                        <span className={cn("block mt-1.5 text-[11px] font-semibold rk-num truncate", c.subTone === "brand" ? "text-brand" : "text-ink-4")}>
+                        <span className={cn("block mt-1.5 text-[12px] font-semibold rk-num truncate", c.subTone === "brand" ? "text-brand" : "text-ink-4")}>
                             {c.sub ?? " "}
                         </span>
                     </>
@@ -298,7 +298,7 @@ export function RecordValue({ template, w, l }: { template: string; w: number; l
         <>
             {parts.map((p, i) => p === "{w}" || p === "{l}"
                 ? <span key={i}>{p === "{w}" ? w : l}</span>
-                : <span key={i} className="text-[11.5px] font-semibold text-ink-2">{p}</span>)}
+                : <span key={i} className="text-[12px] font-semibold text-ink-2">{p}</span>)}
         </>
     );
 }

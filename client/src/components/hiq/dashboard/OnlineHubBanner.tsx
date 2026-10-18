@@ -68,7 +68,7 @@ function Tile({ icon, title, sub, onClick, trackAs, dot = false, testId, classNa
                     <span className="text-[13.5px] font-black text-white truncate">{title}</span>
                     <LucideChevronRight className="w-3 h-3 shrink-0 text-white/45" weight="bold" aria-hidden="true" />
                 </span>
-                <span className="block rk-num text-[11.5px] font-bold text-white/60 truncate mt-0.5">{sub}</span>
+                <span className="block rk-num text-[12px] font-bold text-white/60 truncate mt-0.5">{sub}</span>
             </span>
         </button>
     );
@@ -126,7 +126,7 @@ export function OnlineHubBanner() {
             <div className="px-4 pt-4 pb-3.5 flex items-center gap-2 min-h-[124px]" aria-hidden="true">
                 <span className="shrink-0 -ml-1.5 opacity-40 animate-pulse"><TierEmblem tier="iron" size={96} locked /></span>
                 <span className="flex-1 min-w-0">
-                    <span className="block text-[11.5px] font-bold text-white/60">{t("home.hubLabel")}</span>
+                    <span className="block text-[12px] font-bold text-white/60">{t("home.hubLabel")}</span>
                     <span className="block h-8 w-24 rounded-lg bg-white/10 mt-2 animate-pulse" />
                     <span className="block h-1.5 rounded-pill bg-white/10 mt-3" />
                 </span>
@@ -140,7 +140,7 @@ export function OnlineHubBanner() {
                 {/* 배지를 누르면 배지 안내 — 겉의 단추(랭킹으로)와 따로다 */}
                 <BadgeTap guide={{ kind: "online", tier: s.tier.id, rating: s.rating }} className="hall-emblem -ml-1.5"><TierEmblem tier={s.tier.id} size={96} glow /></BadgeTap>
                 <span className="flex-1 min-w-0">
-                    <span className={cn("block text-[11.5px] font-bold text-white/60 truncate", s.canSwap && "pr-[92px]")}>{caption}</span>
+                    <span className={cn("block text-[12px] font-bold text-white/60 truncate", s.canSwap && "pr-[92px]")}>{caption}</span>
                     <span className="flex items-baseline gap-2 mt-1 min-w-0">
                         <span className="rk-num text-[34px] font-black text-white leading-none tracking-tight" data-rating>{s.rating}</span>
                         <span className="text-[14.5px] font-black truncate" style={{ color: glow }}>{t(s.tier.nameKey)}</span>
@@ -166,7 +166,7 @@ export function OnlineHubBanner() {
                 {/* 배치 전에는 아직 얻은 배지가 없다 — 가장 아래 등급의 실루엣 */}
                 <BadgeTap guide={{ kind: "online", tier: null }} className="-ml-1.5"><TierEmblem tier="iron" size={96} locked /></BadgeTap>
                 <span className="flex-1 min-w-0">
-                    <span className={cn("block text-[11.5px] font-bold text-white/60 truncate", s.canSwap && "pr-[92px]")}>{caption}</span>
+                    <span className={cn("block text-[12px] font-bold text-white/60 truncate", s.canSwap && "pr-[92px]")}>{caption}</span>
                     <span className="block rk-num text-[21px] font-black text-white leading-tight mt-1">
                         {t("sim.rank.unranked").replace("{n}", String(s.matches)).replace("{m}", String(placement))}
                     </span>
@@ -181,7 +181,7 @@ export function OnlineHubBanner() {
                 className="w-full px-4 pt-4 pb-3.5 block text-left min-h-[124px] transition-colors active:bg-white/[0.05]">
                 <span className="flex items-center justify-between gap-3">
                     <span className="min-w-0">
-                        <span className="block text-[11.5px] font-bold text-white/60 truncate">{t("home.hubLabel")}</span>
+                        <span className="block text-[12px] font-bold text-white/60 truncate">{t("home.hubLabel")}</span>
                         <span className="block text-[17px] font-black text-white leading-snug mt-0.5 break-keep [text-wrap:balance]">{t("home.hubShowTitle").replace("{n}", String(placement))}</span>
                     </span>
                     <CtaPill>{gate.isGuest ? t("home.hubJoin") : t("lookalike.playOnline")}</CtaPill>

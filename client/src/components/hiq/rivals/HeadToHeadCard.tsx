@@ -167,14 +167,14 @@ export const HeadToHeadCard = ({
                     <div className="h-px bg-black/[0.06] my-4" />
                     <div className="flex items-center">
                         <div className="flex-1 text-center">
-                            <div className="text-[11px] font-medium text-black/45 mb-1">{t("h2h.myAvg")}</div>
+                            <div className="text-[12px] font-medium text-black/45 mb-1">{t("h2h.myAvg")}</div>
                             <div className="text-[19px] font-bold text-brand tabular-nums leading-none">
                                 {Number(myAvg).toFixed(3)}
                             </div>
                         </div>
                         <div className="w-px h-9 bg-black/10" />
                         <div className="flex-1 text-center">
-                            <div className="text-[11px] font-medium text-black/45 mb-1 truncate px-1">
+                            <div className="text-[12px] font-medium text-black/45 mb-1 truncate px-1">
                                 {t("h2h.opponentAvg").replace("{name}", opponentName)}
                             </div>
                             <div className="text-[19px] font-bold text-ink-1 tabular-nums leading-none">
@@ -183,7 +183,7 @@ export const HeadToHeadCard = ({
                         </div>
                     </div>
                     {avgTypeLabel && (
-                        <div className="mt-2.5 text-center text-[11px] font-medium text-black/35">
+                        <div className="mt-2.5 text-center text-[12px] font-medium text-black/35">
                             {t("h2h.avgBasis").replace("{type}", avgTypeLabel)}
                         </div>
                     )}

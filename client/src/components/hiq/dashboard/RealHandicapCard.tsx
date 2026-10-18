@@ -101,7 +101,7 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
         <RecordStrip cells={[
             {
                 label: t("real.stripRp"),
-                value: <>{rating}<span className="ml-0.5 text-[11px] font-bold text-brand">RP</span></>,
+                value: <>{rating}<span className="ml-0.5 text-[12px] font-bold text-brand">RP</span></>,
                 // 상위 % 는 홈 랭킹 목록으로 셀 수 있을 때만(모집단을 모르면 비운다 — 예전 헤더의 '분석 중' 은 대부분 영원히 그대로였다)
                 sub: pct ? fill(t("real.stripTop"), { n: pct }) : undefined,
                 subTone: "brand",
@@ -254,7 +254,7 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
 
     // 온라인 에버는 회원의 것 — 예시에서는 읽지 않는다(쿼리는 꺼져 있어도, 로그아웃 뒤 캐시에 남은 이전 회원의 값이 예시 카드에 찍히면 안 된다)
     const foot = (
-        <p className="text-[11.5px] text-ink-4 mt-2 rk-num">
+        <p className="text-[12px] text-ink-4 mt-2 rk-num">
             {[
                 !sample && online.data?.ready && online.data.avg != null && d.type === "3c" ? fill(t("real.onlineAvg"), { v: online.data.avg.toFixed(2) }) : "",
                 fill(t("real.games"), { n: d.games }),
@@ -302,7 +302,7 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
                 </span>
                 <span className="flex-1 min-w-0">
                     {/* 예시의 순위는 예시 랭킹 다섯 줄 안에서 센 값 — '랭큐 회원 4구 순위'라고 쓰면 진짜 회원 통계로 읽힌다 */}
-                    <span className="block text-[11.5px] font-semibold text-ink-3">{t(sample ? "guestHome.sampleRank" : "real.rank4c")}</span>
+                    <span className="block text-[12px] font-semibold text-ink-3">{t(sample ? "guestHome.sampleRank" : "real.rank4c")}</span>
                     <span className="block text-[15px] font-bold rk-num truncate">{m ? fill(t("real.rankLine"), { total: m.total.toLocaleString(), rank: m.rank.toLocaleString() }) : "—"}</span>
                 </span>
             </div>
@@ -316,7 +316,7 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
                     { label: t("lookalike.rowHandi"), cells: [d.handi ?? "—", d.peers ? fill(t("real.peersCount"), { h: d.handi ?? "-", n: d.peers.count }) : "—", next ? next.handi : "—"] },
                 ]}
             />
-            <p className="text-[11.5px] text-ink-4 mt-2">{t(sample ? "guestHome.sampleNote" : "real.note4c")}</p>
+            <p className="text-[12px] text-ink-4 mt-2">{t(sample ? "guestHome.sampleNote" : "real.note4c")}</p>
             {/* 예시는 공유하지 않는다 — 예시 숫자가 내 실전 핸디 그림으로 밖에 나가면 안 된다 */}
             <CardActions primary={matchAction} onShare={sample ? undefined : () => void share()} sharing={sharing} />
         </section>

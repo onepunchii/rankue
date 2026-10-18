@@ -89,7 +89,7 @@ function MyDamaPanel({ sample }: { sample?: GuestSampleBilliards | null }) {
                         <span className="min-w-0 text-[13.5px] font-black truncate" style={{ color: REAL_TIER_INK[damaTier.id] }}>{t(damaTier.nameKey)}</span>
                     )}
                 </span>
-                <span className="block mt-1.5 text-[11.5px] leading-snug font-semibold text-[#8A7A55] truncate">
+                <span className="block mt-1.5 text-[12px] leading-snug font-semibold text-[#8A7A55] truncate">
                     {!s ? "\u00a0"
                         : ready && s.handiAvg != null
                             ? t("sim.entry.handicapAvg").replace("{n}", String(Math.min(s.games, 10))).replace("{avg}", s.handiAvg.toFixed(3))
@@ -104,7 +104,7 @@ function MyDamaPanel({ sample }: { sample?: GuestSampleBilliards | null }) {
                 <span className="text-[13px] font-bold text-[#7A5600]">{t("home.damaTitle")}</span>
                 {/* 예시 숫자에는 "예시" 표시 — 제목 바로 옆에 붙고(mr-auto) '자동'은 오른쪽 끝 그대로 */}
                 {sample && <SampleBadge className="mr-auto" />}
-                <span className="text-[11px] font-semibold text-[#9A8A66]">{t("sim.entry.handicapAuto")}</span>
+                <span className="text-[12px] font-semibold text-[#9A8A66]">{t("sim.entry.handicapAuto")}</span>
             </div>
             <div className="flex divide-x divide-[#F1E7CD]">
                 {cell("3c")}
@@ -135,7 +135,7 @@ export function ScoreboardActions({ onStartGame, onJoinGame, sample }: {
                 <span className="block mt-1 px-1 text-[13px] font-medium text-white/90 leading-snug break-keep">
                     {t("quickActions.matchDescLine1")} · {t("quickActions.matchDescLine2")}
                 </span>
-                <span className="ml-1 mt-2.5 inline-flex items-center h-6 px-2.5 rounded-full bg-black/[0.14] text-[11.5px] font-semibold text-white">
+                <span className="ml-1 mt-2.5 inline-flex items-center h-6 px-2.5 rounded-full bg-black/[0.14] text-[12px] font-semibold text-white">
                     {t("quickActions.matchChip")}
                 </span>
                 <span className="mt-4 h-12 w-full rounded-full bg-[#ffffff] text-[15px] font-bold text-[#7A5600] flex items-center justify-center gap-1 shadow-[0_2px_8px_rgba(122,86,0,0.16)]">
