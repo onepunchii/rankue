@@ -22,7 +22,7 @@ import { FishingRanking } from "./FishingRanking";
 import { FishingGear } from "./FishingGear";
 import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { useLocation } from "wouter";
+import { Link, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { appConfirm } from "@/components/AppDialog";
@@ -52,6 +52,7 @@ import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMark
 import { BOAT_SOURCE, cleanBoatQuery, type FishingBoat } from "@shared/fishingBoats";
 import { RESERVOIR_MAX, RESERVOIR_SOURCE, cleanCountyQuery, isReservoirCode, reservoirTrend, type ReservoirRef, type ReservoirView } from "@shared/fishingReservoir";
 import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@shared/fishingStations";
+import { fishingPortPath } from "@shared/fishingSeaPages";
 import { bestOf, durationKo, goodSpots, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type IndexMap, type IndexSpot, type PortBrief } from "@shared/fishingPort";
 import { FishingAquarium } from "./FishingAquarium";
 import { TankFull } from "./tank/TankFull";
@@ -1131,6 +1132,8 @@ function PortCard({ code, today }: { code: string; today: string }) {
                             </p>
                         </>
                     )}
+            {/* 그 항구의 공개 페이지 — 물때 곡선 · 다섯 주 물때 달력 · 이 물때를 쓰는 낚시터 · 지도(2026-10-18) */}
+            <Link href={fishingPortPath(def.name)} className="mt-3 flex h-11 items-center justify-center gap-1 rounded-xl text-[14px] active:opacity-80" style={{ background: "#FFFFFF0F", color: C.soft }} data-testid="fishing-port-page">{def.name} 물때 달력 · 항구 페이지 보기</Link>
         </section>
     );
 }

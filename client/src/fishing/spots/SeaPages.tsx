@@ -193,6 +193,10 @@ export function SeaAreaPage({ id }: { id: string }) {
                 </section>
             )}
             <section className="px-5 pt-6">
+                <h2 className="mb-2.5 text-[17px] font-semibold">{TIDE_SEAS.find((x) => x.id === a.tide)?.name} 물때 달력</h2>
+                <TideCalendar sea={a.tide} />
+            </section>
+            <section className="px-5 pt-6">
                 <h2 className="mb-2.5 text-[17px] font-semibold">{a.name} 항구 물때표</h2>
                 <div className="flex flex-wrap gap-1.5">{portsOf(id).map((p) => <Link key={p.code} href={fishingPortPath(p.name)} className="flex h-10 items-center rounded-full px-3.5 text-[14px]" style={{ background: "#FFFFFF14", color: C.foam }} data-testid="sea-area-port">{p.name}</Link>)}</div>
             </section>
