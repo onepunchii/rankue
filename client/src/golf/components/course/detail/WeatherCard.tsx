@@ -209,7 +209,7 @@ function SunRow({ sun, dusk }: { sun: { rise: string; set: string }; dusk: boole
 }
 
 // ── 열흘 ──────────────────────────────────────────────────────────
-function DayRow({ day, today, active, onPick }: { day: WxDay; today: string; active: boolean; onPick?: () => void }) {
+function DayRow({ day, today, active, onPick, nowTmp }: { day: WxDay; today: string; active: boolean; onPick?: () => void; nowTmp?: number | null }) {
     const pop = dayPop(day);
     const dow = dowOf(day.date);
     const body = (
@@ -224,11 +224,19 @@ function DayRow({ day, today, active, onPick }: { day: WxDay; today: string; act
                 {day.pm ? <WxIcon kind={day.pm.kind} className="w-5 h-5" /> : <span className="w-5 text-center text-[12px] text-[#FFFFFF33]">–</span>}
             </span>
             <span className="w-[44px] shrink-0 text-right text-[13px] font-medium tabular-nums" style={{ color: popColor(pop) }}>{pop != null ? `${pop}%` : ""}</span>
-            <span className="flex-1 min-w-0 text-right text-[15px] tabular-nums">
-                <span className="text-[#FFFFFF73]">{day.tmn != null ? `${day.tmn}°` : "–"}</span>
-                <span className="mx-1.5 text-[#FFFFFF33]">/</span>
-                <span className="font-semibold text-white">{day.tmx != null ? `${day.tmx}°` : "–"}</span>
-            </span>
+            {/* 오늘이 반쯤 지나 최저·최고가 없으면(기상청이 오후 발표에는 오늘 것을 안 준다) "– / –" 대신 지금 기온 — 지나간 시간을 지어 채우지 않는다 */}
+            {day.tmn == null && day.tmx == null && nowTmp != null ? (
+                <span className="flex-1 min-w-0 text-right text-[15px] tabular-nums">
+                    <span className="mr-1.5 text-[12px] text-[#FFFFFF73]">지금</span>
+                    <span className="font-semibold text-white">{nowTmp}°</span>
+                </span>
+            ) : (
+                <span className="flex-1 min-w-0 text-right text-[15px] tabular-nums">
+                    <span className="text-[#FFFFFF73]">{day.tmn != null ? `${day.tmn}°` : "–"}</span>
+                    <span className="mx-1.5 text-[#FFFFFF33]">/</span>
+                    <span className="font-semibold text-white">{day.tmx != null ? `${day.tmx}°` : "–"}</span>
+                </span>
+            )}
         </>
     );
     const cls = "w-full h-[46px] px-5 flex items-center gap-2 text-left";
@@ -274,6 +282,12 @@ export function WeatherCard({ wx, myTees, onRound, slug, name, initial }: {
     const today = kstDateKey(new Date());
     const short = useMemo(() => wx.days.filter((d) => d.src === "short"), [wx.days]);
     const hoursOf = (date: string) => { const ymd = date.replace(/-/g, ""); return wx.hours.filter((h) => h.t.startsWith(ymd)); };
+    // 지금 기온 — 오늘의 이번 시각(없으면 한 시간 뒤까지) 예보. 더 멀면 '지금'이라 하지 않는다
+    const nowTmp = (() => {
+        const hNow = new Date(Date.now() + 9 * 3600_000).getUTCHours();
+        const h = hoursOf(today).find((x) => { const hr = +x.t.slice(8, 10); return hr >= hNow && hr <= hNow + 1; });
+        return h?.tmp ?? null;
+    })();
 
     // 내 티타임 — 시간별 예보가 있는 날(앞 나흘)의 것만. 그 시각의 예보가 있어야 맞춰 줄 수 있다.
     const mine = useMemo(() => (myTees ?? []).map((t) => {
@@ -423,7 +437,7 @@ export function WeatherCard({ wx, myTees, onRound, slug, name, initial }: {
                                         여기부터는 넓은 지역 예보예요{wx.midArea ? ` · ${wx.midArea}` : ""}
                                     </li>
                                 )}
-                                <DayRow day={d} today={today} active={d.date === day.date} onPick={d.src === "short" ? () => pickDay(d.date) : undefined} />
+                                <DayRow day={d} today={today} active={d.date === day.date} onPick={d.src === "short" ? () => pickDay(d.date) : undefined} nowTmp={d.date === today ? nowTmp : null} />
                             </Fragment>
                         ))}
                     </ul>

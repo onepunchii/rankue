@@ -94,6 +94,13 @@ export function MountainWeather({ slug }: { slug: string }) {
     const popOf = (d: (typeof days)[number]) => Math.max(d.am?.pop ?? 0, d.pm?.pop ?? 0);
     const wetOf = (d: (typeof days)[number]) => !!((d.am && WET.includes(d.am.kind)) || (d.pm && WET.includes(d.pm.kind)));
     const words = [today.am, today.pm].filter(Boolean).map((h) => WX_LABEL[h!.kind]);
+    // 오후 발표에는 오늘의 최저 · 최고가 없다 — "–" 대신 지금(이번 시각 · 한 시간 뒤까지) 기온. 지나간 시간을 지어 채우지 않는다
+    const nowTmp = (() => {
+        if (today.tmx != null) return null;
+        const hNow = new Date(Date.now() + 9 * 3600_000).getUTCHours(), ymd = today.date.replace(/-/g, "");
+        const h = (data.hours ?? []).find((x) => x.t.startsWith(ymd) && +x.t.slice(8, 10) >= hNow && +x.t.slice(8, 10) <= hNow + 1);
+        return h?.tmp ?? null;
+    })();
     return (
         <div data-testid="mountain-weather">
             {/* 오늘 — 크게 */}
@@ -102,7 +109,9 @@ export function MountainWeather({ slug }: { slug: string }) {
                 <div className="min-w-0 flex-1">
                     <p className="text-[12.5px] text-[#F6D9A8]">오늘 · 산 아래</p>
                     <p className="mt-0.5 text-[26px] font-semibold tabular-nums leading-none text-[#F4EFE3]">
-                        {today.tmx != null ? `${Math.round(today.tmx)}°` : "–"}<span className="ml-1.5 text-[17px] font-normal text-[#F4EFE380]">{today.tmn != null ? `${Math.round(today.tmn)}°` : ""}</span>
+                        {nowTmp != null
+                            ? <>{Math.round(nowTmp)}°<span className="ml-1.5 text-[14px] font-normal text-[#F4EFE399]">지금</span></>
+                            : <>{today.tmx != null ? `${Math.round(today.tmx)}°` : "–"}<span className="ml-1.5 text-[17px] font-normal text-[#F4EFE380]">{today.tmn != null ? `${Math.round(today.tmn)}°` : ""}</span></>}
                     </p>
                     <p className="mt-1 truncate text-[13.5px] text-[#F4EFE3CC]">{words.filter((w, i, arr) => arr.indexOf(w) === i).join(" → ") || "예보 준비 중"}</p>
                 </div>

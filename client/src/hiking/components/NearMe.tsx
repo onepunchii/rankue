@@ -144,9 +144,21 @@ export function NearDial({ items, done, centre, label, featured }: {
     const [, setLocation] = useLocation();
     const radius = nearRadiusKm(items.map((m) => m.km));
     const spots = useMemo(() => {
-        const out = items.map((m) => { const [x, y] = nearSpot(m, radius); return { m, x: C.x + x * R, y: C.y + y * R, star: !!featured?.includes(m.slug) }; });
+        // 아주 가까운 산(판의 가운데에서 22 안)은 같은 방향으로 22 까지 민다 — 가운데 표시와 '이 산' 글씨를 덮지 않게(표시만, 거리 글은 그대로)
+        const out = items.map((m) => {
+            const [x, y] = nearSpot(m, radius);
+            let px = x * R, py = y * R;
+            const r = Math.hypot(px, py), MIN = 22;
+            if (r < MIN) { const k = r > 0.01 ? MIN / r : 0; [px, py] = r > 0.01 ? [px * k, py * k] : [0, -MIN]; }
+            // 남쪽 바로 아래는 '이 산' 판 자리 — 판에 가리면 판 밖까지 더 민다
+            if (centre) {
+                const hw = centre.length * 7 + 14;
+                for (let i = 0; i < 12 && Math.abs(px) < hw && py > 6 && py < 44; i++) { px *= 1.12; py *= 1.12; }
+            }
+            return { m, x: C.x + px, y: C.y + py, star: !!featured?.includes(m.slug) };
+        });
         // 이름 칸이 겹치면 먼 쪽의 이름을 뺀다(카드의 산 · 명산 · 가까운 산이 먼저) — 산 그림은 다 그린다
-        const boxes: { x0: number; x1: number; y0: number; y1: number }[] = centre ? [{ x0: C.x - centre.length * 6.8 - 4, x1: C.x + centre.length * 6.8 + 4, y0: C.y + 12, y1: C.y + 30 }] : [{ x0: C.x - 10, x1: C.x + 10, y0: C.y - 10, y1: C.y + 10 }];
+        const boxes: { x0: number; x1: number; y0: number; y1: number }[] = centre ? [{ x0: C.x - centre.length * 7 - 8, x1: C.x + centre.length * 7 + 8, y0: C.y - 10, y1: C.y + 35 }] : [{ x0: C.x - 10, x1: C.x + 10, y0: C.y - 10, y1: C.y + 10 }];
         const order = [...out].sort((a, b) => Number(b.star) - Number(a.star) || Number(b.m.famous) - Number(a.m.famous) || a.m.km - b.m.km);
         const labelled = new Map<string, { anchor: "start" | "end"; tx: number; sub?: string }>();
         for (const s of order) {
@@ -212,7 +224,13 @@ export function NearDial({ items, done, centre, label, featured }: {
             {/* 가운데 — 나(또는 이 산) */}
             <circle cx={C.x} cy={C.y} r="15" fill="#F28C6A" opacity="0.2" />
             <circle cx={C.x} cy={C.y} r="6.5" fill="#F28C6A" stroke="#FFFFFF" strokeWidth="2.4" />
-            {centre && <text x={C.x} y={C.y + 26} textAnchor="middle" fontSize="13" fontWeight="600" fill="#0E2A33" stroke="#EEF1DC" strokeWidth="3.2" paintOrder="stroke" pointerEvents="none">{centre}</text>}
+            {/* '이 산' — 가까운 산 그림이 밑에 깔려도 읽히게 종이색 판 위에 */}
+            {centre && (
+                <g pointerEvents="none">
+                    <rect x={C.x - centre.length * 7 - 7} y={C.y + 15} width={centre.length * 14 + 14} height={19} rx={9.5} fill="#F4EFE3" stroke="#0E2A33" strokeOpacity="0.28" strokeWidth="1" />
+                    <text x={C.x} y={C.y + 29} textAnchor="middle" fontSize="13" fontWeight="600" fill="#0E2A33">{centre}</text>
+                </g>
+            )}
         </svg>
     );
 }
