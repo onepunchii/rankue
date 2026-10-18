@@ -50,17 +50,30 @@ export function Shell({ title, children }: { title: string; children: React.Reac
     );
 }
 
-/** 종이 지도 위의 점 — 낚시터마다 종류 색. 'here' 가 있으면 그 한 곳만 크게(나머지는 옅게) */
-export function PaperMap({ items, here, height = 320 }: { items: readonly Lite[]; here?: Lite | null; height?: number }) {
+/** 종이 지도 위의 점 — 낚시터마다 종류 색. 'here' 가 있으면 그 한 곳만 크게(나머지는 옅게).
+ *  fit — 점들이 다 들어가는 만큼만 당겨 본다(지역 페이지: 전국 지도의 한 귀퉁이에 점이 몰리지 않게, 2026-10-18). 점 · 선은 당긴 만큼 줄여 화면 크기를 지킨다 */
+export function PaperMap({ items, here, height = 320, fit }: { items: readonly Lite[]; here?: Lite | null; height?: number; fit?: boolean }) {
     const pts = useMemo(() => items.filter((p) => p.lat != null && p.lng != null).map((p) => ({ p, xy: latLngToOutline(p.lat!, p.lng!) })), [items]);
     const h = here && here.lat != null && here.lng != null ? latLngToOutline(here.lat, here.lng) : null;
+    const box = useMemo(() => {
+        if (!fit || pts.length === 0) return VIEW;
+        const xs = pts.map((x) => x.xy[0]), ys = pts.map((x) => x.xy[1]);
+        const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+        // 가로 : 세로 = 화면(폭 약 320 : height) — 점의 퍼짐에 여백 25%, 아무리 몰려 있어도 반 폭 32칸(약 30km) 아래로는 당기지 않는다(제주 · 부산처럼 몇 곳뿐인 곳이 해안선 조각만 보이지 않게)
+        const ratio = 320 / height;
+        let hw = Math.max(32, ((Math.max(...xs) - Math.min(...xs)) / 2) * 1.25), hh = Math.max(32, ((Math.max(...ys) - Math.min(...ys)) / 2) * 1.25);
+        if (hw / hh > ratio) hh = hw / ratio; else hw = hh * ratio;
+        if (hw * 2 >= VIEW.w) return VIEW;
+        return { x: cx - hw, y: cy - hh, w: hw * 2, h: hh * 2 };
+    }, [fit, pts, height]);
+    const k = Math.max(0.22, box.w / VIEW.w), dot = fit && box !== VIEW ? 3.6 * k * 1.8 : 3.6;
     return (
-        <svg viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`} className="block w-full" style={{ height, background: PAPER }} role="img" aria-label={here ? `${here.name}의 자리` : `낚시터 ${pts.length}곳의 자리`}>
-            <defs><pattern id="sp-wave" width="26" height="12" patternUnits="userSpaceOnUse"><path d="M0 6 q6.5 -5 13 0 t13 0" fill="none" stroke="#1F556026" strokeWidth="1" /></pattern></defs>
+        <svg viewBox={`${box.x} ${box.y} ${box.w} ${box.h}`} className="block w-full" style={{ height, background: PAPER }} role="img" aria-label={here ? `${here.name}의 자리` : `낚시터 ${pts.length}곳의 자리`} data-fit={box !== VIEW ? "1" : undefined}>
+            <defs><pattern id="sp-wave" width={26 * k} height={12 * k} patternUnits="userSpaceOnUse"><path d={`M0 ${6 * k} q${6.5 * k} ${-5 * k} ${13 * k} 0 t${13 * k} 0`} fill="none" stroke="#1F556026" strokeWidth={k} /></pattern></defs>
             <rect x={VIEW.x} y={VIEW.y} width={VIEW.w} height={VIEW.h} fill="url(#sp-wave)" />
-            <g fill="#C9BFA4" opacity="0.55" transform="translate(2.5 3)">{LAND.map((d, i) => <path key={i} d={d} />)}</g>
-            <g fill="#EAE2CC" stroke="#0F283855" strokeWidth={0.8} strokeLinejoin="round">{LAND.map((d, i) => <path key={i} d={d} />)}</g>
-            <g>{pts.map(({ p, xy }) => <circle key={p.id} cx={xy[0]} cy={xy[1]} r={here ? 2.6 : 3.6} fill={KIND_TONE[placeKind(p.kind).id]} stroke="#F3ECDD" strokeWidth={0.8} opacity={here ? 0.35 : 0.9} />)}</g>
+            <g fill="#C9BFA4" opacity="0.55" transform={`translate(${2.5 * k} ${3 * k})`}>{LAND.map((d, i) => <path key={i} d={d} />)}</g>
+            <g fill="#EAE2CC" stroke="#0F283855" strokeWidth={0.8 * k} strokeLinejoin="round">{LAND.map((d, i) => <path key={i} d={d} />)}</g>
+            <g>{pts.map(({ p, xy }) => <circle key={p.id} cx={xy[0]} cy={xy[1]} r={here ? 2.6 : dot} fill={KIND_TONE[placeKind(p.kind).id]} stroke="#F3ECDD" strokeWidth={0.8 * (fit ? k * 1.6 : 1)} opacity={here ? 0.35 : 0.9} />)}</g>
             {h && (
                 <g transform={`translate(${h[0]} ${h[1]})`} data-testid="spot-here">
                     <circle r={20} fill="#C8372D2E" />
@@ -182,7 +195,7 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
             {/* 지도 — 종류 색의 점 */}
             <section className="px-5 pt-5">
                 <div className="overflow-hidden rounded-2xl" style={{ boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
-                    <PaperMap items={shown} height={300} />
+                    <PaperMap items={shown} height={300} fit={!!region} />
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 py-2.5" style={{ background: PAPER, color: "#0F2838B3" }}>
                         {PLACE_KINDS.filter((k) => scopedCounts.kind.some(([id]) => id === k.id)).map((k) => <span key={k.id} className="flex items-center gap-1.5 text-[12px]"><i aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: KIND_TONE[k.id] }} />{k.short}</span>)}
                     </div>
