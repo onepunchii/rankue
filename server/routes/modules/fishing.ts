@@ -30,7 +30,7 @@ import { fishingAllowed } from "../../lib/fishingAccess.js";
 import { getSeaNow } from "../../services/fishingSea.js";
 import { getSeaFcst } from "../../services/fishingSeaFcst.js";
 import { SEA_FCST_REG } from "../../../shared/fishingSeaFcst.js";
-import { getIndexMap, getPortBrief } from "../../services/fishingPort.js";
+import { getIndexMap, getMainPortTurns, getPortBrief } from "../../services/fishingPort.js";
 import { allPlaces, placeById } from "../../storage/fishingPlaces.js";
 import { FISHING_PORTS } from "../../../shared/fishingStations.js";
 import { isPlaceId, nearbyPlaces, nearestPort } from "../../../shared/fishingPlaces.js";
@@ -266,6 +266,13 @@ router.get("/index-map", asyncHandler(async (req: any, res: any) => {
     const day = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.day ?? "")) ? String(req.query.day) : null;
     publicCache(res, 600);
     return sendSuccess(res, await getIndexMap(day).catch(() => null));
+}));
+
+/** 주요 항구 스물네 곳의 그날 만조 · 간조 — '오늘의 바다' 허브의 표(2026-10-18, 공개). 받아 둔 조석을 먼저 읽는다 */
+router.get("/sea/turns", asyncHandler(async (req: any, res: any) => {
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(String(req.query.day ?? "")) ? String(req.query.day) : null;
+    publicCache(res, 600);
+    return sendSuccess(res, await getMainPortTurns(day).catch(() => null));
 }));
 
 /** 항구 브리핑 — 받아 둔 공공 자료를 엮은 한 장. 조석을 못 받았으면 null(화면은 '잠시 뒤에'를 적는다). 모르는 항구는 404 */

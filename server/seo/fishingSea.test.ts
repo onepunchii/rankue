@@ -51,6 +51,12 @@ describe("바다 · 항구 물때 공개 페이지", () => {
         const sea = read("client/src/fishing/spots/SeaPages.tsx");
         expect(sea).not.toContain("og.png");
         expect(sea).toContain('data-testid="port-map"');
+        // 허브의 '오늘 만조 · 간조' — 주요 항구 스물네 곳 한 번에(공개 · CDN 10분), 받아 둔 조석을 먼저 읽는다
+        expect(r).toContain('router.get("/sea/turns", asyncHandler(');
+        const svc = read("server/services/fishingPort.ts");
+        expect(svc).toContain("export async function getMainPortTurns(");
+        expect(svc).toContain("const mains = FISHING_PORTS.filter((p) => p.main);");
+        expect(sea).toContain("<PortTurnsBoard />");
         // 항구 번호는 우리 표에 있는 것만 바깥 자료로 간다
         expect(r).toContain("FISHING_PORTS.some((p) => p.code === code)");
     });

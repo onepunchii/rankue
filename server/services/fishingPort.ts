@@ -11,7 +11,7 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
-import { fishingPort, type FishingPort } from "../../shared/fishingStations.js";
+import { FISHING_PORTS, fishingPort, type FishingPort } from "../../shared/fishingStations.js";
 import { hmToMin, indexMapOf, isFishingIndexStep, officialTurns, tideTurns, type IndexAllRow, type IndexMap, type PortBrief, type PortIndexRow, type PortNow, type PortSun, type TideTurn } from "../../shared/fishingPort.js";
 import { fishingKstDay } from "../../shared/fishing.js";
 import { noteFeed, type FeedSource } from "./fishingFeedHealth.js";
@@ -184,6 +184,26 @@ export async function getPortBrief(code: string, wantDay: string | null, nowMs =
         sun, now,
         index: port.index && rows.length ? { point: port.index.name, km: port.index.km, rows } : null,
     };
+}
+
+/**
+ * 주요 항구 스물네 곳의 그날 만조 · 간조(2026-10-18 — '오늘의 바다' 허브의 한 표). 공식 고 · 저조가 있으면 그것, 없으면 예측 조위의 꺾임.
+ * 둘 다 받아 둔 것(fishing_obs)을 먼저 읽는다 — 바깥에 묻는 것은 그날 그 항구를 처음 볼 때 한 번뿐이다. 못 받은 항구는 빠진다(지어 넣지 않는다).
+ */
+export async function getMainPortTurns(wantDay: string | null, nowMs = Date.now()): Promise<{ day: string; rows: { code: string; name: string; area: string; turns: TideTurn[] }[] } | null> {
+    if (!process.env.DATA_GO_KR_KEY) return null;
+    const today = fishingKstDay(nowMs);
+    const day = wantDay && /^\d{4}-\d{2}-\d{2}$/.test(wantDay) && wantDay >= today && wantDay <= addDays(today, PORT_DAYS - 1) ? wantDay : today;
+    const mains = FISHING_PORTS.filter((p) => p.main);
+    const rows = await Promise.all(mains.map(async (p) => {
+        const official = await tideTurnsOfficial(p, day).catch(() => null);
+        if (official?.length) return { code: p.code, name: p.name, area: p.area, turns: official };
+        const points = await tideDay(p, day).catch(() => null);
+        if (!points || points.length < 12) return null;
+        return { code: p.code, name: p.name, area: p.area, turns: tideTurns(points.map(([min, cm]) => ({ min, cm }))) };
+    }));
+    const got = rows.filter((r): r is NonNullable<typeof r> => !!r);
+    return got.length ? { day, rows: got } : null;
 }
 
 /**

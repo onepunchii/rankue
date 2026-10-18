@@ -51,6 +51,47 @@ function Cover({ src, kicker, title, sub }: { src: string; kicker?: string; titl
     );
 }
 
+type PortTurns = { day: string; rows: { code: string; name: string; area: string; turns: { min: number; cm: number; kind: "high" | "low" }[] }[] };
+/**
+ * 오늘 주요 항구의 만조 · 간조(2026-10-18) — 해역을 고르면 그 바다의 항구들. 지난 것은 옅게, 다음 것은 도드라지게. 국립해양조사원 예보 그대로
+ */
+function PortTurnsBoard() {
+    const today = kstToday();
+    const { data } = useQuery<PortTurns | null>({ queryKey: ["/api/hiq/fishing/sea/turns"], staleTime: 10 * 60_000 });
+    const [area, setArea] = useState("west-mid");
+    if (!data?.rows?.length) return null;
+    const isToday = data.day === today, nowMin = isToday ? kstMinuteNow() : -1;
+    const rows = data.rows.filter((r) => r.area === area);
+    const areas = SEA_AREAS.filter((a) => data.rows.some((r) => r.area === a.id));
+    return (
+        <section className="px-5 pt-6" data-testid="sea-port-turns">
+            <h2 className="mb-2.5 flex items-baseline justify-between gap-3 text-[17px] font-semibold"><span>{isToday ? "오늘" : data.day.slice(5).replace("-", "/")} 만조 · 간조</span><span className="shrink-0 text-[13px] font-normal" style={{ color: C.dim }}>국립해양조사원 예보</span></h2>
+            <div className="-mx-5 mb-2.5 flex gap-1.5 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="해역">
+                {areas.map((a) => <button key={a.id} type="button" aria-pressed={area === a.id} onClick={() => setArea(a.id)} className="h-9 shrink-0 rounded-full px-3.5 text-[13px]" style={area === a.id ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{a.name}</button>)}
+            </div>
+            <ul className="divide-y divide-[#FFFFFF14] rounded-2xl px-3.5" style={{ background: "#FFFFFF0A" }}>
+                {rows.map((r) => {
+                    const next = r.turns.find((t) => t.min >= nowMin);
+                    return (
+                        <li key={r.code}>
+                            <Link href={fishingPortPath(r.name)} className="flex min-h-[56px] items-center gap-3 py-2.5 active:opacity-80">
+                                <span className="w-[64px] shrink-0 text-[15px] font-semibold">{r.name}</span>
+                                <span className="flex min-w-0 flex-1 flex-wrap gap-1">
+                                    {r.turns.map((t) => {
+                                        const past = isToday && t.min < nowMin, on = t === next && isToday;
+                                        return <span key={`${t.kind}${t.min}`} className="rounded-full px-2 py-0.5 text-[12.5px] tabular-nums" style={{ background: on ? (t.kind === "high" ? "#3F86A8" : "#F3ECDD") : t.kind === "high" ? "#3F86A833" : "#FFFFFF14", color: on ? (t.kind === "high" ? "#FFFFFF" : "#0F2838") : C.foam, opacity: past ? 0.42 : 1 }}>{t.kind === "high" ? "만조" : "간조"} {hhmm(t.min)}</span>;
+                                    })}
+                                </span>
+                            </Link>
+                        </li>
+                    );
+                })}
+            </ul>
+            <p className="mt-2 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>진하게 칠한 것이 다음 물때예요. 조석은 예측값이라 바람 · 기압에 따라 달라요. 항구를 누르면 물때 곡선과 열흘치가 보여요.</p>
+        </section>
+    );
+}
+
 /**
  * 물때 달력(2026-10-18) — 이번 주 일요일부터 다섯 주. 칸마다 날짜 · 물때 이름 · 물의 세기 띠, 사리는 파랗게 · 조금은 옅게 · 오늘은 테두리.
  * 물때는 음력 날짜로 센다(shared/fishingTide — 기기 달력에 한국 달력이 없으면 그리지 않는다). 바깥 자료가 필요 없다.
@@ -128,6 +169,7 @@ export function SeaHub() {
                     })}
                 </div>
             </section>
+            <PortTurnsBoard />
             <section className="px-5 pt-6" data-testid="sea-tide-calendar">
                 <h2 className="mb-2.5 text-[17px] font-semibold">물때 달력</h2>
                 <TideCalendar />
