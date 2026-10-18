@@ -138,9 +138,9 @@ export function PlayerLinkRow({ cat, row, hasPrev, locale, sub, showPrev }: {
                 {row.rank ?? row.prevRank}
             </span>
             <span className="flex-1 min-w-0">
-                <span className="block truncate text-[14px] font-semibold text-ink-1">{main}</span>
+                <span className="block line-clamp-2 leading-snug [overflow-wrap:anywhere] text-[14px] font-semibold text-ink-1">{main}</span>
                 {(second || (showPrev && hasPrev && row.prevRank !== null && row.rank !== null)) && (
-                    <span className="block truncate text-[12px] font-medium text-ink-3 mt-0.5 tabular-nums">
+                    <span className="block text-[12px] font-medium text-ink-3 mt-0.5 tabular-nums leading-snug break-keep">
                         {showPrev && hasPrev && row.prevRank !== null && row.rank !== null ? `${L.rank(row.prevRank)} → ${L.rank(row.rank)}` : ""}
                         {showPrev && second && row.prevRank !== null && row.rank !== null ? " · " : ""}
                         {second}

@@ -153,7 +153,7 @@ function RecordRow({ row, k, locale, T }: { row: PbaRecordRow; k: PbaRecordKey; 
             </span>
             <span className="text-[16px] leading-none shrink-0" aria-hidden>{flagEmoji(row.nationCode) || "🏳️"}</span>
             <span className="flex-1 min-w-0">
-                <span className="block truncate text-[14px] font-semibold text-ink-1">
+                <span className="block line-clamp-2 leading-snug [overflow-wrap:anywhere] text-[14px] font-semibold text-ink-1">
                     {main}
                     {other && <span className="ml-1.5 text-[12px] font-medium text-ink-3">{other}</span>}
                 </span>

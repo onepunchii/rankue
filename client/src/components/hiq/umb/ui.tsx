@@ -13,7 +13,7 @@ export function Section({ emoji, title, meta, desc, children }: { emoji: string;
                     <span className="text-[16px] leading-none">{emoji}</span>
                     {title}
                 </h3>
-                {meta && <div className="min-w-0 truncate text-[12px] font-semibold text-ink-3">{meta}</div>}
+                {meta && <div className="min-w-0 text-[12px] font-semibold text-ink-3 leading-snug break-keep">{meta}</div>}
             </div>
             {desc && <p className="text-[12px] font-medium text-ink-3 leading-snug -mt-1.5 mb-3">{desc}</p>}
             {children}

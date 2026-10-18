@@ -71,7 +71,7 @@ export default function BriefingPage() {
           <div className="rounded-3xl bg-white p-6 text-center text-[14px] text-black/45">이 날짜의 브리핑이 없습니다</div>
         )}
 
-        <p className="mt-6 text-[11px] text-black/35 text-center">출처: UMB 공식 랭킹 · 매일 자동 갱신</p>
+        <p className="mt-6 text-[12px] text-black/35 text-center">출처: UMB 공식 랭킹 · 매일 자동 갱신</p>
       </div>
     </div>
   );

@@ -39,7 +39,7 @@ function Cell({ board, gameType }: { board: MyHandicap | undefined; gameType: "3
                     <span className="text-[12px] font-medium text-white/45">{t("sim.entry.handicapUnit")}</span>
                 </span>
             </p>
-            <p className="mt-1 text-[11px] font-medium text-white/45 truncate">
+            <p className="mt-1 text-[12px] font-medium text-white/45 truncate">
                 {board && board.fromRecord
                     ? t("sim.entry.handicapAvg").replace("{avg}", board.avg.toFixed(3)).replace("{n}", String(board.matches))
                     : t("sim.entry.handicapNew")}
@@ -57,13 +57,13 @@ export function HandicapCard({ api = matchApi, enabled = true }: { api?: MatchAp
         <section className={cn(st.card, "px-4 py-3.5")} data-entry="handicap">
             <div className="flex items-baseline justify-between gap-2 mb-2.5">
                 <h2 className={cn("text-[15px] font-bold", st.cardTitle)}>{t("sim.entry.handicapTitle")}</h2>
-                <span className="text-[11px] font-semibold text-white/40">{t("sim.entry.handicapAuto")}</span>
+                <span className="text-[12px] font-semibold text-white/40">{t("sim.entry.handicapAuto")}</span>
             </div>
             <div className="flex gap-2">
                 <Cell board={board("3c")} gameType="3c" />
                 <Cell board={board("4c")} gameType="4c" />
             </div>
-            <p className="mt-2.5 text-[11px] font-medium text-white/45">{t("sim.entry.handicapNote")}</p>
+            <p className="mt-2.5 text-[12px] font-medium text-white/45">{t("sim.entry.handicapNote")}</p>
         </section>
     );
 }
