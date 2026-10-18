@@ -85,6 +85,16 @@ describe("바다 · 항구 물때 공개 페이지", () => {
         expect(port?.body).toContain("선녀바위낚시터");
         expect(port?.body).not.toContain(">저수지<");
     });
+    it("허브에는 앞으로 4주 물때표(서해 7물때 · 남해 동해 제주 8물때) — 음력으로 센 것, 바깥 자료 없이", async () => {
+        const hub = html(await renderFishingSea("/fishing/sea", none, Date.parse("2026-10-18T03:00:00Z")));
+        expect(hub?.body).toContain("<h2>서해 물때표 — 앞으로 4주(7물때)</h2>");
+        expect(hub?.body).toContain("<h2>남해 · 동해 · 제주 물때표 — 앞으로 4주(8물때)</h2>");
+        expect(hub?.body).toContain("<li>10월 18일(일) ");
+        expect((hub?.body.match(/<li>\d+월 \d+일\(/g) ?? []).length).toBe(56);
+        const page = read("client/src/fishing/spots/SeaPages.tsx");
+        expect(page).toContain("<TideCalendar />");
+        expect(page).toContain('<TideCalendar sea={area?.tide ?? "south"} />');
+    });
     it("사이트맵 — 허브 · 해역 일곱 · 항구 51, 모두 카드 그림", () => {
         const parts = fishingSeaSitemapParts("2026-10-18").map((x) => JSON.parse(x) as { loc: string; image: string });
         expect(parts.length).toBe(1 + SEA_AREAS.length + FISHING_PORTS.length);

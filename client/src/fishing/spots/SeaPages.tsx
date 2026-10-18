@@ -17,7 +17,7 @@ import { SEA_AREAS, SEA_CAUTION, SEA_SOURCE, seaHeadline, seaNotes, type SeaArea
 import { FISHING_PORTS } from "@shared/fishingStations";
 import { SEA_FCST_SOURCE, waveText, windText, type SeaFcst } from "@shared/fishingSeaFcst";
 import { durationKo, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, windDirKo, type PortBrief } from "@shared/fishingPort";
-import { tideOf, TIDE_PHASE_TEXT, type TideSea } from "@shared/fishingTide";
+import { tideAddDays, tideOf, TIDE_PHASE_TEXT, TIDE_SEAS, type TideSea } from "@shared/fishingTide";
 import { nearestPort, type PublicPlace } from "@shared/fishingPlaces";
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath, fishingSeaAreaPath, portByName, portSeo, portsOf, seaArt, seaAreaById, seaAreaSeo, seaHubSeo } from "@shared/fishingSeaPages";
 import { SeaChart, SEA_LEGEND, seaWashColor, seaWashLine } from "../SeaChart";
@@ -47,6 +47,45 @@ function Cover({ src, kicker, title, sub }: { src: string; kicker?: string; titl
                 <h1 className="mt-0.5 text-[26px] font-semibold leading-tight tracking-tight">{title}</h1>
                 {sub && <p className="mt-0.5 text-[13px]" style={{ color: "#F3ECDDCC" }}>{sub}</p>}
             </div>
+        </div>
+    );
+}
+
+/**
+ * 물때 달력(2026-10-18) — 이번 주 일요일부터 다섯 주. 칸마다 날짜 · 물때 이름 · 물의 세기 띠, 사리는 파랗게 · 조금은 옅게 · 오늘은 테두리.
+ * 물때는 음력 날짜로 센다(shared/fishingTide — 기기 달력에 한국 달력이 없으면 그리지 않는다). 바깥 자료가 필요 없다.
+ */
+export function TideCalendar({ sea: fixed }: { sea?: TideSea }) {
+    const [pick, setPick] = useState<TideSea>(fixed ?? "west");
+    const sea = fixed ?? pick;
+    const today = kstToday();
+    const start = tideAddDays(today, -new Date(`${today}T00:00:00Z`).getUTCDay());
+    const days = useMemo(() => Array.from({ length: 35 }, (_, i) => tideAddDays(start, i)).map((d) => ({ d, t: tideOf(d, sea) })), [start, sea]);
+    if (!days.some((x) => x.t)) return null;
+    return (
+        <div data-testid="tide-calendar">
+            {!fixed && (
+                <div className="mb-2.5 flex gap-1.5" role="group" aria-label="바다">
+                    {TIDE_SEAS.map((x) => <button key={x.id} type="button" aria-pressed={pick === x.id} onClick={() => setPick(x.id)} className="h-9 rounded-full px-3.5 text-[13px]" style={pick === x.id ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{x.name} <span className="opacity-70">{x.note}</span></button>)}
+                </div>
+            )}
+            <div className="overflow-hidden rounded-2xl p-2" style={{ background: PAPER, color: "#0F2838", boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
+                <div className="grid grid-cols-7 pb-1 text-center text-[12px]" style={{ color: "#0F283899" }}>{["일", "월", "화", "수", "목", "금", "토"].map((w) => <span key={w}>{w}</span>)}</div>
+                <div className="grid grid-cols-7 gap-1">
+                    {days.map(({ d, t }) => {
+                        const past = d < today, isToday = d === today, first = d.endsWith("-01") || d === start;
+                        const spring = t?.mark === "사리", neap = t?.mark === "조금";
+                        return (
+                            <div key={d} className="flex h-[58px] flex-col items-center justify-center rounded-lg" style={{ background: spring ? "#3F86A833" : neap ? "#0F28380D" : "#FFFFFF66", opacity: past ? 0.42 : 1, boxShadow: isToday ? "inset 0 0 0 2px #C8372D" : undefined }} aria-current={isToday ? "date" : undefined} data-tide={t?.name}>
+                                <span className="text-[12px] tabular-nums" style={{ color: "#0F283899" }}>{first ? `${Number(d.slice(5, 7))}/${Number(d.slice(8))}` : Number(d.slice(8))}</span>
+                                <span className="text-[13px] font-semibold leading-tight">{t?.name ?? ""}</span>
+                                {t && <i aria-hidden className="mt-1 h-[3px] rounded-full" style={{ width: `${Math.round(6 + t.flow * 22)}px`, background: spring ? "#1F5A78" : "#0F283855" }} />}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+            <p className="mt-2 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>물때는 음력 날짜로 센 것이에요. 띠가 길수록 물이 세게 가요 — 파란 칸이 사리, 옅은 칸이 조금이에요. {sea === "west" ? "서해는 7물때로 불러요." : "남해 · 동해 · 제주는 8물때로 불러요."}</p>
         </div>
     );
 }
@@ -88,6 +127,10 @@ export function SeaHub() {
                         );
                     })}
                 </div>
+            </section>
+            <section className="px-5 pt-6" data-testid="sea-tide-calendar">
+                <h2 className="mb-2.5 text-[17px] font-semibold">물때 달력</h2>
+                <TideCalendar />
             </section>
             <section className="px-5 pt-6" data-testid="sea-ports">
                 <h2 className="mb-2.5 text-[17px] font-semibold">항구 물때표</h2>
@@ -236,6 +279,10 @@ export function PortPage({ name }: { name: string }) {
                     <div className="flex flex-wrap gap-1.5">{[...new Set(data.index.rows.map((r) => r.fish))].slice(0, 8).map((f) => { const am = data.index!.rows.find((r) => r.fish === f && r.part === "오전")?.index, pm = data.index!.rows.find((r) => r.fish === f && r.part === "오후")?.index; return <span key={f} className="rounded-full px-3 py-1.5 text-[13px]" style={{ background: "#FFFFFF0F" }}>{f === "기타어종" ? "그 밖의 어종" : f} <span className="tabular-nums" style={{ color: C.soft }}>{[am, pm].filter(Boolean).join(" → ")}</span></span>; })}</div>
                 </section>
             )}
+            <section className="px-5 pt-6">
+                <h2 className="mb-2.5 text-[17px] font-semibold">{TIDE_SEAS.find((x) => x.id === (area?.tide ?? "south"))?.name} 물때 달력</h2>
+                <TideCalendar sea={area?.tide ?? "south"} />
+            </section>
             {/* 이 항구는 여기 — 그 바다의 특보 물감 위에 같은 바다의 항구 점, 이 항구는 이름과 함께. 다른 바다를 누르면 그 바다로 */}
             {sea?.areas?.length ? (
                 <section className="px-5 pt-6" data-testid="port-map">

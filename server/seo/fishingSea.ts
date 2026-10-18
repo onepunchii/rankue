@@ -8,7 +8,7 @@ import { SEA_AREAS, SEA_CAUTION, SEA_SOURCE, seaHeadline, seaNotes, type SeaArea
 import { SEA_FCST_SOURCE, waveText, windText, type SeaFcst } from "../../shared/fishingSeaFcst.js";
 import { FISHING_PORTS } from "../../shared/fishingStations.js";
 import { hhmm, tideRange, type PortBrief } from "../../shared/fishingPort.js";
-import { tideOf, TIDE_PHASE_TEXT } from "../../shared/fishingTide.js";
+import { tideDays, tideOf, tideWeekday, TIDE_PHASE_TEXT, TIDE_SEAS } from "../../shared/fishingTide.js";
 import { FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, fishingSpotPath, nearestPort, placeWhere, type PublicPlace } from "../../shared/fishingPlaces.js";
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath, fishingSeaAreaPath, portByName, portSeo, portsOf, seaAreaById, seaAreaSeo, seaArt, seaHubSeo } from "../../shared/fishingSeaPages.js";
 import { fishingSeaCardUrl } from "../../shared/ogCards.js";
@@ -42,7 +42,22 @@ const foot = () => `  <p>자료: ${esc(SEA_SOURCE)} · ${esc(SEA_FCST_SOURCE)} �
   <p><a href="${FISHING_SPOTS_PATH}">${esc(FISHING_SPOTS_LABEL)}</a> · <a href="/?login=1">가입하고 조과 기록 · 어탁 모으기</a></p>`;
 const cover = (area: string, alt: string) => `  <img src="${ORIGIN}${seaArt(area)}" width="640" height="640" alt="${esc(alt)}" loading="eager">`;
 
-function hub(sea: SeaNow | null): FishingSeaRender {
+/** 앞으로 4주 물때(서해 · 남해 동해 제주) — 음력으로 센 것, 바깥 자료 없음. 한국 달력을 모르는 환경이면 빈 글 */
+const tideCalendar = (nowMs: number) => {
+    const today = fishingKstDay(nowMs);
+    return TIDE_SEAS.map((x) => {
+        const days = tideDays(today, x.id, 28);
+        if (!days.length) return "";
+        return `  <section>
+    <h2>${esc(x.name)} 물때표 — 앞으로 4주(${esc(x.note)})</h2>
+    <ul>
+${days.map((t) => `      <li>${Number(t.ymd.slice(5, 7))}월 ${Number(t.ymd.slice(8))}일(${tideWeekday(t.ymd)}) ${esc(t.name)}${t.mark ? ` · ${t.mark}` : ""} — 음력 ${t.lunar.month}월 ${t.lunar.day}일</li>`).join("\n")}
+    </ul>
+  </section>`;
+    }).filter(Boolean).join("\n");
+};
+
+function hub(sea: SeaNow | null, nowMs = Date.now()): FishingSeaRender {
     const seo = seaHubSeo();
     const by = new Map((sea?.areas ?? []).map((a) => [a.id, a]));
     const body = `<main>
@@ -56,6 +71,7 @@ ${SEA_AREAS.map((a) => {
 ${now.length ? `    <p>${esc(now.join(" · "))}${sea?.issued ? ` (${esc(sea.issued)} 발표)` : ""}</p>\n` : ""}    <p>${portLinks(a.id)}</p>
   </section>`;
     }).join("\n")}
+${tideCalendar(nowMs)}
 ${foot()}
 </main>`;
     const list = { "@context": "https://schema.org", "@type": "ItemList", name: seo.h1, numberOfItems: FISHING_PORTS.length, itemListElement: FISHING_PORTS.map((p, i) => ({ "@type": "ListItem", position: i + 1, name: `${p.name} 물때`, url: `${ORIGIN}${fishingPortPath(p.name)}` })) };
@@ -121,7 +137,7 @@ ${foot()}
 
 export async function renderFishingSea(path: string, deps: FishingSeaDeps, nowMs = Date.now()): Promise<FishingSeaRender | null> {
     const p = path.replace(/\/+$/, "") || "/";
-    if (p === FISHING_SEA_PATH) return hub(await deps.sea().catch(() => null));
+    if (p === FISHING_SEA_PATH) return hub(await deps.sea().catch(() => null), nowMs);
     const ar = /^\/fishing\/sea\/([^/]+)$/.exec(p);
     if (ar) {
         const id = decodeURIComponent(ar[1]);
