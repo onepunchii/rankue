@@ -57,7 +57,8 @@ export function RealMedal({ game, handi, size, className, decorative = false }: 
                 className="block w-full h-full object-contain"
                 style={{ filter: tier ? "drop-shadow(0 2px 3px rgba(0,0,0,0.28))" : "grayscale(1) opacity(0.42)" }}
             />
-            {tier && (
+            {/* 숫자는 읽힐 크기에서만(2026-10-18 — 목록의 22px 메달에서는 6px 점이 됐다. 옆 이름표와 aria 에 같은 뜻이 있다) */}
+            {tier && size >= 30 && (
                 <span
                     className="rk-num absolute left-0 right-0 text-center font-black text-white"
                     style={{ top: "50%", transform: "translateY(-52%)", fontSize: Math.round(size * (digits >= 3 ? 0.24 : 0.3)), lineHeight: 1, letterSpacing: "-0.03em", textShadow: "0 1px 2px rgba(0,0,0,0.55)" }}
@@ -84,7 +85,7 @@ export function RealTierChip({ member, size = 22, className }: {
     return (
         <span className={cn("inline-flex items-center gap-1 shrink-0 min-w-0", className)} data-testid="real-tier-chip">
             <RealMedal game={pick.game} handi={pick.handi} size={size} />
-            <span className="text-[11.5px] font-bold truncate" style={{ color: REAL_TIER_INK[pick.tier.id] }}>
+            <span className="text-[12px] font-bold truncate" style={{ color: REAL_TIER_INK[pick.tier.id] }}>
                 {t("real.tierOf").replace("{tier}", t(pick.tier.nameKey))}
             </span>
         </span>

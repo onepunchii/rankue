@@ -121,7 +121,8 @@ describe("화면: 실전 등급은 어디서나 같은 식 · 다마 메달", ()
         const medal = code(client("components/hiq/RealMedal.tsx"));
         // 다마가 없으면 빈 메달(흐린 그림 · 숫자 없음)
         expect(medal).toContain('"grayscale(1) opacity(0.42)"');
-        expect(medal).toContain("{tier && (");
+        // 숫자는 등급이 있을 때만 · 읽힐 크기(30px 이상)에서만(2026-10-18 — 목록의 22px 칩에서는 6px 점이 됐다)
+        expect(medal).toContain("{tier && size >= 30 && (");
     });
 
     it("경기 결과: 올랐거나 처음 생겼을 때만 크게 — 내려간 것은 작은 한 줄", () => {
