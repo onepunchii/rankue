@@ -159,7 +159,7 @@ function StatTile({ label, value, chip, pct, mark, sub }: { label: string; value
                     {mark != null && <div className="absolute -top-1 w-0.5 h-3.5 bg-ink-3" style={{ left: `${Math.max(0, Math.min(99, mark))}%` }} />}
                 </div>
             )}
-            {sub && <div className="text-[11.5px] font-medium text-ink-3 mt-1.5 truncate">{sub}</div>}
+            {sub && <div className="text-[12px] font-medium text-ink-3 mt-1.5 leading-snug break-keep">{sub}</div>}
         </div>
     );
 }
@@ -364,9 +364,9 @@ export default function HiqPbaPlayer() {
                                 sub={p.win != null ? (p.draw ? fill(t.wld, { w: p.win, l: p.lose ?? 0, d: p.draw }) : fill(t.wl, { w: p.win, l: p.lose ?? 0 })) : undefined}
                             />
                         </div>
-                        <p className="text-[11.5px] text-ink-4 mt-2.5">{fill(t.minGames, { n: PBA_RECORDS_MIN_GAMES })}</p>
+                        <p className="text-[12px] text-ink-4 mt-2.5">{fill(t.minGames, { n: PBA_RECORDS_MIN_GAMES })}</p>
                         {/* "선수 연봉" 으로 들어온 방문자에게 주는 정확한 답 — 상금을 연봉이라 부르지 않는다 */}
-                        {lang === "ko" && <p className="text-[11.5px] text-ink-3 leading-relaxed mt-1.5">{PBA_INCOME_NOTE_KO}</p>}
+                        {lang === "ko" && <p className="text-[12px] text-ink-3 leading-relaxed mt-1.5">{PBA_INCOME_NOTE_KO}</p>}
                     </Card>
 
                     {/* 나와 비교하기(2026-09-27) — 가입 전에는 넣어 보고, 회원은 내 기록으로. UMB 선수 페이지와 같은 부품 */}
@@ -419,11 +419,11 @@ export default function HiqPbaPlayer() {
                                         <ResponsiveContainer width="100%" height="100%">
                                             <ComposedChart data={chartData} margin={{ top: 18, right: 12, bottom: 0, left: -18 }}>
                                                 <CartesianGrid vertical={false} stroke={GRID} />
-                                                <XAxis dataKey="name" tick={{ fontSize: 10.5, fill: AXIS }} axisLine={false} tickLine={false} />
+                                                <XAxis dataKey="name" tick={{ fontSize: 12, fill: AXIS }} axisLine={false} tickLine={false} />
                                                 {metric === "prize" ? (
-                                                    <YAxis tick={{ fontSize: 10, fill: AXIS }} axisLine={false} tickLine={false} />
+                                                    <YAxis tick={{ fontSize: 12, fill: AXIS }} axisLine={false} tickLine={false} />
                                                 ) : (
-                                                    <YAxis reversed allowDecimals={false} domain={[1, "dataMax"]} tick={{ fontSize: 10, fill: AXIS }} axisLine={false} tickLine={false} />
+                                                    <YAxis reversed allowDecimals={false} domain={[1, "dataMax"]} tick={{ fontSize: 12, fill: AXIS }} axisLine={false} tickLine={false} />
                                                 )}
                                                 <Tooltip
                                                     formatter={(v: any) => (metric === "prize" ? [`${v}${lang === "ko" ? "억" : "00M"}`, t.mPrize] : [rankUnit(Number(v)), metric === "prizeRank" ? t.mPrizeRank : t.mPointRank])}
@@ -433,7 +433,7 @@ export default function HiqPbaPlayer() {
                                                     <Bar dataKey="prize" fill={BRAND} opacity={0.8} radius={[6, 6, 0, 0]} isAnimationActive={false} />
                                                 ) : (
                                                     <Line dataKey={metric} stroke={BRAND} strokeWidth={2.5} dot={{ r: 4, fill: "#fff", stroke: BRAND, strokeWidth: 2.5 }} connectNulls isAnimationActive={false}>
-                                                        <LabelList dataKey={metric} position="top" formatter={(v: any) => (v == null ? "" : rankUnit(Number(v)))} style={{ fontSize: 10.5, fontWeight: 700, fill: BRAND }} />
+                                                        <LabelList dataKey={metric} position="top" formatter={(v: any) => (v == null ? "" : rankUnit(Number(v)))} style={{ fontSize: 12, fontWeight: 700, fill: BRAND }} />
                                                     </Line>
                                                 )}
                                             </ComposedChart>
@@ -443,7 +443,7 @@ export default function HiqPbaPlayer() {
                             )}
                             <table className="w-full mt-2 text-[13px] rk-num">
                                 <thead>
-                                    <tr className="text-[11.5px] text-ink-3 font-semibold">
+                                    <tr className="text-[12px] text-ink-3 font-semibold">
                                         <th className="text-left font-semibold py-2">{t.colSeason}</th>
                                         <th className="text-left font-semibold">{t.colPrizeRank}</th>
                                         <th className="text-left font-semibold">{t.colPoint}</th>
@@ -483,10 +483,10 @@ export default function HiqPbaPlayer() {
                                             className="w-[84px] shrink-0 flex flex-col items-center text-center py-1 active:opacity-80">
                                             <span className="relative">
                                                 <PlayerPhoto memCode={r.memCode} name={nm} size={44} />
-                                                <span className="absolute -left-1.5 -top-1 rk-num text-[10.5px] font-bold bg-surface-1 border border-surface-line rounded-full px-1.5">{r.prizeRank}</span>
+                                                <span className="absolute -left-1.5 -top-1 rk-num text-[12px] font-bold bg-surface-1 border border-surface-line rounded-full px-1.5">{r.prizeRank}</span>
                                             </span>
                                             <span className="mt-1.5 text-[12.5px] font-semibold w-full truncate">{nm}</span>
-                                            <span className="text-[11px] text-ink-4">{flagEmoji(r.nationCode ?? "")}</span>
+                                            <span className="text-[12px] text-ink-4">{flagEmoji(r.nationCode ?? "")}</span>
                                         </a>
                                     );
                                 })}
@@ -530,7 +530,7 @@ export default function HiqPbaPlayer() {
                         </Card>
                     )}
 
-                    <p className="flex items-center gap-1 text-[11.5px] text-ink-4 px-1 pb-2">
+                    <p className="flex items-center gap-1 text-[12px] text-ink-4 px-1 pb-2">
                         <LucideClock className="w-3 h-3 shrink-0" />
                         <span>{x?.updated ? `${fill(t.updated, { d: x.updated.replace(/-/g, ".") })} · ` : ""}{t.source}</span>
                     </p>

@@ -81,12 +81,12 @@ function VsRow({ label, me, pro, meLabel, proLabel, fmt }: { label: string; me: 
         <div className="mt-3 first:mt-0">
             <div className="text-[12.5px] font-semibold text-ink-3">{label}</div>
             <div className="flex items-center gap-2 mt-1.5">
-                <span className={cn("w-12 shrink-0 text-[11.5px] font-semibold truncate", GOLD_TEXT)}>{meLabel}</span>
+                <span className={cn("w-12 shrink-0 text-[12px] font-semibold truncate", GOLD_TEXT)}>{meLabel}</span>
                 {bar(me, GOLD_BAR)}
                 <span className="w-12 shrink-0 text-right rk-num text-[13.5px] font-bold">{me != null ? fmt(me) : "—"}</span>
             </div>
             <div className="flex items-center gap-2 mt-1">
-                <span className="w-12 shrink-0 text-[11.5px] font-semibold text-brand truncate">{proLabel}</span>
+                <span className="w-12 shrink-0 text-[12px] font-semibold text-brand truncate">{proLabel}</span>
                 {bar(pro, "bg-brand")}
                 <span className="w-12 shrink-0 text-right rk-num text-[13.5px] font-bold">{pro != null ? fmt(pro) : "—"}</span>
             </div>
@@ -200,16 +200,16 @@ export function ProCompareCard({ proName, proAvg, proHighRun, proWinRate, exclud
                         <LucideGlobe className="w-5 h-5 shrink-0 opacity-90" />
                         <span className="flex-1 min-w-0">
                             <span className="block text-[13px] font-semibold truncate">{t("compare.umbRank")}</span>
-                            <span className="block text-[11.5px] opacity-80 truncate">{t("compare.umbSub")}</span>
+                            <span className="block text-[12px] opacity-80 truncate">{t("compare.umbSub")}</span>
                         </span>
                         <span className="rk-num text-[26px] font-bold shrink-0 whitespace-nowrap">{fill(t("compare.rankN"), { n: umbRank })}</span>
                     </div>
-                    <div className="self-center text-[11px] font-bold text-ink-4 leading-none py-0.5">VS</div>
+                    <div className="self-center text-[12px] font-bold text-ink-4 leading-none py-0.5">VS</div>
                     <div className="flex items-center gap-3 rounded-tile bg-[#F5B721]/15 px-3.5 py-3">
                         <LucideUser className={cn("w-5 h-5 shrink-0", GOLD_TEXT)} />
                         <span className="flex-1 min-w-0">
                             <span className="block text-[13px] font-semibold text-ink-1 truncate">{stats ? t("compare.myRankue") : t("compare.yourRankue")}</span>
-                            <span className={cn("block text-[11.5px] leading-snug break-keep", GOLD_TEXT)}>{mine ? fill(t("compare.ofMembers"), { total: mine.total.toLocaleString(), n: mine.topPct }) : "—"}</span>
+                            <span className={cn("block text-[12px] leading-snug break-keep", GOLD_TEXT)}>{mine ? fill(t("compare.ofMembers"), { total: mine.total.toLocaleString(), n: mine.topPct }) : "—"}</span>
                         </span>
                         <span className="rk-num text-[26px] font-bold text-ink-1 shrink-0 whitespace-nowrap">{mine ? fill(t("compare.rankN"), { n: mine.rank.toLocaleString() }) : "—"}</span>
                     </div>
@@ -329,7 +329,7 @@ function AvgInput({ value, text, onSlider, onText }: { value: number; text: stri
                     className="w-[84px] h-11 rounded-[10px] border-[1.5px] border-brand bg-surface-1 text-center rk-num text-[17px] font-bold outline-none focus:ring-2 focus:ring-brand/30"
                 />
             </div>
-            <div className="flex justify-between text-[11px] text-ink-4 -mt-1 pr-[96px]"><span>{COMPARE_AVG_MIN}</span><span>1.0</span><span>2.0</span></div>
+            <div className="flex justify-between text-[12px] text-ink-4 -mt-1 pr-[96px]"><span>{COMPARE_AVG_MIN}</span><span>1.0</span><span>2.0</span></div>
             <p className="sr-only">{fill(t("compare.inputRange"), { min: COMPARE_AVG_MIN, max: COMPARE_AVG_MAX })}</p>
         </div>
     );
