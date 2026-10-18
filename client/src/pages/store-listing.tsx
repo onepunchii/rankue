@@ -338,7 +338,7 @@ export default function StoreListingPage() {
               <div className="absolute inset-x-5 bottom-4">
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-[26px] font-bold tracking-tight text-[#FFFFFF]">{s.name}</h1>
-                  <span className={`px-2 py-1 rounded-full text-[11px] font-bold leading-none ${s.claimed ? "bg-[#FFFFFF] text-brand" : "bg-[#FFFFFF2E] text-[#FFFFFFE6]"}`}>
+                  <span className={`px-2 py-1 rounded-full text-[12px] font-bold leading-none ${s.claimed ? "bg-[#FFFFFF] text-brand" : "bg-[#FFFFFF2E] text-[#FFFFFFE6]"}`}>
                     {s.claimed ? t.verified : t.unverified}
                   </span>
                 </div>
@@ -373,7 +373,7 @@ export default function StoreListingPage() {
                 className={`h-[52px] rounded-2xl flex flex-col items-center justify-center gap-1 transition-colors ${s.phone ? "bg-brand text-white active:bg-brand/90" : "bg-black/[0.04] text-black/25 pointer-events-none"}`}
               >
                 <LucidePhone className="w-[18px] h-[18px]" />
-                <span className="text-[11.5px] font-bold leading-none">{t.callCta}</span>
+                <span className="text-[12px] font-bold leading-none">{t.callCta}</span>
               </a>
               <a
                 href={mapLink(s)}
@@ -382,14 +382,14 @@ export default function StoreListingPage() {
                 className="h-[52px] rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center gap-1 active:bg-black/[0.02] transition-colors"
               >
                 <LucideMapPin className="w-[18px] h-[18px] text-brand" />
-                <span className="text-[11.5px] font-bold leading-none">{t.directionsCta}</span>
+                <span className="text-[12px] font-bold leading-none">{t.directionsCta}</span>
               </a>
               <button
                 onClick={handleShare}
                 className="h-[52px] rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)] flex flex-col items-center justify-center gap-1 active:bg-black/[0.02] transition-colors"
               >
                 <LucideShare2 className="w-[18px] h-[18px] text-brand" />
-                <span className="text-[11.5px] font-bold leading-none">{t.shareCta}</span>
+                <span className="text-[12px] font-bold leading-none">{t.shareCta}</span>
               </button>
             </div>
 
@@ -398,26 +398,26 @@ export default function StoreListingPage() {
 
             <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-3 mb-4">
               <div>
-                <p className="text-[11.5px] font-bold text-black/40">{t.address}</p>
+                <p className="text-[12px] font-bold text-black/55">{t.address}</p>
                 <a href={mapLink(s)} target="_blank" rel="noopener noreferrer" className="text-[14.5px] font-medium mt-0.5 block hover:text-brand transition-colors">
                   {s.address}
                 </a>
               </div>
               {s.phone && (
                 <div>
-                  <p className="text-[11.5px] font-bold text-black/40">{t.phone}</p>
+                  <p className="text-[12px] font-bold text-black/55">{t.phone}</p>
                   <a href={`tel:${s.phone}`} className="text-[14.5px] font-semibold text-brand mt-0.5 inline-block">{s.phone}</a>
                 </div>
               )}
               {s.openHours && (
                 <div>
-                  <p className="text-[11.5px] font-bold text-black/40">{t.hours}</p>
+                  <p className="text-[12px] font-bold text-black/55">{t.hours}</p>
                   <p className="text-[14.5px] font-medium mt-0.5 tabular-nums">{s.openHours}</p>
                 </div>
               )}
               {tableRows.length > 0 && (
                 <div>
-                  <p className="text-[11.5px] font-bold text-black/40">{t.tables}</p>
+                  <p className="text-[12px] font-bold text-black/55">{t.tables}</p>
                   <div className="flex gap-2 mt-1.5">
                     {tableRows.map(([label, n]) => (
                       <span key={label} className="px-2.5 py-1.5 rounded-xl bg-black/[0.04] text-[13px] font-semibold tabular-nums">{label} {n}</span>
@@ -427,11 +427,11 @@ export default function StoreListingPage() {
               )}
               {rateRows.length > 0 && (
                 <div>
-                  <p className="text-[11.5px] font-bold text-black/40">{t.rates}</p>
+                  <p className="text-[12px] font-bold text-black/55">{t.rates}</p>
                   {/* 요금표 — 예전에는 "10분당 1,700원 · 정액 10,000원"이 한 줄에 붙어 있어
                       대대/중대 간 금액 비교가 안 됐다. 열을 나누면 세로로 바로 비교된다. */}
                   <div className="mt-2 rounded-xl border border-black/[0.06] overflow-hidden">
-                    <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-2 bg-black/[0.02] text-[11px] font-bold text-black/40">
+                    <div className="grid grid-cols-[1fr_auto_auto] gap-x-3 px-3 py-2 bg-black/[0.02] text-[12px] font-bold text-black/55">
                       <span />
                       <span className="text-right w-[74px]">{t.per10}</span>
                       <span className="text-right w-[74px]">{t.flat}</span>
@@ -459,14 +459,14 @@ export default function StoreListingPage() {
 
             {/* 명예의 전당 — 데이터가 있으면 왕관, 없으면 빈 왕좌 초대장 */}
             <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-4">
-              <p className="text-[11.5px] font-bold text-black/40 mb-2.5">{t.honorTitle}</p>
+              <p className="text-[12px] font-bold text-black/55 mb-2.5">{t.honorTitle}</p>
               {s.honor && (s.honor.founder || s.honor.regular) ? (
                 <div className="space-y-2">
                   {s.honor.founder && (
                     <div className="flex items-center gap-3 py-2 px-2.5 rounded-xl bg-[#cba258]/10">
                       <span className="text-[20px] leading-none">👑</span>
                       <div className="min-w-0">
-                        <p className="text-[11px] font-bold text-[#8a6a2a]">{t.founder}</p>
+                        <p className="text-[12px] font-bold text-[#8a6a2a]">{t.founder}</p>
                         <p className="text-[14.5px] font-bold text-ink-1 truncate">{s.honor.founder}</p>
                       </div>
                     </div>
@@ -475,7 +475,7 @@ export default function StoreListingPage() {
                     <div className="flex items-center gap-3 py-2 px-2.5 rounded-xl bg-brand/[0.06]">
                       <span className="text-[20px] leading-none">🏆</span>
                       <div className="min-w-0 flex-1">
-                        <p className="text-[11px] font-bold text-brand/70">{t.regular}</p>
+                        <p className="text-[12px] font-bold text-brand/70">{t.regular}</p>
                         <p className="text-[14.5px] font-bold text-ink-1 truncate">{s.honor.regular.name}</p>
                       </div>
                       <span className="text-[12px] font-semibold text-black/45 tabular-nums shrink-0">{s.honor.regular.games}{t.regularGames}</span>
@@ -495,7 +495,7 @@ export default function StoreListingPage() {
             {/* 활동 크루 — 매장 페이지를 살아있는 프로필로 만드는 섹션 */}
             {(s.crews?.length ?? 0) > 0 && (
               <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-4">
-                <p className="text-[11.5px] font-bold text-black/40 mb-2.5">{t.crewsTitle}</p>
+                <p className="text-[12px] font-bold text-black/55 mb-2.5">{t.crewsTitle}</p>
                 <div className="space-y-2">
                   {s.crews!.map((c) => {
                     // 엠블럼은 업로드 이미지 URL — 텍스트로 뿌리면 URL 이 그대로 찍혀 레이아웃을

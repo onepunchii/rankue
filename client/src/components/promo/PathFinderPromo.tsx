@@ -179,13 +179,13 @@ export function PathFinderPromo({ src, name, className }: { src: PromoSrc; name?
                     </svg>
                 </div>
                 <div className="p-4 pt-3.5">
-                    <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand/10 text-brand text-[11.5px] font-bold max-w-full truncate">🎱 {eyebrow}</span>
+                    <span className="inline-flex items-center h-6 px-2.5 rounded-full bg-brand/10 text-brand text-[12px] font-bold max-w-full truncate">🎱 {eyebrow}</span>
                     <h3 className="mt-2 text-[18px] font-bold leading-snug text-ink-1 break-keep">{t("promo.path.title")}</h3>
                     <p className="mt-1 text-[13px] leading-relaxed text-ink-3 break-keep">{t("promo.path.sub")}</p>
                     <span className="mt-3.5 flex items-center justify-center gap-1 h-11 rounded-full bg-brand text-brand-fg text-[14.5px] font-bold">
                         {t("promo.path.cta")}<LucideChevronRight className="w-4 h-4" />
                     </span>
-                    <span className="block mt-2 text-center text-[11.5px] text-ink-4">{member ? t("promo.path.memberNote") : t("promo.path.guestNote")}</span>
+                    <span className="block mt-2 text-center text-[12px] text-ink-4">{member ? t("promo.path.memberNote") : t("promo.path.guestNote")}</span>
                 </div>
             </button>
         </section>

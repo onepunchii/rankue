@@ -216,7 +216,7 @@ export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
     const spots = spreadBalls(shown.map((n) => xy(n.lat!, n.lng!)), ry, { x: 0, y: 0, r: ry * 1.15 }, { hw: 2 * R - ry * 1.3, hh: R - ry * 1.3 });
     return (
         <div className="mb-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]" data-testid="store-near">
-            <p className="mb-2.5 text-[11.5px] font-bold text-black/40">{copy.title}</p>
+            <p className="mb-2.5 text-[12px] font-bold text-black/55">{copy.title}</p>
             <Table portrait={false} rail={9}>
                 <div className="relative" style={{ aspectRatio: "2 / 1" }}>
                     <svg viewBox={`${-2 * R} ${-R} ${4 * R} ${2 * R}`} className="block h-full w-full" role="img" aria-label={`${copy.here} · ${copy.near} ${near.length}`}>
