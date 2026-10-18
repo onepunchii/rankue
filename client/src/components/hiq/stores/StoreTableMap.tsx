@@ -9,11 +9,12 @@
  * 윤곽선 자료는 출처 기록이 없어 **화면에만** 쓴다(golf/lib/koreaOutline 머리말 — 서버가 그리는 카드에는 싣지 않는다).
  * 점은 지어내지 않는다 — 받은 것이 없으면 지도 대신 아무것도 그리지 않는다(빈 당구대를 '0곳'처럼 보이게 두지 않는다).
  */
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { KOREA_MAP_PATHS } from "@/golf/data/koreaMapData";
 import { latLngToOutline } from "@/golf/lib/koreaOutline";
 import { NICE_KM, OUTLINE_TO_STORE_REGION, nearDistText, nearViewKm, spreadBalls, storeRegionCounts, unpackStoreDots, type StoreDot } from "@shared/storeDots";
+import { nearRateCompare, rate10Ok, rateLanes, ratePos, rateVerdict, type NearRateCompare } from "@shared/storeNearRates";
 
 export const STORE_DOTS_KEY = ["/api/hiq/listings/dots"] as const;
 export function useStoreDots() {
@@ -192,12 +193,23 @@ export function StoreTableBanner({ onOpen, copy }: { onOpen: () => void; copy: {
  * 이 매장 = 빨간 공, 가까운 다섯 곳 = 번호 붙은 노란 공(아래 목록의 번호와 같다), 판 안의 그 밖 매장 = 상아색 공.
  * 판의 크기는 다섯째 곳까지 들어가게(1.2 ~ 30km). 윤곽선은 그리지 않는다 — 이 크기에서는 시도 경계가 뜻이 없다. 거리는 직선이다.
  * 자리 셈은 그 자리의 평면 어림(경도 1° = 111.32km · cos 위도, 위도 1° = 110.57km) — 30km 안에서는 충분히 맞다. */
-export interface NearStore { code: string; name: string; address: string; distanceKm: number | null; lat?: number | null; lng?: number | null }
+export interface NearStore { code: string; name: string; address: string; distanceKm: number | null; lat?: number | null; lng?: number | null; rate10Large?: number | null; rate10Medium?: number | null }
 
-export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
+/** 10분 요금 견주기 문구 — 매장 상세가 5개 언어로 넘긴다 */
+export interface NearRateCopy {
+    title: string; large: string; medium: string; avg: string; note: string; same: string;
+    lower: (amount: string) => string; higher: (amount: string) => string;
+    range: (count: number, lo: string, hi: string) => string;
+    won: (n: number) => string;
+}
+
+export function StoreNearTable({ code, lat, lng, onOpen, copy, mine, rates }: {
     code: string; lat: number; lng: number;
     onOpen: (code: string) => void;
     copy: { title: string; here: string; near: string; note: string; within50: string };
+    /** 이 매장의 10분 요금 — 있으면 큐대 위에 빨간 공으로 */
+    mine?: { large: number | null; medium: number | null };
+    rates?: NearRateCopy;
 }) {
     const km = (n: number) => nearDistText(n, copy.within50);
     const key = `/api/hiq/listings?lat=${lat.toFixed(5)}&lng=${lng.toFixed(5)}&limit=6`;
@@ -261,13 +273,117 @@ export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
                                 <span className="block truncate text-[14.5px] font-bold text-ink-1">{n.name}</span>
                                 <span className="mt-0.5 block truncate text-[12px] text-black/55">{n.address}</span>
                             </span>
-                            <span className="shrink-0 text-[13px] font-bold tabular-nums text-brand">{km(n.distanceKm!)}</span>
+                            <span className="flex shrink-0 flex-col items-end">
+                                <span className="text-[13px] font-bold tabular-nums text-brand">{km(n.distanceKm!)}</span>
+                                {rates && rowRate(n, rates) && <span className="mt-0.5 text-[12px] tabular-nums text-black/50" data-testid="store-near-rate">{rowRate(n, rates)}</span>}
+                            </span>
                             <span className="shrink-0 text-[16px] text-black/25" aria-hidden>›</span>
                         </button>
                     </li>
                 ))}
             </ol>
             <p className="mt-1 text-[12px] text-black/40">{copy.note}</p>
+            {rates && <NearRates near={near} mine={mine} copy={rates} />}
+        </div>
+    );
+}
+
+/** 목록 줄의 요금 — 대대가 있으면 대대, 없으면 중대(믿을 만한 값만) */
+function rowRate(n: NearStore, c: NearRateCopy): string | null {
+    if (rate10Ok(n.rate10Large)) return `${c.large} ${c.won(n.rate10Large)}`;
+    if (rate10Ok(n.rate10Medium)) return `${c.medium} ${c.won(n.rate10Medium)}`;
+    return null;
+}
+
+/** 10분 요금 견주기(2026-10-18) — 대대 · 중대 각각, 근처 값이 모자라면 그 줄은 없다 */
+function NearRates({ near, mine, copy }: { near: NearStore[]; mine?: { large: number | null; medium: number | null }; copy: NearRateCopy }) {
+    const rows = [
+        { label: copy.large, c: nearRateCompare(mine?.large, near.map((n) => n.rate10Large)) },
+        { label: copy.medium, c: nearRateCompare(mine?.medium, near.map((n) => n.rate10Medium)) },
+    ].filter((r): r is { label: string; c: NearRateCompare } => r.c != null);
+    if (!rows.length) return null;
+    return (
+        <div className="mt-4 border-t border-black/[0.06] pt-3.5" data-testid="store-near-rates">
+            <p className="mb-1 text-[12px] font-bold text-black/55">{copy.title}</p>
+            <div className="space-y-4">
+                {rows.map((r) => <RateCue key={r.label} label={r.label} c={r.c} copy={copy} />)}
+            </div>
+            <p className="mt-3 text-[12px] text-black/40">{copy.note}</p>
+        </div>
+    );
+}
+
+const BALL = 22, MINE_BALL = 26, CUE_H = 9, AVG_ROOM = 18;
+const YELLOW_BALL = "radial-gradient(circle at 35% 30%, #FFF4C2 0%, #F4C542 46%, #B8890F 100%)";
+const RED_BALL = "radial-gradient(circle at 35% 30%, #FFB4A8 0%, #D8352A 46%, #8C1810 100%)";
+/** 큐대 — 왼쪽 손잡이(굵게)에서 오른쪽 팁(가늘게)으로. 끝에 흰 페룰과 파란 초크 */
+const CUE = "linear-gradient(90deg, #2C1A0D 0%, #4A2E17 17%, #6B4424 17.5%, #B5844E 58%, #E0BC86 94%, #F3EAD6 94%, #F3EAD6 98.4%, #3D6FB5 98.4%)";
+
+/** 큐대 눈금 하나 — 왼쪽이 싸고 오른쪽이 비싸다(양 끝 글은 눈금 끝 — 최소 600원 폭). 노란 번호 공 = 목록의 번호, 빨간 공 = 이 매장, 점선 = 근처 평균 */
+function RateCue({ label, c, copy }: { label: string; c: NearRateCompare; copy: NearRateCopy }) {
+    const ref = useRef<HTMLDivElement>(null);
+    const [w, setW] = useState(320);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el || typeof ResizeObserver === "undefined") return;
+        const ro = new ResizeObserver(([e]) => { if (e?.contentRect.width) setW(e.contentRect.width); });
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+    // 이 매장을 맨 먼저 — 늘 큐대 바로 위 층
+    const items = [
+        ...(c.mine != null ? [{ key: "mine", v: c.mine, i: -1 }] : []),
+        ...c.points.map((p) => ({ key: `n${p.i}`, v: p.v, i: p.i })),
+    ];
+    const pos = items.map((it) => ratePos(it.v, c.from, c.to));
+    const gap = ((BALL + 2) / Math.max(w, 160)) * 100;
+    const lanes = rateLanes(pos, gap);
+    const size = items.map((it) => (it.i < 0 ? MINE_BALL : BALL));
+    // 아래층부터 쌓는다 — 바로 밑에 겹치는 공(빨간 공은 더 크다)의 꼭대기에 살짝 얹는다
+    const bottom: number[] = [];
+    for (const k of items.map((_, k) => k).sort((a, b) => lanes[a] - lanes[b])) {
+        bottom[k] = items.reduce((b, _, j) => (lanes[j] < lanes[k] && Math.abs(pos[j] - pos[k]) < gap ? Math.max(b, bottom[j] + size[j] - 3) : b), CUE_H - 1);
+    }
+    const h = AVG_ROOM + Math.max(...items.map((_, k) => bottom[k] + size[k]));
+    const avgAt = ratePos(c.avg, c.from, c.to);
+    const v = c.diff != null ? rateVerdict(c.diff) : null;
+    const amount = c.diff != null ? copy.won(Math.abs(c.diff)) : "";
+    const headline = v == null ? copy.range(c.points.length, copy.won(c.lo), copy.won(c.hi))
+        : v === "same" ? copy.same : v === "lower" ? copy.lower(amount) : copy.higher(amount);
+    return (
+        <div data-testid="store-near-rate-cue">
+            <div className="flex items-baseline justify-between gap-2">
+                <p className="min-w-0 text-[13.5px] font-semibold leading-snug text-ink-1 break-keep">
+                    <span className="mr-1.5 inline-block rounded-md bg-black/[0.05] px-1.5 py-0.5 text-[12px] font-bold text-black/60">{label}</span>
+                    {headline}
+                </p>
+                <span className="shrink-0 text-[12px] tabular-nums text-black/50">{copy.avg} {copy.won(c.avg)}</span>
+            </div>
+            <div ref={ref} className="relative mt-1.5" style={{ height: h }} role="img" aria-label={`${label} — ${headline}. ${copy.avg} ${copy.won(c.avg)}`}>
+                {/* 근처 평균 — 점선과 이름표(양 끝에서는 안쪽으로 붙인다) */}
+                <span className="absolute w-0 border-l border-dashed border-[#3D6FB5]/70" style={{ left: `${avgAt}%`, top: AVG_ROOM - 2, bottom: CUE_H }} aria-hidden />
+                <span className="absolute top-0 whitespace-nowrap text-[12px] font-semibold leading-none text-[#3D6FB5]" aria-hidden
+                    style={{ left: `${Math.min(Math.max(avgAt, 9), 91)}%`, transform: "translateX(-50%)" }}>{copy.avg}</span>
+                {/* 공 — 번호가 큰 것부터 그려 작은 번호가 위에, 이 매장은 맨 위 */}
+                {items.map((it, k) => ({ it, k })).reverse().sort((a, b) => (a.it.i < 0 ? 1 : 0) - (b.it.i < 0 ? 1 : 0)).map(({ it, k }) => {
+                    const mineBall = it.i < 0;
+                    return (
+                        <span key={it.key} aria-hidden
+                            className="absolute flex items-center justify-center rounded-full text-[12px] font-bold leading-none tabular-nums"
+                            style={{
+                                width: size[k], height: size[k], left: `calc(${pos[k]}% - ${size[k] / 2}px)`, bottom: bottom[k],
+                                background: mineBall ? RED_BALL : YELLOW_BALL, color: "#3A2A04",
+                                boxShadow: mineBall ? "0 2px 4px #00000052, 0 0 0 2px #fff" : "0 2px 3px #00000040, inset 0 0 0 1px #7A5A0855",
+                            }}>
+                            {mineBall ? null : it.i + 1}
+                        </span>
+                    );
+                })}
+                <span className="absolute inset-x-0 bottom-0 block rounded-l-sm" style={{ height: CUE_H, background: CUE, clipPath: "polygon(0 0, 100% 28%, 100% 72%, 0 100%)" }} aria-hidden />
+            </div>
+            <div className="mt-1 flex justify-between text-[12px] tabular-nums text-black/50" aria-hidden>
+                <span>{copy.won(c.from)}</span><span>{copy.won(c.to)}</span>
+            </div>
         </div>
     );
 }

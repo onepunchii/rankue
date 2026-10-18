@@ -40,6 +40,7 @@ const L: Record<Locale, Record<string, string>> = {
     emptyThrone: "이 매장의 왕좌가 비어 있습니다", emptyThroneDesc: "랭큐 점수판으로 이 매장의 첫 경기를 기록한 사람이 초대 대장이 됩니다.",
     descEmpty: "사장님 인증 후 매장 소개가 표시됩니다.",
     nearTitle: "이 근처 당구장", nearHere: "이 매장", nearNear: "가까운 다섯 곳", nearOthers: "그 밖의 당구장", nearNote: "직선 거리예요. 길로 가면 더 멀어요.", nearWithin50: "50m 안",
+    rateCmpTitle: "10분 요금 견주기", rateAvg: "근처 평균", rateSame: "근처 평균과 비슷해요", rateLower: "근처 평균보다 {n} 낮아요", rateHigher: "근처 평균보다 {n} 높아요", rateRange: "가까운 {count}곳은 {lo} ~ {hi}", rateNote: "모은 정보로 견줬어요. 실제 요금은 매장에 물어보세요.",
     claimCta: "사장님이신가요? 내 매장 정보 관리 신청",
     claimTitle: "내 매장 관리 신청",
     claimDesc: "확인 후 연락드리고, 승인되면 영업시간·소개 등을 직접 수정할 수 있습니다.",
@@ -67,6 +68,7 @@ const L: Record<Locale, Record<string, string>> = {
     emptyThrone: "This venue's throne is empty", emptyThroneDesc: "The first player to record a game here on RANKUE becomes the founding champion.",
     descEmpty: "The owner's introduction will appear after verification.",
     nearTitle: "Halls nearby", nearHere: "This hall", nearNear: "5 nearest", nearOthers: "Other halls", nearNote: "Straight-line distance; by road it is farther.", nearWithin50: "<50 m",
+    rateCmpTitle: "10-min rates compared", rateAvg: "Nearby avg", rateSame: "About the nearby average", rateLower: "{n} below the nearby average", rateHigher: "{n} above the nearby average", rateRange: "{count} nearby: {lo} – {hi}", rateNote: "Based on collected info; ask the hall for current rates.",
     claimCta: "Own this hall? Claim your listing",
     claimTitle: "Claim this listing",
     claimDesc: "We'll contact you to verify. Once approved you can edit hours, intro and more.",
@@ -94,6 +96,7 @@ const L: Record<Locale, Record<string, string>> = {
     emptyThrone: "Ngai vàng của quán còn trống", emptyThroneDesc: "Người đầu tiên ghi trận đấu tại đây trên RANKUE sẽ trở thành nhà vô địch khai quán.",
     descEmpty: "Phần giới thiệu sẽ hiển thị sau khi chủ quán xác nhận.",
     nearTitle: "Quán bi-a gần đây", nearHere: "Quán này", nearNear: "5 quán gần nhất", nearOthers: "Quán khác", nearNote: "Khoảng cách đường thẳng; đi đường sẽ xa hơn.", nearWithin50: "<50 m",
+    rateCmpTitle: "So sánh giá 10 phút", rateAvg: "TB gần đây", rateSame: "Gần bằng mức trung bình gần đây", rateLower: "Thấp hơn TB gần đây {n}", rateHigher: "Cao hơn TB gần đây {n}", rateRange: "{count} quán gần: {lo} – {hi}", rateNote: "Dựa trên thông tin thu thập; hãy hỏi quán giá hiện tại.",
     claimCta: "Bạn là chủ quán? Nhận quản lý trang này",
     claimTitle: "Nhận quản lý trang",
     claimDesc: "Chúng tôi sẽ liên hệ xác minh. Sau khi duyệt, bạn có thể tự sửa thông tin.",
@@ -121,6 +124,7 @@ const L: Record<Locale, Record<string, string>> = {
     emptyThrone: "Bu salonun tahtı boş", emptyThroneDesc: "RANKUE ile burada ilk maçı kaydeden kişi kurucu şampiyon olur.",
     descEmpty: "Sahibi doğrulandıktan sonra tanıtım burada görünecek.",
     nearTitle: "Yakındaki salonlar", nearHere: "Bu salon", nearNear: "En yakın 5", nearOthers: "Diğer salonlar", nearNote: "Kuş uçuşu mesafe; yolla daha uzak.", nearWithin50: "<50 m",
+    rateCmpTitle: "10 dk ücret karşılaştırması", rateAvg: "Yakın ort.", rateSame: "Yakındaki ortalamayla benzer", rateLower: "Yakındaki ortalamadan {n} düşük", rateHigher: "Yakındaki ortalamadan {n} yüksek", rateRange: "Yakındaki {count} salon: {lo} – {hi}", rateNote: "Toplanan bilgilere dayanır; güncel ücreti salona sorun.",
     claimCta: "Salon sizin mi? Kaydınızı sahiplenin",
     claimTitle: "Kaydı sahiplen",
     claimDesc: "Doğrulama için sizinle iletişime geçeceğiz. Onay sonrası bilgileri düzenleyebilirsiniz.",
@@ -148,6 +152,7 @@ const L: Record<Locale, Record<string, string>> = {
     emptyThrone: "El trono de este local está vacío", emptyThroneDesc: "El primero en registrar una partida aquí con RANKUE será el campeón fundador.",
     descEmpty: "La presentación aparecerá tras la verificación del propietario.",
     nearTitle: "Salones cercanos", nearHere: "Este salón", nearNear: "5 más cercanos", nearOthers: "Otros salones", nearNote: "Distancia en línea recta; por carretera es más.", nearWithin50: "<50 m",
+    rateCmpTitle: "Tarifas de 10 min comparadas", rateAvg: "Media cercana", rateSame: "Similar a la media cercana", rateLower: "{n} menos que la media cercana", rateHigher: "{n} más que la media cercana", rateRange: "{count} cercanos: {lo} – {hi}", rateNote: "Según datos recopilados; consulta la tarifa actual en el salón.",
     claimCta: "¿Es tu local? Reclama tu ficha",
     claimTitle: "Reclamar ficha",
     claimDesc: "Te contactaremos para verificar. Tras la aprobación podrás editar la información.",
@@ -454,6 +459,13 @@ export default function StoreListingPage() {
                 code={s.code} lat={Number(s.latitude)} lng={Number(s.longitude)}
                 onOpen={(c) => { setLocation(`/stores/${c}`); try { window.scrollTo(0, 0); } catch { /* 스크롤 못 하는 환경 */ } }}
                 copy={{ title: t.nearTitle, here: t.nearHere, near: t.nearNear, note: t.nearNote, within50: t.nearWithin50 }}
+                mine={{ large: s.rate10Large, medium: s.rate10Medium }}
+                rates={{
+                  title: t.rateCmpTitle, large: t.large, medium: t.medium, avg: t.rateAvg, note: t.rateNote, same: t.rateSame,
+                  lower: (n) => t.rateLower.replace("{n}", n), higher: (n) => t.rateHigher.replace("{n}", n),
+                  range: (count, lo, hi) => t.rateRange.replace("{count}", String(count)).replace("{lo}", lo).replace("{hi}", hi),
+                  won,
+                }}
               />
             )}
 

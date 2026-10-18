@@ -3,6 +3,7 @@ import { storage } from "./storage/index.js";
 import { db } from "./db.js";
 import { cleanInviteCode } from "../shared/invite.js";
 import { storeListings } from "../shared/schema.js";
+import { nearRateCompare } from "../shared/storeNearRates.js";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../shared/aboutContent.js";
 import { DOC_META } from "../shared/docMeta.js";
@@ -2696,7 +2697,7 @@ ${list}
         .from(hiqCrews).where(eq(hiqCrews.baseListingCode, s.code)).limit(10);
     } catch { /* 크루 조회 실패는 본문 축소로만 — 페이지는 나간다 */ }
     // 같은 지역 당구장 6곳 — 좌표가 있으면 가까운 순, 없으면 이름순. 상세끼리 이어지는 내부 링크(크롤 경로).
-    let nearby: { code: string; name: string; address: string }[] = [];
+    let nearby: { code: string; name: string; address: string; rate10Large: number | null; rate10Medium: number | null }[] = [];
     try {
       const dist = s.latitude != null && s.longitude != null
         ? sql`CASE WHEN ${storeListings.latitude} IS NULL THEN 1e9 ELSE
@@ -2704,7 +2705,7 @@ ${list}
             cos(radians(${storeListings.longitude}) - radians(${s.longitude})) +
             sin(radians(${s.latitude})) * sin(radians(${storeListings.latitude}))))) END`
         : sql`0`;
-      nearby = await db.select({ code: storeListings.code, name: storeListings.name, address: storeListings.address })
+      nearby = await db.select({ code: storeListings.code, name: storeListings.name, address: storeListings.address, rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium })
         .from(storeListings)
         .where(and(eq(storeListings.region, s.region), ne(storeListings.code, s.code)))
         .orderBy(dist, asc(storeListings.name)).limit(6);
@@ -2720,6 +2721,12 @@ ${list}
     const rates = ([["대대", s.rate10Large, s.flatLarge], ["중대", s.rate10Medium, s.flatMedium], ["포켓", s.rate10Pocket, s.flatPocket]] as const)
       .filter(([, r, f]) => r != null || f != null)
       .map(([label, r, f]) => `${label} ${[r != null ? `10분당 ${won(r)}` : "", f != null ? `정액 ${won(f)}` : ""].filter(Boolean).join(" · ")}`);
+    // 이 근처 10분 요금(2026-10-18) — 화면의 '10분 요금 견주기'와 같은 규칙(shared/storeNearRates — 시간당 요금이 섞인 값은 뺀다). 가까운 다섯 곳
+    const near5 = nearby.slice(0, 5);
+    const rateCmp = ([["대대", s.rate10Large, near5.map((n) => n.rate10Large)], ["중대", s.rate10Medium, near5.map((n) => n.rate10Medium)]] as const)
+      .map(([label, mine, near]) => ({ label, c: nearRateCompare(mine, near) }))
+      .filter((r) => r.c != null)
+      .map(({ label, c }) => `${label} — 가까운 ${c!.points.length}곳 ${won(Math.min(...c!.points.map((p) => p.v)))}~${won(Math.max(...c!.points.map((p) => p.v)))}, 평균 ${won(c!.avg)}${c!.mine != null ? ` · 이 매장 ${won(c!.mine)}` : ""}`);
     res.setHeader("X-Prerender", "store-listing");
     noStore(res);
     res.send(
@@ -2756,6 +2763,7 @@ ${list}
     ${tables.length ? `<dt>테이블</dt><dd>${esc(tables.join(" · "))}</dd>` : ""}
     ${rates.length ? `<dt>요금</dt><dd>${esc(rates.join(", "))}</dd>` : ""}
   </dl>
+  ${rateCmp.length ? `<h2>이 근처 10분 요금</h2><ul>${rateCmp.map((l) => `<li>${esc(l)}</li>`).join("")}</ul><p>모은 정보로 견줬어요. 실제 요금은 매장에 물어보세요.</p>` : ""}
   ${crews.length ? `<h2>이 매장에서 활동하는 크루</h2><ul>${crews.map((c) => `<li><a href="/club/${esc(c.id)}">${esc(c.name)}</a></li>`).join("")}</ul>` : ""}
   ${nearby.length ? `<h2>${esc(s.region)}의 다른 당구장</h2><ul>${nearby.map((n) => `<li><a href="/stores/${esc(n.code)}">${esc(n.name)}</a> — ${esc(n.address)}</li>`).join("")}</ul>${cardGallery(`${s.region}의 다른 당구장`, nearby.map((n) => ({ href: `/stores/${n.code}`, img: storeCardUrl(ORIGIN, n.code), name: n.name, alt: cardAlt(n.name, "당구장") })))}<p><a href="${esc(regionHref)}">${esc(s.region)} 당구장 전체 보기</a></p>` : ""}
   ${hubNav("ko")}
