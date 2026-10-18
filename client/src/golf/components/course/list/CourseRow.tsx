@@ -58,7 +58,7 @@ export function CourseRow({ c, km, myWatch }: { c: CourseListItem; km: number | 
                 <CourseLogo logo={c.logo} name={c.name} size="sm" />
                 <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-[16px] font-semibold tracking-tight text-[#FFFFFF] truncate">{c.name}</span>
+                        <span className="min-w-0 text-[16px] font-semibold tracking-tight text-[#FFFFFF] line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere]">{c.name}</span>
                         {live && <span className="w-1.5 h-1.5 rounded-full bg-[#64DD17] shrink-0" aria-label="지금 티타임" />}
                     </span>
                     {/* 어디 · 얼마 · 몇 홀 · 거리, 특징은 덩어리 사이에서만 줄바꿈(2026-10-17 리뷰 — 오른쪽 회원권 시세에 밀려 "용인 · 19.9만원~ · …" 로 홀 수가 잘렸다) */}

@@ -241,7 +241,7 @@ export function PageHeader({ title, sub, onBack, backLabel, shareUrl, shareTitle
             </motion.button>
             <div className="min-w-0">
                 <h1 className="text-[22px] font-bold tracking-tight text-ink-1 leading-tight line-clamp-2">{title}</h1>
-                {sub && <p className="text-[13px] font-medium text-ink-3 mt-1 truncate">{sub}</p>}
+                {sub && <p className="text-[13px] font-medium text-ink-3 mt-1 leading-snug break-keep">{sub}</p>}
             </div>
             {shareUrl && <ShareButton className="ml-auto shrink-0" url={`${ORIGIN}${shareUrl}`} title={shareTitle} />}
         </div>

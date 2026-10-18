@@ -269,8 +269,8 @@ export default function HiqPba() {
                                     )}
                                     <span className="text-[16px] leading-none shrink-0">{flagEmoji(r.nationCode ?? "") || "🏳️"}</span>
                                     <div className="min-w-0">
-                                        <span className="block text-[15.5px] font-semibold line-clamp-2 leading-snug [overflow-wrap:anywhere]">{r.nameKo}</span>
-                                        {r.nameEn && <span className="block text-[12px] font-medium text-black/55 line-clamp-2 leading-snug [overflow-wrap:anywhere]">{r.nameEn}</span>}
+                                        <span className="block text-[15.5px] font-semibold line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere]">{r.nameKo}</span>
+                                        {r.nameEn && <span className="block text-[12px] font-medium text-black/55 line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere]">{r.nameEn}</span>}
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0 ml-3">

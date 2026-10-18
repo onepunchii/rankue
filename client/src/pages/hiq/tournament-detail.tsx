@@ -165,7 +165,7 @@ function SeasonRow({ t, today }: { t: PbaTourRow; today: string }) {
                     {status !== "finished" && <StatusChip status={status} days={daysUntil(today, t.startDate)} L={L} />}
                 </div>
                 <p className="text-[14px] font-semibold text-ink-1 leading-snug line-clamp-2">{tourTitleOf(t, locale)}</p>
-                <p className="text-[12px] font-medium text-ink-3 mt-0.5 truncate tabular-nums">
+                <p className="text-[12px] font-medium text-ink-3 mt-0.5 tabular-nums leading-snug break-keep">
                     {rangeLabel(t.startDate, t.endDate, locale)}{t.place ? ` · ${t.place}` : ""}
                 </p>
                 {(t.winnerName || t.totalPrize) && (
@@ -452,7 +452,7 @@ function UmbView({ slugSeg }: { slugSeg: string }) {
                                     {data.others.map((o) => (
                                         <Link key={o.slug} href={umbEventPath(o.slug)} className="flex items-center gap-3 px-4 py-3">
                                             <span className="min-w-0 flex-1">
-                                                <span className="block text-[14px] font-semibold text-ink-1 truncate">{L.umbName(o)}</span>
+                                                <span className="block text-[14px] font-semibold text-ink-1 line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere]">{L.umbName(o)}</span>
                                                 <span className="block text-[12px] font-medium text-ink-3 truncate tabular-nums">{rangeLabel(o.date, o.date, locale)}</span>
                                             </span>
                                             <span className="text-[12px] font-semibold text-ink-3 tabular-nums shrink-0">{L.playersWithPoints(o.players)}</span>
@@ -494,7 +494,7 @@ function UmbPlayerRow({ x, category, plain }: { x: UmbEventRow; category: string
             className={cn("flex items-center gap-3 px-4 py-3", kr && "bg-brand/5")}
         >
             <span className="text-[18px] leading-none shrink-0">{flagEmoji(x.fed) || "🏳️"}</span>
-            <span className={cn("min-w-0 flex-1 text-[14px] truncate", kr ? "font-bold text-ink-1" : "font-semibold text-ink-1")}>{name}</span>
+            <span className={cn("min-w-0 flex-1 text-[14px] line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere]", kr ? "font-bold text-ink-1" : "font-semibold text-ink-1")}>{name}</span>
             <span className={cn("text-[14px] font-bold tabular-nums shrink-0", kr ? "text-brand" : "text-ink-2")}>{L.pts(x.points)}</span>
         </Link>
     );

@@ -245,7 +245,7 @@ export default function HiqGolfRanking() {
                                 className={cn("flex items-center gap-3 px-3.5 py-2.5 rounded-2xl text-left transition-colors bg-surface-1 shadow-[0_1px_2px_rgba(0,0,0,0.04)] hover:bg-surface-3")}
                             >
                                 <span className={cn("w-10 shrink-0 text-center font-bold text-[15px] tabular-nums", i < 3 ? "text-brand" : "text-ink-3")}>{r.rank}</span>
-                                <span className="flex-1 min-w-0 line-clamp-2 leading-snug [overflow-wrap:anywhere] font-semibold text-[14px] text-ink-1">{r.playerName}</span>
+                                <span className="flex-1 min-w-0 line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere] font-semibold text-[14px] text-ink-1">{r.playerName}</span>
                                 <span className="shrink-0 text-right font-bold text-[15px] tabular-nums text-ink-1">{formatStatValue(r.value, r.unit)}</span>
                             </button>
                         ))}
@@ -315,7 +315,7 @@ export default function HiqGolfRanking() {
                             >
                                 <span className={cn("w-10 shrink-0 text-center font-bold text-[15px] tabular-nums", isKr ? "text-brand" : "text-ink-3")}>{r.rank}</span>
                                 <span className="text-[17px] leading-none shrink-0">{flagEmoji(iocToAlpha2(r.country))}</span>
-                                <span className={cn("flex-1 min-w-0 line-clamp-2 leading-snug [overflow-wrap:anywhere] font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{golferName(r, locale)}</span>
+                                <span className={cn("flex-1 min-w-0 line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere] font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{golferName(r, locale)}</span>
                                 {/* 세계 랭킹은 출처가 지난주 순위를 주고, 투어 랭킹은 우리 직전 스냅샷과 비교 — 직전이 없으면(첫 회차) 변동 칸을 비운다 */}
                                 {meta.world || data?.prevEdition ? <GMove move={r.move} newLabel={t("golf.new")} /> : <span className="w-8 shrink-0" />}
                                 <span className="w-14 shrink-0 text-right font-bold text-[15px] tabular-nums text-ink-1">{formatRankValue(tour, r.points)}</span>

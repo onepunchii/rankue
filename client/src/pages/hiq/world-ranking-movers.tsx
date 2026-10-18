@@ -79,7 +79,7 @@ export default function HiqWorldRankingMovers() {
                 </motion.button>
                 <div className="min-w-0">
                     <h1 className="text-[24px] font-bold tracking-tight text-ink-1 leading-tight truncate">{L.moversTitle}</h1>
-                    <p className="text-[13px] font-medium text-ink-3 mt-1 truncate">{L.moversSub}</p>
+                    <p className="text-[13px] font-medium text-ink-3 mt-1 leading-snug break-keep">{L.moversSub}</p>
                 </div>
                 <ShareButton className="ml-auto shrink-0" url={`https://www.rankue.co.kr${MOVERS_PATH}`} title={MOVERS_TITLE} />
             </div>

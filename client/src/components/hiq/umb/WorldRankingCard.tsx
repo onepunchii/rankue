@@ -149,7 +149,7 @@ export const WorldRankingCard = ({ preview }: { preview?: RankPreview } = {}) =>
                             </div>
                             <span className="text-[18px] leading-none shrink-0">{flagEmoji(r.fed)}</span>
                             <div className="flex-1 min-w-0">
-                                <span className={cn("block font-semibold text-[14.5px] line-clamp-2 leading-snug [overflow-wrap:anywhere]", isKr ? "text-brand" : "text-ink-1")}>{displayName(r, locale)}</span>
+                                <span className={cn("block font-semibold text-[14.5px] line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere]", isKr ? "text-brand" : "text-ink-1")}>{displayName(r, locale)}</span>
                             </div>
                             <MoveBadge move={r.move} />
                             <div className="flex items-baseline gap-1 shrink-0 w-14 justify-end">

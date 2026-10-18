@@ -153,7 +153,7 @@ function RecordRow({ row, k, locale, T }: { row: PbaRecordRow; k: PbaRecordKey; 
             </span>
             <span className="text-[16px] leading-none shrink-0" aria-hidden>{flagEmoji(row.nationCode) || "🏳️"}</span>
             <span className="flex-1 min-w-0">
-                <span className="block line-clamp-2 leading-snug [overflow-wrap:anywhere] text-[14px] font-semibold text-ink-1">
+                <span className="block line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere] text-[14px] font-semibold text-ink-1">
                     {main}
                     {other && <span className="ml-1.5 text-[12px] font-medium text-ink-3">{other}</span>}
                 </span>
@@ -206,7 +206,7 @@ export default function HiqPbaRecords() {
                 </motion.button>
                 <div className="min-w-0">
                     <h1 className="text-[24px] font-bold tracking-tight text-ink-1 leading-tight truncate">{T.title}</h1>
-                    <p className="text-[13px] font-medium text-ink-3 mt-1 truncate">{T.sub}</p>
+                    <p className="text-[13px] font-medium text-ink-3 mt-1 leading-snug break-keep">{T.sub}</p>
                 </div>
                 <ShareButton className="ml-auto shrink-0" url={`https://www.rankue.co.kr${PBA_RECORDS_PATH}`} title={PBA_RECORDS_TITLE} />
             </div>

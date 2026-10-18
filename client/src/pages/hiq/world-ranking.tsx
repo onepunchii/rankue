@@ -386,7 +386,7 @@ export default function HiqWorldRanking() {
                         >
                             <span className={cn("w-10 shrink-0 text-center font-bold text-[15px] tabular-nums", isKr ? "text-brand" : "text-black/45")}>{r.rank}</span>
                             <span className="text-[17px] leading-none shrink-0">{flagEmoji(r.fed)}</span>
-                            <span className={cn("flex-1 min-w-0 line-clamp-2 leading-snug [overflow-wrap:anywhere] font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{displayName(r, locale)}</span>
+                            <span className={cn("flex-1 min-w-0 line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere] font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{displayName(r, locale)}</span>
                             <MoveBadge move={r.move} />
                             <span className="w-12 shrink-0 text-right font-bold text-[15px] tabular-nums text-ink-1">{r.points}</span>
                         </button>

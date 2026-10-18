@@ -92,7 +92,7 @@ export default function HiqWorldRankingCountry() {
                         {fed && <span className="text-[24px] leading-none shrink-0">{flagEmoji(fed)}</span>}
                         <span className="truncate">{title || L.notFound}</span>
                     </h1>
-                    <p className="text-[13px] font-medium text-ink-3 mt-1 truncate">
+                    <p className="text-[13px] font-medium text-ink-3 mt-1 leading-snug break-keep">
                         {L.countrySub}{section ? ` · ${L.asOf(section.edition, editionDate(section.date, locale))}` : ""}
                     </p>
                 </div>
