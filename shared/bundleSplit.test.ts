@@ -30,7 +30,6 @@ describe("첫 화면 묶음에 무거운 화면을 싣지 않는다", () => {
         const files = execSync('grep -rl \'from "recharts"\' client/src || true', { cwd: resolve(__dirname, ".."), encoding: "utf8" }).trim().split("\n").filter(Boolean).filter((f) => !/\.test\./.test(f)).sort();
         expect(files).toEqual([
             "client/src/components/hiq/charts/RankTrendChart.tsx",
-            "client/src/components/hiq/charts/SeasonChart.tsx",
             "client/src/components/hiq/history/GrowthChart.tsx",
             "client/src/components/ui/chart.tsx",
             "client/src/golf/components/course/detail/PriceChart.tsx",

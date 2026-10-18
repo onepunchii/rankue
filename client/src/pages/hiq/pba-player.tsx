@@ -1,4 +1,4 @@
-import { Suspense, lazy, useState, type ReactNode } from "react";
+import { Fragment, Suspense, lazy, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
 import { LucideChevronLeft, LucideChevronRight, LucideChevronDown, LucideGlobe, LucideTrophy, LucideHeart, LucideClock } from "@/lib/icons";
@@ -234,12 +234,6 @@ export default function HiqPbaPlayer() {
     });
 
     const faq = p ? pbaPlayerFaq(p, lang) : [];
-    const chartData = (p?.seasons ?? []).map((s) => ({
-        name: seasonLabel(s.season),
-        prizeRank: s.prizeRank,
-        pointRank: s.pointRank,
-        prize: Math.round(s.prize / 1e6) / 100, // 억 단위
-    }));
     const seasonsDesc = [...(p?.seasons ?? [])].reverse();
     const shownSeasons = allSeasons ? seasonsDesc : seasonsDesc.slice(0, SEASON_FOLD);
     const rankUnit = (n: number) => (lang === "ko" ? `${n}위` : `${n}${t.rankUnit}`);
@@ -282,7 +276,7 @@ export default function HiqPbaPlayer() {
                                 <PlayerPhoto memCode={p.memCode} name={name} size={72} className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhotoShown(true)}>
                                     {p.nationCode && <span className="absolute -right-0.5 -bottom-0.5 text-[20px] leading-none">{flagEmoji(p.nationCode)}</span>}
                                 </PlayerPhoto>
-                                {photoShown && <span className="mt-1 text-[9.5px] font-medium text-ink-3">{t.photo}</span>}
+                                {photoShown && <span className="mt-1 text-[12px] font-medium leading-none text-ink-3">{t.photo}</span>}
                             </span>
                             <div className="min-w-0 flex-1">
                                 <h1 className="text-[24px] font-bold tracking-tight leading-tight truncate">{name}</h1>
@@ -325,7 +319,12 @@ export default function HiqPbaPlayer() {
                                     <span className="rk-num text-[40px] font-bold leading-none">{latest.rank}</span>
                                     {lang === "ko" && <span className="text-[16px] font-bold">위</span>}
                                 </div>
-                                <div className="text-[12px] opacity-80 mt-1 rk-num">{fill(t.seasonSub, { p: latestRow.rankingPoint.toLocaleString(), m: prizeMoney(latestRow.prize) })}</div>
+                                {/* ' · ' 에서만 줄이 바뀌게 — "상금 / 1,200만원"처럼 이름과 값이 갈라지던 것 */}
+                                <div className="text-[12px] opacity-80 mt-1 rk-num">
+                                    {fill(t.seasonSub, { p: latestRow.rankingPoint.toLocaleString(), m: prizeMoney(latestRow.prize) }).split(" · ").map((part, i) => (
+                                        <Fragment key={i}>{i > 0 && " · "}<span className="whitespace-nowrap">{part}</span></Fragment>
+                                    ))}
+                                </div>
                             </div>
                         ) : null}
                         {latest && latestRow && <div className="w-px bg-white/25 mx-3.5" />}
@@ -389,7 +388,7 @@ export default function HiqPbaPlayer() {
                                         <a href={w.path} onClick={(e) => { e.preventDefault(); setLocation(w.path); }} className="flex items-center gap-3 py-2.5 min-h-14">
                                             <span className="w-10 h-10 shrink-0 rounded-xl bg-[#F5B721]/15 text-[#8a6a0a] flex items-center justify-center"><LucideTrophy className="w-5 h-5" /></span>
                                             <span className="flex-1 min-w-0">
-                                                <span className="block text-[14px] font-semibold truncate">{w.title}</span>
+                                                <span className="block text-[14px] font-semibold leading-snug line-clamp-2 break-keep [overflow-wrap:anywhere]">{w.title}</span>
                                                 <span className="block text-[12px] text-ink-3 rk-num">
                                                     {fill(t.winLine, { s: seasonLabel(w.season), d: w.startDate.replace(/-/g, ".") })}{w.winnerPrize ? ` · ${fill(t.winPrize, { m: prizeMoney(w.winnerPrize) })}` : ""}
                                                 </span>
@@ -406,7 +405,7 @@ export default function HiqPbaPlayer() {
                     {p.seasons.length > 0 && (
                         <Card className="overflow-hidden">
                             <CardHead title={t.seasons} />
-                            {chartData.length > 1 && (
+                            {(p.seasons?.length ?? 0) > 1 && (
                                 <>
                                     <div className="flex gap-1.5 mb-2" role="tablist">
                                         {(["prizeRank", "pointRank", "prize"] as Metric[]).map((m) => (
@@ -416,10 +415,10 @@ export default function HiqPbaPlayer() {
                                             </button>
                                         ))}
                                     </div>
-                                    <div className="h-[170px] min-w-0">
+                                    <div className="min-h-[204px] min-w-0">
                                         <Suspense fallback={null}>
-                                            <SeasonChart data={chartData} metric={metric} colors={{ brand: BRAND, axis: AXIS, grid: GRID }} rankLabel={rankUnit}
-                                                tooltip={(v) => (metric === "prize" ? [`${v}${lang === "ko" ? "억" : "00M"}`, t.mPrize] : [rankUnit(Number(v)), metric === "prizeRank" ? t.mPrizeRank : t.mPointRank])} />
+                                            <SeasonChart seasons={p.seasons} metric={metric} colors={{ brand: BRAND, axis: AXIS, grid: GRID }} rankLabel={rankUnit} lang={lang}
+                                                label={`${t.seasons} — ${metric === "prizeRank" ? t.mPrizeRank : metric === "pointRank" ? t.mPointRank : t.mPrize}`} />
                                         </Suspense>
                                     </div>
                                 </>
@@ -464,7 +463,8 @@ export default function HiqPbaPlayer() {
                                         <a key={r.memCode} href={`/pba-player/${encodeURIComponent(r.memCode)}`}
                                             onClick={(e) => { e.preventDefault(); window.scrollTo({ top: 0 }); setLocation(`/pba-player/${encodeURIComponent(r.memCode)}`); }}
                                             className="w-[84px] shrink-0 flex flex-col items-center text-center py-1 active:opacity-80">
-                                            <span className="relative">
+                                            {/* flex — 사진이 뜨면 글자 기준선이 사라져 이름이 아래로 처지던 것(사진 있는 선수만 2~3px 낮았다) */}
+                                            <span className="relative flex">
                                                 <PlayerPhoto memCode={r.memCode} name={nm} size={44} />
                                                 <span className="absolute -left-1.5 -top-1 rk-num text-[12px] font-bold bg-surface-1 border border-surface-line rounded-full px-1.5">{r.prizeRank}</span>
                                             </span>
