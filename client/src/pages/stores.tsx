@@ -316,7 +316,7 @@ export default function Stores() {
               >
                 <div className="flex items-center gap-2">
                   <h2 className="text-[16px] font-bold text-ink-1">{s.name}</h2>
-                  <span className="px-1.5 py-0.5 rounded-full bg-brand/10 text-[10.5px] font-bold text-brand leading-none">{t.partner}</span>
+                  <span className="px-1.5 py-0.5 rounded-full bg-brand/10 text-[12px] font-bold text-brand leading-none shrink-0">{t.partner}</span>
                 </div>
                 {s.address && <p className="text-[13px] text-black/55 mt-1">{s.address}</p>}
               </button>
@@ -344,11 +344,11 @@ export default function Stores() {
               <button
                 key={s.code}
                 onClick={() => setLocation(`/stores/${s.code}`)}
-                className="text-left bg-white rounded-2xl px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] active:scale-[0.99] transition-transform"
+                className="min-w-0 text-left bg-white rounded-2xl px-5 py-4 shadow-[0_1px_2px_rgba(0,0,0,0.04)] active:scale-[0.99] transition-transform"
               >
                 <div className="flex items-center gap-2 min-w-0">
                   <h2 className="text-[15px] font-bold text-ink-1 truncate">{s.name}</h2>
-                  {s.claimed && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[10px] font-bold text-brand leading-none">✓ {t.verified}</span>}
+                  {s.claimed && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[12px] font-bold text-brand leading-none">✓ {t.verified}</span>}
                 </div>
                 <p className="text-[12.5px] text-black/55 mt-1 truncate">{s.distanceKm != null && <span className="text-brand font-bold">{s.distanceKm}km · </span>}{s.address}</p>
                 {(s.tableLarge || s.tableMedium || s.tablePocket || s.rate10Large || s.rate10Medium) && (

@@ -115,7 +115,7 @@ export default function HiqTournaments() {
                                                             >
                                                                 <Chip tone={w.league === "LPBA" ? "gold" : "brand"} className="shrink-0">{w.league}</Chip>
                                                                 <span className="min-w-0 flex-1">
-                                                                    <span className="block text-[13.5px] font-semibold text-ink-1 truncate">
+                                                                    <span className="block text-[13.5px] font-semibold text-ink-1 line-clamp-2 leading-snug break-keep">
                                                                         {locale === "ko" ? w.title : (w.titleEn ?? w.title)}
                                                                     </span>
                                                                     <span className="block text-[12px] font-medium text-ink-3 truncate">🏆 {w.winnerName}</span>
@@ -153,7 +153,7 @@ export default function HiqTournaments() {
                                                         <span className="text-[18px] leading-none shrink-0">{flagEmoji(e.country)}</span>
                                                         <span className="min-w-0 flex-1">
                                                             {/* 해 묶음 안이라 이름에서 연도를 뺀다 — 넣으면 좁은 폰에서 '월드컵'이 잘린다 */}
-                                                            <span className="block text-[14px] font-semibold text-ink-1 truncate">{L.umbShort(e)}</span>
+                                                            <span className="block text-[14px] font-semibold text-ink-1 line-clamp-2 leading-snug break-keep">{L.umbShort(e)}</span>
                                                             <span className="block text-[12px] font-medium text-ink-3 truncate tabular-nums">
                                                                 {rangeLabel(e.date, e.date, locale, y.year)}{e.org ? ` · ${e.org}` : ""} · {L.playersWithPoints(e.players)}
                                                             </span>
