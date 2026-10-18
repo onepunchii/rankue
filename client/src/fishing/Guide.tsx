@@ -26,7 +26,7 @@ export const guidePhoto = (key: string, small = false) => `/fishing/guide/img/${
 /** 사진 한 줄의 출처 — "사진: 작가 · CC BY-SA 3.0 · 위키미디어 공용" */
 export function PhotoCredit({ author, license, page, dark }: { author: string; license: string; page: string | null; dark?: boolean }) {
     const body = `사진: ${author} · ${license} · 위키미디어 공용`;
-    return <p className="text-[12px] leading-snug [word-break:keep-all]" style={{ color: dark ? "#F3ECDD80" : "#0F283899" }}>{page ? <a href={page} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">{body}</a> : body}</p>;
+    return <p className="text-[12px] leading-snug [word-break:keep-all]" style={{ color: dark ? "#F3ECDD80" : "#0F2838B3" }}>{page ? <a href={page} target="_blank" rel="noopener noreferrer" className="underline-offset-2 hover:underline">{body}</a> : body}</p>;
 }
 export interface RegRow { kind: "closed" | "min"; group: string; name: string; rule: string }
 export interface Regs { basis: string; titles: { closed: string; min: string }; rows: RegRow[] }
@@ -93,12 +93,12 @@ export function RegBox({ names, regs, label, onRules }: { names: readonly string
                 {rows.map((r) => (
                     <li key={`${r.kind}-${r.name}`} className="flex gap-2.5 text-[14px] leading-relaxed [word-break:keep-all]">
                         <span className="w-[56px] shrink-0 font-semibold" style={{ color: SEAL }}>{r.kind === "closed" ? "금어기" : "금지체장"}</span>
-                        <span className="min-w-0 flex-1">{many ? <span className="mr-1" style={{ color: "#0F283899" }}>{r.name}</span> : null}{r.rule}</span>
+                        <span className="min-w-0 flex-1">{many ? <span className="mr-1" style={{ color: "#0F2838B3" }}>{r.name}</span> : null}{r.rule}</span>
                     </li>
                 ))}
             </ul>
             <p className="mt-2 text-[12.5px] leading-relaxed [word-break:keep-all]" style={{ color: "#0F2838B3" }}>낚시하는 사람에게도 적용돼요. 시 · 도가 더 엄하게 고시한 곳이 있을 수 있어요.</p>
-            <p className="mt-1 flex items-baseline justify-between gap-2 text-[12px] [word-break:keep-all]" style={{ color: "#0F283899" }}>
+            <p className="mt-1 flex items-baseline justify-between gap-2 text-[12px] [word-break:keep-all]" style={{ color: "#0F2838B3" }}>
                 <span>출처: {regs!.basis}</span>
                 {onRules && <button type="button" onClick={onRules} className="shrink-0 font-semibold" style={{ color: "#1F5A78" }} data-testid="fishing-reg-rules">낚시 규칙</button>}
             </p>
@@ -122,26 +122,26 @@ export function GuideStory({ guide }: { guide: Guide }) {
             <p className="px-3.5 pb-3 pt-3.5 text-[15px] leading-relaxed [word-break:keep-all]">{guide.intro}</p>
             {shown.map((s) => (
                 <div key={s.h} className="flex gap-3 px-3.5 py-3" style={{ borderTop: RULE }}>
-                    <span className="w-[64px] shrink-0 pt-0.5 text-[13px]" style={{ color: "#0F283899" }}>{s.h}</span>
+                    <span className="w-[64px] shrink-0 pt-0.5 text-[13px]" style={{ color: "#0F2838B3" }}>{s.h}</span>
                     <span className="min-w-0 flex-1 text-[14.5px] leading-relaxed [word-break:keep-all]">{s.b}</span>
                 </div>
             ))}
             {all && guide.id.length > 0 && (
                 <div className="px-3.5 py-3" style={{ borderTop: RULE }}>
-                    <p className="text-[13px]" style={{ color: "#0F283899" }}>이렇게 알아봐요</p>
+                    <p className="text-[13px]" style={{ color: "#0F2838B3" }}>이렇게 알아봐요</p>
                     <ul className="mt-1.5 space-y-1.5">{guide.id.map((t, i) => <li key={t} className="flex gap-2 text-[14.5px] leading-relaxed [word-break:keep-all]"><span className="shrink-0 tabular-nums" style={{ color: "#0F283873" }}>{i + 1}</span><span>{t}</span></li>)}</ul>
                 </div>
             )}
             {all && guide.faq.length > 0 && (
                 <div className="px-3.5 py-3" style={{ borderTop: RULE }}>
-                    <p className="text-[13px]" style={{ color: "#0F283899" }}>자주 묻는 것</p>
+                    <p className="text-[13px]" style={{ color: "#0F2838B3" }}>자주 묻는 것</p>
                     <dl className="mt-1.5 space-y-2.5">{guide.faq.map((f) => <div key={f.q}><dt className="text-[14.5px] font-semibold [word-break:keep-all]">{f.q}</dt><dd className="mt-0.5 text-[14px] leading-relaxed [word-break:keep-all]" style={{ color: "#0F2838CC" }}>{f.a}</dd></div>)}</dl>
                 </div>
             )}
             {more && !all && (
                 <button type="button" onClick={() => setAll(true)} className="flex h-11 w-full items-center justify-center text-[13.5px] font-semibold active:bg-[#0F28380A]" style={{ borderTop: RULE, color: "#1F5A78" }} data-testid="fishing-guide-more">더 보기</button>
             )}
-            <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>
+            <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F2838B3" }}>
                 자료: {guide.sources.map((s, i) => (
                     <Fragment key={`${s.name}${i}`}>{i ? " · " : ""}{s.url ? <a href={s.url} target="_blank" rel="noopener noreferrer" className="underline underline-offset-2">{s.name}{s.title ? ` 「${s.title}」` : ""}</a> : s.name}{s.license ? ` (${s.license})` : ""}</Fragment>
                 ))}{guide.thin ? " · 자료가 짧은 어종이에요" : ""}
@@ -222,8 +222,8 @@ export function GuideBook({ onOurs, onOther }: { onOurs: (fish: FishKind) => voi
                 </div>
             )}
             <div className="mt-3 overflow-hidden rounded-2xl" style={SHEET}>
-                {!list ? <p className="px-4 py-8 text-center text-[14px]" style={{ color: "#0F283899" }}>{isError ? "도감을 불러오지 못했어요" : "불러오는 중…"}</p>
-                    : rows.length === 0 ? <p className="px-4 py-8 text-center text-[14px]" style={{ color: "#0F283899" }}>찾는 어종이 없어요</p> : (
+                {!list ? <p className="px-4 py-8 text-center text-[14px]" style={{ color: "#0F2838B3" }}>{isError ? "도감을 불러오지 못했어요" : "불러오는 중…"}</p>
+                    : rows.length === 0 ? <p className="px-4 py-8 text-center text-[14px]" style={{ color: "#0F2838B3" }}>찾는 어종이 없어요</p> : (
                         <ul>
                             {rows.map((r, i) => {
                                 const ours = oursOfGuide(r.name);
@@ -236,7 +236,7 @@ export function GuideBook({ onOurs, onOther }: { onOurs: (fish: FishKind) => voi
                                             </span>
                                             <span className="min-w-0 flex-1">
                                                 <span className="flex items-center gap-1.5"><span className="truncate text-[15.5px] font-semibold">{guideName(r.name)}</span>{r.reg && <span className="shrink-0 rounded-[4px] px-1.5 py-px text-[12px]" style={{ border: `1px solid ${SEAL}`, color: SEAL }}>금어기</span>}</span>
-                                                <span className="mt-0.5 line-clamp-1 text-[13px]" style={{ color: "#0F283899" }}>{plainLine(r.line)}</span>
+                                                <span className="mt-0.5 line-clamp-1 text-[13px]" style={{ color: "#0F2838B3" }}>{plainLine(r.line)}</span>
                                             </span>
                                             <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#0F283859" }} aria-hidden />
                                         </button>
@@ -306,7 +306,7 @@ export function RulesPage() {
                                 </li>
                             ))}
                         </ul>
-                        <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>{kind === "closed" ? regs.titles.closed : regs.titles.min} — {regs.basis}. 낚시하는 사람에게도 적용돼요.</p>
+                        <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F2838B3" }}>{kind === "closed" ? regs.titles.closed : regs.titles.min} — {regs.basis}. 낚시하는 사람에게도 적용돼요.</p>
                     </div>
                 </section>
             )}
@@ -314,7 +314,7 @@ export function RulesPage() {
             <section className="pt-8">
                 <h2 className="mb-3 text-[18px] font-semibold tracking-tight">낚시하는 사람이 묻는 것</h2>
                 <div className="overflow-hidden rounded-2xl" style={SHEET}>
-                    {!rules ? <p className="px-4 py-8 text-center text-[14px]" style={{ color: "#0F283899" }}>{isError ? "불러오지 못했어요" : "불러오는 중…"}</p> : <ul>{angler.map(qa)}</ul>}
+                    {!rules ? <p className="px-4 py-8 text-center text-[14px]" style={{ color: "#0F2838B3" }}>{isError ? "불러오지 못했어요" : "불러오는 중…"}</p> : <ul>{angler.map(qa)}</ul>}
                 </div>
             </section>
             {business.length > 0 && (

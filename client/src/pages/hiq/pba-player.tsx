@@ -282,7 +282,7 @@ export default function HiqPbaPlayer() {
                                 <PlayerPhoto memCode={p.memCode} name={name} size={72} className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhotoShown(true)}>
                                     {p.nationCode && <span className="absolute -right-0.5 -bottom-0.5 text-[20px] leading-none">{flagEmoji(p.nationCode)}</span>}
                                 </PlayerPhoto>
-                                {photoShown && <span className="mt-1 text-[9.5px] font-medium text-ink-4">{t.photo}</span>}
+                                {photoShown && <span className="mt-1 text-[9.5px] font-medium text-ink-3">{t.photo}</span>}
                             </span>
                             <div className="min-w-0 flex-1">
                                 <h1 className="text-[24px] font-bold tracking-tight leading-tight truncate">{name}</h1>
@@ -365,7 +365,7 @@ export default function HiqPbaPlayer() {
                                 sub={p.win != null ? (p.draw ? fill(t.wld, { w: p.win, l: p.lose ?? 0, d: p.draw }) : fill(t.wl, { w: p.win, l: p.lose ?? 0 })) : undefined}
                             />
                         </div>
-                        <p className="text-[12px] text-ink-4 mt-2.5">{fill(t.minGames, { n: PBA_RECORDS_MIN_GAMES })}</p>
+                        <p className="text-[12px] text-ink-3 mt-2.5">{fill(t.minGames, { n: PBA_RECORDS_MIN_GAMES })}</p>
                         {/* "선수 연봉" 으로 들어온 방문자에게 주는 정확한 답 — 상금을 연봉이라 부르지 않는다 */}
                         {lang === "ko" && <p className="text-[12px] text-ink-3 leading-relaxed mt-1.5">{PBA_INCOME_NOTE_KO}</p>}
                     </Card>
@@ -394,7 +394,7 @@ export default function HiqPbaPlayer() {
                                                     {fill(t.winLine, { s: seasonLabel(w.season), d: w.startDate.replace(/-/g, ".") })}{w.winnerPrize ? ` · ${fill(t.winPrize, { m: prizeMoney(w.winnerPrize) })}` : ""}
                                                 </span>
                                             </span>
-                                            <LucideChevronRight className="w-4 h-4 text-ink-4 shrink-0" />
+                                            <LucideChevronRight className="w-4 h-4 text-ink-3 shrink-0" />
                                         </a>
                                     </li>
                                 ))}
@@ -469,7 +469,7 @@ export default function HiqPbaPlayer() {
                                                 <span className="absolute -left-1.5 -top-1 rk-num text-[12px] font-bold bg-surface-1 border border-surface-line rounded-full px-1.5">{r.prizeRank}</span>
                                             </span>
                                             <span className="mt-1.5 text-[12.5px] font-semibold w-full truncate">{nm}</span>
-                                            <span className="text-[12px] text-ink-4">{flagEmoji(r.nationCode ?? "")}</span>
+                                            <span className="text-[12px] text-ink-3">{flagEmoji(r.nationCode ?? "")}</span>
                                         </a>
                                     );
                                 })}
@@ -504,7 +504,7 @@ export default function HiqPbaPlayer() {
                                     <details key={f.q} open={i === 0} className="group py-1">
                                         <summary className="list-none flex items-center justify-between gap-2 min-h-11 cursor-pointer text-[14px] font-semibold">
                                             <h3 className="min-w-0">{f.q}</h3>
-                                            <LucideChevronDown className="w-4 h-4 text-ink-4 shrink-0 transition-transform group-open:rotate-180" />
+                                            <LucideChevronDown className="w-4 h-4 text-ink-3 shrink-0 transition-transform group-open:rotate-180" />
                                         </summary>
                                         <p className="text-[13px] text-ink-2 leading-relaxed pb-2">{f.a}</p>
                                     </details>
@@ -513,7 +513,7 @@ export default function HiqPbaPlayer() {
                         </Card>
                     )}
 
-                    <p className="flex items-center gap-1 text-[12px] text-ink-4 px-1 pb-2">
+                    <p className="flex items-center gap-1 text-[12px] text-ink-3 px-1 pb-2">
                         <LucideClock className="w-3 h-3 shrink-0" />
                         <span>{x?.updated ? `${fill(t.updated, { d: x.updated.replace(/-/g, ".") })} · ` : ""}{t.source}</span>
                     </p>

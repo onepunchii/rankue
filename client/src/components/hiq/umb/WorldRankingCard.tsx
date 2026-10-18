@@ -16,7 +16,7 @@ export const MoveBadge = ({ move }: { move: number | null }) => {
     if (move === null) return <span className="text-[12px] font-bold text-[#8a6a0a] bg-[#F5B721]/20 px-1.5 py-0.5 rounded-full leading-none">{t("umb.new")}</span>;
     if (move > 0) return <span className="text-[12px] font-bold text-brand tabular-nums leading-none">▲{move}</span>;
     if (move < 0) return <span className="text-[12px] font-bold text-red-500 tabular-nums leading-none">▼{-move}</span>;
-    return <span className="text-[12px] font-medium text-black/25 leading-none">–</span>;
+    return <span className="text-[12px] font-medium text-black/55 leading-none">–</span>;
 };
 
 // 홈 세계 랭킹 카드 — UMB 공식 랭킹 톱10 + 요약 한 줄. 선수 탭 → 상세 시트.
@@ -90,7 +90,7 @@ export const WorldRankingCard = ({ preview }: { preview?: RankPreview } = {}) =>
                     ))}
                 </div>
                 {data?.editionDate && (
-                    <span className="text-[12px] font-medium text-black/40 tabular-nums">
+                    <span className="text-[12px] font-medium text-black/55 tabular-nums">
                         {new Date(data.editionDate).toLocaleDateString("ko-KR", { month: "short", day: "numeric" })} {t("umb.updated")}
                     </span>
                 )}
@@ -124,10 +124,10 @@ export const WorldRankingCard = ({ preview }: { preview?: RankPreview } = {}) =>
             {/* 톱10 */}
             <div className="flex flex-col gap-2">
                 {isLoading && (
-                    <div className="py-10 text-center text-black/40 text-[13.5px] font-medium">{t("umb.loading")}</div>
+                    <div className="py-10 text-center text-black/55 text-[13.5px] font-medium">{t("umb.loading")}</div>
                 )}
                 {!isLoading && rows.length === 0 && (
-                    <div className="py-10 text-center text-black/40 text-[13.5px] font-medium">{t("umb.empty")}</div>
+                    <div className="py-10 text-center text-black/55 text-[13.5px] font-medium">{t("umb.empty")}</div>
                 )}
                 {previewRows(rows, preview).map((r) => {
                     const isKr = r.fed === homeFed;
@@ -144,7 +144,7 @@ export const WorldRankingCard = ({ preview }: { preview?: RankPreview } = {}) =>
                                 {r.rank === 1 ? (
                                     <div className="w-8 h-8 rounded-full bg-[#cba258] flex items-center justify-center font-bold text-[15px] tabular-nums text-white shadow-[0_1px_3px_rgba(203,162,88,0.4)]">1</div>
                                 ) : (
-                                    <span className={cn("font-bold text-[16px] tabular-nums", isKr ? "text-brand" : "text-black/45")}>{r.rank}</span>
+                                    <span className={cn("font-bold text-[16px] tabular-nums", isKr ? "text-brand" : "text-black/55")}>{r.rank}</span>
                                 )}
                             </div>
                             <span className="text-[18px] leading-none shrink-0">{flagEmoji(r.fed)}</span>
@@ -154,7 +154,7 @@ export const WorldRankingCard = ({ preview }: { preview?: RankPreview } = {}) =>
                             <MoveBadge move={r.move} />
                             <div className="flex items-baseline gap-1 shrink-0 w-14 justify-end">
                                 <span className="font-bold text-[16px] tabular-nums tracking-tight text-ink-1">{r.points}</span>
-                                <span className="text-[12px] font-semibold text-black/35">{t("umb.pointsUnit")}</span>
+                                <span className="text-[12px] font-semibold text-black/55">{t("umb.pointsUnit")}</span>
                             </div>
                         </button>
                     );
@@ -165,7 +165,7 @@ export const WorldRankingCard = ({ preview }: { preview?: RankPreview } = {}) =>
             {/* 전체 보기 + 출처 */}
             {rows.length > 0 && (
                 <div className="flex items-center justify-between pt-1">
-                    <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-[12px] font-medium text-black/35 hover:text-black/55 transition-colors">
+                    <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-[12px] font-medium text-black/55 hover:text-black/55 transition-colors">
                         {t("umb.source")}
                     </a>
                     <button

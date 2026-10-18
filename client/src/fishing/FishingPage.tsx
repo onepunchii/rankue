@@ -104,7 +104,7 @@ function Eotak({ rec, today, big, sample }: { rec: FishRecord<FishingCatch>; tod
             <div className={cn("flex items-end justify-between gap-2", big ? "mt-1" : "mt-0.5")}>
                 <div className="min-w-0">
                     <p className={cn("truncate font-semibold tracking-tight", big ? "text-[20px]" : "text-[14px]")}>{rec.fish.name}</p>
-                    <p className={cn("truncate", big ? "mt-0.5 text-[13px]" : "text-[12px]")} style={{ color: "#0F283899" }}>{[fishingDayLabel(rec.best.day, today), rec.best.place].filter(Boolean).join(" · ")}</p>
+                    <p className={cn("truncate", big ? "mt-0.5 text-[13px]" : "text-[12px]")} style={{ color: "#0F2838B3" }}>{[fishingDayLabel(rec.best.day, today), rec.best.place].filter(Boolean).join(" · ")}</p>
                 </div>
                 {v && <p className={cn("shrink-0 font-semibold tabular-nums leading-none tracking-tight", big ? "text-[34px]" : "text-[18px]")}>{v}</p>}
             </div>
@@ -374,7 +374,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                                                         {r?.tier && <span className="absolute right-1.5 top-1.5" style={{ transform: "rotate(6deg)" }}><Seal text={r.tier.name} size={28} /></span>}
                                                         <img src={art(f.id)} alt="" width={640} height={400} loading="lazy" decoding="async" className="mx-auto h-[54px] w-full object-contain" style={{ mixBlendMode: "multiply", opacity: r ? 1 : 0.14 }} />
                                                         <p className="mt-1 truncate text-[13px] font-semibold" style={{ color: r ? INK : "#0F283873" }}>{f.name}</p>
-                                                        <p className="truncate text-[12px] tabular-nums" style={{ color: r ? "#0F283899" : "#0F283866" }}>{r ? (r.value != null ? fishValueText(f.unit, r.value) : "만남") : `${f.tiers[0].name}부터`}</p>
+                                                        <p className="truncate text-[12px] tabular-nums" style={{ color: r ? "#0F2838B3" : "#0F283866" }}>{r ? (r.value != null ? fishValueText(f.unit, r.value) : "만남") : `${f.tiers[0].name}부터`}</p>
                                                     </button>
                                                 );
                                             })}
@@ -389,7 +389,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                                 <span className="relative h-[56px] w-[92px] shrink-0" aria-hidden>
                                     {["galchi", "ssogari", "doldom"].map((id, i) => <img key={id} src={art(id)} alt="" width={640} height={400} loading="lazy" decoding="async" className="absolute h-9 w-[58px] object-contain" style={{ left: i * 17, top: i % 2 ? 18 : 2, mixBlendMode: "multiply", transform: `rotate(${i * 7 - 7}deg)` }} />)}
                                 </span>
-                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">바다 · 민물 어류 374종</span><span className="mt-0.5 block text-[13px] [word-break:keep-all]" style={{ color: "#0F283899" }}>생김새 · 사는 곳 · 금어기를 가나다로 찾아요</span></span>
+                                <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">바다 · 민물 어류 374종</span><span className="mt-0.5 block text-[13px] [word-break:keep-all]" style={{ color: "#0F2838B3" }}>생김새 · 사는 곳 · 금어기를 가나다로 찾아요</span></span>
                                 <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#0F283859" }} />
                             </button>
                         </FsSection>
@@ -556,7 +556,7 @@ function MarketBoard() {
                         );
                     })}
                 </ul>
-                <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>{MARKET_NOTE} 출처: {MARKET_SOURCE}.</p>
+                <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F2838B3" }}>{MARKET_NOTE} 출처: {MARKET_SOURCE}.</p>
             </div>
         </FsSection>
     );
@@ -600,7 +600,7 @@ function ReservoirBoard() {
                                 <li key={r.code} className="px-3.5 py-3" style={{ borderTop: i ? "1px dashed #0F283826" : undefined }} data-testid="fishing-reservoir-row">
                                     <div className="flex items-baseline gap-2">
                                         <span className="min-w-0 flex-1 truncate"><span className="text-[15px] font-semibold">{r.name}</span><span className="ml-1.5 text-[12.5px]" style={{ color: "#0F283880" }}>{r.county}</span></span>
-                                        <span className="shrink-0 text-[12.5px] tabular-nums" style={{ color: trend === "빠지는 중" ? SEAL : "#0F283899" }}>{trend}{trend === "그대로" ? "" : ` ${r.delta > 0 ? "+" : ""}${r.delta.toFixed(1)}`}</span>
+                                        <span className="shrink-0 text-[12.5px] tabular-nums" style={{ color: trend === "빠지는 중" ? SEAL : "#0F2838B3" }}>{trend}{trend === "그대로" ? "" : ` ${r.delta > 0 ? "+" : ""}${r.delta.toFixed(1)}`}</span>
                                         <span className="w-[58px] shrink-0 text-right text-[16px] font-semibold tabular-nums">{r.rate.toFixed(1)}<span className="text-[12px] font-normal" style={{ color: "#0F283880" }}>%</span></span>
                                         {mine.length > 0 && <button type="button" onClick={() => save(mine.filter((x) => x.code !== r.code))} aria-label={`${r.name} 빼기`} className="-mr-1.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full active:bg-[#0F283814]"><LucideX className="h-3.5 w-3.5" style={{ color: "#0F283880" }} /></button>}
                                     </div>
@@ -613,7 +613,7 @@ function ReservoirBoard() {
                             );
                         })}
                     </ul>
-                    <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>저수율과 지난 이레의 움직임이에요({rows[0].asOf.slice(5).replace("-", ".")} 기준). 물의 양이지 조황이 아니에요. 출처: {RESERVOIR_SOURCE}.</p>
+                    <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F2838B3" }}>저수율과 지난 이레의 움직임이에요({rows[0].asOf.slice(5).replace("-", ".")} 기준). 물의 양이지 조황이 아니에요. 출처: {RESERVOIR_SOURCE}.</p>
                 </div>
             )}
             {!finding ? (
@@ -735,7 +735,7 @@ function FishMapHome({ today, list, picks, want, onFish, onAdd, onOpenTrip }: { 
                         {days.map((d, i) => {
                             const on = d === (map?.day ?? day), weekend = ["토", "일"].includes(tideWeekday(d));
                             return <button key={d} type="button" aria-pressed={on} onClick={() => setDay(d)} data-testid="fishing-fishmap-day" className={cn("h-8 shrink-0 rounded-full px-2.5 text-[12.5px] tabular-nums", on && "font-semibold")}
-                                style={on ? { background: "#0F2838", color: "#F3ECDD" } : { color: weekend ? "#B7462A" : "#0F283899" }}>{i === 0 ? "오늘" : i === 1 ? "내일" : `${Number(d.slice(8))} ${tideWeekday(d)}`}</button>;
+                                style={on ? { background: "#0F2838", color: "#F3ECDD" } : { color: weekend ? "#B7462A" : "#0F2838B3" }}>{i === 0 ? "오늘" : i === 1 ? "내일" : `${Number(d.slice(8))} ${tideWeekday(d)}`}</button>;
                         })}
                     </div>
                 )}
@@ -1204,12 +1204,12 @@ function TideCard({ today, sea, onSea, list }: { today: string; sea: TideSea; on
                     <div className="flex shrink-0 rounded-full p-0.5" style={{ background: "#0F283814" }} role="group" aria-label="바다">
                         {TIDE_SEAS.map((s) => (
                             <button key={s.id} type="button" aria-pressed={sea === s.id} onClick={() => onSea(s.id)} className={cn("h-8 rounded-full px-2.5 text-[12px]", sea === s.id && "font-semibold")}
-                                style={sea === s.id ? { background: "#0F2838", color: "#F3ECDD" } : { color: "#0F283899" }} data-testid={`fishing-sea-${s.id}`}>{s.id === "west" ? "서해" : "남해 · 동해"}</button>
+                                style={sea === s.id ? { background: "#0F2838", color: "#F3ECDD" } : { color: "#0F2838B3" }} data-testid={`fishing-sea-${s.id}`}>{s.id === "west" ? "서해" : "남해 · 동해"}</button>
                         ))}
                     </div>
                 </div>
                 <p className="px-3.5 pt-2 text-[14px]" style={{ color: "#0F2838CC" }}>{TIDE_PHASE_TEXT[now.phase]}</p>
-                <p className="px-3.5 pt-0.5 text-[12.5px]" style={{ color: "#0F283899" }}>{[until(spring, "사리"), until(neap, "조금")].filter(Boolean).join(" · ")}</p>
+                <p className="px-3.5 pt-0.5 text-[12.5px]" style={{ color: "#0F2838B3" }}>{[until(spring, "사리"), until(neap, "조금")].filter(Boolean).join(" · ")}</p>
                 {/* 내 기록을 센 것 — 예보가 아니다. 물때가 붙은 조과가 셋은 쌓여야 말한다 */}
                 {tally.total >= 3 && (tally.byPhase[now.phase] > 0 || tally.top) && (
                     <p className="mx-3.5 mt-2.5 rounded-xl px-3 py-2 text-[12.5px] leading-relaxed [word-break:keep-all]" style={{ background: "#0F28380F", color: "#0F2838CC" }} data-testid="fishing-tide-mine">
@@ -1223,7 +1223,7 @@ function TideCard({ today, sea, onSea, list }: { today: string; sea: TideSea; on
                         const weekend = ["토", "일"].includes(tideWeekday(t.ymd));
                         return (
                             <li key={t.ymd} className="flex flex-col items-center pb-2 pt-2.5" style={{ background: i === 0 ? "#0F28380F" : undefined, borderLeft: i ? "1px dashed #0F28381F" : undefined }} data-testid="fishing-tide-day">
-                                <span className="text-[12px]" style={{ color: weekend ? "#B7462A" : "#0F283899" }}>{i === 0 ? "오늘" : `${Number(t.ymd.slice(8))} ${tideWeekday(t.ymd)}`}</span>
+                                <span className="text-[12px]" style={{ color: weekend ? "#B7462A" : "#0F2838B3" }}>{i === 0 ? "오늘" : `${Number(t.ymd.slice(8))} ${tideWeekday(t.ymd)}`}</span>
                                 <span className="mt-1.5"><Moon day={t.lunar.day} /></span>
                                 <span className={cn("mt-1.5 text-[12.5px] tabular-nums", (i === 0 || t.mark) && "font-semibold")} style={{ color: t.mark === "사리" ? SEAL : INK }}>{t.name}</span>
                                 <span className="h-[16px] text-[12px] leading-[16px]" style={{ color: t.mark === "사리" ? SEAL : "#0F283880" }}>{t.mark && t.mark !== t.name ? t.mark : ""}</span>
@@ -1231,7 +1231,7 @@ function TideCard({ today, sea, onSea, list }: { today: string; sea: TideSea; on
                         );
                     })}
                 </ol>
-                <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>음력 날짜로 센 물때예요. 달이 차고 기우는 대로 물이 세지고 약해져요.</p>
+                <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed" style={{ borderColor: "#0F28381F", color: "#0F2838B3" }}>음력 날짜로 센 물때예요. 달이 차고 기우는 대로 물이 세지고 약해져요.</p>
             </div>
         </section>
     );
@@ -1327,7 +1327,7 @@ function Crew({ crewId, meId, today, onAdd }: { crewId: string; meId: string; to
                 <div key={a} className="rounded-xl px-2 py-3 text-center" style={ids.length ? { background: PAPER, color: INK } : { background: "#FFFFFF0A", color: C.dim }} data-testid={`fishing-award-${a}`}>
                     <div className="flex justify-center"><Seal text={TRIP_AWARD_NAME[a]} size={38} faint={!ids.length} /></div>
                     <p className="mt-2 truncate text-[14px] font-semibold">{ids.length ? ids.map(nameOf).join(" · ") : "아직"}</p>
-                    <p className="mt-0.5 truncate text-[12px] tabular-nums" style={{ color: ids.length ? "#0F283899" : C.dim }}>{ids.length ? value : `${TRIP_POINTS[a]}점`}</p>
+                    <p className="mt-0.5 truncate text-[12px] tabular-nums" style={{ color: ids.length ? "#0F2838B3" : C.dim }}>{ids.length ? value : `${TRIP_POINTS[a]}점`}</p>
                 </div>
             );
         };
@@ -1665,7 +1665,7 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                             <>
                                 <img src={shot} alt="고른 사진" className="block aspect-[4/3] w-full object-cover" onLoad={(e) => setPortrait(e.currentTarget.naturalHeight > e.currentTarget.naturalWidth)} />
                                 <button type="button" onClick={() => { URL.revokeObjectURL(shot); setShot(null); setPortrait(false); setFile(null); if (fileRef.current) fileRef.current.value = ""; }} aria-label="사진 빼기" className="absolute right-3.5 top-3.5 flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "#000000A6", color: "#FFFFFF" }}><LucideX className="h-4 w-4" /></button>
-                                <p className="py-2.5 text-center text-[12.5px]" style={{ color: "#0F283899" }}>이 사진이 일지와 어종 한 장에 걸려요</p>
+                                <p className="py-2.5 text-center text-[12.5px]" style={{ color: "#0F2838B3" }}>이 사진이 일지와 어종 한 장에 걸려요</p>
                                 {portrait && <p className="pb-2.5 text-center text-[12.5px] font-semibold" style={{ color: "#C8372D" }} data-testid="fishing-photo-portrait">세로 사진이에요 · 가로로 찍으면 물고기가 더 크게 걸려요</p>}
                             </>
                         ) : (
@@ -1674,7 +1674,7 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                                     <LucideImage className="h-6 w-6" style={{ color: "#0F2838B3" }} />
                                     <span className="text-[14.5px] font-semibold">사진 올리기</span>
                                 </span>
-                                <span className="block py-2.5 text-center text-[12.5px]" style={{ color: "#0F283899" }}>없어도 돼요 · 사진은 나만 봐요</span>
+                                <span className="block py-2.5 text-center text-[12.5px]" style={{ color: "#0F2838B3" }}>없어도 돼요 · 사진은 나만 봐요</span>
                             </button>
                         )}
                     </div>
@@ -1717,11 +1717,11 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                             <span className="absolute right-0 top-0" style={{ transform: "rotate(5deg)" }}>{live?.tier ? <Seal text={live.tier.name} size={52} /> : <Seal text={fish.tiers[0].name} size={52} faint />}</span>
                         </div>
                     )}
-                    <label className="block"><span className="mb-1.5 block text-[13px]" style={{ color: "#0F283899" }}>{unit === "cm" ? "가장 큰 것의 길이" : unit === "count" ? "마릿수" : unit === "kg" ? "가장 큰 것의 무게" : "굵기(지)"}</span>
+                    <label className="block"><span className="mb-1.5 block text-[13px]" style={{ color: "#0F2838B3" }}>{unit === "cm" ? "가장 큰 것의 길이" : unit === "count" ? "마릿수" : unit === "kg" ? "가장 큰 것의 무게" : "굵기(지)"}</span>
                         <div className="flex items-baseline gap-2">
                             <input inputMode={unit === "count" || unit === "ji" ? "numeric" : "decimal"} value={value} onChange={(e) => setValue(e.target.value.replace(unit === "count" || unit === "ji" ? /[^\d]/g : /[^\d.]/g, "").slice(0, 5))} placeholder="0"
                                 className="h-14 w-[132px] rounded-xl px-3 text-[30px] font-semibold tabular-nums outline-none placeholder:text-[#0F283840]" style={{ background: "#0F28380F", color: INK }} data-testid="fishing-value" />
-                            <span className="text-[16px]" style={{ color: "#0F283899" }}>{FISH_UNIT_LABEL[unit]}</span>
+                            <span className="text-[16px]" style={{ color: "#0F2838B3" }}>{FISH_UNIT_LABEL[unit]}</span>
                         </div>
                     </label>
                     {fish && (
@@ -1731,7 +1731,7 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                         </p>
                     )}
                     {unit !== "count" && (
-                        <label className="mt-3 flex items-center gap-3"><span className="text-[13px]" style={{ color: "#0F283899" }}>마릿수</span>
+                        <label className="mt-3 flex items-center gap-3"><span className="text-[13px]" style={{ color: "#0F2838B3" }}>마릿수</span>
                             <input inputMode="numeric" value={count} onChange={(e) => setCount(e.target.value.replace(/[^\d]/g, "").slice(0, 3))} className="h-10 w-[72px] rounded-lg px-3 text-[15px] tabular-nums outline-none" style={{ background: "#0F28380F", color: INK }} data-testid="fishing-count" /></label>
                     )}
                 </div>

@@ -303,7 +303,7 @@ export default function Stores() {
           </div>
         )}
 
-        <p className="text-[12.5px] font-semibold text-black/45 mb-4">{t.count(total + filteredPartners.length)}</p>
+        <p className="text-[12.5px] font-semibold text-black/55 mb-4">{t.count(total + filteredPartners.length)}</p>
 
         {/* 파트너 매장 — 상단 고정 */}
         {filteredPartners.length > 0 && (
@@ -329,7 +329,7 @@ export default function Stores() {
           <div className="h-40 bg-black/[0.04] rounded-2xl animate-pulse" />
         ) : listings.length === 0 && filteredPartners.length === 0 ? (
           <div className="text-center py-14">
-            <p className="text-black/45 text-[14px]">{t.empty}</p>
+            <p className="text-black/55 text-[14px]">{t.empty}</p>
             {/* 검색해도 없다 = 신규 등록의 가장 자연스러운 순간 */}
             <button
               onClick={() => setLocation("/stores/register")}
@@ -352,7 +352,7 @@ export default function Stores() {
                 </div>
                 <p className="text-[12.5px] text-black/55 mt-1 truncate">{s.distanceKm != null && <span className="text-brand font-bold">{s.distanceKm}km · </span>}{s.address}</p>
                 {(s.tableLarge || s.tableMedium || s.tablePocket || s.rate10Large || s.rate10Medium) && (
-                  <p className="text-[12px] text-black/40 mt-0.5 tabular-nums truncate">
+                  <p className="text-[12px] text-black/55 mt-0.5 tabular-nums truncate">
                     {t.tables(s.tableLarge ?? 0, s.tableMedium ?? 0, s.tablePocket ?? 0)}
                     {/* 10분당 요금 — 대대 우선, 없으면 중대 */}
                     {(s.rate10Large || s.rate10Medium) && (

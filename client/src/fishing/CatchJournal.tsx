@@ -74,11 +74,11 @@ export function CatchJournal({ list, today, onFish, onRemove }: { list: readonly
                                     <div className="flex items-center gap-3 px-3.5 pb-2.5 pt-3">
                                         <p className="w-[42px] shrink-0 text-center leading-none">
                                             <span className="block text-[26px] font-semibold tabular-nums tracking-tight">{Number(day.slice(8))}</span>
-                                            <span className="mt-1 block text-[12px]" style={{ color: weekend ? "#B7462A" : "#0F283899" }}>{tideWeekday(day)}요일</span>
+                                            <span className="mt-1 block text-[12px]" style={{ color: weekend ? "#B7462A" : "#0F2838B3" }}>{tideWeekday(day)}요일</span>
                                         </p>
                                         <p className="min-w-0 flex-1">
                                             <span className="block truncate text-[16px] font-semibold tracking-tight">{places.join(" · ") || "곳을 적지 않은 날"}</span>
-                                            <span className="mt-0.5 block truncate text-[13px]" style={{ color: "#0F283899" }}>{[spots.join(" · "), `${rows.length}줄`].filter(Boolean).join(" · ")}</span>
+                                            <span className="mt-0.5 block truncate text-[13px]" style={{ color: "#0F2838B3" }}>{[spots.join(" · "), `${rows.length}줄`].filter(Boolean).join(" · ")}</span>
                                         </p>
                                         {tide && <span className="shrink-0 rounded-full px-2.5 py-1 text-[12.5px] tabular-nums" style={{ boxShadow: "inset 0 0 0 1px #0F283840", color: "#0F2838CC" }}>{tide.name}</span>}
                                     </div>
@@ -110,9 +110,9 @@ export function CatchJournal({ list, today, onFish, onRemove }: { list: readonly
                                                             {fish ? <img src={art(fish.id)} alt="" width={640} height={400} loading="lazy" decoding="async" className="h-9 w-[50px] object-contain" style={{ mixBlendMode: "multiply" }} /> : <i aria-hidden className="h-[2px] w-6 rounded-full" style={{ background: "#0F283840" }} />}
                                                         </span>
                                                         <span className="min-w-0 flex-1">
-                                                            <span className="block truncate text-[15px] font-semibold">{c.species}{c.released ? <span className="ml-1.5 text-[12.5px] font-normal" style={{ color: "#0F283899" }}>방류</span> : null}</span>
+                                                            <span className="block truncate text-[15px] font-semibold">{c.species}{c.released ? <span className="ml-1.5 text-[12.5px] font-normal" style={{ color: "#0F2838B3" }}>방류</span> : null}</span>
                                                             {c.note ? <span className="mt-0.5 line-clamp-2 text-[13px] leading-snug [word-break:keep-all]" style={{ color: "#0F2838B3" }}>{c.note}</span> : null}
-                                                            {(() => { const sea = weatherLine(c.weather); const again = sameSpot(list, c).length; return sea || again ? <span className="mt-0.5 block text-[12.5px] leading-snug [word-break:keep-all]" style={{ color: "#0F283899" }} data-testid="catch-sea">{[sea, again ? `같은 자리 기록 ${again}개` : null].filter(Boolean).join(" · ")}</span> : null; })()}
+                                                            {(() => { const sea = weatherLine(c.weather); const again = sameSpot(list, c).length; return sea || again ? <span className="mt-0.5 block text-[12.5px] leading-snug [word-break:keep-all]" style={{ color: "#0F2838B3" }} data-testid="catch-sea">{[sea, again ? `같은 자리 기록 ${again}개` : null].filter(Boolean).join(" · ")}</span> : null; })()}
                                                         </span>
                                                         <span className="shrink-0 text-[15px] font-semibold tabular-nums">{valueText(c)}</span>
                                                         {tier && <Seal text={tier.name} size={30} />}

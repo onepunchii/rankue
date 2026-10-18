@@ -39,10 +39,10 @@ function H2({ children, aside }: { children: React.ReactNode; aside?: React.Reac
 function FishCard({ f, n }: { f: FishKind; n: number }) {
     return (
         <Link href={fishingFishPath(f.name)} className="block overflow-hidden rounded-2xl active:opacity-85" style={SHEET} data-testid="fish-card">
-            <span className="block px-3 pt-2.5 text-[12px]" style={{ color: "#0F283899" }}>{waterWord(f)}</span>
+            <span className="block px-3 pt-2.5 text-[12px]" style={{ color: "#0F2838B3" }}>{waterWord(f)}</span>
             <img src={art(f.id)} alt={`${f.name} 어탁`} width={640} height={400} loading="lazy" decoding="async" className="mx-auto block h-[82px] w-full object-contain px-2" style={{ mixBlendMode: "multiply" }} />
             <span className="flex items-end justify-between gap-2 px-3 pb-3 pt-1" style={{ borderTop: RULE }}>
-                <span className="min-w-0"><span className="block truncate text-[16px] font-semibold">{f.name}</span><span className="block text-[12px] tabular-nums" style={{ color: "#0F283899" }}>{n > 0 ? `낚시터 ${n}곳` : f.tiers.map((t) => t.name).slice(0, 2).join(" · ")}</span></span>
+                <span className="min-w-0"><span className="block truncate text-[16px] font-semibold">{f.name}</span><span className="block text-[12px] tabular-nums" style={{ color: "#0F2838B3" }}>{n > 0 ? `낚시터 ${n}곳` : f.tiers.map((t) => t.name).slice(0, 2).join(" · ")}</span></span>
                 {/* 카드의 낙관은 세 글자까지인 첫 단계(500그램처럼 긴 이름은 작은 낙관 밖으로 넘친다) */}
                 <Seal text={(f.tiers.find((t) => t.name.length <= 3) ?? f.tiers[0]).name} size={34} />
             </span>
@@ -133,12 +133,12 @@ export function FishPage({ name }: { name: string }) {
             <div className="px-5 pt-4">
                 <div className="overflow-hidden rounded-2xl" style={SHEET} data-testid="fish-hero">
                     <div className="px-4 pt-3.5">
-                        <p className="text-[12.5px]" style={{ color: "#0F283899" }}>{waterWord(f)} 낚시{aka ? ` · 표준 이름 ${aka}` : ""}</p>
+                        <p className="text-[12.5px]" style={{ color: "#0F2838B3" }}>{waterWord(f)} 낚시{aka ? ` · 표준 이름 ${aka}` : ""}</p>
                         <img src={art(f.id)} alt={`${f.name} 어탁`} width={640} height={400} decoding="async" className="mx-auto mt-1 block h-[176px] w-full object-contain" style={{ mixBlendMode: "multiply" }} />
                         <h1 className="pb-3 text-[28px] font-semibold leading-tight tracking-tight">{f.name}</h1>
                     </div>
                     <div className="px-3 pb-3.5 pt-3" style={{ borderTop: RULE }} data-testid="fish-ladder">
-                        <p className="px-1 text-[13px]" style={{ color: "#0F283899" }}>낚시꾼이 부르는 크기</p>
+                        <p className="px-1 text-[13px]" style={{ color: "#0F2838B3" }}>낚시꾼이 부르는 크기</p>
                         <div className="relative mt-3 flex">
                             <i aria-hidden className="absolute left-[10%] right-[10%] top-[21px] border-t border-dashed" style={{ borderColor: "#0F283840" }} />
                             {f.tiers.map((t) => (
@@ -148,7 +148,7 @@ export function FishPage({ name }: { name: string }) {
                                 </div>
                             ))}
                         </div>
-                        <p className="mt-3 px-1 text-[12.5px] [word-break:keep-all]" style={{ color: "#0F283899" }}>낚시계의 관행이에요 — 법의 기준(금지체장)이 아니에요.</p>
+                        <p className="mt-3 px-1 text-[12.5px] [word-break:keep-all]" style={{ color: "#0F2838B3" }}>낚시계의 관행이에요 — 법의 기준(금지체장)이 아니에요.</p>
                     </div>
                 </div>
                 {(FISH_REG_NAMES[f.id] ?? []).length > 0 && <div className="mt-3"><RegBox names={FISH_REG_NAMES[f.id]} regs={regs} label={f.name} /></div>}

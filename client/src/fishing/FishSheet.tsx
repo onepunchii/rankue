@@ -52,7 +52,7 @@ function Story({ info, month }: { info: FishInfo; month: number }) {
         <div className="overflow-hidden rounded-2xl" style={SHEET} data-testid="fishing-fish-story">
             {info.season?.length ? (
                 <div className="px-3.5 pb-3 pt-3.5" data-testid="fishing-fish-season">
-                    <p className="flex items-baseline justify-between text-[13px]" style={{ color: "#0F283899" }}><span>제철</span>{inSeason ? <span className="font-semibold" style={{ color: SEAL }}>지금이 제철</span> : <span>지금은 {month}월</span>}</p>
+                    <p className="flex items-baseline justify-between text-[13px]" style={{ color: "#0F2838B3" }}><span>제철</span>{inSeason ? <span className="font-semibold" style={{ color: SEAL }}>지금이 제철</span> : <span>지금은 {month}월</span>}</p>
                     <div className="mt-2 grid grid-cols-12 gap-px" role="img" aria-label={`제철은 ${info.season.join(" · ")}월`}>
                         {Array.from({ length: 12 }, (_, i) => i + 1).map((m) => {
                             const on = info.season!.includes(m);
@@ -68,13 +68,13 @@ function Story({ info, month }: { info: FishInfo; month: number }) {
             ) : null}
             {rows.map(([label, value], i) => (
                 <div key={label} className="flex gap-3 px-3.5 py-3" style={{ borderTop: i || info.season?.length ? RULE : undefined }}>
-                    <span className="w-[68px] shrink-0 pt-0.5 text-[13px]" style={{ color: "#0F283899" }}>{label}</span>
+                    <span className="w-[68px] shrink-0 pt-0.5 text-[13px]" style={{ color: "#0F2838B3" }}>{label}</span>
                     <span className="min-w-0 flex-1 text-[14.5px] leading-relaxed [word-break:keep-all]">{value}</span>
                 </div>
             ))}
             {info.tips?.length ? (
                 <div className="px-3.5 py-3" style={{ borderTop: rows.length || info.season?.length ? RULE : undefined }}>
-                    <p className="text-[13px]" style={{ color: "#0F283899" }}>요령</p>
+                    <p className="text-[13px]" style={{ color: "#0F2838B3" }}>요령</p>
                     <ul className="mt-1.5 space-y-1.5">{info.tips.map((t, i) => <li key={t} className="flex gap-2 text-[14.5px] leading-relaxed [word-break:keep-all]"><span className="shrink-0 tabular-nums" style={{ color: "#0F283873" }}>{i + 1}</span><span>{t}</span></li>)}</ul>
                 </div>
             ) : null}
@@ -85,10 +85,10 @@ function Story({ info, month }: { info: FishInfo; month: number }) {
                         {[info.ban.period ? `금어기 ${info.ban.period}` : null, info.ban.minCm != null ? `금지체장 ${info.ban.minCm}cm 이하` : null].filter(Boolean).join(" · ")}
                     </p>
                     <p className="mt-0.5 text-[13px] leading-relaxed [word-break:keep-all]" style={{ color: "#0F2838B3" }}>{info.ban.minCm != null ? "이보다 작으면 놓아 줘요. " : ""}{info.ban.note ?? ""}</p>
-                    <p className="mt-1 text-[12px] [word-break:keep-all]" style={{ color: "#0F283899" }}>출처: {info.ban.source}</p>
+                    <p className="mt-1 text-[12px] [word-break:keep-all]" style={{ color: "#0F2838B3" }}>출처: {info.ban.source}</p>
                 </div>
             )}
-            {info.sources?.length ? <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F283899" }}>자료: {info.sources.join(" · ")}</p> : null}
+            {info.sources?.length ? <p className="border-t px-3.5 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderColor: "#0F28381F", color: "#0F2838B3" }}>자료: {info.sources.join(" · ")}</p> : null}
         </div>
     );
 }
@@ -134,24 +134,24 @@ export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap, onRul
                 {/* 1. 종이 위의 어탁 · 이름 · 낙관의 사다리 */}
                 <div className="overflow-hidden rounded-2xl" style={{ ...SHEET, background: `radial-gradient(120% 70% at 20% 0%, #F6F0E2 0%, ${PAPER} 55%, #E7DEC9 100%)` }}>
                     <div className="relative px-4 pt-3.5">
-                        <p className="text-[12.5px]" style={{ color: "#0F283899" }}>{fish.water === "sea" ? "바다" : "민물"}{info?.aka?.length ? ` · ${info.aka.join(" · ")}` : ""}</p>
+                        <p className="text-[12.5px]" style={{ color: "#0F2838B3" }}>{fish.water === "sea" ? "바다" : "민물"}{info?.aka?.length ? ` · ${info.aka.join(" · ")}` : ""}</p>
                         <img src={art(fish.id)} alt={`${fish.name} 어탁`} width={640} height={400} decoding="async" className="mx-auto mt-1 block h-[172px] w-full object-contain" style={{ mixBlendMode: "multiply" }} />
                         <div className="flex items-end justify-between gap-3">
                             <p className="min-w-0 text-[27px] font-semibold leading-tight tracking-tight">{fish.name}</p>
-                            {rec?.value != null && <p className="shrink-0 text-right leading-none"><span className="block text-[12px]" style={{ color: "#0F283899" }}>내 기록</span><span className="mt-1 block text-[26px] font-semibold tabular-nums tracking-tight">{fishValueText(fish.unit, rec.value)}</span></p>}
+                            {rec?.value != null && <p className="shrink-0 text-right leading-none"><span className="block text-[12px]" style={{ color: "#0F2838B3" }}>내 기록</span><span className="mt-1 block text-[26px] font-semibold tabular-nums tracking-tight">{fishValueText(fish.unit, rec.value)}</span></p>}
                         </div>
                         {info?.intro && <p className="mt-1.5 text-[14px] leading-relaxed [word-break:keep-all]" style={{ color: "#0F2838CC" }} data-testid="fishing-fish-intro">{info.intro}</p>}
                         <div className="h-3.5" aria-hidden />
                     </div>
                     {/* 낙관의 사다리 — 칸마다 한 단계. 찍은 것은 붉게, 아직인 것은 테두리만 */}
                     <div className="px-3 pb-3.5 pt-3" style={{ borderTop: RULE }} data-testid="fishing-fish-ladder">
-                        <p className="flex items-baseline justify-between px-1 text-[13px]" style={{ color: "#0F283899" }}><span>낙관 {reached}/{fish.tiers.length}</span><span>{UNIT_WORD[fish.unit]}</span></p>
+                        <p className="flex items-baseline justify-between px-1 text-[13px]" style={{ color: "#0F2838B3" }}><span>낙관 {reached}/{fish.tiers.length}</span><span>{UNIT_WORD[fish.unit]}</span></p>
                         <div className="relative mt-3 flex">
                             <i aria-hidden className="absolute left-[10%] right-[10%] top-[21px] border-t border-dashed" style={{ borderColor: "#0F283840" }} />
                             {fish.tiers.map((t, i) => (
                                 <div key={t.name} className="relative flex flex-1 flex-col items-center gap-1.5" data-got={i < reached ? "1" : "0"}>
                                     <span className="rounded-[6px]" style={{ background: i < reached ? "transparent" : "#EFE8D8" }}><Seal text={t.name} size={42} faint={i >= reached} /></span>
-                                    <span className="text-[12.5px] tabular-nums" style={{ color: i < reached ? INK : "#0F283899" }}>{fishValueText(fish.unit, t.min)}</span>
+                                    <span className="text-[12.5px] tabular-nums" style={{ color: i < reached ? INK : "#0F2838B3" }}>{fishValueText(fish.unit, t.min)}</span>
                                 </div>
                             ))}
                         </div>

@@ -409,7 +409,7 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
                     {lats.map((lat) => { const [, y] = latLngToOutline(lat, 127); return y > v.y + 70 * u && y < v.y + v.h - 16 * u && !underTag(v.x + 14 * u, y - 7 * u) ? <text key={lat} x={v.x + 4 * u} y={y - 3 * u} stroke="#EFE8D8" strokeWidth={fs * 0.2} paintOrder="stroke">{lat}°</text> : null; })}
                 </g>
                 <g transform={`translate(${v.x + 48 * u} ${v.y + 46 * u})`} pointerEvents="none" data-testid="fishing-chart-scale">
-                    <rect x={0} y={-3 * u} width={scaleKm * KM} height={4 * u} fill="#F3ECDD" stroke="#0F283899" strokeWidth={0.8 * u} />
+                    <rect x={0} y={-3 * u} width={scaleKm * KM} height={4 * u} fill="#F3ECDD" stroke="#0F2838B3" strokeWidth={0.8 * u} />
                     <rect x={0} y={-3 * u} width={(scaleKm * KM) / 2} height={4 * u} fill="#0F2838B3" />
                     <text x={scaleKm * KM + 5 * u} y={1 * u} fontSize={fs * 0.97} fill="#0F2838B3" stroke="#EFE8D8" strokeWidth={fs * 0.2} paintOrder="stroke">{scaleKm}km</text>
                 </g>

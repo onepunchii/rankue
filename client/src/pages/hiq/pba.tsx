@@ -206,7 +206,7 @@ export default function HiqPba() {
             {(sched?.upcoming?.length ?? 0) > 0 && (
                 <div className="mb-4">
                     <div className="flex items-baseline justify-between gap-2 mb-2">
-                        <p className="text-[12px] font-bold text-black/40">{t.upcoming}</p>
+                        <p className="text-[12px] font-bold text-black/55">{t.upcoming}</p>
                         <Link href="/tournaments" className="shrink-0 text-[12px] font-semibold text-brand active:opacity-60">{t.allEvents} ›</Link>
                     </div>
                     <div className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5 scrollbar-hide">
@@ -222,10 +222,10 @@ export default function HiqPba() {
                                         )}>
                                             {live ? t.today : `${t.dday}${d}`}
                                         </span>
-                                        <span className="text-[12px] font-bold text-black/40">{e.league.replace(/1$/, "")}</span>
+                                        <span className="text-[12px] font-bold text-black/55">{e.league.replace(/1$/, "")}</span>
                                     </div>
                                     <p className="mt-1.5 text-[12.5px] font-bold leading-snug line-clamp-2">{e.title}</p>
-                                    <p className="mt-1 text-[12px] text-black/40 tabular-nums">
+                                    <p className="mt-1 text-[12px] text-black/55 tabular-nums">
                                         {e.startDate.slice(5).replace("-", ".")}~{e.endDate.slice(5).replace("-", ".")}{e.place ? ` · ${e.place}` : ""}
                                     </p>
                                 </div>
@@ -242,7 +242,7 @@ export default function HiqPba() {
                         <div key={i} className="h-[64px] bg-black/[0.04] rounded-2xl animate-pulse" />
                     ))
                 ) : rows.length === 0 ? (
-                    <div className="rk-card p-8 text-center text-[14px] text-black/45">{t.empty}</div>
+                    <div className="rk-card p-8 text-center text-[14px] text-black/55">{t.empty}</div>
                 ) : (
                     rows.map((r, idx) => {
                         const rank = by === "point" ? r.pointRank : r.prizeRank;
@@ -265,7 +265,7 @@ export default function HiqPba() {
                                             <LucideMedal className="w-[18px] h-[18px]" />
                                         </div>
                                     ) : (
-                                        <span className="w-9 shrink-0 text-center font-semibold text-black/40 text-[15px] tabular-nums">{rank ?? "-"}</span>
+                                        <span className="w-9 shrink-0 text-center font-semibold text-black/55 text-[15px] tabular-nums">{rank ?? "-"}</span>
                                     )}
                                     <span className="text-[16px] leading-none shrink-0">{flagEmoji(r.nationCode ?? "") || "🏳️"}</span>
                                     <div className="min-w-0">
@@ -277,7 +277,7 @@ export default function HiqPba() {
                                     <span className="block text-[15px] font-bold tabular-nums">
                                         {by === "prize" ? formatPrize(r.prize, locale) : r.rankingPoint.toLocaleString()}
                                     </span>
-                                    <span className="block text-[12px] font-medium text-black/40">
+                                    <span className="block text-[12px] font-medium text-black/55">
                                         {by === "prize" ? t.prize : t.point}
                                     </span>
                                 </div>
@@ -311,9 +311,9 @@ export default function HiqPba() {
             </button>
             {/* "프로당구 선수 연봉" 검색 대응 — 상금을 연봉으로 부르지 않고 사실을 밝힌다 */}
             {locale === "ko" && (
-                <p className="mt-4 text-[12px] text-black/40 leading-relaxed px-1">{PBA_INCOME_NOTE_KO}</p>
+                <p className="mt-4 text-[12px] text-black/55 leading-relaxed px-1">{PBA_INCOME_NOTE_KO}</p>
             )}
-            <p className="mt-3 text-center text-[12px] text-black/35">{t.source}</p>
+            <p className="mt-3 text-center text-[12px] text-black/55">{t.source}</p>
             <HiqNavigation />
         </div>
     );

@@ -119,7 +119,7 @@ export function MoveTag({ row, hasPrev, locale }: { row: UmbMoveRow; hasPrev: bo
     }
     if (row.move > 0) return <span className="shrink-0 text-[13px] font-bold tabular-nums text-brand">▲{row.move}</span>;
     if (row.move < 0) return <span className="shrink-0 text-[13px] font-bold tabular-nums text-red-600">▼{-row.move}</span>;
-    return <span className="shrink-0 text-[13px] font-medium text-ink-4">–</span>;
+    return <span className="shrink-0 text-[13px] font-medium text-ink-3">–</span>;
 }
 
 /**
@@ -134,7 +134,7 @@ export function PlayerLinkRow({ cat, row, hasPrev, locale, sub, showPrev }: {
     const L = EXTRA_TEXT[locale] ?? EXTRA_TEXT.en;
     return (
         <Link href={playerPath(cat, row.playerUmbId)} className="flex items-center gap-3 px-3.5 py-3 hover:bg-black/[0.03] transition-colors">
-            <span className={cn("w-11 shrink-0 text-center text-[14px] font-bold tabular-nums", row.rank === null ? "text-ink-4" : "text-ink-2")}>
+            <span className={cn("w-11 shrink-0 text-center text-[14px] font-bold tabular-nums", row.rank === null ? "text-ink-3" : "text-ink-2")}>
                 {row.rank ?? row.prevRank}
             </span>
             <span className="flex-1 min-w-0">
@@ -149,7 +149,7 @@ export function PlayerLinkRow({ cat, row, hasPrev, locale, sub, showPrev }: {
             </span>
             <MoveTag row={row} hasPrev={hasPrev} locale={locale} />
             {/* 이탈한 선수는 직전 회차 포인트라 순위처럼 흐리게 — 현재 포인트로 읽히지 않게 */}
-            <span className={cn("w-11 shrink-0 text-right text-[14px] font-bold tabular-nums", row.rank === null ? "text-ink-4" : "text-ink-1")}>{row.points ?? row.prevPoints ?? "–"}</span>
+            <span className={cn("w-11 shrink-0 text-right text-[14px] font-bold tabular-nums", row.rank === null ? "text-ink-3" : "text-ink-1")}>{row.points ?? row.prevPoints ?? "–"}</span>
         </Link>
     );
 }

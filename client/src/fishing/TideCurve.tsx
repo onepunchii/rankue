@@ -60,7 +60,7 @@ export function TideCurve({ points, turns, nowMin, sun }: {
                     <g key={`${t.kind}${t.min}`} data-testid="fishing-tide-turn">
                         <circle cx={cx} cy={cy} r={3.4 * u} fill={high ? "#C8372D" : "#F3ECDD"} stroke={high ? "#C8372D" : "#1F5A78"} strokeWidth={1.4 * u} />
                         <text x={lx} y={high ? cy - fs * 1.78 : cy + fs * 1.5} textAnchor="middle" fontSize={fs} fontWeight="600" fill="#0F2838" stroke="#F3ECDD" strokeWidth={fs * 0.2} paintOrder="stroke">{label}</text>
-                        <text x={lx} y={high ? cy - fs * 0.66 : cy + fs * 2.62} textAnchor="middle" fontSize={fs} fill="#0F283899" stroke="#F3ECDD" strokeWidth={fs * 0.2} paintOrder="stroke">{t.cm}cm</text>
+                        <text x={lx} y={high ? cy - fs * 0.66 : cy + fs * 2.62} textAnchor="middle" fontSize={fs} fill="#0F2838B3" stroke="#F3ECDD" strokeWidth={fs * 0.2} paintOrder="stroke">{t.cm}cm</text>
                     </g>
                 );
             })}

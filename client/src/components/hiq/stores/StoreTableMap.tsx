@@ -123,7 +123,7 @@ export function StoreTableMap({ region, onPick, copy }: {
                     </div>
                 </Table>
                 <div className="min-w-0 flex-1 pt-0.5">
-                    <p className="mb-1.5 text-[12px] font-semibold text-black/45">{copy.byRegion}</p>
+                    <p className="mb-1.5 text-[12px] font-semibold text-black/55">{copy.byRegion}</p>
                     <ol className="space-y-1">
                         {rows.map((c) => {
                             const sel = c.region === region;
@@ -142,10 +142,10 @@ export function StoreTableMap({ region, onPick, copy }: {
                             );
                         })}
                     </ol>
-                    {rest > 0 && <p className="mt-1.5 px-1.5 text-[12px] font-medium text-black/45 tabular-nums">{copy.others(rest)}</p>}
+                    {rest > 0 && <p className="mt-1.5 px-1.5 text-[12px] font-medium text-black/55 tabular-nums">{copy.others(rest)}</p>}
                 </div>
             </div>
-            <p className="mt-2 flex items-center gap-1.5 text-[12px] font-medium text-black/45">
+            <p className="mt-2 flex items-center gap-1.5 text-[12px] font-medium text-black/55">
                 {/* 범례 — 펠트 한 조각 위의 공 하나(밝은 바탕에서 빈 동그라미로 읽히지 않게) */}
                 <span className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-[4px]" style={{ background: "#0F6E4A" }} aria-hidden>
                     <span className="h-[6px] w-[6px] rounded-full" style={{ background: IVORY }} />
@@ -259,7 +259,7 @@ export function StoreNearTable({ code, lat, lng, onOpen, copy }: {
                             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[12px] font-bold" style={{ background: YELLOW, color: "#3A2A04", boxShadow: "inset 0 0 0 1px #7A5A0866" }}>{i + 1}</span>
                             <span className="min-w-0 flex-1">
                                 <span className="block truncate text-[14.5px] font-bold text-ink-1">{n.name}</span>
-                                <span className="mt-0.5 block truncate text-[12px] text-black/45">{n.address}</span>
+                                <span className="mt-0.5 block truncate text-[12px] text-black/55">{n.address}</span>
                             </span>
                             <span className="shrink-0 text-[13px] font-bold tabular-nums text-brand">{km(n.distanceKm!)}</span>
                             <span className="shrink-0 text-[16px] text-black/25" aria-hidden>›</span>

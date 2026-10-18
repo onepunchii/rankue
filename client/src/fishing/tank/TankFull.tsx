@@ -450,7 +450,7 @@ function DecorSheet({ slot, onSlot, night, items, placed, onPlace, onDone }: {
                             </span>
                             <span className="mt-1 w-full truncate text-[13px] font-semibold" style={{ color: have ? "#0F2838" : "#F3ECDDCC" }}>{d.name}</span>
                             {have ? (
-                                <span className="mt-0.5 text-[12px] tabular-nums" style={{ color: "#0F283899" }}>
+                                <span className="mt-0.5 text-[12px] tabular-nums" style={{ color: "#0F2838B3" }}>
                                     {here ? "놓임 · 누르면 비움" : other ? `${DECOR_SLOT_NAME[other]}에 있음` : r?.serial ? `No.${String(r.serial).padStart(3, "0")}${d.limit ? `/${DECOR_LIMITED}` : ""}` : "놓기"}
                                 </span>
                             ) : (

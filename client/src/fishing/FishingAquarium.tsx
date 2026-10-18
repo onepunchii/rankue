@@ -140,7 +140,7 @@ export function FishingAquarium({ fish, seals, placed, onFish, mini = false, onO
                 </>
             )}
             {!sample && !mini && (
-                <p className="pointer-events-none absolute inset-x-4 bottom-3 text-center text-[12px] break-keep" style={{ color: night ? "#F3ECDD99" : "#0F283899" }} data-testid="fishing-tank-hint">
+                <p className="pointer-events-none absolute inset-x-4 bottom-3 text-center text-[12px] break-keep" style={{ color: night ? "#F3ECDD99" : "#0F2838B3" }} data-testid="fishing-tank-hint">
                     물을 누르면 먹이를 줘요 · 물고기를 누르면 그 어종의 한 장
                 </p>
             )}

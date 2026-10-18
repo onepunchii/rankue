@@ -322,7 +322,7 @@ export default function StoreListingPage() {
         )}
 
         {isLoading && <div className="h-40 bg-black/[0.04] rounded-2xl animate-pulse" />}
-        {!isLoading && !s && <p className="text-center text-black/45 py-16 text-[14px]">{t.notFound}</p>}
+        {!isLoading && !s && <p className="text-center text-black/55 py-16 text-[14px]">{t.notFound}</p>}
 
         {s && (
           <>
@@ -370,7 +370,7 @@ export default function StoreListingPage() {
               <a
                 href={s.phone ? `tel:${s.phone}` : undefined}
                 aria-disabled={!s.phone}
-                className={`h-[52px] rounded-2xl flex flex-col items-center justify-center gap-1 transition-colors ${s.phone ? "bg-brand text-white active:bg-brand/90" : "bg-black/[0.04] text-black/25 pointer-events-none"}`}
+                className={`h-[52px] rounded-2xl flex flex-col items-center justify-center gap-1 transition-colors ${s.phone ? "bg-brand text-white active:bg-brand/90" : "bg-black/[0.04] text-black/55 pointer-events-none"}`}
               >
                 <LucidePhone className="w-[18px] h-[18px]" />
                 <span className="text-[12px] font-bold leading-none">{t.callCta}</span>
@@ -478,7 +478,7 @@ export default function StoreListingPage() {
                         <p className="text-[12px] font-bold text-brand/70">{t.regular}</p>
                         <p className="text-[14.5px] font-bold text-ink-1 truncate">{s.honor.regular.name}</p>
                       </div>
-                      <span className="text-[12px] font-semibold text-black/45 tabular-nums shrink-0">{s.honor.regular.games}{t.regularGames}</span>
+                      <span className="text-[12px] font-semibold text-black/55 tabular-nums shrink-0">{s.honor.regular.games}{t.regularGames}</span>
                     </div>
                   )}
                 </div>
@@ -517,11 +517,11 @@ export default function StoreListingPage() {
                         </span>
                         <span className="flex-1 min-w-0">
                           <span className="block text-[14.5px] font-bold text-ink-1 truncate">{c.name}</span>
-                          <span className="block text-[12px] font-medium text-black/45 tabular-nums mt-0.5">
+                          <span className="block text-[12px] font-medium text-black/55 tabular-nums mt-0.5">
                             {c.memberCount}{t.crewMembers}{c.gameType && c.gameType !== "any" ? ` · ${c.gameType.toUpperCase()}` : ""}
                           </span>
                         </span>
-                        <span className="shrink-0 text-black/25 text-[16px]">›</span>
+                        <span className="shrink-0 text-black/55 text-[16px]">›</span>
                       </button>
                     );
                   })}
@@ -533,7 +533,7 @@ export default function StoreListingPage() {
             <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] mb-4">
               {s.claimed && s.description
                 ? <p className="text-[14px] leading-relaxed whitespace-pre-wrap">{s.description}</p>
-                : <p className="text-[13px] text-black/40">{t.descEmpty}</p>}
+                : <p className="text-[13px] text-black/55">{t.descEmpty}</p>}
             </div>
 
             {/* 이미 인증된 매장에는 신청 버튼을 숨긴다 — 서버도 409 로 이중 방어 */}
@@ -559,7 +559,7 @@ export default function StoreListingPage() {
               </button>
             )}
             {!s.claimed && myClaim?.status !== "pending" && (
-              <p className="-mt-1 mb-2 text-center text-[12px] font-medium text-black/45 break-keep">{t.claimHint}</p>
+              <p className="-mt-1 mb-2 text-center text-[12px] font-medium text-black/55 break-keep">{t.claimHint}</p>
             )}
             <button
               onClick={() => setSuggestOpen(true)}
@@ -580,7 +580,7 @@ export default function StoreListingPage() {
               <span className="block text-[15px] font-bold">{t.guestAccount}</span>
               <span className="mt-0.5 block text-[12.5px] font-medium text-white/80 break-keep">{t.guestAccountSub}</span>
             </button>
-            <div className="my-1 flex items-center gap-3 text-[12px] font-semibold text-black/35"><i className="h-px flex-1 bg-black/10" aria-hidden />{t.guestOr}<i className="h-px flex-1 bg-black/10" aria-hidden /></div>
+            <div className="my-1 flex items-center gap-3 text-[12px] font-semibold text-black/55"><i className="h-px flex-1 bg-black/10" aria-hidden />{t.guestOr}<i className="h-px flex-1 bg-black/10" aria-hidden /></div>
             <div className="rounded-2xl bg-black/[0.03] p-4">
               <p className="text-[15px] font-bold">{t.guestPhoneTitle}</p>
               <p className="mt-0.5 text-[12.5px] font-medium text-black/55 break-keep">{t.guestPhoneSub}</p>

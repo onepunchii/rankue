@@ -111,14 +111,14 @@ export function TideCalendar({ sea: fixed }: { sea?: TideSea }) {
                 </div>
             )}
             <div className="overflow-hidden rounded-2xl p-2" style={{ background: PAPER, color: "#0F2838", boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
-                <div className="grid grid-cols-7 pb-1 text-center text-[12px]" style={{ color: "#0F283899" }}>{["일", "월", "화", "수", "목", "금", "토"].map((w) => <span key={w}>{w}</span>)}</div>
+                <div className="grid grid-cols-7 pb-1 text-center text-[12px]" style={{ color: "#0F2838B3" }}>{["일", "월", "화", "수", "목", "금", "토"].map((w) => <span key={w}>{w}</span>)}</div>
                 <div className="grid grid-cols-7 gap-1">
                     {days.map(({ d, t }) => {
                         const past = d < today, isToday = d === today, first = d.endsWith("-01") || d === start;
                         const spring = t?.mark === "사리", neap = t?.mark === "조금";
                         return (
                             <div key={d} className="flex h-[58px] flex-col items-center justify-center rounded-lg" style={{ background: spring ? "#3F86A833" : neap ? "#0F28380D" : "#FFFFFF66", opacity: past ? 0.42 : 1, boxShadow: isToday ? "inset 0 0 0 2px #C8372D" : undefined }} aria-current={isToday ? "date" : undefined} data-tide={t?.name}>
-                                <span className="text-[12px] tabular-nums" style={{ color: "#0F283899" }}>{first ? `${Number(d.slice(5, 7))}/${Number(d.slice(8))}` : Number(d.slice(8))}</span>
+                                <span className="text-[12px] tabular-nums" style={{ color: "#0F2838B3" }}>{first ? `${Number(d.slice(5, 7))}/${Number(d.slice(8))}` : Number(d.slice(8))}</span>
                                 <span className="text-[13px] font-semibold leading-tight">{t?.name ?? ""}</span>
                                 {t && <i aria-hidden className="mt-1 h-[3px] rounded-full" style={{ width: `${Math.round(6 + t.flow * 22)}px`, background: spring ? "#1F5A78" : "#0F283855" }} />}
                             </div>
@@ -305,7 +305,7 @@ export function PortPage({ name }: { name: string }) {
                                 <div className="border-t px-3.5 py-2.5" style={{ borderColor: "#0F28381F", color: "#0F2838" }}>
                                     <p className="flex flex-wrap gap-1.5">{turns.map((t) => <span key={`${t.kind}${t.min}`} className="rounded-full px-2.5 py-1 text-[13px] font-semibold tabular-nums" style={{ background: t.kind === "high" ? "#3F86A833" : "#0F283812" }}>{t.kind === "high" ? "만조" : "간조"} {hhmm(t.min)} · {t.cm}cm</span>)}</p>
                                     {flow && <p className="mt-1.5 text-[13.5px]">지금은 <span className="font-semibold">{flow.flow}</span> — {flow.next.kind === "high" ? "만조" : "간조"}({hhmm(flow.next.min)})까지 <span className="font-semibold tabular-nums">{durationKo(flow.inMin)}</span></p>}
-                                    {range != null && <p className="mt-0.5 text-[12.5px]" style={{ color: "#0F283899" }}>물높이 차 {range}cm{data.sun?.rise != null && data.sun.set != null ? ` · 해 뜸 ${hhmm(data.sun.rise)} · 해 짐 ${hhmm(data.sun.set)}` : ""}</p>}
+                                    {range != null && <p className="mt-0.5 text-[12.5px]" style={{ color: "#0F2838B3" }}>물높이 차 {range}cm{data.sun?.rise != null && data.sun.set != null ? ` · 해 뜸 ${hhmm(data.sun.rise)} · 해 짐 ${hhmm(data.sun.set)}` : ""}</p>}
                                 </div>
                             </div>
                         )}
