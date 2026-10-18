@@ -82,7 +82,7 @@ export function PlayerCheers({ category, playerUmbId, basePath = "/api/hiq/umb/p
                 // 비로그인: 안내만 두지 않고 로그인 버튼을 준다(2026-09-14 오너). goLogin 은 ?redirect= 로
                 // 지금 보던 선수 페이지에 그대로 되돌아오게 한다(전화·소셜 로그인 모두 지원).
                 <div className="flex items-center justify-between gap-3 rounded-2xl bg-surface-3 px-3 py-2.5 mb-3">
-                    <p className="text-[12px] font-medium text-ink-3 min-w-0">🔒 {t("umb.cheerLogin")}</p>
+                    <p className="text-[12px] font-medium text-ink-3 min-w-0 break-keep">🔒 {t("umb.cheerLogin")}</p>
                     <button
                         type="button"
                         onClick={() => goLogin(setLocation)}

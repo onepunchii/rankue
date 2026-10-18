@@ -138,13 +138,16 @@ export async function parseRankingPdf(buffer: ArrayBuffer): Promise<ParsedRankin
                 .filter(i => /^([A-M]|PP)$/.test(i.str))
                 .map(i => ({ key: i.str, x: i.x }));
         }
+        // 레전드(대회 이름) 줄의 글자는 표의 왼쪽 끝에 있다 — 예전엔 x < 60 으로 고정해 잡았는데, 쪽 크기가 바뀐 PDF(남자 23/2026 은 x=94,
+        // 여자는 처음부터 x=63)에서 대회 이름을 하나도 못 읽었다(2026-10-18 — 선수 화면에 '대회 G'처럼 떴다). 표 머리줄의 첫 대회 칸 x 의 절반 안쪽으로 본다.
+        const legendMaxX = cols.length ? Math.min(...cols.map(c => c.x)) / 2 : 160;
 
         for (const row of page) {
             const items = row.items;
             if (items.length < 2) continue;
 
             // 레전드 행: "A UMB World Championship - ... 2025-07-05 *** 80 54 ..." (첫 페이지)
-            if (/^[A-M]$/.test(items[0].str) && items.length >= 2 && items[0].x < 60) {
+            if (/^[A-M]$/.test(items[0].str) && items.length >= 2 && items[0].x < legendMaxX) {
                 // 뒤쪽 점수표를 토큰 단위로 제거 — 문자 단위로 지우면 날짜의 일(日)까지
                 // 먹혀 "2025-07-"처럼 잘린다. 하이픈 포함 날짜 토큰은 순수 숫자가 아니라 살아남는다.
                 const tokens = items.slice(1).map(i => i.str.trim()).filter(Boolean);

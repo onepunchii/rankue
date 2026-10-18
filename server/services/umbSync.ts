@@ -3,7 +3,7 @@
 //
 // maxPerCategory: 크론은 서버리스 실행시간 제한이 있어 한 번에 부문당 2개까지만.
 // 밀린 회차가 있어도 며칠에 걸쳐 자연 복구된다. 백필은 Infinity로 전부.
-import { fetchArchive, downloadPdf, parseRankingPdf, type ArchiveEntry } from "./umbService.js";
+import { fetchArchive, downloadPdf, parseRankingPdf, type ArchiveEntry, type UmbCategory } from "./umbService.js";
 import { storage } from "../storage/index.js";
 
 export interface SyncResult {
@@ -11,9 +11,11 @@ export interface SyncResult {
     ingested: Array<{ category: string; edition: string; rows: number }>;
     errors: Array<{ category: string; edition: string; error: string }>;
     namesAdded?: number; // 이번 실행에서 새로 채워진 한글 이름 수
+    /** 대회 이름(레전드)을 다시 읽어 채운 회차 */
+    eventsFilled?: Array<{ category: string; edition: string; events: number }>;
 }
 
-export async function syncUmbRankings(opts: { maxPerCategory?: number; delayMs?: number; onlyNewer?: boolean } = {}): Promise<SyncResult> {
+export async function syncUmbRankings(opts: { maxPerCategory?: number; delayMs?: number; onlyNewer?: boolean; eventsFillPerCategory?: number } = {}): Promise<SyncResult> {
     const maxPerCategory = opts.maxPerCategory ?? 2;
     const delayMs = opts.delayMs ?? 300;
     // 크론은 "이미 가진 최신 회차보다 새것"만 본다(기본). 이게 없으면 파싱이 영영 안 되는 구형 회차
@@ -65,6 +67,29 @@ export async function syncUmbRankings(opts: { maxPerCategory?: number; delayMs?:
                 done++; // 같은 회차에서 무한 재시도로 크론이 매일 막히지 않게 카운트에 포함
             }
         }
+    }
+    // 대회 이름이 빈 최근 회차 채우기(2026-10-18) — 해석기가 레전드 줄을 x 좌표 고정으로 잡다 놓친 회차(남자 23/2026 · 여자 전부).
+    // 랭킹 행은 그대로 두고 이름만. 부문마다 한 번에 eventsFillPerCategory 개(크론 시간 제한) — 며칠에 걸쳐 최근 회차부터 채워진다.
+    const fillPer = opts.eventsFillPerCategory ?? 2;
+    const byKey = new Map(entries.map(e => [`${e.category}|${e.edition}`, e]));
+    result.eventsFilled = [];
+    for (const category of byCategory.keys()) {
+        if (fillPer <= 0) break;
+        try {
+            const missing = await storage.umb.editionsMissingEvents(category as UmbCategory, fillPer);
+            for (const m of missing) {
+                const entry = byKey.get(`${category}|${m.edition}`);
+                if (!entry) continue; // 아카이브에서 내려간 회차
+                try {
+                    const parsed = await parseRankingPdf(await downloadPdf(entry.pdfUrl));
+                    const n = await storage.umb.fillEditionEvents(entry.category, entry.edition, m.editionDate, parsed.events);
+                    if (n) result.eventsFilled.push({ category, edition: m.edition, events: n });
+                    if (delayMs) await new Promise(r => setTimeout(r, delayMs));
+                } catch (e: any) {
+                    result.errors.push({ category, edition: m.edition, error: `대회 이름 채우기: ${e?.message || String(e)}` });
+                }
+            }
+        } catch (e) { console.error("[umbSync] 대회 이름 채우기 실패:", e); }
     }
     // 새 한국 선수의 한글 이름 채우기 (결정적 변환, 멱등)
     try {

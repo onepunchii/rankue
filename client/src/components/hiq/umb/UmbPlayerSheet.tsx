@@ -537,7 +537,8 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                 const strongest = eh.rows.find((r) => r.key === eh.strongest);
                 const improved = eh.rows.find((r) => r.key === eh.mostImproved);
                 const visible = showAllEvHist ? eh.rows : eh.rows.slice(0, EVHIST_FOLD);
-                const gridCols = `minmax(0,1fr) repeat(${eh.years.length}, 58px)`;
+                // 대회 이름은 윗줄 전체 폭, 연도별 점수는 아랫줄 — 이름 칸을 연도 칸과 한 줄에 두면 360 폭에서 이름이 0px 로 줄어 국기만 보였다(2026-10-18)
+                const gridCols = `repeat(${eh.years.length}, minmax(0,1fr))`;
                 return (
                     <Section emoji="📅" title={t("umb.evHist.title")} desc={t("umb.evHist.desc")}
                         meta={<span className="tabular-nums">{t("umb.contEvents").replace("{n}", String(eh.rows.length))}</span>}>
@@ -548,11 +549,10 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                 {improved && improved.key === strongest?.key && <Chip tone="brand">📈 ▲{improved.delta}</Chip>}
                             </div>
                         )}
-                        <div className="rounded-2xl bg-surface-3 overflow-x-auto">
-                            <div className="min-w-[280px]">
-                                {/* 머리글 — 대회 · 연도 열 */}
+                        <div className="rounded-2xl bg-surface-3 overflow-hidden" data-testid="umb-event-history">
+                            <div>
+                                {/* 머리글 — 연도 열(대회 이름은 줄마다 윗줄에) */}
                                 <div className="grid items-center px-3 h-9 text-[12px] font-bold text-black/40 border-b border-surface-line" style={{ gridTemplateColumns: gridCols }}>
-                                    <span>{t("umb.evHist.eventCol")}</span>
                                     {eh.years.map((y) => <span key={y} className="text-right tabular-nums">{y.length > 5 ? y.slice(2) : y}</span>)}
                                 </div>
                                 <div className="divide-y divide-surface-line">
@@ -560,34 +560,32 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                         const ev = eventView(r.label, t, { short: true });
                                         const byYear = new Map(r.cells.map((c) => [c.year, c]));
                                         return (
-                                            <div key={r.key} className="grid items-center px-3 py-2.5" style={{ gridTemplateColumns: gridCols }} title={r.label}>
+                                            <div key={r.key} className="px-3 py-2.5" title={r.label}>
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <span className="w-5 shrink-0 text-center text-[16px] leading-none">{ev.emoji}</span>
-                                                    <div className="min-w-0">
-                                                        <div className="flex items-center gap-1.5 min-w-0">
-                                                            <span className="text-[12.5px] font-semibold text-ink-1 truncate">{ev.title}</span>
-                                                            {r.key === eh.strongest && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[#F5B721]/15 text-[12px] font-bold text-[#8a6a0a] leading-none">{t("umb.mainEvent")}</span>}
-                                                        </div>
-                                                        {r.org && <div className="text-[12px] font-medium text-black/40 truncate mt-0.5">{r.org}</div>}
-                                                    </div>
+                                                    <span className="text-[13px] font-semibold text-ink-1 truncate">{ev.title}</span>
+                                                    {r.org && <span className="text-[12px] font-medium text-black/45 truncate shrink-[2]">{r.org}</span>}
+                                                    {r.key === eh.strongest && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[#F5B721]/15 text-[12px] font-bold text-[#8a6a0a] leading-none">{t("umb.mainEvent")}</span>}
                                                 </div>
-                                                {eh.years.map((y, i) => {
-                                                    const c = byYear.get(y);
-                                                    const prevC = i > 0 ? byYear.get(eh.years[i - 1]) : undefined;
-                                                    const d = c && prevC ? c.points - prevC.points : null;
-                                                    return (
-                                                        <div key={y} className="text-right tabular-nums leading-none">
-                                                            {c ? (
-                                                                <>
-                                                                    <div className={cn("text-[13.5px] font-bold", i === eh.years.length - 1 ? "text-ink-1" : "text-ink-2")}>{c.points}</div>
-                                                                    {d !== null && d !== 0 && (
-                                                                        <div className={cn("text-[12px] font-bold mt-1", d > 0 ? "text-brand" : "text-[#c0392b]")}>{d > 0 ? `▲${d}` : `▼${-d}`}</div>
-                                                                    )}
-                                                                </>
-                                                            ) : <div className="text-[13px] font-medium text-black/20">·</div>}
-                                                        </div>
-                                                    );
-                                                })}
+                                                <div className="grid items-start mt-2" style={{ gridTemplateColumns: gridCols }}>
+                                                    {eh.years.map((y, i) => {
+                                                        const c = byYear.get(y);
+                                                        const prevC = i > 0 ? byYear.get(eh.years[i - 1]) : undefined;
+                                                        const d = c && prevC ? c.points - prevC.points : null;
+                                                        return (
+                                                            <div key={y} className="text-right tabular-nums leading-none">
+                                                                {c ? (
+                                                                    <>
+                                                                        <div className={cn("text-[13.5px] font-bold", i === eh.years.length - 1 ? "text-ink-1" : "text-ink-2")}>{c.points}</div>
+                                                                        {d !== null && d !== 0 && (
+                                                                            <div className={cn("text-[12px] font-bold mt-1", d > 0 ? "text-brand" : "text-[#c0392b]")}>{d > 0 ? `▲${d}` : `▼${-d}`}</div>
+                                                                        )}
+                                                                    </>
+                                                                ) : <div className="text-[13px] font-medium text-black/20">·</div>}
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                         );
                                     })}

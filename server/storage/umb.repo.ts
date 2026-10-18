@@ -88,6 +88,33 @@ export class UmbRepository {
         return parsed.rows.length;
     }
 
+    /**
+     * 대회 이름(umb_events)이 비어 있는 최근 회차 — 랭킹 행은 있는데 레전드를 못 읽은 회차(2026-10-18, 해석기 x 좌표 고정 탓).
+     * 크론이 PDF 를 다시 읽어 이름만 채운다(fillEditionEvents). 최신부터 limit 개.
+     */
+    async editionsMissingEvents(category: UmbCategory, limit = 2): Promise<Array<{ edition: string; editionDate: Date }>> {
+        const result: any = await db.execute(sql`
+            select r.edition, max(r.edition_date) as edition_date
+            from ${umbRankings} r
+            where r.category = ${category}
+              and not exists (select 1 from ${umbEvents} e where e.category = r.category and e.edition = r.edition)
+            group by r.edition
+            order by max(r.edition_date) desc
+            limit ${limit}`);
+        return ((result.rows ?? result) as Array<{ edition: string; edition_date: string | Date }>).map(r => ({ edition: r.edition, editionDate: new Date(r.edition_date) }));
+    }
+
+    /** 대회 이름만 채운다 — 랭킹 행은 건드리지 않는다(같은 회차의 이름만 지우고 다시 넣는다) */
+    async fillEditionEvents(category: UmbCategory, edition: string, editionDate: Date, events: ParsedRanking["events"]): Promise<number> {
+        if (!events.length) return 0;
+        await db.transaction(async (tx) => {
+            await tx.delete(umbEvents).where(and(eq(umbEvents.category, category), eq(umbEvents.edition, edition)));
+            await tx.insert(umbEvents).values(events.map(e => ({ category, edition, editionDate, colKey: e.colKey, label: e.label })));
+        });
+        reportCache.clear();
+        return events.length;
+    }
+
     // 최신·직전 회차 (순위 변동 계산의 기준) — 5분 모듈 캐시
     async getLatestEditions(category: UmbCategory, count = 2): Promise<Array<{ edition: string; editionDate: Date }>> {
         const cached = editionsCache.get(category);
