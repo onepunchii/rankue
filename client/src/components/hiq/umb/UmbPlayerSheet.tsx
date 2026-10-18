@@ -107,7 +107,7 @@ function PersonRow({ pos, name, rank, points, me, onClick, t }: {
             <span className={cn("flex-1 min-w-0 truncate text-[13.5px] font-semibold", me ? "text-brand" : "text-ink-1")}>{name}</span>
             <span className="shrink-0 text-right">
                 <span className={cn("block text-[13px] font-bold tabular-nums leading-none", me ? "text-brand" : "text-ink-1")}>{t("umb.sourceWorld")} {rank}{t("umb.rankSuffix")}</span>
-                <span className="block text-[10.5px] font-semibold tabular-nums text-black/40 mt-1">{points}{t("umb.pointsUnit")}</span>
+                <span className="block text-[12px] font-semibold tabular-nums text-black/40 mt-1">{points}{t("umb.pointsUnit")}</span>
             </span>
         </button>
     );
@@ -232,7 +232,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                         <span className="shrink-0 flex flex-col items-center">
                             <PlayerPhoto memCode={pba.memCode} name={locale === "ko" && player.nativeName ? player.nativeName : player.playerName} size={60}
                                 className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhotoShown(true)} />
-                            {photoShown && <span className="mt-1 text-[9.5px] font-medium text-ink-4">{t("lookalike.photoCredit")}</span>}
+                            {photoShown && <span className="mt-1 text-[12px] font-medium text-ink-4">{t("lookalike.photoCredit")}</span>}
                         </span>
                     )}
                     <div className="min-w-0 flex-1">
@@ -276,7 +276,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
             <div className="flex flex-col gap-2 -mt-3">
                 <div className="rounded-2xl bg-brand text-brand-fg px-4 py-4 flex items-end justify-between gap-3">
                     <div className="min-w-0">
-                        <div className="text-[11.5px] font-semibold text-white/70 truncate">🌍 {t("umb.subtitle")}</div>
+                        <div className="text-[12px] font-semibold text-white/70 truncate">🌍 {t("umb.subtitle")}</div>
                         <div className="flex items-center gap-2 mt-2">
                             <span className="text-[38px] font-bold leading-none tabular-nums">
                                 {player.rank}<span className="text-[17px] font-semibold ml-0.5">{rankSuffix}</span>
@@ -290,7 +290,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                     </div>
                     <div className="text-right shrink-0">
                         <div className="text-[26px] font-bold leading-none tabular-nums">{player.points}</div>
-                        <div className="text-[11px] font-semibold text-white/70 mt-1.5">{t("umb.points")}</div>
+                        <div className="text-[12px] font-semibold text-white/70 mt-1.5">{t("umb.points")}</div>
                     </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">
@@ -329,7 +329,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                     key={m}
                                     onClick={() => setMetric(m)}
                                     className={cn(
-                                        "h-7 px-2.5 rounded-full text-[11.5px] font-semibold transition-colors",
+                                        "h-7 px-2.5 rounded-full text-[12px] font-semibold transition-colors",
                                         metric === m ? "bg-ink-1 text-white" : "bg-black/[0.04] text-black/50"
                                     )}
                                 >
@@ -342,9 +342,9 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                     <div className="h-44 w-full min-w-0">
                         <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 0, left: -14 }}>
-                                <XAxis dataKey="label" tick={{ fontSize: 10, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} interval="preserveStartEnd" minTickGap={40} />
+                                <XAxis dataKey="label" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} interval="preserveStartEnd" minTickGap={40} />
                                 {/* domain을 [1, max]로 고정하면 1000위권 선수의 등락이 바닥 평평한 선이 된다 — 본인 범위로 */}
-                                <YAxis reversed={metric === "rank"} domain={["dataMin", "dataMax"]} tick={{ fontSize: 10, fill: AXIS }} tickLine={false} axisLine={false} width={40} allowDecimals={false} />
+                                <YAxis reversed={metric === "rank"} domain={["dataMin", "dataMax"]} tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={false} width={40} allowDecimals={false} />
                                 {metric === "rank" && data!.bestRank <= 10 && (
                                     <ReferenceArea y1={1} y2={10} fill={BRAND} fillOpacity={0.06} />
                                 )}
@@ -373,17 +373,17 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                     {/* 왼쪽: 빠지는 달(큰 글씨) + 연도 — 시간축이 한눈에 */}
                                     <div className="w-10 shrink-0 text-center">
                                         <div className="text-[13px] font-bold text-ink-1 leading-none">{d.toLocaleDateString(dateLocale, { month: "short" })}</div>
-                                        <div className="text-[10px] font-semibold text-black/40 mt-1 tabular-nums">{d.getFullYear()}</div>
+                                        <div className="text-[12px] font-semibold text-black/40 mt-1 tabular-nums">{d.getFullYear()}</div>
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <div className="text-[13px] font-semibold text-ink-1 truncate"><span className="mr-1">{ev.emoji}</span>{ev.title}</div>
-                                        <div className="text-[11px] font-medium text-black/45 truncate mt-0.5">
+                                        <div className="text-[12px] font-medium text-black/45 truncate mt-0.5">
                                             {[ev.sub, t("umb.pointsAfter").replace("{n}", String(e.pointsAfter))].filter(Boolean).join(" · ")}
                                         </div>
                                     </div>
                                     <div className="shrink-0 text-right">
                                         <div className="text-[14px] font-bold tabular-nums text-red-500 leading-none">−{e.points}</div>
-                                        <div className={cn("text-[11px] font-semibold tabular-nums mt-1", delta > 0 ? "text-red-500" : "text-black/45")}>
+                                        <div className={cn("text-[12px] font-semibold tabular-nums mt-1", delta > 0 ? "text-red-500" : "text-black/45")}>
                                             {t("umb.expiryProjected").replace("{r}", String(e.projectedRank))}{delta > 0 ? ` ▼${delta}` : ""}
                                         </div>
                                     </div>
@@ -416,7 +416,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                     </List>
                     {nearby.length > 0 && (
                         <>
-                            <p className="text-[11px] font-semibold text-black/40 mt-3 mb-1.5 px-0.5">↕ {t("umb.nearby")}</p>
+                            <p className="text-[12px] font-semibold text-black/40 mt-3 mb-1.5 px-0.5">↕ {t("umb.nearby")}</p>
                             <List>
                                 {nearby.map(r => (
                                     <PersonRow
@@ -445,7 +445,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                         ].map((c) => (
                             <div key={c.label} className="rounded-2xl bg-black/[0.03] px-2 py-3 text-center min-w-0">
                                 <div className={cn("text-[17px] font-bold tabular-nums leading-none", c.accent ? "text-brand" : "text-ink-1")}>{c.value}</div>
-                                <div className="text-[10.5px] font-semibold text-black/45 mt-1.5 truncate">{c.label}</div>
+                                <div className="text-[12px] font-semibold text-black/45 mt-1.5 leading-snug break-keep">{c.label}</div>
                             </div>
                         ))}
                     </div>
@@ -483,7 +483,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                             </div>
                             <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 mt-2">
                                 {continents.map((c, i) => (
-                                    <span key={c.continent} className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-ink-2 min-w-0 truncate">
+                                    <span key={c.continent} className="inline-flex items-center gap-1.5 text-[12px] font-semibold text-ink-2 min-w-0 truncate">
                                         <span className={cn("w-2 h-2 rounded-full shrink-0", RAMP[i % RAMP.length])} />
                                         {t(`umb.cont.${c.continent}`)}
                                         <span className="font-bold tabular-nums text-ink-1">{c.points}</span>
@@ -505,10 +505,10 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                         <div className="flex items-center gap-1.5 min-w-0">
                                             <span className="text-[13px] font-semibold text-ink-1 truncate">{ev.title}</span>
                                             {idx === 0 && pts > 0 && breakdown.length > 1 && (
-                                                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[10px] font-bold text-brand leading-none">{t("umb.mainEvent")}</span>
+                                                <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[12px] font-bold text-brand leading-none">{t("umb.mainEvent")}</span>
                                             )}
                                         </div>
-                                        {ev.sub && <div className="text-[11px] font-medium text-black/45 truncate mt-0.5">{ev.sub}</div>}
+                                        {ev.sub && <div className="text-[12px] font-medium text-black/45 truncate mt-0.5">{ev.sub}</div>}
                                         {pts > 0 && (
                                             <div className="mt-1.5 h-1 rounded-full bg-black/[0.06] overflow-hidden">
                                                 <div className="h-full rounded-full bg-brand/60" style={{ width: `${Math.max(6, (pts / maxPts) * 100)}%` }} />
@@ -558,7 +558,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                         <div className="rounded-2xl bg-surface-3 overflow-x-auto">
                             <div className="min-w-[280px]">
                                 {/* 머리글 — 대회 · 연도 열 */}
-                                <div className="grid items-center px-3 h-9 text-[11px] font-bold text-black/40 border-b border-surface-line" style={{ gridTemplateColumns: gridCols }}>
+                                <div className="grid items-center px-3 h-9 text-[12px] font-bold text-black/40 border-b border-surface-line" style={{ gridTemplateColumns: gridCols }}>
                                     <span>{t("umb.evHist.eventCol")}</span>
                                     {eh.years.map((y) => <span key={y} className="text-right tabular-nums">{y.length > 5 ? y.slice(2) : y}</span>)}
                                 </div>
@@ -573,9 +573,9 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                                     <div className="min-w-0">
                                                         <div className="flex items-center gap-1.5 min-w-0">
                                                             <span className="text-[12.5px] font-semibold text-ink-1 truncate">{ev.title}</span>
-                                                            {r.key === eh.strongest && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[#F5B721]/15 text-[9.5px] font-bold text-[#8a6a0a] leading-none">{t("umb.mainEvent")}</span>}
+                                                            {r.key === eh.strongest && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[#F5B721]/15 text-[12px] font-bold text-[#8a6a0a] leading-none">{t("umb.mainEvent")}</span>}
                                                         </div>
-                                                        {r.org && <div className="text-[10.5px] font-medium text-black/40 truncate mt-0.5">{r.org}</div>}
+                                                        {r.org && <div className="text-[12px] font-medium text-black/40 truncate mt-0.5">{r.org}</div>}
                                                     </div>
                                                 </div>
                                                 {eh.years.map((y, i) => {
@@ -588,7 +588,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                                                 <>
                                                                     <div className={cn("text-[13.5px] font-bold", i === eh.years.length - 1 ? "text-ink-1" : "text-ink-2")}>{c.points}</div>
                                                                     {d !== null && d !== 0 && (
-                                                                        <div className={cn("text-[10px] font-bold mt-1", d > 0 ? "text-brand" : "text-[#c0392b]")}>{d > 0 ? `▲${d}` : `▼${-d}`}</div>
+                                                                        <div className={cn("text-[12px] font-bold mt-1", d > 0 ? "text-brand" : "text-[#c0392b]")}>{d > 0 ? `▲${d}` : `▼${-d}`}</div>
                                                                     )}
                                                                 </>
                                                             ) : <div className="text-[13px] font-medium text-black/20">·</div>}
@@ -616,7 +616,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
             {/* 응원글(2026-09-13 오너 제안 11번) — 맨 아래. 커뮤니티 댓글과 같은 안전장치 */}
             <PlayerCheers category={category} playerUmbId={playerUmbId} />
 
-            <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-center text-[11px] font-medium text-black/35 hover:text-black/55 transition-colors">
+            <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-center text-[12px] font-medium text-black/35 hover:text-black/55 transition-colors">
                 {t("umb.source")}
             </a>
         </div>

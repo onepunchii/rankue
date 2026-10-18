@@ -194,7 +194,7 @@ export default function HiqWorldRanking() {
                         <h2 className="text-[13px] font-bold text-ink-2">
                             <Link href="/tournaments" className="active:opacity-60">🗓️ {t("umb.calendarTitle")} ›</Link>
                         </h2>
-                        <span className="text-[10.5px] font-medium text-black/35">{t("umb.watchNote")}</span>
+                        <span className="text-[12px] font-medium text-black/35">{t("umb.watchNote")}</span>
                     </div>
                     <div className="flex gap-2 overflow-x-auto scrollbar-hide -mx-5 px-5">
                         {seasonEvents.map(e => {
@@ -212,7 +212,7 @@ export default function HiqWorldRanking() {
                                         <span className="text-[15px] leading-none">{e.country ? flagEmoji(e.country) : "🏆"}</span>
                                         <span className="text-[12.5px] font-bold text-ink-1">{e.city || e.label.slice(0, 16)}</span>
                                         <span className={cn(
-                                            "px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none tabular-nums",
+                                            "px-1.5 py-0.5 rounded-full text-[12px] font-bold leading-none tabular-nums",
                                             past ? "bg-black/[0.06] text-black/40"
                                                 : d === 0 ? "bg-red-500 text-white"
                                                 : "bg-brand/10 text-brand"
@@ -220,7 +220,7 @@ export default function HiqWorldRanking() {
                                             {past ? `✓ ${t("umb.finished")}` : d === 0 ? "D-DAY" : `D-${d}`}
                                         </span>
                                     </div>
-                                    <div className="text-[10.5px] font-medium text-black/45 mt-1">
+                                    <div className="text-[12px] font-medium text-black/45 mt-1">
                                         {t(e.kind === "championship" ? "umb.kindChampionship" : "umb.kindWorldcup")}
                                         {" · "}{new Date(e.date).toLocaleDateString(locale === "ko" ? "ko-KR" : undefined, { month: "short", day: "numeric" })}
                                     </div>
@@ -234,7 +234,7 @@ export default function HiqWorldRanking() {
             {/* ─── 국가 랭킹 보기 ─── */}
             {view === "nations" && (
                 <div className="flex flex-col gap-1.5 relative z-10">
-                    <p className="text-[11.5px] font-medium text-black/40 px-1 mb-0.5">{t("umb.nationsDesc")}</p>
+                    <p className="text-[12px] font-medium text-black/40 px-1 mb-0.5">{t("umb.nationsDesc")}</p>
                     {(nationsData?.nations || []).map((n, idx) => {
                         const isKr = n.fed === homeFed;
                         const medal = idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : null;
@@ -255,7 +255,7 @@ export default function HiqWorldRanking() {
                                 <span className="text-[19px] leading-none shrink-0">{flagEmoji(n.fed)}</span>
                                 <div className="flex-1 min-w-0">
                                     <span className={cn("block text-[14.5px] font-semibold truncate", isKr ? "text-brand" : "text-ink-1")}>{countryName(n.fed)}</span>
-                                    <span className="block text-[11.5px] font-medium text-black/45 truncate mt-0.5">
+                                    <span className="block text-[12px] font-medium text-black/45 truncate mt-0.5">
                                         {t("umb.playersCount").replace("{n}", String(n.players))}
                                         {n.top20Count > 0 ? ` · ${t("umb.top20Count").replace("{n}", String(n.top20Count))}` : ""}
                                         {" · "}{n.bestRank}{t("umb.rankSuffix")} {n.bestPlayer}
@@ -263,12 +263,12 @@ export default function HiqWorldRanking() {
                                 </div>
                                 <div className="text-right shrink-0">
                                     <div className="font-bold text-[16px] tabular-nums text-ink-1">{n.top5Points ?? 0}</div>
-                                    <div className="text-[10px] font-semibold text-black/40">{t("umb.top5Sum")}</div>
+                                    <div className="text-[12px] font-semibold text-black/40">{t("umb.top5Sum")}</div>
                                 </div>
                             </Link>
                         );
                     })}
-                    <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-center text-[11px] font-medium text-black/35 py-3">
+                    <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-center text-[12px] font-medium text-black/35 py-3">
                         {t("umb.source")}
                     </a>
                 </div>
@@ -318,9 +318,9 @@ export default function HiqWorldRanking() {
                                 className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]"
                             >
                                 <span className="text-[16px] leading-none">{flagEmoji(m.fed)}</span>
-                                <span className="text-[13px] font-semibold text-ink-1 max-w-[110px] truncate">{displayName(m, locale)}</span>
+                                <span className="text-[13px] font-semibold text-ink-1 max-w-[160px] truncate">{displayName(m, locale)}</span>
                                 <span className="text-[12px] font-bold text-brand tabular-nums">▲{m.move}</span>
-                                <span className="text-[11.5px] font-medium text-black/40 tabular-nums">{m.rank}{t("umb.rankSuffix")}</span>
+                                <span className="text-[12px] font-medium text-black/40 tabular-nums">{m.rank}{t("umb.rankSuffix")}</span>
                             </button>
                         ))}
                     </div>
@@ -346,9 +346,9 @@ export default function HiqWorldRanking() {
                                     <span className="text-[12.5px] font-bold text-ink-1 max-w-[130px] truncate">
                                         {locale === "ko" && rg.nativeName ? rg.nativeName : rg.playerName}
                                     </span>
-                                    {rg.current && <span className="px-1.5 py-0.5 rounded-full bg-[#F5B721]/25 text-[9.5px] font-bold text-[#8a6a0a] leading-none">{t("umb.reignNow")}</span>}
+                                    {rg.current && <span className="px-1.5 py-0.5 rounded-full bg-[#F5B721]/25 text-[12px] font-bold text-[#8a6a0a] leading-none">{t("umb.reignNow")}</span>}
                                 </div>
-                                <div className="text-[10.5px] font-medium text-black/45 mt-1 tabular-nums">
+                                <div className="text-[12px] font-medium text-black/45 mt-1 tabular-nums">
                                     {new Date(rg.from).toLocaleDateString(locale === "ko" ? "ko-KR" : undefined, { year: "2-digit", month: "short" })}
                                     {" ~ "}
                                     {rg.current ? "" : new Date(rg.to).toLocaleDateString(locale === "ko" ? "ko-KR" : undefined, { year: "2-digit", month: "short" })}
@@ -363,7 +363,7 @@ export default function HiqWorldRanking() {
             {/* 랭킹 리스트 */}
             <div className="flex flex-col gap-1.5 relative z-10">
                 {!isLoading && total > 0 && (
-                    <p className="text-[11.5px] font-medium text-black/40 px-1 mb-0.5 tabular-nums">
+                    <p className="text-[12px] font-medium text-black/40 px-1 mb-0.5 tabular-nums">
                         {t("umb.totalPlayers").replace("{n}", total.toLocaleString())}
                     </p>
                 )}
@@ -386,7 +386,7 @@ export default function HiqWorldRanking() {
                         >
                             <span className={cn("w-10 shrink-0 text-center font-bold text-[15px] tabular-nums", isKr ? "text-brand" : "text-black/45")}>{r.rank}</span>
                             <span className="text-[17px] leading-none shrink-0">{flagEmoji(r.fed)}</span>
-                            <span className={cn("flex-1 min-w-0 truncate font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{displayName(r, locale)}</span>
+                            <span className={cn("flex-1 min-w-0 line-clamp-2 leading-snug [overflow-wrap:anywhere] font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{displayName(r, locale)}</span>
                             <MoveBadge move={r.move} />
                             <span className="w-12 shrink-0 text-right font-bold text-[15px] tabular-nums text-ink-1">{r.points}</span>
                         </button>
@@ -410,7 +410,7 @@ export default function HiqWorldRanking() {
                 >
                     {({ ko: "PBA 투어 랭킹", en: "PBA Tour Rankings", vi: "BXH PBA Tour", tr: "PBA Tur Sıralaması", es: "Ranking PBA Tour" } as Record<string, string>)[locale] ?? "PBA Tour Rankings"} →
                 </button>
-                <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-center text-[11px] font-medium text-black/35 py-3">
+                <a href={UMB_SOURCE_URL} target="_blank" rel="noopener noreferrer" className="text-center text-[12px] font-medium text-black/35 py-3">
                     {t("umb.source")}
                 </a>
             </div>

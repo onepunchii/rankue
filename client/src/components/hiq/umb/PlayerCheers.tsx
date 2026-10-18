@@ -70,7 +70,7 @@ export function PlayerCheers({ category, playerUmbId, basePath = "/api/hiq/umb/p
                         className="w-full bg-transparent text-[13.5px] text-ink-1 placeholder:text-ink-4 outline-none resize-none px-1 py-0.5"
                     />
                     <div className="flex items-center justify-between gap-2 mt-1.5">
-                        <span className="text-[11px] font-medium text-ink-4 tabular-nums px-1">{text.length}/{CHEER_MAX}</span>
+                        <span className="text-[12px] font-medium text-ink-4 tabular-nums px-1">{text.length}/{CHEER_MAX}</span>
                         <button
                             type="button" disabled={!canSend}
                             onClick={() => gate(() => post.mutate())}   // 첫 글이면 약관 동의부터 — 커뮤니티 글쓰기와 같은 규칙
@@ -108,10 +108,10 @@ export function PlayerCheers({ category, playerUmbId, basePath = "/api/hiq/umb/p
                                 <div className="flex items-center justify-between gap-2">
                                     <span className="min-w-0 flex items-baseline gap-1.5">
                                         <span className="text-[12.5px] font-bold text-ink-1 truncate">{c.authorName}</span>
-                                        <span className="text-[11px] font-medium text-ink-3 shrink-0">{timeAgo(c.createdAt, t)}</span>
+                                        <span className="text-[12px] font-medium text-ink-3 shrink-0">{timeAgo(c.createdAt, t)}</span>
                                     </span>
                                     {c.mine ? (
-                                        <button type="button" onClick={() => remove.mutate(c.id)} className="text-[11.5px] font-semibold text-ink-3 hover:text-red-500 shrink-0">{t("umb.cheerDelete")}</button>
+                                        <button type="button" onClick={() => remove.mutate(c.id)} className="text-[12px] font-semibold text-ink-3 hover:text-red-500 shrink-0">{t("umb.cheerDelete")}</button>
                                     ) : member ? (
                                         <UgcActionMenu targetType="player_cheer" targetId={c.id} authorId={c.authorId} authorName={c.authorName} onBlocked={() => void qc.invalidateQueries({ queryKey: key })} />
                                     ) : null}

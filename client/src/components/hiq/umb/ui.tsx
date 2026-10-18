@@ -15,7 +15,7 @@ export function Section({ emoji, title, meta, desc, children }: { emoji: string;
                 </h3>
                 {meta && <div className="min-w-0 truncate text-[12px] font-semibold text-ink-3">{meta}</div>}
             </div>
-            {desc && <p className="text-[11.5px] font-medium text-ink-3 leading-snug -mt-1.5 mb-3">{desc}</p>}
+            {desc && <p className="text-[12px] font-medium text-ink-3 leading-snug -mt-1.5 mb-3">{desc}</p>}
             {children}
         </section>
     );
@@ -27,7 +27,7 @@ export function Tile({ emoji, value, label, accent }: { emoji: string; value: st
         <div className="rounded-2xl bg-surface-3 px-2 py-3 text-center min-w-0">
             <div className="text-[16px] leading-none">{emoji}</div>
             <div className={cn("text-[19px] font-bold tabular-nums mt-1.5 leading-none", accent ? "text-brand" : "text-ink-1")}>{value}</div>
-            <div className="text-[10.5px] font-semibold text-ink-3 mt-1.5 truncate">{label}</div>
+            <div className="text-[12px] font-semibold text-ink-3 mt-1.5 leading-snug break-keep">{label}</div>
         </div>
     );
 }

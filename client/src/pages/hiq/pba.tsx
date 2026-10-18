@@ -206,7 +206,7 @@ export default function HiqPba() {
             {(sched?.upcoming?.length ?? 0) > 0 && (
                 <div className="mb-4">
                     <div className="flex items-baseline justify-between gap-2 mb-2">
-                        <p className="text-[11.5px] font-bold text-black/40">{t.upcoming}</p>
+                        <p className="text-[12px] font-bold text-black/40">{t.upcoming}</p>
                         <Link href="/tournaments" className="shrink-0 text-[12px] font-semibold text-brand active:opacity-60">{t.allEvents} ›</Link>
                     </div>
                     <div className="flex gap-2 overflow-x-auto pb-1 -mx-5 px-5 scrollbar-hide">
@@ -217,15 +217,15 @@ export default function HiqPba() {
                                 <div key={`${e.title}-${e.startDate}`} className="shrink-0 w-[190px] rounded-2xl bg-white p-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                                     <div className="flex items-center gap-1.5">
                                         <span className={cn(
-                                            "px-1.5 py-0.5 rounded-full text-[10px] font-bold leading-none",
+                                            "px-1.5 py-0.5 rounded-full text-[12px] font-bold leading-none",
                                             live ? "bg-[#E02D2D] text-white" : "bg-brand/10 text-brand",
                                         )}>
                                             {live ? t.today : `${t.dday}${d}`}
                                         </span>
-                                        <span className="text-[10.5px] font-bold text-black/40">{e.league.replace(/1$/, "")}</span>
+                                        <span className="text-[12px] font-bold text-black/40">{e.league.replace(/1$/, "")}</span>
                                     </div>
                                     <p className="mt-1.5 text-[12.5px] font-bold leading-snug line-clamp-2">{e.title}</p>
-                                    <p className="mt-1 text-[10.5px] text-black/40 tabular-nums">
+                                    <p className="mt-1 text-[12px] text-black/40 tabular-nums">
                                         {e.startDate.slice(5).replace("-", ".")}~{e.endDate.slice(5).replace("-", ".")}{e.place ? ` · ${e.place}` : ""}
                                     </p>
                                 </div>
@@ -269,15 +269,15 @@ export default function HiqPba() {
                                     )}
                                     <span className="text-[16px] leading-none shrink-0">{flagEmoji(r.nationCode ?? "") || "🏳️"}</span>
                                     <div className="min-w-0">
-                                        <span className="block text-[15.5px] font-semibold truncate">{r.nameKo}</span>
-                                        {r.nameEn && <span className="block text-[11.5px] font-medium text-black/40 truncate">{r.nameEn}</span>}
+                                        <span className="block text-[15.5px] font-semibold line-clamp-2 leading-snug [overflow-wrap:anywhere]">{r.nameKo}</span>
+                                        {r.nameEn && <span className="block text-[12px] font-medium text-black/55 line-clamp-2 leading-snug [overflow-wrap:anywhere]">{r.nameEn}</span>}
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0 ml-3">
                                     <span className="block text-[15px] font-bold tabular-nums">
                                         {by === "prize" ? formatPrize(r.prize, locale) : r.rankingPoint.toLocaleString()}
                                     </span>
-                                    <span className="block text-[11px] font-medium text-black/40">
+                                    <span className="block text-[12px] font-medium text-black/40">
                                         {by === "prize" ? t.prize : t.point}
                                     </span>
                                 </div>
@@ -311,9 +311,9 @@ export default function HiqPba() {
             </button>
             {/* "프로당구 선수 연봉" 검색 대응 — 상금을 연봉으로 부르지 않고 사실을 밝힌다 */}
             {locale === "ko" && (
-                <p className="mt-4 text-[11.5px] text-black/40 leading-relaxed px-1">{PBA_INCOME_NOTE_KO}</p>
+                <p className="mt-4 text-[12px] text-black/40 leading-relaxed px-1">{PBA_INCOME_NOTE_KO}</p>
             )}
-            <p className="mt-3 text-center text-[11px] text-black/35">{t.source}</p>
+            <p className="mt-3 text-center text-[12px] text-black/35">{t.source}</p>
             <HiqNavigation />
         </div>
     );
