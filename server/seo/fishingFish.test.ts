@@ -104,6 +104,16 @@ describe("낚시 어종 공개 페이지", () => {
         expect(r).toContain('router.get("/market", asyncHandler(');
         expect(r).toContain('router.get("/index-map", asyncHandler(');
         expect(read("server/ogImage.ts")).toContain('app.get("/og/fishing-fish/:id.png"');
+        // 없는 주소는 봇에게 404 + noindex(2026-10-18 — 200 껍데기는 '소프트 404'). 표를 못 읽은 경우(낚시터 · 산)는 화면에 맡긴다
+        const pre = read("server/prerender.ts");
+        expect(pre).toContain('if (!r) return sendGone(res, "없는 어종이에요"');
+        expect(pre).toContain('if (!r) return sendGone(res, "없는 바다 · 항구예요"');
+        expect(pre).toContain('if (!r) return all.length ? sendGone(res, "없는 낚시터예요"');
+        expect(pre).toMatch(/if \(!r\) return all\.length && .*sendGone\(res, "없는 산이에요"/);
+        // 앱의 없는 주소 화면은 그린 뒤 noindex(떠나면 되돌린다)
+        const nf = read("client/src/pages/not-found.tsx");
+        expect(nf).toContain('meta?.setAttribute("content", "noindex, follow");');
+        expect(nf).toContain('if (meta && prevRobots != null) meta.setAttribute("content", prevRobots);');
         // 바다 어종은 오늘의 낚시지수 지도(앱과 같은 그림)를 같이 그린다 — 그 어종의 단계로
         const page = read("client/src/fishing/spots/FishPages.tsx");
         expect(page).toContain('data-testid="fish-index-map"');

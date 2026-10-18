@@ -3,6 +3,7 @@
  * 그대로 회원에게 보였다. 옛 링크 · 잘못 친 주소로 온 사람에게 길을 알려 준다: 판화 한 장(빈 이정표 — 그림 속 글자 없음) · 다섯 언어 한 줄 · 홈 / 뒤로.
  * 미리보기 · 카카오 미리보기 등 다른 화면도 이 부품을 그대로 쓴다(import NotFound from "@/pages/not-found").
  */
+import { useEffect } from "react";
 import { useLocation } from "wouter";
 import { useT } from "@/lib/i18n";
 import { NOT_FOUND_ART as ART } from "@shared/pageCovers";
@@ -11,6 +12,15 @@ export default function NotFound() {
     const { t } = useT();
     const [, setLocation] = useLocation();
     const canBack = typeof window !== "undefined" && window.history.length > 1;
+    // 검색에 남지 않게(2026-10-18 — 없는 주소가 봇에게 홈과 같은 제목 · 200 으로 보여 '소프트 404'가 됐다).
+    // 서버가 모르는 주소는 앱 껍데기를 주니, 화면이 그린 뒤 noindex 와 제목을 단다(구글은 그린 뒤의 <head> 를 읽는다). 떠나면 되돌린다
+    useEffect(() => {
+        const meta = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+        const prevRobots = meta?.getAttribute("content") ?? null, prevTitle = document.title;
+        meta?.setAttribute("content", "noindex, follow");
+        document.title = `${t("notFound.title")} | RANKUE`;
+        return () => { if (meta && prevRobots != null) meta.setAttribute("content", prevRobots); document.title = prevTitle; };
+    }, [t]);
     return (
         <div className="min-h-screen w-full bg-surface-0 px-5 py-10 flex items-center justify-center" data-testid="not-found">
             <div className="w-full max-w-sm">

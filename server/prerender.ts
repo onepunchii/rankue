@@ -2060,7 +2060,8 @@ ${list}
     if (!isBot(req)) return next();
     try {
       const r = await renderFishingFish(req.path, () => allPlaces());
-      if (!r) return next();
+      // 우리 표(22종)에 없는 어종 — 봇에게 200 껍데기를 주면 '소프트 404'로 남는다(2026-10-18). 표가 코드에 있어 자료 탓일 수 없다
+      if (!r) return sendGone(res, "없는 어종이에요", "랭큐 낚시 어종 페이지에 없는 이름이에요.");
       noStore(res);
       res.setHeader("X-Prerender", r.tag);
       res.status(r.status).send(r.html);
@@ -2082,7 +2083,8 @@ ${list}
         port: (code) => within(getPortBrief(code, null)),
         places: async () => (await within(allPlaces())) ?? [],
       });
-      if (!r) return next();
+      // 없는 해역 · 항구(표가 코드에 있다 — 자료 탓일 수 없다)
+      if (!r) return sendGone(res, "없는 바다 · 항구예요", "랭큐 낚시 물때 페이지에 없는 이름이에요.");
       noStore(res);
       res.setHeader("X-Prerender", r.tag);
       res.status(r.status).send(r.html);
@@ -2095,8 +2097,10 @@ ${list}
   app.get(FISHING_SPOTS_RE, async (req, res, next) => {
     if (!isBot(req)) return next();
     try {
-      const r = await renderFishingSpots(req.path, await allPlaces());
-      if (!r) return next();
+      const all = await allPlaces();
+      const r = await renderFishingSpots(req.path, all);
+      // 표를 읽었는데도 없는 낚시터 · 지역 · 종류면 404(표가 비어 있으면 자료 탓일 수 있어 화면에 맡긴다)
+      if (!r) return all.length ? sendGone(res, "없는 낚시터예요", "전국 낚시터 표에 없는 곳이에요.") : next();
       noStore(res);
       res.setHeader("X-Prerender", r.tag);
       res.status(r.status).send(r.html);
@@ -2111,7 +2115,8 @@ ${list}
     try {
       const all = await allMountains();
       const r = await renderHiking(req.path, all, async (slug) => { const d = await getMountainDetail(slug); return d ? { d, nearby: nearbyMountains(all, d) } : null; });
-      if (!r) return next();
+      // 산 표를 읽었는데 없는 산 · 권역 · 목록 · 용어 · 해외 코스면 404(허브처럼 자료가 비어서 못 그린 경우는 화면에 맡긴다)
+      if (!r) return all.length && /^\/hiking\/(?:regions|lists|mountains|terms|abroad)\/[^/]+\/?$/.test(req.path) ? sendGone(res, "없는 산이에요", "랭큐 등산에 없는 페이지예요.") : next();
       noStore(res);
       res.setHeader("X-Prerender", r.tag);
       res.status(r.status).send(r.html);
