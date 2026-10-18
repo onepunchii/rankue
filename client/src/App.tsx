@@ -55,28 +55,10 @@ import HiqPbaRecords from "@/pages/hiq/pba-records";
 import HiqGolfRanking from "@/pages/hiq/golf-ranking";
 import HiqGolfer from "@/pages/hiq/golfer";
 import HiqWorldPlayer from "@/pages/hiq/world-player";
-import GolfPlay from "@/golf/pages/GolfPlay";
-import MiniGolfPlay from "@/golf/pages/MiniGolfPlay";
-import GolfNewGame from "@/golf/pages/NewGame";
-import GolfScorecard from "@/golf/pages/GamePage";
-import GameResult from "@/golf/pages/GameResult";
-import GolfPassport from "@/golf/pages/Passport";
-import GolfCourseRanking from "@/golf/pages/CourseRanking";
-import GolfCoursePage from "@/golf/pages/GolfCoursePage";
-import GolfCourseHub from "@/golf/pages/GolfCourseHub";
-import GolfBookingList from "@/golf/pages/BookingList";
-import GolfMyBookings from "@/golf/pages/MyBookings";
-import GolfProAm from "@/golf/pages/ProAm";
-import MembershipExchange from "@/golf/pages/MembershipExchange";
-import MembershipDetail from "@/golf/pages/MembershipDetail";
-import GolfArcadePage from "@/golf/arcade/GolfArcadePage";
-import GolfRangePage from "@/golf/field/RangePage";
 import PartnerLogin from "@/pages/partner/login";
-import PartnerDashboard from "@/pages/partner/dashboard";
 import PartnerSettings from "@/pages/partner/settings";
 import CreateTournament from "@/pages/partner/create-tournament";
 import PartnerSubscription from "@/pages/partner/subscription";
-import AdminDashboard from "@/pages/admin/dashboard";
 import Privacy from "@/pages/privacy";
 import AccountDelete from "@/pages/account-delete";
 import Support from "@/pages/support";
@@ -210,6 +192,25 @@ function BilliardsTermRoute() {
 // 골프 읽을거리(2026-10-05) — 준비물 체크리스트. 글이 길어 메인 청크에서 뺀다. 골프 공개 틀(CourseShell)이 어두운 바탕이라 기다리는 화면도 어둡게.
 const GolfChecklist = lazy(() => import("@/golf/pages/GolfChecklist"));
 const golfReadFallback = <div className="min-h-[100dvh] bg-[#0A0A0A]" aria-busy="true" />;
+// 골프 화면 열세 개도 열 때만(2026-10-18 — 첫 화면 묶음에 골프 소스 2.5MB 가 실려 당구 · 등산 · 낚시 손님도 받았다). 이름은 그대로라 라우트는 바뀌지 않는다
+function lazyPage<P extends object>(load: () => Promise<{ default: ComponentType<P> }>, fallback: JSX.Element): FunctionComponent<P> {
+  const L = lazy(load);
+  return function LazyPage(props: P) { return <Suspense fallback={fallback}><L {...(props as any)} /></Suspense>; };
+}
+const GolfNewGame = lazyPage(() => import("@/golf/pages/NewGame"), golfReadFallback);
+const GolfScorecard = lazyPage(() => import("@/golf/pages/GamePage"), golfReadFallback);
+const GameResult = lazyPage(() => import("@/golf/pages/GameResult"), golfReadFallback);
+const GolfPassport = lazyPage(() => import("@/golf/pages/Passport"), golfReadFallback);
+const GolfCourseRanking = lazyPage(() => import("@/golf/pages/CourseRanking"), golfReadFallback);
+const GolfCoursePage = lazyPage(() => import("@/golf/pages/GolfCoursePage"), golfReadFallback);
+const GolfCourseHub = lazyPage(() => import("@/golf/pages/GolfCourseHub"), golfReadFallback);
+const GolfBookingList = lazyPage(() => import("@/golf/pages/BookingList"), golfReadFallback);
+const GolfMyBookings = lazyPage(() => import("@/golf/pages/MyBookings"), golfReadFallback);
+const GolfProAm = lazyPage(() => import("@/golf/pages/ProAm"), golfReadFallback);
+const MembershipExchange = lazyPage(() => import("@/golf/pages/MembershipExchange"), golfReadFallback);
+const MembershipDetail = lazyPage(() => import("@/golf/pages/MembershipDetail"), golfReadFallback);
+const GolfRangePage = lazyPage(() => import("@/golf/field/RangePage"), golfReadFallback);
+
 function GolfChecklistRoute() {
   return <Suspense fallback={golfReadFallback}><GolfChecklist /></Suspense>;
 }
@@ -267,6 +268,15 @@ const FishingPort = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({
 const FishingFishHub = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishHub })));
 const FishingFish = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishPage })));
 const spotFallback = <div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />;
+// 무거운 화면은 열 때만 받는다(2026-10-18 — 첫 화면 묶음이 7.1MB · gzip 1.9MB 였다: 3D 골프(three · r3f) · 사장님 대시보드(xlsx · html2canvas) · 관리자 콘솔(xlsx)이 모두에게 실려 있었다)
+const GolfPlay = lazy(() => import("@/golf/pages/GolfPlay"));
+const MiniGolfPlay = lazy(() => import("@/golf/pages/MiniGolfPlay"));
+const GolfArcadePage = lazy(() => import("@/golf/arcade/GolfArcadePage"));
+const PartnerDashboardLazy = lazy(() => import("@/pages/partner/dashboard"));
+const AdminDashboardLazy = lazy(() => import("@/pages/admin/dashboard"));
+const lightFallback = <div className="min-h-[100dvh] bg-surface-0" aria-busy="true" />;
+function PartnerDashboard() { return <Suspense fallback={lightFallback}><PartnerDashboardLazy /></Suspense>; }
+function AdminDashboard() { return <Suspense fallback={lightFallback}><AdminDashboardLazy /></Suspense>; }
 const fishingView = (view: "home" | "trip" | "book" | "log" | "points" | "guide" | "rules" | "rank" | "gear" | "tank") => function FishingView() { return <Suspense fallback={<div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />}><FishingPage view={view} /></Suspense>; };
 // 주소마다 한 번만 만든다(그릴 때마다 새 컴포넌트가 되면 화면이 통째로 다시 붙는다)
 const FishingRoute = fishingView("home"), FishingBookRoute = fishingView("book"), FishingLogRoute = fishingView("log"), FishingPointsRoute = fishingView("points"), FishingTripRoute = fishingView("trip"), FishingGuideRoute = fishingView("guide"), FishingRulesRoute = fishingView("rules"), FishingRankRoute = fishingView("rank"), FishingGearRoute = fishingView("gear"), FishingTankRoute = fishingView("tank");
@@ -530,10 +540,10 @@ function AppRoutes() {
       <Route path="/golf/my-bookings"><GolfOnly><GolfMyBookings /></GolfOnly></Route>
       <Route path="/golf/proam"><GolfOnly><GolfProAm /></GolfOnly></Route>
       {/* 3D 필드 골프 & 미니골프(2026-09-17) — 물리 진짜 계산하는 단독 페이지 */}
-      <Route path="/golf/play"><GolfOnly><GolfPlay /></GolfOnly></Route>
-      <Route path="/golf/minigolf"><GolfOnly><MiniGolfPlay /></GolfOnly></Route>
+      <Route path="/golf/play"><GolfOnly><Suspense fallback={golfReadFallback}><GolfPlay /></Suspense></GolfOnly></Route>
+      <Route path="/golf/minigolf"><GolfOnly><Suspense fallback={golfReadFallback}><MiniGolfPlay /></Suspense></GolfOnly></Route>
       {/* 골프 온라인게임(미니골프 대전, 2026-09-14) */}
-      <Route path="/golf/arcade"><GolfOnly><GolfArcadePage /></GolfOnly></Route>
+      <Route path="/golf/arcade"><GolfOnly><Suspense fallback={golfReadFallback}><GolfArcadePage /></Suspense></GolfOnly></Route>
       {/* 필드 골프 연습장(2026-09-15 확정안 3주차 게이트) */}
       <Route path="/golf/range"><GolfOnly><GolfRangePage /></GolfOnly></Route>
       <Route path="/history" component={FramedHistory} />
