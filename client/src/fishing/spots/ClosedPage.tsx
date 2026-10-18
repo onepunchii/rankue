@@ -10,7 +10,7 @@ import { useMemo, useState } from "react";
 import { Link } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
 import { FISHING_COLORS as C } from "@shared/fishing";
-import { CLOSED_GROUPS, FISHING_CLOSED_PATH, closedNow, closedOn, closedRange, closedSeo, type ClosedRange } from "@shared/fishingClosed";
+import { CLOSED_GROUPS, FISHING_CLOSED_PATH, closedNow, closedOn, closedRange, closedSeo, minSize, type ClosedRange } from "@shared/fishingClosed";
 import { FISH, fishById } from "@shared/fishingFish";
 import { FISH_REG_NAMES } from "@shared/fishingFishInfo";
 import { fishingFishPath } from "@shared/fishingFishPages";
@@ -38,6 +38,52 @@ function Bar({ r }: { r: ClosedRange }) {
     return <>{r.wraps ? [seg(r.from, 364, 0), seg(0, r.to, 1)] : [seg(r.from, r.to, 0)]}</>;
 }
 
+/** 금지체장 줄자 — 0cm 부터 그 길이까지 노란 줄자, 눈금 5cm. 이 길이 '이하'는 놓아 준다(무게 기준은 글로) */
+function MinRuler({ rows, onOpen, open }: { rows: { group: string; name: string; rule: string }[]; onOpen: (n: string | null) => void; open: string | null }) {
+    const sized = rows.map((r) => ({ r, m: minSize(r.rule) }));
+    const max = Math.max(10, Math.ceil(Math.max(...sized.map((x) => x.m?.cm ?? 0)) / 10) * 10);
+    const ticks = Array.from({ length: max / 5 + 1 }, (_, i) => i * 5);
+    return (
+        <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, color: INK, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }} data-testid="min-ruler">
+            <div className="flex items-end px-3 pb-1 pt-3 text-[12px] tabular-nums" style={{ color: "#0F2838B3" }}>
+                <span className="w-[86px] shrink-0">cm</span>
+                <span className="relative h-4 flex-1">{ticks.filter((t) => t % 10 === 0).map((t) => <span key={t} className="absolute -translate-x-1/2" style={{ left: `${(t / max) * 100}%` }}>{t}</span>)}</span>
+            </div>
+            <ul>
+                {sized.map(({ r, m }) => {
+                    const href = fishPageOf(r.name), isOpen = open === r.name;
+                    return (
+                        <li key={`${r.group}-${r.name}`} style={{ borderTop: "1px dashed #0F283826" }}>
+                            <button type="button" onClick={() => onOpen(isOpen ? null : r.name)} aria-expanded={isOpen} className="flex w-full items-center px-3 py-2 text-left" data-testid="min-row">
+                                <span className="w-[86px] shrink-0 pr-2">
+                                    <span className="block text-[13px] font-semibold leading-tight [word-break:keep-all]">{r.name.replace(/\(.*\)/, "")}</span>
+                                    {m?.conditional && <span className="block text-[12px]" style={{ color: "#0F2838B3" }}>조건 있음</span>}
+                                </span>
+                                <span className="relative h-5 flex-1">
+                                    {ticks.map((t) => <i key={t} className="absolute top-0 w-px" style={{ left: `${(t / max) * 100}%`, height: t % 10 === 0 ? "100%" : "40%", background: "#0F283822" }} aria-hidden />)}
+                                    {m?.cm != null ? (
+                                        <>
+                                            <i className="absolute left-0 top-[3px] h-[14px] rounded-r-[4px]" style={{ width: `${(m.cm / max) * 100}%`, background: "repeating-linear-gradient(90deg, #F2C230 0 calc(100% / 40), #E4B21E calc(100% / 40) calc(100% / 20))", boxShadow: "inset 0 0 0 1px #0F28381F" }} aria-hidden />
+                                            <span className="absolute top-[1px] pl-1.5 text-[12px] font-semibold tabular-nums" style={{ left: `${(m.cm / max) * 100}%` }}>{m.cm}</span>
+                                        </>
+                                    ) : m?.g != null ? <span className="absolute left-0 top-[1px] text-[12px] font-semibold">{m.g}g 이하(무게)</span> : null}
+                                </span>
+                            </button>
+                            {isOpen && (
+                                <div className="px-3 pb-3 text-[13px] leading-relaxed [word-break:keep-all]" style={{ color: "#0F2838CC" }}>
+                                    <p>{r.rule}</p>
+                                    {href && <Link href={href} className="mt-1.5 inline-block font-semibold underline underline-offset-2" style={{ color: SEAL }}>{r.name} 어종 한 장</Link>}
+                                </div>
+                            )}
+                        </li>
+                    );
+                })}
+            </ul>
+            <div className="px-3 py-2.5 text-[12px] leading-relaxed [word-break:keep-all]" style={{ borderTop: "1px dashed #0F283826", color: "#0F2838B3" }}>줄자의 길이 '이하'는 놓아 줘야 해요. 재는 자리(전장 · 체장 · 두흉갑장 …)는 어종마다 달라요 — 원문을 따르세요.</div>
+        </div>
+    );
+}
+
 export function ClosedPage() {
     const { data: regs } = useRegs();
     const today = kstToday();
@@ -48,8 +94,10 @@ export function ClosedPage() {
     const groups = CLOSED_GROUPS.filter((g) => rows.some((r) => r.group === g));
     const [group, setGroup] = useState<string>("전체");
     const [open, setOpen] = useState<string | null>(null);
+    const [tab, setTab] = useState<"closed" | "min">(() => (typeof window !== "undefined" && window.location.hash === "#min" ? "min" : "closed"));
+    const minRows = useMemo(() => (regs?.rows ?? []).filter((r) => r.kind === "min"), [regs]);
     const shown = rows.filter((r) => group === "전체" || r.group === group);
-    const seo = closedSeo(rows.length || 33);
+    const seo = closedSeo(rows.length || 33, minRows.length);
     useSeo({ title: seo.title, description: seo.description, path: FISHING_CLOSED_PATH, locale: "ko", image: fishingSeaCardUrl("https://www.rankue.co.kr", "closed") });
     return (
         <Shell title={seo.h1}>
@@ -62,6 +110,16 @@ export function ClosedPage() {
                 </div>
             </div>
 
+            <div className="flex gap-1.5 px-5 pt-4" role="tablist" aria-label="보기">
+                {([["closed", "금어기 달력"], ["min", "금지체장 줄자"]] as const).map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)} className="h-10 flex-1 rounded-full text-[14px] font-semibold" style={tab === id ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }} data-testid={`closed-tab-${id}`}>{label}</button>)}
+            </div>
+            {tab === "min" ? (
+                <section className="px-5 pt-4" data-testid="closed-min">
+                    <h2 className="mb-2.5 text-[17px] font-semibold">놓아 줄 크기 <span className="text-[13px] font-normal tabular-nums" style={{ color: C.dim }}>{minRows.length}가지</span></h2>
+                    <MinRuler rows={minRows} open={open} onOpen={setOpen} />
+                    <p className="mt-2 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>출처: {regs?.titles?.min ?? "수산자원관리법 시행령 별표 2"} — {regs?.basis ?? ""}. 낚시하는 사람에게도 적용돼요. 법률 자문이 아니에요.</p>
+                </section>
+            ) : (<>
             {/* 오늘 금어기 */}
             <section className="px-5 pt-5" data-testid="closed-today">
                 <h2 className="mb-2.5 text-[17px] font-semibold">오늘 금어기 <span className="text-[13px] font-normal tabular-nums" style={{ color: C.dim }}>{Number(today.slice(5, 7))}월 {Number(today.slice(8))}일 · {now.length}가지</span></h2>
@@ -127,6 +185,7 @@ export function ClosedPage() {
                 <p className="mt-2 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>출처: {regs?.basis ?? "수산자원관리법 시행령 별표 1"}. 막대는 날짜만 읽은 것이에요 — 해역 한정 · 예외 · 지자체 고시는 원문을 따르세요. 법률 자문이 아니에요.</p>
                 <Link href="/fishing/fish" className="mt-3 flex h-11 items-center justify-center rounded-xl text-[14px]" style={{ background: "#FFFFFF0F", color: C.soft }}>낚시 어종 보기</Link>
             </section>
+            </>)}
         </Shell>
     );
 }

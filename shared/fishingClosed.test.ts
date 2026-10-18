@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { closedNow, closedOn, closedRange, closedSeo, dayOfYear, FISHING_CLOSED_PATH } from "./fishingClosed";
+import { closedNow, closedOn, closedRange, closedSeo, dayOfYear, FISHING_CLOSED_PATH, minSize } from "./fishingClosed";
 
 /**
  * 금어기 달력(2026-10-18) — 받은 법령 표(regs.json)의 금어기 줄을 막대로. 글은 고치지 않고 날짜 구간만 읽는다.
@@ -45,5 +45,14 @@ describe("금어기 달력", () => {
         expect(read("shared/fishingSeaPages.ts")).toContain('if (key === "closed") return { name: "금어기 달력"');
         // 검색용 글은 서버 자산에 — 받은 표와 같은 줄 수
         expect((JSON.parse(read("server/assets/fishing/fish-pages.json")).closed as unknown[]).length).toBe(closed.length);
+    });
+    it("금지체장 줄자 — 센티미터 줄은 첫 값, 무게(대문어)는 그램, '다만'이 있으면 조건", () => {
+        const mins = regs.rows.filter((r) => r.kind === "min");
+        for (const r of mins) expect(minSize(r.rule), r.name).not.toBeNull();
+        expect(minSize("25센티미터 이하")).toEqual({ cm: 25, g: null, conditional: false });
+        expect(minSize("600그램 이하")).toEqual({ cm: null, g: 600, conditional: false });
+        expect(minSize(mins.find((r) => r.name === "문치가자미")!.rule)).toEqual({ cm: 20, g: null, conditional: true });
+        expect((JSON.parse(read("server/assets/fishing/fish-pages.json")).mins as unknown[]).length).toBe(mins.length);
+        expect(read("client/src/fishing/spots/ClosedPage.tsx")).toContain('data-testid="min-ruler"');
     });
 });

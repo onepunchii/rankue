@@ -49,13 +49,22 @@ export function closedNow<R extends RegRowLite>(rows: readonly R[], month: numbe
     return rows.filter((r) => r.kind === "closed").filter((r) => { const c = closedRange(r.rule); return !!c && closedOn(c, month, day); });
 }
 
+/** 금지체장 — '25센티미터 이하' · '600그램 이하'의 첫 값(그보다 작으면 놓아 준다). 앞에 한정이 붙거나 '다만'이 있으면 conditional */
+export function minSize(rule: string): { cm: number | null; g: number | null; conditional: boolean } | null {
+    const cm = /(\d+(?:\.\d+)?)\s*센티미터 이하/.exec(rule), g = /(\d+(?:\.\d+)?)\s*그램 이하/.exec(rule);
+    const hit = cm ?? g;
+    if (!hit) return null;
+    const lead = rule.slice(0, hit.index).trim();
+    return { cm: cm ? Number(cm[1]) : null, g: !cm && g ? Number(g[1]) : null, conditional: lead.length > 0 || /다만|한정|제외/.test(rule) };
+}
+
 /** 무리의 차례 — 표의 차례 그대로 */
 export const CLOSED_GROUPS = ["어류", "갑각류", "패류", "두족류", "해조류", "기타"] as const;
 
-export function closedSeo(total: number): { title: string; description: string; h1: string } {
+export function closedSeo(total: number, minTotal = 0): { title: string; description: string; h1: string } {
     return {
         h1: "금어기 달력",
-        title: `금어기 달력 — 이번 달 잡으면 안 되는 어종 · 갑각류 · 조개 ${total}가지 | 랭큐 낚시`,
-        description: `수산자원관리법 시행령 별표 1의 금어기 ${total}줄을 열두 달 막대로 보여 줘요. 이번 달 금어기 · 해역 한정 · 예외는 원문 그대로 함께 적어요.`,
+        title: `금어기 달력 · 금지체장 — 이번 달 잡으면 안 되는 어종 ${total}가지 · 놓아 줄 크기 | 랭큐 낚시`,
+        description: `수산자원관리법 시행령 별표 1의 금어기 ${total}줄을 열두 달 막대로, 별표 2의 금지체장${minTotal ? ` ${minTotal}줄` : ""}을 줄자로 보여 줘요. 해역 한정 · 예외는 원문 그대로 함께 적어요.`,
     };
 }

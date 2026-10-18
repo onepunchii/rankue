@@ -17,7 +17,7 @@ export interface FishingFishRender { status: 200; tag: string; html: string }
 /** 어종의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
 export const FISHING_FISH_RE = /^\/fishing\/(?:fish(?:\/[^/]+)?|closed)\/?$/;
 
-interface FishAsset { basis: string; closedTitle?: string | null; closed?: { kind: string; group: string; name: string; rule: string }[]; fish: Record<string, { guide: { key: string; name: string; intro: string; sections: { h: string; b: string }[]; sources: { name: string; title?: string; url?: string; license?: string | null }[] } | null; regs: { kind: string; name: string; rule: string }[] }> }
+interface FishAsset { basis: string; closedTitle?: string | null; minTitle?: string | null; closed?: { kind: string; group: string; name: string; rule: string }[]; mins?: { kind: string; group: string; name: string; rule: string }[]; fish: Record<string, { guide: { key: string; name: string; intro: string; sections: { h: string; b: string }[]; sources: { name: string; title?: string; url?: string; license?: string | null }[] } | null; regs: { kind: string; name: string; rule: string }[] }> }
 let asset: FishAsset | null = null;
 export function fishAsset(): FishAsset {
     if (asset) return asset;
@@ -93,7 +93,8 @@ ${signup()}
 function closedPage(nowMs: number): FishingFishRender | null {
     const a = fishAsset(), rows = a.closed ?? [];
     if (!rows.length) return null;
-    const seo = closedSeo(rows.length);
+    const mins = a.mins ?? [];
+    const seo = closedSeo(rows.length, mins.length);
     const kst = new Date(nowMs + 9 * 3600_000), m = kst.getUTCMonth() + 1, d = kst.getUTCDate();
     const now = closedNow(rows, m, d);
     const groups = CLOSED_GROUPS.filter((g) => rows.some((r) => r.group === g));
@@ -106,6 +107,7 @@ function closedPage(nowMs: number): FishingFishRender | null {
     <p>${now.length ? now.map((r) => esc(r.name)).join(" · ") : "오늘 날짜로 걸리는 금어기는 없어요."}</p>
   </section>
 ${groups.map((g) => `  <section>\n    <h2>${esc(g)} 금어기</h2>\n    <ul>\n${rows.filter((r) => r.group === g).map((r) => `      <li><strong>${esc(r.name)}</strong> — ${esc(r.rule)}</li>`).join("\n")}\n    </ul>\n  </section>`).join("\n")}
+${mins.length ? `  <section>\n    <h2>금지체장 — 이 크기 이하는 놓아 주기</h2>\n    <ul>\n${mins.map((r) => `      <li><strong>${esc(r.name)}</strong> — ${esc(r.rule)}</li>`).join("\n")}\n    </ul>\n    <p>출처: ${esc(a.minTitle ?? "")}</p>\n  </section>` : ""}
   <p>출처: ${esc(a.closedTitle ?? "")} — ${esc(a.basis)}. 해역 한정 · 예외 · 지자체 고시는 원문을 따르세요. 법률 자문이 아니에요.</p>
 ${signup()}
 </main>`;
