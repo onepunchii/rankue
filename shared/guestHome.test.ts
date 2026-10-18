@@ -526,7 +526,8 @@ describe("당구 홈", () => {
             expect(bar).toContain('onClick={() => (s.id === "HIKING" && !hikingOk ? setLocation(HIKING_HUB_PATH) : s.id === "FISHING" && !fishingOk ? setLocation(FISHING_SPOTS_PATH) : setSport(s.id))}');
             expect(client("contexts/SportContext.tsx")).toContain('if (routeSport === "HIKING" && !hikingOk) return;');
             // 폭 320: 세 종목 + 로그인 + 메뉴가 한 줄에 안 들어가 메뉴 단추가 잘렸다 — 알약의 옆 여백만 340 미만에서 줄인다(세 종목이 똑같이)
-            expect(bar).toContain('const PILL_PAD = "px-2.5 max-[339px]:px-1.5";');
+            // 2026-10-18 낚시 공개 뒤 알약 넷 + 로그인이 360 을 넘었다 — 400 미만에서 한 번 더 줄인다(여전히 화면 폭으로만)
+            expect(bar).toContain('const PILL_PAD = "px-2.5 max-[399px]:px-[5px] max-[339px]:px-[3px]";');
             // 낚시(2026-10-14)도 다른 종목과 같은 알약이다 — 따로 그리는 단추가 없다(고르면 그 자리에서 낚시 세계로 바뀐다)
             expect(bar.match(/\$\{PILL_PAD\}/g)?.length).toBe(2);
             expect(bar).not.toContain('setLocation("/fishing")');

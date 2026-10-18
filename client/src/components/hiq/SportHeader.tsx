@@ -70,7 +70,8 @@ const barStyle = (c: { bar: string; line: string }, bleed: number, lift: number)
 const BAR_CLASS = "rk-no-safe sticky top-0 z-40 backdrop-blur-md";
 // 알약의 옆 여백 10. 폭 340 미만(아주 작은 폰)에서만 6 으로 — 세 종목 + 로그인 + 메뉴가 320 한 줄에 들어가지 않아 메뉴 단추가 화면 밖으로 잘렸다.
 // 종목에 따라 달라지는 것이 아니라 화면 폭에 따라 세 종목이 똑같이 줄어든다(종목을 바꿔도 자리는 그대로).
-const PILL_PAD = "px-2.5 max-[339px]:px-1.5";
+// 2026-10-18 낚시 공개 뒤 방문자 줄(낱말 + 알약 넷 + 로그인 + 메뉴)이 360 에서 380 이 되어 메뉴 단추가 화면 밖으로 나갔다 → 400 미만에서 5 · 340 미만에서 3.
+const PILL_PAD = "px-2.5 max-[399px]:px-[5px] max-[339px]:px-[3px]";
 
 export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
     sport: HeaderSport; /** 홈 바탕 상자의 옆 여백(px) */ bleed?: number; /** 홈 바탕 상자의 윗여백(px) */ lift?: number; className?: string;
@@ -129,7 +130,7 @@ export function SportHeader({ sport, bleed = 0, lift = 0, className, inner }: {
                     )}
                     {isGuest ? (
                         // 알림 종 자리에 로그인 — 끝나면 지금 보던 홈으로 돌아온다(goLogin 이 지금 주소를 기억한다)
-                        <button type="button" onClick={() => goLogin(setLocation)} className="shrink-0 rounded-full px-3 text-[13.5px] font-semibold active:scale-95 transition-transform" style={{ height: z.button, background: c.iconBg, color: iconColor }} data-testid="sport-header-login">
+                        <button type="button" onClick={() => goLogin(setLocation)} className="shrink-0 rounded-full px-3 max-[339px]:px-2 text-[13.5px] font-semibold active:scale-95 transition-transform" style={{ height: z.button, background: c.iconBg, color: iconColor }} data-testid="sport-header-login">
                             {sport === "BILLIARDS" ? t("guestHome.login") : "로그인"}
                         </button>
                     ) : (
