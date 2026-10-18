@@ -17,7 +17,7 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const G = join(ROOT, "client/public/fishing/guide");
 const read = <T,>(p: string): T => JSON.parse(readFileSync(p, "utf8")) as T;
 const index = read<{ key: string; name: string }[]>(join(G, "index.json"));
-const regs = read<{ basis: string; titles: Record<string, string>; rows: { kind: string; group: string; name: string; rule: string }[] }>(join(G, "regs.json"));
+const regs = read<{ basis: string; titles?: Record<string, string>; rows: { kind: string; group: string; name: string; rule: string }[] }>(join(G, "regs.json"));
 
 const fish: Record<string, unknown> = {};
 for (const f of FISH) {
@@ -31,5 +31,7 @@ for (const f of FISH) {
     };
 }
 const out = join(ROOT, "server/assets/fishing/fish-pages.json");
-writeFileSync(out, JSON.stringify({ basis: regs.basis, fish }) + "\n");
-console.log(`fish-pages.json — ${Object.keys(fish).length}종 · 도감 ${Object.values(fish).filter((x: any) => x.guide).length} · 금어기 줄 ${Object.values(fish).reduce((a: number, x: any) => a + x.regs.length, 0)}`);
+// 금어기 달력(/fishing/closed) — 별표 1의 금어기 줄 전부(받은 글 그대로)
+const closed = regs.rows.filter((r) => r.kind === "closed").map((r) => ({ kind: r.kind, group: r.group, name: r.name, rule: r.rule }));
+writeFileSync(out, JSON.stringify({ basis: regs.basis, closedTitle: regs.titles?.closed ?? null, fish, closed }) + "\n");
+console.log(`fish-pages.json — 금어기 ${closed.length}줄 · ${Object.keys(fish).length}종 · 도감 ${Object.values(fish).filter((x: any) => x.guide).length} · 금어기 줄 ${Object.values(fish).reduce((a: number, x: any) => a + x.regs.length, 0)}`);

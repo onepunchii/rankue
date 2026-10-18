@@ -91,15 +91,15 @@ describe("낚시 어종 공개 페이지", () => {
         expect(await renderFishingFish("/fishing/fish/%E0%A4%A", places)).toBeNull();
     });
     it("길 — 봇 라우트 · 프리렌더 · 앱 라우트 · 사이트맵 · 공개 자료 길", () => {
-        expect(read("vercel.json")).toContain("|port/[^/]+|fish(?:/[^/]+)?))/?");
+        expect(read("vercel.json")).toContain("|port/[^/]+|fish(?:/[^/]+)?|");
         expect(read("server/prerender.ts")).toContain("app.get(FISHING_FISH_RE, async (req, res, next) => {");
         const app = read("client/src/App.tsx");
         expect(app).toContain('<Route path="/fishing/fish">');
         expect(app).toContain('<Route path="/fishing/fish/:name">');
         expect(read("server/sitemap.ts")).toContain("...fishingFishSitemapParts(");
         const parts = fishingFishSitemapParts("2026-10-18").map((x) => JSON.parse(x) as { loc: string; image?: string });
-        expect(parts.length).toBe(1 + FISH.length);
-        expect(parts.slice(1).every((x) => x.image?.includes("/og/fishing-fish/"))).toBe(true);
+        expect(parts.length).toBe(2 + FISH.length); // 허브 · 금어기 달력 · 22종
+        expect(parts.slice(2).every((x) => x.image?.includes("/og/fishing-fish/"))).toBe(true);
         const r = read("server/routes/modules/fishing.ts");
         expect(r).toContain('router.get("/market", asyncHandler(');
         expect(r).toContain('router.get("/index-map", asyncHandler(');

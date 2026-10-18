@@ -267,6 +267,7 @@ const FishingSeaArea = lazy(() => import("@/fishing/spots/SeaPages").then((m) =>
 const FishingPort = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.PortPage })));
 const FishingFishHub = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishHub })));
 const FishingFish = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishPage })));
+const FishingClosed = lazy(() => import("@/fishing/spots/ClosedPage").then((m) => ({ default: m.ClosedPage })));
 const spotFallback = <div className="min-h-[100dvh] bg-[#0B1E2D]" aria-busy="true" />;
 // 무거운 화면은 열 때만 받는다(2026-10-18 — 첫 화면 묶음이 7.1MB · gzip 1.9MB 였다: 3D 골프(three · r3f) · 사장님 대시보드(xlsx · html2canvas) · 관리자 콘솔(xlsx)이 모두에게 실려 있었다)
 const GolfPlay = lazy(() => import("@/golf/pages/GolfPlay"));
@@ -483,6 +484,7 @@ function AppRoutes() {
       <Route path="/fishing/spot/:id">{(p: { id: string }) => <Suspense fallback={spotFallback}><FishingSpot id={p.id} /></Suspense>}</Route>
       <Route path="/fishing/sea">{() => <Suspense fallback={spotFallback}><FishingSeaHub /></Suspense>}</Route>
       <Route path="/fishing/sea/:area">{(p: { area: string }) => <Suspense fallback={spotFallback}><FishingSeaArea id={decodeURIComponent(p.area)} /></Suspense>}</Route>
+      <Route path="/fishing/closed">{() => <Suspense fallback={spotFallback}><FishingClosed /></Suspense>}</Route>
       <Route path="/fishing/fish">{() => <Suspense fallback={spotFallback}><FishingFishHub /></Suspense>}</Route>
       <Route path="/fishing/fish/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingFish name={decodeURIComponent(p.name)} /></Suspense>}</Route>
       <Route path="/fishing/port/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingPort name={decodeURIComponent(p.name)} /></Suspense>}</Route>

@@ -23,7 +23,8 @@ import { FISHING_SPOTS_PATH } from "@shared/fishingPlaces";
 import { josa } from "@shared/briefingMeta";
 import { FISHING_FISH_LABEL, FISHING_FISH_PATH, FISH_PAGES, fishBySlug, fishHubSeo, fishPageSeo, fishSpotCounts, fishingFishPath, goodFishToday, spotsOfFish, waterWord } from "@shared/fishingFishPages";
 import { fishingFishCardUrl } from "@shared/ogCards";
-import { INDEX_TONE, INK, PAPER, Seal, art } from "../ink";
+import { INDEX_TONE, INK, PAPER, SEAL, Seal, art } from "../ink";
+import { FISHING_CLOSED_PATH } from "@shared/fishingClosed";
 import { OurGuideStory, RegBox, useRegs } from "../Guide";
 import { PaperMap, Row, Shell, useSpots } from "./SpotsPages";
 import { PIXEL_LEGEND, SeaChart, type ChartSpot } from "../SeaChart";
@@ -69,6 +70,13 @@ export function FishHub() {
                     <p className="mt-0.5 text-[13.5px]" style={{ color: "#F3ECDDCC" }}>어탁 {FISH_PAGES.length}종 · 낚시꾼이 부르는 크기 · 금어기 · 낚시터</p>
                 </div>
             </div>
+            {/* 금어기 달력(2026-10-18) — 법령 표 그대로, 이번 달 금어기 */}
+            <section className="px-5 pt-5">
+                <Link href={FISHING_CLOSED_PATH} className="flex items-center gap-3 rounded-2xl p-3 active:opacity-85" style={{ background: "#FFFFFF0D", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="fish-closed-link">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl text-[13px] font-semibold" style={{ background: SEAL, color: "#FFF4EC" }}>금어기</span>
+                    <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">금어기 달력</span><span className="block text-[12.5px]" style={{ color: C.dim }}>이번 달 잡으면 안 되는 어종 · 갑각류 · 조개 — 법령 표 그대로</span></span>
+                </Link>
+            </section>
             {/* 오늘 바다에서 좋은 곳이 많은 어종 — 해양조사원 지수 그대로(날마다 바뀐다) */}
             {good.length > 0 && (
                 <section className="px-5 pt-6" data-testid="fish-today">
@@ -152,6 +160,7 @@ export function FishPage({ name }: { name: string }) {
                     </div>
                 </div>
                 {(FISH_REG_NAMES[f.id] ?? []).length > 0 && <div className="mt-3"><RegBox names={FISH_REG_NAMES[f.id]} regs={regs} label={f.name} /></div>}
+                <Link href={FISHING_CLOSED_PATH} className="mt-2 flex h-10 items-center justify-center rounded-xl text-[13.5px]" style={{ background: "#FFFFFF0F", color: C.soft }}>금어기 달력 — 이번 달 금어기 한눈에</Link>
             </div>
 
             {/* 오늘 좋은 곳 — 지수가 매겨지는 바다 어종만 */}

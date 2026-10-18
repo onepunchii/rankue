@@ -9,14 +9,15 @@ import { entry } from "../sitemap.js";
 import { fishValueText, type FishKind } from "../../shared/fishingFish.js";
 import { FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, fishingSpotPath, placeWhere, type PublicPlace } from "../../shared/fishingPlaces.js";
 import { FISHING_FISH_LABEL, FISHING_FISH_PATH, FISH_PAGES, fishBySlug, fishHubSeo, fishPageSeo, fishSpotCounts, fishingFishPath, spotsOfFish, tierLine, waterWord } from "../../shared/fishingFishPages.js";
-import { fishingFishCardUrl } from "../../shared/ogCards.js";
+import { fishingFishCardUrl, fishingSeaCardUrl } from "../../shared/ogCards.js";
+import { CLOSED_GROUPS, FISHING_CLOSED_PATH, closedNow, closedSeo } from "../../shared/fishingClosed.js";
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FishingFishRender { status: 200; tag: string; html: string }
 /** 어종의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
-export const FISHING_FISH_RE = /^\/fishing\/fish(?:\/[^/]+)?\/?$/;
+export const FISHING_FISH_RE = /^\/fishing\/(?:fish(?:\/[^/]+)?|closed)\/?$/;
 
-interface FishAsset { basis: string; fish: Record<string, { guide: { key: string; name: string; intro: string; sections: { h: string; b: string }[]; sources: { name: string; title?: string; url?: string; license?: string | null }[] } | null; regs: { kind: string; name: string; rule: string }[] }> }
+interface FishAsset { basis: string; closedTitle?: string | null; closed?: { kind: string; group: string; name: string; rule: string }[]; fish: Record<string, { guide: { key: string; name: string; intro: string; sections: { h: string; b: string }[]; sources: { name: string; title?: string; url?: string; license?: string | null }[] } | null; regs: { kind: string; name: string; rule: string }[] }> }
 let asset: FishAsset | null = null;
 export function fishAsset(): FishAsset {
     if (asset) return asset;
@@ -88,9 +89,34 @@ ${signup()}
     return { status: 200, tag: `fishing:fish:${f.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${fishingFishPath(f.name)}`, body, image: card, jsonLd: [crumbs([seo.h1, fishingFishPath(f.name)])] }) };
 }
 
+/** 금어기 달력 — 별표 1의 금어기 줄을 무리별로, 원문 그대로(막대는 화면만). 맨 위에 오늘 금어기 */
+function closedPage(nowMs: number): FishingFishRender | null {
+    const a = fishAsset(), rows = a.closed ?? [];
+    if (!rows.length) return null;
+    const seo = closedSeo(rows.length);
+    const kst = new Date(nowMs + 9 * 3600_000), m = kst.getUTCMonth() + 1, d = kst.getUTCDate();
+    const now = closedNow(rows, m, d);
+    const groups = CLOSED_GROUPS.filter((g) => rows.some((r) => r.group === g));
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${FISHING_FISH_PATH}">${esc(FISHING_FISH_LABEL)}</a> › ${esc(seo.h1)}</nav>
+  <h1>${esc(seo.h1)}</h1>
+  <p>${esc(seo.description)}</p>
+  <section>
+    <h2>${m}월 ${d}일 금어기 ${now.length}가지</h2>
+    <p>${now.length ? now.map((r) => esc(r.name)).join(" · ") : "오늘 날짜로 걸리는 금어기는 없어요."}</p>
+  </section>
+${groups.map((g) => `  <section>\n    <h2>${esc(g)} 금어기</h2>\n    <ul>\n${rows.filter((r) => r.group === g).map((r) => `      <li><strong>${esc(r.name)}</strong> — ${esc(r.rule)}</li>`).join("\n")}\n    </ul>\n  </section>`).join("\n")}
+  <p>출처: ${esc(a.closedTitle ?? "")} — ${esc(a.basis)}. 해역 한정 · 예외 · 지자체 고시는 원문을 따르세요. 법률 자문이 아니에요.</p>
+${signup()}
+</main>`;
+    const card = { url: fishingSeaCardUrl(ORIGIN, "closed"), width: 1200, height: 1200, alt: seo.h1 };
+    return { status: 200, tag: "fishing:closed", html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${FISHING_CLOSED_PATH}`, body, image: card, jsonLd: [crumbs([seo.h1, FISHING_CLOSED_PATH])] }) };
+}
+
 export async function renderFishingFish(p0: string, places: () => Promise<readonly PublicPlace[]>): Promise<FishingFishRender | null> {
     const p = p0.replace(/\/+$/, "") || "/";
     if (p === FISHING_FISH_PATH) return hub(await places().catch(() => []));
+    if (p === FISHING_CLOSED_PATH) return closedPage(Date.now());
     const m = /^\/fishing\/fish\/([^/]+)$/.exec(p);
     if (!m) return null;
     let name: string;
@@ -103,6 +129,7 @@ export async function renderFishingFish(p0: string, places: () => Promise<readon
 export function fishingFishSitemapParts(updated: string | null): string[] {
     return [
         entry(`${ORIGIN}${FISHING_FISH_PATH}`, { changefreq: "weekly", priority: "0.7", lastmod: updated }),
+        entry(`${ORIGIN}${FISHING_CLOSED_PATH}`, { changefreq: "monthly", priority: "0.6", lastmod: updated, image: fishingSeaCardUrl(ORIGIN, "closed") }),
         ...FISH_PAGES.map((f) => entry(`${ORIGIN}${fishingFishPath(f.name)}`, { changefreq: "weekly", priority: "0.6", lastmod: updated, image: fishingFishCardUrl(ORIGIN, f.id) })),
     ];
 }

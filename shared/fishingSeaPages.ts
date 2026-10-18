@@ -35,6 +35,8 @@ export function portSeo(p: FishingPort): { title: string; description: string; h
 
 /** 바다 · 항구 카드의 글(server/services/fishingSpotCard 와 같은 틀) — 우리 표에 있는 key 만, 아니면 null. 날마다 바뀌는 값은 넣지 않는다(메신저가 카드를 오래 기억한다) */
 export function fishingSeaCardInput(key: string): { name: string; place: string; detail: string; kind: string; fish: null; cover: string; badge: string } | null {
+    // 금어기 달력(/fishing/closed) — 같은 틀의 카드
+    if (key === "closed") return { name: "금어기 달력", place: "수산자원관리법 시행령 별표 1", detail: "어류 · 갑각류 · 조개 · 해조류 — 이번 달 금어기", kind: "sea", fish: null, cover: "sea-west-south", badge: "금어기" };
     if (key === "all") return { name: "오늘의 바다 · 물때", place: `해역 ${SEA_AREAS.length}곳 · 항구 ${FISHING_PORTS.length}곳`, detail: "풍랑특보 · 해상예보 · 만조 · 간조 · 수온", kind: "sea", fish: null, cover: "sea-south-east", badge: "오늘의 바다" };
     const a = seaAreaById(key);
     if (a) return { name: `${a.name} 바다`, place: a.hint, detail: `풍랑특보 · 해상예보 · 항구 ${portsOf(a.id).length}곳 물때`, kind: "sea", fish: null, cover: `sea-${a.id}`, badge: "오늘의 바다" };
