@@ -1,7 +1,6 @@
-import { useState, type ReactNode } from "react";
+import { Suspense, lazy, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useLocation, useRoute } from "wouter";
-import { ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { LucideChevronLeft, LucideChevronRight, LucideChevronDown, LucideGlobe, LucideTrophy, LucideHeart, LucideClock } from "@/lib/icons";
 import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
@@ -28,6 +27,8 @@ import { PageCover } from "@/components/hiq/PageCover";
 import {
     pbaAge, pbaDisplayName, pbaGames, pbaPlayerFaq, pbaPlayerLdNodes, pbaPlayerSummary, pbaPrizeLabel, type PbaPlayerProfile,
 } from "@shared/pbaPlayerProfile";
+// 시즌별 기록 그래프는 열 때만 받는다(recharts 를 첫 화면 묶음에서 뺀다 — 2026-10-18)
+const SeasonChart = lazy(() => import("@/components/hiq/charts/SeasonChart"));
 
 /**
  * PBA 선수 상세(2026-09-27 개편, 오너 승인 시안 — "완벽하고 풍성하게, 들어오면 머물게, SEO·AEO·GEO").
@@ -416,28 +417,10 @@ export default function HiqPbaPlayer() {
                                         ))}
                                     </div>
                                     <div className="h-[170px] min-w-0">
-                                        <ResponsiveContainer width="100%" height="100%">
-                                            <ComposedChart data={chartData} margin={{ top: 18, right: 12, bottom: 0, left: -18 }}>
-                                                <CartesianGrid vertical={false} stroke={GRID} />
-                                                <XAxis dataKey="name" tick={{ fontSize: 12, fill: AXIS }} axisLine={false} tickLine={false} />
-                                                {metric === "prize" ? (
-                                                    <YAxis tick={{ fontSize: 12, fill: AXIS }} axisLine={false} tickLine={false} />
-                                                ) : (
-                                                    <YAxis reversed allowDecimals={false} domain={[1, "dataMax"]} tick={{ fontSize: 12, fill: AXIS }} axisLine={false} tickLine={false} />
-                                                )}
-                                                <Tooltip
-                                                    formatter={(v: any) => (metric === "prize" ? [`${v}${lang === "ko" ? "억" : "00M"}`, t.mPrize] : [rankUnit(Number(v)), metric === "prizeRank" ? t.mPrizeRank : t.mPointRank])}
-                                                    contentStyle={{ borderRadius: 12, border: "none", boxShadow: "0 4px 14px rgba(0,0,0,0.12)", fontSize: 12 }}
-                                                />
-                                                {metric === "prize" ? (
-                                                    <Bar dataKey="prize" fill={BRAND} opacity={0.8} radius={[6, 6, 0, 0]} isAnimationActive={false} />
-                                                ) : (
-                                                    <Line dataKey={metric} stroke={BRAND} strokeWidth={2.5} dot={{ r: 4, fill: "#fff", stroke: BRAND, strokeWidth: 2.5 }} connectNulls isAnimationActive={false}>
-                                                        <LabelList dataKey={metric} position="top" formatter={(v: any) => (v == null ? "" : rankUnit(Number(v)))} style={{ fontSize: 12, fontWeight: 700, fill: BRAND }} />
-                                                    </Line>
-                                                )}
-                                            </ComposedChart>
-                                        </ResponsiveContainer>
+                                        <Suspense fallback={null}>
+                                            <SeasonChart data={chartData} metric={metric} colors={{ brand: BRAND, axis: AXIS, grid: GRID }} rankLabel={rankUnit}
+                                                tooltip={(v) => (metric === "prize" ? [`${v}${lang === "ko" ? "억" : "00M"}`, t.mPrize] : [rankUnit(Number(v)), metric === "prizeRank" ? t.mPrizeRank : t.mPointRank])} />
+                                        </Suspense>
                                     </div>
                                 </>
                             )}

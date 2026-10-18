@@ -25,4 +25,20 @@ describe("첫 화면 묶음에 무거운 화면을 싣지 않는다", () => {
     it("App 은 three · xlsx · html2canvas 를 직접 부르지 않는다", () => {
         expect(app).not.toMatch(/from "(three|xlsx|html2canvas|@react-three\/fiber)"/);
     });
+    it("recharts 는 그래프 전용 파일에서만 — 화면은 그 파일을 lazy 로 받는다(첫 화면 묶음에서 그래프 라이브러리를 뺀다)", () => {
+        const { execSync } = require("node:child_process") as typeof import("node:child_process");
+        const files = execSync('grep -rl \'from "recharts"\' client/src || true', { cwd: resolve(__dirname, ".."), encoding: "utf8" }).trim().split("\n").filter(Boolean).filter((f) => !/\.test\./.test(f)).sort();
+        expect(files).toEqual([
+            "client/src/components/hiq/charts/RankTrendChart.tsx",
+            "client/src/components/hiq/charts/SeasonChart.tsx",
+            "client/src/components/hiq/history/GrowthChart.tsx",
+            "client/src/components/ui/chart.tsx",
+            "client/src/golf/components/course/detail/PriceChart.tsx",
+            "client/src/golf/components/dashboard/ScoreTrendArea.tsx",
+        ]);
+        const read = (f: string) => readFileSync(resolve(__dirname, "..", f), "utf8");
+        expect(read("client/src/pages/hiq/pba-player.tsx")).toContain('lazy(() => import("@/components/hiq/charts/SeasonChart"))');
+        expect(read("client/src/pages/hiq/history.tsx")).toContain('lazy(() => import("@/components/hiq/history/GrowthChart")');
+        expect(read("client/src/golf/components/dashboard/StatsChart.tsx")).toContain('lazy(() => import("./ScoreTrendArea"))');
+    });
 });

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { LucideTarget, LucideBarChart3, LucideLayers } from "@/lib/icons";
@@ -13,7 +13,6 @@ import { apiRequest } from "@/lib/queryClient";
 import { useGameStats } from "@/hooks/useGameStats";
 import { SPORT_CONFIG, FilterType } from "@/components/hiq/history/types";
 import { StatsOverviewCard } from "@/components/hiq/history/StatsOverviewCard";
-import { GrowthChart } from "@/components/hiq/history/GrowthChart";
 import { HistoryList } from "@/components/hiq/history/HistoryList";
 import { GameDetailDialog } from "@/components/hiq/history/GameDetailDialog";
 import { AchievementCard } from "@/components/hiq/history/AchievementCard";
@@ -23,6 +22,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { LoginGate } from "@/components/hiq/LoginGate";
 import { BallDot } from "@/components/hiq/BallDot";
 import { GolfRoundReport } from "@/golf/pages/RoundReport";
+// 성장 그래프는 열 때만 받는다(recharts 를 첫 화면 묶음에서 뺀다 — 2026-10-18)
+const GrowthChart = lazy(() => import("@/components/hiq/history/GrowthChart").then((m) => ({ default: m.GrowthChart })));
 
 export default function HiqHistory() {
     const { t } = useT();
@@ -121,11 +122,13 @@ export default function HiqHistory() {
 
             {/* 성장 그래프 — 골프는 스코어가 낮을수록 좋아 '평균 추이' 해석이 반대라 제외한다 */}
             {currentSport !== "GOLF" && (
-                <GrowthChart
-                    history={stats.officialHistory}
-                    filter={filter}
-                    mainMode={stats.mainMode}
-                />
+                <Suspense fallback={<div className="h-[300px] rounded-2xl bg-white" aria-busy="true" />}>
+                    <GrowthChart
+                        history={stats.officialHistory}
+                        filter={filter}
+                        mainMode={stats.mainMode}
+                    />
+                </Suspense>
             )}
 
             {/* 주간 달성률 — 득점÷다마수, '지난주의 나'와 대결 */}

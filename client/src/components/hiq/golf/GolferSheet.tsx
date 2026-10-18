@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, lazy, useState } from "react";
 import { useLocation } from "wouter";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { PlayerCardShareButton } from "@/components/hiq/PlayerCardShareButton";
@@ -7,7 +7,6 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Line, LineChart, ReferenceArea, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
@@ -18,6 +17,9 @@ import { ageFrom, regionName } from "@/components/hiq/umb/types";
 import { PlayerCheers } from "@/components/hiq/umb/PlayerCheers";
 import { GChip, GList, GSection, GTile } from "./ui";
 import { golferName, iocToAlpha2, type GolfTour, type GolferDetail } from "./types";
+
+// 그래프는 열 때만 받는다(recharts 를 첫 화면 묶음에서 뺀다 — 2026-10-18)
+const RankTrendChart = lazy(() => import("@/components/hiq/charts/RankTrendChart"));
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 const STAT_FOLD = 8;
@@ -216,19 +218,13 @@ export const GolferBody = ({ tour, playerId, onNavigate, standalone }: GolferBod
                     )}
                 >
                     <div className="h-44 w-full min-w-0">
-                        <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 0, left: -14 }}>
-                                <XAxis dataKey="label" tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={{ stroke: GRID }} interval="preserveStartEnd" minTickGap={40} />
-                                <YAxis reversed={metric === "rank"} domain={["dataMin", "dataMax"]} tick={{ fontSize: 12, fill: AXIS }} tickLine={false} axisLine={false} width={40} allowDecimals={metric === "points"} />
-                                {metric === "rank" && data.bestRank !== null && data.bestRank <= 10 && <ReferenceArea y1={1} y2={10} fill={BRAND} fillOpacity={0.08} />}
-                                <Tooltip
-                                    formatter={(v: any) => [metric === "rank" ? `${v}${rankSuffix}` : formatRankValue(tour, Number(v)), ""]}
-                                    labelFormatter={(l: any, payload: any) => payload?.[0]?.payload?.edition ?? l}
-                                    contentStyle={{ borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "#17181a", color: "#fff", fontSize: 12, padding: "6px 10px" }}
-                                />
-                                <Line type="monotone" dataKey={metric} stroke={BRAND} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: BRAND }} />
-                            </LineChart>
-                        </ResponsiveContainer>
+                        <Suspense fallback={null}>
+                            <RankTrendChart data={chartData} metric={metric} reversed={metric === "rank"} allowDecimals={metric === "points"} top10={metric === "rank" && data.bestRank !== null && data.bestRank <= 10} top10Opacity={0.08}
+                                colors={{ brand: BRAND, axis: AXIS, grid: GRID }}
+                                formatValue={(v) => (metric === "rank" ? `${v}${rankSuffix}` : formatRankValue(tour, Number(v)))}
+                                formatLabel={(l, payload) => payload?.[0]?.payload?.edition ?? l}
+                                tooltipStyle={{ borderRadius: 12, border: "1px solid rgba(255,255,255,0.1)", background: "#17181a", color: "#fff", fontSize: 12, padding: "6px 10px" }} />
+                        </Suspense>
                     </div>
                 </GSection>
             )}

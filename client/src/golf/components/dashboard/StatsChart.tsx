@@ -1,7 +1,9 @@
-import { Area, AreaChart, ResponsiveContainer, YAxis } from "recharts";
+import { Suspense, lazy } from "react";
 import { LucideChevronRight } from "lucide-react";
 import { Link } from "wouter";
 import { SampleBadge } from "@/components/hiq/GuestGate";
+// 그래프는 열 때만 받는다(recharts 를 첫 화면 묶음에서 뺀다 — 2026-10-18)
+const ScoreTrendArea = lazy(() => import("./ScoreTrendArea"));
 
 /**
  * 스코어 트렌드 — 홈의 라운드 기록 **입구**다(2026-09-23).
@@ -61,25 +63,7 @@ export function StatsChart({ recentScores, stats, sample = false }: StatsChartPr
                     </div>
                 ) : (
                 <div className="h-32 w-full mb-6">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={recentScores}>
-                            <defs>
-                                <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#64DD17" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#64DD17" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <YAxis hide domain={['dataMin - 5', 'dataMax + 5']} />
-                            <Area
-                                type="monotone"
-                                dataKey="score"
-                                stroke="#64DD17"
-                                strokeWidth={3}
-                                fillOpacity={1}
-                                fill="url(#colorScore)"
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                    <Suspense fallback={null}><ScoreTrendArea data={recentScores} /></Suspense>
                 </div>
                 )}
 
