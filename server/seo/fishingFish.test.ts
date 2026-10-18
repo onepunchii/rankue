@@ -12,7 +12,7 @@ vi.mock("../sitemap.js", () => ({ entry: (loc: string, opts?: object) => JSON.st
 import { FISHING_FISH_RE, fishAsset, fishingFishSitemapParts, renderFishingFish } from "./fishingFish";
 import { FISH } from "../../shared/fishingFish";
 import { FISH_GUIDE_NAME, FISH_REG_NAMES } from "../../shared/fishingFishInfo";
-import { fishBySlug, fishCardInput, fishPageSeo, fishSpotCounts, fishingFishPath, placeFishId, spotsOfFish } from "../../shared/fishingFishPages";
+import { fishBySlug, fishCardInput, fishPageSeo, fishSpotCounts, fishingFishPath, goodFishToday, placeFishId, spotsOfFish } from "../../shared/fishingFishPages";
 import type { PublicPlace } from "../../shared/fishingPlaces";
 
 /**
@@ -37,6 +37,17 @@ describe("낚시 어종 공개 페이지", () => {
         expect(fishSpotCounts(all).get("ingeo")).toBe(1);
         expect(fishBySlug("감성돔".normalize("NFD"))?.id).toBe("gamseongdom");
         expect(fishBySlug("고래")).toBeNull();
+    });
+    it("오늘 바다에서 좋은 어종 — 지수 그대로, 우리 어종만, 좋음 이상이 많은 순", () => {
+        const S = (name: string, fish: Record<string, { am: any; pm: any }>) => ({ name, lat: 34, lng: 127, fish, wave: null, wind: null, wtemp: null, tide: null });
+        const map = { day: "2026-10-18", days: ["2026-10-18"], fishes: ["감성돔", "우럭", "기타어종"], spots: [
+            S("가", { 감성돔: { am: "좋음", pm: "보통" }, 우럭: { am: "나쁨", pm: null } }),
+            S("나", { 감성돔: { am: "보통", pm: "매우좋음" }, 우럭: { am: "좋음", pm: null } }),
+            S("다", { 감성돔: { am: "보통", pm: null }, 기타어종: { am: "좋음", pm: null } }),
+        ] };
+        const g = goodFishToday(map as any);
+        expect(g.map((x) => [x.fish.name, x.good, x.rated])).toEqual([["감성돔", 2, 3], ["우럭", 1, 2]]);
+        expect(goodFishToday(null)).toEqual([]);
     });
     it("검색용 글(server/assets/fishing/fish-pages.json)은 받은 도감 · 금어기 표와 같다 — 어긋나면 server/scripts/fishing-fish-pages.ts 를 다시 돌린다", () => {
         const index = json<{ key: string; name: string }[]>("client/public/fishing/guide/index.json");

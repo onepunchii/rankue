@@ -12,6 +12,7 @@ import { FISH, fishByName, fishValueText, type FishKind } from "./fishingFish.js
 import { FISH_REG_NAMES } from "./fishingFishInfo.js";
 import { speciesKey, type PublicPlace } from "./fishingPlaces.js";
 import { josa } from "./briefingMeta.js";
+import { bestOf, indexScore, type IndexMap } from "./fishingPort.js";
 
 export const FISHING_FISH_PATH = "/fishing/fish";
 export const FISHING_FISH_LABEL = "낚시 어종";
@@ -54,4 +55,21 @@ export function fishPageSeo(f: FishKind, spots: number): { title: string; descri
 /** 카드 글(server/services/fishingSpotCard 와 같은 틀 — 표지는 바다/저수지 판화, 어탁은 그 어종) */
 export function fishCardInput(f: FishKind, spots: number): { name: string; place: string; detail: string; kind: string; fish: string; badge: string } {
     return { name: f.name, place: `${waterWord(f)} 낚시 · ${f.tiers.slice(0, 3).map((t) => t.name).join(" · ")}`, detail: [hasRegs(f) ? "금어기 · 금지체장" : null, spots > 0 ? `낚시터 ${spots}곳` : null].filter(Boolean).join(" · "), kind: f.water === "sea" ? "sea" : "reservoir", fish: f.id, badge: "어종 한 장" };
+}
+
+/**
+ * 오늘 바다에서 좋은 곳이 많은 어종(2026-10-18 — 어종 허브가 날마다 달라지게) — 국립해양조사원 바다낚시지수 그대로.
+ * 어종마다 오늘 단계가 매겨진 지점 수와, 그 가운데 '좋음' 이상인 지점 수. 우리 어종(어탁이 있는 22종)만, 좋은 곳이 많은 순.
+ */
+export function goodFishToday(map: IndexMap | null | undefined): { fish: FishKind; good: number; rated: number }[] {
+    if (!map) return [];
+    const out: { fish: FishKind; good: number; rated: number }[] = [];
+    for (const name of map.fishes) {
+        const fish = fishBySlug(name);
+        if (!fish) continue;
+        let good = 0, rated = 0;
+        for (const s of map.spots) { const b = bestOf(s.fish[name]); if (!b) continue; rated++; if (indexScore(b) >= 3) good++; }
+        if (rated) out.push({ fish, good, rated });
+    }
+    return out.sort((a, b) => b.good - a.good || b.rated - a.rated);
 }

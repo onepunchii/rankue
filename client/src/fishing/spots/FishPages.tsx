@@ -21,7 +21,7 @@ import { bestOf, goodSpots, rangeText, type IndexMap } from "@shared/fishingPort
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
 import { FISHING_SPOTS_PATH } from "@shared/fishingPlaces";
 import { josa } from "@shared/briefingMeta";
-import { FISHING_FISH_LABEL, FISHING_FISH_PATH, FISH_PAGES, fishBySlug, fishHubSeo, fishPageSeo, fishSpotCounts, fishingFishPath, spotsOfFish, waterWord } from "@shared/fishingFishPages";
+import { FISHING_FISH_LABEL, FISHING_FISH_PATH, FISH_PAGES, fishBySlug, fishHubSeo, fishPageSeo, fishSpotCounts, fishingFishPath, goodFishToday, spotsOfFish, waterWord } from "@shared/fishingFishPages";
 import { fishingFishCardUrl } from "@shared/ogCards";
 import { INDEX_TONE, INK, PAPER, Seal, art } from "../ink";
 import { OurGuideStory, RegBox, useRegs } from "../Guide";
@@ -55,6 +55,10 @@ export function FishHub() {
     const seo = fishHubSeo();
     useSeo({ title: seo.title, description: seo.description, path: FISHING_FISH_PATH, locale: "ko", image: "https://www.rankue.co.kr/og.png" });
     const n = useMemo(() => fishSpotCounts(spots?.items ?? []), [spots]);
+    const today = kstToday();
+    const { data: map } = useQuery<IndexMap | null>({ queryKey: ["/api/hiq/fishing/index-map", today], queryFn: () => apiRequest(`/api/hiq/fishing/index-map?day=${today}`), staleTime: 10 * 60_000 });
+    const good = useMemo(() => goodFishToday(map), [map]);
+    const top = Math.max(1, ...good.map((g) => g.rated));
     return (
         <Shell title={FISHING_FISH_LABEL}>
             <div className="relative h-[180px] overflow-hidden" data-testid="fish-cover">
@@ -65,6 +69,30 @@ export function FishHub() {
                     <p className="mt-0.5 text-[13.5px]" style={{ color: "#F3ECDDCC" }}>어탁 {FISH_PAGES.length}종 · 낚시꾼이 부르는 크기 · 금어기 · 낚시터</p>
                 </div>
             </div>
+            {/* 오늘 바다에서 좋은 곳이 많은 어종 — 해양조사원 지수 그대로(날마다 바뀐다) */}
+            {good.length > 0 && (
+                <section className="px-5 pt-6" data-testid="fish-today">
+                    <H2 aside="해양조사원 지수">오늘 바다 좋은 어종</H2>
+                    {!good.some((x) => x.good > 0) && <p className="rounded-2xl px-4 py-3.5 text-[13.5px]" style={{ background: "#FFFFFF0A", color: C.soft }}>오늘은 '좋음' 이상인 지점이 없어요.</p>}
+                    <ul className="space-y-2">
+                        {good.filter((x) => x.good > 0).slice(0, 6).map(({ fish: f, good: g, rated }) => (
+                            <li key={f.id}>
+                                <Link href={fishingFishPath(f.name)} className="flex items-center gap-3 rounded-2xl px-3 py-2.5 active:opacity-85" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="fish-today-row">
+                                    <span className="flex h-11 w-14 shrink-0 items-center justify-center rounded-lg" style={{ background: PAPER }}><img src={art(f.id)} alt="" width={640} height={400} loading="lazy" className="h-full w-full object-contain p-0.5" style={{ mixBlendMode: "multiply" }} /></span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="flex items-baseline justify-between gap-2"><span className="text-[15.5px] font-semibold">{f.name}</span><span className="shrink-0 text-[13px] tabular-nums" style={{ color: g ? "#F8DDB0" : C.dim }}>좋음 이상 <b className="text-[16px] font-semibold">{g}</b>곳</span></span>
+                                        {/* 막대 — 지수가 매겨진 지점 가운데 좋음 이상의 몫 */}
+                                        <span className="mt-1.5 flex h-[6px] overflow-hidden rounded-full" style={{ background: "#FFFFFF14", width: `${Math.max(30, Math.round((rated / top) * 100))}%` }} aria-hidden>
+                                            <i className="h-full rounded-full" style={{ width: `${Math.round((g / Math.max(1, rated)) * 100)}%`, background: "#4A8FB0" }} />
+                                        </span>
+                                        <span className="mt-1 block text-[12px] tabular-nums" style={{ color: C.dim }}>지수가 매겨진 {rated}곳 가운데</span>
+                                    </span>
+                                </Link>
+                            </li>
+                        ))}
+                    </ul>
+                </section>
+            )}
             {(["sea", "fresh"] as const).map((w) => (
                 <section key={w} className="px-5 pt-6">
                     <H2 aside={`${FISH_PAGES.filter((f) => f.water === w).length}종`}>{w === "sea" ? "바다 낚시" : "민물 낚시"}</H2>
