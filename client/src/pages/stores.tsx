@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
-import { regionTitleKo, regionDescKo } from "@shared/storeMeta";
+import { regionTitleKo, regionDescKo, cityTitleKo, cityDescKo, cityHubPath } from "@shared/storeMeta";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
@@ -26,14 +26,14 @@ interface Listing {
   distanceKm: number | null;
   claimed: boolean;
 }
-interface ListingsResponse { total: number; rows: Listing[]; regions: Array<{ region: string; count: number }> }
+interface ListingsResponse { total: number; rows: Listing[]; regions: Array<{ region: string; count: number }>; cities?: Array<{ city: string; count: number }> }
 
 const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string; mapAll: (n: number) => string; mapIn: (r: string, n: number) => string; mapLegend: string; mapHint: string; mapByRegion: string; mapOthers: (n: number) => string }> = {
   ko: {
     title: "매장 찾기",
     subtitle: "전국 당구장을 지역·이름으로 찾아보세요",
     metaTitle: "당구장 찾기 · 전국 당구장 디렉토리 | 랭큐",
-    metaDesc: "전국 1,200여 개 당구장을 지역·이름으로 검색하세요. 주소·영업시간·테이블 구성, 랭큐 파트너 매장의 랭킹·매칭까지.",
+    metaDesc: "전국 1만 5천여 개 당구장을 지역·이름으로 검색하세요. 주소·영업시간·테이블 구성, 랭큐 파트너 매장의 랭킹·매칭까지.",
     search: "매장명 또는 주소 검색",
     empty: "표시할 매장이 없습니다.",
     count: (n) => `총 ${n.toLocaleString()}개 매장`,
@@ -59,7 +59,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     title: "Find a venue",
     subtitle: "Search billiards halls across Korea by region or name",
     metaTitle: "Find a Billiards Hall · Korea Directory | RANKUE",
-    metaDesc: "Search 1,200+ billiards halls in Korea by region or name — address, hours, and tables, plus RANKUE partner venues.",
+    metaDesc: "Search 15,000+ billiards halls in Korea by region or name — address, hours, and tables, plus RANKUE partner venues.",
     search: "Search by name or address",
     empty: "No venues to show.",
     count: (n) => `${n.toLocaleString()} venues`,
@@ -85,7 +85,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     title: "Tìm quán",
     subtitle: "Tìm quán bi-a khắp Hàn Quốc theo khu vực hoặc tên",
     metaTitle: "Tìm quán bi-a · Danh bạ Hàn Quốc | RANKUE",
-    metaDesc: "Tìm hơn 1.200 quán bi-a tại Hàn Quốc theo khu vực hoặc tên — địa chỉ, giờ mở cửa, số bàn.",
+    metaDesc: "Tìm hơn 15.000 quán bi-a tại Hàn Quốc theo khu vực hoặc tên — địa chỉ, giờ mở cửa, số bàn.",
     search: "Tìm theo tên hoặc địa chỉ",
     empty: "Không có quán nào.",
     count: (n) => `${n.toLocaleString()} quán`,
@@ -111,7 +111,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     title: "Salon bul",
     subtitle: "Kore'deki bilardo salonlarını bölge veya ada göre ara",
     metaTitle: "Bilardo Salonu Bul · Kore Rehberi | RANKUE",
-    metaDesc: "Kore'de 1.200'den fazla bilardo salonunu bölge veya ada göre arayın — adres, çalışma saatleri, masa sayısı.",
+    metaDesc: "Kore'de 15.000'den fazla bilardo salonunu bölge veya ada göre arayın — adres, çalışma saatleri, masa sayısı.",
     search: "Ad veya adrese göre ara",
     empty: "Gösterilecek salon yok.",
     count: (n) => `${n.toLocaleString()} salon`,
@@ -137,7 +137,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     title: "Buscar local",
     subtitle: "Busca billares en Corea por región o nombre",
     metaTitle: "Buscar billar · Directorio de Corea | RANKUE",
-    metaDesc: "Busca más de 1.200 billares en Corea por región o nombre: dirección, horario y mesas.",
+    metaDesc: "Busca más de 15.000 billares en Corea por región o nombre: dirección, horario y mesas.",
     search: "Buscar por nombre o dirección",
     empty: "No hay locales para mostrar.",
     count: (n) => `${n.toLocaleString()} locales`,
@@ -172,13 +172,19 @@ export default function Stores() {
   const [region, setRegionState] = useState(() => {
     try { return new URLSearchParams(window.location.search).get("region")?.slice(0, 10) ?? ""; } catch { return ""; }
   });
+  // 시군구(2026-10-19 — 인허가 자료로 1만 5천 곳) — ?region=서울&city=강남구, 시도를 바꾸면 비운다
+  const [city, setCityState] = useState(() => {
+    try { const c = new URLSearchParams(window.location.search).get("city") ?? ""; return /^[가-힣]{1,6}(시|군|구)$/.test(c) ? c : ""; } catch { return ""; }
+  });
+  const syncUrl = (r: string, c: string) => {
+    try { window.history.replaceState(null, "", r ? (c ? cityHubPath(r, c) : `/stores?region=${encodeURIComponent(r)}`) : "/stores"); } catch { /* 히스토리 갱신 실패는 무시 — 필터는 그대로 동작 */ }
+  };
   const setRegion = (r: string) => {
     setRegionState(r);
-    try {
-      const url = r ? `/stores?region=${encodeURIComponent(r)}` : "/stores";
-      window.history.replaceState(null, "", url);
-    } catch { /* 히스토리 갱신 실패는 무시 — 필터는 그대로 동작 */ }
+    setCityState("");
+    syncUrl(r, "");
   };
+  const setCity = (c: string) => { setCityState(c); syncUrl(region, c); };
   const [older, setOlder] = useState<Listing[]>([]);
   const [nearbyOn, setNearbyOn] = useState(false);
   const { location: gps, requestLocation } = useNativeBridge();
@@ -191,14 +197,14 @@ export default function Stores() {
     const id = setTimeout(() => setDq(q), 300);
     return () => clearTimeout(id);
   }, [q]);
-  useEffect(() => { setOlder([]); }, [dq, region, nearbyOn, gps?.lat]);
+  useEffect(() => { setOlder([]); }, [dq, region, city, nearbyOn, gps?.lat]);
 
   const { data: partners = [] } = useQuery<PublicStore[]>({ queryKey: ["/api/hiq/public-stores"] });
 
   const coords = nearbyOn && gps ? `lat=${gps.lat}&lng=${gps.lng}&` : "";
-  const params = `${region ? `region=${encodeURIComponent(region)}&` : ""}${dq ? `q=${encodeURIComponent(dq)}&` : ""}${coords}limit=${PAGE_SIZE}`;
+  const params = `${region ? `region=${encodeURIComponent(region)}&` : ""}${region && city ? `city=${encodeURIComponent(city)}&` : ""}${dq ? `q=${encodeURIComponent(dq)}&` : ""}${coords}limit=${PAGE_SIZE}`;
   const { data, isLoading } = useQuery<ListingsResponse>({
-    queryKey: ["/api/hiq/listings", region, dq, nearbyOn && gps ? `${gps.lat},${gps.lng}` : ""],
+    queryKey: ["/api/hiq/listings", region, city, dq, nearbyOn && gps ? `${gps.lat},${gps.lng}` : ""],
     queryFn: async () => apiRequest(`/api/hiq/listings?${params}`),
     staleTime: 10 * 60 * 1000,
     placeholderData: (prev) => prev,
@@ -209,6 +215,7 @@ export default function Stores() {
   const listings = [...first, ...older.filter(r => !seen.has(r.code))];
   const total = data?.total ?? 0;
   const regions = data?.regions || [];
+  const cities = data?.cities || [];
 
   const loadMore = async () => {
     if (isLoadingMore) return;
@@ -232,10 +239,11 @@ export default function Stores() {
 
   // 지역 허브(?region=)는 서버 프리렌더(server/prerender.ts /stores)와 문자 단위로 같은 제목·설명 — shared/storeMeta.ts 공유.
   const regionSeo = region && locale === "ko" && regions.some((r) => r.region === region);
+  const citySeo = regionSeo && !!city && cities.some((c) => c.city === city);
   useSeo({
-    title: regionSeo ? regionTitleKo(region) : t.metaTitle,
-    description: regionSeo ? regionDescKo(region, total) : t.metaDesc,
-    path: regionSeo ? `/stores?region=${encodeURIComponent(region)}` : "/stores",
+    title: citySeo ? cityTitleKo(region, city) : regionSeo ? regionTitleKo(region) : t.metaTitle,
+    description: citySeo ? cityDescKo(region, city, total) : regionSeo ? regionDescKo(region, total) : t.metaDesc,
+    path: citySeo ? cityHubPath(region, city) : regionSeo ? `/stores?region=${encodeURIComponent(region)}` : "/stores",
     locale,
     image: "https://www.rankue.co.kr/og.png",
     jsonLd: total
@@ -298,6 +306,21 @@ export default function Stores() {
                 className={`shrink-0 h-9 px-3.5 rounded-full text-[13px] font-semibold transition-colors ${region === r.region ? "bg-ink-1 text-white" : "bg-white text-ink-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"}`}
               >
                 {r.region} <span className="opacity-50 tabular-nums">{r.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* 시군구 칩 — 시도를 골랐을 때(2026-10-19) */}
+        {region && cities.length > 1 && !nearbyOn && (
+          <div className="flex gap-1.5 overflow-x-auto scrollbar-hide -mx-5 px-5 mb-3" data-testid="stores-city-chips">
+            {cities.map((c) => (
+              <button
+                key={c.city}
+                onClick={() => setCity(city === c.city ? "" : c.city)}
+                className={`shrink-0 h-8 px-3 rounded-full text-[12.5px] font-semibold transition-colors ${city === c.city ? "bg-brand text-white" : "bg-white text-ink-3 shadow-[0_1px_2px_rgba(0,0,0,0.05)]"}`}
+              >
+                {c.city} <span className="opacity-60 tabular-nums">{c.count}</span>
               </button>
             ))}
           </div>

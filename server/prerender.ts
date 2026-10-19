@@ -11,7 +11,7 @@ import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../sh
 import { DOC_META } from "../shared/docMeta.js";
 import { absoluteLogoUrl } from "../shared/golfLogo.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
-import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo, isBasicListing, licenseSinceKo } from "../shared/storeMeta.js";
+import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo, isBasicListing, licenseSinceKo, listingCityOf, cityHubPath, cityTitleKo, cityDescKo, CITY_HUB_MIN } from "../shared/storeMeta.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
 import { cardAlt, hubCard } from "../shared/ogCards.js";
@@ -2558,6 +2558,10 @@ ${list}
   app.get("/stores", async (req, res, next) => {
     if (!isBot(req)) return next();
     const regionQ = typeof req.query.region === "string" ? req.query.region.slice(0, 10) : "";
+    // 시군구 허브(2026-10-19) — ?region=서울&city=강남구. 시군구 꼴이 아니면 무시하지 않고 404(아래)
+    const cityRaw = typeof req.query.city === "string" ? req.query.city : "";
+    const cityQ = /^[가-힣]{1,6}(시|군|구)$/.test(cityRaw) ? cityRaw : "";
+    if (cityRaw && (!cityQ || !regionQ)) return sendGone(res, "지역을 찾을 수 없습니다.", "요청한 지역의 당구장 정보가 없습니다.");
     let items: { slug: string | null; name: string; region: string | null; address: string | null }[] = [];
     let dirRows: { code: string; name: string; region: string; address: string }[] = [];
     let dirTotal = 0;
@@ -2569,7 +2573,9 @@ ${list}
         db.select({
           code: storeListings.code, name: storeListings.name,
           region: storeListings.region, address: storeListings.address,
-        }).from(storeListings).where(regionQ ? and(eq(storeListings.region, regionQ), LISTING_LIVE) : LISTING_LIVE)
+        }).from(storeListings).where(regionQ
+          ? and(eq(storeListings.region, regionQ), LISTING_LIVE, cityQ ? sql`split_part(store_listings.address, ' ', 2) = ${cityQ}` : undefined)
+          : LISTING_LIVE)
           // 자세한 매장부터(인허가 자료로만 들어온 곳은 뒤 — 2026-10-19)
           .orderBy(sql`${LISTING_BASIC} ASC`, asc(storeListings.name)).limit(regionQ ? 400 : 30),
         db.select({ total: sql<number>`count(*)::int` }).from(storeListings).where(LISTING_LIVE),
@@ -2585,6 +2591,49 @@ ${list}
     if (regionQ) {
       const hit = regions.find((r) => r.region === regionQ);
       if (!hit) return sendGone(res, "지역을 찾을 수 없습니다.", "요청한 지역의 당구장 정보가 없습니다.");
+      // 그 시도의 시군구(많은 순) — 시군구 허브 링크 · 시군구 허브의 매장 수
+      let cities: { city: string; n: number }[] = [];
+      try {
+        cities = (await db.select({ city: sql<string>`split_part(store_listings.address, ' ', 2)`, n: sql<number>`count(*)::int` })
+          .from(storeListings).where(and(eq(storeListings.region, regionQ), LISTING_LIVE))
+          .groupBy(sql`split_part(store_listings.address, ' ', 2)`).orderBy(sql`count(*) DESC`))
+          .filter((c) => listingCityOf(`${regionQ} ${c.city}`) === c.city);
+      } catch { /* 시군구 링크는 본문 축소로만 */ }
+      const cityLinks = (current?: string) => cities.length ? `<ul>${cities.map((c) => `<li>${c.city === current ? `<strong>${esc(c.city)}</strong>` : `<a href="${esc(cityHubPath(regionQ, c.city))}">${esc(regionQ)} ${esc(c.city)} 당구장</a>`} (${c.n.toLocaleString("ko-KR")})</li>`).join("")}</ul>` : "";
+      if (cityQ) {
+        const ch = cities.find((c) => c.city === cityQ);
+        if (!ch) return sendGone(res, "지역을 찾을 수 없습니다.", "요청한 지역의 당구장 정보가 없습니다.");
+        const canonicalC = `${ORIGIN}${cityHubPath(regionQ, cityQ)}`;
+        res.setHeader("X-Prerender", `stores-city:${encodeURIComponent(regionQ)}:${encodeURIComponent(cityQ)}`);
+        noStore(res);
+        return res.send(page({
+          // client/src/pages/stores.tsx 의 시군구 useSeo 와 문자 단위로 같아야 한다(shared/storeMeta)
+          title: cityTitleKo(regionQ, cityQ),
+          desc: cityDescKo(regionQ, cityQ, ch.n),
+          canonical: canonicalC,
+          // 매장이 너무 적은 시군구는 얇다 — 색인에서 뺀다(사이트맵에도 없다)
+          noindex: ch.n < CITY_HUB_MIN,
+          jsonLd: [
+            { "@context": "https://schema.org", "@type": "ItemList", name: `${regionQ} ${cityQ} 당구장`, numberOfItems: ch.n,
+              itemListElement: dirRows.map((s, i) => ({ "@type": "ListItem", position: i + 1, name: s.name, url: `${ORIGIN}/stores/${s.code}` })) },
+            { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [
+              { "@type": "ListItem", position: 1, name: "매장 찾기", item: `${ORIGIN}/stores` },
+              { "@type": "ListItem", position: 2, name: `${regionQ} 당구장`, item: `${ORIGIN}/stores?region=${encodeURIComponent(regionQ)}` },
+              { "@type": "ListItem", position: 3, name: `${regionQ} ${cityQ} 당구장`, item: canonicalC },
+            ] },
+          ],
+          body: `<main>
+  <nav><a href="/stores">← 매장 찾기</a> › <a href="/stores?region=${esc(encodeURIComponent(regionQ))}">${esc(regionQ)} 당구장</a></nav>
+  <h1>${esc(regionQ)} ${esc(cityQ)} 당구장 ${ch.n.toLocaleString("ko-KR")}곳</h1>
+  <p>${esc(regionQ)} ${esc(cityQ)}에서 영업 중인 당구장의 주소·테이블 구성·요금이에요. 영업 중인 곳은 ${esc(BILLIARD_HALL_SOURCE)}로 날마다 새로 고쳐요.</p>
+  <h2>${esc(cityQ)} 당구장 목록</h2>
+  ${dirRows.map((s) => `<section><h3><a href="/stores/${esc(s.code)}">${esc(s.name)}</a></h3><p>${esc(s.address)}</p></section>`).join("\n  ")}
+  <h2>${esc(regionQ)}의 다른 시군구</h2>
+  ${cityLinks(cityQ)}
+  ${hubNav("ko")}
+</main>`,
+        }));
+      }
       const canonical = `${ORIGIN}/stores?region=${encodeURIComponent(regionQ)}`;
       res.setHeader("X-Prerender", `stores-region:${encodeURIComponent(regionQ)}`);
       noStore(res);
@@ -2616,6 +2665,7 @@ ${list}
   <h1>${esc(regionQ)} 당구장 ${hit.n.toLocaleString("ko-KR")}곳</h1>
   <p>${esc(regionQ)} 지역 당구장의 주소·영업시간·테이블 구성·요금을 확인하세요.</p>
   ${cardGallery(`${regionQ} 당구장`, dirRows.slice(0, 12).map((x) => ({ href: `/stores/${x.code}`, img: storeCardUrl(ORIGIN, x.code), name: x.name, alt: cardAlt(x.name, "당구장") })))}
+  ${cities.length ? `<h2>${esc(regionQ)} 시군구별 당구장</h2>\n  ${cityLinks()}` : ""}
   <h2>${esc(regionQ)} 당구장 목록</h2>
   ${dirRows.map((s) => `<section><h3><a href="/stores/${esc(s.code)}">${esc(s.name)}</a></h3><p>${esc(s.address)}</p></section>`).join("\n  ")}
   <h2>다른 지역 당구장</h2>
@@ -2631,7 +2681,7 @@ ${list}
       page({
         // client/src/pages/stores.tsx 의 ko metaTitle/metaDesc·title/subtitle 과 문자 단위로 같아야 한다.
         title: "당구장 찾기 · 전국 당구장 디렉토리 | 랭큐",
-        desc: "전국 1,200여 개 당구장을 지역·이름으로 검색하세요. 주소·영업시간·테이블 구성, 랭큐 파트너 매장의 랭킹·매칭까지.",
+        desc: "전국 1만 5천여 개 당구장을 지역·이름으로 검색하세요. 주소·영업시간·테이블 구성, 랭큐 파트너 매장의 랭킹·매칭까지.",
         canonical: `${ORIGIN}/stores`,
         jsonLd: [
           {

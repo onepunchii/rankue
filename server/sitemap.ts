@@ -3,6 +3,7 @@ import { storage } from "./storage/index.js";
 import { db } from "./db.js";
 import { storeListings } from "../shared/schema.js";
 import { LISTING_BASIC, LISTING_LIVE } from "./storage/listingSql.js";
+import { CITY_HUB_MIN, cityHubPath, listingCityOf } from "../shared/storeMeta.js";
 import { hreflangOf } from "../shared/aboutContent.js";
 import { asc, sql } from "drizzle-orm";
 import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.js";
@@ -123,6 +124,13 @@ async function coreParts(): Promise<string[]> {
     const regions = await db.select({ region: storeListings.region, n: sql<number>`count(*)::int` })
       .from(storeListings).where(LISTING_LIVE).groupBy(storeListings.region).orderBy(sql`count(*) DESC`);
     for (const r of regions) if (r.region) parts.push(entry(`${ORIGIN}/stores?region=${encodeURIComponent(r.region)}`, { changefreq: "weekly", priority: "0.6" }));
+    // 시군구 허브(2026-10-19 — 인허가 자료로 1만 5천 곳) — "강남구 당구장" · "수원 당구장". 매장이 CITY_HUB_MIN 곳 넘는 곳만(적으면 얇다 · noindex)
+    const cities = await db.select({ region: storeListings.region, city: sql<string>`split_part(store_listings.address, ' ', 2)`, n: sql<number>`count(*)::int` })
+      .from(storeListings).where(LISTING_LIVE).groupBy(storeListings.region, sql`split_part(store_listings.address, ' ', 2)`);
+    for (const c of cities) {
+      if (!c.region || c.n < CITY_HUB_MIN || listingCityOf(`${c.region} ${c.city}`) !== c.city) continue;
+      parts.push(entry(`${ORIGIN}${cityHubPath(c.region, c.city)}`, { changefreq: "weekly", priority: "0.5" }));
+    }
   } catch (e) {
     console.warn("[sitemap] regions failed:", (e as Error)?.message);
   }

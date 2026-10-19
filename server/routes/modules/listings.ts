@@ -71,6 +71,8 @@ const CODE_RE = /^[A-Za-z0-9_-]{1,20}$/;
 // lat/lng 가 오면 거리순(하버사인) 정렬 + distanceKm 포함 ("내 주변 당구장").
 router.get("/", asyncHandler(async (req: any, res: Response) => {
     const region = typeof req.query.region === "string" ? req.query.region.slice(0, 10) : "";
+    // 시군구(2026-10-19) — 주소의 둘째 낱말(shared/storeMeta listingCityOf 와 같은 뜻)
+    const city = typeof req.query.city === "string" && /^[가-힣]{1,6}(시|군|구)$/.test(req.query.city) ? req.query.city : "";
     const q = typeof req.query.q === "string" ? req.query.q.slice(0, 40) : "";
     const limit = Math.max(1, Math.min(Number(req.query.limit) || 30, 100));
     const offset = Math.max(Number(req.query.offset) || 0, 0);
@@ -81,6 +83,7 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
     // 인허가 자료로만 들어왔다가 폐업한 곳은 숨긴다(storage/listingSql)
     const conds: any[] = [LISTING_LIVE];
     if (region) conds.push(eq(storeListings.region, region));
+    if (region && city) conds.push(sql`split_part(store_listings.address, ' ', 2) = ${city}`);
     if (q) conds.push(or(ilike(storeListings.name, `%${q}%`), ilike(storeListings.address, `%${q}%`)));
     const where = conds.length ? and(...conds) : undefined;
 
@@ -94,7 +97,7 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
                 sin(radians(${lat})) * sin(radians(${LISTING_LAT})))))::numeric, 1)::float8 END`
         : sql<number | null>`NULL`;
 
-    const [rows, [{ total }], regions] = await Promise.all([
+    const [rows, [{ total }], regions, cities] = await Promise.all([
         db.select({
             code: storeListings.code, name: storeListings.name, region: storeListings.region,
             address: storeListings.address, phone: storeListings.phone, openHours: storeListings.openHours,
@@ -114,8 +117,14 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
         db.select({ total: sql<number>`count(*)::int` }).from(storeListings).where(where),
         db.select({ region: storeListings.region, count: sql<number>`count(*)::int` })
             .from(storeListings).where(LISTING_LIVE).groupBy(storeListings.region).orderBy(sql`count(*) DESC`),
+        // 고른 시도의 시군구(많은 순) — 화면의 시군구 칩
+        region
+            ? db.select({ city: sql<string>`split_part(store_listings.address, ' ', 2)`, count: sql<number>`count(*)::int` })
+                .from(storeListings).where(and(eq(storeListings.region, region), LISTING_LIVE))
+                .groupBy(sql`split_part(store_listings.address, ' ', 2)`).orderBy(sql`count(*) DESC`)
+            : Promise.resolve([] as { city: string; count: number }[]),
     ]);
-    return sendSuccess(res, { total, rows, regions });
+    return sendSuccess(res, { total, rows, regions, cities: cities.filter((c) => /^[가-힣]{1,6}(시|군|구)$/.test(c.city)) });
 }));
 
 // GET /listings/:code — 매장 상세 (공개 컬럼만 명시 — id·claimedStoreId 등 내부 식별자 미노출)

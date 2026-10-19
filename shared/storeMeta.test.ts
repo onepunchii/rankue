@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { storeDescKo, storeJsonLd, storeLocality, storeTitleKo, isBasicListing, licenseSinceKo } from "./storeMeta.js";
+import { storeDescKo, storeJsonLd, storeLocality, storeTitleKo, isBasicListing, licenseSinceKo, listingCityOf, cityHubPath, cityTitleKo, cityDescKo } from "./storeMeta.js";
 
 describe("매장 주소 → 시군구·동(2026-09-24)", () => {
     it("지번·도로명·광역시·긴 시도 표기", () => {
@@ -65,5 +65,19 @@ describe("인허가 자료로만 들어온 매장(2026-10-19)", () => {
         expect(storeTitleKo("1박2일당구클럽", "전남", "전남 여수시 문수로 152-1 (문수동)", true)).toBe("1박2일당구클럽 여수 문수동 당구장 — 위치·인허가 | 랭큐");
         expect(licenseSinceKo("2009-12-03")).toBe("2009년 12월부터");
         expect(licenseSinceKo(null)).toBeNull();
+    });
+});
+
+describe("시군구 허브(2026-10-19)", () => {
+    it("주소의 둘째 낱말이 시 · 군 · 구일 때만", () => {
+        expect(listingCityOf("서울 강남구 역삼동 669-15")).toBe("강남구");
+        expect(listingCityOf("경기 수원시 권선구 고색동 154")).toBe("수원시");
+        expect(listingCityOf("세종 한누리대로 1")).toBeNull();
+        expect(listingCityOf("전북특별자치도 군산시 월명로 374")).toBe("군산시");
+    });
+    it("주소 · 제목 · 설명", () => {
+        expect(cityHubPath("서울", "강남구")).toBe("/stores?region=%EC%84%9C%EC%9A%B8&city=%EA%B0%95%EB%82%A8%EA%B5%AC");
+        expect(cityTitleKo("서울", "강남구")).toBe("서울 강남구 당구장 목록 · 위치·요금 | 랭큐");
+        expect(cityDescKo("서울", "강남구", 187)).toContain("서울 강남구 당구장 187곳");
     });
 });

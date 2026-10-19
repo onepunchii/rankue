@@ -83,6 +83,22 @@ export function storeTitleKo(name: string, region: string, address?: string | nu
     return `${name} ${area}${name.includes("당구장") ? "" : " 당구장"} — ${tail} | 랭큐`;
 }
 
+/**
+ * 시군구 허브(/stores?region=서울&city=강남구 · 2026-10-19) — 인허가 자료로 1만 5천 곳이 되면서 시도 하나에 2,600곳이 몰렸다.
+ * "강남구 당구장" · "수원 당구장"이 실제 검색어. 클라이언트 useSeo 와 프리렌더가 같은 글을 쓴다.
+ * 시군구 = 주소의 둘째 낱말(시 · 군 · 구로 끝나는 것만 — 세종처럼 시군구가 없는 곳은 허브가 없다).
+ */
+export const listingCityOf = (address: string | null | undefined): string | null => {
+    const t = String(address ?? "").trim().split(/\s+/);
+    return t[1] && /^[가-힣]{1,6}(시|군|구)$/.test(t[1]) ? t[1] : null;
+};
+export const cityHubPath = (region: string, city: string) => `/stores?region=${encodeURIComponent(region)}&city=${encodeURIComponent(city)}`;
+export const cityTitleKo = (region: string, city: string) => `${region} ${city} 당구장 목록 · 위치·요금 | 랭큐`;
+export const cityDescKo = (region: string, city: string, count: number) =>
+    `${region} ${city} 당구장 ${count.toLocaleString("ko-KR")}곳의 주소·테이블 구성·요금. 영업 중인 곳은 행정안전부 인허가 자료로 날마다 새로 고쳐요.`;
+/** 사이트맵에 넣는 시군구 허브의 최소 매장 수 — 그보다 적으면 페이지가 얇다 */
+export const CITY_HUB_MIN = 5;
+
 /** 지역 허브(/stores?region=서울) — "서울 당구장" 로컬 검색 타깃. 클라이언트 useSeo 와 프리렌더가 함께 쓴다. */
 export const regionTitleKo = (region: string) => `${region} 당구장 목록 · 주소·영업시간·요금 | 랭큐`;
 export const regionDescKo = (region: string, count: number) =>
