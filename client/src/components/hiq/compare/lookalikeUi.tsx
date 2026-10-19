@@ -54,7 +54,7 @@ export function TierLadder({ tier, pos }: { tier: number; pos: number }) {
                     ))}
                 </div>
                 <span
-                    className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-[#F5B721] border-[3px] border-surface-1 shadow-[0_1px_4px_rgba(0,0,0,.25)] text-[9.5px] font-bold text-white flex items-center justify-center"
+                    className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[26px] h-[26px] rounded-full bg-[#F5B721] border-[3px] border-surface-1 shadow-[0_1px_4px_rgba(0,0,0,.25)] text-[12px] font-bold leading-none text-white flex items-center justify-center"
                     style={{ left: `${pos}%` }} aria-hidden="true"
                 >{t("lookalike.meDot")}</span>
             </div>
@@ -78,7 +78,7 @@ export function ProTwinHeader({ pro, tier, pos, extra, onOpen }: { pro: CompareP
         <div className="mt-3 rounded-tile bg-brand/[0.05] p-3">
             <a href={`/pba-player/${encodeURIComponent(pro.memCode)}`} onClick={(e) => { e.preventDefault(); onOpen(); }} className="flex items-center gap-3 active:opacity-80">
                 <PlayerPhoto memCode={pro.memCode} name={name} size={56} className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhoto(true)}>
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 h-4 rounded-full bg-surface-1 text-brand text-[9px] font-bold leading-4 shadow-sm whitespace-nowrap">{pro.league}</span>
+                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 h-[18px] rounded-full bg-surface-1 text-brand text-[12px] font-bold leading-[18px] shadow-sm whitespace-nowrap">{pro.league}</span>
                 </PlayerPhoto>
                 <span className="flex-1 min-w-0">
                     <span className="block text-[12px] font-semibold text-ink-3">{t("lookalike.twin")}</span>
@@ -180,7 +180,7 @@ export function CompareTable({ cols, rows }: { cols: TableCol[]; rows: { label: 
                         <th key={i} className={cn("relative px-1 pt-2 pb-1.5 align-bottom rounded-t-tile", tint(c.tone))}>
                             {/* 나 ↔ 둘째 칸 사이 VS */}
                             {i === 1 && cols[0]?.tone === "me" && (
-                                <span className="absolute left-0 top-[27px] -translate-x-1/2 -translate-y-1/2 z-10 w-[22px] h-[22px] rounded-full bg-ink-1 text-surface-1 text-[9px] font-black italic flex items-center justify-center ring-2 ring-surface-1">VS</span>
+                                <span className="absolute left-0 top-[27px] -translate-x-1/2 -translate-y-1/2 z-10 w-[28px] h-[28px] rounded-full bg-ink-1 text-surface-1 text-[12px] font-black italic leading-none flex items-center justify-center ring-2 ring-surface-1">VS</span>
                             )}
                             <span className="flex flex-col items-center gap-1 min-w-0">
                                 {c.avatar}
