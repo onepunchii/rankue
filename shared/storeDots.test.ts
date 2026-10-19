@@ -106,3 +106,12 @@ describe("없는 주소 · 큐 케이스 명판(2026-10-17 리뷰)", () => {
         expect(read("client/src/pages/hiq/cue-case.tsx")).toContain('!d.member.mine && name.trim() ? t("case.ownerTitle")');
     });
 });
+
+describe("전국 당구장 지도는 공을 캔버스에(2026-10-19 — 1만 5천 곳)", () => {
+    it("SVG 원 3만 개를 다시 그리지 않는다 — 느린 폰에서 시도 칩 3.7초 → 0.36초", () => {
+        const src = read("client/src/components/hiq/stores/StoreTableMap.tsx");
+        const felt = src.slice(src.indexOf("function FeltMap"), src.indexOf("export function StoreTableMap"));
+        expect(felt).toContain("<canvas");
+        expect(felt).not.toContain("<circle");
+    });
+});

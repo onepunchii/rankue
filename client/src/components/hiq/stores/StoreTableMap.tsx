@@ -1,6 +1,6 @@
 /**
  * 전국 당구장 지도(2026-10-17) — 당구대를 위에서 내려다본 모습: 나무 레일 · 다이아몬드 표시 · 쿠션 · 펠트.
- * 펠트 위에 우리나라 윤곽선을 분필 선처럼 긋고, 매장 디렉터리 1,199곳을 공 하나씩으로 찍는다(shared/storeDots).
+ * 펠트 위에 우리나라 윤곽선을 분필 선처럼 긋고, 매장 디렉터리(인허가 자료까지 1만 5천여 곳)를 공 하나씩으로 찍는다(shared/storeDots — 공은 캔버스).
  * 캐롬(대대 · 중대)이 우리 당구라 포켓은 없다. 다이아몬드는 긴 레일 일곱 · 짧은 레일 셋(실제 대대의 표시 자리).
  *
  *   StoreTableMap     매장 찾기 화면 — 세로 당구대. 시도를 누르면 그 지역만(다시 누르면 전체). 고른 지역의 공은 노란 공.
@@ -61,36 +61,76 @@ function Table({ portrait, rail = 12, children, className = "" }: { portrait: bo
     );
 }
 
-/** 펠트 위의 지도 — 분필 선 윤곽 · 공 그림자 · 공 */
+/**
+ * 펠트 위의 지도 — 분필 선 윤곽(SVG · 누르면 그 시도) 위에 공(캔버스 한 장).
+ * 2026-10-19 인허가 자료로 점이 1만 5천 개가 되자 SVG 원 3만 개(그림자 + 공)가 됐고, 느린 폰(CPU 6배 느리게)에서 시도 칩을 누르면
+ * 3.5초 뒤에야 바뀌었다 — 공은 캔버스에 그리고, 윤곽선만 SVG 로 남긴다. 그리는 셈(viewBox 맞추기)은 SVG 의 기본(가운데 맞춰 넣기)과 같다.
+ */
 function FeltMap({ dots, region, onPick, r = 3.1, label }: { dots: readonly StoreDot[]; region?: string; onPick?: (region: string) => void; r?: number; label: string }) {
     const pts = useMemo(() => dots.map((d) => ({ d, xy: latLngToOutline(d.lat, d.lng) })), [dots]);
-    const on = (d: StoreDot) => !!region && d.region === region;
+    const wrap = useRef<HTMLDivElement>(null), cv = useRef<HTMLCanvasElement>(null);
+    const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+    useEffect(() => {
+        const el = wrap.current;
+        if (!el) return;
+        const measure = () => { const b = el.getBoundingClientRect(); if (b.width > 0 && b.height > 0) setSize({ w: Math.round(b.width), h: Math.round(b.height) }); };
+        measure();
+        if (typeof ResizeObserver === "undefined") return;
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, []);
+    useEffect(() => {
+        const c = cv.current;
+        if (!c || !size) return;
+        const dpr = Math.min(2, window.devicePixelRatio || 1);
+        c.width = Math.round(size.w * dpr); c.height = Math.round(size.h * dpr);
+        const g = c.getContext("2d");
+        if (!g) return;
+        // SVG viewBox 를 가운데 맞춰 넣는 것과 같은 셈
+        const k = Math.min(size.w / VIEW.w, size.h / VIEW.h);
+        const ox = (size.w - VIEW.w * k) / 2 - VIEW.x * k, oy = (size.h - VIEW.h * k) / 2 - VIEW.y * k;
+        g.setTransform(dpr, 0, 0, dpr, 0, 0);
+        g.clearRect(0, 0, size.w, size.h);
+        const on = (d: StoreDot) => !!region && d.region === region;
+        const rr = (d: StoreDot) => (on(d) ? r + 0.5 : r) * k;
+        // 공 그림자 — 등이 위에 있다
+        g.fillStyle = "#000000";
+        for (const { d, xy } of pts) {
+            g.globalAlpha = 0.25 * (region && !on(d) ? 0.4 : 1);
+            g.beginPath(); g.arc(ox + (xy[0] + 1.1) * k, oy + (xy[1] + 1.5) * k, rr(d), 0, Math.PI * 2); g.fill();
+        }
+        // 공 — 고른 지역은 맨 위에 노란 공
+        g.lineWidth = 0.55 * k; g.strokeStyle = "#0A3D28";
+        const draw = (sel: boolean) => {
+            for (const { d, xy } of pts) {
+                if (on(d) !== sel) continue;
+                g.globalAlpha = region && !sel ? 0.32 : 0.95;
+                g.fillStyle = sel ? YELLOW : IVORY;
+                g.beginPath(); g.arc(ox + xy[0] * k, oy + xy[1] * k, rr(d), 0, Math.PI * 2); g.fill(); g.stroke();
+            }
+        };
+        draw(false); if (region) draw(true);
+        g.globalAlpha = 1;
+    }, [pts, region, r, size]);
     return (
-        <svg viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`} className="block h-full w-full" role="img" aria-label={label}>
-            <g strokeLinejoin="round">
-                {LAND.map(([id, path]) => {
-                    const name = OUTLINE_TO_STORE_REGION[id];
-                    const sel = !!region && name === region;
-                    return (
-                        <path key={id} d={path} fill={sel ? "#F4C5422E" : "#FFFFFF12"} stroke={sel ? YELLOW : "#FFFFFF3D"} strokeWidth={sel ? 1.6 : 0.9}
-                            onClick={onPick && name ? () => onPick(sel ? "" : name) : undefined}
-                            style={onPick ? { cursor: "pointer" } : undefined}
-                            data-region={name} />
-                    );
-                })}
-            </g>
-            {/* 공 그림자 — 등이 위에 있다 */}
-            <g fill="#00000040" pointerEvents="none">
-                {pts.map(({ d, xy }, i) => <circle key={i} cx={xy[0] + 1.1} cy={xy[1] + 1.5} r={on(d) ? r + 0.5 : r} opacity={region && !on(d) ? 0.4 : 1} />)}
-            </g>
-            <g pointerEvents="none">
-                {pts.map(({ d, xy }, i) => (
-                    <circle key={i} cx={xy[0]} cy={xy[1]} r={on(d) ? r + 0.5 : r}
-                        fill={on(d) ? YELLOW : IVORY} stroke="#0A3D28" strokeWidth={0.55}
-                        opacity={region && !on(d) ? 0.32 : 0.95} />
-                ))}
-            </g>
-        </svg>
+        <div ref={wrap} className="relative h-full w-full">
+            <svg viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`} className="block h-full w-full" role="img" aria-label={label}>
+                <g strokeLinejoin="round">
+                    {LAND.map(([id, path]) => {
+                        const name = OUTLINE_TO_STORE_REGION[id];
+                        const sel = !!region && name === region;
+                        return (
+                            <path key={id} d={path} fill={sel ? "#F4C5422E" : "#FFFFFF12"} stroke={sel ? YELLOW : "#FFFFFF3D"} strokeWidth={sel ? 1.6 : 0.9}
+                                onClick={onPick && name ? () => onPick(sel ? "" : name) : undefined}
+                                style={onPick ? { cursor: "pointer" } : undefined}
+                                data-region={name} />
+                        );
+                    })}
+                </g>
+            </svg>
+            <canvas ref={cv} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full" data-testid="store-dots-canvas" />
+        </div>
     );
 }
 
