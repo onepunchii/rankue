@@ -121,7 +121,9 @@ async function main() {
             .onConflictDoUpdate({
                 target: storeListings.code,
                 set: {
-                    name: sql`excluded.name`, region: sql`excluded.region`, address: sql`excluded.address`,
+                    // 수집 CSV 의 잘린 이름("… 당구...")이 고친 이름을 덮지 않게(2026-10-19 — 33곳을 그 매장의 소개 글로 되살렸다)
+                    name: sql`case when excluded.name like '%...' and store_listings.name not like '%...' then store_listings.name else excluded.name end`,
+                    region: sql`excluded.region`, address: sql`excluded.address`,
                     phone: sql`excluded.phone`, openHours: sql`excluded.open_hours`,
                     tableLarge: sql`excluded.table_large`, tableMedium: sql`excluded.table_medium`,
                     tablePocket: sql`excluded.table_pocket`,
