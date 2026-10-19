@@ -1598,6 +1598,8 @@ const en: Dict = {
   "umb.mapTitle": "Events in this ranking",
   "umb.mapSub": "{n} events · numbers show the order",
   "umb.mapLatest": "Latest",
+  "umb.tourMapTitle": "{name} on tour",
+  "umb.tourMapSub": "{n} events with points",
   "umb.finished": "Done",
   "umb.kindChampionship": "World Championship",
   "umb.kindWorldcup": "World Cup",

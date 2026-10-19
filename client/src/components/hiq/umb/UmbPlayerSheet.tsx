@@ -9,6 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { pointsByContinent } from "@shared/umbContinent";
 import { parseEventLabel } from "@shared/umbEventLabel";
 import { caromCity } from "@shared/caromCities";
+import { UmbEventMap, type UmbMapEvent } from "./UmbEventMap";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -225,6 +226,13 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
 
     const rankSuffix = t("umb.rankSuffix");
     const visibleBreakdown = showAllPoints ? breakdown : breakdown.slice(0, POINTS_FOLD);
+    // 이 선수의 세계 투어(2026-10-19) — 포인트를 받은 월드컵 · 세계선수권을 열린 차례로 지도에, 표에는 받은 점수
+    const tourEvents: UmbMapEvent[] = breakdown.flatMap(([colKey, pts]) => {
+        const label = eventLabels.get(colKey);
+        const p = label ? parseEventLabel(label) : null;
+        if (!p || !p.city || !p.date || (p.kind !== "worldcup" && p.kind !== "worldchamp") || pts <= 0) return [];
+        return [{ colKey, label: label!, kind: p.kind === "worldchamp" ? "championship" : "worldcup", city: p.city, country: p.country, date: p.date, pin: `+${pts}` }];
+    });
     const maxPts = breakdown[0]?.[1] || 1;
 
     return (
@@ -466,6 +474,16 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                         </div>
                     )}
                 </Section>
+            )}
+
+            {/* 세계 투어 지도 — 대회 둘 이상일 때(한 곳뿐이면 지도가 심심하다) */}
+            {tourEvents.length >= 2 && (
+                <UmbEventMap events={tourEvents} locale={locale} showList={false}
+                    copy={{
+                        title: t("umb.tourMapTitle").replace("{name}", locale === "ko" && player.nativeName ? player.nativeName : player.playerName),
+                        sub: (n) => t("umb.tourMapSub").replace("{n}", String(n)),
+                        latest: t("umb.mapLatest"), worldcup: t("umb.kindWorldcup"), championship: t("umb.kindChampionship"),
+                    }} />
             )}
 
             {/* 포인트 구성 — 대륙 비중 막대 + 대회별 획득 점수(레전드 매핑) */}

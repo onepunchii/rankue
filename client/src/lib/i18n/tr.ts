@@ -1598,6 +1598,8 @@ const tr: Dict = {
   "umb.mapTitle": "Bu sıralamadaki turnuvalar",
   "umb.mapSub": "{n} turnuva · numaralar sırayı gösterir",
   "umb.mapLatest": "En son",
+  "umb.tourMapTitle": "{name} turda",
+  "umb.tourMapSub": "Puan alınan {n} turnuva",
   "umb.finished": "Bitti",
   "umb.kindChampionship": "Dünya Şampiyonası",
   "umb.kindWorldcup": "Dünya Kupası",

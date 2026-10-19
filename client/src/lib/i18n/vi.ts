@@ -1598,6 +1598,8 @@ const vi: Dict = {
   "umb.mapTitle": "Các giải tính vào BXH này",
   "umb.mapSub": "{n} giải · số là thứ tự diễn ra",
   "umb.mapLatest": "Gần nhất",
+  "umb.tourMapTitle": "Hành trình của {name}",
+  "umb.tourMapSub": "{n} giải có điểm",
   "umb.finished": "Đã xong",
   "umb.kindChampionship": "Giải VĐTG",
   "umb.kindWorldcup": "World Cup",

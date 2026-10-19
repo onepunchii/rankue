@@ -12,18 +12,20 @@ import { caromCity } from "@shared/caromCities";
 import { relaxPins } from "@shared/mapPins";
 import { flagEmoji } from "@/lib/flag";
 
-export interface UmbMapEvent { colKey: string; label: string; kind: string; city: string | null; country: string | null; date: string; tag?: string }
+export interface UmbMapEvent { colKey: string; label: string; kind: string; city: string | null; country: string | null; date: string; tag?: string; /** 번호 대신 표에 적을 글(선수 페이지 — "+80") */ pin?: string }
 
 const LNG0 = -100, LNG1 = 146, LAT_TOP = 64, LAT_BOT = -16;
 const merc = (lat: number) => Math.log(Math.tan(Math.PI / 4 + (lat * Math.PI) / 360));
 const IVORY = "#F6F1E3", GOLD = "#E8C46A", RED = "#E0533B";
 
-export function UmbEventMap({ events, locale, copy, next }: {
+export function UmbEventMap({ events, locale, copy, next, showList = true }: {
     events: readonly UmbMapEvent[];
     locale: string;
     copy: { title: string; sub: (n: number) => string; latest: string; worldcup: string; championship: string; next?: string };
     /** 다음 대회(도시를 알면 지도에) */
     next?: UmbMapEvent | null;
+    /** 아래 목록 — 선수 페이지는 바로 밑에 대회별 표가 있어 뺀다 */
+    showList?: boolean;
 }) {
     const ref = useRef<HTMLDivElement>(null);
     const [w, setW] = useState(320);
@@ -76,7 +78,9 @@ export function UmbEventMap({ events, locale, copy, next }: {
         if (same) same.next = true;
         else pins.push({ ax: nx, ay: ny, ns: [], latest: false, gold: false, next: true, label: "→" });
     }
-    for (const p of pins) if (!p.label) p.label = p.ns.join("·");
+    // 표 글 — 기본은 열린 차례 번호, pin 이 있으면 그 글(같은 자리면 이어 붙인다)
+    const pinOf = new Map(onMap.map((it) => [it.n, it.e.pin]));
+    for (const p of pins) if (!p.label) p.label = p.ns.map((n) => pinOf.get(n) ?? String(n)).join("·");
     const pinW = (p: Pin) => Math.max(18, p.label.length * 7.2 + 8);
     const ringed = (p: Pin) => !!p.next && p.ns.length > 0;
     const spots = relaxPins(pins.map((p) => ({ x: p.ax, y: p.ay, w: pinW(p) + (ringed(p) ? 8 : 0), h: ringed(p) ? 26 : 18 })), w, h, 2);
@@ -99,9 +103,9 @@ export function UmbEventMap({ events, locale, copy, next }: {
 
     return (
         <section className="mb-4" data-testid="umb-event-map">
-            <div className="mb-2 flex items-baseline justify-between gap-2">
-                <h2 className="text-[13px] font-bold text-ink-2">🌍 {copy.title}</h2>
-                <span className="shrink-0 text-[12px] font-medium text-black/55">{copy.sub(list.length)}</span>
+            <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-2 gap-y-0.5">
+                <h2 className="whitespace-nowrap text-[13px] font-bold text-ink-2">🌍 {copy.title}</h2>
+                <span className="text-[12px] font-medium text-black/55 break-keep">{copy.sub(list.length)}</span>
             </div>
             <div className="overflow-hidden rounded-2xl" style={{ background: "radial-gradient(ellipse 90% 70% at 50% 35%, #146B48 0%, #0C4A31 60%, #083624 100%)", boxShadow: "inset 0 0 0 1px #FFFFFF14, 0 1px 2px rgba(0,0,0,0.08)" }}>
                 <div ref={ref} className="w-full">
@@ -149,7 +153,7 @@ export function UmbEventMap({ events, locale, copy, next }: {
                 </div>
                 {/* 번호 · 도시 · 날짜 */}
                 {/* 좁은 화면은 한 줄에 하나(두 칸이면 '샤름엘셰이크'가 잘린다), 넓으면 두 칸 */}
-                <ol className="grid grid-cols-1 gap-x-3 gap-y-1.5 px-3.5 pb-3.5 pt-1 min-[460px]:grid-cols-2" data-testid="umb-event-list">
+                {showList && <ol className="grid grid-cols-1 gap-x-3 gap-y-1.5 px-3.5 pb-3.5 pt-1 min-[460px]:grid-cols-2" data-testid="umb-event-list">
                     {list.map((it) => (
                         <li key={`${it.e.colKey}-${it.e.date}`} className="flex min-w-0 items-center gap-1.5">
                             <span className="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1 text-[12px] font-bold leading-none tabular-nums"
@@ -168,8 +172,8 @@ export function UmbEventMap({ events, locale, copy, next }: {
                             <span className="ml-auto shrink-0 text-[12px] tabular-nums" style={{ color: "#F6F1E399" }}>{md(next.date)}</span>
                         </li>
                     )}
-                </ol>
-                <p className="flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 pb-3 text-[12px]" style={{ color: "#F6F1E399" }}>
+                </ol>}
+                <p className={`flex flex-wrap items-center gap-x-3 gap-y-1 px-3.5 pb-3 text-[12px]${showList ? "" : " pt-2.5"}`} style={{ color: "#F6F1E399" }}>
                     <span className="inline-flex items-center gap-1 whitespace-nowrap"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: GOLD }} aria-hidden />{copy.championship}</span>
                     <span className="inline-flex items-center gap-1 whitespace-nowrap"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ background: IVORY }} aria-hidden />{copy.worldcup}</span>
                     <span className="inline-flex items-center gap-1 whitespace-nowrap"><span className="inline-block h-2.5 w-2.5 rounded-full" style={{ boxShadow: `inset 0 0 0 2px ${RED}` }} aria-hidden />{copy.latest}</span>

@@ -1598,6 +1598,8 @@ const es: Dict = {
   "umb.mapTitle": "Torneos de este ranking",
   "umb.mapSub": "{n} torneos · el número indica el orden",
   "umb.mapLatest": "Más reciente",
+  "umb.tourMapTitle": "{name} en el circuito",
+  "umb.tourMapSub": "{n} torneos con puntos",
   "umb.finished": "Fin",
   "umb.kindChampionship": "Campeonato Mundial",
   "umb.kindWorldcup": "Copa del Mundo",

@@ -1600,6 +1600,8 @@ export const ko: Dict = {
   "umb.mapTitle": "이번 랭킹에 들어간 대회",
   "umb.mapSub": "{n}개 대회 · 번호는 열린 차례",
   "umb.mapLatest": "가장 최근",
+  "umb.tourMapTitle": "{name}의 세계 투어",
+  "umb.tourMapSub": "포인트를 받은 대회 {n}곳",
   "umb.finished": "종료",
   "umb.kindChampionship": "세계선수권",
   "umb.kindWorldcup": "월드컵",

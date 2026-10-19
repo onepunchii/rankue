@@ -42,6 +42,11 @@ describe("대회 지도 — 도시 · 세계 점", () => {
         const chart = readFileSync(resolve(__dirname, "..", "client/src/components/hiq/charts/RankTrendChart.tsx"), "utf8");
         expect(chart).toContain('interval={ticks ? 0 : "preserveEnd"}');
     });
+    it("선수 페이지에 그 선수의 세계 투어 지도 — 표에 받은 점수, 목록은 아래 표가 대신(2026-10-19)", () => {
+        const sheet = readFileSync(resolve(__dirname, "..", "client/src/components/hiq/umb/UmbPlayerSheet.tsx"), "utf8");
+        expect(sheet).toContain("<UmbEventMap events={tourEvents} locale={locale} showList={false}");
+        expect(sheet).toContain("pin: `+${pts}`");
+    });
     it("세계랭킹 화면이 지도를 단다", () => {
         const s = readFileSync(resolve(__dirname, "..", "client/src/pages/hiq/world-ranking.tsx"), "utf8");
         expect(s).toContain("<UmbEventMap events={calendar}");
