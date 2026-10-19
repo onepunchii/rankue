@@ -13,7 +13,7 @@ import { regionName } from "@/components/hiq/umb/types";
 import { formatPrize } from "@shared/pbaMeta";
 import { fedNameKo } from "@shared/umbCountryMeta";
 import {
-    cityKo, dateRangeKo, isJuniorEvent, seasonLabelFull, shortRange,
+    cityKo, dateRangeKo, isJuniorEvent, isLadiesEvent, seasonLabelFull, shortRange,
     type PbaTourLeague, type TourStatus, type UmbEventSummary,
 } from "@shared/tournamentMeta";
 
@@ -40,6 +40,10 @@ interface TourText {
     pointsH: string; pointsDesc: (edition: string) => string; krH: string; playersTile: string; krTile: string; topTile: string;
     org: string; dateLabel: string; others: string; umbSite: string; pts: (n: number) => string; cat: Record<string, string>;
     pbaRanking: string; worldRanking: string;
+    /** 일정판(2026-10-19) — 앞으로 n주 · 막대 짧은 이름 · 오늘 */
+    boardWeeks: (n: number) => string; boardLeg: (n: number) => string; boardRound: (n: number) => string; boardFinal: string; boardPost: string; boardWorld: string; boardWeek: string; today: string;
+    /** UMB 투어 지도 — 최근 1년 대회 + 다음 대회 */
+    mapTitle: string; mapSub: (n: number) => string; mapLatest: string; mapNext: string; mapCup: string; mapChamp: string; mapWomen: string; mapJunior: string;
 }
 
 const KO: TourText = {
@@ -60,14 +64,16 @@ const KO: TourText = {
     history: "같은 대회 역대 우승자", historyDesc: "해마다 열리는 같은 스폰서 대회만 묶었어요", prev: "이전 대회", next: "다음 대회",
     seasonAll: "시즌 전체 일정", officialPage: "PBA 공식 대회 안내",
     status: { upcoming: "예정", live: "진행 중", finished: "종료" },
-    umbName: (e) => `${e.date.slice(0, 4)} ${cityKo(e.city)} ${isJuniorEvent(e) ? "주니어 " : ""}3쿠션 ${e.kind === "worldcup" ? "월드컵" : "세계선수권"}`,
-    umbShort: (e) => `${cityKo(e.city)} ${isJuniorEvent(e) ? "주니어 " : ""}3쿠션 ${e.kind === "worldcup" ? "월드컵" : "세계선수권"}`,
+    umbName: (e) => `${e.date.slice(0, 4)} ${cityKo(e.city)} ${isJuniorEvent(e) ? "주니어 " : isLadiesEvent(e) ? "여자 " : ""}3쿠션 ${e.kind === "worldcup" ? "월드컵" : "세계선수권"}`,
+    umbShort: (e) => `${cityKo(e.city)} ${isJuniorEvent(e) ? "주니어 " : isLadiesEvent(e) ? "여자 " : ""}3쿠션 ${e.kind === "worldcup" ? "월드컵" : "세계선수권"}`,
     kind: { worldcup: "3쿠션 월드컵", worldchamp: "3쿠션 세계선수권" },
     pointsH: "획득 랭킹 포인트", pointsDesc: (ed) => `UMB 세계랭킹 ${ed} 회차에 이 대회 몫으로 적힌 포인트예요. 대회 순위가 아니에요.`,
     krH: "한국 선수", playersTile: "포인트 받은 선수", krTile: "한국 선수", topTile: "최고 포인트",
     org: "주관", dateLabel: "대회일(UMB 표기)", others: "같은 대회 다른 해", umbSite: "UMB 공식 사이트", pts: (n) => `${n.toLocaleString("ko-KR")}점`,
     cat: { players: "남자", ladies: "여자", juniors: "주니어" },
     pbaRanking: "PBA 투어 랭킹", worldRanking: "당구 세계랭킹",
+    boardWeeks: (n) => `앞으로 ${n}주`, boardLeg: (n) => `${n}차`, boardRound: (n) => `${n}라운드`, boardFinal: "파이널", boardPost: "포스트시즌", boardWorld: "월드 챔피언십", boardWeek: "한 주", today: "오늘",
+    mapTitle: "UMB 투어 지도", mapSub: (n) => `최근 1년 ${n}개 대회`, mapLatest: "가장 최근", mapNext: "다음 대회", mapCup: "월드컵", mapChamp: "세계선수권", mapWomen: "여자 세계선수권", mapJunior: "주니어 세계선수권",
 };
 
 const EN: TourText = {
@@ -88,14 +94,16 @@ const EN: TourText = {
     history: "Past winners of this event", historyDesc: "Same sponsor's event across seasons", prev: "Previous", next: "Next",
     seasonAll: "Full season schedule", officialPage: "PBA official event page",
     status: { upcoming: "Upcoming", live: "Live", finished: "Finished" },
-    umbName: (e) => `${e.date.slice(0, 4)} ${e.city} ${isJuniorEvent(e) ? "Junior " : ""}3-Cushion ${e.kind === "worldcup" ? "World Cup" : "World Championship"}`,
-    umbShort: (e) => `${e.city} ${isJuniorEvent(e) ? "Junior " : ""}3-Cushion ${e.kind === "worldcup" ? "World Cup" : "World Championship"}`,
+    umbName: (e) => `${e.date.slice(0, 4)} ${e.city} ${isJuniorEvent(e) ? "Junior " : isLadiesEvent(e) ? "Women's " : ""}3-Cushion ${e.kind === "worldcup" ? "World Cup" : "World Championship"}`,
+    umbShort: (e) => `${e.city} ${isJuniorEvent(e) ? "Junior " : isLadiesEvent(e) ? "Women's " : ""}3-Cushion ${e.kind === "worldcup" ? "World Cup" : "World Championship"}`,
     kind: { worldcup: "3-cushion World Cup", worldchamp: "3-cushion World Championship" },
     pointsH: "Ranking points earned", pointsDesc: (ed) => `Points credited to this event in UMB ranking edition ${ed}. Not the final standings.`,
     krH: "Korean players", playersTile: "Players with points", krTile: "Korean players", topTile: "Top points",
     org: "Organizer", dateLabel: "Date (UMB)", others: "Other years", umbSite: "UMB official site", pts: (n) => `${n.toLocaleString("en-US")} pts`,
     cat: { players: "Men", ladies: "Women", juniors: "Juniors" },
     pbaRanking: "PBA Tour ranking", worldRanking: "World ranking",
+    boardWeeks: (n) => `Next ${n} weeks`, boardLeg: (n) => `#${n}`, boardRound: (n) => `R${n}`, boardFinal: "Final", boardPost: "Playoffs", boardWorld: "World Champ.", boardWeek: "1 week", today: "Today",
+    mapTitle: "UMB tour map", mapSub: (n) => `${n} events in the last 12 months`, mapLatest: "Most recent", mapNext: "Next event", mapCup: "World Cup", mapChamp: "World Championship", mapWomen: "Women's Worlds", mapJunior: "Junior Worlds",
 };
 
 const VI: TourText = {
@@ -122,6 +130,8 @@ const VI: TourText = {
     org: "Tổ chức", dateLabel: "Ngày (UMB)", others: "Các năm khác", umbSite: "Trang UMB", pts: (n) => `${n.toLocaleString("vi-VN")} điểm`,
     cat: { players: "Nam", ladies: "Nữ", juniors: "Trẻ" },
     pbaRanking: "BXH PBA Tour", worldRanking: "BXH thế giới",
+    boardWeeks: (n) => `${n} tuần tới`, boardLeg: (n) => `#${n}`, boardRound: (n) => `V${n}`, boardFinal: "Chung kết", boardPost: "Playoffs", boardWorld: "World Champ.", boardWeek: "1 tuần", today: "Hôm nay",
+    mapTitle: "Bản đồ UMB", mapSub: (n) => `${n} giải trong 12 tháng qua`, mapLatest: "Gần nhất", mapNext: "Giải tiếp theo", mapCup: "World Cup", mapChamp: "VĐ thế giới", mapWomen: "VĐTG nữ", mapJunior: "VĐTG trẻ",
 };
 
 const TR: TourText = {
@@ -143,14 +153,16 @@ const TR: TourText = {
     history: "Bu turnuvanın şampiyonları", historyDesc: "Aynı sponsorun turnuvası, sezonlar boyunca", prev: "Önceki", next: "Sonraki",
     seasonAll: "Sezonun tüm takvimi", officialPage: "PBA resmî turnuva sayfası",
     status: { upcoming: "Yaklaşan", live: "Devam ediyor", finished: "Bitti" },
-    umbName: (e) => `${e.date.slice(0, 4)} ${e.city} ${isJuniorEvent(e) ? "Gençler " : ""}3 Bant ${e.kind === "worldcup" ? "Dünya Kupası" : "Dünya Şampiyonası"}`,
-    umbShort: (e) => `${e.city} ${isJuniorEvent(e) ? "Gençler " : ""}3 Bant ${e.kind === "worldcup" ? "Dünya Kupası" : "Dünya Şampiyonası"}`,
+    umbName: (e) => `${e.date.slice(0, 4)} ${e.city} ${isJuniorEvent(e) ? "Gençler " : isLadiesEvent(e) ? "Kadınlar " : ""}3 Bant ${e.kind === "worldcup" ? "Dünya Kupası" : "Dünya Şampiyonası"}`,
+    umbShort: (e) => `${e.city} ${isJuniorEvent(e) ? "Gençler " : isLadiesEvent(e) ? "Kadınlar " : ""}3 Bant ${e.kind === "worldcup" ? "Dünya Kupası" : "Dünya Şampiyonası"}`,
     kind: { worldcup: "3 bant Dünya Kupası", worldchamp: "3 bant Dünya Şampiyonası" },
     pointsH: "Kazanılan sıralama puanı", pointsDesc: (ed) => `UMB sıralamasının ${ed} sürümünde bu turnuvaya yazılan puan. Final sıralaması değildir.`,
     krH: "Koreli oyuncular", playersTile: "Puan alan oyuncu", krTile: "Koreli oyuncu", topTile: "En yüksek puan",
     org: "Düzenleyen", dateLabel: "Tarih (UMB)", others: "Diğer yıllar", umbSite: "UMB resmî sitesi", pts: (n) => `${n.toLocaleString("tr-TR")} puan`,
     cat: { players: "Erkekler", ladies: "Kadınlar", juniors: "Gençler" },
     pbaRanking: "PBA Tur sıralaması", worldRanking: "Dünya sıralaması",
+    boardWeeks: (n) => `Önümüzdeki ${n} hafta`, boardLeg: (n) => `#${n}`, boardRound: (n) => `${n}. tur`, boardFinal: "Final", boardPost: "Play-off", boardWorld: "Dünya Şamp.", boardWeek: "1 hafta", today: "Bugün",
+    mapTitle: "UMB tur haritası", mapSub: (n) => `Son 12 ayda ${n} turnuva`, mapLatest: "En son", mapNext: "Sıradaki", mapCup: "Dünya Kupası", mapChamp: "Dünya Şampiyonası", mapWomen: "Kadınlar Şamp.", mapJunior: "Gençler Şamp.",
 };
 
 const ES: TourText = {
@@ -172,14 +184,16 @@ const ES: TourText = {
     history: "Campeones de este torneo", historyDesc: "El torneo del mismo patrocinador, temporada a temporada", prev: "Anterior", next: "Siguiente",
     seasonAll: "Calendario completo", officialPage: "Página oficial del torneo PBA",
     status: { upcoming: "Próximo", live: "En curso", finished: "Terminado" },
-    umbName: (e) => `${e.kind === "worldcup" ? "Copa del Mundo" : "Campeonato del Mundo"} ${isJuniorEvent(e) ? "Junior " : ""}de 3 bandas ${e.city} ${e.date.slice(0, 4)}`,
-    umbShort: (e) => `${e.kind === "worldcup" ? "Copa del Mundo" : "Campeonato del Mundo"} ${isJuniorEvent(e) ? "Junior " : ""}de 3 bandas ${e.city}`,
+    umbName: (e) => `${e.kind === "worldcup" ? "Copa del Mundo" : "Campeonato del Mundo"} ${isJuniorEvent(e) ? "Junior " : isLadiesEvent(e) ? "Femenino " : ""}de 3 bandas ${e.city} ${e.date.slice(0, 4)}`,
+    umbShort: (e) => `${e.kind === "worldcup" ? "Copa del Mundo" : "Campeonato del Mundo"} ${isJuniorEvent(e) ? "Junior " : isLadiesEvent(e) ? "Femenino " : ""}de 3 bandas ${e.city}`,
     kind: { worldcup: "Copa del Mundo a 3 bandas", worldchamp: "Campeonato del Mundo a 3 bandas" },
     pointsH: "Puntos de ranking obtenidos", pointsDesc: (ed) => `Puntos asignados a este torneo en la edición ${ed} del ranking UMB. No es la clasificación final.`,
     krH: "Jugadores coreanos", playersTile: "Jugadores con puntos", krTile: "Coreanos", topTile: "Máximo",
     org: "Organiza", dateLabel: "Fecha (UMB)", others: "Otros años", umbSite: "Sitio oficial UMB", pts: (n) => `${n.toLocaleString("es-ES")} pts`,
     cat: { players: "Hombres", ladies: "Mujeres", juniors: "Juveniles" },
     pbaRanking: "Ranking PBA Tour", worldRanking: "Ranking mundial",
+    boardWeeks: (n) => `Próximas ${n} semanas`, boardLeg: (n) => `#${n}`, boardRound: (n) => `J${n}`, boardFinal: "Final", boardPost: "Playoffs", boardWorld: "Mundial", boardWeek: "1 semana", today: "Hoy",
+    mapTitle: "Mapa del circuito UMB", mapSub: (n) => `${n} torneos en los últimos 12 meses`, mapLatest: "Más reciente", mapNext: "Próximo", mapCup: "Copa del Mundo", mapChamp: "Campeonato del Mundo", mapWomen: "Mundial femenino", mapJunior: "Mundial juvenil",
 };
 
 export const TOUR_TEXT: Record<Locale, TourText> = { ko: KO, en: EN, vi: VI, tr: TR, es: ES };

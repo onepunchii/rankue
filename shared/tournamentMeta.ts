@@ -309,6 +309,8 @@ const CITY_KO: Record<string, string> = {
     Blois: "블루아", "Binh Thuan": "빈투안", Cartagena: "카르타헤나", Viersen: "피어젠", Istanbul: "이스탄불", Hurghada: "후르가다",
     // 2026 벨기에 월드컵 — 중계(SOOP)와 대부분의 기사가 '리르'(일부 '리에르')(2026-09-24 확인)
     Lier: "리르",
+    // 2026-10-19 — 허브에 'Gradignan 주니어 …' · 'Yanggu, 대한민국'으로 로마자가 그대로 나왔다
+    Gradignan: "그라디냥", Yanggu: "양구",
 };
 export const cityKo = (city: string) => CITY_KO[city] ?? city;
 
@@ -320,10 +322,16 @@ export const UMB_KIND_KO = { worldcup: "월드컵", worldchamp: "세계선수권
  */
 export const isJuniorEvent = (e: Pick<UmbEventSummary, "kind" | "categories">) =>
     e.kind === "worldchamp" && !e.categories.includes("players") && e.categories.includes("juniors");
+/**
+ * 여자 세계선수권 — 여자 표만 있는 세계선수권(2026-10-19: '2026 그라디냥 3쿠션 세계선수권'이 남자 대회처럼 읽혔고,
+ * '같은 대회 다른 해'도 남자 세계선수권과 한 묶음이었다).
+ */
+export const isLadiesEvent = (e: Pick<UmbEventSummary, "kind" | "categories">) =>
+    e.kind === "worldchamp" && !e.categories.includes("players") && !e.categories.includes("juniors") && e.categories.includes("ladies");
 
-/** "2025 앤트워프 3쿠션 월드컵" · "2025 무르시아 주니어 3쿠션 세계선수권" */
+/** "2025 앤트워프 3쿠션 월드컵" · "2025 무르시아 주니어 3쿠션 세계선수권" · "2026 그라디냥 여자 3쿠션 세계선수권" */
 export function umbEventName(e: Pick<UmbEventSummary, "kind" | "city" | "date" | "categories">): string {
-    return `${e.date.slice(0, 4)} ${cityKo(e.city)} ${isJuniorEvent(e) ? "주니어 " : ""}3쿠션 ${UMB_KIND_KO[e.kind]}`;
+    return `${e.date.slice(0, 4)} ${cityKo(e.city)} ${isJuniorEvent(e) ? "주니어 " : isLadiesEvent(e) ? "여자 " : ""}3쿠션 ${UMB_KIND_KO[e.kind]}`;
 }
 
 /** 이름 표기 — 한글 이름이 있으면 한글(로마자) */
@@ -421,7 +429,7 @@ export function umbEventTitle(e: UmbEventSummary & Partial<Pick<UmbEventDetail, 
     const top = sec?.rows[0];
     if (!sec || !top) return plain;
     // 주니어 표만 남은 월드컵은 어느 랭킹인지 밝힌다(주니어 세계선수권은 이름에 이미 '주니어')
-    const cat = sec.category !== "players" && !isJuniorEvent(e) ? `${CAT_KO[sec.category]} ` : "";
+    const cat = sec.category !== "players" && !isJuniorEvent(e) && !isLadiesEvent(e) ? `${CAT_KO[sec.category]} ` : "";
     // 공동이면 한 명만 '최다'라 적으면 틀린 말이다 — "A 등 2명"
     const tied = sec.rows.filter((r) => r.points === top.points).length;
     const who = `${umbRowShort(top)}${tied > 1 ? ` 등 ${tied}명` : ""}`;
@@ -441,10 +449,11 @@ export function umbEventDescription(d: UmbEventDetail): string {
     const [y, m] = ymd(d.date);
     const org = d.org && d.org !== "UMB" ? `(${d.org} 주관)` : "";
     const junior = isJuniorEvent(d);
-    const head = `${y}년 ${m}월 ${fedNameKo(d.country)} ${cityKo(d.city)} UMB ${junior ? "주니어 " : ""}3쿠션 ${UMB_KIND_KO[d.kind]}`;
+    const ladies = isLadiesEvent(d);
+    const head = `${y}년 ${m}월 ${fedNameKo(d.country)} ${cityKo(d.city)} UMB ${junior ? "주니어 " : ladies ? "여자 " : ""}3쿠션 ${UMB_KIND_KO[d.kind]}`;
     if (!rows.length) return `${head}${org}.`;
     // 남자 표가 없으면(남자 회차는 2025-02 부터 보관) 어느 랭킹의 포인트인지 밝힌다 — 주니어 세계선수권은 이름에 이미 있다
-    const cat = sec && sec.category !== "players" && !junior ? `${CAT_KO[sec.category]} ` : "";
+    const cat = sec && sec.category !== "players" && !junior && !ladies ? `${CAT_KO[sec.category]} ` : "";
     const pts = (r: UmbEventRow) => `${umbRowShort(r)} ${num(r.points)}점`;
     // 공동 최다면 "A 등 2명 10점" — 제목과 같은 규칙
     const tied = rows.filter((r) => r.points === rows[0].points).length;

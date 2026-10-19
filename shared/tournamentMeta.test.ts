@@ -54,6 +54,12 @@ describe("umbEventSlug", () => {
         expect(umbEventName(wc)).toBe("2023 서울 3쿠션 월드컵");
         expect(umbEventName(wch)).toBe("2025 무르시아 주니어 3쿠션 세계선수권");
     });
+    it("여자 표만 있는 세계선수권은 '여자' — 남자 세계선수권처럼 읽히지 않게(2026-10-19)", () => {
+        const lw = { kind: "worldchamp" as const, city: "Gradignan", date: "2026-09-17", categories: ["ladies" as const] };
+        const lwc = { kind: "worldcup" as const, city: "Lier", date: "2026-09-06", categories: ["ladies" as const] };
+        expect(umbEventName(lw)).toBe("2026 그라디냥 여자 3쿠션 세계선수권");
+        expect(umbEventName(lwc)).toBe("2026 리르 3쿠션 월드컵");
+    });
 });
 
 describe("표기·상태·주소", () => {

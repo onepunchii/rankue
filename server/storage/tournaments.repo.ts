@@ -4,7 +4,7 @@ import { asc, eq, sql } from "drizzle-orm";
 import { parseEventLabel } from "../../shared/umbEventLabel.js";
 import { todayKst } from "../../shared/briefingMeta.js";
 import {
-    hasTourPage, isJuniorEvent, pbaEventKey, pbaOfficialUrl, pbaTourPath, tourStatus, umbEventSlug, UMB_OFFICIAL_CALENDAR,
+    hasTourPage, isJuniorEvent, isLadiesEvent, pbaEventKey, pbaOfficialUrl, pbaTourPath, tourStatus, umbEventSlug, UMB_OFFICIAL_CALENDAR,
     type PbaSeasonPage, type PbaTourLeague, type PbaTourPage, type PbaTourRow, type PbaWinnerProfile, type TournamentHub,
     type UmbEventDetail, type UmbEventRow, type UmbEventSummary, type UpcomingEvent,
 } from "../../shared/tournamentMeta.js";
@@ -33,8 +33,8 @@ let umbCache: { at: number; entries: UmbIndexEntry[] } | null = null;
 const CAT_ORDER: Record<string, number> = { players: 0, ladies: 1, juniors: 2 };
 const addDays = (ymd: string, days: number) => new Date(Date.parse(`${ymd}T00:00:00Z`) + days * 86400000).toISOString().slice(0, 10);
 
-/** 같은 UMB 대회의 다른 해를 묶는 열쇠 — 월드컵은 도시, 세계선수권은 부문(남자·주니어) */
-const umbSeriesKey = (e: UmbEventSummary) => e.kind === "worldcup" ? `wc:${e.city.toLowerCase()}` : `wch:${isJuniorEvent(e) ? "juniors" : "players"}`;
+/** 같은 UMB 대회의 다른 해를 묶는 열쇠 — 월드컵은 도시, 세계선수권은 부문(남자·여자·주니어) */
+const umbSeriesKey = (e: UmbEventSummary) => e.kind === "worldcup" ? `wc:${e.city.toLowerCase()}` : `wch:${isJuniorEvent(e) ? "juniors" : isLadiesEvent(e) ? "ladies" : "players"}`;
 
 export class TournamentsRepository {
     /** PBA 대회 전부(날짜순) */

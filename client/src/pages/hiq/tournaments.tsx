@@ -8,12 +8,14 @@ import { useT } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
 import { LucideChevronDown, LucideChevronRight, LucideExternalLink } from "@/lib/icons";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { UmbEventMap, type UmbMapEvent } from "@/components/hiq/umb/UmbEventMap";
+import { ScheduleBoard } from "@/components/hiq/tournaments/ScheduleBoard";
 import { Section, Chip, List } from "@/components/hiq/umb/ui";
 import {
     TOUR_TEXT, PageHeader, LoadState, StatusChip, cityLabel, countryLabel, daysUntil, leagueLabel, rangeLabel, seasonChip,
 } from "@/components/hiq/tournaments/parts";
 import {
-    HUB_TITLE, TOURNAMENTS_PATH, hubDescription, hubJsonLd, pbaSeasonPath, pbaTourPath, tourStatus, umbEventPath,
+    HUB_TITLE, TOURNAMENTS_PATH, hubDescription, hubJsonLd, isJuniorEvent, isLadiesEvent, pbaSeasonPath, pbaTourPath, tourStatus, umbEventPath,
     type TournamentHub, type UpcomingEvent,
 } from "@shared/tournamentMeta";
 
@@ -47,6 +49,18 @@ export default function HiqTournaments() {
     const firstWon = data?.pbaSeasons.find((s) => s.winners.length)?.season;
     const umbYears = data ? (allUmb ? data.umbYears : data.umbYears.slice(0, UMB_YEARS_OPEN)) : [];
     const umbHidden = data ? data.umbYears.slice(UMB_YEARS_OPEN).reduce((n, y) => n + y.events.length, 0) : 0;
+    // UMB 투어 지도(2026-10-19) — 최근 1년 대회를 차례대로 + 다음 대회 하나(공식 달력, 도시를 아는 것)
+    const umbMap = useMemo(() => {
+        if (!data) return null;
+        const since = new Date(Date.parse(`${data.today}T00:00:00Z`) - 365 * 86400000).toISOString().slice(0, 10);
+        const events: UmbMapEvent[] = data.umbYears.flatMap((y) => y.events).filter((e) => e.date >= since && e.date <= data.today).map((e) => ({
+            colKey: e.slug, label: L.umbShort(e), kind: e.kind === "worldchamp" ? "championship" : "worldcup", city: e.city, country: e.country, date: e.date,
+            tag: isJuniorEvent(e) ? L.mapJunior : isLadiesEvent(e) ? L.mapWomen : undefined,
+        }));
+        const n = data.upcoming.find((e) => e.source === "UMB" && e.place && e.startDate > data.today);
+        const next: UmbMapEvent | null = n ? { colKey: "next", label: n.title, kind: "worldcup", city: n.place, country: n.countryCode, date: n.startDate } : null;
+        return events.length ? { events, next } : null;
+    }, [data, L]);
 
     return (
         <div className="min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative overflow-x-hidden font-sans">
@@ -73,10 +87,13 @@ export default function HiqTournaments() {
                             {data.upcoming.length === 0 ? (
                                 <p className="text-[13.5px] font-medium text-ink-3 py-4 text-center">{L.upcomingEmpty}</p>
                             ) : (
+                                <>
+                                <ScheduleBoard events={data.upcoming} today={data.today} locale={locale} />
                                 <List>
                                     {/* PBA·LPBA 가 같은 이름·같은 날 시작하는 대회도 있어 리그와 순번까지 키에 넣는다 */}
                                     {upcoming.map((e, i) => <UpcomingRow key={`${e.source}:${e.league ?? ""}:${e.startDate}:${e.title}:${i}`} e={e} today={data.today} />)}
                                 </List>
+                                </>
                             )}
                             {data.upcoming.length > UPCOMING_FOLD && !allUpcoming && (
                                 <button
@@ -143,6 +160,10 @@ export default function HiqTournaments() {
                     {data.umbYears.length > 0 && (
                         <div className="rk-card p-5">
                             <Section emoji="🌍" title={L.umbEvents} desc={L.umbEventsDesc}>
+                                {umbMap && (
+                                    <UmbEventMap events={umbMap.events} next={umbMap.next} locale={locale}
+                                        copy={{ title: L.mapTitle, sub: L.mapSub, latest: L.mapLatest, next: L.mapNext, worldcup: L.mapCup, championship: L.mapChamp }} />
+                                )}
                                 <div className="flex flex-col gap-4">
                                     {umbYears.map((y) => (
                                         <div key={y.year}>
@@ -219,8 +240,9 @@ function UpcomingRow({ e, today }: { e: UpcomingEvent; today: string }) {
                     </span>
                     {e.postponed && <span className="text-[12px] font-bold leading-none text-[#b45309]">{L.postponed}</span>}
                 </div>
-                <p className="text-[14px] font-semibold text-ink-1 leading-snug line-clamp-2">{title}</p>
-                <p className="text-[12px] font-medium text-ink-3 mt-0.5 line-clamp-2 tabular-nums">
+                {/* break-keep — 한국어가 낱말 가운데서 끊겼다('킨텍/스', '대/한민국', '드림투/어', 2026-10-19) */}
+                <p className="text-[14px] font-semibold text-ink-1 leading-snug line-clamp-2 break-keep">{title}</p>
+                <p className="text-[12px] font-medium text-ink-3 mt-0.5 line-clamp-2 tabular-nums break-keep">
                     {rangeLabel(e.startDate, e.endDate, locale, today.slice(0, 4))}{where ? ` · ${where}` : ""}
                 </p>
             </div>
