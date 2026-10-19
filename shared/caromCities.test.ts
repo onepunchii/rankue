@@ -35,6 +35,13 @@ describe("대회 지도 — 도시 · 세계 점", () => {
         expect(isLandDot(30, -40)).toBe(false);
         expect(isLandDot(0, -150)).toBe(false);
     });
+    it("선수 페이지의 대회 줄은 한글 도시('앤트워프 월드컵') · 순위 추이는 1위 눈금을 빼먹지 않는다(2026-10-19)", () => {
+        const sheet = readFileSync(resolve(__dirname, "..", "client/src/components/hiq/umb/UmbPlayerSheet.tsx"), "utf8");
+        expect(sheet).toContain("ko ? `${city(c)} ${kind}`");
+        expect(sheet).not.toContain("eventView(e.label, t, { short: true })");
+        const chart = readFileSync(resolve(__dirname, "..", "client/src/components/hiq/charts/RankTrendChart.tsx"), "utf8");
+        expect(chart).toContain('interval={ticks ? 0 : "preserveEnd"}');
+    });
     it("세계랭킹 화면이 지도를 단다", () => {
         const s = readFileSync(resolve(__dirname, "..", "client/src/pages/hiq/world-ranking.tsx"), "utf8");
         expect(s).toContain("<UmbEventMap events={calendar}");

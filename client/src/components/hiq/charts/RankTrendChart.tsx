@@ -49,7 +49,8 @@ export default function RankTrendChart({ data, metric, reversed, allowDecimals, 
             <LineChart data={data as any[]} margin={{ top: 8, right: 12, bottom: 0, left: -14 }}>
                 <XAxis dataKey="label" tick={{ fontSize: 12, fill: colors.axis }} tickLine={false} axisLine={{ stroke: colors.grid }} interval="preserveStartEnd" minTickGap={40} />
                 {/* domain을 [1, max]로 고정하면 1000위권 선수의 등락이 바닥 평평한 선이 된다 — 본인 범위로, 다만 너무 좁히지 않는다(trendDomain) */}
-                <YAxis reversed={reversed} domain={domain} ticks={ticks} tick={{ fontSize: 12, fill: colors.axis }} tickLine={false} axisLine={false} width={40} allowDecimals={allowDecimals} />
+                {/* interval={0} — 기본(preserveEnd)은 줄어든 칸에서 맨 위 눈금(1위)을 빼먹었다(2026-10-19 조명우 페이지: 6 · 10 만 보였다) */}
+                <YAxis reversed={reversed} domain={domain} ticks={ticks} interval={ticks ? 0 : "preserveEnd"} tick={{ fontSize: 12, fill: colors.axis }} tickLine={false} axisLine={false} width={40} allowDecimals={allowDecimals} />
                 {top10 && <ReferenceArea y1={1} y2={10} fill={colors.brand} fillOpacity={top10Opacity} />}
                 <Tooltip formatter={(v: any) => [formatValue(v), ""]} labelFormatter={formatLabel} contentStyle={tooltipStyle} />
                 <Line type="linear" dataKey={metric} stroke={colors.brand} strokeWidth={2} dot={false} activeDot={{ r: 4, fill: colors.brand }} />

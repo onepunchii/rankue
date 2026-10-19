@@ -8,6 +8,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
 import { pointsByContinent } from "@shared/umbContinent";
 import { parseEventLabel } from "@shared/umbEventLabel";
+import { caromCity } from "@shared/caromCities";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
@@ -47,16 +48,20 @@ function formatPrize(won: number, locale: string): string {
  * "UMB / CEB World Cup - ANTWERP (BE) 2025-10-12" 를 그대로 찍으면 좁은 폰에서 도시부터 잘렸다(2026-09-13 오너).
  * 원문은 title 속성으로 남겨 두어 길게 누르면 그대로 볼 수 있다.
  */
-function eventView(label: string, t: (k: string) => string, opts: { short?: boolean } = {}): { emoji: string; title: string; sub: string } {
+function eventView(label: string, t: (k: string) => string, opts: { short?: boolean; locale?: string } = {}): { emoji: string; title: string; sub: string } {
     const p = parseEventLabel(label);
-    const date = p.date ? p.date.replace(/-/g, ".") : "";
-    // short: 만료 예고처럼 오른쪽 칸이 넓은 줄 — 주최는 빼고 날짜만(실측: 주최까지 넣으면 "남은 n점"이 잘린다)
+    // short: 만료 예고처럼 오른쪽 칸이 넓은 줄 — 주최는 빼고, 날짜는 두 자리 연도("25.11.09" — 넷이면 "남은 n점"이 잘렸다)
+    const date = p.date ? (opts.short ? p.date.slice(2) : p.date).replace(/-/g, ".") : "";
     const org = (o: string | null) => (opts.short ? null : o);
+    // 한국어는 '앤트워프 월드컵'(도시 먼저 · 한글) — "월드컵 · Sharm El Sheikh"가 영어로 나와 잘렸다(2026-10-19). 모르는 도시는 받은 글자 그대로
+    const ko = opts.locale === "ko";
+    const city = (c: string | null | undefined) => (c ? (ko ? caromCity(c)?.ko ?? c : caromCity(c)?.en ?? c) : "");
+    const named = (kind: string, c: string | null | undefined) => (c ? (ko ? `${city(c)} ${kind}` : `${kind} · ${city(c)}`) : kind);
     switch (p.kind) {
         case "worldcup":
-            return { emoji: flagEmoji(p.country) || "🎱", title: `${t("umb.kindWorldcup")} · ${p.city}`, sub: [org(p.org), date].filter(Boolean).join(" · ") };
+            return { emoji: flagEmoji(p.country) || "🎱", title: named(t("umb.kindWorldcup"), p.city), sub: [org(p.org), date].filter(Boolean).join(" · ") };
         case "worldchamp":
-            return { emoji: "🏆", title: p.city ? `${t("umb.kindChampionship")} · ${p.city}` : t("umb.kindChampionship"), sub: [org("UMB"), date].filter(Boolean).join(" · ") };
+            return { emoji: "🏆", title: named(t("umb.kindChampionship"), p.city), sub: [org("UMB"), date].filter(Boolean).join(" · ") };
         case "confederal":
             return { emoji: "🏅", title: t("umb.cont.confederal"), sub: p.season ?? "" };
         case "national":
@@ -359,7 +364,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                     <List>
                         {data!.expiry!.map((e) => {
                             const d = new Date(e.expiresAround);
-                            const ev = eventView(e.label, t, { short: true });
+                            const ev = eventView(e.label, t, { short: true, locale });
                             const delta = e.projectedRank - player.rank;
                             return (
                                 <div key={e.colKey} className="flex items-center gap-3 px-3 py-2.5" title={e.label}>
@@ -369,7 +374,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                         <div className="text-[12px] font-semibold text-black/40 mt-1 tabular-nums">{d.getFullYear()}</div>
                                     </div>
                                     <div className="flex-1 min-w-0">
-                                        <div className="text-[13px] font-semibold text-ink-1 truncate"><span className="mr-1">{ev.emoji}</span>{ev.title}</div>
+                                        <div className="text-[13px] font-semibold text-ink-1 line-clamp-2 break-keep leading-snug"><span className="mr-1">{ev.emoji}</span>{ev.title}</div>
                                         <div className="text-[12px] font-medium text-black/45 truncate mt-0.5">
                                             {[ev.sub, t("umb.pointsAfter").replace("{n}", String(e.pointsAfter))].filter(Boolean).join(" · ")}
                                         </div>
@@ -490,7 +495,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                     <List>
                         {visibleBreakdown.map(([colKey, pts], idx) => {
                             const label = eventLabels.get(colKey) || `${t("umb.event")} ${colKey}`;
-                            const ev = eventView(label, t);
+                            const ev = eventView(label, t, { locale });
                             return (
                                 <div key={colKey} className="flex items-center gap-3 px-3 py-2.5" title={label}>
                                     <span className="w-6 shrink-0 text-center text-[18px] leading-none">{ev.emoji}</span>
@@ -544,8 +549,8 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                         meta={<span className="tabular-nums">{t("umb.contEvents").replace("{n}", String(eh.rows.length))}</span>}>
                         {(strongest || improved) && (
                             <div className="flex flex-wrap gap-1.5 mb-3">
-                                {strongest && <Chip tone="gold">🏆 {t("umb.evHist.strongest")} · {eventView(strongest.label, t, { short: true }).title} {strongest.latest}</Chip>}
-                                {improved && improved.key !== strongest?.key && <Chip tone="brand">📈 {t("umb.evHist.improved")} · {eventView(improved.label, t, { short: true }).title} ▲{improved.delta}</Chip>}
+                                {strongest && <Chip tone="gold">🏆 {t("umb.evHist.strongest")} · {eventView(strongest.label, t, { short: true, locale }).title} {strongest.latest}</Chip>}
+                                {improved && improved.key !== strongest?.key && <Chip tone="brand">📈 {t("umb.evHist.improved")} · {eventView(improved.label, t, { short: true, locale }).title} ▲{improved.delta}</Chip>}
                                 {improved && improved.key === strongest?.key && <Chip tone="brand">📈 ▲{improved.delta}</Chip>}
                             </div>
                         )}
@@ -557,7 +562,7 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
                                 </div>
                                 <div className="divide-y divide-surface-line">
                                     {visible.map((r) => {
-                                        const ev = eventView(r.label, t, { short: true });
+                                        const ev = eventView(r.label, t, { short: true, locale });
                                         const byYear = new Map(r.cells.map((c) => [c.year, c]));
                                         return (
                                             <div key={r.key} className="px-3 py-2.5" title={r.label}>
