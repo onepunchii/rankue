@@ -242,6 +242,7 @@ function TourView({ seasonSeg, codeSeg }: { seasonSeg: string; codeSeg: string }
                                 </div>
                                 <div className="mt-2 text-[17px] font-bold leading-snug tabular-nums">{rangeLabel(r.startDate, r.endDate, locale)}</div>
                                 {r.place && <div className="mt-1 text-[13px] font-medium text-white/80 leading-snug">{r.place}</div>}
+                                {status !== "finished" && <DayStrip start={r.startDate} end={r.endDate} today={data.today} L={L} />}
                             </div>
                             {/* 상금은 "2억 5,000만원"처럼 길어 타일 3칸에 안 들어간다 — 칩으로 쪼갠다 */}
                             {(r.totalPrize || r.winnerPrize || r.participants) ? (
@@ -277,7 +278,7 @@ function TourView({ seasonSeg, codeSeg }: { seasonSeg: string; codeSeg: string }
                                                 {w.win != null && w.lose != null && <Chip>{L.recordLabel} <span className="tabular-nums">{L.record(w.win, w.lose, w.draw ?? 0)}</span></Chip>}
                                                 {w.careerPrize != null && <Chip tone="gold">{L.careerPrize} <span className="tabular-nums">{prizeLabel(w.careerPrize, locale)}</span></Chip>}
                                             </div>
-                                            <p className="text-[12px] font-medium text-ink-3 mt-2.5">{L.careerNote}</p>
+                                            <p className="text-[12px] font-medium text-ink-3 mt-2.5 break-keep">{L.careerNote}</p>
                                         </>
                                     )}
                                 </div>
@@ -288,6 +289,7 @@ function TourView({ seasonSeg, codeSeg }: { seasonSeg: string; codeSeg: string }
 
                         {data.history.length > 0 && (
                             <Section emoji="📜" title={L.history} desc={L.historyDesc}>
+                                <MultiWinners history={data.history} L={L} />
                                 <List>
                                     {data.history.map((h) => {
                                         const self = h.tourCode === r.tourCode;
@@ -320,7 +322,7 @@ function TourView({ seasonSeg, codeSeg }: { seasonSeg: string; codeSeg: string }
                                     <span className="flex items-center gap-1 text-[12px] font-bold text-ink-3">
                                         {i === 0 && <LucideChevronLeft className="w-3.5 h-3.5" />}{i === 0 ? L.prev : L.next}{i === 1 && <LucideChevronRight className="w-3.5 h-3.5" />}
                                     </span>
-                                    <span className="block mt-1 text-[13px] font-semibold text-ink-1 leading-snug line-clamp-2">{tourTitleOf(n, locale)}</span>
+                                    <span className="block mt-1 text-[13px] font-semibold text-ink-1 leading-snug line-clamp-2 break-keep">{tourTitleOf(n, locale)}</span>
                                 </Link>
                             ) : <div key={i} />)}
                         </div>
@@ -338,6 +340,51 @@ function TourView({ seasonSeg, codeSeg }: { seasonSeg: string; codeSeg: string }
                 </div>
             )}
         </Shell>
+    );
+}
+
+/**
+ * 대회 기간 띠(2026-10-19) — 진행 중이면 '8일 중 2일째', 지난 날은 채우고 오늘은 흰 칸. 날마다의 경기(몇 강)는 우리가 가진 자료가 아니라 적지 않는다.
+ * 2주를 넘는 일정(팀리그 라운드 묶음 등)은 칸이 너무 잘아 그리지 않는다.
+ */
+function DayStrip({ start, end, today, L }: { start: string; end: string; today: string; L: (typeof TOUR_TEXT)["ko"] }) {
+    const total = daysUntil(start, end) + 1;
+    if (total < 2 || total > 14) return null;
+    const nth = daysUntil(start, today) + 1;
+    const days = Array.from({ length: total }, (_, i) => {
+        const d = new Date(Date.parse(`${start}T00:00:00Z`) + i * 86400000);
+        return { day: d.getUTCDate(), weekend: d.getUTCDay() === 0 || d.getUTCDay() === 6, i: i + 1 };
+    });
+    return (
+        <div className="mt-3" data-testid="tour-day-strip">
+            <div className="flex gap-[3px]">
+                {days.map((d) => {
+                    const past = d.i < nth, now = d.i === nth;
+                    return (
+                        <span key={d.i} className={cn(
+                            "flex h-7 min-w-0 flex-1 items-center justify-center rounded-md text-[12px] tabular-nums leading-none",
+                            now ? "bg-white font-bold text-brand" : past ? "bg-white/25 font-semibold text-white" : "font-semibold text-white/75 ring-1 ring-inset ring-white/30",
+                        )}>
+                            {d.day}
+                        </span>
+                    );
+                })}
+            </div>
+            {nth >= 1 && nth <= total && <p className="mt-1.5 text-[12px] font-semibold text-white/80 tabular-nums">{L.dayOf(nth, total)}</p>}
+        </div>
+    );
+}
+
+/** 역대 다승 — 같은 대회를 두 번 넘게 이긴 선수가 있으면 한 줄(김가영 3회 우승) */
+function MultiWinners({ history, L }: { history: readonly { winnerName: string | null }[]; L: (typeof TOUR_TEXT)["ko"] }) {
+    const count = new Map<string, number>();
+    for (const h of history) if (h.winnerName) count.set(h.winnerName, (count.get(h.winnerName) ?? 0) + 1);
+    const top = [...count.entries()].filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]);
+    if (!top.length) return null;
+    return (
+        <div className="mb-2.5 flex flex-wrap gap-1.5" data-testid="tour-multi-winners">
+            {top.slice(0, 3).map(([name, n]) => <Chip key={name} tone="gold">🏆 <span className="tabular-nums">{L.titles(name, n)}</span></Chip>)}
+        </div>
     );
 }
 

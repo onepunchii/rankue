@@ -17,6 +17,12 @@ describe("pbaEventKey — 같은 대회 묶기(실측 제목)", () => {
         expect(pbaEventKey("국민의 행복쉼터 하이원리조트 PBA 챔피언십 2025", "PBA")).toBe("하이원리조트챔피언십");
         expect(pbaEventKey("에버콜라겐 LPBA 챔피언십 @태백", "LPBA")).toBe("에버콜라겐챔피언십");
     });
+    it("광고 문구 · 채리티는 띄어쓰기와 상관없이 걷는다 — 2026-27 NH농협카드가 역대 우승자를 잃었다(2026-10-19)", () => {
+        const k = pbaEventKey("NH농협카드 LPBA 챔피언십 24-25", "LPBA");
+        expect(pbaEventKey("지금 잘사는 방법 zgm NH농협카드 LPBA 챔피언십 26-27", "LPBA")).toBe(k);
+        expect(pbaEventKey("지금 잘 사는 방법 zgm NH농협카드 PBA 챔피언십 26-27", "PBA")).toBe(pbaEventKey("NH농협카드 PBA 챔피언십 22-23", "PBA"));
+        expect(pbaEventKey("올바른 생활카드 NH농협카드 LPBA 채리티 챔피언십 25-26", "LPBA")).toBe(k);
+    });
     it("월드챔피언십은 스폰서가 바뀌어도 같은 대회", () => {
         expect(pbaEventKey("SK렌터카 PBA 월드 챔피언십 2022", "PBA")).toBe("월드챔피언십");
         expect(pbaEventKey("하나카드 하나캐피탈 제주특별자치도 PBA 월드챔피언십 2026", "PBA")).toBe("월드챔피언십");

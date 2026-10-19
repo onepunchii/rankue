@@ -237,14 +237,15 @@ export function umbEventSlug(label: string): string | null {
 /* ── 같은 PBA 대회 묶기 ── */
 
 // 스폰서 이름 앞에 붙는 광고 문구 — 실측한 것만(2025-26·2026-27 일정). 스폰서 이름 자체는 건드리지 않는다.
-const AD_SLOGANS = ["올바른 생활카드", "국민의 행복쉼터", "친환경 건축자재"];
+// '지금 잘사는 방법 zgm'(2026-27 NH농협카드 — PBA 쪽은 '잘 사는') — 띄어쓰기와 상관없이 걷는다(2026-10-19: 이 문구 때문에 역대 우승자가 비었다)
+const AD_SLOGANS = ["올바른 생활카드", "국민의 행복쉼터", "친환경 건축자재", "지금 잘사는 방법 zgm"];
 
 /**
  * 같은 대회(해마다 열리는 같은 스폰서 대회)의 열쇠. 역대 우승자를 묶는 데만 쓴다.
  *
  * 걷어 내는 것 — 해마다 바뀌거나 대회 정체와 상관없는 조각:
  *   연도·시즌("2025", "2025-26", "21-22", "2019-2020", "2021년"), 괄호 메모("(연기)", "[잔여경기]"),
- *   "@태백" 같은 장소 꼬리표, "한가위" 같은 회차 별칭, 리그 표기(PBA·LPBA — 리그는 따로 맞춘다),
+ *   "@태백" 같은 장소 꼬리표, "한가위" · "채리티" 같은 회차 별칭, 리그 표기(PBA·LPBA — 리그는 따로 맞춘다),
  *   띄어쓰기("월드 챔피언십" = "월드챔피언십"), 위 광고 문구.
  * 남기는 것: 스폰서 이름 — PBA 는 스폰서가 곧 대회 이름이다(휴온스 챔피언십 ≠ 하림 챔피언십).
  * 예외: 월드챔피언십은 시즌 마지막 대회 하나뿐이라 스폰서가 바뀌어도(SK렌터카 → 하나카드) 같은 대회다.
@@ -261,9 +262,10 @@ export function pbaEventKey(title: string, league: PbaTourLeague): string | null
         .replace(/@\S+/g, " ")
         .replace(/(?:19|20)?\d{2}\s*-\s*(?:19|20)?\d{2}(?!\d)/g, " ")
         .replace(/(?:19|20)\d{2}년?/g, " ")
-        .replace(/한가위/g, " ")
+        .replace(/한가위|채리티/g, " ")
         .replace(/L?PBA/gi, " ");
-    const key = s.replace(/\s+/g, "").toLowerCase();
+    let key = s.replace(/\s+/g, "").toLowerCase();
+    for (const a of AD_SLOGANS) key = key.split(a.replace(/\s+/g, "").toLowerCase()).join("");
     if (!key) return null;
     if (key.includes("월드챔피언십")) return "월드챔피언십";
     if (/제?\d+차(?:투어|전)?$/.test(key) || /^투어$/.test(key)) return null;

@@ -44,6 +44,8 @@ interface TourText {
     boardWeeks: (n: number) => string; boardLeg: (n: number) => string; boardRound: (n: number) => string; boardFinal: string; boardPost: string; boardWorld: string; boardWeek: string; today: string;
     /** UMB 투어 지도 — 최근 1년 대회 + 다음 대회 */
     mapTitle: string; mapSub: (n: number) => string; mapLatest: string; mapNext: string; mapCup: string; mapChamp: string; mapWomen: string; mapJunior: string;
+    /** 대회 상세 — 기간 띠 · 역대 다승 */
+    dayOf: (n: number, total: number) => string; titles: (name: string, n: number) => string;
 }
 
 const KO: TourText = {
@@ -74,6 +76,7 @@ const KO: TourText = {
     pbaRanking: "PBA 투어 랭킹", worldRanking: "당구 세계랭킹",
     boardWeeks: (n) => `앞으로 ${n}주`, boardLeg: (n) => `${n}차`, boardRound: (n) => `${n}라운드`, boardFinal: "파이널", boardPost: "포스트시즌", boardWorld: "월드 챔피언십", boardWeek: "한 주", today: "오늘",
     mapTitle: "UMB 투어 지도", mapSub: (n) => `최근 1년 ${n}개 대회`, mapLatest: "가장 최근", mapNext: "다음 대회", mapCup: "월드컵", mapChamp: "세계선수권", mapWomen: "여자 세계선수권", mapJunior: "주니어 세계선수권",
+    dayOf: (n, t) => `${t}일 중 ${n}일째`, titles: (name, n) => `${name} ${n}회 우승`,
 };
 
 const EN: TourText = {
@@ -104,6 +107,7 @@ const EN: TourText = {
     pbaRanking: "PBA Tour ranking", worldRanking: "World ranking",
     boardWeeks: (n) => `Next ${n} weeks`, boardLeg: (n) => `#${n}`, boardRound: (n) => `R${n}`, boardFinal: "Final", boardPost: "Playoffs", boardWorld: "World Champ.", boardWeek: "1 week", today: "Today",
     mapTitle: "UMB tour map", mapSub: (n) => `${n} events in the last 12 months`, mapLatest: "Most recent", mapNext: "Next event", mapCup: "World Cup", mapChamp: "World Championship", mapWomen: "Women's Worlds", mapJunior: "Junior Worlds",
+    dayOf: (n, t) => `Day ${n} of ${t}`, titles: (name, n) => `${name} · ${n} titles`,
 };
 
 const VI: TourText = {
@@ -132,6 +136,7 @@ const VI: TourText = {
     pbaRanking: "BXH PBA Tour", worldRanking: "BXH thế giới",
     boardWeeks: (n) => `${n} tuần tới`, boardLeg: (n) => `#${n}`, boardRound: (n) => `V${n}`, boardFinal: "Chung kết", boardPost: "Playoffs", boardWorld: "World Champ.", boardWeek: "1 tuần", today: "Hôm nay",
     mapTitle: "Bản đồ UMB", mapSub: (n) => `${n} giải trong 12 tháng qua`, mapLatest: "Gần nhất", mapNext: "Giải tiếp theo", mapCup: "World Cup", mapChamp: "VĐ thế giới", mapWomen: "VĐTG nữ", mapJunior: "VĐTG trẻ",
+    dayOf: (n, t) => `Ngày ${n}/${t}`, titles: (name, n) => `${name} · ${n} lần vô địch`,
 };
 
 const TR: TourText = {
@@ -163,6 +168,7 @@ const TR: TourText = {
     pbaRanking: "PBA Tur sıralaması", worldRanking: "Dünya sıralaması",
     boardWeeks: (n) => `Önümüzdeki ${n} hafta`, boardLeg: (n) => `#${n}`, boardRound: (n) => `${n}. tur`, boardFinal: "Final", boardPost: "Play-off", boardWorld: "Dünya Şamp.", boardWeek: "1 hafta", today: "Bugün",
     mapTitle: "UMB tur haritası", mapSub: (n) => `Son 12 ayda ${n} turnuva`, mapLatest: "En son", mapNext: "Sıradaki", mapCup: "Dünya Kupası", mapChamp: "Dünya Şampiyonası", mapWomen: "Kadınlar Şamp.", mapJunior: "Gençler Şamp.",
+    dayOf: (n, t) => `${t} günün ${n}. günü`, titles: (name, n) => `${name} · ${n} şampiyonluk`,
 };
 
 const ES: TourText = {
@@ -194,6 +200,7 @@ const ES: TourText = {
     pbaRanking: "Ranking PBA Tour", worldRanking: "Ranking mundial",
     boardWeeks: (n) => `Próximas ${n} semanas`, boardLeg: (n) => `#${n}`, boardRound: (n) => `J${n}`, boardFinal: "Final", boardPost: "Playoffs", boardWorld: "Mundial", boardWeek: "1 semana", today: "Hoy",
     mapTitle: "Mapa del circuito UMB", mapSub: (n) => `${n} torneos en los últimos 12 meses`, mapLatest: "Más reciente", mapNext: "Próximo", mapCup: "Copa del Mundo", mapChamp: "Campeonato del Mundo", mapWomen: "Mundial femenino", mapJunior: "Mundial juvenil",
+    dayOf: (n, t) => `Día ${n} de ${t}`, titles: (name, n) => `${name} · ${n} títulos`,
 };
 
 export const TOUR_TEXT: Record<Locale, TourText> = { ko: KO, en: EN, vi: VI, tr: TR, es: ES };
@@ -254,7 +261,7 @@ export function PageHeader({ title, sub, onBack, backLabel, shareUrl, shareTitle
                 <LucideChevronLeft className="w-5 h-5" />
             </motion.button>
             <div className="min-w-0">
-                <h1 className="text-[22px] font-bold tracking-tight text-ink-1 leading-tight line-clamp-2">{title}</h1>
+                <h1 className="text-[22px] font-bold tracking-tight text-ink-1 leading-tight line-clamp-2 break-keep">{title}</h1>
                 {sub && <p className="text-[13px] font-medium text-ink-3 mt-1 leading-snug break-keep">{sub}</p>}
             </div>
             {shareUrl && <ShareButton className="ml-auto shrink-0" url={`${ORIGIN}${shareUrl}`} title={shareTitle} />}
