@@ -391,20 +391,18 @@ router.get("/spots/:id/tide", asyncHandler(async (req: any, res: any) => {
 router.get("/places", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {
     const q = String(req.query.q ?? "").trim().slice(0, 30);
     const sido = String(req.query.sido ?? "").trim().slice(0, 20);
-    const like = `%${q.replace(/[%_\\]/g, "")}%`;
-    const [items, regions] = await Promise.all([
-        db.execute(sql`
-            select id, name, kind, sido, sigungu, address, species, fee, tel, data_date, count(*) over()::int as total from fishing_places
-            where (${sido} = '' or sido = ${sido}) and (${q} = '' or name ilike ${like} or sigungu ilike ${like} or ${q} = any(species))
-            order by name limit 60`),
-        db.execute(sql`select sido, count(*)::int as n from fishing_places where sido is not null group by sido order by n desc`),
-    ]);
-    const list = rowsOf(items);
+    // 공개 페이지와 같은 묶은 목록(같은 곳이 해마다 새 번호로 실려 한 곳이 12줄까지 나왔다 — 2026-10-19)
+    const all = await allPlaces();
+    const ql = q.toLowerCase();
+    const hit = all.filter((p) => (!sido || p.sido === sido) && (!q || p.name.toLowerCase().includes(ql) || String(p.sigungu ?? "").toLowerCase().includes(ql) || p.species.includes(q)))
+        .sort((a, b) => a.name.localeCompare(b.name, "ko"));
+    const regions = new Map<string, number>();
+    for (const p of all) if (p.sido) regions.set(p.sido, (regions.get(p.sido) ?? 0) + 1);
     res.setHeader("Cache-Control", "no-store");
     return sendSuccess(res, {
-        total: Number(list[0]?.total) || 0,
-        regions: rowsOf(regions).map((r) => ({ sido: String(r.sido), n: Number(r.n) })),
-        items: list.map((r): FishingPlace => ({ id: String(r.id), name: String(r.name), kind: r.kind ?? null, sido: r.sido ?? null, sigungu: r.sigungu ?? null, address: r.address ?? null, species: Array.isArray(r.species) ? r.species.map(String) : [], fee: r.fee ?? null, tel: r.tel ?? null, dataDate: r.data_date ?? null })),
+        total: hit.length,
+        regions: [...regions].sort((a, b) => b[1] - a[1]).map(([sido, n]) => ({ sido, n })),
+        items: hit.slice(0, 60).map((p): FishingPlace => ({ id: p.id, name: p.name, kind: p.kind, sido: p.sido, sigungu: p.sigungu, address: p.address, species: p.species, fee: p.fee, tel: p.tel, dataDate: p.dataDate })),
     });
 }));
 

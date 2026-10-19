@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { FISHING_SPOTS_PATH, fishingRegionPath, fishingSpotPath, fishingTypePath, isPlaceId, nearbyPlaces, nearestPort, placeCounts, placeFeeText, placeKind, placeSeo, sigunguShort, speciesKey, type PublicPlace } from "./fishingPlaces";
+import { FISHING_SPOTS_PATH, dedupePlaces, placeDupKey, fishingRegionPath, fishingSpotPath, fishingTypePath, isPlaceId, nearbyPlaces, nearestPort, placeCounts, placeFeeText, placeKind, placeSeo, sigunguShort, speciesKey, type PublicPlace } from "./fishingPlaces";
 
 const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const P = (o: Partial<PublicPlace>): PublicPlace => ({ id: "202234500001000003", name: "무태낚시터", kind: "저수지", sido: "대구광역시", sigungu: "북구", address: "대구광역시 북구 연경동", lat: 35.935, lng: 128.608, species: ["잉어", "향어"], fee: "30000", tel: null, dataDate: "2024-01-01", ...o });
@@ -47,5 +47,42 @@ describe("전국 낚시터 공개 페이지(2026-10-18)", () => {
         expect(read("vercel.json")).toContain("|fishing/(?:spots(?:/(?:region|type)/[^/]+)?|spot/[^/]+|");
         expect(read("client/src/App.tsx")).toContain('<Route path="/fishing/spot/:id">');
         expect(FISHING_SPOTS_PATH).toBe("/fishing/spots");
+    });
+});
+
+describe("같은 낚시터 묶기(2026-10-19 — 1,151줄 = 861곳, 음성 생극낚시터가 12줄)", () => {
+    const a = P({ id: "202344700001000021", name: "생극낚시터", address: "충청북도 음성군 생극면 오신로 399-16", dataDate: "2023-04-20", fee: "20000", tel: "043-000-0000" });
+    const b = P({ id: "202644700001000161", name: "생극낚시터 ", address: "충청북도 음성군 생극면  오신로 399-16", dataDate: "2026-05-21", fee: null, tel: null, species: ["붕어"] });
+    const c = P({ id: "202644700001000999", name: "생극낚시터", address: "충청북도 음성군 다른길 1", dataDate: "2026-05-21" });
+    it("이름 · 주소가 같으면 한 곳(띄어쓰기 무시), 주소가 다르면 다른 곳", () => {
+        expect(placeDupKey({ ...b, name: b.name.trim() })).toBe(placeDupKey(a));
+        expect(placeDupKey(c)).not.toBe(placeDupKey(a));
+    });
+    it("가장 새 줄이 대표, 대표의 빈 칸만 옛 줄에서 채운다 · 옛 번호는 대표로", () => {
+        const { list, alias } = dedupePlaces([a, { ...b, name: b.name.trim() }, c]);
+        expect(list).toHaveLength(2);
+        const one = list.find((x) => x.id === b.id)!;
+        expect(one.species).toEqual(["붕어"]);
+        expect(one.fee).toBe("20000");
+        expect(one.dataDate).toBe("2026-05-21");
+        expect(alias.get(a.id)).toBe(b.id);
+        expect(alias.has(c.id)).toBe(false);
+    });
+    it("가까운 낚시터에 같은 곳이 되풀이되지 않는다", () => {
+        const twin = P({ id: "202244500001000004", dataDate: "2025-01-01" });
+        const near = P({ id: "202244500001000010", name: "행복낚시터", address: "대구광역시 북구 다른동", lat: 35.94 });
+        const { list } = dedupePlaces([P({}), twin, near, P({ id: "202244500001000011", name: "행복낚시터", address: "대구광역시 북구 다른동", lat: 35.94, dataDate: "2022-01-01" })]);
+        const me = list.find((x) => x.name === "무태낚시터")!;
+        expect(nearbyPlaces(list, me).map((x) => x.name)).toEqual(["행복낚시터"]);
+    });
+    it("옛 번호로 온 검색엔진은 301, 화면은 주소를 바꾼다 · 앱 안 찾기도 묶은 목록", () => {
+        const pre = read("server/prerender.ts");
+        expect(pre).toContain("canonicalPlaceId(old[1])");
+        expect(pre).toContain("res.redirect(301, fishingSpotPath(canon))");
+        expect(read("client/src/fishing/spots/SpotsPages.tsx")).toContain("if (p && p.id !== id) setLocation(fishingSpotPath(p.id), { replace: true })");
+        const route = read("server/routes/modules/fishing.ts");
+        const places = route.slice(route.indexOf('router.get("/places"'), route.indexOf("수족관 꾸미기"));
+        expect(places).toContain("await allPlaces()");
+        expect(places).not.toContain("from fishing_places");
     });
 });

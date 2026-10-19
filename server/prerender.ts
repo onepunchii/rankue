@@ -40,7 +40,8 @@ import { renderGolfChecklist } from "./seo/golfGuide.js";
 import { GOLF_STAMPS_RE, renderGolfStamps } from "./seo/golfStamps.js";
 import { HIKING_RE, renderHiking } from "./seo/hiking.js";
 import { FISHING_SPOTS_RE, renderFishingSpots } from "./seo/fishing.js";
-import { allPlaces } from "./storage/fishingPlaces.js";
+import { allPlaces, canonicalPlaceId } from "./storage/fishingPlaces.js";
+import { fishingSpotPath } from "../shared/fishingPlaces.js";
 import { FISHING_SEA_RE, renderFishingSea } from "./seo/fishingSea.js";
 import { FISHING_FISH_RE, renderFishingFish } from "./seo/fishingFish.js";
 import { getSeaNow } from "./services/fishingSea.js";
@@ -2099,6 +2100,12 @@ ${list}
     if (!isBot(req)) return next();
     try {
       const all = await allPlaces();
+      // 같은 낚시터의 옛 번호(해마다 새로 실린 줄) → 대표 번호로 301 — 1,151줄 = 861곳(2026-10-19)
+      const old = /^\/fishing\/spot\/(\d{6,24})\/?$/.exec(req.path);
+      if (old) {
+        const canon = await canonicalPlaceId(old[1]);
+        if (canon && canon !== old[1]) return res.redirect(301, fishingSpotPath(canon));
+      }
       const r = await renderFishingSpots(req.path, all);
       // 표를 읽었는데도 없는 낚시터 · 지역 · 종류면 404(표가 비어 있으면 자료 탓일 수 있어 화면에 맡긴다)
       if (!r) return all.length ? sendGone(res, "없는 낚시터예요", "전국 낚시터 표에 없는 곳이에요.") : next();

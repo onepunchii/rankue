@@ -7,7 +7,7 @@
  * 받은 칸만 적는다(지어 넣지 않는다). 금어기 · 금지체장은 수산자원관리법 시행령 별표(regs.json — 낚시 규칙 화면과 같은 자료) 그대로.
  * ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지. 한국어만.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { SportBackHeader } from "@/components/hiq/SportHeader";
@@ -23,7 +23,7 @@ import { FISHING_COLORS as C, FISHING_PLACE_SOURCE, fishingSidoShort } from "@sh
 import { fishByName } from "@shared/fishingFish";
 import { hhmm, type PortNow, type TideTurn } from "@shared/fishingPort";
 import {
-    FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, PLACE_KINDS, fishingRegionPath, fishingSpotPath, fishingTypePath, placeCounts, placeFeeText, placeKind, placeKindById, placeSeo, placeWhere,
+    FISHING_PLACE_COUNT, FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, PLACE_KINDS, fishingRegionPath, fishingSpotPath, fishingTypePath, placeCounts, placeFeeText, placeKind, placeKindById, placeSeo, placeWhere,
     speciesKey, spotsHubSeo, spotsRegionSeo, spotsTypeSeo, type PlaceKindId, type PublicPlace,
 } from "@shared/fishingPlaces";
 import { art, PAPER, INK } from "../ink";
@@ -161,7 +161,7 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
     const scopedCounts = useMemo(() => placeCounts(scoped as PublicPlace[]), [scoped]);
     const qq = q.trim().replace(/\s+/g, "");
     const shown = scoped.filter((p) => (!fish || p.species.includes(fish)) && (!qq || p.name.replace(/\s+/g, "").includes(qq) || (p.sigungu ?? "").includes(qq)));
-    const seo = region ? spotsRegionSeo(region, scoped.length) : kind ? spotsTypeSeo(kind.id, scoped.length) : spotsHubSeo(all.length || 1151);
+    const seo = region ? spotsRegionSeo(region, scoped.length) : kind ? spotsTypeSeo(kind.id, scoped.length) : spotsHubSeo(all.length || FISHING_PLACE_COUNT);
     useSeo({ title: seo.title, description: seo.description, path: region ? fishingRegionPath(region) : kind ? fishingTypePath(kind.id) : FISHING_SPOTS_PATH, locale: "ko", image: "https://www.rankue.co.kr/og.png" });
     const cover = kind?.art ?? "/fishing/art/band-reservoir.webp";
     return (
@@ -252,6 +252,8 @@ export function SpotPage({ id }: { id: string }) {
     const { data: regs } = useRegs() as { data?: { basis: string; rows: RegRow[] } };
     const { data: all } = useSpots();
     const p = data?.place ?? null;
+    // 옛 번호(같은 곳의 지난 등록)로 들어오면 대표 번호 주소로 바꿔 둔다 — 검색용 화면은 301(2026-10-19)
+    useEffect(() => { if (p && p.id !== id) setLocation(fishingSpotPath(p.id), { replace: true }); }, [p, id, setLocation]);
     const seo = p ? placeSeo(p) : null;
     useSeo(seo && p ? { title: seo.title, description: seo.description, path: fishingSpotPath(p.id), locale: "ko", image: fishingSpotCardUrl("https://www.rankue.co.kr", p.id) } : null);
     if (isLoading) return <Shell title="낚시터"><div className="h-[60vh] animate-pulse" aria-busy="true" /></Shell>;

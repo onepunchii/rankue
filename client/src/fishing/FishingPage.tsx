@@ -15,7 +15,9 @@
  */
 import { CoachTour } from "@/components/hiq/CoachTour";
 import { goLogin } from "@/components/hiq/LoginGate";
-import { FISHING_SPOTS_PATH } from "@shared/fishingPlaces";
+import { FISHING_PLACE_COUNT, FISHING_SPOTS_PATH, fishingSpotPath, placeFeeText } from "@shared/fishingPlaces";
+import { FISHING_FISH_PATH } from "@shared/fishingFishPages";
+import { FISHING_SEA_PATH } from "@shared/fishingSeaPages";
 import { getDevicePosition } from "@/hooks/useNativeBridge";
 import { cleanCoord } from "@shared/fishingSpot";
 import { FishingRanking } from "./FishingRanking";
@@ -210,7 +212,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
             <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-8 text-center" style={{ background: C.bg, color: C.foam }} data-testid="fishing-guest">
                 <img src={FS_HERO} alt="" width={880} height={880} className="h-40 w-40 rounded-3xl object-cover" draggable={false} />
                 <p className="mt-2 text-[17px] font-semibold">조과 기록 · 어탁 · 수족관은 가입하면 써요</p>
-                <p className="text-[13.5px] [word-break:keep-all]" style={{ color: C.soft }}>전국 낚시터 1,151곳은 가입 없이 지금 바로 볼 수 있어요.</p>
+                <p className="text-[13.5px] [word-break:keep-all]" style={{ color: C.soft }}>전국 낚시터 {FISHING_PLACE_COUNT.toLocaleString("ko-KR")}곳은 가입 없이 지금 바로 볼 수 있어요.</p>
                 <button type="button" onClick={() => goLogin(setLocation, TAB_PATH[tab] === "/dashboard" ? "/fishing" : TAB_PATH[tab])} className="mt-2 h-12 w-full max-w-[300px] rounded-2xl text-[15px] font-semibold" style={{ background: C.brand, color: C.onBrand }}>가입 · 로그인</button>
                 <button type="button" onClick={() => setLocation(FISHING_SPOTS_PATH)} className="h-12 w-full max-w-[300px] rounded-2xl text-[15px] font-semibold" style={{ background: "#FFFFFF14" }}>전국 낚시터 보기</button>
             </div>
@@ -298,7 +300,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             <div className="grid grid-cols-2 gap-2.5">
                                 {([
                                     ["trip", "위판장 · 저수지", "많이 오른 어종 · 물높이", "/fishing/art/band-market.webp", "fishing-tool-trip"],
-                                    ["points", "낚시터 · 낚시어선", "1,151곳 · 3,993척", "/fishing/art/band-boats.webp", "fishing-to-points"],
+                                    ["points", "낚시터 · 낚시어선", `${FISHING_PLACE_COUNT.toLocaleString("ko-KR")}곳 · 3,993척`, "/fishing/art/band-boats.webp", "fishing-to-points"],
                                     ["rules", "낚시 규칙", "금어기 · 금지체장", "/fishing/art/band-rules.webp", "fishing-to-rules"],
                                     ["guide", "어류 도감", "바다 · 민물 374종", "/fishing/art/cover-book.webp", "fishing-to-guide"],
                                 ] as const).map(([to, title, sub, img, id]) => (
@@ -308,6 +310,22 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                                         <span className="relative block text-[15px] font-semibold">{title}</span>
                                         <span className="relative mt-0.5 block text-[12.5px]" style={{ color: C.dim }}>{sub}</span>
                                     </button>
+                                ))}
+                            </div>
+                            {/* 한 곳씩 보는 페이지(누구나 · 검색으로도 들어온다) — 앱 안에서는 입구가 없었다(2026-10-19 오너 "각각 페이지가 없어?") */}
+                            <div className="mt-2.5 overflow-hidden rounded-2xl" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="fishing-public-pages">
+                                {([
+                                    [FISHING_SPOTS_PATH, "전국 낚시터", "지역 · 종류 · 지도 · 가까운 낚시터"],
+                                    [FISHING_FISH_PATH, "어종별 낚시", "감성돔 · 우럭 · 붕어 … 낚시터와 금어기"],
+                                    [FISHING_SEA_PATH, "바다 · 항구 물때", "해역 일곱 · 항구 쉰한 곳"],
+                                ] as const).map(([href, title, sub], i) => (
+                                    <Link key={href} href={href} className="flex items-center gap-3 px-4 py-3 active:opacity-80" style={i ? { borderTop: "1px solid #FFFFFF12" } : undefined}>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-[14.5px] font-semibold">{title}</span>
+                                            <span className="block truncate text-[12.5px]" style={{ color: C.dim }}>{sub}</span>
+                                        </span>
+                                        <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: "#F3ECDD66" }} aria-hidden />
+                                    </Link>
                                 ))}
                             </div>
                         </FsSection>
@@ -412,7 +430,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                         <FsCover src={FS_COVER_TRIP} line="바다 도구함 — 위판장 · 저수지 · 낚시터 · 어선 · 규칙" />
                         <MarketBoard />
                         <ReservoirBoard />
-                        <FsSection title="낚시터 · 낚시어선" aside="1,151곳 · 3,993척">
+                        <FsSection title="낚시터 · 낚시어선" aside={`${FISHING_PLACE_COUNT.toLocaleString("ko-KR")}곳 · 3,993척`}>
                             <button type="button" onClick={() => setTab("points")} className="flex min-h-[60px] w-full items-center gap-3 rounded-2xl bg-[#FFFFFF0A] px-3.5 py-2.5 text-left active:opacity-80" data-testid="fishing-to-points">
                                 <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full" style={{ background: "#FFFFFF14" }}><LucideMap className="h-5 w-5" style={{ color: C.sun }} /></span>
                                 <span className="min-w-0 flex-1"><span className="block text-[15.5px] font-semibold">낚시터 · 낚시어선 찾기</span><span className="mt-0.5 block text-[13px]" style={{ color: C.dim }}>유료 낚시터의 요금 · 신고된 배의 정원</span></span>
@@ -1342,7 +1360,7 @@ function TripForm({ crewId, today, onClose, onMade }: { crewId: string; today: s
 }
 
 /**
- * 낚시터 — 실은 낚시터(지자체에 등록된 낚시터 1,151곳)를 지역 · 글자로 찾는다. 낚시어선 · 출항지는 아직 싣지 않았다.
+ * 낚시터 — 실은 낚시터(지자체에 등록된 낚시터 — 같은 곳을 묶어 861곳)를 지역 · 글자로 찾는다. 낚시어선 · 출항지는 아직 싣지 않았다.
  * 요금 · 전화는 오래된 값일 수 있어 자료 기준일을 같이 적는다. 방파제 · 갯바위 같은 자유 포인트는 이 자료에 없다 — 그렇다고 말한다.
  */
 function Points({ onPick }: { onPick: (p: FishingPlace) => void }) {
@@ -1378,14 +1396,15 @@ function Points({ onPick }: { onPick: (p: FishingPlace) => void }) {
                     {data.items.map((p) => (
                         <li key={p.id} className="rounded-2xl px-4 py-3.5" style={{ background: C.card }} data-testid="fishing-place-row">
                             <div className="flex items-start gap-3">
-                                <div className="min-w-0 flex-1">
-                                    <p className="truncate text-[15px] font-semibold">{p.name}</p>
+                                {/* 이름을 누르면 그 낚시터 페이지(지도 · 가까운 낚시터 · 물때) */}
+                                <Link href={fishingSpotPath(p.id)} className="min-w-0 flex-1 active:opacity-80" data-testid="fishing-place-open">
+                                    <p className="flex items-center gap-1 text-[15px] font-semibold"><span className="truncate">{p.name}</span><LucideChevronRight weight="bold" className="h-3.5 w-3.5 shrink-0" style={{ color: "#F3ECDD66" }} aria-hidden /></p>
                                     <p className="mt-0.5 truncate text-[12.5px]" style={{ color: C.dim }}>{[p.kind, fishingSidoShort(p.sido), p.sigungu].filter(Boolean).join(" · ")}</p>
-                                </div>
+                                </Link>
                                 <button type="button" onClick={() => onPick(p)} className="h-9 shrink-0 rounded-full px-3 text-[13px] font-semibold" style={{ background: "#F4A96326", color: C.brand }} data-testid="fishing-place-pick">조과 적기</button>
                             </div>
                             {p.species.length > 0 && <p className="mt-2 truncate text-[13px]" style={{ color: C.soft }}>{p.species.slice(0, 6).join(" · ")}</p>}
-                            {(p.fee || p.dataDate) && <p className="mt-1 truncate text-[12px]" style={{ color: C.dim }}>{[p.fee ? `요금 ${p.fee}` : null, p.dataDate ? `자료 기준 ${p.dataDate}` : null].filter(Boolean).join(" · ")}</p>}
+                            {(p.fee || p.dataDate) && <p className="mt-1 truncate text-[12px]" style={{ color: C.dim }}>{[placeFeeText(p.fee) ? `요금 ${placeFeeText(p.fee)}` : null, p.dataDate ? `자료 기준 ${p.dataDate}` : null].filter(Boolean).join(" · ")}</p>}
                         </li>
                     ))}
                 </ul>

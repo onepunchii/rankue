@@ -7,7 +7,8 @@
  *   /fishing/spots/type/<종류>            저수지 · 바다 · 평지 · 기타 · 계곡
  *   /fishing/spot/<id>                    낚시터 한 곳
  *
- * 자료는 행정안전부 낚시터정보(fishing_places, 1,151곳) — 받은 칸(이름 · 종류 · 주소 · 대상 어종 · 요금 · 연락처)만 적는다. 지어 넣지 않는다.
+ * 자료는 행정안전부 낚시터정보(fishing_places 1,151줄 → 같은 곳을 하나로 묶으면 861곳) — 받은 칸(이름 · 종류 · 주소 · 대상 어종 · 요금 · 연락처)만 적는다. 지어 넣지 않는다.
+ * ⚠️ 받은 자료는 같은 낚시터를 해마다 새 번호로 다시 올린다(음성 생극낚시터가 12줄 — 2026-10-19 확인). dedupePlaces 로 한 곳 한 페이지, 옛 번호는 새 번호로 301.
  * 한 곳 페이지가 얇아지지 않게 우리 자료를 잇는다: 대상 어종 한 장 · 금어기(수산자원관리법) · 가까운 항구의 물때(국립해양조사원) · 같은 시군 · 가까운 낚시터.
  * ⚠️ 서버가 부른다 — 상대 임포트는 ./x.js.
  */
@@ -16,6 +17,8 @@ import { fishByName } from "./fishingFish.js";
 
 export const FISHING_SPOTS_PATH = "/fishing/spots";
 export const FISHING_SPOTS_LABEL = "전국 낚시터";
+/** 같은 곳을 묶은 낚시터 수(2026-10-19 · 1,151줄 → 861곳) — 화면 문구용. 자료를 다시 적재하면 함께 고친다(server/scripts/fishing-load-places) */
+export const FISHING_PLACE_COUNT = 861;
 export interface PublicPlace extends FishingPlace { lat: number | null; lng: number | null }
 
 /** 종류 — 받은 자료의 칸(저수지 · 바다 · 평지 · 기타 · 계곡)을 그대로, 주소용 이름만 붙인다('기타'를 실내 등으로 짐작해 바꾸지 않는다) */
@@ -34,6 +37,43 @@ export const fishingSpotPath = (id: string) => `/fishing/spot/${encodeURICompone
 export const fishingRegionPath = (sidoShort: string) => `${FISHING_SPOTS_PATH}/region/${encodeURIComponent(sidoShort)}`;
 export const fishingTypePath = (kind: PlaceKindId) => `${FISHING_SPOTS_PATH}/type/${kind}`;
 export const isPlaceId = (v: string) => /^\d{6,24}$/.test(v);
+
+/** 같은 곳의 열쇠 — 이름(띄어쓰기 무시) + 주소(띄어쓰기 무시), 주소가 없으면 좌표(소수 넷째 자리) */
+export const placeDupKey = (p: Pick<PublicPlace, "name" | "address" | "lat" | "lng" | "sido" | "sigungu">): string => {
+    const name = p.name.replace(/\s+/g, "");
+    const addr = String(p.address ?? "").replace(/\s+/g, "");
+    return addr ? `${name}|${addr}` : p.lat != null && p.lng != null ? `${name}|@${p.lat.toFixed(4)},${p.lng.toFixed(4)}` : `${name}|#${p.sido ?? ""}${p.sigungu ?? ""}`;
+};
+
+/**
+ * 같은 낚시터 묶기 — 가장 새 자료(자료 기준일 → 번호 큰 것)를 대표로, 대표에 빈 칸만 옛 줄에서 채운다(받은 값 그대로 · 섞어 만들지 않는다).
+ * alias: 옛 번호 → 대표 번호(페이지 301 · 옛 주소로 온 사람도 같은 곳으로).
+ */
+export function dedupePlaces<T extends PublicPlace>(rows: readonly T[]): { list: T[]; alias: Map<string, string> } {
+    const groups = new Map<string, T[]>();
+    for (const r of rows) {
+        const k = placeDupKey(r);
+        const g = groups.get(k);
+        if (g) g.push(r); else groups.set(k, [r]);
+    }
+    const newer = (a: T, b: T) => (b.dataDate ?? "").localeCompare(a.dataDate ?? "") || (b.id.length - a.id.length) || b.id.localeCompare(a.id);
+    const alias = new Map<string, string>();
+    const keep = new Set<T>();
+    const filled = new Map<T, T>();
+    for (const g of groups.values()) {
+        const sorted = [...g].sort(newer);
+        const head = sorted[0];
+        const pick = <K extends keyof T>(k: K): T[K] => {
+            const empty = (v: unknown) => v == null || v === "" || (Array.isArray(v) && v.length === 0);
+            return (sorted.find((x) => !empty(x[k]))?.[k] ?? head[k]) as T[K];
+        };
+        const one = { ...head, kind: pick("kind"), address: pick("address"), lat: pick("lat"), lng: pick("lng"), species: pick("species"), fee: pick("fee"), tel: pick("tel") } as T;
+        keep.add(head); filled.set(head, one);
+        for (const x of sorted.slice(1)) alias.set(x.id, head.id);
+    }
+    // 차례는 받은 차례(시도 · 시군 · 이름) 그대로
+    return { list: rows.filter((r) => keep.has(r)).map((r) => filled.get(r)!), alias };
+}
 
 /** 시군구 짧게 — "고양시덕양구" → "고양" · "이천시" → "이천" · "북구" 는 그대로 */
 export const sigunguShort = (s: string | null | undefined): string => {
