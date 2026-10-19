@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { storeDescKo, storeJsonLd, storeLocality, storeTitleKo } from "./storeMeta.js";
+import { storeDescKo, storeJsonLd, storeLocality, storeTitleKo, isBasicListing, licenseSinceKo } from "./storeMeta.js";
 
 describe("매장 주소 → 시군구·동(2026-09-24)", () => {
     it("지번·도로명·광역시·긴 시도 표기", () => {
@@ -50,5 +50,20 @@ describe("매장 제목·설명·구조화데이터", () => {
         const sj = storeJsonLd({ code: "C1", name: "B", region: "세종", address: "세종 도담동 675" }) as any;
         expect(sj.address.addressLocality).toBeUndefined();
         expect(sj.address.addressRegion).toBe("세종");
+    });
+});
+
+describe("인허가 자료로만 들어온 매장(2026-10-19)", () => {
+    const gov = { source: "gov", claimed: false, openHours: null, tableLarge: null, tableMedium: null, tablePocket: null, rate10Large: null, rate10Medium: null, rate10Pocket: null };
+    it("얇은 매장 — 인증 · 요금 · 테이블 · 영업시간 중 하나라도 있으면 아니다, 수집 매장은 늘 아니다", () => {
+        expect(isBasicListing(gov)).toBe(true);
+        expect(isBasicListing({ ...gov, rate10Large: 2000 })).toBe(false);
+        expect(isBasicListing({ ...gov, claimed: true })).toBe(false);
+        expect(isBasicListing({ ...gov, source: "collected" })).toBe(false);
+    });
+    it("제목은 있는 것만 — '위치·인허가', 인허가일은 말로", () => {
+        expect(storeTitleKo("1박2일당구클럽", "전남", "전남 여수시 문수로 152-1 (문수동)", true)).toBe("1박2일당구클럽 여수 문수동 당구장 — 위치·인허가 | 랭큐");
+        expect(licenseSinceKo("2009-12-03")).toBe("2009년 12월부터");
+        expect(licenseSinceKo(null)).toBeNull();
     });
 });

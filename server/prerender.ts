@@ -2744,7 +2744,7 @@ ${list}
     res.send(
       page({
         // client/src/pages/store-listing.tsx 의 useSeo title/desc 와 문자 단위로 같아야 한다.
-        title: storeTitleKo(s.name, s.region, s.address), // 시·구·동까지 — 화면 store-listing.tsx 와 같은 인자
+        title: storeTitleKo(s.name, s.region, s.address, isBasicListing(s as any)), // 시·구·동까지 — 화면 store-listing.tsx 와 같은 인자
         desc: storeDescKo(s.name, s.address, s as any, s.openHours),
         canonical: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
         // 인허가 자료로만 들어온 얇은 매장은 색인에서 뺀다(2026-10-19 — shared/storeMeta isBasicListing). 링크는 따라가게(follow)

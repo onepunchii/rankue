@@ -73,12 +73,14 @@ export function storeAreasKo(address: string | null | undefined, region: string)
  * 매장 제목 — "캐롬 그라운드 화성 남양 당구장 — 요금·영업시간 | 랭큐". 이름+동네가 22자를 넘으면 짧은 동네로 내려간다(브랜드 앞 35자 안).
  * address 를 안 주면 예전 꼴(시·도만). 화면·프리렌더가 **같은 인자**를 넘겨야 같은 제목이다(2026-09-24).
  */
-export function storeTitleKo(name: string, region: string, address?: string | null): string {
-    if (address == null) return `${name} — ${region} 당구장 요금·영업시간 | 랭큐`;
+export function storeTitleKo(name: string, region: string, address?: string | null, basic = false): string {
+    // 인허가 자료로만 들어온 매장(basic)은 요금 · 영업시간이 없다 — 있는 것만 제목에(2026-10-19)
+    const tail = basic ? "위치·인허가" : "요금·영업시간";
+    if (address == null) return `${name} — ${region} 당구장 ${tail} | 랭큐`;
     const areas = storeAreasKo(address, region);
     const area = areas.find((a) => name.length + 1 + a.length <= 22) ?? areas[areas.length - 1];
     // 이름에 이미 '당구장'이 있으면(1,199곳 중 280곳) 한 번만 — "코빌당구장 인천 미추홀구 주안동 당구장"이 되지 않게
-    return `${name} ${area}${name.includes("당구장") ? "" : " 당구장"} — 요금·영업시간 | 랭큐`;
+    return `${name} ${area}${name.includes("당구장") ? "" : " 당구장"} — ${tail} | 랭큐`;
 }
 
 /** 지역 허브(/stores?region=서울) — "서울 당구장" 로컬 검색 타깃. 클라이언트 useSeo 와 프리렌더가 함께 쓴다. */
