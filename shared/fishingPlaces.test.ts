@@ -38,6 +38,16 @@ describe("전국 낚시터 공개 페이지(2026-10-18)", () => {
         expect(placeSeo(P({ species: [] })).title).toBe("무태낚시터 — 대구 북구 저수지 낚시터 | 랭큐 낚시");
         expect(placeCounts([P({}), P({ id: "2", kind: "바다", sido: "경기도" })]).kind.map(([k]) => k).sort()).toEqual(["reservoir", "sea"]);
     });
+    it("어종 칸은 묶음 이름까지 한 칸 — 붕어 + 붕어류 = 붕어, 한 곳이 둘 다 적어도 한 번(2026-10-19)", () => {
+        const sp = placeCounts([
+            P({ id: "1", species: ["붕어", "잉어"] }), P({ id: "2", species: ["붕어류"] }), P({ id: "3", species: ["붕어", "붕어류"] }),
+            P({ id: "4", species: ["돔류"] }), P({ id: "5", species: ["돔류", "우럭"] }),
+        ]).species;
+        expect(sp).toContainEqual(["붕어", 3]);
+        expect(sp).toContainEqual(["돔류", 2]);
+        expect(sp.map(([f]) => f)).not.toContain("붕어류");
+        expect(read("client/src/fishing/spots/SpotsPages.tsx")).toContain("p.species.some((f) => speciesKey(f) === fishKey)");
+    });
     it("공개 길은 로그인 없이 · 검색용 화면 · 사이트맵 · 봇 라우트가 같은 주소를 쓴다", () => {
         const r = read("server/routes/modules/fishing.ts");
         expect(r).toContain('router.get("/spots", asyncHandler(');

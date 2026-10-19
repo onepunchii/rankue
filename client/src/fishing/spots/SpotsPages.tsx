@@ -161,7 +161,8 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
     const counts = useMemo(() => placeCounts(all as PublicPlace[]), [all]);
     const scopedCounts = useMemo(() => placeCounts(scoped as PublicPlace[]), [scoped]);
     const qq = q.trim().replace(/\s+/g, "");
-    const shown = scoped.filter((p) => (!fish || p.species.includes(fish)) && (!qq || p.name.replace(/\s+/g, "").includes(qq) || (p.sigungu ?? "").includes(qq)));
+    const fishKey = fish ? speciesKey(fish) : null;
+    const shown = scoped.filter((p) => (!fishKey || p.species.some((f) => speciesKey(f) === fishKey)) && (!qq || p.name.replace(/\s+/g, "").includes(qq) || (p.sigungu ?? "").includes(qq)));
     const seo = region ? spotsRegionSeo(region, scoped.length) : kind ? spotsTypeSeo(kind.id, scoped.length) : spotsHubSeo(all.length || FISHING_PLACE_COUNT);
     useSeo({ title: seo.title, description: seo.description, path: region ? fishingRegionPath(region) : kind ? fishingTypePath(kind.id) : FISHING_SPOTS_PATH, locale: "ko", image: "https://www.rankue.co.kr/og.png" });
     const cover = kind?.art ?? "/fishing/art/band-reservoir.webp";

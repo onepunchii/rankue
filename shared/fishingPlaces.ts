@@ -143,13 +143,18 @@ export function spotsTypeSeo(kind: PlaceKindId, n: number): { title: string; des
 /** 시도별 · 종류별 수 — 허브의 칩 */
 export function placeCounts(all: readonly PublicPlace[]) {
     const bySido = new Map<string, number>(), byKind = new Map<PlaceKindId, number>(), bySpecies = new Map<string, number>();
+    // 어종은 묶음 이름까지 한 칸으로(2026-10-19 — '붕어 496'과 '붕어류 50'이 따로 섰다). 곳 수는 그 어종을 하나라도 적은 낚시터 수
+    const raw = new Map<string, Map<string, number>>();
     for (const p of all) {
         const s = fishingSidoShort(p.sido); if (s) bySido.set(s, (bySido.get(s) ?? 0) + 1);
         const k = placeKind(p.kind).id; byKind.set(k, (byKind.get(k) ?? 0) + 1);
-        for (const f of p.species) bySpecies.set(f, (bySpecies.get(f) ?? 0) + 1);
+        for (const key of new Set(p.species.map(speciesKey).filter(Boolean))) bySpecies.set(key, (bySpecies.get(key) ?? 0) + 1);
+        for (const f of p.species) { const key = speciesKey(f); if (!key) continue; const m = raw.get(key) ?? new Map<string, number>(); m.set(f, (m.get(f) ?? 0) + 1); raw.set(key, m); }
     }
+    // 칸 이름 — 묶음을 뗀 이름이 실제로 쓰였으면 그것('붕어'), 아니면 가장 많이 쓰인 이름('돔류')
+    const label = (key: string) => { const m = raw.get(key); return m?.has(key) ? key : [...(m ?? [])].sort((a, b) => b[1] - a[1])[0]?.[0] ?? key; };
     const sort = <K,>(m: Map<K, number>) => [...m].sort((a, b) => b[1] - a[1]);
-    return { sido: sort(bySido), kind: sort(byKind), species: sort(bySpecies) };
+    return { sido: sort(bySido), kind: sort(byKind), species: sort(bySpecies).map(([k, n]) => [label(k), n] as [string, number]) };
 }
 
 /** 낚시터 카드에 싣는 글 · 그림(server/services/fishingSpotCard) — 받은 칸만. 어탁은 대상 어종 가운데 우리 어탁이 있는 첫 어종 */
