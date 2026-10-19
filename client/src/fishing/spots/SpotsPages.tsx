@@ -27,6 +27,7 @@ import {
     speciesKey, spotsHubSeo, spotsRegionSeo, spotsTypeSeo, type PlaceKindId, type PublicPlace,
 } from "@shared/fishingPlaces";
 import { art, PAPER, INK } from "../ink";
+import { ReservoirWater } from "./ReservoirWater";
 import { fishingSpotCardUrl } from "@shared/ogCards";
 import { spreadBalls } from "@shared/storeDots";
 import { FISHING_SEA_PATH, fishingPortPath, seaArt } from "@shared/fishingSeaPages";
@@ -299,6 +300,9 @@ export function SpotPage({ id }: { id: string }) {
                     </div>
                 )}
             </div>
+
+            {/* 이 저수지 물높이 — 저수지 낚시터이고 같은 이름의 저수지가 있을 때만(2026-10-19) */}
+            {p.kind === "저수지" && <ReservoirWater spotId={p.id} />}
 
             {/* 대상 어종 — 어탁 · 금어기 · 금지체장 */}
             {fishCards.length > 0 && (

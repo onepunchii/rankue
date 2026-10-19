@@ -42,7 +42,7 @@ import { GEAR_MAX, addLineChange, cleanGear, cleanLineChange, type FishingGear, 
 import { getMarketWeek } from "../../services/fishingMarket.js";
 import { cleanBoatQuery, type FishingBoat } from "../../../shared/fishingBoats.js";
 import { getReservoirs, searchReservoirs } from "../../services/fishingReservoir.js";
-import { RESERVOIR_MAX, RESERVOIR_STARTERS, cleanCountyQuery, isReservoirCode, type ReservoirRef } from "../../../shared/fishingReservoir.js";
+import { RESERVOIR_MAX, RESERVOIR_STARTERS, cleanCountyQuery, isReservoirCode, matchSpotReservoir, spotCountyQuery, type ReservoirRef } from "../../../shared/fishingReservoir.js";
 import { FISHING_PHOTO_CATEGORY, FISHING_THUMB_CATEGORY, cleanCatch, fishingKstDay, isOwnFishingPhotoUrl, type FishingCatch, type FishingPlace } from "../../../shared/fishing.js";
 import { deleteBlobs } from "../../utils/blob.js";
 import { appealCatch, decorCatchesOf } from "../../storage/fishingCatches.js";
@@ -386,6 +386,20 @@ router.get("/spots/:id/tide", asyncHandler(async (req: any, res: any) => {
     const b = await getPortBrief(port.code, fishingKstDay(Date.now())).catch(() => null);
     publicCache(res, 300);
     return sendSuccess(res, b ? { port: { code: port.code, name: port.name, km: port.km }, turns: b.turns, now: b.now ?? null } : null);
+}));
+
+/**
+ * 한 곳의 저수지 물높이(2026-10-19) — 저수지 낚시터이고 농어촌공사 목록에 같은 이름이 있을 때만(shared/fishingReservoir matchSpotReservoir).
+ * 목록은 시군마다 이레, 물높이는 여섯 시간 받아 둔 것을 쓴다(services/fishingReservoir). 없거나 못 받으면 null — 화면은 구역을 감춘다.
+ */
+router.get("/spots/:id/water", asyncHandler(async (req: any, res: any) => {
+    const place = isPlaceId(String(req.params.id ?? "")) ? await placeById(String(req.params.id)) : null;
+    const county = place?.kind === "저수지" ? spotCountyQuery(place.sigungu) : null;
+    const list = county ? await searchReservoirs(county).catch(() => null) : null;
+    const ref = place && list ? matchSpotReservoir(place, list) : null;
+    const [view] = ref ? await getReservoirs([ref]).catch(() => []) : [];
+    publicCache(res, 1800);
+    return sendSuccess(res, view ?? null);
 }));
 
 router.get("/places", requireAuth, gate, asyncHandler(async (req: AuthRequest, res: any) => {

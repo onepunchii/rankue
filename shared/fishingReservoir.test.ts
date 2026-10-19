@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { RESERVOIR_STARTERS, cleanCountyQuery, isReservoirCode, reservoirTrend, reservoirView, shortCounty, xmlItems } from "./fishingReservoir";
+import { RESERVOIR_STARTERS, cleanCountyQuery, matchSpotReservoir, spotCountyQuery, spotReservoirNames, isReservoirCode, reservoirTrend, reservoirView, shortCounty, xmlItems } from "./fishingReservoir";
 
 // 농어촌공사 응답 그대로(2026-10-14 탑정)
 const XML = `<response><header><returnReasonCode>00</returnReasonCode></header><body>
@@ -34,5 +34,32 @@ describe("저수지의 물높이", () => {
         expect([isReservoirCode("4423010045"), isReservoirCode("44230"), isReservoirCode(4423010045)]).toEqual([true, false, false]);
         expect(new Set(RESERVOIR_STARTERS.map((r) => r.code)).size).toBe(6);
         for (const r of RESERVOIR_STARTERS) expect(isReservoirCode(r.code), r.name).toBe(true);
+    });
+});
+
+describe("낚시터 ↔ 저수지(2026-10-19 — 저수지 낚시터 페이지의 '이 저수지 물높이')", () => {
+    const list = [
+        { code: "4213010045", name: "고산", county: "강원 원주" },
+        { code: "4213010110", name: "서곡", county: "강원 원주" },
+        { code: "4155010011", name: "마둔", county: "경기 안성" },
+        { code: "4145010001", name: "고산", county: "경기 하남" },
+        { code: "4171010014", name: "원당", county: "경기 양주" },
+        { code: "4171010099", name: "원당", county: "경기 양주" },
+    ];
+    it("이름에서 '낚시터'를 떼거나 주소의 '(○○저수지)'로", () => {
+        expect(spotReservoirNames({ name: "고산낚시터" })).toEqual(["고산"]);
+        expect(spotReservoirNames({ name: "중흥 낚시터", address: "충청남도 공주시 의당면 도신리 487(중흥저수지)" })).toEqual(["중흥"]);
+        expect(spotReservoirNames({ name: "유료 마둔낚시공원" })).toEqual(["마둔"]);
+        expect(spotCountyQuery("고양시덕양구")).toBe("고양");
+        expect(spotCountyQuery("원주시")).toBe("원주");
+    });
+    it("시도 · 시군까지 같아야 — 같은 이름의 다른 시군 저수지는 잇지 않는다", () => {
+        expect(matchSpotReservoir({ name: "고산낚시터", sido: "강원특별자치도", sigungu: "원주시" }, list)?.code).toBe("4213010045");
+        expect(matchSpotReservoir({ name: "고산낚시터", sido: "충청남도", sigungu: "공주시" }, list)).toBeNull();
+        expect(matchSpotReservoir({ name: "마둔", sido: "경기도", sigungu: "안성시" }, list)?.code).toBe("4155010011");
+    });
+    it("한 시군에 같은 이름이 둘이면 고르지 않는다 · 이름이 다르면 짐작하지 않는다", () => {
+        expect(matchSpotReservoir({ name: "원당낚시터", sido: "경기도", sigungu: "양주시" }, list)).toBeNull();
+        expect(matchSpotReservoir({ name: "행복낚시터", sido: "강원특별자치도", sigungu: "원주시" }, list)).toBeNull();
     });
 });

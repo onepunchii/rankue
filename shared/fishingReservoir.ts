@@ -62,3 +62,34 @@ export function reservoirView(ref: ReservoirRef, rows: readonly Record<string, s
 export function reservoirTrend(delta: number): "오르는 중" | "빠지는 중" | "그대로" {
     return delta >= 0.5 ? "오르는 중" : delta <= -0.5 ? "빠지는 중" : "그대로";
 }
+
+/**
+ * 낚시터 ↔ 저수지(2026-10-19) — 저수지 낚시터 페이지에 '이 저수지 물높이'. 이름이 같을 때만 잇는다(짐작해서 가까운 저수지를 붙이지 않는다).
+ * 낚시터 이름에서 '낚시터 · 낚시공원 · 유료'를 뗀 것, 또는 주소의 '(○○저수지)' · '○○저수지'가 농어촌공사 목록의 이름과 같고, 시도 · 시군도 같아야 한다.
+ * 실측(2026-10-19 표본 15개 시군): 90곳 중 17곳 — 고산낚시터 → 고산(원주), 마둔 → 마둔(안성), 원당낚시터 → 원당(양주) …
+ */
+export function spotReservoirNames(spot: { name: string; address?: string | null }): string[] {
+    const base = spot.name.replace(/\s+/g, "").replace(/^유료/, "").replace(/(유료)?(낚시터|낚시공원|낚시장|낚시|터)$/u, "").replace(/저수지$/, "");
+    const addr = String(spot.address ?? "");
+    const inAddr = /\(([가-힣]{2,})저수지\)/.exec(addr)?.[1] ?? /([가-힣]{2,})저수지/.exec(addr)?.[1] ?? null;
+    return [...new Set([base, inAddr].filter((x): x is string => !!x && x.length >= 2))];
+}
+/** 낚시터의 시군 — 목록 찾기에 넣는 조각("고양시덕양구" → "고양", "원주시" → "원주") */
+export function spotCountyQuery(sigungu: string | null | undefined): string | null {
+    const v = String(sigungu ?? "").trim();
+    const city = /^(.{2,}?)시/.exec(v)?.[1];
+    const q = city ?? (v.length > 2 ? v.replace(/(군|구)$/, "") : v);
+    return cleanCountyQuery(q);
+}
+export function matchSpotReservoir(spot: { name: string; address?: string | null; sido: string | null; sigungu: string | null }, list: readonly ReservoirRef[]): ReservoirRef | null {
+    const names = spotReservoirNames(spot);
+    const q = spotCountyQuery(spot.sigungu);
+    if (!names.length || !q) return null;
+    const sido = shortCounty(spot.sido).split(" ")[0];
+    const same = list.filter((r) => r.county.split(" ")[0] === sido && r.county.includes(q));
+    for (const n of names) {
+        const hit = same.filter((r) => r.name.replace(/저수지$/, "") === n);
+        if (hit.length === 1) return hit[0];
+    }
+    return null;
+}
