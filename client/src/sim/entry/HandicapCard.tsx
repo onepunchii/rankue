@@ -18,7 +18,7 @@ import { OnlineDamaBadge } from "./OnlineDamaBadge";
 
 export const HANDICAP_QUERY_KEY = ["/api/hiq/sim/handicap"] as const;
 
-function Cell({ board, gameType }: { board: MyHandicap | undefined; gameType: "3c" | "4c" }) {
+function Cell({ board, gameType, guest }: { board: MyHandicap | undefined; gameType: "3c" | "4c"; guest?: boolean }) {
     const { t } = useT();
     const known = !!board;
     return (
@@ -40,7 +40,9 @@ function Cell({ board, gameType }: { board: MyHandicap | undefined; gameType: "3
                 </span>
             </p>
             <p className="mt-1 text-[12px] font-medium text-white/45 truncate">
-                {board && board.fromRecord
+                {/* 방문자는 기록이 '적은' 게 아니라 없다 — '기본값'이라 하면 틀린 말(2026-10-19) */}
+                {guest ? t("sim.entry.handicapGuest")
+                    : board && board.fromRecord
                     ? t("sim.entry.handicapAvg").replace("{avg}", board.avg.toFixed(3)).replace("{n}", String(board.matches))
                     : t("sim.entry.handicapNew")}
             </p>
@@ -60,10 +62,10 @@ export function HandicapCard({ api = matchApi, enabled = true }: { api?: MatchAp
                 <span className="text-[12px] font-semibold text-white/40">{t("sim.entry.handicapAuto")}</span>
             </div>
             <div className="flex gap-2">
-                <Cell board={board("3c")} gameType="3c" />
-                <Cell board={board("4c")} gameType="4c" />
+                <Cell board={board("3c")} gameType="3c" guest={!enabled} />
+                <Cell board={board("4c")} gameType="4c" guest={!enabled} />
             </div>
-            <p className="mt-2.5 text-[12px] font-medium text-white/45">{t("sim.entry.handicapNote")}</p>
+            <p className="mt-2.5 text-[12px] font-medium text-white/45">{t(enabled ? "sim.entry.handicapNote" : "sim.entry.handicapGuestNote")}</p>
         </section>
     );
 }

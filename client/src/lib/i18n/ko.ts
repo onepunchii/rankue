@@ -2795,6 +2795,8 @@ export const ko: Dict = {
   "sim.entry.handicapAvg": "최근 {n}판 에버 {avg}",
   "sim.entry.handicapNew": "기록이 적어 기본값",
   "sim.entry.handicapNote": "핸디전에서 내가 칠 목표예요. 칠수록 내 기록에 맞게 바뀌어요",
+  "sim.entry.handicapGuest": "가입하면 매겨져요",
+  "sim.entry.handicapGuestNote": "가입하고 몇 판 치면 핸디전에서 칠 내 목표 점수가 생겨요",
   "sim.entry.roomsEmpty": "지금 열린 방이 없어요 · 먼저 열어 보세요",
   "sim.entry.roomList": "방 목록",
   "sim.entry.roomCreate": "방 만들기",

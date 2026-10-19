@@ -2793,6 +2793,8 @@ const en: Dict = {
   "sim.entry.handicapAvg": "Avg {avg} · last {n}",
   "sim.entry.handicapNew": "Default — not enough games",
   "sim.entry.handicapNote": "Your target in handicap matches — it follows your record as you play",
+  "sim.entry.handicapGuest": "Sign up to get one",
+  "sim.entry.handicapGuestNote": "Sign up and play a few games to get your own handicap target",
   "sim.entry.roomsEmpty": "No open rooms right now · open the first one",
   "sim.entry.roomList": "Room list",
   "sim.entry.roomCreate": "Create room",

@@ -2793,6 +2793,8 @@ const vi: Dict = {
   "sim.entry.handicapAvg": "TB {avg} · {n} trận",
   "sim.entry.handicapNew": "Mặc định — chưa đủ trận",
   "sim.entry.handicapNote": "Mục tiêu của bạn trong trận chấp — thay đổi theo thành tích",
+  "sim.entry.handicapGuest": "Đăng ký để có",
+  "sim.entry.handicapGuestNote": "Đăng ký và chơi vài trận để có mục tiêu chấp của riêng bạn",
   "sim.entry.roomsEmpty": "Hiện chưa có phòng mở · hãy mở phòng đầu tiên",
   "sim.entry.roomList": "Danh sách phòng",
   "sim.entry.roomCreate": "Tạo phòng",

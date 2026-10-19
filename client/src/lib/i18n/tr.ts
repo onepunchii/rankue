@@ -2793,6 +2793,8 @@ const tr: Dict = {
   "sim.entry.handicapAvg": "Ort. {avg} · son {n}",
   "sim.entry.handicapNew": "Varsayılan — yeterli maç yok",
   "sim.entry.handicapNote": "Handikaplı maçlardaki hedefin — oynadıkça kaydına göre değişir",
+  "sim.entry.handicapGuest": "Üye olunca belirlenir",
+  "sim.entry.handicapGuestNote": "Üye ol ve birkaç maç oyna, handikap hedefin belirlensin",
   "sim.entry.roomsEmpty": "Şu an açık oda yok · ilk odayı sen aç",
   "sim.entry.roomList": "Oda listesi",
   "sim.entry.roomCreate": "Oda aç",

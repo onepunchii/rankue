@@ -2793,6 +2793,8 @@ const es: Dict = {
   "sim.entry.handicapAvg": "Prom. {avg} · últimas {n}",
   "sim.entry.handicapNew": "Predeterminado — faltan partidas",
   "sim.entry.handicapNote": "Tu meta en partidas con hándicap; cambia según tu registro",
+  "sim.entry.handicapGuest": "Regístrate para tenerlo",
+  "sim.entry.handicapGuestNote": "Regístrate y juega unas partidas para tener tu meta de hándicap",
   "sim.entry.roomsEmpty": "No hay salas abiertas ahora · abre la primera",
   "sim.entry.roomList": "Lista de salas",
   "sim.entry.roomCreate": "Crear sala",
