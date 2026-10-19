@@ -1882,6 +1882,7 @@ const es: Dict = {
   "umb.sourceStore": "Club",
   "umb.sourceWorld": "Mundial",
   "umb.subtitle": "Ranking mundial oficial UMB de 3 bandas",
+  "umb.asOf": "al {d}",
   "umb.summaryLine": "{count} jugadores de {country} · mejor #{rank} {name}",
   "umb.title": "Ranking mundial",
   "umb.totalPlayers": "{n} jugadores",

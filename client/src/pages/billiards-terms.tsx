@@ -1,3 +1,5 @@
+import { TermDiagram } from "@/components/hiq/terms/TermDiagram";
+import { TERM_DIAGRAMS } from "@shared/billiardsTermDiagrams";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { LucideChevronRight, LucideSearch, LucideX } from "@/lib/icons";
@@ -178,6 +180,8 @@ function TermRow({ t, flash }: { t: BilliardsTerm; flash: boolean }) {
                 {t.aliases?.length ? <span className="text-[12px] font-medium text-ink-3">{t.aliases.join(" · ")}</span> : null}
             </div>
             <p className="mt-1 text-[13.5px] leading-relaxed text-ink-2 break-keep">{t.short}</p>
+            {/* 자기 페이지가 없는 짧은 항목도 그림이 있으면 여기서(대회전) */}
+            {!own && TERM_DIAGRAMS[t.slug] && <TermDiagram d={TERM_DIAGRAMS[t.slug]} />}
             {/* 짧은 항목은 풀이가 있는 용어로 건너가는 길을 붙인다(프리렌더의 '→ 밀어치기'와 같다) */}
             {!own && t.related?.length ? (
                 <p className="mt-1.5 flex flex-wrap gap-x-2 gap-y-1 text-[13px] font-semibold">

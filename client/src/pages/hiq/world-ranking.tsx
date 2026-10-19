@@ -24,6 +24,12 @@ const PAGE_SIZE = 50;
 
 // 당구 세계랭킹 전체 페이지 — 풀 랭킹(남 3,600+·여 500+·주니어) + 검색 + 한국 필터 + 이번 주 무버.
 // 공개 페이지: 비로그인 검색 유입 대상 (사이트맵 등록 + 봇 프리렌더).
+/** 한 낱말이 칸보다 긴 이름(POLYCHRONOPOULOS)은 한 단계 작게 — 낱말 가운데서 "POLYCHRONOPO / ULOS"로 잘리던 것(2026-10-19) */
+const longWord = (name: string) => name.split(/\s+/).some((w) => w.length > 13);
+/** 그래도 안 들어가면 음절 경계(모음 뒤 자음 앞)에서만 꺾이고 꺾인 자리에 '-'가 보이게 — 보이지 않는 줄바꿈 기회(U+00AD)를 넣는다 */
+const softBreak = (name: string) => name.split(" ").map((w) => (w.length <= 13 ? w
+    : [...w].map((ch, i, a) => (i >= 3 && i <= a.length - 3 && /[AEIOUY]/i.test(a[i - 1]) && /[B-DF-HJ-NP-TV-XZ]/i.test(ch) ? "\u00AD" + ch : ch)).join(""))).join(" ");
+
 export default function HiqWorldRanking() {
     const { t, locale } = useT();
     const [, setLocation] = useLocation();
@@ -146,8 +152,11 @@ export default function HiqWorldRanking() {
                 </motion.button>
                 <div>
                     <h1 className="text-[26px] font-bold tracking-tight text-[#FFFFFF] leading-none [text-shadow:0_1px_8px_rgba(0,0,0,0.55)]">{t("umb.pageTitle")}</h1>
-                    <p className="text-[13px] font-medium text-[#FFFFFFE6] mt-1 [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]">
-                        {t("umb.subtitle")}{data?.edition ? ` · Edition ${data.edition}` : ""}
+                    <p className="text-[13px] font-medium text-[#FFFFFFE6] mt-1 break-keep [text-shadow:0_1px_6px_rgba(0,0,0,0.6)]">
+                        {/* 회차 코드("Edition 23/2026") 대신 날짜 — 몇 번째 회차보다 '언제 기준'이 읽는 사람에게 뜻이 있다(2026-10-19) */}
+                        {t("umb.subtitle")}{data?.editionDate && <>{" · "}<span className="whitespace-nowrap">
+                            {t("umb.asOf").replace("{d}", new Date(data.editionDate).toLocaleDateString(locale === "ko" ? "ko-KR" : locale, { month: "long", day: "numeric", timeZone: "Asia/Seoul" }))}
+                        </span></>}
                     </p>
                 </div>
                 <ShareButton className="ml-auto" url="https://www.rankue.co.kr/world-ranking" title={t("umb.pageTitle")} />
@@ -386,7 +395,7 @@ export default function HiqWorldRanking() {
                         >
                             <span className={cn("w-10 shrink-0 text-center font-bold text-[15px] tabular-nums", isKr ? "text-brand" : "text-black/55")}>{r.rank}</span>
                             <span className="text-[17px] leading-none shrink-0">{flagEmoji(r.fed)}</span>
-                            <span className={cn("flex-1 min-w-0 line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere] font-semibold text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{displayName(r, locale)}</span>
+                            <span className={cn("flex-1 min-w-0 line-clamp-2 leading-snug break-keep [overflow-wrap:anywhere] font-semibold", longWord(displayName(r, locale)) ? "text-[12.5px]" : "text-[14px]", isKr ? "text-brand" : "text-ink-1")}>{softBreak(displayName(r, locale))}</span>
                             <MoveBadge move={r.move} />
                             <span className="w-12 shrink-0 text-right font-bold text-[15px] tabular-nums text-ink-1">{r.points}</span>
                         </button>

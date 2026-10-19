@@ -1884,6 +1884,7 @@ export const ko: Dict = {
   "umb.sourceStore": "매장",
   "umb.sourceWorld": "세계",
   "umb.subtitle": "UMB 공식 3쿠션 세계랭킹",
+  "umb.asOf": "{d} 기준",
   "umb.summaryLine": "{country} 선수 {count}명 · 최고 {rank}위 {name}",
   "umb.title": "세계 랭킹",
   "umb.totalPlayers": "총 {n}명",

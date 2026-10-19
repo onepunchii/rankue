@@ -3,6 +3,8 @@ import { Link, useLocation, useRoute } from "wouter";
 import { LucideChevronRight, LucideArrowRight } from "@/lib/icons";
 import { useSeo } from "@/hooks/useSeo";
 import { Section, List, Chip } from "@/components/hiq/umb/ui";
+import { TermDiagram } from "@/components/hiq/terms/TermDiagram";
+import { TERM_DIAGRAMS } from "@shared/billiardsTermDiagrams";
 import { ShareButton } from "@/components/hiq/ShareButton";
 import { TermsHeader, KoreanOnlyNote } from "@/components/hiq/terms/TermsParts";
 import { TERM_CATEGORIES, termBySlug, termsInCategory, type BilliardsTerm } from "@shared/billiardsTerms";
@@ -99,6 +101,8 @@ export default function BilliardsTermPage() {
                         </div>
                         {/* 한 줄 뜻 — 초록 히어로 한 장(선수 페이지 디자인 언어와 같다) */}
                         <p className="rounded-2xl bg-brand text-brand-fg px-4 py-4 text-[15.5px] font-semibold leading-relaxed break-keep">{t.short}</p>
+                        {/* 그림(2026-10-19) — 길 · 당점 · 두께를 말 대신 한눈에. 본문 예시를 옮긴 개념도(shared/billiardsTermDiagrams) */}
+                        {TERM_DIAGRAMS[t.slug] && <TermDiagram d={TERM_DIAGRAMS[t.slug]} />}
                         {(t.origin || t.standard) && (
                             <List>
                                 {t.origin && (
