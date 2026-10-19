@@ -15,6 +15,7 @@ import type { HikingPoiKind } from "../../shared/hikingPois.js";
 import { readSurface, type CourseSurface } from "../../shared/hikingSurface.js";
 import { hikingFeaturesOf } from "../../shared/hikingFeatures.js";
 import { hikingDisplayName } from "../../shared/hikingMountains.js";
+import { repairCourseElevation } from "../../shared/hikingElevation.js";
 
 export interface MountainSummary {
     id: string;
@@ -180,7 +181,8 @@ export async function getMountainDetail(slug: string): Promise<MountainDetail | 
         return {
             ...toSummary(m), peakName: m.peak_name ?? null, aliases: Array.isArray(m.aliases) ? m.aliases : [], dong: m.dong ?? null,
             guide: hasMountainGuide(m.guide) ? m.guide : null, poiCounts: m.poi_counts && typeof m.poi_counts === "object" ? m.poi_counts : {},
-            courseList: courses.map((c): MountainCourse => ({
+            // 높이를 못 잰 점이 0 m 로 실린 코스(8% 남짓)는 읽을 때 고친다 — shared/hikingElevation
+            courseList: courses.map((c): MountainCourse => repairCourseElevation({
                 id: c.id, seq: Number(c.seq), km: Number(c.km), gainM: Number(c.gain_m), lossM: Number(c.loss_m), minM: Number(c.min_m), maxM: Number(c.max_m), loop: !!c.loop,
                 summitKm: num(c.summit_km), line: Array.isArray(c.line) ? c.line : [], via: c.via ?? null, surface: readSurface(c.surface),
             })),
