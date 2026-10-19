@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { bestOf, durationKo, goodSpots, hhmm, hmToMin, indexMapOf, indexOutlook, isFishingIndexStep, rangeText, tideFlowAt, tideRange, tideTurns, visibilityText, windDirKo, type IndexAllRow, type PortIndexRow, type TidePoint } from "./fishingPort";
-import { FISHING_PORTS, fishingPort, portsOfArea } from "./fishingStations";
+import { FISHING_PORTS, fishingPort, portsOfArea, indexPointLabel } from "./fishingStations";
 import { SEA_AREAS } from "./fishingSea";
 
 /** 반일주조 흉내 — 12시간 25분 주기, 만조가 highAt 분에 온다 */
@@ -109,3 +109,15 @@ describe("낚시지수 지도", () => {
     });
 });
 
+
+describe("바다낚시지수 지점 이름(2026-10-19 — '인천항서측(24km)(22km)')", () => {
+    it("방향 · 거리를 말로, 없으면 그대로", () => {
+        expect(indexPointLabel("인천항서측(24km)")).toBe("인천항 서쪽 24km");
+        expect(indexPointLabel("도두항북서(2km)")).toBe("도두항 북서쪽 2km");
+        expect(indexPointLabel("목포북항서측(53km)")).toBe("목포북항 서쪽 53km");
+        expect(indexPointLabel("거문도")).toBe("거문도");
+    });
+    it("모든 지점이 이름 한 벌로 — 괄호가 남지 않는다", () => {
+        for (const p of FISHING_PORTS) if (p.index) expect(indexPointLabel(p.index.name), p.name).not.toMatch(/[()]/);
+    });
+});

@@ -52,7 +52,7 @@ import { INDEX_TONE, INK, PAPER, SEAL, Seal, art } from "./ink";
 import { MARKET_NOTE, MARKET_SOURCE, type MarketWeek } from "@shared/fishingMarket";
 import { BOAT_SOURCE, cleanBoatQuery, type FishingBoat } from "@shared/fishingBoats";
 import { RESERVOIR_MAX, RESERVOIR_SOURCE, cleanCountyQuery, isReservoirCode, reservoirTrend, type ReservoirRef, type ReservoirView } from "@shared/fishingReservoir";
-import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, portsOfArea } from "@shared/fishingStations";
+import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, indexPointLabel, portsOfArea } from "@shared/fishingStations";
 import { fishingPortPath } from "@shared/fishingSeaPages";
 import { bestOf, durationKo, goodSpots, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type IndexMap, type IndexSpot, type PortBrief } from "@shared/fishingPort";
 import { FishingAquarium } from "./FishingAquarium";
@@ -997,9 +997,9 @@ function PortCard({ code, today, embedded = false }: { code: string; today: stri
     if (now?.wtemp != null) tiles.push({ label: "수온", value: `${now.wtemp.toFixed(1)}°`, sub: now.atemp != null ? `기온 ${now.atemp.toFixed(1)}°` : null });
     else if (outlook && data?.index?.rows.some((r) => r.wtemp)) { const w = data.index.rows.find((r) => r.wtemp)!.wtemp!; tiles.push({ label: "수온(예보)", value: `${rangeText(w)}°` }); }
     if (now?.buoy?.wave != null) tiles.push({ label: "파고", value: `${now.buoy.wave.toFixed(1)}m`, sub: `${now.buoy.name} 부이 · ${now.buoy.km}km` });
-    else if (outlook?.wave) tiles.push({ label: "파고(예보)", value: `${rangeText(outlook.wave)}m`, sub: data?.index ? `${data.index.point} 지점 예보` : null });
+    else if (outlook?.wave) tiles.push({ label: "파고(예보)", value: `${rangeText(outlook.wave)}m`, sub: data?.index ? `${indexPointLabel(data.index.point)} 지점 예보` : null });
     if (now?.buoy?.wind != null) tiles.push({ label: "바람", value: `${now.buoy.wind.toFixed(1)}m/s`, sub: [windDirKo(now.buoy.windDir), `${now.buoy.name} 부이`].filter(Boolean).join(" · ") });
-    else if (outlook?.wind) tiles.push({ label: "바람(예보)", value: `${rangeText(outlook.wind)}m/s`, sub: data?.index ? `${data.index.point} 지점 예보` : null });
+    else if (outlook?.wind) tiles.push({ label: "바람(예보)", value: `${rangeText(outlook.wind)}m/s`, sub: data?.index ? `${indexPointLabel(data.index.point)} 지점 예보` : null });
     if (now?.fog?.visM != null) tiles.push({ label: "시정", value: visibilityText(now.fog.visM) ?? "-", sub: `${now.fog.name} 해무관측소` });
     if (data?.sun?.rise != null && data.sun.set != null) tiles.push({ label: "해", value: `${hhmm(data.sun.rise)} – ${hhmm(data.sun.set)}`, sub: data.sun.dawn != null ? `여명 ${hhmm(data.sun.dawn)}` : null });
     if (data?.sun?.moonrise != null || data?.sun?.moonset != null) tiles.push({ label: "달", value: `${data!.sun!.moonrise != null ? hhmm(data!.sun!.moonrise!) : "–"} – ${data!.sun!.moonset != null ? hhmm(data!.sun!.moonset!) : "–"}`, sub: "뜨고 지는 때" });
@@ -1052,7 +1052,7 @@ function PortCard({ code, today, embedded = false }: { code: string; today: stri
                                 <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-3.5 pb-3 pt-3" data-testid="fishing-port-index">
                                     <div className="flex items-baseline justify-between gap-2">
                                         <p className="text-[14px] font-semibold">바다낚시지수</p>
-                                        <p className="truncate text-[12px]" style={{ color: C.dim }}>{data.index.point} 지점</p>
+                                        <p className="truncate text-[12px]" style={{ color: C.dim }}>{indexPointLabel(data.index.point)} 지점</p>
                                     </div>
                                     <div className="mt-2 grid grid-cols-[1fr_auto_auto] items-center gap-x-2 gap-y-1.5">
                                         <span />

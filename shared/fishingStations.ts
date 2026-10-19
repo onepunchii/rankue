@@ -72,3 +72,13 @@ export const FISHING_PORTS: readonly FishingPort[] = [
 export const fishingPort = (code: string | null | undefined): FishingPort | null => FISHING_PORTS.find((p) => p.code === code) ?? null;
 export const portsOfArea = (area: string | null | undefined): FishingPort[] => FISHING_PORTS.filter((p) => p.area === area);
 export const FISHING_PORT_SOURCE = "국립해양조사원";
+
+/**
+ * 바다낚시지수 지점 이름을 읽히게(2026-10-19) — 해양조사원 이름은 "인천항서측(24km)"(항에서 서쪽 24km 바다)라
+ * 우리 거리를 붙이면 "인천항서측(24km)(22km)"가 됐다. → "인천항 서쪽 24km". 방향 · 거리가 없는 이름은 그대로.
+ */
+const DIR: Record<string, string> = { 서측: "서쪽", 동측: "동쪽", 남측: "남쪽", 북측: "북쪽", 북서: "북서쪽", 북동: "북동쪽", 남서: "남서쪽", 남동: "남동쪽" };
+export function indexPointLabel(name: string): string {
+    const m = /^(.+?)(서측|동측|남측|북측|북서|북동|남서|남동)\((\d+(?:\.\d+)?)km\)$/.exec(name.trim());
+    return m ? `${m[1]} ${DIR[m[2]]} ${m[3]}km` : name.trim();
+}

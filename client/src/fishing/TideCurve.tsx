@@ -35,6 +35,21 @@ export function TideCurve({ points, turns, nowMin, sun }: {
     const now = nowMin != null && nowMin >= 0 && nowMin <= 1440 ? at(nowMin) : null;
     // 글자가 가장자리 밖으로 나가지 않게 — 글자 너비(대략)를 재서 안쪽으로 민다
     const clampX = (cx: number, chars: number) => { const half = (chars * fs * 0.58) / 2; return Math.max(PAD_X + half - 14, Math.min(W - PAD_X - half + 14, cx)); };
+    // '지금' 글자 자리 — 위 가운데가 만조 글자와 겹치면(2026-10-19 인천 22:23 만조 · 21시 지금) 그 글자 왼쪽(모자라면 오른쪽)으로 비킨다
+    const nowSpot = (() => {
+        if (!now) return null;
+        const nx = x(now.min), w2 = fs * 1.25, top = 8 - fs * 0.2, bot = 8 + fs * 1.05;
+        const boxes = turns.filter((t) => t.kind === "high").map((t) => {
+            const label = `만조 ${hhmm(t.min)}`, lx = clampX(x(t.min), label.length), half = (label.length * fs * 0.58) / 2, cy = y(t.cm);
+            return { l: lx - half, r: lx + half, t: cy - fs * 2.7, b: cy - fs * 0.4 };
+        });
+        const hit = (cx: number) => boxes.find((b) => cx + w2 > b.l && cx - w2 < b.r && bot > b.t && top < b.b);
+        const c = clampX(nx, 2);
+        const b = hit(c);
+        if (!b) return { x: c, anchor: "middle" as const };
+        if (b.l - 4 - w2 * 2 > PAD_X - 10) return { x: b.l - 4, anchor: "end" as const };
+        return { x: Math.min(W - PAD_X + 10, b.r + 4), anchor: "start" as const };
+    })();
     return (
         <svg ref={ref} viewBox={`0 0 ${W} ${H}`} className="block w-full" role="img" aria-label={`오늘의 물높이 — ${turns.map((t) => `${t.kind === "high" ? "만조" : "간조"} ${hhmm(t.min)}`).join(", ")}`} data-testid="fishing-tide-curve">
             <rect width={W} height={H} fill="#F3ECDD" />
@@ -69,7 +84,7 @@ export function TideCurve({ points, turns, nowMin, sun }: {
                 <g data-testid="fishing-tide-nowline">
                     <path d={`M${x(now.min)} ${14 + fs} V${base}`} stroke="#EE7B5B" strokeWidth={1.3 * u} />
                     <circle cx={x(now.min)} cy={y(now.cm)} r={4 * u} fill="#EE7B5B" stroke="#F3ECDD" strokeWidth={1.4 * u} />
-                    <text x={clampX(x(now.min), 2)} y={8 + fs * 0.8} textAnchor="middle" fontSize={fs} fontWeight="600" fill="#B7462A">지금</text>
+                    {nowSpot && <text x={nowSpot.x} y={8 + fs * 0.8} textAnchor={nowSpot.anchor} fontSize={fs} fontWeight="600" fill="#B7462A" stroke="#F3ECDD" strokeWidth={fs * 0.2} paintOrder="stroke">지금</text>}
                 </g>
             )}
         </svg>

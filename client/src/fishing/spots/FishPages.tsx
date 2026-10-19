@@ -188,7 +188,7 @@ export function FishPage({ name }: { name: string }) {
                             </ul>
                         )}
                     </div>
-                    <p className="mt-2 px-1 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>물때 · 파고 · 수온 · 바람으로 매긴 값이에요. 랭큐가 매긴 값이 아니에요.</p>
+                    {/* '랭큐가 매긴 값이 아니에요' 꼬리말은 뺐다 — 머리줄 오른쪽의 출처로 충분(2026-10-19, 오늘 바다와 같은 결정) */}
                 </section>
             )}
 
@@ -209,8 +209,14 @@ export function FishPage({ name }: { name: string }) {
                     <H2 aside={`${md(market.days[0])}~${md(market.days[market.days.length - 1])}`}>위판장</H2>
                     <div className="rounded-2xl bg-[#FFFFFF0A] px-3.5 py-3.5">
                         <div className="flex items-end gap-3">
-                            <div className="flex h-[64px] flex-1 items-end gap-1.5" aria-hidden>
-                                {week.counts.map((n, k) => <i key={market.days[k]} className="flex-1 rounded-t-[3px]" style={{ height: `${Math.max(3, Math.round((n / Math.max(1, ...week.counts)) * 62))}px`, background: C.brand, opacity: k === week.counts.length - 1 ? 0.4 : 0.9 }} />)}
+                            {/* 날마다 — 막대 밑에 날짜(어제 것은 덜 들어와 옅게) */}
+                            <div className="flex flex-1 items-end gap-1.5" aria-hidden>
+                                {week.counts.map((n, k) => (
+                                    <span key={market.days[k]} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                                        <i className="w-full rounded-t-[3px]" style={{ height: `${Math.max(3, Math.round((n / Math.max(1, ...week.counts)) * 62))}px`, background: C.brand, opacity: k === week.counts.length - 1 ? 0.4 : 0.9 }} />
+                                        <span className="text-[12px] leading-none tabular-nums" style={{ color: C.dim }}>{Number(market.days[k].slice(-2))}</span>
+                                    </span>
+                                ))}
                             </div>
                             <p className="shrink-0 text-right leading-none"><span className="block text-[12px]" style={{ color: C.dim }}>이레 동안</span><span className="mt-1.5 block text-[22px] font-semibold tabular-nums">{week.total.toLocaleString("en-US")}<span className="text-[13px] font-normal" style={{ color: C.dim }}>건</span></span></p>
                         </div>

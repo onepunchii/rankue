@@ -90,7 +90,9 @@ export function placeFeeText(fee: string | null | undefined): string | null {
     const v = String(fee ?? "").trim();
     if (!v || v === "0" || v === "-") return null;
     // 숫자만이면 원을 붙이고, 글 속의 네 자리 넘는 숫자는 쉼표만 찍는다("1일 10000원" → "1일 10,000원" — 뜻은 그대로)
-    return /^\d{3,7}$/.test(v) ? `${Number(v).toLocaleString("ko-KR")}원` : v.replace(/\d{4,7}/g, (d) => Number(d).toLocaleString("ko-KR"));
+    if (/^\d{3,7}$/.test(v) || /^\d{1,3}(,\d{3})+$/.test(v)) return `${Number(v.replace(/,/g, "")).toLocaleString("ko-KR")}원`;
+    // 붙어 온 여러 값을 띄운다("44,000원6시간" → "44,000원 · 6시간", "20,000원,청소년" → "20,000원, 청소년") — 글자는 그대로, 띄움만(2026-10-19)
+    return v.replace(/\d{4,7}/g, (d) => Number(d).toLocaleString("ko-KR")).replace(/원(?=\d)/g, "원 · ").replace(/원,(?=[^\d\s])/g, "원, ");
 }
 
 /** 어종 이름 다듬기 — 묶음 이름("돔류" · "볼락류")은 '류'를 떼어 우리 어종 · 도감 · 금어기를 찾는 데 쓴다(화면에는 받은 이름 그대로) */

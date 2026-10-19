@@ -14,7 +14,7 @@ import { useSeo } from "@/hooks/useSeo";
 import { apiRequest } from "@/lib/queryClient";
 import { FISHING_COLORS as C, fishingDayLabel } from "@shared/fishing";
 import { SEA_AREAS, SEA_CAUTION, SEA_SOURCE, seaHeadline, seaNotes, type SeaArea, type SeaNow, type SeaState } from "@shared/fishingSea";
-import { FISHING_PORTS } from "@shared/fishingStations";
+import { FISHING_PORTS, indexPointLabel } from "@shared/fishingStations";
 import { SEA_FCST_SOURCE, waveText, windText, type SeaFcst } from "@shared/fishingSeaFcst";
 import { durationKo, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, windDirKo, type PortBrief } from "@shared/fishingPort";
 import { tideAddDays, tideOf, TIDE_PHASE_TEXT, TIDE_SEAS, type TideSea } from "@shared/fishingTide";
@@ -315,13 +315,13 @@ export function PortPage({ name }: { name: string }) {
                 <section className="grid grid-cols-2 gap-2 px-5 pt-3" data-testid="port-now">
                     {isToday && data.now?.wtemp != null && <div className="rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0D" }}><p className="text-[12px]" style={{ color: C.dim }}>지금 수온</p><p className="text-[16px] font-semibold tabular-nums">{data.now.wtemp.toFixed(1)}°</p></div>}
                     {isToday && data.now?.buoy?.wave != null && <div className="rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0D" }}><p className="text-[12px]" style={{ color: C.dim }}>지금 파고 · {data.now.buoy.name}</p><p className="text-[16px] font-semibold tabular-nums">{data.now.buoy.wave.toFixed(1)}m{data.now.buoy.wind != null ? ` · ${[windDirKo(data.now.buoy.windDir), `${data.now.buoy.wind.toFixed(1)}m/s`].filter(Boolean).join(" ")}` : ""}</p></div>}
-                    {out?.wave && <div className="rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0D" }}><p className="text-[12px]" style={{ color: C.dim }}>파고 예보 · {data.index!.point}</p><p className="text-[16px] font-semibold tabular-nums">{rangeText(out.wave)}m</p></div>}
+                    {out?.wave && <div className="rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0D" }}><p className="text-[12px] [word-break:keep-all]" style={{ color: C.dim }}>파고 예보 · {indexPointLabel(data.index!.point)}</p><p className="text-[16px] font-semibold tabular-nums">{rangeText(out.wave)}m</p></div>}
                     {out?.wind && <div className="rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0D" }}><p className="text-[12px]" style={{ color: C.dim }}>바람 예보</p><p className="text-[16px] font-semibold tabular-nums">{rangeText(out.wind)}m/s</p></div>}
                 </section>
             )}
             {data?.index && data.index.rows.length > 0 && (
                 <section className="px-5 pt-6" data-testid="port-index">
-                    <h2 className="mb-2.5 text-[17px] font-semibold">바다낚시지수 <span className="text-[13px] font-normal" style={{ color: C.dim }}>{data.index.point}({data.index.km}km) · 국립해양조사원</span></h2>
+                    <h2 className="mb-2.5 text-[17px] font-semibold [word-break:keep-all]">바다낚시지수 <span className="text-[13px] font-normal" style={{ color: C.dim }}>{indexPointLabel(data.index.point)} 지점(여기서 {data.index.km}km) · 국립해양조사원</span></h2>
                     <div className="flex flex-wrap gap-1.5">{[...new Set(data.index.rows.map((r) => r.fish))].slice(0, 8).map((f) => { const am = data.index!.rows.find((r) => r.fish === f && r.part === "오전")?.index, pm = data.index!.rows.find((r) => r.fish === f && r.part === "오후")?.index; return <span key={f} className="rounded-full px-3 py-1.5 text-[13px]" style={{ background: "#FFFFFF0F" }}>{f === "기타어종" ? "그 밖의 어종" : f} <span className="tabular-nums" style={{ color: C.soft }}>{[am, pm].filter(Boolean).join(" → ")}</span></span>; })}</div>
                 </section>
             )}
