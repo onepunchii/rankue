@@ -136,7 +136,14 @@ export default function HiqGolfRanking() {
     };
 
     const views: Array<"players" | "nations" | "stats"> = ["players", meta.world ? "nations" : "stats"];
-    const editionLabel = data?.edition ? t("golf.asOf").replace("{date}", data.edition) : "";
+    // 기준일은 말로("10월 11일") — "2026-10-11"은 줄 끝에서 "2026-10-/11"로 끊겼다(2026-10-19)
+    const editionDay = (() => {
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(data?.edition ?? "");
+        if (!m) return data?.edition ?? "";
+        if (locale === "ko") return `${Number(m[2])}월 ${Number(m[3])}일`;
+        try { return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", timeZone: "UTC" }).format(new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00Z`)); } catch { return data?.edition ?? ""; }
+    })();
+    const editionLabel = data?.edition ? t("golf.asOf").replace("{date}", editionDay) : "";
     const valueLabel = t(meta.valueLabelKey);
 
     return (
