@@ -37,6 +37,13 @@ const REGION_BY_SIDO = new Map<string, HikingRegionId>(HIKING_REGIONS.flatMap((r
 export const hikingRegionOf = (sido: string | null | undefined): HikingRegionId | null => (sido ? REGION_BY_SIDO.get(sido) ?? null : null);
 export const hikingRegion = (id: string | null | undefined): HikingRegion | undefined => HIKING_REGIONS.find((r) => r.id === id);
 
+/**
+ * 산 이름에서 정상 표지 설명을 뗀다(2026-10-19) — 받은 자료가 "검마산(정상안내판)" · "내대암봉(삼각점)" · "화산(종이표지)"처럼
+ * 표지를 이름 칸에 적었다(검마산 페이지는 이번 주에도 검색으로 다섯 명이 들어왔다). 다른 이름("금정봉(쇠미산)")은 그대로 둔다.
+ */
+const MARKER_NOTE = /\s*\((?:정상)?\s*(?:안내판|삼각점|종이\s*표지|표지석|정상석|표지판|이정표)\)\s*$/u;
+export const hikingDisplayName = (raw: string): string => String(raw ?? "").replace(MARKER_NOTE, "").trim() || String(raw ?? "");
+
 /** 시도의 짧은 이름 — "강원특별자치도" → "강원" */
 const SIDO_SHORT: Readonly<Record<string, string>> = {
     서울특별시: "서울", 경기도: "경기", 인천광역시: "인천", 강원특별자치도: "강원", 충청북도: "충북", 충청남도: "충남", 대전광역시: "대전", 세종특별자치시: "세종",
@@ -44,7 +51,9 @@ const SIDO_SHORT: Readonly<Record<string, string>> = {
 };
 export const sidoShort = (sido: string | null | undefined): string => (sido ? SIDO_SHORT[sido] ?? sido : "");
 /** "강원 양양군" — 산이 있는 곳 한 줄 */
-export const mountainPlace = (m: { sido?: string | null; sigungu?: string | null }): string => [sidoShort(m.sido), m.sigungu ?? ""].filter(Boolean).join(" ");
+/** 시군구를 읽히게 — 받은 자료는 "전주시완산구" · "용인시처인구"처럼 붙여 적었다(산 280곳쯤, 2026-10-19) → "전주시 완산구". 보이는 글에만 쓴다(맞춰 보는 셈은 받은 값 그대로) */
+export const sigunguText = (raw: string | null | undefined): string => String(raw ?? "").trim().replace(/^(.{1,3}?시)(?=[^\s].*[구군]$)/u, "$1 ");
+export const mountainPlace = (m: { sido?: string | null; sigungu?: string | null }): string => [sidoShort(m.sido), sigunguText(m.sigungu)].filter(Boolean).join(" ");
 
 // ── 목록 ──────────────────────────────────────────────────────────
 export type HikingListId = "kfs100" | "kfs100plus" | "nationalparks" | "provincialparks" | "highest50";

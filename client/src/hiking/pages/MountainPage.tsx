@@ -19,7 +19,7 @@ import { LucideChevronDown, LucideLocateFixed, LucideShare2 } from "@/lib/icons"
 import { useSeo } from "@/hooks/useSeo";
 import { useToast } from "@/hooks/use-toast";
 import { hikingMountainCardUrl } from "@shared/ogCards";
-import { heightText, hikingMountainPath, hikingRegion, hikingRegionPath, mountainPlace } from "@shared/hikingMountains";
+import { heightText, hikingMountainPath, hikingRegion, hikingRegionPath, mountainPlace, sigunguText } from "@shared/hikingMountains";
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "@shared/hikingGuide";
 import { HIKING_POI_NAME, HIKING_POI_ORDER, dedupeCoursePois, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
 import { SURFACE_COPY, surfaceNote, surfaceShares } from "@shared/hikingSurface";
@@ -338,7 +338,7 @@ export default function MountainPage() {
     const seo = useMemo(() => {
         if (!d) return null;
         const s = mountainSeo(d);
-        const where = [d.sido, d.sigungu].filter(Boolean).join(" ");
+        const where = [d.sido, sigunguText(d.sigungu)].filter(Boolean).join(" ");
         // 검색용 화면의 Mountain 과 같은 사실(이름 · 자리 · 높이 · 시도/시군구)에 '어디에 든 산인가'를 보탠다.
         // 그림(image)은 넣지 않는다 — 권역 카드는 장식이지 이 산의 모습이 아니다
         const jsonLd: Record<string, unknown> = {

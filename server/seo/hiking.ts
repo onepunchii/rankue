@@ -14,7 +14,7 @@ const withCard = (body: string, card: { url: string; width: number; height: numb
     card ? body.replace("</h1>", `</h1>\n  <img src="${esc(card.url)}" width="${card.width}" height="${card.height}" alt="${esc(card.alt)}" loading="eager">`) : body;
 import { entry } from "../sitemap.js";
 import type { MountainDetail, MountainSummary } from "../storage/hiking.js";
-import { HIKING_GROUPS, HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, heightText, hikingGroup, hikingRegion, inHikingGroup, mountainPlace } from "../../shared/hikingMountains.js";
+import { HIKING_GROUPS, HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, heightText, hikingGroup, hikingRegion, inHikingGroup, mountainPlace, sigunguText } from "../../shared/hikingMountains.js";
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "../../shared/hikingGuide.js";
 import { HIKING_POI_NAME, hikingPoiTitle, type HikingPoiKind } from "../../shared/hikingPois.js";
 import { SURFACE_COPY, surfaceShares } from "../../shared/hikingSurface.js";
@@ -150,7 +150,7 @@ function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: n
         return `      <li><strong>${esc(`코스 ${c.seq}`)}</strong> — ${esc(bits.join(" · "))}${c.via ? ` ${esc(courseViaNote(c.via))}` : ""}</li>`;
     });
     // 위치 — 화면의 '위치 · 들머리' 구역과 같은 말(시도 · 시군구 · 동)
-    const where = [d.sido, d.sigungu, d.dong].filter(Boolean).join(" ");
+    const where = [d.sido, sigunguText(d.sigungu), d.dong].filter(Boolean).join(" ");
     // 가까운 산의 방향 — 화면의 판(가운데가 이 산)이 보여 주는 것을 글로
     const dirOf = (m: { lat: number | null; lng: number | null }) => (d.lat != null && d.lng != null && m.lat != null && m.lng != null ? `${compass8(bearingDeg(d.lat, d.lng, m.lat, m.lng))}쪽 ` : "");
     const named = NAMED_KINDS.map((k) => ({ k, items: d.pois.filter((p) => p.kind === k).map((p) => hikingPoiTitle(p)).filter((t, i, a) => a.indexOf(t) === i).slice(0, NAMED_MAX) })).filter((x) => x.items.length > 0);

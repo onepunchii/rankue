@@ -14,6 +14,7 @@ import { distM, type LinePoint } from "../../shared/hikingGeo.js";
 import type { HikingPoiKind } from "../../shared/hikingPois.js";
 import { readSurface, type CourseSurface } from "../../shared/hikingSurface.js";
 import { hikingFeaturesOf } from "../../shared/hikingFeatures.js";
+import { hikingDisplayName } from "../../shared/hikingMountains.js";
 
 export interface MountainSummary {
     id: string;
@@ -82,7 +83,7 @@ const num = (v: unknown): number | null => (v == null ? null : Number(v));
 const toSummary = (r: any): MountainSummary => {
     const lists: { list: string; no: number | null }[] = Array.isArray(r.lists) ? r.lists : [];
     return {
-        id: r.id, slug: r.slug, name: r.name, heightM: num(r.height_m), lat: num(r.lat), lng: num(r.lng), region: r.region ?? null, sido: r.sido ?? null, sigungu: r.sigungu ?? null,
+        id: r.id, slug: r.slug, name: hikingDisplayName(r.name), heightM: num(r.height_m), lat: num(r.lat), lng: num(r.lng), region: r.region ?? null, sido: r.sido ?? null, sigungu: r.sigungu ?? null,
         tier: Number(r.tier), lists: lists.map((l) => l.list), kfsNo: lists.find((l) => l.list === "kfs100")?.no ?? null, traits: Array.from(new Set([...(Array.isArray(r.traits) ? r.traits : []), ...hikingFeaturesOf(r.id)])),
         courses: Number(r.course_count ?? 0), minKm: num(r.course_min_km), maxKm: num(r.course_max_km), hasGuide: !!r.has_guide, subtitle: r.subtitle ?? null,
     };
