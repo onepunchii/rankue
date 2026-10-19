@@ -48,7 +48,9 @@ export default function CrewHallOfFame() {
     // 3쿠션 왕·4구 왕은 당구 전용이다. 골프 크루는 대회 자체를 안 열므로 이 화면도 없다.
     // (홈에서 진입로는 감췄지만 주소로 들어올 수 있어 여기서도 막는다, 2026-09-09)
     const isGolfCrew = crewData?.crew?.sportCategory === "GOLF";
-    const back = () => setLocation(`/crew/${id}/tournament`);
+    // 뒤로 = 온 곳으로. 예전엔 늘 대회 목록을 새로 쌓아서, 대회 목록 → 명예의 전당 → (뒤로) 대회 목록 → (밀어서 뒤로) 명예의 전당 …
+    // 두 화면 사이를 오가며 빠져나가지 못했다(2026-10-18 크루장 기록 — 30초 동안 여덟 번 오감). 주소로 바로 들어왔으면 대회 목록으로.
+    const back = () => (window.history.length > 1 ? window.history.back() : setLocation(`/crew/${id}/tournament`));
     useEffect(() => { if (isGolfCrew) setLocation(`/crew/${id}`, { replace: true }); }, [isGolfCrew, id, setLocation]);
 
     // 종목별 왕 — 그 종목에서 우승이 가장 많은 사람. 3쿠션과 4구는 실력 스케일이 달라

@@ -129,7 +129,9 @@ export function evaluateShot(
             return outcome("point", unit, true, false, walk);
         }
         if (walk.contacts.length === 1) return outcome("miss-one-ball", 0, false, true, walk);
-        return outcome("miss-no-contact", 0, false, true, walk);
+        // 아무 공도 못 맞히면(헛치기) 4구에서는 벌점이다 — 상대 공을 맞힌 파울과 같은 감점(−pointUnit × foulPenaltyUnits).
+        // 예전엔 0점 미스로 넘어가 "공을 하나도 못 맞혔는데 벌점이 안 붙는다"(2026-10-19 오너 신고). 3쿠션은 그대로 미스.
+        return outcome("foul-no-contact", -unit * rules.foulPenaltyUnits, false, true, walk);
     }
 
     // 3쿠션

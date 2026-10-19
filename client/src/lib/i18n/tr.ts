@@ -2367,6 +2367,7 @@ const tr: Dict = {
   "sim.outcome.missCushions": "Bant eksik · {n} bant",
   "sim.outcome.missFinish": "Bitiş kuralı sağlanmadı · sayı yok",
   "sim.outcome.foulOpponent": "Faul · rakip topa değdi",
+  "sim.outcome.foulNoContact": "Faul · hiçbir topa değmedi",
   "sim.outcome.foulTruncated": "Vuruş geçersiz · hesap sınırı",
   "sim.outcome.foulOpening": "Faul · açılış vuruşunda önce kırmızı top",
   "sim.outcome.foulTimeout": "Süre doldu · devre geçer",

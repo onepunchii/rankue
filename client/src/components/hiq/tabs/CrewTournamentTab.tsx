@@ -242,11 +242,15 @@ function TournamentDetail({ crewId, tournamentId, isAdmin, me, history, onBack }
     const { data, isLoading, isError, error, refetch } = useQuery<Detail>({
         queryKey: [key],
         refetchOnMount: "always",
-        // 대진이 나온 뒤에는 남의 경기 결과가 계속 바뀐다. 화면이 숨겨지면(백그라운드) react-query 가 알아서 멈춘다.
+        // 남이 바꾸는 화면이다 — 접수 중에는 남의 참가 신청, 대진이 나온 뒤에는 남의 경기 결과.
+        // 예전엔 접수 중에 다시 받지 않아, 크루장이 참가 신청하고 상대를 기다리면 상대가 들어와도 '참가자 1'에 멈춰
+        // '대진 짜기'가 영영 안 떴다 → "대회를 만들면 화면이 먹통"(2026-10-19 신고 — 크루장이 매번 앱을 껐다 켜서 넘어갔다).
+        // 화면이 숨겨지면(백그라운드) react-query 가 알아서 멈춘다. 앱으로 돌아오면(카톡으로 상대를 부르고 온 길) 바로 다시 받는다.
         refetchInterval: (q) => {
             const st = (q.state.data as Detail | undefined)?.tournament.status;
-            return st === "drawn" || st === "ongoing" ? 15_000 : false;
+            return st === "recruiting" ? 5_000 : st === "drawn" || st === "ongoing" ? 10_000 : false;
         },
+        refetchOnWindowFocus: true,
         // 없는 대회(404)는 다시 물어봐도 없다.
         retry: (n, err: any) => err?.status !== 404 && n < 1,
     });

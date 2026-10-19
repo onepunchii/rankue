@@ -132,6 +132,16 @@ describe("4구 판정 (국내 관행)", () => {
         const heavy: Rules = { ...DEFAULT_4C_RULES, gameType: "4c", foulPenaltyUnits: 2 };
         expect(evaluateShot([bb("white", "yellow")], "white", heavy).points).toBe(-20);
     });
+    it("아무 공도 못 맞히면(헛치기) 벌점 — 상대 공 파울과 같은 감점(2026-10-19 오너 신고)", () => {
+        // 쿠션만 돌고 끝 — 예전엔 0점 미스였다
+        const o = evaluateShot([tr("white"), cu("white"), cu("white", "top"), cu("white", "right")], "white", DEFAULT_4C_RULES);
+        expect(o).toMatchObject({ code: "foul-no-contact", points: -10, scored: false, consumesInning: true });
+        const heavy: Rules = { ...DEFAULT_4C_RULES, gameType: "4c", foulPenaltyUnits: 2 };
+        expect(evaluateShot([tr("white"), cu("white")], "white", heavy).points).toBe(-20);
+        // 한 공만 맞히면 벌점 없는 미스 그대로, 3쿠션의 헛치기도 그대로 미스
+        expect(evaluateShot([bb("white", "red1"), cu("white")], "white", DEFAULT_4C_RULES)).toMatchObject({ code: "miss-one-ball", points: 0 });
+        expect(evaluateShot([tr("white"), cu("white")], "white", DEFAULT_3C_RULES)).toMatchObject({ code: "miss-no-contact", points: 0 });
+    });
 });
 
 describe("3쿠션 개시 샷(UMB: 빨간 공 먼저)", () => {

@@ -2367,6 +2367,7 @@ const en: Dict = {
   "sim.outcome.missCushions": "Not enough cushions · {n} cushions",
   "sim.outcome.missFinish": "Finish rule not met · no point",
   "sim.outcome.foulOpponent": "Foul · touched the opponent's ball",
+  "sim.outcome.foulNoContact": "Foul · didn't hit any ball",
   "sim.outcome.foulTruncated": "Shot void · calculation limit",
   "sim.outcome.foulOpening": "Foul · opening shot must hit the red first",
   "sim.outcome.foulTimeout": "Time out · inning passes",

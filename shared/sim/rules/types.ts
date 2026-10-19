@@ -40,6 +40,7 @@ export type ShotOutcomeCode =
     | "miss-one-ball"    // 한 공만 맞힘
     | "miss-cushions"    // 3쿠션: 두 공 다 맞혔지만 쿠션 부족
     | "foul-opponent"    // 4구: 상대 큐볼 접촉
+    | "foul-no-contact"  // 4구: 아무 공도 못 맞힘(헛치기) — 상대 공 파울과 같은 감점(2026-10-19 오너 신고)
     | "miss-finish"      // 마무리 규칙(마지막 점수는 3쿠션/뱅크) 미충족 → 무득점
     | "foul-truncated"   // 물리 이벤트 상한 초과 → 샷 무효
     | "foul-opening"     // 3쿠션 개시 샷: 첫 접촉이 빨간 공이 아님(UMB 개시 규칙) → 무득점·이닝 소모

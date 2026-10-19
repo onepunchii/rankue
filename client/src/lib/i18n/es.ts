@@ -2367,6 +2367,7 @@ const es: Dict = {
   "sim.outcome.missCushions": "Faltan bandas · {n} bandas",
   "sim.outcome.missFinish": "Regla de cierre no cumplida · sin punto",
   "sim.outcome.foulOpponent": "Falta · tocó la bola del rival",
+  "sim.outcome.foulNoContact": "Falta · no tocó ninguna bola",
   "sim.outcome.foulTruncated": "Tiro anulado · límite de cálculo",
   "sim.outcome.foulOpening": "Falta · el saque debe tocar primero la roja",
   "sim.outcome.foulTimeout": "Tiempo agotado · pasa la entrada",
