@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
+import { UmbEventMap } from "@/components/hiq/umb/UmbEventMap";
 import { useT } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
 import { LucideChevronLeft, LucideSearch, LucideTrendingUp } from "@/lib/icons";
@@ -238,6 +239,12 @@ export default function HiqWorldRanking() {
                         })}
                     </div>
                 </div>
+            )}
+
+            {/* 이번 랭킹에 들어간 대회 — 세계 지도 한 장(2026-10-19). 레전드의 대회만(다음 일정은 레전드에 없다) */}
+            {calendar.length > 0 && !q && !krOnly && (
+                <UmbEventMap events={calendar} locale={locale}
+                    copy={{ title: t("umb.mapTitle"), sub: (n) => t("umb.mapSub").replace("{n}", String(n)), latest: t("umb.mapLatest"), worldcup: t("umb.kindWorldcup"), championship: t("umb.kindChampionship") }} />
             )}
 
             {/* ─── 국가 랭킹 보기 ─── */}
