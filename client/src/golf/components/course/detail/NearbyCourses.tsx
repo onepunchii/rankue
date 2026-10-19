@@ -8,6 +8,9 @@ import { Link, useLocation } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
 import { cityShort, coursePath, manwonText } from "@shared/golfCourse";
 import type { CourseDetail } from "@/golf/lib/courseApi";
+
+/** 1km 안은 같은 리조트의 다른 코스 페이지('설해원 더 레전드 코스' 0km, 2026-10-19) — '0km'는 틀린 값처럼 읽힌다 */
+const SAME_SPOT = "같은 자리";
 import { Card, Section } from "./ui";
 
 type Near = CourseDetail["nearby"][number];
@@ -162,7 +165,7 @@ export function NearbyCourses({ items, lat, lng }: { items: Near[]; lat: number 
                                         {/* 자리 · 거리 · 홀은 덩어리 사이에서만 줄바꿈, 회원권 시세는 이름표를 붙여 아래 줄에(2026-10-17 리뷰:
                                             오른쪽의 '2억 6,500만원'이 무엇인지 안 적혀 있었고, 그 칸에 밀려 "진천 · 11.9k…" 로 잘렸다) */}
                                         <span className="mt-0.5 flex flex-wrap gap-x-1 text-[12.5px] text-[#FFFFFF80] tabular-nums">
-                                            {(() => { const f = [cityShort(n.city), n.km != null ? `${n.km}km` : "", n.holes ? `${n.holes}홀` : ""].filter(Boolean); return f.map((x, i) => <span key={i} className="whitespace-nowrap">{x}{i < f.length - 1 ? " ·" : ""}</span>); })()}
+                                            {(() => { const f = [cityShort(n.city), n.km != null ? (n.km < 1 ? SAME_SPOT : `${n.km}km`) : "", n.holes ? `${n.holes}홀` : ""].filter(Boolean); return f.map((x, i) => <span key={i} className="whitespace-nowrap">{x}{i < f.length - 1 ? " ·" : ""}</span>); })()}
                                         </span>
                                         {n.price && <span className="mt-0.5 block text-[12.5px] text-[#FFFFFF99] tabular-nums" data-testid="near-membership">회원권 {manwonText(n.price.price)}</span>}
                                     </span>
