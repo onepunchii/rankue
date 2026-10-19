@@ -8,7 +8,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
+import { storeAreasKo, storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
 import { storeCardUrl } from "@shared/ogCards";
 import { LucidePhone, LucideMapPin, LucideShare2 } from "@/lib/icons";
 import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
@@ -310,6 +310,11 @@ export default function StoreListingPage() {
 
   // 요금 행 — [종류, 10분당, 정액] (있는 값만)
   const won = (n: number) => `${n.toLocaleString("ko-KR")}${locale === "ko" ? t.won : ""}`;
+  const heroArea = (() => {
+    if (!s) return "";
+    const a = locale === "ko" && s.address ? storeAreasKo(s.address, s.region)[0] : null;
+    return !a ? s.region : a.startsWith(s.region) ? a : `${s.region} ${a}`;
+  })();
   const rateRows = s ? [
     [t.large, s.rate10Large, s.flatLarge],
     [t.medium, s.rate10Medium, s.flatMedium],
@@ -347,7 +352,8 @@ export default function StoreListingPage() {
                     {s.claimed ? t.verified : t.unverified}
                   </span>
                 </div>
-                <p className="text-[14px] text-[#FFFFFFD9] font-semibold mt-1">{s.region}</p>
+                {/* 동네까지(2026-10-19 — '경기'만 적혀 제목의 '평택 비전동'보다 덜 알려 줬다). 제목과 같은 함수, 한국어만(동네 이름이 한국어라) */}
+                <p className="text-[14px] text-[#FFFFFFD9] font-semibold mt-1">{heroArea}</p>
               </div>
             </header>
 
