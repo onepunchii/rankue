@@ -68,3 +68,11 @@ describe("수조에서 빼기 · 지도 · 팝업(2026-10-18 오너 낚시 UX)",
         expect(page).toContain("getDevicePosition({ prompt: true, highAccuracy: false");
     });
 });
+
+describe("홈의 작은 수조 — 스크롤하려고 손만 대도 넘어가던 것(2026-10-19 오너 신고)", () => {
+    it("누름은 click 으로 받는다(손가락이 닿는 순간이 아니라 뗐을 때 · 스크롤로 바뀌지 않은 짧은 누름에만)", () => {
+        const s = fs.readFileSync(new URL("../client/src/fishing/FishingAquarium.tsx", import.meta.url), "utf8");
+        expect(s).toContain("<canvas ref={cv} onClick={tap}");
+        expect(s).not.toContain("onPointerDown={tap}");
+    });
+});

@@ -96,7 +96,10 @@ export function FishingAquarium({ fish, seals, placed, onFish, mini = false, onO
 
     useEffect(() => { engineRef.current?.setDecor(placed ?? {}); }, [placed]);
 
-    const tap = (e: React.PointerEvent<HTMLCanvasElement>) => {
+    // 누름은 click 으로 받는다 — 예전엔 pointerdown(손가락이 닿는 순간)이라, 화면을 밀어 내리려고 수조 위에 손만 대도
+    // 수족관으로 넘어가거나 먹이가 뿌려졌다(2026-10-19 오너: "살짝만 터치해도 바로 이동 · 드래그나 스크롤에도").
+    // click 은 손을 뗐을 때, 그사이 스크롤로 바뀌지 않은 짧은 누름에만 온다. 전체 화면 수조(TankFull)는 따로 8px · 450ms 로 가른다.
+    const tap = (e: React.MouseEvent<HTMLCanvasElement>) => {
         // 홈의 작은 수조 — 물고기를 누르면 그 어종의 한 장(내 사진 · 기록), 물을 누르면 수족관으로(2026-10-18 오너: "물고기 눌렀을 때 내가 등록했던 사진")
         const engine = engineRef.current;
         if (!engine) { if (mini) onOpen?.(); return; }
@@ -123,7 +126,7 @@ export function FishingAquarium({ fish, seals, placed, onFish, mini = false, onO
     return (
         <div ref={box} className={mini ? "relative h-[150px] w-full overflow-hidden rounded-2xl" : "relative h-[58vh] max-h-[480px] min-h-[320px] w-full overflow-hidden rounded-2xl"}
             style={{ boxShadow: night ? "inset 0 0 0 1px #FFFFFF14" : "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }} data-testid={mini ? "fishing-tank-mini" : "fishing-tank"} data-mode={mode}>
-            <canvas ref={cv} onPointerDown={tap} className="block h-full w-full cursor-pointer" role="img" aria-label={`내 수족관 — ${names}${sample ? " (예시)" : ""}`} />
+            <canvas ref={cv} onClick={tap} className="block h-full w-full cursor-pointer" role="img" aria-label={`내 수족관 — ${names}${sample ? " (예시)" : ""}`} />
             {!mini && (
                 <>
                     {onFull && (
