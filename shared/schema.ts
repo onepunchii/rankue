@@ -1888,6 +1888,15 @@ export const storeListings = pgTable("store_listings", {
   claimed: boolean("claimed").default(false).notNull(), // 사장님 인증 완료 여부
   claimedStoreId: uuid("claimed_store_id"), // 인증 시 연결되는 제휴 매장(hiqStores)
   description: text("description"), // 사장님 인증 후 직접 작성
+  // 인허가 자료(2026-10-19 — migrations/store_listings_gov.sql · shared/billiardHalls). 'gov' 행은 인허가 자료로만 들어온 곳
+  source: text("source").default("collected").notNull(),
+  govKey: text("gov_key"),
+  govLat: doublePrecision("gov_lat"),
+  govLng: doublePrecision("gov_lng"),
+  licenseDate: date("license_date"),
+  govStatus: text("gov_status"),
+  govClosedDate: date("gov_closed_date"),
+  govCheckedAt: timestamp("gov_checked_at"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 }, (table) => [

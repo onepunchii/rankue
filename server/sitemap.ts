@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { storage } from "./storage/index.js";
 import { db } from "./db.js";
 import { storeListings } from "../shared/schema.js";
+import { LISTING_BASIC, LISTING_LIVE } from "./storage/listingSql.js";
 import { hreflangOf } from "../shared/aboutContent.js";
 import { asc, sql } from "drizzle-orm";
 import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.js";
@@ -120,7 +121,7 @@ async function coreParts(): Promise<string[]> {
   // 매장 지역 허브 — "서울 당구장"류 로컬 검색 타깃이자 디렉토리 1,195곳으로 가는 내부 링크 층.
   try {
     const regions = await db.select({ region: storeListings.region, n: sql<number>`count(*)::int` })
-      .from(storeListings).groupBy(storeListings.region).orderBy(sql`count(*) DESC`);
+      .from(storeListings).where(LISTING_LIVE).groupBy(storeListings.region).orderBy(sql`count(*) DESC`);
     for (const r of regions) if (r.region) parts.push(entry(`${ORIGIN}/stores?region=${encodeURIComponent(r.region)}`, { changefreq: "weekly", priority: "0.6" }));
   } catch (e) {
     console.warn("[sitemap] regions failed:", (e as Error)?.message);
@@ -216,8 +217,9 @@ async function golfParts(): Promise<string[]> {
 async function storeParts(): Promise<string[]> {
   const parts: string[] = [];
   try {
+    // 인허가 자료로만 들어온 얇은 매장 · 폐업한 곳은 사이트맵에 넣지 않는다(2026-10-19 — 페이지는 noindex, storage/listingSql)
     const listings = await db.select({ code: storeListings.code, updatedAt: storeListings.updatedAt })
-      .from(storeListings).orderBy(asc(storeListings.code));
+      .from(storeListings).where(sql`not ${LISTING_BASIC} and ${LISTING_LIVE}`).orderBy(asc(storeListings.code));
     // 이미지 사이트맵 = 매장 카드(2026-09-30) — 페이지 대표 이미지와 같은 주소
     for (const l of listings) parts.push(entry(`${ORIGIN}/stores/${l.code}`, { changefreq: "monthly", priority: "0.4", lastmod: l.updatedAt, image: storeCardUrl(ORIGIN, l.code) }));
   } catch (e) {

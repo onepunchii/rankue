@@ -109,6 +109,25 @@ router.post("/golf-round-eve", asyncHandler(handleGolfRoundEve));
 router.get("/hiking-eve", asyncHandler(handleHikingEve));
 router.post("/hiking-eve", asyncHandler(handleHikingEve));
 
+// 전국 당구장 인허가 자료(2026-10-19) — 최근 사흘 사이 바뀐 줄만: 새로 연 곳은 넣고, 폐업 · 휴업은 상태만(services/billiardHalls). ?dry=1 이면 쓰지 않고 셈만
+async function handleBilliardHalls(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { recordCronRun, errorText } = await import("../../storage/cronRuns.js");
+    try {
+        const { syncBilliardHalls } = await import("../../services/billiardHalls.js");
+        const r = await syncBilliardHalls("recent", Date.now(), { dry: req.query.dry === "1" });
+        await recordCronRun("billiard_halls", !r.error, r);
+        return sendSuccess(res, r);
+    } catch (e) {
+        await recordCronRun("billiard_halls", false, { error: errorText(e) });
+        return sendError(res, 500, "당구장 인허가 자료를 받지 못했어요");
+    }
+}
+router.get("/billiard-halls", asyncHandler(handleBilliardHalls));
+router.post("/billiard-halls", asyncHandler(handleBilliardHalls));
+
 // UMB 세계랭킹 일일 동기화 — 새 회차가 있으면 부문당 최대 2개 적재
 async function handleUmbSync(req: any, res: any) {
     const secret = process.env.CRON_SECRET;

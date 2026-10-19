@@ -8,7 +8,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { storeAreasKo, storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
+import { isBasicListing, licenseSinceKo, storeAreasKo, storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
 import { storeCardUrl } from "@shared/ogCards";
 import { LucidePhone, LucideMapPin, LucideShare2 } from "@/lib/icons";
 import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
@@ -24,6 +24,8 @@ interface Listing {
   rate10Large: number | null; rate10Medium: number | null; rate10Pocket: number | null;
   flatLarge: number | null; flatMedium: number | null; flatPocket: number | null;
   claimed: boolean; description: string | null;
+  /** 인허가 자료(2026-10-19) — 'gov' 는 인허가 자료로만 들어온 매장 */
+  source?: string | null; licenseDate?: string | null; govStatus?: string | null;
   crews?: Array<{ id: string; name: string; emblem: string | null; gameType: string; memberCount: number }>;
   honor?: { founder: string | null; regular: { name: string; games: number } | null } | null;
 }
@@ -31,7 +33,7 @@ interface Listing {
 // 페이지 문구 — 디렉터리는 한국 콘텐츠지만 라벨은 5개 언어 (stores.tsx와 같은 패턴)
 const L: Record<Locale, Record<string, string>> = {
   ko: {
-    back: "매장 찾기", unverified: "수집 정보", verified: "✓ 사장님 인증",
+    back: "매장 찾기", unverified: "수집 정보", verified: "✓ 사장님 인증", govInfo: "인허가 정보", license: "인허가", licenseSource: "행정안전부 인허가 자료",
     address: "주소", phone: "전화", hours: "영업시간", tables: "테이블",
     large: "대대", medium: "중대", pocket: "포켓",
     rates: "요금", per10: "10분당", flat: "정액", won: "원",
@@ -59,7 +61,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "닫기",
   },
   en: {
-    back: "Find a venue", unverified: "Collected info", verified: "✓ Owner verified",
+    back: "Find a venue", unverified: "Collected info", verified: "✓ Owner verified", govInfo: "Public license data", license: "Licensed", licenseSource: "Korean government license data",
     address: "Address", phone: "Phone", hours: "Hours", tables: "Tables",
     large: "Large", medium: "Medium", pocket: "Pocket",
     rates: "Rates", per10: "per 10 min", flat: "Flat rate", won: "₩",
@@ -87,7 +89,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "Close",
   },
   vi: {
-    back: "Tìm quán", unverified: "Thông tin thu thập", verified: "✓ Chủ quán xác nhận",
+    back: "Tìm quán", unverified: "Thông tin thu thập", verified: "✓ Chủ quán xác nhận", govInfo: "Dữ liệu giấy phép", license: "Cấp phép", licenseSource: "Dữ liệu giấy phép của chính phủ Hàn Quốc",
     address: "Địa chỉ", phone: "Điện thoại", hours: "Giờ mở cửa", tables: "Bàn",
     large: "Lớn", medium: "Vừa", pocket: "Pocket",
     rates: "Giá", per10: "mỗi 10 phút", flat: "Trọn gói", won: "₩",
@@ -115,7 +117,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "Đóng",
   },
   tr: {
-    back: "Salon bul", unverified: "Derlenen bilgi", verified: "✓ Sahibi onaylı",
+    back: "Salon bul", unverified: "Derlenen bilgi", verified: "✓ Sahibi onaylı", govInfo: "Resmî ruhsat bilgisi", license: "Ruhsat", licenseSource: "Kore hükümeti ruhsat verisi",
     address: "Adres", phone: "Telefon", hours: "Çalışma saatleri", tables: "Masalar",
     large: "Büyük", medium: "Orta", pocket: "Pocket",
     rates: "Ücretler", per10: "10 dk başına", flat: "Sabit ücret", won: "₩",
@@ -143,7 +145,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "Kapat",
   },
   es: {
-    back: "Buscar local", unverified: "Información recopilada", verified: "✓ Verificado",
+    back: "Buscar local", unverified: "Información recopilada", verified: "✓ Verificado", govInfo: "Datos de licencia", license: "Licencia", licenseSource: "Datos oficiales de licencias de Corea",
     address: "Dirección", phone: "Teléfono", hours: "Horario", tables: "Mesas",
     large: "Grande", medium: "Mediana", pocket: "Pocket",
     rates: "Tarifas", per10: "por 10 min", flat: "Tarifa plana", won: "₩",
@@ -300,6 +302,8 @@ export default function StoreListingPage() {
     // 매장 카드 — 프리렌더(/stores/:code)와 같은 주소(2026-09-30)
     image: s ? storeCardUrl("https://www.rankue.co.kr", s.code ?? code) : undefined,
     jsonLd: s ? { ...storeJsonLd(s), image: storeCardUrl("https://www.rankue.co.kr", s.code ?? code) } : null,
+    // 인허가 자료로만 들어온 얇은 매장은 색인에서 뺀다 — 프리렌더와 같은 규칙(shared/storeMeta isBasicListing)
+    noindex: s ? isBasicListing(s) : false,
   });
 
   const tableRows = s ? [
@@ -349,7 +353,7 @@ export default function StoreListingPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h1 className="text-[26px] font-bold tracking-tight text-[#FFFFFF]">{s.name}</h1>
                   <span className={`px-2 py-1 rounded-full text-[12px] font-bold leading-none ${s.claimed ? "bg-[#FFFFFF] text-brand" : "bg-[#FFFFFF2E] text-[#FFFFFFE6]"}`}>
-                    {s.claimed ? t.verified : t.unverified}
+                    {s.claimed ? t.verified : s.source === "gov" ? t.govInfo : t.unverified}
                   </span>
                 </div>
                 {/* 동네까지(2026-10-19 — '경기'만 적혀 제목의 '평택 비전동'보다 덜 알려 줬다). 제목과 같은 함수, 한국어만(동네 이름이 한국어라) */}
@@ -418,6 +422,13 @@ export default function StoreListingPage() {
                 <div>
                   <p className="text-[12px] font-bold text-black/55">{t.phone}</p>
                   <a href={`tel:${s.phone}`} className="text-[14.5px] font-semibold text-brand mt-0.5 inline-block">{s.phone}</a>
+                </div>
+              )}
+              {/* 인허가 — 행정안전부 인허가 자료의 인허가일(2026-10-19) */}
+              {s.licenseDate && (
+                <div data-testid="listing-license">
+                  <p className="text-[12px] font-bold text-black/55">{t.license}</p>
+                  <p className="text-[14.5px] font-medium mt-0.5">{locale === "ko" ? licenseSinceKo(s.licenseDate) : s.licenseDate.slice(0, 7)} <span className="text-[12px] font-medium text-black/45">· {t.licenseSource}</span></p>
                 </div>
               )}
               {s.openHours && (

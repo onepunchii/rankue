@@ -15,6 +15,8 @@ interface SeoOptions {
   locale?: string;
   image?: string;
   jsonLd?: object | null; // 페이지별 구조화데이터(LocalBusiness 등)
+  /** 검색 색인에서 뺄 화면(2026-10-19 — 인허가 자료로만 들어온 매장). 페이지를 떠나면 원래 값으로 */
+  noindex?: boolean;
 }
 
 function upsertMeta(attr: "name" | "property", key: string, content: string) {
@@ -43,7 +45,7 @@ const PAGE_LD_ID = "page-jsonld";
 // 훅을 조건부로 호출하지 않고도 "아직 정할 수 없음"을 표현할 수 있게 하기 위함이다.
 // 그동안에는 client/index.html 의 기본 메타가 그대로 유지된다.
 export function useSeo(opts: SeoOptions | null) {
-  const { title, description, path, locale = "ko", image, jsonLd } = opts ?? ({} as Partial<SeoOptions>);
+  const { title, description, path, locale = "ko", image, jsonLd, noindex } = opts ?? ({} as Partial<SeoOptions>);
   useEffect(() => {
     if (!title || !description || !path) return;
     const url = ORIGIN + path;
@@ -75,8 +77,12 @@ export function useSeo(opts: SeoOptions | null) {
       s.textContent = JSON.stringify(jsonLd);
       document.head.appendChild(s);
     }
+    const robots = document.head.querySelector<HTMLMetaElement>('meta[name="robots"]');
+    const robotsWas = robots?.getAttribute("content") ?? null;
+    if (noindex) upsertMeta("name", "robots", "noindex, follow");
     return () => {
       document.getElementById(PAGE_LD_ID)?.remove();
+      if (noindex && robotsWas != null) upsertMeta("name", "robots", robotsWas);
     };
-  }, [title, description, path, locale, image, jsonLd]);
+  }, [title, description, path, locale, image, jsonLd, noindex]);
 }

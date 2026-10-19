@@ -89,7 +89,8 @@ describe("매장 상세 '이 근처' 당구대", () => {
     });
     it("상세 화면에 붙어 있다 · 거리순 목록은 좌표를 같이 준다", () => {
         expect(read("client/src/pages/store-listing.tsx")).toContain("<StoreNearTable");
-        expect(read("server/routes/modules/listings.ts")).toContain("...(nearby ? { lat: storeListings.latitude, lng: storeListings.longitude } : {}),");
+        // 2026-10-19 부터 인허가 좌표가 먼저(storage/listingSql LISTING_LAT/LNG)
+        expect(read("server/routes/modules/listings.ts")).toContain("...(nearby ? { lat: LISTING_LAT, lng: LISTING_LNG } : {}),");
     });
 });
 

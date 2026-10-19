@@ -202,3 +202,22 @@ export function mapLink(s: { name: string; address: string; latitude?: number | 
     }
     return `https://map.kakao.com/link/search/${encodeURIComponent(s.name)}`;
 }
+
+/**
+ * 인허가 자료로만 들어온 매장인가(2026-10-19) — 이름 · 주소 · 인허가일뿐이라 페이지가 얇다.
+ * 그런 페이지는 검색 색인에서 빼고(noindex · 사이트맵 제외) 목록에서는 자세한 매장 뒤에 둔다.
+ * 사장님이 인증하거나 요금 · 테이블 · 영업시간이 들어오면 그때부터 색인한다.
+ */
+export function isBasicListing(s: {
+    source?: string | null; claimed?: boolean | null; openHours?: string | null;
+    tableLarge?: number | null; tableMedium?: number | null; tablePocket?: number | null;
+    rate10Large?: number | null; rate10Medium?: number | null; rate10Pocket?: number | null;
+}): boolean {
+    if (s.source !== "gov" || s.claimed) return false;
+    return ![s.openHours, s.tableLarge, s.tableMedium, s.tablePocket, s.rate10Large, s.rate10Medium, s.rate10Pocket].some((v) => v != null && v !== "" && v !== 0);
+}
+/** 인허가일을 말로 — "2015-03-01" → "2015년 3월부터" */
+export const licenseSinceKo = (d: string | null | undefined): string | null => {
+    const m = /^(\d{4})-(\d{2})/.exec(String(d ?? ""));
+    return m ? `${m[1]}년 ${Number(m[2])}월부터` : null;
+};

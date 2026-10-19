@@ -99,6 +99,10 @@
       "schedule": "15 18 * * *"
     },
     {
+      "path": "/api/cron/billiard-halls",
+      "schedule": "20 19 * * *"
+    },
+    {
       "path": "/api/cron/golf-sync?tour=owgr",
       "schedule": "40 21 * * *"
     },

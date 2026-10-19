@@ -1351,15 +1351,17 @@ router.get("/store-search", requireAuth, asyncHandler(async (req: AuthRequest, r
     if (q.length < 2) return sendSuccess(res, []);
     const { db } = await import("../../db.js");
     const { storeListings } = await import("../../../shared/schema.js");
-    const { ilike, or, asc } = await import("drizzle-orm");
+    const { ilike, or, asc, and, sql } = await import("drizzle-orm");
+    const { LISTING_BASIC, LISTING_LIVE } = await import("../../storage/listingSql.js");
     const [partners, listings] = await Promise.all([
         storage.searchStores(q),
         db.select({
             code: storeListings.code, name: storeListings.name,
             region: storeListings.region, address: storeListings.address,
         }).from(storeListings)
-            .where(or(ilike(storeListings.name, `%${q}%`), ilike(storeListings.address, `%${q}%`)))
-            .orderBy(asc(storeListings.name)).limit(15),
+            // 폐업한 인허가 매장은 빼고, 자세한 매장부터(2026-10-19 — 인허가 자료 1만 4천 곳이 더해졌다)
+            .where(and(or(ilike(storeListings.name, `%${q}%`), ilike(storeListings.address, `%${q}%`)), LISTING_LIVE))
+            .orderBy(sql`${LISTING_BASIC} ASC`, asc(storeListings.name)).limit(15),
     ]);
     // 파트너 매장 중 (a) 시스템 매장(hiq·global — 소속 그릇이지 갈 수 있는 매장이 아님)과
     // (b) 디렉토리에 연결된 매장은 제외한다. (b)를 남기면 같은 매장이 두 줄로 뜨고,

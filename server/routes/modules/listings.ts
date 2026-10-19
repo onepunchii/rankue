@@ -2,6 +2,7 @@ import { Router } from "express";
 import { Response } from "express";
 import { db } from "../../db.js";
 import { storeListings, storeListingClaims, storeListingSuggestions, storeRegistrations, hiqCrews, hiqStores } from "../../../shared/schema.js";
+import { LISTING_BASIC, LISTING_LAT, LISTING_LIVE, LISTING_LNG } from "../../storage/listingSql.js";
 import { storage } from "../../storage/index.js";
 import { applicantOf, isContactPhone, type Applicant } from "../../lib/partnerApply.js";
 import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
@@ -77,18 +78,20 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
     const lat = Number(req.query.lat), lng = Number(req.query.lng);
     const nearby = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 
-    const conds: any[] = [];
+    // 인허가 자료로만 들어왔다가 폐업한 곳은 숨긴다(storage/listingSql)
+    const conds: any[] = [LISTING_LIVE];
     if (region) conds.push(eq(storeListings.region, region));
     if (q) conds.push(or(ilike(storeListings.name, `%${q}%`), ilike(storeListings.address, `%${q}%`)));
     const where = conds.length ? and(...conds) : undefined;
 
     // 좌표 없는 행은 거리 계산 불가 — 거리순일 때 목록 끝으로 보낸다
+    // 좌표는 인허가 좌표가 있으면 그것(LISTING_LAT/LNG)
     const distanceKm = nearby
-        ? sql<number | null>`CASE WHEN store_listings.latitude IS NULL THEN NULL ELSE
+        ? sql<number | null>`CASE WHEN ${LISTING_LAT} IS NULL THEN NULL ELSE
             round((6371 * acos(least(1.0,
-                cos(radians(${lat})) * cos(radians(store_listings.latitude)) *
-                cos(radians(store_listings.longitude) - radians(${lng})) +
-                sin(radians(${lat})) * sin(radians(store_listings.latitude)))))::numeric, 1)::float8 END`
+                cos(radians(${lat})) * cos(radians(${LISTING_LAT})) *
+                cos(radians(${LISTING_LNG}) - radians(${lng})) +
+                sin(radians(${lat})) * sin(radians(${LISTING_LAT})))))::numeric, 1)::float8 END`
         : sql<number | null>`NULL`;
 
     const [rows, [{ total }], regions] = await Promise.all([
@@ -98,17 +101,19 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
             tableLarge: storeListings.tableLarge, tableMedium: storeListings.tableMedium, tablePocket: storeListings.tablePocket,
             rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium,
             claimed: storeListings.claimed,
+            source: storeListings.source, licenseDate: storeListings.licenseDate,
             distanceKm,
             // 거리순일 때만 좌표를 같이 — 매장 상세의 '이 근처' 당구대가 가까운 다섯 곳을 번호 공으로 찍는다(2026-10-17)
-            ...(nearby ? { lat: storeListings.latitude, lng: storeListings.longitude } : {}),
+            ...(nearby ? { lat: LISTING_LAT, lng: LISTING_LNG } : {}),
         }).from(storeListings).where(where)
+            // 거리순이 아니면 자세한 매장(요금 · 테이블 · 인증)부터 — 인허가 자료로만 들어온 1만 4천 곳이 앞을 덮지 않게
             .orderBy(...(nearby
                 ? [sql`${distanceKm} ASC NULLS LAST`]
-                : [asc(storeListings.name)]))
+                : [sql`${LISTING_BASIC} ASC`, asc(storeListings.name)]))
             .limit(limit).offset(offset),
         db.select({ total: sql<number>`count(*)::int` }).from(storeListings).where(where),
         db.select({ region: storeListings.region, count: sql<number>`count(*)::int` })
-            .from(storeListings).groupBy(storeListings.region).orderBy(sql`count(*) DESC`),
+            .from(storeListings).where(LISTING_LIVE).groupBy(storeListings.region).orderBy(sql`count(*) DESC`),
     ]);
     return sendSuccess(res, { total, rows, regions });
 }));
@@ -119,7 +124,7 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
 let dotsCache: { at: number; data: StoreDotsWire } | null = null;
 router.get("/dots", asyncHandler(async (_req: any, res: Response) => {
     if (!dotsCache || Date.now() - dotsCache.at > 30 * 60_000) {
-        const rows = await db.select({ lat: storeListings.latitude, lng: storeListings.longitude, region: storeListings.region }).from(storeListings);
+        const rows = await db.select({ lat: LISTING_LAT, lng: LISTING_LNG, region: storeListings.region }).from(storeListings).where(LISTING_LIVE);
         dotsCache = { at: Date.now(), data: packStoreDots(rows) };
     }
     return sendSuccess(res, dotsCache.data);
@@ -136,7 +141,9 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
         claimed: storeListings.claimed, description: storeListings.description,
         // 좌표 — 길찾기 버튼과 LocalBusiness geo(로컬 검색 노출)에 쓴다. 이미 공개된 주소의 좌표라
         // 새로 노출되는 개인정보는 없다.
-        latitude: storeListings.latitude, longitude: storeListings.longitude,
+        latitude: LISTING_LAT, longitude: LISTING_LNG,
+        // 인허가 자료(2026-10-19) — 어디서 온 매장인지 · 인허가일 · 영업상태(화면의 '인허가 정보' 줄 · 얇은 매장은 noindex)
+        source: storeListings.source, licenseDate: storeListings.licenseDate, govStatus: storeListings.govStatus,
         claimedStoreId: storeListings.claimedStoreId, // 내부용 — 응답에서 제거
     }).from(storeListings).where(eq(storeListings.code, req.params.code));
     if (!row) return sendError(res, 404, "매장을 찾을 수 없습니다");

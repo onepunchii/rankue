@@ -3,13 +3,15 @@ import { storage } from "./storage/index.js";
 import { db } from "./db.js";
 import { cleanInviteCode } from "../shared/invite.js";
 import { storeListings } from "../shared/schema.js";
+import { LISTING_BASIC, LISTING_LAT, LISTING_LIVE, LISTING_LNG } from "./storage/listingSql.js";
+import { BILLIARD_HALL_SOURCE } from "../shared/billiardHalls.js";
 import { nearRateCompare } from "../shared/storeNearRates.js";
 import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../shared/aboutContent.js";
 import { DOC_META } from "../shared/docMeta.js";
 import { absoluteLogoUrl } from "../shared/golfLogo.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
-import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo } from "../shared/storeMeta.js";
+import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo, isBasicListing, licenseSinceKo } from "../shared/storeMeta.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
 import { cardAlt, hubCard } from "../shared/ogCards.js";
@@ -2551,7 +2553,7 @@ ${list}
       ? `<strong>${esc(r.region)}</strong>`
       : `<a href="/stores?region=${esc(encodeURIComponent(r.region))}">${esc(r.region)} 당구장</a>`} (${r.n.toLocaleString("ko-KR")})</li>`).join("")}</ul>`;
   const listRegions = () => db.select({ region: storeListings.region, n: sql<number>`count(*)::int` })
-    .from(storeListings).groupBy(storeListings.region).orderBy(sql`count(*) DESC`);
+    .from(storeListings).where(LISTING_LIVE).groupBy(storeListings.region).orderBy(sql`count(*) DESC`);
 
   app.get("/stores", async (req, res, next) => {
     if (!isBot(req)) return next();
@@ -2567,9 +2569,10 @@ ${list}
         db.select({
           code: storeListings.code, name: storeListings.name,
           region: storeListings.region, address: storeListings.address,
-        }).from(storeListings).where(regionQ ? eq(storeListings.region, regionQ) : undefined)
-          .orderBy(asc(storeListings.name)).limit(regionQ ? 400 : 30),
-        db.select({ total: sql<number>`count(*)::int` }).from(storeListings),
+        }).from(storeListings).where(regionQ ? and(eq(storeListings.region, regionQ), LISTING_LIVE) : LISTING_LIVE)
+          // 자세한 매장부터(인허가 자료로만 들어온 곳은 뒤 — 2026-10-19)
+          .orderBy(sql`${LISTING_BASIC} ASC`, asc(storeListings.name)).limit(regionQ ? 400 : 30),
+        db.select({ total: sql<number>`count(*)::int` }).from(storeListings).where(LISTING_LIVE),
         listRegions(),
       ]);
     } catch (e) {
@@ -2706,15 +2709,17 @@ ${list}
     // 같은 지역 당구장 6곳 — 좌표가 있으면 가까운 순, 없으면 이름순. 상세끼리 이어지는 내부 링크(크롤 경로).
     let nearby: { code: string; name: string; address: string; rate10Large: number | null; rate10Medium: number | null }[] = [];
     try {
-      const dist = s.latitude != null && s.longitude != null
-        ? sql`CASE WHEN ${storeListings.latitude} IS NULL THEN 1e9 ELSE
-            (6371 * acos(least(1.0, cos(radians(${s.latitude})) * cos(radians(${storeListings.latitude})) *
-            cos(radians(${storeListings.longitude}) - radians(${s.longitude})) +
-            sin(radians(${s.latitude})) * sin(radians(${storeListings.latitude}))))) END`
+      // 좌표는 인허가 좌표가 먼저(storage/listingSql), 폐업한 인허가 매장은 빼고
+      const myLat = s.govLat ?? s.latitude, myLng = s.govLng ?? s.longitude;
+      const dist = myLat != null && myLng != null
+        ? sql`CASE WHEN ${LISTING_LAT} IS NULL THEN 1e9 ELSE
+            (6371 * acos(least(1.0, cos(radians(${myLat})) * cos(radians(${LISTING_LAT})) *
+            cos(radians(${LISTING_LNG}) - radians(${myLng})) +
+            sin(radians(${myLat})) * sin(radians(${LISTING_LAT}))))) END`
         : sql`0`;
       nearby = await db.select({ code: storeListings.code, name: storeListings.name, address: storeListings.address, rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium })
         .from(storeListings)
-        .where(and(eq(storeListings.region, s.region), ne(storeListings.code, s.code)))
+        .where(and(eq(storeListings.region, s.region), ne(storeListings.code, s.code), LISTING_LIVE))
         .orderBy(dist, asc(storeListings.name)).limit(6);
     } catch { /* 이웃 조회 실패는 본문 축소로만 */ }
     const regionHref = `/stores?region=${encodeURIComponent(s.region)}`;
@@ -2742,6 +2747,8 @@ ${list}
         title: storeTitleKo(s.name, s.region, s.address), // 시·구·동까지 — 화면 store-listing.tsx 와 같은 인자
         desc: storeDescKo(s.name, s.address, s as any, s.openHours),
         canonical: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
+        // 인허가 자료로만 들어온 얇은 매장은 색인에서 뺀다(2026-10-19 — shared/storeMeta isBasicListing). 링크는 따라가게(follow)
+        noindex: isBasicListing(s as any),
         // 매장 카드(요금·테이블·영업시간) — 1,199곳 대표 이미지가 하나도 없었다(2026-09-30)
         image: { url: storeCardUrl(ORIGIN, s.code), width: CARD_SIZE, height: CARD_SIZE, alt: cardAlt(s.name, "당구장") },
         jsonLd: [
@@ -2766,6 +2773,7 @@ ${list}
   <dl>
     <dt>주소</dt><dd>${esc(s.address)}</dd>
     ${s.phone ? `<dt>전화</dt><dd>${esc(s.phone)}</dd>` : ""}
+    ${s.licenseDate ? `<dt>인허가</dt><dd>${esc(licenseSinceKo(String(s.licenseDate)) ?? "")} · ${esc(BILLIARD_HALL_SOURCE)}</dd>` : ""}
     ${s.openHours ? `<dt>영업시간</dt><dd>${esc(s.openHours)}</dd>` : ""}
     ${tables.length ? `<dt>테이블</dt><dd>${esc(tables.join(" · "))}</dd>` : ""}
     ${rates.length ? `<dt>요금</dt><dd>${esc(rates.join(", "))}</dd>` : ""}
