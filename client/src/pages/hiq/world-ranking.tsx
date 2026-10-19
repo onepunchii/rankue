@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import { apiRequest } from "@/lib/queryClient";
 import { flagEmoji } from "@/lib/flag";
 import { UmbEventMap } from "@/components/hiq/umb/UmbEventMap";
+import { NationsWorldMap } from "@/components/hiq/umb/NationsWorldMap";
 import { useT } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
 import { LucideChevronLeft, LucideSearch, LucideTrendingUp } from "@/lib/icons";
@@ -250,6 +251,14 @@ export default function HiqWorldRanking() {
             {/* ─── 국가 랭킹 보기 ─── */}
             {view === "nations" && (
                 <div className="flex flex-col gap-1.5 relative z-10">
+                    {/* 3쿠션 세계 지도(2026-10-19) — 나라마다 거품(상위 5명 포인트 합) */}
+                    {(nationsData?.nations?.length ?? 0) > 0 && (
+                        <NationsWorldMap nations={nationsData!.nations} homeFed={homeFed} nameOf={countryName} href={countryPath}
+                            copy={{
+                                title: t("umb.nationsMapTitle"), sub: t("umb.nationsMapSub"), points: t("umb.top5Sum"), world: t("umb.nationsMapWorld"), europe: t("umb.nationsMapEurope"),
+                                pick: (n) => t("umb.nationsMapPick").replace("{n}", String(n.players)).replace("{r}", String(n.bestRank)).replace("{name}", n.bestPlayer),
+                            }} />
+                    )}
                     <p className="text-[12px] font-medium text-black/55 px-1 mb-0.5">{t("umb.nationsDesc")}</p>
                     {(nationsData?.nations || []).map((n, idx) => {
                         const isKr = n.fed === homeFed;
