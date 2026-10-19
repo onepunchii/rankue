@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { SLOPE_LABEL, SLOPE_STEEP, SLOPE_VERY, altitudeTicks, courseLevel, courseSlopes, kmTicks, slopeClasses, slopeRuns } from "./hikingCourseLook";
+import { SLOPE_LABEL, SLOPE_STEEP, SLOPE_VERY, altitudeTicks, compareCourses, courseLevel, courseSlopes, kmTicks, slopeClasses, slopeRuns } from "./hikingCourseLook";
 import type { LinePoint } from "./hikingGeo";
 
 const read = (f: string) => readFileSync(resolve(__dirname, "..", f), "utf8");
@@ -63,5 +63,30 @@ describe("코스를 보여 주는 셈", () => {
         expect(parts).toContain("slopeRuns(line)");
         // 산행 중 화면도 같은 그림을 쓴다(지나온 길은 산호빛)
         expect(parts).toContain('stroke="#F28C6A" strokeWidth="4"');
+    });
+});
+
+describe("코스 한눈에 견주기(2026-10-19)", () => {
+    const line = (km: number, lo: number, hi: number): LinePoint[] => Array.from({ length: 11 }, (_, i) => [0, 0, lo + (hi - lo) * Math.sin((i / 10) * Math.PI), (i / 10) * km] as LinePoint);
+    const courses = [
+        { km: 4.9, gainM: 539, minM: 101, maxM: 375, line: line(4.9, 101, 375) },
+        { km: 2.4, gainM: 210, minM: 150, maxM: 363, line: line(2.4, 150, 363) },
+        { km: 1.5, gainM: 260, minM: 120, maxM: 363, line: line(1.5, 120, 363) },
+    ];
+    it("같은 눈금 — 긴 코스가 넓다", () => {
+        const rows = compareCourses(courses, 120, 32);
+        expect(rows[0].w).toBeCloseTo(120);
+        expect(rows[2].w).toBeCloseTo((1.5 / 4.9) * 120);
+        expect(rows[0].path.startsWith("M0.0,")).toBe(true);
+    });
+    it("꼬리표는 사실만 — 가장 짧은 · 오르막 가장 적은(셋 이상일 때)", () => {
+        const rows = compareCourses(courses);
+        expect(rows[2].tags).toEqual(["shortest"]);
+        expect(rows[1].tags).toEqual(["leastGain"]);
+        expect(compareCourses(courses.slice(0, 2)).every((r) => r.tags.length === 0)).toBe(true);
+    });
+    it("산 페이지가 단다", () => {
+        const s = readFileSync(resolve(__dirname, "..", "client/src/hiking/pages/MountainPage.tsx"), "utf8");
+        expect(s).toContain("<CourseCompare");
     });
 });

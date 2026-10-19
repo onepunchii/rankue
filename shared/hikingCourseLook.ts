@@ -83,3 +83,37 @@ export function kmTicks(km: number): number[] {
     for (let v = step; v < km - step * 0.35; v += step) out.push(Math.round(v * 10) / 10);
     return out;
 }
+
+/**
+ * 코스 한눈에 견주기(2026-10-19) — 산 페이지의 검색 방문자가 코스 칩을 하나씩 눌러 보며 견주고 있었다(이번 주 72명이 224번).
+ * 코스마다 작은 높이 그림 — 모든 코스를 **같은 눈금**(가로 = 가장 긴 코스의 km, 세로 = 이 산 코스들의 가장 낮은 곳~높은 곳)에 그려
+ * 길이와 오르막이 그림만으로 견줘지게 한다. 꼬리표는 사실만: 가장 짧은 · 오르막 가장 적은(코스가 셋 이상일 때).
+ */
+export interface CourseCompareRow { index: number; path: string; area: string; w: number; tags: ("shortest" | "leastGain")[] }
+export function compareCourses(courses: readonly { km: number; gainM: number; minM: number; maxM: number; line: readonly LinePoint[] }[], width = 120, height = 32): CourseCompareRow[] {
+    if (!courses.length) return [];
+    const maxKm = Math.max(...courses.map((c) => c.km), 0.1);
+    const lo = Math.min(...courses.map((c) => c.minM)), hi = Math.max(...courses.map((c) => c.maxM));
+    const span = Math.max(1, hi - lo);
+    const shortest = courses.reduce((b, c, i) => (c.km < courses[b].km ? i : b), 0);
+    const least = courses.reduce((b, c, i) => (c.gainM < courses[b].gainM ? i : b), 0);
+    return courses.map((c, index) => {
+        const w = Math.max(8, (c.km / maxKm) * width);
+        const pts = c.line.length >= 2 ? c.line : [[0, 0, c.minM, 0], [0, 0, c.maxM, c.km]] as LinePoint[];
+        const last = pts[pts.length - 1][3] || c.km || 1;
+        // 160점이라 그대로 그리면 작은 그림에서 지글거린다 — 32칸으로 줄여 그린다
+        const N = 32, xy: [number, number][] = [];
+        for (let k = 0; k <= N; k++) {
+            const at = (k / N) * last;
+            let j = 0; while (j < pts.length - 2 && pts[j + 1][3] < at) j++;
+            const a = pts[j], b = pts[j + 1] ?? a, t = b[3] > a[3] ? (at - a[3]) / (b[3] - a[3]) : 0;
+            const ele = a[2] + (b[2] - a[2]) * Math.min(1, Math.max(0, t));
+            xy.push([(k / N) * w, height - 2 - ((ele - lo) / span) * (height - 4)]);
+        }
+        const path = xy.map(([x, y], k) => `${k ? "L" : "M"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+        const tags: CourseCompareRow["tags"] = [];
+        if (courses.length >= 3 && index === shortest) tags.push("shortest");
+        if (courses.length >= 3 && index === least && least !== shortest) tags.push("leastGain");
+        return { index, path, area: `${path} L${w.toFixed(1)},${height} L0,${height} Z`, w, tags };
+    });
+}

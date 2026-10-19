@@ -33,7 +33,7 @@ import { MountainNearbyPlaces } from "../components/MountainNearbyPlaces";
 import { NearDial } from "../components/NearMe";
 import { CourseMap } from "../components/CourseMap";
 import { CourseProfile, CourseTrace, SLOPE_COLOR } from "../components/CourseParts";
-import { SLOPE_LABEL, courseLevel, courseSlopes, type CourseLevelId } from "@shared/hikingCourseLook";
+import { SLOPE_LABEL, compareCourses, courseLevel, courseSlopes, type CourseLevelId } from "@shared/hikingCourseLook";
 import { Fact, HikingCta, MountainRow, MountainWeather, SunToday } from "../components/MountainParts";
 import { SummitStamp, regionInk } from "../stamps/SummitStamp";
 import { SummitCheckin } from "../stamps/SummitCheckin";
@@ -184,22 +184,62 @@ function CourseCard({ c, pois }: { c: MountainCourse; pois: readonly MountainPoi
     );
 }
 
+/**
+ * 코스 한눈에 견주기(2026-10-19) — 칩을 하나씩 눌러 보던 것(이번 주 검색 방문자 72명이 224번)을 한 판에.
+ * 줄마다 작은 높이 그림(모든 코스가 같은 눈금 — 길이 · 오르막이 그림으로 견줘진다) · 거리 · 시간 · 오르막 · 힘든 정도. 줄을 누르면 그 코스.
+ */
+const COMPARE_FIRST = 5;
+const LEVEL_DOT: Readonly<Record<CourseLevelId, string>> = { easy: "#6FBF8F", moderate: "#E4AE45", hard: "#E8694F" };
+function CourseCompare({ d, i, onPick }: { d: MountainDetail; i: number; onPick: (i: number) => void }) {
+    const rows = useMemo(() => compareCourses(d.courseList, 112, 30), [d.courseList]);
+    const [all, setAll] = useState(false);
+    const shown = all ? rows : rows.slice(0, Math.max(COMPARE_FIRST, i + 1));
+    return (
+        <div className="mb-3 overflow-hidden rounded-2xl bg-[#FFFFFF0A]" role="tablist" aria-label="코스 고르기" data-testid="course-compare">
+            {shown.map((r) => {
+                const c = d.courseList[r.index], f = courseFacts(c), level = courseLevel(c), on = r.index === i;
+                return (
+                    <button key={c.id} type="button" role="tab" aria-selected={on} onClick={() => onPick(r.index)} data-testid={`course-tab-${r.index + 1}`}
+                        className="block w-full px-3.5 pb-2.5 pt-2 text-left" style={{ background: on ? "#F28C6A1F" : undefined, borderTop: r.index ? "1px solid #FFFFFF10" : undefined, boxShadow: on ? "inset 3px 0 0 #F28C6A" : undefined }}>
+                        {/* 윗줄 — 이름 · 힘든 정도 · 꼬리표 */}
+                        <span className="flex items-center gap-2">
+                            <span className="whitespace-nowrap text-[14px] font-semibold" style={{ color: on ? "#F28C6A" : "#F4EFE3" }}>{c.summitKm != null && <span className="mr-0.5 text-[12px]" aria-label="정상을 지나는 코스">▲</span>}코스 {c.seq}</span>
+                            <span className="flex items-center gap-1 whitespace-nowrap text-[12px] text-[#F4EFE3B3]"><i aria-hidden className="h-1.5 w-1.5 rounded-full" style={{ background: LEVEL_DOT[level.id] }} />{level.label}</span>
+                            {r.tags.length > 0 && <span className="ml-auto whitespace-nowrap rounded-full bg-[#F2B36A24] px-2 py-0.5 text-[12px] font-semibold text-[#F2B36A]">{r.tags.map((t) => (t === "shortest" ? "가장 짧음" : "오르막 가장 적음")).join(" · ")}</span>}
+                        </span>
+                        {/* 아랫줄 — 같은 눈금의 높이 그림 · 숫자 */}
+                        <span className="mt-1 flex items-end gap-3">
+                            <svg viewBox="0 0 112 30" preserveAspectRatio="none" className="h-[30px] min-w-0 flex-1" aria-hidden>
+                                <line x1="0" y1="29.5" x2="112" y2="29.5" stroke="#F4EFE31F" vectorEffect="non-scaling-stroke" />
+                                <path d={r.area} fill={on ? "#F28C6A40" : "#F4EFE31A"} />
+                                <path d={r.path} fill="none" stroke={on ? "#F28C6A" : "#F4EFE3B3"} strokeWidth={1.5} strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+                            </svg>
+                            {/* 숫자 칸 폭을 고정 — 그림 폭이 줄마다 같아야 같은 눈금이다 */}
+                            <span className="w-[124px] shrink-0 whitespace-nowrap text-right leading-tight">
+                                <span className="block text-[15px] font-semibold tabular-nums text-[#F4EFE3]">{f.km}</span>
+                                <span className="block text-[12px] tabular-nums text-[#F4EFE399]">{f.time.replace("약 ", "")} · ↑{f.gain}</span>
+                            </span>
+                        </span>
+                    </button>
+                );
+            })}
+            {rows.length > shown.length && (
+                <button type="button" onClick={() => setAll(true)} className="flex h-11 w-full items-center justify-center gap-1 text-[13px] font-semibold text-[#F4EFE3CC]" style={{ borderTop: "1px solid #FFFFFF10" }} data-testid="course-compare-more">
+                    코스 {rows.length - shown.length}개 더 보기 <LucideChevronDown className="h-4 w-4" />
+                </button>
+            )}
+            <p className="px-3.5 pb-2.5 pt-1 text-[12px] text-[#F4EFE380] break-keep" style={{ borderTop: "1px solid #FFFFFF10" }}>그림은 모든 코스가 같은 눈금이에요 — 넓을수록 길고, 높을수록 많이 올라요.</p>
+        </div>
+    );
+}
+
 /** 코스 구역 — 고른 코스(i)는 산 화면이 들고 있는다: '위치 · 들머리' 구역이 그 코스의 들머리를 쓴다 */
 function Courses({ d, canStart, i, onPick, loc }: { d: MountainDetail; canStart?: boolean; i: number; onPick: (i: number) => void; loc: MyLocation }) {
     const c = d.courseList[Math.min(i, d.courseList.length - 1)];
     if (!c) return <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-4 text-[14px] leading-relaxed text-[#F4EFE3B3] break-keep">{MOUNTAIN_LABEL.noCourse}</p>;
     return (
         <div>
-            {d.courseList.length > 1 && (
-                <div className="-mx-5 mb-3 flex gap-2 overflow-x-auto px-5" style={{ scrollbarWidth: "none" }} role="tablist" aria-label="코스 고르기">
-                    {d.courseList.map((x, k) => (
-                        <button key={x.id} type="button" role="tab" aria-selected={k === i} onClick={() => onPick(k)} data-testid={`course-tab-${k + 1}`}
-                            className="h-10 shrink-0 rounded-full px-3.5 text-[13.5px]" style={{ background: k === i ? "#F28C6A" : "#FFFFFF14", color: k === i ? "#2A1208" : "#F4EFE3", fontWeight: k === i ? 600 : 400 }}>
-                            {x.summitKm != null && <span className="mr-1 text-[12px]" aria-label="정상을 지나는 코스">▲</span>}코스 {x.seq} · {courseFacts(x).km}
-                        </button>
-                    ))}
-                </div>
-            )}
+            {d.courseList.length > 1 && <CourseCompare d={d} i={i} onPick={onPick} />}
             {/* 코스가 많은 산(북한산 36 · 금정산 37)은 정상을 지나지 않는 길이 더 많다 — 세모의 뜻을 한 줄로 */}
             {d.courseList.length > 1 && d.courseList.some((x) => x.summitKm != null) && d.courseList.some((x) => x.summitKm == null) && (
                 <p className="-mt-1 mb-3 text-[12.5px] text-[#F4EFE399]" data-testid="course-summit-legend">▲ 정상을 지나는 코스 {d.courseList.filter((x) => x.summitKm != null).length}개 · 나머지는 능선 · 계곡 · 둘레를 걷는 길</p>

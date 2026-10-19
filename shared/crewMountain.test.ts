@@ -235,7 +235,11 @@ describe("코스 고르기 — 상세 내용에 적는 한 줄", () => {
         expect(activityCourseChip(up)).toBe("코스 1 · 7.1km");
         expect(activityCourseChip(loop)).toBe("코스 2 · 12.3km");
         expect(activityCourseChip(ridge)).toBe("코스 3 · 3km");
-        expect(read("client/src/hiking/pages/MountainPage.tsx")).toContain("코스 {x.seq} · {courseFacts(x).km}");
+        // 산 화면은 2026-10-19 부터 칩 대신 '코스 한눈에 견주기' 줄 — 번호('코스 {c.seq}')와 거리(courseFacts 의 km)를 같은 함수로 쓴다
+        const page = read("client/src/hiking/pages/MountainPage.tsx");
+        expect(page).toContain("코스 {c.seq}</span>");
+        expect(page).toContain("f = courseFacts(c)");
+        expect(page).toContain("{f.km}</span>");
     });
     it("한 줄 — 번호 · 길의 모양 · 거리 · 오르막 · 걷는 시간(어림)", () => {
         expect(activityCourseLine(up)).toBe("코스 1 · 정상까지 · 7.1km · 오르막 1,370m · 걷는 시간 약 4시간 5분(어림)");
