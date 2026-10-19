@@ -5,25 +5,30 @@
  *  1. 그 바다 구역의 표지(판화 · sea-<구역>.webp) 위에 지점 이름 · 구역 · 고른 칸에서의 거리 · 풍랑특보 꼬리표
  *  2. 오늘 이 바다의 어종 — 사진 카드(위키미디어 공용 · 사진마다 작가와 라이선스를 아래에 적는다. 사진이 없는 어종은 우리 어탁) · 오전/오후 지수
  *  3. 파고 · 바람 · 수온 · 물때 단추(그림은 같은 손의 판화) — 누르면 그 아래에 자세히(예보 범위 · 가까운 부이의 지금 값 · 만조/간조)
+ *  3-1. 반나절 해상예보(기상청 — 그 바다 구역) · 3-2. 물때 곡선(가까운 조위 관측소 — 만조 · 간조 · 지금 · 해)
+ *     (2026-10-19 오너 "오늘 바다를 심플하게 — 팝업에 정보를 더": 홈의 '오늘의 바다' · '항구의 하루'에서 옮겨 왔다)
  *  4. 이 근처에서 적은 내 조과(위치를 재지 않으니 적은 곳 이름이 근처 지명과 같은 줄)
  *  5. 여기서 낚았어요 — 조과 적기
- * 지수는 국립해양조사원이 매긴 값이라고 적는다(랭큐가 매긴 값이 아니다). ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지.
+ * 설명 · 출처 글은 맨 아래 'ⓘ 자료 출처' 한 줄을 눌러야 펼친다(같은 날 오너 "이런 거 다 빼 주고"). 사진의 작가 · 라이선스는
+ * 사진 위 작은 ⓘ — CC BY-SA 라 어딘가엔 남겨야 한다(지우지 말 것). 지수는 국립해양조사원 값이라는 말도 그 펼침 안에 있다. ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지.
  */
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { LucidePlus, LucideX } from "@/lib/icons";
 import { FISHING_COLORS as C, fishingDayLabel, type FishingCatch } from "@shared/fishing";
 import { fishByName, fishValue, fishValueText } from "@shared/fishingFish";
 import { FISH_GUIDE_NAME } from "@shared/fishingFishInfo";
-import { hhmm, rangeText, windDirKo, type FishingIndexStep, type IndexSpot, type PortBrief } from "@shared/fishingPort";
+import { durationKo, hhmm, rangeText, tideFlowAt, windDirKo, type FishingIndexStep, type IndexSpot, type PortBrief } from "@shared/fishingPort";
 import { tideOf, TIDE_PHASE_TEXT } from "@shared/fishingTide";
 import { seaVerdict } from "@shared/fishingPort";
-import type { SeaArea } from "@shared/fishingSea";
+import { SEA_AREAS, type SeaArea } from "@shared/fishingSea";
 import { FISHING_PORTS } from "@shared/fishingStations";
 import { INK, PAPER, art } from "./ink";
 import { PhotoCredit, guidePhoto, useGuideIndex, type GuidePhotoCredit } from "./Guide";
 import { seaTagText, zoneAt } from "./SeaChart";
+import { SeaForecast } from "./SeaForecast";
+import { TideCurve } from "./TideCurve";
 
 const STEP_TONE: Readonly<Record<FishingIndexStep, { bg: string; text: string }>> = {
     매우좋음: { bg: "#0F4A66", text: "#F3ECDD" }, 좋음: { bg: "#3F86A8", text: "#F3ECDD" }, 보통: { bg: "#A9C9D3", text: "#0F2838" },
@@ -60,8 +65,14 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
         for (const p of FISHING_PORTS) { const km = Math.round(kmBetween(p, spot)); if (!best || km < best.km) best = { code: p.code, name: p.name, km }; }
         return best && best.km <= 80 ? best : null;
     }, [spot]);
+    // 바다 구역 — 칸이 구역 네모 밖이면(연도처럼 섬 가까이) 가까운 조위 관측소의 구역으로(해상예보 · 표지 그림)
+    const areaId = zone?.id ?? (port ? FISHING_PORTS.find((p) => p.code === port.code)?.area ?? null : null);
+    const areaName = zone?.name ?? SEA_AREAS.find((a) => a.id === areaId)?.name ?? null;
     const { data: brief } = useQuery<PortBrief | null>({ queryKey: port ? ["/api/hiq/fishing/ports", port.code, day] : ["/api/hiq/fishing/ports", "none"], queryFn: () => apiRequest(`/api/hiq/fishing/ports/${port!.code}?day=${day}`), enabled: !!port, staleTime: 5 * 60_000 });
     const { data: guide } = useGuideIndex();
+    // 사진 출처를 펼친 카드 · 맨 아래 '자료 출처'를 펼쳤나
+    const [creditOf, setCreditOf] = useState<string | null>(null);
+    const [sourceOpen, setSourceOpen] = useState(false);
 
     // 어종 카드 — 고른 어종이 먼저. 사진은 도감(위키미디어 공용)에서, 없으면 우리 어탁
     const names = [fish, ...Object.keys(spot.fish).filter((f) => f !== fish)].filter((f) => spot.fish[f]);
@@ -81,7 +92,10 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
     }, [spot.name, at.lat, at.lng]);
     const mine = list.filter((c) => nearNames.some((n) => c.place.replace(/\s+/g, "").includes(n)));
 
-    const sea = zone?.id.startsWith("west") ? "west" : "south";
+    const sea = areaId?.startsWith("west") ? "west" : "south";
+    // 지금 — 오늘일 때만(물의 흐름 · 곡선 위 '지금')
+    const nowMin = day === today ? Math.floor(((Date.now() + 9 * 3600_000) % 86_400_000) / 60_000) : null;
+    const flow = nowMin != null && brief ? tideFlowAt(brief.turns, nowMin) : null;
     const tide = tideOf(day, sea);
     const buoy = brief?.now?.buoy ?? null;
     // 네 칸 — 예보 범위(국립해양조사원) + 그 아래 지금 잰 값(가까운 부이 · 관측소). 누르는 단추가 아니라 한눈 표(예전엔 누르면 같은 값을 한 번 더 적었다)
@@ -101,7 +115,7 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
             <div className="relative flex max-h-[88dvh] flex-col overflow-hidden rounded-t-[28px]" style={{ background: C.bg, color: C.foam, boxShadow: "0 -12px 40px #00000066" }}>
                 {/* 1. 표지 — 그 바다 구역의 판화 */}
                 <div className="relative h-[150px] shrink-0 overflow-hidden">
-                    <img src={`/fishing/art/sea-${zone?.id ?? "south-west"}.webp`} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 55%" }} draggable={false} />
+                    <img src={`/fishing/art/sea-${areaId ?? "south-west"}.webp`} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 55%" }} draggable={false} />
                     <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1E2D33 0%,#0B1E2D00 30%,#0B1E2DCC 78%,#0B1E2D 100%)" }} aria-hidden />
                     <i aria-hidden className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full" style={{ background: "#F3ECDD99" }} />
                     <button type="button" onClick={onClose} aria-label="닫기" className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "#0B1E2D99" }} data-testid="fishing-sea-popup-close"><LucideX className="h-4 w-4" /></button>
@@ -112,7 +126,7 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                     )}
                     <div className="absolute inset-x-4 bottom-3">
                         <p className="text-[24px] font-semibold leading-tight tracking-tight">{short(spot.name)}</p>
-                        <p className="mt-0.5 text-[13px] [word-break:keep-all]" style={{ color: "#F3ECDDCC" }}>{[zone ? `${zone.name} 쪽 바다` : null, fromMe != null ? `나에게서 ${fromMe}km` : cell && cell.km > 0 ? `고른 칸에서 ${cell.km}km` : null, dayWord].filter(Boolean).join(" · ")}</p>
+                        <p className="mt-0.5 text-[13px] [word-break:keep-all]" style={{ color: "#F3ECDDCC" }}>{[areaName ? `${areaName} 쪽 바다` : null, fromMe != null ? `나에게서 ${fromMe}km` : cell && cell.km > 0 ? `고른 칸에서 ${cell.km}km` : null, dayWord].filter(Boolean).join(" · ")}</p>
                     </div>
                 </div>
 
@@ -124,13 +138,14 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                         {verdict.why && <p className="mt-0.5 text-[13.5px] [word-break:keep-all] opacity-90">{verdict.why}</p>}
                     </div>
                     {/* 2. 어종 카드 */}
-                    <p className="px-4 pb-2 pt-4 text-[13px]" style={{ color: C.dim }}>{dayWord} 이 바다의 어종 · 국립해양조사원 낚시지수</p>
+                    <p className="px-4 pb-2 pt-4 text-[13px]" style={{ color: C.dim }}>{dayWord} 이 바다의 어종 · 낚시지수</p>
                     {/* 고른 카드의 테두리(바깥 2.5px)가 가로 줄에 잘리지 않게 위아래로 숨 쉴 틈(2026-10-18 오너 "테두리가 짤려보임") */}
                     <div className="flex gap-2.5 overflow-x-auto px-4 pb-1.5 pt-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="fishing-sea-popup-fish">
                         {cards.map((c) => {
                             const on = c.name === fish, v = spot.fish[c.name];
                             return (
-                                <button key={c.name} type="button" disabled={!c.ours} onClick={() => onFish(c.name)} className="w-[150px] shrink-0 overflow-hidden rounded-2xl text-left active:opacity-85"
+                                <div key={c.name} className="relative w-[150px] shrink-0">
+                                <button type="button" disabled={!c.ours} onClick={() => onFish(c.name)} className="w-full overflow-hidden rounded-2xl text-left active:opacity-85"
                                     style={{ background: PAPER, color: INK, boxShadow: on ? `0 0 0 2.5px ${C.brand}` : "inset 0 0 0 1px #0F28381F" }} data-testid="fishing-sea-popup-card" data-photo={c.photo ? "1" : "0"}>
                                     <span className="relative block h-[96px] overflow-hidden" style={{ background: c.photo ? "#0F2838" : PAPER }}>
                                         {c.photo ? <img src={c.photo} alt={`${c.name} 사진`} loading="lazy" decoding="async" className="h-full w-full object-cover" />
@@ -143,6 +158,19 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                                         <span className="mt-1.5 flex gap-1"><Pill step={v.am} label="오전" /><Pill step={v.pm} label="오후" /></span>
                                     </span>
                                 </button>
+                                {/* 사진 출처 — 사진 위 작은 ⓘ(CC BY-SA: 작가 · 라이선스를 볼 수 있어야 한다). 누르면 사진 위에 한 겹 */}
+                                {c.credit && (
+                                    <>
+                                        <button type="button" onClick={() => setCreditOf(creditOf === c.name ? null : c.name)} aria-label={`${c.name} 사진 출처`} aria-expanded={creditOf === c.name}
+                                            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-semibold" style={{ background: "#0B1E2DB3", color: "#F3ECDD" }} data-testid="fishing-sea-photo-credit">i</button>
+                                        {creditOf === c.name && (
+                                            <div className="absolute inset-x-0 top-0 flex h-[96px] items-center rounded-t-2xl px-2.5 pr-9" style={{ background: "#0B1E2DE6" }} data-testid="fishing-sea-photo-credit-text">
+                                                <PhotoCredit author={`${c.name} — ${c.credit.a}`} license={c.credit.l} page={c.credit.p} dark />
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+                                </div>
                             );
                         })}
                     </div>
@@ -160,11 +188,20 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                             </div>
                         ))}
                     </div>
-                    {/* 물때 시간표 — 만조 · 간조(가까운 조위 관측소의 예보) */}
+                    {/* 3-1. 반나절 해상예보 — 그 바다 구역(기상청). 홈의 '오늘의 바다'에서 옮겨 왔다 */}
+                    {areaId && <div className="px-4"><SeaForecast area={areaId} inset="4" /></div>}
+                    {/* 3-2. 물때 — 가까운 조위 관측소의 곡선(만조 · 간조 · 지금 · 해). 홈의 '항구의 하루'에서 옮겨 왔다 */}
                     {port && brief && brief.turns.length > 0 && (
-                        <div className="mx-4 mt-2.5 rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0A" }} data-testid="fishing-sea-turns">
-                            <p className="text-[12.5px]" style={{ color: C.dim }}>{dayWord} 만조 · 간조 — {port.name}({port.km}km){spot.tide ? ` · ${spot.tide}` : ""}</p>
-                            <p className="mt-1.5 flex flex-wrap gap-1.5">{brief.turns.map((t) => <span key={`${t.kind}${t.min}`} className="rounded-full px-2.5 py-1 text-[13px] font-semibold tabular-nums" style={{ background: t.kind === "high" ? "#3F86A84D" : "#FFFFFF14", color: C.foam }}>{t.kind === "high" ? "만조" : "간조"} {hhmm(t.min)}</span>)}</p>
+                        <div className="mx-4 mt-3 overflow-hidden rounded-2xl" style={{ background: PAPER, color: INK }} data-testid="fishing-sea-turns">
+                            <p className="px-3.5 pt-3 text-[12.5px]" style={{ color: "#0F2838B3" }}>{dayWord} 물때 — {port.name}({port.km}km){spot.tide ? ` · ${spot.tide}` : ""}</p>
+                            {brief.points.length > 1 && (
+                                <TideCurve points={brief.points.map(([min, cm]) => ({ min, cm }))} turns={brief.turns} nowMin={nowMin}
+                                    sun={brief.sun?.rise != null && brief.sun.set != null ? { rise: brief.sun.rise, set: brief.sun.set } : null} />
+                            )}
+                            <p className="border-t px-3.5 py-2.5 text-[13.5px] [word-break:keep-all]" style={{ borderColor: "#0F28381F" }} data-testid="fishing-sea-flow">
+                                {flow ? <>지금은 <span className="font-semibold">{flow.flow}</span> — {flow.next.kind === "high" ? "만조" : "간조"}({hhmm(flow.next.min)})까지 <span className="font-semibold tabular-nums">{durationKo(flow.inMin)}</span></>
+                                    : brief.turns.map((t) => `${t.kind === "high" ? "만조" : "간조"} ${hhmm(t.min)}`).join(" · ")}
+                            </p>
                         </div>
                     )}
 
@@ -179,13 +216,14 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                             </ul>
                         )}
                     </div>
-                    <p className="px-4 pt-3 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>
-                        지수 · 파고 · 바람 · 수온 예보는 국립해양조사원 바다낚시지수예요. 랭큐가 매긴 값이 아니에요.
-                    </p>
-                    {cards.some((c) => c.credit) && (
-                        <div className="space-y-0.5 px-4 pt-1.5" data-testid="fishing-sea-popup-credits">
-                            {cards.filter((c) => c.credit).map((c) => <PhotoCredit key={c.name} author={`${c.name} — ${c.credit!.a}`} license={c.credit!.l} page={c.credit!.p} dark />)}
-                        </div>
+                    {/* 자료 출처 — 한 줄만, 누르면 펼친다(설명 글을 본문에 늘어놓지 않는다) */}
+                    <button type="button" onClick={() => setSourceOpen((v) => !v)} aria-expanded={sourceOpen} className="mx-4 mt-3 flex h-9 items-center gap-1.5 text-[12.5px]" style={{ color: C.dim }} data-testid="fishing-sea-source">
+                        <span aria-hidden className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[11px] font-semibold" style={{ boxShadow: `inset 0 0 0 1.5px ${C.dim}` }}>i</span>자료 출처
+                    </button>
+                    {sourceOpen && (
+                        <p className="px-4 pb-1 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }} data-testid="fishing-sea-source-text">
+                            지수 · 파고 · 바람 · 수온은 국립해양조사원 바다낚시지수예요(랭큐가 매긴 값이 아니에요). 바다 예보는 기상청, 물때는 국립해양조사원 예측이라 바람 · 기압에 따라 실제와 달라요. 어종 사진의 작가 · 라이선스는 사진의 ⓘ에 있어요.
+                        </p>
                     )}
                 </div>
 

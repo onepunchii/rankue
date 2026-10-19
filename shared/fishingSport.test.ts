@@ -92,14 +92,18 @@ describe("낚시 — 따로 선 종목", () => {
         expect(chart).toContain("export const PIXEL_REACH_KM = 42;");
         expect(chart).toContain("if (d > PIXEL_REACH_KM) continue;");
         const page = read("client/src/fishing/FishingPage.tsx");
-        expect(page).toContain("바다의 칸은 그 값을 거리로 섞은 어림이고 지점에서 {PIXEL_REACH_KM}km 안만 칠했어요. 랭큐가 매긴 값이 아니에요.");
+        // 설명은 지도 머리의 ⓘ 를 눌러야 펼친다(2026-10-19 오너 "이런 거 다 빼 주고") — 지우지 않고 접었다
+        expect(page).toContain("바다의 칸은 그 값을 거리로 섞은 어림이에요(지점에서 ${PIXEL_REACH_KM}km 안만). 랭큐가 매긴 값이 아니에요.");
+        expect(page).toContain('data-testid="fishing-fishmap-about"');
         // 칸을 누르면 팝업 — 이 근처 내 기록은 위치가 아니라 적은 곳의 이름으로 찾는다(조과는 위치를 재지 않는다)
         const popup = read("client/src/fishing/SeaPopup.tsx");
         expect(page).toContain("<SeaPopup spot={picked}");
         expect(popup).toContain('data-testid="fishing-spot-mine"');
-        expect(popup).toContain("랭큐가 매긴 값이 아니에요.");
-        // 사진 밑에 작가 · 라이선스(위키미디어 공용 — CC BY · BY-SA 의 표시 의무)
-        expect(popup).toContain("<PhotoCredit key={c.name}");
+        expect(popup).toContain("랭큐가 매긴 값이 아니에요"); // '자료 출처' 펼침 안
+        expect(popup).toContain('data-testid="fishing-sea-source"');
+        // 사진의 작가 · 라이선스(위키미디어 공용 — CC BY · BY-SA 의 표시 의무) — 사진 위 작은 ⓘ 를 누르면(지우지 말 것)
+        expect(popup).toContain('data-testid="fishing-sea-photo-credit"');
+        expect(popup).toContain("<PhotoCredit author={`${c.name} — ${c.credit.a}`}");
         for (const f of [page, popup, chart]) expect(f).not.toMatch(/navigator\.geolocation|upload\.wikimedia\.org/);
         // 확대 · 단추 그림
         expect(chart).toContain("useBoxZoom(HOME, HOME, VIEW.w / 6)");

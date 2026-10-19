@@ -119,13 +119,34 @@ describe("낚시 홈 지도 한 장(2026-10-17 오너 '한 장으로 합치기')
         expect(Math.hypot(a.cx - 160, a.cy - 200)).toBeLessThan(80);
         expect(b.cx + 60 <= btn.x0 || b.cy + 19 <= btn.y0 || b.cy - 19 >= btn.y1).toBe(true);
     });
-    it("홈에는 지도가 한 장 — 보기 단추(낚시지수 | 특보 · 항구), 아래 '오늘의 바다'는 지도 없이 바다 칩 + 고른 바다", () => {
+    it("홈에는 지도가 한 장 — 지도 위 보기 단추(낚시지수 ↔ 특보 · 항구), 바다를 누르면 그 바다의 시트(2026-10-19 '오늘의 바다' 구역을 옮김)", () => {
         const src = readFileSync(resolve(__dirname, "..", "client/src/fishing/FishingPage.tsx"), "utf8");
         expect(src).toContain('data-testid="fishing-map-mode"');
-        expect(src).toContain('data-testid="fishing-sea-areas"');
-        const board = src.slice(src.indexOf("function SeaBoard("), src.indexOf("function SeaForecast("));
-        expect(board).not.toContain("<SeaChart");
+        expect(src).not.toContain('data-testid="fishing-sea-areas"'); // 해역 칩 줄은 없앴다 — 지도에서 누른다
+        const sheet = src.slice(src.indexOf("function SeaAreaSheet("), src.indexOf("const portKey"));
+        expect(sheet).not.toContain("<SeaChart");
+        expect(sheet).toContain("<SeaForecast area={def.id}");
+        expect(sheet).toContain("<PortCard code={portHere} today={today} embedded />");
         expect(src.match(/<SeaChart /g)!.length).toBe(2); // 한 지도 안의 두 보기
+        expect(src).toContain("onPick={(id) => { picks.pickArea(id); setAreaSheet(id); }}");
         expect(src).toContain("const seaPicks = useSeaPicks();");
+    });
+});
+
+describe("오늘 바다 정리(2026-10-19 오너 '심플하게 · 겹치는 것 합치기 · 물때 카드는 남기고')", () => {
+    const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
+    it("홈의 지도 아래는 오늘의 물때 카드만 — '오늘의 바다' · '항구의 하루'는 지도의 시트 · 팝업으로", () => {
+        const src = read("client/src/fishing/FishingPage.tsx");
+        const today = src.slice(src.indexOf("function Today("), src.indexOf("// 색은 뜻 하나씩"));
+        expect(today).toContain("<TideCard ");
+        expect(today).not.toContain("<SeaBoard");
+        expect(today).not.toContain("<PortCard");
+        expect(src).not.toContain("function SeaBoard(");
+    });
+    it("지도 팝업 한 장에 반나절 해상예보 · 물때 곡선이 들어 있다, 설명 · 출처는 접힌 한 줄", () => {
+        const popup = read("client/src/fishing/SeaPopup.tsx");
+        expect(popup).toContain('<SeaForecast area={areaId} inset="4" />');
+        expect(popup).toContain("<TideCurve points={brief.points.map(");
+        expect(popup).toContain("{sourceOpen && (");
     });
 });
