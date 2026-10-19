@@ -5,6 +5,10 @@ export default {
   content: ["./client/index.html", "./client/src/**/*.{js,jsx,ts,tsx}"],
   theme: {
     extend: {
+      // 투명도 단계 — 기본 눈금(0 · 5 · 10 · 15 · 20 … 95)에 없는 값은 클래스가 아예 만들어지지 않는다(오류 없이 조용히 빈다).
+      // `bg-brand/12` 가 서른한 곳에 쓰였는데 하나도 안 칠해졌다(2026-10-19 — PBA 랭킹 1위 메달 바탕이 비고 3위가 회색으로 보였다).
+      // 쓰는 값을 여기 더하고, shared/tailwindOpacity.test 가 눈금에 없는 값을 잡는다.
+      opacity: { 12: "0.12", 18: "0.18", 88: "0.88" },
       // 프리텐다드(2026-09-21 오너). index.html 이 가변 폰트를 받고, index.css 의 본문 스택과 같다 — font-sans 클래스가
       // 붙은 곳(골프 선수 페이지 등)이 tailwind 기본 스택으로 되돌아가지 않게 여기서도 잡는다.
       fontFamily: {
