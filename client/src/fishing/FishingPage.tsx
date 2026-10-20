@@ -60,6 +60,7 @@ import { TankFull } from "./tank/TankFull";
 import { TANK_KEY, placeLocal, readDecorSeen, useMyTank, writeDecorSeen } from "./tank/tankData";
 import { isNightKst, type TankMode } from "./tank/engine";
 import { DECOR_SLOTS, SLOT_KIND, decorHow, decorImage, decorItem, type CrewTankRow, type DecorSlot, type TankFishRow, type TankView } from "@shared/fishingDecor";
+import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
 
 const KEY = ["/api/hiq/fishing/catches"];
 type Tab = "home" | "trip" | "book" | "log" | "points" | "guide" | "rules" | "rank" | "gear" | "tank";
@@ -279,6 +280,8 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             </div>
                         </div>
 
+                        {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 낚시 크루 회원 목록 · 조 나누기에 쓴다 */}
+                        <div className="px-5 empty:hidden [&:has(>*)]:pt-1 [&:has(>*)]:pb-1"><ProfileNudge sport="FISHING" /></div>
                         {/* 첫 방문의 코치마크(2026-10-14) — 어종 · 바다의 칸 · 조과 적기 */}
                         <CoachTour id="fishing-home" tone="fishing" steps={[
                             { target: "fs-fish", title: "어종을 고르면", body: "지도의 바다 칸이 그 어종의 오늘 낚시지수로 칠해져요." },

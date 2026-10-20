@@ -126,6 +126,8 @@ export const hiqMembers = pgTable("hiq_members", {
   phone: text("phone").notNull(),
   name: text("name").notNull(), // Display Name
   birthYear: integer("birth_year"),
+  /** 나이대 10s~60s(2026-10-20 — 설정 · 홈 배너의 프로필 기본 두 가지). 비면 birth_year 로 읽는다(shared/profileBasics) */
+  ageBand: text("age_band"),
   gender: text("gender", { enum: ["male", "female"] }),
 
   // Global Stats (Default)

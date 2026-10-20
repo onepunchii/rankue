@@ -135,6 +135,7 @@ export class CrewRepository {
                 id: hiqMembers.id,
                 name: hiqMembers.name,
                 birthYear: hiqMembers.birthYear,
+                ageBand: hiqMembers.ageBand,
                 gender: hiqMembers.gender,
                 handi3c: hiqMembers.handi3c,
                 handi4c: hiqMembers.handi4c,

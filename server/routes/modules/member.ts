@@ -25,6 +25,7 @@ import { recordTermsAcceptance, requireTermsAccepted } from "../../middleware/te
 import { screenMemberProfile } from "../../utils/crewModeration.js";
 import { isTermsAccepted } from "../../../shared/terms.js";
 import { notifyListingTakenDown } from "./golf.js";
+import { isAgeBand } from "../../../shared/profileBasics.js";
 
 const router = Router();
 
@@ -274,6 +275,10 @@ router.patch("/me", requireAuth, gateProfileUgc, asyncHandler(async (req: AuthRe
     if (req.body.gender === "male" || req.body.gender === "female") updateData.gender = req.body.gender;
     const by = Number(req.body.birthYear);
     if (Number.isInteger(by) && by >= 1920 && by <= 2020) updateData.birthYear = by;
+    // 나이대(2026-10-20 — 설정 · 홈 배너 · 프로필 창). 여섯 칸만. null 이면 지운다(출생연도도 같이 — 지우기는 둘 다 지우는 것)
+    if (isAgeBand(req.body.ageBand)) updateData.ageBand = req.body.ageBand;
+    if (req.body.ageBand === null) { updateData.ageBand = null; updateData.birthYear = null; }
+    if (req.body.gender === null) updateData.gender = null;
     // 커뮤니티 실력 뱃지 숨김 토글
     if (typeof req.body.hideSkillBadge === "boolean") updateData.hideSkillBadge = req.body.hideSkillBadge;
     // 국가(ISO 3166-1 alpha-2) — 온라인당구 게임 랭킹의 국가별 보기. 빈 문자열이면 지운다.

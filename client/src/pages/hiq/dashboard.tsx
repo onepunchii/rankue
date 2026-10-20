@@ -38,6 +38,7 @@ import { useT } from "@/lib/i18n";
 import { CoachTour } from "@/components/hiq/CoachTour";
 
 import { useLocation, useSearch } from "wouter";
+import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
 
 // 서버 GET /api/hiq/rankings 는 항상 상위 20명만 잘라서 준다(getTopRankings(storeId, 20, type)).
 // 응답 길이가 이 값에 닿았다면 뒤에 몇 명이 더 있는지 알 수 없다.
@@ -225,16 +226,9 @@ function HiqDashboardBilliards() {
             {/* 시뮬레이터 대전에서 내 차례 — 푸시를 놓쳐도 여기서 돌아간다 */}
             <SimMatchBanner />
 
-            {/* 프로필 완성 넛지 — 가입에서 설정으로 옮긴 선택 정보(성별·출생연도) 채움 유도 */}
-            {member && (!(member as any).gender || !(member as any).birthYear) && (
-                <button
-                    onClick={() => setLocation("/settings")}
-                    className="w-full mb-4 px-4 py-3 rounded-tile bg-brand/10 border border-brand/25 flex items-center justify-between text-left active:scale-[0.99] transition-transform"
-                >
-                    <span className="text-[13px] font-semibold text-brand">{t("dashboard.completeProfile")}</span>
-                    <span className="text-[12px] text-brand/70">{t("dashboard.completeProfileCta")}</span>
-                </button>
-            )}
+            {/* 프로필 기본 두 가지(성별 · 나이대) — 비었을 때만, 회원에게만(2026-10-20 오너: "지금 당구에 미프로필 시 나오는 배너 디자인이 별로").
+                예전 넛지는 설정으로 보냈고 '매칭 정확도'라고 적었지만 매칭엔 쓰지 않는다 — 이제 그 자리에서 창이 열리고, 실제로 쓰는 곳만 적는다 */}
+            {member && <ProfileNudge sport="BILLIARDS" className="mb-4" />}
 
             {/* 내 실전 기록 — 맨 위(2026-10-04 오너: "3쿠션·4구 RP 카드와 전적 카드는 중복 — 실전 핸디 카드에 통합해 맨 위로").
                 머리 아래 기록 띠(랭킹 점수·전적·최근 5경기) + 닮은 프로·비교표. 공식 경기가 없으면 첫 경기 안내. */}

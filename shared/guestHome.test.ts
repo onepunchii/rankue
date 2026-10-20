@@ -643,7 +643,8 @@ describe("당구 홈", () => {
         });
 
         it("프로필 완성 넛지는 회원에게만", () => {
-            expect(jsx).toContain("{member && (!(member as any).gender || !(member as any).birthYear) && (");
+            // 2026-10-20 — 성별 · 나이대 배너(창이 그 자리에서 열린다). 비었는지는 배너가 스스로 본다(shared/profileBasics needsProfileBasics)
+            expect(jsx).toContain('{member && <ProfileNudge sport="BILLIARDS" className="mb-4" />}');
         });
     });
 

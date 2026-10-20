@@ -4,6 +4,7 @@ import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { AppDialogHost } from "@/components/AppDialog";
 import { PrimarySportGate } from "@/components/hiq/sport/PrimarySport";
+import { ProfileBasicsHost } from "@/components/hiq/profile/ProfileBasics";
 import { PresenceArrivals } from "@/components/hiq/presence/PresenceArrivals";
 import { AppInstallSheet } from "@/components/hiq/AppInstallSheet";
 import { HandoffRedeemer } from "@/components/hiq/HandoffRedeemer";
@@ -633,6 +634,8 @@ function App() {
             <AppDialogHost />
             {/* 주 종목 한 번 묻기(2026-10-01) — 가입 직후·기존 회원 다음 접속 때 한 번. 고른 종목으로 앱이 시작한다 */}
             <PrimarySportGate />
+            {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 종목 홈의 배너가 연다. 스스로 뜨지 않는다 */}
+            <ProfileBasicsHost />
             {/* 친구 초대 내기(2026-10-16) — 초대 링크로 온 기기에서 로그인하면 한 번 서버에 낸다. 받으면 '환영해요'(다른 창이 닫힌 뒤) */}
             <InviteClaimer />
             {/* 친구·크루 접속 배너(2026-10-01) — 앱을 보고 있을 때만, 폰은 울리지 않는다 */}

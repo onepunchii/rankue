@@ -31,6 +31,7 @@ import { MY_TRIPS_KEY, type MyTrip } from "../trail/useTrail";
 import { durationText } from "@shared/hikingGeo";
 import { HIKING_HERO } from "../theme";
 import { CoachTour } from "@/components/hiq/CoachTour";
+import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
 
 const TILT = [-4, 3, -2, 5];
 
@@ -81,6 +82,8 @@ export default function HikingHome() {
                     </div>
                 </div>
 
+                {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 산악회 회원 목록 · 조 나누기에 쓴다 */}
+                <div className="px-5 empty:hidden [&:has(>*)]:pt-2"><ProfileNudge sport="HIKING" /></div>
                 {s.isLoading ? (
                     <div className="space-y-4 px-5 pt-4" aria-busy="true"><HkSkel className="h-24" /><HkSkel className="h-[420px]" /></div>
                 ) : (

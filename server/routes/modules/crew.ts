@@ -1523,7 +1523,7 @@ async function stripMemberPrivacy(req: any, crew: any): Promise<any> {
         ...crew,
         members: (crew.members || []).map((m: any) => ({
             ...m,
-            member: { ...m.member, birthYear: null, gender: null },
+            member: { ...m.member, birthYear: null, ageBand: null, gender: null },
         })),
     };
 }

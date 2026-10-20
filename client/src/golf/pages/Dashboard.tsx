@@ -30,6 +30,7 @@ import { StampHomeEntry } from "../stamps/StampHomeEntry";
 // Hooks
 import { useGolfMatch } from "../hooks/useGolfMatch";
 import { useGolfStats } from "../hooks/useGolfStats";
+import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
 
 export default function GolfDashboard() {
     const queryClient = useQueryClient();
@@ -127,6 +128,9 @@ export default function GolfDashboard() {
                     onOpenJoin={() => matchLogic.setIsJoinOpen(true)}
                 />
             </div>
+
+            {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 조인을 열 때 내 자리 남 · 여가 여기서 온다 */}
+            <ProfileNudge sport="GOLF" className="relative z-10 mb-6" />
 
             {/* 도장깨기(2026-10-12 오너: "도장깨기가 우리 골프 콘텐츠의 핵심") — 도장첩 책장의 입구. 방문자에게는 예시 인물의 진행을 보여 준다 */}
             <div data-tour="gh-stamps"><StampHomeEntry /></div>

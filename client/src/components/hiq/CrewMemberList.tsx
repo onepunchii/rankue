@@ -32,6 +32,7 @@ import { MemberSearchBar } from "@/components/hiq/club/MemberSearchBar";
 import { golfScoreOf, memberStat } from "@/components/hiq/club/memberStat";
 import { filterSortMembers, type MemberSort } from "@shared/crewManage";
 import { TierAvatarBadge, TierNameChip } from "@/components/hiq/TierAvatarBadge";
+import { ageBandOf } from "@shared/profileBasics";
 
 // --- Types ---
 interface EnhancedHiqMember extends HiqMember {
@@ -210,7 +211,9 @@ export function CrewMemberList({ members, currentMemberId, sportCategory = "BILL
     // 모르면 그리지 않는다: 예전엔 성별이 null 이면 '남성'으로 찍혔다.
     const profileLine = (m: EnhancedHiqMember) => {
         const parts: string[] = [];
-        if (m.birthYear) parts.push(`${Math.floor((new Date().getFullYear() - m.birthYear) / 10) * 10}${t("crewMemberList.ageSuffix")}`);
+        // 나이대(2026-10-20) — 고른 나이대가 먼저, 없으면 출생연도로(shared/profileBasics)
+        const band = ageBandOf(m as never, new Date(Date.now() + 9 * 3600_000).getUTCFullYear());
+        if (band) parts.push(t(`profileBasics.age.${band}`));
         if (m.gender === "female") parts.push(t("crewMemberList.female"));
         else if (m.gender === "male") parts.push(t("crewMemberList.male"));
         return parts.join(" · ");

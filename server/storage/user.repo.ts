@@ -34,8 +34,8 @@ const WITHDRAWN_LISTING_REASON = "탈퇴한 회원의 글";
 export const PUBLIC_MEMBER_COLUMNS = {
     id: hiqMembers.id,
     name: hiqMembers.name,
-    birthYear: hiqMembers.birthYear,
-    gender: hiqMembers.gender,
+    // 출생연도 · 성별은 뺐다(2026-10-20) — 랭킹 · 상대 목록 · 검색 · 친구 · 남의 프로필 어느 화면도 그리지 않는데 답에 실려 나갔다.
+    // 프로필 창의 약속('같은 크루 안에서만 보여요')과 맞춘다. 크루 목록 · 팀 나누기는 crew.repo 가 크루원에게만 따로 준다.
     handi3c: hiqMembers.handi3c,
     handi4c: hiqMembers.handi4c,
     average: hiqMembers.average,
@@ -757,6 +757,7 @@ export class UserRepository {
                 name: "탈퇴회원",
                 phone: `del-${memberId.slice(0, 12)}`,
                 birthYear: null,
+                ageBand: null,
                 gender: null,
                 average: null,
                 introduction: null,

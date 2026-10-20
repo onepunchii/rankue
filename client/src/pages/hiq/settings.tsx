@@ -25,6 +25,7 @@ import {
 } from "@/lib/kakaoLogin";
 import GoogleLinkPanel, { googleLinkAvailable } from "@/components/hiq/GoogleLinkPanel";
 import { openAttachPhoneSheet } from "@/components/hiq/AttachPhoneSheet";
+import { AGE_BANDS, ageBandOf, type AgeBand } from "@shared/profileBasics";
 
 // 설정 — 전체메뉴 톱니바퀴 진입. 1순위: 계정 연결 상태 + 언어. (형 결정: 2026-07)
 export default function HiqSettings() {
@@ -80,8 +81,8 @@ export default function HiqSettings() {
         setLocation("/");
     };
 
-    // 프로필 선택 정보(성별·출생연도) 저장 — 탭 즉시 저장, 실패는 토스트
-    const saveProfileField = async (patch: { gender?: "male" | "female"; birthYear?: number }) => {
+    // 프로필 선택 정보(성별 · 나이대 — 2026-10-20 출생연도 칸을 나이대로) 저장 — 탭 즉시 저장, 실패는 토스트. null 은 지우기
+    const saveProfileField = async (patch: { gender?: "male" | "female" | null; ageBand?: AgeBand | null }) => {
         try {
             await apiRequest("/api/hiq/me", { method: "PATCH", body: JSON.stringify(patch) });
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/me"] });
@@ -267,7 +268,7 @@ export default function HiqSettings() {
                     </div>
                 </section>
 
-                {/* 내 프로필 — 가입에서 옮겨온 선택 정보(성별·출생연도). 소셜·전화 유저 공통 입력처 */}
+                {/* 내 프로필 — 성별 · 나이대(2026-10-20 오너 "성별이랑 나이대로"). 홈 배너의 창과 같은 두 가지 · 같은 저장 길 */}
                 <section className="rk-card p-5">
                     <div className="flex items-center gap-2 mb-1">
                         <LucideBadgeCheck className="w-4 h-4 text-brand" />
@@ -288,17 +289,26 @@ export default function HiqSettings() {
                             </button>
                         ))}
                     </div>
-                    <select
-                        value={member?.birthYear ?? ""}
-                        onChange={(e) => { const v = Number(e.target.value); if (v) saveProfileField({ birthYear: v }); }}
-                        aria-label={t("settings.birthYear")}
-                        className="w-full h-12 px-4 bg-black/[0.04] rounded-tile text-[14px] font-semibold outline-none cursor-pointer"
-                    >
-                        <option value="">{t("settings.birthYear")}</option>
-                        {Array.from({ length: 81 }, (_, i) => 2010 - i).map((y) => (
-                            <option key={y} value={y}>{y}</option>
-                        ))}
-                    </select>
+                    <p className="text-[12px] font-semibold text-black/45 mb-2">{t("settings.ageBand")}</p>
+                    <div className="grid grid-cols-3 gap-2" role="group" aria-label={t("settings.ageBand")}>
+                        {AGE_BANDS.map((a) => {
+                            const on = ageBandOf(member as never, new Date(Date.now() + 9 * 3600_000).getUTCFullYear()) === a;
+                            return (
+                                <button
+                                    key={a} type="button" aria-pressed={on}
+                                    onClick={() => saveProfileField({ ageBand: a })}
+                                    className={cn("h-11 rounded-tile text-[14px] font-semibold transition-colors", on ? "bg-brand text-brand-fg" : "bg-black/[0.04] text-black/60")}
+                                    data-testid={`settings-age-${a}`}
+                                >{t(`profileBasics.age.${a}`)}</button>
+                            );
+                        })}
+                    </div>
+                    {/* 지우기 — 성별 · 나이대(예전 출생연도까지) 한꺼번에. 창의 약속 '언제든 바꾸거나 지울 수 있어요' */}
+                    {(member?.gender || (member as { ageBand?: string | null } | null)?.ageBand || member?.birthYear) && (
+                        <button type="button" onClick={() => saveProfileField({ gender: null, ageBand: null })} className="mt-3 h-9 px-1 text-[12.5px] font-semibold text-black/45 underline-offset-2 hover:underline" data-testid="settings-profile-clear">
+                            {t("settings.clearProfile")}
+                        </button>
+                    )}
                 </section>
 
                 {/* 언어 */}
