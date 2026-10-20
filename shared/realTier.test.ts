@@ -116,7 +116,7 @@ describe("화면: 실전 등급은 어디서나 같은 식 · 다마 메달", ()
         const quick = client("components/hiq/dashboard/QuickActions.tsx");
         expect(quick).toContain("<RealMedal game={type} handi={ready ? s!.handi : null} size={54} />");
         const card = client("components/hiq/dashboard/RealHandicapCard.tsx");
-        expect(card).toContain("<RealMedal game={cur} handi={sideReady ? side.handi : null} size={56} />");
+        expect(card).toContain("<RealMedal game={cur} handi={sideReady ? side.handi : null} size={64} />");   // 2026-10-20 시안 A — 56 → 64
         expect(card).toContain("{medalRow}");
         const medal = code(client("components/hiq/RealMedal.tsx"));
         // 다마가 없으면 빈 메달(흐린 그림 · 숫자 없음)

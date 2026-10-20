@@ -73,6 +73,19 @@ export function nextHandicap(avg: number, type: "3c" | "4c"): HandiStep | null {
     return i > 0 ? map[i - 1] : null;
 }
 
+/**
+ * 지금 핸디 칸 안에서 어디쯤인가(0~1) — 홈 '내 실전 기록'의 다음 다마 막대(2026-10-20 오너 시안 A).
+ * 칸의 아래 끝 = 지금 핸디의 권장 에버, 위 끝 = 바로 위 칸의 권장 에버. 맨 위 칸이면 null(막대 대신 '최고 핸디').
+ */
+export function handiBandProgress(avg: number, type: "3c" | "4c"): number | null {
+    if (!Number.isFinite(avg)) return null;
+    const map = mapOf(type);
+    const i = map.findIndex((s) => s.handi === handicapFor(avg, type));
+    if (i <= 0) return null;
+    const lo = map[i].avg, hi = map[i - 1].avg;
+    return hi > lo ? Math.min(1, Math.max(0, (avg - lo) / (hi - lo))) : null;
+}
+
 /** 핸디를 매길 때 보는 한 판 — 기록 줄의 에버리지 글자와, 그 판에서 그 사람이 적은 목표(없으면 null) */
 export interface HandiGame { average: string | number; target?: number | null }
 

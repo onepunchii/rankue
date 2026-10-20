@@ -1730,6 +1730,7 @@ export const ko: Dict = {
   "lookalike.photoCredit": "사진 PBA",
   "lookalike.funShort": "최근 10판 · 재미로 보세요",
   "lookalike.meDot": "나",
+  "lookalike.nextTierArrow": "다음 {name} →",
   "lookalike.tierShort0": "아마추어",
   "lookalike.tierShort1": "LPBA 신인",
   "lookalike.tierShort2": "LPBA 상위",

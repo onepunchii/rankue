@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
     HANDICAP_MAP_3C, HANDICAP_MAP_4C, HANDI_4C_INNINGS, HANDI_4C_MAX, HANDI_MIN_GAMES, HANDI_RECENT_GAMES,
-    handiBasis, handiBasisAverage, handiGameAverage, handicapFor, nextHandicap,
+    handiBasis, handiBasisAverage, handiGameAverage, handicapFor, nextHandicap, handiBandProgress,
 } from "./realHandicap";
 
 /**
@@ -148,5 +148,15 @@ describe("서버: 경기 끝의 다마 산정과 홈 '다음 다마까지'가 �
         const repo = read("server/storage/compare.repo.ts");
         const fn = repo.slice(repo.indexOf("async handiBasis("), repo.indexOf("/** 같은 핸디 회원"));
         expect(fn).toContain("avg: handiBasisAverage(await recentHandiGames(memberId, type), type)");
+    });
+});
+
+describe("다음 다마 막대 — 지금 핸디 칸 안의 자리(2026-10-20 시안 A)", () => {
+    it("칸 아래 끝 0 · 위 끝 1 · 맨 위 칸은 null", () => {
+        expect(handiBandProgress(0.52, "3c")).toBeCloseTo(0, 5);          // 23점 칸의 아래 끝
+        expect(handiBandProgress(0.5405, "3c")).toBeCloseTo(0.5, 2);      // 0.52 ~ 0.561 의 가운데
+        expect(handiBandProgress(1.5, "3c")).toBeNull();                  // 40점 — 더 오를 칸이 없다
+        expect(handiBandProgress(Number.NaN, "3c")).toBeNull();
+        expect(handiBandProgress(0.1, "3c")).toBeGreaterThan(0);          // 맨 아래 칸(12점)도 막대가 있다
     });
 });

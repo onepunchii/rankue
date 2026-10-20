@@ -70,20 +70,30 @@ export function TierLadder({ tier, pos }: { tier: number; pos: number }) {
 }
 
 /** 닮은 프로 머리 — 누르면 그 선수 페이지. extra: 등급 칩 옆 작은 칩(예: 랭큐 상위 30%) */
-export function ProTwinHeader({ pro, tier, pos, extra, onOpen }: { pro: ComparePro; tier: number | null; pos: number | null; extra?: ReactNode; onOpen: () => void }) {
+export function ProTwinHeader({ pro, tier, pos, extra, extraText, flat, onOpen }: {
+    pro: ComparePro; tier: number | null; pos: number | null; extra?: ReactNode;
+    /** flat 에서 사다리 밑 한 줄에 붙일 글(예: 랭큐 회원 상위 29%) — 칩 대신 */
+    extraText?: string;
+    /**
+     * 상자 없는 판(2026-10-20 오너 "답답해 보임" → 시안 A '한 판으로'): 옅은 초록 상자 · 등급 칩을 걷고 위에 실선 하나,
+     * 사다리는 이어진 막대 + '지금 · 다음' 두 이름만(다섯 이름이 360 폭에서 두 줄로 꺾였다). 실전 카드가 쓴다.
+     */
+    flat?: boolean;
+    onOpen: () => void;
+}) {
     const { t, locale } = useT();
     const name = proName(pro, locale);
     const [photo, setPhoto] = useState(false);
     return (
-        <div className="mt-3 rounded-tile bg-brand/[0.05] p-3">
+        <div className={flat ? "mt-3.5 pt-3.5 border-t border-surface-line" : "mt-3 rounded-tile bg-brand/[0.05] p-3"} data-testid="pro-twin">
             <a href={`/pba-player/${encodeURIComponent(pro.memCode)}`} onClick={(e) => { e.preventDefault(); onOpen(); }} className="flex items-center gap-3 active:opacity-80">
-                <PlayerPhoto memCode={pro.memCode} name={name} size={56} className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhoto(true)}>
+                <PlayerPhoto memCode={pro.memCode} name={name} size={flat ? 52 : 56} className="ring-[3px] ring-surface-1 shadow-[0_2px_8px_rgba(0,0,0,.15)]" onShown={() => setPhoto(true)}>
                     <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-1.5 h-[18px] rounded-full bg-surface-1 text-brand text-[12px] font-bold leading-[18px] shadow-sm whitespace-nowrap">{pro.league}</span>
                 </PlayerPhoto>
                 <span className="flex-1 min-w-0">
                     <span className="block text-[12px] font-semibold text-ink-3">{t("lookalike.twin")}</span>
                     <span className="flex items-center gap-1 min-w-0">
-                        <span className="text-[19px] font-bold leading-tight truncate">{name}</span>
+                        <span className={cn("font-bold leading-tight truncate", flat ? "text-[17px]" : "text-[19px]")}>{name}</span>
                         <span className="text-[14px] shrink-0">{flagEmoji(pro.nationCode ?? "")}</span>
                     </span>
                     <span className="block rk-num text-[12px] font-medium text-ink-3">
@@ -94,13 +104,44 @@ export function ProTwinHeader({ pro, tier, pos, extra, onOpen }: { pro: CompareP
                 </span>
                 <LucideChevronRight className="w-4 h-4 text-ink-4 shrink-0" />
             </a>
-            {(tier != null || extra) && (
-                <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
-                    {tier != null && <TierChip tier={tier} />}
-                    {extra}
-                </div>
+            {flat ? (
+                tier != null && pos != null && <TierTrack tier={tier} pos={pos} extraText={extraText} />
+            ) : (
+                <>
+                    {(tier != null || extra) && (
+                        <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+                            {tier != null && <TierChip tier={tier} />}
+                            {extra}
+                        </div>
+                    )}
+                    {tier != null && pos != null && <TierLadder tier={tier} pos={pos} />}
+                </>
             )}
-            {tier != null && pos != null && <TierLadder tier={tier} pos={pos} />}
+        </div>
+    );
+}
+
+/**
+ * 이어진 사다리(flat) — 한 줄 막대에 칸 경계 넷, 내 자리 '나' 점. 밑에는 왼쪽 '지금 칸 · extraText', 오른쪽 '다음 칸 →'.
+ * 칸 이름 다섯을 다 적지 않는다 — 맨 위 칸이면 오른쪽은 비운다.
+ */
+export function TierTrack({ tier, pos, extraText }: { tier: number; pos: number; extraText?: string }) {
+    const { t } = useT();
+    const left = Math.min(100, Math.max(0, pos));
+    return (
+        <div className="mt-3.5" aria-label={t(`lookalike.tier${tier}`)} data-testid="tier-track">
+            <div className="relative h-1.5 rounded-full bg-surface-line">
+                <span className="absolute inset-y-0 left-0 rounded-full bg-brand" style={{ width: `${left}%` }} />
+                {[20, 40, 60, 80].map((x) => <span key={x} className="absolute inset-y-0 w-[3px] -ml-[1.5px] bg-surface-1" style={{ left: `${x}%` }} />)}
+                <span
+                    className="absolute top-1/2 -translate-x-1/2 -translate-y-1/2 w-[22px] h-[22px] rounded-full bg-[#F5B721] border-[2.5px] border-surface-1 shadow-[0_1px_4px_rgba(0,0,0,.25)] text-[11px] font-bold leading-none text-white flex items-center justify-center"
+                    style={{ left: `${left}%` }} aria-hidden="true"
+                >{t("lookalike.meDot")}</span>
+            </div>
+            <div className="mt-2 flex items-baseline justify-between gap-2 text-[12px] font-semibold rk-num">
+                <span className="text-brand truncate">{[t(`lookalike.tierShort${tier}`), extraText].filter(Boolean).join(" · ")}</span>
+                {tier < 4 && <span className="text-ink-4 shrink-0">{t("lookalike.nextTierArrow").replace("{name}", t(`lookalike.tierShort${tier + 1}`))}</span>}
+            </div>
         </div>
     );
 }
@@ -259,11 +300,18 @@ export interface StripCell {
     /** 라벨 옆 작은 '?' — 누르면 설명이 열리는 칸(랭킹 점수 → RP 안내) */
     hint?: boolean;
 }
-export function RecordStrip({ cells }: { cells: StripCell[] }) {
+export function RecordStrip({ cells, flat }: {
+    cells: StripCell[];
+    /** 상자 없는 판(2026-10-20 시안 A) — 테두리 대신 위 실선 하나 · 칸 사이 세로 실선, 숫자를 조금 크게 */
+    flat?: boolean;
+}) {
     return (
         <div
-            className="mt-3 grid rounded-tile border border-surface-line divide-x divide-surface-line overflow-hidden"
+            className={flat
+                ? "mt-3.5 pt-3 grid border-t border-surface-line divide-x divide-surface-line"
+                : "mt-3 grid rounded-tile border border-surface-line divide-x divide-surface-line overflow-hidden"}
             style={{ gridTemplateColumns: `repeat(${cells.length}, minmax(0, 1fr))` }}
+            data-testid="record-strip"
         >
             {cells.map((c, i) => {
                 const body = (
@@ -272,16 +320,18 @@ export function RecordStrip({ cells }: { cells: StripCell[] }) {
                             <span className="truncate">{c.label}</span>
                             {c.hint && <HelpCircle className="w-3 h-3 shrink-0 text-ink-4" aria-hidden="true" />}
                         </span>
-                        <span className="block mt-1.5 h-[18px] text-[16px] leading-[18px] font-bold text-ink-1 rk-num truncate">{c.value}</span>
+                        <span className={cn("block font-bold text-ink-1 rk-num truncate", flat ? "mt-1 h-[24px] text-[20px] leading-[24px]" : "mt-1.5 h-[18px] text-[16px] leading-[18px]")}>{c.value}</span>
                         <span className={cn("block mt-1.5 text-[12px] font-semibold rk-num truncate", c.subTone === "brand" ? "text-brand" : "text-ink-4")}>
                             {c.sub ?? " "}
                         </span>
                     </>
                 );
+                // flat: 첫 칸은 카드 안쪽 여백에 맞춰 왼쪽을 붙이고, 나머지는 세로 실선에서 띄운다
+                const pad = flat ? (i === 0 ? "pl-0 pr-3 py-1" : "pl-3.5 pr-1 py-1") : "px-2.5 py-2.5";
                 return c.onClick ? (
-                    <button key={i} type="button" onClick={c.onClick} className="min-w-0 px-2.5 py-2.5 text-left transition-colors active:bg-surface-3">{body}</button>
+                    <button key={i} type="button" onClick={c.onClick} className={cn("min-w-0 text-left transition-colors active:bg-surface-3", flat && "rounded-lg", pad)}>{body}</button>
                 ) : (
-                    <div key={i} className="min-w-0 px-2.5 py-2.5">{body}</div>
+                    <div key={i} className={cn("min-w-0", pad)}>{body}</div>
                 );
             })}
         </div>

@@ -1728,6 +1728,7 @@ const es: Dict = {
   "lookalike.photoCredit": "Foto: PBA",
   "lookalike.funShort": "Últimas 10 · por diversión",
   "lookalike.meDot": "Yo",
+  "lookalike.nextTierArrow": "Siguiente: {name} →",
   "lookalike.tierShort0": "Aficionado",
   "lookalike.tierShort1": "LPBA novato",
   "lookalike.tierShort2": "LPBA alto",

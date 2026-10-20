@@ -1728,6 +1728,7 @@ const vi: Dict = {
   "lookalike.photoCredit": "Ảnh: PBA",
   "lookalike.funShort": "10 trận · cho vui",
   "lookalike.meDot": "Tôi",
+  "lookalike.nextTierArrow": "Tiếp: {name} →",
   "lookalike.tierShort0": "Nghiệp dư",
   "lookalike.tierShort1": "LPBA mới",
   "lookalike.tierShort2": "LPBA trên",

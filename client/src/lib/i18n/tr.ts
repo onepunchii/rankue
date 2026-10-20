@@ -1728,6 +1728,7 @@ const tr: Dict = {
   "lookalike.photoCredit": "Foto: PBA",
   "lookalike.funShort": "Son 10 · eğlence",
   "lookalike.meDot": "Ben",
+  "lookalike.nextTierArrow": "Sıradaki: {name} →",
   "lookalike.tierShort0": "Amatör",
   "lookalike.tierShort1": "LPBA çaylak",
   "lookalike.tierShort2": "LPBA üst",

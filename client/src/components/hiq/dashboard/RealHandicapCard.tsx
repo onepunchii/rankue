@@ -43,6 +43,7 @@ import { BadgeAvatar, CardActions, CompareTable, FormDots, GOLD_TEXT, MeAvatar, 
 import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
 import { BadgeTap } from "@/components/hiq/BadgeGuideSheet";
 import { realTierFor } from "@shared/realTier";
+import { handiBandProgress } from "@shared/realHandicap";
 
 type HistoryRow = { sportCategory?: string | null; gameMode?: string | null; isRanked?: boolean | null; gameType?: string | null; isWinner?: boolean | null };
 
@@ -97,8 +98,10 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     const pct = sample ? sample.percentile[cur] : getPercentile?.(cur) ?? null;
     // 전적·최근 5경기 칸은 내 기록 화면으로 간다 — 예시에서는 누를 곳이 아니다(눌러서 로그인 안내에 떨어지지 않게)
     const openHistory = sample ? undefined : () => setLocation("/history");
+    // 2026-10-20 오너 "답답해 보임" → 시안 A '한 판으로': 상자 없이 두 칸 — 랭킹 점수 | 전적 · 최근 5경기(점은 전적 밑).
+    // 예전 셋째 칸(최근 5경기)은 아래 절반이 늘 비어 있었다.
     const strip = (
-        <RecordStrip cells={[
+        <RecordStrip flat cells={[
             {
                 label: t("real.stripRp"),
                 value: <>{rating}<span className="ml-0.5 text-[12px] font-bold text-brand">RP</span></>,
@@ -109,14 +112,16 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
                 hint: !!onOpenRpGuide,
             },
             {
-                label: t("performanceCard.title"),
-                value: <RecordValue template={t("real.stripRecord")} w={wins} l={losses} />,
-                sub: mine.length ? fill(t("real.stripRate"), { n: Math.round((wins / mine.length) * 100) }) : t("real.stripNone"),
-                onClick: openHistory,
-            },
-            {
-                label: t("performanceCard.recentFive"),
-                value: <FormDots results={mine.slice(0, 5).map((g) => (g.isWinner ? "W" : "L"))} />,
+                label: `${t("performanceCard.title")} · ${t("performanceCard.recentFive")}`,
+                value: (
+                    <>
+                        <RecordValue template={t("real.stripRecord")} w={wins} l={losses} />
+                        <span className="ml-1.5 text-[12px] font-semibold text-ink-4">
+                            {mine.length ? fill(t("real.stripRate"), { n: Math.round((wins / mine.length) * 100) }) : t("real.stripNone")}
+                        </span>
+                    </>
+                ),
+                sub: <FormDots results={mine.slice(0, 5).map((g) => (g.isWinner ? "W" : "L"))} />,
                 onClick: openHistory,
             },
         ]} />
@@ -138,17 +143,29 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     const side = data?.[cur];
     const sideReady = !!(side?.ready && side.handi);
     const sideTier = sideReady ? realTierFor(side!.handi, cur) : null;
+    // 다음 다마까지 막대(2026-10-20 시안 A) — 지금 핸디 칸 안의 자리(최근 공식 10판 평균 기준, 다음 다마 글과 같은 근거).
+    // 공식 5판 전에는 친 판 수 / 필요한 판 수. 맨 위 핸디면 막대 없이 '최고 핸디' 글만.
+    const tierInk = sideTier ? REAL_TIER_INK[sideTier.id] : undefined;
+    const barPct = !side ? null
+        : !sideReady ? Math.min(100, Math.round((Math.min(side.games, side.needed) / Math.max(1, side.needed)) * 100))
+        : side.nextHandi && side.handiAvg != null ? (() => { const p = handiBandProgress(side.handiAvg!, cur); return p == null ? null : Math.max(4, Math.round(p * 100)); })()
+        : null;
     const medalRow = side ? (
-        <div className="mt-3 flex items-center gap-3" data-testid="real-tier-row">
+        <div className="mt-3.5 flex items-center gap-3.5" data-testid="real-tier-row">
             {/* 메달을 누르면 배지 안내(2026-10-12 오너: "이거 누르면 팝업창으로 … 무슨 배지가 있고") */}
             <BadgeTap guide={{ kind: "real", game: cur, handi: sideReady ? side.handi : null }}>
-                <RealMedal game={cur} handi={sideReady ? side.handi : null} size={56} />
+                <RealMedal game={cur} handi={sideReady ? side.handi : null} size={64} />
             </BadgeTap>
-            <div className="min-w-0">
-                <p className="text-[16px] font-black leading-tight truncate" style={sideTier ? { color: REAL_TIER_INK[sideTier.id] } : undefined}>
+            <div className="min-w-0 flex-1">
+                <p className="text-[17px] font-black leading-tight truncate" style={tierInk ? { color: tierInk } : undefined}>
                     {sideTier ? fill(t("real.tierOf"), { tier: t(sideTier.nameKey) }) : t("real.tierNone")}
                 </p>
-                <p className="mt-0.5 text-[12px] font-semibold text-ink-3 rk-num truncate">
+                {barPct != null && (
+                    <div className="mt-2 h-1.5 rounded-full bg-surface-3 overflow-hidden" data-testid="real-next-bar" aria-hidden="true">
+                        <div className="h-full rounded-full" style={{ width: `${barPct}%`, backgroundColor: tierInk ?? "rgb(var(--brand))" }} />
+                    </div>
+                )}
+                <p className="mt-1.5 text-[12px] font-semibold text-ink-3 rk-num truncate">
                     {!sideReady
                         ? fill(t("home.damaNeed"), { n: Math.max(1, side.needed - side.games) })
                         : side.nextHandi
@@ -269,9 +286,10 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
         return (
             <section className="rk-card rounded-3xl p-4">
                 {head}
+                {/* 상자 · 등급 칩 없이(2026-10-20 시안 A) — 회원 상위 % 는 사다리 밑 한 줄로 */}
                 <ProTwinHeader
-                    pro={pro} tier={d.tier} pos={d.pos} onOpen={openPro}
-                    extra={d.members ? <span className="inline-flex items-center h-6 px-2.5 rounded-full text-[12px] font-semibold bg-surface-1 text-ink-2 rk-num">{fill(t("compare.topPctLong"), { n: d.members.topPct })}</span> : null}
+                    flat pro={pro} tier={d.tier} pos={d.pos} onOpen={openPro}
+                    extraText={d.members ? fill(t("compare.topPctLong"), { n: d.members.topPct }) : undefined}
                 />
                 <CompareTable
                     cols={[{ label: t("compare.me"), tone: "me", avatar: meFace }, { label: proName(pro, locale), avatar: <ProAvatar pro={pro} /> }, nextColFace]}
