@@ -94,6 +94,15 @@ export function targetFor(avg: number, gameType: GameType, pointUnit: number, in
     return caroms * (pointUnit > 0 ? pointUnit : 1);
 }
 
+/**
+ * 랭킹 줄의 온라인 다마수(2026-10-20 오너: 랭킹에 "핸디 점수 보이면 좋을듯" → 점수 옆 큰 육각).
+ * 기록이 모자라면(MIN_INNINGS 미만) null — 종목 기본값을 그 사람의 다마처럼 보이면 안 된다(화면은 회색 빈 육각).
+ */
+export function onlineDamaOf(rec: MatchRecord | null | undefined, gameType: GameType, pointUnit: number): number | null {
+    if (!rec || !hasEnoughRecord(rec)) return null;
+    return targetFor(playerAverage({ gameType, pointUnit, record: rec }), gameType, pointUnit);
+}
+
 /** 두 사람의 목표를 한 번에. 반환은 [방장, 게스트] 점수. */
 export function handicapPair(a: number, b: number, gameType: GameType, pointUnit: number, innings = TARGET_INNINGS): [number, number] {
     return [targetFor(a, gameType, pointUnit, innings), targetFor(b, gameType, pointUnit, innings)];

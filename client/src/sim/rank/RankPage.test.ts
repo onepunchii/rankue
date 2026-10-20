@@ -42,9 +42,9 @@ afterEach(() => { while (live.length) live.pop()!.unmount(); authState.member = 
 
 const ladder = (over: Partial<RankLadder> = {}): RankLadder => ({
     rows: [
-        { memberId: "a", name: "고수", country: "KR", rating: 1480, matches: 20, wins: 15, rank: 1, countryRank: 1 },
-        { memberId: "me", name: "나", country: "KR", rating: 1160, matches: 6, wins: 4, rank: 2, countryRank: 2 },
-        { memberId: "c", name: "멕시코", country: "MX", rating: 1100, matches: 3, wins: 2, rank: 3, countryRank: 1 },
+        { memberId: "a", name: "고수", country: "KR", rating: 1480, matches: 20, wins: 15, rank: 1, countryRank: 1, dama: 24 },
+        { memberId: "me", name: "나", country: "KR", rating: 1160, matches: 6, wins: 4, rank: 2, countryRank: 2, dama: 12 },
+        { memberId: "c", name: "멕시코", country: "MX", rating: 1100, matches: 3, wins: 2, rank: 3, countryRank: 1, dama: null },
     ],
     total: 3, countries: [{ country: "KR", players: 2 }, { country: "MX", players: 1 }],
     me: { rating: 1160, matches: 6, wins: 4, country: "KR", rank: 2, countryRank: 2 }, ...over,
@@ -97,9 +97,12 @@ describe("RankPage", () => {
         expect(rows).toHaveLength(3);
         expect(rows[0].textContent).toContain("고수");
         for (const r of Array.from(rows)) expect(r.className).toContain("hall-row-top");
-        expect(srcs(rows[0])).toEqual(["/sim/rank/medal-1.webp", "/sim/rank/tier-master.webp"]);
-        expect(srcs(rows[1])).toEqual(["/sim/rank/medal-2.webp", "/sim/rank/tier-gold.webp"]);
-        expect(srcs(rows[2])).toEqual(["/sim/rank/medal-3.webp", "/sim/rank/tier-silver.webp"]);
+        expect(srcs(rows[0])).toEqual(["/sim/rank/medal-1.webp", "/sim/rank/tier-master.webp", "/sim/rank/dama-online.svg"]);
+        expect(srcs(rows[1])).toEqual(["/sim/rank/medal-2.webp", "/sim/rank/tier-gold.webp", "/sim/rank/dama-online.svg"]);
+        expect(srcs(rows[2])).toEqual(["/sim/rank/medal-3.webp", "/sim/rank/tier-silver.webp", "/sim/rank/dama-online.svg"]);
+        // 점수 옆 온라인 다마 육각(2026-10-20 오너 시안 B) — 기록이 모자라면 숫자 없는 회색 육각
+        expect(Array.from(rows).map((r) => r.querySelector("[data-testid=online-dama]")?.getAttribute("data-target"))).toEqual(["24", "12", ""]);
+        expect(rows[0].querySelector("[data-testid=online-dama]")?.getAttribute("aria-label")).toContain("24");
         expect(rows[1].className).toContain("hall-row-mine");
         expect(rows[1].getAttribute("aria-current")).toBe("true");
         expect(rows[1].textContent).toContain(ko["sim.rank.meMark"]);
@@ -160,12 +163,12 @@ describe("RankPage", () => {
 describe("RankPage: 이달 · 통산", () => {
     const NOW = Date.UTC(2026, 9, 12, 6);   // 한국 시각 2026-10-12 15시
     const monthly = (month: string): import("./rankApi").MonthlyRank => month === "2026-09"
-        ? { month, minMatches: 5, rows: [{ memberId: "a", name: "고수", country: "KR", points: 94, matches: 13, wins: 12, rank: 1, tier: "master" }], total: 1, players: 4, me: { points: 0, matches: 0, wins: 0, rank: null, tier: "gold" }, months: ["2026-10", "2026-09"] }
+        ? { month, minMatches: 5, rows: [{ memberId: "a", name: "고수", country: "KR", points: 94, matches: 13, wins: 12, rank: 1, tier: "master", dama: 24 }], total: 1, players: 4, me: { points: 0, matches: 0, wins: 0, rank: null, tier: "gold" }, months: ["2026-10", "2026-09"] }
         : {
             month, minMatches: 5, total: 2, players: 5, months: ["2026-10", "2026-09"],
             rows: [
-                { memberId: "a", name: "고수", country: "KR", points: 47, matches: 9, wins: 7, rank: 1, tier: "master" },
-                { memberId: "me", name: "나", country: "KR", points: -12, matches: 6, wins: 2, rank: 2, tier: "gold" },
+                { memberId: "a", name: "고수", country: "KR", points: 47, matches: 9, wins: 7, rank: 1, tier: "master", dama: 24 },
+                { memberId: "me", name: "나", country: "KR", points: -12, matches: 6, wins: 2, rank: 2, tier: "gold", dama: null },
             ],
             me: { points: -12, matches: 6, wins: 2, rank: 2, tier: "gold" },
         };
@@ -199,7 +202,9 @@ describe("RankPage: 이달 · 통산", () => {
         expect(Array.from(rows).map((r) => r.textContent)).toEqual([expect.stringContaining("+47"), expect.stringContaining("−12")]);
         expect(rows[1].className).toContain("hall-row-mine");
         // 이름 옆 배지는 통산 등급이다
-        expect(Array.from(rows[0].querySelectorAll("img")).map((i) => i.getAttribute("src"))).toEqual(["/sim/rank/medal-1.webp", "/sim/rank/tier-master.webp"]);
+        expect(Array.from(rows[0].querySelectorAll("img")).map((i) => i.getAttribute("src"))).toEqual(["/sim/rank/medal-1.webp", "/sim/rank/tier-master.webp", "/sim/rank/dama-online.svg"]);
+        // 이달 탭에도 점수 옆 온라인 다마 육각(2026-10-20) — 나는 기록이 모자라 빈 육각
+        expect(Array.from(rows).map((r) => r.querySelector("[data-testid=online-dama]")?.getAttribute("data-target"))).toEqual(["24", ""]);
         // 통산의 내 카드(레이팅)는 이 탭에 없다
         expect(h.container.querySelector("[data-testid=rank-me]")).toBeNull();
         expect(h.container.querySelector("[data-testid=rank-month-label]")!.textContent).toContain("2026");
@@ -251,7 +256,7 @@ describe("RankPage: 이달 · 통산", () => {
         await settle(h, () => h.container.querySelector("[data-testid=rank-monthly-me]") !== null);
         const rows = h.container.querySelectorAll("[data-testid=rank-monthly] ol li");
         // 2등이지만 −12 — 메달이 없다(등급 배지 그림만) · 줄의 금빛 강조도 없다
-        expect(Array.from(rows[1].querySelectorAll("img")).map((i) => i.getAttribute("src"))).toEqual(["/sim/rank/tier-gold.webp"]);
+        expect(Array.from(rows[1].querySelectorAll("img")).map((i) => i.getAttribute("src"))).toEqual(["/sim/rank/tier-gold.webp", "/sim/rank/dama-online.svg"]);
         expect(rows[0].className).toContain("hall-row-top");
         expect(rows[1].className).not.toContain("hall-row-top");
         // 내 카드도 메달이 아니라 내 등급 배지

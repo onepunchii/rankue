@@ -11,11 +11,13 @@ describe("rankApi", () => {
     });
     it("파서: 숫자 문자열·잘못된 국가 코드·배치 전 me", () => {
         const l = parseRankLadder({
-            rows: [{ memberId: "a", name: "가", country: "KR", rating: "1200", matches: 5, wins: 4, rank: "1", countryRank: 1 }, { name: "no id" }],
+            rows: [{ memberId: "a", name: "가", country: "KR", rating: "1200", matches: 5, wins: 4, rank: "1", countryRank: 1, dama: "18" }, { name: "no id" }],
             total: "1", countries: [{ country: "KR", players: 1 }, { country: null, players: 2 }, { country: "korea", players: 1 }],
             me: { rating: 1030, matches: 1, wins: 1, country: null, rank: null, countryRank: null },
         });
-        expect(l.rows).toEqual([{ memberId: "a", name: "가", country: "KR", rating: 1200, matches: 5, wins: 4, rank: 1, countryRank: 1 }]);
+        expect(l.rows).toEqual([{ memberId: "a", name: "가", country: "KR", rating: 1200, matches: 5, wins: 4, rank: 1, countryRank: 1, dama: 18 }]);
+        // 온라인 다마수(2026-10-20) — 양의 정수만, 0 · 음수 · 글자 · 없음은 null(옛 서버 응답도 깨지지 않는다)
+        for (const bad of [0, -3, "x", null, undefined, 12.5]) expect(parseRankLadder({ rows: [{ memberId: "a", dama: bad }] }).rows[0].dama).toBeNull();
         expect(l.total).toBe(1);
         expect(l.countries.map((c) => c.country)).toEqual(["KR", null, null]);
         expect(l.me).toEqual({ rating: 1030, matches: 1, wins: 1, country: null, rank: null, countryRank: null });
@@ -50,13 +52,13 @@ describe("rankApi: 이달의 랭킹", () => {
     it("파서: 음수 점수 · 모르는 등급 · 깨진 달 · 순위 없는 나", () => {
         const m = parseMonthlyRank({
             month: "2026-10", minMatches: "5", total: 2, players: "6",
-            rows: [{ memberId: "a", name: "가", country: "KR", points: "-34", matches: 20, wins: 11, rank: 3, tier: "iron" }, { memberId: "b", name: "나", country: "korea", points: 12, matches: 5, wins: 3, rank: 4, tier: "legend" }, { name: "no id" }],
+            rows: [{ memberId: "a", name: "가", country: "KR", points: "-34", matches: 20, wins: 11, rank: 3, tier: "iron", dama: 21 }, { memberId: "b", name: "나", country: "korea", points: 12, matches: 5, wins: 3, rank: 4, tier: "legend" }, { name: "no id" }],
             me: { points: 24, matches: 3, wins: 3, rank: null, tier: null },
             months: ["2026-10", "2026-09", "2026-13", 7],
         });
         expect(m.rows).toEqual([
-            { memberId: "a", name: "가", country: "KR", points: -34, matches: 20, wins: 11, rank: 3, tier: "iron" },
-            { memberId: "b", name: "나", country: null, points: 12, matches: 5, wins: 3, rank: 4, tier: null },
+            { memberId: "a", name: "가", country: "KR", points: -34, matches: 20, wins: 11, rank: 3, tier: "iron", dama: 21 },
+            { memberId: "b", name: "나", country: null, points: 12, matches: 5, wins: 3, rank: 4, tier: null, dama: null },
         ]);
         expect([m.month, m.minMatches, m.total, m.players]).toEqual(["2026-10", 5, 2, 6]);
         expect(m.me).toEqual({ points: 24, matches: 3, wins: 3, rank: null, tier: null });

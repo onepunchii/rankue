@@ -22,6 +22,7 @@ import { countryName } from "./country";
 import { rankFlag } from "./flag";
 import { RANK_QUERY_KEY, type MonthlyRankRow, type RankApi } from "./rankApi";
 import { RankMedal, TierEmblem } from "./TierEmblem";
+import { OnlineDamaBadge } from "../entry/OnlineDamaBadge";
 import { ShelfLink } from "./ShelfLink";
 import { CupLink } from "../cup/CupArt";
 
@@ -51,6 +52,8 @@ const Row = memo(function Row({ r, mine, locale, onOpen }: { r: MonthlyRankRow; 
                     {t("sim.entry.record").replace("{w}", String(r.wins)).replace("{l}", String(r.matches - r.wins))}
                 </span>
             </span>
+            {/* 온라인 다마수(2026-10-20 오너: "핸디 점수 보이면 좋을듯" → 시안 B '점수 옆 큰 육각'). 기록이 모자라면 회색 빈 육각 */}
+            <OnlineDamaBadge target={r.dama} size={34} label={r.dama ? t("badgeGuide.damaTitle").replace("{n}", String(r.dama)) : undefined} />
             <span className={cn("hall-rating rk-num shrink-0 h-8 px-3 inline-flex items-center rounded-pill text-[14px] font-black", r.points > 0 ? "text-[color:var(--hall-lime)]" : "text-white/80")}>{signedPoints(r.points)}</span>
         </>
     );

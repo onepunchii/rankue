@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
     averageOf, caromsOf, CAROM_MAX, CAROM_MIN, DEFAULT_AVG, handicapPair,
-    MIN_INNINGS, playerAverage, pointUnitFor, sessionAverage, TARGET_INNINGS, targetFor,
+    MIN_INNINGS, onlineDamaOf, playerAverage, pointUnitFor, sessionAverage, TARGET_INNINGS, targetFor,
 } from "./handicap.js";
 
 describe("averageOf", () => {
@@ -84,5 +84,17 @@ describe("caromsOf / sessionAverage", () => {
     it("이상한 값이어도 나눗셈이 깨지지 않는다", () => {
         expect(sessionAverage(Number.NaN, 5, "3c")).toBe(0);
         expect(sessionAverage(10, Number.NaN, "3c")).toBe(10);
+    });
+});
+
+describe("랭킹 줄의 온라인 다마수(2026-10-20)", () => {
+    it("기록이 모자라면 null — 종목 기본값을 그 사람 다마처럼 보이지 않는다", () => {
+        expect(onlineDamaOf(null, "3c", 1)).toBeNull();
+        expect(onlineDamaOf({ score: 10, innings: MIN_INNINGS - 1, matches: 2 }, "3c", 1)).toBeNull();
+    });
+    it("3쿠션: 에버 × 18이닝 · 4구는 10점 단위", () => {
+        expect(onlineDamaOf({ score: 20, innings: 20, matches: 3 }, "3c", 1)).toBe(18);          // 에버 1.0 → 18
+        expect(onlineDamaOf({ score: 400, innings: 20, matches: 3 }, "4c", 10)).toBe(360);      // 2캐롬/이닝 → 36캐롬 → 360점
+        expect(onlineDamaOf({ score: 0, innings: 20, matches: 3 }, "3c", 1)).toBe(CAROM_MIN["3c"]);
     });
 });

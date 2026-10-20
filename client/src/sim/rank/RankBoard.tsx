@@ -6,6 +6,7 @@ import type { RankRow } from "./rankApi";
 import { countryName } from "./country";
 import { rankFlag } from "./flag";
 import { RankMedal, TierEmblem } from "./TierEmblem";
+import { OnlineDamaBadge } from "../entry/OnlineDamaBadge";
 
 /**
  * 랭킹 목록 — '진열장' 모양(2026-10-12 오너: 시안 A·B 가운데 "B 로 가고 … 게임 느낌도 나고 진짜 소유욕이 들게끔").
@@ -24,18 +25,22 @@ const Row = memo(function Row({ r, mine, locale, onOpen }: { r: RankRow; mine: b
                     ? <RankMedal rank={r.rank as 1 | 2 | 3} size={42} />
                     : <span className="rk-num text-[19px] font-black text-white/90">{r.rank}</span>}
             </span>
-            <TierEmblem tier={tier.id} size={46} />
+            {/* 2026-10-20 점수 옆에 다마 육각이 들어오며 이달 탭과 같은 40 으로(360 폭에서 이름 · 전적 자리) */}
+            <TierEmblem tier={tier.id} size={40} />
             <span className="flex-1 min-w-0 flex flex-col">
                 <span className="text-[14.5px] font-black text-white truncate">
                     {r.name}{mine ? ` · ${t("sim.rank.meMark")}` : ""}
                 </span>
                 <span className="text-[11.5px] font-bold text-white/60 truncate">
                     {r.country && <span title={countryName(r.country, locale)}>{rankFlag(r.country) || r.country} </span>}
-                    {t(tier.nameKey)}
-                    {` · ${t("sim.entry.record").replace("{w}", String(r.wins)).replace("{l}", String(r.matches - r.wins))}`}
+                    {/* 등급 이름은 바로 옆 방패 그림이 말한다 — 다마 육각이 들어온 뒤 360 폭에서 전적이 잘려 글자는 읽어 주기만(2026-10-20) */}
+                    <span className="sr-only">{t(tier.nameKey)} · </span>
+                    {t("sim.entry.record").replace("{w}", String(r.wins)).replace("{l}", String(r.matches - r.wins))}
                     <span className="sr-only">{r.country ? countryName(r.country, locale) : ""}</span>
                 </span>
             </span>
+            {/* 온라인 다마수(2026-10-20 오너: "핸디 점수 보이면 좋을듯" → 시안 B '점수 옆 큰 육각'). 기록이 모자라면 회색 빈 육각 */}
+            <OnlineDamaBadge target={r.dama} size={34} label={r.dama ? t("badgeGuide.damaTitle").replace("{n}", String(r.dama)) : undefined} />
             <span className="hall-rating rk-num shrink-0 h-8 px-3 inline-flex items-center rounded-pill text-[14px] font-black text-white">{r.rating}</span>
         </>
     );

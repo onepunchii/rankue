@@ -13,6 +13,8 @@ export interface RankRow {
     /** 전역 순위(국가 필터와 무관) */
     readonly rank: number;
     readonly countryRank: number;
+    /** 온라인 다마수(2026-10-20 — 점수 옆 육각). 기록이 모자라거나 옛 서버면 null */
+    readonly dama: number | null;
 }
 export interface RankMe {
     readonly rating: number;
@@ -50,6 +52,8 @@ const num = (v: unknown, d = 0): number => (typeof v === "number" && Number.isFi
 const numOrNull = (v: unknown): number | null => (v === null || v === undefined ? null : num(v));
 const cc = (v: unknown): string | null => (typeof v === "string" && /^[A-Z]{2}$/.test(v) ? v : null);
 const rec = (v: unknown): Record<string, unknown> => (v && typeof v === "object" ? (v as Record<string, unknown>) : {});
+/** 다마수는 양의 정수만 — 0 · 음수 · 글자는 '아직 없음'(null) */
+const damaOrNull = (v: unknown): number | null => { const n = numOrNull(v); return n !== null && Number.isInteger(n) && n > 0 ? n : null; };
 
 export function parseRankLadder(raw: unknown): RankLadder {
     const o = rec(raw);
@@ -60,6 +64,7 @@ export function parseRankLadder(raw: unknown): RankLadder {
         rows: rows.filter((r) => typeof r.memberId === "string").map((r) => ({
             memberId: String(r.memberId), name: typeof r.name === "string" ? r.name : "", country: cc(r.country),
             rating: num(r.rating, 1000), matches: num(r.matches), wins: num(r.wins), rank: num(r.rank), countryRank: num(r.countryRank),
+            dama: damaOrNull(r.dama),
         })),
         total: num(o.total),
         countries: countries.map((c) => ({ country: cc(c.country), players: num(c.players) })),
@@ -84,6 +89,8 @@ export interface MonthlyRankRow {
     readonly rank: number;
     /** 지금 통산 등급(배치 전이면 null) — 이름 옆 배지 */
     readonly tier: TierId | null;
+    /** 온라인 다마수(2026-10-20 — 점수 옆 육각). 기록이 모자라거나 옛 서버면 null */
+    readonly dama: number | null;
 }
 export interface MonthlyRank {
     /** "2026-10" */
@@ -121,6 +128,7 @@ export function parseMonthlyRank(raw: unknown, fallbackMonth = ""): MonthlyRank 
         rows: rows.filter((r) => typeof r.memberId === "string").map((r) => ({
             memberId: String(r.memberId), name: typeof r.name === "string" ? r.name : "", country: cc(r.country),
             points: num(r.points), matches: num(r.matches), wins: num(r.wins), rank: num(r.rank), tier: tierOrNull(r.tier),
+            dama: damaOrNull(r.dama),
         })),
         total: num(o.total),
         players: num(o.players),

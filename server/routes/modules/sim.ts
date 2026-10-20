@@ -24,6 +24,7 @@ import {
 import { openingLayout, isValidLayout } from "../../../shared/sim/layouts.js";
 import { tierFor } from "../../../shared/sim/rank.js";
 import { isMonthId, kstMonthOf } from "../../../shared/simMonthly.js";
+import { onlineDamaOf, RECENT_MATCHES } from "../../../shared/sim/handicap.js";
 
 const router = Router();
 
@@ -155,8 +156,22 @@ router.get("/sim/rank", requireAuth, asyncHandler(async (req: AuthRequest, res: 
     const raw = typeof req.query.country === "string" ? req.query.country.toUpperCase() : "";
     const country = /^[A-Z]{2}$/.test(raw) ? raw : null;
     const limit = Math.min(200, Math.max(10, Number(req.query.limit) || 100));
-    return sendSuccess(res, await storage.sim.rankLadder(req.userId!, gameType, country, limit, PLACEMENT_MATCHES));
+    const ladder = await storage.sim.rankLadder(req.userId!, gameType, country, limit, PLACEMENT_MATCHES);
+    return sendSuccess(res, { ...ladder, rows: await withOnlineDama(ladder.rows, gameType) });
 }));
+
+/**
+ * 랭킹 줄마다 온라인 다마수(2026-10-20 오너 "핸디 점수 보이면 좋을듯" — 점수 옆 큰 육각).
+ * 온라인 대전 기록(최근 RECENT_MATCHES 판)으로만 매긴다 — 실전 성적은 읽지 않는다(sim.guard.test). 한 번의 질의로 모두.
+ * 기록이 모자라면 null(화면은 회색 빈 육각). 읽다 실패해도 랭킹은 그대로 보낸다(다마만 비운다).
+ */
+async function withOnlineDama<R extends { memberId: string }>(rows: readonly R[], gameType: "3c" | "4c"): Promise<(R & { dama: number | null })[]> {
+    const rules = DEFAULT_4C_RULES;
+    const pointUnit = gameType === "4c" && rules.gameType === "4c" ? rules.pointUnit : 1;
+    let recs: Map<string, { score: number; innings: number; matches: number }> = new Map();
+    try { recs = await storage.simMatch.recentMatchRecords(rows.map((r) => r.memberId), gameType, RECENT_MATCHES); } catch { /* 다마만 비운다 */ }
+    return rows.map((r) => ({ ...r, dama: onlineDamaOf(recs.get(r.memberId), gameType, pointUnit) }));
+}
 
 /**
  * GET /sim/rank/monthly?gameType=3c|4c&month=YYYY-MM — 이달의 랭킹(2026-10-12 오너: "랭킹을 달로 … 매월초가 되면 리셋").
@@ -166,7 +181,8 @@ router.get("/sim/rank", requireAuth, asyncHandler(async (req: AuthRequest, res: 
 router.get("/sim/rank/monthly", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const gameType = req.query.gameType === "4c" ? "4c" : "3c";
     const month = isMonthId(req.query.month) ? req.query.month : kstMonthOf(Date.now());
-    return sendSuccess(res, await storage.simMatch.monthlyLadder(req.userId!, gameType, month, 100, PLACEMENT_MATCHES));
+    const board = await storage.simMatch.monthlyLadder(req.userId!, gameType, month, 100, PLACEMENT_MATCHES);
+    return sendSuccess(res, { ...board, rows: await withOnlineDama(board.rows, gameType) });
 }));
 
 // GET /sim/rank/me — 네 판의 내 대전 순위(진입 화면 '랭킹' 줄). 랭킹 화면을 네 번 부르지 않으려고 따로 둔다.
