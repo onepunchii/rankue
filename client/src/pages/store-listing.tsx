@@ -8,7 +8,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { isBasicListing, licenseSinceKo, storeAreasKo, storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
+import { closedNoticeKo, isBasicListing, isClosedListing, licenseSinceKo, storeAreasKo, storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
 import { storeCardUrl } from "@shared/ogCards";
 import { LucidePhone, LucideMapPin, LucideShare2 } from "@/lib/icons";
 import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
@@ -25,7 +25,7 @@ interface Listing {
   flatLarge: number | null; flatMedium: number | null; flatPocket: number | null;
   claimed: boolean; description: string | null;
   /** 인허가 자료(2026-10-19) — 'gov' 는 인허가 자료로만 들어온 매장 */
-  source?: string | null; licenseDate?: string | null; govStatus?: string | null;
+  source?: string | null; licenseDate?: string | null; govStatus?: string | null; govClosedDate?: string | null;
   crews?: Array<{ id: string; name: string; emblem: string | null; gameType: string; memberCount: number }>;
   honor?: { founder: string | null; regular: { name: string; games: number } | null } | null;
 }
@@ -303,7 +303,7 @@ export default function StoreListingPage() {
     image: s ? storeCardUrl("https://www.rankue.co.kr", s.code ?? code) : undefined,
     jsonLd: s ? { ...storeJsonLd(s), image: storeCardUrl("https://www.rankue.co.kr", s.code ?? code) } : null,
     // 인허가 자료로만 들어온 얇은 매장은 색인에서 뺀다 — 프리렌더와 같은 규칙(shared/storeMeta isBasicListing)
-    noindex: s ? isBasicListing(s) : false,
+    noindex: s ? isBasicListing(s) || isClosedListing(s) : false,
   });
 
   const tableRows = s ? [
@@ -407,6 +407,13 @@ export default function StoreListingPage() {
                 <span className="text-[12px] font-bold leading-none">{t.shareCta}</span>
               </button>
             </div>
+
+            {/* 인허가 자료의 폐업 · 휴업 안내(2026-10-20) — 한국어 문장(자료가 한국 행정 자료) */}
+            {(() => { const n = closedNoticeKo(s); return n ? (
+              <div className={`mb-4 rounded-2xl px-4 py-3.5 text-[14px] font-semibold break-keep ${n.kind === "closed" ? "bg-[#FDECEA] text-[#9B2C1F]" : "bg-[#FFF4DC] text-[#7A5208]"}`} data-testid="listing-closed-notice">
+                {n.text}<span className="mt-0.5 block text-[12px] font-medium opacity-75">{t.licenseSource}</span>
+              </div>
+            ) : null; })()}
 
             {/* 검색 유입 → 가입(2026-09-27 오너) — 전화·길찾기를 마친 사람에게 다음 거리: 온라인게임 '길 찾기' */}
             <PathFinderPromo src="store" name={s.name} className="mb-4" />

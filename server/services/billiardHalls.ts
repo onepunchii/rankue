@@ -101,3 +101,25 @@ export async function syncBilliardHalls(mode: "full" | "recent", nowMs = Date.no
     out.inserted = toInsert.length;
     return out;
 }
+
+/**
+ * 폐업 · 휴업으로 나온 줄을 우리 수집 매장(아직 안 이은 행)에 잇는다(2026-10-20 — 처음 한 번: 우리 230곳 중 79곳이 폐업 76 · 휴업 3).
+ * gov_* 열만 채운다(이름 · 주소 · 좌표 · 요금은 그대로). 폐업한 곳은 storage/listingSql LISTING_LIVE 가 목록 · 지도 · 사이트맵에서 뺀다.
+ * 그 뒤로는 매일 크론(recent)이 이은 곳의 상태를 따라간다.
+ */
+export async function linkClosedHalls(rows: readonly GovHallRow[], nowMs = Date.now(), opts: { dry?: boolean } = {}): Promise<{ linked: number; closed: number; paused: number }> {
+    const govs = rows.map(govHallOf).filter((g): g is GovHall => !!g && g.status !== "open");
+    const ours = rowsOf(await db.execute(sql`select code, name, address, latitude as lat, longitude as lng from store_listings where source <> 'gov' and gov_key is null`));
+    const link = matchHalls(ours.map((o) => ({ code: o.code, name: o.name, address: o.address, lat: o.lat, lng: o.lng })), govs);
+    const byKey = new Map(govs.map((g) => [g.key, g]));
+    const pairs = [...link].map(([code, key]) => ({ code, g: byKey.get(key)! }));
+    const res = { linked: pairs.length, closed: pairs.filter((p) => p.g.status === "closed").length, paused: pairs.filter((p) => p.g.status === "paused").length };
+    if (opts.dry || !pairs.length) return res;
+    const at = new Date(nowMs).toISOString();
+    await inChunks(pairs, async (part) => {
+        const vals = sql.join(part.map(({ code, g }) => sql`(${code}, ${g.key}, ${g.lat}::float8, ${g.lng}::float8, ${g.licenseDate}::date, ${g.status}, ${g.closedDate}::date)`), sql`, `);
+        await db.execute(sql`update store_listings s set gov_key = v.key, gov_lat = v.lat, gov_lng = v.lng, license_date = v.lic, gov_status = v.st, gov_closed_date = v.cl, gov_checked_at = ${at}::timestamp
+            from (values ${vals}) as v(code, key, lat, lng, lic, st, cl) where s.code = v.code and s.gov_key is null`);
+    });
+    return res;
+}

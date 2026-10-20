@@ -239,3 +239,14 @@ export const licenseSinceKo = (d: string | null | undefined): string | null => {
     const m = /^(\d{4})-(\d{2})/.exec(String(d ?? ""));
     return m ? `${m[1]}년 ${Number(m[2])}월부터` : null;
 };
+
+/** 인허가 자료의 폐업 · 휴업 안내(2026-10-20) — 매장 페이지 머리 아래. 영업 중이면 null. 폐업한 곳(인증 안 된)은 목록 · 지도 · 사이트맵에서 빠지고 noindex */
+export function closedNoticeKo(s: { govStatus?: string | null; govClosedDate?: string | null; claimed?: boolean | null }): { kind: "closed" | "paused"; text: string } | null {
+    if (s.claimed) return null;
+    const m = /^(\d{4})-(\d{2})/.exec(String(s.govClosedDate ?? ""));
+    const when = m ? `${m[1]}년 ${Number(m[2])}월 ` : "";
+    if (s.govStatus === "closed") return { kind: "closed", text: `${when}폐업 신고된 곳이에요 — 지금은 영업하지 않을 수 있어요.` };
+    if (s.govStatus === "paused") return { kind: "paused", text: "휴업 신고된 곳이에요 — 가기 전에 영업하는지 확인해 주세요." };
+    return null;
+}
+export const isClosedListing = (s: { govStatus?: string | null; claimed?: boolean | null }) => s.govStatus === "closed" && !s.claimed;

@@ -11,7 +11,7 @@ import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../sh
 import { DOC_META } from "../shared/docMeta.js";
 import { absoluteLogoUrl } from "../shared/golfLogo.js";
 import { crewTitle, crewDescription } from "../shared/crewMeta.js";
-import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo, isBasicListing, licenseSinceKo, listingCityOf, cityHubPath, cityTitleKo, cityDescKo, CITY_HUB_MIN } from "../shared/storeMeta.js";
+import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo, isBasicListing, isClosedListing, closedNoticeKo, licenseSinceKo, listingCityOf, cityHubPath, cityTitleKo, cityDescKo, CITY_HUB_MIN } from "../shared/storeMeta.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
 import { cardAlt, hubCard } from "../shared/ogCards.js";
@@ -2798,7 +2798,7 @@ ${list}
         desc: storeDescKo(s.name, s.address, s as any, s.openHours),
         canonical: `${ORIGIN}/stores/${encodeURIComponent(s.code)}`,
         // 인허가 자료로만 들어온 얇은 매장은 색인에서 뺀다(2026-10-19 — shared/storeMeta isBasicListing). 링크는 따라가게(follow)
-        noindex: isBasicListing(s as any),
+        noindex: isBasicListing(s as any) || isClosedListing(s as any),
         // 매장 카드(요금·테이블·영업시간) — 1,199곳 대표 이미지가 하나도 없었다(2026-09-30)
         image: { url: storeCardUrl(ORIGIN, s.code), width: CARD_SIZE, height: CARD_SIZE, alt: cardAlt(s.name, "당구장") },
         jsonLd: [
@@ -2818,6 +2818,7 @@ ${list}
   <img src="${esc(storeCardUrl(ORIGIN, s.code))}" width="${CARD_SIZE}" height="${CARD_SIZE}" alt="${esc(cardAlt(s.name, "당구장"))}" loading="eager">
   <h1>${esc(s.name)}</h1>
   <p>${esc(s.region)}</p>
+  ${(() => { const n = closedNoticeKo(s as any); return n ? `<p><strong>${esc(n.text)}</strong> (${esc(BILLIARD_HALL_SOURCE)})</p>` : ""; })()}
   <p><a href="${esc(mapLink(s as any))}" rel="noopener">길찾기 · 지도에서 보기</a>${s.phone ? ` · <a href="tel:${esc(s.phone)}">전화 걸기</a>` : ""}</p>
   <h2>매장 정보 · 영업시간 · 요금</h2>
   <dl>

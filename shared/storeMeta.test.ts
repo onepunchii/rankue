@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { storeDescKo, storeJsonLd, storeLocality, storeTitleKo, isBasicListing, licenseSinceKo, listingCityOf, cityHubPath, cityTitleKo, cityDescKo } from "./storeMeta.js";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
+import { storeDescKo, storeJsonLd, storeLocality, storeTitleKo, isBasicListing, licenseSinceKo, listingCityOf, cityHubPath, cityTitleKo, cityDescKo, closedNoticeKo, isClosedListing } from "./storeMeta.js";
 
 describe("매장 주소 → 시군구·동(2026-09-24)", () => {
     it("지번·도로명·광역시·긴 시도 표기", () => {
@@ -79,5 +82,20 @@ describe("시군구 허브(2026-10-19)", () => {
         expect(cityHubPath("서울", "강남구")).toBe("/stores?region=%EC%84%9C%EC%9A%B8&city=%EA%B0%95%EB%82%A8%EA%B5%AC");
         expect(cityTitleKo("서울", "강남구")).toBe("서울 강남구 당구장 목록 · 위치·요금 | 랭큐");
         expect(cityDescKo("서울", "강남구", 187)).toContain("서울 강남구 당구장 187곳");
+    });
+});
+
+describe("인허가 자료의 폐업 · 휴업(2026-10-20 — 오너 '목록 · 지도에서 빼고 페이지엔 안내')", () => {
+    it("폐업은 안내 + 숨김, 휴업은 안내만, 사장님 인증은 둘 다 아님", () => {
+        expect(closedNoticeKo({ govStatus: "closed", govClosedDate: "2026-10-06" })?.text).toBe("2026년 10월 폐업 신고된 곳이에요 — 지금은 영업하지 않을 수 있어요.");
+        expect(closedNoticeKo({ govStatus: "paused" })?.kind).toBe("paused");
+        expect(closedNoticeKo({ govStatus: "open" })).toBeNull();
+        expect(closedNoticeKo({ govStatus: "closed", claimed: true })).toBeNull();
+        expect(isClosedListing({ govStatus: "closed" })).toBe(true);
+        expect(isClosedListing({ govStatus: "paused" })).toBe(false);
+    });
+    it("목록 · 지도 · 사이트맵이 쓰는 LIVE 는 수집 매장의 폐업도 숨긴다(인증 매장은 빼고)", () => {
+        const s = read("server/storage/listingSql.ts");
+        expect(s).toContain("not (coalesce(store_listings.gov_status, 'open') = 'closed' and not store_listings.claimed)");
     });
 });

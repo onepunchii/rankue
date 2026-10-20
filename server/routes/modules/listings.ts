@@ -152,7 +152,7 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
         // 새로 노출되는 개인정보는 없다.
         latitude: LISTING_LAT, longitude: LISTING_LNG,
         // 인허가 자료(2026-10-19) — 어디서 온 매장인지 · 인허가일 · 영업상태(화면의 '인허가 정보' 줄 · 얇은 매장은 noindex)
-        source: storeListings.source, licenseDate: storeListings.licenseDate, govStatus: storeListings.govStatus,
+        source: storeListings.source, licenseDate: storeListings.licenseDate, govStatus: storeListings.govStatus, govClosedDate: storeListings.govClosedDate,
         claimedStoreId: storeListings.claimedStoreId, // 내부용 — 응답에서 제거
     }).from(storeListings).where(eq(storeListings.code, req.params.code));
     if (!row) return sendError(res, 404, "매장을 찾을 수 없습니다");
