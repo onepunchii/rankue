@@ -80,7 +80,7 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
     const lat = Number(req.query.lat), lng = Number(req.query.lng);
     const nearby = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
 
-    // 인허가 자료로만 들어왔다가 폐업한 곳은 숨긴다(storage/listingSql)
+    // 인허가 자료에 폐업으로 나온 곳은 숨긴다 — 사장님 인증 매장은 빼고(storage/listingSql LISTING_LIVE)
     const conds: any[] = [LISTING_LIVE];
     if (region) conds.push(eq(storeListings.region, region));
     if (region && city) conds.push(sql`split_part(store_listings.address, ' ', 2) = ${city}`);

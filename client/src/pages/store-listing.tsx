@@ -33,7 +33,7 @@ interface Listing {
 // 페이지 문구 — 디렉터리는 한국 콘텐츠지만 라벨은 5개 언어 (stores.tsx와 같은 패턴)
 const L: Record<Locale, Record<string, string>> = {
   ko: {
-    back: "매장 찾기", unverified: "수집 정보", verified: "✓ 사장님 인증", govInfo: "인허가 정보", license: "인허가", licenseSource: "행정안전부 인허가 자료",
+    back: "매장 찾기", unverified: "수집 정보", verified: "✓ 사장님 인증", govInfo: "인허가 정보", license: "인허가", licenseSource: "행정안전부 인허가 자료", nearOpenCta: "근처 영업 중인 당구장 보기",
     address: "주소", phone: "전화", hours: "영업시간", tables: "테이블",
     large: "대대", medium: "중대", pocket: "포켓",
     rates: "요금", per10: "10분당", flat: "정액", won: "원",
@@ -61,7 +61,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "닫기",
   },
   en: {
-    back: "Find a venue", unverified: "Collected info", verified: "✓ Owner verified", govInfo: "Public license data", license: "Licensed", licenseSource: "Korean government license data",
+    back: "Find a venue", unverified: "Collected info", verified: "✓ Owner verified", govInfo: "Public license data", license: "Licensed", licenseSource: "Korean government license data", nearOpenCta: "See open halls nearby",
     address: "Address", phone: "Phone", hours: "Hours", tables: "Tables",
     large: "Large", medium: "Medium", pocket: "Pocket",
     rates: "Rates", per10: "per 10 min", flat: "Flat rate", won: "₩",
@@ -89,7 +89,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "Close",
   },
   vi: {
-    back: "Tìm quán", unverified: "Thông tin thu thập", verified: "✓ Chủ quán xác nhận", govInfo: "Dữ liệu giấy phép", license: "Cấp phép", licenseSource: "Dữ liệu giấy phép của chính phủ Hàn Quốc",
+    back: "Tìm quán", unverified: "Thông tin thu thập", verified: "✓ Chủ quán xác nhận", govInfo: "Dữ liệu giấy phép", license: "Cấp phép", licenseSource: "Dữ liệu giấy phép của chính phủ Hàn Quốc", nearOpenCta: "Xem quán đang mở gần đây",
     address: "Địa chỉ", phone: "Điện thoại", hours: "Giờ mở cửa", tables: "Bàn",
     large: "Lớn", medium: "Vừa", pocket: "Pocket",
     rates: "Giá", per10: "mỗi 10 phút", flat: "Trọn gói", won: "₩",
@@ -117,7 +117,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "Đóng",
   },
   tr: {
-    back: "Salon bul", unverified: "Derlenen bilgi", verified: "✓ Sahibi onaylı", govInfo: "Resmî ruhsat bilgisi", license: "Ruhsat", licenseSource: "Kore hükümeti ruhsat verisi",
+    back: "Salon bul", unverified: "Derlenen bilgi", verified: "✓ Sahibi onaylı", govInfo: "Resmî ruhsat bilgisi", license: "Ruhsat", licenseSource: "Kore hükümeti ruhsat verisi", nearOpenCta: "Yakındaki açık salonlar",
     address: "Adres", phone: "Telefon", hours: "Çalışma saatleri", tables: "Masalar",
     large: "Büyük", medium: "Orta", pocket: "Pocket",
     rates: "Ücretler", per10: "10 dk başına", flat: "Sabit ücret", won: "₩",
@@ -145,7 +145,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "Kapat",
   },
   es: {
-    back: "Buscar local", unverified: "Información recopilada", verified: "✓ Verificado", govInfo: "Datos de licencia", license: "Licencia", licenseSource: "Datos oficiales de licencias de Corea",
+    back: "Buscar local", unverified: "Información recopilada", verified: "✓ Verificado", govInfo: "Datos de licencia", license: "Licencia", licenseSource: "Datos oficiales de licencias de Corea", nearOpenCta: "Ver locales abiertos cerca",
     address: "Dirección", phone: "Teléfono", hours: "Horario", tables: "Mesas",
     large: "Grande", medium: "Mediana", pocket: "Pocket",
     rates: "Tarifas", per10: "por 10 min", flat: "Tarifa plana", won: "₩",
@@ -273,6 +273,8 @@ export default function StoreListingPage() {
     staleTime: 10 * 60 * 1000,
     retry: false,
   });
+  // 좌표가 있어야 '이 근처'가 뜬다 — 폐업 안내의 '근처 영업 중인 곳' 단추도 같은 조건
+  const hasCoords = !!s && s.latitude != null && s.longitude != null && Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude));
 
   const claimMutation = useMutation({
     mutationFn: async () => apiRequest(`/api/hiq/listings/${code}/claim`, {
@@ -412,11 +414,24 @@ export default function StoreListingPage() {
             {(() => { const n = closedNoticeKo(s); return n ? (
               <div className={`mb-4 rounded-2xl px-4 py-3.5 text-[14px] font-semibold break-keep ${n.kind === "closed" ? "bg-[#FDECEA] text-[#9B2C1F]" : "bg-[#FFF4DC] text-[#7A5208]"}`} data-testid="listing-closed-notice">
                 {n.text}<span className="mt-0.5 block text-[12px] font-medium opacity-75">{t.licenseSource}</span>
+                {/* 문 닫은 곳을 찾아온 사람에게 필요한 건 근처의 열린 곳 — '이 근처'(LISTING_LIVE 로 영업 중만)로 바로 */}
+                {n.kind === "closed" && hasCoords && (
+                  <button
+                    type="button"
+                    onClick={() => { try { document.getElementById("store-near")?.scrollIntoView({ behavior: "smooth", block: "start" }); } catch { /* 스크롤 못 하는 환경 */ } }}
+                    className="mt-2.5 inline-flex min-h-[40px] items-center gap-1 rounded-full bg-white/80 px-3.5 text-[13px] font-semibold text-[#9B2C1F] active:scale-[0.98]"
+                    data-testid="listing-closed-near"
+                  >
+                    {t.nearOpenCta}
+                    <svg viewBox="0 0 16 16" aria-hidden className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3.5v9M4 8.5l4 4 4-4" /></svg>
+                  </button>
+                )}
               </div>
             ) : null; })()}
 
-            {/* 검색 유입 → 가입(2026-09-27 오너) — 전화·길찾기를 마친 사람에게 다음 거리: 온라인게임 '길 찾기' */}
-            <PathFinderPromo src="store" name={s.name} className="mb-4" />
+            {/* 검색 유입 → 가입(2026-09-27 오너) — 전화·길찾기를 마친 사람에게 다음 거리: 온라인게임 '길 찾기'.
+                폐업 신고된 곳엔 '가기 전에 몸풀기'가 앞뒤가 안 맞아 뺀다(2026-10-20) */}
+            {!isClosedListing(s) && <PathFinderPromo src="store" name={s.name} className="mb-4" />}
 
             <div className="bg-white rounded-2xl p-5 shadow-[0_1px_2px_rgba(0,0,0,0.05)] space-y-3 mb-4">
               <div>
@@ -478,7 +493,8 @@ export default function StoreListingPage() {
             </div>
 
             {/* 이 근처(2026-10-17) — 이 매장을 가운데 둔 당구대 위의 공 + 가까운 다섯 곳. 검색용 화면(prerender)의 '가까운 당구장'과 같은 쪽 */}
-            {Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude)) && s.latitude != null && s.longitude != null && (
+            {hasCoords && (
+              <div id="store-near" className="scroll-mt-4">
               <StoreNearTable
                 code={s.code} lat={Number(s.latitude)} lng={Number(s.longitude)}
                 onOpen={(c) => { setLocation(`/stores/${c}`); try { window.scrollTo(0, 0); } catch { /* 스크롤 못 하는 환경 */ } }}
@@ -491,6 +507,7 @@ export default function StoreListingPage() {
                   won,
                 }}
               />
+              </div>
             )}
 
             {/* 명예의 전당 — 데이터가 있으면 왕관, 없으면 빈 왕좌 초대장 */}
