@@ -13,7 +13,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { KOREA_MAP_PATHS } from "@/golf/data/koreaMapData";
 import { latLngToOutline } from "@/golf/lib/koreaOutline";
-import { NICE_KM, OUTLINE_TO_STORE_REGION, nearDistText, nearViewKm, spreadBalls, storeRegionCounts, unpackStoreDots, type StoreDot } from "@shared/storeDots";
+import { NICE_KM, OUTLINE_TO_STORE_REGION, nearDistText, nearViewKm, spreadBalls, storeCityCounts, storeFocusBox, storeRegionCounts, unpackStoreDots, type StoreDot } from "@shared/storeDots";
 import { nearRateCompare, rate10Ok, rateLanes, ratePos, rateVerdict, type NearRateCompare } from "@shared/storeNearRates";
 
 export const STORE_DOTS_KEY = ["/api/hiq/listings/dots"] as const;
@@ -61,15 +61,63 @@ function Table({ portrait, rail = 12, children, className = "" }: { portrait: bo
     );
 }
 
+type View = { x: number; y: number; w: number; h: number };
+/** 윤곽 좌표 한 칸 ≈ 0.954km(위도 1도 = 116.4칸 = 111km. 경도 쪽도 37도에서 거의 같다) — 축척 막대 */
+const KM_PER_UNIT = 111 / 116.4;
+/**
+ * 확대 범위(2026-10-20 — 시도 · 시군구를 고르면 그곳으로). 고른 점의 상자에 여백을 두르고 판의 가로세로 비에 맞춘다.
+ * 너무 작게 당기지 않는다(시군구 최소 폭 ≈ 10km · 시도 ≈ 40km) — 동네 한 칸까지 당기면 공 몇 개가 판 가득 흩어져 지도로 안 읽힌다.
+ */
+function focusView(dots: readonly StoreDot[], region: string, city: string): View | null {
+    // 시군구 칸이 없는 옛 답(CDN 에 남은 것)이면 그 시도로 — 전국으로 튕기지 않게
+    const byCity = city ? storeFocusBox(dots, region, city) : null;
+    const b = byCity ?? storeFocusBox(dots, region, null);
+    if (!b) return null;
+    const [x0, y0] = latLngToOutline(b.maxLat, b.minLng), [x1, y1] = latLngToOutline(b.minLat, b.maxLng);
+    const min = byCity ? 10.5 : 42;
+    let w = Math.max(min, (x1 - x0) * 1.36), h = Math.max(min, (y1 - y0) * 1.3);
+    const aspect = VIEW.w / VIEW.h;
+    if (w / h > aspect) h = w / aspect; else w = h * aspect;
+    if (w >= VIEW.w * 0.92) return null;   // 거의 전국이면 당기지 않는다
+    const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+    return { x: cx - w / 2, y: cy - h / 2, w, h };
+}
+
 /**
  * 펠트 위의 지도 — 분필 선 윤곽(SVG · 누르면 그 시도) 위에 공(캔버스 한 장).
+ * 2026-10-20 확대(focus): 시도 · 시군구를 고르면 그 범위로 0.45초 동안 당겨 간다(rAF — 판 밖의 공은 그리지 않는다).
+ * 당겨도 공은 화면에서 비슷한 크기(조금 커진다) · 선 굵기는 그대로(vector-effect), 판 아래에 축척 막대.
  * 2026-10-19 인허가 자료로 점이 1만 5천 개가 되자 SVG 원 3만 개(그림자 + 공)가 됐고, 느린 폰(CPU 6배 느리게)에서 시도 칩을 누르면
  * 3.5초 뒤에야 바뀌었다 — 공은 캔버스에 그리고, 윤곽선만 SVG 로 남긴다. 그리는 셈(viewBox 맞추기)은 SVG 의 기본(가운데 맞춰 넣기)과 같다.
  */
-function FeltMap({ dots, region, onPick, r = 3.1, label }: { dots: readonly StoreDot[]; region?: string; onPick?: (region: string) => void; r?: number; label: string }) {
+function FeltMap({ dots, region, city = "", focus = false, onPick, r = 3.1, label }: { dots: readonly StoreDot[]; region?: string; city?: string; focus?: boolean; onPick?: (region: string) => void; r?: number; label: string }) {
     const pts = useMemo(() => dots.map((d) => ({ d, xy: latLngToOutline(d.lat, d.lng) })), [dots]);
     const wrap = useRef<HTMLDivElement>(null), cv = useRef<HTMLCanvasElement>(null);
     const [size, setSize] = useState<{ w: number; h: number } | null>(null);
+    // 지금 보는 범위 — 목표(target)로 0.45초 동안 옮겨 간다. 움직임 줄이기를 켠 기기는 바로
+    const target = useMemo<View>(() => (focus && region ? focusView(dots, region, city) : null) ?? VIEW, [focus, dots, region, city]);
+    const [view, setView] = useState<View>(target);
+    const viewRef = useRef(view); viewRef.current = view;
+    useEffect(() => {
+        const from = viewRef.current, to = target;
+        if (from.x === to.x && from.y === to.y && from.w === to.w && from.h === to.h) return;
+        let reduce = false;
+        try { reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches; } catch { /* 모르면 움직인다 */ }
+        if (reduce || typeof requestAnimationFrame === "undefined") { setView(to); return; }
+        const t0 = performance.now(), dur = 450;
+        let raf = 0;
+        // 넓이는 로그로 옮겨 간다(전국 → 구 처럼 서른 배를 당길 때 처음에 한꺼번에 튀지 않게)
+        const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
+        const step = (now: number) => {
+            const p = Math.min(1, (now - t0) / dur), t = 1 - Math.pow(1 - p, 3);
+            const w = Math.exp(lerp(Math.log(from.w), Math.log(to.w), t)), h = w * (to.h / to.w);
+            const cx = lerp(from.x + from.w / 2, to.x + to.w / 2, t), cy = lerp(from.y + from.h / 2, to.y + to.h / 2, t);
+            setView(p >= 1 ? to : { x: cx - w / 2, y: cy - h / 2, w, h });
+            if (p < 1) raf = requestAnimationFrame(step);
+        };
+        raf = requestAnimationFrame(step);
+        return () => cancelAnimationFrame(raf);
+    }, [target]);
     useEffect(() => {
         const el = wrap.current;
         if (!el) return;
@@ -87,41 +135,61 @@ function FeltMap({ dots, region, onPick, r = 3.1, label }: { dots: readonly Stor
         c.width = Math.round(size.w * dpr); c.height = Math.round(size.h * dpr);
         const g = c.getContext("2d");
         if (!g) return;
-        // SVG viewBox 를 가운데 맞춰 넣는 것과 같은 셈
-        const k = Math.min(size.w / VIEW.w, size.h / VIEW.h);
-        const ox = (size.w - VIEW.w * k) / 2 - VIEW.x * k, oy = (size.h - VIEW.h * k) / 2 - VIEW.y * k;
+        // SVG viewBox 를 가운데 맞춰 넣는 것과 같은 셈(지금 보는 범위로)
+        const k = Math.min(size.w / view.w, size.h / view.h);
+        const ox = (size.w - view.w * k) / 2 - view.x * k, oy = (size.h - view.h * k) / 2 - view.y * k;
+        // 공의 크기는 화면 기준 — 전국 판의 크기에서 당길수록 조금씩 키운다(구까지 당기면 1.9배쯤)
+        const k0 = Math.min(size.w / VIEW.w, size.h / VIEW.h), zoom = VIEW.w / view.w;
+        const px = r * k0 * Math.min(2, 1 + 0.2 * Math.log2(Math.max(1, zoom)));
         g.setTransform(dpr, 0, 0, dpr, 0, 0);
         g.clearRect(0, 0, size.w, size.h);
-        const on = (d: StoreDot) => !!region && d.region === region;
-        const rr = (d: StoreDot) => (on(d) ? r + 0.5 : r) * k;
+        const on = (d: StoreDot) => !!region && d.region === region && (!city || d.city === city);
+        const near = (d: StoreDot) => !!region && d.region === region;
+        const rr = (d: StoreDot) => (on(d) ? px * 1.12 : px);
+        // 판 밖의 공은 건너뛴다(당겼을 때 1만 5천 개를 다 그리지 않게)
+        const m = px * 3;
+        const inView = (x: number, y: number) => x > -m && y > -m && x < size.w + m && y < size.h + m;
+        const sx = (xy: readonly number[]) => ox + xy[0] * k, sy = (xy: readonly number[]) => oy + xy[1] * k;
+        const dim = (d: StoreDot) => !region ? 1 : on(d) ? 1 : city && near(d) ? 0.62 : 0.4;
         // 공 그림자 — 등이 위에 있다
         g.fillStyle = "#000000";
         for (const { d, xy } of pts) {
-            g.globalAlpha = 0.25 * (region && !on(d) ? 0.4 : 1);
-            g.beginPath(); g.arc(ox + (xy[0] + 1.1) * k, oy + (xy[1] + 1.5) * k, rr(d), 0, Math.PI * 2); g.fill();
+            const x = sx(xy), y = sy(xy);
+            if (!inView(x, y)) continue;
+            g.globalAlpha = 0.25 * dim(d);
+            g.beginPath(); g.arc(x + px * 0.3, y + px * 0.42, rr(d), 0, Math.PI * 2); g.fill();
         }
-        // 공 — 고른 지역은 맨 위에 노란 공
-        g.lineWidth = 0.55 * k; g.strokeStyle = "#0A3D28";
+        // 공 — 고른 곳은 맨 위에 노란 공
+        g.lineWidth = Math.max(0.5, px * 0.14); g.strokeStyle = "#0A3D28";
         const draw = (sel: boolean) => {
             for (const { d, xy } of pts) {
                 if (on(d) !== sel) continue;
-                g.globalAlpha = region && !sel ? 0.32 : 0.95;
+                const x = sx(xy), y = sy(xy);
+                if (!inView(x, y)) continue;
+                g.globalAlpha = sel ? 0.95 : region ? (city && near(d) ? 0.55 : 0.32) : 0.95;
                 g.fillStyle = sel ? YELLOW : IVORY;
-                g.beginPath(); g.arc(ox + xy[0] * k, oy + xy[1] * k, rr(d), 0, Math.PI * 2); g.fill(); g.stroke();
+                g.beginPath(); g.arc(x, y, rr(d), 0, Math.PI * 2); g.fill(); g.stroke();
+                // 당겼을 때만 공의 빛(작을 땐 점 하나로 충분하다)
+                if (zoom > 2.5 && sel) { g.globalAlpha = 0.75; g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(x - rr(d) * 0.32, y - rr(d) * 0.34, rr(d) * 0.3, 0, Math.PI * 2); g.fill(); }
             }
         };
         draw(false); if (region) draw(true);
         g.globalAlpha = 1;
-    }, [pts, region, r, size]);
+    }, [pts, region, city, r, size, view]);
+    // 축척 막대 — 당겼을 때만(전국 판은 우리나라 모양이 축척을 말한다)
+    const zoomed = view.w < VIEW.w * 0.6;
+    const pxPerKm = size ? Math.min(size.w / view.w, size.h / view.h) / KM_PER_UNIT : 0;
+    const barKm = size ? NICE_KM.filter((km) => km * pxPerKm <= size.w * 0.32).pop() ?? null : null;
     return (
         <div ref={wrap} className="relative h-full w-full">
-            <svg viewBox={`${VIEW.x} ${VIEW.y} ${VIEW.w} ${VIEW.h}`} className="block h-full w-full" role="img" aria-label={label}>
+            <svg viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`} className="block h-full w-full" role="img" aria-label={label}>
                 <g strokeLinejoin="round">
                     {LAND.map(([id, path]) => {
                         const name = OUTLINE_TO_STORE_REGION[id];
                         const sel = !!region && name === region;
                         return (
-                            <path key={id} d={path} fill={sel ? "#F4C5422E" : "#FFFFFF12"} stroke={sel ? YELLOW : "#FFFFFF3D"} strokeWidth={sel ? 1.6 : 0.9}
+                            <path key={id} d={path} fill={sel ? (city ? "#F4C5421A" : "#F4C5422E") : "#FFFFFF12"} stroke={sel ? YELLOW : "#FFFFFF3D"}
+                                strokeWidth={sel ? 1.4 : 0.6} vectorEffect="non-scaling-stroke"
                                 onClick={onPick && name ? () => onPick(sel ? "" : name) : undefined}
                                 style={onPick ? { cursor: "pointer" } : undefined}
                                 data-region={name} />
@@ -130,49 +198,73 @@ function FeltMap({ dots, region, onPick, r = 3.1, label }: { dots: readonly Stor
                 </g>
             </svg>
             <canvas ref={cv} aria-hidden className="pointer-events-none absolute inset-0 h-full w-full" data-testid="store-dots-canvas" />
+            {zoomed && barKm != null && (
+                <span className="pointer-events-none absolute bottom-2 left-2 flex flex-col items-start gap-0.5" data-testid="store-map-scale" aria-hidden>
+                    <span className="text-[11px] font-bold leading-none tabular-nums" style={{ color: IVORY, textShadow: "0 1px 2px #00000080" }}>{barKm < 1 ? `${barKm * 1000}m` : `${barKm}km`}</span>
+                    <span className="block h-[3px] rounded-full" style={{ width: Math.round(barKm * pxPerKm), background: IVORY, boxShadow: "0 1px 2px #00000066" }} />
+                </span>
+            )}
         </div>
     );
 }
 
 /** 매장 찾기 — 세로 당구대 + 옆의 지역별 막대(지도의 범례이자 고르기). 시도나 줄을 누르면 그 지역(onPick("") = 전체).
  *  폭 360 에서 지도를 꽉 채우면 높이가 500px 을 넘어 목록이 첫 화면에서 사라졌다 — 지도는 57%, 옆에 지역별 일곱 줄. */
-export function StoreTableMap({ region, onPick, copy }: {
+export function StoreTableMap({ region, city = "", onPick, onPickCity, copy }: {
     region: string;
+    /** 고른 시군구(2026-10-20 — 지도가 그곳으로 당겨지고, 옆 범례가 시군구로 바뀐다) */
+    city?: string;
     onPick: (region: string) => void;
-    copy: { all: (n: number) => string; inRegion: (r: string, n: number) => string; legend: string; hint: string; byRegion: string; others: (n: number) => string };
+    onPickCity?: (city: string) => void;
+    copy: { all: (n: number) => string; inRegion: (r: string, n: number) => string; legend: string; hint: string; byRegion: string; others: (n: number) => string; byCity?: (r: string) => string; backAll?: string };
 }) {
     const { dots } = useStoreDots();
     const counts = useMemo(() => storeRegionCounts(dots), [dots]);
+    const cityCounts = useMemo(() => (region ? storeCityCounts(dots, region) : []), [dots, region]);
     if (dots.length < 50) return null;
-    const n = region ? counts.find((c) => c.region === region)?.count ?? 0 : dots.length;
-    const head = region ? copy.inRegion(region, n) : copy.all(dots.length);
+    // 시도를 고르면 범례가 그 시도의 시군구로(시군구 자료가 있는 답일 때만 — 옛 답이면 예전처럼 시도 막대)
+    const drill = !!region && !!onPickCity && cityCounts.length > 1;
+    const n = region ? (city ? cityCounts.find((c) => c.city === city)?.count ?? 0 : counts.find((c) => c.region === region)?.count ?? 0) : dots.length;
+    const head = region ? copy.inRegion(city ? `${region} ${city}` : region, n) : copy.all(dots.length);
     const TOP = 7;
-    // 고른 지역이 일곱 줄 밖이면 마지막 줄을 그 지역으로 — 고른 것이 늘 보이게
-    const top = counts.slice(0, TOP);
-    const picked = region && !top.some((c) => c.region === region) ? counts.find((c) => c.region === region) : undefined;
+    // 고른 것이 일곱 줄 밖이면 마지막 줄을 그것으로 — 고른 것이 늘 보이게
+    const list: { key: string; label: string; count: number }[] = drill
+        ? cityCounts.map((c) => ({ key: c.city, label: c.city, count: c.count }))
+        : counts.map((c) => ({ key: c.region, label: c.region, count: c.count }));
+    const cur = drill ? city : region;
+    const top = list.slice(0, TOP);
+    const picked = cur && !top.some((c) => c.key === cur) ? list.find((c) => c.key === cur) : undefined;
     const rows = picked ? [...top.slice(0, TOP - 1), picked] : top;
-    const rest = dots.length - rows.reduce((a, c) => a + c.count, 0);
-    const max = counts[0]?.count ?? 1;
+    const pool = drill ? cityCounts.reduce((a, c) => a + c.count, 0) : dots.length;
+    const rest = pool - rows.reduce((a, c) => a + c.count, 0);
+    const max = list[0]?.count ?? 1;
+    const pick = (key: string, sel: boolean) => drill ? onPickCity!(sel ? "" : key) : onPick(sel ? "" : key);
     return (
         <div className="mb-4" data-testid="store-table-map">
             <div className="flex items-start gap-3">
                 <Table portrait rail={9} className="w-[57%] max-w-[300px] shrink-0">
                     <div className="relative" style={{ aspectRatio: `${VIEW.w} / ${VIEW.h}` }}>
-                        <FeltMap dots={dots} region={region} onPick={onPick} r={4.4} label={head} />
+                        <FeltMap dots={dots} region={region} city={city} focus onPick={onPick} r={4.4} label={head} />
                         {/* 지금 보는 범위 — 펠트 위의 작은 패 */}
                         <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-full px-2 py-0.5 text-[12px] font-bold tabular-nums" style={{ background: "#062B1CCC", color: region ? YELLOW : IVORY, boxShadow: "inset 0 0 0 1px #FFFFFF1F" }} data-testid="store-table-head">{head}</span>
                     </div>
                 </Table>
                 <div className="min-w-0 flex-1 pt-0.5">
-                    <p className="mb-1.5 text-[12px] font-semibold text-black/55">{copy.byRegion}</p>
-                    <ol className="space-y-1">
+                    <div className="mb-1.5 flex items-baseline justify-between gap-1.5">
+                        <p className="truncate text-[12px] font-semibold text-black/55">{drill && copy.byCity ? copy.byCity(region) : copy.byRegion}</p>
+                        {/* 시도를 고른 뒤 전국으로 — 지도의 그 시도를 다시 눌러도 된다 */}
+                        {drill && copy.backAll && (
+                            <button type="button" onClick={() => onPick("")} className="shrink-0 rounded-full px-1.5 text-[12px] font-semibold text-brand active:opacity-70" data-testid="store-table-back">{copy.backAll}</button>
+                        )}
+                    </div>
+                    <ol className="space-y-1" data-testid={drill ? "store-table-cities" : "store-table-regions"}>
                         {rows.map((c) => {
-                            const sel = c.region === region;
+                            const sel = c.key === cur;
                             return (
-                                <li key={c.region}>
-                                    <button type="button" onClick={() => onPick(sel ? "" : c.region)} aria-pressed={sel} className="block w-full rounded-lg px-1.5 py-1 text-left active:bg-black/[0.04]" style={sel ? { background: "#F4C54229" } : undefined} data-testid="store-table-row">
+                                <li key={c.key}>
+                                    <button type="button" onClick={() => pick(c.key, sel)} aria-pressed={sel} className="block w-full rounded-lg px-1.5 py-1 text-left active:bg-black/[0.04]" style={sel ? { background: "#F4C54229" } : undefined} data-testid="store-table-row">
                                         <span className="flex items-baseline justify-between gap-1.5">
-                                            <span className={`truncate text-[13px] ${sel ? "font-bold text-ink-1" : "font-semibold text-ink-2"}`}>{c.region}</span>
+                                            <span className={`truncate text-[13px] ${sel ? "font-bold text-ink-1" : "font-semibold text-ink-2"}`}>{c.label}</span>
                                             <span className="shrink-0 text-[12.5px] font-bold tabular-nums text-ink-1">{c.count.toLocaleString()}</span>
                                         </span>
                                         <span className="mt-1 block h-[5px] overflow-hidden rounded-full bg-black/[0.06]" aria-hidden>

@@ -8,18 +8,25 @@
  *
  * 지도의 시도 윤곽선(golf/data/koreaMapData, 영문 id 17개)과 디렉터리의 지역 이름(한글 약칭 17개)을 잇는 표도 여기에 둔다.
  * ⚠️ 서버가 부른다 — 상대 임포트는 ./x.js.
+ *
+ * 2026-10-20 시군구(지도 확대): 점마다 시군구(주소 둘째 낱말 — storeMeta listingCityOf, 목록 API 의 city 와 같은 뜻)를 따로 싣는다.
+ *   { …, cities: ["강남구", …], ci: [점마다 시군구 번호 · 없으면 -1] } — pts 의 셋씩 꼴은 그대로(옛 화면은 새 칸을 모른 채 읽는다).
  */
+import { listingCityOf } from "./storeMeta.js";
 
-export interface StoreDotsWire { total: number; regions: string[]; pts: number[] }
-export interface StoreDot { lat: number; lng: number; region: string }
+export interface StoreDotsWire { total: number; regions: string[]; pts: number[]; cities?: string[]; ci?: number[] }
+export interface StoreDot { lat: number; lng: number; region: string; city?: string | null }
 
 const LAT0 = 33000, LNG0 = 124000;
 
 /** 행 → 보낼 꼴. 좌표가 없거나 한반도 밖이면 뺀다(지도에 찍을 수 없다) */
-export function packStoreDots(rows: readonly { lat: number | null; lng: number | null; region: string | null }[]): StoreDotsWire {
+export function packStoreDots(rows: readonly { lat: number | null; lng: number | null; region: string | null; address?: string | null }[]): StoreDotsWire {
     const regions: string[] = [];
     const idx = new Map<string, number>();
+    const cities: string[] = [];
+    const cidx = new Map<string, number>();
     const pts: number[] = [];
+    const ci: number[] = [];
     for (const r of rows) {
         if (r.lat == null || r.lng == null || !Number.isFinite(r.lat) || !Number.isFinite(r.lng)) continue;
         if (r.lat < 33 || r.lat > 38.7 || r.lng < 124.5 || r.lng > 131) continue;
@@ -27,8 +34,12 @@ export function packStoreDots(rows: readonly { lat: number | null; lng: number |
         let i = idx.get(name);
         if (i == null) { i = regions.length; regions.push(name); idx.set(name, i); }
         pts.push(Math.round(r.lat * 1000) - LAT0, Math.round(r.lng * 1000) - LNG0, i);
+        const city = listingCityOf(r.address);
+        let j = city ? cidx.get(city) : -1;
+        if (city && j == null) { j = cities.length; cities.push(city); cidx.set(city, j); }
+        ci.push(j ?? -1);
     }
-    return { total: pts.length / 3, regions, pts };
+    return { total: pts.length / 3, regions, pts, cities, ci };
 }
 
 /** 받은 꼴 → 점. 모양이 틀린 답은 빈 목록 */
@@ -36,10 +47,14 @@ export function unpackStoreDots(w: unknown): StoreDot[] {
     const o = (w ?? {}) as Partial<StoreDotsWire>;
     if (!Array.isArray(o.pts) || !Array.isArray(o.regions) || o.pts.length % 3 !== 0) return [];
     const out: StoreDot[] = [];
+    // 시군구 칸은 있을 때만(옛 답 · 길이가 안 맞는 답이면 모두 null)
+    const cities = Array.isArray(o.cities) ? o.cities : null;
+    const ci = cities && Array.isArray(o.ci) && o.ci.length * 3 === o.pts.length ? o.ci : null;
     for (let i = 0; i < o.pts.length; i += 3) {
         const a = Number(o.pts[i]), b = Number(o.pts[i + 1]), r = o.regions[Number(o.pts[i + 2])];
         if (!Number.isFinite(a) || !Number.isFinite(b) || typeof r !== "string") continue;
-        out.push({ lat: (a + LAT0) / 1000, lng: (b + LNG0) / 1000, region: r });
+        const c = ci ? cities![Number(ci[i / 3])] : undefined;
+        out.push({ lat: (a + LAT0) / 1000, lng: (b + LNG0) / 1000, region: r, city: typeof c === "string" ? c : null });
     }
     return out;
 }
@@ -58,6 +73,28 @@ export function storeRegionCounts(dots: readonly StoreDot[]): { region: string; 
     const m = new Map<string, number>();
     for (const d of dots) m.set(d.region, (m.get(d.region) ?? 0) + 1);
     return [...m].map(([region, count]) => ({ region, count })).sort((a, b) => b.count - a.count || a.region.localeCompare(b.region, "ko"));
+}
+
+/** 고른 시도 안의 시군구별 수 — 많은 차례(지도 옆 범례가 시도를 고르면 시군구로 바뀐다) */
+export function storeCityCounts(dots: readonly StoreDot[], region: string): { city: string; count: number }[] {
+    const m = new Map<string, number>();
+    for (const d of dots) if (d.region === region && d.city) m.set(d.city, (m.get(d.city) ?? 0) + 1);
+    return [...m].map(([city, count]) => ({ city, count })).sort((a, b) => b.count - a.count || a.city.localeCompare(b.city, "ko"));
+}
+
+/**
+ * 지도를 당겨 볼 범위(2026-10-20 — 시도 · 시군구를 고르면 그곳으로 확대). 위경도 상자 하나.
+ * 잘못 찍힌 점 몇 개(동 · 구 수준 좌표, 섬)가 상자를 키우지 않게 위아래 2% 씩 버린다(점이 20개 넘을 때만).
+ * 고른 점이 없으면 null(전국 그대로).
+ */
+export function storeFocusBox(dots: readonly StoreDot[], region: string, city?: string | null): { minLat: number; maxLat: number; minLng: number; maxLng: number; count: number } | null {
+    if (!region) return null;
+    const sel = dots.filter((d) => d.region === region && (!city || d.city === city));
+    if (!sel.length) return null;
+    const lats = sel.map((d) => d.lat).sort((a, b) => a - b), lngs = sel.map((d) => d.lng).sort((a, b) => a - b);
+    const cut = sel.length > 20 ? Math.floor(sel.length * 0.02) : 0;
+    const lo = cut, hi = sel.length - 1 - cut;
+    return { minLat: lats[lo], maxLat: lats[hi], minLng: lngs[lo], maxLng: lngs[hi], count: sel.length };
 }
 
 /* ── 매장 상세 '이 근처' 당구대(client/src/components/hiq/stores/StoreTableMap — StoreNearTable)의 셈 ── */

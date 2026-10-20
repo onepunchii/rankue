@@ -133,7 +133,8 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
 let dotsCache: { at: number; data: StoreDotsWire } | null = null;
 router.get("/dots", asyncHandler(async (_req: any, res: Response) => {
     if (!dotsCache || Date.now() - dotsCache.at > 30 * 60_000) {
-        const rows = await db.select({ lat: LISTING_LAT, lng: LISTING_LNG, region: storeListings.region }).from(storeListings).where(LISTING_LIVE);
+        // 주소는 시군구만 뽑는다(점에 싣는 것은 시군구 이름뿐 — 2026-10-20 지도 확대)
+        const rows = await db.select({ lat: LISTING_LAT, lng: LISTING_LNG, region: storeListings.region, address: storeListings.address }).from(storeListings).where(LISTING_LIVE);
         dotsCache = { at: Date.now(), data: packStoreDots(rows) };
     }
     return sendSuccess(res, dotsCache.data);

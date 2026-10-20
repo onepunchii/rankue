@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { OUTLINE_TO_STORE_REGION, nearDistText, nearViewKm, packStoreDots, spreadBalls, storeRegionCounts, unpackStoreDots } from "./storeDots";
+import { OUTLINE_TO_STORE_REGION, nearDistText, nearViewKm, packStoreDots, spreadBalls, storeCityCounts, storeFocusBox, storeRegionCounts, unpackStoreDots } from "./storeDots";
 
 const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 
@@ -17,9 +17,31 @@ describe("전국 당구장 지도 — 점 묶기", () => {
         expect(w.total).toBe(3);
         expect(w.regions).toEqual(["서울", "부산"]);
         const dots = unpackStoreDots(JSON.parse(JSON.stringify(w)));
-        expect(dots[0]).toEqual({ lat: 37.567, lng: 126.978, region: "서울" });
-        expect(dots[1]).toEqual({ lat: 35.18, lng: 129.075, region: "부산" });
+        expect(dots[0]).toEqual({ lat: 37.567, lng: 126.978, region: "서울", city: null });
+        expect(dots[1]).toEqual({ lat: 35.18, lng: 129.075, region: "부산", city: null });
         expect(storeRegionCounts(dots)).toEqual([{ region: "서울", count: 2 }, { region: "부산", count: 1 }]);
+    });
+
+    it("시군구(2026-10-20 지도 확대) — 주소 둘째 낱말, 옛 답(시군구 칸 없음)도 그대로 읽는다", () => {
+        const w = packStoreDots([
+            { lat: 37.5, lng: 127.04, region: "서울", address: "서울 강남구 역삼동 669-15" },
+            { lat: 37.51, lng: 127.05, region: "서울", address: "서울 강남구 삼성동 106-8" },
+            { lat: 37.54, lng: 127.08, region: "서울", address: "서울 광진구 구의동 242-22" },
+            { lat: 36.6, lng: 127.3, region: "세종", address: "세종 한누리대로 1" },
+        ]);
+        expect(w.cities).toEqual(["강남구", "광진구"]);
+        expect(w.ci).toEqual([0, 0, 1, -1]);
+        const dots = unpackStoreDots(JSON.parse(JSON.stringify(w)));
+        expect(dots.map((d) => d.city)).toEqual(["강남구", "강남구", "광진구", null]);
+        expect(storeCityCounts(dots, "서울")).toEqual([{ city: "강남구", count: 2 }, { city: "광진구", count: 1 }]);
+        const old = unpackStoreDots({ total: w.total, regions: w.regions, pts: w.pts });
+        expect(old).toHaveLength(4);
+        expect(old.every((d) => d.city === null)).toBe(true);
+        // 확대 범위 — 고른 시군구의 점만, 없으면 null(전국 그대로)
+        expect(storeFocusBox(dots, "서울", "강남구")).toEqual({ minLat: 37.5, maxLat: 37.51, minLng: 127.04, maxLng: 127.05, count: 2 });
+        expect(storeFocusBox(dots, "서울", "없는구")).toBeNull();
+        expect(storeFocusBox(dots, "")).toBeNull();
+        expect(storeFocusBox(dots, "서울")?.count).toBe(3);
     });
 
     it("모양이 틀린 답은 빈 목록(지도를 그리지 않는다)", () => {
@@ -45,7 +67,7 @@ describe("전국 당구장 지도 — 점 묶기", () => {
     it("화면: 홈 둘러보기는 가로 당구대 · 매장 찾기는 세로 당구대 + 지역별 · 홈의 매장 수는 지도와 같은 값", () => {
         expect(read("client/src/components/hiq/dashboard/QuickActions.tsx")).toContain("<StoreTableBanner onOpen={() => setLocation(\"/stores\")}");
         const stores = read("client/src/pages/stores.tsx");
-        expect(stores).toContain("<StoreTableMap region={region} onPick={(r) => setRegion(r)}");
+        expect(stores).toContain("<StoreTableMap region={region} city={city} onPick={(r) => setRegion(r)} onPickCity={setCity}");
         for (const k of ["mapAll", "mapIn", "mapLegend", "mapHint", "mapByRegion", "mapOthers"]) expect(stores.match(new RegExp(`\\n    ${k}: `, "g"))!.length, k).toBe(5);
         const dash = read("client/src/pages/hiq/dashboard.tsx");
         expect(dash).toContain("const storeN = useStoreDots().dots.length;");
@@ -113,5 +135,16 @@ describe("전국 당구장 지도는 공을 캔버스에(2026-10-19 — 1만 5�
         const felt = src.slice(src.indexOf("function FeltMap"), src.indexOf("export function StoreTableMap"));
         expect(felt).toContain("<canvas");
         expect(felt).not.toContain("<circle");
+    });
+});
+
+describe("지도 확대(2026-10-20) — 시도 · 시군구를 고르면 그곳으로", () => {
+    it("매장 찾기 지도만 당긴다(홈 배너는 전국 그대로) · 범례는 시군구로 · 점의 시군구는 서버가 주소로", () => {
+        const map = read("client/src/components/hiq/stores/StoreTableMap.tsx");
+        expect(map).toContain("<FeltMap dots={dots} region={region} city={city} focus onPick={onPick} r={4.4} label={head} />");
+        expect(map).toContain('vectorEffect="non-scaling-stroke"');
+        expect(map).toContain('data-testid="store-map-scale"');
+        expect(read("client/src/pages/stores.tsx")).toContain("onPickCity={setCity}");
+        expect(read("server/routes/modules/listings.ts")).toContain("region: storeListings.region, address: storeListings.address }).from(storeListings).where(LISTING_LIVE)");
     });
 });

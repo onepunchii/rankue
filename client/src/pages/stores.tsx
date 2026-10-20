@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
-import { regionTitleKo, regionDescKo, cityTitleKo, cityDescKo, cityHubPath } from "@shared/storeMeta";
+import { regionTitleKo, regionDescKo, cityTitleKo, cityDescKo, cityHubPath, listingCityOf } from "@shared/storeMeta";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
@@ -28,7 +28,7 @@ interface Listing {
 }
 interface ListingsResponse { total: number; rows: Listing[]; regions: Array<{ region: string; count: number }>; cities?: Array<{ city: string; count: number }> }
 
-const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string; mapAll: (n: number) => string; mapIn: (r: string, n: number) => string; mapLegend: string; mapHint: string; mapByRegion: string; mapOthers: (n: number) => string }> = {
+const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string; mapAll: (n: number) => string; mapIn: (r: string, n: number) => string; mapLegend: string; mapHint: string; mapByRegion: string; mapOthers: (n: number) => string; mapByCity: (r: string) => string; mapBackAll: string }> = {
   ko: {
     title: "매장 찾기",
     subtitle: "전국 당구장을 지역·이름으로 찾아보세요",
@@ -54,6 +54,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapHint: "지도나 지역을 누르면 그 지역만",
     mapByRegion: "지역별",
     mapOthers: (n) => `그 밖 ${n.toLocaleString()}곳`,
+    mapByCity: (r) => `${r} 시군구별`,
+    mapBackAll: "전국",
   },
   en: {
     title: "Find a venue",
@@ -80,6 +82,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapHint: "Tap a region to see only its halls",
     mapByRegion: "By region",
     mapOthers: (n) => `${n.toLocaleString()} elsewhere`,
+    mapByCity: (r) => `${r} by district`,
+    mapBackAll: "All",
   },
   vi: {
     title: "Tìm quán",
@@ -106,6 +110,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapHint: "Chạm vào một vùng để chỉ xem quán ở đó",
     mapByRegion: "Theo vùng",
     mapOthers: (n) => `${n.toLocaleString()} nơi khác`,
+    mapByCity: (r) => `${r} theo quận`,
+    mapBackAll: "Toàn quốc",
   },
   tr: {
     title: "Salon bul",
@@ -132,6 +138,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapHint: "Yalnızca o bölgeyi görmek için bölgeye dokun",
     mapByRegion: "Bölgeye göre",
     mapOthers: (n) => `Diğer ${n.toLocaleString()}`,
+    mapByCity: (r) => `${r} ilçeye göre`,
+    mapBackAll: "Tümü",
   },
   es: {
     title: "Buscar local",
@@ -158,6 +166,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapHint: "Toca una región para ver solo sus salas",
     mapByRegion: "Por región",
     mapOthers: (n) => `${n.toLocaleString()} en otras`,
+    mapByCity: (r) => `${r} por distrito`,
+    mapBackAll: "Todo",
   },
 };
 
@@ -231,10 +241,13 @@ export default function Stores() {
     }
   };
 
-  // 파트너 매장은 검색어·지역 필터에 맞을 때만 상단 노출
+  // 파트너 매장은 검색어·지역·시군구 필터에 맞을 때만 상단 노출.
+  // 2026-10-20 화면 확인: 시군구(?city=)를 안 봐서 '서울 강남구' 목록 맨 위에 광진구 파트너가 떴다(총 수도 하나 많았다).
+  // 시군구는 목록 API 와 같은 뜻 — 주소의 둘째 낱말(listingCityOf)
   const filteredPartners = partners.filter(
     (s) => (!dq || s.name?.toLowerCase().includes(dq.toLowerCase()) || (s.address ?? "").includes(dq))
-      && (!region || (s.region ?? "").includes(region)),
+      && (!region || (s.region ?? "").includes(region))
+      && (!region || !city || listingCityOf(s.address) === city),
   );
 
   // 지역 허브(?region=)는 서버 프리렌더(server/prerender.ts /stores)와 문자 단위로 같은 제목·설명 — shared/storeMeta.ts 공유.
@@ -278,7 +291,7 @@ export default function Stores() {
 
         {/* 전국 당구장 지도(2026-10-17) — 위에서 본 당구대 위의 공. 시도를 누르면 아래 칩과 같은 지역 고르기 */}
         {!dq && !nearbyOn && (
-          <StoreTableMap region={region} onPick={(r) => setRegion(r)} copy={{ all: t.mapAll, inRegion: t.mapIn, legend: t.mapLegend, hint: t.mapHint, byRegion: t.mapByRegion, others: t.mapOthers }} />
+          <StoreTableMap region={region} city={city} onPick={(r) => setRegion(r)} onPickCity={setCity} copy={{ all: t.mapAll, inRegion: t.mapIn, legend: t.mapLegend, hint: t.mapHint, byRegion: t.mapByRegion, others: t.mapOthers, byCity: t.mapByCity, backAll: t.mapBackAll }} />
         )}
 
         {/* 지역 칩 */}
