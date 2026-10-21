@@ -37,6 +37,7 @@ import { findLocalDish } from "../../../shared/golfLocalDish.js";
 import { summaryForViewer } from "../../lib/golfListingBlock.js";
 import { getCourseGuide } from "../../storage/golfCourseGuide.js";
 import { crewsAtClub } from "../../storage/golfCrewStamps.js";
+import { GOLF_TOUR_PHOTOS } from "../../data/golfTourPhotos.js";
 
 const router = Router();
 
@@ -435,6 +436,9 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
         // 이 골프장을 깬 크루(2026-10-12 크루 도장깨기) — 먼저 깬 순서. 못 읽어도 상세는 나간다
         crews: await crewsAtClub(p.clubId ? [p.clubId] : []).catch((e) => { console.error("[golf] course crews", e); return []; }),
         bookable: p.courseIds.length > 0,
+        // 골프장 사진(2026-10-21) — 한국관광공사 TourAPI · 공공누리 제1 · 3유형만(server/data/golfTourPhotos, 만든 스크립트 fetch-golf-tour-photos).
+        // 없으면 빈 칸. 화면이 출처(사진 한국관광공사 · 공공누리 제N유형)를 단다
+        tourPhotos: GOLF_TOUR_PHOTOS[p.slug]?.photos ?? [],
         prices: prices.map((m) => ({
             itemId: m.item_id, label: m.label, price: m.price, change: m.change, yearHigh: m.year_high, yearLow: m.year_low,
             asOf: m.as_of ? String(m.as_of).slice(0, 10) : null, history: thin(byItem.get(m.item_id) ?? []),

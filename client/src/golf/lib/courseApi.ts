@@ -56,6 +56,8 @@ export interface WatchFilters {
 }
 export interface CourseDetail {
     slug: string; name: string; region: string; city: string | null; address: string | null;
+    /** 골프장 사진(2026-10-21 — 한국관광공사 TourAPI · 공공누리 제1 · 3유형). 옛 응답엔 없다 */
+    tourPhotos?: { url: string; thumb: string | null; lic: "Type1" | "Type3" }[];
     lat: number | null; lng: number | null; kind: string | null; holes: number | null;
     /** 미니 지도에 찍을 자리(2026-10-05) — 골프장 좌표가 없거나 틀렸으면 시군 중심(approx). 옛 응답엔 없다 */
     spot?: { lat: number; lng: number; approx: boolean } | null;

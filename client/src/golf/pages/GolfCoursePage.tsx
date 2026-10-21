@@ -23,6 +23,7 @@ import { ORIGIN, REGION_LABEL, cityShort, courseDescription, coursePath, courseT
 import { COURSES_KEY, slugForCourseId, useCourseDetail, useCourseWeather, type CourseDetail, type CourseListItem } from "@/golf/lib/courseApi";
 import type { CourseWeather } from "@shared/golfWeather";
 import { CourseShell } from "@/golf/components/course/CourseShell";
+import { TourPhotos } from "@/golf/components/course/detail/TourPhotos";
 import { CourseLogo } from "@/golf/components/course/CourseLogo";
 import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/CourseHeader";
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";
@@ -286,6 +287,8 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             {/* ⚠️ 아래 구역들의 key 는 **서로 달라야 한다**(골프장을 옮길 때 안의 상태를 비우려고 슬러그를 붙인다).
                 2026-10-05 사고: 넷이 똑같이 key={d.slug} 였는데, 날씨가 뼈대(key 없음)에서 카드(key 있음)로 바뀌는 순간 리액트가
                 남은 형제를 key 로 찾다가 같은 key 끼리 덮어써서 옛 '시세'·'소개' 구역을 지우지 못했다 — 화면에 구역이 두 번 떴다. */}
+            {/* 골프장 사진(2026-10-21 — 한국관광공사 TourAPI · 공공누리) — 머리 바로 밑, 구역 이동 줄 앞. 없으면 칸을 그리지 않는다 */}
+            <TourPhotos key={`tour:${d.slug}`} photos={d.tourPhotos} name={d.name} className="px-5 pt-4" />
             <SectionNav ids={ids} />
             {ids.includes("tee") && <TeeTimes slug={d.slug} name={d.name} listings={d.listings} counts={d.counts} myWatch={d.myWatch} watchers={d.watchers} />}
             {/* 이 근처 조인·부킹(2026-10-08 오너: "각 개별 CC 페이지에 이 카드 들어가면 어때? … 조인 활성화" → "시안 1 이 좋네") — 이 골프장에 글이
