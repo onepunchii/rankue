@@ -6,7 +6,7 @@
 import { Router } from "express";
 import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
-import { toSummary, trailCourse, trailCourses, trailRouteCounts, trailRouteMeta } from "../../storage/koreaTrails.js";
+import { toSummary, trailCourse, trailCourses, trailRouteCounts, trailRouteMeta, trailSpotsOf } from "../../storage/koreaTrails.js";
 import { TRAIL_ROUTES, trailRouteOf } from "../../../shared/koreaTrails.js";
 import { thinLine } from "../../../shared/hikingGeo.js";
 import { tourFestivals, kstYmd } from "../../services/tourFestivals.js";
@@ -100,7 +100,8 @@ router.get("/:route/:key", asyncHandler(async (req, res) => {
     const festivals = mid ? nearbyFestivals(await tourFestivals().catch(() => []), mid[0], mid[1], kstYmd()) : [];
     const side = (c: typeof prev) => (c ? { ...toSummary(c), line: thinLine(c.line as unknown as [number, number, number, number][], 60).map((p) => [...p]) } : null);
     res.set("Cache-Control", PUBLIC_CACHE);
-    return sendSuccess(res, { course, prev: side(prev), next: side(next), festivals });
+    // 코스 근처 볼거리(10/21) — 관광공사 관광지 · 사진(near-spots.json)
+    return sendSuccess(res, { course, prev: side(prev), next: side(next), festivals, spots: trailSpotsOf(course.id) });
 }));
 
 /** 코스 시작점의 날씨(골프장 · 산 · 축제와 같은 기상청 예보 저장 · 같은 셈). 못 받으면 null */

@@ -1,7 +1,7 @@
 /**
  * /hiking/trails/:route/:key — 코리아둘레길 코스 한 곳(2026-10-21).
  * 위에서부터: 길 이름 · 코스 이름 · 붙은 말(예약노선 · 우회로) → 거리 · 시간 · 난이도 · 오르막 → 코스 지도(등산의 CourseMap — 앞 · 뒤 코스는 옅게, 누르면 그 코스)
- * → 높낮이 → 시작 · 끝(길찾기) → 시작점 날씨 → 코스 소개 · 볼거리 · 가는 길(두루누비 글 그대로) → 근처 축제 → 앞 · 뒤 코스 → GPX · 출처.
+ * → 높낮이 → 시작 · 끝(길찾기) → 시작점 날씨 → 코스 소개 · 볼거리(두루누비 글 그대로) → 코스 근처 볼거리(관광공사 사진) → 가는 길 → 근처 축제 → 앞 · 뒤 코스 → GPX · 출처.
  * 글은 받은 그대로(지어 쓰지 않는다) · 선은 두루누비 GPX 를 줄인 것. ⚠️ 리터럴 색만. 글자는 12px 이상.
  */
 import { useState } from "react";
@@ -20,6 +20,7 @@ import type { MountainCourse } from "../lib/api";
 import { NearbyFestivalList, HIKING_FESTIVAL_TONE } from "@/festivals/components/NearbyFestivalList";
 import { WeatherDays } from "@/festivals/components/WeatherDays";
 import { trailCardUrl } from "@shared/ogCards";
+import { TRAIL_SPOT_CREDIT } from "@shared/trailSpots";
 import { shortCourseName } from "./TrailParts";
 import { trailCourseKey, trailWeatherKey, type TrailCourseData, type TrailWeather } from "./api";
 import { TrailStampCard } from "./TrailStamp";
@@ -128,6 +129,25 @@ export default function TrailCoursePage() {
                     </HkSection>
                 )}
                 {c.tour && <HkSection title="볼거리"><Lines text={c.tour} /></HkSection>}
+
+                {/* 코스 근처 볼거리(10/21) — 관광공사 관광지 가운데 코스 선 2km 안 · 사진(제3유형은 자르지 않는다 — 원본 비율). 누르면 카카오맵 길찾기 */}
+                {!!data.spots?.length && (
+                    <HkSection title="코스 근처 볼거리" aside="코스 선 2km 안">
+                        <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="trail-spots">
+                            {data.spots.map((sp) => (
+                                <a key={sp.id} href={kakaoRoute(sp.title, sp.lat, sp.lng)} target="_blank" rel="noopener noreferrer" onClick={outside(kakaoRoute(sp.title, sp.lat, sp.lng))}
+                                    className="block shrink-0 active:opacity-80" data-track-as="trail-spot" data-testid="trail-spot">
+                                    <span className="block overflow-hidden rounded-xl" style={{ background: "#FFFFFF0A" }}>
+                                        <img src={sp.thumb ?? sp.image} alt={`${sp.title} 사진`} loading="lazy" decoding="async" referrerPolicy="no-referrer" className="block h-[104px] w-auto max-w-none" />
+                                    </span>
+                                    <span className="mt-1.5 block max-w-[180px] truncate text-[14.5px] font-semibold text-[#F4EFE3]">{sp.title}</span>
+                                    <span className="block text-[12.5px] tabular-nums text-[#F4EFE399]">{sp.dist < 0.5 ? "코스 바로 옆" : `코스에서 ${sp.dist}km`}</span>
+                                </a>
+                            ))}
+                        </div>
+                        <p className="mt-2 text-[12px] text-[#F4EFE366] break-keep">{TRAIL_SPOT_CREDIT} 제{data.spots.some((x) => x.lic === "Type3") ? "1 · 3" : "1"}유형 · 누르면 카카오맵 길찾기</p>
+                    </HkSection>
+                )}
                 {c.traveler && <HkSection title="가는 길 · 편의"><Lines text={c.traveler} /></HkSection>}
 
                 {data.festivals.length > 0 && (

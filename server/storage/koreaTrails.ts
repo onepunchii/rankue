@@ -5,6 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import type { TrailSpot } from "../../shared/trailSpots.js";
 import { TRAIL_ROUTES, fillTrailEndNames, fixTrailSigun, type TrailCourseDetail, type TrailCourseSummary, type TrailRouteId, type TrailRouteMeta } from "../../shared/koreaTrails.js";
 
 interface TrailsFile { source: string; made: string; routes: TrailRouteMeta[]; courses: TrailCourseDetail[] }
@@ -51,4 +52,18 @@ export function trailCourse(route: string, key: string): { course: TrailCourseDe
     const before = [...main].reverse().find((c) => c.no < list[i].no) ?? null;
     const after = main.find((c) => c.no > list[i].no) ?? null;
     return { course: list[i], prev: before, next: after };
+}
+
+/** 코스 근처 볼거리(2026-10-21 — 관광공사 관광지, scripts/fetch-trail-spots.ts 가 만든 near-spots.json). 파일이 없으면 빈 칸 */
+let spotsCache: Record<string, TrailSpot[]> | null = null;
+export function trailSpotsOf(courseId: string): TrailSpot[] {
+    if (!spotsCache) {
+        const candidates = [
+            path.join(process.cwd(), "server/assets/trails/near-spots.json"),
+            path.join(path.dirname(fileURLToPath(import.meta.url)), "../assets/trails/near-spots.json"),
+        ];
+        const file = candidates.find((c) => fs.existsSync(c));
+        try { spotsCache = file ? (JSON.parse(fs.readFileSync(file, "utf8")).spots ?? {}) : {}; } catch { spotsCache = {}; }
+    }
+    return spotsCache![courseId] ?? [];
 }

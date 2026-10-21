@@ -1,6 +1,7 @@
 // 코리아둘레길 프리렌더(2026-10-21) — /hiking/trails(허브) · /hiking/trails/<길> · /hiking/trails/<길>/<코스>.
 // 글은 shared/koreaTrails 로 화면(client/src/hiking/trails)과 같다. 코스 소개 · 볼거리 · 가는 길은 두루누비 글 그대로 + 출처.
 // prerender.ts 와 서로 import 하는 모양이라 page · esc · hubNav 는 함수 안에서만 부른다(최상위에서 호출하지 말 것).
+import { TRAIL_SPOT_CREDIT, type TrailSpot } from "../../shared/trailSpots.js";
 import { page, esc, hubNav } from "../prerender.js";
 import { entry } from "../sitemap.js";
 import {
@@ -87,7 +88,7 @@ ${hubNav("ko")}`;
     return { status: 200, tag: "trails:route", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card), jsonLd: [list, crumbs([r.name, trailRoutePath(r.id)])], ...(card ? { image: card } : {}) }) };
 }
 
-function course(c: TrailCourseDetail, prev: TrailCourseDetail | null, next: TrailCourseDetail | null): TrailsRender {
+function course(c: TrailCourseDetail, prev: TrailCourseDetail | null, next: TrailCourseDetail | null, spots: readonly TrailSpot[] = []): TrailsRender {
     const r = trailRouteOf(c.route)!;
     const seo = trailCourseSeo(c);
     const facts: [string, string | null][] = [["길", r.name], ["거리", `${c.km}km`], ["걸리는 시간", trailTimeText(c.minutes) || null], ["난이도", c.level ? TRAIL_LEVEL_NAME[c.level] : null],
@@ -112,6 +113,13 @@ ${c.tour ? `  <section>
     <h2>볼거리</h2>
 ${paras(c.tour)}
   </section>` : ""}
+${spots.length ? `  <section>
+    <h2>코스 근처 볼거리</h2>
+    <ul>
+${spots.map((x) => `      <li>${esc(x.title)} — ${esc(x.dist < 0.5 ? "코스 바로 옆" : `코스에서 ${x.dist}km`)}${x.addr ? ` · ${esc(x.addr)}` : ""}</li>`).join("\n")}
+    </ul>
+    <p>${esc(TRAIL_SPOT_CREDIT)}</p>
+  </section>` : ""}
 ${c.traveler ? `  <section>
     <h2>가는 길 · 편의</h2>
 ${paras(c.traveler)}
@@ -133,7 +141,7 @@ ${hubNav("ko")}`;
     return { status: 200, tag: "trails:course", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card), jsonLd: [{ ...place, image: card.url }, crumbs([r.name, trailRoutePath(r.id)], [c.name, seo.path])], image: card }) };
 }
 
-export function renderTrails(path: string, all: readonly TrailCourseDetail[], meta: readonly TrailRouteMeta[], find: (route: string, key: string) => { course: TrailCourseDetail; prev: TrailCourseDetail | null; next: TrailCourseDetail | null } | null): TrailsRender | null {
+export function renderTrails(path: string, all: readonly TrailCourseDetail[], meta: readonly TrailRouteMeta[], find: (route: string, key: string) => { course: TrailCourseDetail; prev: TrailCourseDetail | null; next: TrailCourseDetail | null } | null, spotsOf: (courseId: string) => readonly TrailSpot[] = () => []): TrailsRender | null {
     const p = path.replace(/\/+$/, "") || "/";
     if (p === TRAILS_PATH) return hub(all, meta);
     const m = /^\/hiking\/trails\/([a-z]+)(?:\/([^/]+))?$/.exec(p);
@@ -142,7 +150,7 @@ export function renderTrails(path: string, all: readonly TrailCourseDetail[], me
     let key = m[2];
     try { key = decodeURIComponent(key); } catch { return null; }
     const hit = find(m[1], key);
-    return hit ? course(hit.course, hit.prev, hit.next) : null;
+    return hit ? course(hit.course, hit.prev, hit.next, spotsOf(hit.course.id)) : null;
 }
 
 /** 사이트맵 — 허브 · 길 넷 · 코스마다(받은 자료를 만든 날) */

@@ -2135,8 +2135,8 @@ ${list}
   app.get(TRAILS_RE, async (req, res, next) => {
     if (!isBot(req)) return next();
     try {
-      const { trailCourses, trailRouteMeta, trailCourse } = await import("./storage/koreaTrails.js");
-      const r = renderTrails(req.path, trailCourses(), trailRouteMeta(), trailCourse);
+      const { trailCourses, trailRouteMeta, trailCourse, trailSpotsOf } = await import("./storage/koreaTrails.js");
+      const r = renderTrails(req.path, trailCourses(), trailRouteMeta(), trailCourse, trailSpotsOf);
       if (!r) return /^\/hiking\/trails\/[a-z]+\/[^/]+\/?$/.test(req.path) ? sendGone(res, "없는 코스예요", "코리아둘레길에 없는 코스예요.") : next();
       noStore(res);
       res.setHeader("X-Prerender", r.tag);

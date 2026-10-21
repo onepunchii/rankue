@@ -5,6 +5,7 @@ import type { TrailCourseDetail, TrailCourseSummary, TrailRoute } from "@shared/
 import type { NearbyFestival } from "@shared/tourFestivals";
 import type { WxDay } from "@shared/golfWeather";
 import type { FestiveTrail } from "@shared/trailFestivals";
+import type { TrailSpot } from "@shared/trailSpots";
 
 export const TRAILS_KEY = ["/api/hiq/trails"] as const;
 export const trailCourseKey = (route: string, key: string) => [`/api/hiq/trails/${encodeURIComponent(route)}/${encodeURIComponent(key)}`] as const;
@@ -16,7 +17,8 @@ export interface TrailRouteInfo extends TrailRoute { line: string | null; desc: 
 /** festive: 축제가 열리는 둘레길(10/21 더함 — 옛 응답엔 없다) */
 export interface TrailsData { routes: TrailRouteInfo[]; courses: TrailCourseSummary[]; festive?: FestiveTrail[] }
 export interface TrailSide extends TrailCourseSummary { line: number[][] }
-export interface TrailCourseData { course: TrailCourseDetail; prev: TrailSide | null; next: TrailSide | null; festivals: NearbyFestival[] }
+/** spots: 코스 근처 볼거리(10/21 더함 — 옛 응답엔 없다) */
+export interface TrailCourseData { course: TrailCourseDetail; prev: TrailSide | null; next: TrailSide | null; festivals: NearbyFestival[]; spots?: TrailSpot[] }
 export interface TrailWeather { days: WxDay[]; area: string | null }
 
 /** 내 코스 도장(등산 회원만 — server GET /trails/me). 도장 · 도장이 안 된 출발 확인 */
