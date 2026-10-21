@@ -33,6 +33,16 @@ export function cityShort(city: string | null | undefined): string {
     return s.length >= 2 ? s : city;
 }
 
+/**
+ * 화면에 보이는 짧은 이름 — 여러 지역이 섞인 목록(가까운 골프장 · 목록 · 관심 · 조인 줄)용. 주소 · 거르기는 cityShort 그대로(허브 주소가 /golf/courses/경기/광주 다).
+ * 떼면 다른 곳과 같아지는 이름은 도를 붙인다: 경기 '광주시' → '경기 광주'(그냥 '광주'면 광주광역시로 읽힌다 — 2026-10-21 88CC 의 가까운 골프장 '강남300 · 광주 9.1km').
+ */
+const CITY_LABEL_AMBIGUOUS: Readonly<Record<string, string>> = { 광주시: "경기 광주" };
+export function cityLabel(city: string | null | undefined): string {
+    if (!city) return "";
+    return CITY_LABEL_AMBIGUOUS[city] ?? cityShort(city);
+}
+
 /** 주소 한 조각을 URL 에 쓸 꼴로 — 한글은 그대로 두고 링크 만들 때 encodeURIComponent 한다. */
 /**
  * 골프장의 홀 수(2026-10-17 리뷰) — 명부의 홀 수가 9 아래면(더스타휴 · 양평TPC '1홀') 틀린 값이다: 코스별 파 자료의 홀 합으로,

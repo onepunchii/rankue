@@ -8,7 +8,7 @@
  */
 import { Link } from "wouter";
 import { cn } from "@/lib/utils";
-import { coursePath, cityShort, manwonText, wonShort } from "@shared/golfCourse";
+import { coursePath, cityLabel, manwonText, wonShort } from "@shared/golfCourse";
 import { formatDistance } from "@shared/golfJoin";
 import type { CourseCounts, CourseListItem, WatchFilters } from "../../../lib/courseApi";
 import { WatchButton } from "../WatchSheet";
@@ -46,7 +46,7 @@ export function PriceChange({ change, className }: { change: number | null | und
 
 export function CourseRow({ c, km, myWatch }: { c: CourseListItem; km: number | null; myWatch: { filters: WatchFilters } | null }) {
     // 한 줄에 셋 — 이름 / 어디·얼마·몇 홀 / 특징. 칩 대신 글(2026-09-24 둘째 판: 알약이 줄마다 쌓여 무거웠다).
-    const meta = [cityShort(c.city) || c.region, c.feeFrom ? `${wonShort(c.feeFrom)}~` : null, c.holes ? `${c.holes}홀` : null, km != null ? formatDistance(km) : null].filter(Boolean);
+    const meta = [cityLabel(c.city) || c.region, c.feeFrom ? `${wonShort(c.feeFrom)}~` : null, c.holes ? `${c.holes}홀` : null, km != null ? formatDistance(km) : null].filter(Boolean);
     const traits = [...(c.play ?? []).map((p) => PLAY_LABEL[p] ?? p), ...(c.grass ?? [])];
     const live = c.counts.booking + c.counts.join > 0;
     return (

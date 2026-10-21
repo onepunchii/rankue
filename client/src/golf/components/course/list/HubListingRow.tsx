@@ -4,7 +4,7 @@
  */
 import { cn } from "@/lib/utils";
 import { kstDateKey, kstDateLabel, kstTime } from "@/lib/kst";
-import { cityShort, teePart, wonShort } from "@shared/golfCourse";
+import { cityLabel, teePart, wonShort } from "@shared/golfCourse";
 import type { HubListing } from "../../../lib/courseApi";
 import { SlotDots, dayLabel, hostSeatLabel, slotsOf } from "../../join/joinUi";
 import { TeeWxInline } from "../TeeWx";
@@ -51,7 +51,7 @@ export function HubListingRow({ l, now, onOpen }: { l: HubListing; now: number; 
                     {/* 둘째 줄: 시각·부·시군은 좁으면 줄이고, 날씨는 줄이지 않는다(줄 끝에서 말줄임에 먹혔다 — 2026-10-05 실측) */}
                     <span className="mt-0.5 flex items-center gap-1.5 min-w-0 text-[13px] text-[#FFFFFF80] tabular-nums">
                         <span className="truncate">
-                            {kstTime(l.datetime)} · {teePart(l.datetime)}부{l.city ? ` · ${cityShort(l.city)}` : ""}
+                            {kstTime(l.datetime)} · {teePart(l.datetime)}부{l.city ? ` · ${cityLabel(l.city)}` : ""}
                             {l.isUrgent ? <span className="text-[#FF6B63]"> · {timeLeft(l.datetime, now)}</span> : null}
                         </span>
                         {/* 그 티타임의 날씨 — 그림 + 티오프 기온, 비 올 땐 확률. 예보가 없으면 안 그린다 */}

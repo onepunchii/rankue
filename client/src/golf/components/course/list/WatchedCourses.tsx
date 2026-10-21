@@ -4,7 +4,7 @@
  */
 import { Link } from "wouter";
 import { LucideChevronRight, LucideLoader2 } from "@/lib/icons";
-import { cityShort, coursePath } from "@shared/golfCourse";
+import { cityLabel, coursePath } from "@shared/golfCourse";
 import { useMyWatches } from "../../../lib/courseApi";
 import { watchSummary } from "../WatchSheet";
 import { LiveBadges } from "./CourseRow";
@@ -35,7 +35,7 @@ export function WatchedCourses({ enabled }: { enabled: boolean }) {
                             <span className="min-w-0 flex-1">
                                 <span className="flex items-center gap-1.5 min-w-0">
                                     <span className="text-[14px] font-medium text-[#FFFFFF] truncate">{w.name}</span>
-                                    <span className="shrink-0 text-[12px] text-[#FFFFFF66]">{cityShort(w.city) || w.region}</span>
+                                    <span className="shrink-0 text-[12px] text-[#FFFFFF66]">{cityLabel(w.city) || w.region}</span>
                                 </span>
                                 <span className="mt-0.5 block text-[12px] text-[#FFFFFF80] truncate">{watchSummary(w.filters) || "모든 티타임"}</span>
                             </span>
