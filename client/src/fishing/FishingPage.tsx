@@ -280,8 +280,6 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             </div>
                         </div>
 
-                        {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 낚시 크루 회원 목록 · 조 나누기에 쓴다 */}
-                        <div className="px-5 empty:hidden [&:has(>*)]:pt-1 [&:has(>*)]:pb-1"><ProfileNudge sport="FISHING" /></div>
                         {/* 첫 방문의 코치마크(2026-10-14) — 어종 · 바다의 칸 · 조과 적기 */}
                         <CoachTour id="fishing-home" tone="fishing" steps={[
                             { target: "fs-fish", title: "어종을 고르면", body: "지도의 바다 칸이 그 어종의 오늘 낚시지수로 칠해져요." },
@@ -293,6 +291,9 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                         <FishMapHome today={today} list={list} picks={seaPicks} want={mapFish} onFish={(name) => { const f = fishByName(name); if (f) setFishOpen(f.id); }} onAdd={(place, species) => { setPreset({ place, species }); setAdding(true); }} />
                         {/* 나가기 전에 보는 것 — 바다의 특보 · 내 항구 · 물때(예전 출조 탭의 것) */}
                         <div id="fishing-today-block" className="scroll-mt-16"><Today today={today} list={list} picks={seaPicks} /></div>
+                        {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 낚시 크루 회원 목록 · 조 나누기에 쓴다.
+                            지도 먼저(2026-10-14 오너) — 지도 · 오늘의 바다 뒤에 둔다(2026-10-21 화면 확인: 표지 바로 밑이면 지도를 밀어 냈다) */}
+                        <div className="px-5 empty:hidden [&:has(>*)]:pt-3"><ProfileNudge sport="FISHING" /></div>
                         {/* 내 수족관 — 잡은 어종이 헤엄치는 작은 창. 누르면 수족관 */}
                         <FsSection title="내 수족관" aside={<button type="button" onClick={() => setTab("tank")} style={{ color: C.sun }}>수족관 가기</button>} testid="fishing-home-tank">
                             <div data-tour="fs-tank"><FishingAquarium fish={empty ? [] : tankFish} placed={tank?.placed} mini onOpen={() => setTab("tank")} onFish={setFishOpen} /></div>

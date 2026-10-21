@@ -82,8 +82,6 @@ export default function HikingHome() {
                     </div>
                 </div>
 
-                {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 산악회 회원 목록 · 조 나누기에 쓴다 */}
-                <div className="px-5 empty:hidden [&:has(>*)]:pt-2"><ProfileNudge sport="HIKING" /></div>
                 {s.isLoading ? (
                     <div className="space-y-4 px-5 pt-4" aria-busy="true"><HkSkel className="h-24" /><HkSkel className="h-[420px]" /></div>
                 ) : (
@@ -101,6 +99,9 @@ export default function HikingHome() {
                                 </Link>
                             </div>
                         )}
+                        {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 산악회 회원 목록 · 조 나누기에 쓴다.
+                            가장 가까운 도장첩 다음(2026-10-21 화면 확인: 표지 바로 밑이면 도장첩 카드를 밀어 냈다) */}
+                        <div className="px-5 empty:hidden [&:has(>*)]:pt-2"><ProfileNudge sport="HIKING" /></div>
 
                         <NearMe famous={s.famous} done={s.done} />
 
