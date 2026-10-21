@@ -2158,7 +2158,7 @@ ${list}
       const today = kstToday();
       const r = await renderFestivals(req.path, all, today, async (id) => { const f = await getFestival(id); return f ? { f, around: await festivalAround(f, today) } : null; });
       // 축제 표를 읽었는데 없는 번호면 404(표가 비어서 못 그린 경우는 화면에 맡긴다)
-      if (!r) return all.length && /^\/festivals\/\d+\/?$/.test(req.path) ? sendGone(res, "없는 축제예요", "랭큐 전국 축제에 없는 페이지예요.") : next();
+      if (!r) return all.length && /^\/(?:(?:golf|hiking|fishing)\/)?festivals\/\d+\/?$/.test(req.path) ? sendGone(res, "없는 축제예요", "랭큐 전국 축제에 없는 페이지예요.") : next();
       noStore(res);
       res.setHeader("X-Prerender", r.tag);
       res.status(r.status).send(r.html);

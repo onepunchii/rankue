@@ -177,7 +177,7 @@ describe("전국 축제 — 이어 붙인 곳", () => {
     it("서버: 공개 라우터 · 검색용 화면 · 봇 경로 · 사이트맵 · 매일 받기", () => {
         expect(read("server/routes/index.ts")).toContain('router.use("/festivals", festivalsRouter);');
         expect(read("server/prerender.ts")).toContain("app.get(FESTIVALS_RE,");
-        expect(read("vercel.json")).toContain('"src": "/(festivals(?:/[0-9]+)?|about|');
+        expect(read("vercel.json")).toContain('"src": "/((?:(?:golf|hiking|fishing)/)?festivals(?:/[0-9]+)?|about|');
         expect(read("server/sitemap.ts")).toContain('SITEMAP_SECTIONS = ["core", "festivals", ');
         expect(read("server/routes/modules/cron.ts")).toContain("await festivalsQuietly()");
         expect(read("migrations/tour_festivals.sql")).toContain("CREATE TABLE IF NOT EXISTS tour_festivals");

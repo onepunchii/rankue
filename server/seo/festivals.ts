@@ -20,7 +20,8 @@ const withCard = (body: string, card: { url: string; width: number; height: numb
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FestivalRender { status: 200; tag: string; html: string }
 /** 축제의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
-export const FESTIVALS_RE = /^\/festivals(?:\/\d{1,12})?\/?$/;
+// 종목마다의 축제 화면(/golf · /hiking · /fishing/festivals…)도 같은 글 — 정본(canonical)은 /festivals… 하나(주소창에서 복사해 보낸 링크도 카드가 붙게)
+export const FESTIVALS_RE = /^\/(?:(?:golf|hiking|fishing)\/)?festivals(?:\/\d{1,12})?\/?$/;
 
 type Around = {
     mountains: { slug: string; name: string; heightM: number | null; km: number }[];
@@ -153,7 +154,7 @@ ${hubNav("ko")}`;
 }
 
 export async function renderFestivals(path: string, all: readonly FestivalRow[], today: string, detail: (id: string) => Promise<{ f: FestivalDetail; around: Around } | null>): Promise<FestivalRender | null> {
-    const p = path.replace(/\/+$/, "") || "/";
+    const p = path.replace(/\/+$/, "").replace(/^\/(?:golf|hiking|fishing)(?=\/festivals(?:\/|$))/, "") || "/";
     if (p === FESTIVALS_PATH) return all.length ? hub(all, today) : null;
     const m = /^\/festivals\/(\d{1,12})$/.exec(p);
     if (!m) return null;
