@@ -41,7 +41,9 @@ const nav = () => `  <nav aria-label="둘러보기">
 function hub(all: readonly FestivalRow[], today: string): FestivalRender {
     const live = liveFestivals(all, today, 45);
     const { sat, sun } = thisWeekend(today);
-    const weekend = live.filter((f) => overlaps(f, sat, sun));
+    // 화면과 같이 짧은 축제 먼저(두 달짜리 정원 · 전시가 '이번 주말' 맨 앞에 오지 않게)
+    const len = (f: FestivalRow) => Date.UTC(+f.end.slice(0, 4), +f.end.slice(4, 6) - 1, +f.end.slice(6, 8)) - Date.UTC(+f.start.slice(0, 4), +f.start.slice(4, 6) - 1, +f.start.slice(6, 8));
+    const weekend = live.filter((f) => overlaps(f, sat, sun)).sort((a, b) => len(a) - len(b) || a.start.localeCompare(b.start));
     const seo = festivalsHubSeo({ live: live.length, weekend: weekend.length });
     const year = today.slice(0, 4);
     // 달마다 — 올해 열린(열릴) 축제를 시작한 달로. 지난 축제는 올해 날짜 그대로(다음 해 날짜가 나오면 바뀐다)

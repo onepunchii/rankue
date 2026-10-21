@@ -39,7 +39,9 @@ export default function FestivalsHub() {
     const filtered = useMemo(() => inRegion.filter((f) => !cat || f.cat === cat), [inRegion, cat]);
     const live = useMemo(() => liveFestivals(filtered, today, 45), [filtered, today]);
     const { sat, sun } = thisWeekend(today);
-    const weekend = live.filter((f) => overlaps(f, sat, sun));
+    // 이번 주말 — 짧은 축제 먼저(2026-10-21 화면 확인: 두 달 내내 하는 정원 · 전시가 맨 앞에 와서 '이번 주말'의 느낌이 없었다). 같으면 시작한 날 순서
+    const dayLen = (f: { start: string; end: string }) => Date.UTC(+f.end.slice(0, 4), +f.end.slice(4, 6) - 1, +f.end.slice(6, 8)) - Date.UTC(+f.start.slice(0, 4), +f.start.slice(4, 6) - 1, +f.start.slice(6, 8));
+    const weekend = live.filter((f) => overlaps(f, sat, sun)).sort((a, b) => dayLen(a) - dayLen(b) || a.start.localeCompare(b.start));
     const regionCounts = useMemo(() => { const m = new Map<string, number>(); for (const f of liveAll) if (f.region) m.set(f.region, (m.get(f.region) ?? 0) + 1); return m; }, [liveAll]);
     const catCounts = useMemo(() => { const m = new Map<string, number>(); for (const f of liveFestivals(inRegion, today, 45)) if (f.cat) m.set(f.cat, (m.get(f.cat) ?? 0) + 1); return m; }, [inRegion, today]);
     const pick = live.find((f) => f.id === picked) ?? null;

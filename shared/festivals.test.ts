@@ -128,6 +128,13 @@ describe("전국 축제 — 이어 붙인 곳", () => {
         expect(read("client/src/festivals/pages/FestivalsHub.tsx").match(/object-cover/g)?.length).toBe(1);
         expect(read("client/src/festivals/pages/FestivalsHub.tsx")).toContain("src={FESTIVAL_HERO}");
     });
+    it("골프장 · 낚시터 페이지에도 이 근처 축제(종목별) — 서버가 산 페이지와 같은 셈으로 싣고, 화면은 우리 축제 페이지로 잇는다", () => {
+        expect(read("server/routes/modules/golfCourses.ts")).toContain("festivals: p.lat != null && p.lng != null ? nearbyFestivals(await tourFestivals()");
+        expect(read("server/routes/modules/fishing.ts")).toContain("nearbyFestivals(await tourFestivals().catch(() => []), place.lat, place.lng, kstYmd())");
+        expect(read("client/src/golf/pages/GolfCoursePage.tsx")).toContain("<NearbyFestivalList items={d.festivals!} tone={GOLF_FESTIVAL_TONE} />");
+        expect(read("client/src/fishing/spots/SpotsPages.tsx")).toContain("<NearbyFestivalList items={data!.festivals!} tone={FISHING_FESTIVAL_TONE} />");
+        expect(read("client/src/festivals/components/NearbyFestivalList.tsx")).toContain("href={festivalPath(f.id)}");
+    });
     it("산 페이지의 근처 축제는 우리 축제 페이지로 잇는다", () => {
         const c = read("client/src/hiking/pages/MountainPage.tsx");
         expect(c).toContain("href={festivalPath(f.id)}");

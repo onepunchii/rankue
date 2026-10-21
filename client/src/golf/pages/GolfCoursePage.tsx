@@ -44,6 +44,7 @@ import { NearbyCourses } from "@/golf/components/course/detail/NearbyCourses";
 import { NearbyPlaces } from "@/golf/components/course/detail/NearbyPlaces";
 import { SectionNav, jumpTo } from "@/golf/components/course/detail/SectionNav";
 import { Card, Section, Skel, type SectionId } from "@/golf/components/course/detail/ui";
+import { NearbyFestivalList, GOLF_FESTIVAL_TONE } from "@/festivals/components/NearbyFestivalList";
 import { CoursePhotoGallery } from "@/golf/components/photos/CoursePhotoGallery";
 import { GolfGuestIntro } from "@/golf/components/course/GolfGuide";
 import { hasGuide } from "@shared/golfCourseGuide";
@@ -317,6 +318,12 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             {/* 근처 먹거리·카페·숙소(2026-10-05) — 네이버 지역 검색을 그 자리에서. 위치 바로 아래(라운드 끝나고 어디서 먹을지).
                 날씨에서 보고 있는 라운드(round)가 첫 메뉴 칩을 고른다 */}
             {ids.includes("food") && <NearbyPlaces key={`food:${d.slug}`} slug={d.slug} name={d.name} region={d.region} city={d.city} round={round} />}
+            {/* 이 근처 축제(2026-10-21 전국 축제 — 종목별) — 먹거리 다음(라운드 끝나고 들를 곳). 없으면 칸이 없다 */}
+            {(d.festivals?.length ?? 0) > 0 && (
+                <Section key={`fest:${d.slug}`} title="이 근처 축제" aside={<span className="text-[12.5px] text-[#FFFFFF80]">20km 안</span>}>
+                    <NearbyFestivalList items={d.festivals!} tone={GOLF_FESTIVAL_TONE} />
+                </Section>
+            )}
 
             {/* 회원이 공개한 라운드 사진(2026-09-30) — 없으면 칸을 그리지 않는다 */}
             <CoursePhotoGallery slug={d.slug} name={d.name} />

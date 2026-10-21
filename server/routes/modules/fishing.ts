@@ -47,6 +47,8 @@ import { FISHING_PHOTO_CATEGORY, FISHING_THUMB_CATEGORY, cleanCatch, fishingKstD
 import { deleteBlobs } from "../../utils/blob.js";
 import { appealCatch, decorCatchesOf } from "../../storage/fishingCatches.js";
 import { FISHING_TOUR_PHOTOS } from "../../data/fishingTourPhotos.js";
+import { tourFestivals, kstYmd } from "../../services/tourFestivals.js";
+import { nearbyFestivals } from "../../../shared/tourFestivals.js";
 
 const router = Router();
 /** 누구에게나 같은 답(공공 자료 · 전국 낚시터) — 브라우저는 매번 묻고 CDN 이 들고 있는다 */
@@ -379,7 +381,9 @@ router.get("/spots/:id", asyncHandler(async (req: any, res: any) => {
     publicCache(res);
     // 낚시터 사진(2026-10-21) — 한국관광공사 TourAPI · 공공누리 제1 · 3유형만(server/data/fishingTourPhotos, 열쇠 '시도|시군구|이름'). 없으면 빈 칸
     const tourPhotos = FISHING_TOUR_PHOTOS[`${place.sido ?? ""}|${place.sigungu ?? ""}|${place.name}`]?.photos ?? [];
-    return sendSuccess(res, { place, nearby: nearbyPlaces(all, place, 6), port: port ? { code: port.code, name: port.name, km: port.km, area: port.area } : null, tourPhotos });
+    // 이 근처 축제(2026-10-21 전국 축제 — 종목별) — 20km 안, 열렸거나 45일 안에 여는 것 셋(산 페이지와 같은 셈)
+    const festivals = place.lat != null && place.lng != null ? nearbyFestivals(await tourFestivals().catch(() => []), place.lat, place.lng, kstYmd()) : [];
+    return sendSuccess(res, { place, nearby: nearbyPlaces(all, place, 6), port: port ? { code: port.code, name: port.name, km: port.km, area: port.area } : null, tourPhotos, festivals });
 }));
 /** 한 곳의 오늘 물때 — 가까운 항구의 만조 · 간조 · 지금 바다(바다 낚시터만). 못 받았으면 null */
 router.get("/spots/:id/tide", asyncHandler(async (req: any, res: any) => {

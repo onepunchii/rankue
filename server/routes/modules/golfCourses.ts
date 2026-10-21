@@ -38,6 +38,8 @@ import { summaryForViewer } from "../../lib/golfListingBlock.js";
 import { getCourseGuide } from "../../storage/golfCourseGuide.js";
 import { crewsAtClub } from "../../storage/golfCrewStamps.js";
 import { GOLF_TOUR_PHOTOS } from "../../data/golfTourPhotos.js";
+import { tourFestivals, kstYmd } from "../../services/tourFestivals.js";
+import { nearbyFestivals } from "../../../shared/tourFestivals.js";
 
 const router = Router();
 
@@ -439,6 +441,8 @@ router.get("/:slug", asyncHandler(async (req: any, res: any) => {
         // 골프장 사진(2026-10-21) — 한국관광공사 TourAPI · 공공누리 제1 · 3유형만(server/data/golfTourPhotos, 만든 스크립트 fetch-golf-tour-photos).
         // 없으면 빈 칸. 화면이 출처(사진 한국관광공사 · 공공누리 제N유형)를 단다
         tourPhotos: GOLF_TOUR_PHOTOS[p.slug]?.photos ?? [],
+        // 이 근처 축제(2026-10-21 전국 축제 — 종목별) — 20km 안, 열렸거나 45일 안에 여는 것 셋. 산 페이지와 같은 셈. 좌표가 없거나 못 읽으면 빈 칸
+        festivals: p.lat != null && p.lng != null ? nearbyFestivals(await tourFestivals().catch(() => []), Number(p.lat), Number(p.lng), kstYmd()) : [],
         prices: prices.map((m) => ({
             itemId: m.item_id, label: m.label, price: m.price, change: m.change, yearHigh: m.year_high, yearLow: m.year_low,
             asOf: m.as_of ? String(m.as_of).slice(0, 10) : null, history: thin(byItem.get(m.item_id) ?? []),

@@ -34,6 +34,8 @@ import { FISHING_SEA_PATH, fishingPortPath, seaArt } from "@shared/fishingSeaPag
 import { FISHING_FISH_PATH, fishingFishPath } from "@shared/fishingFishPages";
 import { useRegs } from "../Guide";
 import { TourPhotos, type TourPhoto } from "@/components/TourPhotos";
+import { NearbyFestivalList, FISHING_FESTIVAL_TONE } from "@/festivals/components/NearbyFestivalList";
+import type { NearbyFestival } from "@shared/tourFestivals";
 
 type Lite = Pick<PublicPlace, "id" | "name" | "kind" | "sido" | "sigungu" | "lat" | "lng" | "species" | "fee">;
 const LAND = Object.values(KOREA_MAP_PATHS);
@@ -247,7 +249,9 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
 interface RegRow { kind: "closed" | "min"; group: string; name: string; rule: string }
 type SpotDetail = { place: PublicPlace; nearby: (PublicPlace & { km: number | null })[]; port: { code: string; name: string; km: number; area: string } | null;
     /** 한국관광공사 사진(2026-10-21 — 공공누리 제1 · 3유형). 옛 응답엔 없다 */
-    tourPhotos?: TourPhoto[] };
+    tourPhotos?: TourPhoto[];
+    /** 이 근처 축제(2026-10-21 — 한국관광공사 · 20km · 45일). 옛 응답엔 없다 */
+    festivals?: NearbyFestival[] };
 
 export function SpotPage({ id }: { id: string }) {
     const [, setLocation] = useLocation();
@@ -365,6 +369,14 @@ export function SpotPage({ id }: { id: string }) {
                     </div>
                 </div>
             </section>
+
+            {/* 이 근처 축제(2026-10-21 전국 축제 — 종목별). 가까운 낚시터 앞 — 낚시 가는 날 들를 곳 */}
+            {(data?.festivals?.length ?? 0) > 0 && (
+                <section className="px-5 pt-7" data-testid="spot-festivals">
+                    <h2 className="mb-2.5 text-[17px] font-semibold">이 근처 축제</h2>
+                    <NearbyFestivalList items={data!.festivals!} tone={FISHING_FESTIVAL_TONE} />
+                </section>
+            )}
 
             {/* 가까운 낚시터 */}
             {(data!.nearby.length > 0 || sameArea.length > 0) && (
