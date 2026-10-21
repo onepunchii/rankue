@@ -16,6 +16,7 @@ import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { TrailMap } from "./TrailMap";
 import { TrailSketch, shortCourseName } from "./TrailParts";
 import { TRAILS_COVER, TRAILS_KEY, type TrailsData } from "./api";
+import { festivalBadge, festivalPeriod, kstToday } from "@shared/festivals";
 import { useMyTrails } from "./TrailStamp";
 
 export default function TrailsHub() {
@@ -66,6 +67,31 @@ export default function TrailsHub() {
                             <TrailMap courses={courses} focus={focus} numbers onPick={(c) => setLocation(trailCoursePath(c.route, c.key))} />
                             <p className="mt-2.5 text-[12.5px] text-[#F4EFE380] break-keep">선은 두루누비 공개 코스 {courses.length}개 — 빈 데는 아직 공개되지 않은 코스예요</p>
                         </HkSection>
+
+                        {/* 축제가 열리는 둘레길(10/21) — 지금 · 30일 안 축제가 코스 선 5km 안(도심 3km)인 코스. 누르면 그 코스(근처 축제가 거기 있다) */}
+                        {!!data.festive?.length && (
+                            <HkSection title="축제가 열리는 둘레길" aside="코스 5km 안 · 30일">
+                                <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="trail-festive">
+                                    {data.festive.map((x) => {
+                                        const now = x.festival.state === "now";
+                                        return (
+                                            <Link key={`${x.route}/${x.key}`} href={trailCoursePath(x.route, x.key)} className="block w-[176px] shrink-0 rounded-2xl p-3 active:opacity-80" style={{ background: "#FFFFFF0A", boxShadow: now ? "inset 0 0 0 1px #F6D9A84D" : undefined }}>
+                                                <span className="flex items-start justify-between gap-2">
+                                                    <TrailSketch coarse={x.coarse} color={color(x.route)} w={84} h={56} />
+                                                    <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[12px] font-semibold tabular-nums" style={now ? { background: "#F6D9A8", color: "#2A1208" } : { background: "#FFFFFF14", color: "#F4EFE3CC" }}>
+                                                        {now && <span className="h-1.5 w-1.5 rounded-full bg-[#2A1208]" aria-hidden />}{festivalBadge(x.festival, kstToday())}
+                                                    </span>
+                                                </span>
+                                                <span className="mt-2 line-clamp-2 min-h-[2.7em] text-[14.5px] font-semibold leading-snug text-[#F6D9A8] break-keep">{x.festival.title}</span>
+                                                <span className="block truncate text-[12.5px] tabular-nums text-[#F4EFE3B3]">{festivalPeriod(x.festival)}</span>
+                                                <span className="mt-1.5 block truncate text-[13px] font-medium" style={{ color: color(x.route) }}>{shortCourseName(x)}{x.dist < 1 ? " · 코스 바로 옆" : ` · ${x.dist}km`}</span>
+                                                <span className="block truncate text-[12.5px] text-[#F4EFE380]">{TRAIL_ROUTES.find((r) => r.id === x.route)?.name} · {x.km}km</span>
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            </HkSection>
+                        )}
 
                         <HkSection title="길 넷" aside="공개 코스 / 전체">
                             <div className="space-y-2.5">

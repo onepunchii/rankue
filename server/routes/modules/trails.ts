@@ -11,6 +11,7 @@ import { TRAIL_ROUTES, trailRouteOf } from "../../../shared/koreaTrails.js";
 import { thinLine } from "../../../shared/hikingGeo.js";
 import { tourFestivals, kstYmd } from "../../services/tourFestivals.js";
 import { nearbyFestivals } from "../../../shared/tourFestivals.js";
+import { festiveTrails } from "../../../shared/trailFestivals.js";
 import { getCourseWeather } from "../../services/golfWeather.js";
 import { requireHikingAccess } from "../../middleware/hikingAccess.js";
 import type { AuthRequest } from "../../middleware/auth.js";
@@ -23,10 +24,14 @@ const PUBLIC_CACHE = "public, max-age=600, s-maxage=3600, stale-while-revalidate
 router.get("/", asyncHandler(async (_req, res) => {
     const counts = trailRouteCounts();
     const meta = new Map(trailRouteMeta().map((m) => [m.id, m]));
+    const courses = trailCourses().map(toSummary);
+    // 축제가 열리는 둘레길(10/21) — 축제 표를 못 읽으면 빈 줄(허브는 그 구역을 그리지 않는다)
+    const festive = festiveTrails(courses, await tourFestivals().catch(() => []), kstYmd());
     res.set("Cache-Control", PUBLIC_CACHE);
     return sendSuccess(res, {
         routes: TRAIL_ROUTES.map((r) => ({ ...r, line: meta.get(r.id)?.line ?? null, desc: meta.get(r.id)?.desc ?? null, have: counts[r.id].courses, haveKm: Math.round(counts[r.id].km) })),
-        courses: trailCourses().map(toSummary),
+        courses,
+        festive,
     });
 }));
 

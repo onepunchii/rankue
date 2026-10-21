@@ -4,6 +4,7 @@
 import type { TrailCourseDetail, TrailCourseSummary, TrailRoute } from "@shared/koreaTrails";
 import type { NearbyFestival } from "@shared/tourFestivals";
 import type { WxDay } from "@shared/golfWeather";
+import type { FestiveTrail } from "@shared/trailFestivals";
 
 export const TRAILS_KEY = ["/api/hiq/trails"] as const;
 export const trailCourseKey = (route: string, key: string) => [`/api/hiq/trails/${encodeURIComponent(route)}/${encodeURIComponent(key)}`] as const;
@@ -12,7 +13,8 @@ export const trailWeatherKey = (route: string, key: string) => [`/api/hiq/trails
 export const TRAILS_COVER = "/hiking/art/cover-trails.webp";
 
 export interface TrailRouteInfo extends TrailRoute { line: string | null; desc: string | null; have: number; haveKm: number }
-export interface TrailsData { routes: TrailRouteInfo[]; courses: TrailCourseSummary[] }
+/** festive: 축제가 열리는 둘레길(10/21 더함 — 옛 응답엔 없다) */
+export interface TrailsData { routes: TrailRouteInfo[]; courses: TrailCourseSummary[]; festive?: FestiveTrail[] }
 export interface TrailSide extends TrailCourseSummary { line: number[][] }
 export interface TrailCourseData { course: TrailCourseDetail; prev: TrailSide | null; next: TrailSide | null; festivals: NearbyFestival[] }
 export interface TrailWeather { days: WxDay[]; area: string | null }
