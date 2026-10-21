@@ -99,6 +99,19 @@ export function travelerPoint(text: string | null | undefined, which: "시점" |
     return v ? v.replace(/\s+/g, " ").slice(0, 40) : null;
 }
 
+/** 코스 카드(1200 정사각 · server/services/trailCard)의 글 — 길 · 코스 이름 · 거리/시간/난이도 · 지역 · 코스 선 */
+export function trailCardInput(c: Pick<TrailCourseDetail, "route" | "name" | "km" | "minutes" | "level" | "sigun" | "tags" | "line">): { route: string; color: string; name: string; facts: string; place: string; line: [number, number][] } {
+    const r = trailRouteOf(c.route);
+    const short = r ? c.name.replace(r.name, "").trim() || c.name : c.name;
+    const half = c.minutes != null && c.minutes % 60 === 30 ? `${Math.floor(c.minutes / 60)}시간 반` : trailTimeText(c.minutes);
+    return {
+        route: r?.name ?? "코리아둘레길", color: r?.color ?? "#F6D9A8", name: short,
+        facts: [`${c.km}km`, half, c.level ? TRAIL_LEVEL_NAME[c.level] : ""].filter(Boolean).join(" · "),
+        place: [c.sigun, ...c.tags].filter(Boolean).join(" · "),
+        line: c.line.map((p) => [p[0], p[1]] as [number, number]),
+    };
+}
+
 export const TRAILS_PATH = "/hiking/trails";
 export const trailRoutePath = (id: TrailRouteId) => `${TRAILS_PATH}/${id}`;
 export const trailCoursePath = (route: TrailRouteId, key: string) => `${TRAILS_PATH}/${route}/${encodeURIComponent(key)}`;

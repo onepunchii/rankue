@@ -156,6 +156,12 @@ describe("축제 카드(미리보기 1200 정사각)", () => {
         expect(read("server/seo/festivals.ts")).toContain("url: festivalCardUrl(ORIGIN, f.id), width: 1200, height: 1200");
         expect(read("client/src/festivals/pages/FestivalPage.tsx")).toContain("image: festivalCardUrl(ORIGIN, f.id)");
     });
+    it("사이트맵 · 검색용 화면 — 허브는 허브 카드(/og-hub/festivals.jpg), 축제는 카드 + 관광공사 사진", () => {
+        const s = read("server/seo/festivals.ts");
+        expect(s).toContain("image: hubCard(ORIGIN, FESTIVALS_PATH)?.url");
+        expect(s).toContain("body: withCard(body, card)");
+        expect(s).toContain("image: festivalCardUrl(ORIGIN, f.id)");
+    });
 });
 
 describe("전국 축제 — 이어 붙인 곳", () => {

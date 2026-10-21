@@ -19,6 +19,7 @@ import { CourseProfile } from "../components/CourseParts";
 import type { MountainCourse } from "../lib/api";
 import { NearbyFestivalList, HIKING_FESTIVAL_TONE } from "@/festivals/components/NearbyFestivalList";
 import { WeatherDays } from "@/festivals/components/WeatherDays";
+import { trailCardUrl } from "@shared/ogCards";
 import { shortCourseName } from "./TrailParts";
 import { trailCourseKey, trailWeatherKey, type TrailCourseData, type TrailWeather } from "./api";
 
@@ -44,7 +45,7 @@ export default function TrailCoursePage() {
     const [open, setOpen] = useState(false);
     const c = data?.course;
     const seo = c ? trailCourseSeo(c) : null;
-    useSeo(seo ? { title: seo.title, description: seo.desc, path: seo.path } : null);
+    useSeo(seo && c ? { title: seo.title, description: seo.desc, path: seo.path, image: trailCardUrl("https://www.rankue.co.kr", c.route, c.key) } : null);
 
     if (!route || isError || (!isLoading && !c)) {
         return (

@@ -28,6 +28,9 @@ export const fishingSeaCardUrl = (origin: string, key: string) => `${origin}/og/
 /** 축제 카드(2026-10-21) — 우리 그림(강가 마을의 등불) 위에 이름 · 기간 · 자리. 한국관광공사 사진은 얹지 않는다(제3유형 변경 금지). 그림을 바꾸면 올린다 */
 export const FESTIVAL_CARD_VERSION = 1;
 export const festivalCardUrl = (origin: string, id: string) => `${origin}/og/festival/${encodeURIComponent(id)}.png?v=${FESTIVAL_CARD_VERSION}`;
+/** 코리아둘레길 코스 카드(2026-10-21) — 우리 그림 위에 코스 이름 · 거리 · 시간 · 난이도 + 그 코스의 선. 그림을 바꾸면 올린다 */
+export const TRAIL_CARD_VERSION = 1;
+export const trailCardUrl = (origin: string, route: string, key: string) => `${origin}/og/trail/${encodeURIComponent(route)}/${encodeURIComponent(key)}.png?v=${TRAIL_CARD_VERSION}`;
 /** 당구장 카드 — 매장 코드는 영숫자 */
 export const storeCardUrl = (origin: string, code: string) => `${origin}/og/store/${encodeURIComponent(code)}.png?v=${CARD_VERSION}`;
 
@@ -68,10 +71,16 @@ export const HUB_HIKING_LIST_NAMES: Readonly<Record<string, string>> = {
     azalea: "철쭉 · 진달래 명산", maple: "단풍 명산", reeds: "억새 명산", snow: "눈꽃 산행",
 };
 
+/** 코리아둘레길의 길 넷(2026-10-21) — 길마다 카드가 있다(shared/koreaTrails 의 TRAIL_ROUTES 와 같아야 한다. 시험이 맞춰 본다) */
+export const HUB_TRAIL_ROUTES: readonly string[] = ["haeparang", "namparang", "seohaerang", "dmz"];
+export const HUB_TRAIL_ROUTE_NAMES: Readonly<Record<string, string>> = { haeparang: "해파랑길", namparang: "남파랑길", seohaerang: "서해랑길", dmz: "DMZ 평화의 길" };
+
 /** alt 는 글이거나, 카드 이름(test 가 돌려준 값)으로 글을 만드는 함수다 — 권역 · 묶음은 카드마다 이름이 다르다 */
 interface HubRule { test: (path: string) => string | null; alt: string | ((name: string) => string) }
 const exact = (re: RegExp, name: string) => (path: string) => (re.test(path) ? name : null);
 const HUB_RULES: readonly HubRule[] = [
+    // 전국 축제(2026-10-21) — 허브(정본 /festivals · 종목마다의 /golf · /hiking · /fishing/festivals). 축제 한 곳은 제 카드(festivalCardUrl)
+    { test: exact(/^\/(?:(?:golf|hiking|fishing)\/)?festivals(\/|$)/, "festivals"), alt: "전국 축제 달력 · 지도 — 랭큐" },
     { test: exact(/^\/world-ranking(\/|$)/, "world-ranking"), alt: "당구 세계랭킹 — 랭큐" },
     { test: exact(/^\/pba(\/records)?\/?$/, "pba"), alt: "PBA 투어 랭킹 · 상금 — 랭큐" },
     { test: exact(/^\/stores\/?$/, "stores"), alt: "전국 당구장 찾기 — 랭큐" },
@@ -89,6 +98,9 @@ const HUB_RULES: readonly HubRule[] = [
     { test: (path) => { const m = /^\/hiking\/regions\/([a-z]+)\/?$/.exec(path); return m && HUB_HIKING_REGIONS.includes(m[1]) ? `hiking-${m[1]}` : null; }, alt: (n) => `${HUB_HIKING_REGION_NAMES[n.replace(/^hiking-/, "")] ?? "권역"}의 산 · 등산코스 — 랭큐 등산` },
     // 묶음(100대 명산 · 국립공원 · 단풍 · 억새 · 섬 …) — 묶음마다 그 표지와 큰 이름
     { test: (path) => { const m = /^\/hiking\/lists\/([a-z0-9]+)\/?$/.exec(path); return m && HUB_HIKING_LISTS.includes(m[1]) ? `hiking-list-${m[1]}` : null; }, alt: (n) => `${HUB_HIKING_LIST_NAMES[n.replace(/^hiking-list-/, "")] ?? "묶어서 찾는 산"} · 등산코스 — 랭큐 등산` },
+    // 코리아둘레길(2026-10-21) — 허브 · 길 넷. 일반 등산 규칙보다 먼저(안 그러면 '전국 명산' 카드를 빌려 갔다). 코스 한 곳은 제 카드(trailCardUrl)
+    { test: (path) => { const m = /^\/hiking\/trails(?:\/([a-z]+))?(?:\/[^/]+)?\/?$/.exec(path); if (!m) return null; return m[1] && HUB_TRAIL_ROUTES.includes(m[1]) ? `trails-${m[1]}` : "trails"; },
+        alt: (n) => (n === "trails" ? "코리아둘레길 — 해파랑길 · 남파랑길 · 서해랑길 · DMZ 평화의 길 | 랭큐 등산" : `${HUB_TRAIL_ROUTE_NAMES[n.replace(/^trails-/, "")] ?? "코리아둘레길"} 코스 지도 — 랭큐 등산`) },
     { test: exact(/^\/hiking(\/|$)/, "hiking"), alt: "전국 명산 — 랭큐 등산" },
 ];
 
@@ -111,4 +123,5 @@ export function hubCard(origin: string, pathname: string): { url: string; width:
 
 /** 쓰는 카드 전부 — 파일이 다 있는지 · 남는 파일이 없는지 시험이 본다 */
 export const HUB_CARD_NAMES: readonly string[] = ["world-ranking", "pba", "stores", "terms", "golf-terms", "golf-courses", "golf-stamps", ...HUB_STAMP_BOOKS.map((b) => `golf-stamps-${b}`),
-    "hiking", "hiking-stamps", "hiking-terms", "hiking-checklist", ...HUB_HIKING_REGIONS.map((r) => `hiking-${r}`), ...HUB_HIKING_LISTS.map((l) => `hiking-list-${l}`)];
+    "hiking", "hiking-stamps", "hiking-terms", "hiking-checklist", ...HUB_HIKING_REGIONS.map((r) => `hiking-${r}`), ...HUB_HIKING_LISTS.map((l) => `hiking-list-${l}`),
+    "festivals", "trails", ...HUB_TRAIL_ROUTES.map((r) => `trails-${r}`)];

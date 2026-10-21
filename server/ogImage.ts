@@ -29,6 +29,7 @@ import { listStampAwards } from "./storage/golfStampAwards.js";
 import { bookStates, stampBook } from "../shared/golfStampBooks.js";
 import { renderHikingMountainCardPng } from "./services/hikingMountainCard.js";
 import { renderFestivalCardPng } from "./services/festivalCard.js";
+import { renderTrailCardPng } from "./services/trailCard.js";
 import { renderFishingSpotCardPng } from "./services/fishingSpotCard.js";
 import { placeById } from "./storage/fishingPlaces.js";
 import { fishingSpotCardInput, isPlaceId } from "../shared/fishingPlaces.js";
@@ -50,6 +51,7 @@ import { hikingMountainCardInput } from "../shared/hikingPage.js";
 //   /og/fishing-fish/:id.png          낚시 어종 카드 (2026-10-18) — 판화 위에 어탁 · 크기 이름 · 낚시터 수
 //   /og/fishing-sea/:key.png          바다 · 항구 물때 카드 (2026-10-18) — 해역 그림 위에 이름 · 해역(그날 값은 넣지 않는다)
 //   /og/hiking-mountain/:slug.png     산 카드 (2026-10-13) — 권역의 표지 위에 산의 이름 · 높이 · 자리 · 코스. 우리 표에 있는 산만
+//   /og/trail/:route/:key.png         코리아둘레길 코스 카드 (2026-10-21) — 우리 그림 위에 코스 이름 · 거리 · 시간 · 난이도 + 그 코스의 선
 //   /og/festival/:id.png              축제 카드 (2026-10-21) — 우리 그림(강가 마을의 등불) 위에 이름 · 기간 · 자리. 관광공사 사진은 싣지 않는다
 //   /og/golf-footprints/:memberId.png 골프 발자국 카드 (2026-09-30) — **비공개**: 서명(t)·만료가 맞아야 열린다
 //   /og/golf-stamp/:memberId/:book.png 도장첩 완성 카드 (2026-10-12) — **비공개**: 서명(t)·만료가 맞아야 열린다. 다 채운 권만
@@ -482,6 +484,26 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] hiking mountain card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  // 코리아둘레길 코스 카드(2026-10-21) — 길은 넷 중 하나, 코스는 받은 파일에 있는 것만(없는 주소는 404)
+  app.get("/og/trail/:route/:key.png", async (req, res) => {
+    const route = String(req.params.route ?? ""), key = String(req.params.key ?? "");
+    if (!/^[a-z]{2,12}$/.test(route) || !/^[0-9]{1,3}(-[0-9]{1,2})?$/.test(key)) return res.status(404).type("text/plain").send("not found");
+    try {
+      const { trailCourse } = await import("./storage/koreaTrails.js");
+      const { trailCardInput } = await import("../shared/koreaTrails.js");
+      const hit = trailCourse(route, key);
+      if (!hit) return res.status(404).type("text/plain").send("not found");
+      const png = await renderTrailCardPng(trailCardInput(hit.course));
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=86400, s-maxage=604800, stale-while-revalidate=604800");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] trail card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });

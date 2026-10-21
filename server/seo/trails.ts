@@ -8,6 +8,11 @@ import {
     trailTimeText, trailsHubSeo, type TrailCourseDetail, type TrailRouteMeta,
 } from "../../shared/koreaTrails.js";
 import { HIKING_HUB_PATH } from "../../shared/hikingMountains.js";
+import { hubCard, trailCardUrl } from "../../shared/ogCards.js";
+
+/** 본문 제목 바로 밑에 그 화면의 미리보기 그림(등산 · 골프장 검색용 화면과 같은 꼴 — og:image 와 같은 한 장) */
+const withCard = (body: string, card: { url: string; width: number; height: number; alt: string } | null | undefined): string =>
+    card ? body.replace("</h1>", `</h1>\n  <img src="${esc(card.url)}" width="${card.width}" height="${card.height}" alt="${esc(card.alt)}" loading="eager">`) : body;
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface TrailsRender { status: 200; tag: string; html: string }
@@ -50,7 +55,8 @@ ${nav()}
 </main>
 ${hubNav("ko")}`;
     const list = { "@context": "https://schema.org", "@type": "ItemList", name: "코리아둘레길", numberOfItems: TRAIL_ROUTES.length, itemListElement: TRAIL_ROUTES.map((r, i) => ({ "@type": "ListItem", position: i + 1, name: r.name, url: `${ORIGIN}${trailRoutePath(r.id)}` })) };
-    return { status: 200, tag: "trails:hub", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [list, crumbs()] }) };
+    const card = hubCard(ORIGIN, TRAILS_PATH);
+    return { status: 200, tag: "trails:hub", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card), jsonLd: [list, crumbs()], ...(card ? { image: card } : {}) }) };
 }
 
 function route(id: string, all: readonly TrailCourseDetail[], meta: readonly TrailRouteMeta[]): TrailsRender | null {
@@ -77,7 +83,8 @@ ${nav()}
 </main>
 ${hubNav("ko")}`;
     const list = { "@context": "https://schema.org", "@type": "ItemList", name: r.name, numberOfItems: cs.length, itemListElement: cs.map((c, i) => ({ "@type": "ListItem", position: i + 1, name: c.name, url: `${ORIGIN}${trailCoursePath(c.route, c.key)}` })) };
-    return { status: 200, tag: "trails:route", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [list, crumbs([r.name, trailRoutePath(r.id)])] }) };
+    const card = hubCard(ORIGIN, trailRoutePath(r.id));
+    return { status: 200, tag: "trails:route", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card), jsonLd: [list, crumbs([r.name, trailRoutePath(r.id)])], ...(card ? { image: card } : {}) }) };
 }
 
 function course(c: TrailCourseDetail, prev: TrailCourseDetail | null, next: TrailCourseDetail | null): TrailsRender {
@@ -121,7 +128,9 @@ ${nav()}
 </main>
 ${hubNav("ko")}`;
     const place = { "@context": "https://schema.org", "@type": "TouristAttraction", name: c.name, description: (c.summary ?? c.contents ?? "").slice(0, 300) || undefined, geo: { "@type": "GeoCoordinates", latitude: c.start[0], longitude: c.start[1] }, isAccessibleForFree: !c.tags.some((t) => t.includes("예약")) || undefined, url: `${ORIGIN}${seo.path}` };
-    return { status: 200, tag: "trails:course", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [place, crumbs([r.name, trailRoutePath(r.id)], [c.name, seo.path])] }) };
+    // 코스 카드 — 우리 그림 위에 코스 이름 · 거리 · 시간 · 난이도 + 그 코스의 선(server/services/trailCard)
+    const card = { url: trailCardUrl(ORIGIN, c.route, c.key), width: 1200, height: 1200, alt: `${c.name} — ${bits(c)}` };
+    return { status: 200, tag: "trails:course", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card), jsonLd: [{ ...place, image: card.url }, crumbs([r.name, trailRoutePath(r.id)], [c.name, seo.path])], image: card }) };
 }
 
 export function renderTrails(path: string, all: readonly TrailCourseDetail[], meta: readonly TrailRouteMeta[], find: (route: string, key: string) => { course: TrailCourseDetail; prev: TrailCourseDetail | null; next: TrailCourseDetail | null } | null): TrailsRender | null {
@@ -140,8 +149,9 @@ export function renderTrails(path: string, all: readonly TrailCourseDetail[], me
 export function trailsSitemapParts(all: readonly TrailCourseDetail[], made: string): string[] {
     if (!all.length) return [];
     return [
-        entry(`${ORIGIN}${TRAILS_PATH}`, { changefreq: "monthly", priority: "0.6", lastmod: made }),
-        ...TRAIL_ROUTES.map((r) => entry(`${ORIGIN}${trailRoutePath(r.id)}`, { changefreq: "monthly", priority: "0.6", lastmod: made })),
-        ...all.map((c) => entry(`${ORIGIN}${trailCoursePath(c.route, c.key)}`, { changefreq: "monthly", priority: "0.5", lastmod: made })),
+        // 허브 · 길은 허브 카드, 코스는 코스 카드(코스 선이 그려진 한 장) — 등산 사이트맵과 같은 꼴
+        entry(`${ORIGIN}${TRAILS_PATH}`, { changefreq: "monthly", priority: "0.6", lastmod: made, image: hubCard(ORIGIN, TRAILS_PATH)?.url }),
+        ...TRAIL_ROUTES.map((r) => entry(`${ORIGIN}${trailRoutePath(r.id)}`, { changefreq: "monthly", priority: "0.6", lastmod: made, image: hubCard(ORIGIN, trailRoutePath(r.id))?.url })),
+        ...all.map((c) => entry(`${ORIGIN}${trailCoursePath(c.route, c.key)}`, { changefreq: "monthly", priority: "0.5", lastmod: made, image: trailCardUrl(ORIGIN, c.route, c.key) })),
     ];
 }

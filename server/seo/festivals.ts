@@ -11,7 +11,11 @@ import {
 import { hikingMountainPath, HIKING_HUB_PATH } from "../../shared/hikingMountains.js";
 import { coursePath } from "../../shared/golfCourse.js";
 import { fishingSpotPath } from "../../shared/fishingPlaces.js";
-import { festivalCardUrl } from "../../shared/ogCards.js";
+import { festivalCardUrl, hubCard } from "../../shared/ogCards.js";
+
+/** 본문 제목 바로 밑에 그 화면의 미리보기 그림(등산 · 골프장 검색용 화면과 같은 꼴 — og:image 와 같은 한 장) */
+const withCard = (body: string, card: { url: string; width: number; height: number; alt: string } | null | undefined): string =>
+    card ? body.replace("</h1>", `</h1>\n  <img src="${esc(card.url)}" width="${card.width}" height="${card.height}" alt="${esc(card.alt)}" loading="eager">`) : body;
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FestivalRender { status: 200; tag: string; html: string }
@@ -78,7 +82,8 @@ ${nav()}
 </main>
 ${hubNav("ko")}`;
     const list = { "@context": "https://schema.org", "@type": "ItemList", name: "지금 · 곧 열리는 축제", numberOfItems: live.length, itemListElement: live.slice(0, 100).map((f, i) => ({ "@type": "ListItem", position: i + 1, name: f.title, url: `${ORIGIN}${festivalPath(f.id)}` })) };
-    return { status: 200, tag: "festivals:hub", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [list, crumbs()] }) };
+    const card = hubCard(ORIGIN, FESTIVALS_PATH);
+    return { status: 200, tag: "festivals:hub", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card), jsonLd: [list, crumbs()], ...(card ? { image: card } : {}) }) };
 }
 
 function one(f: FestivalDetail, around: Around, today: string): FestivalRender {
@@ -144,7 +149,7 @@ ${hubNav("ko")}`;
     };
     // 미리보기 카드 — 우리 그림 위에 이름 · 기간 · 자리(server/services/festivalCard). 관광공사 사진은 카드에 얹지 않는다
     const card = { url: festivalCardUrl(ORIGIN, f.id), width: 1200, height: 1200, alt: `${f.title} — ${festivalPeriod(f, true)}` };
-    return { status: 200, tag: "festivals:one", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [event, crumbs([f.title, seo.path])], image: card }) };
+    return { status: 200, tag: "festivals:one", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card), jsonLd: [event, crumbs([f.title, seo.path])], image: card }) };
 }
 
 export async function renderFestivals(path: string, all: readonly FestivalRow[], today: string, detail: (id: string) => Promise<{ f: FestivalDetail; around: Around } | null>): Promise<FestivalRender | null> {
@@ -161,7 +166,7 @@ export function festivalSitemapParts(all: readonly FestivalRow[], today: string)
     if (!all.length) return [];
     const day = (ymd: string | null) => (ymd ? isoDay(ymd) : null);
     return [
-        entry(`${ORIGIN}${FESTIVALS_PATH}`, { changefreq: "daily", priority: "0.7", lastmod: isoDay(today) }),
+        entry(`${ORIGIN}${FESTIVALS_PATH}`, { changefreq: "daily", priority: "0.7", lastmod: isoDay(today), image: hubCard(ORIGIN, FESTIVALS_PATH)?.url }),
         ...all.map((f) => entry(`${ORIGIN}${festivalPath(f.id)}`, { changefreq: "weekly", priority: f.end >= today ? "0.6" : "0.4", lastmod: day(f.mod), image: festivalCardUrl(ORIGIN, f.id), ...(f.image ? { images: [f.image] } : {}) })),
     ];
 }

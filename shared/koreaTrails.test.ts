@@ -2,8 +2,9 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    TRAIL_ROUTES, TRAIL_TOTAL_COURSES, TRAIL_TOTAL_KM, parseTrailCourseName, trailCoursePath, trailCourseSeo, trailTimeShort, trailTimeText, travelerPoint, type TrailCourseDetail,
+    TRAIL_ROUTES, TRAIL_TOTAL_COURSES, TRAIL_TOTAL_KM, parseTrailCourseName, trailCardInput, trailCoursePath, trailCourseSeo, trailTimeShort, trailTimeText, travelerPoint, type TrailCourseDetail,
 } from "./koreaTrails";
+import { HUB_CARD_NAMES, hubCardName, trailCardUrl } from "./ogCards";
 import { sportForPath } from "./sportRoute";
 
 const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
@@ -71,5 +72,29 @@ describe("코리아둘레길 — 이어 붙인 곳", () => {
         expect(read("client/src/pages/hiq/menu.tsx")).toContain('setLocation("/hiking/trails")');
         // 등산의 코스 지도를 그대로 — 글만 둘레길에 맞게
         expect(read("client/src/hiking/trails/TrailCoursePage.tsx")).toContain('words={{ wide: "앞 · 뒤 코스까지"');
+    });
+});
+
+describe("코리아둘레길 — 카드(미리보기 1200 정사각)", () => {
+    const one = asset.courses.find((c) => c.route === "haeparang" && c.key === "1")!;
+    it("코스 카드의 글 — 길 이름 · 코스 · 거리 · 시간 · 난이도 · 지역 · 그 코스의 선", () => {
+        expect(trailCardInput(one)).toMatchObject({ route: "해파랑길", name: "1코스", facts: "17km · 6시간 반 · 보통", place: "부산 남구" });
+        expect(trailCardInput(one).line.length).toBeGreaterThan(10);
+        expect(trailCardUrl("https://www.rankue.co.kr", "dmz", "3-1")).toMatch(/^https:\/\/www\.rankue\.co\.kr\/og\/trail\/dmz\/3-1\.png\?v=\d+$/);
+    });
+    it("허브 카드 — 둘레길 주소가 '전국 명산' 카드로 나가지 않는다 · 축제는 종목 주소 모두 축제 카드", () => {
+        expect(hubCardName("/hiking/trails")).toBe("trails");
+        expect(hubCardName("/hiking/trails/seohaerang")).toBe("trails-seohaerang");
+        expect(hubCardName("/hiking/trails/seohaerang/12")).toBe("trails-seohaerang");
+        expect(hubCardName("/hiking")).not.toMatch(/^trails/);
+        for (const p of ["/festivals", "/golf/festivals", "/hiking/festivals/1", "/fishing/festivals"]) expect(hubCardName(p), p).toBe("festivals");
+        for (const n of ["festivals", "trails", ...TRAIL_ROUTES.map((r) => `trails-${r.id}`)]) expect(HUB_CARD_NAMES, n).toContain(n);
+    });
+    it("서버 — 카드 길 · 검색용 화면 · 앱 화면이 같은 주소", () => {
+        expect(read("server/ogImage.ts")).toContain('app.get("/og/trail/:route/:key.png"');
+        expect(read("server/seo/trails.ts")).toContain("url: trailCardUrl(ORIGIN, c.route, c.key), width: 1200, height: 1200");
+        expect(read("client/src/hiking/trails/TrailCoursePage.tsx")).toContain('image: trailCardUrl("https://www.rankue.co.kr", c.route, c.key)');
+        // 두루누비 선만 — 시도 윤곽선(화면에서만 쓰는 자료)은 카드에 싣지 않는다
+        expect(read("server/services/trailCard.ts")).not.toMatch(/sido|outline|provinces/i);
     });
 });

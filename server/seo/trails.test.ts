@@ -41,4 +41,15 @@ describe("코리아둘레길 — 검색용 화면", () => {
     it("사이트맵 — 허브 · 길 넷 · 코스 170", () => {
         expect(trailsSitemapParts(asset.courses, asset.made).length).toBe(1 + 4 + asset.courses.length);
     });
+    it("사이트맵 · 검색용 화면의 그림 — 허브 · 길은 허브 카드, 코스는 그 코스의 카드(등산 사이트맵과 같은 꼴)", () => {
+        const parts = trailsSitemapParts(asset.courses, asset.made).map((x) => JSON.parse(x) as { loc: string; image?: string; lastmod?: string });
+        const O = "https://www.rankue.co.kr";
+        expect(parts[0]).toMatchObject({ loc: `${O}/hiking/trails`, image: expect.stringMatching(/\/og-hub\/trails\.jpg\?v=\d+$/), lastmod: asset.made });
+        expect(parts[1].image).toMatch(/\/og-hub\/trails-haeparang\.jpg\?v=\d+$/);
+        expect(parts.find((p) => p.loc === `${O}/hiking/trails/haeparang/1`)?.image).toMatch(/\/og\/trail\/haeparang\/1\.png\?v=\d+$/);
+        expect(parts.every((p) => !!p.image), "그림 없는 줄").toBe(true);
+        const one = renderTrails("/hiking/trails/dmz/10", asset.courses, asset.routes, find)!;
+        expect(one.html).toMatch(/<\/h1>\n  <img src="https:\/\/www\.rankue\.co\.kr\/og\/trail\/dmz\/10\.png\?v=\d+" width="1200" height="1200" alt="DMZ 평화의 길 10코스 — /);
+        expect(renderTrails("/hiking/trails/namparang", asset.courses, asset.routes, find)!.html).toContain("/og-hub/trails-namparang.jpg?v=");
+    });
 });
