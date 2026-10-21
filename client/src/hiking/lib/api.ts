@@ -19,6 +19,8 @@ export interface MountainPoi { id: string; kind: HikingPoiKind; name: string; no
 export interface MountainDetail extends MountainSummary {
     peakName: string | null; aliases: string[]; dong: string | null; guide: MountainGuide | null; poiCounts: Record<string, number>;
     courseList: MountainCourse[]; pois: MountainPoi[]; nearby: (MountainSummary & { km: number })[];
+    /** 한국관광공사 사진(2026-10-21 — 공공누리 제1 · 3유형). 옛 응답엔 없다 */
+    tourPhotos?: { url: string; thumb: string | null; lic: "Type1" | "Type3" }[];
 }
 export interface HikingHubData {
     counts: { total: number; famous: number; courses: number; withCourse: number };

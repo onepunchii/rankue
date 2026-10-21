@@ -50,6 +50,7 @@ import { stampDate } from "../lib/date";
 import { POI_COLOR, SURFACE_COLOR, hikingCover } from "../theme";
 import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi } from "../lib/api";
 import { useMyLocation, type MyLocation } from "../lib/useMyLocation";
+import { TourPhotos } from "@/components/TourPhotos";
 
 const ORIGIN = "https://www.rankue.co.kr";
 /**
@@ -481,6 +482,9 @@ export default function MountainPage() {
                         <StatStrip d={d} onCourses={() => hkJumpTo("sec-courses")} onShortest={(i) => { pickCourse(i); hkJumpTo("sec-courses"); }} onMap={() => hkJumpTo("sec-map")} />
                     </div>
                 </div>
+
+                {/* 이 산의 실제 모습(2026-10-21) — 한국관광공사 사진(공공누리). 표지 그림은 장식이라, 바로 밑에 진짜 사진을 둔다. 없으면 칸이 없다 */}
+                <TourPhotos key={`tour:${d.slug}`} photos={d.tourPhotos} name={d.name} className="px-5 pt-3" tone={{ frame: "#FFFFFF0A", line: "#F4EFE31F", credit: "#F4EFE380" }} />
 
                 {/* 이 산의 도장 — 정상에서 받는 것. 방문자를 가입으로 잇는다.
                     카드 하나에 다 있다(2026-10-13 오너: "요기 기능을 넣으면 어때? 디자인도 살짝"): 받는 것 · 정상까지 얼마나 남았나 · 인증 · 가고 싶은 산 */}

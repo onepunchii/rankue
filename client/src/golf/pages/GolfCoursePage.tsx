@@ -23,7 +23,7 @@ import { ORIGIN, REGION_LABEL, cityShort, courseDescription, coursePath, courseT
 import { COURSES_KEY, slugForCourseId, useCourseDetail, useCourseWeather, type CourseDetail, type CourseListItem } from "@/golf/lib/courseApi";
 import type { CourseWeather } from "@shared/golfWeather";
 import { CourseShell } from "@/golf/components/course/CourseShell";
-import { TourPhotos } from "@/golf/components/course/detail/TourPhotos";
+import { TourPhotos } from "@/components/TourPhotos";
 import { CourseLogo } from "@/golf/components/course/CourseLogo";
 import { CourseHeader, type HeaderData } from "@/golf/components/course/detail/CourseHeader";
 import { TeeTimes } from "@/golf/components/course/detail/TeeTimes";

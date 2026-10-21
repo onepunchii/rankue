@@ -28,6 +28,7 @@ import { obsFresh, stationFor, summitsNow, type SummitNow } from "../../../share
 import { HIKING_LISTS, HIKING_REGIONS, HIKING_TRAITS, hikingGroup, hikingRegion, inHikingGroup } from "../../../shared/hikingMountains.js";
 import { toMountainPoint, type MountainPoint } from "../../../shared/hikingNear.js";
 import { HIKING_NEARBY_RADIUS_KM, hikingNearbyNames, hikingNearbyWord, isHikingNearbyKind } from "../../../shared/hikingAround.js";
+import { MOUNTAIN_TOUR_PHOTOS } from "../../data/mountainTourPhotos.js";
 
 const router = Router();
 const PUBLIC_CACHE = "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400";
@@ -80,7 +81,8 @@ router.get("/mountains/:slug", asyncHandler(async (req: any, res: any) => {
     if (!d) return sendError(res, 404, "없는 산이에요");
     const near = nearbyMountains(await allMountains(), d);
     res.set("Cache-Control", PUBLIC_CACHE);
-    return sendSuccess(res, { ...d, nearby: near });
+    // 산 사진(2026-10-21) — 한국관광공사 TourAPI · 공공누리 제1 · 3유형만(server/data/mountainTourPhotos). 없으면 빈 칸
+    return sendSuccess(res, { ...d, nearby: near, tourPhotos: MOUNTAIN_TOUR_PHOTOS[d.slug]?.photos ?? [] });
 }));
 
 /** 산의 들머리(코스의 가장 낮은 곳) — 코스 선을 다 읽어야 해서 인스턴스가 6시간 기억한다. 못 구하면 null */

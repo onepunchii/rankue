@@ -18,9 +18,21 @@ describe("골프장 사진(한국관광공사)", () => {
         }
     });
     it("화면: 자르지 않는다(object-cover 없음) · 출처 표시 · 상세 응답에 실린다", () => {
-        const c = readFileSync(resolve(__dirname, "../client/src/golf/components/course/detail/TourPhotos.tsx"), "utf8");
+        const c = readFileSync(resolve(__dirname, "../client/src/components/TourPhotos.tsx"), "utf8");
         expect(c).not.toContain("object-cover");
         expect(c).toContain("사진 한국관광공사");
         expect(readFileSync(resolve(__dirname, "../server/routes/modules/golfCourses.ts"), "utf8")).toContain("tourPhotos: GOLF_TOUR_PHOTOS[p.slug]?.photos ?? [],");
+    });
+});
+
+import { MOUNTAIN_TOUR_PHOTOS } from "../server/data/mountainTourPhotos";
+describe("산 사진(한국관광공사, 2026-10-21)", () => {
+    it("같은 규칙(제1 · 3유형 · https · 넷까지) · 상세 응답 · 표지 밑에 같은 사진 줄", () => {
+        const all = Object.values(MOUNTAIN_TOUR_PHOTOS);
+        expect(all.length).toBeGreaterThan(150);
+        for (const x of all) for (const p of x.photos) { expect(["Type1", "Type3"]).toContain(p.lic); expect(p.url.startsWith("https://")).toBe(true); }
+        expect(all.every((x) => x.photos.length >= 1 && x.photos.length <= 4)).toBe(true);
+        expect(readFileSync(resolve(__dirname, "../server/routes/modules/hiking.ts"), "utf8")).toContain("tourPhotos: MOUNTAIN_TOUR_PHOTOS[d.slug]?.photos ?? []");
+        expect(readFileSync(resolve(__dirname, "../client/src/hiking/pages/MountainPage.tsx"), "utf8")).toContain("<TourPhotos key={`tour:${d.slug}`} photos={d.tourPhotos}");
     });
 });
