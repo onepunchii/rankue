@@ -151,7 +151,8 @@ ${hubNav("ko")}`;
         "@context": "https://schema.org", "@type": "Event", name: f.title, startDate: isoDay(f.start), endDate: isoDay(f.end),
         eventStatus: "https://schema.org/EventScheduled", eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
         location: { "@type": "Place", name: f.place ?? f.title, address: { "@type": "PostalAddress", streetAddress: f.addr ?? undefined, addressRegion: f.region ?? undefined, addressCountry: "KR" }, geo: { "@type": "GeoCoordinates", latitude: f.lat, longitude: f.lng } },
-        ...(f.image ? { image: [f.image] } : {}),
+        // 대표 사진 + 사진 더 보기 넷까지(관광공사 · 공공누리 — 주소 그대로)
+        ...(f.image || f.images?.length ? { image: [...(f.image ? [f.image] : []), ...(f.images ?? []).slice(0, 4).map((x) => x.url)] } : {}),
         ...(f.overview ? { description: f.overview.slice(0, 300) } : {}),
         ...(f.host ? { organizer: { "@type": "Organization", name: f.host, ...(f.homepage ? { url: f.homepage } : {}) } } : {}),
         url: `${ORIGIN}${seo.path}`,

@@ -54,7 +54,10 @@ export interface FestivalDetail extends FestivalRow {
     hostTel: string | null;
     homepage: string | null;
     overview: string | null;
+    /** 사진 더 보기(detailImage2 — 공공누리 1 · 3유형만, 대표 사진은 뺀다). 옛 줄 · 아직 안 받은 줄은 빈 배열 */
+    images?: FestivalImage[];
 }
+export interface FestivalImage { url: string; small: string | null; lic: "Type1" | "Type3" }
 
 /** 시도 — 지도 · 고르기 순서(수도권 → 강원 → 충청 → 전라 → 경상 → 제주) */
 /**
@@ -200,6 +203,28 @@ export function festivalPhone(raw: unknown): string | null {
     if (/^050\d{9}$/.test(d)) return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`;
     if (/^1[5-8]\d{6}$/.test(d)) return `${d.slice(0, 4)}-${d.slice(4)}`;
     return null;
+}
+
+/** 사진 더 보기의 상한 — 한 축제에 열둘 */
+export const FESTIVAL_IMAGES_MAX = 12;
+/**
+ * detailImage2 → 사진들(2026-10-21). 공공누리 1 · 3유형으로 표시된 것만 · 관광공사 사진 서버(tong.visitkorea.or.kr)의 주소만 ·
+ * 대표 사진(목록의 firstimage)과 같은 것은 뺀다 · 같은 주소는 한 번 · http 는 https 로. **주소만 받는다**(제3유형은 자르지 않고 원본 비율로 그린다).
+ */
+export function festivalImagesFromTour(items: readonly Record<string, unknown>[], mainImage: string | null): FestivalImage[] {
+    const seen = new Set<string>(mainImage ? [mainImage.replace(/^http:\/\//, "https://")] : []);
+    const out: FestivalImage[] = [];
+    for (const x of items) {
+        const lic = String(x.cpyrhtDivCd ?? "");
+        if (lic !== "Type1" && lic !== "Type3") continue;
+        const url = String(x.originimgurl ?? "").trim().replace(/^http:\/\//, "https://");
+        if (!/^https:\/\/tong\.visitkorea\.or\.kr\//.test(url) || seen.has(url)) continue;
+        seen.add(url);
+        const small = String(x.smallimageurl ?? "").trim().replace(/^http:\/\//, "https://");
+        out.push({ url, small: /^https:\/\/tong\.visitkorea\.or\.kr\//.test(small) ? small : null, lic });
+        if (out.length >= FESTIVAL_IMAGES_MAX) break;
+    }
+    return out;
 }
 
 /**

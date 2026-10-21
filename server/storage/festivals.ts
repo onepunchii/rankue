@@ -5,7 +5,7 @@
  */
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
-import type { FestivalDetail, FestivalRow } from "../../shared/festivals.js";
+import type { FestivalDetail, FestivalImage, FestivalRow } from "../../shared/festivals.js";
 
 const TTL_MS = 10 * 60_000;
 let cache: { at: number; list: FestivalRow[]; byId: Map<string, FestivalRow> } | null = null;
@@ -42,10 +42,11 @@ export async function allFestivals(): Promise<FestivalRow[]> {
 export async function getFestival(id: string): Promise<FestivalDetail | null> {
     if (!/^\d{1,12}$/.test(id)) return null;
     const r = rowsOf(await db.execute(sql`
-        select content_id, title, start_ymd, end_ymd, addr, region, lat, lng, cat, image, image_lic, modified, tel, place, playtime, fee, host, host_tel, homepage, overview
+        select content_id, title, start_ymd, end_ymd, addr, region, lat, lng, cat, image, image_lic, modified, tel, place, playtime, fee, host, host_tel, homepage, overview, images
         from tour_festivals where content_id = ${id} and seen_at > now() - interval '3 days'`))[0];
     if (!r) return null;
-    return { ...toRow(r), tel: r.tel ?? null, place: r.place ?? null, playtime: r.playtime ?? null, fee: r.fee ?? null, host: r.host ?? null, hostTel: r.host_tel ?? null, homepage: r.homepage ?? null, overview: r.overview ?? null };
+    const images = Array.isArray(r.images) ? (r.images as FestivalImage[]).filter((x) => x && typeof x.url === "string") : [];
+    return { ...toRow(r), tel: r.tel ?? null, place: r.place ?? null, playtime: r.playtime ?? null, fee: r.fee ?? null, host: r.host ?? null, hostTel: r.host_tel ?? null, homepage: r.homepage ?? null, overview: r.overview ?? null, images };
 }
 
 /** 목록에서 받은 줄들을 넣거나 고친다(상세 칸은 건드리지 않는다). 본 날(seen_at)을 지금으로 */
@@ -86,6 +87,18 @@ export async function setFestivalDetail(id: string, mod: string | null, d: { pla
         update tour_festivals set place = ${d.place}, playtime = ${d.playtime}, fee = ${d.fee}, host = ${d.host}, host_tel = ${d.hostTel}, homepage = ${d.homepage},
             overview = ${d.overview}, tel = coalesce(tel, ${d.tel}), detail_mod = ${mod ?? ""}
         where content_id = ${id}`);
+}
+
+/** 사진 더 보기를 받을 줄 — 아직 안 받았거나 30일 지난 것, 열려 있거나 곧 열리는 것 먼저(2026-10-21) */
+export async function festivalsNeedingImages(today: string, max: number): Promise<{ id: string; image: string | null }[]> {
+    const r = rowsOf(await db.execute(sql`
+        select content_id, image from tour_festivals
+        where images_at is null or images_at < now() - interval '30 days'
+        order by (end_ymd >= ${today}) desc, start_ymd asc limit ${max}`));
+    return r.map((x) => ({ id: String(x.content_id), image: x.image ?? null }));
+}
+export async function setFestivalImages(id: string, images: readonly FestivalImage[]): Promise<void> {
+    await db.execute(sql`update tour_festivals set images = ${JSON.stringify(images)}::jsonb, images_at = now() where content_id = ${id}`);
 }
 
 /** 근처를 셈할 골프장(공개 페이지) — 이름 · 좌표 · 로고만. 10분 기억 */

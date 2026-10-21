@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    FESTIVALS_PATH, FESTIVAL_METRO_GOLF_KM, FESTIVAL_METRO_REGIONS, festivalsSportPath, festivalSportPath, festivalCardInput, festivalWeatherDays, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
+    FESTIVALS_PATH, FESTIVAL_IMAGES_MAX, festivalImagesFromTour, FESTIVAL_METRO_GOLF_KM, FESTIVAL_METRO_REGIONS, festivalsSportPath, festivalSportPath, festivalCardInput, festivalWeatherDays, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
     liveFestivals, overlaps, thisWeekend, tourHomepage, weekdayKo, FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, type FestivalRow,
 } from "./festivals";
 import { sportForPath } from "./sportRoute";
@@ -186,6 +186,34 @@ describe("축제 페이지의 '걸어 볼 둘레길'(2026-10-21)", () => {
     });
 });
 
+describe("축제 사진 더 보기(2026-10-21 — detailImage2)", () => {
+    const it0 = (o: Record<string, unknown>) => ({ cpyrhtDivCd: "Type3", originimgurl: "http://tong.visitkorea.or.kr/cms/resource/1/a.jpg", smallimageurl: "http://tong.visitkorea.or.kr/cms/resource/1/a_s.jpg", ...o });
+    it("공공누리 1 · 3유형 · 관광공사 사진 서버만 · 대표 사진과 같은 것은 빼고 · https · 열둘까지", () => {
+        const out = festivalImagesFromTour([
+            it0({}),
+            it0({ originimgurl: "https://tong.visitkorea.or.kr/cms/resource/1/b.jpg", cpyrhtDivCd: "Type1" }),
+            it0({ originimgurl: "https://tong.visitkorea.or.kr/cms/resource/1/c.jpg", cpyrhtDivCd: "Type4" }),
+            it0({ originimgurl: "https://example.com/x.jpg" }),
+            it0({ originimgurl: "https://tong.visitkorea.or.kr/cms/resource/1/main.jpg" }),
+            it0({}),
+        ], "http://tong.visitkorea.or.kr/cms/resource/1/main.jpg");
+        expect(out).toEqual([
+            { url: "https://tong.visitkorea.or.kr/cms/resource/1/a.jpg", small: "https://tong.visitkorea.or.kr/cms/resource/1/a_s.jpg", lic: "Type3" },
+            { url: "https://tong.visitkorea.or.kr/cms/resource/1/b.jpg", small: "https://tong.visitkorea.or.kr/cms/resource/1/a_s.jpg", lic: "Type1" },
+        ]);
+        const many = Array.from({ length: 20 }, (_, i) => it0({ originimgurl: `https://tong.visitkorea.or.kr/cms/resource/1/${i}.jpg` }));
+        expect(festivalImagesFromTour(many, null)).toHaveLength(FESTIVAL_IMAGES_MAX);
+    });
+    it("받기는 매일 크론(못 받은 줄은 다음 날) · 화면은 원본 비율 줄 + 크게 보기 · 크레딧", () => {
+        expect(read("server/services/festivalSync.ts")).toContain("await setFestivalImages(t.id, festivalImagesFromTour(itemsOf(res), t.image));");
+        expect(read("migrations/tour_festival_images.sql")).toContain("add column if not exists images jsonb");
+        const g = read("client/src/festivals/components/FestivalGallery.tsx");
+        expect(g).toContain("h-[84px] w-auto max-w-none");
+        expect(g).toContain("object-contain");
+        expect(g).toContain("festivalPhotoCredit(cur.lic)");
+    });
+});
+
 describe("전국 축제 — 이어 붙인 곳", () => {
     it("주소 · 색: /festivals 는 등산의 색 · 앱 라우트 · 메뉴", () => {
         expect(FESTIVALS_PATH).toBe("/festivals");
@@ -207,7 +235,7 @@ describe("전국 축제 — 이어 붙인 곳", () => {
         expect(read("server/services/tourFestivals.ts")).toContain("const stored = await allFestivals();");
     });
     it("사진은 자르지 않는다(제3유형) · 사진 위에 얹지 않는다 · 출처를 적는다", () => {
-        for (const p of ["client/src/festivals/components/FestivalBits.tsx", "client/src/festivals/pages/FestivalPage.tsx", "client/src/festivals/components/FestivalPicks.tsx"]) {
+        for (const p of ["client/src/festivals/components/FestivalBits.tsx", "client/src/festivals/pages/FestivalPage.tsx", "client/src/festivals/components/FestivalPicks.tsx", "client/src/festivals/components/FestivalGallery.tsx"]) {
             const c = read(p);
             expect(c, p).not.toContain("object-cover");
         }

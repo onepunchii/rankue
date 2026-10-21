@@ -3,11 +3,12 @@
  *  1) 목록(searchFestival2) — 지난해 1월부터 시작한 축제 전부(한 번에 1,000줄 · 900줄쯤이라 한두 번). 축제(EV01)만 넣고 고친다.
  *     해마다 같은 번호(contentid)에 날짜만 새로 실린다 — 올해 날짜가 아직 안 나온 축제는 지난 날짜로 남는다(페이지는 '끝남'으로 그린다).
  *  2) 상세(detailIntro2 · detailCommon2) — 새 줄 · 자료가 고쳐진 줄만, 열려 있거나 곧 열리는 것 먼저 detailMax 곳까지.
+ *  3) 사진 더 보기(detailImage2 — 2026-10-21) — 아직 안 받았거나 30일 지난 줄, 열린 것 먼저 imagesMax 곳까지(공공누리 1 · 3유형만).
  * 개발 계정은 기능마다 하루 1,000번 — 매일 크론은 목록 1~2번 + 상세 40곳(80번). 처음 채우기는 scripts/sync-festivals.ts.
  * 못 받으면 표는 그대로 둔다(지난 값으로 그린다).
  */
-import { cleanTourText, festivalFromTour, festivalPhone, kstToday, tourHomepage, type FestivalRow } from "../../shared/festivals.js";
-import { dropStaleFestivals, festivalsNeedingDetail, setFestivalDetail, upsertFestivalRows } from "../storage/festivals.js";
+import { cleanTourText, festivalFromTour, festivalImagesFromTour, festivalPhone, kstToday, tourHomepage, type FestivalRow } from "../../shared/festivals.js";
+import { dropStaleFestivals, festivalsNeedingDetail, festivalsNeedingImages, setFestivalDetail, setFestivalImages, upsertFestivalRows } from "../storage/festivals.js";
 
 const BASE = "https://apis.data.go.kr/B551011/KorService2";
 
@@ -29,9 +30,9 @@ async function getJson(url: string): Promise<any> {
 }
 const itemsOf = (j: any): any[] => { const x = j?.response?.body?.items?.item; return Array.isArray(x) ? x : x ? [x] : []; };
 
-export interface FestivalSyncResult { got: number; kept: number; dropped: number; details: number; detailFailed: number; error?: string }
+export interface FestivalSyncResult { got: number; kept: number; dropped: number; details: number; detailFailed: number; images?: number; error?: string }
 
-export async function syncFestivals(opts: { nowMs?: number; detailMax?: number; list?: boolean } = {}): Promise<FestivalSyncResult> {
+export async function syncFestivals(opts: { nowMs?: number; detailMax?: number; list?: boolean; imagesMax?: number } = {}): Promise<FestivalSyncResult> {
     const c = common();
     const out: FestivalSyncResult = { got: 0, kept: 0, dropped: 0, details: 0, detailFailed: 0 };
     if (!c) return { ...out, error: "DATA_GO_KR_KEY 없음" };
@@ -83,5 +84,20 @@ export async function syncFestivals(opts: { nowMs?: number; detailMax?: number; 
         }
     };
     await Promise.all([worker(), worker(), worker()]);
+
+    // 사진 더 보기 — 못 받은 줄은 다음 날 다시(images_at 을 안 적는다)
+    const pics = await festivalsNeedingImages(today, opts.imagesMax ?? 60).catch(() => []);
+    out.images = 0;
+    let j = 0;
+    const picWorker = async () => {
+        while (j < pics.length) {
+            const t = pics[j++];
+            const res = await getJson(`${BASE}/detailImage2?${c}&contentId=${t.id}&imageYN=Y&numOfRows=30&pageNo=1`);
+            if (!res) continue;
+            await setFestivalImages(t.id, festivalImagesFromTour(itemsOf(res), t.image));
+            out.images!++;
+        }
+    };
+    await Promise.all([picWorker(), picWorker(), picWorker()]);
     return out;
 }

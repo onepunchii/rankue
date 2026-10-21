@@ -16,6 +16,7 @@ import { LucideChevronRight, LucideGlobe, LucideNavigation, LucidePhone, LucideS
 import { useToast } from "@/hooks/use-toast";
 import { festivalCardUrl } from "@shared/ogCards";
 import { WeatherDays } from "../components/WeatherDays";
+import { FestivalGallery } from "../components/FestivalGallery";
 import { canOpenInApp, openInAppBrowser } from "@/lib/openOutside";
 import { FESTIVAL_CREDIT, FESTIVAL_SOURCE, addDays, festivalPath, festivalCatName, type FestivalWxDay, festivalPeriod, festivalPhotoCredit, festivalSeo, festivalSportPath, festivalState, type FestivalSport } from "@shared/festivals";
 import { hikingMountainPath } from "@shared/hikingMountains";
@@ -218,6 +219,8 @@ export default function FestivalPage() {
                         <figcaption className="mt-1.5 text-right text-[12px]" style={{ color: `${t.text}66` }}>{festivalPhotoCredit(f.lic)}</figcaption>
                     </figure>
                 )}
+                {/* 사진 더 보기(10/21) — 관광공사 사진들, 원본 비율 그대로 · 누르면 크게 */}
+                {!!f.images?.length && <div className="px-5"><FestivalGallery images={f.images} title={f.title} text={t.text} /></div>}
 
                 <header className="px-5 pt-4">
                     <div className="flex flex-wrap items-center gap-1.5">
