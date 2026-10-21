@@ -73,6 +73,7 @@ import {
   BRAND_KO, GOLF_LIST_SEO_LIMIT, GOLF_TOUR_LABEL, SITE_GRAPH_LD, SITE_VERIFICATION_META, worldRankingSeo,
   golferDesc, golferNameFull, golferTitle, golfRankingDesc, golfRankingPath, golfRankingTitle, umbPlayerDesc, umbPlayerTitle,
 } from "../shared/siteGraph.js";
+import { GOLF_TOUR_PHOTOS } from "./data/golfTourPhotos.js";
 
 // 크롤러 전용 프리렌더 — 봇에게 "React 가 그리는 것과 같은 내용"을 HTML 로 미리 채워 준다.
 //
@@ -793,6 +794,11 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
   const guideHtml = guide ? courseGuideHtml(p.name, guide) : "";
 
   // 라운드 사진 — figure + figcaption(사진 · 닉네임 · 달). 날짜는 달까지만(화면과 같다)
+  // 한국관광공사 사진(2026-10-21) — 화면(TourPhotos)과 같은 값 · 같은 출처 표시. 3유형은 변경 금지라 크기를 적지 않고 원본 그대로
+  const tour = GOLF_TOUR_PHOTOS[slug]?.photos ?? [];
+  const tourHtml = tour.length
+    ? `\n  <h2>${esc(p.name)} 사진</h2>\n  ${tour.map((ph, i) => `<figure><img src="${esc(ph.url)}" alt="${esc(`${p.name} 사진 ${i + 1}`)}" loading="lazy"><figcaption>${esc(`사진 한국관광공사 · 공공누리 제${ph.lic === "Type1" ? 1 : 3}유형`)}</figcaption></figure>`).join("\n  ")}`
+    : "";
   const photoHtml = photos.length
     ? `\n  <h2>${esc(p.name)} 라운드 사진</h2>\n  ${photos.map((ph) => `<figure><img src="${esc(ph.url)}" alt="${esc(`${p.name} 라운드 사진`)}"${ph.width && ph.height ? ` width="${ph.width}" height="${ph.height}"` : ""} loading="lazy"><figcaption>${esc(`사진 · ${ph.credit}${ph.month ? ` · ${ph.month}` : ""}`)}</figcaption></figure>`).join("\n  ")}`
     : "";
@@ -900,7 +906,8 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
     description: desc,
     ...(absoluteLogoUrl(ORIGIN, p.logo) ? { logo: absoluteLogoUrl(ORIGIN, p.logo) } : {}),
     // 대표 이미지는 골프장 카드(정사각형) — 네이버·구글 썸네일이 가운데를 정사각형으로 자른다(2026-09-30)
-    image: golfCourseCardUrl(ORIGIN, slug),
+    // 실제 사진이 있으면 함께(2026-10-21 한국관광공사 · 공공누리) — 이미지 검색에 골프장의 진짜 모습이 걸리게
+    image: tour.length ? [golfCourseCardUrl(ORIGIN, slug), ...tour.slice(0, 3).map((t) => t.url)] : golfCourseCardUrl(ORIGIN, slug),
     ...(p.phone ? { telephone: p.phone } : {}),
     // addressRegion 은 넣지 않는다 — 우리 지역은 '경상·전라' 같은 묶음이라 행정구역으로 적으면 거짓이다(2026-09-24 검토).
     address: {
@@ -936,7 +943,7 @@ async function renderGolfCourse(s: GolfSummary, rawSlug: string, now: number, ro
   <dl>
     ${dlHtml}
   </dl>
-  ${mapHtml}${listingHtml}${weatherHtml}${feeHtml}${priceHtml}${courseHtml}${guideHtml}${introHtml}${dishHtml}${photoHtml}${nearHtml}${hubHtml}
+  ${tourHtml}${mapHtml}${listingHtml}${weatherHtml}${feeHtml}${priceHtml}${courseHtml}${guideHtml}${introHtml}${dishHtml}${photoHtml}${nearHtml}${hubHtml}
   ${hubNav("ko")}
 </main>`,
   });

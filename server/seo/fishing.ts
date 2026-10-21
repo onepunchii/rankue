@@ -15,6 +15,12 @@ import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath } from "../../shar
 import { nearestPort } from "../../shared/fishingPlaces.js";
 import { fishingFishPath, placeFishId } from "../../shared/fishingFishPages.js";
 import { FISH } from "../../shared/fishingFish.js";
+import { FISHING_TOUR_PHOTOS } from "../data/fishingTourPhotos.js";
+/** 한국관광공사 사진(2026-10-21) — 열쇠 '시도|시군구|이름'(화면과 같은 값) */
+const tourOf = (pl: { sido: string | null; sigungu: string | null; name: string }) => FISHING_TOUR_PHOTOS[`${pl.sido ?? ""}|${pl.sigungu ?? ""}|${pl.name}`]?.photos ?? [];
+const tourFigures = (name: string, photos: readonly { url: string; lic: "Type1" | "Type3" }[]) => photos.length
+    ? `  <h2>${esc(name)} 사진</h2>\n${photos.map((ph, i) => `  <figure><img src="${esc(ph.url)}" alt="${esc(`${name} 사진 ${i + 1}`)}" loading="lazy"><figcaption>${esc(`사진 한국관광공사 · 공공누리 제${ph.lic === "Type1" ? 1 : 3}유형`)}</figcaption></figure>`).join("\n")}\n`
+    : "";
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FishingRender { status: 200; tag: string; html: string }
@@ -101,7 +107,7 @@ export async function renderFishingSpots(path: string, all: readonly PublicPlace
   <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${FISHING_SPOTS_PATH}">${esc(FISHING_SPOTS_LABEL)}</a> › <a href="${fishingRegionPath(sido)}">${esc(sido)} 낚시터</a> › ${esc(pl.name)}</nav>
   <h1>${esc(pl.name)}</h1>
   <p>${esc(`${placeWhere(pl)}의 ${k.label}`)}${pl.address ? ` · ${esc(pl.address)}` : ""}</p>
-  <section>
+${tourFigures(pl.name, tourOf(pl))}  <section>
     <h2>한눈에</h2>
     <dl>
       <dt>대상 어종</dt><dd>${pl.species.length ? pl.species.map((s) => { const id = placeFishId(s); const f = id ? FISH.find((x) => x.id === id) : null; return f ? `<a href="${fishingFishPath(f.name)}">${esc(s)}</a>` : esc(s); }).join(" · ") : "등록된 어종이 없어요"}</dd>
@@ -119,7 +125,7 @@ ${source()}${pl.dataDate ? `\n  <p>${esc(pl.dataDate)} 기준 자료</p>` : ""}
         // 낚시터 카드 — 머리의 og:image 와 본문 제목 밑 그림이 같은 한 장(산 · 골프장의 검색용 화면과 같은 꼴)
         const card = { url: fishingSpotCardUrl(ORIGIN, pl.id), width: 1200, height: 1200, alt: `${pl.name} — ${placeWhere(pl)} ${k.label}` };
         const withCard = body.replace("</h1>", `</h1>\n  <img src="${esc(card.url)}" width="1200" height="1200" alt="${esc(card.alt)}" loading="eager">`);
-        return { status: 200, tag: `fishing:spot:${pl.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${fishingSpotPath(pl.id)}`, body: withCard, image: card, jsonLd: [{ ...ld, image: card.url }, crumbs([`${sido} 낚시터`, fishingRegionPath(sido)], [pl.name, fishingSpotPath(pl.id)])] }) };
+        return { status: 200, tag: `fishing:spot:${pl.id}`, html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${fishingSpotPath(pl.id)}`, body: withCard, image: card, jsonLd: [{ ...ld, image: tourOf(pl).length ? [card.url, ...tourOf(pl).slice(0, 3).map((t) => t.url)] : card.url }, crumbs([`${sido} 낚시터`, fishingRegionPath(sido)], [pl.name, fishingSpotPath(pl.id)])] }) };
     }
     return null;
 }

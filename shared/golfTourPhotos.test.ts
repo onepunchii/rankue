@@ -47,3 +47,13 @@ describe("낚시터 사진(한국관광공사, 2026-10-21)", () => {
         expect(readFileSync(resolve(__dirname, "../client/src/fishing/spots/SpotsPages.tsx"), "utf8")).toContain("<TourPhotos key={`tour:${p.id}`} photos={data?.tourPhotos}");
     });
 });
+
+describe("검색용 화면에도 같은 사진(2026-10-21)", () => {
+    it("골프장 · 산 · 낚시터 — figure + 출처, 구조화 데이터 image", () => {
+        const pre = readFileSync(resolve(__dirname, "../server/prerender.ts"), "utf8");
+        expect(pre).toContain("const tour = GOLF_TOUR_PHOTOS[slug]?.photos ?? [];");
+        expect(pre).toContain("image: tour.length ? [golfCourseCardUrl(ORIGIN, slug), ...tour.slice(0, 3).map((t) => t.url)] : golfCourseCardUrl(ORIGIN, slug),");
+        expect(readFileSync(resolve(__dirname, "../server/seo/hiking.ts"), "utf8")).toContain("tourFigures(d.name, MOUNTAIN_TOUR_PHOTOS[d.slug]?.photos ?? [])");
+        expect(readFileSync(resolve(__dirname, "../server/seo/fishing.ts"), "utf8")).toContain("tourFigures(pl.name, tourOf(pl))");
+    });
+});

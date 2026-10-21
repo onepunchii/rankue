@@ -36,6 +36,11 @@ import {
     HIKING_ABROAD_SEO, abroadHeightText, hikingAbroad, hikingAbroadPath, hikingAbroadSeo, type AbroadCourse, type AbroadFact,
 } from "../../shared/hikingAbroad.js";
 import { HIKING_GRANDS, HIKING_PINS, HIKING_SERIES, hikingBooks, type HikingBookKind } from "../../shared/hikingStamps.js";
+import { MOUNTAIN_TOUR_PHOTOS } from "../data/mountainTourPhotos.js";
+/** 한국관광공사 사진(2026-10-21) — 화면(TourPhotos)과 같은 값 · 같은 출처 표시. 3유형 변경 금지라 크기를 적지 않고 원본 그대로 */
+const tourFigures = (name: string, photos: readonly { url: string; lic: "Type1" | "Type3" }[]) => photos.length
+    ? `  <h2>${esc(name)} 사진</h2>\n${photos.map((ph, i) => `  <figure><img src="${esc(ph.url)}" alt="${esc(`${name} 사진 ${i + 1}`)}" loading="lazy"><figcaption>${esc(`사진 한국관광공사 · 공공누리 제${ph.lic === "Type1" ? 1 : 3}유형`)}</figcaption></figure>`).join("\n")}\n`
+    : "";
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface HikingRender { status: 200; tag: string; html: string }
@@ -158,7 +163,7 @@ function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: n
   <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a>${region ? ` › <a href="${hikingRegionPath(region.id)}">${esc(`${region.name}의 산`)}</a>` : ""} › ${esc(d.name)}</nav>
   <h1>${esc(d.name)}</h1>
 ${g?.subtitle ? `  <p>${esc(g.subtitle)}</p>\n` : ""}  <p>${esc(facts.join(" · "))}</p>
-${g?.intro ? `  <p>${esc(g.intro)}</p>\n` : ""}  <section>
+${g?.intro ? `  <p>${esc(g.intro)}</p>\n` : ""}${tourFigures(d.name, MOUNTAIN_TOUR_PHOTOS[d.slug]?.photos ?? [])}  <section>
     <h2>${esc(MOUNTAIN_LABEL.courses)}</h2>
 ${courses.length ? `    <p>${esc(MOUNTAIN_LABEL.coursesAside)}</p>
     <ul>
@@ -192,6 +197,8 @@ ${hubNav("ko")}`;
         crumbs(...(region ? [[`${region.name}의 산`, hikingRegionPath(region.id)] as [string, string]] : []), [d.name, seo.path]),
         {
             "@context": "https://schema.org", "@type": "Mountain", name: d.name, url: `${ORIGIN}${seo.path}`, description: seo.desc,
+            // 한국관광공사 사진(2026-10-21 · 공공누리) — 있으면 이 산의 진짜 모습을 이미지로
+            ...((MOUNTAIN_TOUR_PHOTOS[d.slug]?.photos.length ?? 0) > 0 ? { image: MOUNTAIN_TOUR_PHOTOS[d.slug]!.photos.slice(0, 3).map((t) => t.url) } : {}),
             ...(d.lat != null && d.lng != null ? { geo: { "@type": "GeoCoordinates", latitude: d.lat, longitude: d.lng, ...(d.heightM ? { elevation: `${d.heightM} m` } : {}) } } : {}),
             ...(d.sido ? { address: { "@type": "PostalAddress", addressCountry: "KR", addressRegion: d.sido, ...(d.sigungu ? { addressLocality: d.sigungu } : {}) } } : {}),
         },
