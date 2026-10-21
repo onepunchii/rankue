@@ -133,6 +133,28 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
 // GET /listings/dots — 전국 당구장 지도(당구대 위의 공)에 찍을 점(shared/storeDots). 누구에게나 같은 답 → CDN 공개 캐시(위의 GET 규칙).
 // ⚠️ "/:code" 보다 먼저 — 'dots' 도 매장 코드 꼴이라 뒤에 두면 상세로 빠진다.
 let dotsCache: { at: number; data: StoreDotsWire } | null = null;
+// GET /listings/recent?region=&city= — 새로 문 연 당구장(2026-10-21 디자인 리뷰: 인허가일이 생겼다 — 매장 찾기의 '새로 문 연 곳' 띠).
+// 최근 60일, 그 범위에 셋이 안 되면 최근 1년. 영업 중(휴업 · 폐업 아님)만. 누구에게나 같은 답 → CDN 공개 캐시(위의 GET 규칙).
+// ⚠️ "/:code" 보다 먼저.
+router.get("/recent", asyncHandler(async (req: any, res: Response) => {
+    const region = typeof req.query.region === "string" ? req.query.region.slice(0, 10) : "";
+    const city = typeof req.query.city === "string" && /^[가-힣]{1,6}(시|군|구)$/.test(req.query.city) ? req.query.city : "";
+    const where = (days: number) => and(
+        LISTING_LIVE,
+        sql`coalesce(store_listings.gov_status, 'open') = 'open'`,
+        sql`store_listings.license_date >= current_date - ${days}::int`,
+        region ? eq(storeListings.region, region) : undefined,
+        region && city ? sql`split_part(store_listings.address, ' ', 2) = ${city}` : undefined,
+    );
+    const pick = (days: number) => db.select({
+        code: storeListings.code, name: storeListings.name, region: storeListings.region, address: storeListings.address, licenseDate: storeListings.licenseDate,
+    }).from(storeListings).where(where(days)).orderBy(sql`store_listings.license_date desc`, asc(storeListings.name)).limit(12);
+    const [{ n60 }] = await db.select({ n60: sql<number>`count(*)::int` }).from(storeListings).where(where(60));
+    const days = n60 >= 3 ? 60 : 365;
+    const [rows, [{ total }]] = await Promise.all([pick(days), db.select({ total: sql<number>`count(*)::int` }).from(storeListings).where(where(days))]);
+    return sendSuccess(res, { days, total, rows });
+}));
+
 router.get("/dots", asyncHandler(async (_req: any, res: Response) => {
     if (!dotsCache || Date.now() - dotsCache.at > 30 * 60_000) {
         // 주소는 시군구만 뽑는다(점에 싣는 것은 시군구 이름뿐 — 2026-10-20 지도 확대)

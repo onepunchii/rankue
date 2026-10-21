@@ -141,3 +141,14 @@ describe("제보 확인 뒤 고치기 — 받는 칸(2026-10-21)", () => {
         expect(admin).toContain('if (listing.claimed) return sendError(res, 409,');
     });
 });
+
+describe("새로 문 연 당구장 띠(2026-10-21)", () => {
+    it("/listings/recent 는 /:code 보다 먼저 · 영업 중만 · 60일(셋 미만이면 1년) · 화면은 검색 · 내 주변일 때 감춘다", () => {
+        const api = read("server/routes/modules/listings.ts");
+        expect(api.indexOf('router.get("/recent"')).toBeGreaterThan(0);
+        expect(api.indexOf('router.get("/recent"')).toBeLessThan(api.indexOf('router.get("/:code"'));
+        expect(api).toContain("const days = n60 >= 3 ? 60 : 365;");
+        expect(api).toContain("sql`coalesce(store_listings.gov_status, 'open') = 'open'`");
+        expect(read("client/src/pages/stores.tsx")).toContain("{!dq && !nearbyOn && <RecentStrip");
+    });
+});

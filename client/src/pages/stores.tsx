@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
-import { regionTitleKo, regionDescKo, cityTitleKo, cityDescKo, cityHubPath, listingCityOf, isNewlyLicensed, licenseSinceKo } from "@shared/storeMeta";
+import { regionTitleKo, regionDescKo, cityTitleKo, cityDescKo, cityHubPath, listingCityOf, isNewlyLicensed, licenseSinceKo, storeAreasKo } from "@shared/storeMeta";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
@@ -30,7 +30,7 @@ interface Listing {
 }
 interface ListingsResponse { total: number; rows: Listing[]; regions: Array<{ region: string; count: number }>; cities?: Array<{ city: string; count: number }> }
 
-const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string; mapAll: (n: number) => string; mapIn: (r: string, n: number) => string; mapLegend: string; mapHint: string; mapByRegion: string; mapOthers: (n: number) => string; mapByCity: (r: string) => string; mapBackAll: string; newOpen: string; paused: string; licensed: (ymd: string) => string }> = {
+const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string; mapAll: (n: number) => string; mapIn: (r: string, n: number) => string; mapLegend: string; mapHint: string; mapByRegion: string; mapOthers: (n: number) => string; mapByCity: (r: string) => string; mapBackAll: string; newOpen: string; paused: string; licensed: (ymd: string) => string; recentTitle: string; recentSub: (days: number, n: number) => string; recentDate: (ymd: string) => string }> = {
   ko: {
     title: "매장 찾기",
     subtitle: "전국 당구장을 지역·이름으로 찾아보세요",
@@ -59,6 +59,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapByCity: (r) => `${r} 시군구별`,
     mapBackAll: "전국",
     newOpen: "새로 연 곳", paused: "휴업",
+    recentTitle: "새로 문 연 당구장", recentSub: (d, n) => `${d === 60 ? "최근 60일" : "최근 1년"} · ${n.toLocaleString()}곳`, recentDate: (d) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8, 10))}일 인허가`,
     licensed: (d) => `${licenseSinceKo(d) ?? d.slice(0, 4)} · 인허가`,
   },
   en: {
@@ -89,6 +90,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapByCity: (r) => `${r} by district`,
     mapBackAll: "All",
     newOpen: "New", paused: "Paused",
+    recentTitle: "Newly opened halls", recentSub: (d, n) => `${d === 60 ? "Last 60 days" : "Last year"} · ${n.toLocaleString()}`, recentDate: (d) => `Licensed ${d.slice(0, 10)}`,
     licensed: (d) => `Licensed ${d.slice(0, 7)}`,
   },
   vi: {
@@ -119,6 +121,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapByCity: (r) => `${r} theo quận`,
     mapBackAll: "Toàn quốc",
     newOpen: "Mới mở", paused: "Tạm nghỉ",
+    recentTitle: "Quán mới mở", recentSub: (d, n) => `${d === 60 ? "60 ngày qua" : "1 năm qua"} · ${n.toLocaleString()}`, recentDate: (d) => `Cấp phép ${d.slice(0, 10)}`,
     licensed: (d) => `Cấp phép ${d.slice(0, 7)}`,
   },
   tr: {
@@ -149,6 +152,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapByCity: (r) => `${r} ilçeye göre`,
     mapBackAll: "Tümü",
     newOpen: "Yeni", paused: "Ara verdi",
+    recentTitle: "Yeni açılan salonlar", recentSub: (d, n) => `${d === 60 ? "Son 60 gün" : "Son 1 yıl"} · ${n.toLocaleString()}`, recentDate: (d) => `Ruhsat ${d.slice(0, 10)}`,
     licensed: (d) => `Ruhsat ${d.slice(0, 7)}`,
   },
   es: {
@@ -179,6 +183,7 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapByCity: (r) => `${r} por distrito`,
     mapBackAll: "Todo",
     newOpen: "Nuevo", paused: "Pausado",
+    recentTitle: "Recién abiertos", recentSub: (d, n) => `${d === 60 ? "Últimos 60 días" : "Último año"} · ${n.toLocaleString()}`, recentDate: (d) => `Licencia ${d.slice(0, 10)}`,
     licensed: (d) => `Licencia ${d.slice(0, 7)}`,
   },
 };
@@ -351,6 +356,9 @@ export default function Stores() {
           </div>
         )}
 
+        {/* 새로 문 연 곳(2026-10-21) — 인허가일로. 고른 시도 · 시군구를 따른다. 검색 · 내 주변일 땐 감춘다 */}
+        {!dq && !nearbyOn && <RecentStrip region={region} city={city} locale={locale} t={t} onOpen={(code) => setLocation(`/stores/${code}`)} />}
+
         <p className="text-[12.5px] font-semibold text-black/55 mb-4">{t.count(total + filteredPartners.length)}</p>
 
         {/* 파트너 매장 — 상단 고정 */}
@@ -447,6 +455,42 @@ export default function Stores() {
       {/* 모바일 하단 네비 — 앱에서 넘어온 사용자가 돌아갈 길, 검색 유입에는 제품 진입로.
           데스크톱은 넓은 공개 레이아웃이라 앱 탭바가 어울리지 않아 감춘다. */}
       <div className="md:hidden"><HiqNavigation /></div>
+    </div>
+  );
+}
+
+/**
+ * 새로 문 연 당구장(2026-10-21 디자인 리뷰) — 인허가 자료의 인허가일로 최근 60일(셋이 안 되면 1년). 가로로 넘기는 작은 카드.
+ * 받지 못했거나 하나도 없으면 아무것도 그리지 않는다.
+ */
+function RecentStrip({ region, city, locale, t, onOpen }: { region: string; city: string; locale: string; t: (typeof L)[Locale]; onOpen: (code: string) => void }) {
+  const p = new URLSearchParams();
+  if (region) p.set("region", region);
+  if (region && city) p.set("city", city);
+  const qs = p.toString();
+  const { data } = useQuery<{ days: number; total: number; rows: { code: string; name: string; region: string; address: string; licenseDate: string | null }[] }>({
+    queryKey: [`/api/hiq/listings/recent${qs ? `?${qs}` : ""}`], staleTime: 10 * 60_000,
+  });
+  const rows = Array.isArray(data?.rows) ? data!.rows.filter((r) => r.licenseDate) : [];
+  if (!rows.length) return null;
+  return (
+    <div className="mb-4" data-testid="stores-recent">
+      <div className="mb-2 flex items-baseline justify-between gap-2">
+        <p className="text-[14.5px] font-bold text-ink-1">{t.recentTitle}</p>
+        <span className="text-[12px] font-semibold text-black/45 tabular-nums">{t.recentSub(data!.days, data!.total)}</span>
+      </div>
+      <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 scrollbar-hide">
+        {rows.map((r) => {
+          const area = locale === "ko" ? (storeAreasKo(r.address, r.region)[0] ?? r.region) : r.region;
+          return (
+            <button key={r.code} type="button" onClick={() => onOpen(r.code)} className="w-[164px] shrink-0 rounded-2xl bg-white p-3.5 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:scale-[0.98] transition-transform" data-testid="stores-recent-card">
+              <span className="inline-flex h-6 items-center rounded-full bg-[#F4C542] px-2 text-[12px] font-bold text-[#3A2A05] tabular-nums">{t.recentDate(r.licenseDate!)}</span>
+              <span className="mt-2 block text-[14.5px] font-bold leading-snug text-ink-1 line-clamp-2 break-keep">{r.name}</span>
+              <span className="mt-1 block truncate text-[12px] font-medium text-black/50">{area}</span>
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }
