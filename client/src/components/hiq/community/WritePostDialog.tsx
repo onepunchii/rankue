@@ -14,6 +14,8 @@ interface WritePostDialogProps {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     board: CommunityBoard; // 열릴 때의 기본 게시판 — 다이얼로그 안에서 변경 가능
+    /** 이야기 거리(2026-10-21) — 열 때 비어 있는 칸에 넣어 주는 첫 문장(우리 매장 · 레슨은 제목, 그 밖은 본문). 지어 쓰는 글이 아니라 쓰는 사람이 고친다 */
+    starter?: string;
 }
 
 const ALL_BOARDS: CommunityBoard[] = ["brag", "ask", "store", "lesson"];
@@ -27,7 +29,7 @@ interface MyHistoryItem extends CommunityGameCard {
 // - 자랑(brag): 제목 없음(캡션이 곧 제목), 사진 또는 경기결과 카드 중 1개 필수
 // - 물어보기(ask): 진입 마찰 0 — 한 줄만 써도 됨. #장비 태그 제공(중고거래 수요 관찰)
 // - 우리 매장(store)·레슨(lesson): 최근 30일 경기 기록 매장을 소속 근거로 선택
-export const WritePostDialog = ({ open, onOpenChange, board: initialBoard }: WritePostDialogProps) => {
+export const WritePostDialog = ({ open, onOpenChange, board: initialBoard, starter }: WritePostDialogProps) => {
     const { t, locale } = useT();
     const { gate } = useTermsGate();
     const { toast } = useToast();
@@ -43,6 +45,13 @@ export const WritePostDialog = ({ open, onOpenChange, board: initialBoard }: Wri
 
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
+    // 이야기 거리로 열렸으면 빈 칸에만 첫 문장을 넣는다(쓰던 글은 덮지 않는다)
+    const [prevStarter, setPrevStarter] = useState<string | undefined>(undefined);
+    if (open && starter && starter !== prevStarter) {
+        setPrevStarter(starter);
+        if (initialBoard === "store" || initialBoard === "lesson") { if (!title.trim()) setTitle(starter); }
+        else if (!content.trim()) setContent(starter);
+    }
     const [images, setImages] = useState<string[]>([]);
     const [isUploading, setIsUploading] = useState(false);
     const [historyId, setHistoryId] = useState<string | null>(null);

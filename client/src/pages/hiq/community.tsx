@@ -12,6 +12,7 @@ import { CommunityPostCard } from "@/components/hiq/community/CommunityPostCard"
 import { WritePostDialog } from "@/components/hiq/community/WritePostDialog";
 import { BOARD_KEYS, type CommunityBoard, type CommunityPost } from "@/components/hiq/community/types";
 import type { HiqMember } from "@shared/schema";
+import { goLogin } from "@/components/hiq/LoginGate";
 
 const BOARDS: (CommunityBoard | "all")[] = ["all", "brag", "ask", "store", "lesson"];
 
@@ -25,6 +26,8 @@ export default function HiqCommunity() {
     // (오너 결정 2026-08-31: 게시판 분리가 아니라 태그+필터). 내 언어가 아닌 글에는 뱃지가 붙는다.
     const [langOnly, setLangOnly] = useState(false);
     const [isWriteOpen, setIsWriteOpen] = useState(false);
+    // 이야기 거리로 연 글쓰기 — 그 게시판 · 첫 문장(2026-10-21)
+    const [starter, setStarter] = useState<{ board: CommunityBoard; text: string } | null>(null);
     const [older, setOlder] = useState<CommunityPost[]>([]);
     const [hasMore, setHasMore] = useState(true);
 
@@ -70,7 +73,16 @@ export default function HiqCommunity() {
     };
 
     // 글쓰기는 게시판을 정해야 열린다 — 전체 탭에서는 물어보기(마찰 0)로 기본 선택
-    const writeBoard: CommunityBoard = board === "all" ? "ask" : board;
+    const writeBoard: CommunityBoard = starter?.board ?? (board === "all" ? "ask" : board);
+    // 비로그인은 글쓰기 창 대신 로그인 팝업(2026-10-21 — 예전엔 창을 열고 보내기에서야 막혔다)
+    const openWrite = (s?: { board: CommunityBoard; text: string }) => {
+        if (!me) { goLogin(setLocation); return; }
+        setStarter(s ?? null);
+        setIsWriteOpen(true);
+    };
+    // 이야기 거리 — 글이 적은 동안만(여섯 개 미만), 게시판마다 셋. 누르면 그 게시판 · 그 첫 문장으로 글쓰기
+    const STARTER_BOARDS: CommunityBoard[] = board === "all" ? ["ask", "brag", "store"] : [board];
+    const starters = STARTER_BOARDS.flatMap((b) => (board === "all" ? [0] : [0, 1, 2]).map((i) => ({ board: b, text: t(`community.starter.${b}.${i}`) })));
 
     return (
         <div className="rk-clip-x min-h-screen bg-surface-0 text-ink-1 px-5 pt-6 pb-nav relative font-sans">
@@ -106,10 +118,22 @@ export default function HiqCommunity() {
                         {t("community.loading")}
                     </div>
                 )}
-                {!isLoading && posts.length === 0 && (
-                    <div className="rk-card p-10 text-center">
-                        <p className="text-[15px] font-bold text-ink-2">{t("community.empty")}</p>
-                        <p className="text-[13px] font-medium text-black/45 mt-1">{t("community.emptyDesc")}</p>
+                {/* 이야기 거리(2026-10-21 디자인 리뷰 — 지금까지 글 세 개, 게시판 셋은 비어 있었다). 글이 쌓이면(여섯 개 이상) 사라진다.
+                    가짜 글을 깔지 않는다 — 쓸 거리를 건네고, 누르면 그 게시판 글쓰기가 첫 문장과 함께 열린다 */}
+                {!isLoading && !langOnly && posts.length < 6 && (
+                    <div className="rk-card p-4" data-testid="community-starters">
+                        <p className="text-[15px] font-bold text-ink-1">{t(posts.length === 0 ? "community.empty" : "community.starterTitle")}</p>
+                        <p className="mt-0.5 text-[12.5px] font-medium text-black/50 break-keep">{t("community.starterDesc")}</p>
+                        <div className="mt-3 flex flex-col gap-1.5">
+                            {starters.map((s) => (
+                                <button key={`${s.board}-${s.text}`} type="button" onClick={() => openWrite(s)}
+                                    className="flex items-center gap-2 rounded-xl bg-black/[0.035] px-3 py-2.5 text-left active:bg-black/[0.06]" data-testid="community-starter">
+                                    {board === "all" && <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[12px] font-semibold text-ink-3">{t(BOARD_KEYS[s.board])}</span>}
+                                    <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-ink-1">{s.text}</span>
+                                    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden className="shrink-0" fill="none" stroke="#C9920E" strokeWidth="2" strokeLinecap="round"><path d="M8 3.5v9M3.5 8h9" /></svg>
+                                </button>
+                            ))}
+                        </div>
                     </div>
                 )}
                 {posts.map(post => (
@@ -138,7 +162,7 @@ export default function HiqCommunity() {
                 <div className="max-w-md mx-auto px-5 flex justify-end">
                     <motion.button
                         whileTap={{ scale: 0.92 }}
-                        onClick={() => setIsWriteOpen(true)}
+                        onClick={() => openWrite()}
                         className="pointer-events-auto w-14 h-14 rounded-full bg-[#F5B721] shadow-[0_8px_24px_rgba(245,183,33,0.45)] flex items-center justify-center"
                         aria-label={t("community.write")}
                     >
@@ -147,7 +171,7 @@ export default function HiqCommunity() {
                 </div>
             </div>
 
-            <WritePostDialog open={isWriteOpen} onOpenChange={setIsWriteOpen} board={writeBoard} />
+            <WritePostDialog open={isWriteOpen} onOpenChange={(o) => { setIsWriteOpen(o); if (!o) setStarter(null); }} board={writeBoard} starter={starter?.text} />
 
             <HiqNavigation />
         </div>
