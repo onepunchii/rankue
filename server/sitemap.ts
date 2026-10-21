@@ -56,7 +56,7 @@ const ORIGIN = "https://www.rankue.co.kr";
 const APP_LANGS = ["en", "vi", "tr", "es"];
 const ABOUT_LANGS = ["en", "vi", "tr", "es", "ja", "zh"];
 
-export const SITEMAP_SECTIONS = ["core", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs", "rankings", "terms", "tournaments", "pba-records", "hiking", "fishing"] as const;
+export const SITEMAP_SECTIONS = ["core", "festivals", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs", "rankings", "terms", "tournaments", "pba-records", "hiking", "fishing"] as const;
 export type SitemapSection = (typeof SITEMAP_SECTIONS)[number];
 
 function esc(s: string): string {
@@ -337,6 +337,14 @@ const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
     const all = await allPlaces().catch((e) => { console.warn("[sitemap] fishing:", (e as Error)?.message); return []; });
     // 바다 · 항구 물때(2026-10-18)는 낚시터를 못 읽어도 나간다(표가 코드에 있다)
     return [...fishingSitemapParts(all, await placesUpdatedDay().catch(() => null)), ...fishingSeaSitemapParts(new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)), ...fishingFishSitemapParts(await placesUpdatedDay().catch(() => null))];
+  },
+  // 전국 축제(2026-10-21) — 허브 + 축제마다. 표를 못 읽으면 빈 구역
+  festivals: async () => {
+    const { allFestivals } = await import("./storage/festivals.js");
+    const { festivalSitemapParts } = await import("./seo/festivals.js");
+    const { kstToday } = await import("../shared/festivals.js");
+    const all = await allFestivals().catch((e) => { console.warn("[sitemap] festivals:", (e as Error)?.message); return []; });
+    return festivalSitemapParts(all, kstToday());
   },
   hiking: async () => {
     const all = await allMountains().catch((e) => { console.warn("[sitemap] hiking:", (e as Error)?.message); return []; });

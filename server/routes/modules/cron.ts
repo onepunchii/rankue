@@ -119,10 +119,26 @@ async function handleBilliardHalls(req: any, res: any) {
         const { syncBilliardHalls } = await import("../../services/billiardHalls.js");
         const r = await syncBilliardHalls("recent", Date.now(), { dry: req.query.dry === "1" });
         await recordCronRun("billiard_halls", !r.error, r);
-        return sendSuccess(res, r);
+        return sendSuccess(res, { ...r, festivals: req.query.dry === "1" ? null : await festivalsQuietly() });
     } catch (e) {
         await recordCronRun("billiard_halls", false, { error: errorText(e) });
         return sendError(res, 500, "당구장 인허가 자료를 받지 못했어요");
+    }
+}
+
+// 전국 축제(2026-10-21) — 하루 한 번 목록 + 상세 40곳(services/festivalSync). 크론 항목을 늘리지 않게 새벽 공공자료 받기에 얹는다.
+// 여기서 터져도 당구장 쪽 응답은 깨지 않는다. 실행 기록은 hiq_cron_runs 'festival_sync'
+async function festivalsQuietly(): Promise<unknown> {
+    const { recordCronRun, errorText } = await import("../../storage/cronRuns.js");
+    try {
+        const { syncFestivals } = await import("../../services/festivalSync.js");
+        const r = await syncFestivals({ detailMax: 40 });
+        await recordCronRun("festival_sync", !r.error, r);
+        return r;
+    } catch (e) {
+        console.error("[FestivalSync]", e);
+        await recordCronRun("festival_sync", false, { error: errorText(e) });
+        return { error: true };
     }
 }
 router.get("/billiard-halls", asyncHandler(handleBilliardHalls));

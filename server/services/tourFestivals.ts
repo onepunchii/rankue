@@ -13,6 +13,10 @@ const ymd = (ms: number) => { const d = new Date(ms + 9 * 3600_000); return `${d
 export const kstYmd = (ms = Date.now()) => ymd(ms);
 
 export async function tourFestivals(): Promise<TourFestival[]> {
+    // 2026-10-21: 전국 축제 표(tour_festivals — 하루 한 번 받아 둔 것)를 먼저 읽는다. 표가 비었을 때만 아래처럼 바로 부른다
+    const { allFestivals } = await import("../storage/festivals.js");
+    const stored = await allFestivals();
+    if (stored.length) return stored;
     if (cache && Date.now() - cache.at < TTL) return cache.list;
     if (!inflight) {
         inflight = (async () => {

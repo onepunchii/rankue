@@ -33,6 +33,7 @@ import { HIKING_HERO } from "../theme";
 import { CoachTour } from "@/components/hiq/CoachTour";
 import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
 import { FeaturedPhotos } from "../components/FeaturedPhotos";
+import { FestivalPicks } from "@/festivals/components/FestivalPicks";
 
 const TILT = [-4, 3, -2, 5];
 
@@ -112,6 +113,9 @@ export default function HikingHome() {
 
                         {/* 오늘의 명산(2026-10-21) — 100대 명산의 실제 사진(한국관광공사 · 공공누리). 날마다 다른 여덟 산 */}
                         <FeaturedPhotos />
+
+                        {/* 산행 길에 들를 축제(2026-10-21 — 전국 축제의 등산 줄. 명산 5km 안에서 열리는 축제, 꽃 · 단풍 · 억새 축제가 앞) */}
+                        <FestivalPicks sport="HIKING" />
 
                         <HkSection title="내 산 지도" aside={verified.length ? `깃발 ${s.done.size}개` : "오른 산에 깃발이 꽂혀요"}>
                             <div data-tour="hh-map"><MountainMap mountains={s.famous} done={s.done} /></div>

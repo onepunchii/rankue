@@ -29,6 +29,7 @@ import tournamentsRouter from "./modules/tournaments.js";
 import golfRankRouter from "./modules/golfRank.js";
 import golfCoursesRouter from "./modules/golfCourses.js";
 import hikingRouter from "./modules/hiking.js";
+import festivalsRouter from "./modules/festivals.js";
 import fishingRouter from "./modules/fishing.js";
 import hikingWishesRouter from "./modules/hikingWishes.js";
 import hikingGoalsRouter from "./modules/hikingGoals.js";
@@ -52,6 +53,8 @@ router.use("/golf-courses", golfCoursesRouter);
 // 등산(2026-10-13) — 산 허브 · 목록 · 산 한 곳 · 날씨. 공개 읽기라 로그인 없이 열린다. 당구 · 골프와 따로 선 길이다.
 router.use("/hiking", hikingRouter);
 router.use("/fishing", fishingRouter);
+// 전국 축제(2026-10-21) — 공개 읽기. 축제 목록 · 종목에 맞는 축제 · 축제 한 곳
+router.use("/festivals", festivalsRouter);
 // 가고 싶은 산(2026-10-13) — 같은 주소 아래에 따로 선 작은 라우터(회원만)
 router.use("/hiking", hikingWishesRouter);
 router.use("/hiking", hikingGoalsRouter);

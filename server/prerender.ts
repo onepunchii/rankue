@@ -41,6 +41,7 @@ import { renderBilliardsTerms, type TermsRender } from "./seo/billiardsTerms.js"
 import { renderGolfChecklist } from "./seo/golfGuide.js";
 import { GOLF_STAMPS_RE, renderGolfStamps } from "./seo/golfStamps.js";
 import { HIKING_RE, renderHiking } from "./seo/hiking.js";
+import { FESTIVALS_RE, renderFestivals } from "./seo/festivals.js";
 import { FISHING_SPOTS_RE, renderFishingSpots } from "./seo/fishing.js";
 import { allPlaces, canonicalPlaceId } from "./storage/fishingPlaces.js";
 import { fishingSpotPath } from "../shared/fishingPlaces.js";
@@ -170,6 +171,8 @@ export function hubNav(lang = "ko"): string {
     ...(ko ? [[STAMPS_HUB_PATH, STAMPS_NAV_LABEL] as [string, string]] : []),
     // 등산(2026-10-13) — 전국 명산 허브. 한국어 전용.
     ...(ko ? [[HIKING_HUB_PATH, HIKING_NAV_LABEL] as [string, string]] : []),
+    // 전국 축제(2026-10-21) — 한국어 전용.
+    ...(ko ? [["/festivals", "전국 축제"] as [string, string]] : []),
     // 당구 용어 사전(2026-09-24) — 본문이 한국어 전용이라 한국어 문서에만 건다.
     ...(ko ? [["/billiards/terms", "당구 용어"] as [string, string]] : []),
     // 당구 대회(2026-09-24) — 프리렌더가 한국어 전용(?lang= 무시)이라 한국어 문서에만 건다.
@@ -2123,6 +2126,27 @@ ${list}
       res.status(r.status).send(r.html);
     } catch (e) {
       console.warn("[prerender] fishing:", (e as Error)?.message);
+      next();
+    }
+  });
+
+  // 전국 축제(2026-10-21) — 허브 · 축제 한 곳. 본문은 server/seo/festivals 가 화면과 같은 글(shared/festivals)로 쓴다
+  app.get(FESTIVALS_RE, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    try {
+      const { allFestivals, getFestival } = await import("./storage/festivals.js");
+      const { festivalAround } = await import("./routes/modules/festivals.js");
+      const { kstToday } = await import("../shared/festivals.js");
+      const all = await allFestivals();
+      const today = kstToday();
+      const r = await renderFestivals(req.path, all, today, async (id) => { const f = await getFestival(id); return f ? { f, around: await festivalAround(f, today) } : null; });
+      // 축제 표를 읽었는데 없는 번호면 404(표가 비어서 못 그린 경우는 화면에 맡긴다)
+      if (!r) return all.length && /^\/festivals\/\d+\/?$/.test(req.path) ? sendGone(res, "없는 축제예요", "랭큐 전국 축제에 없는 페이지예요.") : next();
+      noStore(res);
+      res.setHeader("X-Prerender", r.tag);
+      res.status(r.status).send(r.html);
+    } catch (e) {
+      console.warn("[prerender] festivals:", (e as Error)?.message);
       next();
     }
   });

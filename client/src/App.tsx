@@ -258,6 +258,11 @@ function HikingPackRoute() { return <Suspense fallback={hikingFallback}><HikingP
 const HikingAlbum = lazy(() => import("@/hiking/pages/AlbumPage"));
 function HikingAlbumRoute() { return <Suspense fallback={hikingFallback}><HikingAlbum /></Suspense>; }
 function HikingHubRoute() { return <Suspense fallback={hikingFallback}><HikingHub /></Suspense>; }
+// 전국 축제(2026-10-21) — 공개 화면 · 등산의 색(shared/sportRoute). 검색용 화면은 server/seo/festivals, 봇 경로는 vercel.json
+const FestivalsHub = lazy(() => import("@/festivals/pages/FestivalsHub"));
+const FestivalPage = lazy(() => import("@/festivals/pages/FestivalPage"));
+function FestivalsHubRoute() { return <Suspense fallback={hikingFallback}><FestivalsHub /></Suspense>; }
+function FestivalRoute() { return <Suspense fallback={hikingFallback}><FestivalPage /></Suspense>; }
 // 낚시(2026-10-14) — 네 번째 종목의 첫 뼈대. 지금은 운영자에게만 보인다(/me 의 fishingAccess). 검색용 화면 · 사이트맵은 아직 없다
 const FishingPage = lazy(() => import("@/fishing/FishingPage"));
 // 전국 낚시터 공개 화면(2026-10-18) — 누구나(로그인 없이). 검색용 화면은 server/seo/fishing
@@ -499,6 +504,8 @@ function AppRoutes() {
       <Route path="/fishing/rank" component={FishingRankRoute} />
       <Route path="/fishing/gear" component={FishingGearRoute} />
       <Route path="/fishing/tank" component={FishingTankRoute} />
+      <Route path="/festivals" component={FestivalsHubRoute} />
+      <Route path="/festivals/:id" component={FestivalRoute} />
       <Route path="/hiking" component={HikingHubRoute} />
       <Route path="/hiking/regions/:id" component={HikingListRoute} />
       <Route path="/hiking/lists/:id" component={HikingListRoute} />

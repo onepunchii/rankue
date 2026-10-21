@@ -52,6 +52,7 @@ import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi
 import { useMyLocation, type MyLocation } from "../lib/useMyLocation";
 import { TourPhotos } from "@/components/TourPhotos";
 import { festivalDateKo } from "@shared/tourFestivals";
+import { festivalPath } from "@shared/festivals";
 
 const ORIGIN = "https://www.rankue.co.kr";
 /**
@@ -590,8 +591,9 @@ export default function MountainPage() {
                         <ul className="space-y-2" data-testid="mountain-festivals">
                             {d.festivals!.map((f) => (
                                 <li key={f.id}>
-                                    <a href={`https://search.naver.com/search.naver?query=${encodeURIComponent(f.title)}`} target="_blank" rel="noreferrer"
-                                        className="flex items-center gap-3 rounded-2xl px-3.5 py-3 active:opacity-80" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }}>
+                                    {/* 2026-10-21: 네이버 검색 대신 우리 축제 페이지(사진 · 장소 · 시간 · 요금 · 가는 길에 들를 곳) */}
+                                    <Link href={festivalPath(f.id)}
+                                        className="flex items-center gap-3 rounded-2xl px-3.5 py-3 active:opacity-80" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="mountain-festival-link">
                                         <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl text-center leading-none" style={f.state === "now" ? { background: "#F28C6A", color: "#2A1208" } : { background: "#FFFFFF14", color: "#F4EFE3" }}>
                                             <span className="text-[12px] font-semibold">{f.state === "now" ? "진행" : `${Number(f.start.slice(4, 6))}월`}</span>
                                             <span className="mt-0.5 text-[15px] font-semibold tabular-nums">{f.state === "now" ? "중" : Number(f.start.slice(6, 8))}</span>
@@ -601,7 +603,7 @@ export default function MountainPage() {
                                             <span className="mt-0.5 block truncate text-[12.5px] text-[#F4EFE399] tabular-nums">{festivalDateKo(f)} · {f.km < 1 ? "1km 안" : `${f.km.toFixed(f.km < 10 ? 1 : 0)}km`}</span>
                                         </span>
                                         <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
-                                    </a>
+                                    </Link>
                                 </li>
                             ))}
                         </ul>

@@ -51,7 +51,7 @@
       "dest": "/api/index.ts"
     },
     {
-      "src": "/(about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking(?:/country/[^/]+|/movers)?|billiards/terms(?:/[^/]+)?|tournaments(?:/pba/[^/]+(?:/[^/]+)?|/umb/[^/]+)?|pba(?:/records)?|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|golf-ranking|golfer/[^/]+/[^/]+|(?:store|club|r|i)/[^/]+|golf/course/[^/]+|golf/(?:courses|booking|join|urgent)(?:/[^/]+){0,2}|golf/checklist|golf/find/[^/]+(?:/[^/]+)?|golf/terms(?:/[^/]+)?|golf/stamps(?:/[^/]+)?|golf/shelf|hiking(?:/(?:regions|lists|mountains)/[^/]+|/stamps|/pack|/terms(?:/[^/]+)?|/checklist|/abroad(?:/[^/]+)?)?|fishing/(?:spots(?:/(?:region|type)/[^/]+)?|spot/[^/]+|sea(?:/[^/]+)?|port/[^/]+|fish(?:/[^/]+)?|closed))/?",
+      "src": "/(festivals(?:/[0-9]+)?|about|stores(?:/[^/]+)?|support|privacy|account-delete|world-ranking(?:/country/[^/]+|/movers)?|billiards/terms(?:/[^/]+)?|tournaments(?:/pba/[^/]+(?:/[^/]+)?|/umb/[^/]+)?|pba(?:/records)?|pba-player/[^/]+|briefing(?:/[^/]+)?|community(?:/[^/]+)?|player/[^/]+/[^/]+|golf-ranking|golfer/[^/]+/[^/]+|(?:store|club|r|i)/[^/]+|golf/course/[^/]+|golf/(?:courses|booking|join|urgent)(?:/[^/]+){0,2}|golf/checklist|golf/find/[^/]+(?:/[^/]+)?|golf/terms(?:/[^/]+)?|golf/stamps(?:/[^/]+)?|golf/shelf|hiking(?:/(?:regions|lists|mountains)/[^/]+|/stamps|/pack|/terms(?:/[^/]+)?|/checklist|/abroad(?:/[^/]+)?)?|fishing/(?:spots(?:/(?:region|type)/[^/]+)?|spot/[^/]+|sea(?:/[^/]+)?|port/[^/]+|fish(?:/[^/]+)?|closed))/?",
       "has": [
         {
           "type": "header",

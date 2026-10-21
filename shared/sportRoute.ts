@@ -11,7 +11,8 @@ export type RouteSport = "GOLF" | "BILLIARDS" | "HIKING" | "FISHING";
 
 const GOLF_PREFIXES = ["/golf", "/golfer", "/golf-ranking"] as const;
 /** 등산(2026-10-13) — 세 번째 종목. 공개 산 화면과 등산 전용 화면이 다 이 아래에 산다 */
-const HIKING_PREFIXES = ["/hiking"] as const;
+/** 전국 축제(2026-10-21) — 종목이 아니라 '갈 이유'라 등산의 색으로 그린다(입구가 등산 홈 · 산 페이지다) */
+const HIKING_PREFIXES = ["/hiking", "/festivals"] as const;
 /** 낚시(2026-10-14) — 네 번째 종목. 낚시의 화면은 다 이 아래에 산다 */
 const FISHING_PREFIXES = ["/fishing"] as const;
 /** 당구에만 있는 화면. /ranking·/history 같은 공용 화면은 넣지 않는다(골프 모드에서 골프 내용을 그린다). */

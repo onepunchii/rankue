@@ -61,6 +61,7 @@ import { TANK_KEY, placeLocal, readDecorSeen, useMyTank, writeDecorSeen } from "
 import { isNightKst, type TankMode } from "./tank/engine";
 import { DECOR_SLOTS, SLOT_KIND, decorHow, decorImage, decorItem, type CrewTankRow, type DecorSlot, type TankFishRow, type TankView } from "@shared/fishingDecor";
 import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
+import { FestivalPicks } from "@/festivals/components/FestivalPicks";
 
 const KEY = ["/api/hiq/fishing/catches"];
 type Tab = "home" | "trip" | "book" | "log" | "points" | "guide" | "rules" | "rank" | "gear" | "tank";
@@ -294,6 +295,8 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                         {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 낚시 크루 회원 목록 · 조 나누기에 쓴다.
                             지도 먼저(2026-10-14 오너) — 지도 · 오늘의 바다 뒤에 둔다(2026-10-21 화면 확인: 표지 바로 밑이면 지도를 밀어 냈다) */}
                         <div className="px-5 empty:hidden [&:has(>*)]:pt-3"><ProfileNudge sport="FISHING" /></div>
+                        {/* 낚시 축제(2026-10-21 — 전국 축제의 낚시 줄. 산천어 · 송어 · 빙어처럼 이름에 낚시가 든 것만) */}
+                        <FestivalPicks sport="FISHING" />
                         {/* 내 수족관 — 잡은 어종이 헤엄치는 작은 창. 누르면 수족관 */}
                         <FsSection title="내 수족관" aside={<button type="button" onClick={() => setTab("tank")} style={{ color: C.sun }}>수족관 가기</button>} testid="fishing-home-tank">
                             <div data-tour="fs-tank"><FishingAquarium fish={empty ? [] : tankFish} placed={tank?.placed} mini onOpen={() => setTab("tank")} onFish={setFishOpen} /></div>

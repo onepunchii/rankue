@@ -544,11 +544,13 @@ export default function HiqMenu() {
                                 { icon: LucideStamp, label: "어탁첩", desc: "어종마다 한 장 · 짜 승급", onClick: () => setLocation("/fishing/book") },
                                 { icon: LucideHistory, label: "내 조과", desc: "적어 둔 조과 전부", onClick: () => setLocation("/fishing/log") },
                                 { icon: LucideMap, label: "출조", desc: "오늘의 바다 · 물때 · 낚시터", onClick: () => setLocation("/fishing/trip") },
+                                { icon: LucideCalendar, label: "전국 축제", desc: "산천어 · 송어 · 빙어 축제까지", onClick: () => setLocation("/festivals") },
                             ]
                             : []),
                         ...(isHiking
                             ? [
                                 { icon: LucideMap, label: "산 찾기", desc: "전국 명산 · 코스 · 날씨", onClick: () => setLocation("/hiking") },
+                                { icon: LucideCalendar, label: "전국 축제", desc: "축제 지도 · 달력 · 이번 주말", onClick: () => setLocation("/festivals") },
                                 { icon: LucideStamp, label: "내 도장첩", desc: "정상에서 받은 도장 모아 보기", onClick: () => setLocation("/hiking/stamps") },
                                 { icon: LucideMedal, label: "배낭", desc: "산행 등급 · 와펜 · 핀", onClick: () => setLocation("/hiking/pack") },
                                 { icon: LucideCheckCircle, label: "산행 준비물", desc: "철마다 배낭에 넣을 것", onClick: () => setLocation("/hiking/checklist") },
