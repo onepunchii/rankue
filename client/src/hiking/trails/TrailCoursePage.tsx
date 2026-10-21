@@ -94,6 +94,7 @@ export default function TrailCoursePage() {
 
                 <HkSection title="코스 지도" aside="위가 북쪽 · 참고용">
                     <CourseMap courses={courses} index={0} pois={[]} summit={null} here={null} words={{ wide: "앞 · 뒤 코스까지", others: "옅은 선은 앞 · 뒤 코스 — 누르면 그 코스로 가요" }}
+                        extras={(data.spots ?? []).map((sp) => ({ id: sp.id, lat: sp.lat, lng: sp.lng, name: sp.title }))} extrasWord="코스 근처 볼거리"
                         onPick={(i) => { const s = sideOf(courses[i]?.id ?? ""); if (s) setLocation(trailCoursePath(s.route, s.key)); }} />
                     <CourseProfile line={c.line as unknown as LinePoint[]} className="mt-3" />
                 </HkSection>

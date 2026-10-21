@@ -32,9 +32,13 @@ const BTN = "flex h-10 w-10 items-center justify-center rounded-xl text-[20px] l
 const CHIP = "absolute left-2 top-2 h-9 rounded-full px-3 text-[13px] font-medium text-[#0E2A33] active:bg-[#E4DCC8]";
 const FLOAT = { background: "#F4EFE3F2", boxShadow: "0 1px 4px rgba(14,42,51,0.28), inset 0 0 0 1px rgba(14,42,51,0.18)" } as const;
 const FS = 12.5;
-type Label = { key: string; x: number; y: number; dx: number; dy: number; text: string; fill: string; bold?: boolean; opacity?: number; keep?: boolean; center?: boolean };
+/** noFlip: 오른쪽에 안 들어가면 왼쪽으로 옮기지 않고 그리지 않는다(볼거리 — 점에서 멀어진 이름표가 길의 것처럼 보였다) */
+type Label = { key: string; x: number; y: number; dx: number; dy: number; text: string; fill: string; bold?: boolean; opacity?: number; keep?: boolean; center?: boolean; noFlip?: boolean };
 
-export function CourseMap({ courses, index, onPick, pois, summit, here, ask, asking, live, className, words }: {
+/** 볼거리 점의 색(코리아둘레길의 관광지 — 2026-10-21). 길 위의 지점과 섞이지 않는 산호 잉크 */
+const SPOT_INK = "#C2552F";
+
+export function CourseMap({ courses, index, onPick, pois, summit, here, ask, asking, live, className, words, extras = [], extrasWord = "볼거리" }: {
     courses: readonly MountainCourse[];
     /** 고른 코스의 차례 */
     index: number;
@@ -51,6 +55,9 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
     className?: string;
     /** 글 바꾸기 — 코리아둘레길(2026-10-21)은 '산 전체 보기' · '이 산의 다른 코스'가 아니다 */
     words?: { wide?: string; others?: string };
+    /** 길 밖의 점(코리아둘레길 코스 근처 볼거리 — 2026-10-21). 길 위의 지점보다 이름표가 뒤로 밀린다 */
+    extras?: readonly { id: string; lat: number; lng: number; name: string }[];
+    extrasWord?: string;
 }) {
     const at = Math.min(Math.max(index, 0), Math.max(0, courses.length - 1));
     const sel = courses[at];
@@ -99,6 +106,7 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
     // 길 위의 지점 — 고른 코스의 것만. 갈림길은 작은 점, 나머지는 이름표 후보
     const dots = pois.filter((p) => p.courseId === sel.id && COURSE_MAP_DOT_KINDS.includes(p.kind)).map((p) => { const [x, y] = toKmXY(frame, p.lat, p.lng); return { p, x, y }; }).filter((d) => inView(d.x, d.y, 12 * unit));
     const kindsShown = COURSE_MAP_LABEL_KINDS.filter((k) => pois.some((p) => p.courseId === sel.id && p.kind === k));
+    const extraDots = extras.map((e) => { const [x, y] = toKmXY(frame, e.lat, e.lng); return { e, x, y }; }).filter((d) => inView(d.x, d.y, 12 * unit));
     const me = hereOnMap(frame, here);
     const acc = me?.inside && here?.accuracy != null && here.accuracy > 15 && here.accuracy <= 600 ? here.accuracy / 1000 : null;
 
@@ -114,6 +122,7 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
         .sort((a, b) => LABEL_RANK.indexOf(a.p.kind) - LABEL_RANK.indexOf(b.p.kind) || (a.p.km ?? 0) - (b.p.km ?? 0))
         .forEach((d) => labels.push({ key: `poi:${d.p.id}`, x: d.x, y: d.y, dx: 8, dy: 0, text: hikingPoiTitle({ kind: d.p.kind as HikingPoiKind, name: d.p.name, note: d.p.note }).slice(0, 10), fill: INK }));
     if (sxy) rings.forEach((r) => labels.push({ key: `ring:${r}`, x: sxy[0], y: sxy[1] - r, dx: 0, dy: -9, text: `정상에서 ${scaleBarText(r)}`, fill: TEAL, opacity: 0.8, center: true }));
+    extraDots.forEach((d) => labels.push({ key: `extra:${d.e.id}`, x: d.x, y: d.y, dx: 8, dy: 0, text: d.e.name.slice(0, 10), fill: SPOT_INK, noFlip: true }));
     // km 표지 — 넓게 볼 때 서로 붙으면 솎는다(앞의 것에서 22px 안이면 건너뛴다)
     const marks: { km: number; x: number; y: number; px: number; py: number }[] = [];
     for (const m of walk?.marks ?? []) {
@@ -123,7 +132,7 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
     }
     const taken: PxRect[] = [{ x0: 0, y0: 0, x1: 176, y1: 46 }, { x0: W - 58, y0: 0, x1: W, y1: 100 }, { x0: 0, y0: H - 46, x1: 118, y1: H }, { x0: W - 172, y0: H - 56, x1: W, y1: H },
         ...marks.map((m) => ({ x0: m.px - 10, y0: m.py - 10, x1: m.px + 10, y1: m.py + 10 }))];
-    const spots = labels.filter((l) => inView(l.x, l.y)).map((l) => {
+    const spots = labels.filter((l) => inView(l.x, l.y)).filter((l) => !l.noFlip || (l.x - v.x) / unit + l.dx + labelPx(l.text, FS) <= W - 4).map((l) => {
         const w = labelPx(l.text, FS), ax = (l.x - v.x) / unit, py = (l.y - v.y) / unit + l.dy;
         // 오른쪽 끝에서 잘릴 이름표는 점의 왼쪽에 단다
         const px = l.center ? ax - w / 2 : ax + l.dx + w > W - 4 ? ax - l.dx - w : ax + l.dx;
@@ -166,6 +175,10 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
                     {dots.map((d) => (d.p.kind === "SIGN"
                         ? <circle key={d.p.id} cx={d.x} cy={d.y} r={2.4 * unit} fill={POI_COLOR.SIGN} stroke={PAPER} strokeWidth={0.9 * unit} />
                         : <circle key={d.p.id} cx={d.x} cy={d.y} r={4.6 * unit} fill={POI_COLOR[d.p.kind] ?? "#8A979B"} stroke={PAPER} strokeWidth={1.7 * unit} />))}
+                    {/* 길 밖의 볼거리 — 마름모(길 위의 지점은 동그라미) */}
+                    {extraDots.map((d) => (
+                        <rect key={`extra:${d.e.id}`} x={d.x - 3.6 * unit} y={d.y - 3.6 * unit} width={7.2 * unit} height={7.2 * unit} transform={`rotate(45 ${d.x} ${d.y})`} fill={SPOT_INK} stroke={PAPER} strokeWidth={1.5 * unit} data-testid="course-map-extra" />
+                    ))}
                     {/* km 표지 — 길 위의 작은 팻말 */}
                     {marks.map((m) => (
                         <g key={`km${m.km}`} transform={`translate(${m.x} ${m.y}) scale(${unit})`} data-testid="course-map-km">
@@ -259,11 +272,12 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
             {/* 지도 밑 — 내 위치가 지도 밖일 때의 안내, 점의 뜻, 선의 뜻 */}
             {me && !me.inside && me.note && <p className="mt-2 text-[13px] text-[#F6D9A8] break-keep" data-testid="course-map-here-note">{me.note}</p>}
             {me?.inside && !inView(me.x, me.y) && <p className="mt-2 text-[13px] text-[#F6D9A8] break-keep" data-testid="course-map-here-away">{offViewNote(me.x - (v.x + v.w / 2), me.y - (v.y + v.h / 2))}</p>}
-            {kindsShown.length > 0 && (
+            {(kindsShown.length > 0 || extraDots.length > 0) && (
                 <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 px-0.5 text-[12.5px] text-[#F4EFE3B3]" aria-label="점의 뜻">
                     {kindsShown.map((k) => (
                         <li key={k} className="flex items-center gap-1.5 whitespace-nowrap"><span className="h-2.5 w-2.5 rounded-full" style={{ background: POI_COLOR[k], boxShadow: "0 0 0 1.5px #F4EFE3" }} aria-hidden />{HIKING_POI_NAME[k as HikingPoiKind]}</li>
                     ))}
+                    {extraDots.length > 0 && <li className="flex items-center gap-1.5 whitespace-nowrap"><span className="h-2 w-2 rotate-45" style={{ background: SPOT_INK, boxShadow: "0 0 0 1.5px #F4EFE3" }} aria-hidden />{extrasWord}</li>}
                 </ul>
             )}
             {onPick && courses.length > 1 && <p className="mt-1.5 px-0.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{words?.others ?? COURSE_MAP_COPY.others}</p>}

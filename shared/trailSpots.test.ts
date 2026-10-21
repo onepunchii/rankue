@@ -41,3 +41,13 @@ describe("코스 근처 볼거리 고르기", () => {
         expect(Object.values(file.spots).filter((x) => x.length).length).toBeGreaterThan(100);
     });
 });
+
+describe("코스 지도의 볼거리 점", () => {
+    it("마름모 점 · 이름표는 오른쪽에 들어갈 때만(점에서 멀어진 이름표가 길의 것처럼 보였다) · 점의 뜻에 '코스 근처 볼거리'", () => {
+        const map = read("client/src/hiking/components/CourseMap.tsx");
+        expect(map).toContain('data-testid="course-map-extra"');
+        expect(map).toContain("noFlip: true");
+        expect(map).toContain(".filter((l) => !l.noFlip || (l.x - v.x) / unit + l.dx + labelPx(l.text, FS) <= W - 4)");
+        expect(read("client/src/hiking/trails/TrailCoursePage.tsx")).toContain('extrasWord="코스 근처 볼거리"');
+    });
+});
