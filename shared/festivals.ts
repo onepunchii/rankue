@@ -222,6 +222,22 @@ export function festivalFromTour(x: Record<string, unknown>): (FestivalRow & { t
     };
 }
 
+/**
+ * 축제 날 날씨(2026-10-21) — 기상청 예보(오늘부터 열하루, server/services/golfWeather 를 그대로)에서 축제 기간과 겹치는 날만, 일곱 날까지.
+ * 하루의 하늘은 비 · 눈이 낀 반나절이 있으면 그것, 아니면 낮(오후)의 하늘. 예보 칸은 'YYYY-MM-DD'.
+ */
+export interface FestivalWxDay { date: string; kind: string; pop: number | null; tmn: number | null; tmx: number | null; src: "short" | "mid" }
+export function festivalWeatherDays(days: readonly { date: string; src: "short" | "mid"; am: { kind: string; pop: number | null } | null; pm: { kind: string; pop: number | null } | null; tmn: number | null; tmx: number | null }[], f: Pick<FestivalRow, "start" | "end">): FestivalWxDay[] {
+    const wet = new Set(["shower", "rain", "sleet", "snow"]);
+    const ymd = (d: string) => d.replace(/-/g, "");
+    return days.filter((d) => ymd(d.date) >= f.start && ymd(d.date) <= f.end).slice(0, 7).map((d) => {
+        const halves = [d.am, d.pm].filter((x): x is { kind: string; pop: number | null } => !!x);
+        const pick = halves.find((x) => wet.has(x.kind)) ?? d.pm ?? d.am;
+        const pops = halves.map((x) => x.pop).filter((x): x is number => x != null);
+        return { date: d.date, kind: pick?.kind ?? "clear", pop: pops.length ? Math.max(...pops) : null, tmn: d.tmn, tmx: d.tmx, src: d.src };
+    });
+}
+
 /** 축제 카드(1200 정사각 · server/services/festivalCard)의 글 — 이름 · 기간(해까지) · 지역 · 장소 · 알약(열림 · D-day, 끝났으면 없음) */
 export function festivalCardInput(f: FestivalRow & { place?: string | null }, today: string): { title: string; period: string; place: string; tag: string | null; live: boolean } {
     const st = festivalState(f, today);

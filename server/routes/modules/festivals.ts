@@ -9,7 +9,8 @@ import { allFestivals, getFestival, golfPoints } from "../../storage/festivals.j
 import { allMountains } from "../../storage/hiking.js";
 import { allPlaces } from "../../storage/fishingPlaces.js";
 import { MOUNTAIN_TOUR_PHOTOS } from "../../data/mountainTourPhotos.js";
-import { FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, festivalKm, kstToday, liveFestivals, type FestivalRow } from "../../../shared/festivals.js";
+import { FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, addDays, festivalKm, festivalWeatherDays, kstToday, liveFestivals, type FestivalRow } from "../../../shared/festivals.js";
+import { getCourseWeather } from "../../services/golfWeather.js";
 
 const router = Router();
 const PUBLIC_CACHE = "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400";
@@ -87,6 +88,20 @@ router.get("/layer", asyncHandler(async (req, res) => {
     else return sendError(res, 400, "종목을 골라 주세요");
     res.set("Cache-Control", PUBLIC_CACHE);
     return sendSuccess(res, { items });
+}));
+
+/**
+ * 축제 날 날씨(2026-10-21) — 축제 자리의 기상청 예보(골프장 · 산과 같은 격자 저장 · 같은 셈)에서 축제 기간과 겹치는 날만.
+ * 끝났거나 열하루 뒤에 여는 축제는 부르지 않는다(빈 답). 못 받으면 빈 답 — 화면은 그 칸을 그리지 않는다.
+ */
+router.get("/:id/weather", asyncHandler(async (req, res) => {
+    const f = await getFestival(String(req.params.id));
+    if (!f) return sendError(res, 404, "없는 축제예요");
+    const today = kstToday();
+    if (f.end < today || f.start > addDays(today, 10)) { res.set("Cache-Control", PUBLIC_CACHE); return sendSuccess(res, { days: [], area: null }); }
+    const wx = await getCourseWeather({ lat: f.lat, lng: f.lng }, { fetch: true }).catch((e) => { console.error("[FestivalWeather]", e); return null; });
+    res.set("Cache-Control", wx ? "public, max-age=300, s-maxage=900, stale-while-revalidate=3600" : "no-store");
+    return sendSuccess(res, { days: wx ? festivalWeatherDays(wx.days, f) : [], area: wx?.midArea ?? null });
 }));
 
 router.get("/:id", asyncHandler(async (req, res) => {

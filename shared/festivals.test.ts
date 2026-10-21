@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    FESTIVALS_PATH, festivalsSportPath, festivalSportPath, festivalCardInput, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
+    FESTIVALS_PATH, festivalsSportPath, festivalSportPath, festivalCardInput, festivalWeatherDays, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
     liveFestivals, overlaps, thisWeekend, tourHomepage, weekdayKo, FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, type FestivalRow,
 } from "./festivals";
 import { sportForPath } from "./sportRoute";
@@ -126,6 +126,17 @@ describe("종목마다의 축제 화면(2026-10-21 오너: 낚시에서 누르�
         expect(r.indexOf('router.get("/layer"')).toBeLessThan(r.indexOf('router.get("/:id"'));
         expect(r).toContain('if (sport === "GOLF") {');
         expect(read("client/src/golf/pages/Dashboard.tsx")).toContain('<FestivalPicks sport="GOLF" golfHome />');
+    });
+});
+
+describe("축제 날 날씨", () => {
+    it("축제 기간과 겹치는 날만 · 일곱 날까지 · 비 낀 반나절이 이긴다 · 강수확률은 큰 쪽", () => {
+        const day = (date: string, am: string, pm: string, pa = 10, pp = 20) => ({ date, src: "short" as const, am: { kind: am, pop: pa }, pm: { kind: pm, pop: pp }, tmn: 5, tmx: 15 });
+        const out = festivalWeatherDays([day("2026-10-22", "clear", "clear"), day("2026-10-23", "rain", "cloudy", 70, 40), day("2026-10-24", "partly", "clear"), day("2026-10-26", "clear", "clear")], { start: "20261023", end: "20261025" });
+        expect(out.map((d) => d.date)).toEqual(["2026-10-23", "2026-10-24"]);
+        expect(out[0]).toMatchObject({ kind: "rain", pop: 70 });
+        expect(out[1]).toMatchObject({ kind: "clear", pop: 20 });
+        expect(read("server/routes/modules/festivals.ts")).toContain('router.get("/:id/weather"');
     });
 });
 

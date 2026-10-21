@@ -15,8 +15,10 @@ import { useSeo } from "@/hooks/useSeo";
 import { LucideChevronRight, LucideGlobe, LucideNavigation, LucidePhone, LucideShare2 } from "@/lib/icons";
 import { useToast } from "@/hooks/use-toast";
 import { festivalCardUrl } from "@shared/ogCards";
+import { WX_LABEL, type WxKind } from "@shared/golfWeather";
+import { WxIcon, WX_RAIN } from "@/golf/components/course/TeeWx";
 import { canOpenInApp, openInAppBrowser } from "@/lib/openOutside";
-import { FESTIVAL_CREDIT, FESTIVAL_SOURCE, festivalPath, festivalCatName, festivalPeriod, festivalPhotoCredit, festivalSeo, festivalSportPath, festivalState, type FestivalSport } from "@shared/festivals";
+import { FESTIVAL_CREDIT, FESTIVAL_SOURCE, addDays, weekdayKo, festivalPath, festivalCatName, type FestivalWxDay, festivalPeriod, festivalPhotoCredit, festivalSeo, festivalSportPath, festivalState, type FestivalSport } from "@shared/festivals";
 import { hikingMountainPath } from "@shared/hikingMountains";
 import { coursePath } from "@shared/golfCourse";
 import { fishingSpotPath } from "@shared/fishingPlaces";
@@ -135,6 +137,10 @@ export default function FestivalPage() {
     const { data, isLoading, isError } = useQuery<FestivalData>({ queryKey: festivalKey(id), enabled: !!id, staleTime: 10 * 60_000, retry: 1 });
     const [open, setOpen] = useState(false);
     const f = data?.festival, around = data?.around, today = data?.today ?? "";
+    // 축제 날 날씨 — 열려 있거나 열하루 안에 여는 축제만 부른다(서버도 같은 판단)
+    const wxOn = !!f && !!today && f.end >= today && f.start <= addDays(today, 10);
+    const wxQ = useQuery<{ days: FestivalWxDay[]; area: string | null }>({ queryKey: [`/api/hiq/festivals/${encodeURIComponent(id)}/weather`], enabled: wxOn, staleTime: 10 * 60_000, retry: 0 });
+    const wxDays = wxOn && Array.isArray(wxQ.data?.days) ? wxQ.data!.days : [];
     const seo = f && around ? festivalSeo(f, { mountains: around.mountains.length, golf: around.golf.length, fishing: around.fishing.length }) : null;
     useSeo(seo && f ? { title: seo.title, description: seo.desc, path: seo.path, image: festivalCardUrl(ORIGIN, f.id) } : null);
     const { toast } = useToast();
@@ -218,6 +224,26 @@ export default function FestivalPage() {
                         )}
                     </div>
                 </header>
+
+                {wxDays.length > 0 && (
+                    <FestSection title="축제 날 날씨" aside={wxQ.data?.area ? `기상청 · ${wxQ.data.area}` : "기상청 예보"} testId="festival-weather">
+                        <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                            {wxDays.map((d) => {
+                                const ymd = d.date.replace(/-/g, ""), wd = weekdayKo(ymd), weekend = wd === "토" || wd === "일";
+                                return (
+                                    <div key={d.date} className="w-[74px] shrink-0 rounded-2xl px-1.5 py-3 text-center" style={{ background: weekend ? `${t.accent}1F` : "#FFFFFF0A", boxShadow: ymd === today ? `inset 0 0 0 1.5px ${t.accent}` : undefined }}>
+                                        <div className="text-[12.5px] font-medium" style={{ color: weekend ? t.soon : `${t.text}B3` }}>{ymd === today ? "오늘" : `${wd} ${Number(ymd.slice(6, 8))}일`}</div>
+                                        <WxIcon kind={d.kind as WxKind} className="mx-auto mt-2 h-7 w-7" />
+                                        <div className="mt-1.5 text-[12.5px]" style={{ color: `${t.text}CC` }}>{WX_LABEL[d.kind as WxKind] ?? ""}</div>
+                                        {d.tmx != null && <div className="mt-1 text-[14px] font-semibold tabular-nums" style={{ color: t.text }}>{Math.round(d.tmx)}°<span className="ml-1 text-[12.5px] font-normal" style={{ color: `${t.text}80` }}>{d.tmn != null ? `${Math.round(d.tmn)}°` : ""}</span></div>}
+                                        {d.pop != null && d.pop >= 30 && <div className="mt-0.5 text-[12px] font-medium tabular-nums" style={{ color: WX_RAIN }}>비 {d.pop}%</div>}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                        <p className="mt-2 text-[12px]" style={{ color: `${t.text}66` }}>앞 사흘은 축제 자리의 예보, 그 뒤는 넓은 지역 예보예요{f.end > wxDays[wxDays.length - 1].date.replace(/-/g, "") ? " · 남은 날은 예보가 나오면 채워져요" : ""}</p>
+                    </FestSection>
+                )}
 
                 <FestSection title="축제 정보">
                     <dl className="divide-y divide-[#FFFFFF12] rounded-2xl bg-[#FFFFFF08] px-4" style={{ boxShadow: "inset 0 0 0 1px #FFFFFF12" }} data-testid="festival-facts">
