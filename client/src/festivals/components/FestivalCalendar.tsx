@@ -6,13 +6,15 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "wouter";
-import { festivalPath, festivalState, overlaps, weekdayKo, type FestivalRow } from "@shared/festivals";
+import { festivalState, overlaps, weekdayKo, type FestivalRow } from "@shared/festivals";
+import { useFestTheme } from "../theme";
 
 const nextMonth = (ym: string) => { const y = Number(ym.slice(0, 4)), m = Number(ym.slice(4, 6)); return m === 12 ? `${y + 1}01` : `${y}${String(m + 1).padStart(2, "0")}`; };
 const daysIn = (ym: string) => new Date(Date.UTC(Number(ym.slice(0, 4)), Number(ym.slice(4, 6)), 0)).getUTCDate();
 const SHOW = 12;
 
 export function FestivalCalendar({ items, today }: { items: readonly FestivalRow[]; today: string }) {
+    const t = useFestTheme();
     const thisMonth = today.slice(0, 6);
     const months = useMemo(() => {
         const set = new Set<string>([thisMonth]);
@@ -54,7 +56,7 @@ export function FestivalCalendar({ items, today }: { items: readonly FestivalRow
                     return (
                         <button key={m} type="button" data-month={m} onClick={() => setMonth(m)} aria-pressed={on}
                             className="h-9 shrink-0 rounded-full px-3.5 text-[13.5px] font-medium tabular-nums active:opacity-80"
-                            style={on ? { background: "#F4EFE3", color: "#0B1F26" } : { background: "#FFFFFF0F", color: "#F4EFE3CC" }}>
+                            style={on ? { background: t.text, color: t.bg } : { background: "#FFFFFF0F", color: `${t.text}CC` }}>
                             {label}{m === thisMonth ? " · 이번 달" : ""}
                         </button>
                     );
@@ -62,30 +64,30 @@ export function FestivalCalendar({ items, today }: { items: readonly FestivalRow
             </div>
 
             {rows.length === 0 ? (
-                <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-6 text-center text-[14px] text-[#F4EFE399]">이 달에 열리는 축제가 아직 없어요</p>
+                <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-6 text-center text-[14px]" style={{ color: `${t.text}99` }}>이 달에 열리는 축제가 아직 없어요</p>
             ) : (
                 <div className="rounded-2xl bg-[#FFFFFF08] px-3.5 pb-2 pt-3" style={{ boxShadow: "inset 0 0 0 1px #FFFFFF12" }}>
                     {/* 날짜 눈금 */}
-                    <div className="relative mb-1 h-5 text-[12px] tabular-nums text-[#F4EFE380]">
+                    <div className="relative mb-1 h-5 text-[12px] tabular-nums" style={{ color: `${t.text}80` }}>
                         {ticks.map((d) => <span key={d} className="absolute -translate-x-1/2" style={{ left: `${((d - 0.5) / n) * 100}%` }}>{d}</span>)}
                     </div>
                     <div className="relative">
                         {/* 주말 칸 · 오늘 줄 */}
                         <div className="pointer-events-none absolute inset-0" aria-hidden>
-                            {weekends.map((d) => <span key={d} className="absolute inset-y-0 bg-[#F4EFE30A]" style={{ left: `${((d - 1) / n) * 100}%`, width: `${100 / n}%` }} />)}
-                            {todayPct != null && <span className="absolute inset-y-0 w-[1.5px] bg-[#F28C6A]" style={{ left: `${todayPct}%`, boxShadow: "0 0 6px #F28C6A" }} />}
+                            {weekends.map((d) => <span key={d} className="absolute inset-y-0" style={{ left: `${((d - 1) / n) * 100}%`, width: `${100 / n}%`, background: `${t.text}0A` }} />)}
+                            {todayPct != null && <span className="absolute inset-y-0 w-[1.5px]" style={{ left: `${todayPct}%`, background: t.accent, boxShadow: `0 0 6px ${t.accent}` }} />}
                         </div>
                         <ul className="relative">
                             {shown.map((f) => {
                                 const st = festivalState(f, today).state;
                                 const left = pct(f.start, "start"), right = pct(f.end, "end");
-                                const bar = st === "now" ? "linear-gradient(90deg,#F28C6A,#F6B08F)" : st === "soon" ? "#F6D9A8CC" : "#F4EFE340";
+                                const bar = st === "now" ? `linear-gradient(90deg,${t.accent},${t.glow})` : st === "soon" ? `${t.soon}CC` : `${t.text}40`;
                                 return (
                                     <li key={f.id}>
-                                        <Link href={festivalPath(f.id)} className="block py-1.5 active:opacity-70" data-testid="festival-calendar-row">
+                                        <Link href={t.item(f.id)} className="block py-1.5 active:opacity-70" data-testid="festival-calendar-row">
                                             <span className="flex items-baseline justify-between gap-2">
-                                                <span className={`truncate text-[13.5px] ${st === "ended" ? "text-[#F4EFE399]" : "text-[#F4EFE3]"}`}>{f.title}</span>
-                                                <span className="shrink-0 text-[12px] text-[#F4EFE380]">{f.region}</span>
+                                                <span className="truncate text-[13.5px]" style={{ color: st === "ended" ? `${t.text}99` : t.text }}>{f.title}</span>
+                                                <span className="shrink-0 text-[12px]" style={{ color: `${t.text}80` }}>{f.region}</span>
                                             </span>
                                             <span className="relative mt-1 block h-[7px]">
                                                 <span className="absolute inset-y-0" style={{ left: `${left}%`, width: `${Math.max(right - left, 100 / n)}%`, background: bar, borderRadius: `${f.start < from ? 0 : 99}px ${f.end > to ? 0 : 99}px ${f.end > to ? 0 : 99}px ${f.start < from ? 0 : 99}px` }} />
@@ -97,13 +99,13 @@ export function FestivalCalendar({ items, today }: { items: readonly FestivalRow
                         </ul>
                     </div>
                     {rows.length > SHOW && (
-                        <button type="button" onClick={() => setMore((v) => !v)} className="mt-1 h-10 w-full rounded-xl text-[13.5px] font-medium text-[#F6D9A8] active:bg-[#FFFFFF0A]">
+                        <button type="button" onClick={() => setMore((v) => !v)} className="mt-1 h-10 w-full rounded-xl text-[13.5px] font-medium active:bg-[#FFFFFF0A]" style={{ color: t.soon }}>
                             {more ? "접기" : `${rows.length - SHOW}곳 더 보기`}
                         </button>
                     )}
                 </div>
             )}
-            <p className="mt-2 text-[12px] text-[#F4EFE366]">옅은 칸은 주말 · 산호색 줄은 오늘 — 지난 달은 올해 열린 날짜예요</p>
+            <p className="mt-2 text-[12px]" style={{ color: `${t.text}66` }}>옅은 칸은 주말 · 밝은 세로줄은 오늘 — 지난 달은 올해 열린 날짜예요</p>
         </div>
     );
 }

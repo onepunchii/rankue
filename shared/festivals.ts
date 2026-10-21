@@ -9,8 +9,18 @@
  */
 import { shortenAddress } from "./billiardHalls.js";
 
+/** 검색용 정본 주소 — 종목마다의 화면(아래)은 정본을 이 주소로 둔다(같은 글이 세 주소로 색인되지 않게) */
 export const FESTIVALS_PATH = "/festivals";
 export const festivalPath = (id: string) => `/festivals/${encodeURIComponent(id)}`;
+
+/**
+ * 종목마다의 축제 화면(2026-10-21 오너: "낚시에서 전국축제 누르면 등산으로 가잖아 … 골프 등산 낚시에 각각 … 골프도 축제가 중요해").
+ * 자료는 하나, 화면은 종목의 색 · 하단 탭 안에서 — /golf/festivals · /hiking/festivals · /fishing/festivals(+ /:id).
+ */
+export type FestivalSport = "GOLF" | "HIKING" | "FISHING";
+export const FESTIVAL_SPORTS: readonly FestivalSport[] = ["GOLF", "HIKING", "FISHING"];
+export const festivalsSportPath = (sport: FestivalSport) => `/${sport.toLowerCase()}/festivals`;
+export const festivalSportPath = (sport: FestivalSport, id: string) => `${festivalsSportPath(sport)}/${encodeURIComponent(id)}`;
 export const FESTIVAL_SOURCE = "한국관광공사";
 export const FESTIVAL_CREDIT = "자료 · 사진 한국관광공사 · 공공누리 제3유형";
 export const festivalPhotoCredit = (lic: string | null | undefined) => `사진 한국관광공사 · 공공누리 제${lic === "Type1" ? 1 : 3}유형`;

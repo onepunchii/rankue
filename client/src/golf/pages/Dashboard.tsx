@@ -31,6 +31,7 @@ import { StampHomeEntry } from "../stamps/StampHomeEntry";
 import { useGolfMatch } from "../hooks/useGolfMatch";
 import { useGolfStats } from "../hooks/useGolfStats";
 import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
+import { FestivalPicks } from "@/festivals/components/FestivalPicks";
 
 export default function GolfDashboard() {
     const queryClient = useQueryClient();
@@ -137,6 +138,9 @@ export default function GolfDashboard() {
 
             {/* 전국 골프장(2026-09-24) — 골프장 목록·지역·부킹/조인/긴급 허브의 입구 */}
             <div data-tour="gh-courses"><CourseHomeEntry /></div>
+
+            {/* 라운드 길에 들를 축제(2026-10-21 오너: "골프도 축제가 중요해 — 동강시스타 갔는데 메밀축제 하길래 정보가 더 있었으면") — 골프장 10km 안의 축제. 없으면 칸이 없다 */}
+            <FestivalPicks sport="GOLF" golfHome />
 
             {/* Dashboard Widgets */}
             <StatsChart

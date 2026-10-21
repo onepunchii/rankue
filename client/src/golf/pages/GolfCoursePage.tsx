@@ -320,8 +320,8 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             {ids.includes("food") && <NearbyPlaces key={`food:${d.slug}`} slug={d.slug} name={d.name} region={d.region} city={d.city} round={round} />}
             {/* 이 근처 축제(2026-10-21 전국 축제 — 종목별) — 먹거리 다음(라운드 끝나고 들를 곳). 없으면 칸이 없다 */}
             {(d.festivals?.length ?? 0) > 0 && (
-                <Section key={`fest:${d.slug}`} title="이 근처 축제" aside={<span className="text-[12.5px] text-[#FFFFFF80]">20km 안</span>}>
-                    <NearbyFestivalList items={d.festivals!} tone={GOLF_FESTIVAL_TONE} />
+                <Section key={`fest:${d.slug}`} title="이 근처 축제" aside={<span className="text-[12.5px] text-[#FFFFFF80]">50km 안</span>}>
+                    <NearbyFestivalList items={d.festivals!} tone={GOLF_FESTIVAL_TONE} sport="GOLF" />
                 </Section>
             )}
 

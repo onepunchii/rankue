@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    FESTIVALS_PATH, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
+    FESTIVALS_PATH, festivalsSportPath, festivalSportPath, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
     liveFestivals, overlaps, thisWeekend, tourHomepage, weekdayKo, FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, type FestivalRow,
 } from "./festivals";
 import { sportForPath } from "./sportRoute";
@@ -97,6 +97,38 @@ describe("전국 축제 — 규칙", () => {
     });
 });
 
+describe("종목마다의 축제 화면(2026-10-21 오너: 낚시에서 누르면 등산으로 가잖아 — 골프 · 등산 · 낚시 각각)", () => {
+    it("주소: /golf · /hiking · /fishing 아래 — 주소가 종목의 색 · 하단 탭을 정한다, 정본은 /festivals", () => {
+        expect(festivalsSportPath("GOLF")).toBe("/golf/festivals");
+        expect(festivalSportPath("FISHING", "507599")).toBe("/fishing/festivals/507599");
+        expect(sportForPath("/golf/festivals")).toBe("GOLF");
+        expect(sportForPath("/fishing/festivals/507599")).toBe("FISHING");
+        expect(sportForPath("/hiking/festivals")).toBe("HIKING");
+        const app = read("client/src/App.tsx");
+        for (const sp of ["golf", "hiking", "fishing"]) for (const p of [`/${sp}/festivals`, `/${sp}/festivals/:id`]) expect(app).toContain(`<Route path="${p}"`);
+        // 정본 — 종목 화면도 useSeo 의 path 는 /festivals(검색용 화면 하나만 색인)
+        expect(read("client/src/festivals/pages/FestivalsHub.tsx")).toContain("useSeo(data ? { title: seo.title, description: seo.desc, path: seo.path } : null);");
+        expect(festivalSeo(row({ id: "9" }), { mountains: 0, golf: 0, fishing: 0 }).path).toBe("/festivals/9");
+    });
+    it("종목마다 색 · 표지 · 지도 밑의 점 · 가는 길의 순서가 다르다", async () => {
+        const th = read("client/src/festivals/theme.tsx");
+        for (const hero of ["/festivals/art/hero.webp", "/festivals/art/hero-golf.webp", "/festivals/art/hero-fishing.webp"]) expect(th).toContain(hero);
+        expect(th).toContain('aroundOrder: ["golf", "mountain", "fishing"]');
+        expect(th).toContain('aroundOrder: ["fishing", "mountain", "golf"]');
+        expect(th).toContain('picksTitle: "라운드 길에 들를 축제"');
+        // 축제 줄이 틀을 끌고 오지 않게 — 틀은 FestShell 에만
+        expect(th).not.toContain("HikingShell");
+        expect(th).not.toContain("CourseShell");
+        expect(read("client/src/festivals/FestShell.tsx")).toContain("CourseShell");
+        // 종목의 자리(지도 밑) · 골프 축제 줄
+        const r = read("server/routes/modules/festivals.ts");
+        expect(r.indexOf('router.get("/layer"')).toBeGreaterThan(0);
+        expect(r.indexOf('router.get("/layer"')).toBeLessThan(r.indexOf('router.get("/:id"'));
+        expect(r).toContain('if (sport === "GOLF") {');
+        expect(read("client/src/golf/pages/Dashboard.tsx")).toContain('<FestivalPicks sport="GOLF" golfHome />');
+    });
+});
+
 describe("전국 축제 — 이어 붙인 곳", () => {
     it("주소 · 색: /festivals 는 등산의 색 · 앱 라우트 · 메뉴", () => {
         expect(FESTIVALS_PATH).toBe("/festivals");
@@ -105,7 +137,7 @@ describe("전국 축제 — 이어 붙인 곳", () => {
         expect(sportForPath("/festivals/825295")).toBe("HIKING");
         const app = read("client/src/App.tsx");
         for (const p of ["/festivals", "/festivals/:id"]) expect(app).toContain(`<Route path="${p}"`);
-        expect(read("client/src/pages/hiq/menu.tsx")).toContain('setLocation("/festivals")');
+        for (const sp of ["golf", "hiking", "fishing"]) expect(read("client/src/pages/hiq/menu.tsx")).toContain(`setLocation("/${sp}/festivals")`);
     });
     it("서버: 공개 라우터 · 검색용 화면 · 봇 경로 · 사이트맵 · 매일 받기", () => {
         expect(read("server/routes/index.ts")).toContain('router.use("/festivals", festivalsRouter);');
@@ -126,18 +158,20 @@ describe("전국 축제 — 이어 붙인 곳", () => {
         expect(read("client/src/festivals/pages/FestivalPage.tsx")).toContain("festivalPhotoCredit(f.lic)");
         // 허브 표지만 object-cover — 우리가 만든 그림이다
         expect(read("client/src/festivals/pages/FestivalsHub.tsx").match(/object-cover/g)?.length).toBe(1);
-        expect(read("client/src/festivals/pages/FestivalsHub.tsx")).toContain("src={FESTIVAL_HERO}");
+        expect(read("client/src/festivals/pages/FestivalsHub.tsx")).toContain("src={t.hero}");
     });
     it("골프장 · 낚시터 페이지에도 이 근처 축제(종목별) — 서버가 산 페이지와 같은 셈으로 싣고, 화면은 우리 축제 페이지로 잇는다", () => {
         expect(read("server/routes/modules/golfCourses.ts")).toContain("festivals: p.lat != null && p.lng != null ? nearbyFestivals(await tourFestivals()");
         expect(read("server/routes/modules/fishing.ts")).toContain("nearbyFestivals(await tourFestivals().catch(() => []), place.lat, place.lng, kstYmd())");
-        expect(read("client/src/golf/pages/GolfCoursePage.tsx")).toContain("<NearbyFestivalList items={d.festivals!} tone={GOLF_FESTIVAL_TONE} />");
-        expect(read("client/src/fishing/spots/SpotsPages.tsx")).toContain("<NearbyFestivalList items={data!.festivals!} tone={FISHING_FESTIVAL_TONE} />");
-        expect(read("client/src/festivals/components/NearbyFestivalList.tsx")).toContain("href={festivalPath(f.id)}");
+        expect(read("client/src/golf/pages/GolfCoursePage.tsx")).toContain('<NearbyFestivalList items={d.festivals!} tone={GOLF_FESTIVAL_TONE} sport="GOLF" />');
+        expect(read("client/src/fishing/spots/SpotsPages.tsx")).toContain('<NearbyFestivalList items={data!.festivals!} tone={FISHING_FESTIVAL_TONE} sport="FISHING" />');
+        expect(read("client/src/festivals/components/NearbyFestivalList.tsx")).toContain("href={festivalSportPath(sport, f.id)}");
+        // 골프는 차로 간다 — 50km(오너: 동강시스타에서 본 메밀 축제, 봉평 효석문화제가 46km)
+        expect(read("server/routes/modules/golfCourses.ts")).toContain("kstYmd(), 50, 45, 4)");
     });
     it("산 페이지의 근처 축제는 우리 축제 페이지로 잇는다", () => {
         const c = read("client/src/hiking/pages/MountainPage.tsx");
-        expect(c).toContain("href={festivalPath(f.id)}");
+        expect(c).toContain('href={festivalSportPath("HIKING", f.id)}');
         expect(c).not.toContain("search.naver.com/search.naver?query=${encodeURIComponent(f.title)}");
     });
 });

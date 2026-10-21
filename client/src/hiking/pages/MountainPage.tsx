@@ -52,7 +52,7 @@ import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi
 import { useMyLocation, type MyLocation } from "../lib/useMyLocation";
 import { TourPhotos } from "@/components/TourPhotos";
 import { festivalDateKo } from "@shared/tourFestivals";
-import { festivalPath } from "@shared/festivals";
+import { festivalSportPath } from "@shared/festivals";
 
 const ORIGIN = "https://www.rankue.co.kr";
 /**
@@ -592,7 +592,7 @@ export default function MountainPage() {
                             {d.festivals!.map((f) => (
                                 <li key={f.id}>
                                     {/* 2026-10-21: 네이버 검색 대신 우리 축제 페이지(사진 · 장소 · 시간 · 요금 · 가는 길에 들를 곳) */}
-                                    <Link href={festivalPath(f.id)}
+                                    <Link href={festivalSportPath("HIKING", f.id)}
                                         className="flex items-center gap-3 rounded-2xl px-3.5 py-3 active:opacity-80" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="mountain-festival-link">
                                         <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl text-center leading-none" style={f.state === "now" ? { background: "#F28C6A", color: "#2A1208" } : { background: "#FFFFFF14", color: "#F4EFE3" }}>
                                             <span className="text-[12px] font-semibold">{f.state === "now" ? "진행" : `${Number(f.start.slice(4, 6))}월`}</span>

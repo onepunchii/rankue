@@ -506,6 +506,13 @@ function AppRoutes() {
       <Route path="/fishing/tank" component={FishingTankRoute} />
       <Route path="/festivals" component={FestivalsHubRoute} />
       <Route path="/festivals/:id" component={FestivalRoute} />
+      {/* 종목마다의 축제 화면(2026-10-21 오너: "낚시에서 전국축제 누르면 등산으로 가잖아") — 같은 화면, 종목의 색 · 하단 탭 */}
+      <Route path="/golf/festivals" component={FestivalsHubRoute} />
+      <Route path="/golf/festivals/:id" component={FestivalRoute} />
+      <Route path="/hiking/festivals" component={FestivalsHubRoute} />
+      <Route path="/hiking/festivals/:id" component={FestivalRoute} />
+      <Route path="/fishing/festivals" component={FestivalsHubRoute} />
+      <Route path="/fishing/festivals/:id" component={FestivalRoute} />
       <Route path="/hiking" component={HikingHubRoute} />
       <Route path="/hiking/regions/:id" component={HikingListRoute} />
       <Route path="/hiking/lists/:id" component={HikingListRoute} />

@@ -11,6 +11,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { KOREA_MAP_PATHS } from "@/golf/data/koreaMapData";
 import { latLngToOutline } from "@/golf/lib/koreaOutline";
 import { festivalState, type FestivalRow, type FestivalState } from "@shared/festivals";
+import { useFestTheme, type FestLayerKind } from "../theme";
 
 interface Box { x: number; y: number; w: number; h: number }
 /** 가로:세로 = 4:5 */
@@ -41,9 +42,9 @@ const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 const ORDER: Record<FestivalState, number> = { ended: 0, soon: 1, now: 2 };
 /** 숨쉬기를 등불마다 어긋나게 — 번호로 정하는 늦춤(새로 그려도 같다) */
 const delayOf = (id: string) => { let h = 0; for (const c of id) h = (h * 31 + c.charCodeAt(0)) % 2600; return h; };
-const MARK_COLOR: Record<LanternMark["kind"], string> = { mountain: "#F6D9A8", golf: "#8FD3A7", fishing: "#8EC5FF" };
+const MARK_COLOR: Record<FestLayerKind, string> = { mountain: "#F6D9A8", golf: "#8FD3A7", fishing: "#8EC5FF" };
 
-export function LanternMap({ items, today, region = null, picked = null, onPick, focus, marks = [], className, label = "전국 축제 지도" }: {
+export function LanternMap({ items, today, region = null, picked = null, onPick, focus, marks = [], layer = [], className, label = "전국 축제 지도" }: {
     items: readonly FestivalRow[];
     today: string;
     /** 고른 시도 — 그 시도로 당겨 들어간다 */
@@ -54,9 +55,12 @@ export function LanternMap({ items, today, region = null, picked = null, onPick,
     focus?: { lat: number; lng: number } | null;
     /** 같이 놓을 곳(가는 길에 들를 산 · 골프장 · 낚시터) */
     marks?: readonly LanternMark[];
+    /** 등불 밑에 옅게 깔리는 종목의 자리(골프장 · 명산 · 낚시터) — 종목마다 다른 지도로 보이게 */
+    layer?: readonly { lat: number; lng: number }[];
     className?: string;
     label?: string;
 }) {
+    const t = useFestTheme();
     const wrapRef = useRef<HTMLDivElement>(null);
     const pathRefs = useRef<Record<string, SVGPathElement | null>>({});
     const [px, setPx] = useState(360);
@@ -75,6 +79,7 @@ export function LanternMap({ items, today, region = null, picked = null, onPick,
     const spots = useMemo(() => items.map((f) => { const [x, y] = latLngToOutline(f.lat, f.lng); return { f, x, y, st: festivalState(f, today).state }; })
         .sort((a, b) => ORDER[a.st] - ORDER[b.st]), [items, today]);
     const markSpots = useMemo(() => marks.map((m) => { const [x, y] = latLngToOutline(m.lat, m.lng); return { ...m, x, y }; }), [marks]);
+    const layerSpots = useMemo(() => layer.map((p) => latLngToOutline(p.lat, p.lng)), [layer]);
 
     // 가야 할 그림 상자 — 한 곳 · 시도 · 전국
     const target = useMemo<Box>(() => {
@@ -189,24 +194,32 @@ export function LanternMap({ items, today, region = null, picked = null, onPick,
     const nowN = spots.filter((s) => s.st === "now").length, soonN = spots.filter((s) => s.st === "soon").length;
 
     return (
-        <div ref={wrapRef} className={`relative overflow-hidden rounded-2xl ${className ?? ""}`} style={{ aspectRatio: "4 / 5", background: "radial-gradient(120% 75% at 50% 0%, #143A44 0%, #0B1F26 72%)", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="lantern-map">
+        <div ref={wrapRef} className={`relative overflow-hidden rounded-2xl ${className ?? ""}`} style={{ aspectRatio: "4 / 5", background: t.mapBg, boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="lantern-map">
             <style>{`@keyframes lt-breathe{0%,100%{opacity:.55;transform:scale(.82)}50%{opacity:1;transform:scale(1.14)}}.lt-pulse{transform-box:fill-box;transform-origin:center;animation:lt-breathe 2.6s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.lt-pulse{animation:none}}`}</style>
             <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} className={`absolute inset-0 h-full w-full ${onPick ? "cursor-pointer" : ""}`} onClick={onPick ? tap : undefined} role="img" aria-label={label}>
                 <defs>
-                    <radialGradient id="lt-now"><stop offset="0" stopColor="#FFE1CF" stopOpacity="0.95" /><stop offset="0.32" stopColor="#F28C6A" stopOpacity="0.6" /><stop offset="1" stopColor="#F28C6A" stopOpacity="0" /></radialGradient>
-                    <radialGradient id="lt-soon"><stop offset="0" stopColor="#F6D9A8" stopOpacity="0.75" /><stop offset="1" stopColor="#F6D9A8" stopOpacity="0" /></radialGradient>
+                    <radialGradient id="lt-now"><stop offset="0" stopColor={t.glow} stopOpacity="0.95" /><stop offset="0.32" stopColor={t.accent} stopOpacity="0.6" /><stop offset="1" stopColor={t.accent} stopOpacity="0" /></radialGradient>
+                    <radialGradient id="lt-soon"><stop offset="0" stopColor={t.soon} stopOpacity="0.75" /><stop offset="1" stopColor={t.soon} stopOpacity="0" /></radialGradient>
                 </defs>
-                {SEAS.map((s) => { const [x, y] = latLngToOutline(s.lat, s.lng); return <text key={s.name} x={x} y={y} fontSize={12 * k} fill="#F4EFE333" textAnchor="middle" letterSpacing={6 * k}>{s.name}</text>; })}
+                {SEAS.map((s) => { const [x, y] = latLngToOutline(s.lat, s.lng); return <text key={s.name} x={x} y={y} fontSize={12 * k} fill={`${t.text}33`} textAnchor="middle" letterSpacing={6 * k}>{s.name}</text>; })}
                 <g>
                     {Object.entries(KOREA_MAP_PATHS).map(([key, d]) => (
-                        <path key={key} ref={(el) => { pathRefs.current[key] = el; }} d={d} fill={region && REGION_KEY[region] === key ? "#1D4C55" : "#13363F"} stroke={region && REGION_KEY[region] === key ? "#F6D9A866" : "#2B5E66"} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
+                        <path key={key} ref={(el) => { pathRefs.current[key] = el; }} d={d} fill={region && REGION_KEY[region] === key ? t.landSel : t.land} stroke={region && REGION_KEY[region] === key ? `${t.soon}66` : t.landStroke} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
                     ))}
                 </g>
                 {!zoomed && !focus && PLACES.filter((p) => !p.city).map((p) => {
                     const [x, y] = latLngToOutline(p.lat, p.lng);
                     const n = counts.get(p.name) ?? 0;
-                    return <text key={p.name} x={x} y={y} fontSize={12 * k} fill="#F4EFE366" textAnchor="middle">{p.name}{n ? ` ${n}` : ""}</text>;
+                    return <text key={p.name} x={x} y={y} fontSize={12 * k} fill={`${t.text}66`} textAnchor="middle">{p.name}{n ? ` ${n}` : ""}</text>;
                 })}
+                {/* 종목의 자리 — 아주 옅게(등불이 주인공). 산 ▲ · 골프장 ■ · 낚시터 ◆ */}
+                {layerSpots.length > 0 && (
+                    <g opacity={0.42} pointerEvents="none" data-layer={t.layer}>
+                        {layerSpots.map(([x, y], i) => t.layer === "mountain"
+                            ? <path key={i} d={`M${x} ${y - 2.4 * k} L${x + 2.2 * k} ${y + 1.6 * k} L${x - 2.2 * k} ${y + 1.6 * k} Z`} fill={MARK_COLOR.mountain} />
+                            : <rect key={i} x={x - 1.5 * k} y={y - 1.5 * k} width={3 * k} height={3 * k} fill={MARK_COLOR[t.layer]} transform={t.layer === "fishing" ? `rotate(45 ${x} ${y})` : undefined} />)}
+                    </g>
+                )}
                 {markSpots.map((m, i) => (
                     <g key={`m${i}`}>
                         {m.kind === "mountain"
@@ -215,33 +228,33 @@ export function LanternMap({ items, today, region = null, picked = null, onPick,
                     </g>
                 ))}
                 {spots.map(({ f, x, y, st }) => {
-                    if (st === "ended") return <circle key={f.id} cx={x} cy={y} r={1.6 * k} fill="#F4EFE3" opacity={0.25} />;
+                    if (st === "ended") return <circle key={f.id} cx={x} cy={y} r={1.6 * k} fill={t.text} opacity={0.25} />;
                     const sel = picked === f.id || (focus != null && Math.abs(f.lat - focus.lat) < 1e-6 && Math.abs(f.lng - focus.lng) < 1e-6);
                     const glow = (st === "now" ? 13 : 8.5) * k * (sel ? 1.4 : 1);
                     return (
                         <g key={f.id}>
                             <circle cx={x} cy={y} r={glow} fill={`url(#lt-${st})`} className={st === "now" ? "lt-pulse" : undefined} style={st === "now" ? { animationDelay: `-${delayOf(f.id)}ms` } : undefined} />
-                            <circle cx={x} cy={y} r={(st === "now" ? 2.7 : 2.1) * k} fill={st === "now" ? "#FFEDE2" : "#F6D9A8"} />
-                            {sel && <circle cx={x} cy={y} r={8 * k} fill="none" stroke="#F4EFE3" strokeWidth={1.4} vectorEffect="non-scaling-stroke" />}
+                            <circle cx={x} cy={y} r={(st === "now" ? 2.7 : 2.1) * k} fill={st === "now" ? t.core : t.soon} data-lantern={st} />
+                            {sel && <circle cx={x} cy={y} r={8 * k} fill="none" stroke={t.text} strokeWidth={1.4} vectorEffect="non-scaling-stroke" />}
                         </g>
                     );
                 })}
                 {markLabels.map((l) => (
                     <text key={`ml${l.i}`} x={l.x} y={l.y} fontSize={12 * k} fill={MARK_COLOR[markSpots[l.i].kind]} textAnchor={l.anchor} pointerEvents="none"
-                        stroke="#0B1F26" strokeWidth={3 * k} strokeLinejoin="round" paintOrder="stroke">{l.text}</text>
+                        stroke={t.bg} strokeWidth={3 * k} strokeLinejoin="round" paintOrder="stroke">{l.text}</text>
                 ))}
                 {labels.map((l) => (
                     <g key={`l${l.id}`} pointerEvents="none">
-                        <rect x={l.x} y={l.y} width={l.w} height={22 * k} rx={11 * k} fill={l.id === picked ? "#F28C6A" : "#0B1F26D9"} stroke="#F4EFE326" strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
-                        <text x={l.x + 7 * k} y={l.y + 15.5 * k} fontSize={12 * k} fill={l.id === picked ? "#2A1208" : "#F4EFE3"} fontWeight={l.id === picked ? 600 : 400}>{l.text}</text>
+                        <rect x={l.x} y={l.y} width={l.w} height={22 * k} rx={11 * k} fill={l.id === picked ? t.accent : `${t.bg}D9`} stroke={`${t.text}26`} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
+                        <text x={l.x + 7 * k} y={l.y + 15.5 * k} fontSize={12 * k} fill={l.id === picked ? t.onAccent : t.text} fontWeight={l.id === picked ? 600 : 400}>{l.text}</text>
                     </g>
                 ))}
             </svg>
             {/* 범례는 오른쪽 아래(바다) — 왼쪽 아래는 제주의 등불을 덮었다 */}
             {!focus && (
-                <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-3 rounded-full bg-[#0B1F26CC] px-3 py-1.5 text-[12px] text-[#F4EFE3CC] backdrop-blur-sm">
-                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#F28C6A]" style={{ boxShadow: "0 0 8px #F28C6A" }} />지금 {nowN}</span>
-                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-[#F6D9A8]" />곧 {soonN}</span>
+                <div className="pointer-events-none absolute bottom-3 right-3 flex items-center gap-3 rounded-full px-3 py-1.5 text-[12px] backdrop-blur-sm" style={{ background: `${t.bg}CC`, color: `${t.text}CC` }}>
+                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: t.accent, boxShadow: `0 0 8px ${t.accent}` }} />지금 {nowN}</span>
+                    <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full" style={{ background: t.soon }} />곧 {soonN}</span>
                 </div>
             )}
         </div>

@@ -374,7 +374,7 @@ export function SpotPage({ id }: { id: string }) {
             {(data?.festivals?.length ?? 0) > 0 && (
                 <section className="px-5 pt-7" data-testid="spot-festivals">
                     <h2 className="mb-2.5 text-[17px] font-semibold">이 근처 축제</h2>
-                    <NearbyFestivalList items={data!.festivals!} tone={FISHING_FESTIVAL_TONE} />
+                    <NearbyFestivalList items={data!.festivals!} tone={FISHING_FESTIVAL_TONE} sport="FISHING" />
                 </section>
             )}
 
