@@ -16,3 +16,9 @@ export interface TrailsData { routes: TrailRouteInfo[]; courses: TrailCourseSumm
 export interface TrailSide extends TrailCourseSummary { line: number[][] }
 export interface TrailCourseData { course: TrailCourseDetail; prev: TrailSide | null; next: TrailSide | null; festivals: NearbyFestival[] }
 export interface TrailWeather { days: WxDay[]; area: string | null }
+
+/** 내 코스 도장(등산 회원만 — server GET /trails/me). 도장 · 도장이 안 된 출발 확인 */
+export const TRAIL_ME_KEY = ["/api/hiq/trails/me"] as const;
+export interface MyTrailStamp { courseId: string; route: string; key: string; firstEnd: "start" | "end"; startedAt: string; doneAt: string }
+export interface MyTrailOpen { courseId: string; route: string; key: string; end: "start" | "end"; at: string }
+export interface MyTrails { stamps: MyTrailStamp[]; open: MyTrailOpen[] }

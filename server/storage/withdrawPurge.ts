@@ -16,6 +16,7 @@ const missingTable = (e: any) => (e?.code ?? e?.cause?.code) === "42P01";
 export const WITHDRAW_PURGE_TABLES = [
     "fishing_catches", "fishing_gear", "fishing_decor_awards", "fishing_tanks", "hiq_invite_codes",
     "hiking_marks", "hiking_summits", "hiking_awards", "hiking_trips", "hiking_goals",
+    "hiking_trail_checks", "hiking_trail_stamps",
 ] as const;
 
 export async function purgeFishingHiking(memberId: string): Promise<{ blobs: string[]; removed: Record<string, number> }> {
@@ -43,5 +44,8 @@ export async function purgeFishingHiking(memberId: string): Promise<{ blobs: str
     await run("hiking_awards", sql`delete from hiking_awards where member_id = ${memberId}::uuid returning id`);
     await run("hiking_trips", sql`delete from hiking_trips where member_id = ${memberId}::uuid returning id`);
     await run("hiking_goals", sql`delete from hiking_goals where member_id = ${memberId}::uuid returning year`);
+    // 코리아둘레길 코스 도장(10/21) — 좌표는 없지만 언제 어느 코스에 있었는지가 남는다
+    await run("hiking_trail_checks", sql`delete from hiking_trail_checks where member_id = ${memberId}::uuid returning id`);
+    await run("hiking_trail_stamps", sql`delete from hiking_trail_stamps where member_id = ${memberId}::uuid returning course_id`);
     return { blobs, removed };
 }

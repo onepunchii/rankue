@@ -5,7 +5,8 @@
  */
 import { Link } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
-import { TRAIL_LEVEL_NAME, trailCoursePath, trailRouteOf, trailTimeText, type TrailCourseSummary } from "@shared/koreaTrails";
+import { TRAIL_LEVEL_NAME, trailCoursePath, trailRouteOf, trailTimeText, type TrailCourseSummary, type TrailRouteId } from "@shared/koreaTrails";
+import { TrailStampSeal } from "./TrailStamp";
 
 /** 코스의 선 — 정한 상자 안에 가운데로. 시작점은 속이 찬 점, 끝점은 고리 */
 export function TrailSketch({ coarse, color, w = 96, h = 64, className }: { coarse: readonly (readonly [number, number])[]; color: string; w?: number; h?: number; className?: string }) {
@@ -42,14 +43,16 @@ export const shortCourseName = (c: Pick<TrailCourseSummary, "name" | "route">) =
     return r ? c.name.replace(r.name, "").trim() || c.name : c.name;
 };
 
-/** 목록 한 줄 — 번호 · 이름 · 붙은 말(예약노선 · 우회로) · 거리 · 시간 · 난이도 · 선 그림 */
-export function TrailRow({ c }: { c: TrailCourseSummary }) {
+/** 목록 한 줄 — 번호 · 이름 · 붙은 말(예약노선 · 우회로) · 거리 · 시간 · 난이도 · 선 그림. 내 도장이 있으면 번호 자리에 도장(종이 동그라미 위) */
+export function TrailRow({ c, mine = "none" }: { c: TrailCourseSummary; mine?: "none" | "half" | "done" }) {
     const r = trailRouteOf(c.route);
     const bits = [`${c.km}km`, trailTimeText(c.minutes), c.level ? TRAIL_LEVEL_NAME[c.level] : null, c.loop ? "순환" : null].filter(Boolean).join(" · ");
     return (
         <li>
             <Link href={trailCoursePath(c.route, c.key)} className="flex items-center gap-3 py-3 active:opacity-80" data-testid="trail-row">
-                <TrailNo c={c} />
+                {mine === "done"
+                    ? <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#F4EFE3]" data-testid="trail-row-stamp" title="도장을 받은 코스"><TrailStampSeal route={c.route as TrailRouteId} label={c.key} state="done" size={34} /></span>
+                    : <TrailNo c={c} />}
                 <span className="min-w-0 flex-1">
                     <span className="flex flex-wrap items-center gap-1.5">
                         <span className="text-[15.5px] font-semibold text-[#F4EFE3]">{shortCourseName(c)}</span>
@@ -58,6 +61,7 @@ export function TrailRow({ c }: { c: TrailCourseSummary }) {
                         ))}
                     </span>
                     <span className="mt-0.5 block text-[13px] tabular-nums text-[#F4EFE3B3]">{bits}</span>
+                    {mine === "half" && <span className="block text-[12.5px] font-medium text-[#F6D9A8]" data-testid="trail-row-half">출발 확인 — 반대쪽 끝에서 한 번 더</span>}
                     {c.sigun && <span className="block truncate text-[12.5px] text-[#F4EFE380]">{c.sigun}</span>}
                 </span>
                 <TrailSketch coarse={c.coarse} color={r?.color ?? "#F4EFE3"} w={72} h={52} className="shrink-0" />

@@ -16,6 +16,7 @@ import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { TrailMap } from "./TrailMap";
 import { TrailSketch, shortCourseName } from "./TrailParts";
 import { TRAILS_COVER, TRAILS_KEY, type TrailsData } from "./api";
+import { useMyTrails } from "./TrailStamp";
 
 export default function TrailsHub() {
     const { data, isLoading } = useQuery<TrailsData>({ queryKey: TRAILS_KEY, staleTime: 60 * 60_000 });
@@ -27,6 +28,8 @@ export default function TrailsHub() {
     // 처음 걷기 좋은 코스 — 쉬움(1) · 본 코스 · 짧은 순
     const easy = useMemo(() => courses.filter((c) => c.level === 1 && c.sub == null && !c.tags.some((t) => t.includes("예약"))).sort((a, b) => a.km - b.km).slice(0, 10), [courses]);
     const color = (id: TrailRouteId) => TRAIL_ROUTES.find((r) => r.id === id)?.color ?? "#F4EFE3";
+    // 내 코스 도장(등산 회원만) — 길 카드에 '내 도장 n'
+    const my = useMyTrails();
 
     return (
         <HikingShell title="코리아둘레길" backTo="/hiking">
@@ -77,6 +80,7 @@ export default function TrailsHub() {
                                         <span className="mt-2.5 flex items-center gap-2.5">
                                             <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#FFFFFF14]"><span className="block h-full rounded-full" style={{ width: `${Math.round((r.have / r.total) * 100)}%`, background: r.color }} /></span>
                                             <span className="shrink-0 text-[12.5px] tabular-nums text-[#F4EFE3B3]">{r.have} / {r.total}코스</span>
+                                            {my && <span className="shrink-0 rounded-full bg-[#F4EFE3] px-2 py-0.5 text-[12px] font-semibold tabular-nums text-[#0E2A33]" data-testid="trail-route-mine">내 도장 {my.stamps.filter((x) => x.route === r.id).length}</span>}
                                         </span>
                                     </Link>
                                 ))}

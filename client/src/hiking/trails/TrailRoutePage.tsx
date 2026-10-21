@@ -13,6 +13,7 @@ import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
 import { TrailMap } from "./TrailMap";
 import { TrailRow } from "./TrailParts";
 import { TRAILS_KEY, type TrailsData } from "./api";
+import { useMyTrails } from "./TrailStamp";
 
 export default function TrailRoutePage() {
     const [, params] = useRoute("/hiking/trails/:route");
@@ -24,11 +25,16 @@ export default function TrailRoutePage() {
     const courses = useMemo(() => (data?.courses ?? []).filter((c) => c.route === route?.id), [data, route?.id]);
     const seo = route ? trailRouteSeo(route, { courses: info?.have ?? courses.length, km: info?.haveKm ?? 0 }) : null;
     useSeo(seo && data ? { title: seo.title, description: seo.desc, path: seo.path } : null);
+    // 내 도장(등산 회원만) — 이 길의 도장 · 출발 확인
+    const my = useMyTrails();
+    const done = new Set((my?.stamps ?? []).filter((x) => x.route === route?.id).map((x) => x.courseId));
+    const half = new Set((my?.open ?? []).filter((x) => x.route === route?.id).map((x) => x.courseId));
 
     if (!route) {
         return <HikingShell title="코리아둘레길" backTo={TRAILS_PATH}><p className="px-5 pt-16 text-center text-[16px] text-[#F4EFE3B3]">없는 길이에요.</p></HikingShell>;
     }
     const missing = route.total - courses.length;
+
     return (
         <HikingShell title={route.name} backTo={TRAILS_PATH}>
             <div data-testid="trail-route-page">
@@ -38,7 +44,7 @@ export default function TrailRoutePage() {
                     {info?.line && <p className="mt-1 text-[15px] text-[#F4EFE3E6] break-keep">{info.line}</p>}
                     <p className="mt-2 text-[13.5px] text-[#F4EFE3B3] break-keep">{route.from} → {route.to}</p>
                     <div className="mt-3 flex rounded-2xl bg-[#FFFFFF0A] py-3" style={{ boxShadow: "inset 0 0 0 1px #FFFFFF12" }}>
-                        {([[`${route.total}`, "전체 코스"], [`${route.km.toLocaleString("en-US")}km`, "전체 거리"], [`${courses.length}`, "공개 코스"]] as const).map(([n, l]) => (
+                        {([[`${route.total}`, "전체 코스"], [`${route.km.toLocaleString("en-US")}km`, "전체 거리"], [`${courses.length}`, "공개 코스"], ...(my ? [[`${done.size}`, "내 도장"] as const] : [])] as const).map(([n, l]) => (
                             <div key={l} className="flex-1 text-center">
                                 <div className="text-[20px] font-semibold tabular-nums leading-none text-[#F4EFE3]">{n}</div>
                                 <div className="mt-1.5 text-[12px] text-[#F4EFE399]">{l}</div>
@@ -64,7 +70,7 @@ export default function TrailRoutePage() {
 
                         <HkSection title="코스" aside={`${courses.length}개 · ${Math.round(courses.reduce((a, c) => a + c.km, 0)).toLocaleString("en-US")}km`}>
                             <ul className="divide-y divide-[#FFFFFF12]" data-testid="trail-list">
-                                {courses.map((c) => <TrailRow key={c.id} c={c} />)}
+                                {courses.map((c) => <TrailRow key={c.id} c={c} mine={done.has(c.id) ? "done" : half.has(c.id) ? "half" : "none"} />)}
                             </ul>
                             {missing > 0 && (
                                 <p className="mt-3 rounded-xl bg-[#FFFFFF0A] px-3.5 py-3 text-[13px] leading-relaxed text-[#F4EFE3B3] break-keep">

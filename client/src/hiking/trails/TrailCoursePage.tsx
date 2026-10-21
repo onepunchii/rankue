@@ -22,6 +22,7 @@ import { WeatherDays } from "@/festivals/components/WeatherDays";
 import { trailCardUrl } from "@shared/ogCards";
 import { shortCourseName } from "./TrailParts";
 import { trailCourseKey, trailWeatherKey, type TrailCourseData, type TrailWeather } from "./api";
+import { TrailStampCard } from "./TrailStamp";
 
 const kakaoRoute = (name: string, lat: number, lng: number) => `https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}`;
 const outside = (url: string) => async (e: React.MouseEvent) => { if (canOpenInApp()) { e.preventDefault(); await openInAppBrowser(url); } };
@@ -86,6 +87,8 @@ export default function TrailCoursePage() {
                             </div>
                         ))}
                     </div>
+                    {/* 코스 도장 — 두 끝에서 위치 확인(shared/trailStamps). 등산이 막힌 회원에게는 없다 */}
+                    <TrailStampCard c={c} />
                 </header>
 
                 <HkSection title="코스 지도" aside="위가 북쪽 · 참고용">
