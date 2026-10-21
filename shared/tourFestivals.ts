@@ -8,6 +8,8 @@ export interface TourFestival { id: string; title: string; start: string; end: s
 export interface NearbyFestival extends TourFestival { km: number; state: "now" | "soon" }
 
 const km = (a: number, b: number, c: number, d: number) => { const t = Math.PI / 180, x = (d - b) * t * Math.cos(((a + c) / 2) * t), y = (c - a) * t; return Math.sqrt(x * x + y * y) * 6371; };
+/** 서울 · 광역시 주소 — 이 안의 축제는 산에서 가까워도 도심 행사라 반경을 좁힌다 */
+const METRO_ADDR = /^(서울|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시)/;
 /** 'YYYYMMDD' 하나를 그날의 날 수로(비교 · 뺄셈용) */
 const dayNo = (ymd: string) => Date.UTC(Number(ymd.slice(0, 4)), Number(ymd.slice(4, 6)) - 1, Number(ymd.slice(6, 8))) / 86_400_000;
 
@@ -35,7 +37,8 @@ export function nearbyFestivals(list: readonly TourFestival[], lat: number, lng:
     const today = dayNo(todayYmd);
     return list
         .map((f) => ({ ...f, km: Math.round(km(lat, lng, f.lat, f.lng) * 10) / 10 }))
-        .filter((f) => f.km <= radiusKm && dayNo(f.end) >= today && dayNo(f.start) - today <= aheadDays)
+        // 대도시(서울 · 광역시)의 축제는 8km 안만 — 도심 행사(도서관 · 궁궐 야행)가 산 페이지에 걸리던 것(2026-10-21 북한산 · 남한산 확인)
+        .filter((f) => f.km <= (METRO_ADDR.test(f.addr ?? "") ? Math.min(radiusKm, 8) : radiusKm) && dayNo(f.end) >= today && dayNo(f.start) - today <= aheadDays)
         .map((f) => ({ ...f, state: (dayNo(f.start) <= today ? "now" : "soon") as "now" | "soon" }))
         .sort((a, b) => (a.state === b.state ? 0 : a.state === "now" ? -1 : 1) || a.start.localeCompare(b.start) || a.km - b.km)
         .slice(0, max);

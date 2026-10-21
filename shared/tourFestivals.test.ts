@@ -27,6 +27,13 @@ describe("이 근처 축제 · 행사(2026-10-21)", () => {
         expect(out.map((x) => [x.title, x.state])).toEqual([["열림", "now"], ["곧", "soon"]]);
         expect(out[0].km).toBeGreaterThan(0);
     });
+    it("서울 · 광역시 축제는 8km 안만(도심 행사)", () => {
+        const city = festivalOf({ contentid: "c", title: "도심 야행", eventstartdate: "20261020", eventenddate: "20261030", mapy: 37.58, mapx: 126.977, addr1: "서울특별시 종로구 사직로 161" })!;
+        const near = festivalOf({ contentid: "n", title: "동네 축제", eventstartdate: "20261020", eventenddate: "20261030", mapy: 37.66, mapx: 127.06, addr1: "서울특별시 노원구 어딘가" })!;
+        const rural = festivalOf({ contentid: "r", title: "들판 축제", eventstartdate: "20261020", eventenddate: "20261030", mapy: 37.55, mapx: 127.3, addr1: "경기도 양평군 어딘가" })!;
+        const out = nearbyFestivals([city, near, rural], 37.659, 126.977, "20261021");   // 북한산 언저리
+        expect(out.map((x) => x.title)).toEqual(["동네 축제"]);   // 도심 야행 9km(대도시 8km 밖) · 들판 축제는 20km 밖
+    });
     it("날짜 글", () => {
         expect(festivalDateKo({ start: "20261024", end: "20261101" })).toBe("10월 24일 ~ 11월 1일");
         expect(festivalDateKo({ start: "20261024", end: "20261024" })).toBe("10월 24일");
