@@ -281,10 +281,14 @@ export function SpotPage({ id }: { id: string }) {
             </div>
             {/* 한눈 칸 */}
             <div className="grid grid-cols-2 gap-2 px-5 pt-4" data-testid="spot-facts">
-                <div className="col-span-2 rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0D", boxShadow: "inset 0 0 0 1px #FFFFFF14" }}>
-                    <p className="text-[12px]" style={{ color: C.dim }}>대상 어종</p>
-                    <p className="mt-0.5 text-[16px] font-semibold [word-break:keep-all]">{p.species.length ? p.species.join(" · ") : "등록된 어종이 없어요"}</p>
-                </div>
+                {/* 대상 어종 — 받은 자료에 있을 때만 맨 위 큰 칸(2026-10-21 디자인 리뷰: '등록된 어종이 없어요'가 첫 칸을 차지했다).
+                    없으면 칸을 비우고 요금 · 연락처(종류)만 — 아래 '이곳의 어종'도 같은 조건이라 빈 말을 두 번 하지 않는다 */}
+                {p.species.length > 0 && (
+                    <div className="col-span-2 rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0D", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="spot-species">
+                        <p className="text-[12px]" style={{ color: C.dim }}>대상 어종</p>
+                        <p className="mt-0.5 text-[16px] font-semibold [word-break:keep-all]">{p.species.join(" · ")}</p>
+                    </div>
+                )}
                 <div className="rounded-2xl px-3.5 py-3" style={{ background: "#FFFFFF0D", boxShadow: "inset 0 0 0 1px #FFFFFF14" }}>
                     <p className="text-[12px]" style={{ color: C.dim }}>요금</p>
                     <p className="mt-0.5 text-[15px] font-semibold [word-break:keep-all]">{fee ?? "등록 안 됨"}</p>
