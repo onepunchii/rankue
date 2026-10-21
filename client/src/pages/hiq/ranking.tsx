@@ -9,6 +9,7 @@ import { useSport } from "@/contexts/SportContext";
 import { useAuth } from "@/hooks/useAuth";
 import { BallDot } from "@/components/hiq/BallDot";
 import { LoginGate } from "@/components/hiq/LoginGate";
+import { GuestRankingPreview } from "@/components/hiq/GuestRankingPreview";
 
 import { cn } from "@/lib/utils";
 import { flagEmoji } from "@/lib/flag";
@@ -97,12 +98,10 @@ export default function HiqRanking() {
                 icon={LucideMedal}
                 title="랭킹"
                 desc="로그인하면 자주 가는 매장과 전국에서 내가 몇 등인지 볼 수 있습니다."
-                links={[
-                    { label: "세계 랭킹 — UMB 공식", to: "/world-ranking" },
-                    { label: "PBA 투어 랭킹", to: "/pba" },
-                    { label: "매장 찾기 — 전국 당구장", to: "/stores" },
-                ]}
-            />
+            >
+                {/* 로그인 없이 볼 수 있는 것을 그 자리에서(2026-10-21 — 예전엔 글 링크 세 줄): 세계 · PBA 상위 셋 · 전국 당구장 지도 */}
+                <GuestRankingPreview />
+            </LoginGate>
         );
     }
 

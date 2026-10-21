@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useT } from "@/lib/i18n";
 import { useLocation } from "wouter";
 import { HiqNavigation } from "./HiqNavigation";
@@ -47,14 +48,17 @@ interface LoginGateProps {
     links?: { label: string; to: string }[];
     /** 하단 탭 표시 여부 — 탭이 없는 화면(모달 등)에서 끌 수 있다. */
     nav?: boolean;
+    /** 로그인 카드 아래 — 로그인 없이 볼 수 있는 것을 미리 보여 준다(2026-10-21 랭킹: 세계 · PBA 상위 셋 · 전국 당구장 지도) */
+    children?: ReactNode;
 }
 
-export function LoginGate({ title, desc, icon: Icon = LucideLock, links, nav = true }: LoginGateProps) {
+export function LoginGate({ title, desc, icon: Icon = LucideLock, links, nav = true, children }: LoginGateProps) {
     const { t } = useT();
     const [, setLocation] = useLocation();
 
     return (
-        <div className="min-h-screen bg-surface-0 px-5 pb-32 flex flex-col items-center justify-center">
+        // 미리 보기(children)가 있으면 위에서부터 — 가운데 맞춤이면 긴 화면의 위가 잘려 보인다
+        <div className={`min-h-screen bg-surface-0 px-5 pb-32 flex flex-col items-center ${children ? "justify-start pt-8" : "justify-center"}`}>
             <div className="w-full max-w-[380px] rk-card p-7 flex flex-col items-center text-center">
                 <div className="w-14 h-14 rounded-full bg-brand/[0.08] flex items-center justify-center mb-4">
                     <Icon className="w-7 h-7 text-brand" />
@@ -69,6 +73,8 @@ export function LoginGate({ title, desc, icon: Icon = LucideLock, links, nav = t
                     {t("loginGate.cta")}
                 </button>
             </div>
+
+            {children && <div className="w-full max-w-[380px] mt-4">{children}</div>}
 
             {links && links.length > 0 && (
                 <div className="w-full max-w-[380px] mt-4">
