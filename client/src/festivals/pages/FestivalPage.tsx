@@ -21,6 +21,8 @@ import { FESTIVAL_CREDIT, FESTIVAL_SOURCE, addDays, festivalPath, festivalCatNam
 import { hikingMountainPath } from "@shared/hikingMountains";
 import { coursePath } from "@shared/golfCourse";
 import { fishingSpotPath } from "@shared/fishingPlaces";
+import { TRAIL_ROUTES, trailCoursePath, trailTimeText } from "@shared/koreaTrails";
+import { TrailSketch } from "@/hiking/trails/TrailParts";
 import { HkSkel } from "@/hiking/components/HikingShell";
 import { LanternMap, type LanternMark } from "../components/LanternMap";
 import { FestivalBadge, FestivalItem } from "../components/FestivalBits";
@@ -117,6 +119,28 @@ function AroundBlock({ kind, around, text, first }: { kind: FestLayerKind; aroun
         );
     }
     return null;
+}
+
+/** 걸어 볼 둘레길(2026-10-21) — 축제 자리에서 코스 선까지 15km 안의 코리아둘레길 코스(가까운 셋). 코스 선 그림 · 길 이름 · 거리 */
+function TrailsBlock({ trails, text, first }: { trails: NonNullable<FestivalAround["trails"]>; text: string; first: boolean }) {
+    return (
+        <div className={first ? "" : "mt-5"} data-testid="festival-around-trails">
+            <p className="mb-2 text-[13px] font-semibold" style={{ color: "#8FD3A7" }}>걸어 볼 둘레길</p>
+            <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                {trails.map((c) => {
+                    const r = TRAIL_ROUTES.find((x) => x.id === c.route);
+                    return (
+                        <Link key={`${c.route}/${c.key}`} href={trailCoursePath(c.route, c.key)} className="block w-[156px] shrink-0 rounded-2xl p-3 active:opacity-80" style={{ background: "#FFFFFF0A" }}>
+                            <TrailSketch coarse={c.coarse} color={r?.color ?? "#F4EFE3"} w={132} h={64} />
+                            <span className="mt-1.5 block text-[12.5px] font-medium" style={{ color: r?.color ?? text }}>{r?.name ?? ""}</span>
+                            <span className="block truncate text-[14.5px] font-semibold" style={{ color: text }}>{r ? c.name.replace(r.name, "").trim() || c.name : c.name}</span>
+                            <span className="block text-[12.5px] tabular-nums" style={{ color: `${text}99` }}>{[`${c.courseKm}km`, trailTimeText(c.minutes), `축제 ${c.km}km`].filter(Boolean).join(" · ")}</span>
+                        </Link>
+                    );
+                })}
+            </div>
+        </div>
+    );
 }
 
 export default function FestivalPage() {
@@ -262,9 +286,10 @@ export default function FestivalPage() {
                     </FestSection>
                 )}
 
-                {blocks.length > 0 && (
+                {(blocks.length > 0 || !!around.trails?.length) && (
                     <FestSection title="가는 길에 들를 곳" aside="축제 자리에서 잰 거리">
                         {blocks.map((k, i) => <AroundBlock key={k} kind={k} around={around} text={t.text} first={i === 0} />)}
+                        {!!around.trails?.length && <TrailsBlock trails={around.trails} text={t.text} first={blocks.length === 0} />}
                     </FestSection>
                 )}
 

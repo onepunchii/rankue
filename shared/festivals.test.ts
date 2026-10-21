@@ -176,6 +176,16 @@ describe("화면 다듬기(2026-10-21 디자이너 순회)", () => {
     });
 });
 
+describe("축제 페이지의 '걸어 볼 둘레길'(2026-10-21)", () => {
+    it("코스 선까지 15km(도심 10km) · 가까운 셋 — 앱 화면 · 검색용 화면 둘 다, 둘레길 코스 페이지는 이미 근처 축제를 잇는다", () => {
+        const route = read("server/routes/modules/festivals.ts");
+        expect(route).toContain('const trailKm = FESTIVAL_METRO_REGIONS.has(f.region ?? "") ? 10 : 15;');
+        expect(route).toContain("trails: tr,");
+        expect(read("client/src/festivals/pages/FestivalPage.tsx")).toContain("<TrailsBlock trails={around.trails}");
+        expect(read("server/seo/festivals.ts")).toContain("<h2>걸어 볼 둘레길</h2>");
+    });
+});
+
 describe("전국 축제 — 이어 붙인 곳", () => {
     it("주소 · 색: /festivals 는 등산의 색 · 앱 라우트 · 메뉴", () => {
         expect(FESTIVALS_PATH).toBe("/festivals");

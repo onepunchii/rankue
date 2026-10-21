@@ -11,6 +11,7 @@ import { allPlaces } from "../../storage/fishingPlaces.js";
 import { MOUNTAIN_TOUR_PHOTOS } from "../../data/mountainTourPhotos.js";
 import { FESTIVAL_METRO_GOLF_KM, FESTIVAL_METRO_REGIONS, FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, addDays, festivalKm, festivalWeatherDays, kstToday, liveFestivals, type FestivalRow } from "../../../shared/festivals.js";
 import { getCourseWeather } from "../../services/golfWeather.js";
+import { trailCourses } from "../../storage/koreaTrails.js";
 
 const router = Router();
 const PUBLIC_CACHE = "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400";
@@ -30,7 +31,12 @@ export async function festivalAround(f: FestivalRow, today: string) {
         .map(({ p, km }) => ({ id: p.id, name: p.name, kind: p.kind, lat: p.lat!, lng: p.lng!, km: r1(km) }));
     const fests = liveFestivals(all.filter((x) => x.id !== f.id), today, 60).map((x) => ({ ...x, km: r1(festivalKm(f, x)) })).filter((x) => x.km <= 30)
         .sort((a, b) => a.km - b.km).slice(0, 4);
-    return { mountains: mts, golf: gc, fishing: fp, festivals: fests };
+    // 코리아둘레길 코스(2026-10-21) — 코스 선 위의 가장 가까운 점까지 15km 안(서울 · 광역시 축제는 10km), 가까운 셋. 선은 줄인 것(coarse)으로 잰다
+    const trailKm = FESTIVAL_METRO_REGIONS.has(f.region ?? "") ? 10 : 15;
+    const tr = trailCourses().map((c) => ({ c, km: Math.min(...c.coarse.map((p) => festivalKm(f, { lat: p[0], lng: p[1] }))) }))
+        .filter((x) => Number.isFinite(x.km) && x.km <= trailKm).sort((a, b) => a.km - b.km).slice(0, 3)
+        .map(({ c, km }) => ({ route: c.route, key: c.key, name: c.name, courseKm: c.km, minutes: c.minutes, level: c.level, coarse: c.coarse, km: r1(km) }));
+    return { mountains: mts, golf: gc, fishing: fp, trails: tr, festivals: fests };
 }
 
 router.get("/", asyncHandler(async (_req, res) => {

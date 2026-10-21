@@ -1,6 +1,7 @@
 /**
  * 전국 축제 — 공개 자료 읽기(2026-10-21). 서버 server/routes/modules/festivals(누구에게나 열려 있다). 규칙 · 글은 shared/festivals.
  */
+import type { TrailRouteId } from "@shared/koreaTrails";
 import type { FestivalDetail, FestivalRow } from "@shared/festivals";
 
 export const FESTIVALS_KEY = ["/api/hiq/festivals"] as const;
@@ -15,6 +16,8 @@ export interface FestivalAround {
     mountains: { slug: string; name: string; heightM: number | null; lat: number; lng: number; km: number; photo: { url: string; lic: "Type1" | "Type3" } | null }[];
     golf: { slug: string; name: string; logo: string | null; lat: number; lng: number; km: number }[];
     fishing: { id: string; name: string; kind: string | null; lat: number; lng: number; km: number }[];
+    /** 코리아둘레길 코스 — 코스 선까지 15km 안(10/21 더함 — 옛 응답엔 없다) */
+    trails?: { route: TrailRouteId; key: string; name: string; courseKm: number; minutes: number | null; level: 1 | 2 | 3 | null; coarse: [number, number][]; km: number }[];
     festivals: (FestivalRow & { km: number })[];
 }
 export interface FestivalData { today: string; festival: FestivalDetail; around: FestivalAround }

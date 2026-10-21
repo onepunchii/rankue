@@ -11,6 +11,7 @@ import {
 import { hikingMountainPath, HIKING_HUB_PATH } from "../../shared/hikingMountains.js";
 import { coursePath } from "../../shared/golfCourse.js";
 import { fishingSpotPath } from "../../shared/fishingPlaces.js";
+import { trailCoursePath, type TrailRouteId } from "../../shared/koreaTrails.js";
 import { festivalCardUrl, hubCard } from "../../shared/ogCards.js";
 
 /** 본문 제목 바로 밑에 그 화면의 미리보기 그림(등산 · 골프장 검색용 화면과 같은 꼴 — og:image 와 같은 한 장) */
@@ -27,6 +28,7 @@ type Around = {
     mountains: { slug: string; name: string; heightM: number | null; km: number }[];
     golf: { slug: string; name: string; km: number }[];
     fishing: { id: string; name: string; kind: string | null; km: number }[];
+    trails?: { route: TrailRouteId; key: string; name: string; courseKm: number; km: number }[];
     festivals: (FestivalRow & { km: number })[];
 };
 
@@ -128,7 +130,13 @@ ${around.fishing.length ? `  <section>
 ${around.fishing.map((p) => `      <li><a href="${fishingSpotPath(p.id)}">${esc(p.name)}</a> — ${esc([p.kind, `${p.km}km`].filter(Boolean).join(" · "))}</li>`).join("\n")}
     </ul>
   </section>` : ""}
-${around.festivals.length ? `  <section>
+${around.trails?.length ? `  <section>
+    <h2>걸어 볼 둘레길</h2>
+    <ul>
+${around.trails.map((c) => `      <li><a href="${trailCoursePath(c.route, c.key)}">${esc(c.name)}</a> — ${esc(`코스 ${c.courseKm}km · 축제 자리에서 ${c.km}km`)}</li>`).join("\n")}
+    </ul>
+  </section>
+` : ""}${around.festivals.length ? `  <section>
     <h2>근처 다른 축제</h2>
     <ul>
 ${around.festivals.map((x) => line(x, today)).join("\n")}
