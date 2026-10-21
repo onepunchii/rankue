@@ -12,9 +12,11 @@ import { useEffect, useState, type ReactNode } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useSeo } from "@/hooks/useSeo";
-import { LucideChevronRight, LucideGlobe, LucideNavigation, LucidePhone } from "@/lib/icons";
+import { LucideChevronRight, LucideGlobe, LucideNavigation, LucidePhone, LucideShare2 } from "@/lib/icons";
+import { useToast } from "@/hooks/use-toast";
+import { festivalCardUrl } from "@shared/ogCards";
 import { canOpenInApp, openInAppBrowser } from "@/lib/openOutside";
-import { FESTIVAL_CREDIT, FESTIVAL_SOURCE, festivalCatName, festivalPeriod, festivalPhotoCredit, festivalSeo, festivalSportPath, festivalState, type FestivalSport } from "@shared/festivals";
+import { FESTIVAL_CREDIT, FESTIVAL_SOURCE, festivalPath, festivalCatName, festivalPeriod, festivalPhotoCredit, festivalSeo, festivalSportPath, festivalState, type FestivalSport } from "@shared/festivals";
 import { hikingMountainPath } from "@shared/hikingMountains";
 import { coursePath } from "@shared/golfCourse";
 import { fishingSpotPath } from "@shared/fishingPlaces";
@@ -25,6 +27,7 @@ import { FestSection, festSportOfPath, festTheme, type FestLayerKind } from "../
 import { FestShell } from "../FestShell";
 import { festivalKey, type FestivalAround, type FestivalData } from "../api";
 
+const ORIGIN = "https://www.rankue.co.kr";
 const kakaoRoute = (name: string, lat: number, lng: number) => `https://map.kakao.com/link/to/${encodeURIComponent(name)},${lat},${lng}`;
 /** 바깥 링크 — 앱에서는 앱 안 브라우저 창으로(닫으면 이 화면) */
 const outside = (url: string) => async (e: React.MouseEvent) => { if (canOpenInApp()) { e.preventDefault(); await openInAppBrowser(url); } };
@@ -133,7 +136,22 @@ export default function FestivalPage() {
     const [open, setOpen] = useState(false);
     const f = data?.festival, around = data?.around, today = data?.today ?? "";
     const seo = f && around ? festivalSeo(f, { mountains: around.mountains.length, golf: around.golf.length, fishing: around.fishing.length }) : null;
-    useSeo(seo ? { title: seo.title, description: seo.desc, path: seo.path } : null);
+    useSeo(seo && f ? { title: seo.title, description: seo.desc, path: seo.path, image: festivalCardUrl(ORIGIN, f.id) } : null);
+    const { toast } = useToast();
+    // 공유 — 정본 주소(/festivals/:id)로. 받은 사람은 그 사람의 종목 화면으로 열린다(앱에서 연 경우)
+    const share = async () => {
+        if (!f) return;
+        const url = ORIGIN + festivalPath(f.id);
+        try { if (navigator.share) { await navigator.share({ title: `${f.title} | 랭큐 전국 축제`, url }); return; } }
+        catch (e: any) { if (e?.name === "AbortError") return; }
+        try { await navigator.clipboard.writeText(url); toast({ title: "주소를 복사했어요" }); }
+        catch { toast({ title: url }); }
+    };
+    const shareBtn = f ? (
+        <button type="button" onClick={share} aria-label="공유" className="flex h-10 w-10 items-center justify-center rounded-full active:bg-[#FFFFFF14]" style={{ color: t.text }} data-testid="festival-share">
+            <LucideShare2 className="h-[21px] w-[21px]" />
+        </button>
+    ) : null;
 
     if (isLoading || (!data && !isError)) {
         return <FestShell sport={sport} title="축제" back={t.base}><div className="space-y-4 px-5 pt-5" aria-busy="true"><HkSkel className="h-[240px]" /><HkSkel className="h-24" /><HkSkel className="h-40" /></div></FestShell>;
@@ -162,7 +180,7 @@ export default function FestivalPage() {
     const btn2 = { background: "#FFFFFF1F", color: t.text };
 
     return (
-        <FestShell sport={sport} title={f.title} back={t.base}>
+        <FestShell sport={sport} title={f.title} back={t.base} right={shareBtn}>
             <article data-testid="festival-page" data-festival-sport={sport ?? "NONE"}>
                 {f.image && (
                     <figure className="px-5 pt-4">

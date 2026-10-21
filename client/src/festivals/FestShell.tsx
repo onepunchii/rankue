@@ -11,18 +11,18 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { FestThemeCtx, festTheme } from "./theme";
 
 /** 종목의 틀 — 등산은 HikingShell, 골프는 CourseShell(아래 띠 없이), 낚시는 낚시 머리줄 + 하단 탭 */
-export function FestShell({ sport, title, back, children }: { sport: FestivalSport | null; title: string; back: string; children: ReactNode }) {
+export function FestShell({ sport, title, back, right, children }: { sport: FestivalSport | null; title: string; back: string; right?: ReactNode; children: ReactNode }) {
     const t = festTheme(sport);
     const body = <FestThemeCtx.Provider value={t}>{children}</FestThemeCtx.Provider>;
-    if (sport === "GOLF") return <CourseShell title={title} backTo={back} hideBottomCta>{body}</CourseShell>;
+    if (sport === "GOLF") return <CourseShell title={title} backTo={back} right={right} hideBottomCta>{body}</CourseShell>;
     if (sport === "FISHING") {
         return (
             <div className="min-h-[100dvh] pb-28" style={{ background: t.bg, color: t.text }} data-fishing-festivals="1">
-                <SportBackHeader sport="FISHING" title={title} fallback={back} inner="mx-auto max-w-[720px]" />
+                <SportBackHeader sport="FISHING" title={title} right={right} fallback={back} inner="mx-auto max-w-[720px]" />
                 <main className="mx-auto max-w-[720px]">{body}</main>
                 <HiqNavigation />
             </div>
         );
     }
-    return <HikingShell title={title} backTo={back}>{body}</HikingShell>;
+    return <HikingShell title={title} backTo={back} right={right}>{body}</HikingShell>;
 }

@@ -11,6 +11,7 @@ import {
 import { hikingMountainPath, HIKING_HUB_PATH } from "../../shared/hikingMountains.js";
 import { coursePath } from "../../shared/golfCourse.js";
 import { fishingSpotPath } from "../../shared/fishingPlaces.js";
+import { festivalCardUrl } from "../../shared/ogCards.js";
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FestivalRender { status: 200; tag: string; html: string }
@@ -141,7 +142,9 @@ ${hubNav("ko")}`;
         ...(f.host ? { organizer: { "@type": "Organization", name: f.host, ...(f.homepage ? { url: f.homepage } : {}) } } : {}),
         url: `${ORIGIN}${seo.path}`,
     };
-    return { status: 200, tag: "festivals:one", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [event, crumbs([f.title, seo.path])] }) };
+    // 미리보기 카드 — 우리 그림 위에 이름 · 기간 · 자리(server/services/festivalCard). 관광공사 사진은 카드에 얹지 않는다
+    const card = { url: festivalCardUrl(ORIGIN, f.id), width: 1200, height: 1200, alt: `${f.title} — ${festivalPeriod(f, true)}` };
+    return { status: 200, tag: "festivals:one", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body, jsonLd: [event, crumbs([f.title, seo.path])], image: card }) };
 }
 
 export async function renderFestivals(path: string, all: readonly FestivalRow[], today: string, detail: (id: string) => Promise<{ f: FestivalDetail; around: Around } | null>): Promise<FestivalRender | null> {
@@ -159,6 +162,6 @@ export function festivalSitemapParts(all: readonly FestivalRow[], today: string)
     const day = (ymd: string | null) => (ymd ? isoDay(ymd) : null);
     return [
         entry(`${ORIGIN}${FESTIVALS_PATH}`, { changefreq: "daily", priority: "0.7", lastmod: isoDay(today) }),
-        ...all.map((f) => entry(`${ORIGIN}${festivalPath(f.id)}`, { changefreq: "weekly", priority: f.end >= today ? "0.6" : "0.4", lastmod: day(f.mod), ...(f.image ? { image: f.image } : {}) })),
+        ...all.map((f) => entry(`${ORIGIN}${festivalPath(f.id)}`, { changefreq: "weekly", priority: f.end >= today ? "0.6" : "0.4", lastmod: day(f.mod), image: festivalCardUrl(ORIGIN, f.id), ...(f.image ? { images: [f.image] } : {}) })),
     ];
 }

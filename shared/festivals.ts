@@ -222,6 +222,17 @@ export function festivalFromTour(x: Record<string, unknown>): (FestivalRow & { t
     };
 }
 
+/** 축제 카드(1200 정사각 · server/services/festivalCard)의 글 — 이름 · 기간(해까지) · 지역 · 장소 · 알약(열림 · D-day, 끝났으면 없음) */
+export function festivalCardInput(f: FestivalRow & { place?: string | null }, today: string): { title: string; period: string; place: string; tag: string | null; live: boolean } {
+    const st = festivalState(f, today);
+    const where = f.place || f.addr?.split(" ").slice(1, 3).join(" ") || null;
+    return {
+        title: f.title, period: festivalPeriod(f, true), place: [f.region, where].filter(Boolean).join(" · "),
+        tag: st.state === "now" ? (st.days === 0 ? "오늘까지" : "지금 열려요") : st.state === "soon" ? `D-${st.days}` : null,
+        live: st.state === "now",
+    };
+}
+
 /** 검색용 제목 · 설명 — 허브 */
 export function festivalsHubSeo(n: { live: number; weekend: number }) {
     const bits = [n.weekend > 0 ? `이번 주말 ${n.weekend}곳` : "", n.live > 0 ? `지금 · 곧 열리는 축제 ${n.live}곳` : ""].filter(Boolean).join(" · ");

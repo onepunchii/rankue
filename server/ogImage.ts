@@ -28,6 +28,7 @@ import { verifyStampShare } from "./lib/stampShare.js";
 import { listStampAwards } from "./storage/golfStampAwards.js";
 import { bookStates, stampBook } from "../shared/golfStampBooks.js";
 import { renderHikingMountainCardPng } from "./services/hikingMountainCard.js";
+import { renderFestivalCardPng } from "./services/festivalCard.js";
 import { renderFishingSpotCardPng } from "./services/fishingSpotCard.js";
 import { placeById } from "./storage/fishingPlaces.js";
 import { fishingSpotCardInput, isPlaceId } from "../shared/fishingPlaces.js";
@@ -49,6 +50,7 @@ import { hikingMountainCardInput } from "../shared/hikingPage.js";
 //   /og/fishing-fish/:id.png          낚시 어종 카드 (2026-10-18) — 판화 위에 어탁 · 크기 이름 · 낚시터 수
 //   /og/fishing-sea/:key.png          바다 · 항구 물때 카드 (2026-10-18) — 해역 그림 위에 이름 · 해역(그날 값은 넣지 않는다)
 //   /og/hiking-mountain/:slug.png     산 카드 (2026-10-13) — 권역의 표지 위에 산의 이름 · 높이 · 자리 · 코스. 우리 표에 있는 산만
+//   /og/festival/:id.png              축제 카드 (2026-10-21) — 우리 그림(강가 마을의 등불) 위에 이름 · 기간 · 자리. 관광공사 사진은 싣지 않는다
 //   /og/golf-footprints/:memberId.png 골프 발자국 카드 (2026-09-30) — **비공개**: 서명(t)·만료가 맞아야 열린다
 //   /og/golf-stamp/:memberId/:book.png 도장첩 완성 카드 (2026-10-12) — **비공개**: 서명(t)·만료가 맞아야 열린다. 다 채운 권만
 // /api 아래에 두지 않는 이유: robots.txt 가 /api/ 를 막고 있어 구글이 이미지를 못 가져간다.
@@ -480,6 +482,26 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] hiking mountain card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  // 축제 카드(2026-10-21) — 번호는 숫자만, 우리 표에 있는 축제만(없는 주소는 404). 알약(D-day)이 날마다 바뀌어 캐시는 반나절
+  app.get("/og/festival/:id.png", async (req, res) => {
+    const id = String(req.params.id ?? "");
+    if (!/^\d{1,12}$/.test(id)) return res.status(404).type("text/plain").send("not found");
+    try {
+      const { getFestival } = await import("./storage/festivals.js");
+      const { festivalCardInput, kstToday } = await import("../shared/festivals.js");
+      const f = await getFestival(id);
+      if (!f) return res.status(404).type("text/plain").send("not found");
+      const png = await renderFestivalCardPng(festivalCardInput(f, kstToday()));
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=43200, stale-while-revalidate=86400");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] festival card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });

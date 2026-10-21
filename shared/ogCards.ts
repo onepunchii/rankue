@@ -25,6 +25,9 @@ export const fishingSpotCardUrl = (origin: string, id: string) => `${origin}/og/
 export const fishingFishCardUrl = (origin: string, id: string) => `${origin}/og/fishing-fish/${encodeURIComponent(id)}.png?v=${FISHING_CARD_VERSION}`;
 /** 바다 · 항구 물때 카드(2026-10-18) — key 는 'all'(허브) · 해역 id · 항구 이름 */
 export const fishingSeaCardUrl = (origin: string, key: string) => `${origin}/og/fishing-sea/${encodeURIComponent(key)}.png?v=${FISHING_CARD_VERSION}`;
+/** 축제 카드(2026-10-21) — 우리 그림(강가 마을의 등불) 위에 이름 · 기간 · 자리. 한국관광공사 사진은 얹지 않는다(제3유형 변경 금지). 그림을 바꾸면 올린다 */
+export const FESTIVAL_CARD_VERSION = 1;
+export const festivalCardUrl = (origin: string, id: string) => `${origin}/og/festival/${encodeURIComponent(id)}.png?v=${FESTIVAL_CARD_VERSION}`;
 /** 당구장 카드 — 매장 코드는 영숫자 */
 export const storeCardUrl = (origin: string, code: string) => `${origin}/og/store/${encodeURIComponent(code)}.png?v=${CARD_VERSION}`;
 

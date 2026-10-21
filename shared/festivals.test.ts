@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    FESTIVALS_PATH, festivalsSportPath, festivalSportPath, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
+    FESTIVALS_PATH, festivalsSportPath, festivalSportPath, festivalCardInput, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
     liveFestivals, overlaps, thisWeekend, tourHomepage, weekdayKo, FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, type FestivalRow,
 } from "./festivals";
 import { sportForPath } from "./sportRoute";
@@ -126,6 +126,24 @@ describe("종목마다의 축제 화면(2026-10-21 오너: 낚시에서 누르�
         expect(r.indexOf('router.get("/layer"')).toBeLessThan(r.indexOf('router.get("/:id"'));
         expect(r).toContain('if (sport === "GOLF") {');
         expect(read("client/src/golf/pages/Dashboard.tsx")).toContain('<FestivalPicks sport="GOLF" golfHome />');
+    });
+});
+
+describe("축제 카드(미리보기 1200 정사각)", () => {
+    it("글 — 기간은 해까지 · 알약은 열림 · D-day · 끝났으면 없음", () => {
+        const f = row({ id: "1", title: "강릉커피축제", start: "20261021", end: "20261025", region: "강원", addr: "강원특별자치도 강릉시 창해로" });
+        expect(festivalCardInput(f, "20261022")).toMatchObject({ title: "강릉커피축제", period: "2026년 10월 21일(수) ~ 25일(일)", place: "강원 · 강릉시 창해로", tag: "지금 열려요", live: true });
+        expect(festivalCardInput(f, "20261025").tag).toBe("오늘까지");
+        expect(festivalCardInput(f, "20261018")).toMatchObject({ tag: "D-3", live: false });
+        expect(festivalCardInput(f, "20261101").tag).toBeNull();
+    });
+    it("관광공사 사진은 카드에 얹지 않는다(제3유형) · 우리 그림만 · 검색용 화면과 화면이 같은 주소", () => {
+        const c = read("server/services/festivalCard.ts");
+        expect(c).toContain("server/assets/festivals/cover.png");
+        expect(c).not.toMatch(/f\.image|\.image\b.*src/);
+        expect(read("server/ogImage.ts")).toContain('app.get("/og/festival/:id.png"');
+        expect(read("server/seo/festivals.ts")).toContain("url: festivalCardUrl(ORIGIN, f.id), width: 1200, height: 1200");
+        expect(read("client/src/festivals/pages/FestivalPage.tsx")).toContain("image: festivalCardUrl(ORIGIN, f.id)");
     });
 });
 
