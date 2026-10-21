@@ -36,3 +36,14 @@ describe("산 사진(한국관광공사, 2026-10-21)", () => {
         expect(readFileSync(resolve(__dirname, "../client/src/hiking/pages/MountainPage.tsx"), "utf8")).toContain("<TourPhotos key={`tour:${d.slug}`} photos={d.tourPhotos}");
     });
 });
+
+import { FISHING_TOUR_PHOTOS } from "../server/data/fishingTourPhotos";
+describe("낚시터 사진(한국관광공사, 2026-10-21)", () => {
+    it("같은 규칙 · 열쇠는 '시도|시군구|이름' · 상세 응답 · 표지 밑 사진 줄", () => {
+        const all = Object.entries(FISHING_TOUR_PHOTOS);
+        expect(all.length).toBeGreaterThan(80);
+        for (const [k, x] of all) { expect(k.split("|").length).toBe(3); for (const p of x.photos) { expect(["Type1", "Type3"]).toContain(p.lic); expect(p.url.startsWith("https://")).toBe(true); } }
+        expect(readFileSync(resolve(__dirname, "../server/routes/modules/fishing.ts"), "utf8")).toContain("FISHING_TOUR_PHOTOS[`${place.sido ?? \"\"}|${place.sigungu ?? \"\"}|${place.name}`]?.photos ?? []");
+        expect(readFileSync(resolve(__dirname, "../client/src/fishing/spots/SpotsPages.tsx"), "utf8")).toContain("<TourPhotos key={`tour:${p.id}`} photos={data?.tourPhotos}");
+    });
+});

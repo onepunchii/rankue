@@ -33,6 +33,7 @@ import { spreadBalls } from "@shared/storeDots";
 import { FISHING_SEA_PATH, fishingPortPath, seaArt } from "@shared/fishingSeaPages";
 import { FISHING_FISH_PATH, fishingFishPath } from "@shared/fishingFishPages";
 import { useRegs } from "../Guide";
+import { TourPhotos, type TourPhoto } from "@/components/TourPhotos";
 
 type Lite = Pick<PublicPlace, "id" | "name" | "kind" | "sido" | "sigungu" | "lat" | "lng" | "species" | "fee">;
 const LAND = Object.values(KOREA_MAP_PATHS);
@@ -244,7 +245,9 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
 }
 
 interface RegRow { kind: "closed" | "min"; group: string; name: string; rule: string }
-type SpotDetail = { place: PublicPlace; nearby: (PublicPlace & { km: number | null })[]; port: { code: string; name: string; km: number; area: string } | null };
+type SpotDetail = { place: PublicPlace; nearby: (PublicPlace & { km: number | null })[]; port: { code: string; name: string; km: number; area: string } | null;
+    /** 한국관광공사 사진(2026-10-21 — 공공누리 제1 · 3유형). 옛 응답엔 없다 */
+    tourPhotos?: TourPhoto[] };
 
 export function SpotPage({ id }: { id: string }) {
     const [, setLocation] = useLocation();
@@ -279,6 +282,8 @@ export function SpotPage({ id }: { id: string }) {
                     <h1 className="mt-0.5 text-[26px] font-semibold leading-tight tracking-tight">{p.name}</h1>
                 </div>
             </div>
+            {/* 이곳의 실제 모습(2026-10-21) — 한국관광공사 사진(공공누리). 표지는 그 종류의 판화라, 바로 밑에 진짜 사진. 없으면 칸이 없다 */}
+            <TourPhotos key={`tour:${p.id}`} photos={data?.tourPhotos} name={p.name} className="px-5 pt-3" tone={{ frame: "#FFFFFF0D", line: "#FFFFFF14", credit: "#F3ECDD80" }} />
             {/* 한눈 칸 */}
             <div className="grid grid-cols-2 gap-2 px-5 pt-4" data-testid="spot-facts">
                 {/* 대상 어종 — 받은 자료에 있을 때만 맨 위 큰 칸(2026-10-21 디자인 리뷰: '등록된 어종이 없어요'가 첫 칸을 차지했다).
