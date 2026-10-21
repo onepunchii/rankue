@@ -74,7 +74,7 @@ export async function syncBilliardHalls(mode: "full" | "recent", nowMs = Date.no
     const at = new Date(nowMs).toISOString();
     // 1) 이미 이은 곳 — 상태 · 좌표 · 인허가일(인허가 자료로만 들어온 행은 이름 · 주소도)
     await inChunks(known, async (part) => {
-        const vals = sql.join(part.map((g) => sql`(${g.key}, ${g.name}, ${g.address}, ${g.lat}::float8, ${g.lng}::float8, ${g.licenseDate}::date, ${g.status}, ${g.closedDate}::date, ${g.phone})`), sql`, `);
+        const vals = sql.join(part.map((g) => sql`(${g.key}, ${g.name}, ${g.address}, ${g.lat}::float8, ${g.lng}::float8, ${g.licenseDate}::date, ${g.status}, ${g.closedDate}::date, ${g.phone}::text)`), sql`, `);
         // 전화(2026-10-21): 인허가 자료로만 들어온 행은 새 번호로(없으면 있던 것), 우리 수집 매장은 비어 있을 때만 채운다 · 사장님 인증 매장은 건드리지 않는다
         await db.execute(sql`update store_listings s set
             gov_lat = v.lat, gov_lng = v.lng, license_date = v.lic, gov_status = v.st, gov_closed_date = v.cl, gov_checked_at = ${at}::timestamp,
@@ -89,7 +89,7 @@ export async function syncBilliardHalls(mode: "full" | "recent", nowMs = Date.no
     out.refreshed = known.length;
     // 2) 우리 수집 매장과 같은 곳 — gov_* 열만
     await inChunks(toLink, async (part) => {
-        const vals = sql.join(part.map((g) => sql`(${linkedKeys.get(g.key)!}, ${g.key}, ${g.lat}::float8, ${g.lng}::float8, ${g.licenseDate}::date, ${g.status}, ${g.closedDate}::date, ${g.phone})`), sql`, `);
+        const vals = sql.join(part.map((g) => sql`(${linkedKeys.get(g.key)!}, ${g.key}, ${g.lat}::float8, ${g.lng}::float8, ${g.licenseDate}::date, ${g.status}, ${g.closedDate}::date, ${g.phone}::text)`), sql`, `);
         await db.execute(sql`update store_listings s set gov_key = v.key, gov_lat = v.lat, gov_lng = v.lng, license_date = v.lic, gov_status = v.st, gov_closed_date = v.cl, gov_checked_at = ${at}::timestamp,
             phone = case when s.claimed then s.phone else coalesce(s.phone, v.tel) end
             from (values ${vals}) as v(code, key, lat, lng, lic, st, cl, tel) where s.code = v.code and s.gov_key is null`);
@@ -97,7 +97,7 @@ export async function syncBilliardHalls(mode: "full" | "recent", nowMs = Date.no
     out.linked = toLink.length;
     // 3) 새로 — 영업 중인 곳만, 인허가 자료로만 들어온 행('gov')
     await inChunks(toInsert, async (part) => {
-        const vals = sql.join(part.map((g) => sql`(${govHallCode(g.key)}, ${g.name}, ${g.region}, ${g.address}, ${g.lat}::float8, ${g.lng}::float8, 'gov', ${g.key}, ${g.lat}::float8, ${g.lng}::float8, ${g.licenseDate}::date, ${g.status}, ${at}::timestamp, ${g.phone})`), sql`, `);
+        const vals = sql.join(part.map((g) => sql`(${govHallCode(g.key)}, ${g.name}, ${g.region}, ${g.address}, ${g.lat}::float8, ${g.lng}::float8, 'gov', ${g.key}, ${g.lat}::float8, ${g.lng}::float8, ${g.licenseDate}::date, ${g.status}, ${at}::timestamp, ${g.phone}::text)`), sql`, `);
         await db.execute(sql`insert into store_listings (code, name, region, address, latitude, longitude, source, gov_key, gov_lat, gov_lng, license_date, gov_status, gov_checked_at, phone)
             values ${vals} on conflict (code) do nothing`);
     });
