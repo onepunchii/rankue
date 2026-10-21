@@ -51,8 +51,13 @@ function mergeShots(cur: readonly MatchShot[], add: readonly MatchShot[]): reado
     return [...byIdx.values()].sort((a, b) => a.idx - b.idx);
 }
 
-export default function WatchPage({ matchId }: { matchId: string }) {
+/**
+ * onExit — 나가기(2026-10-21): 부르는 화면(SimulatorPage)이 정한다 — 앱 안에서 열었으면 한 칸 뒤로(결과 창 · 목록으로), 아니면 멀티방.
+ * 예전엔 늘 멀티방으로 밀어 넣어서, 결과 창에서 연 다시보기를 나가면 끝난 판 화면 → 나가기 → '초대 만들기'로 떨어졌다.
+ */
+export default function WatchPage({ matchId, onExit }: { matchId: string; onExit?: () => void }) {
     const [, navigate] = useLocation();
+    const exit = () => (onExit ? onExit() : navigate("/online-game?rooms=1"));
     const { t } = useT();
     const [match, setMatch] = useState<MatchPublic | null>(null);
     const [error, setError] = useState<string | null>(null);
@@ -420,7 +425,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
         return (
             <div className="min-h-dvh bg-surface-0 flex flex-col items-center justify-center gap-4 px-6 text-center">
                 <p className="text-[15px] text-ink-2">{error}</p>
-                <button onClick={() => navigate("/online-game?rooms=1")} className="h-11 px-5 rounded-tile bg-brand text-black text-[14px] font-bold">{t("sim.watch.toRooms")}</button>
+                <button onClick={exit} className="h-11 px-5 rounded-tile bg-brand text-black text-[14px] font-bold">{t("sim.watch.toRooms")}</button>
             </div>
         );
     }
@@ -442,7 +447,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                 record={false} offline={false} syncing={false} queued={0}
                 onSummary={() => setSheetOpen(true)}
                 clock={clockSeconds !== null ? { seconds: clockSeconds, mine: false } : null}
-                matchHeader={headerPlayers ? { players: headerPlayers, onExit: () => navigate("/online-game?rooms=1") } : null}
+                matchHeader={headerPlayers ? { players: headerPlayers, onExit: exit } : null}
                 hideStatus
             />
 
@@ -459,7 +464,7 @@ export default function WatchPage({ matchId }: { matchId: string }) {
                 {/* 머리줄의 나가기는 대전 정보(state)가 있을 때만 그려진다 — 없어도 늘 나갈 길이 있게 */}
                 {!headerPlayers && (
                     <button
-                        type="button" onClick={() => navigate("/online-game?rooms=1")}
+                        type="button" onClick={exit}
                         className="absolute top-2 left-2 z-[3] h-9 px-3.5 rounded-pill bg-surface-1 border border-surface-line-strong shadow-[0_2px_8px_rgba(0,0,0,.45)] text-[12.5px] font-bold text-ink-1"
                     >{t("sim.watch.exit")}</button>
                 )}

@@ -140,6 +140,11 @@ export interface MatchPublic {
     readonly hostName: string;
     readonly guestName: string | null;
     readonly hostTarget: number;
+    /**
+     * 친선전 방장의 온라인 핸디(2026-10-21) — **코드 조회 · 방 목록에만** 온다. 참가 화면이 '내 다마수'를 미리 보여 주는 데 쓴다
+     * (방장이 고른 다마 ÷ 이 값 = 비율, 내 핸디 × 비율 = 내 다마 — shared/sim/handicap scaledTarget). 핸디전 방 · 옛 응답은 null/없음.
+     */
+    readonly hostHandi?: number | null;
     /** 게스트 다마수. 참가 전엔 null */
     readonly guestTarget: number | null;
     /** 보는 사람의 자리. 0 = 호스트(흰 공), 1 = 게스트(노란 공), -1 = 참가자 아님(코드 조회 화면) */
@@ -532,6 +537,8 @@ export function parseMatch(raw: unknown): MatchPublic {
         // 방장 접속 여부(방 목록) — 2026-10-06 까지 이 줄이 없어 서버가 준 값을 버렸다: 목록은 늘 '방장 자리 비움'이었고
         // 빠른 대전(pickQuickRoom)은 들어갈 방을 한 번도 찾지 못했다. 화면 시험은 parseMatch 를 거치지 않아 놓쳤다.
         hostOnline: typeof raw.hostOnline === "boolean" ? raw.hostOnline : undefined,
+        // 친선전 방장의 온라인 핸디(2026-10-21) — 이 줄이 없으면 서버가 준 값을 버린다(hostOnline 에서 겪은 일)
+        hostHandi: typeof raw.hostHandi === "number" && Number.isFinite(raw.hostHandi) ? raw.hostHandi : null,
         title: typeof raw.title === "string" && raw.title !== "" ? raw.title : null,
         hostId: typeof raw.hostId === "string" && raw.hostId !== "" ? raw.hostId : undefined,
         handicap: typeof raw.handicap === "boolean" ? raw.handicap : undefined,

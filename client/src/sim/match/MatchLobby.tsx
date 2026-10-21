@@ -20,6 +20,7 @@ import { Switch } from "@/components/ui/switch";
 import { BallDot } from "@/components/hiq/BallDot";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { GuestScaledTarget, HostScaledHint } from "./ScaledTarget";
 import { TABLES } from "@shared/sim/params";
 import type { GameType, ThreeCushionRuleSet } from "@shared/sim/rules/types";
 import { SIM_MODES, type SimMode,
@@ -168,7 +169,7 @@ export function TargetPicker({ id, gameType, text, onText, label }: {
 
 /* ------------------------------------------------------------------ 만들기 */
 
-function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, initialRoomId, prefsStore = deviceLobbyPrefs }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void; initialPublic?: boolean; initialRoomId?: string; prefsStore?: LobbyPrefsStore }) {
+function CreateTab({ api, pollMs, onStarted, onCreated, onWaiting, initialPublic = false, initialRoomId, prefsStore = deviceLobbyPrefs }: { api: MatchApi; pollMs: number; onStarted: (m: MatchPublic) => void; onCreated?: (m: MatchPublic) => void; /** 대기 화면(내 방)을 보이는 중인가 — 로비의 제목이 따른다 */ onWaiting?: (waiting: boolean) => void; initialPublic?: boolean; initialRoomId?: string; prefsStore?: LobbyPrefsStore }) {
     const { t } = useT();
     // 지난번에 만든 설정(이 기기) — 처음 한 번만 읽는다. 없는 칸은 예전 기본값 그대로.
     const [saved] = useState(() => prefsStore.load());
@@ -226,6 +227,8 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
         })();
         return () => { alive = false; };
     }, [api, created, creating, initialRoomId]);
+    // 제목을 보이는 것에 맞춘다(2026-10-21 — 내 방을 보이는데 '초대 만들기'였다)
+    useEffect(() => { onWaiting?.(created !== null && created.status === "waiting"); }, [created, onWaiting]);
     const [copied, setCopied] = useState(false);
     const [linkCopied, setLinkCopied] = useState(false);
     const [canceling, setCanceling] = useState(false);
@@ -458,6 +461,8 @@ function CreateTab({ api, pollMs, onStarted, onCreated, initialPublic = false, i
                 {!handicap && (
                     <>
                         <TargetPicker id="sim-match-target" gameType={gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                        {/* 같은 비율(2026-10-21 오너) — 상대도 자기 핸디의 같은 비율로 맞춰진다 */}
+                        {targetOk && <HostScaledHint target={targetNum} myHandi={myBoard?.target} />}
                         {/* 2026-09-26 오너: 다마수를 손으로 넣는 방은 레이팅에 넣지 않는다(shared/sim/rating.ts) */}
                         <p className="text-[12px] font-medium text-ink-3">{t("sim.match.friendlyDesc")}</p>
                     </>
@@ -609,7 +614,6 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
     // 비밀번호 방(hasPassword)일 때만 묻는다
     const [password, setPassword] = useState("");
     const [lookup, setLookup] = useState<Lookup>({ status: "idle" });
-    const [targetText, setTargetText] = useState("");
     const [joining, setJoining] = useState(false);
     const [joinError, setJoinError] = useState<string | null>(null);
     const reqRef = useRef(0);
@@ -625,26 +629,26 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
         setLookup({ status: "looking" });
         setJoinError(null);
         void api.lookupCode(code).then(
-            (m) => { if (reqRef.current !== id) return; setLookup({ status: "found", match: m }); setTargetText(String(m.hostTarget)); },
+            (m) => { if (reqRef.current !== id) return; setLookup({ status: "found", match: m }); },
             (e: unknown) => { if (reqRef.current !== id) return; setLookup({ status: "error", key: joinErrorKey(e) }); },
         );
     }, [code, api]);
 
     const found = lookup.status === "found" ? lookup.match : null;
-    const targetNum = targetText.trim() === "" ? NaN : Number(targetText);
-    const targetOk = isValidTarget(targetNum);
     const needsPassword = !!found?.hasPassword;
     // 핸디전 방은 서버가 두 사람의 온라인 기록으로 목표를 정한다 — 게스트가 적을 게 없다(방 목록 참가와 같은 규칙).
+    // 친선전 방(2026-10-21)도 고르지 않는다 — 방장이 자기 핸디의 몇 배를 골랐는지 그 비율로 서버가 정한다(GuestScaledTarget 이 미리 보여 준다)
     const foundHandicap = found?.handicap === true;
-    const canJoin = !!found && (foundHandicap || targetOk) && (!needsPassword || password !== "");
+    const myHandiQ = useQuery({ queryKey: ["/api/hiq/sim/handicap"], queryFn: () => api.getMyHandicap(), staleTime: 60_000, enabled: !!found && !foundHandicap });
+    const myOnline = found ? myHandiQ.data?.boards.find((b) => b.gameType === found.gameType)?.target ?? null : null;
+    const canJoin = !!found && (!needsPassword || password !== "");
 
     const join = async () => {
         if (!found || !canJoin || joining) return;
         setJoining(true);
         setJoinError(null);
         try {
-            const t0 = foundHandicap ? undefined : targetNum;
-            const m = needsPassword ? await api.joinMatch(code, t0, password) : await api.joinMatch(code, t0);
+            const m = needsPassword ? await api.joinMatch(code, undefined, password) : await api.joinMatch(code);
             onCreated?.(m);
             onStarted(m);
         } catch (e) {
@@ -707,7 +711,7 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
                         </div>
                     ) : (
                         <>
-                            <TargetPicker id="sim-match-guest-target" gameType={found.gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                            <GuestScaledTarget room={found} myHandi={myOnline} />
                             <p className="text-[12px] font-medium text-ink-3">{t("sim.match.friendlyDesc")}</p>
                         </>
                     )}
@@ -740,7 +744,8 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
 export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, initialTab = "create", showTabs = false, pollMs = 2000, initialPublic = false, initialCode, initialRoomId, prefsStore }: MatchLobbyProps) {
     const { t } = useT();
     const [tab, setTab] = useState<LobbyTab>(initialTab);
-    const title = showTabs ? t("sim.match.title") : tab === "create" ? (initialPublic ? t("sim.entry.roomCreate") : t("sim.entry.create")) : t("sim.entry.join");
+    const [waiting, setWaiting] = useState(false);
+    const title = showTabs ? t("sim.match.title") : tab === "create" ? (waiting ? t("sim.match.myRoomTitle") : initialPublic ? t("sim.entry.roomCreate") : t("sim.entry.create")) : t("sim.entry.join");
 
     return (
         <div className="rank-hall flex flex-col gap-4 w-full max-w-[420px] mx-auto px-5 pt-4 pb-2">
@@ -773,7 +778,7 @@ export function MatchLobby({ onStarted, onCreated, onClose, api = defaultApi, in
             )}
 
             {tab === "create"
-                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} initialPublic={initialPublic} initialRoomId={initialRoomId} prefsStore={prefsStore} />
+                ? <CreateTab api={api} pollMs={pollMs} onStarted={onStarted} onCreated={onCreated} onWaiting={setWaiting} initialPublic={initialPublic} initialRoomId={initialRoomId} prefsStore={prefsStore} />
                 : <JoinTab api={api} onStarted={onStarted} onCreated={onCreated} initialCode={initialCode} />}
         </div>
     );

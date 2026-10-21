@@ -4,6 +4,7 @@ import App from "./App";
 import "./index.css";
 import { initErrorReporter } from "./lib/errorReporter";
 import { installChunkReload } from "./lib/chunkReload";
+import { installInAppHistory } from "./lib/inAppHistory";
 import { AppErrorBoundary } from "./components/AppErrorBoundary";
 import { initNativeBridge, isNativeApp } from "./lib/nativeBridge";
 import { initKeyboardAvoid } from "./lib/keyboardAvoid";
@@ -13,6 +14,8 @@ initErrorReporter();
 
 // 배포 직후 옛 조각 파일을 못 읽으면 한 번 새로고침(흰 화면 원인 1위, 2026-10-01) — lib/chunkReload
 installChunkReload();
+// 앱 안에서 밀어 넣은 기록에 표시 — 닫기 · 나가기가 온 곳으로 돌아가는 데 쓴다(lib/inAppHistory, 2026-10-21)
+installInAppHistory();
 
 // 네이티브 앱(Capacitor) 브릿지 — 뒤로가기·오프라인 복귀·딥링크·푸시 리스너. 웹에선 no-op.
 // 오프라인 복귀 경로를 첫 렌더 전에 적용하므로 반드시 render 보다 먼저 부른다.

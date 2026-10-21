@@ -103,7 +103,7 @@ function fakeApi(over: Partial<MatchApi> = {}): MatchApi {
     return {
         createMatch: vi.fn(async () => match()),
         listMatches: vi.fn(async () => []),
-        lookupCode: vi.fn(async () => match({ myIndex: -1 })),
+        lookupCode: vi.fn(async () => match({ myIndex: -1, hostHandi: 20 })),
         joinMatch: vi.fn(async () => match({ status: "playing", myIndex: 1, guestName: "나", guestTarget: 20 })),
         getMatch: vi.fn(async () => match()),
         getShots: vi.fn(async () => []),
@@ -245,12 +245,13 @@ describe("MatchLobby · 코드로 참가", () => {
         expect(h.container.textContent).toContain("호스트");
         expect(h.container.textContent).toContain(ko["sim.setup.type3c"]);
         expect(h.container.textContent).toContain(ko["sim.hud.ruleUmb"]);
-        expect((h.container.querySelector("#sim-match-guest-target") as HTMLInputElement).value).toBe("20");
-        // 다마수 칩으로 바꾼다
-        click(buttons(h).find((b) => b.textContent === "15" && b.getAttribute("aria-pressed") !== null)!);
+        // 친선전(2026-10-21): 고르는 칸 없이 방장 비율로 내 다마를 미리 보여 준다 — 방장 핸디 20 중 20(그대로) → 내 핸디 7 그대로
+        expect(h.container.querySelector("#sim-match-guest-target")).toBeNull();
+        await flush();
+        expect(h.container.querySelector("[data-testid=scaled-guest-target]")?.textContent).toBe("7");
         click(byText(h, ko["sim.match.join"])!);
         await flush();
-        expect(api.joinMatch).toHaveBeenCalledWith("123456", 15);
+        expect(api.joinMatch).toHaveBeenCalledWith("123456");
         expect(onStarted).toHaveBeenCalledTimes(1);
         expect(onStarted.mock.calls[0][0].myIndex).toBe(1);
     });
@@ -437,7 +438,7 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
         expect(h3.container.querySelector("#sim-match-password")).toBeNull();
     });
 
-    it("코드가 채워진 참가 화면(initialCode): 비밀번호 방이면 비밀번호를 넣어야 참가 → joinMatch(code, 다마수, 비밀번호)", async () => {
+    it("코드가 채워진 참가 화면(initialCode): 비밀번호 방이면 비밀번호를 넣어야 참가 → joinMatch(code, 다마수 없이 — 서버가 정한다, 비밀번호)", async () => {
         const api = fakeApi({ lookupCode: vi.fn(async () => match({ myIndex: -1, hasPassword: true })) });
         const onStarted = vi.fn();
         const h = mountEl(React.createElement(MatchLobby, { onStarted, onClose: () => undefined, api, initialTab: "join", initialCode: "123456" }));
@@ -450,7 +451,7 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
         expect(join.disabled).toBe(false);
         click(join);
         await flush();
-        expect(api.joinMatch).toHaveBeenCalledWith("123456", 20, "abcd");
+        expect(api.joinMatch).toHaveBeenCalledWith("123456", undefined, "abcd");
         expect(onStarted).toHaveBeenCalledTimes(1);
     });
 });

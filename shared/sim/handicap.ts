@@ -103,6 +103,31 @@ export function onlineDamaOf(rec: MatchRecord | null | undefined, gameType: Game
     return targetFor(playerAverage({ gameType, pointUnit, record: rec }), gameType, pointUnit);
 }
 
+/**
+ * 친선전(방장이 '내 다마수'를 고른 방)의 게스트 목표(2026-10-21 오너: "내가 15개를 치는데 5개만 놓고 싶으면 3분의 1이니깐 상대도 3분의 1로 다마가 축소되는 거지").
+ * 방장이 자기 온라인 핸디의 몇 배를 골랐는지(비율) 그대로 게스트의 온라인 핸디에 곱한다 — 핸디만큼 쳐도 '같은 비율'이면 실력 차는 그대로다.
+ * 캐롬 단위로 반올림하고, 한 캐롬 아래 · 999점 위로는 가지 않는다. 비율이 1(방장이 자기 핸디 그대로)이면 핸디전과 같은 목표가 된다.
+ */
+export function scaledTarget(hostTarget: number, hostHandi: number, guestHandi: number, pointUnit: number): number {
+    const unit = pointUnit > 0 ? pointUnit : 1;
+    const ratio = hostHandi > 0 && hostTarget > 0 ? hostTarget / hostHandi : 1;
+    const caroms = Math.max(1, Math.round((Math.max(0, guestHandi) / unit) * ratio));
+    return Math.min(999, caroms * unit);
+}
+
+/**
+ * 비율을 사람이 읽는 꼴로 — 1 이면 'same', 두 배 · 세 배면 'times', 흔한 분수(분모 4까지)에 2% 안으로 맞으면 { p, q }, 아니면 백분율.
+ * 화면은 { p, q } 를 '3분의 1'(ko) · '1/3'(그 밖) 으로 적는다.
+ */
+export function ratioParts(hostTarget: number, hostHandi: number): { kind: "same" } | { kind: "times"; n: number } | { kind: "frac"; p: number; q: number } | { kind: "pct"; pct: number } {
+    if (!(hostHandi > 0) || !(hostTarget > 0)) return { kind: "same" };
+    const r = hostTarget / hostHandi;
+    if (Math.abs(r - 1) < 0.02) return { kind: "same" };
+    if (r > 1.5 && Math.abs(r - Math.round(r)) / r < 0.02) return { kind: "times", n: Math.round(r) };
+    for (let q = 2; q <= 4; q++) for (let p = 1; p <= q * 3; p++) if (p % q !== 0 && Math.abs(r - p / q) / r < 0.02) return { kind: "frac", p, q };
+    return { kind: "pct", pct: Math.round(r * 100) };
+}
+
 /** 두 사람의 목표를 한 번에. 반환은 [방장, 게스트] 점수. */
 export function handicapPair(a: number, b: number, gameType: GameType, pointUnit: number, innings = TARGET_INNINGS): [number, number] {
     return [targetFor(a, gameType, pointUnit, innings), targetFor(b, gameType, pointUnit, innings)];

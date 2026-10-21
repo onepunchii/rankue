@@ -98,3 +98,32 @@ describe("랭킹 줄의 온라인 다마수(2026-10-20)", () => {
         expect(onlineDamaOf({ score: 0, innings: 20, matches: 3 }, "3c", 1)).toBe(CAROM_MIN["3c"]);
     });
 });
+
+import { ratioParts, scaledTarget } from "./handicap";
+/** 친선전의 '같은 비율' 다마(2026-10-21 오너: "내가 15개를 치는데 5개만 놓고 싶으면 3분의 1이니깐 상대도 3분의 1로") */
+describe("친선전 — 같은 비율", () => {
+    it("방장이 자기 핸디의 몇 배를 골랐는지 그대로 게스트 핸디에 곱한다 — 캐롬 단위 반올림 · 한 캐롬 아래로 안 간다", () => {
+        expect(scaledTarget(5, 15, 30, 1)).toBe(10);          // 3분의 1
+        expect(scaledTarget(15, 15, 22, 1)).toBe(22);         // 그대로 = 핸디전과 같은 목표
+        expect(scaledTarget(30, 15, 12, 1)).toBe(24);         // 두 배
+        expect(scaledTarget(100, 300, 240, 10)).toBe(80);     // 4구(1캐롬 = 10점): 30캐롬 중 10 → 24캐롬의 3분의 1 = 8캐롬
+        expect(scaledTarget(1, 30, 3, 1)).toBe(1);            // 아무리 줄여도 한 캐롬
+        expect(scaledTarget(999, 3, 30, 1)).toBe(999);        // 999점 위로는 가지 않는다
+        expect(scaledTarget(10, 0, 20, 1)).toBe(20);          // 방장 핸디를 모르면 비율 1
+    });
+    it("비율 글 — 그대로 · 몇 배 · 흔한 분수 · 백분율", () => {
+        expect(ratioParts(15, 15)).toEqual({ kind: "same" });
+        expect(ratioParts(5, 15)).toEqual({ kind: "frac", p: 1, q: 3 });
+        expect(ratioParts(20, 30)).toEqual({ kind: "frac", p: 2, q: 3 });
+        expect(ratioParts(30, 15)).toEqual({ kind: "times", n: 2 });
+        expect(ratioParts(7, 15)).toEqual({ kind: "pct", pct: 47 });
+    });
+    it("서버는 친선전 게스트 목표를 같은 셈으로 정하고, 게스트가 보낸 숫자는 쓰지 않는다", async () => {
+        const { readFileSync } = await import("node:fs");
+        const { resolve } = await import("node:path");
+        const src = readFileSync(resolve(__dirname, "../../server/routes/modules/simMatch.ts"), "utf8");
+        expect(src).toContain("scaledTarget(m.hostTarget, hostH, guestH, pointUnitOf(rules))");
+        expect(src).not.toContain("body.target ?? m.hostTarget");
+    });
+});
+

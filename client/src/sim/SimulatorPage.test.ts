@@ -23,6 +23,8 @@ const nav = vi.hoisted(() => ({ search: "", navigate: vi.fn(), apiRequest: vi.fn
 
 vi.mock("@/lib/i18n", () => ({ useT: () => ({ t: (k: string) => ko[k] ?? k, locale: "ko" }) }));
 vi.mock("@/lib/nativeBridge", () => ({ setBackHandler: () => undefined, isNativeApp: () => false }));
+// 앱 안 기록 표시(2026-10-21) — 시험은 늘 '바로 들어온' 화면이다(닫기 · 나가기가 정해 둔 곳으로 바꿔 끼운다)
+vi.mock("@/lib/inAppHistory", () => ({ cameInApp: () => false }));
 vi.mock("@/lib/utils", () => ({ cn: (...a: unknown[]) => a.filter((x) => typeof x === "string" && x).join(" ") }));
 vi.mock("@/lib/queryClient", () => ({ apiRequest: nav.apiRequest }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: nav.toast }) }));

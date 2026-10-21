@@ -31,7 +31,7 @@ import {
 } from "../../../shared/sim/chat.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
 import { ROOM_TITLE_MAX, checkRoomTitle } from "../../../shared/sim/roomTitle.js";
-import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCHES, TARGET_INNINGS, targetFor } from "../../../shared/sim/handicap.js";
+import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCHES, scaledTarget, TARGET_INNINGS, targetFor } from "../../../shared/sim/handicap.js";
 import { countWatchers } from "../../../shared/sim/watchers.js";
 import { LOOKALIKE_MIN_MATCHES, nearestPros, nextPro, proTier, type LookalikeResponse } from "../../../shared/proCompare.js";
 import type { MatchWithNames } from "../../storage/simMatch.repo.js";
@@ -437,7 +437,7 @@ router.get("/sim/matches/code/:code", requireAuth, asyncHandler(async (req: Auth
     if (m.status === "playing" && m.hostId !== req.userId && m.guestId !== req.userId) {
         return sendError(res, 409, "err.sim.alreadyStarted");
     }
-    return sendSuccess(res, publicMatch(m, req.userId!));
+    return sendSuccess(res, { ...publicMatch(m, req.userId!), hostHandi: m.status === "waiting" ? await hostHandiOf(m).catch(() => null) : null });
 }));
 
 /** 게스트 참가 → 시작. 코드 참가와 멀티방(id) 참가가 같은 길을 쓴다. 비밀번호 방이면 맞아야 한다(403 BAD_PASSWORD). */
@@ -460,9 +460,15 @@ async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body:
     // 핸디전(2026-09-12 오너): 참가하는 순간 두 사람의 온라인 에버리지로 각자 목표를 정한다.
     // 비율(실력 차)은 그대로, 길이는 기준 이닝으로 고정된다 — 다마수를 그대로 옮기면 고수 판이 300이닝씩 간다.
     // 게스트가 보낸 target 은 핸디전에서 무시한다(짠다마 방지 — 자기신고를 안 받는 건 실전 핸디와 같은 설계).
-    const targets = m.handicap
+    // 친선전(2026-10-21 오너: "내가 15개를 치는데 5개만 놓고 싶으면 3분의 1이니깐 상대도 3분의 1로") — 방장이 고른 다마가 자기 핸디의 몇 배인지
+    // 그 비율로 게스트의 핸디도 줄인다(shared/sim/handicap scaledTarget). 예전엔 게스트가 고른 숫자(기본값은 방장의 숫자)였다 — 실력 차가 사라졌다.
+    // 게스트가 보낸 target 은 쓰지 않는다 — 친선전도 자기신고를 받지 않는다(핸디전과 같은 까닭).
+    const targets: [number, number] = m.handicap
         ? await handicapTargets(m, req.userId!, pointUnitOf(rules))
-        : [m.hostTarget, body.target ?? m.hostTarget] as [number, number];
+        : await (async () => {
+            const [hostH, guestH] = await handicapTargets(m, req.userId!, pointUnitOf(rules));
+            return [m.hostTarget, scaledTarget(m.hostTarget, hostH, guestH, pointUnitOf(rules))] as [number, number];
+        })();
     const [hostTarget, guestTarget] = targets;
     const state = createSession({
         rules, finishType: m.finishType, inningCap: m.inningCap,
@@ -495,6 +501,16 @@ function pointUnitOf(rules: Rules): number {
 async function simAverage(memberId: string, gameType: "3c" | "4c", pointUnit: number): Promise<{ avg: number; record: { score: number; innings: number; matches: number } }> {
     const record = await storage.simMatch.recentMatchRecord(memberId, gameType, RECENT_MATCHES);
     return { avg: playerAverage({ gameType, pointUnit, record }), record };
+}
+
+/**
+ * 친선전 방의 방장 온라인 핸디(2026-10-21) — 참가 화면이 "방장은 핸디 15의 3분의 1, 나는 내 핸디의 3분의 1 = 10" 을 미리 보여 주는 데 쓴다.
+ * 핸디전 방은 null(참가 순간 서버가 정한다). 실제 목표는 참가할 때 다시 잰다(joinAndStart).
+ */
+async function hostHandiOf(m: MatchWithNames): Promise<number | null> {
+    if (m.handicap) return null;
+    const pu = pointUnitOf(m.rules as Rules);
+    return targetFor((await simAverage(m.hostId, m.gameType, pu)).avg, m.gameType, pu);
 }
 
 /** 핸디전 목표 두 개. [방장, 게스트]. */
@@ -636,7 +652,8 @@ router.get("/sim/rooms", requireAuth, asyncHandler(async (req: AuthRequest, res:
     const rows = await storage.simMatch.listPublicWaiting(req.userId!, Date.now() - ROOM_LIST_WINDOW_MS);
     // 방장이 보고 있는 방을 먼저 — 들어가면 바로 친다. 자리 비운 방장은 알림을 받고 돌아와야 시작된다.
     // 방장 id 는 목록에서만 준다 — 신고·차단(방제와 방장 이름은 누구에게나 보이는 글이다)이 대상을 알아야 한다
-    const out = rows.map((m) => ({ ...publicMatch(m, req.userId!), code: "", hostId: m.hostId }));
+    // 친선전 방은 방장의 온라인 핸디를 같이(참가 화면의 '내 다마 미리 보기' — hostHandiOf). 방이 몇 안 돼 한 번에 잰다
+    const out = await Promise.all(rows.map(async (m) => ({ ...publicMatch(m, req.userId!), code: "", hostId: m.hostId, hostHandi: await hostHandiOf(m).catch(() => null) })));
     out.sort((a, b) => Number(b.hostOnline) - Number(a.hostOnline));
     return sendSuccess(res, out);
 }));

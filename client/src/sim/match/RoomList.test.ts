@@ -50,7 +50,7 @@ type ClientMod = typeof import("react-dom/client");
 type Mod = typeof import("./RoomList");
 type RQ = typeof import("@tanstack/react-query");
 let ROOMS_QUERY_KEY: Mod["ROOMS_QUERY_KEY"];
-let React: ReactMod; let createRoot: ClientMod["createRoot"]; let RoomList: Mod["RoomList"]; let roomAge: Mod["roomAge"]; let defaultJoinTarget: Mod["defaultJoinTarget"]; let pickQuickRoom: Mod["pickQuickRoom"]; let rq: RQ; let dom: JSDOM;
+let React: ReactMod; let createRoot: ClientMod["createRoot"]; let RoomList: Mod["RoomList"]; let roomAge: Mod["roomAge"]; let pickQuickRoom: Mod["pickQuickRoom"]; let rq: RQ; let dom: JSDOM;
 const globalsSet: string[] = [];
 
 beforeAll(async () => {
@@ -65,7 +65,7 @@ beforeAll(async () => {
     React = await import("react");
     if (!("React" in g)) { g.React = React; globalsSet.push("React"); }
     ({ createRoot } = await import("react-dom/client"));
-    ({ RoomList, roomAge, defaultJoinTarget, pickQuickRoom, ROOMS_QUERY_KEY } = await import("./RoomList"));
+    ({ RoomList, roomAge, pickQuickRoom, ROOMS_QUERY_KEY } = await import("./RoomList"));
     rq = await import("@tanstack/react-query");
 });
 afterAll(() => { const g = globalThis as unknown as Record<string, unknown>; for (const k of globalsSet) delete g[k]; dom.window.close(); });
@@ -88,6 +88,8 @@ function api(rows: MatchPublic[], joinRoom?: MatchApi["joinRoom"], live: unknown
         resign: vi.fn(async () => ({ status: "canceled" as const })),
         joinRoom: joinRoom ?? vi.fn(async (id) => room({ id, status: "playing", myIndex: 1 })),
         getWatchable: vi.fn(async () => ({ live, replays: [] })),
+        // 내 온라인 핸디 — 3쿠션 15(친선전 방의 '내 다마수' 미리 보기)
+        getMyHandicap: vi.fn(async () => ({ minInnings: 20, innings: 18, boards: [{ gameType: "3c" as const, avg: 0.8, target: 15, matches: 8, innings: 40, fromRecord: true }] })),
     } as unknown as MatchApi;
 }
 
@@ -97,7 +99,7 @@ const liveCard = (over: Record<string, unknown> = {}) => ({
     targets: [20, 20], scores: [7, 5], innings: 9, turn: 0, shots: 18, winnerIndex: null, watchers: 2,
     startedAt: new Date(NOW - 60_000).toISOString(), finishedAt: null, lastShotAt: null, ...over,
 });
-function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; myHandi?: { handi3c: number | null; handi4c: number | null }; live?: unknown[]; onWatch?: (id: string) => void; autoJoinId?: string; mine?: MatchPublic[]; onEnterMine?: () => void }) {
+function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; live?: unknown[]; onWatch?: (id: string) => void; autoJoinId?: string; mine?: MatchPublic[]; onEnterMine?: () => void }) {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
@@ -106,7 +108,7 @@ function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; my
     const a = api(props.rows, props.joinRoom, props.live ?? [], props.mine ?? []);
     React.act(() => {
         root.render(React.createElement(rq.QueryClientProvider, { client: qc },
-            React.createElement(RoomList, { onOpen, onWatch: props.onWatch, onCreate, onEnterMine: props.onEnterMine, onClose: () => undefined, api: a, myHandi: props.myHandi, autoJoinId: props.autoJoinId, now: () => NOW })));
+            React.createElement(RoomList, { onOpen, onWatch: props.onWatch, onCreate, onEnterMine: props.onEnterMine, onClose: () => undefined, api: a, autoJoinId: props.autoJoinId, now: () => NOW })));
     });
     const h = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); }, onOpen, onCreate, api: a };
     live.push(h);
@@ -160,9 +162,10 @@ describe("RoomList · 방제(2026-10-06)", () => {
 });
 
 describe("RoomList", () => {
-    it("행: 방장·종목·다마수·칩(리얼리티·비밀번호)·만든 지 n분 → 참가 다이얼로그(내 핸디가 기본) → joinRoom → onOpen", async () => {
-        const rows = [room(), room({ id: "r2", hostName: "고수", aimAssist: false, hasPassword: true, createdAt: new Date(NOW - 3 * 3_600_000).toISOString() })];
-        const h = mount({ rows, myHandi: { handi3c: 18, handi4c: null } });
+    it("행: 방장·종목·다마수·칩(리얼리티·비밀번호)·만든 지 n분 → 참가 다이얼로그(친선전 — 방장 비율로 내 다마 미리 보기) → joinRoom → onOpen", async () => {
+        // 방장 핸디 30 중 20(3분의 2) → 내 핸디 15 의 3분의 2 = 10 (2026-10-21 오너: 상대도 같은 비율)
+        const rows = [room({ hostHandi: 30 }), room({ id: "r2", hostName: "고수", aimAssist: false, hasPassword: true, createdAt: new Date(NOW - 3 * 3_600_000).toISOString() })];
+        const h = mount({ rows });
         await settle(h, () => text(h).includes("방장"));
         expect(text(h)).toContain("열린 방 2");
         expect(text(h)).toContain("5분 전");
@@ -172,11 +175,13 @@ describe("RoomList", () => {
         click(buttons(h).find((b) => b.getAttribute("aria-label") === `${ko["sim.rooms.join"]} · 방장`)!);
         const dlg = h.container.querySelector("[role=dialog]")!;
         expect(dlg).not.toBeNull();
-        expect((dlg.querySelector("#sim-room-target") as HTMLInputElement).value).toBe("18");
+        expect(dlg.querySelector("#sim-room-target")).toBeNull();
+        await settle(h, () => (dlg.querySelector("[data-testid=scaled-guest-target]")?.textContent ?? "") === "10");
+        expect(dlg.textContent).toContain("3분의 2");
         expect(dlg.querySelector("#sim-room-password")).toBeNull();
         click(Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent === ko["sim.rooms.join"])!);
         await settle(h, () => h.onOpen.mock.calls.length > 0);
-        expect(h.api.joinRoom).toHaveBeenCalledWith("r1", 18, undefined);
+        expect(h.api.joinRoom).toHaveBeenCalledWith("r1", undefined, undefined);
         expect(h.onOpen.mock.calls[0][0].status).toBe("playing");
     });
 
@@ -186,18 +191,17 @@ describe("RoomList", () => {
         await settle(h, () => text(h).includes("방장"));
         click(buttons(h).find((b) => b.getAttribute("aria-label") === `${ko["sim.rooms.join"]} · 방장`)!);
         const dlg = h.container.querySelector("[role=dialog]")!;
-        expect((dlg.querySelector("#sim-room-target") as HTMLInputElement).value).toBe("20"); // 핸디 없음 → 방장 다마수
         const join = Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent === ko["sim.rooms.join"]) as HTMLButtonElement;
         expect(join.disabled).toBe(true);
         type(dlg.querySelector("#sim-room-password") as HTMLInputElement, "0000");
         expect(join.disabled).toBe(false);
         click(join);
         await settle(h, () => text(h).includes(ko["sim.match.badPassword"]));
-        expect(joinRoom).toHaveBeenCalledWith("r1", 20, "0000");
+        expect(joinRoom).toHaveBeenCalledWith("r1", undefined, "0000");
         expect(h.onOpen).not.toHaveBeenCalled();
     });
 
-    it("빈 목록 안내와 방 만들기, roomAge·defaultJoinTarget", async () => {
+    it("빈 목록 안내와 방 만들기, roomAge", async () => {
         const h = mount({ rows: [] });
         await settle(h, () => text(h).includes(ko["sim.rooms.empty"]));
         click(buttons(h).find((b) => b.textContent === ko["sim.entry.roomCreate"])!);
@@ -206,8 +210,6 @@ describe("RoomList", () => {
         expect(roomAge(new Date(NOW - 10_000).toISOString(), NOW, t)).toBe("방금");
         expect(roomAge(new Date(NOW - 61 * 60_000).toISOString(), NOW, t)).toBe("1시간 전");
         expect(roomAge("junk", NOW, t)).toBe("방금");
-        expect(defaultJoinTarget({ gameType: "4c", hostTarget: 100 }, { handi3c: 18, handi4c: 80 })).toBe(80);
-        expect(defaultJoinTarget({ gameType: "4c", hostTarget: 100 }, { handi3c: 18, handi4c: null })).toBe(100);
     });
 });
 

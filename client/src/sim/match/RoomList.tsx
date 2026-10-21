@@ -18,8 +18,7 @@ import { useT } from "@/lib/i18n";
 import { matchApi as defaultApi, matchErrorCode, type MatchApi, type MatchPublic, type WatchCard } from "../matchApi";
 import { gameLabel, rulesLabel, inningCapLabel } from "./matchView";
 import { roomSetKey, shouldRefreshWatch, WATCH_LIST_REFETCH_MS, WATCH_QUERY_KEY } from "../watch/watchPlan";
-import { isValidTarget } from "../setupPresets";
-import { TargetPicker } from "./MatchLobby";
+import { GuestScaledTarget } from "./ScaledTarget";
 import { MyRoomRow, useMyOpenRoom } from "./MyRoomRow";
 import { ReportDialog } from "@/components/hiq/community/ReportDialog";
 import { TierEmblem } from "../rank/TierEmblem";
@@ -37,8 +36,6 @@ export interface RoomListProps {
     onEnterMine?: () => void;
     onClose: () => void;
     api?: MatchApi;
-    /** 내 실전 핸디(있으면 다마수 기본값) */
-    myHandi?: { handi3c: number | null; handi4c: number | null };
     /**
      * 이 방의 참가 창을 바로 연다(홈 카드에서 방을 눌러 들어온 경우 ?rooms=1&room=<id>).
      * 목록이 도착한 뒤 한 번만 연다 — 닫으면 다시 열리지 않는다. 그사이 방이 차서 없어졌으면 목록만 보인다.
@@ -66,10 +63,6 @@ export function pickQuickRoom(rows: readonly MatchPublic[]): MatchPublic | null 
     return open.find((m) => m.handicap) ?? open[0] ?? null;
 }
 
-export function defaultJoinTarget(m: Pick<MatchPublic, "gameType" | "hostTarget">, handi?: { handi3c: number | null; handi4c: number | null }): number {
-    const h = handi ? (m.gameType === "3c" ? handi.handi3c : handi.handi4c) : null;
-    return h !== null && h !== undefined && isValidTarget(h) ? h : m.hostTarget;
-}
 
 const pill = "h-10 px-3.5 inline-flex items-center rounded-pill border border-surface-line bg-surface-1 text-[13px] font-semibold text-ink-2 active:bg-surface-3 shrink-0";
 /** 누를 것 하나 — 연두(랭킹 화면의 고른 칩과 같은 색) */
@@ -166,26 +159,28 @@ function joinErrorKey(e: unknown): string {
     return "sim.match.joinFailed";
 }
 
-function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic | null; api: MatchApi; myHandi?: RoomListProps["myHandi"]; onClose: () => void; onOpen: (m: MatchPublic) => void }) {
+function JoinDialog({ room, api, onClose, onOpen }: { room: MatchPublic | null; api: MatchApi; onClose: () => void; onOpen: (m: MatchPublic) => void }) {
     const { t } = useT();
     const qc = useQueryClient();
-    const [targetText, setTargetText] = useState("");
     const [password, setPassword] = useState("");
     const [joining, setJoining] = useState(false);
     const [error, setError] = useState<string | null>(null);
     useEffect(() => {
-        if (room) { setTargetText(String(defaultJoinTarget(room, myHandi))); setPassword(""); setError(null); }
-    }, [room, myHandi]);
-    const targetNum = targetText.trim() === "" ? NaN : Number(targetText);
+        if (room) { setPassword(""); setError(null); }
+    }, [room]);
+    // 내 온라인 핸디(방 만들기 화면과 같은 값 · 같은 캐시) — 친선전 방의 '내 다마수' 미리 보기에 쓴다
+    const myHandiQ = useQuery({ queryKey: ["/api/hiq/sim/handicap"], queryFn: () => api.getMyHandicap(), staleTime: 60_000, enabled: room !== null && room.handicap !== true });
+    const myOnline = room ? myHandiQ.data?.boards.find((b) => b.gameType === room.gameType)?.target ?? null : null;
     // 핸디전 방(2026-09-12): 다마수를 게스트가 정하지 않는다 — 참가하는 순간 서버가 두 사람 기록으로 정한다(짠다마 방지).
+    // 친선전 방(2026-10-21)도 고르지 않는다 — 방장이 자기 핸디의 몇 배를 골랐는지 그 비율로 서버가 내 다마를 정한다(GuestScaledTarget 이 미리 보여 준다)
     const isHandicap = room?.handicap === true;
-    const ok = !!room && (isHandicap || isValidTarget(targetNum)) && (!room.hasPassword || password !== "");
+    const ok = !!room && (!room.hasPassword || password !== "");
     const join = async () => {
         if (!room || !ok || joining) return;
         setJoining(true);
         setError(null);
         try {
-            const m = await api.joinRoom(room.id, isHandicap ? undefined : targetNum, room.hasPassword ? password : undefined);
+            const m = await api.joinRoom(room.id, undefined, room.hasPassword ? password : undefined);
             void qc.invalidateQueries({ queryKey: ROOMS_QUERY_KEY });
             onOpen(m);
         } catch (e) {
@@ -229,7 +224,7 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
                             </div>
                         ) : (
                             <>
-                                <TargetPicker id="sim-room-target" gameType={room.gameType} text={targetText} onText={setTargetText} label={t("sim.match.myTarget")} />
+                                <GuestScaledTarget room={room} myHandi={myOnline} />
                                 <p className="text-[12px] font-medium text-ink-3">{t("sim.match.friendlyDesc")}</p>
                             </>
                         )}
@@ -257,7 +252,7 @@ function JoinDialog({ room, api, myHandi, onClose, onOpen }: { room: MatchPublic
     );
 }
 
-export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api = defaultApi, myHandi, autoJoinId, now = Date.now }: RoomListProps) {
+export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api = defaultApi, autoJoinId, now = Date.now }: RoomListProps) {
     const { t } = useT();
     const q = useQuery({ queryKey: ROOMS_QUERY_KEY, queryFn: () => api.listRooms(), staleTime: 0, refetchInterval: ROOMS_REFETCH_MS });
     // 게임 중인 공개 방 — 참가 목록에서는 빠지지만 관전으로 들어갈 수 있어 같은 목록에 이어 붙인다.
@@ -363,7 +358,7 @@ export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api 
                 </ul>
             )}
             </div>
-            <JoinDialog room={target} api={api} myHandi={myHandi} onClose={() => setTarget(null)} onOpen={(m) => { setTarget(null); onOpen(m); }} />
+            <JoinDialog room={target} api={api} onClose={() => setTarget(null)} onOpen={(m) => { setTarget(null); onOpen(m); }} />
             {reported?.hostId && (
                 <ReportDialog
                     open onOpenChange={(o) => { if (!o) setReported(null); }}
