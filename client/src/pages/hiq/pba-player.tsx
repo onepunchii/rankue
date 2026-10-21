@@ -330,7 +330,8 @@ export default function HiqPbaPlayer() {
                         {latest && latestRow && <div className="w-px bg-white/25 mx-3.5" />}
                         <div className="flex-1 min-w-0">
                             <div className="text-[12px] font-semibold opacity-80">{t.careerPrize}</div>
-                            <div className="rk-num text-[24px] font-bold mt-1.5 leading-tight">{p.careerPrize != null ? prizeMoney(p.careerPrize) : "-"}</div>
+                            {/* '원'이 혼자 다음 줄로 떨어지지 않게(2026-10-21 360 폭: "5억 1,150만 / 원") — 한글은 글자 사이에서도 끊겨서 낱말 단위로(break-keep), 끊기면 억에서 */}
+                            <div className="rk-num text-[24px] font-bold mt-1.5 leading-tight break-keep">{p.careerPrize != null ? prizeMoney(p.careerPrize) : "-"}</div>
                             {rk.careerPrize && <div className="text-[12px] opacity-80 mt-0.5">{fill(t.careerPrizeRank, { lg: p.league, n: rk.careerPrize.rank })}</div>}
                         </div>
                     </div>
