@@ -22,7 +22,7 @@ export function FestivalGallery({ images, title, text }: { images: readonly Fest
                     </button>
                 ))}
             </div>
-            <p className="mt-1.5 text-right text-[12px]" style={{ color: `${text}66` }}>사진 {images.length}장 · {festivalPhotoCredit(images.some((x) => x.lic === "Type3") ? "Type3" : "Type1")}</p>
+            <p className="mt-1.5 text-right text-[12px]" style={{ color: `${text}66` }}>사진 {images.length}장 · {festivalPhotoCredit(images.some((x) => x.lic === "Type3") ? "Type3" : "Type1").replace(/^사진 /, "")}</p>
 
             <DialogPrimitive.Root open={at != null} onOpenChange={(o) => { if (!o) setAt(null); }}>
                 <DialogPrimitive.Portal>
@@ -39,7 +39,10 @@ export function FestivalGallery({ images, title, text }: { images: readonly Fest
                                 <img src={cur.url} alt={`${title} 사진 ${at! + 1}`} referrerPolicy="no-referrer" onClick={(e) => e.stopPropagation()} className="max-h-[calc(100dvh-200px)] max-w-full rounded-xl object-contain" />
                                 <div className="mt-3 flex w-full max-w-[520px] items-center justify-between gap-3 px-2" onClick={(e) => e.stopPropagation()}>
                                     <button type="button" onClick={() => go(-1)} aria-label="앞 사진" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white active:bg-white/20" disabled={images.length < 2}><LucideChevronLeft className="h-5 w-5" /></button>
-                                    <span className="text-center text-[13px] tabular-nums text-white/70">{at! + 1} / {images.length} · {festivalPhotoCredit(cur.lic)}</span>
+                                    <span className="flex flex-col items-center text-center">
+                                        <span className="text-[14px] font-semibold tabular-nums text-white/85">{at! + 1} / {images.length}</span>
+                                        <span className="mt-0.5 text-[12px] text-white/55 break-keep">{festivalPhotoCredit(cur.lic)}</span>
+                                    </span>
                                     <button type="button" onClick={() => go(1)} aria-label="다음 사진" className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white active:bg-white/20" disabled={images.length < 2}><LucideChevronRight className="h-5 w-5" /></button>
                                 </div>
                             </>
