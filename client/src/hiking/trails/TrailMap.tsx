@@ -14,11 +14,13 @@ interface Box { x: number; y: number; w: number; h: number }
 const ASPECT = 0.8;
 /** 전체 — 위를 조금 더(접경의 DMZ 평화의 길 이름이 지도 위 끝에서 잘렸다) */
 const FULL: Box = { x: 40, y: -6, w: 436, h: 661 };
-const fit = (b: Box): Box => {
-    if (b.w / b.h > ASPECT) { const h = b.w / ASPECT; return { x: b.x, y: b.y - (h - b.h) / 2, w: b.w, h }; }
-    const w = b.h * ASPECT;
+const fit = (b: Box, aspect = ASPECT): Box => {
+    if (b.w / b.h > aspect) { const h = b.w / aspect; return { x: b.x, y: b.y - (h - b.h) / 2, w: b.w, h }; }
+    const w = b.h * aspect;
     return { x: b.x - (w - b.w) / 2, y: b.y, w, h: b.h };
 };
+/** 길 하나만 그리는 지도(길 페이지)의 가로 : 세로 — 길의 꼴대로(DMZ 처럼 옆으로 긴 길 위아래가 비지 않게), 0.8 ~ 1.5 */
+const clampAspect = (v: number) => Math.min(1.5, Math.max(ASPECT, v));
 const ease = (t: number) => 1 - Math.pow(1 - t, 3);
 const COLOR: Record<TrailRouteId, string> = Object.fromEntries(TRAIL_ROUTES.map((r) => [r.id, r.color])) as Record<TrailRouteId, string>;
 /** 넓게 볼 때 길 이름을 놓는 자리(바다 쪽) */
@@ -29,10 +31,12 @@ const NAME_AT: Record<TrailRouteId, { lat: number; lng: number; anchor: "start" 
     dmz: { lat: 38.47, lng: 127.55, anchor: "middle" },
 };
 
-export function TrailMap({ courses, focus = null, picked = null, onPick, numbers = false, className, label = "코리아둘레길 지도" }: {
+export function TrailMap({ courses, focus = null, picked = null, onPick, numbers = false, fitShape = false, className, label = "코리아둘레길 지도" }: {
     courses: readonly TrailCourseSummary[];
     /** 고른 길 — 그 길로 당겨 들어가고 나머지는 옅게 */
     focus?: TrailRouteId | null;
+    /** 길 페이지 — 고른 길이 바뀌지 않으니 상자를 길의 꼴에 맞춘다(허브는 길을 바꿔 가며 당겨 들어가므로 4:5 그대로) */
+    fitShape?: boolean;
     picked?: string | null;
     onPick?: (c: TrailCourseSummary) => void;
     /** 당겨 들어갔을 때 코스 번호를 단다 */
@@ -57,14 +61,16 @@ export function TrailMap({ courses, focus = null, picked = null, onPick, numbers
         return { c, pts, d: pts.map(([x, y], i) => `${i ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)}`).join(" ") };
     }), [courses]);
 
-    const target = useMemo<Box>(() => {
+    const { target, aspect } = useMemo<{ target: Box; aspect: number }>(() => {
         const sel = focus ? lines.filter((l) => l.c.route === focus) : [];
-        if (!sel.length) return fit(FULL);
+        if (!sel.length) return { target: fit(FULL), aspect: ASPECT };
         const xs = sel.flatMap((l) => l.pts.map((p) => p[0])), ys = sel.flatMap((l) => l.pts.map((p) => p[1]));
         const b = { x: Math.min(...xs), y: Math.min(...ys), w: Math.max(...xs) - Math.min(...xs), h: Math.max(...ys) - Math.min(...ys) };
         const pad = Math.max(b.w, b.h) * 0.1 + 6;
-        return fit({ x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 });
-    }, [focus, lines]);
+        const padded = { x: b.x - pad, y: b.y - pad, w: b.w + pad * 2, h: b.h + pad * 2 };
+        const a = fitShape ? clampAspect(padded.w / padded.h) : ASPECT;
+        return { target: fit(padded, a), aspect: a };
+    }, [focus, lines, fitShape]);
 
     const [vb, setVb] = useState<Box>(target);
     const vbRef = useRef(vb);
@@ -78,13 +84,13 @@ export function TrailMap({ courses, focus = null, picked = null, onPick, numbers
         const fc = { x: from.x + from.w / 2, y: from.y + from.h / 2 }, tc = { x: to.x + to.w / 2, y: to.y + to.h / 2 };
         const step = (t: number) => {
             const k = ease(Math.min(1, (t - t0) / 450));
-            const w = Math.exp(Math.log(from.w) + (Math.log(to.w) - Math.log(from.w)) * k), h = w / ASPECT;
+            const w = Math.exp(Math.log(from.w) + (Math.log(to.w) - Math.log(from.w)) * k), h = w / aspect;
             setVb({ x: fc.x + (tc.x - fc.x) * k - w / 2, y: fc.y + (tc.y - fc.y) * k - h / 2, w, h });
             if (k < 1) raf = requestAnimationFrame(step);
         };
         raf = requestAnimationFrame(step);
         return () => cancelAnimationFrame(raf);
-    }, [target]);
+    }, [target, aspect]);
 
     const k = vb.w / Math.max(200, px);
     const zoomed = vb.w < 300;
@@ -114,7 +120,7 @@ export function TrailMap({ courses, focus = null, picked = null, onPick, numbers
     };
 
     return (
-        <div ref={wrapRef} className={`relative overflow-hidden rounded-2xl ${className ?? ""}`} style={{ aspectRatio: "4 / 5", background: "radial-gradient(120% 75% at 50% 0%, #143A44 0%, #0B1F26 72%)", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="trail-map">
+        <div ref={wrapRef} className={`relative overflow-hidden rounded-2xl ${className ?? ""}`} style={{ aspectRatio: `${aspect}`, background: "radial-gradient(120% 75% at 50% 0%, #143A44 0%, #0B1F26 72%)", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="trail-map">
             <svg viewBox={`${vb.x} ${vb.y} ${vb.w} ${vb.h}`} className={`absolute inset-0 h-full w-full ${onPick ? "cursor-pointer" : ""}`} onClick={onPick ? tap : undefined} role="img" aria-label={label}>
                 <g>{Object.entries(KOREA_MAP_PATHS).map(([key, d]) => <path key={key} d={d} fill="#13363F" stroke="#2B5E66" strokeWidth={0.8} vectorEffect="non-scaling-stroke" />)}</g>
                 {/* 빛 — 선 밑에 넓고 옅게 */}

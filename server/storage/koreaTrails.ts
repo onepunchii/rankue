@@ -5,7 +5,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { TRAIL_ROUTES, fillTrailEndNames, type TrailCourseDetail, type TrailCourseSummary, type TrailRouteId, type TrailRouteMeta } from "../../shared/koreaTrails.js";
+import { TRAIL_ROUTES, fillTrailEndNames, fixTrailSigun, type TrailCourseDetail, type TrailCourseSummary, type TrailRouteId, type TrailRouteMeta } from "../../shared/koreaTrails.js";
 
 interface TrailsFile { source: string; made: string; routes: TrailRouteMeta[]; courses: TrailCourseDetail[] }
 let cache: TrailsFile | null = null;
@@ -19,8 +19,9 @@ function load(): TrailsFile {
     const file = candidates.find((c) => fs.existsSync(c));
     if (!file) throw new Error(`[koreaTrails] asset not found: ${candidates.join(", ")}`);
     const raw = JSON.parse(fs.readFileSync(file, "utf8")) as TrailsFile;
-    // 시작 · 끝 이름 — '시점 :' 줄이 없는 코스(해파랑 · DMZ 77)는 두루누비 요약의 말 · 이어진 코스에서(shared fillTrailEndNames). 파일은 받은 그대로 둔다
-    cache = { ...raw, courses: fillTrailEndNames(raw.courses) };
+    // 시작 · 끝 이름 — '시점 :' 줄이 없는 코스(해파랑 · DMZ 77)는 두루누비 요약의 말 · 이어진 코스에서(shared fillTrailEndNames).
+    // 지역 글자가 좌표와 크게 어긋나면(우회로 둘이 '서울 강동구 · 강남구') 본 코스의 지역으로(fixTrailSigun). 파일은 받은 그대로 둔다
+    cache = { ...raw, courses: fixTrailSigun(fillTrailEndNames(raw.courses)) };
     return cache;
 }
 

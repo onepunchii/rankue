@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    TRAIL_ROUTES, TRAIL_TOTAL_COURSES, TRAIL_TOTAL_KM, parseTrailCourseName, fillTrailEndNames, summaryEnds, trailCardInput, trailCoursePath, trailCourseSeo, trailTimeShort, trailTimeText, travelerPoint, type TrailCourseDetail,
+    TRAIL_ROUTES, TRAIL_TOTAL_COURSES, TRAIL_TOTAL_KM, parseTrailCourseName, fillTrailEndNames, fixTrailSigun, summaryEnds, trailCardInput, trailCoursePath, trailCourseSeo, trailTimeShort, trailTimeText, travelerPoint, type TrailCourseDetail,
 } from "./koreaTrails";
 import { HUB_CARD_NAMES, hubCardName, trailCardUrl } from "./ogCards";
 import { sportForPath } from "./sportRoute";
@@ -120,6 +120,24 @@ describe("코리아둘레길 — 시작 · 끝 이름(두루누비 요약의 말
         expect(at("haeparang", "2").startName).toBe("해운대");
         expect(at("dmz", "34").endName).toBe("통일전망대");
         expect(filled.some((c) => /^(?:해|하여) /.test(`${c.startName} ${c.endName}`) || / (?:해|하여) /.test(` ${c.endName}`))).toBe(false);
-        expect(read("server/storage/koreaTrails.ts")).toContain("courses: fillTrailEndNames(raw.courses)");
+        expect(read("server/storage/koreaTrails.ts")).toContain("courses: fixTrailSigun(fillTrailEndNames(raw.courses))");
+    });
+});
+
+describe("코리아둘레길 — 지역 글자가 좌표와 어긋나면", () => {
+    it("우회로 둘('서울 강동구 · 강남구')은 붙어 있는 본 코스의 지역으로 · 나머지 168코스는 그대로", () => {
+        const fixed = fixTrailSigun(asset.courses);
+        const at = (k: string) => fixed.find((c) => c.route === "dmz" && c.key === k)!;
+        expect(at("19-1").sigun).toBe("강원 철원군");
+        expect(at("31-1").sigun).toBe("강원 고성군");
+        expect(fixed.filter((c, i) => c.sigun !== asset.courses[i].sigun).length).toBe(2);
+    });
+    it("붙어 있는 본 코스가 없으면 비운다 — 지어 쓰지 않는다", () => {
+        const lone = { ...asset.courses.find((c) => c.route === "dmz" && c.key === "19-1")!, no: 999 };
+        expect(fixTrailSigun([lone])[0].sigun).toBeNull();
+    });
+    it("길 페이지 지도는 길의 꼴대로(허브는 4:5 — 길을 바꿔 가며 당겨 들어간다)", () => {
+        expect(read("client/src/hiking/trails/TrailRoutePage.tsx")).toContain("focus={route.id} numbers fitShape");
+        expect(read("client/src/hiking/trails/TrailMap.tsx")).toContain("aspectRatio: `${aspect}`");
     });
 });

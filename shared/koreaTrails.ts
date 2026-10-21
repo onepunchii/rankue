@@ -165,6 +165,32 @@ export function fillTrailEndNames<T extends Pick<TrailCourseDetail, "route" | "n
     return out;
 }
 
+/** 시도의 대강 가운데(검사용 — 지역 글자가 좌표와 크게 어긋나는지만 본다) */
+const SIDO_CENTER: Readonly<Record<string, readonly [number, number]>> = {
+    서울: [37.56, 126.98], 부산: [35.18, 129.08], 대구: [35.87, 128.6], 인천: [37.46, 126.7], 광주: [35.16, 126.85], 대전: [36.35, 127.38], 울산: [35.54, 129.31], 세종: [36.48, 127.29],
+    경기: [37.4, 127.3], 강원: [37.8, 128.2], 충북: [36.8, 127.7], 충남: [36.5, 126.8], 전북: [35.7, 127.1], 전남: [34.8, 126.9], 경북: [36.4, 128.9], 경남: [35.3, 128.3], 제주: [33.4, 126.5],
+};
+const SIDO_METRO = new Set(["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종"]);
+/**
+ * 지역 글자 고치기(2026-10-21) — 받은 자료에 'DMZ 평화의 길 19-1코스(우회로) · 서울 강동구'(실제는 철원, 72km), '31-1코스 · 서울 강남구'(고성, 146km)가 있었다.
+ * 시도 가운데에서 광역시 40km · 도 140km 를 넘게 어긋나면 그 글자를 버리고, 붙어 있는(2km 안) 본 코스의 지역을 쓴다. 없으면 비운다(지어 쓰지 않는다).
+ */
+export function fixTrailSigun<T extends Pick<TrailCourseDetail, "route" | "no" | "sub" | "sigun" | "coarse" | "start">>(courses: readonly T[]): T[] {
+    const off = (c: T) => {
+        const sido = (c.sigun ?? "").split(" ")[0];
+        const at = SIDO_CENTER[sido];
+        if (!at || !c.coarse.length) return false;
+        return nearKm(at, c.coarse[Math.floor(c.coarse.length / 2)]) > (SIDO_METRO.has(sido) ? 40 : 140);
+    };
+    const main = new Map(courses.filter((c) => c.sub == null).map((c) => [`${c.route}/${c.no}`, c]));
+    return courses.map((c) => {
+        if (!c.sigun || !off(c)) return c;
+        const m = main.get(`${c.route}/${c.no}`);
+        const touching = m && m !== c && !off(m) && m.coarse.some((p) => nearKm(p, c.start) <= 2 || c.coarse.some((q) => nearKm(p, q) <= 2));
+        return { ...c, sigun: touching ? m.sigun : null };
+    });
+}
+
 /** 코스 카드(1200 정사각 · server/services/trailCard)의 글 — 길 · 코스 이름 · 거리/시간/난이도 · 지역 · 코스 선 */
 export function trailCardInput(c: Pick<TrailCourseDetail, "route" | "name" | "km" | "minutes" | "level" | "sigun" | "tags" | "line">): { route: string; color: string; name: string; facts: string; place: string; line: [number, number][] } {
     const r = trailRouteOf(c.route);

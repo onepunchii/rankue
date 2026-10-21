@@ -52,7 +52,7 @@ export default function TrailRoutePage() {
                 ) : (
                     <>
                         <HkSection title="길 지도" aside="번호는 코스 시작점">
-                            <TrailMap courses={data.courses} focus={route.id} numbers onPick={(c) => setLocation(trailCoursePath(c.route, c.key))} label={`${route.name} 지도`} />
+                            <TrailMap courses={data.courses} focus={route.id} numbers fitShape onPick={(c) => setLocation(trailCoursePath(c.route, c.key))} label={`${route.name} 지도`} />
                         </HkSection>
 
                         {info?.desc && (
