@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useT, type Locale } from "@/lib/i18n";
 import { useSeo } from "@/hooks/useSeo";
-import { regionTitleKo, regionDescKo, cityTitleKo, cityDescKo, cityHubPath, listingCityOf } from "@shared/storeMeta";
+import { regionTitleKo, regionDescKo, cityTitleKo, cityDescKo, cityHubPath, listingCityOf, isNewlyLicensed, licenseSinceKo } from "@shared/storeMeta";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useNativeBridge } from "@/hooks/useNativeBridge";
@@ -25,10 +25,12 @@ interface Listing {
   rate10Large: number | null; rate10Medium: number | null;
   distanceKm: number | null;
   claimed: boolean;
+  /** 인허가 자료(2026-10-19~) — 옛 답엔 없다 */
+  source?: string | null; licenseDate?: string | null; govStatus?: string | null;
 }
 interface ListingsResponse { total: number; rows: Listing[]; regions: Array<{ region: string; count: number }>; cities?: Array<{ city: string; count: number }> }
 
-const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string; mapAll: (n: number) => string; mapIn: (r: string, n: number) => string; mapLegend: string; mapHint: string; mapByRegion: string; mapOthers: (n: number) => string; mapByCity: (r: string) => string; mapBackAll: string }> = {
+const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; metaDesc: string; search: string; empty: string; count: (n: number) => string; partner: string; directory: string; all: string; tables: (l: number, m: number, p: number) => string; more: string; verified: string; ownerBannerTitle: string; ownerBannerDesc: string; registerCta: string; nearby: string; nearbyOn: string; mapAll: (n: number) => string; mapIn: (r: string, n: number) => string; mapLegend: string; mapHint: string; mapByRegion: string; mapOthers: (n: number) => string; mapByCity: (r: string) => string; mapBackAll: string; newOpen: string; paused: string; licensed: (ymd: string) => string }> = {
   ko: {
     title: "매장 찾기",
     subtitle: "전국 당구장을 지역·이름으로 찾아보세요",
@@ -56,6 +58,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapOthers: (n) => `그 밖 ${n.toLocaleString()}곳`,
     mapByCity: (r) => `${r} 시군구별`,
     mapBackAll: "전국",
+    newOpen: "새로 연 곳", paused: "휴업",
+    licensed: (d) => `${licenseSinceKo(d) ?? d.slice(0, 4)} · 인허가`,
   },
   en: {
     title: "Find a venue",
@@ -84,6 +88,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapOthers: (n) => `${n.toLocaleString()} elsewhere`,
     mapByCity: (r) => `${r} by district`,
     mapBackAll: "All",
+    newOpen: "New", paused: "Paused",
+    licensed: (d) => `Licensed ${d.slice(0, 7)}`,
   },
   vi: {
     title: "Tìm quán",
@@ -112,6 +118,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapOthers: (n) => `${n.toLocaleString()} nơi khác`,
     mapByCity: (r) => `${r} theo quận`,
     mapBackAll: "Toàn quốc",
+    newOpen: "Mới mở", paused: "Tạm nghỉ",
+    licensed: (d) => `Cấp phép ${d.slice(0, 7)}`,
   },
   tr: {
     title: "Salon bul",
@@ -140,6 +148,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapOthers: (n) => `Diğer ${n.toLocaleString()}`,
     mapByCity: (r) => `${r} ilçeye göre`,
     mapBackAll: "Tümü",
+    newOpen: "Yeni", paused: "Ara verdi",
+    licensed: (d) => `Ruhsat ${d.slice(0, 7)}`,
   },
   es: {
     title: "Buscar local",
@@ -168,6 +178,8 @@ const L: Record<Locale, { title: string; subtitle: string; metaTitle: string; me
     mapOthers: (n) => `${n.toLocaleString()} en otras`,
     mapByCity: (r) => `${r} por distrito`,
     mapBackAll: "Todo",
+    newOpen: "Nuevo", paused: "Pausado",
+    licensed: (d) => `Licencia ${d.slice(0, 7)}`,
   },
 };
 
@@ -385,6 +397,9 @@ export default function Stores() {
                 <div className="flex items-center gap-2 min-w-0">
                   <h2 className="text-[15px] font-bold text-ink-1 truncate">{s.name}</h2>
                   {s.claimed && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-brand/10 text-[12px] font-bold text-brand leading-none">✓ {t.verified}</span>}
+                  {/* 새로 연 곳 · 휴업(2026-10-21) — 인허가 자료의 인허가일 · 영업 상태. 매장 페이지와 같은 셈(shared/storeMeta) */}
+                  {!s.claimed && s.govStatus === "paused" && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[#FFF4DC] text-[12px] font-bold text-[#7A5208] leading-none" data-testid="stores-row-paused">{t.paused}</span>}
+                  {s.govStatus !== "paused" && isNewlyLicensed(s.licenseDate, Date.now()) && <span className="shrink-0 px-1.5 py-0.5 rounded-full bg-[#F4C542] text-[12px] font-bold text-[#3A2A05] leading-none" data-testid="stores-row-new">{t.newOpen}</span>}
                 </div>
                 <p className="text-[12.5px] text-black/55 mt-1 truncate">{s.distanceKm != null && <span className="text-brand font-bold">{s.distanceKm}km · </span>}{s.address}</p>
                 {(s.tableLarge || s.tableMedium || s.tablePocket || s.rate10Large || s.rate10Medium) && (
@@ -398,6 +413,10 @@ export default function Stores() {
                       </span>
                     )}
                   </p>
+                )}
+                {/* 요금 · 테이블이 없는 줄(인허가 자료로만 들어온 곳)은 빈 줄 대신 인허가 해 — 몇 년째 이 자리인지라도(2026-10-21) */}
+                {!(s.tableLarge || s.tableMedium || s.tablePocket || s.rate10Large || s.rate10Medium) && s.licenseDate && (
+                  <p className="text-[12px] text-black/45 mt-0.5 truncate" data-testid="stores-row-license">{t.licensed(s.licenseDate)}</p>
                 )}
               </button>
             ))}

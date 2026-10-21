@@ -105,6 +105,8 @@ router.get("/", asyncHandler(async (req: any, res: Response) => {
             rate10Large: storeListings.rate10Large, rate10Medium: storeListings.rate10Medium,
             claimed: storeListings.claimed,
             source: storeListings.source, licenseDate: storeListings.licenseDate,
+            // 휴업(paused)은 목록에 남는다 — 줄에 '휴업' 표시(2026-10-21). 폐업은 LIVE 가 이미 뺐다
+            govStatus: storeListings.govStatus,
             distanceKm,
             // 거리순일 때만 좌표를 같이 — 매장 상세의 '이 근처' 당구대가 가까운 다섯 곳을 번호 공으로 찍는다(2026-10-17)
             ...(nearby ? { lat: LISTING_LAT, lng: LISTING_LNG } : {}),
