@@ -81,3 +81,14 @@ describe("코스 도장 — 이어 붙인 곳", () => {
         expect(read("client/src/hiking/trails/TrailCoursePage.tsx")).toContain("<TrailStampCard c={c} />");
     });
 });
+
+describe("코스 도장 — 도장첩의 칸", () => {
+    it("도장첩(/hiking/stamps)에 길 넷 · 한 줄 여섯 개 + '+n' · 빈 칸은 점선 동그라미 · 길 '완주'는 그리지 않는다", () => {
+        expect(read("client/src/hiking/pages/StampShelf.tsx")).toContain("<TrailShelfSection example={example} />");
+        const ui = read("client/src/hiking/trails/TrailShelf.tsx");
+        expect(ui).toContain("const SHOW = 6;");
+        expect(ui).toContain("1.5px dashed");
+        // 주석 밖(화면에 그리는 글)에 '완주'가 없다
+        expect(ui.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n")).not.toMatch(/완주/);
+    });
+});

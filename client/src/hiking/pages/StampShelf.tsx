@@ -25,6 +25,7 @@ import { HikingCta } from "../components/MountainParts";
 import { GradeCard } from "../stamps/GradeParts";
 import { BookRow, HIKING_PACK_PATH, HIKING_STAMPS_PATH, PatchArt } from "../stamps/StampParts";
 import { useHikingStamps } from "../stamps/useHikingStamps";
+import { TrailShelfSection } from "../trails/TrailShelf";
 
 const SERIES: readonly HikingBookKind[] = ["kfs", "season", "theme", "plus"];
 
@@ -127,6 +128,9 @@ export default function StampShelf() {
                                 </HkSection>
                             );
                         })}
+
+                        {/* 코리아둘레길 코스 도장(10/21) — 두 끝에서 위치 확인(shared/trailStamps) */}
+                        <TrailShelfSection example={example} />
 
                         {!s.member && <div className="px-5 pt-8"><HikingCta /></div>}
                     </>
