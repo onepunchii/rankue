@@ -613,6 +613,10 @@ export class CrewRepository {
                 )
             )
             .groupBy(hiqCrews.id, hiqStores.latitude, hiqStores.longitude, storeListings.latitude, storeListings.longitude, profiles.countryCode)
+            // 크루원이 한 명도 없는 크루는 둘러보기에서 뺀다(2026-10-21 디자인 리뷰 — '전체' 맨 위에 0/10 크루가 떴다).
+            // 혼자 남은 크루장이 탈퇴하면 크루는 지우지 않고 남긴다(user.repo — 자식 표가 많아서). 승인해 줄 사람이 없는 크루라 들어갈 수 없다.
+            // 새로 만든 크루는 크루장이 곧 크루원이라 늘 1 이상이다. 주소로 직접 여는 크루 페이지는 그대로.
+            .having(sql`count(${hiqCrewMembers.id}) filter (where ${hiqCrewMembers.role} <> 'pending') > 0`)
             .orderBy(...[countryOrder, distOrder, desc(hiqCrews.createdAt)].filter((o): o is NonNullable<typeof o> => o != null))
             .limit(50);
 
