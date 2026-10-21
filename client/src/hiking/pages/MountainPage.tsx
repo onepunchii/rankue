@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useRoute } from "wouter";
 import { useQuery } from "@tanstack/react-query";
-import { LucideChevronDown, LucideLocateFixed, LucideShare2 } from "@/lib/icons";
+import { LucideChevronDown, LucideChevronRight, LucideLocateFixed, LucideShare2 } from "@/lib/icons";
 import { useSeo } from "@/hooks/useSeo";
 import { useToast } from "@/hooks/use-toast";
 import { hikingMountainCardUrl } from "@shared/ogCards";
@@ -51,6 +51,7 @@ import { POI_COLOR, SURFACE_COLOR, hikingCover } from "../theme";
 import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi } from "../lib/api";
 import { useMyLocation, type MyLocation } from "../lib/useMyLocation";
 import { TourPhotos } from "@/components/TourPhotos";
+import { festivalDateKo } from "@shared/tourFestivals";
 
 const ORIGIN = "https://www.rankue.co.kr";
 /**
@@ -582,6 +583,31 @@ export default function MountainPage() {
                 <HkSection title={MOUNTAIN_AROUND_LABEL.map} aside={MOUNTAIN_AROUND_LABEL.mapAside} sec="map">
                     <MountainLocation key={`location:${d.slug}`} d={d} course={course} fromMe={fromMe} ask={loc.ask} asking={loc.asking} />
                 </HkSection>
+
+                {/* 이 근처 축제 · 행사(2026-10-21 — 단풍철) — 한국관광공사 축제 중 20km 안, 열렸거나 45일 안에 여는 것. 이름 · 날짜 · 자리 · 거리만, 없으면 칸이 없다 */}
+                {(d.festivals?.length ?? 0) > 0 && (
+                    <HkSection title="이 근처 축제" aside="한국관광공사" className="" sec="festivals">
+                        <ul className="space-y-2" data-testid="mountain-festivals">
+                            {d.festivals!.map((f) => (
+                                <li key={f.id}>
+                                    <a href={`https://search.naver.com/search.naver?query=${encodeURIComponent(f.title)}`} target="_blank" rel="noreferrer"
+                                        className="flex items-center gap-3 rounded-2xl px-3.5 py-3 active:opacity-80" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }}>
+                                        <span className="flex h-11 w-11 shrink-0 flex-col items-center justify-center rounded-xl text-center leading-none" style={f.state === "now" ? { background: "#F28C6A", color: "#2A1208" } : { background: "#FFFFFF14", color: "#F4EFE3" }}>
+                                            <span className="text-[12px] font-semibold">{f.state === "now" ? "진행" : `${Number(f.start.slice(4, 6))}월`}</span>
+                                            <span className="mt-0.5 text-[15px] font-semibold tabular-nums">{f.state === "now" ? "중" : Number(f.start.slice(6, 8))}</span>
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block truncate text-[15px] font-semibold text-[#F4EFE3]">{f.title}</span>
+                                            <span className="mt-0.5 block truncate text-[12.5px] text-[#F4EFE399] tabular-nums">{festivalDateKo(f)} · {f.km < 1 ? "1km 안" : `${f.km.toFixed(f.km < 10 ? 1 : 0)}km`}</span>
+                                        </span>
+                                        <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0 text-[#F4EFE366]" aria-hidden />
+                                    </a>
+                                </li>
+                            ))}
+                        </ul>
+                        <p className="mt-2 text-[12px] text-[#F4EFE366]">축제 정보 한국관광공사 · 날짜와 운영은 바뀔 수 있어요 — 가기 전에 확인해 주세요.</p>
+                    </HkSection>
+                )}
 
                 {/* 근처 맛집 · 카페 — 네이버 지역 검색을 그 자리에서(구역이 화면에 들어올 때). 위치 바로 아래(내려와서 어디서 먹을지) */}
                 <MountainNearbyPlaces key={`food:${d.slug}`} slug={d.slug} name={d.name} />
