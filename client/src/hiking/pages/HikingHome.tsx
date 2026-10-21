@@ -32,6 +32,7 @@ import { durationText } from "@shared/hikingGeo";
 import { HIKING_HERO } from "../theme";
 import { CoachTour } from "@/components/hiq/CoachTour";
 import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
+import { FeaturedPhotos } from "../components/FeaturedPhotos";
 
 const TILT = [-4, 3, -2, 5];
 
@@ -108,6 +109,9 @@ export default function HikingHome() {
                         <WishShelf done={s.done} />
 
                         <SeasonNow mountains={s.famous} done={s.done} mine />
+
+                        {/* 오늘의 명산(2026-10-21) — 100대 명산의 실제 사진(한국관광공사 · 공공누리). 날마다 다른 여덟 산 */}
+                        <FeaturedPhotos />
 
                         <HkSection title="내 산 지도" aside={verified.length ? `깃발 ${s.done.size}개` : "오른 산에 깃발이 꽂혀요"}>
                             <div data-tour="hh-map"><MountainMap mountains={s.famous} done={s.done} /></div>

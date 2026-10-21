@@ -57,3 +57,15 @@ describe("검색용 화면에도 같은 사진(2026-10-21)", () => {
         expect(readFileSync(resolve(__dirname, "../server/seo/fishing.ts"), "utf8")).toContain("tourFigures(pl.name, tourOf(pl))");
     });
 });
+
+describe("등산 홈 '오늘의 명산'(2026-10-21)", () => {
+    it("100대 명산(+플러스) 중 사진 있는 산에서 날마다 여덟 · 화면은 셋 미만이면 칸 없음 · 자르지 않음", () => {
+        const h = readFileSync(resolve(__dirname, "../server/routes/modules/hiking.ts"), "utf8");
+        expect(h).toContain('router.get("/featured-photos"');
+        expect(h).toContain('m.lists.some((l) => l === "kfs100" || l === "kfs100plus") && MOUNTAIN_TOUR_PHOTOS[m.slug]?.photos.length');
+        const c = readFileSync(resolve(__dirname, "../client/src/hiking/components/FeaturedPhotos.tsx"), "utf8");
+        expect(c).toContain("if (items.length < 3) return null;");
+        expect(c).not.toContain("object-cover");
+        expect(readFileSync(resolve(__dirname, "../client/src/hiking/pages/HikingHome.tsx"), "utf8")).toContain("<FeaturedPhotos />");
+    });
+});

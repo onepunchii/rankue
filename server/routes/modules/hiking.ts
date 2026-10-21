@@ -77,6 +77,24 @@ router.get("/points", asyncHandler(async (_req: any, res: any) => {
     return sendSuccess(res, { points });
 }));
 
+/**
+ * 오늘의 명산 사진(2026-10-21) — 100대 명산(+플러스) 가운데 한국관광공사 사진이 있는 산에서 여덟(날마다 돌아간다 — 그날은 누구에게나 같다).
+ * 등산 홈의 사진 줄. 사진은 공공누리 제1 · 3유형(server/data/mountainTourPhotos), 화면이 출처를 단다.
+ */
+router.get("/featured-photos", asyncHandler(async (_req: any, res: any) => {
+    const all = await allMountains();
+    const pool = all.filter((m) => m.lists.some((l) => l === "kfs100" || l === "kfs100plus") && MOUNTAIN_TOUR_PHOTOS[m.slug]?.photos.length)
+        .sort((a, b) => a.slug.localeCompare(b.slug, "ko"));
+    const day = Math.floor((Date.now() + 9 * 3600_000) / 86_400_000);
+    const n = Math.min(8, pool.length);
+    const start = pool.length ? (day * 7) % pool.length : 0;
+    const items = Array.from({ length: n }, (_, i) => pool[(start + i * 11) % pool.length])
+        .filter((m, i, a) => a.findIndex((x) => x.slug === m.slug) === i)
+        .map((m) => ({ slug: m.slug, name: m.name, heightM: m.heightM, sigungu: m.sigungu, photo: MOUNTAIN_TOUR_PHOTOS[m.slug]!.photos[0] }));
+    res.set("Cache-Control", PUBLIC_CACHE);
+    return sendSuccess(res, { items });
+}));
+
 /** 산 한 곳 — 글 · 코스(선) · 지점 · 가까운 산 */
 router.get("/mountains/:slug", asyncHandler(async (req: any, res: any) => {
     const d = await getMountainDetail(String(req.params.slug));
