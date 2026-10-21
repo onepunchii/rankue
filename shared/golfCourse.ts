@@ -35,12 +35,17 @@ export function cityShort(city: string | null | undefined): string {
 
 /**
  * 화면에 보이는 짧은 이름 — 여러 지역이 섞인 목록(가까운 골프장 · 목록 · 관심 · 조인 줄)용. 주소 · 거르기는 cityShort 그대로(허브 주소가 /golf/courses/경기/광주 다).
- * 떼면 다른 곳과 같아지는 이름은 도를 붙인다: 경기 '광주시' → '경기 광주'(그냥 '광주'면 광주광역시로 읽힌다 — 2026-10-21 88CC 의 가까운 골프장 '강남300 · 광주 9.1km').
+ * 떼면 다른 지역의 곳과 같아지는 이름은 권역을 붙인다(2026-10-21 88CC 의 가까운 골프장 '강남300 · 광주 9.1km'가 광주광역시로 읽혔다):
+ *   '광주시' — 경기면 '경기 광주', 전라(광주광역시)면 '광주'  ·  '고성군' — 강원 '강원 고성', 경상 '경남 고성'.
+ * 골프장 명부는 광주광역시 · 경기 광주시를 둘 다 '광주시'로 적는다 — 권역 없이는 가를 수 없어 그때는 cityShort 그대로.
  */
-const CITY_LABEL_AMBIGUOUS: Readonly<Record<string, string>> = { 광주시: "경기 광주" };
-export function cityLabel(city: string | null | undefined): string {
+const CITY_LABEL_BY_REGION: Readonly<Record<string, Readonly<Record<string, string>>>> = {
+    광주시: { 경기: "경기 광주" },
+    고성군: { 강원: "강원 고성", 경상: "경남 고성" },
+};
+export function cityLabel(city: string | null | undefined, region?: string | null): string {
     if (!city) return "";
-    return CITY_LABEL_AMBIGUOUS[city] ?? cityShort(city);
+    return (region ? CITY_LABEL_BY_REGION[city]?.[region] : undefined) ?? cityShort(city);
 }
 
 /** 주소 한 조각을 URL 에 쓸 꼴로 — 한글은 그대로 두고 링크 만들 때 encodeURIComponent 한다. */

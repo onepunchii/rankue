@@ -7,9 +7,13 @@ const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 
 /** 화면용 짧은 지역 이름(2026-10-21 — 88CC 의 가까운 골프장 '강남300 · 광주 9.1km'가 광주광역시로 읽혔다) */
 describe("골프 — 지역 이름 줄이기", () => {
-    it("경기 '광주시'는 '경기 광주' · 나머지는 '시 · 군'만 뗀다", () => {
-        expect(cityLabel("광주시")).toBe("경기 광주");
-        expect(cityLabel("용인시")).toBe("용인");
+    it("권역으로 가른다 — 경기 광주시는 '경기 광주', 광주광역시(전라 · 명부엔 같은 '광주시')는 '광주' · 고성은 강원/경남 · 나머지는 '시 · 군'만 뗀다", () => {
+        expect(cityLabel("광주시", "경기")).toBe("경기 광주");
+        expect(cityLabel("광주시", "전라")).toBe("광주");
+        expect(cityLabel("광주시")).toBe("광주");
+        expect(cityLabel("고성군", "강원")).toBe("강원 고성");
+        expect(cityLabel("고성군", "경상")).toBe("경남 고성");
+        expect(cityLabel("용인시", "경기")).toBe("용인");
         expect(cityLabel("가평군")).toBe("가평");
         expect(cityLabel(null)).toBe("");
     });
