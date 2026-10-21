@@ -22,6 +22,22 @@ export interface GovHallRow {
 export interface GovHall {
     key: string; name: string; region: string; address: string; roadAddress: string | null; lotAddress: string | null;
     lat: number | null; lng: number | null; licenseDate: string | null; status: "open" | "paused" | "closed"; closedDate: string | null;
+    /** 매장 전화(2026-10-21) — 지역번호 · 070 · 050 만(hallPhone). 없거나 꼴이 모르는 것이면 null */
+    phone: string | null;
+}
+
+/**
+ * 인허가 자료의 전화(TELNO) → 매장 페이지의 전화(2026-10-21 디자인 리뷰: 인허가 자료로만 들어온 매장은 '전화' 단추가 늘 꺼져 있었다).
+ * 지역번호(02 · 0xx) · 070 · 050x 만 받는다 — 휴대전화(01x)는 사람의 번호일 수 있어 받지 않는다(실측 15,187곳 중 0곳이었지만 막아 둔다).
+ * 지역번호 없는 7~8자리(157곳)는 어느 지역인지 몰라 받지 않는다. 대시를 넣어 돌려준다.
+ */
+export function hallPhone(raw: unknown): string | null {
+    const d = String(raw ?? "").replace(/[^0-9]/g, "");
+    if (/^02\d{7,8}$/.test(d)) return d.length === 9 ? `02-${d.slice(2, 5)}-${d.slice(5)}` : `02-${d.slice(2, 6)}-${d.slice(6)}`;
+    if (/^0[3-6][1-5]\d{7,8}$/.test(d)) return d.length === 10 ? `${d.slice(0, 3)}-${d.slice(3, 6)}-${d.slice(6)}` : `${d.slice(0, 3)}-${d.slice(3, 7)}-${d.slice(7)}`;
+    if (/^070\d{8}$/.test(d)) return `070-${d.slice(3, 7)}-${d.slice(7)}`;
+    if (/^050\d{9}$/.test(d)) return `${d.slice(0, 4)}-${d.slice(4, 8)}-${d.slice(8)}`;
+    return null;
 }
 
 const SIDO_SHORT: readonly [RegExp, string][] = [
@@ -58,6 +74,7 @@ export function govHallOf(r: GovHallRow): GovHall | null {
         roadAddress: road ? shortenAddress(road)?.address ?? road : null, lotAddress: lot ? shortenAddress(lot)?.address ?? lot : null,
         lat: p?.lat ?? null, lng: p?.lng ?? null, licenseDate: ymd(r.LCPMT_YMD),
         status: code === "01" ? "open" : code === "02" ? "paused" : "closed", closedDate: ymd(r.CLSBIZ_YMD),
+        phone: hallPhone(r.TELNO),
     };
 }
 

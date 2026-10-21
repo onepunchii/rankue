@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { govHallCode, govHallOf, hallNameKey, matchHalls, placeKey, roadNumberKey, sameHall, shortenAddress } from "./billiardHalls";
+import { govHallCode, govHallOf, hallNameKey, hallPhone, matchHalls, placeKey, roadNumberKey, sameHall, shortenAddress } from "./billiardHalls";
 
 /** 전국 당구장 인허가 자료 잇기(2026-10-19 — 영업 중 15,191곳 · 우리 1,199곳 중 969곳이 같은 곳) */
 const row = (o: Record<string, string>) => govHallOf({ OPN_ATMY_GRP_CD: "4510000", MNG_NO: "CDFH3301082026000002", SALS_STTS_CD: "01", CRD_INFO_X: "198000", CRD_INFO_Y: "451000", ...o })!;
@@ -49,5 +49,28 @@ describe("우리 매장과 같은 곳인가", () => {
         const b = { ...row({ BPLC_NM: "락 당구클럽", ROAD_NM_ADDR: "대구광역시 수성구 화랑로 134, 5층 (만촌동)" }), key: "x-2" };
         const m = matchHalls([{ code: "C3", name: "락 당구클럽", address: "대구 수성구 만촌동 1330-51 5층" }], [a, b]);
         expect(m.size).toBe(1);
+    });
+});
+
+describe("전화(2026-10-21) — 지역번호 · 070 · 050 만, 대시를 넣어서", () => {
+    it("꼴", () => {
+        expect(hallPhone("0212345678")).toBe("02-1234-5678");
+        expect(hallPhone("02-123-4567")).toBe("02-123-4567");
+        expect(hallPhone("055 321 1234")).toBe("055-321-1234");
+        expect(hallPhone("0313211234")).toBe("031-321-1234");
+        expect(hallPhone("03132112345")).toBe("031-3211-2345");
+        expect(hallPhone("07012345678")).toBe("070-1234-5678");
+        expect(hallPhone("050412345678")).toBe("0504-1234-5678");
+    });
+    it("휴대전화 · 지역번호 없는 번호 · 대표번호 · 빈 값은 받지 않는다", () => {
+        expect(hallPhone("01012345678")).toBeNull();
+        expect(hallPhone("3211234")).toBeNull();
+        expect(hallPhone("15881234")).toBeNull();
+        expect(hallPhone("")).toBeNull();
+        expect(hallPhone(null)).toBeNull();
+    });
+    it("받은 줄의 전화가 GovHall 에 실린다", () => {
+        expect(row({ BPLC_NM: "큐 당구장", ROAD_NM_ADDR: "서울특별시 종로구 새문안로3길 36", TELNO: "02-735-1234" }).phone).toBe("02-735-1234");
+        expect(row({ BPLC_NM: "큐 당구장", ROAD_NM_ADDR: "서울특별시 종로구 새문안로3길 36", TELNO: "010-1234-5678" }).phone).toBeNull();
     });
 });
