@@ -249,4 +249,50 @@ export function closedNoticeKo(s: { govStatus?: string | null; govClosedDate?: s
     if (s.govStatus === "paused") return { kind: "paused", text: "휴업 신고된 곳이에요 — 가기 전에 영업하는지 확인해 주세요." };
     return null;
 }
+/**
+ * 최근에 인허가를 받은 곳인가(2026-10-21 — 매장 페이지의 '새로 연 곳' 표시). 인허가일이 오늘부터 days 일 안.
+ * 인허가일은 행정안전부 자료의 그 사업장 인허가일 — 주인이 바뀌어 새로 받은 것도 '새로 연 곳'이다(지어내는 말이 아니다).
+ */
+export function isNewlyLicensed(licenseDate: string | null | undefined, nowMs: number, days = 120): boolean {
+    const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(licenseDate ?? ""));
+    if (!m) return false;
+    const t = Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
+    const age = nowMs - t;
+    return age >= -86_400_000 && age <= days * 86_400_000;
+}
 export const isClosedListing = (s: { govStatus?: string | null; claimed?: boolean | null }) => s.govStatus === "closed" && !s.claimed;
+
+/**
+ * 어드민이 제보를 확인하고 매장 정보를 고칠 때 받는 칸(2026-10-21 — '매장 정보 제보'의 고치기).
+ * 영업시간 · 전화 · 테이블 수 · 10분 요금만. 빈 칸('')은 지우기(null), 보내지 않은 칸은 그대로. 이상한 값은 통째로 거절.
+ * 이름 · 주소 · 좌표는 고치지 않는다(인허가 자료가 매일 다시 쓴다 · 사장님 인증 매장은 사장님이).
+ */
+export type ListingPatch = Partial<Record<"openHours" | "phone", string | null> & Record<"tableLarge" | "tableMedium" | "tablePocket" | "rate10Large" | "rate10Medium" | "rate10Pocket", number | null>>;
+export function cleanListingPatch(body: unknown): { ok: true; patch: ListingPatch } | { ok: false; reason: string } {
+    const b = (body && typeof body === "object" ? body : {}) as Record<string, unknown>;
+    const patch: ListingPatch = {};
+    if (b.openHours !== undefined) {
+        const v = String(b.openHours ?? "").trim().replace(/\s+/g, " ");
+        if (v.length > 40) return { ok: false, reason: "영업시간은 40자 안으로 적어 주세요" };
+        patch.openHours = v || null;
+    }
+    if (b.phone !== undefined) {
+        const v = String(b.phone ?? "").replace(/\s/g, "");
+        if (v && !/^0\d{1,2}-?\d{3,4}-?\d{4}$/.test(v)) return { ok: false, reason: "전화번호 꼴이 아닙니다" };
+        patch.phone = v || null;
+    }
+    const int = (k: keyof ListingPatch, max: number, label: string): string | null => {
+        if (b[k] === undefined) return null;
+        if (b[k] === null || b[k] === "") { (patch as Record<string, unknown>)[k] = null; return null; }
+        const n = Number(b[k]);
+        if (!Number.isInteger(n) || n < 0 || n > max) return `${label}은(는) 0~${max.toLocaleString()} 사이의 정수로 적어 주세요`;
+        (patch as Record<string, unknown>)[k] = n;
+        return null;
+    };
+    for (const [k, max, label] of [["tableLarge", 60, "대대 수"], ["tableMedium", 60, "중대 수"], ["tablePocket", 60, "포켓 수"], ["rate10Large", 10000, "대대 10분 요금"], ["rate10Medium", 10000, "중대 10분 요금"], ["rate10Pocket", 10000, "포켓 10분 요금"]] as const) {
+        const err = int(k, max, label);
+        if (err) return { ok: false, reason: err };
+    }
+    if (!Object.keys(patch).length) return { ok: false, reason: "고칠 칸이 없습니다" };
+    return { ok: true, patch };
+}

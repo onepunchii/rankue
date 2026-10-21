@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
-import { storeDescKo, storeJsonLd, storeLocality, storeTitleKo, isBasicListing, licenseSinceKo, listingCityOf, cityHubPath, cityTitleKo, cityDescKo, closedNoticeKo, isClosedListing } from "./storeMeta.js";
+import { storeDescKo, storeJsonLd, storeLocality, storeTitleKo, isBasicListing, licenseSinceKo, listingCityOf, cityHubPath, cityTitleKo, cityDescKo, closedNoticeKo, isClosedListing, isNewlyLicensed, cleanListingPatch } from "./storeMeta.js";
 
 describe("매장 주소 → 시군구·동(2026-09-24)", () => {
     it("지번·도로명·광역시·긴 시도 표기", () => {
@@ -97,5 +97,47 @@ describe("인허가 자료의 폐업 · 휴업(2026-10-20 — 오너 '목록 · 
     it("목록 · 지도 · 사이트맵이 쓰는 LIVE 는 수집 매장의 폐업도 숨긴다(인증 매장은 빼고)", () => {
         const s = read("server/storage/listingSql.ts");
         expect(s).toContain("not (coalesce(store_listings.gov_status, 'open') = 'closed' and not store_listings.claimed)");
+    });
+});
+
+describe("새로 연 곳 · 아는 만큼 알려 주기 · 매장 정보 제보(2026-10-21)", () => {
+    it("인허가일이 120일 안이면 새로 연 곳", () => {
+        const now = Date.UTC(2026, 9, 21);
+        expect(isNewlyLicensed("2026-09-14", now)).toBe(true);
+        expect(isNewlyLicensed("2026-06-01", now)).toBe(false);
+        expect(isNewlyLicensed(null, now)).toBe(false);
+        expect(isNewlyLicensed("2026-10-22", now)).toBe(true);    // 하루 앞(시간대 차이)은 봐준다
+        expect(isNewlyLicensed("2027-01-01", now)).toBe(false);
+    });
+    it("빈 매장에 묻는 칸 · 제보는 어드민 '매장 정보 제보'에서 처리함으로", () => {
+        const page = read("client/src/pages/store-listing.tsx");
+        expect(page).toContain("{isBasicListing(s) && !isClosedListing(s) && (");
+        expect(page).toContain('data-testid="listing-fill"');
+        expect(page).toContain("sMsg.trim() === t.fillTemplate.trim()");      // 빈 틀 그대로는 못 보낸다
+        const admin = read("server/routes/modules/admin.ts");
+        expect(admin).toContain('router.get("/listing-suggestions", checkSuperAdmin,');
+        expect(admin).toContain('router.post("/listing-suggestions/:id/handled", checkSuperAdmin,');
+        expect(read("client/src/pages/admin/dashboard.tsx")).toContain('{tab === "store-suggestions" && <ListingSuggestionsView />}');
+    });
+});
+
+describe("제보 확인 뒤 고치기 — 받는 칸(2026-10-21)", () => {
+    it("영업시간 · 전화 · 테이블 · 10분 요금만, 빈 칸은 지우기, 보내지 않은 칸은 그대로", () => {
+        expect(cleanListingPatch({ openHours: "  12:00   ~ 02:00 ", tableLarge: "4", rate10Large: 2500, phone: "" }))
+            .toEqual({ ok: true, patch: { openHours: "12:00 ~ 02:00", tableLarge: 4, rate10Large: 2500, phone: null } });
+        expect(cleanListingPatch({ name: "바꾼 이름", address: "다른 주소" })).toEqual({ ok: false, reason: "고칠 칸이 없습니다" });
+        expect(cleanListingPatch({ tableMedium: null })).toEqual({ ok: true, patch: { tableMedium: null } });
+    });
+    it("이상한 값은 통째로 거절", () => {
+        expect(cleanListingPatch({ phone: "1234" }).ok).toBe(false);
+        expect(cleanListingPatch({ tableLarge: 61 }).ok).toBe(false);
+        expect(cleanListingPatch({ rate10Medium: 2500.5 }).ok).toBe(false);
+        expect(cleanListingPatch({ openHours: "가".repeat(41) }).ok).toBe(false);
+        expect(cleanListingPatch(null).ok).toBe(false);
+    });
+    it("서버: 슈퍼관리자만 · 사장님 인증 매장은 409", () => {
+        const admin = read("server/routes/modules/admin.ts");
+        expect(admin).toContain('router.patch("/listings/:code", checkSuperAdmin,');
+        expect(admin).toContain('if (listing.claimed) return sendError(res, 409,');
     });
 });

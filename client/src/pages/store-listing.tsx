@@ -8,7 +8,7 @@ import { HiqNavigation } from "@/components/hiq/HiqNavigation";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { closedNoticeKo, isBasicListing, isClosedListing, licenseSinceKo, storeAreasKo, storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
+import { closedNoticeKo, isBasicListing, isClosedListing, isNewlyLicensed, licenseSinceKo, storeAreasKo, storeTitleKo, storeDescKo, storeJsonLd, mapLink } from "@shared/storeMeta";
 import { storeCardUrl } from "@shared/ogCards";
 import { LucidePhone, LucideMapPin, LucideShare2 } from "@/lib/icons";
 import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
@@ -33,7 +33,7 @@ interface Listing {
 // 페이지 문구 — 디렉터리는 한국 콘텐츠지만 라벨은 5개 언어 (stores.tsx와 같은 패턴)
 const L: Record<Locale, Record<string, string>> = {
   ko: {
-    back: "매장 찾기", unverified: "수집 정보", verified: "✓ 사장님 인증", govInfo: "인허가 정보", license: "인허가", licenseSource: "행정안전부 인허가 자료", nearOpenCta: "근처 영업 중인 당구장 보기",
+    back: "매장 찾기", unverified: "수집 정보", verified: "✓ 사장님 인증", govInfo: "인허가 정보", license: "인허가", licenseSource: "행정안전부 인허가 자료", nearOpenCta: "근처 영업 중인 당구장 보기", newBadge: "새로 연 곳", fillTitle: "요금 · 영업시간이 아직 없어요", fillDesc: "다녀오셨다면 아는 만큼만 알려 주세요. 확인한 뒤 이 페이지에 싣습니다.", fillCta: "아는 만큼 알려 주기", fillDialogTitle: "이 당구장, 아는 만큼 알려 주세요", fillDialogDesc: "모르는 칸은 비워 두셔도 돼요. 확인한 내용만 이 페이지에 싣습니다.", fillTemplate: "영업시간: \n테이블(대대 · 중대 · 포켓): \n10분 요금: \n전화: ",
     address: "주소", phone: "전화", hours: "영업시간", tables: "테이블",
     large: "대대", medium: "중대", pocket: "포켓",
     rates: "요금", per10: "10분당", flat: "정액", won: "원",
@@ -61,7 +61,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "닫기",
   },
   en: {
-    back: "Find a venue", unverified: "Collected info", verified: "✓ Owner verified", govInfo: "Public license data", license: "Licensed", licenseSource: "Korean government license data", nearOpenCta: "See open halls nearby",
+    back: "Find a venue", unverified: "Collected info", verified: "✓ Owner verified", govInfo: "Public license data", license: "Licensed", licenseSource: "Korean government license data", nearOpenCta: "See open halls nearby", newBadge: "Newly opened", fillTitle: "No rates or hours yet", fillDesc: "Been there? Tell us what you know — we'll check and add it here.", fillCta: "Share what you know", fillDialogTitle: "Tell us about this hall", fillDialogDesc: "Leave blanks for what you don't know. We only publish what we can confirm.", fillTemplate: "Hours: \nTables (carom · medium · pocket): \n10-min rate: \nPhone: ",
     address: "Address", phone: "Phone", hours: "Hours", tables: "Tables",
     large: "Large", medium: "Medium", pocket: "Pocket",
     rates: "Rates", per10: "per 10 min", flat: "Flat rate", won: "₩",
@@ -89,7 +89,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "Close",
   },
   vi: {
-    back: "Tìm quán", unverified: "Thông tin thu thập", verified: "✓ Chủ quán xác nhận", govInfo: "Dữ liệu giấy phép", license: "Cấp phép", licenseSource: "Dữ liệu giấy phép của chính phủ Hàn Quốc", nearOpenCta: "Xem quán đang mở gần đây",
+    back: "Tìm quán", unverified: "Thông tin thu thập", verified: "✓ Chủ quán xác nhận", govInfo: "Dữ liệu giấy phép", license: "Cấp phép", licenseSource: "Dữ liệu giấy phép của chính phủ Hàn Quốc", nearOpenCta: "Xem quán đang mở gần đây", newBadge: "Mới mở", fillTitle: "Chưa có giá và giờ mở cửa", fillDesc: "Bạn đã đến đây? Hãy cho biết những gì bạn biết — chúng tôi sẽ kiểm tra và thêm vào.", fillCta: "Chia sẻ thông tin", fillDialogTitle: "Cho chúng tôi biết về quán này", fillDialogDesc: "Có thể bỏ trống phần không biết. Chúng tôi chỉ đăng những gì đã xác nhận.", fillTemplate: "Giờ mở cửa: \nBàn (lớn · vừa · lỗ): \nGiá 10 phút: \nĐiện thoại: ",
     address: "Địa chỉ", phone: "Điện thoại", hours: "Giờ mở cửa", tables: "Bàn",
     large: "Lớn", medium: "Vừa", pocket: "Pocket",
     rates: "Giá", per10: "mỗi 10 phút", flat: "Trọn gói", won: "₩",
@@ -117,7 +117,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "Đóng",
   },
   tr: {
-    back: "Salon bul", unverified: "Derlenen bilgi", verified: "✓ Sahibi onaylı", govInfo: "Resmî ruhsat bilgisi", license: "Ruhsat", licenseSource: "Kore hükümeti ruhsat verisi", nearOpenCta: "Yakındaki açık salonlar",
+    back: "Salon bul", unverified: "Derlenen bilgi", verified: "✓ Sahibi onaylı", govInfo: "Resmî ruhsat bilgisi", license: "Ruhsat", licenseSource: "Kore hükümeti ruhsat verisi", nearOpenCta: "Yakındaki açık salonlar", newBadge: "Yeni açıldı", fillTitle: "Henüz fiyat ve saat yok", fillDesc: "Gittiniz mi? Bildiklerinizi paylaşın — kontrol edip buraya ekleriz.", fillCta: "Bildiklerini paylaş", fillDialogTitle: "Bu salonu anlatın", fillDialogDesc: "Bilmediklerinizi boş bırakabilirsiniz. Yalnızca doğruladıklarımızı yayınlarız.", fillTemplate: "Saatler: \nMasalar (büyük · orta · pool): \n10 dk ücret: \nTelefon: ",
     address: "Adres", phone: "Telefon", hours: "Çalışma saatleri", tables: "Masalar",
     large: "Büyük", medium: "Orta", pocket: "Pocket",
     rates: "Ücretler", per10: "10 dk başına", flat: "Sabit ücret", won: "₩",
@@ -145,7 +145,7 @@ const L: Record<Locale, Record<string, string>> = {
     close: "Kapat",
   },
   es: {
-    back: "Buscar local", unverified: "Información recopilada", verified: "✓ Verificado", govInfo: "Datos de licencia", license: "Licencia", licenseSource: "Datos oficiales de licencias de Corea", nearOpenCta: "Ver locales abiertos cerca",
+    back: "Buscar local", unverified: "Información recopilada", verified: "✓ Verificado", govInfo: "Datos de licencia", license: "Licencia", licenseSource: "Datos oficiales de licencias de Corea", nearOpenCta: "Ver locales abiertos cerca", newBadge: "Recién abierto", fillTitle: "Aún sin precios ni horario", fillDesc: "¿Has ido? Cuéntanos lo que sepas — lo revisaremos y lo añadiremos.", fillCta: "Compartir lo que sé", fillDialogTitle: "Cuéntanos de este local", fillDialogDesc: "Deja en blanco lo que no sepas. Solo publicamos lo que podemos confirmar.", fillTemplate: "Horario: \nMesas (grande · mediana · pool): \nTarifa 10 min: \nTeléfono: ",
     address: "Dirección", phone: "Teléfono", hours: "Horario", tables: "Mesas",
     large: "Grande", medium: "Mediana", pocket: "Pocket",
     rates: "Tarifas", per10: "por 10 min", flat: "Tarifa plana", won: "₩",
@@ -198,6 +198,8 @@ export default function StoreListingPage() {
 
   const [claimOpen, setClaimOpen] = useState(false);
   const [suggestOpen, setSuggestOpen] = useState(false);
+  // 'fix' = 정보가 다른가요(수정 제안) · 'fill' = 요금 · 영업시간이 빈 매장의 '아는 만큼 알려 주기'(2026-10-21) — 같은 제보함으로 간다
+  const [suggestMode, setSuggestMode] = useState<"fix" | "fill">("fix");
   // 사장님 신청은 로그인한 계정으로 받는다(2026-10-07 오너: "앞으로 사장님들이 신청·승인했을 때를 생각해서") — 승인되면 그 계정이 사장님이 된다.
   const { member, isGuest } = useAuth();
   const qc = useQueryClient();
@@ -357,6 +359,10 @@ export default function StoreListingPage() {
                   <span className={`px-2 py-1 rounded-full text-[12px] font-bold leading-none ${s.claimed ? "bg-[#FFFFFF] text-brand" : "bg-[#FFFFFF2E] text-[#FFFFFFE6]"}`}>
                     {s.claimed ? t.verified : s.source === "gov" ? t.govInfo : t.unverified}
                   </span>
+                  {/* 새로 연 곳(2026-10-21) — 인허가일이 120일 안(행정안전부 자료). 폐업 신고된 곳엔 달지 않는다 */}
+                  {!isClosedListing(s) && isNewlyLicensed(s.licenseDate, Date.now()) && (
+                    <span className="px-2 py-1 rounded-full text-[12px] font-bold leading-none bg-[#F4C542] text-[#3A2A05]" data-testid="listing-new">{t.newBadge}</span>
+                  )}
                 </div>
                 {/* 동네까지(2026-10-19 — '경기'만 적혀 제목의 '평택 비전동'보다 덜 알려 줬다). 제목과 같은 함수, 한국어만(동네 이름이 한국어라) */}
                 <p className="text-[14px] text-[#FFFFFFD9] font-semibold mt-1">{heroArea}</p>
@@ -490,6 +496,18 @@ export default function StoreListingPage() {
                   </div>
                 </div>
               )}
+              {/* 요금 · 영업시간이 빈 매장(인허가 자료로만 들어온 1만 4천여 곳) — 아는 사람에게 묻는다(2026-10-21 디자인 리뷰: 주소 · 인허가 두 줄뿐인 빈 카드).
+                  받은 것은 어드민 '매장 정보 제보'로 간다. 지어 싣지 않는다 — 확인한 뒤 매장 리스트에서 고친다 */}
+              {isBasicListing(s) && !isClosedListing(s) && (
+                <div className="rounded-2xl border border-dashed border-brand/30 bg-brand/[0.04] px-4 py-3.5" data-testid="listing-fill">
+                  <p className="text-[14px] font-bold text-ink-1 break-keep">{t.fillTitle}</p>
+                  <p className="mt-0.5 text-[12.5px] font-medium text-black/55 break-keep">{t.fillDesc}</p>
+                  <button type="button" onClick={() => { setSuggestMode("fill"); if (!sMsg.trim()) setSMsg(t.fillTemplate); setSuggestOpen(true); }}
+                    className="mt-2.5 inline-flex h-10 items-center rounded-full bg-brand px-4 text-[13.5px] font-bold text-white active:scale-[0.98]" data-testid="listing-fill-cta">
+                    {t.fillCta}
+                  </button>
+                </div>
+              )}
             </div>
 
             {/* 이 근처(2026-10-17) — 이 매장을 가운데 둔 당구대 위의 공 + 가까운 다섯 곳. 검색용 화면(prerender)의 '가까운 당구장'과 같은 쪽 */}
@@ -615,7 +633,7 @@ export default function StoreListingPage() {
               <p className="-mt-1 mb-2 text-center text-[12px] font-medium text-black/55 break-keep">{t.claimHint}</p>
             )}
             <button
-              onClick={() => setSuggestOpen(true)}
+              onClick={() => { setSuggestMode("fix"); if (sMsg === t.fillTemplate) setSMsg(""); setSuggestOpen(true); }}
               className="w-full py-3 rounded-2xl text-[13.5px] font-semibold text-black/50 hover:bg-black/[0.03]"
             >
               {t.suggestCta}
@@ -680,15 +698,15 @@ export default function StoreListingPage() {
         {/* 수정 제안 */}
         <Dialog open={suggestOpen} onOpenChange={setSuggestOpen}>
           <DialogContent className="bg-white text-ink-1 max-w-md w-[92%] rounded-[28px] p-6">
-            <DialogTitle className="text-[19px] font-bold">{t.suggestTitle}</DialogTitle>
-            <DialogDescription className="text-[12.5px] font-medium text-black/55">{t.suggestDesc}</DialogDescription>
+            <DialogTitle className="text-[19px] font-bold">{suggestMode === "fill" ? t.fillDialogTitle : t.suggestTitle}</DialogTitle>
+            <DialogDescription className="text-[12.5px] font-medium text-black/55">{suggestMode === "fill" ? t.fillDialogDesc : t.suggestDesc}</DialogDescription>
             <div className="flex flex-col gap-2.5 mt-2">
-              <textarea value={sMsg} onChange={e => setSMsg(e.target.value)} maxLength={500} rows={3} placeholder={t.suggestMsg}
+              <textarea value={sMsg} onChange={e => setSMsg(e.target.value)} maxLength={500} rows={suggestMode === "fill" ? 5 : 3} placeholder={t.suggestMsg}
                 className="px-4 py-3 rounded-2xl bg-black/[0.03] text-[14.5px] font-medium outline-none focus:bg-black/[0.05] resize-none" />
               <input value={sContact} onChange={e => setSContact(e.target.value)} maxLength={50} placeholder={t.suggestContact}
                 className="h-12 px-4 rounded-2xl bg-black/[0.03] text-[14.5px] font-medium outline-none focus:bg-black/[0.05]" />
               <button
-                disabled={sMsg.trim().length < 5 || suggestMutation.isPending}
+                disabled={sMsg.trim().length < 5 || sMsg.trim() === t.fillTemplate.trim() || suggestMutation.isPending}
                 onClick={() => suggestMutation.mutate()}
                 className="h-12 rounded-full bg-brand text-white text-[15px] font-bold disabled:opacity-40"
               >

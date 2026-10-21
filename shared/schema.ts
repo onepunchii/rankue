@@ -1933,6 +1933,8 @@ export const storeListingSuggestions = pgTable("store_listing_suggestions", {
   message: text("message").notNull(),
   contact: text("contact"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+  /** 어드민이 처리했다고 표시한 때(2026-10-21 — '매장 정보 제보'). 비면 새 제보 */
+  handledAt: timestamp("handled_at"),
 });
 
 export type StoreListing = typeof storeListings.$inferSelect;

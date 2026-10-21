@@ -357,3 +357,132 @@ export function LeadsView() {
         </div>
     );
 }
+
+// ================= 매장 정보 제보(2026-10-21) =================
+// 매장 페이지의 '수정 제안' · '아는 만큼 알려 주기'가 쌓이는 곳(예전엔 보는 화면이 없어 아무도 못 봤다 — 2건).
+// 처리 = 표시만. 실제로 고치는 것은 '매장 리스트'(또는 사장님 인증 뒤 사장님이). 연락처가 있으면 전화 단추.
+export type ListingSuggestion = {
+    id: string; listingCode: string; message: string; contact: string | null; createdAt: string; handledAt: string | null;
+    listingName: string | null; listingAddress: string | null; listingSource: string | null; listingClaimed: boolean | null;
+};
+export const LISTING_SUGGESTIONS_KEY = ["/api/hiq/admin/listing-suggestions"] as const;
+
+/** 제보를 확인하고 고치기 — 영업시간 · 전화 · 테이블 수 · 10분 요금만(서버 PATCH /admin/listings/:code, 사장님 인증 매장은 거절) */
+const EDIT_FIELDS = [
+    ["openHours", "영업시간", "예: 12:00 ~ 02:00", "text"], ["phone", "전화", "02-000-0000", "tel"],
+    // 빈 칸의 회색 글씨가 값처럼 읽히지 않게 — 숫자 칸은 '—' · '예:'
+    ["tableLarge", "대대 수", "—", "num"], ["tableMedium", "중대 수", "—", "num"], ["tablePocket", "포켓 수", "—", "num"],
+    ["rate10Large", "대대 10분(원)", "예: 2500", "num"], ["rate10Medium", "중대 10분(원)", "예: 2000", "num"], ["rate10Pocket", "포켓 10분(원)", "예: 2000", "num"],
+] as const;
+type EditKey = (typeof EDIT_FIELDS)[number][0];
+function ListingEditor({ code, suggestionId, onDone }: { code: string; suggestionId: string; onDone: () => void }) {
+    const { toast } = useToast();
+    const qc = useQueryClient();
+    // 지금 값 — 공개 매장 상세(같은 값을 매장 페이지가 그린다)
+    const cur = useQuery<Record<string, unknown>>({ queryKey: [`/api/hiq/listings/${code}`] });
+    const [form, setForm] = useState<Partial<Record<EditKey, string>> | null>(null);
+    const base = useMemo(() => {
+        const d = cur.data ?? {};
+        return Object.fromEntries(EDIT_FIELDS.map(([k]) => [k, d[k] == null ? "" : String(d[k])])) as Record<EditKey, string>;
+    }, [cur.data]);
+    const f = form ?? base;
+    const save = useMutation({
+        mutationFn: async () => {
+            // 바뀐 칸만 보낸다(빈 칸 = 지우기)
+            const body: Record<string, unknown> = { suggestionId };
+            for (const [k, , , kind] of EDIT_FIELDS) if (f[k] !== base[k]) body[k] = kind === "num" ? (f[k] === "" ? null : Number(f[k])) : f[k];
+            if (Object.keys(body).length === 1) throw new Error("바뀐 칸이 없습니다");
+            return apiRequest(`/api/hiq/admin/listings/${code}`, { method: "PATCH", body });
+        },
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: LISTING_SUGGESTIONS_KEY }); qc.invalidateQueries({ queryKey: [`/api/hiq/listings/${code}`] });
+            toast({ title: "매장 정보를 고치고 처리함으로 표시했습니다" }); onDone();
+        },
+        onError: (e: any) => toast({ title: e?.message || "저장 실패", variant: "destructive" }),
+    });
+    if (cur.isLoading) return <p className="mt-3 text-[12.5px] text-black/45">지금 값을 불러오는 중…</p>;
+    return (
+        <div className="mt-3 rounded-xl border border-black/10 p-3" data-testid="listing-editor">
+            <div className="grid grid-cols-2 gap-2">
+                {EDIT_FIELDS.map(([k, label, ph, kind]) => (
+                    <label key={k} className={k === "openHours" ? "col-span-2" : ""}>
+                        <span className="block text-[12px] font-bold text-black/50">{label}</span>
+                        <input value={f[k] ?? ""} placeholder={ph} inputMode={kind === "num" ? "numeric" : kind === "tel" ? "tel" : "text"}
+                            onChange={(e) => setForm({ ...f, [k]: kind === "num" ? e.target.value.replace(/[^0-9]/g, "") : e.target.value })}
+                            className="mt-0.5 h-10 w-full rounded-lg bg-black/[0.04] px-3 text-[14px] font-medium outline-none focus:bg-black/[0.06] tabular-nums" />
+                    </label>
+                ))}
+            </div>
+            <p className="mt-2 text-[12px] text-black/45">제보 내용을 확인한 것만 적어 주세요. 빈 칸은 지우기입니다.</p>
+            <div className="mt-2 flex justify-end gap-1.5">
+                <Button size="sm" variant="ghost" className="h-9 text-black/50" onClick={onDone}>닫기</Button>
+                <Button data-admin-write size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={save.isPending} onClick={() => save.mutate()}>고치고 처리함</Button>
+            </div>
+        </div>
+    );
+}
+
+export function ListingSuggestionsView() {
+    const { toast } = useToast();
+    const qc = useQueryClient();
+    const { data, isLoading } = useQuery<ListingSuggestion[]>({ queryKey: LISTING_SUGGESTIONS_KEY });
+    const list = Array.isArray(data) ? data : [];
+    const [filter, setFilter] = useState<"new" | "done" | "all">("new");
+    const [q, setQ] = useState("");
+    const [editing, setEditing] = useState<string | null>(null);
+    const mark = useMutation({
+        mutationFn: async ({ id, handled }: { id: string; handled: boolean }) => apiRequest(`/api/hiq/admin/listing-suggestions/${id}/handled`, { method: "POST", body: { handled } }),
+        onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: LISTING_SUGGESTIONS_KEY }); toast({ title: v.handled ? "처리함으로 표시했습니다" : "새 제보로 되돌렸습니다" }); },
+        onError: (e: any) => toast({ title: e?.message || "변경 실패", variant: "destructive" }),
+    });
+    const rows = useMemo(() => {
+        const s = q.trim();
+        return list
+            .filter((x) => filter === "all" || (filter === "new" ? !x.handledAt : !!x.handledAt))
+            .filter((x) => !s || [x.listingName, x.listingAddress, x.message, x.listingCode].some((v) => v?.includes(s)));
+    }, [list, filter, q]);
+    const fresh = list.filter((x) => !x.handledAt).length;
+    return (
+        <div className="space-y-3">
+            <div className="bg-black/[0.04] p-4 rounded-2xl text-[13px] text-black/65 leading-relaxed">
+                매장 페이지의 <b>'정보가 다른가요? 수정 제안'</b>과, 요금 · 영업시간이 비어 있는 매장의 <b>'아는 만큼 알려 주기'</b>가 여기로 옵니다.
+                확인한 것만 <b>정보 고치기</b>로 싣습니다(영업시간 · 전화 · 테이블 · 10분 요금). 요금이나 영업시간이 들어간 매장은 검색 색인에도 다시 들어갑니다.
+                폐업 · 이전 같은 제보는 확인 뒤 <b>처리함</b>만 누르세요. 사장님 인증 매장은 사장님이 고칩니다.
+            </div>
+            <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <FilterChips value={filter} onChange={setFilter} options={[
+                    { id: "new", label: "새 제보", count: fresh, alert: true },
+                    { id: "done", label: "처리함", count: list.length - fresh },
+                    { id: "all", label: "전체", count: list.length },
+                ]} />
+                <SearchBox value={q} onChange={setQ} placeholder="매장·주소·내용" className="sm:ml-auto sm:w-64" />
+            </div>
+            {isLoading ? <EmptyState>불러오는 중…</EmptyState> : rows.length === 0 ? <EmptyState>해당하는 제보가 없습니다.</EmptyState> : rows.map((x) => (
+                <Panel key={x.id} className="p-4" data-testid="listing-suggestion">
+                    <div className="flex items-center gap-1.5 mb-1">
+                        <Pill tone={x.handledAt ? "neutral" : "alert"}>{x.handledAt ? "처리함" : "새 제보"}</Pill>
+                        {x.listingSource === "gov" && <Pill tone="info">인허가 정보만</Pill>}
+                        {x.listingClaimed && <Pill tone="brand">사장님 인증</Pill>}
+                        <span className="ml-auto text-[12px] text-black/40 tabular-nums" title={kstDateTime(x.createdAt)}>{agoLabel(x.createdAt)}</span>
+                    </div>
+                    <h3 className="text-[16px] font-bold">{x.listingName ?? `매장 코드 ${x.listingCode}`}</h3>
+                    {x.listingAddress && <p className="text-[12.5px] text-black/45">{x.listingAddress}</p>}
+                    <p className="mt-2 whitespace-pre-wrap rounded-xl bg-black/[0.03] px-3 py-2.5 text-[14px] leading-relaxed">{x.message}</p>
+                    <div className="mt-3 flex gap-2 flex-wrap items-center">
+                        {x.contact && <CallButton phone={x.contact} label={`회신 ${x.contact}`} />}
+                        <a href={`/stores/${encodeURIComponent(x.listingCode)}`} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-lg border border-black/10 px-3 text-[13px] font-bold text-black/65">매장 페이지</a>
+                        {!x.listingClaimed && x.listingName && editing !== x.id && (
+                            <Button data-admin-write size="sm" variant="outline" className="h-9" onClick={() => setEditing(x.id)}>정보 고치기</Button>
+                        )}
+                        <div className="ml-auto">
+                            {x.handledAt
+                                ? <Button data-admin-write size="sm" variant="ghost" className="h-9 text-black/50" disabled={mark.isPending} onClick={() => mark.mutate({ id: x.id, handled: false })}>새 제보로</Button>
+                                : <Button data-admin-write size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={mark.isPending} onClick={() => mark.mutate({ id: x.id, handled: true })}>처리함</Button>}
+                        </div>
+                    </div>
+                    {editing === x.id && <ListingEditor code={x.listingCode} suggestionId={x.id} onDone={() => setEditing(null)} />}
+                </Panel>
+            ))}
+        </div>
+    );
+}

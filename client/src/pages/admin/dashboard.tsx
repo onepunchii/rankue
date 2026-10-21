@@ -48,7 +48,7 @@ import CrewsView from "./CrewsView";
 import GolfOrdersView, { GOLF_ORDERS_KEY } from "./GolfOrdersView";
 import { StoresView, BillingView } from "./StoresView";
 import {
-    ClaimsView, RegistrationsView, LeadsView,
+    ClaimsView, RegistrationsView, LeadsView, ListingSuggestionsView, LISTING_SUGGESTIONS_KEY, type ListingSuggestion,
     type Claim, type Registration, type PartnerLead, CLAIMS_KEY, REGISTRATIONS_KEY, LEADS_KEY, LEAD_STATUS_LABEL,
 } from "./StoreOnboardingViews";
 import MemberDetailSheet, { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
@@ -73,11 +73,11 @@ type GlobalStats = {
     newUsersToday?: number;
 };
 
-type Tab = "dashboard" | "today" | "store-demand" | "claims" | "registrations" | "leads" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
+type Tab = "dashboard" | "today" | "store-demand" | "claims" | "registrations" | "leads" | "store-suggestions" | "stores" | "crews" | "members" | "push" | "billing" | "suggestions" | "notices" | "moderation" | "golf-orders" | "online-game"
     | "golf-overview" | "golf-listings" | "golf-rounds" | "golf-photos" | "golf-courses" | "golf-pars" | "golf-awards" | "golf-actions" | "golf-feeds" | "search-trend" | "visitors" | "actions" | "goods" | "billiards-games" | "billiards-online" | "billiards-cup" | "billiards-case" | "billiards-invites" | "hiking-overview" | "hiking-summits" | "hiking-mountains" | "hiking-photos" | "fishing-catches" | "fishing-rank" | "fishing-feeds" | "fishing-decor";
 
 // 운영자 알림(푸시)을 누르면 ?tab= 으로 온다 — 신고 알림은 moderation, 새 건의 알림은 suggestions.
-const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "store-demand", "claims", "registrations", "leads", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-pars", "golf-awards", "golf-actions", "golf-feeds", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos", "fishing-catches", "fishing-rank", "fishing-feeds", "fishing-decor"] as const;
+const DEEP_LINK_TABS = ["moderation", "suggestions", "today", "members", "store-demand", "claims", "registrations", "leads", "store-suggestions", "push", "golf-overview", "golf-listings", "golf-rounds", "golf-photos", "golf-courses", "golf-pars", "golf-awards", "golf-actions", "golf-feeds", "golf-orders", "visitors", "actions", "goods", "billiards-games", "billiards-online", "billiards-cup", "billiards-case", "billiards-invites", "hiking-overview", "hiking-summits", "hiking-mountains", "hiking-photos", "fishing-catches", "fishing-rank", "fishing-feeds", "fishing-decor"] as const;
 
 // --- Sidebar (데스크탑 고정 · 폰 서랍 공용) ---
 // 14개 메뉴를 한 줄로 늘어놓던 것을 일의 묶음으로 나누고, 처리할 게 쌓인 메뉴엔 숫자를 단다(2026-09-26).
@@ -102,6 +102,8 @@ const MENU_GROUPS: { title: string; items: { id: Tab; label: string; icon: any }
         { id: "claims", label: "매장 클레임", icon: LucideStore },
         { id: "registrations", label: "신규 매장 등록", icon: LucideUserPlus },
         { id: "leads", label: "입점 문의", icon: LucidePhone },
+        // 매장 정보 제보(2026-10-21) — 매장 페이지의 수정 제안 · 아는 만큼 알려 주기(예전엔 보는 화면이 없었다)
+        { id: "store-suggestions", label: "매장 정보 제보", icon: LucideMail },
         { id: "stores", label: "매장 리스트", icon: LucideStore },
         { id: "billing", label: "결제 관리", icon: LucideCreditCard },
     ] },
@@ -294,6 +296,7 @@ export default function AdminDashboard() {
     const suggestions = asList<Suggestion>(useQuery<Suggestion[]>({ queryKey: SUGGESTIONS_KEY }).data);
     const claims = asList<Claim>(useQuery<Claim[]>({ queryKey: CLAIMS_KEY }).data);
     const registrations = asList<Registration>(useQuery<Registration[]>({ queryKey: REGISTRATIONS_KEY }).data);
+    const listingSuggestions = asList<ListingSuggestion>(useQuery<ListingSuggestion[]>({ queryKey: LISTING_SUGGESTIONS_KEY }).data);
     const golfOrders = asList<{ status: string }>(useQuery<{ status: string }[]>({ queryKey: GOLF_ORDERS_KEY }).data);
     const { data: reportCount } = useQuery<{ open: number }>({ queryKey: ["/api/hiq/admin/reports/count"], refetchInterval: 120_000 });
 
@@ -301,14 +304,16 @@ export default function AdminDashboard() {
         claims: claims.filter((c) => c.status === "pending").length,
         registrations: registrations.filter((r) => r.status === "pending").length,
         leads: leads.filter((l) => l.status === "NEW").length,
+        storeSuggestions: listingSuggestions.filter((x) => !x.handledAt).length,
         suggestions: suggestions.filter((x) => !x.isRead).length,
         golfOrders: golfOrders.filter((o) => o.status === "PENDING").length,
         reports: reportCount?.open ?? 0,
-    }), [claims, registrations, leads, suggestions, golfOrders, reportCount]);
+    }), [claims, registrations, leads, listingSuggestions, suggestions, golfOrders, reportCount]);
     const badges: Partial<Record<Tab, number>> = {
         claims: pending.claims,
         registrations: pending.registrations,
         leads: pending.leads,
+        "store-suggestions": pending.storeSuggestions,
         suggestions: pending.suggestions,
         "golf-orders": pending.golfOrders,
         moderation: pending.reports,
@@ -334,6 +339,7 @@ export default function AdminDashboard() {
         { tab: "claims", label: "매장 클레임 대기", n: pending.claims },
         { tab: "registrations", label: "신규 매장 등록 대기", n: pending.registrations },
         { tab: "leads", label: "새 입점 문의", n: pending.leads },
+        { tab: "store-suggestions", label: "새 매장 정보 제보", n: pending.storeSuggestions },
         { tab: "suggestions", label: "안 읽은 건의", n: pending.suggestions },
         { tab: "golf-orders", label: "골프 회원권 대기", n: pending.golfOrders },
     ];
@@ -480,6 +486,7 @@ export default function AdminDashboard() {
                     {tab === "claims" && <ClaimsView />}
                     {tab === "registrations" && <RegistrationsView />}
                     {tab === "leads" && <LeadsView />}
+                    {tab === "store-suggestions" && <ListingSuggestionsView />}
                     {tab === "stores" && <StoresView />}
                     {tab === "billing" && <BillingView />}
                     {tab === "crews" && <CrewsView />}
@@ -544,6 +551,7 @@ function getTabTitle(tab: string) {
         case "search-trend": return "검색 수요";
         case "members": return "회원 관리";
         case "leads": return "입점 문의";
+        case "store-suggestions": return "매장 정보 제보";
         case "stores": return "가맹점 리스트";
         case "billing": return "결제 관리";
         case "suggestions": return "건의함";

@@ -673,6 +673,63 @@ router.patch("/membership/orders/:id/status", checkSuperAdmin, asyncHandler(asyn
     return sendSuccess(res, order);
 }));
 
+// --- 매장 정보 제보(2026-10-21) ---
+// 매장 페이지의 '수정 제안' · '아는 만큼 알려 주기'(POST /listings/:code/suggest)가 쌓이는 곳. 예전엔 보는 화면이 없어 아무도 못 봤다.
+// 연락처가 실리므로 슈퍼관리자만. 처리 = 표시만(매장 정보는 '매장 리스트'에서 고친다).
+router.get("/listing-suggestions", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
+    const { db } = await import("../../db.js");
+    const { storeListingSuggestions, storeListings } = await import("../../../shared/schema.js");
+    const { eq, desc } = await import("drizzle-orm");
+    const rows = await db.select({
+        id: storeListingSuggestions.id,
+        listingCode: storeListingSuggestions.listingCode,
+        message: storeListingSuggestions.message,
+        contact: storeListingSuggestions.contact,
+        createdAt: storeListingSuggestions.createdAt,
+        handledAt: storeListingSuggestions.handledAt,
+        listingName: storeListings.name,
+        listingAddress: storeListings.address,
+        listingSource: storeListings.source,
+        listingClaimed: storeListings.claimed,
+    }).from(storeListingSuggestions)
+        .leftJoin(storeListings, eq(storeListings.code, storeListingSuggestions.listingCode))
+        .orderBy(desc(storeListingSuggestions.createdAt))
+        .limit(300);
+    return sendSuccess(res, rows);
+}));
+
+router.post("/listing-suggestions/:id/handled", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { db } = await import("../../db.js");
+    const { storeListingSuggestions } = await import("../../../shared/schema.js");
+    const { eq } = await import("drizzle-orm");
+    const handled = req.body?.handled !== false;
+    const [row] = await db.update(storeListingSuggestions).set({ handledAt: handled ? new Date() : null })
+        .where(eq(storeListingSuggestions.id, String(req.params.id))).returning({ id: storeListingSuggestions.id });
+    if (!row) return sendError(res, 404, "제보를 찾을 수 없습니다");
+    adminLog(req, "listing_suggestion_handled", { id: row.id, handled });
+    return sendSuccess(res, { success: true });
+}));
+
+// PATCH /admin/listings/:code — 제보를 확인하고 매장 정보 고치기(영업시간 · 전화 · 테이블 수 · 10분 요금만 — shared/storeMeta cleanListingPatch).
+// 사장님 인증 매장은 사장님이 관리한다(파트너 화면이 이 칸들을 다시 쓴다) — 409. suggestionId 를 주면 그 제보를 처리함으로.
+router.patch("/listings/:code", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { db } = await import("../../db.js");
+    const { storeListings, storeListingSuggestions } = await import("../../../shared/schema.js");
+    const { eq } = await import("drizzle-orm");
+    const { cleanListingPatch } = await import("../../../shared/storeMeta.js");
+    const code = String(req.params.code);
+    const [listing] = await db.select({ code: storeListings.code, claimed: storeListings.claimed }).from(storeListings).where(eq(storeListings.code, code));
+    if (!listing) return sendError(res, 404, "매장을 찾을 수 없습니다");
+    if (listing.claimed) return sendError(res, 409, "사장님이 인증한 매장입니다 — 사장님이 직접 고칩니다");
+    const c = cleanListingPatch(req.body);
+    if (!c.ok) return sendError(res, 400, c.reason);
+    await db.update(storeListings).set({ ...c.patch, updatedAt: new Date() }).where(eq(storeListings.code, code));
+    const sid = typeof req.body?.suggestionId === "string" ? req.body.suggestionId : null;
+    if (sid) await db.update(storeListingSuggestions).set({ handledAt: new Date() }).where(eq(storeListingSuggestions.id, sid));
+    adminLog(req, "listing_patched", { code, fields: Object.keys(c.patch), suggestionId: sid });
+    return sendSuccess(res, { success: true });
+}));
+
 // --- 매장 클레임 승인 대기열 ---
 // 승인 = 사장님 계정(profile) + 파트너 매장(hiqStores) 자동 발급 + 디렉토리 연결.
 // 임시 PIN은 응답에 1회만 노출 — 오너가 사장님께 전화로 전달하는 운영 전제.
