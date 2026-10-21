@@ -432,7 +432,7 @@ export function ListingSuggestionsView() {
     const [editing, setEditing] = useState<string | null>(null);
     const mark = useMutation({
         mutationFn: async ({ id, handled }: { id: string; handled: boolean }) => apiRequest(`/api/hiq/admin/listing-suggestions/${id}/handled`, { method: "POST", body: { handled } }),
-        onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: LISTING_SUGGESTIONS_KEY }); toast({ title: v.handled ? "처리함으로 표시했습니다" : "새 제보로 되돌렸습니다" }); },
+        onSuccess: (_r, v) => { qc.invalidateQueries({ queryKey: LISTING_SUGGESTIONS_KEY }); toast({ title: v.handled ? "처리함으로 표시했습니다(매장 정보는 그대로)" : "새 제보로 되돌렸습니다" }); },
         onError: (e: any) => toast({ title: e?.message || "변경 실패", variant: "destructive" }),
     });
     const rows = useMemo(() => {
@@ -447,7 +447,7 @@ export function ListingSuggestionsView() {
             <div className="bg-black/[0.04] p-4 rounded-2xl text-[13px] text-black/65 leading-relaxed">
                 매장 페이지의 <b>'정보가 다른가요? 수정 제안'</b>과, 요금 · 영업시간이 비어 있는 매장의 <b>'아는 만큼 알려 주기'</b>가 여기로 옵니다.
                 확인한 것만 <b>정보 고치기</b>로 싣습니다(영업시간 · 전화 · 테이블 · 10분 요금). 요금이나 영업시간이 들어간 매장은 검색 색인에도 다시 들어갑니다.
-                폐업 · 이전 같은 제보는 확인 뒤 <b>처리함</b>만 누르세요. 사장님 인증 매장은 사장님이 고칩니다.
+                폐업 · 이전처럼 고칠 칸이 없는 제보는 확인 뒤 <b>고칠 것 없이 처리</b>를 누르세요 — 이 단추는 매장 정보를 바꾸지 않습니다. 사장님 인증 매장은 사장님이 고칩니다.
             </div>
             <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
                 <FilterChips value={filter} onChange={setFilter} options={[
@@ -472,12 +472,13 @@ export function ListingSuggestionsView() {
                         {x.contact && <CallButton phone={x.contact} label={`회신 ${x.contact}`} />}
                         <a href={`/stores/${encodeURIComponent(x.listingCode)}`} target="_blank" rel="noreferrer" className="inline-flex h-9 items-center rounded-lg border border-black/10 px-3 text-[13px] font-bold text-black/65">매장 페이지</a>
                         {!x.listingClaimed && x.listingName && editing !== x.id && (
-                            <Button data-admin-write size="sm" variant="outline" className="h-9" onClick={() => setEditing(x.id)}>정보 고치기</Button>
+                            // 정보 고치기가 주 단추(2026-10-21 — '처리함'만 눌러 표시만 바뀌고 매장 정보는 그대로였던 일: 위너스 당구클럽)
+                            <Button data-admin-write size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" onClick={() => setEditing(x.id)}>정보 고치기</Button>
                         )}
                         <div className="ml-auto">
                             {x.handledAt
                                 ? <Button data-admin-write size="sm" variant="ghost" className="h-9 text-black/50" disabled={mark.isPending} onClick={() => mark.mutate({ id: x.id, handled: false })}>새 제보로</Button>
-                                : <Button data-admin-write size="sm" className="h-9 bg-brand hover:bg-brand-strong text-white" disabled={mark.isPending} onClick={() => mark.mutate({ id: x.id, handled: true })}>처리함</Button>}
+                                : <Button data-admin-write size="sm" variant="ghost" className="h-9 text-black/55" disabled={mark.isPending} onClick={() => mark.mutate({ id: x.id, handled: true })} title="매장 정보는 바꾸지 않고 처리했다고만 표시">고칠 것 없이 처리</Button>}
                         </div>
                     </div>
                     {editing === x.id && <ListingEditor code={x.listingCode} suggestionId={x.id} onDone={() => setEditing(null)} />}
