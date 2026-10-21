@@ -23,6 +23,8 @@ export interface MountainDetail extends MountainSummary {
     tourPhotos?: { url: string; thumb: string | null; lic: "Type1" | "Type3" }[];
     /** 이 근처 축제 · 행사(2026-10-21 — 한국관광공사, shared/tourFestivals). 옛 응답엔 없다 */
     festivals?: import("@shared/tourFestivals").NearbyFestival[];
+    /** 가까운 둘레길(2026-10-21 — 코리아둘레길 코스 선까지 10km 안, shared/trailFestivals). 옛 응답엔 없다 */
+    trails?: import("@shared/trailFestivals").TrailNear[];
 }
 export interface HikingHubData {
     counts: { total: number; famous: number; courses: number; withCourse: number };

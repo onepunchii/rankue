@@ -2172,7 +2172,14 @@ ${list}
     if (!isBot(req)) return next();
     try {
       const all = await allMountains();
-      const r = await renderHiking(req.path, all, async (slug) => { const d = await getMountainDetail(slug); return d ? { d, nearby: nearbyMountains(all, d) } : null; });
+      const r = await renderHiking(req.path, all, async (slug) => {
+        const d = await getMountainDetail(slug);
+        if (!d) return null;
+        // 가까운 둘레길(10/21) — 앱 화면과 같은 셈(shared/trailFestivals trailsNear)
+        const { trailCourses, toSummary } = await import("./storage/koreaTrails.js");
+        const { trailsNear } = await import("../shared/trailFestivals.js");
+        return { d, nearby: nearbyMountains(all, d), trails: d.lat != null && d.lng != null ? trailsNear(trailCourses().map(toSummary), d.lat, d.lng) : [] };
+      });
       // 산 표를 읽었는데 없는 산 · 권역 · 목록 · 용어 · 해외 코스면 404(허브처럼 자료가 비어서 못 그린 경우는 화면에 맡긴다)
       if (!r) return all.length && /^\/hiking\/(?:regions|lists|mountains|terms|abroad)\/[^/]+\/?$/.test(req.path) ? sendGone(res, "없는 산이에요", "랭큐 등산에 없는 페이지예요.") : next();
       noStore(res);

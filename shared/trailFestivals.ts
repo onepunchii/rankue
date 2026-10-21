@@ -42,3 +42,20 @@ export function festiveTrails(courses: readonly Pick<TrailCourseSummary, "route"
     const seen = new Set<string>();
     return pairs.filter((p) => { const k = `${p.route}/${p.key}`; if (seen.has(k)) return false; seen.add(k); return true; }).slice(0, max);
 }
+
+export interface TrailNear { route: TrailRouteId; key: string; name: string; km: number; minutes: number | null; coarse: [number, number][]; dist: number }
+/**
+ * 한 자리에서 가까운 코리아둘레길 코스(2026-10-21 — 산 페이지의 '가까운 둘레길'). 코스 선(coarse 점)까지 radiusKm 안, 가까운 max 개.
+ * 같은 길의 이웃 코스가 셋 다 차지하지 않게 — 길마다 가장 가까운 것 먼저, 그다음 남은 자리.
+ */
+export function trailsNear(courses: readonly Pick<TrailCourseSummary, "route" | "key" | "name" | "km" | "minutes" | "coarse">[], lat: number, lng: number, radiusKm = 10, max = 3): TrailNear[] {
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return [];
+    const all = courses
+        .map((c) => ({ c, d: Math.min(...c.coarse.map((p) => km(lat, lng, p[0], p[1]))) }))
+        .filter((x) => Number.isFinite(x.d) && x.d <= radiusKm)
+        .sort((a, b) => a.d - b.d);
+    const firstOfRoute = all.filter((x, i) => all.findIndex((y) => y.c.route === x.c.route) === i);
+    const rest = all.filter((x) => !firstOfRoute.includes(x));
+    return [...firstOfRoute, ...rest].slice(0, max).sort((a, b) => a.d - b.d)
+        .map(({ c, d }) => ({ route: c.route as TrailRouteId, key: c.key, name: c.name, km: c.km, minutes: c.minutes, coarse: c.coarse.map((p) => [p[0], p[1]] as [number, number]), dist: Math.round(d * 10) / 10 }));
+}

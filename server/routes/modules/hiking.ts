@@ -15,6 +15,8 @@ import { addPhoto, appealPhoto, listMountainPhotos, listPhotos, photoCounts, rem
 import { HIKING_GALLERY_LIMIT, HIKING_GALLERY_MAX, HIKING_PHOTO_CATEGORY, HIKING_PHOTO_DAILY_MAX, HIKING_PHOTO_LABEL, HIKING_PHOTO_PER_MOUNTAIN_MAX, HIKING_THUMB_CATEGORY, isOwnHikingPhotoUrl, validPhotoSize } from "../../../shared/hikingPhotos.js";
 import { HIKING_ALBUM_MAX, groupHikingAlbum, type AlbumMountainInfo } from "../../../shared/hikingAlbum.js";
 import { deleteBlobs, isOnOwnBlobHost } from "../../utils/blob.js";
+import { trailCourses, toSummary as toTrailSummary } from "../../storage/koreaTrails.js";
+import { trailsNear } from "../../../shared/trailFestivals.js";
 import { checkHiking, requireHikingAccess } from "../../middleware/hikingAccess.js";
 import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
 import { requireTermsAccepted } from "../../middleware/terms.js";
@@ -104,7 +106,9 @@ router.get("/mountains/:slug", asyncHandler(async (req: any, res: any) => {
     // 산 사진(2026-10-21) — 한국관광공사 TourAPI · 공공누리 제1 · 3유형만(server/data/mountainTourPhotos). 없으면 빈 칸
     // 이 근처 축제 · 행사(2026-10-21) — 한국관광공사 축제 중 20km 안, 열려 있거나 45일 안에 시작하는 것 셋. 못 받으면 빈 칸
     const festivals = d.lat != null && d.lng != null ? nearbyFestivals(await tourFestivals().catch(() => []), d.lat, d.lng, kstYmd()) : [];
-    return sendSuccess(res, { ...d, nearby: near, tourPhotos: MOUNTAIN_TOUR_PHOTOS[d.slug]?.photos ?? [], festivals });
+    // 가까운 둘레길(2026-10-21) — 코리아둘레길 코스 선까지 10km 안, 셋(두루누비 파일 · storage/koreaTrails)
+    const trails = d.lat != null && d.lng != null ? trailsNear(trailCourses().map(toTrailSummary), d.lat, d.lng) : [];
+    return sendSuccess(res, { ...d, nearby: near, tourPhotos: MOUNTAIN_TOUR_PHOTOS[d.slug]?.photos ?? [], festivals, trails });
 }));
 
 /** 산의 들머리(코스의 가장 낮은 곳) — 코스 선을 다 읽어야 해서 인스턴스가 6시간 기억한다. 못 구하면 null */

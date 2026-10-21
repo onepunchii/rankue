@@ -3,6 +3,8 @@
 //
 // 본문은 shared/hikingPage · hikingMountains · hikingGuide · hikingPois 로 화면(client/src/hiking)과 같은 글을 쓴다.
 // prerender.ts 와 서로 import 하는 모양이 되지만, 이 파일은 page·esc·hubNav 를 함수 안에서만 부른다(최상위에서 호출하지 말 것).
+import type { TrailNear } from "../../shared/trailFestivals.js";
+import { trailCoursePath } from "../../shared/koreaTrails.js";
 import { page, esc, hubNav } from "../prerender.js";
 
 /**
@@ -136,7 +138,7 @@ ${hubNav("ko")}`;
 const NAMED_KINDS: readonly HikingPoiKind[] = ["DANGER", "SHELTER", "CULTURAL", "WILD"];
 const NAMED_MAX = 12;
 
-function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: number })[]): HikingRender {
+function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: number })[], trails: readonly TrailNear[] = []): HikingRender {
     const seo = mountainSeo(d);
     const g = d.guide;
     const lists = listNames(d.lists);
@@ -187,6 +189,11 @@ ${g.highlights.length ? `    <h3>${esc(GUIDE_LABEL.highlights)}</h3>\n    <ul>\n
     <h2>${esc(MOUNTAIN_LABEL.nearby)}</h2>
     <ul>
 ${nearby.map((m) => `      <li><a href="${hikingMountainPath(m.slug)}">${esc(m.name)}</a> — ${esc([heightText(m.heightM), `${dirOf(m)}${m.km}km`].filter(Boolean).join(" · "))}</li>`).join("\n")}
+    </ul>
+  </section>\n` : ""}${trails.length ? `  <section>
+    <h2>가까운 둘레길</h2>
+    <ul>
+${trails.map((c) => `      <li><a href="${trailCoursePath(c.route, c.key)}">${esc(c.name)}</a> — ${esc(`코스 ${c.km}km · 이 산에서 ${c.dist}km`)}</li>`).join("\n")}
     </ul>
   </section>\n` : ""}${cta()}
   <p>${esc(OSM_NOTE)}</p>
@@ -416,7 +423,7 @@ ${hubNav("ko")}`;
  * 주소 → 검색용 화면. 등산의 주소가 아니거나 없는 권역 · 목록 · 산이면 null(다음 라우트로 — 화면이 '없는 산이에요'를 그린다).
  * detail 은 산 화면일 때만 부른다(산 한 곳의 글 · 코스 · 지점).
  */
-export async function renderHiking(path: string, all: readonly MountainSummary[], detail: (slug: string) => Promise<{ d: MountainDetail; nearby: (MountainSummary & { km: number })[] } | null>): Promise<HikingRender | null> {
+export async function renderHiking(path: string, all: readonly MountainSummary[], detail: (slug: string) => Promise<{ d: MountainDetail; nearby: (MountainSummary & { km: number })[]; trails?: TrailNear[] } | null>): Promise<HikingRender | null> {
     const p = path.replace(/\/+$/, "") || "/";
     if (p === HIKING_HUB_PATH) return all.length ? hub(all) : null;
     if (p === HIKING_STAMPS_PATH) return all.length ? stamps(all) : null;
@@ -446,7 +453,7 @@ export async function renderHiking(path: string, all: readonly MountainSummary[]
         return listing(`hiking:list:${l.id}`, hikingListSeo(l, items.length), l.name, `${l.name} ${items.length.toLocaleString("en-US")}곳 — ${l.note}.`, items, items.length);
     }
     const got = await detail(key);
-    return got ? mountain(got.d, got.nearby) : null;
+    return got ? mountain(got.d, got.nearby, got.trails ?? []) : null;
 }
 
 /** 사이트맵 — 허브 · 권역 여덟 · 목록 다섯 · 산(코스나 글이 있는 산만 — 빈 화면을 색인에 올리지 않는다) */

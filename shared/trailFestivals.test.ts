@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { FESTIVE_TRAIL_AHEAD_DAYS, festiveTrails } from "./trailFestivals";
+import { FESTIVE_TRAIL_AHEAD_DAYS, festiveTrails, trailsNear } from "./trailFestivals";
 import type { TourFestival } from "./tourFestivals";
 
 const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
@@ -34,5 +34,23 @@ describe("축제가 열리는 둘레길", () => {
         const hub = read("client/src/hiking/trails/TrailsHub.tsx");
         expect(hub).toContain("{!!data.festive?.length && (");
         expect(hub).toContain('title="축제가 열리는 둘레길"');
+    });
+});
+
+describe("가까운 둘레길(산 페이지)", () => {
+    const C = (route: string, key: string, lat: number) => course(route, key, [[lat, 128.95], [lat + 0.01, 128.95]]);
+    it("10km 안 · 가까운 셋 · 길마다 가장 가까운 것 먼저(한 길의 이웃 코스가 셋 다 차지하지 않게)", () => {
+        const list = [C("haeparang", "1", 37.77), C("haeparang", "2", 37.775), C("haeparang", "3", 37.78), C("dmz", "34", 37.82), C("namparang", "1", 38.5)];
+        const out = trailsNear(list, 37.77, 128.95);
+        expect(out.map((x) => `${x.route}/${x.key}`)).toEqual(["haeparang/1", "haeparang/2", "dmz/34"]);
+        expect(out[0].dist).toBe(0);
+        expect(trailsNear(list, 35, 127)).toEqual([]);
+        expect(trailsNear(list, NaN, 128)).toEqual([]);
+    });
+    it("앱 화면 · 검색용 화면이 같은 셈", () => {
+        expect(read("server/routes/modules/hiking.ts")).toContain("trailsNear(trailCourses().map(toTrailSummary), d.lat, d.lng)");
+        expect(read("server/prerender.ts")).toContain("trailsNear(trailCourses().map(toSummary), d.lat, d.lng)");
+        expect(read("server/seo/hiking.ts")).toContain("<h2>가까운 둘레길</h2>");
+        expect(read("client/src/hiking/pages/MountainPage.tsx")).toContain('data-testid="mountain-trails"');
     });
 });

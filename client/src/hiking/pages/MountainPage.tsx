@@ -36,6 +36,8 @@ import { CourseProfile, CourseTrace, SLOPE_COLOR } from "../components/CoursePar
 import { SLOPE_LABEL, compareCourses, courseLevel, courseSlopes, type CourseLevelId } from "@shared/hikingCourseLook";
 import { Fact, HikingCta, MountainRow, MountainWeather, SunToday } from "../components/MountainParts";
 import { SummitStamp, regionInk } from "../stamps/SummitStamp";
+import { TrailSketch, shortCourseName } from "../trails/TrailParts";
+import { TRAIL_ROUTES, trailCoursePath, trailTimeText } from "@shared/koreaTrails";
 import { SummitCheckin } from "../stamps/SummitCheckin";
 import { MountainPatch } from "../stamps/MountainPatch";
 import { hikingBookPath } from "../stamps/StampParts";
@@ -608,6 +610,26 @@ export default function MountainPage() {
                             ))}
                         </ul>
                         <p className="mt-2 text-[12px] text-[#F4EFE366]">축제 정보 한국관광공사 · 날짜와 운영은 바뀔 수 있어요 — 가기 전에 확인해 주세요.</p>
+                    </HkSection>
+                )}
+
+                {/* 가까운 둘레길(2026-10-21) — 코리아둘레길 코스 선까지 10km 안, 셋. 코스 선 · 길 이름 · 코스 거리 · 이 산에서의 거리 */}
+                {(d.trails?.length ?? 0) > 0 && (
+                    <HkSection title="가까운 둘레길" aside="코리아둘레길">
+                        <div className="-mx-5 flex gap-2.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="mountain-trails">
+                            {d.trails!.map((c) => {
+                                const r = TRAIL_ROUTES.find((x) => x.id === c.route);
+                                return (
+                                    <Link key={`trail:${c.route}/${c.key}`} href={trailCoursePath(c.route, c.key)} className="block w-[156px] shrink-0 rounded-2xl p-3 active:opacity-80" style={{ background: "#FFFFFF0A" }}>
+                                        <TrailSketch coarse={c.coarse} color={r?.color ?? "#F4EFE3"} w={132} h={64} />
+                                        <span className="mt-1.5 block text-[12.5px] font-medium" style={{ color: r?.color ?? "#F4EFE3" }}>{r?.name ?? ""}</span>
+                                        <span className="block truncate text-[14.5px] font-semibold text-[#F4EFE3]">{shortCourseName(c)}</span>
+                                        <span className="block text-[12.5px] tabular-nums text-[#F4EFE399]">{[`${c.km}km`, trailTimeText(c.minutes)].filter(Boolean).join(" · ")}</span>
+                                        <span className="block text-[12.5px] tabular-nums text-[#F6D9A8]">{c.dist < 1 ? "이 산 바로 옆" : `이 산에서 ${c.dist}km`}</span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
                     </HkSection>
                 )}
 
