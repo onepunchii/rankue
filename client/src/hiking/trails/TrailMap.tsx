@@ -31,12 +31,14 @@ const NAME_AT: Record<TrailRouteId, { lat: number; lng: number; anchor: "start" 
     dmz: { lat: 38.47, lng: 127.55, anchor: "middle" },
 };
 
-export function TrailMap({ courses, focus = null, picked = null, onPick, numbers = false, fitShape = false, className, label = "코리아둘레길 지도" }: {
+export function TrailMap({ courses, focus = null, picked = null, onPick, numbers = false, fitShape = false, lanterns = [], className, label = "코리아둘레길 지도" }: {
     courses: readonly TrailCourseSummary[];
     /** 고른 길 — 그 길로 당겨 들어가고 나머지는 옅게 */
     focus?: TrailRouteId | null;
     /** 길 페이지 — 고른 길이 바뀌지 않으니 상자를 길의 꼴에 맞춘다(허브는 길을 바꿔 가며 당겨 들어가므로 4:5 그대로) */
     fitShape?: boolean;
+    /** 등불 — 축제가 열리는 둘레길(허브, 2026-10-21). 지금 열리는 것은 밝게, 곧 열리는 것은 옅게. 선 위에 얹고 누름은 받지 않는다 */
+    lanterns?: readonly { id: string; lat: number; lng: number; now: boolean }[];
     picked?: string | null;
     onPick?: (c: TrailCourseSummary) => void;
     /** 당겨 들어갔을 때 코스 번호를 단다 */
@@ -139,6 +141,27 @@ export function TrailMap({ courses, focus = null, picked = null, onPick, numbers
                         {l.pts[0] && <circle cx={l.pts[0][0]} cy={l.pts[0][1]} r={4.5 * k} fill="#F4EFE3" />}
                     </g>
                 ))}
+                {/* 축제 등불 — 옅은 빛 두 겹 + 가운데 점(전국 축제 지도의 등불과 같은 결) */}
+                {lanterns.length > 0 && (
+                    <g pointerEvents="none" data-testid="trail-map-lanterns">
+                        <defs>
+                            <radialGradient id="trail-lantern-glow">
+                                <stop offset="0%" stopColor="#FFD28A" stopOpacity="0.9" />
+                                <stop offset="45%" stopColor="#F6A94A" stopOpacity="0.35" />
+                                <stop offset="100%" stopColor="#F6A94A" stopOpacity="0" />
+                            </radialGradient>
+                        </defs>
+                        {lanterns.map((l) => {
+                            const [x, y] = latLngToOutline(l.lat, l.lng);
+                            return (
+                                <g key={`lan${l.id}`} opacity={l.now ? 1 : 0.55}>
+                                    <circle cx={x} cy={y} r={(l.now ? 16 : 11) * k} fill="url(#trail-lantern-glow)" />
+                                    <circle cx={x} cy={y} r={(l.now ? 3.4 : 2.6) * k} fill={l.now ? "#FFE3B0" : "#F6D9A8"} stroke="#0B1F26" strokeWidth={0.8 * k} />
+                                </g>
+                            );
+                        })}
+                    </g>
+                )}
                 {!zoomed && TRAIL_ROUTES.map((r) => {
                     const at = NAME_AT[r.id];
                     const [x, y] = latLngToOutline(at.lat, at.lng);

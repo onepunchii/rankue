@@ -15,7 +15,7 @@ const km = (a: number, b: number, c: number, d: number) => { const t = Math.PI /
 
 export interface FestiveTrail {
     route: TrailRouteId; key: string; name: string; km: number; minutes: number | null; coarse: [number, number][];
-    festival: { id: string; title: string; start: string; end: string; state: "now" | "soon" };
+    festival: { id: string; title: string; start: string; end: string; state: "now" | "soon"; lat: number; lng: number };
     /** 축제 자리에서 코스 선까지(km, 소수 하나) */
     dist: number;
 }
@@ -33,7 +33,7 @@ export function festiveTrails(courses: readonly Pick<TrailCourseSummary, "route"
         if (!best) continue;
         pairs.push({
             route: best.c.route as TrailRouteId, key: best.c.key, name: best.c.name, km: best.c.km, minutes: best.c.minutes, coarse: best.c.coarse.map((p) => [p[0], p[1]]),
-            festival: { id: f.id, title: f.title, start: f.start, end: f.end, state: dayNo(f.start) <= today ? "now" : "soon" },
+            festival: { id: f.id, title: f.title, start: f.start, end: f.end, state: dayNo(f.start) <= today ? "now" : "soon", lat: f.lat, lng: f.lng },
             dist: Math.round(best.d * 10) / 10,
         });
     }

@@ -64,8 +64,9 @@ export default function TrailsHub() {
                         </div>
 
                         <HkSection title="둘레길 지도" aside="선을 누르면 그 코스">
-                            <TrailMap courses={courses} focus={focus} numbers onPick={(c) => setLocation(trailCoursePath(c.route, c.key))} />
-                            <p className="mt-2.5 text-[12.5px] text-[#F4EFE380] break-keep">선은 두루누비 공개 코스 {courses.length}개 — 빈 데는 아직 공개되지 않은 코스예요</p>
+                            <TrailMap courses={courses} focus={focus} numbers onPick={(c) => setLocation(trailCoursePath(c.route, c.key))}
+                                lanterns={(data.festive ?? []).filter((x) => !focus || x.route === focus).map((x) => ({ id: x.festival.id, lat: x.festival.lat, lng: x.festival.lng, now: x.festival.state === "now" }))} />
+                            <p className="mt-2.5 text-[12.5px] text-[#F4EFE380] break-keep">선은 두루누비 공개 코스 {courses.length}개 — 빈 데는 아직 공개되지 않은 코스예요{data.festive?.length ? " · 등불은 축제가 열리는 둘레길(밝으면 지금, 옅으면 30일 안)" : ""}</p>
                         </HkSection>
 
                         {/* 축제가 열리는 둘레길(10/21) — 지금 · 30일 안 축제가 코스 선 5km 안(도심 3km)인 코스. 누르면 그 코스(근처 축제가 거기 있다) */}

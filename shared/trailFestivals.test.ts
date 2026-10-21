@@ -54,3 +54,12 @@ describe("가까운 둘레길(산 페이지)", () => {
         expect(read("client/src/hiking/pages/MountainPage.tsx")).toContain('data-testid="mountain-trails"');
     });
 });
+
+describe("둘레길 허브 지도의 축제 등불", () => {
+    it("축제 자리 좌표를 싣는다 · 지도는 지금 밝게 / 곧 옅게 · 길을 고르면 그 길의 등불만", () => {
+        const out = festiveTrails([A], [fest({ id: "a", lat: 37.775, lng: 128.95 })], "20261021");
+        expect(out[0].festival).toMatchObject({ lat: 37.775, lng: 128.95 });
+        expect(read("client/src/hiking/trails/TrailMap.tsx")).toContain('data-testid="trail-map-lanterns"');
+        expect(read("client/src/hiking/trails/TrailsHub.tsx")).toContain("(data.festive ?? []).filter((x) => !focus || x.route === focus)");
+    });
+});
