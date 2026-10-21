@@ -92,3 +92,12 @@ describe("코스 도장 — 도장첩의 칸", () => {
         expect(ui.split("\n").filter((l) => !/^\s*(\*|\/\/|\/\*)/.test(l)).join("\n")).not.toMatch(/완주/);
     });
 });
+
+describe("코스 도장 — 등산 허브 · 홈의 둘레길 입구", () => {
+    it("회원이면 최근 도장 셋과 '내 코스 도장 n' · 출발 확인 수(방문자 · 도장 없는 회원은 그대로)", () => {
+        const ui = read("client/src/hiking/trails/TrailsEntry.tsx");
+        expect(ui).toContain("const my = useMyTrails();");
+        expect(ui).toContain("{my && (my.stamps.length > 0 || open > 0) && (");
+        expect(ui).toContain("`내 코스 도장 ${my.stamps.length}`");
+    });
+});
