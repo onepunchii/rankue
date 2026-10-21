@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    TRAIL_ROUTES, TRAIL_TOTAL_COURSES, TRAIL_TOTAL_KM, parseTrailCourseName, trailCardInput, trailCoursePath, trailCourseSeo, trailTimeShort, trailTimeText, travelerPoint, type TrailCourseDetail,
+    TRAIL_ROUTES, TRAIL_TOTAL_COURSES, TRAIL_TOTAL_KM, parseTrailCourseName, fillTrailEndNames, summaryEnds, trailCardInput, trailCoursePath, trailCourseSeo, trailTimeShort, trailTimeText, travelerPoint, type TrailCourseDetail,
 } from "./koreaTrails";
 import { HUB_CARD_NAMES, hubCardName, trailCardUrl } from "./ogCards";
 import { sportForPath } from "./sportRoute";
@@ -96,5 +96,30 @@ describe("코리아둘레길 — 카드(미리보기 1200 정사각)", () => {
         expect(read("client/src/hiking/trails/TrailCoursePage.tsx")).toContain('image: trailCardUrl("https://www.rankue.co.kr", c.route, c.key)');
         // 두루누비 선만 — 시도 윤곽선(화면에서만 쓰는 자료)은 카드에 싣지 않는다
         expect(read("server/services/trailCard.ts")).not.toMatch(/sido|outline|provinces/i);
+    });
+});
+
+describe("코리아둘레길 — 시작 · 끝 이름(두루누비 요약의 말 · 이어진 코스)", () => {
+    it("요약에서 — '에서 출발해 … 에 이르는' · '을 출발해 … 까지' · '부터 … 까지' · '로 향하는' · 시작이 없으면 끝만", () => {
+        expect(summaryEnds("- 해파랑길 세 번째 코스로 기장읍 대변리와 임랑리를 잇는 길\n- 대변항에서 출발해 봉대산 봉수대와 기장군청, 일광해변을 지나 임랑 해변에 이르는 구간")).toEqual({ start: "대변항", end: "임랑 해변" });
+        expect(summaryEnds("- 진하해변을 출발해 덕하역까지 구간")).toEqual({ start: "진하해변", end: "덕하역" });
+        expect(summaryEnds("- 인제 피스빌리지부터 진부령 미술관까지 이어지는 길이다.")).toEqual({ start: "인제 피스빌리지", end: "진부령 미술관" });
+        expect(summaryEnds("- 금강산 건봉사를 출발해 통일안보공원으로 향하는 코스다.")).toEqual({ start: "금강산 건봉사", end: "통일안보공원" });
+        expect(summaryEnds("- 풍산교에서 출발해 평화의댐이 있는 국제평화아트파크까지 걷는 길이다.")).toEqual({ start: "풍산교", end: "국제평화아트파크" });
+        expect(summaryEnds("- 미포, 청사포, 구덕포를 거쳐 송정해변을 지나 대변항에 이르는 코스")).toEqual({ start: null, end: "대변항" });
+        // 동네 이름 한 마디는 지점이 아니다 · 못 읽으면 지어내지 않는다
+        expect(summaryEnds("- 보성군에서 고흥군까지 이어지는 코스").start).toBeNull();
+        expect(summaryEnds("- 숲길과 해변을 두루 걷는 길")).toEqual({ start: null, end: null });
+    });
+    it("자료 170코스 모두 이름이 있다 — '시점 :' 줄이 있던 코스는 그대로, 앞 코스의 끝은 좌표가 가까울 때만", () => {
+        const filled = fillTrailEndNames(asset.courses);
+        expect(filled.every((c) => c.startName && c.endName)).toBe(true);
+        asset.courses.forEach((c, i) => { if (c.startName) expect(filled[i].startName).toBe(c.startName); });
+        const at = (r: string, k: string) => filled.find((c) => c.route === r && c.key === k)!;
+        expect([at("haeparang", "1").startName, at("haeparang", "1").endName]).toEqual(["오륙도 해맞이공원", "해운대"]);
+        expect(at("haeparang", "2").startName).toBe("해운대");
+        expect(at("dmz", "34").endName).toBe("통일전망대");
+        expect(filled.some((c) => /^(?:해|하여) /.test(`${c.startName} ${c.endName}`) || / (?:해|하여) /.test(` ${c.endName}`))).toBe(false);
+        expect(read("server/storage/koreaTrails.ts")).toContain("courses: fillTrailEndNames(raw.courses)");
     });
 });

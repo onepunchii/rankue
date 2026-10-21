@@ -99,6 +99,72 @@ export function travelerPoint(text: string | null | undefined, which: "시점" |
     return v ? v.replace(/\s+/g, " ").slice(0, 40) : null;
 }
 
+/**
+ * 두루누비 코스 요약('- 대변항에서 출발해 봉대산 봉수대와 … 임랑 해변에 이르는 구간')에서 시작 · 끝 이름(2026-10-21).
+ * 해파랑길 · DMZ 평화의 길 77코스는 '시점 :' 줄이 없어 화면이 '코스 시작점 · 코스 끝점'으로만 나왔다. 요약에 적힌 말만 쓴다 — 못 읽으면 null.
+ * 줄마다 보고 '출발 · 시작'이 있는 줄을 먼저 믿는다('울산 남구에서 중구까지 이어지는 코스' 같은 동네 단위 줄보다).
+ */
+const END_MARK = /(?:까지|에 이르|에 이름|(?:으로|로) (?:이어지|향하|연결)|에서 끝)/;
+const BAD_NAME = /코스|구간|번째|길을|있는|잇는|따라|^\d|[.·~]|^바다$|숲길$/;
+/** '보성군 · 고흥군'처럼 동네 이름 한 마디 — 지점이 아니다 */
+const AREA_ONLY = /^[가-힣]{1,3}(?:시|군|구|읍|면)$/;
+const tidyName = (v: string | undefined): string | null => {
+    const t = (v ?? "").replace(/^[-\s]+/, "").replace(/\s+/g, " ").trim();
+    return t.length >= 2 && t.length <= 20 && t.split(" ").length <= 4 && !BAD_NAME.test(t) && !AREA_ONLY.test(t) ? t : null;
+};
+const CUTS = ["지나 ", "거쳐 ", "출발해 ", "출발하여 ", "시작해 ", "시작하여 ", "에서 ", "부터 ", "있는 ", ", "];
+export function summaryEnds(summary: string | null | undefined): { start: string | null; end: string | null } {
+    const lines = String(summary ?? "").split("\n").map((l) => l.replace(/^\s*-\s*/, "").trim()).filter(Boolean);
+    const ranked = [...lines.filter((l) => /출발|시작|부터/.test(l)), ...lines.filter((l) => !/출발|시작|부터/.test(l))];
+    let endOnly: string | null = null;
+    for (const l of ranked) {
+        const em = END_MARK.exec(l);
+        if (!em) continue;
+        const head = l.slice(0, em.index);
+        const sm = /^(.+?)(?:에서|을|를)\s*(?:출발|시작)(?:해|하여|하는|한|하고)?\s/.exec(head) ?? /^(.+?)(?:에서|부터)\s/.exec(head);
+        const start = sm ? tidyName(sm[1]) : null;
+        // 끝 — 끝 표시 바로 앞, 마지막 '지나 · 거쳐 · 출발해 · 에서 · 부터 · 있는' 뒤
+        const tail = sm ? head.slice(sm.index + sm[0].length) : head;
+        const cut = Math.max(...CUTS.map((w) => { const i = tail.lastIndexOf(w); return i < 0 ? -1 : i + w.length; }), 0);
+        const end = tidyName(tail.slice(cut));
+        if (start && end) return { start, end };
+        // 시작이 안 적힌 줄('미포 · 청사포를 거쳐 … 대변항에 이르는 코스')은 끝만 — 시작은 앞 코스의 끝으로 채운다(fillTrailEndNames)
+        if (!sm && end && !endOnly) endOnly = end;
+    }
+    return { start: null, end: endOnly };
+}
+
+const nearKm = (a: readonly [number, number], b: readonly [number, number]) => {
+    const la = ((a[0] + b[0]) / 2) * Math.PI / 180;
+    return Math.hypot((a[0] - b[0]) * 111, (a[1] - b[1]) * 111 * Math.cos(la));
+};
+/**
+ * 시작 · 끝 이름 채우기 — ① '시점 :' 줄(이미 있는 값) ② 요약의 말(summaryEnds) ③ 이어진 코스(앞 코스의 끝 · 뒤 코스의 시작, **좌표가 400m 안일 때만**)
+ * ④ 길의 첫 코스 시작 · 마지막 코스 끝은 길 소개의 출발 · 도착. 어느 것도 없으면 null(화면은 '코스 시작점').
+ */
+export function fillTrailEndNames<T extends Pick<TrailCourseDetail, "route" | "no" | "sub" | "start" | "end" | "startName" | "endName" | "summary">>(courses: readonly T[]): T[] {
+    const out = courses.map((c) => {
+        if (c.startName && c.endName) return { ...c };
+        const e = summaryEnds(c.summary);
+        return { ...c, startName: c.startName ?? e.start, endName: c.endName ?? e.end };
+    });
+    const main = new Map(out.filter((c) => c.sub == null).map((c) => [`${c.route}/${c.no}`, c]));
+    for (const c of out) {
+        const r = TRAIL_ROUTES.find((x) => x.id === c.route);
+        if (!c.startName) {
+            const prev = main.get(`${c.route}/${c.no - 1}`);
+            if (c.sub == null && prev?.endName && nearKm(prev.end, c.start) <= 0.4) c.startName = prev.endName;
+            else if (c.sub == null && c.no === 1 && r) c.startName = r.from;
+        }
+        if (!c.endName) {
+            const next = main.get(`${c.route}/${c.no + 1}`);
+            if (c.sub == null && next?.startName && nearKm(next.start, c.end) <= 0.4) c.endName = next.startName;
+            else if (c.sub == null && r && c.no === r.total) c.endName = r.to;
+        }
+    }
+    return out;
+}
+
 /** 코스 카드(1200 정사각 · server/services/trailCard)의 글 — 길 · 코스 이름 · 거리/시간/난이도 · 지역 · 코스 선 */
 export function trailCardInput(c: Pick<TrailCourseDetail, "route" | "name" | "km" | "minutes" | "level" | "sigun" | "tags" | "line">): { route: string; color: string; name: string; facts: string; place: string; line: [number, number][] } {
     const r = trailRouteOf(c.route);
