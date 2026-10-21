@@ -20,3 +20,10 @@ describe("비로그인 랭킹 미리 보기", () => {
         expect(g).toContain('${children ? "justify-start pt-8" : "justify-center"}');
     });
 });
+
+describe("비로그인 기록(2026-10-21)", () => {
+    it("당구는 예시 인물의 '내 실전 기록'(홈과 같은 sample 갈래 — '예시' 표시 · 공유 없음), 골프는 그리지 않는다", () => {
+        const h = readFileSync(resolve(__dirname, "../client/src/pages/hiq/history.tsx"), "utf8");
+        expect(h).toContain('{(currentSport as string) !== "GOLF" ? <RealHandicapCard sample={GUEST_SAMPLE.billiards} onStartMatch={() => goLogin(setLocation)} /> : null}');
+    });
+});

@@ -19,7 +19,10 @@ import { AchievementCard } from "@/components/hiq/history/AchievementCard";
 import { SimHistoryCard } from "@/components/hiq/history/SimHistoryCard";
 import { useT } from "@/lib/i18n";
 import { useAuth } from "@/hooks/useAuth";
-import { LoginGate } from "@/components/hiq/LoginGate";
+import { LoginGate, goLogin } from "@/components/hiq/LoginGate";
+import { RealHandicapCard } from "@/components/hiq/dashboard/RealHandicapCard";
+import { GUEST_SAMPLE } from "@shared/guestSample";
+import { useLocation } from "wouter";
 import { BallDot } from "@/components/hiq/BallDot";
 import { GolfRoundReport } from "@/golf/pages/RoundReport";
 // 성장 그래프는 열 때만 받는다(recharts 를 첫 화면 묶음에서 뺀다 — 2026-10-18)
@@ -28,6 +31,7 @@ const GrowthChart = lazy(() => import("@/components/hiq/history/GrowthChart").th
 export default function HiqHistory() {
     const { t } = useT();
     const { currentSport, sport } = useSport();
+    const [, setLocation] = useLocation();
     const [filter, setFilter] = useState<FilterType>("all");
     const [selectedGameId, setSelectedGameId] = useState<string | null>(null);
 
@@ -74,7 +78,11 @@ export default function HiqHistory() {
                     { label: t("loginGate.linkWorld"), to: "/world-ranking" },
                     { label: t("loginGate.linkPba"), to: "/pba" },
                 ]}
-            />
+            >
+                {/* 기록이 어떻게 쌓이는지 — 홈과 같은 예시 인물의 '내 실전 기록'(2026-10-21 디자인 리뷰: 로그인 카드와 글 링크 둘뿐이었다).
+                    '예시' 표시 · 공유 없음 · 경기 시작은 가입 안내(RealHandicapCard 의 sample 갈래). 당구만 — 골프 기록은 모양이 다르다 */}
+                {(currentSport as string) !== "GOLF" ? <RealHandicapCard sample={GUEST_SAMPLE.billiards} onStartMatch={() => goLogin(setLocation)} /> : null}
+            </LoginGate>
         );
     }
 
