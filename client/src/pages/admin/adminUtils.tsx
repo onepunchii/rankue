@@ -1,7 +1,10 @@
 /**
  * 어드민 화면 공용 표시 도우미 — 시각은 전부 한국 시각으로 읽는다(서버·관리자 기기 시간대와 무관).
  */
+import { useState } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { flagEmoji } from "@/lib/flag";
+import { LucideExternalLink, LucideX } from "@/lib/icons";
 
 const KST_TIME = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
 const KST_DATE = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", year: "2-digit", month: "2-digit", day: "2-digit" });
@@ -76,12 +79,17 @@ export function phoneLabel(phone: string | null | undefined): string {
  * 회원 얼굴 — 프로필 사진이 있으면 사진, 없거나 안 열리면 이름 첫 글자.
  * 사진은 직접 올린 것이거나, 올리기 전까지 쓰는 카카오·구글 계정의 사진이다(server/lib/providerAvatar.ts).
  * 글자를 밑에 깔고 사진을 그 위에 얹는다 — 사진이 깨지면 사진만 치워서 글자가 그대로 보인다.
+ * zoom(2026-10-21 오너: "어드민에 회원에 프로필 사진 누르면 크게 볼 수 있게") — 사진이 있을 때만 단추가 되어 크게 보기를 연다.
+ *   줄 전체가 회원 상세를 여는 단추 · 행이라, 누름이 그쪽으로 새지 않게 막는다(포털 안의 누름도 React 에선 부모로 올라간다).
+ *   단추 안에 단추를 넣지 말 것 — 폰 목록은 사진을 줄 단추 밖에 둔다(MembersView).
  */
-export function MemberAvatar({ name, src, className = "" }: { name: string | null | undefined; src: string | null | undefined; className?: string }) {
-    return (
+export function MemberAvatar({ name, src, className = "", zoom = false }: { name: string | null | undefined; src: string | null | undefined; className?: string; zoom?: boolean }) {
+    const [broken, setBroken] = useState(false);
+    const [open, setOpen] = useState(false);
+    const face = (
         <span className={`relative shrink-0 rounded-full overflow-hidden flex items-center justify-center ${className}`}>
             {name?.slice(0, 1) || "?"}
-            {src && (
+            {src && !broken && (
                 <img
                     src={src}
                     alt=""
@@ -89,10 +97,82 @@ export function MemberAvatar({ name, src, className = "" }: { name: string | nul
                     decoding="async"
                     referrerPolicy="no-referrer"
                     className="absolute inset-0 w-full h-full object-cover"
-                    onError={(e) => { e.currentTarget.style.display = "none"; }}
+                    onError={() => setBroken(true)}
                 />
             )}
         </span>
+    );
+    if (!zoom || !src || broken) return face;
+    // 누름만 막는다 — keydown · pointerdown 까지 막으면 Radix 가 document 에서 듣는 Esc · 바깥 누름이 끊긴다
+    return (
+        <span className="shrink-0 inline-flex" onClick={(e) => e.stopPropagation()}>
+            <button
+                type="button"
+                onClick={() => setOpen(true)}
+                aria-label={`${name ?? "회원"} 프로필 사진 크게 보기`}
+                data-testid="member-avatar-zoom"
+                className="rounded-full focus:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 active:scale-95 transition-transform cursor-zoom-in"
+            >
+                {face}
+            </button>
+            <MemberPhotoZoom open={open} onOpenChange={setOpen} name={name} src={src} />
+        </span>
+    );
+}
+
+/** 사진이 어디서 왔나 — 직접 올린 것(hiq/avatar/) · 카카오·구글 계정에서 가져온 사본(hiq/profile/) */
+export function memberPhotoSource(src: string): string | null {
+    if (/\/hiq\/avatar\//.test(src)) return "직접 올린 사진";
+    if (/\/hiq\/profile\//.test(src)) return "카카오 · 구글 계정 사진";
+    return null;
+}
+
+/**
+ * 회원 사진 크게 보기 — 검은 바탕에 사진 한 장(자르지 않는다), 밑에 이름 · 어디서 온 사진인지 · 원본 열기.
+ * Radix Dialog 라 회원 상세 시트 위에 겹쳐 열리고, 관리자 콘솔의 '뒤로'(adminBack.closeTopLayer)가 이것부터 닫는다.
+ */
+export function MemberPhotoZoom({ open, onOpenChange, name, src }: { open: boolean; onOpenChange: (v: boolean) => void; name: string | null | undefined; src: string }) {
+    const from = memberPhotoSource(src);
+    return (
+        <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+            <DialogPrimitive.Portal>
+                <DialogPrimitive.Overlay className="fixed inset-0 z-[60] bg-[#0A0A0B]/95 backdrop-blur-md data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+                <DialogPrimitive.Content
+                    onClick={() => onOpenChange(false)}
+                    className="fixed inset-0 z-[61] flex flex-col items-center justify-center px-4 outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95"
+                    style={{ paddingTop: "calc(env(safe-area-inset-top) + 56px)", paddingBottom: "calc(env(safe-area-inset-bottom) + 24px)" }}
+                    data-testid="member-photo-zoom"
+                >
+                    <DialogPrimitive.Title className="sr-only">{`${name ?? "회원"} 프로필 사진`}</DialogPrimitive.Title>
+                    <DialogPrimitive.Description className="sr-only">사진 밖을 누르면 닫혀요</DialogPrimitive.Description>
+                    <DialogPrimitive.Close
+                        aria-label="닫기"
+                        onClick={(e) => e.stopPropagation()}
+                        className="absolute right-3 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white active:bg-white/20"
+                        style={{ top: "calc(env(safe-area-inset-top) + 8px)" }}
+                    >
+                        <LucideX className="h-6 w-6" />
+                    </DialogPrimitive.Close>
+                    <img
+                        src={src}
+                        alt={`${name ?? "회원"} 프로필 사진`}
+                        referrerPolicy="no-referrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="max-h-[calc(100dvh-220px)] max-w-[min(92vw,640px)] rounded-2xl object-contain bg-white/5 shadow-[0_20px_60px_rgba(0,0,0,0.5)]"
+                    />
+                    <div className="mt-4 flex flex-col items-center gap-1 text-center" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-[16px] font-bold text-white">{name ?? "이름 없음"}</span>
+                        <span className="flex items-center gap-2 text-[13px] text-white/60">
+                            {from && <span>{from}</span>}
+                            {from && <span aria-hidden>·</span>}
+                            <a href={src} target="_blank" rel="noreferrer noopener" className="inline-flex items-center gap-1 font-semibold text-white/80 underline-offset-2 hover:underline">
+                                원본 열기 <LucideExternalLink className="h-3.5 w-3.5" />
+                            </a>
+                        </span>
+                    </div>
+                </DialogPrimitive.Content>
+            </DialogPrimitive.Portal>
+        </DialogPrimitive.Root>
     );
 }
 

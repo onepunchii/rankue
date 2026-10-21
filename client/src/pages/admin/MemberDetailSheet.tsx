@@ -399,7 +399,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                         <>
                             <div className="shrink-0 bg-white border-b border-black/[0.07] px-5 pt-6 pb-4">
                                 <div className="flex items-center gap-3 pr-8">
-                                    <MemberAvatar name={m.name} src={m.profileImageUrl} className="w-12 h-12 bg-brand/10 text-[18px] font-black text-brand" />
+                                    <MemberAvatar name={m.name} src={m.profileImageUrl} zoom className="w-12 h-12 bg-brand/10 text-[18px] font-black text-brand" />
                                     <div className="min-w-0">
                                         <SheetTitle className="flex items-center gap-1.5 text-[18px] font-black text-[rgba(0,0,0,0.87)]">
                                             <span className="truncate">{m.name}</span>

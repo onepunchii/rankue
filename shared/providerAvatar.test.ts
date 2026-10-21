@@ -84,8 +84,9 @@ describe("어드민 회원 관리 — 사진이 같이 보인다", () => {
         const utils = code(root("client/src/pages/admin/adminUtils.tsx"));
         const avatar = utils.slice(utils.indexOf("export function MemberAvatar("), utils.indexOf("export function PlatformIcon("));
         expect(avatar).toContain('{name?.slice(0, 1) || "?"}');
-        expect(avatar).toContain("{src && (");
-        expect(avatar).toContain('onError={(e) => { e.currentTarget.style.display = "none"; }}');
+        // 사진이 깨지면 사진만 치운다(10/21부터 상태로 — 크게 보기 단추도 같이 거둔다)
+        expect(avatar).toContain("{src && !broken && (");
+        expect(avatar).toContain("onError={() => setBroken(true)}");
         expect(avatar).toContain('className="absolute inset-0 w-full h-full object-cover"');
 
         const list = code(root("client/src/pages/admin/MembersView.tsx"));

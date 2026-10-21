@@ -198,9 +198,12 @@ export default function MembersView({ onOpenId }: {
                     {/* 폰: 카드 목록 */}
                     <ul className="md:hidden rounded-2xl bg-white border border-black/[0.08] divide-y divide-black/[0.05] overflow-hidden">
                         {shown.map((m) => (
-                            <li key={m.id}>
-                                <button onClick={() => onOpenId(m.id)} className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-black/[0.04]">
-                                    <MemberAvatar name={m.name} src={m.profileImageUrl} className="w-9 h-9 bg-black/[0.05] text-[13px] font-bold text-black/60" />
+                            <li key={m.id} className="flex items-center">
+                                {/* 사진은 줄 단추 밖에 — 누르면 크게(단추 안에 단추를 넣지 않는다) */}
+                                <span className="shrink-0 pl-4 py-3">
+                                    <MemberAvatar name={m.name} src={m.profileImageUrl} zoom className="w-9 h-9 bg-black/[0.05] text-[13px] font-bold text-black/60" />
+                                </span>
+                                <button onClick={() => onOpenId(m.id)} className="min-w-0 flex-1 flex items-center gap-3 pl-3 pr-4 py-3 text-left active:bg-black/[0.04]">
                                     <span className="min-w-0 flex-1">
                                         <span className="flex items-center gap-1.5">
                                             <span className="font-bold text-[14px] truncate">{m.name}</span>
@@ -243,7 +246,7 @@ export default function MembersView({ onOpenId }: {
                                     <tr key={m.id} onClick={() => onOpenId(m.id)} className="border-b border-black/[0.05] hover:bg-brand/[0.03] cursor-pointer">
                                         <td className="px-4 py-3">
                                             <div className="flex items-center gap-3">
-                                                <MemberAvatar name={m.name} src={m.profileImageUrl} className="w-9 h-9 bg-black/[0.05] text-[13px] font-bold text-black/60" />
+                                                <MemberAvatar name={m.name} src={m.profileImageUrl} zoom className="w-9 h-9 bg-black/[0.05] text-[13px] font-bold text-black/60" />
                                                 <div className="min-w-0">
                                                     <div className="flex items-center gap-1.5">
                                                         <span className="font-bold text-[rgba(0,0,0,0.87)]">{m.name}</span>

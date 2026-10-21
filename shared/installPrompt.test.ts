@@ -742,6 +742,8 @@ describe("화면(AppInstallSheet) — 소스 검사", () => {
         const KNOWN: Record<string, string> = {
             // Radix AlertDialog 가 role="alertdialog" 를 스스로 단다
             "components/AppDialog.tsx": "radix",
+            // 관리자 회원 사진 크게 보기 — Radix Dialog.Content 가 role="dialog" 를 스스로 단다(2026-10-21)
+            "pages/admin/adminUtils.tsx": "radix",
             // 스코어카드 화면 안에서만 열린다 — 표식은 없지만 자리 검사(coveredByOverlay)가 잡는다(z-60 · z-70)
             "golf/components/OrderModal.tsx": "covered",
             "golf/components/ScorecardModal.tsx": "covered",
