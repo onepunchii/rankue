@@ -19,6 +19,7 @@ import { BundleNotebook } from "../components/BundleNotebook";
 import { MountainMap } from "../components/MountainMap";
 import { HikingCta, MountainRow } from "../components/MountainParts";
 import { SeasonNow } from "../components/SeasonNow";
+import { TrailsEntry } from "../trails/TrailsEntry";
 import { HIKING_HERO, hikingCover } from "../theme";
 import { HIKING_HUB_KEY, type HikingHubData } from "../lib/api";
 import { useHikingStamps } from "../stamps/useHikingStamps";
@@ -76,6 +77,8 @@ export default function HikingHub() {
                         </HkSection>
 
                         <SeasonNow mountains={data.famous} done={my.done} mine={my.mine} />
+                        {/* 코리아둘레길(2026-10-21 — 국토종주는 걸어서 · 등산 안에) */}
+                        <TrailsEntry />
 
                         <HkSection title="권역으로 찾기" aside="여덟 권역">
                             <ul className="grid grid-cols-2 gap-2.5">

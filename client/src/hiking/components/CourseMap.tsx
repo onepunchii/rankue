@@ -34,7 +34,7 @@ const FLOAT = { background: "#F4EFE3F2", boxShadow: "0 1px 4px rgba(14,42,51,0.2
 const FS = 12.5;
 type Label = { key: string; x: number; y: number; dx: number; dy: number; text: string; fill: string; bold?: boolean; opacity?: number; keep?: boolean; center?: boolean };
 
-export function CourseMap({ courses, index, onPick, pois, summit, here, ask, asking, live, className }: {
+export function CourseMap({ courses, index, onPick, pois, summit, here, ask, asking, live, className, words }: {
     courses: readonly MountainCourse[];
     /** 고른 코스의 차례 */
     index: number;
@@ -49,6 +49,8 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
     /** 산행 중 — 내 위치가 계속 새로 온다(점이 숨을 쉰다) */
     live?: boolean;
     className?: string;
+    /** 글 바꾸기 — 코리아둘레길(2026-10-21)은 '산 전체 보기' · '이 산의 다른 코스'가 아니다 */
+    words?: { wide?: string; others?: string };
 }) {
     const at = Math.min(Math.max(index, 0), Math.max(0, courses.length - 1));
     const sel = courses[at];
@@ -218,7 +220,7 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
                 {z.moved ? (
                     <button type="button" onClick={z.reset} data-testid="course-map-reset" className={CHIP} style={FLOAT}>{COURSE_MAP_COPY.reset}</button>
                 ) : z.canOut ? (
-                    <button type="button" onClick={z.wide} data-testid="course-map-wide" data-track-as="hiking-course-map-wide" className={CHIP} style={FLOAT}>{COURSE_MAP_COPY.wide}</button>
+                    <button type="button" onClick={z.wide} data-testid="course-map-wide" data-track-as="hiking-course-map-wide" className={CHIP} style={FLOAT}>{words?.wide ?? COURSE_MAP_COPY.wide}</button>
                 ) : (
                     <span className="pointer-events-none absolute left-2.5 top-2.5 rounded-full px-2.5 py-1.5 text-[12px] leading-none text-[#0E2A33B3]" style={{ background: "#F4EFE3D9" }} aria-hidden>{COURSE_MAP_COPY.hint}</span>
                 )}
@@ -264,7 +266,7 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
                     ))}
                 </ul>
             )}
-            {onPick && courses.length > 1 && <p className="mt-1.5 px-0.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{COURSE_MAP_COPY.others}</p>}
+            {onPick && courses.length > 1 && <p className="mt-1.5 px-0.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{words?.others ?? COURSE_MAP_COPY.others}</p>}
             {(me?.inside || ask) && <p className="mt-1 px-0.5 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">{COURSE_MAP_COPY.hereNote}</p>}
         </div>
     );

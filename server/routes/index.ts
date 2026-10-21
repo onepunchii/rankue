@@ -30,6 +30,7 @@ import golfRankRouter from "./modules/golfRank.js";
 import golfCoursesRouter from "./modules/golfCourses.js";
 import hikingRouter from "./modules/hiking.js";
 import festivalsRouter from "./modules/festivals.js";
+import trailsRouter from "./modules/trails.js";
 import fishingRouter from "./modules/fishing.js";
 import hikingWishesRouter from "./modules/hikingWishes.js";
 import hikingGoalsRouter from "./modules/hikingGoals.js";
@@ -55,6 +56,8 @@ router.use("/hiking", hikingRouter);
 router.use("/fishing", fishingRouter);
 // 전국 축제(2026-10-21) — 공개 읽기. 축제 목록 · 종목에 맞는 축제 · 축제 한 곳
 router.use("/festivals", festivalsRouter);
+// 코리아둘레길(2026-10-21) — 공개 읽기. 길 넷 · 코스 · 코스 날씨(두루누비 자료 파일)
+router.use("/trails", trailsRouter);
 // 가고 싶은 산(2026-10-13) — 같은 주소 아래에 따로 선 작은 라우터(회원만)
 router.use("/hiking", hikingWishesRouter);
 router.use("/hiking", hikingGoalsRouter);

@@ -10,6 +10,7 @@ import type { NearbyFestival } from "@shared/tourFestivals";
 
 export interface FestivalListTone { accent: string; onAccent: string; text: string; dim: string; tile: string; card: string }
 export const GOLF_FESTIVAL_TONE: FestivalListTone = { accent: "#64DD17", onAccent: "#0B2A00", text: "#FFFFFF", dim: "#FFFFFF99", tile: "#FFFFFF14", card: "#FFFFFF08" };
+export const HIKING_FESTIVAL_TONE: FestivalListTone = { accent: "#F28C6A", onAccent: "#2A1208", text: "#F4EFE3", dim: "#F4EFE399", tile: "#FFFFFF14", card: "#FFFFFF0A" };
 export const FISHING_FESTIVAL_TONE: FestivalListTone = { accent: "#F4A963", onAccent: "#2A1606", text: "#F3ECDD", dim: "#F3ECDD99", tile: "#FFFFFF14", card: "#FFFFFF0A" };
 
 export function NearbyFestivalList({ items, tone, sport, testId = "nearby-festivals" }: { items: readonly NearbyFestival[]; tone: FestivalListTone; sport: FestivalSport; testId?: string }) {

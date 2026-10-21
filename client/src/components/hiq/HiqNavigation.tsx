@@ -112,7 +112,7 @@ export function HiqNavigation() {
             // 크루는 둘째 자리(2026-10-13 오너: "네비게이션 바에 크루를 2번째로") — 당구 · 골프와 같은 자리다
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
             // 산 — /hiking 아래의 지도 · 목록 · 산 화면. 도장첩(/hiking/stamps …)은 옆 탭의 것이라 여기서 켜지지 않게 한다(only)
-            { id: "mountains", text: "산", icon: LucideMap, path: "/hiking", also: ["/hiking/regions", "/hiking/lists", "/hiking/mountains", "/hiking/trail", "/hiking/terms", "/hiking/checklist"], only: true },
+            { id: "mountains", text: "산", icon: LucideMap, path: "/hiking", also: ["/hiking/regions", "/hiking/lists", "/hiking/mountains", "/hiking/trail", "/hiking/trails", "/hiking/terms", "/hiking/checklist"], only: true },
             { id: "stamps", text: "도장첩", icon: LucideStamp, path: "/hiking/stamps", also: ["/hiking/pack", "/hiking/trips"] },
             { id: "chat", label: "hiqNavigation.chat", icon: LucideMessageSquare, path: "/chat" },
         ]

@@ -42,6 +42,7 @@ import { renderGolfChecklist } from "./seo/golfGuide.js";
 import { GOLF_STAMPS_RE, renderGolfStamps } from "./seo/golfStamps.js";
 import { HIKING_RE, renderHiking } from "./seo/hiking.js";
 import { FESTIVALS_RE, renderFestivals } from "./seo/festivals.js";
+import { TRAILS_RE, renderTrails } from "./seo/trails.js";
 import { FISHING_SPOTS_RE, renderFishingSpots } from "./seo/fishing.js";
 import { allPlaces, canonicalPlaceId } from "./storage/fishingPlaces.js";
 import { fishingSpotPath } from "../shared/fishingPlaces.js";
@@ -2126,6 +2127,22 @@ ${list}
       res.status(r.status).send(r.html);
     } catch (e) {
       console.warn("[prerender] fishing:", (e as Error)?.message);
+      next();
+    }
+  });
+
+  // 코리아둘레길(2026-10-21) — 허브 · 길 넷 · 코스. 자료는 두루누비 파일(storage/koreaTrails), 본문은 server/seo/trails
+  app.get(TRAILS_RE, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    try {
+      const { trailCourses, trailRouteMeta, trailCourse } = await import("./storage/koreaTrails.js");
+      const r = renderTrails(req.path, trailCourses(), trailRouteMeta(), trailCourse);
+      if (!r) return /^\/hiking\/trails\/[a-z]+\/[^/]+\/?$/.test(req.path) ? sendGone(res, "없는 코스예요", "코리아둘레길에 없는 코스예요.") : next();
+      noStore(res);
+      res.setHeader("X-Prerender", r.tag);
+      res.status(r.status).send(r.html);
+    } catch (e) {
+      console.warn("[prerender] trails:", (e as Error)?.message);
       next();
     }
   });

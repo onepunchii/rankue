@@ -258,6 +258,13 @@ function HikingPackRoute() { return <Suspense fallback={hikingFallback}><HikingP
 const HikingAlbum = lazy(() => import("@/hiking/pages/AlbumPage"));
 function HikingAlbumRoute() { return <Suspense fallback={hikingFallback}><HikingAlbum /></Suspense>; }
 function HikingHubRoute() { return <Suspense fallback={hikingFallback}><HikingHub /></Suspense>; }
+// 코리아둘레길(2026-10-21 — 국토종주는 걸어서 · 등산 안에) — 공개 화면. 검색용 화면은 server/seo/trails
+const TrailsHub = lazy(() => import("@/hiking/trails/TrailsHub"));
+const TrailRoutePage = lazy(() => import("@/hiking/trails/TrailRoutePage"));
+const TrailCoursePage = lazy(() => import("@/hiking/trails/TrailCoursePage"));
+function TrailsHubRoute() { return <Suspense fallback={hikingFallback}><TrailsHub /></Suspense>; }
+function TrailRouteRoute() { return <Suspense fallback={hikingFallback}><TrailRoutePage /></Suspense>; }
+function TrailCourseRoute() { return <Suspense fallback={hikingFallback}><TrailCoursePage /></Suspense>; }
 // 전국 축제(2026-10-21) — 공개 화면 · 등산의 색(shared/sportRoute). 검색용 화면은 server/seo/festivals, 봇 경로는 vercel.json
 const FestivalsHub = lazy(() => import("@/festivals/pages/FestivalsHub"));
 const FestivalPage = lazy(() => import("@/festivals/pages/FestivalPage"));
@@ -514,6 +521,9 @@ function AppRoutes() {
       <Route path="/fishing/festivals" component={FestivalsHubRoute} />
       <Route path="/fishing/festivals/:id" component={FestivalRoute} />
       <Route path="/hiking" component={HikingHubRoute} />
+      <Route path="/hiking/trails" component={TrailsHubRoute} />
+      <Route path="/hiking/trails/:route" component={TrailRouteRoute} />
+      <Route path="/hiking/trails/:route/:key" component={TrailCourseRoute} />
       <Route path="/hiking/regions/:id" component={HikingListRoute} />
       <Route path="/hiking/lists/:id" component={HikingListRoute} />
       <Route path="/hiking/mountains/:slug" component={HikingMountainRoute} />

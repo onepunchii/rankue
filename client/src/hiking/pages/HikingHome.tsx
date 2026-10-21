@@ -34,6 +34,7 @@ import { CoachTour } from "@/components/hiq/CoachTour";
 import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
 import { FeaturedPhotos } from "../components/FeaturedPhotos";
 import { FestivalPicks } from "@/festivals/components/FestivalPicks";
+import { TrailsEntry } from "../trails/TrailsEntry";
 
 const TILT = [-4, 3, -2, 5];
 
@@ -122,6 +123,9 @@ export default function HikingHome() {
                         </HkSection>
 
                         <SummitsNow />
+
+                        {/* 코리아둘레길(2026-10-21 — 국토종주는 걸어서 · 등산 안에) */}
+                        <TrailsEntry />
 
                         {trips.length > 0 && (
                             <HkSection title="최근 산행" aside={`${trips.length}번`}>

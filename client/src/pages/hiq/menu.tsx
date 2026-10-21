@@ -553,6 +553,7 @@ export default function HiqMenu() {
                             ? [
                                 { icon: LucideMap, label: "산 찾기", desc: "전국 명산 · 코스 · 날씨", onClick: () => setLocation("/hiking") },
                                 { icon: LucideCalendar, label: "전국 축제", desc: "축제 지도 · 달력 · 산행 길에 들를 축제", onClick: () => setLocation("/hiking/festivals") },
+                                { icon: LucideMap, label: "코리아둘레길", desc: "해파랑 · 남파랑 · 서해랑 · DMZ 평화의 길 코스 지도", onClick: () => setLocation("/hiking/trails") },
                                 { icon: LucideStamp, label: "내 도장첩", desc: "정상에서 받은 도장 모아 보기", onClick: () => setLocation("/hiking/stamps") },
                                 { icon: LucideMedal, label: "배낭", desc: "산행 등급 · 와펜 · 핀", onClick: () => setLocation("/hiking/pack") },
                                 { icon: LucideCheckCircle, label: "산행 준비물", desc: "철마다 배낭에 넣을 것", onClick: () => setLocation("/hiking/checklist") },

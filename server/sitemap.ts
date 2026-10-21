@@ -56,7 +56,7 @@ const ORIGIN = "https://www.rankue.co.kr";
 const APP_LANGS = ["en", "vi", "tr", "es"];
 const ABOUT_LANGS = ["en", "vi", "tr", "es", "ja", "zh"];
 
-export const SITEMAP_SECTIONS = ["core", "festivals", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs", "rankings", "terms", "tournaments", "pba-records", "hiking", "fishing"] as const;
+export const SITEMAP_SECTIONS = ["core", "festivals", "trails", "players", "pba", "golf", "stores", "golf-courses", "golf-hubs", "rankings", "terms", "tournaments", "pba-records", "hiking", "fishing"] as const;
 export type SitemapSection = (typeof SITEMAP_SECTIONS)[number];
 
 function esc(s: string): string {
@@ -349,6 +349,14 @@ const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
   hiking: async () => {
     const all = await allMountains().catch((e) => { console.warn("[sitemap] hiking:", (e as Error)?.message); return []; });
     return hikingSitemapParts(all, await mountainUpdatedDays().catch(() => new Map<string, string>()));
+  },
+  // 코리아둘레길(2026-10-21) — 허브 · 길 넷 · 코스(두루누비 파일). 파일을 못 읽으면 빈 구역
+  trails: async () => {
+    try {
+      const { trailCourses, trailsMade } = await import("./storage/koreaTrails.js");
+      const { trailsSitemapParts } = await import("./seo/trails.js");
+      return trailsSitemapParts(trailCourses(), trailsMade());
+    } catch (e) { console.warn("[sitemap] trails:", (e as Error)?.message); return []; }
   },
 };
 
