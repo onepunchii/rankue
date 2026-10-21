@@ -25,11 +25,12 @@ import { parseFootprintYear } from "../shared/golfFootprints.js";
 import { verifyFootprintShare } from "./lib/footprintShare.js";
 import { renderGolfStampCardPng, type StampCardInput } from "./services/golfStampCard.js";
 import { verifyStampShare } from "./lib/stampShare.js";
+import { verifyTrailStampShare } from "./lib/trailStampShare.js";
 import { listStampAwards } from "./storage/golfStampAwards.js";
 import { bookStates, stampBook } from "../shared/golfStampBooks.js";
 import { renderHikingMountainCardPng } from "./services/hikingMountainCard.js";
 import { renderFestivalCardPng } from "./services/festivalCard.js";
-import { renderTrailCardPng } from "./services/trailCard.js";
+import { renderTrailCardPng, renderTrailStampCardPng, type TrailStampCardInput } from "./services/trailCard.js";
 import { renderFishingSpotCardPng } from "./services/fishingSpotCard.js";
 import { placeById } from "./storage/fishingPlaces.js";
 import { fishingSpotCardInput, isPlaceId } from "../shared/fishingPlaces.js";
@@ -52,6 +53,7 @@ import { hikingMountainCardInput } from "../shared/hikingPage.js";
 //   /og/fishing-sea/:key.png          바다 · 항구 물때 카드 (2026-10-18) — 해역 그림 위에 이름 · 해역(그날 값은 넣지 않는다)
 //   /og/hiking-mountain/:slug.png     산 카드 (2026-10-13) — 권역의 표지 위에 산의 이름 · 높이 · 자리 · 코스. 우리 표에 있는 산만
 //   /og/trail/:route/:key.png         코리아둘레길 코스 카드 (2026-10-21) — 우리 그림 위에 코스 이름 · 거리 · 시간 · 난이도 + 그 코스의 선
+//   /og/trail-stamp/:memberId/:courseId.png 코스 도장 카드 (2026-10-21) — **비공개**: 서명(t) · 만료가 맞아야 열린다. 받은 도장만
 //   /og/festival/:id.png              축제 카드 (2026-10-21) — 우리 그림(강가 마을의 등불) 위에 이름 · 기간 · 자리. 관광공사 사진은 싣지 않는다
 //   /og/golf-footprints/:memberId.png 골프 발자국 카드 (2026-09-30) — **비공개**: 서명(t)·만료가 맞아야 열린다
 //   /og/golf-stamp/:memberId/:book.png 도장첩 완성 카드 (2026-10-12) — **비공개**: 서명(t)·만료가 맞아야 열린다. 다 채운 권만
@@ -346,6 +348,33 @@ export async function buildGolfStampCard(memberId: string, bookId: string): Prom
   };
 }
 
+// ── 코리아둘레길 코스 도장 ──────────────────────────────────────────────
+/** 받은 도장만 · 탈퇴하면 닫는다(탈퇴 회원 행은 del- 전화번호로 익명화된다 — 골프 도장첩 카드와 같다) */
+export async function buildTrailStampCard(memberId: string, courseId: string): Promise<TrailStampCardInput | null> {
+  const [{ trailCourses }, { trailCardInput }, { myTrailStamps }] = await Promise.all([
+    import("./storage/koreaTrails.js"), import("../shared/koreaTrails.js"), import("./storage/trailStamps.js"),
+  ]);
+  const c = trailCourses().find((x) => x.id === courseId);
+  if (!c) return null;
+  const [members, stamps] = await Promise.all([
+    db.select({ name: hiqMembers.name, phone: hiqMembers.phone }).from(hiqMembers).where(eq(hiqMembers.id, memberId)).limit(1),
+    myTrailStamps(memberId),
+  ]);
+  const m = members[0];
+  if (!m || m.phone?.startsWith("del-")) return null;
+  const st = stamps.find((x) => x.courseId === courseId);
+  if (!st) return null;
+  const kst = new Date(st.doneMs + 9 * 3_600_000);
+  const from = st.firstEnd === "start" ? c.startName : c.endName, to = st.firstEnd === "start" ? c.endName : c.startName;
+  return {
+    ...trailCardInput(c), routeId: c.route, key: c.key,
+    doneDay: `${kst.getUTCFullYear()}년 ${kst.getUTCMonth() + 1}월 ${kst.getUTCDate()}일`,
+    // 걸은 방향 그대로(출발한 끝 → 반대쪽 끝)
+    walk: from && to ? `${from} → ${to}` : null,
+    nickname: m.name ?? "",
+  };
+}
+
 // ── 골프 발자국 ────────────────────────────────────────────────────
 /** 탈퇴하면 발자국 카드도 닫는다 — 예전에 보낸 링크가 남아 있어도(탈퇴 회원 행은 del- 전화번호로 익명화된다). */
 export async function buildGolfFootprintsCard(memberId: string, year: number | null): Promise<FootprintsCardInput | null> {
@@ -504,6 +533,27 @@ export function registerOgImages(app: Express) {
       res.send(png);
     } catch (e) {
       console.error("[og] trail card failed:", (e as Error)?.message);
+      res.status(500).type("text/plain").send("card error");
+    }
+  });
+
+  // 코스 도장 카드(2026-10-21) — 언제 어느 코스를 걸었는지라 공개 카드가 아니다(골프 도장첩 카드와 같은 규칙). 서명 · 만료가 틀리거나 받은 도장이 아니면 404
+  app.get("/og/trail-stamp/:memberId/:courseId.png", async (req, res) => {
+    const memberId = String(req.params.memberId ?? "").toLowerCase();
+    const courseId = String(req.params.courseId ?? "");
+    const notFound = () => res.status(404).setHeader("Cache-Control", "no-store").type("text/plain").send("not found");
+    if (!verifyTrailStampShare(memberId, courseId, req.query.t)) return notFound();
+    try {
+      const input = await buildTrailStampCard(memberId, courseId);
+      if (!input) return notFound();
+      const png = await renderTrailStampCardPng(input);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Cache-Control", "private, max-age=600");
+      res.setHeader("X-Robots-Tag", "noindex, nofollow, noimageindex");
+      res.setHeader("Referrer-Policy", "no-referrer");
+      res.send(png);
+    } catch (e) {
+      console.error("[og] trail stamp card failed:", (e as Error)?.message);
       res.status(500).type("text/plain").send("card error");
     }
   });

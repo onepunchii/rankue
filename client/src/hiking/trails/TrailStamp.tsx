@@ -14,11 +14,12 @@ import { getDevicePosition } from "@/hooks/useNativeBridge";
 import { useAuth } from "@/hooks/useAuth";
 import { useHikingAccess } from "@/hooks/useHikingAccess";
 import { goLogin } from "@/components/hiq/LoginGate";
-import { LucideLocateFixed } from "@/lib/icons";
+import { LucideLocateFixed, LucideShare2 } from "@/lib/icons";
 import type { TrailCourseDetail, TrailRouteId } from "@shared/koreaTrails";
 import { TRAIL_END_RADIUS_M, TRAIL_PAIR_WINDOW_H, isLoopCourse, trailHalfLine } from "@shared/trailStamps";
 import { stampDate } from "../lib/date";
 import { TRAIL_ME_KEY, type MyTrails } from "./api";
+import { TrailStampShareSheet } from "./TrailStampShare";
 
 /** 종이 위에서 읽히는 길의 잉크(길의 화면 색은 밝아서 종이에 흐리다) */
 export const TRAIL_INK: Record<TrailRouteId, string> = { haeparang: "#1F5F99", namparang: "#B04A28", seohaerang: "#8A5A0A", dmz: "#2C6B47" };
@@ -68,6 +69,7 @@ export function TrailStampCard({ c }: { c: TrailCourseDetail }) {
     const qc = useQueryClient();
     const [, setLocation] = useLocation();
     const [msg, setMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+    const [sharing, setSharing] = useState(false);
     const route = c.route as TrailRouteId;
     const label = c.key;
     const loop = isLoopCourse(c);
@@ -123,7 +125,14 @@ export function TrailStampCard({ c }: { c: TrailCourseDetail }) {
                         className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-[#0E2A33] text-[15px] font-semibold text-[#F4EFE3] active:bg-[#16404D] disabled:opacity-50">
                         <LucideLocateFixed className="h-4 w-4" aria-hidden />{check.isPending ? "위치를 확인하는 중…" : state === "half" ? "도착했어요 — 위치 확인" : "여기 왔어요 — 위치 확인"}
                     </button>
-                ) : null}
+                ) : (
+                    // 도장 카드 공유 — 걸은 날 · 코스가 적힌 카드(서명된 주소, 30일)
+                    <button type="button" onClick={() => setSharing(true)} data-track-as="trail-stamp-share-open" data-testid="trail-stamp-share"
+                        className="flex h-12 w-full items-center justify-center gap-1.5 rounded-xl bg-[#0E2A33] text-[15px] font-semibold text-[#F4EFE3] active:bg-[#16404D]">
+                        <LucideShare2 weight="bold" className="h-4 w-4" aria-hidden />도장 카드 공유
+                    </button>
+                )}
+                {stamp && <TrailStampShareSheet open={sharing} onClose={() => setSharing(false)} route={c.route} courseKey={c.key} title={`${ROUTE_SHORT[route]} ${label}코스`} />}
                 {msg && <p className="mt-2 text-[13.5px] leading-snug break-keep" style={{ color: msg.tone === "ok" ? "#2F6A0C" : "#A14A1E" }} role="status" data-testid="trail-stamp-msg">{msg.text}</p>}
                 {member && <p className="mt-2 text-[12px] leading-snug text-[#0E2A33A6] break-keep">위치는 코스 끝까지의 거리를 재는 데만 쓰고 저장하지 않아요.</p>}
             </div>

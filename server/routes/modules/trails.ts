@@ -16,6 +16,7 @@ import { getCourseWeather } from "../../services/golfWeather.js";
 import { requireHikingAccess } from "../../middleware/hikingAccess.js";
 import type { AuthRequest } from "../../middleware/auth.js";
 import { isLoopCourse, judgeTrailEnd, trailHint, trailPairs, type TrailEnds } from "../../../shared/trailStamps.js";
+import { signTrailStampShare, trailStampCardPath } from "../../lib/trailStampShare.js";
 import { addTrailCheck, addTrailStamp, myOpenTrailChecks, myTrailStamps, recentTrailChecks, trailChecksToday } from "../../storage/trailStamps.js";
 
 const router = Router();
@@ -71,6 +72,22 @@ router.post("/:route/:key/check", ...requireHikingAccess, asyncHandler(async (re
     if (!pair.done || !pair.from) return sendSuccess(res, { state: "half", reason: "ok", bucket: judged.bucket, hint: null, end: judged.at, at: new Date(now).toISOString(), stamped: false });
     const added = await addTrailStamp(req.userId!, c, pair.from, now);
     return sendSuccess(res, { state: "done", reason: "ok", bucket: judged.bucket, hint: null, end: judged.at, at: new Date(now).toISOString(), stamped: added, startedAt: new Date(pair.from.atMs).toISOString() });
+}));
+
+/**
+ * 코스 도장 카드의 공유 주소(2026-10-21) — **본인의, 받은 도장만**. 서명된 주소를 만들어 줄 뿐 아무것도 저장하지 않는다(골프 도장첩 카드의 GET /golf/stamp-share 와 같다).
+ * 주소는 30일 뒤 닫힌다(server/lib/trailStampShare).
+ */
+router.get("/:route/:key/share", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    const hit = trailCourse(String(req.params.route), String(req.params.key));
+    if (!hit) return sendError(res, 404, "없는 코스예요");
+    const mine = (await myTrailStamps(req.userId!)).some((s) => s.courseId === hit.course.id);
+    if (!mine) return sendError(res, 404, "도장을 받은 코스만 카드로 만들 수 있어요");
+    const signed = signTrailStampShare(req.userId!, hit.course.id);
+    if (!signed) return sendError(res, 503, "지금은 공유 링크를 만들 수 없어요");
+    // 주소 자체가 열쇠다 — 어디에도 캐시되지 않게
+    res.set("Cache-Control", "no-store");
+    return sendSuccess(res, { url: trailStampCardPath(req.userId!, hit.course.id, signed.token), expiresAt: new Date(signed.exp * 1000).toISOString() });
 }));
 
 /** 코스 한 곳 — 앞 · 뒤 코스는 지도에 옅게 그릴 선(60점)까지. 근처 축제는 코스의 가운데 자리에서 20km · 45일 */

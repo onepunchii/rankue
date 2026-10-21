@@ -102,3 +102,76 @@ export async function renderTrailCardPng(p: TrailCardInput): Promise<Buffer> {
     const svg = await satori(tree(p) as any, { width: CARD_SIZE, height: CARD_SIZE, fonts: fonts() });
     return new Resvg(svg, { fitTo: { mode: "width", value: CARD_SIZE } }).render().asPng();
 }
+
+// ── 코스 도장 카드(2026-10-21) ──────────────────────────────────────────
+/** 종이 위에서 읽히는 길의 잉크(화면의 TrailStamp TRAIL_INK 와 같은 값) */
+const INK: Record<string, string> = { haeparang: "#1F5F99", namparang: "#B04A28", seohaerang: "#8A5A0A", dmz: "#2C6B47" };
+
+export interface TrailStampCardInput extends TrailCardInput {
+    routeId: string;
+    /** '1' · '3-1' */
+    key: string;
+    /** '2026년 10월 21일' */
+    doneDay: string;
+    /** '오륙도 해맞이공원 → 해운대'(이름을 알 때만) */
+    walk: string | null;
+    nickname: string;
+}
+
+/** 도장 무늬(바다 물결 · 접경 능선) — 글자 없는 SVG 만(서버에서 SVG 안의 글자는 글꼴이 없어 그리지 않는다) */
+function motifSvg(routeId: string, ink: string): string {
+    const d = routeId === "dmz" ? "M10 36 L34 18 L52 30 L70 10 L88 28 L106 16 L130 36" : "M10 26 q15 -15 30 0 t30 0 t30 0 t30 0";
+    return `data:image/svg+xml;base64,${Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="140" height="44" viewBox="0 0 140 44"><path d="${d}" fill="none" stroke="${ink}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/></svg>`).toString("base64")}`;
+}
+
+/** 도장 — 종이 동그라미 · 두 겹 테 · 위 길 이름 · 가운데 코스 번호 · 무늬 · 아래 '코리아둘레길'(글자는 satori 가 그린다) */
+function seal(p: TrailStampCardInput, size: number): El {
+    const ink = INK[p.routeId] ?? "#1F5F99";
+    const big = p.key.length <= 2 ? size * 0.3 : p.key.length <= 4 ? size * 0.24 : size * 0.18;
+    return h("div", { width: size, height: size, borderRadius: size / 2, backgroundColor: PAPER, alignItems: "center", justifyContent: "center", transform: "rotate(-9deg)", boxShadow: "0 18px 50px rgba(0,0,0,0.5)" },
+        h("div", { width: size - 26, height: size - 26, borderRadius: size / 2, border: `9px solid ${ink}`, alignItems: "center", justifyContent: "center" },
+            h("div", { width: size - 64, height: size - 64, borderRadius: size / 2, border: `3px solid ${ink}`, flexDirection: "column", alignItems: "center", justifyContent: "center" },
+                h("div", { fontSize: size * 0.085, fontWeight: 800, color: ink, letterSpacing: 4 }, p.route),
+                h("div", { fontSize: big, fontWeight: 800, color: ink, lineHeight: 1, marginTop: 4, letterSpacing: -2 }, p.key),
+                img(motifSvg(p.routeId, ink), size * 0.36, size * 0.113, { marginTop: 8 }),
+                h("div", { fontSize: size * 0.06, fontWeight: 700, color: ink, letterSpacing: 6, marginTop: 8 }, "코리아둘레길"),
+            ),
+        ),
+    );
+}
+
+function stampTree(p: TrailStampCardInput): El {
+    const SEAL = 420;
+    const room = CARD_SIZE - PAD * 2;
+    const name = nameLines(p.name, room - 40, 150, 120);
+    return h("div", { width: CARD_SIZE, height: CARD_SIZE, flexDirection: "column", fontFamily: "Pretendard", color: PAPER, backgroundColor: BG, position: "relative" },
+        h("div", { position: "absolute", left: 0, top: 0, width: CARD_SIZE, height: COVER_H, overflow: "hidden" },
+            img(cover(), CARD_SIZE, CARD_SIZE, { position: "absolute", left: 0, top: -280 }),
+            h("div", { position: "absolute", left: 0, top: 0, width: CARD_SIZE, height: 200, backgroundImage: "linear-gradient(180deg, rgba(11,31,38,0.6) 0%, rgba(11,31,38,0) 100%)" }),
+            h("div", { position: "absolute", left: 0, top: COVER_H - 280, width: CARD_SIZE, height: 280, backgroundImage: "linear-gradient(180deg, rgba(11,31,38,0) 0%, rgba(11,31,38,0.85) 70%, #0B1F26 100%)" }),
+        ),
+        h("div", { position: "absolute", left: 60, top: 52, width: CARD_SIZE - 120, justifyContent: "space-between", alignItems: "center" },
+            h("div", { alignItems: "center", fontSize: 32, fontWeight: 800, letterSpacing: 2, color: "#FFFFFF" },
+                h("div", { width: 18, height: 18, borderRadius: 9, background: CORAL, marginRight: 14 }), "RANKUE 코리아둘레길"),
+            h("div", { fontSize: 30, fontWeight: 700, color: "#0B1F26", background: p.color, borderRadius: 999, padding: "8px 26px" }, "코스 도장"),
+        ),
+        // 도장 — 오른쪽 위, 표지 위에 찍힌 꼴
+        h("div", { position: "absolute", right: 70, top: 150 }, seal(p, SEAL)),
+        // 코스 선 — 왼쪽, 표지 끝에 걸친다
+        p.line.length > 1 ? img(trailSketchSvg(p.line, p.color, 240), 240, 240, { position: "absolute", left: PAD, top: COVER_H - 200, borderRadius: 32, boxShadow: "0 12px 40px rgba(0,0,0,0.45)" }) : "",
+        h("div", { position: "absolute", left: PAD, top: COVER_H + 70, width: room, height: CARD_SIZE - COVER_H - 70, flexDirection: "column", justifyContent: "center" },
+            h("div", { fontSize: 40, fontWeight: 700, color: p.color, marginBottom: 6 }, p.route),
+            h("div", { flexDirection: "column" }, ...name.lines.map((l) =>
+                h("div", { fontSize: name.size, fontWeight: 800, letterSpacing: -name.size * 0.035, lineHeight: 1.05, whiteSpace: "nowrap" }, l))),
+            h("div", { marginTop: 18, fontSize: fitSize([`${p.doneDay} 걸었어요 · ${p.facts}`], room, 46), fontWeight: 700, color: CORAL, whiteSpace: "nowrap" }, `${p.doneDay} 걸었어요 · ${p.facts}`),
+            p.walk ? h("div", { marginTop: 8, fontSize: fitSize([p.walk], room, 38), fontWeight: 500, color: MUTED, whiteSpace: "nowrap" }, p.walk) : "",
+            p.nickname ? h("div", { marginTop: 8, fontSize: 32, fontWeight: 600, color: MUTED }, `${p.nickname}의 코스 도장`) : "",
+        ),
+    );
+}
+
+export async function renderTrailStampCardPng(p: TrailStampCardInput): Promise<Buffer> {
+    const { satori, Resvg } = await engines();
+    const svg = await satori(stampTree(p) as any, { width: CARD_SIZE, height: CARD_SIZE, fonts: fonts() });
+    return new Resvg(svg, { fitTo: { mode: "width", value: CARD_SIZE } }).render().asPng();
+}
