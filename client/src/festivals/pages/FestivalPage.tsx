@@ -134,7 +134,8 @@ function TrailsBlock({ trails, text, first }: { trails: NonNullable<FestivalArou
                             <TrailSketch coarse={c.coarse} color={r?.color ?? "#F4EFE3"} w={132} h={64} />
                             <span className="mt-1.5 block text-[12.5px] font-medium" style={{ color: r?.color ?? text }}>{r?.name ?? ""}</span>
                             <span className="block truncate text-[14.5px] font-semibold" style={{ color: text }}>{r ? c.name.replace(r.name, "").trim() || c.name : c.name}</span>
-                            <span className="block text-[12.5px] tabular-nums" style={{ color: `${text}99` }}>{[`${c.courseKm}km`, trailTimeText(c.minutes), `축제 ${c.km}km`].filter(Boolean).join(" · ")}</span>
+                            <span className="block text-[12.5px] tabular-nums" style={{ color: `${text}99` }}>{[`${c.courseKm}km`, trailTimeText(c.minutes)].filter(Boolean).join(" · ")}</span>
+                            <span className="block text-[12.5px] tabular-nums" style={{ color: "#8FD3A7" }}>{c.km < 1 ? "축제 자리 1km 안" : `축제에서 ${c.km}km`}</span>
                         </Link>
                     );
                 })}
