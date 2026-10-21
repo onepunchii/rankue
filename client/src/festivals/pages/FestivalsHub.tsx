@@ -15,6 +15,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSeo } from "@/hooks/useSeo";
 import { LucideChevronRight } from "@/lib/icons";
 import {
+    FESTIVAL_METRO_GOLF_KM, FESTIVAL_METRO_REGIONS,
     FESTIVALS_H1, FESTIVALS_TAGLINE, FESTIVAL_CATS, FESTIVAL_CREDIT, FESTIVAL_REGIONS, festivalKm, festivalPeriod, festivalsHubSeo, festivalsSportPath, kstToday, liveFestivals, overlaps, thisWeekend,
     type FestivalSport,
 } from "@shared/festivals";
@@ -78,7 +79,9 @@ export default function FestivalsHub() {
         const rule = NEAR[t.layer];
         for (const f of live) {
             let best: { n: string; km: number } | null = null;
-            for (const p of layer) { const km = festivalKm(f, { lat: p.a, lng: p.o }); if (km <= rule.km && (!best || km < best.km)) best = { n: p.n, km }; }
+            // 도심 축제(서울 · 광역시)는 골프장 3km 안만 — '라운드 길에 들를 축제'와 같은 규칙(경복궁 ↔ 고양 6홀 9.7km 같은 줄을 내지 않는다)
+            const limit = t.layer === "golf" && FESTIVAL_METRO_REGIONS.has(f.region ?? "") ? FESTIVAL_METRO_GOLF_KM : rule.km;
+            for (const p of layer) { const km = festivalKm(f, { lat: p.a, lng: p.o }); if (km <= limit && (!best || km < best.km)) best = { n: p.n, km }; }
             if (best) m.set(f.id, `${rule.word} ${best.n} ${best.km < 1 ? "1km 안" : `${best.km.toFixed(best.km < 10 ? 1 : 0)}km`}`);
         }
         return m;

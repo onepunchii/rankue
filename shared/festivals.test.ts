@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import {
-    FESTIVALS_PATH, festivalsSportPath, festivalSportPath, festivalCardInput, festivalWeatherDays, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
+    FESTIVALS_PATH, FESTIVAL_METRO_GOLF_KM, FESTIVAL_METRO_REGIONS, festivalsSportPath, festivalSportPath, festivalCardInput, festivalWeatherDays, addDays, cleanTourText, festivalBadge, festivalFromTour, festivalPath, festivalPeriod, festivalPhone, festivalRegion, festivalSeo, festivalState, kstToday,
     liveFestivals, overlaps, thisWeekend, tourHomepage, weekdayKo, FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, type FestivalRow,
 } from "./festivals";
 import { sportForPath } from "./sportRoute";
@@ -161,6 +161,18 @@ describe("축제 카드(미리보기 1200 정사각)", () => {
         expect(s).toContain("image: hubCard(ORIGIN, FESTIVALS_PATH)?.url");
         expect(s).toContain("body: withCard(body, card)");
         expect(s).toContain("image: festivalCardUrl(ORIGIN, f.id)");
+    });
+});
+
+describe("화면 다듬기(2026-10-21 디자이너 순회)", () => {
+    it("도심 축제(서울 · 광역시)는 골프장 3km 안만 — 서버의 '라운드 길에' 줄 · 화면의 '가까운 골프장' 줄이 같은 묶음", () => {
+        expect(FESTIVAL_METRO_REGIONS.has("서울") && FESTIVAL_METRO_REGIONS.has("부산") && !FESTIVAL_METRO_REGIONS.has("경기")).toBe(true);
+        expect(FESTIVAL_METRO_GOLF_KM).toBe(3);
+        expect(read("server/routes/modules/festivals.ts")).toContain("const METRO_REGIONS = FESTIVAL_METRO_REGIONS;");
+        expect(read("client/src/festivals/pages/FestivalsHub.tsx")).toContain('t.layer === "golf" && FESTIVAL_METRO_REGIONS.has(f.region ?? "") ? FESTIVAL_METRO_GOLF_KM : rule.km');
+    });
+    it("달력 줄 — 긴 이름이 오른쪽 지역 글자를 덮지 않는다(줄임표가 먹으려면 min-w-0)", () => {
+        expect(read("client/src/festivals/components/FestivalCalendar.tsx")).toContain('<span className="min-w-0 truncate text-[13.5px]"');
     });
 });
 

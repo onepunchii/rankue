@@ -86,7 +86,7 @@ export function FestivalCalendar({ items, today }: { items: readonly FestivalRow
                                     <li key={f.id}>
                                         <Link href={t.item(f.id)} className="block py-1.5 active:opacity-70" data-testid="festival-calendar-row">
                                             <span className="flex items-baseline justify-between gap-2">
-                                                <span className="truncate text-[13.5px]" style={{ color: st === "ended" ? `${t.text}99` : t.text }}>{f.title}</span>
+                                                <span className="min-w-0 truncate text-[13.5px]" style={{ color: st === "ended" ? `${t.text}99` : t.text }}>{f.title}</span>
                                                 <span className="shrink-0 text-[12px]" style={{ color: `${t.text}80` }}>{f.region}</span>
                                             </span>
                                             <span className="relative mt-1 block h-[7px]">

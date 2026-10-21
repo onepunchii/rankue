@@ -57,6 +57,13 @@ export interface FestivalDetail extends FestivalRow {
 }
 
 /** 시도 — 지도 · 고르기 순서(수도권 → 강원 → 충청 → 전라 → 경상 → 제주) */
+/**
+ * 서울 · 광역시 — 도심 축제를 골프장과 넓게 잇지 않는다(2026-10-21 화면 확인: 경복궁 별빛야행이 고양의 6홀 골프장 9.7km 로 걸렸다).
+ * 골프의 '라운드 길에 들를 축제'(서버) · 목록 줄 '가까운 골프장'(화면)이 같이 쓴다 — 도심 축제는 골프장 3km 안만.
+ */
+export const FESTIVAL_METRO_REGIONS: ReadonlySet<string> = new Set(["서울", "부산", "대구", "인천", "광주", "대전", "울산"]);
+export const FESTIVAL_METRO_GOLF_KM = 3;
+
 export const FESTIVAL_REGIONS = ["서울", "경기", "인천", "강원", "충북", "충남", "대전", "세종", "전북", "전남", "광주", "경북", "경남", "대구", "울산", "부산", "제주"] as const;
 const SHORT_PREFIX = new RegExp(`^(${FESTIVAL_REGIONS.join("|")})(?:\\s|$)`);
 /** 법정동 시도 코드(lDongRegnCd) → 줄임말. 주소로 못 정할 때만 쓴다 */

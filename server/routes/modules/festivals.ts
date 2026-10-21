@@ -9,14 +9,14 @@ import { allFestivals, getFestival, golfPoints } from "../../storage/festivals.j
 import { allMountains } from "../../storage/hiking.js";
 import { allPlaces } from "../../storage/fishingPlaces.js";
 import { MOUNTAIN_TOUR_PHOTOS } from "../../data/mountainTourPhotos.js";
-import { FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, addDays, festivalKm, festivalWeatherDays, kstToday, liveFestivals, type FestivalRow } from "../../../shared/festivals.js";
+import { FESTIVAL_METRO_GOLF_KM, FESTIVAL_METRO_REGIONS, FISHING_FESTIVAL_WORDS, HIKING_FESTIVAL_WORDS, addDays, festivalKm, festivalWeatherDays, kstToday, liveFestivals, type FestivalRow } from "../../../shared/festivals.js";
 import { getCourseWeather } from "../../services/golfWeather.js";
 
 const router = Router();
 const PUBLIC_CACHE = "public, max-age=300, s-maxage=1800, stale-while-revalidate=86400";
 const r1 = (n: number) => Math.round(n * 10) / 10;
-/** 서울 · 광역시 — 도심 축제는 골프 · 산 둘레로 넓게 잡지 않는다(shared/tourFestivals 의 METRO_ADDR 와 같은 묶음) */
-const METRO_REGIONS = new Set(["서울", "부산", "대구", "인천", "광주", "대전", "울산"]);
+/** 서울 · 광역시 — 도심 축제는 골프 · 산 둘레로 넓게 잡지 않는다(shared/festivals FESTIVAL_METRO_REGIONS — 화면의 '가까운 골프장' 줄과 같은 묶음) */
+const METRO_REGIONS = FESTIVAL_METRO_REGIONS;
 
 /** 축제 둘레 — 산(명산 25km) · 골프장(40km — 차로 간다) · 낚시터(20km) · 근처 축제(30km, 열렸거나 곧 열리는 것). 화면과 검색용 화면이 같이 쓴다 */
 export async function festivalAround(f: FestivalRow, today: string) {
@@ -60,7 +60,7 @@ router.get("/picks", asyncHandler(async (req, res) => {
     if (sport === "GOLF") {
         const golf = await golfPoints();
         const items = liveFestivals(all, today, 45).map((f) => {
-            const near = golf.map((g) => ({ g, km: festivalKm(f, g) })).filter((x) => x.km <= (METRO_REGIONS.has(f.region ?? "") ? 3 : 10)).sort((a, b) => a.km - b.km)[0];
+            const near = golf.map((g) => ({ g, km: festivalKm(f, g) })).filter((x) => x.km <= (METRO_REGIONS.has(f.region ?? "") ? FESTIVAL_METRO_GOLF_KM : 10)).sort((a, b) => a.km - b.km)[0];
             return { ...f, mountain: near ? { slug: near.g.slug, name: near.g.name, km: r1(near.km) } : null };
         }).filter((f) => f.mountain).sort((a, b) => Number(b.start <= today) - Number(a.start <= today) || a.mountain!.km - b.mountain!.km).slice(0, 8);
         return sendSuccess(res, { today, items });
