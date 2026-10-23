@@ -11,6 +11,13 @@ import { arrayMove } from '@dnd-kit/sortable';
 import { GameState } from "@/types/game";
 import { useAuth } from "@/hooks/useAuth";
 import { gameSaveScope, gameFinishKey, gameDiscardKey, canQueueSave, isGameGone, isNoAnswer, SAVE_TIMEOUT_MS, DISCARD_TIMEOUT_MS } from "@shared/gameMutationQueue";
+import { breakerOf, canChooseBreaker, inningOf, nextSlot, turnFromArrays, type Slot } from "@shared/scoreboardOrder";
+import { clearStash, pickRestore, pruneStashes, readStash, rowFingerprint, stateFingerprint, withKnown, writeStash, type StorageLike } from "@shared/scoreboardStash";
+
+/** 기기 저장소 — 막힌 환경(사파리 프라이빗 등)에선 null. 보관은 덤이라 없어도 점수판은 그대로 돈다 */
+const boardStorage = (): StorageLike | null => {
+    try { return typeof localStorage !== "undefined" ? localStorage : null; } catch { return null; }
+};
 
 // 경기 종료는 handleTurnChange 를 거치지 않고 곧장 finish 로 가기 때문에,
 // 진행 중이던 턴의 run 이 어떤 이닝 배열에도 들어가지 않아 '이닝 합계 ≠ 총점'이 됐다.
@@ -54,28 +61,25 @@ export function gameStateFromRow(game: HiqGame): GameState {
         return Math.max(0, score - confirmed);
     };
 
-    // Derive whose turn it is: among active players, the one with the
-    // shortest inning-history array is currently up (fallback: player 1).
+    // 지금 차례 · 이닝은 이닝 배열에서 되살린다 — 초구(breakPlayer, 없으면 1)부터의 순서에서 배열이 가장 짧은 첫 사람의 차례,
+    // 이닝은 초구가 친 이닝 수(shared/scoreboardOrder). 초구가 1이면 예전 규칙(가장 짧은 사람, 같으면 1번)과 같다.
     const activeCount = 1
         + ((game.player2Id || game.player2Name) ? 1 : 0)
         + ((game.player3Id || game.player3Name) ? 1 : 0)
         + ((game.player4Id || game.player4Name) ? 1 : 0);
     const inningArrays = [p1Innings, p2Innings, p3Innings, p4Innings];
-    let derivedTurn = 1;
-    let minLen = Infinity;
-    for (let i = 0; i < activeCount; i++) {
-        if (inningArrays[i].length < minLen) {
-            minLen = inningArrays[i].length;
-            derivedTurn = i + 1;
-        }
-    }
+    const breaker = breakerOf((game as any).breakPlayer, activeCount);
+    const derivedTurn = turnFromArrays(inningArrays, breaker, activeCount);
+    // 이닝 배열이 없던 아주 옛 행은 저장된 총이닝을 그대로 쓴다
+    const hasArrays = inningArrays.slice(0, activeCount).some((a) => a.length > 0);
+    const innings = hasArrays ? inningOf(inningArrays, breaker, derivedTurn) : Math.max(1, game.totalInnings ?? 0);
 
     return {
         p1Score: game.player1Score ?? 0,
         p2Score: game.player2Score ?? 0,
         p3Score: game.player3Score ?? 0,
         p4Score: game.player4Score ?? 0,
-        innings: Math.max(1, game.totalInnings ?? 0),
+        innings,
         p1FinishScore: Number((game as any).finishProgress?.["1"] ?? 0),
         p2FinishScore: Number((game as any).finishProgress?.["2"] ?? 0),
         p3FinishScore: Number((game as any).finishProgress?.["3"] ?? 0),
@@ -92,7 +96,8 @@ export function gameStateFromRow(game: HiqGame): GameState {
         p2HighRun: game.player2HighRun ?? 0,
         p3HighRun: game.player3HighRun ?? 0,
         p4HighRun: game.player4HighRun ?? 0,
-        currentTurn: derivedTurn as 1 | 2 | 3 | 4,
+        currentTurn: derivedTurn,
+        breaker,
         p1Innings,
         p2Innings,
         p3Innings,
@@ -130,6 +135,7 @@ export function useGameScore(id: string) {
         p3HighRun: 0,
         p4HighRun: 0,
         currentTurn: 1,
+        breaker: 1,
         p1Innings: [],
         p2Innings: [],
         p3Innings: [],
@@ -144,7 +150,7 @@ export function useGameScore(id: string) {
     // 점수판은 호스트(player1 — 서버가 경기를 만든 사람으로 고정)만 조작한다. 참가자(푸시·이어하기·대진으로 들어온 상대)는
     // 관전 — 저장하지 않고 3초마다 서버 행을 새로 받아 그린다. 서버도 점수·종료·버리기를 호스트만 받는다(routes/game.ts assertHost).
     // 골프는 이번 결정의 대상이 아니다(같은 행을 쓰지만 점수판이 따로다).
-    const { member } = useAuth();
+    const { member, isLoading: authLoading } = useAuth();
     const memberId = member?.id ?? null;
     const isSpectator = (g: HiqGame | undefined | null) => !!g && g.gameType !== "golf" && !!memberId && g.player1Id !== memberId;
     const { data: game, isLoading, error } = useQuery<HiqGame>({
@@ -238,6 +244,8 @@ export function useGameScore(id: string) {
         },
         onSuccess: (data, variables) => {
             speak(t("tts.gameOver"));
+            // 끝난 경기의 기기 보관은 더 쓸 일이 없다
+            clearStash(boardStorage(), id);
 
             if (typeof screen !== 'undefined' && screen.orientation && typeof screen.orientation.unlock === 'function') {
                 try {
@@ -292,6 +300,22 @@ export function useGameScore(id: string) {
      */
     const lateRef = useRef(false);
 
+    /**
+     * 기기 보관(2026-10-23 오너: "오프라인 보관" — shared/scoreboardStash). 호스트 기기는 바뀔 때마다 최신 상태를 localStorage 에 적어 둔다.
+     * 저장이 실패한 동안 앱이 꺼져도(지하 당구장 · iOS 가 뒤에 둔 앱 정리) 다시 열면 그 점수로 되살리고 서버에 다시 보낸다.
+     *  seq: 바뀔 때마다 1 씩 · ackedSeq: 서버가 받았다고 답한 마지막 seq · known: 서버가 지금 가질 수 있는 이 기기의 지문들
+     */
+    const stashRef = useRef<{ seq: number; ackedSeq: number; known: string[] }>({ seq: 0, ackedSeq: 0, known: [] });
+    /** 보내지 못한 변경이 있다 — 하단 바에 '기기에 보관 중'을 띄운다 */
+    const [unsaved, setUnsaved] = useState(false);
+    /** 열 때 기기에 보관한 점수로 되살렸다 — 점수판이 잠깐 알린다 */
+    const [restored, setRestored] = useState(false);
+    const persistStash = () => {
+        if (!hydratedRef.current || !canSaveRef.current || finishedRef.current) return;
+        const r = stashRef.current;
+        writeStash(boardStorage(), id, { v: 1, seq: r.seq, ackedSeq: r.ackedSeq, at: Date.now(), state: latestStateRef.current, known: r.known });
+    };
+
     const updateScoreMutation = useMutation({
         // 연타로 여러 PATCH 가 겹치면 늦게 도착한 낮은 점수가 최신 점수를 덮어썼다.
         // 같은 스코프의 뮤테이션은 직렬로 실행되므로 보낸 순서가 그대로 유지된다.
@@ -301,7 +325,11 @@ export function useGameScore(id: string) {
         networkMode: "always",
         mutationFn: async () => {
             const s = latestStateRef.current;
-            return await apiRequest(`/api/hiq/game/${id}/score`, {
+            // 보내기 **전에** 이 상태의 지문을 기억한다 — 답을 못 받아도 서버에 닿았을 수 있다(다시 열 때 '서버가 내 것인가'를 이걸로 본다)
+            const seq = stashRef.current.seq;
+            stashRef.current.known = withKnown(stashRef.current.known, stateFingerprint(s));
+            persistStash();
+            await apiRequest(`/api/hiq/game/${id}/score`, {
                 method: "PATCH",
                 // 응답 없이 매달린 저장이 뒤의 저장·FINISH 를 60초(기본)씩 붙잡지 않게 짧게 놓는다
                 timeoutMs: SAVE_TIMEOUT_MS,
@@ -324,20 +352,27 @@ export function useGameScore(id: string) {
                         1: s.p1FinishScore, 2: s.p2FinishScore,
                         3: s.p3FinishScore, 4: s.p4FinishScore,
                     },
+                    // 초구 — 새로고침해도 누가 먼저 쳤는지 남아야 차례 · 이닝 · 공 색을 되살린다
+                    breakPlayer: s.breaker,
                     status: "playing_base"
                 },
             });
+            return { seq };
         },
         // 저장은 늘 전체 상태를 보낸다 — 가장 나중에 끝난 저장이 성공이면 서버는 최신이다.
         // 단, 답 없이 놓은 저장이 앞에 있었으면(lateRef) 확인 저장을 한 번 더 세우고 그 성공에서 '안 보낸 변경'을 지운다.
         // 점수판이 떠 있고 끝나는 중이 아닐 때만이다 — 떠난 화면의 옛 점수가 다시 들어온 화면의 저장 뒤에 서거나, 줄 선 FINISH 뒤에 진행 중 저장이 서면 안 된다.
-        onSuccess: () => {
+        onSuccess: (data) => {
             const again = lateRef.current && mountedRef.current && !finishedRef.current && !endingNow();
             lateRef.current = false;
             if (again) { requestSave(); return; }
             unsentRef.current = false;
+            setUnsaved(false);
+            // 서버가 받았다 — 이 seq 까지는 기기에서 되살릴 필요가 없다(확인 저장을 다시 세운 경우는 그 저장의 성공에서)
+            stashRef.current.ackedSeq = Math.max(stashRef.current.ackedSeq, data?.seq ?? 0);
+            persistStash();
         },
-        onError: (e) => { console.error(e); unsentRef.current = true; if (isNoAnswer(e)) lateRef.current = true; },
+        onError: (e) => { console.error(e); unsentRef.current = true; setUnsaved(true); if (isNoAnswer(e)) lateRef.current = true; },
         onSettled: () => { savingRef.current = Math.max(0, savingRef.current - 1); },
     });
 
@@ -352,11 +387,37 @@ export function useGameScore(id: string) {
     // Hydrate gameState from the server row once, so a mid-game refresh
     // recovers scores/innings/high-runs instead of showing (and re-saving) zeros.
     useEffect(() => {
-        if (hydratedRef.current || !game || game.status === "finished") return;
+        if (hydratedRef.current || !game) return;
+        if (game.status === "finished") { clearStash(boardStorage(), id); return; }
+        // 회원 확인이 끝나야 호스트인지(기기 보관을 쓸지) 안다 — 늦게 와도 되살리기를 건너뛰지 않게 기다린다
+        if (authLoading) return;
 
-        resetGameState(gameStateFromRow(game));
+        const fromRow = gameStateFromRow(game);
+        let base = fromRow;
+        const storage = canSaveRef.current ? boardStorage() : null;
+        if (storage) {
+            const now = Date.now();
+            pruneStashes(storage, now);
+            const stash = readStash<GameState>(storage, id);
+            const back = pickRestore(stash, game as any, now);
+            if (back && stash) {
+                // 보내지 못한 점수가 기기에 있고 서버는 이 기기가 보냈던 상태 그대로다 — 기기 것으로 되살린다(아래 자동 저장이 곧 서버에 보낸다)
+                base = { ...fromRow, ...back };
+                stashRef.current = { seq: stash.seq, ackedSeq: stash.ackedSeq, known: [...stash.known] };
+                setRestored(true);
+            } else {
+                stashRef.current = { seq: 0, ackedSeq: 0, known: [rowFingerprint(game as any)] };
+                if (stash) clearStash(storage, id);
+            }
+        }
+        resetGameState(base);
         hydratedRef.current = true;
-    }, [game]);
+    }, [game, authLoading]);
+
+    // 경기가 서버에서 사라졌으면(다른 기기에서 버림) 기기 보관도 지운다
+    useEffect(() => {
+        if (error && isGameGone(error)) clearStash(boardStorage(), id);
+    }, [error, id]);
 
     // Auto-save logic — gated on hydration so we never PATCH zeros over saved scores.
     // 예전 조건(innings > 1 || p1Score > 0)은 1이닝 동안 P2~P4 점수를 아예 저장하지 않았고,
@@ -366,6 +427,8 @@ export function useGameScore(id: string) {
     useEffect(() => {
         latestStateRef.current = gameState;
         if (!hydratedRef.current || !canSaveRef.current) return;
+        // 기기 보관 — 바뀐 즉시(디바운스 전에) 적는다. 앱이 꺼지는 것은 400ms 를 기다려 주지 않는다
+        if (!finishedRef.current) { stashRef.current.seq += 1; persistStash(); }
         pendingSaveRef.current = true;
         const timer = setTimeout(() => {
             pendingSaveRef.current = false;
@@ -442,6 +505,7 @@ export function useGameScore(id: string) {
             }
         },
         onSuccess: () => {
+            clearStash(boardStorage(), id);
             queryClient.invalidateQueries({ queryKey: ["/api/hiq/game/ongoing/mine"] });
             setLocation("/dashboard");
         },
@@ -527,47 +591,53 @@ export function useGameScore(id: string) {
 
     const handleTurnChange = (targetPlayer?: number) => {
         setGameState(prev => {
-            let nextTurn = prev.currentTurn;
-            let nextInnings = prev.innings;
-
-            if (targetPlayer) {
-                // ⚠ 알려진 위험(미수정): 상대 카드를 잘못 눌러 턴을 옮겼다가 되돌리면
-                // 이닝이 한 번 더 올라가 경기 내내 1 어긋난다. (예: 1번 턴 → 3번 오탭 →
-                // 다시 1번 → nextTurn === 1 조건에 걸려 이닝 +1)
-                // 순환 순서라 '되돌리는 방향'을 번호 크기로 판별할 수 없다. 특히 2인 경기의
-                // 2 → 1 은 정상적인 이닝 넘김이라, 어설픈 방어를 넣으면 가장 흔한 경기의
-                // 이닝이 오히려 안 올라간다. 근본적으로는 이닝 수를 별도 카운터로 들지 말고
-                // 이닝 배열 길이에서 파생시켜야 한다. 그전까지 오탭 복구는 되돌리기(undo)로 한다.
-                nextTurn = targetPlayer as any;
-                if (nextTurn === 1 && prev.currentTurn !== 1) {
-                    nextInnings = prev.innings + 1;
-                }
-            } else {
-                nextTurn = (prev.currentTurn % totalPlayers + 1) as any;
-                if (nextTurn === 1) {
-                    nextInnings = prev.innings + 1;
-                    speak(`${t("tts.inningPrefix")}${nextInnings}${t("tts.inningSuffix")}`);
-                }
-            }
+            // 상대 카드를 누르면 그 사람에게, '이닝 종료'면 다음 자리로(차례는 자리 번호 순서 — 초구는 시작점만 바꾼다)
+            const nextTurn = (targetPlayer ?? nextSlot(prev.currentTurn, totalPlayers)) as Slot;
 
             const finishedPlayer = prev.currentTurn;
             const run = prev[`p${finishedPlayer}Run` as keyof GameState] as number;
             const inningHistoryKey = `p${finishedPlayer}Innings` as keyof GameState;
             const newHistory = [...(prev[inningHistoryKey] as number[]), run];
-
-            return {
+            const next = {
                 ...prev,
                 p1Run: 0,
                 p2Run: 0,
                 p3Run: 0,
                 p4Run: 0,
                 currentTurn: nextTurn,
-                innings: nextInnings,
                 [inningHistoryKey]: newHistory
-            };
+            } as GameState;
+            // 이닝은 따로 세지 않고 이닝 배열에서 끌어낸다 — 초구가 친 이닝 수 + (초구 차례면 1)(2026-10-23 · shared/scoreboardOrder).
+            // 예전 카운터는 '차례가 1번으로 돌아오면 +1' 이라 3 · 4인 경기에서 배열과 어긋날 수 있었다.
+            // 상대 카드를 잘못 눌렀다 되돌리면 그 사이의 이닝이 기록되는 것은 같다(2인 경기의 2 → 1 은 정상 넘김과 구별할 수 없다) — 되돌리기(undo)로 고친다.
+            next.innings = inningOf([next.p1Innings, next.p2Innings, next.p3Innings, next.p4Innings], prev.breaker ?? 1, nextTurn);
+            // '이닝 종료' 단추로 넘길 때 새 이닝이면 부른다(상대 카드로 넘길 때는 handleCardTap 이 이름과 함께 부른다)
+            if (!targetPlayer && nextTurn === (prev.breaker ?? 1)) {
+                speak(`${t("tts.inningPrefix")}${next.innings}${t("tts.inningSuffix")}`);
+            }
+            return next;
         });
 
         playEffect('turn');
+    };
+
+    const nameOf = (slot: number): string => {
+        const p = slot === 1 ? player1 : slot === 2 ? player2 : slot === 3 ? player3 : player4;
+        return p?.name || ((game?.[`player${slot}Name` as keyof HiqGame] as string) ?? "");
+    };
+
+    /** 초구를 아직 바꿀 수 있는가 — 아무 일도 없던 판의 호스트만(shared/scoreboardOrder canChooseBreaker) */
+    const canChooseBreak = !!game && !spectating && totalPlayers > 1 && canChooseBreaker(gameState, totalPlayers);
+    /**
+     * 초구 정하기(2026-10-23 오너). 뱅킹으로 정한 선공의 카드에서 '초구로'를 누른다 — 그 자리부터 차례가 돌고, 그 사람이 흰 공이다.
+     * 되돌리기 한 번으로 취소된다. 치기 시작하면(점수 · 이닝 기록) 더는 바꾸지 않는다.
+     */
+    const chooseBreaker = (slot: Slot) => {
+        if (!canChooseBreak || slot === gameState.breaker || slot > totalPlayers) return;
+        setGameState(prev => ({ ...prev, breaker: slot, currentTurn: slot, innings: 1 }));
+        playEffect('turn');
+        const name = nameOf(slot);
+        speak(name ? `${name}, ${t("tts.breakShot")}` : t("tts.breakShot"));
     };
 
     const handleCardTap = (playerIndex: 1 | 2 | 3 | 4, zone: "top" | "bottom") => {
@@ -579,10 +649,15 @@ export function useGameScore(id: string) {
         const currentScore = gameState[key] as number;
 
         if (gameState.currentTurn !== playerIndex) {
+            // 차례가 초구에게 돌아가면 새 이닝이다
+            const newInning = playerIndex === (gameState.breaker ?? 1);
             handleTurnChange(playerIndex);
-            const p = playerIndex === 1 ? player1 : playerIndex === 2 ? player2 : playerIndex === 3 ? player3 : player4;
-            const pName = p?.name || (game[`player${playerIndex}Name` as keyof HiqGame] as string);
-            if (pName) speak(`${pName}, ${t("tts.yourTurn")}`);
+            const pName = nameOf(playerIndex);
+            const call = pName ? `${pName}, ${t("tts.yourTurn")}` : "";
+            // 경기 모드는 '이닝 종료' 단추가 없어 차례가 여기서만 넘어간다 — 새 이닝이면 이닝 번호도 함께 부른다(2026-10-23).
+            // 한 번에 부른다: speak 는 앞의 말을 끊는다.
+            if (newInning) speak(`${t("tts.inningPrefix")}${gameState.innings + 1}${t("tts.inningSuffix")}${call ? `, ${call}` : ""}`);
+            else if (call) speak(call);
             return;
         }
 
@@ -754,6 +829,11 @@ export function useGameScore(id: string) {
         discardBusy,
         finishFailure,
         dismissFinishFailure,
+        canChooseBreak,
+        chooseBreaker,
+        unsaved,
+        restored,
+        dismissRestored: () => setRestored(false),
         speak
     };
 }

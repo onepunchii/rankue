@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { LucideUndo2, LucideRedo2 } from "@/lib/icons";
+import { LucideUndo2, LucideRedo2, LucideMoon, LucideSun } from "@/lib/icons";
 import { useT } from "@/lib/i18n";
 
 interface Props {
@@ -30,6 +30,13 @@ interface Props {
      * 예전엔 화면이 뜬 순간부터 세어, 새로고침 · 홈의 '이어서'로 다시 들어오면 00:00:00 으로 돌아갔다.
      */
     startedAt?: string | null;
+    /** 어두운 점수판인가 · 바꾸기(2026-10-23 오너: "다크버젼") — 없으면 단추를 안 그린다 */
+    dark?: boolean;
+    onToggleDark?: () => void;
+    /** 보내지 못한 점수가 기기에 보관돼 있다(오프라인) — '진행 시간' 자리에 알린다(자리가 흔들리지 않게) */
+    unsaved?: boolean;
+    /** 이닝 공을 누르면 이닝별 득점표 — 없으면 공은 표시만 */
+    onInnings?: () => void;
 }
 
 /** 진행 시간(초) — 시작 시각이 있으면 지금까지, 없거나 깨졌으면 null(화면이 뜬 때부터 센다). 기기 시계가 늦어도 0 아래로는 안 간다. */
@@ -38,7 +45,7 @@ export function elapsedSince(startedAt: string | null | undefined, now: number):
     return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 1000)) : null;
 }
 
-export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo, onUndo, onRedo, onBankShot, bankColor, bankDisabled, startedAt }: Props) {
+export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo, onUndo, onRedo, onBankShot, bankColor, bankDisabled, startedAt, dark, onToggleDark, unsaved, onInnings }: Props) {
     const { t } = useT();
     // 시계는 여기서만 돈다(부모가 1초마다 다시 그려지지 않게)
     const [mountedAt] = useState(() => Date.now());
@@ -58,12 +65,30 @@ export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo
     };
 
     return (
-        <div className="rk-board-bar h-16 bg-white border-t border-black/10 flex items-center justify-between px-8 shrink-0 z-50">
-            {/* Left Section: Time */}
-            <div className="flex items-center gap-6 w-1/4">
-                <div className="flex flex-col">
-                    <span className="text-[12px] font-medium text-black/40">{t("scoreboardBottomBar.elapsedTime")}</span>
-                    <span className="text-xl font-bold text-[rgba(0,0,0,0.87)] tabular-nums">{formatTime(elapsedTime)}</span>
+        <div className="rk-board-bar h-16 bg-surface-1 border-t border-surface-line flex items-center justify-between px-8 shrink-0 z-50">
+            {/* Left Section: 밝게/어둡게 + 진행 시간(보내지 못한 점수가 있으면 그 자리에 '기기에 보관 중') */}
+            <div className="flex items-center gap-3 w-1/4 min-w-0">
+                {onToggleDark && (
+                    <button
+                        type="button"
+                        onClick={onToggleDark}
+                        aria-label={dark ? t("scoreboardBottomBar.lightMode") : t("scoreboardBottomBar.darkMode")}
+                        aria-pressed={!!dark}
+                        className="shrink-0 w-10 h-10 rounded-full bg-surface-3 text-ink-2 flex items-center justify-center active:scale-95 transition-transform"
+                        data-testid="board-theme"
+                    >
+                        {dark ? <LucideSun className="w-5 h-5" /> : <LucideMoon className="w-5 h-5" />}
+                    </button>
+                )}
+                <div className="flex flex-col min-w-0">
+                    {unsaved ? (
+                        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-amber-600 whitespace-nowrap" role="status" data-testid="board-unsaved">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 shrink-0" />{t("scoreboardBottomBar.keptOnDevice")}
+                        </span>
+                    ) : (
+                        <span className="text-[12px] font-medium text-ink-4">{t("scoreboardBottomBar.elapsedTime")}</span>
+                    )}
+                    <span className="text-xl font-bold text-ink-1 tabular-nums">{formatTime(elapsedTime)}</span>
                 </div>
             </div>
 
@@ -75,18 +100,24 @@ export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo
                     onClick={onUndo}
                     disabled={!canUndo}
                     data-tour="bb-undo"
-                    className={`w-14 h-14 rounded-2xl bg-black/[0.04] ${canUndo ? 'text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]' : 'text-black/25'}`}
+                    className={`w-14 h-14 rounded-2xl bg-surface-3 ${canUndo ? 'text-ink-1 hover:bg-surface-3' : 'text-ink-4 opacity-60'}`}
                 >
                     <LucideUndo2 className="w-6 h-6" />
                 </Button>
 
-                {/* Billiard Ball Style Inning Display */}
+                {/* 이닝 공 — 누르면 이닝별 득점표(2026-10-23 오너). 낮은 점수판(폰 가로)에선 index.css 의 rk-inning-ball 규칙이 공을 바 안으로 넣는다 */}
                 <div className="relative group">
-                    {/* 낮은 점수판(폰 가로)에선 index.css 의 rk-inning-ball 규칙이 공을 바 안으로 넣는다 — 카드 숫자를 가리지 않게 */}
-                    <div className="rk-inning-ball w-24 h-24 rounded-full border-4 border-brand flex flex-col items-center justify-center -mt-16 bg-white z-50 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                        <span className="rk-inning-label text-[12px] font-medium text-black/55 leading-none mb-1">{t("scoreboardBottomBar.inning")}</span>
+                    <button
+                        type="button"
+                        onClick={onInnings}
+                        disabled={!onInnings}
+                        aria-label={t("inningHistoryModal.title")}
+                        className="rk-inning-ball w-24 h-24 rounded-full border-4 border-brand flex flex-col items-center justify-center -mt-16 bg-surface-1 z-50 shadow-[0_1px_2px_rgba(0,0,0,0.06)] active:scale-95 transition-transform disabled:active:scale-100"
+                        data-testid="board-inning-ball"
+                    >
+                        <span className="rk-inning-label text-[12px] font-medium text-ink-3 leading-none mb-1">{t("scoreboardBottomBar.inning")}</span>
                         <span className="rk-inning-num text-4xl font-bold text-brand tabular-nums leading-none">{innings}</span>
-                    </div>
+                    </button>
                 </div>
 
                 <Button
@@ -94,7 +125,7 @@ export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo
                     size="icon"
                     onClick={onRedo}
                     disabled={!canRedo}
-                    className={`w-14 h-14 rounded-2xl bg-black/[0.04] ${canRedo ? 'text-[rgba(0,0,0,0.87)] hover:bg-black/[0.06]' : 'text-black/25'}`}
+                    className={`w-14 h-14 rounded-2xl bg-surface-3 ${canRedo ? 'text-ink-1 hover:bg-surface-3' : 'text-ink-4 opacity-60'}`}
                 >
                     <LucideRedo2 className="w-6 h-6" />
                 </Button>
@@ -107,7 +138,7 @@ export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo
                         type="button"
                         onClick={onBankShot}
                         disabled={bankDisabled}
-                        className="h-12 px-4 rounded-2xl border-2 bg-white flex items-center gap-2 whitespace-nowrap active:scale-95 transition-transform disabled:opacity-35"
+                        className="h-12 px-4 rounded-2xl border-2 bg-surface-1 flex items-center gap-2 whitespace-nowrap active:scale-95 transition-transform disabled:opacity-35"
                         style={{ borderColor: bankColor ?? "#0f6b4f", color: bankColor ?? "#0f6b4f" }}
                     >
                         <span className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: bankColor ?? "#0f6b4f" }} />

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 
-export function LandscapeGuard({ children }: { children: React.ReactNode }) {
+/** className: 바깥 상자에 더할 클래스 — 어두운 점수판이면 노치 · 홈 막대 쪽 여백도 어둡게(sim-dark 토큰) */
+export function LandscapeGuard({ children, className = "" }: { children: React.ReactNode; className?: string }) {
     const [isPortrait, setIsPortrait] = useState(false);
 
     useEffect(() => {
@@ -23,7 +24,7 @@ export function LandscapeGuard({ children }: { children: React.ReactNode }) {
         // env()는 회전(transform)된 컨테이너 안에서도 물리 기기값으로 정상 해석된다(실측 확인: 62px).
         return (
             <div
-                className="fixed top-1/2 left-1/2 bg-surface-0 overflow-hidden origin-center"
+                className={`fixed top-1/2 left-1/2 bg-surface-0 overflow-hidden origin-center ${className}`}
                 style={{
                     width: "100vh",
                     height: "100vw",
@@ -42,7 +43,7 @@ export function LandscapeGuard({ children }: { children: React.ReactNode }) {
     // 실기기를 실제 가로로 든 경우: 노치가 좌/우 변에 오므로 left/right 인셋으로 회피
     return (
         <div
-            className="w-full h-[100dvh] overflow-hidden"
+            className={`w-full h-[100dvh] overflow-hidden bg-surface-0 ${className}`}
             style={{
                 boxSizing: "border-box",
                 paddingLeft: "env(safe-area-inset-left)",

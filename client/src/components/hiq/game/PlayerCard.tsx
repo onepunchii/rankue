@@ -17,6 +17,14 @@ interface Props {
     theme: string;
     onTap: (zone: "top" | "bottom") => void;
     /**
+     * 초구 표시(2026-10-23 오너: "초구 정하기") — "is": 이 사람이 초구(작은 표, 경기 내내) · "choose": 아직 아무도 안 쳤다, 이 사람을 초구로 고를 수 있다.
+     * 없으면 아무것도 안 그린다(1인 연습).
+     */
+    breakState?: "is" | "choose";
+    onChooseBreak?: () => void;
+    /** 어두운 점수판 — 공 색을 어두운 바탕에서 보이는 값으로 */
+    dark?: boolean;
+    /**
      * 3~4인 경기 — 카드 폭이 폰 가로에서 약 210px 이다(2026-09-24 오너: "4인시 화면이 잘리네").
      * 여백·글씨를 줄이고 이름을 말줄임한다. 큰 점수와 탭 영역은 그대로 둔다(멀리서 보는 점수판이다).
      */
@@ -32,8 +40,12 @@ interface Props {
     onInningClick?: () => void;
 }
 
-/** 선수별 공 색(흰 카드에서도 보이는 값). 하단 바의 뱅크 버튼이 '지금 차례인 선수' 색으로 같이 쓴다. */
-export function playerThemeColor(theme: string): string {
+/**
+ * 선수별 공 색(흰 카드에서도 보이는 값). 하단 바의 뱅크 버튼이 '지금 차례인 선수' 색으로 같이 쓴다.
+ * 어두운 점수판에서는 밝은 값 — 흰 공은 거의 흰색, 나머지는 한 단계 밝게(검은 카드 위 대비 4.5:1 이상).
+ */
+export function playerThemeColor(theme: string, dark = false): string {
+    if (dark) return theme === 'white' ? '#E7E5E4' : theme === 'yellow' ? '#FACC15' : theme === 'red' ? '#F87171' : '#60A5FA';
     return theme === 'white' ? '#374151' : theme === 'yellow' ? '#CA8A04' : theme === 'red' ? '#DC2626' : '#2563EB';
 }
 
@@ -58,19 +70,23 @@ export function PlayerCard({
     dragAttributes,
     dragListeners,
     isDragging,
-    onInningClick
+    onInningClick,
+    breakState,
+    onChooseBreak,
+    dark = false,
 }: Props) {
     const { t } = useT();
     // Light-theme-safe ball identity colors — pure white / bright yellow are invisible on a
     // white card, so player identity shifts to readable equivalents (graphite / deep gold / red / blue).
-    const themeColor = playerThemeColor(theme);
+    const themeColor = playerThemeColor(theme, dark);
 
     const displayScore = score;
     const displayRun = run;
     const displayHighRun = highRun;
     const displayRemaining = Math.max(0, target - score);
 
-    const bgTone = isTurn ? "bg-white" : "bg-black/[0.03]";
+    // 색은 점수판 토큰으로(밝음 · 어두움 — index.css .rk-board / .board-dark)
+    const bgTone = isTurn ? "bg-surface-1" : "bg-[var(--sb-idle)]";
     const turnBorderStyle = isTurn
         ? { border: `6px solid ${themeColor}`, borderTopColor: themeColor }
         : { border: "6px solid transparent" };
@@ -86,26 +102,47 @@ export function PlayerCard({
                 {...dragListeners}
                 className={`flex-[0_0_15%] flex items-center justify-between ${compact ? 'px-3 gap-2' : 'px-8'} relative z-50 border-b transition-all duration-300 pointer-events-none touch-none`}
                 style={{
-                    backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                    borderColor: isTurn ? themeColor : 'rgba(0, 0, 0, 0.1)'
+                    backgroundColor: 'var(--sb-band)',
+                    borderColor: isTurn ? themeColor : 'var(--sb-band-line)'
                 }}
             >
                 {/* Content Container - Capture Drag Here */}
                 <div className="flex items-center gap-3 min-w-0 pointer-events-auto cursor-grab active:cursor-grabbing">
-                    <h2 className={`${compact ? 'text-xl truncate' : 'text-3xl lg:text-4xl'} font-bold ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/50'}`}>
+                    <h2 className={`${compact ? 'text-xl truncate' : 'text-3xl lg:text-4xl'} font-bold ${isTurn ? 'text-ink-1' : 'text-ink-3'}`}>
                         {player?.name || t("playerCard.defaultName")}
                     </h2>
                     {isSolo && (
-                        <span className="text-[12px] px-2 py-0.5 rounded-tile text-black/55 font-medium">
+                        <span className="text-[12px] px-2 py-0.5 rounded-tile text-ink-3 font-medium">
                             {t("playerCard.solo")}
                         </span>
+                    )}
+                    {/* 초구 — 고른 사람은 공 색 표(경기 내내), 아직 아무도 안 쳤으면 다른 사람 카드에 '초구로'. 탭 존(z-45) 위에서 눌린다 */}
+                    {breakState === "is" && (
+                        <span
+                            className="shrink-0 inline-flex items-center gap-1 h-6 px-2.5 rounded-full text-[12px] font-bold"
+                            style={{ backgroundColor: themeColor, color: dark ? '#111' : '#fff' }}
+                            data-testid="board-break-badge"
+                        >{t("playerCard.breakShot")}</span>
+                    )}
+                    {breakState === "choose" && onChooseBreak && (
+                        <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); onChooseBreak(); }}
+                            // 머리줄은 카드 순서를 바꾸는 끌기 손잡이다(dnd-kit) — 마우스 센서는 지연 없이 곧바로 끌기를 시작해 이 단추의 클릭을 삼켰다.
+                            // 누르기 시작하는 이벤트를 손잡이까지 올려 보내지 않는다
+                            onPointerDown={(e) => e.stopPropagation()}
+                            onMouseDown={(e) => e.stopPropagation()}
+                            onTouchStart={(e) => e.stopPropagation()}
+                            className="shrink-0 h-8 px-3 rounded-full border-2 border-dashed border-ink-4 text-[13px] font-semibold text-ink-2 bg-surface-1 active:scale-95 transition-transform"
+                            data-testid="board-break-choose"
+                        >{t("playerCard.makeBreak")}</button>
                     )}
                 </div>
 
                 <div className="flex items-center gap-3 shrink-0 pointer-events-auto">
                     <div className="flex flex-col items-end">
-                        <span className="text-[12px] font-medium text-black/40">{t("playerCard.target")}</span>
-                        <span className={`${compact ? 'text-base' : 'text-xl'} font-semibold tabular-nums ${isTurn ? 'text-black/60' : 'text-black/40'}`}>{target}</span>
+                        <span className="text-[12px] font-medium text-ink-4">{t("playerCard.target")}</span>
+                        <span className={`${compact ? 'text-base' : 'text-xl'} font-semibold tabular-nums ${isTurn ? 'text-ink-2' : 'text-ink-4'}`}>{target}</span>
                     </div>
                 </div>
             </div>
@@ -125,7 +162,7 @@ export function PlayerCard({
                 />
 
                 {/* Visual Divider - Enhanced Visibility */}
-                <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-black/10 pointer-events-none" />
+                <div className="absolute top-1/2 left-0 right-0 h-[2px] bg-[var(--sb-band-line)] pointer-events-none" />
             </div>
 
             {/* FINISH / 마무리 오버레이 — 탭 존(z-[45])보다 위(z-[46])에 있어야 눌린다.
@@ -172,7 +209,7 @@ export function PlayerCard({
                         >
                             <h1
                                 className={`${compact ? 'text-[10vw]' : 'text-[12vw]'} lg:text-[190px] leading-none font-bold tabular-nums`}
-                                style={{ color: isTurn ? themeColor : 'rgba(0,0,0,0.18)' }}
+                                style={{ color: isTurn ? themeColor : 'var(--sb-ghost)' }}
                             >
                                 {displayScore}
                             </h1>
@@ -184,10 +221,14 @@ export function PlayerCard({
                                         initial={{ opacity: 0, y: -20 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -10 }}
-                                        className="mt-[-20px] inline-flex items-center gap-1.5 px-4 py-1.5 rounded-pill bg-brand/15 border border-brand/25"
+                                        // 연속 득점 칩(2026-10-23 오너: "투명도 버튼보다 다른 디자인으로") — 예전엔 반투명 초록 알약이 큰 숫자 아래쪽에 겹쳐(-20px) 숫자를 가렸다.
+                                        // 이제 꽉 찬 초록 칩을 숫자 밑에 띄운다. 탭 존 아래 층이라 눌리지 않는다(표시만).
+                                        className="mt-3 inline-flex items-center gap-1.5 h-9 px-4 rounded-full bg-brand text-brand-fg shadow-[0_2px_10px_rgba(0,0,0,0.18)]"
+                                        data-testid="board-streak"
                                     >
-                                        <Flame className="w-3.5 h-3.5 text-brand" />
-                                        <span className="text-[13px] font-semibold text-brand">+{displayRun} {t("playerCard.streak")}</span>
+                                        <Flame className="w-4 h-4" />
+                                        <span className="text-[15px] font-bold tabular-nums">+{displayRun}</span>
+                                        <span className="text-[13px] font-semibold opacity-85">{t("playerCard.streak")}</span>
                                     </motion.div>
                                 )}
                             </AnimatePresence>
@@ -206,26 +247,26 @@ export function PlayerCard({
             <div
                 className={`flex-[0_0_15%] flex items-center justify-between ${compact ? 'px-3 gap-2' : 'px-5'} relative z-50 border-t transition-all duration-300 pointer-events-none`}
                 style={{
-                    backgroundColor: 'rgba(0, 0, 0, 0.04)',
-                    borderColor: isTurn ? themeColor : 'rgba(0, 0, 0, 0.1)'
+                    backgroundColor: 'var(--sb-band)',
+                    borderColor: isTurn ? themeColor : 'var(--sb-band-line)'
                 }}
             >
                 {/* Left Section: Average (Top) & High Run (Bottom) */}
                 <div className={`flex flex-col ${compact ? 'gap-0.5 min-w-0' : 'gap-3'}`}>
                     <div className={`flex items-center ${compact ? 'gap-1.5' : 'gap-3'}`}>
-                        <span className={`text-[12px] font-medium text-black/55 ${compact ? 'whitespace-nowrap' : 'w-12 text-right'}`}>{t("playerCard.average")}</span>
-                        <span className={`${compact ? 'text-base' : 'text-2xl'} font-bold tabular-nums ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/45'}`}>{avg}</span>
+                        <span className={`text-[12px] font-medium text-ink-3 ${compact ? 'whitespace-nowrap' : 'w-12 text-right'}`}>{t("playerCard.average")}</span>
+                        <span className={`${compact ? 'text-base' : 'text-2xl'} font-bold tabular-nums ${isTurn ? 'text-ink-1' : 'text-ink-4'}`}>{avg}</span>
                     </div>
                     <div className={`flex items-center ${compact ? 'gap-1.5' : 'gap-3'}`}>
-                        <span className={`text-[12px] font-medium text-black/55 ${compact ? 'whitespace-nowrap' : 'w-12 text-right'}`}>{t("playerCard.highRun")}</span>
-                        <span className={`${compact ? 'text-base' : 'text-2xl'} font-bold tabular-nums ${isTurn ? 'text-[rgba(0,0,0,0.87)]' : 'text-black/45'}`}>{displayHighRun}</span>
+                        <span className={`text-[12px] font-medium text-ink-3 ${compact ? 'whitespace-nowrap' : 'w-12 text-right'}`}>{t("playerCard.highRun")}</span>
+                        <span className={`${compact ? 'text-base' : 'text-2xl'} font-bold tabular-nums ${isTurn ? 'text-ink-1' : 'text-ink-4'}`}>{displayHighRun}</span>
                     </div>
                 </div>
 
                 {/* Right Section: To Go & Button */}
                 <div className={`flex items-center shrink-0 ${compact ? 'gap-2' : 'gap-10'}`}>
                     <div className="flex flex-col items-end">
-                        <span className={`${compact ? 'text-4xl' : 'text-6xl lg:text-7xl'} font-bold tabular-nums leading-none ${isTurn ? 'text-brand' : 'text-black/40'}`}>
+                        <span className={`${compact ? 'text-4xl' : 'text-6xl lg:text-7xl'} font-bold tabular-nums leading-none ${isTurn ? 'text-brand' : 'text-ink-4'}`}>
                             {displayRemaining === 0 ? (
                                 <span className="text-transparent">0</span>
                             ) : displayRemaining}

@@ -186,7 +186,8 @@ afterEach(async () => {
 
 describe("useGameScore — 종료하기(버리기)", () => {
     it("들어오면 받은 점수를 되살려 한 번 저장한다(예전 그대로) — 저장은 10초 타임아웃으로 나간다", async () => {
-        const hn = await enter(gameRow({ player1Score: 7, player1Innings: [3, 4], totalInnings: 3 }));
+        // 이닝은 이닝 배열에서 끌어낸다(2026-10-23 — 초구가 친 이닝 수 + 초구 차례면 1): 둘 다 두 이닝을 마쳤고 1번(초구) 차례 = 3이닝
+        const hn = await enter(gameRow({ player1Score: 7, player1Innings: [3, 4], player2Score: 1, player2Innings: [1, 0], totalInnings: 3 }));
         expect(hn.latest().gameState.p1Score).toBe(7);
         expect(sent("PATCH")).toHaveLength(1);
         const save = sent("PATCH")[0];
@@ -741,5 +742,82 @@ describe("useGameScore — 다시 들어온 화면(같은 세션)", () => {
         expect(h.setLocation).toHaveBeenCalledWith("/game/result?id=g1");
         await flush(60_000);
         expect(sent("PATCH")).toHaveLength(2);
+    });
+});
+
+describe("useGameScore — 기기 보관 · 초구(2026-10-23)", () => {
+    /** 진짜처럼 값을 담는 저장소(위 beforeEach 의 가짜는 아무것도 담지 않는다) */
+    const memStorage = () => {
+        const m = new Map<string, string>();
+        return {
+            m,
+            getItem: (k: string) => m.get(k) ?? null,
+            setItem: (k: string, v: string) => { m.set(k, String(v)); },
+            removeItem: (k: string) => { m.delete(k); },
+            get length() { return m.size; },
+            key: (i: number) => [...m.keys()][i] ?? null,
+        };
+    };
+    const offline = () => { h.respond = (_u, o) => (o?.method === "PATCH" ? Promise.reject(new TypeError("Failed to fetch")) : Promise.resolve({ success: true })); };
+
+    it("저장이 실패한 채 앱이 꺼져도 — 다시 열면 기기에 보관한 점수로 되살리고 서버에 보낸다", async () => {
+        vi.stubGlobal("localStorage", memStorage());
+        const row = gameRow();
+        offline();
+        const a = await enter(row);
+        await tap(a);
+        await tap(a);
+        expect(a.latest().gameState.p1Score).toBe(2);
+        expect(a.latest().unsaved).toBe(true);
+        a.unmount();
+        // 앱이 꺼진 동안은 끝까지 오프라인 — 떠날 때 민 마지막 저장도 실패로 끝난다(가짜 서버는 받은 저장을 행에 반영하지 않으니, 여기서 성공하면 시험이 거짓이 된다)
+        await flush(0);
+
+        h.calls.length = 0;
+        h.respond = () => Promise.resolve({ success: true });
+        const b = await enter(row); // 서버는 처음 행 그대로다(저장이 하나도 안 닿았다)
+        expect(b.latest().gameState.p1Score).toBe(2);
+        expect(b.latest().restored).toBe(true);
+        expect(sent("PATCH").at(-1)!.opts.body).toMatchObject({ player1Score: 2, player1HighRun: 2 });
+        expect(b.latest().unsaved).toBe(false);
+    });
+
+    it("그 사이 서버가 다른 기기에서 바뀌었으면 서버를 믿는다 — 기기 보관은 버린다", async () => {
+        const st = memStorage();
+        vi.stubGlobal("localStorage", st);
+        offline();
+        const a = await enter(gameRow());
+        await tap(a);
+        a.unmount();
+        expect([...st.m.keys()].some((k) => k.startsWith("rankue.board.stash."))).toBe(true);
+
+        h.respond = () => Promise.resolve({ success: true });
+        const b = await enter(gameRow({ player1Score: 6, player1HighRun: 6, player1Innings: [6], totalInnings: 1 }));
+        expect(b.latest().gameState.p1Score).toBe(6);
+        expect(b.latest().restored).toBe(false);
+    });
+
+    it("초구 — 아무도 안 쳤을 때만 고를 수 있고, 고르면 그 사람 차례 · 저장에 breakPlayer", async () => {
+        vi.stubGlobal("localStorage", memStorage());
+        const hn = await enter(gameRow());
+        expect(hn.latest().canChooseBreak).toBe(true);
+        React.act(() => { hn.latest().chooseBreaker(2); });
+        await flush(400);
+        expect(hn.latest().gameState.breaker).toBe(2);
+        expect(hn.latest().gameState.currentTurn).toBe(2);
+        expect(hn.latest().gameState.innings).toBe(1);
+        expect(sent("PATCH").at(-1)!.opts.body).toMatchObject({ breakPlayer: 2 });
+        // 치기 시작하면 더는 못 바꾼다
+        React.act(() => { hn.latest().handleCardTap(2, "top"); });
+        await flush(400);
+        expect(hn.latest().canChooseBreak).toBe(false);
+        // 2번(초구)이 이닝을 마치고 1번이 마치면 2이닝 — 이닝은 초구에게 차례가 돌아올 때 오른다
+        React.act(() => { hn.latest().handleCardTap(1, "top"); });   // 1번에게 차례
+        await flush(400);
+        expect(hn.latest().gameState.innings).toBe(1);
+        React.act(() => { hn.latest().handleCardTap(2, "top"); });   // 다시 2번(초구)에게
+        await flush(400);
+        expect(hn.latest().gameState.innings).toBe(2);
+        expect(sent("PATCH").at(-1)!.opts.body).toMatchObject({ player2Innings: [1], player1Innings: [0], totalInnings: 2, breakPlayer: 2 });
     });
 });

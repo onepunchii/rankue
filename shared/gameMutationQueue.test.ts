@@ -567,11 +567,11 @@ describe("점수판 요청 줄 — 훅(useGameScore)", () => {
         // 옛 클로저(gameState)를 보내지 않는다
         expect(save).not.toMatch(/\bgameState\b/);
         expect(save).toContain('status: "playing_base"');
-        expect(save).toContain("onError: (e) => { console.error(e); unsentRef.current = true; if (isNoAnswer(e)) lateRef.current = true; },");
+        expect(save).toContain("onError: (e) => { console.error(e); unsentRef.current = true; setUnsaved(true); if (isNoAnswer(e)) lateRef.current = true; },");
         expect(save).toContain("onSettled: () => { savingRef.current = Math.max(0, savingRef.current - 1); },");
         // 성공 — 답 없이 끝난 저장이 앞에 있었으면 확인 저장을 한 번 더 세우고(그때는 '안 보낸 변경'을 지우지 않는다), 아니면 지운다.
         // 확인 저장은 점수판이 떠 있고 끝나는 중이 아닐 때만 — 떠난 화면의 옛 점수나, 줄 선 FINISH 뒤의 진행 중 저장이 되면 안 된다
-        const ok = save.slice(save.indexOf("onSuccess: () => {"), save.indexOf("onError: (e) => {"));
+        const ok = save.slice(save.indexOf("onSuccess: (data) => {"), save.indexOf("onError: (e) => {"));
         const ask = ok.indexOf("const again = lateRef.current && mountedRef.current && !finishedRef.current && !endingNow();");
         const once = ok.indexOf("lateRef.current = false;");
         const resend = ok.indexOf("if (again) { requestSave(); return; }");
@@ -590,7 +590,7 @@ describe("점수판 요청 줄 — 훅(useGameScore)", () => {
     });
 
     it("저장을 내보내는 길은 requestSave 하나 — 자동 저장 · 언마운트 · 다시 보내기가 모두 그 길로 간다", () => {
-        const req = hook.slice(hook.indexOf("const requestSave = () => {"), hook.indexOf("hydratedRef.current || !game ||"));
+        const req = hook.slice(hook.indexOf("const requestSave = () => {"), hook.indexOf("if (hydratedRef.current || !game) return;"));
         const gate = req.indexOf("if (!canQueueSave(savingRef.current)) return;");
         const inc = req.indexOf("savingRef.current += 1;");
         const go = req.indexOf("updateScoreMutation.mutate();");
@@ -740,8 +740,9 @@ describe("점수판 요청 줄 — 훅(useGameScore)", () => {
         expect(q).toContain("queryKey: [`/api/hiq/game/${id}`],");
         expect(q).toContain("gcTime: 0,");
         expect(count(hook, "gcTime")).toBe(1);
-        // 되살리기는 한 번뿐이다(그래서 처음 받는 행이 새것이어야 한다)
-        expect(hook).toContain("if (hydratedRef.current || !game || game.status === \"finished\") return;");
+        // 되살리기는 한 번뿐이다(그래서 처음 받는 행이 새것이어야 한다). 끝난 경기는 되살리지 않고 기기 보관만 지운다(2026-10-23)
+        expect(hook).toContain("if (hydratedRef.current || !game) return;");
+        expect(hook).toContain('if (game.status === "finished") { clearStash(boardStorage(), id); return; }');
     });
 });
 
@@ -749,12 +750,12 @@ describe("점수판 요청 줄 — 화면(종료 단추 · 확인창 · 실패 �
     const page = code(src("pages/hiq/game/[id].tsx"));
     const bar = code(src("components/hiq/game/ScoreboardBottomBar.tsx"));
     /** 점수판 상자 안 — LandscapeGuard 가 감싼 부분 */
-    const box = page.slice(page.indexOf("<LandscapeGuard>"), page.indexOf("</LandscapeGuard>"));
+    const box = page.slice(page.indexOf("<LandscapeGuard"), page.indexOf("</LandscapeGuard>"));
     const ASK = "{exitAsking && !spectating && (";
     const NOTE = "{finishFailure !== null && (";
 
     it("종료와 FINISH 는 함께 나가지 않는다 — 화면은 훅의 finishGame · discardGame 으로만 보낸다(둘 다 보내는 순간의 캐시를 본다)", () => {
-        expect(page).toContain("finishGame, discardGame, finishBusy, discardBusy, finishFailure, dismissFinishFailure, speak");
+        expect(page).toContain("finishGame, discardGame, finishBusy, discardBusy, finishFailure, dismissFinishFailure,");
         // 화면이 직접 보내지 않고, 그 화면이 보낸 요청만 보는 isPending 으로 막지도 않는다
         expect(page).not.toMatch(/Mutation\.(mutate|isPending)/);
         // FINISH(차례 단추)
@@ -782,8 +783,8 @@ describe("점수판 요청 줄 — 화면(종료 단추 · 확인창 · 실패 �
         expect(ask).toContain('role="alertdialog"');
         expect(ask).toContain('className="absolute inset-0 z-[60] flex items-center justify-center bg-black/55 px-5"');
         // 덮는 기준(relative)은 점수판의 뿌리 상자다
-        expect(box).toContain('<div ref={boardRef} className="rk-board h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">');
-        expect(bar).toContain('<div className="rk-board-bar h-16 bg-white border-t border-black/10 flex items-center justify-between px-8 shrink-0 z-50">');
+        expect(box).toContain('<div ref={boardRef} className={`rk-board ${dark ? "sim-dark board-dark" : ""} h-full bg-surface-0 text-ink-1 font-sans overflow-hidden flex flex-col touch-none select-none relative`}');
+        expect(bar).toContain('<div className="rk-board-bar h-16 bg-surface-1 border-t border-surface-line flex items-center justify-between px-8 shrink-0 z-50">');
 
         // 묻는 말은 예전 그대로 · 단추는 취소 → 확인 순서
         expect(ask).toContain('{t("gameScoreboard.exitConfirm")}');
@@ -833,9 +834,10 @@ describe("점수판 요청 줄 — 화면(종료 단추 · 확인창 · 실패 �
         expect(exit.length).toBeGreaterThan(0);
         expect(exit).toContain("disabled={exiting}");
         expect(exit).toContain("disabled:opacity-40");
-        // 새 문구를 만들지 않았다 — 하단 바가 쓰는 키는 예전 그대로다
+        // 하단 바가 쓰는 키 — 2026-10-23 다크 전환 · 기기 보관 · 득점표 여는 공이 넷을 더했다(다섯 사전은 scoreboardFeatures.test 가 본다)
         const used = Array.from(new Set(Array.from(bar.matchAll(/t\("([A-Za-z.]+)"\)/g), (m) => m[1]))).sort();
-        expect(used).toEqual(["playerCard.bankShot", "scoreboardBottomBar.elapsedTime", "scoreboardBottomBar.exit", "scoreboardBottomBar.inning"]);
+        expect(used).toEqual(["inningHistoryModal.title", "playerCard.bankShot", "scoreboardBottomBar.darkMode", "scoreboardBottomBar.elapsedTime",
+            "scoreboardBottomBar.exit", "scoreboardBottomBar.inning", "scoreboardBottomBar.keptOnDevice", "scoreboardBottomBar.lightMode"]);
     });
 });
 
@@ -934,7 +936,7 @@ describe("점수판 리뷰 수정(2026-10-23) — 진행 시간 · 결과 에버
         for (const n of [1, 2, 3, 4]) expect(result).toContain(`avg={avgOf(${n})}`);
     });
     it("이닝 공은 바 안에 — 점수판 상자 높이로 묻는다(세로 폰은 상자를 돌려 그려 화면 미디어쿼리로는 못 잰다)", () => {
-        expect(page).toContain('<div ref={boardRef} className="rk-board h-full');
+        expect(page).toContain('<div ref={boardRef} className={`rk-board ${dark ? "sim-dark board-dark" : ""} h-full');
         expect(bar).toContain('className="rk-board-bar h-16');
         expect(bar).toContain('className="rk-inning-ball w-24 h-24');
         expect(css).toContain("container-type: size;");

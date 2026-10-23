@@ -21,6 +21,8 @@ export type GameState = {
     p3HighRun: number;
     p4HighRun: number;
     currentTurn: 1 | 2 | 3 | 4;
+    /** 초구(선공) 자리 — 차례 순서 · 이닝 · 공 색이 여기서 시작한다(shared/scoreboardOrder). 예전 경기는 1 */
+    breaker: 1 | 2 | 3 | 4;
     p1Innings: number[];
     p2Innings: number[];
     p3Innings: number[];

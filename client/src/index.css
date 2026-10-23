@@ -2067,6 +2067,25 @@ html.admin-viewonly [data-admin-lock] {
 .rk-board {
   container-type: size;
   container-name: rk-board;
+  /* 점수판 전용 색(2026-10-23) — 카드 머리 · 발 띠, 차례 아닌 카드 바탕, 흐린 큰 숫자. 밝은 값은 예전 그대로 */
+  --sb-idle: rgba(0, 0, 0, 0.03);
+  --sb-band: rgba(0, 0, 0, 0.04);
+  --sb-band-line: rgba(0, 0, 0, 0.1);
+  --sb-ghost: rgba(0, 0, 0, 0.18);
+}
+/*
+ * 어두운 점수판(2026-10-23 오너: "다크버젼") — 페이지가 sim-dark(온라인게임과 같은 어두운 토큰)와 board-dark 를 함께 준다.
+ * 어두운 당구장에서 눈부심을 줄인다. 초록은 검은 바탕에서 대비가 모자라 밝은 연두로(온라인게임 진열장과 같은 값),
+ * 그 위 글자는 검게. 공 색은 PlayerCard playerThemeColor(theme, dark).
+ */
+.rk-board.board-dark {
+  --sb-idle: rgba(255, 255, 255, 0.025);
+  --sb-band: rgba(255, 255, 255, 0.05);
+  --sb-band-line: rgba(255, 255, 255, 0.12);
+  --sb-ghost: rgba(255, 255, 255, 0.2);
+  --brand: 100 221 23;
+  --brand-strong: 86 190 20;
+  --brand-fg: 10 10 10;
 }
 @container rk-board (max-height: 560px) {
   .rk-inning-ball {

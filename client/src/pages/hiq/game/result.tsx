@@ -16,6 +16,7 @@ import { useT } from "@/lib/i18n";
 import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
 import { handiChangeKind, realTierFor } from "@shared/realTier";
 import { scoringInnings } from "@shared/averageRule";
+import { ballThemeOf, breakerOf } from "@shared/scoreboardOrder";
 
 export default function HiqGameResult() {
     const { t } = useT();
@@ -107,6 +108,9 @@ export default function HiqGameResult() {
     // 에버 = 점수 ÷ 그 선수가 친 이닝(목표에 닿은 이닝까지) — 점수판 · 전적(서버 저장)과 같은 규칙(shared/averageRule).
     // 예전엔 점수 ÷ 경기 전체 이닝이라, 마지막 이닝을 못 친 후공과 목표 뒤 마무리 이닝이 있는 선수는 여기서만 낮게 나왔다(2026-10-23).
     // 화면 카드와 공유 카드가 같은 값을 쓴다.
+    // 공유 카드의 공 색 — 점수판과 같이 초구가 흰 공(shared/scoreboardOrder). 초구 칸이 없는 옛 경기는 1번이 흰 공
+    const breaker = breakerOf(game.breakPlayer, totalPlayers);
+    const ballOf = (n: 1 | 2 | 3 | 4) => ["white", "yellow", "red", "blue"].indexOf(ballThemeOf(n, breaker, totalPlayers));
     const avgOf = (n: 1 | 2 | 3 | 4) => {
         const innings = result[`p${n}Innings`] ?? game[`player${n}Innings`];
         const denom = scoringInnings(innings, Number(game[`player${n}Target`] ?? 0), game.totalInnings || 0);
@@ -118,6 +122,7 @@ export default function HiqGameResult() {
             score: game.player1Score,
             target: game.player1Target,
             avg: avgOf(1),
+            ball: ballOf(1),
             highRun: result.p1HighRun ?? 0,
             win: p1Win,
         },
@@ -128,6 +133,7 @@ export default function HiqGameResult() {
             score: game.player2Score,
             target: game.player2Target,
             avg: avgOf(2),
+            ball: ballOf(2),
             highRun: result.p2HighRun ?? 0,
             win: p2Win,
         });
@@ -137,6 +143,7 @@ export default function HiqGameResult() {
                 score: game.player3Score,
                 target: game.player3Target,
                 avg: avgOf(3),
+                ball: ballOf(3),
                 highRun: result.p3HighRun ?? 0,
                 win: p3Win,
             });
@@ -147,6 +154,7 @@ export default function HiqGameResult() {
                 score: game.player4Score,
                 target: game.player4Target,
                 avg: avgOf(4),
+                ball: ballOf(4),
                 highRun: result.p4HighRun ?? 0,
                 win: p4Win,
             });

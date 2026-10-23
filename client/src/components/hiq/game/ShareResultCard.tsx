@@ -36,6 +36,8 @@ export interface SharePlayer {
     avg: string;
     highRun: number;
     win: boolean;
+    /** 공 색 칸(0 흰 · 1 노랑 · 2 빨강 · 3 파랑) — 초구가 흰 공이라 자리 순서와 다를 수 있다(2026-10-23). 없으면 자리 순서 */
+    ball?: number;
 }
 
 export interface ShareResultData {
@@ -267,7 +269,7 @@ export function drawShareCard(ctx: CanvasRenderingContext2D, data: ShareResultDa
             ctx.fill();
         }
 
-        drawBall(ctx, innerL + ballR + 6, cy, ballR, BALLS[i] || BALLS[0]);
+        drawBall(ctx, innerL + ballR + 6, cy, ballR, BALLS[p.ball ?? i] || BALLS[0]);
 
         // 오른쪽 점수 블록을 먼저 재서 이름 최대폭을 정한다
         const targetTxt = `/ ${Number(p.target) || 0}`;
@@ -465,7 +467,7 @@ export function ShareResultCard({ data, className }: { data: ShareResultData; cl
                                         showWin && "bg-brand/[0.07]",
                                     )}
                                 >
-                                    <PreviewBall index={i} size={sz.ball} />
+                                    <PreviewBall index={p.ball ?? i} size={sz.ball} />
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-1.5">
                                             <span className={cn("truncate font-bold text-ink-1", sz.name)}>

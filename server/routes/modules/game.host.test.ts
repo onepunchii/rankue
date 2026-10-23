@@ -71,3 +71,20 @@ describe("점수판 호스트 전용", () => {
         expect((await call("PATCH", "/game/golf/score", GUEST, { player1Score: 4 })).status).toBe(200);
     });
 });
+
+describe("초구 저장(2026-10-23)", () => {
+    it("점수 저장이 초구 자리(1~4 정수)를 함께 적는다 — 그 밖의 값은 칸을 건드리지 않는다", async () => {
+        expect((await call("PATCH", "/game/g1/score", HOST, { player1Score: 0, breakPlayer: 2 })).status).toBe(200);
+        expect(updateHiqGameScore).toHaveBeenLastCalledWith("g1", expect.objectContaining({ breakPlayer: 2 }));
+        for (const bad of [0, 5, 1.5, "2", null, -1]) {
+            updateHiqGameScore.mockClear();
+            expect((await call("PATCH", "/game/g1/score", HOST, { player1Score: 0, breakPlayer: bad })).status).toBe(200);
+            const data = (updateHiqGameScore.mock.calls[0] as unknown[] | undefined)?.[1] as Record<string, unknown>;
+            expect(data, String(bad)).not.toHaveProperty("breakPlayer");
+        }
+    });
+    it("참가자는 초구도 못 바꾼다(403)", async () => {
+        expect((await call("PATCH", "/game/g1/score", GUEST, { breakPlayer: 2 })).status).toBe(403);
+        expect(updateHiqGameScore).not.toHaveBeenCalled();
+    });
+});

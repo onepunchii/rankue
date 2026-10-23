@@ -291,6 +291,9 @@ router.patch("/game/:id/score", requireAuth, asyncHandler(async (req: AuthReques
     for (const key of ALLOWED_KEYS) {
         if (req.body[key] !== undefined) updateData[key] = req.body[key];
     }
+    // 초구 자리(2026-10-23) — 1~4 정수만. 그 밖의 값은 무시한다(칸을 건드리지 않는다).
+    const bp = req.body.breakPlayer;
+    if (Number.isInteger(bp) && bp >= 1 && bp <= 4) updateData.breakPlayer = bp;
     // status may only move within the in-progress states; 'finished' must go via /finish.
     if (req.body.status === "playing_base" || req.body.status === "playing_finish") {
         updateData.status = req.body.status;

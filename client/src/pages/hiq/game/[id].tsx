@@ -7,17 +7,19 @@ import { useGameScore, gameStateFromRow } from "@/hooks/useGameScore";
 import { LandscapeGuard } from "@/components/hiq/LandscapeGuard";
 import { PlayerCard, playerThemeColor } from "@/components/hiq/game/PlayerCard";
 import { ScoreboardBottomBar } from "@/components/hiq/game/ScoreboardBottomBar";
-import { InningHistoryModal } from "@/components/hiq/game/InningHistoryModal";
+import { InningHistoryModal, type InningRow } from "@/components/hiq/game/InningHistoryModal";
 import { SortablePlayerWrapper } from "@/components/hiq/game/SortablePlayerWrapper";
 import { DndContext, closestCenter, PointerSensor, TouchSensor, MouseSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { SortableContext, horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { HiqMember } from "@shared/schema";
 import { useT } from "@/lib/i18n";
 import { scoringInnings } from "@shared/averageRule";
+import { ballThemeOf, playOrder, type Slot } from "@shared/scoreboardOrder";
 import { Eye, LucideX } from "@/lib/icons";
 
-/** 선수 번호 → 공 색 이름. 카드와 하단 바(뱅크 버튼)가 같은 표를 본다. */
-const THEMES = ["white", "yellow", "red", "blue"] as const;
+/** 점수판 밝음/어두움 — 기기마다 기억한다(2026-10-23 오너: "다크버젼"). 처음엔 밝게(예전 그대로) */
+const BOARD_THEME_KEY = "rankue.board.theme";
+const readBoardDark = (): boolean => { try { return localStorage.getItem(BOARD_THEME_KEY) === "dark"; } catch { return false; } };
 
 export default function HiqScoreboard() {
     usePreventZoom();
@@ -33,14 +35,29 @@ export default function HiqScoreboard() {
         game, isLoading, error, spectating, players, totalPlayers,
         gameState, canUndo, canRedo, undo, redo,
         playerOrder, handleDragEnd, handleCardTap, handleBankShot, handleTurnChange,
-        finishGame, discardGame, finishBusy, discardBusy, finishFailure, dismissFinishFailure, speak
+        finishGame, discardGame, finishBusy, discardBusy, finishFailure, dismissFinishFailure,
+        canChooseBreak, chooseBreaker, unsaved, restored, dismissRestored, speak
     } = useGameScore(id || "");
 
     const boardRef = useRef<HTMLDivElement>(null);
     // 경기 중엔 화면이 꺼지지 않게 — 폰을 테이블에 두고 쓰는 점수판이다.
     useKeepAwake(!!id && game?.status !== "finished");
 
-    const [inningModalPlayer, setInningModalPlayer] = useState<number | null>(null);
+    // 이닝별 득점표 — 이닝 공(하단 바)을 누르면 점수판 상자 안에 뜬다
+    const [inningsOpen, setInningsOpen] = useState(false);
+    // 어두운 점수판 — 색 토큰만 바꾼다(.sim-dark + .board-dark, index.css). 카드 · 하단 바 · 득점표가 토큰을 따른다
+    const [dark, setDark] = useState(readBoardDark);
+    const toggleDark = () => setDark((d) => {
+        const next = !d;
+        try { localStorage.setItem(BOARD_THEME_KEY, next ? "dark" : "light"); } catch { /* 막힌 저장소 — 이번만 */ }
+        return next;
+    });
+    // 기기에 보관한 점수로 되살렸다는 알림 — 4초 뒤 저절로 닫힌다
+    useEffect(() => {
+        if (!restored) return;
+        const timer = setTimeout(dismissRestored, 4000);
+        return () => clearTimeout(timer);
+    }, [restored]);
     // 종료하기의 확인창 — 점수판 안에 그린다(아래 exitAsking 자리 참고)
     const [exitAsking, setExitAsking] = useState(false);
 
@@ -116,12 +133,36 @@ export default function HiqScoreboard() {
     }
 
     if (isLoading || !game) {
-        return <div className="min-h-screen bg-surface-0 flex items-center justify-center text-[rgba(0,0,0,0.87)]">{t("gameScoreboard.loading")}</div>;
+        return <div className="min-h-screen bg-surface-0 flex items-center justify-center text-ink-1">{t("gameScoreboard.loading")}</div>;
     }
 
+    // 초구부터 치는 순서 — 공 색(초구 = 흰 공)과 득점표의 줄 순서가 여기서 나온다(shared/scoreboardOrder)
+    const breaker = (view.breaker ?? 1) as Slot;
+    const themeOf = (slot: number) => ballThemeOf(slot as Slot, breaker, Math.max(1, totalPlayers));
+    const nameOfSlot = (slot: number): string => {
+        const p = players[slot as keyof typeof players];
+        return p?.name || (game[`player${slot}Name` as keyof typeof game] as string) || t("playerCard.defaultName");
+    };
+    const inningRows: InningRow[] = playOrder(breaker, Math.max(1, totalPlayers)).map((slot) => {
+        const target = (game[`player${slot}Target` as keyof typeof game] as number) || 0;
+        const score = view[`p${slot}Score` as keyof typeof view] as number;
+        const live = view.currentTurn === slot && game.status !== "finished" ? (view[`p${slot}Run` as keyof typeof view] as number) : null;
+        return {
+            slot,
+            name: nameOfSlot(slot),
+            color: playerThemeColor(themeOf(slot), dark),
+            innings: (view[`p${slot}Innings` as keyof typeof view] as number[] | undefined) ?? [],
+            live,
+            score,
+            avg: getAvg(score, slot, target),
+            highRun: view[`p${slot}HighRun` as keyof typeof view] as number,
+            isBreaker: totalPlayers > 1 && slot === breaker,
+        };
+    });
+
     return (
-        <LandscapeGuard>
-            <div ref={boardRef} className="rk-board h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
+        <LandscapeGuard className={dark ? "sim-dark" : ""}>
+            <div ref={boardRef} className={`rk-board ${dark ? "sim-dark board-dark" : ""} h-full bg-surface-0 text-ink-1 font-sans overflow-hidden flex flex-col touch-none select-none relative`} data-theme={dark ? "dark" : "light"}>
                 {/* 첫 경기의 코치마크(2026-10-14) — 점수 · 이닝 · 되돌리기 · 종료. 상자(돌려 놓은 가로 화면) 안에 그린다. 첫 점수 전에만 */}
                 <CoachTour id="billiards-scoreboard" tone="billiards" inside={boardRef} when={!spectating && !canUndo && view.innings === 1 && game.status !== "finished"} steps={[
                     { target: "bb-card", title: t("tour.bb.cardTitle"), body: t("tour.bb.cardBody") },
@@ -142,7 +183,8 @@ export default function HiqScoreboard() {
                                 const run = view[`p${playerId}Run` as keyof typeof view] as number;
                                 const highRun = view[`p${playerId}HighRun` as keyof typeof view] as number;
 
-                                const theme = THEMES[playerId - 1];
+                                // 공 색은 치는 순서를 따른다 — 초구가 흰 공(예전엔 자리 번호로 고정)
+                                const theme = themeOf(playerId);
 
                                 if (playerId > totalPlayers) return null;
 
@@ -185,7 +227,10 @@ export default function HiqScoreboard() {
                                             isSolo={totalPlayers === 1}
                                             hideEndInning={game.gameMode === "match"}
                                             is4c={game.gameType === "4c"}
-                                            onInningClick={() => setInningModalPlayer(playerId)}
+                                            dark={dark}
+                                            // 초구 — 고른 사람은 표, 아무도 안 쳤으면 다른 사람 카드에 '초구로'(호스트만 · 2인 이상)
+                                            breakState={totalPlayers > 1 ? (breaker === playerId ? "is" : canChooseBreak ? "choose" : undefined) : undefined}
+                                            onChooseBreak={() => chooseBreaker(playerId as Slot)}
                                         />
                                     </SortablePlayerWrapper>
                                 );
@@ -195,24 +240,26 @@ export default function HiqScoreboard() {
                 </div>
 
                 <InningHistoryModal
-                    player={inningModalPlayer}
-                    innings={view.innings}
-                    onClose={() => setInningModalPlayer(null)}
+                    open={inningsOpen}
+                    rows={inningRows}
+                    inning={view.innings}
+                    onClose={() => setInningsOpen(false)}
                 />
 
                 {spectating ? (
-                    <div className="h-16 bg-white border-t border-black/10 flex items-center justify-between gap-4 px-6 shrink-0 z-50">
+                    <div className="h-16 bg-surface-1 border-t border-surface-line flex items-center justify-between gap-4 px-6 shrink-0 z-50">
                         {/* 관전 표시는 아래 줄에 — 위에 띄우면 이름·목표를 가린다 */}
                         <span className="flex items-center gap-2 min-w-0 flex-1">
                             <span className="inline-flex items-center gap-1 px-2 h-6 rounded-full bg-[#DC2626] text-white text-[11px] font-bold shrink-0">
                                 <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />{t("gameScoreboard.spectateLive")}
                             </span>
-                            <Eye className="w-4 h-4 text-black/40 shrink-0" />
-                            <span className="text-[13px] font-semibold text-black/55 truncate">{t("gameScoreboard.spectating").replace("{host}", game.player1Name || "")}</span>
+                            <Eye className="w-4 h-4 text-ink-4 shrink-0" />
+                            <span className="text-[13px] font-semibold text-ink-3 truncate">{t("gameScoreboard.spectating").replace("{host}", game.player1Name || "")}</span>
                         </span>
-                        <span className="text-xl font-bold tabular-nums text-[rgba(0,0,0,0.87)] shrink-0 px-2">{view.innings} {t("scoreboardBottomBar.inning")}</span>
+                        {/* 관전자도 이닝을 누르면 득점표 */}
+                        <button type="button" onClick={() => setInningsOpen(true)} className="text-xl font-bold tabular-nums text-ink-1 shrink-0 px-3 h-10 rounded-full active:bg-surface-3" data-testid="board-inning-ball">{view.innings} {t("scoreboardBottomBar.inning")}</button>
                         <span className="flex justify-end shrink-0">
-                        <button type="button" onClick={() => setLocation("/dashboard")} className="h-10 px-5 rounded-full border border-black/15 text-[14px] font-semibold text-[rgba(0,0,0,0.87)]">
+                        <button type="button" onClick={() => setLocation("/dashboard")} className="h-10 px-5 rounded-full border border-surface-line-strong text-[14px] font-semibold text-ink-1">
                             {t("gameScoreboard.spectateExit")}
                         </button>
                         </span>
@@ -229,7 +276,11 @@ export default function HiqScoreboard() {
                         onRedo={() => { redo(); speak(t("gameScoreboard.redo")); }}
                         // PBA 룰(3구) 경기에서만 — 저장만 되고 점수판이 안 읽던 설정이다(2026-09-24).
                         onBankShot={game.usePbaRule && game.gameType === "3c" ? () => handleBankShot(view.currentTurn as 1 | 2 | 3 | 4) : undefined}
-                        bankColor={playerThemeColor(THEMES[view.currentTurn - 1])}
+                        bankColor={playerThemeColor(themeOf(view.currentTurn), dark)}
+                        dark={dark}
+                        onToggleDark={toggleDark}
+                        unsaved={unsaved}
+                        onInnings={() => setInningsOpen(true)}
                         bankDisabled={(() => {
                             const turn = view.currentTurn;
                             const target = (game[`player${turn}Target` as keyof typeof game] as number) || 0;
@@ -242,6 +293,19 @@ export default function HiqScoreboard() {
                 {/* FINISH 실패 알림 — 점수판 안에 그린다(2026-10-06). 세로로 든 폰에서 점수판은 화면 전체를 덮는 맨 위 상자라
                     (LandscapeGuard — zIndex 9999) 앱 뿌리의 토스트가 그 밑에 깔려, 실패해도 아무 표시가 없었다.
                     누르면 닫히고 FINISH 를 다시 누르면 사라진다. 점수판을 떠난 뒤의 실패는 훅이 토스트로 알린다. */}
+                {/* 기기 보관에서 되살렸다(2026-10-23 오너: "오프라인 보관") — 연결이 끊긴 동안 친 점수가 이 기기에 남아 있어 그걸로 이어 간다.
+                    점수판 상자 안에 그린다(토스트는 세로 점수판 밑에 깔린다). 4초 뒤 저절로, 누르면 바로 닫힌다 */}
+                {restored && finishFailure === null && (
+                    <div role="status" className="absolute top-3 inset-x-0 z-[55] flex justify-center px-4 pointer-events-none">
+                        <button
+                            type="button"
+                            onClick={dismissRestored}
+                            className="pointer-events-auto max-w-[560px] rounded-2xl bg-ink-1 text-surface-1 px-4 py-2.5 text-[13.5px] font-semibold break-keep shadow-[0_8px_24px_rgba(0,0,0,0.25)] active:opacity-90"
+                            data-testid="board-restored"
+                        >{t("gameScoreboard.restored")}</button>
+                    </div>
+                )}
+
                 {finishFailure !== null && (
                     <div role="alert" className="absolute top-3 inset-x-0 z-[55] flex justify-center px-4 pointer-events-none">
                         <button
