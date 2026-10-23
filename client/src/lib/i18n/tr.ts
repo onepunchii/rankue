@@ -3862,7 +3862,7 @@ const tr: Dict = {
   "tour.bb.undoTitle": "Yanlış mı dokundun?",
   "tour.bb.undoBody": "Bu düğme son dokunuşunu geri alır.",
   "tour.bb.exitTitle": "Maç bitince",
-  "tour.bb.exitBody": "Kayda, RP'ye ve ortalamaya girmesi için 'Bitir'e dokun. Öylece çıkarsan maç devam ediyor olarak kalır.",
+  "tour.bb.exitBody": "Hedefine ulaşınca kartında 'BİTİŞ' çıkar — kayda, RP'ye ve ortalamaya girmesi için ona dokun. 'Bitir' bu maçı kaydetmeden siler.",
   "tour.bh.recordTitle": "Gerçek maç kaydın",
   "tour.bh.recordBody": "Resmî bir maçı bitirdiğinde sıralama puanın, galibiyet–mağlubiyet kaydın ve son beş maçın burada birikir.",
   "tour.bh.boardTitle": "Skor tabelasında oyna",

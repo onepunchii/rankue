@@ -3862,7 +3862,7 @@ const vi: Dict = {
   "tour.bb.undoTitle": "Lỡ chạm nhầm?",
   "tour.bb.undoBody": "Nút này hoàn tác lần chạm vừa rồi.",
   "tour.bb.exitTitle": "Khi kết thúc trận",
-  "tour.bb.exitBody": "Chạm 'Kết thúc' để lưu vào thành tích, RP và trung bình. Nếu chỉ rời đi, trận sẽ vẫn đang diễn ra.",
+  "tour.bb.exitBody": "Khi đạt mục tiêu, thẻ sẽ hiện 'KẾT THÚC' — chạm vào để lưu vào thành tích, RP và trung bình. Nút 'Kết thúc' ở thanh dưới sẽ bỏ trận này mà không lưu.",
   "tour.bh.recordTitle": "Thành tích thực chiến",
   "tour.bh.recordBody": "Khi kết thúc trận chính thức, điểm xếp hạng, thành tích thắng thua và năm trận gần nhất sẽ được lưu ở đây.",
   "tour.bh.boardTitle": "Thi đấu trên bảng điểm",

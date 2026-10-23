@@ -3862,7 +3862,7 @@ const es: Dict = {
   "tour.bb.undoTitle": "¿Te equivocaste?",
   "tour.bb.undoBody": "Este botón deshace tu último toque.",
   "tour.bb.exitTitle": "Al terminar la partida",
-  "tour.bb.exitBody": "Toca 'Finalizar' para guardarla en tu historial, RP y promedio. Si solo sales, queda como partida en curso.",
+  "tour.bb.exitBody": "Al llegar a tu meta aparece 'FINAL' en tu tarjeta: tócalo para guardarla en tu historial, RP y promedio. 'Finalizar' descarta esta partida sin guardarla.",
   "tour.bh.recordTitle": "Tu historial real",
   "tour.bh.recordBody": "Al terminar una partida oficial, aquí se acumulan tus puntos de ranking, tu récord y tus últimas cinco partidas.",
   "tour.bh.boardTitle": "Juega con el marcador",

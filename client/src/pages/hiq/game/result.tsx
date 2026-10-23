@@ -15,6 +15,7 @@ import { ShareResultButton, type SharePlayer } from "@/components/hiq/game/Share
 import { useT } from "@/lib/i18n";
 import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
 import { handiChangeKind, realTierFor } from "@shared/realTier";
+import { scoringInnings } from "@shared/averageRule";
 
 export default function HiqGameResult() {
     const { t } = useT();
@@ -103,14 +104,20 @@ export default function HiqGameResult() {
     if (game.player3Id || game.player3Name) totalPlayers = 3;
     if (game.player4Id || game.player4Name) totalPlayers = 4;
 
-    // 공유 카드용 데이터 — 화면 카드와 같은 계산식(에버 = 점수 / 총이닝)을 쓴다.
-    const avgOf = (score: number) => (Number(score || 0) / (game.totalInnings || 1)).toFixed(2);
+    // 에버 = 점수 ÷ 그 선수가 친 이닝(목표에 닿은 이닝까지) — 점수판 · 전적(서버 저장)과 같은 규칙(shared/averageRule).
+    // 예전엔 점수 ÷ 경기 전체 이닝이라, 마지막 이닝을 못 친 후공과 목표 뒤 마무리 이닝이 있는 선수는 여기서만 낮게 나왔다(2026-10-23).
+    // 화면 카드와 공유 카드가 같은 값을 쓴다.
+    const avgOf = (n: 1 | 2 | 3 | 4) => {
+        const innings = result[`p${n}Innings`] ?? game[`player${n}Innings`];
+        const denom = scoringInnings(innings, Number(game[`player${n}Target`] ?? 0), game.totalInnings || 0);
+        return (Number(game[`player${n}Score`] || 0) / Math.max(1, denom)).toFixed(2);
+    };
     const sharePlayers: SharePlayer[] = [
         {
             name: p1?.name || game.player1Name || `${t("gameResult.player")} 1`,
             score: game.player1Score,
             target: game.player1Target,
-            avg: avgOf(game.player1Score),
+            avg: avgOf(1),
             highRun: result.p1HighRun ?? 0,
             win: p1Win,
         },
@@ -120,7 +127,7 @@ export default function HiqGameResult() {
             name: p2?.name || game.player2Name || `${t("gameResult.player")} 2`,
             score: game.player2Score,
             target: game.player2Target,
-            avg: avgOf(game.player2Score),
+            avg: avgOf(2),
             highRun: result.p2HighRun ?? 0,
             win: p2Win,
         });
@@ -129,7 +136,7 @@ export default function HiqGameResult() {
                 name: p3?.name || game.player3Name || `${t("gameResult.player")} 3`,
                 score: game.player3Score,
                 target: game.player3Target,
-                avg: avgOf(game.player3Score),
+                avg: avgOf(3),
                 highRun: result.p3HighRun ?? 0,
                 win: p3Win,
             });
@@ -139,7 +146,7 @@ export default function HiqGameResult() {
                 name: p4?.name || game.player4Name || `${t("gameResult.player")} 4`,
                 score: game.player4Score,
                 target: game.player4Target,
-                avg: avgOf(game.player4Score),
+                avg: avgOf(4),
                 highRun: result.p4HighRun ?? 0,
                 win: p4Win,
             });
@@ -286,7 +293,7 @@ export default function HiqGameResult() {
                     name={p1?.name}
                     score={game.player1Score}
                     target={game.player1Target}
-                    avg={(game.player1Score / (game.totalInnings || 1)).toFixed(2)}
+                    avg={avgOf(1)}
                     win={p1Win}
                     handicapUpdate={handicapUpdate1}
                     pNo={1}
@@ -300,7 +307,7 @@ export default function HiqGameResult() {
                             name={p2?.name || game.player2Name}
                             score={game.player2Score}
                             target={game.player2Target}
-                            avg={(game.player2Score / (game.totalInnings || 1)).toFixed(2)}
+                            avg={avgOf(2)}
                             win={p2Win}
                             handicapUpdate={handicapUpdate2}
                             pNo={2}
@@ -313,7 +320,7 @@ export default function HiqGameResult() {
                                 name={p3?.name || game.player3Name}
                                 score={game.player3Score}
                                 target={game.player3Target}
-                                avg={(game.player3Score / (game.totalInnings || 1)).toFixed(2)}
+                                avg={avgOf(3)}
                                 win={p3Win}
                                 pNo={3}
                                 memberId={game.player3Id}
@@ -326,7 +333,7 @@ export default function HiqGameResult() {
                                 name={p4?.name || game.player4Name}
                                 score={game.player4Score}
                                 target={game.player4Target}
-                                avg={(game.player4Score / (game.totalInnings || 1)).toFixed(2)}
+                                avg={avgOf(4)}
                                 win={p4Win}
                                 pNo={4}
                                 memberId={game.player4Id}

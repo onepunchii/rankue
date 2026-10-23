@@ -3862,7 +3862,7 @@ const en: Dict = {
   "tour.bb.undoTitle": "Tapped by mistake?",
   "tour.bb.undoBody": "This button undoes your last tap.",
   "tour.bb.exitTitle": "When the match is over",
-  "tour.bb.exitBody": "Tap 'End Game' to save it to your record, RP and average. If you just leave, it stays as a match in progress.",
+  "tour.bb.exitBody": "Reach your target and 'FINISH' appears on your card — tap it to save to your record, RP and average. 'End Game' throws this match away without a record.",
   "tour.bh.recordTitle": "Your match record",
   "tour.bh.recordBody": "Finish an official match and your ranking points, win–loss record and last five matches build up here.",
   "tour.bh.boardTitle": "Play on the scoreboard",

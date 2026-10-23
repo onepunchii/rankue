@@ -121,7 +121,7 @@ export default function HiqScoreboard() {
 
     return (
         <LandscapeGuard>
-            <div ref={boardRef} className="h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
+            <div ref={boardRef} className="rk-board h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">
                 {/* 첫 경기의 코치마크(2026-10-14) — 점수 · 이닝 · 되돌리기 · 종료. 상자(돌려 놓은 가로 화면) 안에 그린다. 첫 점수 전에만 */}
                 <CoachTour id="billiards-scoreboard" tone="billiards" inside={boardRef} when={!spectating && !canUndo && view.innings === 1 && game.status !== "finished"} steps={[
                     { target: "bb-card", title: t("tour.bb.cardTitle"), body: t("tour.bb.cardBody") },
@@ -220,6 +220,7 @@ export default function HiqScoreboard() {
                 ) : (
                     <ScoreboardBottomBar
                         innings={view.innings}
+                        startedAt={game.playedAt ? String(game.playedAt) : null}
                         onExit={() => { if (exitBusy) return; setExitAsking(true); }}
                         exiting={exitBusy}
                         canUndo={canUndo}

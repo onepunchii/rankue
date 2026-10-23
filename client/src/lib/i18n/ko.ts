@@ -3870,7 +3870,7 @@ export const ko: Dict = {
   "tour.bb.undoTitle": "잘못 눌렀다면",
   "tour.bb.undoBody": "이 단추로 방금 것을 되돌려요.",
   "tour.bb.exitTitle": "경기를 마칠 때",
-  "tour.bb.exitBody": "'종료하기'를 눌러야 기록 · RP · 에버리지에 들어가요. 그냥 나가면 진행 중인 경기로 남아요.",
+  "tour.bb.exitBody": "목표 점수를 채우면 카드에 '피니시'가 떠요 — 그걸 눌러야 기록 · RP · 에버리지에 들어가요. '종료하기'는 이 경기를 기록 없이 버려요.",
   "tour.bh.recordTitle": "내 실전 기록",
   "tour.bh.recordBody": "공식 경기를 마치면 랭킹 점수 · 전적 · 최근 다섯 경기가 여기에 쌓여요.",
   "tour.bh.boardTitle": "경기는 점수판에서",

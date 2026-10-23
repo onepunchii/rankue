@@ -782,8 +782,8 @@ describe("점수판 요청 줄 — 화면(종료 단추 · 확인창 · 실패 �
         expect(ask).toContain('role="alertdialog"');
         expect(ask).toContain('className="absolute inset-0 z-[60] flex items-center justify-center bg-black/55 px-5"');
         // 덮는 기준(relative)은 점수판의 뿌리 상자다
-        expect(box).toContain('<div ref={boardRef} className="h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">');
-        expect(bar).toContain('<div className="h-16 bg-white border-t border-black/10 flex items-center justify-between px-8 shrink-0 z-50">');
+        expect(box).toContain('<div ref={boardRef} className="rk-board h-full bg-surface-0 text-[rgba(0,0,0,0.87)] font-sans overflow-hidden flex flex-col touch-none select-none relative">');
+        expect(bar).toContain('<div className="rk-board-bar h-16 bg-white border-t border-black/10 flex items-center justify-between px-8 shrink-0 z-50">');
 
         // 묻는 말은 예전 그대로 · 단추는 취소 → 확인 순서
         expect(ask).toContain('{t("gameScoreboard.exitConfirm")}');
@@ -912,5 +912,33 @@ describe("점수판 요청 줄 — 문구(다섯 언어)", () => {
             expect(c.length, l).toBeGreaterThan(0);
             expect(d, l).toContain(c);
         }
+    });
+});
+
+describe("점수판 리뷰 수정(2026-10-23) — 진행 시간 · 결과 에버 · 이닝 공", () => {
+    const page = src("pages/hiq/game/[id].tsx");
+    const bar = src("components/hiq/game/ScoreboardBottomBar.tsx");
+    const result = src("pages/hiq/game/result.tsx");
+    const css = src("index.css");
+
+    it("진행 시간은 경기 시작 시각(playedAt)부터 — 새로고침 · '이어서'로 들어와도 0 으로 돌아가지 않는다", () => {
+        expect(page).toContain("startedAt={game.playedAt ? String(game.playedAt) : null}");
+        expect(bar).toContain("const elapsedTime = elapsedSince(startedAt, now) ?? Math.max(0, Math.floor((now - mountedAt) / 1000));");
+        expect(bar).toContain("return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 1000)) : null;");
+        expect(bar).not.toContain("setElapsedTime(prev => prev + 1)");
+    });
+    it("결과 화면 에버는 점수판 · 전적과 같은 규칙(scoringInnings) — 점수 ÷ 경기 전체 이닝으로 나누지 않는다", () => {
+        expect(result).toContain('import { scoringInnings } from "@shared/averageRule";');
+        expect(result).toContain("scoringInnings(innings, Number(game[`player${n}Target`] ?? 0), game.totalInnings || 0)");
+        expect(result).not.toMatch(/Score \/ \(game\.totalInnings \|\| 1\)/);
+        for (const n of [1, 2, 3, 4]) expect(result).toContain(`avg={avgOf(${n})}`);
+    });
+    it("이닝 공은 바 안에 — 점수판 상자 높이로 묻는다(세로 폰은 상자를 돌려 그려 화면 미디어쿼리로는 못 잰다)", () => {
+        expect(page).toContain('<div ref={boardRef} className="rk-board h-full');
+        expect(bar).toContain('className="rk-board-bar h-16');
+        expect(bar).toContain('className="rk-inning-ball w-24 h-24');
+        expect(css).toContain("container-type: size;");
+        expect(css).toContain("@container rk-board (max-height: 560px) {");
+        expect(css).toContain("@container rk-board (min-height: 561px) {");
     });
 });

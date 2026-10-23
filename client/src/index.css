@@ -2057,3 +2057,38 @@ html.admin-viewonly [data-admin-lock] {
   pointer-events: none !important;
   opacity: 0.55;
 }
+
+/*
+ * 실전 점수판 이닝 공(2026-10-23) — 하단 바 위로 64px 솟은 지름 96px 공이 폰 가로 화면(점수판 높이 390 안팎)에선
+ * 왼쪽 카드의 남은 점수와 오른쪽 카드의 '하이런' 글자를 가렸다. 세로로 든 폰은 LandscapeGuard 가 상자를 돌려 그려
+ * 화면 미디어쿼리로는 높이를 못 잰다 — 점수판 상자 자체(rk-board)의 높이로 묻는다. 낮은 점수판은 공을 줄여, 높은 점수판은 바를 키워 공을 바 안에 넣는다.
+ * 컨테이너 쿼리를 모르는 옛 브라우저는 예전 모양 그대로.
+ */
+.rk-board {
+  container-type: size;
+  container-name: rk-board;
+}
+@container rk-board (max-height: 560px) {
+  .rk-inning-ball {
+    width: 3.5rem;
+    height: 3.5rem;
+    margin-top: 0;
+    border-width: 3px;
+  }
+  .rk-inning-ball .rk-inning-label {
+    font-size: 10px;
+    margin-bottom: 2px;
+  }
+  .rk-inning-ball .rk-inning-num {
+    font-size: 1.5rem;
+  }
+}
+/* 높은 점수판(태블릿)은 공이 그대로 크되, 바를 공 높이만큼 키워 바 안에 둔다 — 솟아오르면 같은 자리를 가렸다 */
+@container rk-board (min-height: 561px) {
+  .rk-board-bar {
+    height: 7rem;
+  }
+  .rk-inning-ball {
+    margin-top: 0;
+  }
+}

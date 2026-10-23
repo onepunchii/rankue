@@ -25,19 +25,30 @@ interface Props {
     bankColor?: string;
     /** 목표 도달 뒤(마무리·FINISH)엔 잠근다. 숨기지 않는 건 버튼 자리가 흔들리지 않게 하려는 것이다. */
     bankDisabled?: boolean;
+    /**
+     * 경기를 시작한 시각(ISO — 경기 행의 playedAt). 진행 시간은 여기서부터 센다(2026-10-23).
+     * 예전엔 화면이 뜬 순간부터 세어, 새로고침 · 홈의 '이어서'로 다시 들어오면 00:00:00 으로 돌아갔다.
+     */
+    startedAt?: string | null;
 }
 
-export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo, onUndo, onRedo, onBankShot, bankColor, bankDisabled }: Props) {
+/** 진행 시간(초) — 시작 시각이 있으면 지금까지, 없거나 깨졌으면 null(화면이 뜬 때부터 센다). 기기 시계가 늦어도 0 아래로는 안 간다. */
+export function elapsedSince(startedAt: string | null | undefined, now: number): number | null {
+    const t = startedAt ? Date.parse(startedAt) : NaN;
+    return Number.isFinite(t) ? Math.max(0, Math.floor((now - t) / 1000)) : null;
+}
+
+export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo, onUndo, onRedo, onBankShot, bankColor, bankDisabled, startedAt }: Props) {
     const { t } = useT();
-    // Timer State moved here to prevent re-rendering of parent
-    const [elapsedTime, setElapsedTime] = useState(0);
+    // 시계는 여기서만 돈다(부모가 1초마다 다시 그려지지 않게)
+    const [mountedAt] = useState(() => Date.now());
+    const [now, setNow] = useState(() => Date.now());
 
     useEffect(() => {
-        const timer = setInterval(() => {
-            setElapsedTime(prev => prev + 1);
-        }, 1000);
+        const timer = setInterval(() => setNow(Date.now()), 1000);
         return () => clearInterval(timer);
     }, []);
+    const elapsedTime = elapsedSince(startedAt, now) ?? Math.max(0, Math.floor((now - mountedAt) / 1000));
 
     const formatTime = (seconds: number) => {
         const h = Math.floor(seconds / 3600);
@@ -47,7 +58,7 @@ export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo
     };
 
     return (
-        <div className="h-16 bg-white border-t border-black/10 flex items-center justify-between px-8 shrink-0 z-50">
+        <div className="rk-board-bar h-16 bg-white border-t border-black/10 flex items-center justify-between px-8 shrink-0 z-50">
             {/* Left Section: Time */}
             <div className="flex items-center gap-6 w-1/4">
                 <div className="flex flex-col">
@@ -71,9 +82,10 @@ export function ScoreboardBottomBar({ innings, onExit, exiting, canUndo, canRedo
 
                 {/* Billiard Ball Style Inning Display */}
                 <div className="relative group">
-                    <div className="w-24 h-24 rounded-full border-4 border-brand flex flex-col items-center justify-center -mt-16 bg-white z-50 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
-                        <span className="text-[12px] font-medium text-black/55 leading-none mb-1">{t("scoreboardBottomBar.inning")}</span>
-                        <span className="text-4xl font-bold text-brand tabular-nums leading-none">{innings}</span>
+                    {/* 낮은 점수판(폰 가로)에선 index.css 의 rk-inning-ball 규칙이 공을 바 안으로 넣는다 — 카드 숫자를 가리지 않게 */}
+                    <div className="rk-inning-ball w-24 h-24 rounded-full border-4 border-brand flex flex-col items-center justify-center -mt-16 bg-white z-50 shadow-[0_1px_2px_rgba(0,0,0,0.06)]">
+                        <span className="rk-inning-label text-[12px] font-medium text-black/55 leading-none mb-1">{t("scoreboardBottomBar.inning")}</span>
+                        <span className="rk-inning-num text-4xl font-bold text-brand tabular-nums leading-none">{innings}</span>
                     </div>
                 </div>
 

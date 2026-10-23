@@ -87,6 +87,8 @@ describe("코치마크", () => {
             const inning = (f.match(/"tour\.bb\.inningBody": "([^"]+)"/) ?? [])[1] ?? "", exit = (f.match(/"tour\.bb\.exitBody": "([^"]+)"/) ?? [])[1] ?? "";
             expect(inning, `${l} 이닝 단추 이름`).toContain(label("playerCard.endInning")!);
             expect(exit, `${l} 종료 단추 이름`).toContain(label("scoreboardBottomBar.exit")!);
+            // 기록하는 길은 카드의 '피니시'다 — '종료하기'(버리기)를 눌러야 기록된다고 거꾸로 적혀 있었다(2026-10-23)
+            expect(exit, `${l} 피니시 단추 이름`).toContain(label("playerCard.finish")!);
         }
     });
 });
