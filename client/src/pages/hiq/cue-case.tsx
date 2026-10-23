@@ -25,7 +25,7 @@ import { shareBlob } from "@/sim/share/useShare";
 import { canvasToBlob } from "@/sim/share/shareCard";
 import { renderCaseCard } from "@/components/hiq/cueCase/caseCard";
 import { InvitePanel } from "@/components/hiq/invite/InvitePanel";
-import { CASE_ITEMS, CHALKS, CUES, GLOVES, PEOPLE_STEPS, caseImage, caseItem, cueHow, difficulty, type CaseItem, type CaseLocale, type CueGroup } from "@shared/cueCase";
+import { CASE_ITEMS, CHALKS, CUES, GLOVES, PEOPLE_STEPS, caseImage, caseItem, cueHow, difficulty, type CaseItem, type CaseKind, type CaseLocale, type CueGroup } from "@shared/cueCase";
 import { serialText } from "@/components/hiq/cueCase/cueCaseApi";
 import { CASE_SECTIONS, CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, fetchCueCase, readCaseSeen, saveHero, writeCaseSeen, type CaseItemView, type CaseSection, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
 
@@ -509,7 +509,7 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
             <p className="mt-2 flex items-center gap-2 text-[12.5px] text-white/60" data-testid="cue-case-difficulty">
                 <span>{t("case.difficulty")}</span><StarRow n={difficulty(item)} size={16} />
             </p>
-            {!view.soon && <OwnerPlate view={view} limit={item.limit} />}
+            {!view.soon && <OwnerPlate view={view} limit={item.limit} kind={item.kind} />}
             <p className="mt-2 text-[13.5px] leading-relaxed text-white/75 break-keep" data-testid="cue-case-how">{cueHow(item, l, view.done)}</p>
             {view.done && view.at ? (
                 <p className="rk-num mt-3 text-[13px] text-white/60">{t("case.got").replace("{date}", fmtDate(view.at, locale))}</p>
@@ -535,7 +535,7 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
  * 주인 패(2026-10-16 오너: "가진 사람도 중요하네 … 총 몇 명이 가지고 넘버링처럼") — 놋쇠 번호판 + 가진 사람 수.
  * 받았으면 내 번호(몇 번째 주인), 아직이면 받으면 받을 번호. 번호는 한 번 정하면 바뀌지 않는다(서버가 적힌 순서로 매긴다).
  */
-function OwnerPlate({ view, limit }: { view: CaseItemView; limit?: number }) {
+function OwnerPlate({ view, limit, kind }: { view: CaseItemView; limit?: number; kind: CaseKind }) {
     const { t } = useT();
     const mine = view.done && view.serial;
     const next = view.holders + 1;
@@ -549,7 +549,7 @@ function OwnerPlate({ view, limit }: { view: CaseItemView; limit?: number }) {
                         : view.holders > 0 ? t("case.holders").replace("{n}", String(view.holders)) : t("case.holdersNone")}
                 </span>
                 <span className="mt-0.5 block text-[12.5px] leading-snug text-white/60 break-keep">
-                    {mine ? (view.serial === 1 ? t("case.serialFirst") : t("case.serialMine").replace("{n}", String(view.serial)))
+                    {mine ? (view.serial === 1 ? t(`case.serialFirst.${kind}`) : t(`case.serialMine.${kind}`).replace("{n}", String(view.serial)))
                         : soldOut ? t("case.soldOutDesc") : t("case.serialNext").replace("{no}", serialText(next))}
                 </span>
             </span>

@@ -278,7 +278,7 @@ describe("연결", () => {
         expect(css).toContain("outline: 1.5px dashed rgba(160, 180, 210, 0.24);");
     });
     it("문구가 다섯 언어에 있고 자리 표시를 지킨다", () => {
-        const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"], "case.serialMine": ["{n}"], "case.serialNext": ["{no}"], "case.rowHolders": ["{n}"], "case.limitedLeft": ["{n}", "{m}"], "case.limitedTaken": ["{n}", "{m}"], "case.ownedSec": ["{n}"], "case.lockedSec": ["{n}"] };
+        const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"], "case.serialMine.cue": ["{n}"], "case.serialMine.chalk": ["{n}"], "case.serialMine.glove": ["{n}"], "case.serialMine.pennant": ["{n}"], "case.serialNext": ["{no}"], "case.rowHolders": ["{n}"], "case.limitedLeft": ["{n}", "{m}"], "case.limitedTaken": ["{n}", "{m}"], "case.ownedSec": ["{n}"], "case.lockedSec": ["{n}"] };
         const page = read("client/src/pages/hiq/cue-case.tsx") + read("client/src/components/hiq/cueCase/CueCaseEntry.tsx") + read("client/src/components/hiq/cueCase/CrewCueRack.tsx");
         const used = [...new Set([...page.matchAll(/t\(["`](case\.[a-zA-Z.]+)["`]\)/g)].map((m) => m[1]))];
         expect(used.length).toBeGreaterThan(40);
@@ -287,6 +287,8 @@ describe("연결", () => {
             for (const k of used) expect(f, `${l} ${k}`).toContain(`"${k}":`);
             for (const g of ["real", "online", "common", "both", "crew", "stage2", "limited"]) expect(f, `${l} group ${g}`).toContain(`"case.group.${g}":`);
             for (const s of ["cue", "chalk", "glove", "medals"]) expect(f, `${l} sec ${s}`).toContain(`"case.sec.${s}":`);
+            // 주인 번호판은 종류마다 — 초크 상세에 '이 큐의 n번째 주인'이 나오던 것(2026-10-23)
+            for (const k of ["cue", "chalk", "glove", "pennant"]) for (const w of ["serialMine", "serialFirst"]) expect(f, `${l} ${w} ${k}`).toContain(`"case.${w}.${k}":`);
             for (const [k, ph] of Object.entries(need)) {
                 const v = (f.match(new RegExp(`"${k.replace(/\./g, "\\.")}": "([^"]+)"`)) ?? [])[1] ?? "";
                 for (const p of ph) expect(v, `${l} ${k} ${p}`).toContain(p);
