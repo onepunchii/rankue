@@ -48,6 +48,11 @@ export interface ViewFrame {
      * 공이 어디로 가든 보이게 하고(움직이는 공을 쫓으면 3쿠션마다 화면이 돈다), 조준으로 돌아오면 다시 큐볼 뒤로 내려온다.
      */
     readonly mode?: "follow" | "overview";
+    /**
+     * overview 의 내려다보는 각도(°, 수평 기준). 없으면 OVERVIEW_PITCH_DEG(78 — 선수 화면). 관전 · 다시보기는 낮춰서 원근을 살린다
+     * (2026-10-23 오너: "3D 버튼 누르면 그냥 3D 가 아니라 평면" — 다시보기는 샷이 쉬지 않고 이어져 거의 늘 부감이었다).
+     */
+    readonly pitch?: number;
 }
 
 export interface RenderFrame {

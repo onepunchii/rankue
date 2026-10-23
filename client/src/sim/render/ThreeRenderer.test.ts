@@ -15,7 +15,7 @@ import {
     CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, CUE_GAP, CUE_PULLBACK_MAX, cameraBasis, cueGap, cueRotationZ, dampRig, diamondWorld,
     integrateOrientation, makeBasis, makePose, makeRig, orthoFrustum, PLAYER_AHEAD, PLAYER_BACK, PLAYER_FAR, PLAYER_FOV_DEG, PLAYER_HEIGHT,
     PLAYER_MARGIN, PLAYER_MIN_Z, PLAYER_NEAR, PLAYER_SMOOTH_S, playerPose, projectOrtho, projectPerspective, snapRig, unprojectOrtho,
-    unprojectPerspective, overviewPose, OVERVIEW_EDGE, OVERVIEW_MARGIN_M, OVERVIEW_SMOOTH_S, rigSmoothTime, zoomedFovDeg, dampScalar,
+    unprojectPerspective, overviewPose, OVERVIEW_EDGE, OVERVIEW_MARGIN_M, OVERVIEW_PITCH_DEG, OVERVIEW_SMOOTH_S, rigSmoothTime, zoomedFovDeg, dampScalar,
     type CameraPose,
 } from "./threeMath";
 import { ZOOM_MAX, ZOOM_MIN } from "./Renderer";
@@ -993,6 +993,47 @@ describe("ThreeRenderer 재생 중 부감(view.mode = 'overview')", () => {
         t += 1000; setTime(t);
         r.draw({ balls });
         expect(r.getCameraPose(makePose())).toEqual(back);
+    });
+    it("핀치 배율을 저장해 둬도 부감은 테이블 전체 — 부감 동안만 배율 1, 조준으로 돌아오면 저장 배율(2026-10-23 다시보기 3D 제보)", () => {
+        for (const zoom of [ZOOM_MAX, ZOOM_MIN]) {
+            const { r, el, setTime } = make();
+            r.mount(el, T);
+            const balls = openingLayout("3c", T, "white");
+            const follow = { cueBallId: "white", phi: Math.PI / 2 };
+            r.draw({ balls, view: follow });
+            r.setView("player");
+            r.setZoom(zoom);
+            let t = 0;
+            for (let i = 0; i < 600; i++) { t += 1000 / 60; setTime(t); r.draw({ balls, view: { ...follow, mode: "overview" } }); }
+            expect(r.stats().zoom).toBe(1);
+            expect(r.needsFrame()).toBe(false);
+            for (const [x, y] of [[0, 0], [T.width, 0], [0, T.length], [T.width, T.length]] as const) {
+                const q = r.project(x, y);
+                expect(q[0], `zoom ${zoom}`).toBeGreaterThan(0);
+                expect(q[0], `zoom ${zoom}`).toBeLessThan(390);
+                expect(q[1], `zoom ${zoom}`).toBeGreaterThan(INSETS.top);
+                expect(q[1], `zoom ${zoom}`).toBeLessThan(844 - INSETS.bottom);
+            }
+            for (let i = 0; i < 600; i++) { t += 1000 / 60; setTime(t); r.draw({ balls, view: follow }); }
+            expect(r.stats().zoom).toBe(zoom);
+        }
+    });
+    it("view.pitch 로 부감 각도를 낮추면(관전 · 다시보기) 같은 중심을 더 비스듬히 본다 — 없으면 OVERVIEW_PITCH_DEG", () => {
+        const fly = (pitch?: number) => {
+            const { r, el, setTime } = make();
+            r.mount(el, T);
+            const balls = openingLayout("3c", T, "white");
+            r.draw({ balls, view: { cueBallId: "white", phi: Math.PI / 2 } });
+            r.setView("player");
+            let t = 0;
+            for (let i = 0; i < 600; i++) { t += 1000 / 60; setTime(t); r.draw({ balls, view: { cueBallId: "white", phi: Math.PI / 2, mode: "overview", pitch } }); }
+            return r.getCameraPose(makePose());
+        };
+        const deg = (p: CameraPose) => (Math.atan2(p.ez - p.tz, p.ty - p.ey) * 180) / Math.PI;
+        expect(deg(fly())).toBeCloseTo(OVERVIEW_PITCH_DEG, 6);
+        const low = fly(60);
+        expect(deg(low)).toBeCloseTo(60, 6);
+        expect(low.ty).toBeCloseTo(T.length / 2, 6);
     });
 });
 

@@ -38,6 +38,11 @@ import { matchParamsKey, nextPollMs, normalizeShots, planWatch, shouldSkipAnimat
 import { ShotStrip, type ShotStripState } from "./ShotStrip";
 
 const INSETS: SafeInsets = { top: 8, right: 8, bottom: 8, left: 8 };
+/**
+ * 3D 보기에서 공이 구르는 동안 내려다보는 각도(°). 선수 화면의 78°(거의 수직)를 그대로 쓰면, 샷이 쉬지 않고 이어지는 다시보기는
+ * 늘 위에서 본 평면처럼 보였다(2026-10-23 오너: "3D 버튼 누르면 그냥 3D 가 아니라 평면"). 낮출수록 원근이 살고 테이블은 작아진다.
+ */
+export const WATCH_OVERVIEW_PITCH_DEG = 60;
 // 느리게 보기(2026-09-30 오너: "샷 속도를 느리게 하는 옵션") — 0.25·0.5 배. 재생 중에 바꿔도 시계가 그 자리에서 이어진다(playback withSpeed)
 const SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 type Speed = typeof SPEEDS[number];
@@ -206,7 +211,7 @@ export default function WatchPage({ matchId, onExit }: { matchId: string; onExit
                 balls: ballsRef.current,
                 cue: opp ? { phi: opp.phi, pullback: OPP_AIM_PULLBACK, visible: true, ballId: liveCueRef.current } : undefined,
                 highlightBallId: aim.cueBallId,
-                view: { cueBallId: camBall, phi: opp ? opp.phi : aim.phi, mode: animRef.current ? "overview" : "follow" },
+                view: { cueBallId: camBall, phi: opp ? opp.phi : aim.phi, mode: animRef.current ? "overview" : "follow", pitch: WATCH_OVERVIEW_PITCH_DEG },
             });
         });
         // 재생 중에 화면이 가려지면 프레임이 멈춰 영영 안 끝난다 — 마지막 상태로 붙이고 끝낸 것으로 친다.

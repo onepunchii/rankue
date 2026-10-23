@@ -45,7 +45,7 @@ import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, t
 import { DEFAULT_PALETTE, parseColor, readPalette, rgba, scaleColor, type Palette, type RGBA } from "./tokens";
 import {
     CAMERA_FAR, CAMERA_NEAR, CAMERA_Z, copyPose, CUE_BUTT_W, CUE_FERRULE_L, CUE_LENGTH, CUE_TIP_L, CUE_TIP_W, cameraBasis, cueElevation, cueGap,
-    cueRotationZ, dampRig, diamondWorld, integrateOrientation, makeBasis, makePose, makeRig, MAX_DT, orthoFrustum, overviewPose, PLAYER_FAR,
+    cueRotationZ, dampRig, diamondWorld, integrateOrientation, makeBasis, makePose, makeRig, MAX_DT, orthoFrustum, OVERVIEW_PITCH_DEG, overviewPose, PLAYER_FAR,
     PLAYER_FOV_DEG, PLAYER_NEAR, playerPose, projectPerspective, rigSmoothTime, snapRig, unprojectPerspective, type CameraBasis,
     type CameraPose, type CameraRig, dampScalar, ZOOM_SMOOTH_S, zoomedFovDeg,
 } from "./threeMath";
@@ -255,9 +255,12 @@ export class ThreeRenderer implements Renderer {
     private readonly rigTarget: CameraPose = makePose();
     private readonly basis: CameraBasis = makeBasis();
     private cameraMoving = false;
-    /** 재생 중 부감 자세(테이블·aspect 별로 한 번 계산). overviewAspect 가 현재 aspect 와 다르면 다시 만든다. */
+    /** 재생 중 부감 자세(테이블·aspect·각도별로 한 번 계산). overviewAspect · overviewPitch 가 지금과 다르면 다시 만든다. */
     private readonly overview: CameraPose = makePose();
     private overviewAspect = -1;
+    private overviewPitch = -1;
+    /** 지금 프레임이 부감인가 — 부감 동안은 핀치 배율 대신 기본 시야각으로 그린다(zoomGoal). */
+    private overviewing = false;
     /** 핀치 축소: 현재 배율·목표·그로 정한 세로 시야각(°). project/unproject 와 GPU 가 같은 값을 쓴다. */
     private zoom = 1;
     private zoomTarget = 1;
@@ -588,7 +591,16 @@ export class ThreeRenderer implements Renderer {
     needsFrame(): boolean {
         // 손잡이 그림이 막 불러와졌으면 한 번 더 그린다(조준을 안 움직여도 그림이 감기게)
         if (this.cueSkinUrl !== null && this.cueSkinTex === null && cueSkinVersion() !== this.cueSkinSeen) return true;
-        return this.view === "player" && (this.cameraMoving || this.zoom !== this.zoomTarget);
+        return this.view === "player" && (this.cameraMoving || this.zoom !== this.zoomGoal());
+    }
+
+    /**
+     * 지금 따라갈 배율. 부감은 테이블 전체를 **기본 시야각(45°)** 으로 맞춘 자세라, 저장된 핀치 배율을 그대로 쓰면 어긋난다 —
+     * 2배로 확대해 둔 기기는 가운데 천만 크게, 축소해 둔 기기는 테이블이 멀리 조그맣게 보였다(2026-10-23 오너 제보, 다시보기 3D).
+     * 부감 동안만 1 로 갔다가 조준(follow)으로 돌아오면 저장된 배율로 돌아간다.
+     */
+    private zoomGoal(): number {
+        return this.overviewing ? 1 : this.zoomTarget;
     }
 
     /** 핀치 축소 목표(ZOOM_MIN..1). 다음 draw 부터 감쇠로 따라간다 — needsFrame 이 페이지 루프를 돌린다. */
@@ -612,10 +624,13 @@ export class ThreeRenderer implements Renderer {
     private retarget(frame: RenderFrame): boolean {
         const vf = frame.view;
         if (!vf || !this.table) return false;
+        this.overviewing = vf.mode === "overview";
         if (vf.mode === "overview") {
-            if (this.overviewAspect !== this.aspect) {
-                overviewPose(this.overview, this.table, this.aspect);
+            const pitch = vf.pitch ?? OVERVIEW_PITCH_DEG;
+            if (this.overviewAspect !== this.aspect || this.overviewPitch !== pitch) {
+                overviewPose(this.overview, this.table, this.aspect, PLAYER_FOV_DEG, pitch);
                 this.overviewAspect = this.aspect;
+                this.overviewPitch = pitch;
             }
             copyPose(this.rigTarget, this.overview);
             return true;
@@ -766,8 +781,9 @@ export class ThreeRenderer implements Renderer {
             this.retarget(frame);
             this.cameraMoving = dampRig(this.rig, this.rigTarget, rigSmoothTime(this.rig, this.rigTarget), dt);
             this.applyRig();
-            if (this.zoom !== this.zoomTarget) {
-                this.zoom = dampScalar(this.zoom, this.zoomTarget, ZOOM_SMOOTH_S, dt);
+            const goal = this.zoomGoal();
+            if (this.zoom !== goal) {
+                this.zoom = dampScalar(this.zoom, goal, ZOOM_SMOOTH_S, dt);
                 this.applyZoom();
             }
         }
