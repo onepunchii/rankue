@@ -29,7 +29,9 @@ export const SPORT_ACCENT: Record<PrimarySport, { color: string; tint: string; f
 };
 /** 등산 — 처음 묻는 창의 셋째 칸(2026-10-13 등산을 열면서). 흰 카드 위라 살구색을 한 단계 짙게 */
 const HIKING_ACCENT = { color: "#D9623C", tint: "#F28C6A1F", fg: "#ffffff" } as const;
-const accentOf = (s: StartSport) => (s === "HIKING" ? HIKING_ACCENT : SPORT_ACCENT[s]);
+/** 낚시 — 넷째 칸(2026-10-24). 낚시의 동틀 녘 호박색(#F4A963)을 흰 카드 위에서 읽히게 한 단계 짙게 */
+const FISHING_ACCENT = { color: "#C46A24", tint: "#F4A9632B", fg: "#ffffff" } as const;
+const accentOf = (s: StartSport) => (s === "HIKING" ? HIKING_ACCENT : s === "FISHING" ? FISHING_ACCENT : SPORT_ACCENT[s]);
 
 /** 당구 — 캐롬 공 세 개(흰·노랑·빨강) */
 function BilliardsArt({ size = 44 }: { size?: number }) {
@@ -72,7 +74,28 @@ function HikingArt({ size = 44 }: { size?: number }) {
     );
 }
 
-const ART: Record<StartSport, (p: { size?: number }) => JSX.Element> = { BILLIARDS: BilliardsArt, GOLF: GolfArt, HIKING: HikingArt };
+/** 낚시 — 새벽 바다 위의 찌와 뛰어오른 물고기 */
+function FishingArt({ size = 44 }: { size?: number }) {
+    return (
+        <svg viewBox="0 0 48 48" width={size} height={size} aria-hidden>
+            <circle cx="37" cy="11" r="4" fill="#F8DDB0" />
+            <path d="M6 5 Q24 3 31 27" fill="none" stroke="#3A3A3A" strokeWidth="1.3" strokeLinecap="round" />
+            <path d="M4 31 Q10 28 16 31 T28 31 T40 31 T44 30.5 V42 Q44 43 43 43 H5 Q4 43 4 42 Z" fill="#0F4A66" />
+            <path d="M8 36 Q12 34.5 16 36 M24 38 Q28 36.5 32 38" fill="none" stroke="#7FB8CC" strokeWidth="1.2" strokeLinecap="round" />
+            <circle cx="31" cy="28.5" r="2.8" fill="#E24B4A" />
+            <path d="M28.2 28.5 A2.8 2.8 0 0 1 33.8 28.5 Z" fill="#ffffff" />
+            <g transform="rotate(-28 15 20)">
+                <ellipse cx="15" cy="20" rx="6.5" ry="3.3" fill="#F4A963" />
+                <path d="M8.8 20 L4.6 16.8 L4.6 23.2 Z" fill="#E08A3C" />
+                <circle cx="18.6" cy="19.2" r="0.9" fill="#2A1606" />
+            </g>
+        </svg>
+    );
+}
+
+const ART: Record<StartSport, (p: { size?: number }) => JSX.Element> = { BILLIARDS: BilliardsArt, GOLF: GolfArt, HIKING: HikingArt, FISHING: FishingArt };
+/** 시작 단추의 글 */
+const START_KEY: Record<StartSport, string> = { BILLIARDS: "primarySport.startBilliards", GOLF: "primarySport.startGolf", HIKING: "primarySport.startHiking", FISHING: "primarySport.startFishing" };
 
 /** 주 종목 저장 — 서버(회원 정보)·지금 화면 종목·캐시를 한 번에 */
 export function useSavePrimarySport() {
@@ -86,16 +109,19 @@ export function useSavePrimarySport() {
     };
 }
 
-/** 팝업 안의 타일 — 늘 밝은 카드 위(리터럴 색). 등산을 쓸 수 있는 회원에게는 셋째 칸(등산)까지 */
-function SportTiles({ value, onChange, hiking }: { value: StartSport; onChange: (s: StartSport) => void; hiking?: boolean }) {
+/** 팝업 안의 타일 — 늘 밝은 카드 위(리터럴 색). 등산 · 낚시를 쓸 수 있는 회원에게는 그 칸까지(넷이면 두 줄) */
+function SportTiles({ value, onChange, hiking, fishing }: { value: StartSport; onChange: (s: StartSport) => void; hiking?: boolean; fishing?: boolean }) {
     const { t } = useT();
     const items: { id: StartSport; title: string; sub: string }[] = [
         { id: "BILLIARDS", title: t("primarySport.billiards"), sub: t("primarySport.billiardsSub") },
         { id: "GOLF", title: t("primarySport.golf"), sub: t("primarySport.golfSub") },
         ...(hiking ? [{ id: "HIKING" as const, title: t("primarySport.hiking"), sub: t("primarySport.hikingSub") }] : []),
+        ...(fishing ? [{ id: "FISHING" as const, title: t("primarySport.fishing"), sub: t("primarySport.fishingSub") }] : []),
     ];
+    // 셋이면 한 줄 세 칸, 둘 · 넷이면 두 칸씩(네 칸 한 줄은 360 폭 카드에서 글이 끊긴다)
+    const three = items.length === 3;
     return (
-        <div role="radiogroup" aria-label={t("primarySport.title")} className={cn("grid", hiking ? "grid-cols-3 gap-2" : "grid-cols-2 gap-2.5")} data-testid="primary-sport-tiles" data-count={items.length}>
+        <div role="radiogroup" aria-label={t("primarySport.title")} className={cn("grid", three ? "grid-cols-3 gap-2" : "grid-cols-2 gap-2.5")} data-testid="primary-sport-tiles" data-count={items.length}>
             {items.map(({ id, title, sub }) => {
                 const on = value === id;
                 const a = accentOf(id);
@@ -103,7 +129,7 @@ function SportTiles({ value, onChange, hiking }: { value: StartSport; onChange: 
                 return (
                     <button
                         key={id} type="button" role="radio" aria-checked={on} onClick={() => onChange(id)} data-testid={`primary-sport-tile-${id.toLowerCase()}`}
-                        className={cn("relative flex flex-col items-center text-center rounded-[20px] pt-5 pb-4 transition-all active:scale-[0.98]", hiking ? "px-1.5" : "px-3")}
+                        className={cn("relative flex flex-col items-center text-center rounded-[20px] transition-all active:scale-[0.98]", three ? "px-1.5 pt-5 pb-4" : items.length > 3 ? "px-3 pt-4 pb-3.5" : "px-3 pt-5 pb-4")}
                         style={{
                             border: `2px solid ${on ? a.color : "#EDEDEA"}`,
                             backgroundColor: on ? a.tint : "#FAFAF8",
@@ -163,13 +189,17 @@ export function PrimarySportGate() {
     const [location] = useLocation();
     const { toast } = useToast();
     const save = useSavePrimarySport();
-    const m = member as (typeof member & { primarySport?: string | null; suggestedSport?: string | null; golfAccess?: boolean; hikingAccess?: boolean }) | undefined;
+    const m = member as (typeof member & { primarySport?: string | null; suggestedSport?: string | null; golfAccess?: boolean; hikingAccess?: boolean; fishingAccess?: boolean }) | undefined;
     // 등산을 쓸 수 있는 회원에게는 셋째 칸(등산)을 같이 묻는다(2026-10-13 오너: "등산으로 와서 가입했을 때 로직의 문제는 없지?" —
     // 창에 당구 · 골프뿐이라 등산 화면에서 가입한 사람이 둘 중 하나를 골라야 했고, 다음에 열면 당구 홈으로 시작했다).
     const hiking = m?.hikingAccess === true;
+    // 낚시도 같은 규칙(2026-10-24 오너: "첫 진입때 카테고리 선택에 낚시 카드도") — 낚시를 쓸 수 있는 회원에게 넷째 칸
+    const fishing = m?.fishingAccess === true;
     // 미리 골라 두는 칸 — **등산 화면에서 묻게 됐으면 등산**(거기서 가입한 사람이다). 아니면 서버가 기록으로 추정한 값
     const { sport: here } = useSport();
-    const suggested: StartSport = hiking && (here === "HIKING" || /^\/hiking(\/|$|\?)/.test(location)) ? "HIKING" : m?.suggestedSport === "GOLF" ? "GOLF" : "BILLIARDS";
+    const suggested: StartSport = hiking && (here === "HIKING" || /^\/hiking(\/|$|\?)/.test(location)) ? "HIKING"
+        : fishing && (here === "FISHING" || /^\/fishing(\/|$|\?)/.test(location)) ? "FISHING"
+            : m?.suggestedSport === "GOLF" ? "GOLF" : "BILLIARDS";
     const [choice, setChoice] = useState<StartSport | null>(null);
     const [busy, setBusy] = useState(false);
     // "전에 전화번호로 쓰셨나요?"(AttachPhoneSheet)가 먼저다 — 이으면 계정이 바뀌어, 빈 새 계정에 주 종목을 물을 이유가 없다
@@ -204,16 +234,16 @@ export function PrimarySportGate() {
                 <h1 id="primary-sport-title" className="mt-2 text-center text-[21px] leading-snug font-bold text-[#141414] break-keep">{t("primarySport.title")}</h1>
                 <p className="mt-1.5 text-center text-[13px] leading-relaxed text-[#7A7A76] break-keep">{t("primarySport.desc")}</p>
                 <div className="mt-5">
-                    <SportTiles value={picked} onChange={setChoice} hiking={hiking} />
+                    <SportTiles value={picked} onChange={setChoice} hiking={hiking} fishing={fishing} />
                 </div>
                 <button
                     type="button" onClick={() => void start()} disabled={busy}
                     className="mt-5 w-full h-[52px] rounded-2xl text-[15.5px] font-bold transition-opacity disabled:opacity-60 active:scale-[0.99]"
                     style={{ backgroundColor: a.color, color: a.fg }}
                 >
-                    {t(picked === "HIKING" ? "primarySport.startHiking" : picked === "GOLF" ? "primarySport.startGolf" : "primarySport.startBilliards")}
+                    {t(START_KEY[picked])}
                 </button>
-                <p className="mt-3 text-center text-[11.5px] text-[#A0A09C] break-keep">{t(hiking ? "primarySport.noteThree" : "primarySport.note")}</p>
+                <p className="mt-3 text-center text-[11.5px] text-[#A0A09C] break-keep">{t(hiking || fishing ? "primarySport.noteThree" : "primarySport.note")}</p>
             </motion.div>
         </div>
     );

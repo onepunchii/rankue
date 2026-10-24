@@ -87,8 +87,8 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
     const { member } = useAuth();
     const primary = (member as { primarySport?: string | null } | undefined)?.primarySport;
     useEffect(() => {
-        // 등산으로 시작하기는 등산을 쓸 수 있는 회원만(허용이 풀린 회원은 당구 · 골프의 저장값 그대로)
-        if (primary !== "GOLF" && primary !== "BILLIARDS" && !(primary === "HIKING" && hikingOk)) return;
+        // 등산 · 낚시로 시작하기는 그 종목을 쓸 수 있는 회원만(허용이 풀린 회원은 당구 · 골프의 저장값 그대로)
+        if (primary !== "GOLF" && primary !== "BILLIARDS" && !(primary === "HIKING" && hikingOk) && !(primary === "FISHING" && fishingOk)) return;
         try {
             if (sessionStorage.getItem(BOOT_KEY)) return;
             sessionStorage.setItem(BOOT_KEY, "1");
@@ -97,7 +97,7 @@ export function SportProvider({ children }: { children: React.ReactNode }) {
             setSaved(primary);
             try { localStorage.setItem(STORAGE_KEY, primary); } catch { /* 저장소를 못 쓰는 환경 */ }
         }
-    }, [primary, hikingOk]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [primary, hikingOk, fishingOk]); // eslint-disable-line react-hooks/exhaustive-deps
 
     // 종목이 정해진 주소로 들어왔으면 그게 곧 선택이다 — 골프 선수 페이지에서 '홈'을 누르면 골프 홈으로 이어져야지,
     // 당구 홈으로 튀면 "골프 앱인 줄 알았는데" 가 된다. 반대(당구 전용 주소)도 같다.

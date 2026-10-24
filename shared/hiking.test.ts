@@ -245,7 +245,7 @@ describe("화면의 글 · 따로 선 세계", () => {
         const route = member.slice(member.indexOf('router.post("/me/primary-sport"'));
         expect(route.slice(0, 900)).toContain('if (sport === "HIKING") {');
         expect(route.slice(0, 900)).toContain("if (!hikingAllowed(me,");
-        expect(read("client/src/contexts/SportContext.tsx")).toContain('!(primary === "HIKING" && hikingOk)) return;');
+        expect(read("client/src/contexts/SportContext.tsx")).toContain('!(primary === "HIKING" && hikingOk) && !(primary === "FISHING" && fishingOk)) return;');
     });
 
     it("코스가 없는 명산 — 이웃 봉우리의 코스를 옮기지 않고 이어서 보여 준다", () => {
@@ -313,8 +313,9 @@ describe("화면의 글 · 따로 선 세계", () => {
         const gate = read("client/src/components/hiq/sport/PrimarySport.tsx");
         expect(gate).toContain("const hiking = m?.hikingAccess === true;");
         expect(gate).toContain('...(hiking ? [{ id: "HIKING" as const, title: t("primarySport.hiking"), sub: t("primarySport.hikingSub") }] : []),');
-        expect(gate).toContain('const suggested: StartSport = hiking && (here === "HIKING" || /^\\/hiking(\\/|$|\\?)/.test(location)) ? "HIKING" : m?.suggestedSport === "GOLF" ? "GOLF" : "BILLIARDS";');
-        expect(gate).toContain('{t(picked === "HIKING" ? "primarySport.startHiking" : picked === "GOLF" ? "primarySport.startGolf" : "primarySport.startBilliards")}');
+        expect(gate).toContain('const suggested: StartSport = hiking && (here === "HIKING" || /^\\/hiking(\\/|$|\\?)/.test(location)) ? "HIKING"');
+        expect(gate).toContain('HIKING: "primarySport.startHiking"');
+        expect(gate).toContain("{t(START_KEY[picked])}");
         // 고른 값은 서버가 확인하고 받는다(등산을 쓸 수 있는 회원만) · 다섯 언어에 글이 다 있다
         expect(read("server/routes/modules/member.ts")).toContain('const { isStartSport } = await import("../../../shared/primarySport.js");');
         for (const l of ["ko", "en", "tr", "vi", "es"]) { const dict = read(`client/src/lib/i18n/${l}.ts`); for (const k of ["primarySport.hikingSub", "primarySport.startHiking", "primarySport.noteThree"]) expect(dict, `${l}:${k}`).toContain(`"${k}":`); }

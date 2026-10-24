@@ -307,6 +307,7 @@ export const SPORT_CHIP: Record<string, { label: string; bg: string; fg: string 
     BILLIARDS: { label: "당구", bg: "#0062411F", fg: "#006241" },
     GOLF: { label: "골프", bg: "#FF6B0024", fg: "#C24E00" },
     HIKING: { label: "등산", bg: "#F28C6A33", fg: "#A34E2E" },
+    FISHING: { label: "낚시", bg: "#F4A96333", fg: "#9A5418" },
 };
 export function SportChip({ sport }: { sport?: string | null }) {
     const c = sport ? SPORT_CHIP[sport] : undefined;

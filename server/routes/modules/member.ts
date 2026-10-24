@@ -225,6 +225,12 @@ router.post("/me/primary-sport", requireAuth, asyncHandler(async (req: AuthReque
         const myProfile = me?.profileId ? await storage.getProfile(me.profileId) : null;
         if (!hikingAllowed(me, (myProfile as { role?: string | null } | null | undefined)?.role)) return sendError(res, 400, "err.member.badSport");
     }
+    // 낚시로 시작하기도 낚시를 쓸 수 있는 회원만(2026-10-24)
+    if (sport === "FISHING") {
+        const me = await storage.getMemberById(req.userId!);
+        const myProfile = me?.profileId ? await storage.getProfile(me.profileId) : null;
+        if (!fishingAllowed(me, (myProfile as { role?: string | null } | null | undefined)?.role)) return sendError(res, 400, "err.member.badSport");
+    }
     await storage.updateMember(req.userId!, { primarySport: sport });
     return sendSuccess(res, { primarySport: sport });
 }));

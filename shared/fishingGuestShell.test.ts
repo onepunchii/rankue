@@ -49,3 +49,31 @@ describe("방문자 첫 화면 · 회원 화면", () => {
         for (const p of ["/fishing/tank", "/fishing/log", "/fishing/book", "/fishing/trip", "/dashboard"]) expect(home, p).not.toContain(`"${p}"`);
     });
 });
+
+describe("첫 진입 종목 고르기 — 낚시 카드(2026-10-24 오너: \"첫 진입때 카테고리 선택에 낚시 카드도\")", () => {
+    const gate = src("components/hiq/sport/PrimarySport.tsx");
+    const setting = src("components/hiq/sport/PrimarySportSetting.tsx");
+    const root = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
+    it("낚시를 쓸 수 있는 회원에게 넷째 칸 · 낚시 화면에서 가입했으면 미리 골라진다 · 넷이면 두 칸씩", () => {
+        expect(gate).toContain("const fishing = m?.fishingAccess === true;");
+        expect(gate).toContain('...(fishing ? [{ id: "FISHING" as const, title: t("primarySport.fishing"), sub: t("primarySport.fishingSub") }] : []),');
+        expect(gate).toContain(': fishing && (here === "FISHING" || /^\\/fishing(\\/|$|\\?)/.test(location)) ? "FISHING"');
+        expect(gate).toContain('three ? "grid-cols-3 gap-2" : "grid-cols-2 gap-2.5"');
+        expect(gate).toContain('FISHING: "primarySport.startFishing"');
+    });
+    it("저장 — 시작 종목에 FISHING, 서버는 낚시를 쓸 수 있는 회원만 받는다, 세션 시작도 낚시로", () => {
+        expect(root("shared/primarySport.ts")).toContain('export type StartSport = PrimarySport | "HIKING" | "FISHING";');
+        const route = root("server/routes/modules/member.ts");
+        expect(route).toContain('if (sport === "FISHING") {');
+        expect(route).toContain("if (!fishingAllowed(me,");
+        expect(src("contexts/SportContext.tsx")).toContain('!(primary === "FISHING" && fishingOk)) return;');
+    });
+    it("설정 '주 종목' — 낚시를 쓸 수 있는 회원에게 낚시 줄", () => {
+        expect(setting).toContain('(["HIKING", "FISHING"] as const).filter((x) => (x === "HIKING" ? hiking : fishing))');
+        expect(src("pages/hiq/settings.tsx")).toContain('fishing={(member as any)?.fishingAccess === true}');
+        for (const l of ["ko", "en", "es", "vi", "tr"]) {
+            const dict = src(`lib/i18n/${l}.ts`);
+            for (const k of ["primarySport.fishing", "primarySport.fishingSub", "primarySport.startFishing", "primarySport.savedFishing"]) expect(dict, `${l} ${k}`).toContain(`"${k}":`);
+        }
+    });
+});
