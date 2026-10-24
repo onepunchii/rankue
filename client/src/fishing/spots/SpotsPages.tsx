@@ -10,8 +10,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
-import { SportBackHeader } from "@/components/hiq/SportHeader";
-import { HiqNavigation } from "@/components/hiq/HiqNavigation";
+import { FishingShell } from "../FishingShell";
 import { useSeo } from "@/hooks/useSeo";
 import { useAuth } from "@/hooks/useAuth";
 import { goLogin } from "@/components/hiq/LoginGate";
@@ -44,14 +43,9 @@ const VIEW = { x: 52, y: 20, w: 400, h: 620 };
 export const KIND_TONE: Readonly<Record<PlaceKindId, string>> = { reservoir: "#3F86A8", sea: "#0F4A66", flat: "#7FA36A", etc: "#C98A4B", valley: "#5E8F6F" };
 export const useSpots = () => useQuery<{ total: number; items: Lite[] }>({ queryKey: ["/api/hiq/fishing/spots"], staleTime: 10 * 60_000 });
 
+/** 공개 낚시 화면의 틀 — 낚시를 쓰는 회원은 하단 탭, 방문자는 '로그인' + 아래 가입 단추(FishingShell, 2026-10-24) */
 export function Shell({ title, children }: { title: string; children: React.ReactNode }) {
-    return (
-        <div className="min-h-[100dvh] pb-28" style={{ background: C.bg, color: C.foam }}>
-            <SportBackHeader sport="FISHING" title={title} fallback={FISHING_SPOTS_PATH} inner="mx-auto max-w-[720px]" />
-            <main className="mx-auto max-w-[720px]">{children}</main>
-            <HiqNavigation />
-        </div>
-    );
+    return <FishingShell title={title} backTo={FISHING_SPOTS_PATH}>{children}</FishingShell>;
 }
 
 /** 종이 지도 위의 점 — 낚시터마다 종류 색. 'here' 가 있으면 그 한 곳만 크게(나머지는 옅게).

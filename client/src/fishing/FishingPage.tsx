@@ -14,7 +14,8 @@
  * ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지. 한국어만.
  */
 import { CoachTour } from "@/components/hiq/CoachTour";
-import { goLogin } from "@/components/hiq/LoginGate";
+import { FishingShell } from "./FishingShell";
+import { FishingGuestHome } from "./spots/GuestHome";
 import { FISHING_PLACE_COUNT, FISHING_SPOTS_PATH, fishingSpotPath, placeFeeText } from "@shared/fishingPlaces";
 import { FISHING_FISH_PATH } from "@shared/fishingFishPages";
 import { FISHING_SEA_PATH } from "@shared/fishingSeaPages";
@@ -209,16 +210,22 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
     });
 
     if (!meLoading && !allowed) {
-        // 방문자(2026-10-18 전면 공개) — 낚시 기록은 회원의 것: 가입 · 로그인, 아니면 누구나 보는 '전국 낚시터'로
-        if (!me) return (
-            <div className="flex min-h-screen flex-col items-center justify-center gap-3 px-8 text-center" style={{ background: C.bg, color: C.foam }} data-testid="fishing-guest">
-                <img src={FS_HERO} alt="" width={880} height={880} className="h-40 w-40 rounded-3xl object-cover" draggable={false} />
-                <p className="mt-2 text-[17px] font-semibold">조과 기록 · 어탁 · 수족관은 가입하면 써요</p>
-                <p className="text-[13.5px] [word-break:keep-all]" style={{ color: C.soft }}>전국 낚시터 {FISHING_PLACE_COUNT.toLocaleString("ko-KR")}곳은 가입 없이 지금 바로 볼 수 있어요.</p>
-                <button type="button" onClick={() => goLogin(setLocation, TAB_PATH[tab] === "/dashboard" ? "/fishing" : TAB_PATH[tab])} className="mt-2 h-12 w-full max-w-[300px] rounded-2xl text-[15px] font-semibold" style={{ background: C.brand, color: C.onBrand }}>가입 · 로그인</button>
-                <button type="button" onClick={() => setLocation(FISHING_SPOTS_PATH)} className="h-12 w-full max-w-[300px] rounded-2xl text-[15px] font-semibold" style={{ background: "#FFFFFF14" }}>전국 낚시터 보기</button>
-            </div>
-        );
+        // 방문자(2026-10-18 전면 공개 · 2026-10-24 오너 "골프 · 등산처럼") — 첫 화면은 누구나 보는 공개 낚시 홈(오늘 바다 · 전국 낚시터 · 입구 · 예시),
+        // 회원 화면(수족관 · 일지 · 어탁첩 …)은 같은 틀(머리줄 '로그인' · 아래 가입 단추) 안의 안내. 예전엔 머리줄도 뒤로 가기도 없는 벽이었다.
+        if (!me) {
+            if (tab === "home") return <FishingGuestHome />;
+            return (
+                <FishingShell title={TAB_TITLE[tab]} backTo="/fishing">
+                    <div className="flex flex-col items-center gap-3 px-8 pt-14 text-center" data-testid="fishing-guest">
+                        <img src={FS_HERO} alt="" width={880} height={880} className="h-36 w-36 rounded-3xl object-cover" draggable={false} />
+                        <p className="mt-2 text-[17px] font-semibold [word-break:keep-all]">조과 기록 · 어탁 · 수족관은 가입하면 써요</p>
+                        <p className="text-[13.5px] [word-break:keep-all]" style={{ color: C.soft }}>전국 낚시터 {FISHING_PLACE_COUNT.toLocaleString("ko-KR")}곳과 오늘 바다는 가입 없이 지금 바로 볼 수 있어요.</p>
+                        <button type="button" onClick={() => setLocation("/fishing")} className="mt-2 h-12 w-full max-w-[300px] rounded-2xl text-[15px] font-semibold" style={{ background: "#FFFFFF14" }}>낚시 둘러보기</button>
+                        <button type="button" onClick={() => setLocation(FISHING_SPOTS_PATH)} className="h-12 w-full max-w-[300px] rounded-2xl text-[15px] font-semibold" style={{ background: "#FFFFFF14" }}>전국 낚시터 보기</button>
+                    </div>
+                </FishingShell>
+            );
+        }
         return (
             <div className="flex min-h-screen flex-col items-center justify-center gap-4 px-8 text-center" style={{ background: C.bg, color: C.foam }}>
                 <p className="text-[15px]">낚시는 아직 준비 중이에요.</p>
