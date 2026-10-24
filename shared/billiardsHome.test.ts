@@ -90,6 +90,10 @@ describe("당구 홈", () => {
         // 아래 줄은 할 말이 있을 때만(비로그인 · 빈 목록 · 넘친 방)
         expect(jsx).toContain("{(gate.isGuest || (shown.length === 0 && !myRoom) || list.length > MAX_ROWS) && (");
     });
+    it("① 내 실력은 늘 3쿠션으로 열린다 — 많이 친 종목(preferred)을 따라 4구로 열리지 않게(오너 '3쿠션이 기본' 10/24)", () => {
+        expect(skill).toContain('const [cur, setTab] = useState<"3c" | "4c">("3c");');
+        expect(skill).not.toMatch(/\.preferred\b/);
+    });
     it("문구는 다섯 언어", () => {
         const keys = ["home.skillTitle", "home.skillReal", "home.skillOnline", "home.skillNote", "home.boardTitle", "home.boardStart", "home.caseTitle", "home.caseCounts", "home.caseTier", "tour.bh.caseTitle", "tour.bh.caseBody", "home.skillProReal", "home.skillProOnline", "home.proNeedReal", "home.proNeedOnline", "home.proSoon", "home.proLadder"];
         for (const l of ["ko", "en", "es", "vi", "tr"]) {

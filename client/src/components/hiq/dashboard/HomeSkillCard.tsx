@@ -14,7 +14,7 @@
  * 비로그인은 실전 칸만 예시(shared/guestSample — "예시" 표시). 예시의 닮은 프로는 예시 인물의 에버로 공개 API(/compare/avg)를 그때 부른다
  * (예시 자료에는 실제 선수를 넣지 않는다 — RealHandicapCard 와 같은 규칙 · 같은 캐시). 온라인 칸은 예시 숫자를 만들지 않고 시작을 권한다.
  */
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { useAuth } from "@/hooks/useAuth";
@@ -65,10 +65,9 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
     const data = sample ? sample.real : real.data;
     const me = sample ? sample.member : member;
     const games: HistoryRow[] = (sample ? sample.history : history) ?? [];
-    const [tab, setTab] = useState<"3c" | "4c" | null>(null);
-    useEffect(() => { if (data && tab === null) setTab(data.preferred); }, [data, tab]);
+    // 처음엔 늘 3쿠션(2026-10-24 오너 "3쿠션이 기본") — 예전엔 서버의 preferred(많이 친 종목)를 따라 4구로 열리기도 했다
+    const [cur, setTab] = useState<"3c" | "4c">("3c");
     if (!me) return null;
-    const cur: "3c" | "4c" = tab ?? data?.preferred ?? "3c";
 
     // ── 실전 칸
     const side = data?.[cur];
