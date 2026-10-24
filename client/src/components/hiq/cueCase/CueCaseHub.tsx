@@ -5,6 +5,8 @@
  * 가운데: 온라인 등급(지금 등급 · 다음 등급까지 막대 / 배치 중 / 처음이면 시작 권유) → 누르면 랭킹(통산) 또는 멀티방.
  * 아래: 케이스 칸 셋 — 랭킹 · 월대회 · 대시보드. 칸의 한 줄은 OnlineHubBanner 와 같은 규칙(같은 사전 키).
  * 비로그인: 대표 큐 자리는 흐린 큐, 등급은 시작 권유, 회원 화면(랭킹 · 대시보드 · 멀티방)은 가입 안내로 잇는다. 예시 숫자를 만들지 않는다.
+ * 예전 두 장이 하던 것도 잇는다: 이 기기에서 못 본 것(큐 케이스에 새로 들어온 것 · 달 마감으로 받은 메달)이 있으면 '새로',
+ * 회원에게는 아래에 친구 초대 한 줄(큐 케이스 띠에 있던 것 — 오너 "바이럴에 중요").
  */
 import type { CSSProperties, ReactNode } from "react";
 import { useLocation } from "wouter";
@@ -18,13 +20,16 @@ import { RANK_TROPHY_SRC, TIER_GLOW, TierEmblem } from "@/sim/rank/TierEmblem";
 import { CUP_ICON_SRC } from "@/sim/cup/CupArt";
 import { CUP_PATH, timeLeft } from "@/sim/cup/cupApi";
 import { useGuestGate } from "@/components/hiq/GuestGate";
-import { cueCasePath, useCaseSummary } from "./cueCaseApi";
+import { BadgeTap } from "@/components/hiq/BadgeGuideSheet";
+import { cueCasePath, readCaseSeen, useCaseSummary } from "./cueCaseApi";
+import { isShelfNew, readShelfSeen } from "@/sim/rank/shelfApi";
 
 const RANK_URL = "/online-game?rank=1";
 const DASH_URL = "/online-game?dash=1";
 const ROOMS_URL = "/online-game?rooms=1";
 const DASH_ICON = "/sim/rank/icon-stats.webp";
 const GHOST = caseItem("cue-najeon-crane") ?? CUES[0];
+const INVITE_FACE = caseItem("chalk-invite") ?? CUES[0];
 const GOLD = "#e8c46a", INK = "#f4ead6";
 const LEATHER: CSSProperties = { background: "radial-gradient(140% 120% at 22% 0%,#62301f 0%,#3d1b12 48%,#23100a 100%)", boxShadow: "0 14px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,220,180,.12)" };
 const VELVET: CSSProperties = { background: "radial-gradient(70% 120% at 50% 0%,rgba(255,236,190,.2),rgba(255,236,190,0) 60%),linear-gradient(180deg,#060b14,#0f1b30)", boxShadow: "inset 0 4px 10px rgba(0,0,0,.8), inset 0 0 0 1.5px rgba(232,196,106,.55)" };
@@ -51,7 +56,8 @@ export function CueCaseHub() {
     const [, setLocation] = useLocation();
     const gate = useGuestGate("dark");
     const sum = useCaseSummary(!!member).data;
-    const { boards, placement, ready, cup } = useOnlineRecord();
+    const { boards, placement, ready, cup, shelf } = useOnlineRecord();
+    const fresh = !!member && ((!!sum?.latest && sum.latest > readCaseSeen()) || isShelfNew(shelf?.latest, readShelfSeen()));
     const hero = sum?.hero ? caseItem(sum.hero) : null;
     const loading = !!member && !ready;
     const s: HubState = member ? hubStateOf(boards, placement) : { kind: "fresh", canSwap: false };
@@ -81,7 +87,7 @@ export function CueCaseHub() {
         const glow = TIER_GLOW[s.tier.id];
         tier = (
             <>
-                <TierEmblem tier={s.tier.id} size={54} glow />
+                <BadgeTap guide={{ kind: "online", tier: s.tier.id, rating: s.rating }}><TierEmblem tier={s.tier.id} size={54} glow /></BadgeTap>
                 <span className="min-w-0 flex-1">
                     <span className="block text-[11px] font-bold tracking-wide" style={{ color: `${GOLD}cc` }}>{t("home.caseTier")}{game ? ` · ${t(game === "3c" ? "real.tab3c" : "real.tab4c")}` : ""}</span>
                     <span className="block text-[15px] font-black truncate" style={{ color: glow }}>{t(s.tier.nameKey)} <span className="rk-num text-[12px] font-semibold" style={{ color: `${INK}99` }}>{s.rating.toLocaleString()}</span></span>
@@ -95,7 +101,7 @@ export function CueCaseHub() {
     } else {
         tier = (
             <>
-                <TierEmblem tier="iron" size={54} locked />
+                <BadgeTap guide={{ kind: "online", tier: null }}><TierEmblem tier="iron" size={54} locked /></BadgeTap>
                 <span className="min-w-0 flex-1">
                     <span className="block text-[11px] font-bold tracking-wide" style={{ color: `${GOLD}cc` }}>{t("home.caseTier")}</span>
                     <span className="block text-[14px] font-black leading-snug break-keep" style={{ color: INK }}>
@@ -108,6 +114,7 @@ export function CueCaseHub() {
     }
 
     return (
+        <>
         <section className="relative rounded-[26px] px-4 pb-4 pt-5" style={LEATHER} aria-label={t("home.caseTitle")} data-testid="home-case-hub">
             <i className="pointer-events-none absolute inset-[9px] rounded-[20px]" style={{ border: "1.5px dashed rgba(232,196,106,.42)" }} aria-hidden="true" />
             {/* 케이스 — 누르면 큐 케이스 */}
@@ -117,7 +124,9 @@ export function CueCaseHub() {
                         <img src="/billiards/case/mascot-foil.webp" alt="" aria-hidden="true" decoding="async" draggable={false} className="absolute inset-[4px] h-[calc(100%-8px)] w-[calc(100%-8px)] rounded-full" />
                     </span>
                     <span className="rounded-md px-5 py-1 text-[14px] font-bold truncate" style={PLATE}>{t("home.caseTitle")}</span>
-                    <span className="w-11 text-right text-[12px] font-bold" style={{ color: GOLD }}>{t("home.caseOpen")} ›</span>
+                    {fresh
+                        ? <span className="rounded-full bg-[#e8c46a] px-1.5 py-[1px] text-[11.5px] font-bold text-[#2d1a08]" data-testid="home-case-new">{t("case.new")}</span>
+                        : <span className="w-11 text-right text-[12px] font-bold" style={{ color: GOLD }}>{t("home.caseOpen")} ›</span>}
                 </span>
                 <span className="relative mt-3.5 block h-[52px] overflow-hidden rounded-[26px]" style={VELVET}>
                     <img src={caseImage(hero ?? GHOST)} alt="" decoding="async" draggable={false} className={cn("absolute left-3 right-3 top-1/2 w-[calc(100%-24px)] -translate-y-1/2", !hero && "opacity-30 grayscale")}
@@ -138,5 +147,19 @@ export function CueCaseHub() {
                 <Compartment icon={DASH_ICON} title={t("home.hubDash")} sub={loading ? " " : dashSub} onClick={() => go(DASH_URL)} trackAs="홈 큐 케이스 대시보드" testId="home-case-dash" />
             </div>
         </section>
+        {/* 친구 초대(2026-10-16 오너: "바이럴에 중요") — 회원에게만, 큐 케이스의 초대 칸으로 바로(예전 큐 케이스 띠의 것 그대로) */}
+        {member && (
+            <button type="button" onClick={() => setLocation("/cue-case?invite=1")} data-testid="cue-case-entry-invite" data-track-as="홈 친구 초대"
+                className="mt-2 flex w-full items-center gap-3 overflow-hidden rounded-[18px] px-3.5 py-2.5 text-left active:opacity-90"
+                style={{ background: "linear-gradient(100deg, #FF4FA3, #FF2E8A)", boxShadow: "inset 0 0 0 1.5px #1A0B1433" }}>
+                <img src={caseImage(INVITE_FACE)} alt="" aria-hidden="true" decoding="async" draggable={false} className="h-10 w-10 shrink-0 -rotate-6 object-contain" />
+                <span className="min-w-0 flex-1">
+                    <span className="block truncate text-[14.5px] font-bold text-white">{t("inv.homeNudge")}</span>
+                    <span className="block truncate text-[12px] font-semibold text-[#1A0B14]/75">{t("inv.homeNudgeSub")}</span>
+                </span>
+                <span className="shrink-0 text-[18px] font-bold text-white/85" aria-hidden>›</span>
+            </button>
+        )}
+        </>
     );
 }

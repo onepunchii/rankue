@@ -12,20 +12,16 @@ const FishingHome = lazy(() => import("@/fishing/FishingPage"));
 
 // New Components
 import { DashboardHeader } from "@/components/hiq/dashboard/DashboardHeader";
-import { RealHandicapCard } from "@/components/hiq/dashboard/RealHandicapCard";
 import { RankingListCard } from "@/components/hiq/dashboard/RankingListCard";
 import { WorldRankingCard } from "@/components/hiq/umb/WorldRankingCard";
 import { PbaRankingCard, PBA_CARD_L } from "@/components/hiq/pba/PbaRankingCard";
 import { OngoingGameBanner } from "@/components/hiq/dashboard/OngoingGameBanner";
 import { SimMatchBanner } from "@/components/hiq/dashboard/SimMatchBanner";
-import { HomeSectionHeader, ScoreboardActions, ExploreActions } from "@/components/hiq/dashboard/QuickActions";
-import { OnlineHubBanner } from "@/components/hiq/dashboard/OnlineHubBanner";
-import { CueCaseEntry } from "@/components/hiq/cueCase/CueCaseEntry";
+import { HomeSectionHeader, ExploreActions } from "@/components/hiq/dashboard/QuickActions";
 import { CueCaseHub } from "@/components/hiq/cueCase/CueCaseHub";
 import { HomeSkillCard } from "@/components/hiq/dashboard/HomeSkillCard";
 import { ScoreboardHero } from "@/components/hiq/dashboard/ScoreboardHero";
 import { OnlineGameCard } from "@/components/hiq/dashboard/OnlineGameCard";
-import { LookalikeProCard } from "@/components/hiq/dashboard/LookalikeProCard";
 import { useStoreDots } from "@/components/hiq/stores/StoreTableMap";
 import { HomeGuideDialog, type HomeGuideTopic } from "@/components/hiq/dashboard/HomeGuideDialog";
 import { useRankPreview } from "@/components/hiq/dashboard/RankPreview";
@@ -215,12 +211,11 @@ function HiqDashboardBilliards() {
         ? (sample.rankings[rankingTab].map((r) => ({ ...r, name: t(r.nameKey) })) as unknown as HiqMember[])
         : null;
 
-    // 홈 시안 B(2026-10-24 오너 "화면이 복잡한가 · 시안 부탁해" → 카드 시안 셋 "좋네 진행") — ?home=b 로만, 기본 홈은 그대로.
-    // 방문 기록(14일): 회원이 홈 다음에 가장 많이 가는 곳은 온라인게임(20명)인데 그 입구가 화면 두세 장 아래였다.
-    // B: ① 내 실력(실전 + 온라인 한 카드, 두 시작 단추) → ③ 큐 케이스 허브(대표 큐 · 온라인 등급 · 랭킹 · 월대회 · 대시보드)
-    //    → 당구 게임(혼자 · 같이 치기) → ② 실전 점수판(실제 점수판 모양) → 둘러보기 · 랭킹.
-    // 내 실전 기록 · 온라인 실력 · 온라인 배너 · 큐 케이스 띠 · 노란 점수판 카드를 대신한다. 오너가 휴대폰으로 보고 정하면 기본으로 옮긴다.
-    const homeB = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search).get("home") === "b";
+    // 당구 홈(2026-10-24 오너: "화면이 복잡한가" → 시안 B · 카드 셋 "좋네 진행" → "B 로 기본"). 방문 기록(14일, 운영진 제외 72명):
+    // 홈 다음 1위 행선지가 온라인게임(20명)인데 입구가 화면 2.1장 아래였고, 홈에서 가장 많이 누른 것은 안내 닫기였다.
+    // ① 내 실력(실전 + 온라인 한 카드, 두 시작 단추) → ③ 큐 케이스 허브(대표 큐 · 온라인 등급 · 랭킹 · 월대회 · 대시보드)
+    // → 당구 게임(혼자 · 같이 치기) → ② 실전 점수판(실제 점수판 모양) → 둘러보기 · 랭킹.
+    // 예전의 내 실전 기록(RealHandicapCard — 기록 화면엔 남는다) · 내 온라인 실력 · 온라인 대전 배너 · 큐 케이스 띠 · 노란 점수판 카드를 대신한다.
 
     return (
         <div className="min-h-screen bg-surface-0 px-5 pb-nav">
@@ -240,77 +235,31 @@ function HiqDashboardBilliards() {
                 예전 넛지는 설정으로 보냈고 '매칭 정확도'라고 적었지만 매칭엔 쓰지 않는다 — 이제 그 자리에서 창이 열리고, 실제로 쓰는 곳만 적는다 */}
             {member && <ProfileNudge sport="BILLIARDS" className="mb-4" />}
 
-            {!homeB ? (
-            <>
-            {/* 내 실전 기록 — 맨 위(2026-10-04 오너: "3쿠션·4구 RP 카드와 전적 카드는 중복 — 실전 핸디 카드에 통합해 맨 위로").
-                머리 아래 기록 띠(랭킹 점수·전적·최근 5경기) + 닮은 프로·비교표. 공식 경기가 없으면 첫 경기 안내. */}
-            {/* 당구 홈의 첫 안내(2026-10-15) — 내 기록 · 점수판 · 당구 게임. 불러오기가 끝난 뒤에만 그려지는 자리라 when 이 필요 없다 */}
+            {/* 당구 홈의 첫 안내(2026-10-15 → 2026-10-24 새 홈에 맞춰 셋) — 내 실력 · 큐 케이스 · 실전 점수판. 다른 창이 떠 있으면 기다린다(CoachTour) */}
             <CoachTour id="billiards-home" tone="billiards" steps={[
                 { target: "bh-record", title: t("tour.bh.recordTitle"), body: t("tour.bh.recordBody") },
+                { target: "bh-case", title: t("tour.bh.caseTitle"), body: t("tour.bh.caseBody") },
                 { target: "bh-board", title: t("tour.bh.boardTitle"), body: t("tour.bh.boardBody") },
-                { target: "bh-game", title: t("tour.bh.gameTitle"), body: t("tour.bh.gameBody") },
             ]} />
+            {/* ① 내 실력 — 실전(당구장) | 온라인(폰 당구대), 닮은 프로 · 한 표 · 두 시작 단추 */}
             <div data-tour="bh-record">
-            <RealHandicapCard
-                onStartMatch={() => handleStartGameClick("match")}
-                onOpenRpGuide={() => toggleModal('rpGuide', true)}
-                getPercentile={getPercentile}
-                history={history as any}
-                onPreview={() => setGuide("scoreboard")}
-                sample={sample}
-            />
+                <HomeSkillCard onStartMatch={() => handleStartGameClick("match")} history={history as any} sample={sample}
+                    getPercentile={getPercentile} onOpenRpGuide={() => toggleModal('rpGuide', true)} />
             </div>
             {/* 예시 카드 바로 아래 가입 안내 한 줄 — 비로그인에게만. 가입하면 지금 보던 홈으로 돌아온다 */}
-            {sample && (
-                <GuestJoinCta
-                    className="mt-3"
-                    title={t("guestHome.recordCtaTitle")}
-                    desc={t("guestHome.recordCtaDesc")}
-                />
-            )}
-            {/* 큐 케이스(2026-10-16) — 실전 · 온라인에서 모은 큐 · 초크 · 장갑. 내 기록 바로 아래가 자리다(기록이 쌓이면 여기에 들어온다) */}
-            <CueCaseEntry />
-
-            {/* 홈 구역(2026-10-04 오너: "빠른 실행보다 각 섹션별로 — 점수판 / 당구 게임 / 기타").
-                점수판 구역은 입구 셋(점수판·혼자 연습·PIN으로 합류)만 — 기록은 위 카드로 모였다. */}
-            <section className="mt-10 mb-10" data-tour="bh-board">
-                <HomeSectionHeader title={t("home.secScoreboard")} desc={t("home.secScoreboardDesc")} onGuide={() => setGuide("scoreboard")} />
-                <ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={handleJoinGameClick} sample={sample} />
-            </section>
-
-            {/* 당구 게임(예전 이름 온라인게임) — 온라인 대전 배너(내 등급 · 랭킹 · 대시보드) · 혼자 치기 · 같이 치기 · 내 온라인 실력(닮은 프로 + 내 다마수).
-                홈이 온라인게임의 입구다(2026-10-04) — 게임·멀티방·랭킹을 닫으면 ?sec=game 으로 이 구역에 돌아온다.
-                배너는 2026-10-12 오너: "혼자 치기 카드 위에 배너 카드를 만들어서 … 대시보드 랭킹 들어가게". */}
-            <section id="home-game" className="mb-10 scroll-mt-4" data-tour="bh-game">
+            {sample && <GuestJoinCta className="mt-3" title={t("guestHome.recordCtaTitle")} desc={t("guestHome.recordCtaDesc")} />}
+            {/* ③ 큐 케이스 허브 — 오너 "큐 케이스가 더 중요 · 그 안에 등급 · 랭킹 · 월대회 · 대시보드" */}
+            <div className="mt-4" data-tour="bh-case"><CueCaseHub /></div>
+            {/* 당구 게임 — 혼자 치기 · 같이 치기. 홈이 온라인게임의 입구다(2026-10-04) — 게임 · 멀티방 · 랭킹을 닫으면 ?sec=game 으로 이 구역에 돌아온다 */}
+            <section id="home-game" className="mt-10 mb-10 scroll-mt-4" data-tour="bh-game">
                 <HomeSectionHeader title={t("home.secOnline")} desc={t("home.secOnlineDesc")} onGuide={() => setGuide("online")} />
-                <div className="space-y-3">
-                    <OnlineHubBanner />
-                    <OnlineGameCard />
-                    <LookalikeProCard />
-                </div>
+                <OnlineGameCard />
             </section>
-            </>
-            ) : (
-                <>
-                    {/* 시안 B — ① 내 실력 */}
-                    <div data-tour="bh-record">
-                        <HomeSkillCard onStartMatch={() => handleStartGameClick("match")} history={history as any} sample={sample} />
-                    </div>
-                    {sample && <GuestJoinCta className="mt-3" title={t("guestHome.recordCtaTitle")} desc={t("guestHome.recordCtaDesc")} />}
-                    {/* ③ 큐 케이스 허브 — 온라인 등급 · 랭킹 · 월대회 · 대시보드가 케이스 안에 */}
-                    <div className="mt-4"><CueCaseHub /></div>
-                    {/* 당구 게임 — 혼자 치기 · 같이 치기 */}
-                    <section id="home-game" className="mt-10 mb-10 scroll-mt-4" data-tour="bh-game">
-                        <HomeSectionHeader title={t("home.secOnline")} desc={t("home.secOnlineDesc")} onGuide={() => setGuide("online")} />
-                        <OnlineGameCard />
-                    </section>
-                    {/* ② 실전 점수판 — 실제 점수판 모양 */}
-                    <section className="mb-10" data-tour="bh-board">
-                        <HomeSectionHeader title={t("home.boardTitle")} desc={t("home.boardDesc")} onGuide={() => setGuide("scoreboard")} />
-                        <ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} />
-                    </section>
-                </>
-            )}
+            {/* ② 실전 점수판 — 실제 점수판 모양(오너 "아 이게 실전 점수판이구나"). 입구는 위의 두 함수(비로그인은 거기서 가입 안내) */}
+            <section className="mb-10" data-tour="bh-board">
+                <HomeSectionHeader title={t("home.boardTitle")} desc={t("home.boardDesc")} onGuide={() => setGuide("scoreboard")} />
+                <ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} />
+            </section>
 
             {/* 둘러보기 — 매장 찾기·커뮤니티 */}
             <section className="mb-10">

@@ -86,7 +86,7 @@ describe("친구 초대 — 다듬기(2026-10-16 저녁)", () => {
         expect(panel).toContain('data-testid="cue-case-picked-serial">{serialText(serial)}');
         expect(panel).toContain("function PickedCelebration(");
         expect(read("client/src/index.css")).toContain(".cc-picked-rays, .cc-confetti, .cc-picked-cue { animation: none; }");
-        expect(read("client/src/components/hiq/cueCase/CueCaseEntry.tsx")).toContain('onClick={() => setLocation("/cue-case?invite=1")}');
+        expect(read("client/src/components/hiq/cueCase/CueCaseHub.tsx")).toContain('onClick={() => setLocation("/cue-case?invite=1")}');
         const page = read("client/src/pages/hiq/cue-case.tsx");
         expect(page).toContain('<CoachTour id="cue-case-invite"');
         expect(page).toContain('if (!seen) localStorage.setItem("rankue_tour_cue-case-invite", "1");');

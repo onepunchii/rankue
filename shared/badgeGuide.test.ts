@@ -74,11 +74,13 @@ describe("화면: 배지를 누르면 안내가 뜬다", () => {
         expect(sheet).toContain("{member && (");
     });
 
-    it("누를 수 있는 배지: 홈의 실전 메달 둘(내 실전 기록 · 점수판 카드) · 온라인 등급 방패(배너) · 온라인 다마 배지", () => {
+    it("누를 수 있는 배지: 홈 내 실력의 실전 메달 · 온라인 등급 방패 · 온라인 다마, 큐 케이스 허브의 등급 방패, 기록 화면의 실전 메달", () => {
+        const skill = client("components/hiq/dashboard/HomeSkillCard.tsx");
+        expect(skill).toContain('<BadgeTap guide={{ kind: "real", game: cur, handi: ready ? side!.handi : null }}>');
+        expect(skill).toContain('<BadgeTap guide={s.kind === "ranked" ? { kind: "online", tier: s.tier.id, rating: s.rating } : { kind: "online", tier: null }}>');
+        expect(skill).toContain('<BadgeTap guide={{ kind: "online", dama: onlineDama }}>');
+        expect(client("components/hiq/cueCase/CueCaseHub.tsx")).toContain('<BadgeTap guide={{ kind: "online", tier: s.tier.id, rating: s.rating }}>');
         expect(client("components/hiq/dashboard/RealHandicapCard.tsx")).toContain('<BadgeTap guide={{ kind: "real", game: cur, handi: sideReady ? side.handi : null }}>');
-        expect(client("components/hiq/dashboard/QuickActions.tsx")).toContain('<BadgeTap guide={{ kind: "real", game: type, handi: ready ? s!.handi : null }}>');
-        expect(client("components/hiq/dashboard/OnlineHubBanner.tsx")).toContain('<BadgeTap guide={{ kind: "online", tier: s.tier.id, rating: s.rating }} className="hall-emblem -ml-1.5">');
-        expect(client("components/hiq/dashboard/LookalikeProCard.tsx")).toContain('<BadgeTap guide={{ kind: "online", dama: handi?.target ?? null }}>');
     });
 
     it("배지가 다른 단추 안에 있어도 된다 — span 으로 그리고 눌림이 바깥으로 번지지 않게 막는다", () => {

@@ -34,14 +34,13 @@ describe("목록", () => {
         }
         expect(total).toBeLessThan(2 * 1024 * 1024);
     });
-    it("큐 케이스 그림(아이콘) — 들어가는 길 셋(홈 배너 칸 · 랭킹/대시보드 줄 · 큐 케이스 머리)이 같은 그림, 가볍다", () => {
+    it("큐 케이스 그림(아이콘) — 랭킹/대시보드 줄 · 큐 케이스 머리가 같은 그림, 가볍다(홈은 2026-10-24 부터 가죽 케이스 허브 — 마스코트 패치)", () => {
         const p = resolve(root, "client/public/billiards/case/icon-case.webp");
         const b = readFileSync(p);
         expect(b.subarray(8, 12).toString("ascii")).toBe("WEBP");
         expect(b.length).toBeLessThan(20 * 1024);
         expect(read("client/src/sim/rank/ShelfLink.tsx")).toContain('export const CASE_ICON_SRC = "/billiards/case/icon-case.webp";');
-        expect(read("client/src/components/hiq/dashboard/OnlineHubBanner.tsx")).toContain("<Tile icon={CASE_ICON_SRC} title={t(\"home.hubShelf\")}");
-        expect(read("client/src/components/hiq/cueCase/CueCaseEntry.tsx")).toContain('const CASE_ICON = "/billiards/case/icon-case.webp";');
+        expect(read("client/src/pages/hiq/cue-case.tsx")).toContain('<img src="/billiards/case/icon-case.webp"');
     });
     it("큐마다 제 이름(2026-10-16 오너: \"첫큐 50큐 뭐가 무슨 큐인지 모르겠어\") — 조건 이름이 아니라 무늬 이름, 겹치지 않는다", () => {
         const ko = CUES.map((c) => c.name.ko);
@@ -201,7 +200,7 @@ describe("연결", () => {
         const page = read("client/src/pages/hiq/cue-case.tsx");
         expect(page).toContain("<ShelfPage embedded memberId={memberId}");
         expect(page).toContain('aria-label={t("common.back")}');
-        expect(read("client/src/pages/hiq/dashboard.tsx")).toContain("<CueCaseEntry />");
+        expect(read("client/src/pages/hiq/dashboard.tsx")).toContain("<CueCaseHub />");
     });
     it("게임 큐대(2026-10-16 오너: \"이거 다 좋네\") — 대표 큐가 손잡이에, 상대가 겨눌 땐 상대 큐, 세기 막대 · 대전 시작 · 끝 · 공유 카드", () => {
         expect(read("client/src/sim/render/Renderer.ts")).toContain("readonly skin?: string | null;");
@@ -280,7 +279,7 @@ describe("연결", () => {
     });
     it("문구가 다섯 언어에 있고 자리 표시를 지킨다", () => {
         const need: Record<string, string[]> = { "case.ownerTitle": ["{name}"], "case.people": ["{n}"], "case.peopleNext": ["{n}"], "case.holders": ["{n}"], "case.monthGlove": ["{m}"], "case.monthCells": ["{n}", "{m}"], "case.got": ["{date}"], "case.newCount": ["{n}"], "case.newMore": ["{n}"], "case.entryCounts": ["{c}", "{k}", "{g}"], "case.rackOwned": ["{n}", "{m}"], "case.rackCount": ["{n}"], "case.rackMore": ["{n}"], "case.serialMine.cue": ["{n}"], "case.serialMine.chalk": ["{n}"], "case.serialMine.glove": ["{n}"], "case.serialMine.pennant": ["{n}"], "case.serialNext": ["{no}"], "case.rowHolders": ["{n}"], "case.limitedLeft": ["{n}", "{m}"], "case.limitedTaken": ["{n}", "{m}"], "case.ownedSec": ["{n}"], "case.lockedSec": ["{n}"] };
-        const page = read("client/src/pages/hiq/cue-case.tsx") + read("client/src/components/hiq/cueCase/CueCaseEntry.tsx") + read("client/src/components/hiq/cueCase/CrewCueRack.tsx");
+        const page = read("client/src/pages/hiq/cue-case.tsx") + read("client/src/components/hiq/cueCase/CueCaseHub.tsx") + read("client/src/components/hiq/cueCase/CrewCueRack.tsx");
         const used = [...new Set([...page.matchAll(/t\(["`](case\.[a-zA-Z.]+)["`]\)/g)].map((m) => m[1]))];
         expect(used.length).toBeGreaterThan(40);
         for (const l of LOCALES) {

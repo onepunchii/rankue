@@ -42,7 +42,7 @@ describe("코치마크", () => {
         const homes: [string, string, string[]][] = [
             ["client/src/golf/pages/Dashboard.tsx", '<CoachTour id="golf-home" tone="golf"', ["gh-play", "gh-stamps", "gh-courses"]],
             ["client/src/hiking/pages/HikingHome.tsx", '<CoachTour id="hiking-home" tone="hiking" when={!s.isLoading}', ["hh-find", "hh-grade", "hh-map"]],
-            ["client/src/pages/hiq/dashboard.tsx", '<CoachTour id="billiards-home" tone="billiards"', ["bh-record", "bh-board", "bh-game"]],
+            ["client/src/pages/hiq/dashboard.tsx", '<CoachTour id="billiards-home" tone="billiards"', ["bh-record", "bh-case", "bh-board"]],
             ["client/src/pages/hiq/club.tsx", '<CoachTour id="crew-list" tone={tourToneOf(sport)}', ["cl-mine", "cl-search", "cl-create"]],
             ["client/src/pages/hiq/club-detail.tsx", '<CoachTour id="crew-detail" tone={tourToneOf(crew.sportCategory)}', ["cd-tabs", "cd-chat", "cd-menu"]],
         ];
@@ -51,7 +51,7 @@ describe("코치마크", () => {
             expect(src, f).toContain(call);
             for (const tag of tags) expect(src, `${f} ${tag}`).toMatch(new RegExp(`data-tour=(\\{[^}]*)?"${tag}"`));
         }
-        const keys = ["recordTitle", "recordBody", "boardTitle", "boardBody", "gameTitle", "gameBody"].map((k) => `tour.bh.${k}`)
+        const keys = ["recordTitle", "recordBody", "caseTitle", "caseBody", "boardTitle", "boardBody"].map((k) => `tour.bh.${k}`)
             .concat(["mineTitle", "mineBody", "searchTitle", "searchBody", "createTitle", "createBody"].map((k) => `tour.cl.${k}`))
             .concat(["tabsTitle", "tabsBody", "chatTitle", "chatBody", "menuTitle", "menuAdminBody", "menuMemberBody"].map((k) => `tour.cd.${k}`));
         for (const l of ["ko", "en", "vi", "tr", "es"]) {

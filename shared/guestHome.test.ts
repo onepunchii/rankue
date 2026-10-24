@@ -475,13 +475,11 @@ describe("당구 홈", () => {
             ["알림 수(머리 — 세 종목이 같이 쓰는 SportHeader)", "components/hiq/SportHeader.tsx", "UNREAD_COUNT_KEY, {"],
             ["진행 중 경기", `${DASH}/OngoingGameBanner.tsx`, '"/api/hiq/game/ongoing/mine"'],
             ["진행 중 온라인 대전", `${DASH}/SimMatchBanner.tsx`, "queryKey: MATCH_LIST_QUERY_KEY"],
-            ["실전 비교(내 실전 기록)", `${DASH}/RealHandicapCard.tsx`, '"/api/hiq/compare/real"'],
-            ["온라인 에버(내 실전 기록)", `${DASH}/RealHandicapCard.tsx`, '"/api/hiq/sim/lookalike"'],
-            ["실전 비교(내 다마)", `${DASH}/QuickActions.tsx`, '"/api/hiq/compare/real"'],
+            ["실전 비교(내 실력)", `${DASH}/HomeSkillCard.tsx`, '"/api/hiq/compare/real"'],
+            ["온라인 에버 · 닮은 프로(내 실력)", `${DASH}/HomeSkillCard.tsx`, '"/api/hiq/sim/lookalike"'],
+            ["내 온라인 다마수(내 실력)", `${DASH}/HomeSkillCard.tsx`, "queryKey: HANDICAP_QUERY_KEY"],
             ["열린 방 목록(20초 폴링)", `${DASH}/OnlineGameCard.tsx`, "queryKey: ROOMS_QUERY_KEY"],
             ["이번 주 드릴", `${DASH}/OnlineGameCard.tsx`, "queryKey: DRILL_WEEK_QUERY_KEY"],
-            ["닮은 프로(온라인)", `${DASH}/LookalikeProCard.tsx`, '"/api/hiq/sim/lookalike"'],
-            ["내 온라인 다마수", `${DASH}/LookalikeProCard.tsx`, "queryKey: HANDICAP_QUERY_KEY"],
         ];
         for (const [name, file, marker] of cases) {
             it(name, () => {
@@ -636,9 +634,11 @@ describe("당구 홈", () => {
             expect(code(client(`${DASH}/SimMatchBanner.tsx`))).toContain("if (!member || !first) return null;");
         });
 
-        it("내 온라인 실력(LookalikeProCard): 숨김 그대로 — 예시를 억지로 만들지 않는다", () => {
-            const src = code(client(`${DASH}/LookalikeProCard.tsx`));
-            expect(src).toContain("if (!member) return null;");
+        it("내 실력의 온라인 칸(HomeSkillCard): 비로그인에게 예시 숫자를 억지로 만들지 않는다 — 시작을 권한다", () => {
+            const src = code(client(`${DASH}/HomeSkillCard.tsx`));
+            expect(src).toContain("const playedHere = !sample && boards.some((b) => b.gameType === cur && b.matches > 0);");
+            expect(src).toContain("const onlineDama = !sample ? handi?.target ?? null : null;");
+            expect(src).toContain('const lk = !sample && cur === "3c" ? look.data : undefined;');
             expect(src).not.toContain("GUEST_SAMPLE");
         });
 
@@ -654,19 +654,18 @@ describe("당구 홈", () => {
             expect(home.match(/GUEST_SAMPLE\.billiards/g)).toHaveLength(1);
         });
 
-        it("예시를 그리는 카드 셋에 넘긴다 — 내 실전 기록 · 점수판(내 다마) · 매장 랭킹", () => {
-            const record = jsx.slice(jsx.indexOf("<RealHandicapCard"), jsx.indexOf("<section"));
+        it("예시를 그리는 카드 둘에 넘긴다 — 내 실력(실전 칸 · 내 다마) · 매장 랭킹", () => {
+            const record = jsx.slice(jsx.indexOf("<HomeSkillCard"), jsx.indexOf("<CueCaseHub"));
             expect(record).toContain("sample={sample}");
-            expect(jsx).toContain("<ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={handleJoinGameClick} sample={sample} />");
             const ranking = jsx.slice(jsx.indexOf("<RankingListCard"), jsx.indexOf("<AppInstallCard"));
             expect(ranking).toContain("rankings={sampleRankings ?? rankings}");
             expect(ranking).toContain("sample={!!sample}");
         });
 
         it("예시 숫자를 그리는 카드마다 '예시' 표시(SampleBadge)가 있다", () => {
-            for (const file of ["RealHandicapCard.tsx", "QuickActions.tsx", "RankingListCard.tsx"]) {
+            for (const file of ["HomeSkillCard.tsx", "RealHandicapCard.tsx", "RankingListCard.tsx"]) {
                 const src = code(client(`${DASH}/${file}`));
-                expect(src, file).toContain('import { SampleBadge } from "@/components/hiq/GuestGate";');
+                expect(src, file).toMatch(/import \{[^}]*\bSampleBadge\b[^}]*\} from "@\/components\/hiq\/GuestGate";/);
                 expect(src, file).toMatch(/\{?sample (?:&&|\?) .*<SampleBadge/);
             }
             // 홈 자신은 예시 숫자를 직접 그리지 않는다 — 카드에 넘기기만 한다
@@ -839,9 +838,9 @@ describe("당구 홈", () => {
             expect(jsx).toContain('onStartMatch={() => handleStartGameClick("match")}');
         });
 
-        it("카드 바로 아래에 가입 안내 한 줄(GuestJoinCta) — 비로그인에게만", () => {
-            const below = jsx.slice(jsx.indexOf("<RealHandicapCard"), jsx.indexOf("<section"));
-            expect(below).toMatch(/\{sample && \(\s*<GuestJoinCta/);
+        it("홈의 내 실력 카드 바로 아래에 가입 안내 한 줄(GuestJoinCta) — 비로그인에게만", () => {
+            const below = jsx.slice(jsx.indexOf("<HomeSkillCard"), jsx.indexOf("<CueCaseHub"));
+            expect(below).toMatch(/\{sample && \(?\s*<GuestJoinCta/);
             expect(below).toContain('title={t("guestHome.recordCtaTitle")}');
             expect(below).toContain('desc={t("guestHome.recordCtaDesc")}');
             expect(koValue("guestHome.recordCtaTitle")).toBe("가입하면 내 실전 기록이 이렇게 쌓여요");
@@ -849,14 +848,16 @@ describe("당구 홈", () => {
         });
     });
 
-    describe("점수판 — 내 다마는 예시, 입구 셋은 입구에서 가입 안내", () => {
-        const quick = code(client(`${DASH}/QuickActions.tsx`));
+    describe("실전 점수판(ScoreboardHero) — 입구 셋은 입구에서 가입 안내, 내 다마는 내 실력 카드의 예시", () => {
+        const board = code(client(`${DASH}/ScoreboardHero.tsx`));
 
-        it("내 다마: '—' 로 비우지 않고 예시 숫자 + SampleBadge", () => {
-            expect(quick).toContain("const data = sample ? sample.real : q.data;");
-            expect(quick).toContain("const s = data?.[type];");
-            expect(quick).toContain('{sample && <SampleBadge className="mr-auto" />}');
-            expect(quick).toContain("<MyDamaPanel sample={sample} />");
+        it("내 다마: '—' 로 비우지 않고 예시 숫자 + SampleBadge — 맨 위 내 실력 카드가 그린다", () => {
+            const skill = code(client(`${DASH}/HomeSkillCard.tsx`));
+            expect(skill).toContain("const data = sample ? sample.real : real.data;");
+            expect(skill).toContain("{sample && <SampleBadge />}");
+            // 점수판 판의 숫자는 화면 미리 보기 — 예시 인물 · 내 기록을 읽지 않는다
+            expect(board).toContain('t("home.boardPreview")');
+            expect(board).not.toMatch(/sample|useQuery|useAuth/);
         });
 
         it("막는 자리는 홈의 두 함수 한 곳 — 경기 시작·혼자 연습은 handleStartGameClick, PIN 은 handleJoinGameClick", () => {
@@ -879,14 +880,15 @@ describe("당구 홈", () => {
             expect(billiards.indexOf("gate.guard(() => {")).toBeLessThan(billiards.indexOf("if (!member || matchParamRef.current) return;"));
         });
 
-        it("입구가 전부 그 두 함수로 이어진다 — 점수판 카드·혼자 연습·PIN·설명 창", () => {
-            expect(jsx.match(/onStartGame=\{handleStartGameClick\}/g)).toHaveLength(2);
-            expect(jsx.match(/onJoinGame=\{handleJoinGameClick\}/g)).toHaveLength(2);
-            expect(quick).toContain('onClick={() => onStartGame("match")}');
-            expect(quick).toContain('onClick={() => onStartGame("practice")}');
-            expect(quick).toContain("onClick={onJoinGame}");
+        it("입구가 전부 그 두 함수로 이어진다 — 점수판 판 · 혼자 연습 · PIN · 설명 창 · 내 실력의 실전 시작", () => {
+            expect(jsx).toContain("<ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} />");
+            expect(jsx.match(/onStartGame=\{handleStartGameClick\}/g)).toHaveLength(1);
+            expect(jsx.match(/onJoinGame=\{handleJoinGameClick\}/g)).toHaveLength(1);
+            expect(board).toContain('onClick={() => onStart("match")}');
+            expect(board).toContain('onClick={() => onStart("practice")}');
+            expect(board).toContain("onClick={onJoin}");
             // 점수판 구역이 제 손으로 창을 열거나 서버를 부르지 않는다
-            expect(quick).not.toMatch(/toggleModal|GameCreationModal|PinCodeModal|apiRequest/);
+            expect(board).not.toMatch(/toggleModal|GameCreationModal|PinCodeModal|apiRequest/);
         });
 
         it("받은 시트를 홈에 한 번 그린다", () => {
@@ -999,7 +1001,7 @@ describe("당구 홈", () => {
     });
 
     describe("문구 — 다섯 언어 사전, 사실과 다른 말 없음", () => {
-        const files = ["pages/hiq/dashboard.tsx", ...["DashboardHeader", "RealHandicapCard", "QuickActions", "OnlineHubBanner", "OnlineGameCard", "RankingListCard"].map((f) => `${DASH}/${f}.tsx`)];
+        const files = ["pages/hiq/dashboard.tsx", "components/hiq/cueCase/CueCaseHub.tsx", ...["DashboardHeader", "HomeSkillCard", "RealHandicapCard", "QuickActions", "ScoreboardHero", "OnlineGameCard", "RankingListCard"].map((f) => `${DASH}/${f}.tsx`)];
         const used = new Set(files.flatMap((f) => Array.from(code(client(f)).matchAll(/"(guestHome\.[A-Za-z0-9]+)"/g), (m) => m[1])));
 
         it("화면이 쓰는 guestHome.* 키가 ko·en·es·tr·vi 에 전부 있다", () => {

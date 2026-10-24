@@ -31,10 +31,14 @@ import { matchApi } from "@/sim/matchApi";
 type HistoryRow = { sportCategory?: string | null; gameMode?: string | null; isRanked?: boolean | null; gameType?: string | null; isWinner?: boolean | null };
 const ROOMS_URL = "/online-game?rooms=1";
 
-export function HomeSkillCard({ onStartMatch, history, sample }: {
+export function HomeSkillCard({ onStartMatch, history, sample, getPercentile, onOpenRpGuide }: {
     onStartMatch: () => void;
     history?: HistoryRow[];
     sample?: GuestSampleBilliards | null;
+    /** 상위 % (홈이 랭킹 목록으로 계산 — 모집단을 모르면 null) */
+    getPercentile?: (type: "3c" | "4c") => number | null;
+    /** RP 옆 ⓘ — 랭킹 점수 안내 창 */
+    onOpenRpGuide?: () => void;
 }) {
     const { t, locale } = useT();
     const { member } = useAuth();
@@ -60,6 +64,8 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
     const rating = (cur === "3c" ? (me as { rating3c?: number | null }).rating3c : (me as { rating4c?: number | null }).rating4c) ?? 0;
     const mine = (Array.isArray(games) ? games : []).filter((g) => g.sportCategory === "BILLIARDS" && g.gameMode === "match" && g.isRanked && g.gameType === cur);
     const wins = mine.filter((g) => g.isWinner).length;
+    // 예시의 상위 % 는 예시 랭킹 다섯 줄 안에서 센 값이다(카드의 "예시" 표시 아래에서만 쓴다)
+    const pct = sample ? sample.percentile[cur] : getPercentile?.(cur) ?? null;
 
     // ── 온라인 칸 — 고른 종목에 대전이 있을 때만 그 종목의 등급
     const playedHere = !sample && boards.some((b) => b.gameType === cur && b.matches > 0);
@@ -116,8 +122,12 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
                             </p>
                         </div>
                     </div>
-                    <button type="button" onClick={openHistory} disabled={!openHistory} className="mt-2 block w-full text-left disabled:cursor-default">
-                        <span className="block text-[20px] font-black rk-num leading-none">{rating}<span className="ml-0.5 text-[11px] font-bold text-brand">RP</span></span>
+                    <span className="mt-2 flex items-baseline gap-1.5">
+                        <span className="text-[20px] font-black rk-num leading-none">{rating}<span className="ml-0.5 text-[11px] font-bold text-brand">RP</span></span>
+                        {onOpenRpGuide && <button type="button" onClick={onOpenRpGuide} aria-label={t("real.stripRp")} data-testid="home-skill-rp-guide" className="h-5 w-5 rounded-full border border-ink-4/50 text-[11px] font-bold leading-none text-ink-3">?</button>}
+                        {pct ? <span className="ml-auto text-[11.5px] font-bold text-brand rk-num">{fill(t("real.stripTop"), { n: pct })}</span> : null}
+                    </span>
+                    <button type="button" onClick={openHistory} disabled={!openHistory} className="block w-full text-left disabled:cursor-default">
                         <span className="mt-1.5 flex items-center gap-1.5 text-[12px] font-semibold text-ink-3 rk-num">
                             {t("sim.entry.record").replace("{w}", String(wins)).replace("{l}", String(mine.length - wins))}
                             <FormDots results={mine.slice(0, 5).map((g) => (g.isWinner ? "W" : "L"))} />
@@ -129,14 +139,17 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
                 <button type="button" onClick={() => goOnline(s.kind === "ranked" ? rankUrl : ROOMS_URL)} className="rounded-2xl bg-[#121722] p-3 text-left text-white min-w-0" data-testid="home-skill-online" data-track-as="홈 내 실력 온라인">
                     <span className="block text-[11.5px] font-bold tracking-wide text-[#7FD8E8] truncate">{t("home.skillOnline")}</span>
                     <span className="mt-1.5 flex items-center gap-2">
-                        {s.kind === "ranked" ? <TierEmblem tier={s.tier.id} size={50} glow /> : <TierEmblem tier="iron" size={50} locked />}
+                        {/* 배지를 누르면 배지 안내(겉의 단추와 따로 — BadgeTap 이 눌림을 막는다) */}
+                        <BadgeTap guide={s.kind === "ranked" ? { kind: "online", tier: s.tier.id, rating: s.rating } : { kind: "online", tier: null }}>
+                            {s.kind === "ranked" ? <TierEmblem tier={s.tier.id} size={50} glow /> : <TierEmblem tier="iron" size={50} locked />}
+                        </BadgeTap>
                         <span className="min-w-0">
                             {/* 등급 이름은 한 줄, 배치 중 · 시작 권유 글은 길어서 두 줄까지(잘리면 뜻이 안 보였다 — 시안 화면 확인) */}
                             <span className={cn("block font-black", s.kind === "ranked" ? "text-[15px] leading-tight truncate" : "text-[13.5px] leading-snug break-keep line-clamp-2")} style={s.kind === "ranked" ? { color: TIER_GLOW[s.tier.id] } : undefined}>
                                 {s.kind === "ranked" ? t(s.tier.nameKey) : s.kind === "placing" ? t("sim.rank.unranked").replace("{n}", String(s.matches)).replace("{m}", String(placement)) : t("home.skillOnlineFresh").replace("{n}", String(placement))}
                             </span>
                             <span className="flex items-center gap-1 text-[12px] font-semibold text-white/60 rk-num">
-                                {onlineDama ? <><OnlineDamaBadge target={onlineDama} size={18} /> {fill(t("home.skillDama"), { n: onlineDama })}</> : t("home.skillOnlinePlay")}
+                                {onlineDama ? <><BadgeTap guide={{ kind: "online", dama: onlineDama }}><OnlineDamaBadge target={onlineDama} size={18} /></BadgeTap> {fill(t("home.skillDama"), { n: onlineDama })}</> : t("home.skillOnlinePlay")}
                             </span>
                         </span>
                     </span>
