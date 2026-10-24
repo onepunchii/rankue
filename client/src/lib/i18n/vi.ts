@@ -4038,6 +4038,7 @@ const vi: Dict = {
   "case.serialFirst.cue": "Bạn là người đầu tiên nhận cây cơ này",
   "case.serialFirst.chalk": "Bạn là người đầu tiên nhận viên phấn này",
   "case.serialFirst.glove": "Bạn là người đầu tiên nhận chiếc găng này",
+  "sim.brand.sponsor": "Tài trợ bởi {name}",
   "case.serialFirst.pennant": "Bạn là người đầu tiên nhận lá cờ này",
   "case.count.shaft": "Thân cơ",
   "case.count.ball": "Bi",

@@ -7,6 +7,7 @@
  */
 import type { BallState } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
+import type { TableBrandView } from "@shared/tableBrand";
 
 /** 큐 표시. `ballId` 가 없으면 highlightBallId → 첫 번째 공 순으로 큐볼을 고른다. */
 export interface CueFrame {
@@ -130,4 +131,9 @@ export interface Renderer {
      * 구현하지 않는 렌더러(Canvas2D)는 없음 — 페이지는 이 메서드가 있을 때만 핀치를 시작한다.
      */
     setZoom?(zoom: number): void;
+    /**
+     * 당구대 로고 · 광고(2026-10-24, shared/tableBrand) — 천에 인쇄한 것처럼 옅게. null 이면 지운다(선택).
+     * 그림은 렌더러가 불러오고, 다 불러오면 needsFrame 이 한 번 더 그리게 한다. 물리 · 조준과는 상관없다.
+     */
+    setBrand?(brand: TableBrandView | null): void;
 }

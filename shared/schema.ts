@@ -13,7 +13,7 @@ import {
   index,
   uniqueIndex,
   primaryKey,
-  bigint, type AnyPgColumn } from "drizzle-orm/pg-core";
+  bigint, real, type AnyPgColumn } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -2509,6 +2509,27 @@ export const hiqCueCasePrefs = pgTable("hiq_cue_case_prefs", {
   heroShaft: text("hero_shaft"),
   heroBall: text("hero_ball"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+/**
+ * 당구대 로고 · 광고(2026-10-24, migrations/sim_table_brands.sql) — 줄 하나 = 캠페인 하나, 고르는 규칙은 shared/tableBrand pickBrands.
+ * tables = 걸 테이블(DAEDAE · JUNGDAE_KR), sponsor 가 있으면 화면에 '○○ 협찬'.
+ */
+export const simTableBrands = pgTable("sim_table_brands", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  title: text("title").notNull(),
+  image: text("image").notNull(),
+  opacity: real("opacity").notNull().default(0.16),
+  scale: real("scale").notNull().default(0.6),
+  place: text("place").notNull().default("center"),
+  tone: text("tone").notNull().default("original"),
+  tables: text("tables").array().default(["DAEDAE", "JUNGDAE_KR"]).notNull(),
+  sponsor: text("sponsor"),
+  startsAt: timestamp("starts_at", { withTimezone: true }),
+  endsAt: timestamp("ends_at", { withTimezone: true }),
+  enabled: boolean("enabled").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 /**

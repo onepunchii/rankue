@@ -24,6 +24,8 @@ import type { BallState, ShotInput, SimResult } from "@shared/sim/types";
 import { SHOT_CLOCK_S, type SessionState } from "@shared/sim/rules";
 import { Canvas2DRenderer } from "../render/Canvas2DRenderer";
 import type { BallSkins, Renderer, RendererView, SafeInsets } from "../render/Renderer";
+import { useTableBrand } from "../render/useTableBrand";
+import type { TableBrandView } from "@shared/tableBrand";
 import { caseImage, caseItem } from "@shared/cueCase";
 import { readZoomPref, safeLocalStorage, selectRendererKind, type RendererKind } from "../render/rendererChoice";
 import { matchApi, matchConfig, type ChatLine, type MatchPublic, type MatchShot } from "../matchApi";
@@ -141,6 +143,11 @@ export default function WatchPage({ matchId, onExit }: { matchId: string; onExit
     // 큐 케이스 꾸미기(2026-10-24) — 겨누는 사람의 큐대(손잡이 · 상대)와 두 사람 수구의 무늬. 관전자도 선수와 같은 것을 본다
     const turnIdx = session?.turn === 1 ? 1 : 0;
     const wornRef = useRef<{ skin: string | null; shaft: string | null; ballSkins: BallSkins }>({ skin: null, shaft: null, ballSkins: {} });
+    // 당구대 로고 · 광고(2026-10-24) — 선수 화면과 같은 것. 루프가 지금 렌더러에 건다
+    const tableBrand = useTableBrand(match?.tableId ?? null);
+    const brandRef = useRef<TableBrandView | null>(tableBrand);
+    brandRef.current = tableBrand;
+    const brandAppliedRef = useRef<{ r: Renderer | null; b: TableBrandView | null | undefined }>({ r: null, b: undefined });
     wornRef.current = {
         skin: (() => { const id = match?.cues?.[turnIdx]; const x = id ? caseItem(id) : null; return x && x.kind === "cue" ? caseImage(x) : null; })(),
         shaft: match?.shafts?.[turnIdx] ?? null,
@@ -208,6 +215,11 @@ export default function WatchPage({ matchId, onExit }: { matchId: string; onExit
             raf = requestAnimationFrame(loop);
             const r = rendererRef.current;
             if (!r) return;
+            if (brandAppliedRef.current.r !== r || brandAppliedRef.current.b !== brandRef.current) {
+                r.setBrand?.(brandRef.current);
+                brandAppliedRef.current = { r, b: brandRef.current };
+                dirtyRef.current = true;
+            }
             const anim = animRef.current;
             if (anim) {
                 const tt = clockTime(anim.clock, performance.now());
@@ -474,6 +486,9 @@ export default function WatchPage({ matchId, onExit }: { matchId: string; onExit
             />
 
             <div ref={tableRef} className="flex-1 min-h-[45vh] relative">
+                {tableBrand?.sponsor && (
+                    <span className="pointer-events-none absolute bottom-2 left-2 z-[2] rounded-pill bg-black/45 px-2 py-0.5 text-[11px] font-medium text-white/85" data-testid="watch-brand-sponsor">{t("sim.brand.sponsor").replace("{name}", tableBrand.sponsor)}</span>
+                )}
                 {/* 3D 보기 토글 — 선수 화면과 같은 시점으로 볼 수 있다(되는 기기에서만) */}
                 {/* 2026-10-11 문의: 'bg-surface-1/90' 은 색이 CSS 변수라 투명이 됐고(불투명도 수식어가 안 먹는다) 바탕까지 흰색이라
                     흰 글씨 버튼이 안 보였다 — 불투명 바탕·진한 테두리·그림자로 어떤 바탕에서도 보이게 */}

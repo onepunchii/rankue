@@ -52,6 +52,8 @@ import { useAuth } from "@/hooks/useAuth";
 import { useKeepAwake } from "../hooks/useKeepAwake"; // 상대 경로 — vitest 에 "@/" 별칭이 없고 SimulatorPage.test 는 "@/" 를 전부 목으로 바꾼다
 import { useSimulator, type OfflineReason } from "./useSimulator";
 import type { BallSkins, Renderer, RendererView, SafeInsets } from "./render/Renderer";
+import { useTableBrand } from "./render/useTableBrand";
+import type { TableBrandView } from "@shared/tableBrand";
 import { ZOOM_MAX, ZOOM_MIN } from "./render/Renderer";
 import { Canvas2DRenderer } from "./render/Canvas2DRenderer";
 import {
@@ -568,6 +570,11 @@ export function SimulatorPage() {
     const dirtyRef = useRef(true);
     const tableSpecRef = useRef(table);
     tableSpecRef.current = table;
+    // 당구대 로고 · 광고(2026-10-24) — rAF 루프가 지금 렌더러에 건다(Canvas2D → 3D 로 바뀌어도 다시 건다)
+    const tableBrand = useTableBrand(table.id);
+    const brandRef = useRef<TableBrandView | null>(tableBrand);
+    brandRef.current = tableBrand;
+    const brandAppliedRef = useRef<{ r: Renderer | null; b: TableBrandView | null | undefined }>({ r: null, b: undefined });
     const fullLabel = t("sim.aim.fullBall");
     const projectRef = useRef<Project>((x, y) => rendererRef.current?.project(x, y) ?? [0, 0]);
     // 렌더러 종류는 화면 인스턴스마다 한 번 고른다(저장값 → WebGL2 탐색). 컨텍스트 손실이 쌓이면 세션 동안 canvas 로 고정.
@@ -729,6 +736,11 @@ export function SimulatorPage() {
             handle = requestAnimationFrame(loop);
             const renderer = rendererRef.current;
             if (!renderer) return;
+            if (brandAppliedRef.current.r !== renderer || brandAppliedRef.current.b !== brandRef.current) {
+                renderer.setBrand?.(brandRef.current);
+                brandAppliedRef.current = { r: renderer, b: brandRef.current };
+                dirtyRef.current = true;
+            }
             const frame = frameAt(performance.now());
             // 선수 시점 카메라가 아직 움직이는 중이면(needsFrame) dirty 가 아니어도 그린다 — 오버레이도 같은 자세로 다시 얹힌다
             const v = viewRef.current;
@@ -1688,6 +1700,10 @@ export function SimulatorPage() {
 
                     {/* 왼쪽 위 칩 열(상단 띠 바로 아래): 공유 알약(샷 뒤) · 빨리감기 안내 · 드릴 · 배치 안내 · 리플레이 · 종료 · 대전 상태. 겹치지 않게 세로로 쌓는다. */}
                     <div className="absolute top-2 left-2 z-[3] flex flex-col items-start gap-1 pointer-events-none max-w-[calc(100%-64px)]">
+                        {/* 협찬 로고가 깔린 테이블이면 광고라는 것을 밝힌다(2026-10-24) */}
+                        {tableBrand?.sponsor && (
+                            <span className="rounded-pill bg-black/45 px-2 py-0.5 text-[11px] font-medium text-white/85" data-testid="sim-brand-sponsor">{t("sim.brand.sponsor").replace("{name}", tableBrand.sponsor)}</span>
+                        )}
                         {canShare && (
                             <button
                                 type="button" onClick={onShareShot} disabled={sharing}

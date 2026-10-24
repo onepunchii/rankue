@@ -4038,6 +4038,7 @@ const es: Dict = {
   "case.serialFirst.cue": "Fuiste el primero en conseguir este taco",
   "case.serialFirst.chalk": "Fuiste el primero en conseguir esta tiza",
   "case.serialFirst.glove": "Fuiste el primero en conseguir este guante",
+  "sim.brand.sponsor": "Patrocinado por {name}",
   "case.serialFirst.pennant": "Fuiste el primero en conseguir este banderín",
   "case.count.shaft": "Ejes",
   "case.count.ball": "Bolas",

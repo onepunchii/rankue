@@ -4038,6 +4038,7 @@ const tr: Dict = {
   "case.serialFirst.cue": "Bu ıstakayı ilk kazanan sensin",
   "case.serialFirst.chalk": "Bu tebeşiri ilk kazanan sensin",
   "case.serialFirst.glove": "Bu eldiveni ilk kazanan sensin",
+  "sim.brand.sponsor": "{name} sponsorluğunda",
   "case.serialFirst.pennant": "Bu flamayı ilk kazanan sensin",
   "case.count.shaft": "Şaftlar",
   "case.count.ball": "Toplar",

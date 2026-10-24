@@ -38,6 +38,7 @@ import type { MatchWithNames } from "../../storage/simMatch.repo.js";
 import { caseItem } from "../../../shared/cueCase.js";
 import { startTurnSeenAt } from "../../storage/simMatch.repo.js";
 import { rollCups } from "../../services/simCupService.js";
+import { liveBrands } from "../../storage/tableBrands.js";
 
 const router = Router();
 
@@ -409,6 +410,17 @@ export async function createHostMatch(hostId: string, b: z.infer<typeof createSc
 }
 
 // POST /sim/matches — 대전 만들기(호스트)
+/**
+ * 당구대 로고 · 광고(2026-10-24) — 테이블마다 지금 걸 것(shared/tableBrand). 로그인 없이 · CDN 이 5분 둔다(브라우저는 매번 다시 묻는다).
+ * 게임 화면 · 관전이 테이블을 올릴 때 한 번 묻는다. 실패해도 게임은 그대로(로고만 없다).
+ */
+router.get("/sim/table-brand", asyncHandler(async (_req: any, res: any) => {
+    const brands = await liveBrands();
+    res.set("Cache-Control", "public, max-age=0, must-revalidate");
+    res.set("CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");
+    return sendSuccess(res, brands);
+}));
+
 router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) return sendError(res, 400, "err.sim.badInput");

@@ -20,6 +20,8 @@ import { feltColors } from "./felt";
 import { BALL_STYLES, DEFAULT_SHAFT, shaftStyle, type ShaftStyle } from "@shared/cueStyles";
 import { cueSkin, cueSkinVersion } from "./cueSkin";
 import { paintBallSkinMark, SHAFT_RINGS } from "./cueLook";
+import { brandArt, brandAspect, brandImage, brandKey, brandRects } from "./tableBrandArt";
+import type { TableBrandView } from "@shared/tableBrand";
 import type { RenderFrame, Renderer, SafeInsets, Viewport } from "./Renderer";
 import { computeLayout, NO_INSETS, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, readPalette, rgba, scaleColor, type Palette } from "./tokens";
@@ -119,6 +121,10 @@ export class Canvas2DRenderer implements Renderer {
     private lastFrame: RenderFrame | null = null;
     /** 마지막으로 그린 때의 손잡이 그림 판 — 그림이 늦게 불러와지면 다음 프레임을 한 번 더 그린다 */
     private skinSeen = -1;
+    /** 당구대 로고 · 광고(2026-10-24) — 정적 층에 그린다. 그림이 늦게 오면 정적 층을 다시 그린다 */
+    private brand: TableBrandView | null = null;
+    private brandDrawn = "";
+    private brandArtCache: { key: string; art: CanvasImageSource; aspect: number } | null = null;
     private cssW = 0;
     private cssH = 0;
     /** 색별 스프라이트. 스프라이트 한 변(CSS px)은 spriteSide. */
@@ -250,7 +256,17 @@ export class Canvas2DRenderer implements Renderer {
     // ── 동적 층 ───────────────────────────────────────────────────────────
     /** 손잡이 그림이 막 불러와졌으면 한 번 더 그린다(조준을 안 움직여도 그림이 들어가게) */
     needsFrame(): boolean {
+        if (this.brand && this.table && this.brandDrawn !== brandKey(this.brand, this.table.id) && brandImage(this.brand.image)) return true;
         return !!this.lastFrame?.cue?.skin && cueSkinVersion() !== this.skinSeen;
+    }
+
+    setBrand(brand: TableBrandView | null): void {
+        this.brand = brand;
+        if (this.layout && this.staticCanvas) {
+            this.drawStatic();
+            if (this.lastFrame) this.draw(this.lastFrame);
+            else this.blitStatic();
+        }
     }
 
     draw(frame: RenderFrame): void {
@@ -259,6 +275,8 @@ export class Canvas2DRenderer implements Renderer {
         const ctx = this.ctx;
         const L = this.layout;
         if (!ctx || !L || !this.staticCanvas) return;
+        // 로고 그림이 막 불러와졌으면 정적 층부터 다시
+        if (this.brand && this.table && this.brandDrawn !== brandKey(this.brand, this.table.id) && brandImage(this.brand.image)) this.drawStatic();
         this.blitStatic();
 
         const balls = frame.balls;
@@ -523,6 +541,8 @@ export class Canvas2DRenderer implements Renderer {
         ctx.fillRect(play.x + play.w - inner, play.y, inner, play.h);
         ctx.restore();
 
+        this.drawBrand(ctx, L);
+
         // 쿠션 코 라인: 라사 경계에 살짝 어두운 선
         ctx.lineWidth = 1;
         ctx.strokeStyle = RAIL_NOSE;
@@ -548,6 +568,32 @@ export class Canvas2DRenderer implements Renderer {
             ctx.arc(d.sx, d.sy, dR, 0, Math.PI * 2);
             ctx.fill();
         }
+    }
+
+    /** 당구대 로고 — 천에 인쇄한 것처럼 옅게(라사 위 · 스팟 아래). 그림이 아직이면 건너뛰고 나중에 다시 그린다 */
+    private drawBrand(ctx: CanvasRenderingContext2D, L: TableLayout): void {
+        const b = this.brand;
+        const key = brandKey(b, L.table.id);
+        const img = b ? brandImage(b.image) : null;
+        if (!b || !img) { this.brandDrawn = b ? "" : key; return; }
+        if (this.brandArtCache?.key !== key) this.brandArtCache = { key, art: brandArt(img, b.tone, this.createCanvas), aspect: brandAspect(img) };
+        const { art, aspect } = this.brandArtCache;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(L.play.x, L.play.y, L.play.w, L.play.h);
+        ctx.clip();
+        ctx.globalAlpha = b.opacity;
+        for (const r of brandRects(L.table, b, aspect)) {
+            const [sx, sy] = worldToScreen(L, r.cx, r.cy);
+            const w = r.w * L.scale, h = r.h * L.scale;
+            ctx.save();
+            ctx.translate(sx, sy);
+            ctx.rotate(-r.rot);
+            ctx.drawImage(art, -w / 2, -h / 2, w, h);
+            ctx.restore();
+        }
+        ctx.restore();
+        this.brandDrawn = key;
     }
 
     // ── 공 스프라이트 ─────────────────────────────────────────────────────

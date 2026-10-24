@@ -414,7 +414,9 @@ describe("SimulatorPage", () => {
             Object.defineProperties(ev, { pointerId: { value: id }, isPrimary: { value: primary }, pointerType: { value: "touch" } });
             el.dispatchEvent(ev);
         });
-        const reasons = () => sent.mock.calls.map((c) => (JSON.parse(String(c[1]?.body)) as { reason: string }).reason);
+        // 계측 보내기만 본다 — 테이블을 올리면 당구대 로고(GET /sim/table-brand)도 한 번 묻는다(2026-10-24)
+        const telemetry = () => sent.mock.calls.filter((c) => !String(c[0]).includes("/sim/table-brand"));
+        const reasons = () => telemetry().map((c) => (JSON.parse(String(c[1]?.body)) as { reason: string }).reason);
         const openPractice = () => {
             nav.search = `cfg=${encodePageConfig({ config: buildConfig({ gameType: "3c", target: 5 }), record: false })}`;
             const h = mount();
@@ -430,7 +432,7 @@ describe("SimulatorPage", () => {
             pointer(table, "pointerdown", 1); // pointerup 이 오지 않는다(OS 메뉴가 가로챔)
             pointer(table, "pointerdown", 2); // 예전엔 '두 번째 손가락'으로 무시돼 영구히 굳었다
             expect(reasons()).toEqual(["stale-pointerdown"]);
-            const body = JSON.parse(String(sent.mock.calls[0][1]?.body));
+            const body = JSON.parse(String(telemetry()[0][1]?.body));
             expect(body).toMatchObject({ kind: "sim-gesture-recover", view: "top", mode: "practice", native: false });
             // 새 손가락(2)이 조준 기록의 주인이 됐다 — 그 뗌 신호로 정상 정리되고 다음 터치는 복구 없이 시작된다
             pointer(table, "pointerup", 2);
@@ -445,7 +447,7 @@ describe("SimulatorPage", () => {
             const { h, table } = openPractice();
             pointer(table, "pointerdown", 7);
             pointer(table, "pointerup", 7);
-            expect(sent).not.toHaveBeenCalled();
+            expect(telemetry()).toHaveLength(0);
             pointer(table, "pointerdown", 5);
             pointer(table, "lostpointercapture", 5);
             expect(reasons()).toEqual(["lostcapture"]);

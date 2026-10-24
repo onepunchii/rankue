@@ -4048,6 +4048,7 @@ export const ko: Dict = {
   "case.serialFirst.cue": "이 큐를 가장 먼저 받았어요 — 첫 번째 주인",
   "case.serialFirst.chalk": "이 초크를 가장 먼저 받았어요 — 첫 번째 주인",
   "case.serialFirst.glove": "이 장갑을 가장 먼저 받았어요 — 첫 번째 주인",
+  "sim.brand.sponsor": "{name} 협찬",
   "case.serialFirst.pennant": "이 페넌트를 가장 먼저 받았어요 — 첫 번째 주인",
   "case.count.shaft": "상대",
   "case.count.ball": "공",

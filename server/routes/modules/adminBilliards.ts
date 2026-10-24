@@ -19,6 +19,7 @@
  * POST /admin/billiards/cups/games/:gameId/extend { hours, reason }   기한 늘리기(아직 안 가려진 판)
  * POST /admin/billiards/cups/games/:gameId/decide { winnerId, loserForfeit, reason }  결과 정하기(아직 안 가려진 판 · 방은 닫는다)
  * POST /admin/billiards/cups/games/:gameId/change { winnerId, loserForfeit, reason }  결과 바꾸기(다음 판이 시작 전일 때만)
+ * /admin/billiards/table-brands/*                                   당구대 로고 · 광고(adminTableBrand.ts)
  * 지우기는 예전 길(DELETE /admin/games/:id — RP · 에버리지를 되돌린다)을 그대로 쓴다. 까닭은 작업 기록에 남는다.
  */
 import { Router } from "express";
@@ -39,9 +40,12 @@ import { adminOutcome, canChangeResult, canDecide, downstreamOf, type AdminCupDe
 import { announce } from "../../services/simCupService.js";
 import { isRatedMatch, onlineFlags, type AdminOnlineDetail, type AdminOnlineRow, type AdminRatingChange, type AdminRatingRow } from "../../../shared/simMatchFlags.js";
 import { storage } from "../../storage/index.js";
+import tableBrandRouter from "./adminTableBrand.js";
 
 const router = Router();
 router.use(checkSuperAdmin);
+// 당구대 광고(2026-10-24) — 따로 둔 파일(adminTableBrand.ts)
+router.use("/table-brands", tableBrandRouter);
 const rowsOf = (r: any) => (r.rows ?? r) as any[];
 
 router.get("/games", asyncHandler(async (req: any, res: any) => {

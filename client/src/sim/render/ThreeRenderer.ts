@@ -41,6 +41,8 @@ import type { TableSpec } from "@shared/sim/params";
 import { BALL_STYLES, SHAFT_STYLES, ballMaterialOf, shaftRoughnessOf } from "@shared/cueStyles";
 import { cueSkin, cueSkinVersion } from "./cueSkin";
 import { paintBallSkinMap, paintShaftMap } from "./cueLook";
+import { brandArt, brandAspect, brandImage, brandImageVersion, brandKey, brandRects } from "./tableBrandArt";
+import type { TableBrandView } from "@shared/tableBrand";
 import { feltColors } from "./felt";
 import { ZOOM_MIN, type RenderFrame, type Renderer, type RendererView, type SafeInsets, type Viewport, ZOOM_MAX } from "./Renderer";
 import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
@@ -126,6 +128,8 @@ const PLINTH_M = 0.004;
 const PLINTH_DEPTH = 0.01;
 const NOSE_Z = 0.0003;
 const SPOT_Z = 0.0002;
+/** 당구대 로고 판 — 천(0)과 스팟 사이 */
+const BRAND_Z = 0.0001;
 const SHADOW_Z = 0.0006;
 const DIAMOND_Z = RAIL_TOP + 0.0005;
 /** 접촉 그림자: Canvas2D 와 같은 오른쪽 아래 오프셋·타원 비율(R 배). */
@@ -342,6 +346,14 @@ export class ThreeRenderer implements Renderer {
     private cueShaftId: string | null = null;
     private cueShaftTex: CanvasTexture | null = null;
 
+    // 당구대 로고 · 광고(2026-10-24) — 천 바로 위의 얇은 판(투명 질감). 그림이 늦게 오면 needsFrame 이 한 번 더 그린다
+    private brand: TableBrandView | null = null;
+    private brandBuilt = "";
+    private brandSeen = -1;
+    private readonly brandMeshes: Mesh[] = [];
+    private brandTex: CanvasTexture | null = null;
+    private brandMat: MeshStandardMaterial | null = null;
+
     // 강조 링
     private readonly ringGroup = new Group();
     private readonly ringHaloMat = new MeshBasicMaterial({ transparent: true, depthTest: false, depthWrite: false });
@@ -445,6 +457,7 @@ export class ThreeRenderer implements Renderer {
         this.overviewAspect = -1;
         if (this.disposed) return;
         this.buildTable(table);
+        this.applyBrand();
         // 공 크기가 바뀌었을 수 있으니 풀·활성 항목의 스케일을 새로 잡는다
         for (let i = 0; i < this.active.length; i++) this.fitBall(this.active[i], table.ball.R);
         if (this.el) this.resize();
@@ -506,6 +519,7 @@ export class ThreeRenderer implements Renderer {
         this.shadowMat.map?.dispose();
         this.shadowMat.dispose();
         this.clearSkinMats();
+        this.clearBrand();
         for (const c of COLOURS) {
             this.ballTex[c]?.dispose();
             this.ballMats[c].dispose();
@@ -603,6 +617,8 @@ export class ThreeRenderer implements Renderer {
     needsFrame(): boolean {
         // 손잡이 그림이 막 불러와졌으면 한 번 더 그린다(조준을 안 움직여도 그림이 감기게)
         if (this.cueSkinUrl !== null && this.cueSkinTex === null && cueSkinVersion() !== this.cueSkinSeen) return true;
+        // 당구대 로고가 막 불러와졌으면 한 번 더
+        if (this.brand && this.table && this.brandBuilt !== brandKey(this.brand, this.table.id) && brandImageVersion() !== this.brandSeen) return true;
         return this.view === "player" && (this.cameraMoving || this.zoom !== this.zoomGoal());
     }
 
@@ -748,6 +764,7 @@ export class ThreeRenderer implements Renderer {
             const b = balls[i];
             if (!this.findEntry(b.id)) this.placeBall(this.acquire(b.id, R), b, R, 0, stamp);
         }
+        this.applyBrand();
         // 공 꾸미기 — 흰 공 · 노란 공에 주인이 고른 무늬(없으면 기본 재질)
         const skins = frame.ballSkins;
         for (let i = 0; i < this.active.length; i++) {
@@ -1263,6 +1280,54 @@ export class ThreeRenderer implements Renderer {
             } else shaft.color.set(st.base);
         }
         shaft.needsUpdate = true; ferrule.needsUpdate = true; tip.needsUpdate = true;
+    }
+
+    setBrand(brand: TableBrandView | null): void {
+        this.brand = brand;
+        this.applyBrand();
+    }
+
+    /** 로고 판을 지금 값에 맞춘다 — 같으면 아무것도 안 한다(draw 마다 불린다). 그림이 아직이면 다음에 */
+    private applyBrand(): void {
+        const t = this.table;
+        if (!t || this.disposed) return;
+        const key = brandKey(this.brand, t.id);
+        if (key === this.brandBuilt) return;
+        this.brandSeen = brandImageVersion();
+        const b = this.brand;
+        const img = b ? brandImage(b.image) : null;
+        if (b && !img) return;
+        this.clearBrand();
+        this.brandBuilt = key;
+        if (!b || !img || typeof document === "undefined") return;
+        const tex = new CanvasTexture(brandArt(img, b.tone, this.createCanvas) as HTMLCanvasElement);
+        tex.colorSpace = SRGBColorSpace;
+        this.brandTex = tex;
+        // 천과 같은 빛을 받게 Standard — 거칠게(반짝이지 않게), 깊이는 안 쓴다(그림자 · 스팟이 위에 얹힌다)
+        const mat = new MeshStandardMaterial({ map: tex, transparent: true, opacity: b.opacity, roughness: 1, metalness: 0, depthWrite: false });
+        this.brandMat = mat;
+        for (const r of brandRects(t, b, brandAspect(img))) {
+            const m = new Mesh(new PlaneGeometry(r.w, r.h), mat);
+            m.position.set(r.cx, r.cy, BRAND_Z);
+            m.rotation.z = r.rot;
+            m.renderOrder = -1;
+            m.frustumCulled = false;
+            this.brandMeshes.push(m);
+            this.scene.add(m);
+        }
+    }
+
+    private clearBrand(): void {
+        for (const m of this.brandMeshes) {
+            this.scene.remove(m);
+            m.geometry.dispose();
+        }
+        this.brandMeshes.length = 0;
+        this.brandMat?.dispose();
+        this.brandMat = null;
+        this.brandTex?.dispose();
+        this.brandTex = null;
+        this.brandBuilt = "";
     }
 
     /** 꾸민 공 재질 — 처음 볼 때 한 번 그린다. 못 그리면(2D 캔버스 없음 · 모르는 id) 기본 재질 */
