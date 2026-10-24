@@ -87,7 +87,7 @@ export function writeCaseSeen(ms: number): void {
 }
 
 /* ── 홈 입구 띠 · 게임 큐대 — 받은 수와 대표 큐(GET /cue-case/summary, 받은 기록만 읽는다) ── */
-export interface CaseSummary { opened: boolean; cue: number; chalk: number; glove: number; hero: string | null; heroShaft: string | null; heroBall: string | null; latest: number | null }
+export interface CaseSummary { opened: boolean; cue: number; chalk: number; glove: number; shaft: number; ball: number; hero: string | null; heroShaft: string | null; heroBall: string | null; latest: number | null }
 export const CASE_SUMMARY_KEY = ["cue-case-summary"] as const;
 const n0 = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 export async function fetchCaseSummary(): Promise<CaseSummary> {
@@ -95,7 +95,7 @@ export async function fetchCaseSummary(): Promise<CaseSummary> {
     const hero = typeof r.hero === "string" && caseItem(r.hero)?.kind === "cue" ? r.hero : null;
     const worn = (v: unknown, kind: "shaft" | "ball") => (typeof v === "string" && caseItem(v)?.kind === kind ? v : null);
     return {
-        opened: r.opened === true, cue: n0(r.cue), chalk: n0(r.chalk), glove: n0(r.glove), hero,
+        opened: r.opened === true, cue: n0(r.cue), chalk: n0(r.chalk), glove: n0(r.glove), shaft: n0(r.shaft), ball: n0(r.ball), hero,
         heroShaft: worn(r.heroShaft, "shaft"), heroBall: worn(r.heroBall, "ball"),
         latest: typeof r.latest === "number" && Number.isFinite(r.latest) ? r.latest : null,
     };

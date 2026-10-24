@@ -338,7 +338,7 @@ export class CueCaseRepository {
      * 홈 입구 띠 · 게임 큐대의 한 줄 — 받은 수 · 대표 큐 · 가장 최근에 적은 때(띠의 '새로'). 판정은 SYNC_MS 마다 한 번 같이 돌린다.
      * 대표 큐는 고른 것, 없으면 가장 최근에 받은 큐.
      */
-    async summary(memberId: string): Promise<{ opened: boolean; cue: number; chalk: number; glove: number; hero: string | null; heroShaft: string | null; heroBall: string | null; latest: number | null }> {
+    async summary(memberId: string): Promise<{ opened: boolean; cue: number; chalk: number; glove: number; shaft: number; ball: number; hero: string | null; heroShaft: string | null; heroBall: string | null; latest: number | null }> {
         // 판정도 가끔 돌린다 — 처음 한 번(받은 기록이 없을 때)과 그 뒤 SYNC_MS 마다. 그래야 큐 케이스를 안 연 사람도
         // 게임 큐대 · 홈 띠에 받은 큐가 들어온다. 실패해도 띠는 받은 기록만으로 그린다.
         const last = syncedAt.get(memberId) ?? 0;
@@ -354,13 +354,13 @@ export class CueCaseRepository {
             const [p] = await db.select({ heroItem: hiqCueCasePrefs.heroItem, heroShaft: hiqCueCasePrefs.heroShaft, heroBall: hiqCueCasePrefs.heroBall }).from(hiqCueCasePrefs).where(eq(hiqCueCasePrefs.memberId, memberId)).limit(1);
             const hero = p?.heroItem && ids.includes(p.heroItem) ? p.heroItem : ids.find((id) => caseItem(id)!.kind === "cue") ?? null;
             return {
-                opened: rows.length > 0, cue: kind("cue"), chalk: kind("chalk"), glove: kind("glove"), hero,
+                opened: rows.length > 0, cue: kind("cue"), chalk: kind("chalk"), glove: kind("glove"), shaft: kind("shaft"), ball: kind("ball"), hero,
                 heroShaft: wornOf("shaft", p?.heroShaft, ids), heroBall: wornOf("ball", p?.heroBall, ids),
                 latest: rows.length ? Math.max(...rows.map((r) => n(r.created))) : null,
             };
         } catch (e) {
             if (!missingTable(e)) throw e;
-            return { opened: false, cue: 0, chalk: 0, glove: 0, hero: null, heroShaft: null, heroBall: null, latest: null };
+            return { opened: false, cue: 0, chalk: 0, glove: 0, shaft: 0, ball: 0, hero: null, heroShaft: null, heroBall: null, latest: null };
         }
     }
 

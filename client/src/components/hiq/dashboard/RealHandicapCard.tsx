@@ -47,7 +47,7 @@ import { handiBandProgress } from "@shared/realHandicap";
 
 type HistoryRow = { sportCategory?: string | null; gameMode?: string | null; isRanked?: boolean | null; gameType?: string | null; isWinner?: boolean | null };
 
-export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, history, onPreview, sample, compact = false }: {
+export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, history, onPreview, sample }: {
     onStartMatch: () => void;
     /** 랭킹 점수 칸 — RP 안내 창 */
     onOpenRpGuide?: () => void;
@@ -59,11 +59,6 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     onPreview?: () => void;
     /** 비로그인 홈의 예시 인물 — 넘기면 내 기록 대신 이 숫자로 같은 카드를 그리고 "예시" 표시를 단다. 회원이면 넘기지 않는다 */
     sample?: GuestSampleBilliards | null;
-    /**
-     * 접은 모양(2026-10-24 홈 시안 B — 오너 "화면이 복잡한가"): 머리(제목 · 탭 · 메달 · 기록 띠)만 두고 닮은 프로 · 비교표는 '보기'로 편다.
-     * 회원들이 홈에서 제일 많이 가는 곳(온라인게임)이 이 카드 아래 두세 화면에 묻혀 있었다.
-     */
-    compact?: boolean;
 }) {
     const { t, locale } = useT();
     const { member } = useAuth();
@@ -74,7 +69,6 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
     // 온라인 에버 한 줄 — 온라인 카드와 같은 쿼리(캐시를 같이 쓴다)
     const online = useQuery<LookalikeResponse>({ queryKey: ["/api/hiq/sim/lookalike"], enabled: !!member, staleTime: 60_000, retry: false });
     const [tab, setTab] = useState<"3c" | "4c" | null>(null);
-    const [open, setOpen] = useState(false);
     // 예시일 땐 서버 응답·회원 행·경기 기록 자리에 예시 값을 넣는다 — 아래 그리는 코드는 회원과 같은 길을 탄다.
     // (비로그인은 위 두 쿼리가 꺼져 있다. 캐시에 남은 옛 답이 있어도 예시가 먼저다)
     const data = sample ? sample.real : q.data;
@@ -193,19 +187,6 @@ export function RealHandicapCard({ onStartMatch, onOpenRpGuide, getPercentile, h
             {strip}
         </>
     );
-
-    // 접은 모양 — 머리만, 아래는 '보기'로(편 뒤에는 아래의 원래 모양)
-    if (compact && !open) {
-        return (
-            <section className="rk-card rounded-3xl p-4" data-testid="real-card-compact">
-                {head}
-                <button type="button" onClick={() => setOpen(true)} data-testid="real-card-more"
-                    className="mt-2 w-full h-9 rounded-full text-[13px] font-semibold text-ink-2 hover:bg-surface-3 transition-colors">
-                    {t("home.recordMore")} ▾
-                </button>
-            </section>
-        );
-    }
 
     // 실전 비교(닮은 프로·비교표)는 따로 불러온다 — 그동안 머리·기록 띠는 먼저 보이고 아래만 자리를 잡아 둔다
     if (!data) {
