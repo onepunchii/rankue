@@ -170,7 +170,7 @@ describe("서버: 달마다 한 번만 주고, 준 것은 고치지 않는다", 
         expect(fn).toContain('.catch((e: unknown) => { console.error("[shelf close]", e); return null; });');
         // 마감 바로 뒤에 월대회를 연다(2026-10-12) — 메달 · 배지와 같은 자료로 출전자를 정한다
         expect(fn.indexOf("storage.simShelf.closeMonths(Date.now())")).toBeLessThan(fn.indexOf("m.openAndAnnounce(Date.now())"));
-        expect(fn).toContain("return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, shelf, cups });");
+        expect(fn).toContain("return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, summitMisses, shelf, cups });");
         expect(read("server/storage/index.ts")).toContain("public simShelf = new SimShelfRepository((fresh) => this.simMatch.ratedDeltas(fresh));");
     });
 

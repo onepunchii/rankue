@@ -8,7 +8,7 @@ import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { allMountains, getMountainDetail, mountainById, mountainBySlug, nearbyMountains, type MountainSummary } from "../../storage/hiking.js";
 import { trailheadPoint, type SummitBase } from "../../../shared/hikingSummitWx.js";
-import { addSummit, listHikingAwards, listSummits, removeRecord, syncHikingAwards, CREW_TOGETHER, crewSummits } from "../../storage/hikingStamps.js";
+import { addSummit, addSummitMiss, listHikingAwards, listSummits, removeRecord, syncHikingAwards, CREW_TOGETHER, crewSummits } from "../../storage/hikingStamps.js";
 import { addTrip, listTrips } from "../../storage/hikingTrips.js";
 import { cleanTrip } from "../../../shared/hikingTrail.js";
 import { addPhoto, appealPhoto, listMountainPhotos, listPhotos, photoCounts, removePhoto, setPhotoPublic } from "../../storage/hikingPhotos.js";
@@ -22,6 +22,7 @@ import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
 import { requireTermsAccepted } from "../../middleware/terms.js";
 import { distM } from "../../../shared/hikingGeo.js";
 import { judgeSummit, summitHint } from "../../../shared/hikingStamps.js";
+import { accuracyBand, fixErrorReason, isSummitClient } from "../../../shared/hikingSummitMiss.js";
 import { getCourseWeather } from "../../services/golfWeather.js";
 import { mountObsAll } from "../../services/hikingMountObs.js";
 import { fireRiskAll } from "../../services/hikingFireRisk.js";
@@ -211,13 +212,25 @@ router.get("/me/stamps", ...requireHikingAccess, asyncHandler(async (req: AuthRe
 router.post("/summits", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
     const m = await mountainById(String(req.body?.mountainId ?? ""));
     if (!m) return sendError(res, 404, "없는 산이에요");
+    // 실패의 까닭을 좌표 없이 남긴다(2026-10-24 — shared/hikingSummitMiss): 까닭 · 거리 구간 · 정확도 구간 · 기기 종류.
+    // 기다린다 — 서버리스는 답한 뒤 남은 일을 끊을 수 있다(적기 실패는 addSummitMiss 가 삼켜 인증 답을 막지 않는다)
+    const client = isSummitClient(req.body?.client) ? req.body.client : null;
+    // 화면이 위치를 못 받았다(거부 · 못 씀) — 위치 없이 까닭만 알린다. 적기만 하고 아무것도 찍지 않는다
+    const fixError = fixErrorReason(req.body?.fixError);
+    if (fixError) {
+        await addSummitMiss(req.userId!, m.id, { reason: fixError, bucket: null, accuracy: null, client });
+        return sendSuccess(res, { verified: false, reason: fixError, bucket: "no-fix", hint: null, added: false, awards: [] });
+    }
     const lat = Number(req.body?.lat), lng = Number(req.body?.lng);
     const acc = req.body?.accuracy == null ? null : Number(req.body.accuracy);
     const hasFix = Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180;
     const judged = m.lat == null || m.lng == null
         ? { verified: false, bucket: "no-fix" as const, reason: "no-summit" as const }
         : judgeSummit(hasFix ? distM(lat, lng, m.lat, m.lng) : null, acc);
-    if (!judged.verified) return sendSuccess(res, { verified: false, reason: judged.reason, bucket: judged.bucket, hint: summitHint(judged.reason, judged.bucket), added: false, awards: [] });
+    if (!judged.verified) {
+        await addSummitMiss(req.userId!, m.id, { reason: judged.reason, bucket: judged.bucket, accuracy: accuracyBand(acc), client });
+        return sendSuccess(res, { verified: false, reason: judged.reason, bucket: judged.bucket, hint: summitHint(judged.reason, judged.bucket), added: false, awards: [] });
+    }
     const now = Date.now();
     const added = await addSummit(req.userId!, m.id, { atMs: now, verified: true, bucket: judged.bucket });
     const fresh = added ? await syncHikingAwards(req.userId!, await allMountains(), (await listSummits(req.userId!)).map((s) => ({ mountainId: s.mountainId, at: s.at, verified: s.verified }))) : [];

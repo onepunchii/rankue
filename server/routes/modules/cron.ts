@@ -338,6 +338,9 @@ async function handleSimCleanup(req: any, res: any) {
     // 방문자 발자국(2026-10-08) — 60일 지난 줄을 지운다(shared/uiTrail TRAIL_KEEP_DAYS). 표가 없거나 실패해도 다른 청소 결과는 그대로 보낸다
     const trail = await db.execute(sql`delete from ui_events where created_at < now() - make_interval(days => ${TRAIL_KEEP_DAYS})`)
         .then((r: any) => Number(r?.rowCount ?? 0)).catch((e: unknown) => { console.error("[trail purge]", e); return -1; });
+    // 정상 인증 실패(2026-10-24 — shared/hikingSummitMiss) — 180일 지난 줄. 표가 없으면(마이그레이션 전) 조용히 넘어간다
+    const summitMisses = await db.execute(sql`delete from hiking_summit_misses where created_at < now() - interval '180 days'`)
+        .then((r: any) => Number(r?.rowCount ?? 0)).catch((e: any) => { if ((e?.code ?? e?.cause?.code) !== "42P01") console.error("[summit miss purge]", e); return -1; });
     // 장식장(2026-10-12) — 끝난 달을 마감해 그 달의 메달 · 등급 배지를 준다(shared/simShelf). 달마다 한 번뿐이고, 밀린 달이 있으면 같이 마감한다.
     // 매일 03:15(한국 시각)에 도니 1일 새벽에 지난달이 마감된다. 실패해도 다른 청소 결과는 그대로 보낸다 — 다음 날 다시 마감한다.
     const shelf = await storage.simShelf.closeMonths(Date.now())
@@ -346,7 +349,7 @@ async function handleSimCleanup(req: any, res: any) {
     // 마감 바로 뒤에 둔다 — 메달 · 배지와 같은 자료로 출전자를 정한다. 실패해도 다른 결과는 그대로 보낸다(다음 날 다시 연다).
     const cups = await import("../../services/simCupService.js").then((m) => m.openAndAnnounce(Date.now()))
         .catch((e: unknown) => { console.error("[cup open]", e); return null; });
-    return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, shelf, cups });
+    return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, summitMisses, shelf, cups });
 }
 router.get("/sim-cleanup", asyncHandler(handleSimCleanup));
 router.post("/sim-cleanup", asyncHandler(handleSimCleanup));

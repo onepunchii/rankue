@@ -11,9 +11,11 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { appConfirm } from "@/components/AppDialog";
 import type { AdminHikingAwardLoss, AdminSummitRow } from "@shared/hikingSummitFlags";
+import { SUMMIT_CLIENT_LABEL, SUMMIT_MISS_AFTER_LABEL, SUMMIT_MISS_LABEL, maybeOnTop, type AdminSummitMissRow } from "@shared/hikingSummitMiss";
 import { EmptyState, FilterChips, KpiTile, Panel, Pill, SearchBox, kstDateTime, kstTime } from "./adminUtils";
 
 const LIST = "/api/hiq/admin/hiking/summits";
+const MISSES = "/api/hiq/admin/hiking/summit-misses";
 const PERIODS = [{ id: "7", label: "7일" }, { id: "30", label: "30일" }, { id: "365", label: "1년" }] as const;
 
 function SummitDetail({ s, all, onOpenMember, onDone }: { s: AdminSummitRow; all: AdminSummitRow[]; onOpenMember?: (id: string) => void; onDone: () => void }) {
@@ -83,29 +85,73 @@ function SummitDetail({ s, all, onOpenMember, onDone }: { s: AdminSummitRow; all
     );
 }
 
+/**
+ * 실패한 시도(2026-10-24 오너: "진행") — 인증이 안 된 순간의 까닭(좌표 없음)과 그 뒤의 결과.
+ * '정상 근처'(150–500m · 위치 흐림 · 못 잡음)를 먼저 본다 — 정상에 있었는데 떨어졌을 수 있는 것. 멀리서 눌러 본 것은 뒤로.
+ */
+function SummitMisses({ rows, near, onOpenMember }: { rows: AdminSummitMissRow[]; near: boolean; onOpenMember?: (id: string) => void }) {
+    const shown = near ? rows.filter(maybeOnTop) : rows;
+    if (!shown.length) return <EmptyState>{rows.length ? "정상 근처에서 떨어진 시도가 없어요." : "실패한 시도가 없어요."}</EmptyState>;
+    return (
+        <div data-testid="admin-summit-misses"><Panel className="divide-y divide-black/[0.06]">
+            {shown.map((r) => (
+                <div key={r.id} className="flex items-start gap-3 px-4 py-3" data-testid="admin-summit-miss">
+                    {maybeOnTop(r) ? <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-red-500" title="정상 근처" /> : <span className="mt-1.5 h-1.5 w-1.5 shrink-0" />}
+                    <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-center gap-x-1.5 text-[13.5px]">
+                            <span className="font-black">{r.mountainName}</span>
+                            <span className="text-black/30">·</span>
+                            {onOpenMember ? <button type="button" onClick={() => onOpenMember(r.memberId)} className="font-bold text-black/65 underline-offset-2 hover:underline">{r.memberName}</button> : <span className="font-bold text-black/65">{r.memberName}</span>}
+                        </p>
+                        <p className="mt-0.5 text-[12px] text-black/45">
+                            {kstDateTime(r.at)} · {SUMMIT_MISS_LABEL[r.reason]}{r.reason === "far" && r.bucket ? ` ${r.bucket}` : ""}{r.accuracy ? ` · 정확도 ${r.accuracy}` : ""}{r.client ? ` · ${SUMMIT_CLIENT_LABEL[r.client]}` : ""}
+                        </p>
+                    </div>
+                    <Pill tone={r.after === "verified" ? "brand" : r.after === "recorded" ? "neutral" : "warn"}>{SUMMIT_MISS_AFTER_LABEL[r.after]}</Pill>
+                </div>
+            ))}
+        </Panel></div>
+    );
+}
+
 export default function HikingSummitsView({ onOpenMember }: { onOpenMember?: (id: string) => void }) {
     const qc = useQueryClient();
     const [days, setDays] = useState<string>("30");
-    const [view, setView] = useState<"all" | "flag" | "void">("all");
+    const [view, setView] = useState<"all" | "flag" | "void" | "miss">("all");
+    const [nearOnly, setNearOnly] = useState(true);
     const [q, setQ] = useState("");
     const [open, setOpen] = useState<string | null>(null);
     const list = useQuery<AdminSummitRow[]>({ queryKey: [LIST, { days, ...(q.trim() ? { q: q.trim() } : {}) }] });
     const rows = useMemo(() => (Array.isArray(list.data) ? list.data : []), [list.data]);
+    // 실패한 시도는 최대 180일
+    const missQ = useQuery<AdminSummitMissRow[]>({ queryKey: [MISSES, { days: String(Math.min(180, Number(days))), ...(q.trim() ? { q: q.trim() } : {}) }] });
+    const misses = useMemo(() => (Array.isArray(missQ.data) ? missQ.data : []), [missQ.data]);
+    const nearMisses = misses.filter(maybeOnTop).length;
     const live = rows.filter((r) => !r.voided);
-    const shown = view === "flag" ? live.filter((r) => r.flags.length) : view === "void" ? rows.filter((r) => r.voided) : rows;
+    const shown = view === "flag" ? live.filter((r) => r.flags.length) : view === "void" ? rows.filter((r) => r.voided) : view === "miss" ? [] : rows;
     return (
         <div className="space-y-4" data-testid="admin-hiking-summits">
-            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+            <div className="grid grid-cols-2 gap-2.5 lg:grid-cols-5">
                 <KpiTile label="정상 인증" value={live.length} unit="번" tone="brand" onClick={() => setView("all")} />
                 <KpiTile label="인증한 사람" value={new Set(live.map((r) => r.memberId)).size} unit="명" />
                 <KpiTile label="다시 볼 것" value={live.filter((r) => r.flags.length).length} unit="번" tone={live.some((r) => r.flags.length) ? "alert" : "default"} onClick={() => setView("flag")} />
                 <KpiTile label="취소한 인증" value={rows.length - live.length} unit="번" onClick={() => setView("void")} />
+                <KpiTile label="실패한 시도" value={misses.length} unit="번" tone={nearMisses ? "alert" : "default"} onClick={() => setView("miss")} />
             </div>
             <div className="flex flex-wrap items-center gap-2">
                 <div className="shrink-0"><FilterChips value={days} onChange={setDays} options={PERIODS.map((p) => ({ id: p.id, label: p.label }))} /></div>
-                <div className="shrink-0"><FilterChips value={view} onChange={setView} options={[{ id: "all", label: "전부" }, { id: "flag", label: "다시 볼 것", alert: true }, { id: "void", label: "취소한 인증" }]} /></div>
+                <div className="shrink-0"><FilterChips value={view} onChange={setView} options={[{ id: "all", label: "전부" }, { id: "flag", label: "다시 볼 것", alert: true }, { id: "void", label: "취소한 인증" }, { id: "miss", label: "실패한 시도" }]} /></div>
                 <SearchBox value={q} onChange={setQ} placeholder="회원 · 산 이름" className="w-full sm:ml-auto sm:w-56" />
             </div>
+            {view === "miss" ? (
+                <>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <FilterChips value={nearOnly ? "near" : "all"} onChange={(v) => setNearOnly(v === "near")} options={[{ id: "near", label: `정상 근처 ${nearMisses}`, alert: nearMisses > 0 }, { id: "all", label: `전부 ${misses.length}` }]} />
+                    </div>
+                    <p className="text-[12px] leading-snug text-black/45">인증이 안 된 순간의 까닭만 남겨요(좌표 없음). '정상 근처'는 150–500m · 위치가 흐림 · 위치를 못 잡음 — 정상에 있었는데 떨어졌을 수 있는 시도예요. 오른쪽은 같은 날 그 뒤의 결과.</p>
+                    {missQ.isLoading ? <EmptyState>불러오는 중…</EmptyState> : <SummitMisses rows={misses} near={nearOnly} onOpenMember={onOpenMember} />}
+                </>
+            ) : (<>
             <p className="text-[12px] leading-snug text-black/45">정상 인증은 서버가 정상까지의 거리를 재고 구간만 남겨요(좌표는 남기지 않음). 그래서 하루에 너무 많은 곳 · 산과 산 사이를 너무 빨리 옮긴 인증을 골라 보여 줍니다.</p>
             {list.isLoading ? <EmptyState>불러오는 중…</EmptyState> : shown.length === 0 ? (
                 <EmptyState>{rows.length === 0 ? "아직 정상 인증이 없어요." : view === "flag" ? "다시 볼 인증이 없어요." : view === "void" ? "취소한 인증이 없어요." : "맞는 인증이 없어요."}</EmptyState>
@@ -130,6 +176,7 @@ export default function HikingSummitsView({ onOpenMember }: { onOpenMember?: (id
                     ))}
                 </Panel>
             )}
+            </>)}
         </div>
     );
 }

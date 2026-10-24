@@ -18,6 +18,12 @@ import { GradeArt } from "./GradeParts";
 import { MountainPatch } from "./MountainPatch";
 import { PatchArt, PinArt } from "./StampParts";
 import { MY_STAMPS_KEY, type MyAward } from "./useHikingStamps";
+import { isNative } from "@shared/nativeCaps";
+import { isInAppBrowser } from "@shared/installPrompt";
+import type { SummitClient } from "@shared/hikingSummitMiss";
+
+/** 기기 종류 — 실패의 까닭과 함께 서버에 남는다(앱 · 다른 앱 안의 브라우저 · 웹). 위치 정확도가 기기마다 달라서다 */
+const clientKind = (): SummitClient => (isNative() ? "app" : typeof navigator !== "undefined" && isInAppBrowser(navigator.userAgent) ? "inapp" : "web");
 
 interface CheckinResult { verified: boolean; reason: string; hint: string | null; added: boolean; awards: MyAward[] }
 
@@ -34,13 +40,19 @@ export function SummitCheckin({ mountainId, name, stamp, hasSummit, region, patc
     const [justNow, setJustNow] = useState(false);
 
     const checkin = useMutation({
-        mutationFn: async (): Promise<CheckinResult | { denied: true }> => {
+        mutationFn: async (): Promise<CheckinResult | { denied: "denied" | "unavailable" | "prompt" }> => {
             const pos = await getDevicePosition({ prompt: true, highAccuracy: true, timeoutMs: 15000, maximumAgeMs: 0 });
-            if (pos.status !== "granted") return { denied: true };
-            return apiRequest("/api/hiq/hiking/summits", { method: "POST", body: JSON.stringify({ mountainId, lat: pos.fix.lat, lng: pos.fix.lng, accuracy: pos.fix.accuracy }) });
+            const client = clientKind();
+            if (pos.status !== "granted") {
+                // 위치를 못 받았다 — 서버에 위치 없이 까닭만 알린다(2026-10-24 · 관리자 '실패한 시도'). 답을 기다리지 않고 안내를 띄운다
+                void apiRequest("/api/hiq/hiking/summits", { method: "POST", body: JSON.stringify({ mountainId, fixError: pos.status, client }) }).catch(() => { /* 못 알려도 안내는 그대로 */ });
+                return { denied: pos.status };
+            }
+            return apiRequest("/api/hiq/hiking/summits", { method: "POST", body: JSON.stringify({ mountainId, lat: pos.fix.lat, lng: pos.fix.lng, accuracy: pos.fix.accuracy, client }) });
         },
         onSuccess: (r) => {
-            if ("denied" in r) { setMsg({ tone: "warn", text: "위치를 쓸 수 없어요. 설정에서 위치를 허용한 뒤 다시 눌러 주세요." }); return; }
+            // 거부(허락 안 함)와 못 잡음(시간 초과 · GPS 꺼짐)은 안내가 다르다 — 예전엔 못 잡아도 '허용하라'고 했다
+            if ("denied" in r) { setMsg({ tone: "warn", text: r.denied === "unavailable" ? "위치를 잡지 못했어요. 하늘이 트인 곳에서 잠시 뒤 다시 눌러 주세요." : "위치를 쓸 수 없어요. 설정에서 위치를 허용한 뒤 다시 눌러 주세요." }); return; }
             if (!r.verified) { setMsg({ tone: "warn", text: r.hint ?? "정상 가까이에서 다시 눌러 주세요." }); return; }
             setMsg({ tone: "ok", text: r.added ? `${name} 정상 도장이 찍혔어요.` : "오늘은 이미 인증했어요." });
             setFresh(r.awards ?? []);

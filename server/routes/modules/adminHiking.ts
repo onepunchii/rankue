@@ -2,6 +2,7 @@
  * 어드민 · 등산(2026-10-16 어드민 전수 조사 → 오너가 정한 순서의 '등산'). 지금은 '정상 인증' — 회원을 한 명씩 열지 않고 전부를 본다.
  *
  * GET /admin/hiking/summits?days=30&q=                    정상 인증 전부(취소한 것 포함) — 회원 · 산 · 때 · 거리 구간 · 다시 볼 것(shared/hikingSummitFlags)
+ * GET /admin/hiking/summit-misses?days=30&q=              정상 인증 실패(2026-10-24) — 까닭 · 거리/정확도 구간 · 기기 · 그 뒤의 결과(인증함 · 다녀왔어요 · 그만둠). 좌표 없음
  * GET /admin/hiking/summits/:id/revoke-preview            인증을 취소하면 거둘 와펜 · 핀 · 등급(계산만)
  * POST /admin/hiking/summits/:id/revoke { reason }        인증 취소 — '인증 없는 기록'으로 내리고(admin_void), 남은 기록이 받쳐 주지 않는 받은 것을 거둔다
  * POST /admin/hiking/summits/:id/restore { reason }       되살리기 — 다시 인증으로, 받을 것을 다시 적는다(번호는 새로)
@@ -36,6 +37,7 @@ import { isWithdrawnMember } from "../../../shared/chatSupport.js";
 import { goodsItem } from "../../../shared/goods.js";
 import { hikingAwardsDue, hikingAwardId, type Summit } from "../../../shared/hikingStamps.js";
 import { summitFlags, type AdminHikingAwardLoss, type AdminSummitRow, type MountainSpot } from "../../../shared/hikingSummitFlags.js";
+import { ACCURACY_BANDS, isSummitClient, isSummitMissReason, type AccuracyBand, type AdminSummitMissRow, type SummitMissAfter } from "../../../shared/hikingSummitMiss.js";
 import { distM, nearestOnLine, summitCandidates, summitKmOn, validSpot, type AdminKeep, type AdminMountainDetail, type AdminMountainRow, type KeepField, type LinePoint } from "../../../shared/hikingMountainEdit.js";
 
 const router = Router();
@@ -70,6 +72,40 @@ router.get("/summits", asyncHandler(async (req: any, res: any) => {
         heightM: r.height_m == null ? null : Number(r.height_m), at: String(r.at_iso), day: String(r.day), bucket: r.bucket ?? null,
         flags: r.verified ? flags.get(r.id) ?? [] : [],
         voided: !r.verified && r.admin_void ? { at: String(r.admin_void.at ?? ""), reason: String(r.admin_void.reason ?? ""), by: String(r.admin_void.by ?? "관리자") } : null,
+    }));
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, out);
+}));
+
+/**
+ * 정상 인증 실패(2026-10-24 오너: "진행") — 실패할 때 남긴 까닭(좌표 없음)과, 같은 회원 · 같은 산 · 같은 날 그 뒤에 어떻게 됐는지.
+ * 뒤에 인증했으면 '뒤에 인증함', 인증 없이 적었으면 '다녀왔어요로 적음', 아무것도 없으면 '그만둠'.
+ */
+router.get("/summit-misses", asyncHandler(async (req: any, res: any) => {
+    const days = Math.min(180, Math.max(1, Number(req.query.days) || 30));
+    const term = typeof req.query.q === "string" ? req.query.q.trim().slice(0, 30) : "";
+    const like = `%${term.replace(/[%_\\]/g, "")}%`;
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+    let rows: any[] = [];
+    try {
+        rows = rowsOf(await db.execute(sql`
+            select x.id::text as id, x.member_id::text as member_id, x.mountain_id, x.reason, x.bucket, x.accuracy, x.client, ${TS("x.created_at")} as at_iso,
+                m.name as member_name, m.phone, hm.name as mountain_name,
+                (select case when bool_or(s.verified) then 'verified' when count(*) > 0 then 'recorded' else 'none' end
+                   from hiking_summits s
+                  where s.member_id = x.member_id and s.mountain_id = x.mountain_id
+                    and s.day = to_char(x.created_at + interval '9 hours', 'YYYY-MM-DD') and s.created_at >= x.created_at) as after
+            from hiking_summit_misses x left join hiq_members m on m.id = x.member_id left join hiking_mountains hm on hm.id = x.mountain_id
+            where x.created_at >= (${since}::timestamptz at time zone 'UTC')
+              and (${term} = '' or m.name ilike ${like} or hm.name ilike ${like})
+            order by x.created_at desc limit 500`));
+    } catch (e: any) { if ((e?.code ?? e?.cause?.code) !== "42P01") throw e; }
+    const out: AdminSummitMissRow[] = rows.filter((r) => isSummitMissReason(r.reason)).map((r) => ({
+        id: r.id, at: String(r.at_iso), memberId: r.member_id, memberName: shownName(r.member_name, r.phone),
+        mountainId: r.mountain_id, mountainName: String(r.mountain_name ?? r.mountain_id),
+        reason: r.reason, bucket: r.bucket ?? null, accuracy: ACCURACY_BANDS.includes(r.accuracy) ? (r.accuracy as AccuracyBand) : null,
+        client: isSummitClient(r.client) ? r.client : null,
+        after: (r.after === "verified" || r.after === "recorded" ? r.after : "none") as SummitMissAfter,
     }));
     res.set("Cache-Control", "private, no-store");
     return sendSuccess(res, out);

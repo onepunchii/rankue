@@ -47,6 +47,18 @@ export async function addSummit(memberId: string, mountainId: string, input: { a
 }
 
 /** 인증 없이 적은 기록 한 줄을 지운다(본인 것만). 인증 도장은 지우지 않는다 */
+/**
+ * 정상 인증 실패 한 줄(2026-10-24 — shared/hikingSummitMiss). 좌표 없이 까닭 · 거리 구간 · 정확도 구간 · 기기 종류만.
+ * 적기 실패(표가 아직 없음 등)는 인증 응답을 막지 않는다 — 부르는 쪽이 기다리지 않는다.
+ */
+export async function addSummitMiss(memberId: string, mountainId: string, m: { reason: string; bucket: string | null; accuracy: string | null; client: string | null }): Promise<void> {
+    try {
+        await db.execute(sql`insert into hiking_summit_misses (member_id, mountain_id, reason, bucket, accuracy, client) values (${memberId}::uuid, ${mountainId}, ${m.reason}, ${m.bucket}, ${m.accuracy}, ${m.client})`);
+    } catch (e: any) {
+        if ((e?.code ?? e?.cause?.code) !== "42P01") console.error("[summit miss]", e?.message ?? e);
+    }
+}
+
 export async function removeRecord(memberId: string, summitId: string): Promise<boolean> {
     const r = await rows<any>(sql`delete from hiking_summits where id = ${summitId}::uuid and member_id = ${memberId}::uuid and verified = false returning id`);
     return r.length > 0;
