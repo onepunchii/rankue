@@ -1,6 +1,6 @@
 /**
- * 당구대 로고 · 광고를 묻는 곳(2026-10-24) — GET /api/hiq/sim/table-brand(로그인 없이 · CDN 5분). 게임 · 관전이 같이 쓴다.
- * 한 번 물은 답은 5분 둔다. 실패하면 다음에 다시 묻고(실패한 promise 를 붙잡아 두지 않는다) 로고 없이 간다.
+ * 당구대 로고 · 광고를 묻는 곳(2026-10-24) — GET /api/hiq/sim/table-brand(로그인 없이 · CDN 30초). 게임 · 관전이 같이 쓴다.
+ * 한 번 물은 답은 1분 둔다(게임 화면을 다시 열면 그 뒤로 새로 묻는다). 실패하면 다음에 다시 묻고(실패한 promise 를 붙잡아 두지 않는다) 로고 없이 간다.
  * '@/' 별칭을 쓰지 않는다 — 관전 화면 시험(vitest)이 이 파일까지 불러온다.
  */
 import { useEffect, useState } from "react";
@@ -8,7 +8,7 @@ import { parseBrands, type BrandTableId, type TableBrandView } from "@shared/tab
 
 type Brands = Record<BrandTableId, TableBrandView | null>;
 const NONE: Brands = { DAEDAE: null, JUNGDAE_KR: null };
-const KEEP_MS = 5 * 60_000;
+const KEEP_MS = 60_000;
 let pending: Promise<Brands> | null = null;
 let at = 0;
 

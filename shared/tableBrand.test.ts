@@ -98,10 +98,10 @@ describe("연결", () => {
         expect(m).toContain("where not exists (select 1 from sim_table_brands)");
         expect(m.split("\n").filter((l) => !l.trim().startsWith("--")).join("\n")).not.toMatch(/\bdrop\b|\bdelete\s+from\b|\bupdate\s+\w+\s+set\b|\btruncate\b/i);
     });
-    it("게임이 묻는 길 — 로그인 없이 · CDN 5분, 관리자 길은 슈퍼관리자(adminBilliards 안)", () => {
+    it("게임이 묻는 길 — 로그인 없이 · CDN 30초(길면 고친 것이 안 보인다 — 오너 제보), 관리자 길은 슈퍼관리자(adminBilliards 안)", () => {
         const sim = read("server/routes/modules/simMatch.ts");
         expect(sim).toContain('router.get("/sim/table-brand", asyncHandler(');
-        expect(sim).toContain('res.set("CDN-Cache-Control", "public, s-maxage=300, stale-while-revalidate=600");');
+        expect(sim).toContain('res.set("CDN-Cache-Control", "public, s-maxage=30, stale-while-revalidate=30");');
         const adm = read("server/routes/modules/adminBilliards.ts");
         expect(adm.indexOf('router.use("/table-brands", tableBrandRouter);')).toBeGreaterThan(adm.indexOf("router.use(checkSuperAdmin);"));
         expect(read("server/routes/modules/adminTableBrand.ts")).toContain("const clean = stripImageMetadata(");

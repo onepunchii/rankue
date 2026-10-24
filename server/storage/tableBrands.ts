@@ -1,6 +1,6 @@
 /**
  * 당구대 로고 · 광고 저장소(2026-10-24) — 표 sim_table_brands(migrations/sim_table_brands.sql) · 규칙 shared/tableBrand.
- * 게임이 묻는 '지금 걸 것'은 인스턴스마다 1분 둔다(고치면 바로 비운다). 표가 아직 없으면 우리 기본 로고만.
+ * 게임이 묻는 '지금 걸 것'은 인스턴스마다 15초 둔다(고치면 그 인스턴스는 바로 비운다). 표가 아직 없으면 우리 기본 로고만.
  */
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
@@ -9,7 +9,7 @@ import { DEFAULT_BRAND_IMAGE, pickBrands, type BrandTableId, type TableBrandRow,
 const rowsOf = (r: any) => (r.rows ?? r) as any[];
 const missing = (e: any) => ["42P01", "42703"].includes(e?.code ?? e?.cause?.code);
 const ms = (v: unknown): number | null => (v == null ? null : v instanceof Date ? v.getTime() : new Date(String(v)).getTime());
-const LIVE_MS = 60_000;
+const LIVE_MS = 15_000;
 let cache: { at: number; rows: TableBrandRow[] } | null = null;
 
 /** 표가 없을 때의 한 줄 — 마이그레이션이 넣는 '랭큐 기본'과 같다 */

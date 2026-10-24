@@ -2,7 +2,7 @@
  * 어드민 · 당구 › 당구대 광고(2026-10-24 오너: "이 로고를 투명도 있게 온라인게임 당구대에 · 어드민에서 사진 교체해서 광고나 이런거").
  * 위: 지금 걸린 것(대대 파랑 · 중대 초록 천에 실제 비율로). 가운데: 캠페인 목록(지금 걸림 · 예정 · 끝남 · 꺼짐). 아래: 고치기.
  * 고르는 규칙은 shared/tableBrand pickBrands — 기간 있는 캠페인(협찬)이 기간 없는 '랭큐 기본'보다 먼저 걸린다.
- * 게임은 5분 안에 바뀐 것을 본다(CDN · 서버 캐시). 협찬 이름을 적으면 게임 화면에 '○○ 협찬'이 뜬다.
+ * 게임은 1분 안에 바뀐 것을 본다(CDN 30초 · 서버 15초 · 화면 1분 — 열려 있던 게임 화면은 다시 열어야 바뀐다). 협찬 이름을 적으면 게임 화면에 '○○ 협찬'이 뜬다.
  */
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -78,7 +78,7 @@ export default function BilliardsTableBrandView() {
     };
     const save = useMutation({
         mutationFn: () => apiRequest(editing === "new" ? API : `${API}/${editing}`, { method: editing === "new" ? "POST" : "PATCH", body: { ...form, sponsor: form.sponsor?.trim() ? form.sponsor.trim() : null } }),
-        onSuccess: () => { toast({ title: editing === "new" ? "캠페인을 만들었어요" : "고쳤어요", description: "게임에는 5분 안에 보여요." }); setEditing(null); done(); },
+        onSuccess: () => { toast({ title: editing === "new" ? "캠페인을 만들었어요" : "고쳤어요", description: "게임에는 1분 안에 보여요 — 열려 있던 게임 화면은 다시 열면 바뀝니다." }); setEditing(null); done(); },
         onError: (e) => toast({ title: "저장하지 못했어요", description: errMsg(e), variant: "destructive" }),
     });
     const toggle = useMutation({
@@ -103,7 +103,7 @@ export default function BilliardsTableBrandView() {
         <div className="space-y-4" data-testid="admin-table-brand">
             <Panel className="p-4">
                 <p className="text-[13px] font-bold text-black/80">지금 게임에 걸린 것</p>
-                <p className="mt-0.5 text-[12px] leading-relaxed text-black/45">기간 있는 캠페인(협찬)이 기간 없는 '랭큐 기본'보다 먼저 걸립니다. 바꾸면 게임에는 5분 안에 보여요.</p>
+                <p className="mt-0.5 text-[12px] leading-relaxed text-black/45">기간 있는 캠페인(협찬)이 기간 없는 '랭큐 기본'보다 먼저 걸립니다. 바꾸면 게임에는 1분 안에 보여요(열려 있던 게임 화면은 다시 열면).</p>
                 <div className="mt-3 grid max-w-[300px] grid-cols-2 gap-4">
                     {BRAND_TABLES.map((t) => (
                         <div key={t}>
