@@ -29,6 +29,26 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const rowsOf = (r: any) => (r.rows ?? r) as any[];
 const iso = (v: unknown) => (v == null ? null : new Date(v as string).toISOString());
 
+/**
+ * 굿즈샵 출시 알림 신청(2026-10-24, shared/goodsShop) — 품목별 수 · 고른 것이 있는 사람 수 · 최근 신청 50.
+ * 표가 아직 없으면 빈 값.
+ */
+router.get("/shop-interest", asyncHandler(async (_req: any, res: any) => {
+    res.set("Cache-Control", "private, no-store");
+    try {
+        const rows = rowsOf(await db.execute(sql`
+            select g.member_id, g.items, g.updated_at, m.name from goods_shop_interest g left join hiq_members m on m.id = g.member_id
+            where cardinality(g.items) > 0 order by g.updated_at desc`));
+        const byItem: Record<string, number> = {};
+        for (const r of rows) for (const it of (Array.isArray(r.items) ? r.items : [])) byItem[it] = (byItem[it] ?? 0) + 1;
+        const recent = rows.slice(0, 50).map((r) => ({ memberId: String(r.member_id), name: String(r.name ?? ""), items: Array.isArray(r.items) ? r.items.map(String) : [], at: new Date(r.updated_at).getTime() }));
+        return sendSuccess(res, { total: rows.length, byItem, recent });
+    } catch (e: any) {
+        if ((e?.code ?? e?.cause?.code) === "42P01") return sendSuccess(res, { total: 0, byItem: {}, recent: [] });
+        throw e;
+    }
+}));
+
 router.get("/member/:id", asyncHandler(async (req: any, res: any) => {
     if (!UUID.test(req.params.id)) return sendError(res, 404, "회원을 찾을 수 없어요");
     const [m] = await db.select({ id: hiqMembers.id, name: hiqMembers.name, locale: hiqMembers.locale }).from(hiqMembers).where(eq(hiqMembers.id, req.params.id)).limit(1);

@@ -15,6 +15,7 @@ import gameRouter from "./modules/game.js";
 import notificationRouter from "./modules/notification.js";
 import simRouter from "./modules/sim.js";
 import cueCaseRouter from "./modules/cueCase.js";
+import goodsShopRouter from "./modules/goodsShop.js";
 import inviteRouter from "./modules/invite.js";
 import giftsRouter from "./modules/gifts.js";
 import simMatchRouter from "./modules/simMatch.js";
@@ -103,6 +104,7 @@ router.use("/", gameRouter);
 // 시뮬레이터 v2: /sim/sessions, /sim/ladder — 서버가 shared/sim 으로 재시뮬해 정본을 만든다
 router.use("/", simRouter);
 router.use("/", cueCaseRouter);
+router.use("/", goodsShopRouter);   // 굿즈샵 출시 알림(2026-10-24)
 router.use("/", inviteRouter);
 router.use("/", giftsRouter);
 router.use("/", simMatchRouter);

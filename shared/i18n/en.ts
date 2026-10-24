@@ -182,6 +182,7 @@ export const en: Record<string, string> = {
   "err.sim.sessionNotFound": "Session not found",
   "err.sim.shelfNotFound": "Trophy shelf not found",
   "err.cueCase.notFound": "Cue case not found",
+  "err.goodsShop.items": "Some of those items can't be chosen",
   "err.cueCase.notOwned": "You haven't earned this cue yet",
   "err.cueCase.pickNone": "No limited cue to pick yet",
   "err.cueCase.pickHave": "You already own this design",

@@ -26,6 +26,7 @@ import { shareBlob } from "@/sim/share/useShare";
 import { canvasToBlob } from "@/sim/share/shareCard";
 import { renderCaseCard } from "@/components/hiq/cueCase/caseCard";
 import { InvitePanel } from "@/components/hiq/invite/InvitePanel";
+import { GOODS_TEASER_ID, GoodsTeaser } from "@/components/hiq/cueCase/GoodsTeaser";
 import { BALLS, CASE_ITEMS, CHALKS, CUES, GLOVES, PEOPLE_STEPS, SHAFTS, caseImage, caseItem, cueHow, difficulty, isSecret, type CaseItem, type CaseKind, type CaseLocale, type CueGroup, type WornKind } from "@shared/cueCase";
 import { serialText } from "@/components/hiq/cueCase/cueCaseApi";
 import { DEFAULT_BALL, DEFAULT_SHAFT } from "@shared/cueStyles";
@@ -151,7 +152,12 @@ export default function CueCasePage() {
 
                 {/* 가죽 뚜껑 — 놋쇠 명판과 모은 수 */}
                 <section className="cc-lid rounded-[26px] px-5 pb-5 pt-6" aria-label={plate} data-tour="cc-plate">
-                    <div className="cc-plate mx-auto w-fit max-w-full rounded-md px-7 py-1.5 text-center">
+                    {/* 가죽 패치(2026-10-24) — 마스코트를 금박으로 눌러 찍은 랭큐 패치. 실물 큐 케이스에 달 패치와 같은 그림. 누르면 굿즈 칸으로 */}
+                    <button type="button" onClick={() => document.getElementById(GOODS_TEASER_ID)?.scrollIntoView({ behavior: "smooth", block: "center" })}
+                        className="cc-patch absolute left-3.5 top-3.5" aria-label={t("shop.patch")} data-testid="cue-case-patch" data-track-as="큐 케이스 가죽 패치">
+                        <img src="/billiards/case/mascot-foil.webp" alt="" width={46} height={46} decoding="async" draggable={false} />
+                    </button>
+                    <div className="cc-plate mx-auto w-fit max-w-[calc(100%-96px)] rounded-md px-7 py-1.5 text-center">
                         <p className="truncate text-[14px] font-bold tracking-[0.02em]" data-testid="cue-case-plate">{plate}</p>
                     </div>
                     <dl className="mt-4 grid grid-cols-3 gap-2 text-center" data-testid="cue-case-counts">
@@ -291,6 +297,9 @@ export default function CueCasePage() {
                         )}
                     </section>
                 )}
+
+                {/* 랭큐 굿즈 곧 나와요(2026-10-24) — 출시 알림 신청으로 무엇부터 만들지 센다 */}
+                <GoodsTeaser l={l} signedIn={!!member} onGuest={() => gate.guard(() => undefined)} />
             </div>
 
             {pick && <ItemSheet item={pick} view={it(pick.id)} l={l} mine={!!d?.member.mine && mineView} hero={d?.hero ?? null} worn={pick.kind === "shaft" ? d?.heroShaft ?? null : pick.kind === "ball" ? d?.heroBall ?? null : null} onClose={() => setPick(null)} />}

@@ -182,6 +182,7 @@ export const tr: Record<string, string> = {
   "err.sim.sessionNotFound": "Oturum bulunamadı",
   "err.sim.shelfNotFound": "Vitrin bulunamadı",
   "err.cueCase.notFound": "Istaka çantası bulunamadı",
+  "err.goodsShop.items": "Seçilemeyen ürünler var",
   "err.cueCase.notOwned": "Bu ıstakayı henüz kazanmadın",
   "err.cueCase.pickNone": "Henüz seçebileceğin sınırlı ıstaka yok",
   "err.cueCase.pickHave": "Bu tasarım zaten sende",

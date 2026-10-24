@@ -182,6 +182,7 @@ export const es: Record<string, string> = {
   "err.sim.sessionNotFound": "No se encontró la sesión",
   "err.sim.shelfNotFound": "No se encontró la vitrina",
   "err.cueCase.notFound": "No se encontró el estuche",
+  "err.goodsShop.items": "Hay artículos que no se pueden elegir",
   "err.cueCase.notOwned": "Aún no has ganado este taco",
   "err.cueCase.pickNone": "Aún no puedes elegir un taco limitado",
   "err.cueCase.pickHave": "Ya tienes este diseño",

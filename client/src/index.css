@@ -1154,6 +1154,39 @@ body {
     background: linear-gradient(90deg, #b48a3d, var(--cc-gold));
   }
   .cue-case .cc-bar.cc-online > i { background: linear-gradient(90deg, #138b8f, #46e4e0); }
+  /* 가죽 패치(2026-10-24) — 마스코트 금박을 눌러 찍은 둥근 가죽. 뚜껑보다 한 톤 짙고, 안쪽 바느질 고리 */
+  .cue-case .cc-patch {
+    width: 46px;
+    height: 46px;
+    border-radius: 9999px;
+    overflow: hidden;
+    background: radial-gradient(circle at 40% 32%, #4f2417 0%, #2e130b 70%, #1f0c06 100%);
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.7), inset 0 -1px 0 rgba(255, 220, 180, 0.12), 0 1px 0 rgba(255, 220, 180, 0.1);
+    z-index: 1;
+  }
+  .cue-case .cc-patch::before {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    border-radius: inherit;
+    border: 1px dashed rgba(232, 196, 106, 0.5);
+    pointer-events: none;
+    z-index: 1;
+  }
+  .cue-case .cc-patch > img {
+    position: absolute;
+    inset: 4px;
+    width: calc(100% - 8px);
+    height: calc(100% - 8px);
+    border-radius: 9999px;
+    filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.65));
+  }
+  .cue-case .cc-patch:active { transform: scale(0.95); }
+  /* 굿즈 칸 — 마스코트 사진의 바탕과 같은 검정에 금실 테 */
+  .cue-case .cc-goods {
+    background: radial-gradient(120% 90% at 85% 20%, #1c1a17 0%, #0b0a09 60%);
+    box-shadow: inset 0 0 0 1px rgba(232, 196, 106, 0.22), 0 10px 26px rgba(0, 0, 0, 0.45);
+  }
   /* 칸 고르기(2026-10-24) — 케이스 안의 칸. 벨벳 홈에 지금 쓰는 물건을 눕혀 두고, 고른 칸은 놋쇠 테에 불이 켜진다 */
   .cue-case .cc-comp {
     display: flex;

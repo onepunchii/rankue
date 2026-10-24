@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { GOODS_SPORTS, GOODS_SPORT_NAME, goodsCatalog, type GoodsGrantRow, type GoodsItem, type GoodsOwned, type GoodsSport } from "@shared/goods";
+import { GOODS_SHOP_ITEMS, type GoodsShopStats } from "@shared/goodsShop";
 import { ADMIN_MEMBERS_KEY, type AdminMember } from "./MemberDetailSheet";
 import { EmptyState, FilterChips, MemberAvatar, Panel, Pill, SearchBox, kstDateTime } from "./adminUtils";
 
@@ -34,6 +35,45 @@ function Thumb({ item, size = "md" }: { item: GoodsItem; size?: "md" | "lg" }) {
                 ? <img src={item.image} alt="" loading="lazy" draggable={false} className={item.shape === "cue" ? "w-full object-contain" : "max-w-full object-contain"} style={{ height: h, mixBlendMode: t.blend ? "multiply" : undefined }} />
                 : <span className="text-center text-[13px] font-black leading-tight" style={{ color: t.ink }}>{item.name}</span>}
         </span>
+    );
+}
+
+/**
+ * 굿즈샵 출시 알림 신청(2026-10-24) — 큐 케이스의 '랭큐 굿즈 곧 나와요'에서 고른 것. 실물을 무엇부터 만들지 보는 숫자.
+ * 출시 알림은 아직 안 보낸다(열 때 이 명단으로).
+ */
+function ShopInterestPanel() {
+    const q = useQuery<GoodsShopStats>({ queryKey: ["/api/hiq/admin/goods/shop-interest"] });
+    const d = q.data;
+    if (!d) return null;
+    const max = Math.max(1, ...GOODS_SHOP_ITEMS.map((x) => d.byItem?.[x.id] ?? 0));
+    return (
+        <Panel className="p-4" >
+            <div className="flex items-baseline justify-between gap-2">
+                <p className="text-[13px] font-bold text-black/80">굿즈샵 출시 알림 신청 <span className="tabular-nums text-brand">{d.total}명</span></p>
+                <p className="text-[11.5px] text-black/40">큐 케이스 아래 '랭큐 굿즈 곧 나와요'에서 고른 것</p>
+            </div>
+            <div className="mt-3 space-y-1.5" data-testid="admin-shop-interest">
+                {GOODS_SHOP_ITEMS.map((x) => {
+                    const n = d.byItem?.[x.id] ?? 0;
+                    return (
+                        <div key={x.id} className="flex items-center gap-2 text-[12.5px]">
+                            <span className="w-24 shrink-0 text-black/65">{x.name.ko}</span>
+                            <span className="h-2 flex-1 overflow-hidden rounded-full bg-black/[0.05]"><i className="block h-full rounded-full bg-brand" style={{ width: `${(n / max) * 100}%` }} /></span>
+                            <span className="w-10 shrink-0 text-right tabular-nums font-bold text-black/70">{n}</span>
+                        </div>
+                    );
+                })}
+            </div>
+            {d.recent?.length > 0 && (
+                <details className="mt-3">
+                    <summary className="cursor-pointer text-[12px] font-semibold text-black/50">최근 신청 {Math.min(50, d.recent.length)}</summary>
+                    <ul className="mt-2 space-y-1 text-[12px] text-black/60">
+                        {d.recent.map((r) => <li key={r.memberId}><b className="text-black/75">{r.name || "회원"}</b> · {r.items.map((id) => GOODS_SHOP_ITEMS.find((x) => x.id === id)?.name.ko ?? id).join(" · ")} · {kstDateTime(new Date(r.at).toISOString())}</li>)}
+                    </ul>
+                </details>
+            )}
+        </Panel>
     );
 }
 
@@ -83,6 +123,7 @@ export default function GoodsView({ initialMemberId = null }: { initialMemberId?
 
     return (
         <div className="space-y-4" data-testid="admin-goods">
+            <ShopInterestPanel />
             {/* 1. 회원 */}
             <Panel className="p-4">
                 <p className="text-[12px] font-black text-black/40">1. 받을 회원</p>

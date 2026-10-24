@@ -182,6 +182,7 @@ export const ko: Record<string, string> = {
   "err.sim.sessionNotFound": "세션이 없습니다",
   "err.sim.shelfNotFound": "장식장을 찾을 수 없어요",
   "err.cueCase.notFound": "큐 케이스를 찾을 수 없어요",
+  "err.goodsShop.items": "고를 수 없는 품목이 있어요",
   "err.cueCase.notOwned": "아직 받지 않은 큐예요",
   "err.cueCase.pickNone": "아직 고를 수 있는 한정 큐가 없어요",
   "err.cueCase.pickHave": "이미 가진 디자인이에요",

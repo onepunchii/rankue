@@ -182,6 +182,7 @@ export const vi: Record<string, string> = {
   "err.sim.sessionNotFound": "Không tìm thấy phiên chơi",
   "err.sim.shelfNotFound": "Không tìm thấy tủ trưng bày",
   "err.cueCase.notFound": "Không tìm thấy hộp cơ",
+  "err.goodsShop.items": "Có mặt hàng không thể chọn",
   "err.cueCase.notOwned": "Bạn chưa nhận cây cơ này",
   "err.cueCase.pickNone": "Bạn chưa có lượt chọn cơ giới hạn",
   "err.cueCase.pickHave": "Bạn đã có mẫu này",
