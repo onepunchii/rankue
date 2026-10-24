@@ -39,10 +39,38 @@ describe("당구 홈", () => {
         expect(skill).toContain("<TierEmblem tier={s.tier.id} size={50} glow />");
         expect(skill).toContain("<OnlineDamaBadge target={onlineDama}");
     });
-    it("① 상위 % · RP 안내 · 경기 기록으로 가는 길을 잇는다(예전 내 실전 기록 카드에 있던 것)", () => {
-        expect(home).toContain("getPercentile={getPercentile} onOpenRpGuide={() => toggleModal('rpGuide', true)}");
-        expect(skill).toContain('data-testid="home-skill-rp-guide"');
+    it("① 실전 칸에 RP · 상위 % 를 두지 않는다(오너 '60RP 랑 상위 빼 줘' 10/24) — 경기 기록으로 가는 길은 그대로", () => {
+        expect(skill).not.toContain("home-skill-rp-guide");
+        expect(skill).not.toContain("real.stripTop");
+        expect(skill).not.toMatch(/>RP</);
+        expect(skill).not.toContain("getPercentile");
+        // 홈도 그 숫자를 만들지 않는다(3쿠션 랭킹을 따로 부르던 것 · RP 안내 창까지 걷었다)
+        expect(home).toContain('<HomeSkillCard onStartMatch={() => handleStartGameClick("match")} history={history as any} sample={sample} />');
+        expect(home).not.toContain("getPercentile");
+        expect(home).not.toContain("RPGuideModal");
+        expect(home).not.toContain('queryKey: ["/api/hiq/rankings", "3c"]');
         expect(skill).toContain('const openHistory = sample ? undefined : () => setLocation("/history");');
+    });
+    it("① 닮은 프로는 실전 · 온라인 각각, 아래 프로 실력 사다리에 두 자리(오너 '각각 · 그래프가 누락' 10/24) — 3쿠션만", () => {
+        const pros = skill.slice(skill.indexOf('{cur === "3c" && ('), skill.indexOf('data-testid="home-skill-table"'));
+        expect(pros).toContain('testId="home-skill-pro-real"');
+        expect(pros).toContain('testId="home-skill-pro-online"');
+        expect(pros).toContain("<ProLadder real={realSpot} online={onlineSpot} />");
+        // 실전 기준은 실전 기록(/compare/real)의 프로 · 자리, 온라인 기준은 온라인 기록(/sim/lookalike)의 프로 · 자리 — 섞지 않는다
+        expect(skill).toContain("ready ? side?.pro ?? null : null;");
+        expect(skill).toContain("ready ? spotOf(side?.tier, side?.pos) : null;");
+        expect(skill).toContain("const onlinePro = lk?.ready ? lk.pro : null;");
+        expect(skill).toContain("const onlineSpot = lk?.ready ? spotOf(lk.tier, lk.pos) : null;");
+        // 예시는 예시 인물의 에버로 공개 API 를 그때 부른다(예시 자료에 실제 선수를 넣지 않는다) — 회원은 부르지 않는다
+        expect(skill).toContain("enabled: !!sample && sampleAvg3c != null,");
+        // 사다리: 다섯 칸 이름 · 실전 깃발은 위 · 온라인 깃발은 아래(붙어 있어도 겹치지 않게)
+        const ladder = skill.slice(skill.indexOf("function ProLadder("));
+        expect(ladder).toContain("{real && flag(real, t(\"home.colReal\"), REAL_INK, false)}");
+        expect(ladder).toContain("{online && flag(online, t(\"home.colOnline\"), \"#121722\", true)}");
+        expect(ladder).toContain("const name = t(`lookalike.tierShort${i}`);");
+        // 프로 칸이 생겨 표는 실전 | 온라인 두 열
+        expect(skill).toContain('<div className="grid grid-cols-3 bg-surface-3/60');
+        expect(skill).not.toContain("grid-cols-4");
     });
     it("② 실전 점수판 — 실제 점수판 모양, 판의 숫자는 미리 보기, 입구는 홈의 두 함수", () => {
         expect(board).toContain('t("home.boardPreview")');
@@ -63,7 +91,7 @@ describe("당구 홈", () => {
         expect(jsx).toContain("{(gate.isGuest || (shown.length === 0 && !myRoom) || list.length > MAX_ROWS) && (");
     });
     it("문구는 다섯 언어", () => {
-        const keys = ["home.skillTitle", "home.skillReal", "home.skillOnline", "home.skillNote", "home.boardTitle", "home.boardStart", "home.caseTitle", "home.caseCounts", "home.caseTier", "tour.bh.caseTitle", "tour.bh.caseBody"];
+        const keys = ["home.skillTitle", "home.skillReal", "home.skillOnline", "home.skillNote", "home.boardTitle", "home.boardStart", "home.caseTitle", "home.caseCounts", "home.caseTier", "tour.bh.caseTitle", "tour.bh.caseBody", "home.skillProReal", "home.skillProOnline", "home.proNeedReal", "home.proNeedOnline", "home.proSoon", "home.proLadder"];
         for (const l of ["ko", "en", "es", "vi", "tr"]) {
             const f = read(`client/src/lib/i18n/${l}.ts`);
             for (const k of keys) expect(f, `${l} ${k}`).toContain(`"${k}":`);

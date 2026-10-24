@@ -469,7 +469,6 @@ describe("당구 홈", () => {
 
     describe("'내 것' 쿼리 — 비로그인은 부르지 않는다(enabled)", () => {
         const cases: [string, string, string][] = [
-            ["3쿠션 랭킹(상위 % 용)", "pages/hiq/dashboard.tsx", 'queryKey: ["/api/hiq/rankings", "3c"]'],
             ["내 경기 기록", "hooks/useDashboardStats.ts", '"/api/hiq/history"'],
             ["매장 랭킹", "hooks/useDashboardStats.ts", "`/api/hiq/rankings`"],
             ["알림 수(머리 — 세 종목이 같이 쓰는 SportHeader)", "components/hiq/SportHeader.tsx", "UNREAD_COUNT_KEY, {"],

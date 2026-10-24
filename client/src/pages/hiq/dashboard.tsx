@@ -1,7 +1,5 @@
 import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
-import { Suspense, lazy, useState, useCallback, useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiRequest } from "@/lib/queryClient";
+import { Suspense, lazy, useState, useEffect, useRef } from "react";
 import { HiqMember } from "@shared/schema";
 import { useSport } from "@/contexts/SportContext";
 import { HiqNavigation } from "@/components/hiq/HiqNavigation";
@@ -28,7 +26,6 @@ import { useRankPreview } from "@/components/hiq/dashboard/RankPreview";
 import { GameCreationModal } from "@/components/hiq/dashboard/GameCreationModal";
 import { PinCodeModal } from "@/components/hiq/dashboard/PinCodeModal";
 import { ScoreCorrectionModal } from "@/components/hiq/dashboard/ScoreCorrectionModal";
-import { RPGuideModal } from "@/components/hiq/dashboard/RPGuideModal";
 import { useDashboardStats } from "@/hooks/useDashboardStats";
 import { useAuth } from "@/hooks/useAuth";
 import { GuestJoinCta, useGuestGate } from "@/components/hiq/GuestGate";
@@ -38,10 +35,6 @@ import { CoachTour } from "@/components/hiq/CoachTour";
 
 import { useLocation, useSearch } from "wouter";
 import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
-
-// 서버 GET /api/hiq/rankings 는 항상 상위 20명만 잘라서 준다(getTopRankings(storeId, 20, type)).
-// 응답 길이가 이 값에 닿았다면 뒤에 몇 명이 더 있는지 알 수 없다.
-const RANKINGS_API_LIMIT = 20;
 
 function HiqDashboardBilliards() {
     const { t, locale } = useT();
@@ -61,17 +54,6 @@ function HiqDashboardBilliards() {
     // Use Custom Hook for Data
     const { member, history, rankings, isLoading } = useDashboardStats(rankingTab);
 
-    // Dedicated 3-cushion ranking list, fetched independently of the ranking tab so the
-    // header '상위 N%' percentile is computed against the correct 3c population even when
-    // the bottom 매장 랭킹 tab is on 4구. Shares the react-query cache with useDashboardStats'
-    // rankings query when rankingTab === '3c' (same key + queryFn).
-    // 로그인 필수 API 라 비로그인은 부르지 않는다 — 홈을 비로그인에 열면서(2026-10-05) enabled 가 없으면 401 이 재시도까지 두 번 난다.
-    const { data: rankings3c } = useQuery<HiqMember[]>({
-        queryKey: ["/api/hiq/rankings", "3c"],
-        queryFn: async () => await apiRequest("/api/hiq/rankings?type=3c"),
-        enabled: !!member,
-    });
-
     // 비로그인 홈(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다 — 랭킹 1위와 내 수지를 비슷하게.
     // 내 기록을 쌓으려 할 때 가입을 유도한다"). 예전엔 비로그인이면 로그인 안내(LoginGate) 한 장으로 끝냈다.
     //  · sample: 비로그인이 **확인된** 때만 예시 인물(shared/guestSample). '내 실전 기록'·점수판의 내 다마·매장 랭킹 세 곳이 같은 사람을 그린다.
@@ -80,38 +62,11 @@ function HiqDashboardBilliards() {
     const gate = useGuestGate();
     const sample = gate.isGuest ? GUEST_SAMPLE.billiards : null;
 
-    // UI Logic Helpers (Keep strict UI logic here or move to utils if generic)
-    const getPercentile = useCallback((type: '3c' | '4c') => {
-        if (!member) return null;
-
-        // Pick a population that matches the requested type, independent of the ranking tab.
-        // (3c always uses the dedicated 3c list; 4c only meaningful when the tab is on 4c.)
-        const source = type === '3c' ? rankings3c : (rankingTab === '4c' ? rankings : null);
-        if (!source) return null;
-
-        // 목록이 상한에 걸렸으면 이건 매장 전체가 아니라 '상위 20명'일 뿐이다.
-        // 이걸 모집단으로 쓰면 회원 400명 매장에서도 "상위 50%" 같은 거짓 숫자가 나오므로,
-        // 모집단을 확신할 수 없을 땐 백분위를 포기한다(DashboardHeader는 null이면 '분석 중'을 띄운다).
-        if (source.length >= RANKINGS_API_LIMIT) return null;
-
-        const field = type === '3c' ? 'rating3c' : 'rating4c';
-        const ranked = source
-            .filter(r => (r[field] ?? 0) > 0)
-            .sort((a, b) => (b[field] ?? 0) - (a[field] ?? 0));
-
-        // Match by member id (not score value) so ties / duplicate scores don't mis-rank.
-        const myIndex = ranked.findIndex(r => r.id === member.id);
-        if (myIndex === -1) return null;
-
-        return Math.max(1, Math.round(((myIndex + 1) / ranked.length) * 100));
-    }, [rankings, rankings3c, member, rankingTab]);
-
     // Modal State Management
     const [modalState, setModalState] = useState({
         game: false,
         join: false,
         score: false,
-        rpGuide: false
     });
 
     const [startGameMode, setStartGameMode] = useState<"practice" | "match">("practice");
@@ -243,8 +198,7 @@ function HiqDashboardBilliards() {
             ]} />
             {/* ① 내 실력 — 실전(당구장) | 온라인(폰 당구대), 닮은 프로 · 한 표 · 두 시작 단추 */}
             <div data-tour="bh-record">
-                <HomeSkillCard onStartMatch={() => handleStartGameClick("match")} history={history as any} sample={sample}
-                    getPercentile={getPercentile} onOpenRpGuide={() => toggleModal('rpGuide', true)} />
+                <HomeSkillCard onStartMatch={() => handleStartGameClick("match")} history={history as any} sample={sample} />
             </div>
             {/* 예시 카드 바로 아래 가입 안내 한 줄 — 비로그인에게만. 가입하면 지금 보던 홈으로 돌아온다 */}
             {sample && <GuestJoinCta className="mt-3" title={t("guestHome.recordCtaTitle")} desc={t("guestHome.recordCtaDesc")} />}
@@ -376,11 +330,6 @@ function HiqDashboardBilliards() {
                     member={member}
                 />
             )}
-
-            <RPGuideModal
-                open={modalState.rpGuide}
-                onOpenChange={(v) => toggleModal('rpGuide', v)}
-            />
 
             {/* 가입 안내 시트 — 점수판 입구의 guard 가 여는 것. 한 번만 그린다 */}
             {gate.sheet}
