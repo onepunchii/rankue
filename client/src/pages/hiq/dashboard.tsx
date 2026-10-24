@@ -212,8 +212,15 @@ function HiqDashboardBilliards() {
         ? (sample.rankings[rankingTab].map((r) => ({ ...r, name: t(r.nameKey) })) as unknown as HiqMember[])
         : null;
 
+    // 홈 시안 B(2026-10-24 오너 "화면이 복잡한가 · 시안 부탁해") — ?home=b 로만, 기본 홈은 그대로. 방문 기록(14일): 회원이 홈 다음에 가장 많이 가는 곳은
+    // 온라인게임(20명)인데 그 입구가 화면 두세 장 아래였다. B: 내 실전 기록을 접고(머리만) → 당구 게임을 둘째로(혼자 · 같이 치기 먼저) → 점수판 → 둘러보기 · 랭킹,
+    // 큐 케이스 띠는 온라인 배너 안의 입구와 겹쳐 뺀다. 시안이라 순서는 CSS order 로만 바꾼다(정하면 마크업 순서를 옮긴다).
+    const homeB = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search).get("home") === "b";
+
     return (
         <div className="min-h-screen bg-surface-0 px-5 pb-nav">
+            {/* 시안 B 의 순서 바꾸기 — 기본 홈은 contents(상자가 없는 것과 같다) */}
+            <div className={homeB ? "flex flex-col" : "contents"}>
 
             {/* Header / Profile */}
             <DashboardHeader member={member} />
@@ -246,6 +253,7 @@ function HiqDashboardBilliards() {
                 history={history as any}
                 onPreview={() => setGuide("scoreboard")}
                 sample={sample}
+                compact={homeB}
             />
             </div>
             {/* 예시 카드 바로 아래 가입 안내 한 줄 — 비로그인에게만. 가입하면 지금 보던 홈으로 돌아온다 */}
@@ -257,11 +265,11 @@ function HiqDashboardBilliards() {
                 />
             )}
             {/* 큐 케이스(2026-10-16) — 실전 · 온라인에서 모은 큐 · 초크 · 장갑. 내 기록 바로 아래가 자리다(기록이 쌓이면 여기에 들어온다) */}
-            <CueCaseEntry />
+            {!homeB && <CueCaseEntry />}
 
             {/* 홈 구역(2026-10-04 오너: "빠른 실행보다 각 섹션별로 — 점수판 / 당구 게임 / 기타").
                 점수판 구역은 입구 셋(점수판·혼자 연습·PIN으로 합류)만 — 기록은 위 카드로 모였다. */}
-            <section className="mt-10 mb-10" data-tour="bh-board">
+            <section className={homeB ? "order-2 mb-10" : "mt-10 mb-10"} data-tour="bh-board">
                 <HomeSectionHeader title={t("home.secScoreboard")} desc={t("home.secScoreboardDesc")} onGuide={() => setGuide("scoreboard")} />
                 <ScoreboardActions onStartGame={handleStartGameClick} onJoinGame={handleJoinGameClick} sample={sample} />
             </section>
@@ -269,9 +277,9 @@ function HiqDashboardBilliards() {
             {/* 당구 게임(예전 이름 온라인게임) — 온라인 대전 배너(내 등급 · 랭킹 · 대시보드) · 혼자 치기 · 같이 치기 · 내 온라인 실력(닮은 프로 + 내 다마수).
                 홈이 온라인게임의 입구다(2026-10-04) — 게임·멀티방·랭킹을 닫으면 ?sec=game 으로 이 구역에 돌아온다.
                 배너는 2026-10-12 오너: "혼자 치기 카드 위에 배너 카드를 만들어서 … 대시보드 랭킹 들어가게". */}
-            <section id="home-game" className="mb-10 scroll-mt-4" data-tour="bh-game">
+            <section id="home-game" className={homeB ? "order-1 mt-8 mb-10 scroll-mt-4" : "mb-10 scroll-mt-4"} data-tour="bh-game">
                 <HomeSectionHeader title={t("home.secOnline")} desc={t("home.secOnlineDesc")} onGuide={() => setGuide("online")} />
-                <div className="space-y-3">
+                <div className={homeB ? "flex flex-col gap-3 [&>*:nth-child(2)]:-order-1" : "space-y-3"}>
                     <OnlineHubBanner />
                     <OnlineGameCard />
                     <LookalikeProCard />
@@ -279,14 +287,14 @@ function HiqDashboardBilliards() {
             </section>
 
             {/* 둘러보기 — 매장 찾기·커뮤니티 */}
-            <section className="mb-10">
+            <section className={homeB ? "order-3 mb-10" : "mb-10"}>
                 <HomeSectionHeader title={t("home.secExplore")} desc={t("home.secExploreDesc")} onGuide={() => setGuide("explore")} />
                 <ExploreActions />
             </section>
 
             {/* 랭킹 섹션 — 기본은 UMB 세계랭킹(볼거리·매주 갱신), PBA·매장 랭킹은 토글로.
                 매장 데이터가 쌓이면 기본값 재검토 (오너 결정 2026-08-05) */}
-            <div className="mb-10">
+            <div className={homeB ? "order-3 mb-10" : "mb-10"}>
                 <header className="mb-4 flex items-end justify-between gap-3">
                     <div className="min-w-0">
                         <h2 className="text-[19px] font-bold tracking-tight text-ink-1 truncate">
@@ -354,7 +362,7 @@ function HiqDashboardBilliards() {
             </div>
 
             {/* 앱 설치 카드 — 오너 지정 자리(세계랭킹 아래). 앱/PWA 안이면 스스로 안 그린다. */}
-            <AppInstallCard className="mt-6" />
+            <AppInstallCard className={homeB ? "order-3 mt-6" : "mt-6"} />
 
             {/* Modals */}
             <GameCreationModal
@@ -403,6 +411,7 @@ function HiqDashboardBilliards() {
             {gate.sheet}
 
             <HiqNavigation />
+            </div>
         </div>
     );
 }

@@ -4049,6 +4049,7 @@ const vi: Dict = {
   "shop.waiting": "{n} người đang chờ",
   "shop.patch": "Xem đồ Rankue",
   "shop.failed": "Không lưu được — vui lòng thử lại",
+  "home.recordMore": "Xem tuyển thủ giống bạn & so sánh",
   "case.serialFirst.pennant": "Bạn là người đầu tiên nhận lá cờ này",
   "case.count.shaft": "Thân cơ",
   "case.count.ball": "Bi",

@@ -4059,6 +4059,7 @@ export const ko: Dict = {
   "shop.waiting": "{n}명이 기다리는 중",
   "shop.patch": "랭큐 굿즈 보기",
   "shop.failed": "저장하지 못했어요 — 다시 해 주세요",
+  "home.recordMore": "닮은 프로 · 비교표 보기",
   "case.serialFirst.pennant": "이 페넌트를 가장 먼저 받았어요 — 첫 번째 주인",
   "case.count.shaft": "상대",
   "case.count.ball": "공",

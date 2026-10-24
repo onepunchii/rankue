@@ -4049,6 +4049,7 @@ const tr: Dict = {
   "shop.waiting": "{n} kişi bekliyor",
   "shop.patch": "Rankue ürünlerini gör",
   "shop.failed": "Kaydedilemedi — tekrar dene",
+  "home.recordMore": "Benzer profesyonel ve karşılaştırmayı gör",
   "case.serialFirst.pennant": "Bu flamayı ilk kazanan sensin",
   "case.count.shaft": "Şaftlar",
   "case.count.ball": "Toplar",

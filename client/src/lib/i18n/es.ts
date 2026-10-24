@@ -4049,6 +4049,7 @@ const es: Dict = {
   "shop.waiting": "{n} esperando",
   "shop.patch": "Ver productos Rankue",
   "shop.failed": "No se pudo guardar — inténtalo de nuevo",
+  "home.recordMore": "Ver pro parecido y comparación",
   "case.serialFirst.pennant": "Fuiste el primero en conseguir este banderín",
   "case.count.shaft": "Ejes",
   "case.count.ball": "Bolas",
