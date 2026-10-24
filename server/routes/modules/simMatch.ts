@@ -305,14 +305,15 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
 
 /**
  * 멀티방을 열면 기기 알림을 받을 수 있는 회원 모두에게 "방이 열렸다"고 알린다(2026-09-09 오너: 아직 사람이 적어 모여야 한다).
- * 도배 방지: 같은 제목이 최근 ROOM_BROADCAST_QUIET_MIN 분 안에 있으면 건너뛴다(방을 연속으로 열어도 한 번만).
+ * 도배 방지: 같은 방장이 최근 ROOM_BROADCAST_QUIET_MIN 분 안에 공개 방을 또 열었으면 건너뛴다(방을 연달아 다시 열어도 한 번만).
  * 토큰이 없는 회원은 제외한다 — 알림함에만 쌓여 방이 닫힌 뒤에 읽히면 안내가 아니라 소음이다.
  */
 /** 관전 목록에 띄우는 범위: 진행 중은 하루 안에 시작한 대전, 다시보기는 최근 7일. */
 const WATCH_LIVE_WINDOW_MS = 24 * 60 * 60 * 1000;
 const WATCH_REPLAY_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
-const ROOM_BROADCAST_QUIET_MIN = 30;
+// 2026-10-24 오너: 30 → 10분. 방을 닫았다가 20분쯤 뒤에 다시 열면 30분 규칙에 걸려 "알림이 안 가나?"가 됐다
+const ROOM_BROADCAST_QUIET_MIN = 10;
 const ROOM_BROADCAST_LIMIT = 300;
 /** 방송을 기다려 주는 상한(ms) — 넘으면 남은 건 다음 요청 없이 그대로 끝난다. */
 const ROOM_BROADCAST_WAIT_MS = 6000;

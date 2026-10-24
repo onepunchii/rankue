@@ -23,7 +23,7 @@ function deepLinkUrl(category?: string, type?: string, params?: any): string {
     return '/';
 }
 
-const ROOM_OPEN_TTL_SEC = 30 * 60;      // 멀티방 방송의 도배 방지 간격(simMatch ROOM_BROADCAST_QUIET_MIN)과 같다
+const ROOM_OPEN_TTL_SEC = 30 * 60;      // 꺼진 기기에 늦게라도 닿는 한도 — 방송 간격(simMatch ROOM_BROADCAST_QUIET_MIN 10분)보다 길어도 같은 tag 라 새 방송이 덮는다
 const ONLINE_GAME_TTL_SEC = 2 * 60 * 60;
 
 /**

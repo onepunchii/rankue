@@ -52,6 +52,10 @@ describe("방 열림 알림은 방장 기준으로만 막는다", () => {
         expect(block).not.toContain("hasRecentTitle");
     });
 
+    it("방장이 다시 연 방은 10분이 지나면 다시 알린다(2026-10-24 오너 — 30분이면 닫았다 다시 연 방이 조용했다)", () => {
+        expect(route).toContain("const ROOM_BROADCAST_QUIET_MIN = 10;");
+    });
+
     it("저장소 질의는 지금 만든 방을 빼고 센다(자기 자신 때문에 늘 막히면 안 된다)", () => {
         const repo = code("server/storage/simMatch.repo.ts");
         const j = repo.indexOf("async recentPublicRoomsByHost(");
