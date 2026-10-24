@@ -2939,6 +2939,7 @@ const es: Dict = {
   "sim.rooms.password": "Contraseña",
   "sim.rooms.passwordHint": "Introduce la contraseña que puso el anfitrión",
   "sim.rooms.gone": "Esta sala ya empezó o se cerró",
+  "sim.rooms.watchInstead": "Esa sala ya empezó: entras como espectador",
   "sim.match.publicRoom": "Abrir como sala",
   "sim.match.publicRoomDesc": "Aparece en la lista de salas y cualquiera puede entrar",
   "sim.match.passwordLabel": "Contraseña (opcional)",

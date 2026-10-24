@@ -158,10 +158,12 @@ export function OnlineGameCard() {
     // '온라인게임'이라 하니 혼자 하고 싶은 사람이 머뭇거린다" → 이어서 "드릴·길 찾기까지 빼서 진입 화면을 거칠 필요 없게".
     // 홈이 곧 입구다. 진입 화면(SimEntry)의 혼자/같이 두 묶음을 그대로 카드 둘로 옮겼다.
     //  · 혼자 치기: 3D 테이블(누르면 바로 설정 창 ?solo=1, 닫으면 홈으로) + 아랫단 이번 주 드릴 · 길 찾기
-    //  · 같이 치기: 머리(누르면 멀티방) + 친구 초대(초록) · 코드로 참가(노랑 — 진입 화면 규칙) + 열린 방 줄 + 방 만들기
+    //  · 같이 치기: 머리(누르면 멀티방 목록) + 그 위 방 만들기 단추 + 친구 초대(초록) · 코드로 참가(노랑 — 진입 화면 규칙) + 열린 방 줄
+    //    2026-10-24 오너: "멀티방 단추와 방 만들기 단추가 중복 — 방 만들기는 빼고 멀티방을 방 만들기로" → 그림 위 알약이 방 만들기, 그림의 나머지는 목록(관전도 거기서)
     const cell = "min-w-0 px-4 py-3 flex items-center gap-3 text-left transition-colors hover:bg-black/[0.02] active:bg-black/[0.04]";
     return (
-        <>
+        // 두 카드 사이를 띄운다 — 예전엔 부모가 띄웠는데 새 홈(2026-10-24)은 이 카드만 놓아 둘이 붙어 보였다(오너 제보)
+        <div className="space-y-3">
             <div className="rounded-3xl overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
                 <motion.button
                     whileTap={{ scale: 0.99 }}
@@ -222,30 +224,37 @@ export function OnlineGameCard() {
             </div>
 
             <div ref={roomsRef} className="rounded-3xl overflow-hidden bg-white shadow-[0_1px_2px_rgba(0,0,0,0.05)]">
-                {/* 같이 치기 — 블루 다이 그림(대대·노란 공). 누르면 멀티방 목록 */}
-                <motion.button
-                    whileTap={{ scale: 0.99 }}
-                    onClick={() => together("/online-game?rooms=1")}
-                    className="relative block w-full h-[156px] overflow-hidden bg-[#0F1A2E] text-left"
-                >
-                    <img src={TOGETHER_IMG} alt="" width={1050} height={468} className="absolute inset-0 w-full h-full object-cover" />
-                    {list.length > 0 && (
-                        <span className="absolute top-4 right-4 h-7 px-3 rounded-pill bg-brand text-brand-fg text-[12px] font-bold inline-flex items-center gap-1">
-                            <span className="w-1.5 h-1.5 rounded-full bg-white" aria-hidden="true" />
-                            {t("sim.entry.roomsOpen")} {list.length}
+                {/* 같이 치기 — 블루 다이 그림(대대·노란 공). 그림을 누르면 멀티방 목록(관전도 거기서), 알약은 방 만들기(단추 안에 단추를 두지 않게 따로 띄운다) */}
+                <div className="relative h-[156px] overflow-hidden bg-[#0F1A2E]">
+                    <motion.button
+                        whileTap={{ scale: 0.99 }}
+                        onClick={() => together("/online-game?rooms=1")}
+                        aria-label={`${t("home.togetherTitle")} · ${t("sim.entry.rooms")}`}
+                        data-track-as="홈 같이 치기 멀티방"
+                        className="absolute inset-0 block w-full text-left"
+                    >
+                        <img src={TOGETHER_IMG} alt="" width={1050} height={468} className="absolute inset-0 w-full h-full object-cover" />
+                        {list.length > 0 && (
+                            <span className="absolute top-4 right-4 h-7 px-3 rounded-pill bg-brand text-brand-fg text-[12px] font-bold inline-flex items-center gap-1">
+                                <span className="w-1.5 h-1.5 rounded-full bg-white" aria-hidden="true" />
+                                {t("sim.entry.roomsOpen")} {list.length}
+                            </span>
+                        )}
+                        <span className="relative flex h-full items-end p-5 pr-[136px] bg-gradient-to-t from-black/55 via-black/10 to-transparent">
+                            <span className="min-w-0">
+                                <span className="block text-[21px] font-bold text-white leading-tight">{t("home.togetherTitle")}</span>
+                                <span className="block text-[13px] font-medium text-white/85 mt-1 leading-snug truncate">{t("home.togetherDesc")}</span>
+                            </span>
                         </span>
-                    )}
-                    <div className="relative h-full flex items-end justify-between gap-3 p-5 bg-gradient-to-t from-black/55 via-black/10 to-transparent">
-                        <span className="min-w-0">
-                            <span className="block text-[21px] font-bold text-white leading-tight">{t("home.togetherTitle")}</span>
-                            <span className="block text-[13px] font-medium text-white/85 mt-1 leading-snug truncate">{t("home.togetherDesc")}</span>
-                        </span>
-                        <span className="shrink-0 h-10 pl-4 pr-3 rounded-full bg-[#ffffff] text-[14px] font-bold text-[#174479] flex items-center gap-0.5">
-                            {t("sim.entry.rooms")}
-                            <LucideChevronRight className="w-4 h-4" />
-                        </span>
-                    </div>
-                </motion.button>
+                    </motion.button>
+                    <button
+                        type="button" onClick={() => together("/online-game?lobby=1&public=1")} data-testid="home-room-create" data-track-as="홈 같이 치기 방 만들기"
+                        className="absolute bottom-5 right-5 h-10 pl-4 pr-3 rounded-full bg-[#ffffff] text-[14px] font-bold text-[#174479] flex items-center gap-0.5 active:scale-[0.98] transition-transform"
+                    >
+                        {t("sim.entry.roomCreate")}
+                        <LucideChevronRight className="w-4 h-4" />
+                    </button>
+                </div>
                 <div className="grid grid-cols-2 gap-2 p-4">
                     <button
                         type="button" onClick={() => together("/online-game?lobby=1")}
@@ -270,27 +279,20 @@ export function OnlineGameCard() {
                         ))}
                     </div>
                 )}
-                <div className="px-4 py-3 flex items-center gap-2 border-t border-black/[0.06]">
-                    <span className="flex-1 min-w-0 text-[12.5px] font-medium text-black/45 truncate">
+                {/* 아래 한 줄 — 방 만들기 단추는 그림 위 알약 하나뿐(2026-10-24). 할 말이 있을 때만 */}
+                {(gate.isGuest || (shown.length === 0 && !myRoom) || list.length > MAX_ROWS) && (
+                    <div className="px-4 py-3 border-t border-black/[0.06] text-[12.5px] font-medium text-black/45 truncate">
                         {/* 비로그인은 방 목록을 받지 않았다 — '열린 방이 없어요'(거짓 빈 값) 대신 가입하면 되는 일을 적는다 */}
                         {gate.isGuest
                             ? t("guestHome.togetherJoin")
                             : shown.length === 0 && !myRoom
                                 ? (rooms.isPending && member ? t("sim.rooms.loading") : t("sim.rooms.empty"))
-                                : list.length > MAX_ROWS
-                                    ? <button type="button" onClick={() => together("/online-game?rooms=1")} className="font-semibold text-black/60">{t("sim.entry.rooms")} {list.length} →</button>
-                                    : null}
-                    </span>
-                    <button
-                        type="button" onClick={() => together("/online-game?lobby=1&public=1")}
-                        className="shrink-0 h-9 px-4 rounded-pill border border-black/10 text-[13px] font-bold text-ink-1 hover:bg-black/[0.03] active:scale-[0.98] transition-transform"
-                    >
-                        {t("sim.entry.roomCreate")}
-                    </button>
-                </div>
+                                : <button type="button" onClick={() => together("/online-game?rooms=1")} className="font-semibold text-black/60">{t("sim.entry.rooms")} {list.length} →</button>}
+                    </div>
+                )}
             </div>
             {/* 가입 안내 시트 — guard 가 여는 것. 한 번만 그린다 */}
             {gate.sheet}
-        </>
+        </div>
     );
 }

@@ -2939,6 +2939,7 @@ const en: Dict = {
   "sim.rooms.password": "Password",
   "sim.rooms.passwordHint": "Enter the password set by the host",
   "sim.rooms.gone": "This room already started or closed",
+  "sim.rooms.watchInstead": "That room already started — watching instead",
   "sim.match.publicRoom": "Open as a multi room",
   "sim.match.publicRoomDesc": "Listed in rooms so anyone can join",
   "sim.match.passwordLabel": "Password (optional)",

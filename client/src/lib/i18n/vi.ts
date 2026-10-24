@@ -2939,6 +2939,7 @@ const vi: Dict = {
   "sim.rooms.password": "Mật khẩu",
   "sim.rooms.passwordHint": "Nhập mật khẩu do chủ phòng đặt",
   "sim.rooms.gone": "Phòng này đã bắt đầu hoặc đã đóng",
+  "sim.rooms.watchInstead": "Phòng đã bắt đầu — bạn vào xem trận",
   "sim.match.publicRoom": "Mở làm phòng chơi",
   "sim.match.publicRoomDesc": "Hiện trong danh sách phòng để ai cũng có thể vào",
   "sim.match.passwordLabel": "Mật khẩu (tùy chọn)",

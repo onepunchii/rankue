@@ -2941,6 +2941,7 @@ export const ko: Dict = {
   "sim.rooms.password": "비밀번호",
   "sim.rooms.passwordHint": "방장이 정한 비밀번호를 입력하세요",
   "sim.rooms.gone": "이미 시작됐거나 닫힌 방이에요",
+  "sim.rooms.watchInstead": "이미 시작된 방이라 관전으로 들어가요",
   "sim.match.publicRoom": "멀티방으로 열기",
   "sim.match.publicRoomDesc": "방 목록에 떠서 누구나 들어올 수 있어요",
   "sim.match.passwordLabel": "비밀번호 (선택)",

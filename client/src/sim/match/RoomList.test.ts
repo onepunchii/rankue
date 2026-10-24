@@ -8,6 +8,9 @@ import { DEFAULT_3C_RULES } from "@shared/sim/rules";
 import { ko } from "../../lib/i18n/ko";
 
 vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
+// 늦게 들어가 관전으로 넘어갈 때의 안내(2026-10-24) — 무엇을 띄웠는지만 본다
+const toastSpy = vi.hoisted(() => vi.fn());
+vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: toastSpy }) }));
 vi.mock("@/lib/i18n", () => ({ useT: () => ({ t: (k: string) => ko[k] ?? k, locale: "ko" }) }));
 vi.mock("@/lib/utils", () => ({ cn: (...a: unknown[]) => a.filter((x) => typeof x === "string" && x).join(" ") }));
 vi.mock("@/components/hiq/BallDot", async () => { const React = await import("react"); return { BallDot: () => React.createElement("span") }; });
@@ -81,8 +84,9 @@ const room = (over: Partial<MatchPublic> = {}): MatchPublic => ({
     myIndex: -1, turn: 0, shots: 0, version: 1, state: null, balls: null, winnerIndex: null, endReason: null, engineVersion: "v", paramsHash: "h",
     createdAt: new Date(NOW - 5 * 60_000).toISOString(), startedAt: null, lastShotAt: null, finishedAt: null, claimableAt: null, turnSeenAt: null, serverNow: null, ...over,
 });
-function api(rows: MatchPublic[], joinRoom?: MatchApi["joinRoom"], live: unknown[] = [], mine: MatchPublic[] = []): MatchApi {
+function api(rows: MatchPublic[], joinRoom?: MatchApi["joinRoom"], live: unknown[] = [], mine: MatchPublic[] = [], getMatch?: MatchApi["getMatch"]): MatchApi {
     return {
+        getMatch: getMatch ?? vi.fn(async () => { throw { status: 404 }; }),
         listRooms: vi.fn(async () => rows),
         listMatches: vi.fn(async () => mine),
         resign: vi.fn(async () => ({ status: "canceled" as const })),
@@ -99,13 +103,13 @@ const liveCard = (over: Record<string, unknown> = {}) => ({
     targets: [20, 20], scores: [7, 5], innings: 9, turn: 0, shots: 18, winnerIndex: null, watchers: 2,
     startedAt: new Date(NOW - 60_000).toISOString(), finishedAt: null, lastShotAt: null, ...over,
 });
-function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; live?: unknown[]; onWatch?: (id: string) => void; autoJoinId?: string; mine?: MatchPublic[]; onEnterMine?: () => void }) {
+function mount(props: { rows: MatchPublic[]; joinRoom?: MatchApi["joinRoom"]; live?: unknown[]; onWatch?: (id: string) => void; autoJoinId?: string; mine?: MatchPublic[]; onEnterMine?: () => void; getMatch?: MatchApi["getMatch"]; myHandi?: unknown }) {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
     const qc = new rq.QueryClient({ defaultOptions: { queries: { retry: false } } });
     const onOpen = vi.fn(); const onCreate = vi.fn();
-    const a = api(props.rows, props.joinRoom, props.live ?? [], props.mine ?? []);
+    const a = api(props.rows, props.joinRoom, props.live ?? [], props.mine ?? [], props.getMatch);
     React.act(() => {
         root.render(React.createElement(rq.QueryClientProvider, { client: qc },
             React.createElement(RoomList, { onOpen, onWatch: props.onWatch, onCreate, onEnterMine: props.onEnterMine, onClose: () => undefined, api: a, autoJoinId: props.autoJoinId, now: () => NOW })));
@@ -251,6 +255,80 @@ describe("RoomList: 홈 카드에서 고른 방(autoJoinId)", () => {
         const h = mount({ rows: [room()], autoJoinId: "gone" });
         await settle(h, () => text(h).includes("방장"));
         expect(h.container.querySelector("[role=dialog]")).toBeNull();
+    });
+});
+
+/**
+ * 늦게 눌러 방이 이미 시작됐을 때(2026-10-24 오너: "후순위로 들어가면 시작한 방인가 안내창이 나오잖아 — 거기서 바로 해당 방 관전 모드로").
+ * 관전할 수 있는 방(서버가 답하고 치는 중)이면 안내창 대신 그 방 관전으로, 아니면 예전 문구 그대로.
+ */
+describe("RoomList: 늦게 들어가면 관전으로", () => {
+    const joinGone = () => vi.fn(async () => { throw { status: 409, data: { code: "ROOM_TAKEN" } }; });
+    async function tryJoin(h: ReturnType<typeof mount>) {
+        await settle(h, () => text(h).includes("방장"));
+        click(buttons(h).find((b) => b.getAttribute("aria-label") === `${ko["sim.rooms.join"]} · 방장`)!);
+        const dlg = h.container.querySelector("[role=dialog]")!;
+        click(Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent === ko["sim.rooms.join"])!);
+    }
+    afterEach(() => toastSpy.mockClear());
+
+    it("참가 창: 그새 시작된 공개 방이면 '방이 없어요' 대신 그 방 관전으로 · 안내 한 줄", async () => {
+        const onWatch = vi.fn();
+        const getMatch = vi.fn(async (id: string) => room({ id, status: "playing" }));
+        const h = mount({ rows: [room()], joinRoom: joinGone(), onWatch, getMatch });
+        await tryJoin(h);
+        await settle(h, () => onWatch.mock.calls.length > 0);
+        expect(onWatch).toHaveBeenCalledWith("r1");
+        expect(getMatch).toHaveBeenCalledWith("r1");
+        expect(toastSpy).toHaveBeenCalledWith({ title: ko["sim.rooms.watchInstead"] });
+        expect(text(h)).not.toContain(ko["sim.rooms.gone"]);
+        expect(h.onOpen).not.toHaveBeenCalled();
+    });
+
+    it("관전할 수 없으면(비공개 · 비밀번호 — 서버가 404, 또는 취소된 방) 예전 문구 그대로", async () => {
+        for (const getMatch of [vi.fn(async () => { throw { status: 404 }; }), vi.fn(async (id: string) => room({ id, status: "canceled" }))]) {
+            const onWatch = vi.fn();
+            const h = mount({ rows: [room()], joinRoom: joinGone(), onWatch, getMatch: getMatch as unknown as MatchApi["getMatch"] });
+            await tryJoin(h);
+            await settle(h, () => text(h).includes(ko["sim.rooms.gone"]));
+            expect(onWatch).not.toHaveBeenCalled();
+            expect(toastSpy).not.toHaveBeenCalled();
+            h.unmount();
+        }
+    });
+
+    it("비밀번호가 틀린 것은 관전으로 넘기지 않는다(방이 있다)", async () => {
+        const onWatch = vi.fn();
+        const getMatch = vi.fn(async (id: string) => room({ id, status: "playing" }));
+        const joinRoom = vi.fn(async () => { throw { status: 403, data: { code: "BAD_PASSWORD" } }; });
+        const h = mount({ rows: [room({ hasPassword: true })], joinRoom, onWatch, getMatch });
+        await settle(h, () => text(h).includes("방장"));
+        click(buttons(h).find((b) => b.getAttribute("aria-label") === `${ko["sim.rooms.join"]} · 방장`)!);
+        const dlg = h.container.querySelector("[role=dialog]")!;
+        type(dlg.querySelector("#sim-room-password") as HTMLInputElement, "0000");
+        click(Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent === ko["sim.rooms.join"])!);
+        await settle(h, () => text(h).includes(ko["sim.match.badPassword"]));
+        expect(getMatch).not.toHaveBeenCalled();
+        expect(onWatch).not.toHaveBeenCalled();
+    });
+
+    it("홈 카드에서 고른 방이 그새 시작됐으면 목록에 말없이 떨어지지 않고 그 방 관전으로", async () => {
+        const onWatch = vi.fn();
+        const getMatch = vi.fn(async (id: string) => room({ id, status: "playing" }));
+        const h = mount({ rows: [room()], autoJoinId: "started", onWatch, getMatch });
+        await settle(h, () => onWatch.mock.calls.length > 0);
+        expect(onWatch).toHaveBeenCalledWith("started");
+        expect(onWatch).toHaveBeenCalledTimes(1);
+        expect(toastSpy).toHaveBeenCalledWith({ title: ko["sim.rooms.watchInstead"] });
+        expect(h.container.querySelector("[role=dialog]")).toBeNull();
+    });
+
+    it("관전 안내 문구는 다섯 언어 모두", async () => {
+        const { readFileSync } = await import("node:fs");
+        const { resolve } = await import("node:path");
+        for (const l of ["ko", "en", "es", "vi", "tr"]) {
+            expect(readFileSync(resolve(__dirname, `../../lib/i18n/${l}.ts`), "utf8"), l).toContain('"sim.rooms.watchInstead":');
+        }
     });
 });
 

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
+import { useToast } from "@/hooks/use-toast";
 import { matchApi as defaultApi, matchErrorCode, type MatchApi, type MatchPublic, type WatchCard } from "../matchApi";
 import { gameLabel, rulesLabel, inningCapLabel } from "./matchView";
 import { roomSetKey, shouldRefreshWatch, WATCH_LIST_REFETCH_MS, WATCH_QUERY_KEY } from "../watch/watchPlan";
@@ -159,8 +160,23 @@ function joinErrorKey(e: unknown): string {
     return "sim.match.joinFailed";
 }
 
-function JoinDialog({ room, api, onClose, onOpen }: { room: MatchPublic | null; api: MatchApi; onClose: () => void; onOpen: (m: MatchPublic) => void }) {
+/**
+ * 늦게 눌러 방이 이미 시작됐으면(409) 안내창 대신 그 방을 관전한다(2026-10-24 오너: "후순위로 들어가면 시작한 방인가 안내창이 나오잖아 —
+ * 거기서 바로 해당 방 관전 모드로"). 관전할 수 있는 방(공개 · 비밀번호 없음 · 치는 중)일 때만 — 아니면 예전 안내 그대로.
+ * 관전 가능은 서버가 정한다(GET /sim/matches/:id 가 참가자가 아니어도 isWatchable 이면 답한다).
+ */
+async function watchIfStarted(api: MatchApi, id: string): Promise<boolean> {
+    try {
+        const m = await api.getMatch(id);
+        return m.status === "playing";
+    } catch {
+        return false;
+    }
+}
+
+function JoinDialog({ room, api, onClose, onOpen, onWatch }: { room: MatchPublic | null; api: MatchApi; onClose: () => void; onOpen: (m: MatchPublic) => void; onWatch?: (id: string) => void }) {
     const { t } = useT();
+    const { toast } = useToast();
     const qc = useQueryClient();
     const [password, setPassword] = useState("");
     const [joining, setJoining] = useState(false);
@@ -185,8 +201,13 @@ function JoinDialog({ room, api, onClose, onOpen }: { room: MatchPublic | null; 
             onOpen(m);
         } catch (e) {
             const key = joinErrorKey(e);
-            setError(t(key));
             if (key === "sim.rooms.gone") void qc.invalidateQueries({ queryKey: ROOMS_QUERY_KEY });
+            if (key === "sim.rooms.gone" && onWatch && await watchIfStarted(api, room.id)) {
+                toast({ title: t("sim.rooms.watchInstead") });
+                onWatch(room.id);
+                return;
+            }
+            setError(t(key));
         } finally {
             setJoining(false);
         }
@@ -282,14 +303,24 @@ export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api 
     }, [rows, q.isSuccess, onWatch, qc]);
 
     // 홈 카드에서 고른 방 — 목록이 오면 그 방의 참가 창을 한 번 연다.
+    // 그새 누가 들어가 대기 목록에서 빠졌으면(2026-10-24) 관전할 수 있는 방인지 보고 바로 관전으로 — 말없이 목록에 떨어지지 않게
     const autoOpenedRef = useRef<string | null>(null);
+    const { toast } = useToast();
+    // 관전으로 넘기는 답은 화면이 닫혔을 때만 버린다 — effect 정리로 끊으면 부모가 다시 그릴 때(onWatch 가 새 함수) 넘어가지 못한다
+    const mountedRef = useRef(true);
+    useEffect(() => { mountedRef.current = true; return () => { mountedRef.current = false; }; }, []);
     useEffect(() => {
         if (!autoJoinId || autoOpenedRef.current === autoJoinId || !q.isSuccess) return;
         const room = rows.find((m) => m.id === autoJoinId);
-        if (!room) return;
         autoOpenedRef.current = autoJoinId;
-        setTarget(room);
-    }, [autoJoinId, rows, q.isSuccess]);
+        if (room) { setTarget(room); return; }
+        if (!onWatch) return;
+        void watchIfStarted(api, autoJoinId).then((ok) => {
+            if (!mountedRef.current || !ok) return;
+            toast({ title: t("sim.rooms.watchInstead") });
+            onWatch(autoJoinId);
+        });
+    }, [autoJoinId, rows, q.isSuccess, onWatch, api, toast, t]);
     // 방도 게임 중인 방도 없다 — 이때는 아래 카드의 큰 '방 만들기' 하나만 둔다(위의 두 단추도 같은 곳으로 가서 같은 단추가 셋이 된다)
     const nothing = q.isSuccess && rows.length === 0 && live.length === 0;
     return (
@@ -358,7 +389,8 @@ export function RoomList({ onOpen, onWatch, onCreate, onEnterMine, onClose, api 
                 </ul>
             )}
             </div>
-            <JoinDialog room={target} api={api} onClose={() => setTarget(null)} onOpen={(m) => { setTarget(null); onOpen(m); }} />
+            <JoinDialog room={target} api={api} onClose={() => setTarget(null)} onOpen={(m) => { setTarget(null); onOpen(m); }}
+                onWatch={onWatch ? (id) => { setTarget(null); onWatch(id); } : undefined} />
             {reported?.hostId && (
                 <ReportDialog
                     open onOpenChange={(o) => { if (!o) setReported(null); }}

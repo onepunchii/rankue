@@ -2939,6 +2939,7 @@ const tr: Dict = {
   "sim.rooms.password": "Şifre",
   "sim.rooms.passwordHint": "Ev sahibinin belirlediği şifreyi gir",
   "sim.rooms.gone": "Bu oda başladı ya da kapandı",
+  "sim.rooms.watchInstead": "Oda başlamış — izleyici olarak giriyorsun",
   "sim.match.publicRoom": "Oda olarak aç",
   "sim.match.publicRoomDesc": "Oda listesinde görünür, herkes katılabilir",
   "sim.match.passwordLabel": "Şifre (isteğe bağlı)",

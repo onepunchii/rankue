@@ -48,6 +48,20 @@ describe("당구 홈", () => {
         expect(board).toContain('t("home.boardPreview")');
         expect(home).toContain("<ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} />");
     });
+    it("당구 게임 — 혼자 치기 · 같이 치기 두 카드를 띄우고, 같이 치기의 방 만들기 단추는 그림 위 하나(오너 '중복 아닌가' 10/24)", () => {
+        const game = read("client/src/components/hiq/dashboard/OnlineGameCard.tsx");
+        const jsx = game.slice(game.indexOf("    return (\n"));
+        expect(jsx).toContain('<div className="space-y-3">');
+        // 방 만들기는 하나 — 그림 위 알약. 예전 '멀티방' 알약 · 아래 줄 '방 만들기'는 없다
+        expect(jsx.match(/together\("\/online-game\?lobby=1&public=1"\)/g)).toHaveLength(1);
+        expect(jsx.match(/t\("sim\.entry\.roomCreate"\)/g)).toHaveLength(1);
+        expect(jsx).toContain('data-testid="home-room-create"');
+        // 그림(멀티방 목록)과 방 만들기는 형제 단추 — 단추 안에 단추를 두지 않는다
+        const art = jsx.slice(jsx.indexOf('onClick={() => together("/online-game?rooms=1")}'), jsx.indexOf('data-testid="home-room-create"'));
+        expect(art).toContain("</motion.button>");
+        // 아래 줄은 할 말이 있을 때만(비로그인 · 빈 목록 · 넘친 방)
+        expect(jsx).toContain("{(gate.isGuest || (shown.length === 0 && !myRoom) || list.length > MAX_ROWS) && (");
+    });
     it("문구는 다섯 언어", () => {
         const keys = ["home.skillTitle", "home.skillReal", "home.skillOnline", "home.skillNote", "home.boardTitle", "home.boardStart", "home.caseTitle", "home.caseCounts", "home.caseTier", "tour.bh.caseTitle", "tour.bh.caseBody"];
         for (const l of ["ko", "en", "es", "vi", "tr"]) {
