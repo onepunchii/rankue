@@ -17,7 +17,9 @@
  */
 import type { TableSpec } from "@shared/sim/params";
 import { feltColors } from "./felt";
+import { BALL_STYLES, DEFAULT_SHAFT, shaftStyle, type ShaftStyle } from "@shared/cueStyles";
 import { cueSkin, cueSkinVersion } from "./cueSkin";
+import { paintBallSkinMark, SHAFT_RINGS } from "./cueLook";
 import type { RenderFrame, Renderer, SafeInsets, Viewport } from "./Renderer";
 import { computeLayout, NO_INSETS, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
 import { DEFAULT_PALETTE, readPalette, rgba, scaleColor, type Palette } from "./tokens";
@@ -43,11 +45,8 @@ const DIAMOND = "rgba(240, 233, 214, 0.9)";
 const SPOT = "rgba(255, 255, 255, 0.14)";
 const BALL_OUTLINE = "rgba(0, 0, 0, 0.45)";
 const SHADOW = "rgba(0, 0, 0, 0.30)";
-const CUE_SHAFT = "#C9955A";
 const CUE_BUTT = "#4E2E19";
 const CUE_EDGE = "rgba(0, 0, 0, 0.35)";
-const CUE_FERRULE = "#EDE6D6";
-const CUE_TIP = "#2F4A66";
 
 type BallColour = "white" | "yellow" | "red";
 /** 음영 쪽 색 = 토큰 색 × 배수(좌상단 광원 기준 반대편). 흰 공은 덜, 붉은 공은 더 어둡게. */
@@ -124,6 +123,8 @@ export class Canvas2DRenderer implements Renderer {
     private cssH = 0;
     /** 색별 스프라이트. 스프라이트 한 변(CSS px)은 spriteSide. */
     private sprites: Record<BallColour, HTMLCanvasElement | null> = { white: null, yellow: null, red: null };
+    /** 꾸민 공의 스프라이트 — 색마다 아이템 id 로. 크기 · 팔레트가 바뀌면(buildSprites) 다 버린다 */
+    private skinSprites: Record<"white" | "yellow", Map<string, HTMLCanvasElement | null>> = { white: new Map(), yellow: new Map() };
     private spriteSide = 0;
     private ballPx = 0;
     private palette: Palette = DEFAULT_PALETTE;
@@ -206,6 +207,8 @@ export class Canvas2DRenderer implements Renderer {
         this.ctx = null;
         this.staticCanvas = null;
         this.sprites = { white: null, yellow: null, red: null };
+        this.skinSprites.white.clear();
+        this.skinSprites.yellow.clear();
         this.layout = null;
         this.lastFrame = null;
         this.el = null;
@@ -276,7 +279,7 @@ export class Canvas2DRenderer implements Renderer {
             ctx.beginPath();
             ctx.rect(ins.left, ins.top, Math.max(0, L.container.width - ins.left - ins.right), Math.max(0, L.container.height - ins.top - ins.bottom));
             ctx.clip();
-            this.drawCue(ctx, L, cb.r[0], cb.r[1], cue.phi, cue.pullback, cueSkin(cue.skin));
+            this.drawCue(ctx, L, cb.r[0], cb.r[1], cue.phi, cue.pullback, cueSkin(cue.skin), shaftStyle(cue.shaft));
             ctx.restore();
         }
 
@@ -284,7 +287,9 @@ export class Canvas2DRenderer implements Renderer {
         const Rm = L.table.ball.R;
         for (let i = 0; i < balls.length; i++) {
             const b = balls[i];
-            const sprite = this.sprites[ballColour(b.id)];
+            const colour = ballColour(b.id);
+            const skinId = colour === "red" ? null : frame.ballSkins?.[colour] ?? null;
+            const sprite = (skinId && colour !== "red" ? this.skinSprite(colour, skinId) : null) ?? this.sprites[colour];
             if (!sprite) continue;
             const px = L.originX + b.r[0] * L.scale;
             const py = L.originY - b.r[1] * L.scale;
@@ -351,7 +356,7 @@ export class Canvas2DRenderer implements Renderer {
     }
 
     /** 큐대: 공 뒤(−phi)에 놓인 테이퍼 막대. 좌표는 모두 숫자 지역변수로만 계산한다. */
-    private drawCue(ctx: CanvasRenderingContext2D, L: TableLayout, bx: number, by: number, phi: number, pullback: number, skin: HTMLImageElement | null = null): void {
+    private drawCue(ctx: CanvasRenderingContext2D, L: TableLayout, bx: number, by: number, phi: number, pullback: number, skin: HTMLImageElement | null = null, shaft: ShaftStyle = DEFAULT_SHAFT): void {
         const s = L.scale;
         const pb = pullback < 0 ? 0 : pullback > 1 ? 1 : pullback;
         // 화면 방향: 테이블 y 가 화면 아래로 뒤집히므로 sin 부호만 반전
@@ -383,10 +388,35 @@ export class Canvas2DRenderer implements Renderer {
         ctx.lineTo(mx - nx * midW / 2, my - ny * midW / 2);
         ctx.lineTo(t0x - nx * tipW / 2, t0y - ny * tipW / 2);
         ctx.closePath();
-        ctx.fillStyle = CUE_SHAFT;
+        if (shaft.fade) {
+            // 불꽃 같은 상대 — 이음쇠(mx) 쪽에서 팁 쪽으로 색이 바뀐다(이 상대만 그라디언트를 만든다)
+            const g = ctx.createLinearGradient(mx, my, t0x, t0y);
+            g.addColorStop(0, shaft.fade[0]);
+            g.addColorStop(1, shaft.fade[1]);
+            ctx.fillStyle = g;
+        } else ctx.fillStyle = shaft.base; // 상대 아이템이 없으면 DEFAULT_SHAFT(메이플 #C9955A · 페룰 · 팁 색도 거기)
         ctx.fill();
+        if (shaft.ring) {
+            // 이음쇠 쪽 고리 띠 — 위에서 보면 상대를 가로지르는 줄
+            const shaftLen = midD - gap;
+            ctx.strokeStyle = shaft.ring;
+            for (const [at, th] of SHAFT_RINGS) {
+                const d = midD - at * shaftLen, w = midW / 2 + 0.5;
+                ctx.lineWidth = Math.max(1, th * shaftLen);
+                ctx.beginPath();
+                ctx.moveTo(cx + dx * d + nx * w, cy + dy * d + ny * w);
+                ctx.lineTo(cx + dx * d - nx * w, cy + dy * d - ny * w);
+                ctx.stroke();
+            }
+        }
         ctx.lineWidth = 1;
         ctx.strokeStyle = CUE_EDGE;
+        ctx.beginPath();
+        ctx.moveTo(t0x + nx * tipW / 2, t0y + ny * tipW / 2);
+        ctx.lineTo(mx + nx * midW / 2, my + ny * midW / 2);
+        ctx.lineTo(mx - nx * midW / 2, my - ny * midW / 2);
+        ctx.lineTo(t0x - nx * tipW / 2, t0y - ny * tipW / 2);
+        ctx.closePath();
         ctx.stroke();
 
         ctx.beginPath();
@@ -417,7 +447,7 @@ export class Canvas2DRenderer implements Renderer {
         ctx.lineTo(f1x - nx * tipW / 2, f1y - ny * tipW / 2);
         ctx.lineTo(t0x - nx * tipW / 2, t0y - ny * tipW / 2);
         ctx.closePath();
-        ctx.fillStyle = CUE_FERRULE;
+        ctx.fillStyle = shaft.ferrule;
         ctx.fill();
 
         // 팁(가죽)
@@ -428,7 +458,7 @@ export class Canvas2DRenderer implements Renderer {
         ctx.lineTo(t0x - nx * tipW / 2, t0y - ny * tipW / 2);
         ctx.lineTo(p0x - nx * tipW / 2, p0y - ny * tipW / 2);
         ctx.closePath();
-        ctx.fillStyle = CUE_TIP;
+        ctx.fillStyle = shaft.tip;
         ctx.fill();
     }
 
@@ -539,6 +569,33 @@ export class Canvas2DRenderer implements Renderer {
             this.paintBall(ctx, this.spriteSide / 2, this.spriteSide / 2, R, colour);
             this.sprites[colour] = c;
         }
+        this.skinSprites.white.clear();
+        this.skinSprites.yellow.clear();
+    }
+
+    /** 꾸민 공 — 기본 공 위에 가운데 점 하나(처음 볼 때 한 번 그린다). 모르는 id 면 null → 기본 공 */
+    private skinSprite(colour: "white" | "yellow", id: string): HTMLCanvasElement | null {
+        const map = this.skinSprites[colour];
+        const hit = map.get(id);
+        if (hit !== undefined) return hit;
+        const st = BALL_STYLES[id];
+        const L = this.layout;
+        let c: HTMLCanvasElement | null = null;
+        if (st && L && this.spriteSide > 0) {
+            const R = L.table.ball.R * L.scale;
+            const devSide = Math.max(1, Math.ceil(this.spriteSide * this.dpr));
+            c = this.createCanvas();
+            c.width = devSide;
+            c.height = devSide;
+            const ctx = c.getContext("2d");
+            if (ctx) {
+                ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
+                this.paintBall(ctx, this.spriteSide / 2, this.spriteSide / 2, R, colour);
+                paintBallSkinMark(ctx, this.spriteSide / 2, this.spriteSide / 2, R, st, scaleColor(this.palette.ballRed, 0.9));
+            } else c = null;
+        }
+        map.set(id, c);
+        return c;
     }
 
     private paintBall(ctx: CanvasRenderingContext2D, cx: number, cy: number, R: number, colour: BallColour): void {

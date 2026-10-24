@@ -233,6 +233,7 @@ function tierIdOf(rating: number | null | undefined, rated: number | undefined):
 
 /** 목록에 있는 큐만 보낸다 — 지운 id 가 남아 있어도 화면은 기본 큐대 */
 const cueIdOf = (id: string | null | undefined): string | null => (id && caseItem(id)?.kind === "cue" ? id : null);
+const wornIdOf = (id: string | null | undefined, kind: "shaft" | "ball"): string | null => (id && caseItem(id)?.kind === kind ? id : null);
 
 function publicMatch(m: MatchWithNames, viewerId: string) {
     const myIndex = m.hostId === viewerId ? 0 : m.guestId === viewerId ? 1 : -1;
@@ -252,6 +253,9 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         tiers: [tierIdOf(m.hostRating, m.hostRated), m.guestId ? tierIdOf(m.guestRating, m.guestRated) : null] as const,
         /** [방장, 게스트]의 대표 큐(큐 케이스 id, 2026-10-16) — 큐대 손잡이에 입힌다. 겉모습만 다르다(성능 차이 없음). 없으면 null */
         cues: [cueIdOf(m.hostCue), m.guestId ? cueIdOf(m.guestCue) : null] as const,
+        /** [방장, 게스트]가 입은 상대 · 공(큐 케이스 id, 2026-10-24) — 겨누는 사람의 상대 · 각자 수구의 점 무늬. 겉모습만. 없으면 null */
+        shafts: [wornIdOf(m.hostShaft, "shaft"), m.guestId ? wornIdOf(m.guestShaft, "shaft") : null] as const,
+        ballSkins: [wornIdOf(m.hostBall, "ball"), m.guestId ? wornIdOf(m.guestBall, "ball") : null] as const,
         myIndex, turn: m.turn, shots: m.shots, version: m.version,
         state: m.state as SessionState | null, balls: m.balls as BallState[] | null,
         winnerIndex: m.winnerId === null ? null : m.winnerId === m.hostId ? 0 : 1,

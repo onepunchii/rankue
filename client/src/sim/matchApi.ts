@@ -177,6 +177,10 @@ export interface MatchPublic {
     readonly tiers?: readonly [TierId | null, TierId | null];
     /** [방장, 게스트]의 대표 큐(큐 케이스 id, 2026-10-16) — 큐대 손잡이 그림. 없거나 목록에 없는 id 면 null. parseMatch 가 읽는다 */
     readonly cues?: readonly [string | null, string | null];
+    /** [방장, 게스트]가 입은 상대 · 공(큐 케이스 id, 2026-10-24) — 겨누는 사람의 상대 · 각자 수구의 점 무늬. 없으면 null. parseMatch 가 읽는다 */
+    readonly shafts?: readonly [string | null, string | null];
+    /** 공 꾸미기 — 공의 자리(balls)와 이름이 겹치지 않게 ballSkins */
+    readonly ballSkins?: readonly [string | null, string | null];
     /** 정본 세션 상태. waiting 이면 null. players[0]=호스트(white), players[1]=게스트(yellow) */
     readonly state: SessionState | null;
     readonly balls: readonly BallState[] | null;
@@ -267,6 +271,12 @@ export interface ChatLine {
 function cueOrNull(v: unknown): string | null {
     return typeof v === "string" && caseItem(v)?.kind === "cue" ? v : null;
 }
+/** 상대 · 공도 목록에 있는 그 종류의 id 만 — 모르는 값이면 기본 */
+function wornOrNull(v: unknown, kind: "shaft" | "ball"): string | null {
+    return typeof v === "string" && caseItem(v)?.kind === kind ? v : null;
+}
+const wornPair = (raw: unknown, kind: "shaft" | "ball"): readonly [string | null, string | null] =>
+    Array.isArray(raw) ? [wornOrNull(raw[0], kind), wornOrNull(raw[1], kind)] : [null, null];
 
 function tierOrNull(v: unknown): TierId | null {
     return typeof v === "string" && TIERS.some((t) => t.id === v) ? (v as TierId) : null;
@@ -563,6 +573,8 @@ export function parseMatch(raw: unknown): MatchPublic {
         guestCountry: countryOrNull(raw.guestCountry),
         tiers: Array.isArray(raw.tiers) ? [tierOrNull(raw.tiers[0]), tierOrNull(raw.tiers[1])] : [null, null],
         cues: Array.isArray(raw.cues) ? [cueOrNull(raw.cues[0]), cueOrNull(raw.cues[1])] : [null, null],
+        shafts: wornPair(raw.shafts, "shaft"),
+        ballSkins: wornPair(raw.ballSkins, "ball"),
         state,
         balls,
         winnerIndex: playerIndexOrNull(raw.winnerIndex),

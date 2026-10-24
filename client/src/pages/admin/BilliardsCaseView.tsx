@@ -16,8 +16,8 @@ import { ORIGIN_LABEL, canTakeBack, type CaseAuditMember, type CaseAuditRow, typ
 import { EmptyState, FilterChips, KpiTile, Panel, Pill, SearchBox, kstDate } from "./adminUtils";
 
 const KEY = ["/api/hiq/admin/billiards/case-audit"] as const;
-const KIND_NAME: Record<CaseKind, string> = { cue: "큐", chalk: "초크", glove: "장갑", pennant: "페넌트" };
-const KINDS: CaseKind[] = ["cue", "chalk", "glove", "pennant"];
+const KIND_NAME: Record<CaseKind, string> = { cue: "큐", chalk: "초크", glove: "장갑", pennant: "페넌트", shaft: "상대", ball: "공" };
+const KINDS: CaseKind[] = ["cue", "shaft", "ball", "chalk", "glove", "pennant"];
 const no = (n: number | null) => (n == null ? "" : `No.${String(n).padStart(2, "0")}`);
 
 function ItemTile({ r, picked, onPick }: { r: CaseAuditRow; picked: boolean; onPick?: () => void }) {
@@ -27,7 +27,7 @@ function ItemTile({ r, picked, onPick }: { r: CaseAuditRow; picked: boolean; onP
         <button type="button" disabled={!bad} onClick={onPick} data-testid={bad ? "admin-case-bad" : undefined}
             className={`flex min-w-0 flex-col rounded-xl border p-2 text-left ${bad ? (picked ? "border-red-500 bg-red-50" : "border-red-300 bg-white") : "border-black/[0.06] bg-white"} ${bad ? "" : "cursor-default"}`}>
             <span className="flex h-10 items-center justify-center">
-                {x && <img src={caseImage(x)} alt="" loading="lazy" draggable={false} className={x.kind === "cue" ? "h-[12px] w-full object-contain" : "h-10 w-10 object-contain"} />}
+                {x && <img src={caseImage(x)} alt="" loading="lazy" draggable={false} className={x.kind === "cue" || x.kind === "shaft" ? "h-[12px] w-full object-contain" : "h-10 w-10 object-contain"} />}
             </span>
             <span className="mt-1 truncate text-[12px] font-black text-black/80">{x?.name.ko ?? r.itemId}</span>
             <span className="truncate text-[11.5px] text-black/45">{r.serial != null && x?.limit ? `${no(r.serial)} · ` : ""}{kstDate(r.earnedAt)}</span>

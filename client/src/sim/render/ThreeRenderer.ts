@@ -38,7 +38,9 @@ import {
     Scene, Shape, SphereGeometry, SRGBColorSpace, Vector3, WebGLRenderer, BoxGeometry } from "three";
 import type { BallState } from "@shared/sim/types";
 import type { TableSpec } from "@shared/sim/params";
+import { BALL_STYLES, SHAFT_STYLES, ballMaterialOf, shaftRoughnessOf } from "@shared/cueStyles";
 import { cueSkin, cueSkinVersion } from "./cueSkin";
+import { paintBallSkinMap, paintShaftMap } from "./cueLook";
 import { feltColors } from "./felt";
 import { ZOOM_MIN, type RenderFrame, type Renderer, type RendererView, type SafeInsets, type Viewport, ZOOM_MAX } from "./Renderer";
 import { computeLayout, NO_INSETS, RAIL_WIDTH_M, screenToWorld, worldToScreen, type TableLayout } from "./tableGeometry";
@@ -318,6 +320,8 @@ export class ThreeRenderer implements Renderer {
         red: new MeshStandardMaterial({ roughness: 0.25, metalness: 0 }),
     };
     private readonly ballTex: Record<BallColour, CanvasTexture | null> = { white: null, yellow: null, red: null };
+    /** 꾸민 공의 재질 — 색마다 아이템 id 로(draw 에서 문자열을 만들지 않게 두 겹). 팔레트가 바뀌면 다 버린다 */
+    private readonly skinMats: Record<"white" | "yellow", Map<string, MeshStandardMaterial>> = { white: new Map(), yellow: new Map() };
     private readonly active: BallEntry[] = [];
     private readonly pool: BallEntry[] = [];
 
@@ -331,6 +335,12 @@ export class ThreeRenderer implements Renderer {
     private cueSkinUrl: string | null = null;
     private cueSkinTex: CanvasTexture | null = null;
     private cueSkinSeen = -1;
+    /** 상대 · 페룰 · 팁 재질과 지금 입힌 상대 아이템(null = 메이플) */
+    private cueShaftMat: MeshStandardMaterial | null = null;
+    private cueFerruleMat: MeshStandardMaterial | null = null;
+    private cueTipMat: MeshStandardMaterial | null = null;
+    private cueShaftId: string | null = null;
+    private cueShaftTex: CanvasTexture | null = null;
 
     // 강조 링
     private readonly ringGroup = new Group();
@@ -495,6 +505,7 @@ export class ThreeRenderer implements Renderer {
         this.shadowGeo.dispose();
         this.shadowMat.map?.dispose();
         this.shadowMat.dispose();
+        this.clearSkinMats();
         for (const c of COLOURS) {
             this.ballTex[c]?.dispose();
             this.ballMats[c].dispose();
@@ -502,6 +513,7 @@ export class ThreeRenderer implements Renderer {
         for (const e of this.active) e.shadowMat.dispose();
         for (const e of this.pool) e.shadowMat.dispose();
         this.cueSkinTex?.dispose();
+        this.cueShaftTex?.dispose();
         for (const g of this.cueGeos) g.dispose();
         for (const m of this.cueMats) m.dispose();
         this.clothMat.dispose();
@@ -736,6 +748,14 @@ export class ThreeRenderer implements Renderer {
             const b = balls[i];
             if (!this.findEntry(b.id)) this.placeBall(this.acquire(b.id, R), b, R, 0, stamp);
         }
+        // 공 꾸미기 — 흰 공 · 노란 공에 주인이 고른 무늬(없으면 기본 재질)
+        const skins = frame.ballSkins;
+        for (let i = 0; i < this.active.length; i++) {
+            const e = this.active[i];
+            const id = e.colour === "red" ? null : skins?.[e.colour] ?? null;
+            const want = id && e.colour !== "red" ? this.skinMat(e.colour, id) : this.ballMats[e.colour];
+            if (e.mesh.material !== want) e.mesh.material = want;
+        }
 
         // 큐대(공 뒤, −phi)
         const cue = frame.cue;
@@ -757,6 +777,7 @@ export class ThreeRenderer implements Renderer {
             this.cueBody.position.y = cueGap(R, cue.pullback);
             this.cueSkinSeen = cueSkinVersion();
             this.applyCueSkin(cue.skin);
+            this.applyShaft(cue.shaft ?? null);
         } else {
             this.cueGroup.visible = false;
         }
@@ -1078,6 +1099,7 @@ export class ThreeRenderer implements Renderer {
         const key = [p.ballWhite, p.ballYellow, p.ballRed, p.brand, p.surface1].map((c) => rgba(c)).join("|");
         if (key === this.paletteKey) return;
         this.paletteKey = key;
+        this.clearSkinMats();
 
         setTokenColor(this.ringBrandMat.color, p.brand);
         this.ringBrandMat.opacity = p.brand[3];
@@ -1169,6 +1191,7 @@ export class ThreeRenderer implements Renderer {
         part(midR, tipR, shaftL, CUE_FERRULE_L + shaftL / 2, CUE_SHAFT);
         part(buttR, midR, buttL, CUE_LENGTH * 0.55 + buttL / 2, CUE_BUTT);
         this.cueButtMat = this.cueMats[this.cueMats.length - 1] ?? null;
+        [this.cueTipMat, this.cueFerruleMat, this.cueShaftMat] = [this.cueMats[0] ?? null, this.cueMats[1] ?? null, this.cueMats[2] ?? null];
         this.cueGroup.add(this.cueBody);
         // 회전 순서: 먼저 로컬 x 로 뒤를 들고(올림각), 그 다음 z 로 조준 방향을 돌린다 — 기본 순서(XYZ)면 올림각이 조준과 무관한 세계 x 축으로 걸린다
         this.cueGroup.rotation.order = "ZXY";
@@ -1207,6 +1230,71 @@ export class ThreeRenderer implements Renderer {
         tex.colorSpace = SRGBColorSpace;
         this.cueSkinTex = tex;
         m.map = tex; m.color.setHex(0xffffff); m.needsUpdate = true;
+    }
+
+    /**
+     * 상대 · 페룰 · 팁을 상대 아이템대로(2026-10-24). 결 · 고리는 질감으로 감는다(원통 둘레 = 가로, 위 = 이음쇠 쪽).
+     * 같은 아이템이면 아무것도 안 한다 — draw 마다 불린다.
+     */
+    private applyShaft(id: string | null): void {
+        if (id === this.cueShaftId) return;
+        const shaft = this.cueShaftMat, ferrule = this.cueFerruleMat, tip = this.cueTipMat;
+        if (!shaft || !ferrule || !tip) return;
+        this.cueShaftId = id;
+        this.cueShaftTex?.dispose();
+        this.cueShaftTex = null;
+        const st = id ? SHAFT_STYLES[id] : undefined;
+        shaft.map = null;
+        if (!st) {
+            shaft.color.setHex(CUE_SHAFT); ferrule.color.setHex(CUE_FERRULE); tip.color.setHex(CUE_TIP);
+            shaft.roughness = 0.5;
+        } else {
+            ferrule.color.set(st.ferrule); tip.color.set(st.tip);
+            shaft.roughness = shaftRoughnessOf(st);
+            const cv = typeof document === "undefined" ? null : this.createCanvas();
+            const c = cv ? context2d(cv, 64, 512) : null;
+            if (cv && c) {
+                paintShaftMap(c, 64, 512, st);
+                const tex = new CanvasTexture(cv);
+                tex.colorSpace = SRGBColorSpace;
+                this.cueShaftTex = tex;
+                shaft.map = tex;
+                shaft.color.setHex(0xffffff);
+            } else shaft.color.set(st.base);
+        }
+        shaft.needsUpdate = true; ferrule.needsUpdate = true; tip.needsUpdate = true;
+    }
+
+    /** 꾸민 공 재질 — 처음 볼 때 한 번 그린다. 못 그리면(2D 캔버스 없음 · 모르는 id) 기본 재질 */
+    private skinMat(colour: "white" | "yellow", id: string): MeshStandardMaterial {
+        const cached = this.skinMats[colour].get(id);
+        if (cached) return cached;
+        const st = BALL_STYLES[id];
+        let mat = this.ballMats[colour];
+        if (st) {
+            const p = this.palette;
+            const canvas = this.createCanvas();
+            const ctx = context2d(canvas, BALL_TEX_W, BALL_TEX_H);
+            if (ctx && paintBallSkinMap(ctx, BALL_TEX_W, BALL_TEX_H, colour === "yellow" ? p.ballYellow : p.ballWhite, st, scaleColor(p.ballRed, 0.9), this.createCanvas)) {
+                const tex = new CanvasTexture(canvas);
+                tex.colorSpace = SRGBColorSpace;
+                mat = new MeshStandardMaterial({ map: tex, ...ballMaterialOf(st.finish) });
+            }
+        }
+        this.skinMats[colour].set(id, mat);
+        return mat;
+    }
+
+    /** 꾸민 공 재질을 다 버린다(팔레트가 바뀌었거나 정리) — 다음 draw 가 새로 만든다 */
+    private clearSkinMats(): void {
+        for (const c of ["white", "yellow"] as const) {
+            for (const m of this.skinMats[c].values()) {
+                if (m === this.ballMats[c]) continue;
+                m.map?.dispose();
+                m.dispose();
+            }
+            this.skinMats[c].clear();
+        }
     }
 
     private readInsets(): SafeInsets {

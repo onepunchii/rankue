@@ -34,10 +34,10 @@ export interface GoodsItem {
     limit?: number;
 }
 
-const CASE_GROUP: Readonly<Record<CaseKind, string>> = { cue: "큐", chalk: "초크", glove: "장갑", pennant: "페넌트" };
+const CASE_GROUP: Readonly<Record<CaseKind, string>> = { cue: "큐", chalk: "초크", glove: "장갑", pennant: "페넌트", shaft: "상대", ball: "공" };
 const billiards = (): GoodsItem[] => CASE_ITEMS.map((x) => ({
     sport: "billiards", key: x.id, name: x.name.ko, group: x.kind, groupName: CASE_GROUP[x.kind], image: caseImage(x),
-    shape: x.kind === "cue" ? "cue" : "square", ...(x.limit ? { limit: x.limit } : {}),
+    shape: x.kind === "cue" || x.kind === "shaft" ? "cue" : "square", ...(x.limit ? { limit: x.limit } : {}),
 }));
 const DECOR_GROUP = { bg: "배경", floor: "바닥", big: "큰 장식", prop: "소품" } as const;
 const fishing = (): GoodsItem[] => DECOR.map((d) => ({

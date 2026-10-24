@@ -40,7 +40,7 @@ export const RECENT_CATCHES = 8;
 
 /** 큐 케이스를 종류별로 — 모르는 id(지운 물건)는 '기타' */
 export function caseByKind(ids: readonly string[]): Record<CaseKind | "other", number> {
-    const out: Record<CaseKind | "other", number> = { cue: 0, chalk: 0, glove: 0, pennant: 0, other: 0 };
+    const out: Record<CaseKind | "other", number> = { cue: 0, chalk: 0, glove: 0, pennant: 0, shaft: 0, ball: 0, other: 0 };
     for (const id of ids) out[caseItem(id)?.kind ?? "other"] += 1;
     return out;
 }

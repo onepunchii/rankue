@@ -2499,10 +2499,15 @@ export const hiqCueCaseAwards = pgTable("hiq_cue_case_awards", {
   uniqSerial: uniqueIndex("hiq_cue_case_awards_item_serial_unique").on(t.itemId, t.serial),
 }));
 
-/** 큐 케이스 — 대표 큐(맨 위에 크게 · 나중에 크루 큐 랙). 받은 큐 가운데서만 고른다 */
+/**
+ * 큐 케이스 — 대표 큐(맨 위에 크게 · 나중에 크루 큐 랙). 받은 큐 가운데서만 고른다.
+ * 2026-10-24 상대 · 공(migrations/cue_case_worn.sql): 온라인 대전에 입은 상대 · 공. null = 가장 최근에 받은 것, 'none' = 기본(메이플 · 빨간 점)
+ */
 export const hiqCueCasePrefs = pgTable("hiq_cue_case_prefs", {
   memberId: uuid("member_id").primaryKey().references(() => hiqMembers.id, { onDelete: "cascade" }).notNull(),
   heroItem: text("hero_item"),
+  heroShaft: text("hero_shaft"),
+  heroBall: text("hero_ball"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 

@@ -17,7 +17,7 @@ describe("회원 상세 · 종목 칸", () => {
     it("큐 케이스를 종류별로 · 한정 큐를 센다 · 모르는 물건은 따로", () => {
         const lt = CUES.find((c) => c.group === "limited")!;
         const ids = [CUES[0].id, lt.id, CHALKS[0].id, "gone-item"];
-        expect(caseByKind(ids)).toEqual({ cue: 2, chalk: 1, glove: 0, pennant: 0, other: 1 });
+        expect(caseByKind(ids)).toEqual({ cue: 2, chalk: 1, glove: 0, pennant: 0, shaft: 0, ball: 0, other: 1 });
         expect(limitedCount(ids)).toBe(1);
     });
 

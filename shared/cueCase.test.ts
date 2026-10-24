@@ -23,7 +23,8 @@ describe("목록", () => {
     });
     it("그림이 다 있고 가볍다(webp · 장당 40KB 아래 · 합쳐 2MB 아래)", () => {
         let total = 0;
-        for (const x of CASE_ITEMS) {
+        // 상대 · 공은 그림 파일이 없다 — 아래 시험이 따로 본다
+        for (const x of CASE_ITEMS.filter((c) => c.kind !== "shaft" && c.kind !== "ball")) {
             const p = resolve(root, "client/public", caseImage(x).slice(1));
             expect(existsSync(p), x.id).toBe(true);
             const b = readFileSync(p);
@@ -219,7 +220,7 @@ describe("연결", () => {
         const repo = read("server/storage/simMatch.repo.ts");
         expect(repo).toContain("hostCue: heroCueSql(sql`${hiqSimMatches.hostId}`),");
         expect(repo).toContain("order by a.earned_at desc, a.item_id limit 1");
-        expect(read("server/storage/cueCase.repo.ts")).toContain(".sort((a, b) => ((items[b.id].at ?? 0) - (items[a.id].at ?? 0)) || (a.id < b.id ? -1 : 1));");
+        expect(read("server/storage/cueCase.repo.ts")).toContain(".sort((a, b) => ((items[b.id].at ?? 0) - (items[a.id].at ?? 0)) || (a.id < b.id ? -1 : 1)).map((x) => x.id);");
         expect(read("server/routes/modules/simMatch.ts")).toContain("cues: [cueIdOf(m.hostCue), m.guestId ? cueIdOf(m.guestCue) : null] as const,");
         expect(read("client/src/sim/matchApi.ts")).toContain("cues: Array.isArray(raw.cues) ? [cueOrNull(raw.cues[0]), cueOrNull(raw.cues[1])] : [null, null],");
     });

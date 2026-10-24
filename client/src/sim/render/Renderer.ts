@@ -21,6 +21,17 @@ export interface CueFrame {
      * 겉모습만 바뀐다(길이 · 굵기 · 놓이는 자리는 그대로). 그림은 ./cueSkin 이 한 번만 부른다.
      */
     readonly skin?: string | null;
+    /**
+     * 상대(큐의 윗대) — 큐 케이스의 상대 아이템 id(2026-10-24, 모양은 shared/cueStyles). 없으면 지금의 메이플 나무.
+     * 손잡이 그림과 같이 지금 겨누는 사람의 것이고, 겉모습만 바뀐다.
+     */
+    readonly shaft?: string | null;
+}
+
+/** 공 꾸미기(2026-10-24) — 흰 공 · 노란 공 각각에 입힌 큐 케이스의 공 아이템 id. 빨간 공은 꾸미지 않는다 */
+export interface BallSkins {
+    readonly white?: string | null;
+    readonly yellow?: string | null;
 }
 
 /**
@@ -62,6 +73,8 @@ export interface RenderFrame {
     readonly highlightBallId?: string;
     /** 선수 시점 카메라 대상(player 뷰에서만 의미). 조준 단계에서 페이지가 매 프레임 넘긴다. */
     readonly view?: ViewFrame;
+    /** 공 꾸미기 — 각 공의 주인이 고른 것(대전이면 두 사람, 혼자 치기면 내 공만). 점 무늬 · 마감만 바뀐다 */
+    readonly ballSkins?: BallSkins;
 }
 
 /** 세이프 에어리어 인셋(CSS px). 테이블은 이 안쪽에 letterbox 된다. */

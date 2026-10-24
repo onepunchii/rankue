@@ -1,9 +1,10 @@
 /**
  * 큐 케이스(2026-10-16 오너: "당구도 골프랑 등산처럼 배찌가 필요해 …" → "큐케이스로 가고 · 2번도 합치자(온라인 장식장)").
- * `/cue-case[?m=<회원 id>][&sec=cue|chalk|glove|medals]`. 옛 장식장(/online-game?shelf=1)은 여기의 메달 · 배지 칸으로 온다.
+ * `/cue-case[?m=<회원 id>][&sec=cue|shaft|ball|chalk|glove|medals]`. 옛 장식장(/online-game?shelf=1)은 여기의 메달 · 배지 칸으로 온다.
  *
  * 위에서부터: 가죽 뚜껑(놋쇠 명판 — 누구의 케이스 · 모은 수) → 대표 큐(상감을 크게 훑는다) → 이달 장갑 12칸
- * → [큐 · 초크 · 장갑 · 메달 · 배지]. 큐는 다시 [실전 · 온라인 · 공통 · 양쪽 · 크루]로 가른다.
+ * → [큐 · 상대 · 공 · 초크 · 장갑 · 메달 · 배지]. 큐는 다시 [실전 · 온라인 · 공통 · 양쪽 · 크루]로 가른다.
+ * 상대 · 공(2026-10-24)은 온라인 대전에 입는 것 — 칸 위에 '지금 대전에 쓰는 것'과 '기본으로 쓰기'.
  * 받은 것은 자리에 들어가 있고, 못 받은 자리는 파인 모양만 — 누르면 받는 법 · 받은 날 · 가진 사람 수가 아래 시트에 나온다.
  * 이 기기에서 처음 보는 것은 '새로' — 열자마자 들어온 것을 한 번 보여 준다(케이스에 넣기).
  * 목록 shared/cueCase · 판정 shared/cueCaseRules · 값 GET /api/hiq/cue-case. 비로그인은 빈 케이스 + 가입 안내.
@@ -25,9 +26,11 @@ import { shareBlob } from "@/sim/share/useShare";
 import { canvasToBlob } from "@/sim/share/shareCard";
 import { renderCaseCard } from "@/components/hiq/cueCase/caseCard";
 import { InvitePanel } from "@/components/hiq/invite/InvitePanel";
-import { CASE_ITEMS, CHALKS, CUES, GLOVES, PEOPLE_STEPS, caseImage, caseItem, cueHow, difficulty, type CaseItem, type CaseKind, type CaseLocale, type CueGroup } from "@shared/cueCase";
+import { BALLS, CASE_ITEMS, CHALKS, CUES, GLOVES, PEOPLE_STEPS, SHAFTS, caseImage, caseItem, cueHow, difficulty, isSecret, type CaseItem, type CaseKind, type CaseLocale, type CueGroup, type WornKind } from "@shared/cueCase";
 import { serialText } from "@/components/hiq/cueCase/cueCaseApi";
-import { CASE_SECTIONS, CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, fetchCueCase, readCaseSeen, saveHero, writeCaseSeen, type CaseItemView, type CaseSection, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
+import { DEFAULT_BALL, DEFAULT_SHAFT } from "@shared/cueStyles";
+import { ballSvg, shaftSvg, svgDataUrl } from "@shared/cueStyleArt";
+import { CASE_SECTIONS, CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, fetchCueCase, readCaseSeen, saveHero, saveWornNone, writeCaseSeen, type CaseItemView, type CaseSection, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
 
 const LOCALES: readonly CaseLocale[] = ["ko", "en", "es", "vi", "tr"];
 const asLocale = (l: string): CaseLocale => (LOCALES as readonly string[]).includes(l) ? (l as CaseLocale) : "en";
@@ -35,6 +38,11 @@ const EMPTY: CaseItemView = { done: false, at: null, got: null, bars: [], soon: 
 const GROUP_KEY: Record<CueGroup, string> = { real: "case.group.real", online: "case.group.online", common: "case.group.common", both: "case.group.both", crew: "case.group.crew", stage2: "case.group.stage2", limited: "case.group.limited" };
 /** 크루 · 원정은 아직 열리지 않아 한 칸에 모은다 */
 const TAB_GROUPS: readonly CueGroup[] = ["limited", "real", "online", "common", "both", "crew"];
+/** 기본 상대 · 공 그림(아이템이 아닌 것 — 지금 대전에 쓰는 것이 기본일 때) */
+const DEFAULT_SHAFT_ART = svgDataUrl(shaftSvg(DEFAULT_SHAFT, "dflt"));
+const DEFAULT_BALL_ART = svgDataUrl(ballSvg(DEFAULT_BALL, { id: "dflt" }));
+/** 상대처럼 긴 홈(큐 모양)에 놓이는 것 */
+const isLong = (x: Pick<CaseItem, "kind">) => x.kind === "cue" || x.kind === "shaft";
 
 export default function CueCasePage() {
     const { t, locale } = useT();
@@ -180,13 +188,8 @@ export default function CueCasePage() {
                     </div>
                 )}
 
-                {/* 칸 고르기 */}
-                <nav className="mt-6 grid grid-cols-4 gap-1 rounded-full border border-[color:var(--cc-gold)]/20 bg-black/25 p-1" aria-label={t("case.title")} data-tour="cc-secs">
-                    {CASE_SECTIONS.map((s) => (
-                        <button key={s} type="button" aria-pressed={sec === s} onClick={() => setSec(s)} data-testid={`cue-case-sec-${s}`}
-                            className="cc-tab h-10 truncate rounded-full px-1 text-[13px] font-semibold text-white/75">{t(`case.sec.${s}`)}</button>
-                    ))}
-                </nav>
+                {/* 칸 고르기 — 케이스의 칸처럼(2026-10-24 오너: "큐를 하대라고 · 이 부분 디자인 잘해줘") */}
+                <SectionPicker sec={sec} onPick={setSec} d={d} it={it} />
 
                 {sec === "cue" && (
                     <section className="mt-4" aria-label={t("case.sec.cue")}>
@@ -220,6 +223,25 @@ export default function CueCasePage() {
                                 </div>
                             );
                         })()}
+                    </section>
+                )}
+
+                {(sec === "shaft" || sec === "ball") && (
+                    <section className="mt-4" aria-label={t(`case.sec.${sec}`)} data-testid={`cue-case-${sec}s`}>
+                        <p className="px-1 text-[12.5px] leading-relaxed text-white/60 break-keep">{t(sec === "shaft" ? "case.shaftDesc" : "case.ballDesc")}</p>
+                        {d && <WornNow kind={sec} worn={sec === "shaft" ? d.heroShaft : d.heroBall} mine={d.member.mine && mineView} l={l} onOpen={setPick} />}
+                        {sec === "shaft" ? (() => {
+                            const got = SHAFTS.filter((c) => it(c.id).done), yet = SHAFTS.filter((c) => !it(c.id).done);
+                            return (
+                                <div className="mt-4">
+                                    {got.length > 0 && <p className="mb-2 px-1 text-[12px] font-bold tracking-[0.04em] text-[color:var(--cc-gold)]">{t("case.ownedSecShaft").replace("{n}", String(got.length))}</p>}
+                                    <ol className="space-y-3.5">{got.map((c) => <CueRow key={c.id} item={c} view={it(c.id)} l={l} isNew={fresh.includes(c)} onOpen={() => setPick(c)} />)}</ol>
+                                    {got.length > 0 && yet.length > 0 && <i className="my-4 block h-px bg-[color:var(--cc-gold)]/18" aria-hidden />}
+                                    {yet.length > 0 && <p className="mb-2 px-1 text-[12px] font-bold tracking-[0.04em] text-white/55">{t("case.lockedSec").replace("{n}", String(yet.length))}</p>}
+                                    <ol className="space-y-3.5">{yet.map((c) => <CueRow key={c.id} item={c} view={it(c.id)} l={l} isNew={false} onOpen={() => setPick(c)} />)}</ol>
+                                </div>
+                            );
+                        })() : <TileGrid list={BALLS} it={it} l={l} fresh={fresh} onOpen={setPick} />}
                     </section>
                 )}
 
@@ -271,7 +293,7 @@ export default function CueCasePage() {
                 )}
             </div>
 
-            {pick && <ItemSheet item={pick} view={it(pick.id)} l={l} mine={!!d?.member.mine && mineView} hero={d?.hero ?? null} onClose={() => setPick(null)} />}
+            {pick && <ItemSheet item={pick} view={it(pick.id)} l={l} mine={!!d?.member.mine && mineView} hero={d?.hero ?? null} worn={pick.kind === "shaft" ? d?.heroShaft ?? null : pick.kind === "ball" ? d?.heroBall ?? null : null} onClose={() => setPick(null)} />}
             {reveal && reveal.length > 0 && <RevealSheet list={reveal} l={l} onClose={() => setReveal(null)} />}
             {gate.sheet}
             {/* 코치마크(2026-10-16 오너: "큐케이스도 코치마크에 추가해줘 · 큐케이스 세부도") — 내 케이스에서만. 새로 들어온 것 창이 떠 있으면 기다린다(대화창이 있으면 멈추는 규칙).
@@ -306,11 +328,60 @@ export default function CueCasePage() {
     );
 }
 
+/**
+ * 칸 고르기 — 케이스 안의 칸처럼 두 줄: 대전에 쓰는 것(하대 · 상대 · 공) · 모으는 것(초크 · 장갑 · 메달).
+ * 칸마다 지금 쓰는 것(대표 큐 · 입은 상대 · 공)이나 첫 물건을 작게 넣고, 모은 수를 적는다. 고른 칸은 놋쇠 테에 불이 켜진다.
+ */
+const SEC_ROWS: readonly (readonly [string, readonly CaseSection[]])[] = [["case.grpWear", ["cue", "shaft", "ball"]], ["case.grpCollect", ["chalk", "glove", "medals"]]];
+function SectionPicker({ sec, onPick, d, it }: { sec: CaseSection; onPick: (s: CaseSection) => void; d: CueCaseView | undefined; it: (id: string) => CaseItemView }) {
+    const { t } = useT();
+    const lists: Partial<Record<CaseSection, readonly CaseItem[]>> = { cue: CUES, shaft: SHAFTS, ball: BALLS, chalk: CHALKS, glove: GLOVES };
+    const thumb = (s: CaseSection): ReactNode => {
+        const pickOwned = (list: readonly CaseItem[]) => list.find((x) => it(x.id).done) ?? list[0];
+        if (s === "cue") return <img src={caseImage((d?.hero && caseItem(d.hero)) || CUES[0])} alt="" draggable={false} className="cc-comp-long" />;
+        if (s === "shaft") { const x = d?.heroShaft ? caseItem(d.heroShaft) : null; return <img src={x ? caseImage(x) : DEFAULT_SHAFT_ART} alt="" draggable={false} className="cc-comp-long" />; }
+        if (s === "ball") { const x = d?.heroBall ? caseItem(d.heroBall) : null; return <img src={x ? caseImage(x) : DEFAULT_BALL_ART} alt="" draggable={false} className="cc-comp-round" />; }
+        if (s === "chalk") return <img src={caseImage(pickOwned(CHALKS))} alt="" draggable={false} className="cc-comp-round" />;
+        if (s === "glove") return <img src={caseImage(pickOwned(GLOVES))} alt="" draggable={false} className="cc-comp-round" />;
+        return (
+            <svg viewBox="0 0 40 40" className="cc-comp-round" aria-hidden="true">
+                <path d="M13 3h6l3 11h-6z" fill="#2f6fd8" /><path d="M27 3h-6l-3 11h6z" fill="#c8442e" />
+                <circle cx="20" cy="24" r="11" fill="url(#ccMedal)" stroke="#8a6524" strokeWidth="1.2" />
+                <path d="M20 17.5l2 4.1 4.5.6-3.3 3.1.8 4.5-4-2.2-4 2.2.8-4.5-3.3-3.1 4.5-.6z" fill="#fff4d2" opacity="0.9" />
+                <defs><radialGradient id="ccMedal" cx="0.35" cy="0.3" r="0.8"><stop offset="0" stopColor="#fbe7b0" /><stop offset="0.55" stopColor="#d6a956" /><stop offset="1" stopColor="#8a6524" /></radialGradient></defs>
+            </svg>
+        );
+    };
+    return (
+        <nav className="mt-6 space-y-3" aria-label={t("case.title")} data-tour="cc-secs" data-testid="cue-case-secs">
+            {SEC_ROWS.map(([cap, row]) => (
+                <div key={cap}>
+                    <p className="mb-1.5 flex items-center gap-2 px-1 text-[11.5px] font-semibold tracking-[0.06em] text-[rgba(232,196,106,0.85)]">
+                        <span>{t(cap)}</span><i className="h-px flex-1 bg-[rgba(232,196,106,0.2)]" aria-hidden />
+                    </p>
+                    <div className="grid grid-cols-3 gap-2">
+                        {row.map((s) => {
+                            const list = lists[s];
+                            return (
+                                <button key={s} type="button" aria-pressed={sec === s} onClick={() => onPick(s)} data-testid={`cue-case-sec-${s}`} className="cc-comp">
+                                    <span className="cc-comp-well" aria-hidden="true">{thumb(s)}</span>
+                                    <span className="cc-comp-label">{t(`case.sec.${s}`)}</span>
+                                    <span className="cc-comp-count rk-num">{list && d ? `${list.filter((x) => it(x.id).done).length}/${list.length}` : "\u00a0"}</span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            ))}
+        </nav>
+    );
+}
+
 /** 달 이름 — 한국어 '10월', 영어 'October' … */
 const monthName = (m: number, locale: string) => {
     try { return new Intl.DateTimeFormat(locale, { month: "long", timeZone: "UTC" }).format(new Date(Date.UTC(2026, m - 1, 15))); } catch { return String(m); }
 };
-const kindOrder = (x: CaseItem) => ({ cue: 0, chalk: 1, glove: 2, pennant: 3 })[x.kind];
+const kindOrder = (x: CaseItem) => ({ cue: 0, shaft: 1, ball: 2, chalk: 3, glove: 4, pennant: 5 })[x.kind];
 const fmtDate = (ms: number, locale: string) => {
     try { return new Intl.DateTimeFormat(locale, { year: "numeric", month: "short", day: "numeric", timeZone: "Asia/Seoul" }).format(new Date(ms)); } catch { return new Date(ms).toISOString().slice(0, 10); }
 };
@@ -363,6 +434,37 @@ function HeroCue({ item, view, l, onOpen }: { item: CaseItem | null; view: CaseI
                 </div>
             )}
         </section>
+    );
+}
+
+/**
+ * 지금 대전에 쓰는 상대 · 공(2026-10-24) — 그림 · 이름, 내 케이스면 '기본으로 쓰기'. 기본은 메이플 상대 · 빨간 점 공.
+ * 고르지 않았으면 서버가 가장 최근에 받은 것을 준다(대표 큐와 같은 규칙).
+ */
+function WornNow({ kind, worn, mine, l, onOpen }: { kind: WornKind; worn: string | null; mine: boolean; l: CaseLocale; onOpen: (x: CaseItem) => void }) {
+    const { t } = useT();
+    const qc = useQueryClient();
+    const item = worn ? caseItem(worn) : null;
+    const reset = useMutation({
+        mutationFn: () => saveWornNone(kind),
+        onSuccess: () => { void qc.invalidateQueries({ queryKey: CUE_CASE_QUERY_KEY }); void qc.invalidateQueries({ queryKey: CASE_SUMMARY_KEY }); },
+    });
+    return (
+        <div className="mt-3 rounded-[20px] bg-black/25 px-3.5 py-3" data-testid={`cue-case-worn-${kind}`}>
+            <p className="text-[12px] font-semibold text-[color:var(--cc-gold)]">{t("case.wornNow")}</p>
+            <button type="button" onClick={() => item && onOpen(item)} disabled={!item} className="mt-2 flex w-full items-center gap-3 text-left active:opacity-85">
+                {kind === "shaft"
+                    ? <span className="cc-slot cc-lit block min-w-0 flex-1 !h-[34px]">{item ? <img src={caseImage(item)} alt="" className="cc-own" draggable={false} /> : <img src={DEFAULT_SHAFT_ART} alt="" className="cc-own" draggable={false} />}</span>
+                    : <span className="cc-tile cc-lit block h-12 w-12 shrink-0"><img src={item ? caseImage(item) : DEFAULT_BALL_ART} alt="" className="cc-own" draggable={false} /></span>}
+                {kind === "ball" && <span className="min-w-0 flex-1 truncate text-[14px] font-semibold text-white">{item ? item.name[l] : t("case.wornDefault.ball")}</span>}
+            </button>
+            {kind === "shaft" && <p className="mt-1.5 truncate px-1 text-[14px] font-semibold text-white">{item ? item.name[l] : t("case.wornDefault.shaft")}</p>}
+            {mine && item && (
+                <button type="button" onClick={() => reset.mutate()} disabled={reset.isPending} data-testid={`cue-case-worn-none-${kind}`}
+                    className="mt-2.5 h-9 rounded-full border border-white/15 px-3.5 text-[12.5px] font-semibold text-white/80 active:bg-white/10 disabled:opacity-60">{t("case.wearNone")}</button>
+            )}
+            {mine && <p className="mt-2 px-1 text-[12px] leading-snug text-white/50 break-keep">{t("case.wornAuto")}</p>}
+        </div>
     );
 }
 
@@ -422,7 +524,7 @@ function CueRow({ item, view, l, isNew, onOpen, tour }: { item: CaseItem; view: 
                 <span className="mt-1.5 flex items-baseline gap-2 px-1">
                     <span className={cn("min-w-0 flex-1 truncate text-[14px] font-semibold", view.done ? "text-white" : "text-white/60")}>
                         {itemName(item, view, l, t)}
-                        <StarRow n={difficulty(item)} size={11} className="ml-1.5" />
+                        {!isSecret(item) && <StarRow n={difficulty(item)} size={11} className="ml-1.5" />}
                         {item.online && <span className="ml-1.5 align-[1px] text-[11.5px] font-semibold text-[#46e4e0]">{t("case.onlineMark")}</span>}
                         {isNew && <span className="ml-1.5 rounded-full bg-[color:var(--cc-gold)] px-1.5 py-[1px] align-[1px] text-[11.5px] font-bold text-[#2d1a08]">{t("case.new")}</span>}
                     </span>
@@ -480,7 +582,7 @@ function Sheet({ label, onClose, children, testId, closeLabel }: { label: string
 }
 
 /** 하나를 눌렀을 때 — 큰 그림 · 받는 법 · 받은 날 · 가진 사람 · 대표 큐로 */
-function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; view: CaseItemView; l: CaseLocale; mine: boolean; hero: string | null; onClose: () => void }) {
+function ItemSheet({ item, view, l, mine, hero, worn, onClose }: { item: CaseItem; view: CaseItemView; l: CaseLocale; mine: boolean; hero: string | null; worn: string | null; onClose: () => void }) {
     const { t, locale } = useT();
     const qc = useQueryClient();
     const pickHero = useMutation({
@@ -491,7 +593,7 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
     return (
         <Sheet label={itemName(item, view, l, t)} onClose={onClose} testId="cue-case-sheet">
             {/* 잠겨 있어도 누르면 원래 무늬 그대로 보여 준다(2026-10-16 오너: "해금이 안 됐더라도 클릭하면 어떤 큐인지 보이게") — 숨은 큐만 모양으로 */}
-            {item.kind === "cue" ? (
+            {isLong(item) ? (
                 <span className="cc-slot relative block !h-[52px] !rounded-[26px]">
                     <img src={caseImage(item)} alt="" className={view.done || !item.hidden ? "cc-own" : "cc-secret"} />
                     {!view.done && <LockMark />}
@@ -506,9 +608,11 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
                 <span>{kindLabel}{item.online ? ` · ${t("case.onlineMark")}` : ""}</span>
             </p>
             <h2 className="mt-0.5 text-[20px] font-bold tracking-tight text-white">{itemName(item, view, l, t)}</h2>
-            <p className="mt-2 flex items-center gap-2 text-[12.5px] text-white/60" data-testid="cue-case-difficulty">
-                <span>{t("case.difficulty")}</span><StarRow n={difficulty(item)} size={16} />
-            </p>
+            {!isSecret(item) && (
+                <p className="mt-2 flex items-center gap-2 text-[12.5px] text-white/60" data-testid="cue-case-difficulty">
+                    <span>{t("case.difficulty")}</span><StarRow n={difficulty(item)} size={16} />
+                </p>
+            )}
             {!view.soon && <OwnerPlate view={view} limit={item.limit} kind={item.kind} />}
             <p className="mt-2 text-[13.5px] leading-relaxed text-white/75 break-keep" data-testid="cue-case-how">{cueHow(item, l, view.done)}</p>
             {view.done && view.at ? (
@@ -526,6 +630,13 @@ function ItemSheet({ item, view, l, mine, hero, onClose }: { item: CaseItem; vie
                     ? <p className="mt-4 text-center text-[13px] font-semibold text-[color:var(--cc-gold)]">{t("case.heroPicked")}</p>
                     : <button type="button" onClick={() => pickHero.mutate()} disabled={pickHero.isPending} data-testid="cue-case-pick-hero"
                         className="mt-4 h-12 w-full rounded-full bg-[color:var(--cc-gold)] text-[14px] font-semibold text-[#2d1a08] active:opacity-90 disabled:opacity-60">{t("case.heroPick")}</button>
+            )}
+            {/* 상대 · 공 — 온라인 대전에 쓰기(받은 것만) */}
+            {mine && (item.kind === "shaft" || item.kind === "ball") && view.done && (
+                worn === item.id
+                    ? <p className="mt-4 text-center text-[13px] font-semibold text-[color:var(--cc-gold)]" data-testid="cue-case-wearing">{t("case.wearing")}</p>
+                    : <button type="button" onClick={() => pickHero.mutate()} disabled={pickHero.isPending} data-testid="cue-case-wear"
+                        className="mt-4 h-12 w-full rounded-full bg-[color:var(--cc-gold)] text-[14px] font-semibold text-[#2d1a08] active:opacity-90 disabled:opacity-60">{t("case.wear")}</button>
             )}
         </Sheet>
     );
@@ -577,10 +688,10 @@ function RevealSheet({ list, l, onClose }: { list: readonly CaseItem[]; l: CaseL
             <ul className="mt-4 space-y-3">
                 {shown.map((x, i) => (
                     <li key={x.id} className="flex items-center gap-3" style={{ animationDelay: `${i * 90}ms` }}>
-                        {x.kind === "cue"
+                        {isLong(x)
                             ? <span className="cc-slot block min-w-0 flex-1"><img src={caseImage(x)} alt="" className="cc-own cc-in" style={{ animationDelay: `${i * 110}ms` }} /></span>
                             : <span className="cc-tile block h-12 w-12 shrink-0"><img src={caseImage(x)} alt="" className="cc-own" /></span>}
-                        <span className={cn("text-[13.5px] font-semibold text-white", x.kind === "cue" ? "w-[38%] shrink-0 truncate" : "min-w-0 flex-1 truncate")}>{x.name[l]}</span>
+                        <span className={cn("text-[13.5px] font-semibold text-white", isLong(x) ? "w-[38%] shrink-0 truncate" : "min-w-0 flex-1 truncate")}>{x.name[l]}</span>
                     </li>
                 ))}
             </ul>

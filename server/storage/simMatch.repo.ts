@@ -90,12 +90,16 @@ export type MatchWithNames = HiqSimMatch & {
     guestRating?: number | null; guestRated?: number;
     /** 두 선수의 대표 큐(큐 케이스, 2026-10-16) — 큐대 손잡이 그림. 받은 큐가 없으면 null(기본 큐대) */
     hostCue?: string | null; guestCue?: string | null;
+    /** 두 선수가 입은 상대 · 공(큐 케이스, 2026-10-24) — 없으면 null(메이플 상대 · 빨간 점 공) */
+    hostShaft?: string | null; guestShaft?: string | null;
+    hostBall?: string | null; guestBall?: string | null;
 };
 
 type NamedRow = {
     m: HiqSimMatch; hostName: string; guestName: string | null; hostCountry: string | null; guestCountry: string | null;
     hostRating: number | null; hostRated: number | null; guestRating: number | null; guestRated: number | null;
     hostCue: string | null; guestCue: string | null;
+    hostShaft: string | null; guestShaft: string | null; hostBall: string | null; guestBall: string | null;
 };
 /** withNames() 의 한 줄 → 대전 행 + 이름 · 국가 · 레이팅 */
 function named(r: NamedRow): MatchWithNames {
@@ -103,6 +107,7 @@ function named(r: NamedRow): MatchWithNames {
         ...r.m, hostName: r.hostName, guestName: r.guestName ?? null, hostCountry: r.hostCountry ?? null, guestCountry: r.guestCountry ?? null,
         hostRating: r.hostRating ?? null, hostRated: Number(r.hostRated ?? 0), guestRating: r.guestRating ?? null, guestRated: Number(r.guestRated ?? 0),
         hostCue: r.hostCue ?? null, guestCue: r.guestCue ?? null,
+        hostShaft: r.hostShaft ?? null, guestShaft: r.guestShaft ?? null, hostBall: r.hostBall ?? null, guestBall: r.guestBall ?? null,
     };
 }
 
@@ -113,6 +118,18 @@ function named(r: NamedRow): MatchWithNames {
 const heroCueSql = (member: ReturnType<typeof sql>) => sql<string | null>`coalesce(
     (select p.hero_item from hiq_cue_case_prefs p join hiq_cue_case_awards a on a.member_id = p.member_id and a.item_id = p.hero_item where p.member_id = ${member}),
     (select a.item_id from hiq_cue_case_awards a where a.member_id = ${member} and a.item_id like 'cue-%' order by a.earned_at desc, a.item_id limit 1))`;
+
+/**
+ * 한 사람이 입은 상대 · 공(2026-10-24) — shared/cueCase wornOf 와 같은 규칙: 'none' 이면 기본(null), 고른 것(받은 것일 때만),
+ * 아무것도 안 골랐으면 가장 최근에 받은 것. 열 이름 · 머리말은 아래 둘만 들어온다(사용자 값이 아니다).
+ */
+const wornSql = (member: ReturnType<typeof sql>, kind: "shaft" | "ball") => {
+    const col = sql.raw(kind === "shaft" ? "hero_shaft" : "hero_ball");
+    const like = kind === "shaft" ? "shaft-%" : "ball-%";
+    return sql<string | null>`case when exists (select 1 from hiq_cue_case_prefs p where p.member_id = ${member} and p.${col} = 'none') then null else coalesce(
+    (select p.${col} from hiq_cue_case_prefs p join hiq_cue_case_awards a on a.member_id = p.member_id and a.item_id = p.${col} where p.member_id = ${member}),
+    (select a.item_id from hiq_cue_case_awards a where a.member_id = ${member} and a.item_id like ${like} order by a.earned_at desc, a.item_id limit 1)) end`;
+};
 
 function randomCode(): string {
     // 6자리, 앞자리 0 허용 안 함(입력 혼동 방지)
@@ -157,6 +174,10 @@ export class SimMatchRepository {
                 guestRating: guestLadder.rating, guestRated: guestLadder.matches,
                 hostCue: heroCueSql(sql`${hiqSimMatches.hostId}`),
                 guestCue: heroCueSql(sql`${hiqSimMatches.guestId}`),
+                hostShaft: wornSql(sql`${hiqSimMatches.hostId}`, "shaft"),
+                guestShaft: wornSql(sql`${hiqSimMatches.guestId}`, "shaft"),
+                hostBall: wornSql(sql`${hiqSimMatches.hostId}`, "ball"),
+                guestBall: wornSql(sql`${hiqSimMatches.guestId}`, "ball"),
             }).from(hiqSimMatches)
                 .innerJoin(hiqMembers, eq(hiqMembers.id, hiqSimMatches.hostId))
                 .leftJoin(guest, eq(guest.id, hiqSimMatches.guestId))

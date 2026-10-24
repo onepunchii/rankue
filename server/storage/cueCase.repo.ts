@@ -11,7 +11,7 @@ import { db } from "../db.js";
 import { and, eq, sql } from "drizzle-orm";
 import { hiqCueCaseAwards, hiqCueCasePrefs, hiqMembers } from "../../shared/schema.js";
 import { isWithdrawnMember } from "../../shared/chatSupport.js";
-import { CASE_ITEMS, caseItem, invitePicks, isLive } from "../../shared/cueCase.js";
+import { CASE_ITEMS, WORN_NONE, caseItem, invitePicks, isLive, wornOf, type WornKind } from "../../shared/cueCase.js";
 import { deficitFromInnings, deficitFromShots, evaluateCase, kstMonthKey, type Bar, type OnlineGame, type RealGame } from "../../shared/cueCaseRules.js";
 import { bestRealTier } from "../../shared/realTier.js";
 import { START_RATING } from "../../shared/sim/rank.js";
@@ -33,6 +33,9 @@ export interface CueCaseItemView { done: boolean; at: number | null; got: number
 export interface CueCaseView {
     member: { id: string; name: string; country: string | null; mine: boolean };
     hero: string | null;
+    /** 온라인 대전에 입은 상대 · 공(2026-10-24). null = 기본 */
+    heroShaft: string | null;
+    heroBall: string | null;
     items: Record<string, CueCaseItemView>;
     /** 이달 장갑 칸(실전 1판 = 3칸 · 온라인 1판 = 1칸) */
     month: { key: string; cells: number; need: number };
@@ -246,22 +249,25 @@ export class CueCaseRepository {
 
         // 대표 큐 — 고른 것(받은 큐만), 없으면 가장 최근에 받은 큐. 대전 화면(simMatch.repo heroCueSql) · 홈 띠와 같은 규칙이다 — 큐 케이스와 게임의 대표 큐는 하나
         let hero: string | null = null;
+        let prefs: { heroShaft: string | null; heroBall: string | null } = { heroShaft: null, heroBall: null };
         try {
-            const [p] = await db.select({ heroItem: hiqCueCasePrefs.heroItem }).from(hiqCueCasePrefs).where(eq(hiqCueCasePrefs.memberId, memberId)).limit(1);
+            const [p] = await db.select({ heroItem: hiqCueCasePrefs.heroItem, heroShaft: hiqCueCasePrefs.heroShaft, heroBall: hiqCueCasePrefs.heroBall }).from(hiqCueCasePrefs).where(eq(hiqCueCasePrefs.memberId, memberId)).limit(1);
             if (p?.heroItem && items[p.heroItem]?.done && caseItem(p.heroItem)?.kind === "cue") hero = p.heroItem;
+            if (p) prefs = { heroShaft: p.heroShaft, heroBall: p.heroBall };
         } catch (e) { if (!missingTable(e)) throw e; }
-        if (!hero) {
-            const owned = CASE_ITEMS.filter((x) => x.kind === "cue" && items[x.id].done)
-                .sort((a, b) => ((items[b.id].at ?? 0) - (items[a.id].at ?? 0)) || (a.id < b.id ? -1 : 1));
-            hero = owned[0]?.id ?? null;
-        }
+        // 받은 것을 최근 것부터 — 대표 큐 · 입은 상대 · 공이 같은 차례를 쓴다
+        const ownedLatest = CASE_ITEMS.filter((x) => items[x.id].done)
+            .sort((a, b) => ((items[b.id].at ?? 0) - (items[a.id].at ?? 0)) || (a.id < b.id ? -1 : 1)).map((x) => x.id);
+        if (!hero) hero = ownedLatest.find((id) => caseItem(id)!.kind === "cue") ?? null;
+        const heroShaft = wornOf("shaft", prefs.heroShaft, ownedLatest);
+        const heroBall = wornOf("ball", prefs.heroBall, ownedLatest);
 
         const monthKey = kstMonthKey(nowMs);
         const cells = real.filter((g) => kstMonthKey(g.at) === monthKey).length * 3 + online.filter((g) => kstMonthKey(g.at) === monthKey).length;
         const people = new Set([...real.flatMap((g) => g.opps), ...online.map((g) => g.opp)]).size;
         return {
             member: { id: String(who.id), name: String(who.name), country, mine },
-            hero, items, month: { key: monthKey, cells, need: 12 }, people,
+            hero, heroShaft, heroBall, items, month: { key: monthKey, cells, need: 12 }, people,
             online: online.length > 0 || awards.length > 0,
             handi: { "3c": (who.handi3c as number | null) ?? null, "4c": (who.handi4c as number | null) ?? null },
             invite: mine ? { count: inv.invites.length, picks: invitePicks(inv.invites.length, CASE_ITEMS.filter((x) => x.rule.k === "invitePick" && items[x.id].done).length) } : null,
@@ -321,6 +327,8 @@ export class CueCaseRepository {
         if (!ids.length) return [];
         await db.execute(sql`delete from hiq_cue_case_awards where member_id = ${memberId} and item_id in (${inList(ids)})`);
         await db.execute(sql`update hiq_cue_case_prefs set hero_item = null where member_id = ${memberId} and hero_item in (${inList(ids)})`).catch(() => undefined);
+        await db.execute(sql`update hiq_cue_case_prefs set hero_shaft = null where member_id = ${memberId} and hero_shaft in (${inList(ids)})`).catch(() => undefined);
+        await db.execute(sql`update hiq_cue_case_prefs set hero_ball = null where member_id = ${memberId} and hero_ball in (${inList(ids)})`).catch(() => undefined);
         holders = null;
         syncedAt.delete(memberId);
         return ids;
@@ -330,7 +338,7 @@ export class CueCaseRepository {
      * 홈 입구 띠 · 게임 큐대의 한 줄 — 받은 수 · 대표 큐 · 가장 최근에 적은 때(띠의 '새로'). 판정은 SYNC_MS 마다 한 번 같이 돌린다.
      * 대표 큐는 고른 것, 없으면 가장 최근에 받은 큐.
      */
-    async summary(memberId: string): Promise<{ opened: boolean; cue: number; chalk: number; glove: number; hero: string | null; latest: number | null }> {
+    async summary(memberId: string): Promise<{ opened: boolean; cue: number; chalk: number; glove: number; hero: string | null; heroShaft: string | null; heroBall: string | null; latest: number | null }> {
         // 판정도 가끔 돌린다 — 처음 한 번(받은 기록이 없을 때)과 그 뒤 SYNC_MS 마다. 그래야 큐 케이스를 안 연 사람도
         // 게임 큐대 · 홈 띠에 받은 큐가 들어온다. 실패해도 띠는 받은 기록만으로 그린다.
         const last = syncedAt.get(memberId) ?? 0;
@@ -343,12 +351,16 @@ export class CueCaseRepository {
                 select item_id, extract(epoch from created_at) * 1000 as created from hiq_cue_case_awards where member_id = ${memberId} order by earned_at desc, item_id`)).rows as Record<string, unknown>[];
             const ids = rows.map((r) => String(r.item_id)).filter((id) => caseItem(id));
             const kind = (k: string) => ids.filter((id) => caseItem(id)!.kind === k).length;
-            const [p] = await db.select({ heroItem: hiqCueCasePrefs.heroItem }).from(hiqCueCasePrefs).where(eq(hiqCueCasePrefs.memberId, memberId)).limit(1);
+            const [p] = await db.select({ heroItem: hiqCueCasePrefs.heroItem, heroShaft: hiqCueCasePrefs.heroShaft, heroBall: hiqCueCasePrefs.heroBall }).from(hiqCueCasePrefs).where(eq(hiqCueCasePrefs.memberId, memberId)).limit(1);
             const hero = p?.heroItem && ids.includes(p.heroItem) ? p.heroItem : ids.find((id) => caseItem(id)!.kind === "cue") ?? null;
-            return { opened: rows.length > 0, cue: kind("cue"), chalk: kind("chalk"), glove: kind("glove"), hero, latest: rows.length ? Math.max(...rows.map((r) => n(r.created))) : null };
+            return {
+                opened: rows.length > 0, cue: kind("cue"), chalk: kind("chalk"), glove: kind("glove"), hero,
+                heroShaft: wornOf("shaft", p?.heroShaft, ids), heroBall: wornOf("ball", p?.heroBall, ids),
+                latest: rows.length ? Math.max(...rows.map((r) => n(r.created))) : null,
+            };
         } catch (e) {
             if (!missingTable(e)) throw e;
-            return { opened: false, cue: 0, chalk: 0, glove: 0, hero: null, latest: null };
+            return { opened: false, cue: 0, chalk: 0, glove: 0, hero: null, heroShaft: null, heroBall: null, latest: null };
         }
     }
 
@@ -414,15 +426,25 @@ export class CueCaseRepository {
         }
     }
 
-    /** 대표 큐 고르기 — 받은 큐만. 고르면 true */
-    async setHero(memberId: string, itemId: string): Promise<boolean> {
+    /**
+     * 대표 큐 · 입은 상대 · 공 고르기 — 받은 것만. 고르면 true.
+     * 상대 · 공은 itemId 'none' + kind 로 기본(메이플 · 빨간 점)으로 돌린다 — 아무것도 안 고른 것(가장 최근에 받은 것)과 다르다.
+     */
+    async setHero(memberId: string, itemId: string, kind?: WornKind): Promise<boolean> {
+        const now = new Date();
+        if (itemId === WORN_NONE) {
+            if (kind !== "shaft" && kind !== "ball") return false;
+            const set = kind === "shaft" ? { heroShaft: WORN_NONE, updatedAt: now } : { heroBall: WORN_NONE, updatedAt: now };
+            await db.insert(hiqCueCasePrefs).values({ memberId, ...set }).onConflictDoUpdate({ target: hiqCueCasePrefs.memberId, set });
+            return true;
+        }
         const x = caseItem(itemId);
-        if (!x || x.kind !== "cue") return false;
+        if (!x || (x.kind !== "cue" && x.kind !== "shaft" && x.kind !== "ball")) return false;
         const [own] = await db.select({ id: hiqCueCaseAwards.id }).from(hiqCueCaseAwards)
             .where(and(eq(hiqCueCaseAwards.memberId, memberId), eq(hiqCueCaseAwards.itemId, itemId))).limit(1);
         if (!own) return false;
-        await db.insert(hiqCueCasePrefs).values({ memberId, heroItem: itemId, updatedAt: new Date() })
-            .onConflictDoUpdate({ target: hiqCueCasePrefs.memberId, set: { heroItem: itemId, updatedAt: new Date() } });
+        const set = x.kind === "cue" ? { heroItem: itemId, updatedAt: now } : x.kind === "shaft" ? { heroShaft: itemId, updatedAt: now } : { heroBall: itemId, updatedAt: now };
+        await db.insert(hiqCueCasePrefs).values({ memberId, ...set }).onConflictDoUpdate({ target: hiqCueCasePrefs.memberId, set });
         return true;
     }
 }

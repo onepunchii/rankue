@@ -81,7 +81,7 @@ export default function MemberSportsSection({ memberId }: { memberId: string }) 
                             <Cell label="초대 취소" value={b.invites.canceled} tone={b.invites.canceled ? "warn" : "muted"} />
                         </div>
                         {b.caseItems.length > 0 && (
-                            <Line>큐 {kinds.cue} · 초크 {kinds.chalk} · 장갑 {kinds.glove} · 페넌트 {kinds.pennant}{kinds.other ? ` · 지금 없는 물건 ${kinds.other}` : ""}{hero ? ` · 대표 큐 ${hero.name.ko}` : ""}</Line>
+                            <Line>큐 {kinds.cue} · 상대 {kinds.shaft} · 공 {kinds.ball} · 초크 {kinds.chalk} · 장갑 {kinds.glove} · 페넌트 {kinds.pennant}{kinds.other ? ` · 지금 없는 물건 ${kinds.other}` : ""}{hero ? ` · 대표 큐 ${hero.name.ko}` : ""}</Line>
                         )}
                         {b.invites.invitedBy && <Line>{b.invites.invitedBy}님의 초대로 가입</Line>}
                         {b.online.filter((o) => o.matches > 0).map((o) => (

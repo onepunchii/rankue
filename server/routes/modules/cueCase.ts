@@ -4,7 +4,7 @@
  * GET  /cue-case?memberId=   한 사람의 큐 케이스(안 주면 내 것). 열 때 새로 채운 것을 받은 기록에 더한다.
  * GET  /cue-case/summary     홈 입구 띠 — 받은 수 · 대표 큐.
  * GET  /cue-case/crew/:id    크루 큐 랙 — 당구 크루 홈 벽.
- * POST /cue-case/hero        { itemId } 대표 큐 고르기 — 받은 큐만.
+ * POST /cue-case/hero        { itemId, kind? } 대표 큐 · 입은 상대 · 공 고르기 — 받은 것만. 상대 · 공은 itemId 'none' + kind 로 기본.
  * POST /cue-case/invite-pick { itemId } 친구 30명마다 한정 큐 한 자루 고르기(디자인마다 10자루 · 선착순 번호).
  * 남의 것도 볼 수 있다(랭킹 · 프로필이 보여 주는 이름 · 전적에서 나온 것). 탈퇴했거나 아무 기록도 없는 회원은 404.
  */
@@ -42,11 +42,11 @@ router.get("/cue-case/crew/:crewId", requireAuth, asyncHandler(async (req: AuthR
     return sendSuccess(res, rack);
 }));
 
-const heroBody = z.object({ itemId: z.string().min(1).max(64) });
+const heroBody = z.object({ itemId: z.string().min(1).max(64), kind: z.enum(["shaft", "ball"]).optional() });
 router.post("/cue-case/hero", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const body = heroBody.safeParse(req.body);
     if (!body.success) return sendError(res, 400, "err.cueCase.notOwned");
-    const ok = await storage.cueCase.setHero(req.userId!, body.data.itemId);
+    const ok = await storage.cueCase.setHero(req.userId!, body.data.itemId, body.data.kind);
     if (!ok) return sendError(res, 403, "err.cueCase.notOwned");
     return sendSuccess(res, { hero: body.data.itemId });
 }));

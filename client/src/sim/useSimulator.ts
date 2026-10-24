@@ -139,6 +139,9 @@ export interface MatchView {
     readonly tiers: readonly [TierId | null, TierId | null];
     /** 두 선수의 대표 큐([호스트, 게스트], 큐 케이스 id) — 큐대 손잡이 그림. 없으면 null */
     readonly cues: readonly [string | null, string | null];
+    /** 두 선수가 입은 상대 · 공([호스트, 게스트], 큐 케이스 id, 2026-10-24) — 겨누는 사람의 상대 · 각자 수구의 무늬. 없으면 null */
+    readonly shafts: readonly [string | null, string | null];
+    readonly ballSkins: readonly [string | null, string | null];
     /** 이 대전에서 오간 한마디(오래된 것부터). 내가 보낸 것도 들어 있다. */
     readonly chat: readonly ChatLine[];
     /**
@@ -278,6 +281,8 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             countries: m.countries ?? [null, null],
             tiers: m.tiers ?? [null, null],
             cues: m.cues ?? [null, null],
+            shafts: m.shafts ?? [null, null],
+            ballSkins: m.ballSkins ?? [null, null],
             chat: aux.chat,
             // 차례는 안 본다(2026-09-18) — 내 차례 대화창은 말풍선을 눌러 직접 연다. 보낼 샷이 남은 동안만 막는다
             // (그 창에선 서버 상태가 아직 내 샷을 모른다).

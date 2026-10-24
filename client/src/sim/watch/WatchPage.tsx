@@ -23,7 +23,8 @@ import { simulateShot } from "@shared/sim/simulate";
 import type { BallState, ShotInput, SimResult } from "@shared/sim/types";
 import { SHOT_CLOCK_S, type SessionState } from "@shared/sim/rules";
 import { Canvas2DRenderer } from "../render/Canvas2DRenderer";
-import type { Renderer, RendererView, SafeInsets } from "../render/Renderer";
+import type { BallSkins, Renderer, RendererView, SafeInsets } from "../render/Renderer";
+import { caseImage, caseItem } from "@shared/cueCase";
 import { readZoomPref, safeLocalStorage, selectRendererKind, type RendererKind } from "../render/rendererChoice";
 import { matchApi, matchConfig, type ChatLine, type MatchPublic, type MatchShot } from "../matchApi";
 import { cueBallIdOf, paramsFromConfig } from "../simReducer";
@@ -137,6 +138,21 @@ export default function WatchPage({ matchId, onExit }: { matchId: string; onExit
     const completed = useMemo(() => (completedKey ? completedKey.split(",").map(Number) : undefined), [completedKey]);
     liveAimRef.current = live && match?.opponentAim ? match.opponentAim.phi : null;
     liveCueRef.current = cueBallIdOf(session);
+    // 큐 케이스 꾸미기(2026-10-24) — 겨누는 사람의 큐대(손잡이 · 상대)와 두 사람 수구의 무늬. 관전자도 선수와 같은 것을 본다
+    const turnIdx = session?.turn === 1 ? 1 : 0;
+    const wornRef = useRef<{ skin: string | null; shaft: string | null; ballSkins: BallSkins }>({ skin: null, shaft: null, ballSkins: {} });
+    wornRef.current = {
+        skin: (() => { const id = match?.cues?.[turnIdx]; const x = id ? caseItem(id) : null; return x && x.kind === "cue" ? caseImage(x) : null; })(),
+        shaft: match?.shafts?.[turnIdx] ?? null,
+        ballSkins: (() => {
+            const out: { white?: string | null; yellow?: string | null } = {};
+            for (const i of [0, 1] as const) {
+                const ball = session?.players[i]?.cueBallId ?? (i === 0 ? "white" : "yellow");
+                if (ball === "white" || ball === "yellow") out[ball] = match?.ballSkins?.[i] ?? null;
+            }
+            return out;
+        })(),
+    };
     const names = useMemo(() => [match?.hostName || t("sim.watch.host"), match?.guestName || t("sim.watch.guest")], [match, t]);
     /** 관전 헤더도 선수와 같은 모양으로 — 왼쪽이 호스트, 오른쪽이 게스트(관전자에겐 "나"가 없다). */
     const headerPlayers = useMemo((): readonly [MatchHeaderPlayer, MatchHeaderPlayer] | null => {
@@ -209,7 +225,8 @@ export default function WatchPage({ matchId, onExit }: { matchId: string; onExit
             const camBall = opp ? liveCueRef.current : aim.cueBallId;
             r.draw({
                 balls: ballsRef.current,
-                cue: opp ? { phi: opp.phi, pullback: OPP_AIM_PULLBACK, visible: true, ballId: liveCueRef.current } : undefined,
+                cue: opp ? { phi: opp.phi, pullback: OPP_AIM_PULLBACK, visible: true, ballId: liveCueRef.current, skin: wornRef.current.skin, shaft: wornRef.current.shaft } : undefined,
+                ballSkins: wornRef.current.ballSkins,
                 highlightBallId: aim.cueBallId,
                 view: { cueBallId: camBall, phi: opp ? opp.phi : aim.phi, mode: animRef.current ? "overview" : "follow", pitch: WATCH_OVERVIEW_PITCH_DEG },
             });

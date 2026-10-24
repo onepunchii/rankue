@@ -51,7 +51,7 @@ import { useGameAudio } from "@/hooks/useGameAudio";
 import { useAuth } from "@/hooks/useAuth";
 import { useKeepAwake } from "../hooks/useKeepAwake"; // 상대 경로 — vitest 에 "@/" 별칭이 없고 SimulatorPage.test 는 "@/" 를 전부 목으로 바꾼다
 import { useSimulator, type OfflineReason } from "./useSimulator";
-import type { Renderer, RendererView, SafeInsets } from "./render/Renderer";
+import type { BallSkins, Renderer, RendererView, SafeInsets } from "./render/Renderer";
 import { ZOOM_MAX, ZOOM_MIN } from "./render/Renderer";
 import { Canvas2DRenderer } from "./render/Canvas2DRenderer";
 import {
@@ -217,6 +217,10 @@ interface View {
     /** 큐대 손잡이 그림 — 내 것 · 상대 것(큐 케이스의 대표 큐, 2026-10-16). 없으면 나무 색 */
     mySkin: string | null;
     oppSkin: string | null;
+    /** 상대(큐의 윗대) · 공 꾸미기(2026-10-24) — 상대는 겨누는 사람의 것, 공은 각자 수구에(흰 공 · 노란 공) */
+    myShaft: string | null;
+    oppShaft: string | null;
+    ballSkins: BallSkins;
 }
 
 export function SimulatorPage() {
@@ -691,6 +695,14 @@ export function SimulatorPage() {
     const caseSummary = useCaseSummary(!!member);
     const mySkin = cueSkinUrl(sim.match ? sim.match.cues[sim.match.myIndex] : caseSummary.data?.hero);
     const oppSkin = sim.match ? cueSkinUrl(sim.match.cues[sim.match.myIndex === 0 ? 1 : 0]) : null;
+    // 상대 · 공 꾸미기(2026-10-24) — 대전이면 서버가 준 두 사람의 것, 혼자 치기 · 연습이면 내 큐 케이스의 것(내 수구에만)
+    const oppIndex = sim.match?.myIndex === 0 ? 1 : 0;
+    const myShaft = sim.match ? sim.match.shafts[sim.match.myIndex] ?? null : caseSummary.data?.heroShaft ?? null;
+    const oppShaft = sim.match ? sim.match.shafts[oppIndex] ?? null : null;
+    const myBallSkin = sim.match ? sim.match.ballSkins[sim.match.myIndex] ?? null : caseSummary.data?.heroBall ?? null;
+    const oppBallSkin = sim.match ? sim.match.ballSkins[oppIndex] ?? null : null;
+    const myCueBall: "white" | "yellow" = sim.session?.players[sim.match ? Math.max(0, sim.match.myIndex) : 0]?.cueBallId === "yellow" ? "yellow" : "white";
+    const ballSkins = useMemo<BallSkins>(() => (myCueBall === "yellow" ? { yellow: myBallSkin, white: oppBallSkin } : { white: myBallSkin, yellow: oppBallSkin }), [myCueBall, myBallSkin, oppBallSkin]);
     /** 직전 프레임에 그린 상대 큐 각도(따라가는 중간값). 값이 없어지면 null 로 비워 큐대를 지운다. */
     const oppAimRef = useRef<number | null>(null);
 
@@ -698,14 +710,16 @@ export function SimulatorPage() {
     const viewRef = useRef<View>({
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
         table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist, opponentAim, mySkin, oppSkin,
+        myShaft, oppShaft, ballSkins,
     });
     viewRef.current = {
         phase: sim.phase, input: sim.input, cueBallId: sim.cueBallId, balls: sim.balls, preview: sim.preview,
         table, canPlace: sim.canPlace && !drillLocked, dragging, placing, diamond: diamondOn, solverPreview, cameraView, assist, opponentAim, mySkin, oppSkin,
+        myShaft, oppShaft, ballSkins,
     };
     useEffect(() => {
         dirtyRef.current = true;
-    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview, cameraView, assist, opponentAim, mySkin, oppSkin]);
+    }, [sim.phase, sim.input, sim.cueBallId, sim.balls, sim.preview, table, dragging, placing, diamondOn, solverPreview, cameraView, assist, opponentAim, mySkin, oppSkin, myShaft, oppShaft, ballSkins]);
 
     const { frameAt } = sim;
     useEffect(() => {
@@ -737,7 +751,9 @@ export function SimulatorPage() {
                     visible: v.phase === "aim" || opp !== null,
                     ballId: v.cueBallId,
                     skin: opp ? v.oppSkin : v.mySkin,
+                    shaft: opp ? v.oppShaft : v.myShaft,
                 },
+                ballSkins: v.ballSkins,
                 // 큐볼은 큐 스틱이 가리키므로 링을 두르지 않는다 — 8px 남짓한 공에 링이 겹치면 속이 빈 공처럼 보였다(실측).
                 highlightBallId: v.placing ?? undefined,
                 // 선수 시점 카메라 대상: 조준 중엔 큐볼 뒤(follow), 재생 중엔 부감(overview — 테이블 전체가 보이게 올라갔다가 조준으로

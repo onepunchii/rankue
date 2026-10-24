@@ -11,10 +11,13 @@
  * ⚠️ 서버가 부른다 — 상대 임포트는 ./x.js.
  */
 import type { TierId } from "./sim/rank.js";
+import { BALL_STYLES, SHAFT_STYLES } from "./cueStyles.js";
+import { ballSvg, shaftSvg, svgDataUrl } from "./cueStyleArt.js";
 
 export type CaseLocale = "ko" | "en" | "es" | "vi" | "tr";
 export type Names = Readonly<Record<CaseLocale, string>>;
-export type CaseKind = "cue" | "chalk" | "glove" | "pennant";
+/** shaft = 큐의 상대(윗대) · ball = 내 수구의 점 무늬 · 마감(2026-10-24 — 모양은 shared/cueStyles) */
+export type CaseKind = "cue" | "chalk" | "glove" | "pennant" | "shaft" | "ball";
 /** 큐가 속한 칸 — 화면의 탭 */
 export type CueGroup = "real" | "online" | "common" | "both" | "crew" | "stage2" | "limited";
 
@@ -43,7 +46,9 @@ export type Rule =
     /** 친구 초대(2026-10-16) — 내 초대 링크 · 코드로 **새로 가입한** 사람 수(가입만 센다 — 오너) · 친구의 초대로 가입했다 */
     | { k: "invite"; n: number } | { k: "invited" }
     /** 친구 30명마다 한 자루를 고른다(디자인마다 10자루) — 판정으로는 안 들어오고 고를 때만 들어온다 */
-    | { k: "invitePick" };
+    | { k: "invitePick" }
+    /** 조건 미공개(2026-10-24 오너: "나머지는 조건 미공개 · 내가 나중에 설정") — 판정으로는 안 들어온다(증정으로만). 정해지면 이 자리에 규칙을 넣는다 */
+    | { k: "secret" };
 /** 한정판 다섯(2026-10-16 오너: "열기 어려운 채는 수량 한정 넘버링 — 따로 새로 · 모두 99자루") */
 export type LimitedRule = "doubleMaster" | "thousand" | "tripleCup" | "legendRun" | "fiveNations";
 export type Season = "spring" | "summer" | "autumn" | "winter";
@@ -247,6 +252,55 @@ export const PENNANTS: readonly CaseItem[] = [
     pennant("store-trips", "stores5", N("매장 원정 5곳", "Five Hall Tour", "Gira de 5 salas", "Chinh phục 5 quán", "Beş Salon Turu")),
 ];
 
+/**
+ * 상대 · 공 꾸미기(2026-10-24 오너: "상대 색도 커스텀 · 조건을 달성하면" → "1단계부터"). 온라인 대전에서 보인다 — 내 큐대의 상대와 내 수구.
+ * 조건(2026-10-24 오너): 흑단 상대 · 파란 점만 '온라인 핸디전 50판'(레이팅에 반영되는 판 = 핸디전), 나머지는 조건 미공개(secret — 오너가 나중에 정한다).
+ * 판정 shared/cueCaseRules 가 목록 전부를 돈다 — 조건을 정해 넣으면 지난 기록도 쳐 준다. 모양은 shared/cueStyles(SHAFT_STYLES · BALL_STYLES)가 id 로 안다 — img 는 그 id.
+ */
+const shaft = (id: string, name: Names, rule: Rule): CaseItem => ({ id: `shaft-${id}`, kind: "shaft", img: `shaft-${id}`, name, rule, online: true });
+export const SHAFTS: readonly CaseItem[] = [
+    shaft("white", N("화이트 메이플", "White Maple", "Arce blanco", "Phong trắng", "Beyaz Akçaağaç"), { k: "secret" }),
+    shaft("ebony", N("흑단 상대", "Ebony Shaft", "Eje de ébano", "Thân mun", "Abanoz Şaft"), { k: "onGames", n: 50 }),
+    shaft("birdseye", N("버즈아이", "Birdseye", "Ojo de pájaro", "Vân mắt chim", "Kuş Gözü"), { k: "secret" }),
+    shaft("flame", N("불꽃 상대", "Flame Shaft", "Eje llama", "Thân lửa", "Alev Şaft"), { k: "secret" }),
+    shaft("teal", N("청록 상대", "Teal Shaft", "Eje turquesa", "Thân xanh ngọc", "Turkuaz Şaft"), { k: "secret" }),
+    shaft("carbon", N("카본 블랙", "Black Carbon", "Carbono negro", "Carbon đen", "Siyah Karbon"), { k: "secret" }),
+    shaft("carbon-white", N("카본 화이트", "White Carbon", "Carbono blanco", "Carbon trắng", "Beyaz Karbon"), { k: "secret" }),
+    shaft("carbon-red", N("레드 카본", "Red Carbon", "Carbono rojo", "Carbon đỏ", "Kırmızı Karbon"), { k: "secret" }),
+    shaft("carbon-blue", N("블루 카본", "Blue Carbon", "Carbono azul", "Carbon xanh", "Mavi Karbon"), { k: "secret" }),
+    shaft("gold-ring", N("골드 링 카본", "Gold Ring Carbon", "Carbono anillo dorado", "Carbon viền vàng", "Altın Halkalı Karbon"), { k: "secret" }),
+];
+const ball = (id: string, name: Names, rule: Rule): CaseItem => ({ id: `ball-${id}`, kind: "ball", img: `ball-${id}`, name, rule, online: true });
+export const BALLS: readonly CaseItem[] = [
+    ball("dot-blue", N("파란 점", "Blue Dots", "Puntos azules", "Chấm xanh dương", "Mavi Noktalar"), { k: "onGames", n: 50 }),
+    ball("dot-green", N("초록 점", "Green Dots", "Puntos verdes", "Chấm xanh lá", "Yeşil Noktalar"), { k: "secret" }),
+    ball("dot-gold", N("금 점", "Gold Dots", "Puntos dorados", "Chấm vàng", "Altın Noktalar"), { k: "secret" }),
+    ball("dot-star", N("별 점", "Star Dots", "Puntos estrella", "Chấm sao", "Yıldız Noktalar"), { k: "secret" }),
+    ball("dot-ring", N("고리 점", "Ring Dots", "Puntos anillo", "Chấm vòng", "Halka Noktalar"), { k: "secret" }),
+    ball("dot-five", N("다섯 점", "Five Dots", "Cinco puntos", "Năm chấm", "Beş Nokta"), { k: "secret" }),
+    ball("dot-globe", N("지구 점", "Globe Dots", "Puntos globo", "Chấm địa cầu", "Küre Noktalar"), { k: "secret" }),
+    ball("dot-heart", N("하트 점", "Heart Dots", "Puntos corazón", "Chấm trái tim", "Kalp Noktalar"), { k: "secret" }),
+    ball("carbon", N("카본결", "Carbon Weave", "Trama de carbono", "Vân carbon", "Karbon Örgü"), { k: "secret" }),
+    ball("pearl", N("진주 광택", "Pearl Sheen", "Brillo perla", "Ánh ngọc trai", "İnci Parıltı"), { k: "secret" }),
+    ball("marble", N("대리석결", "Marble", "Mármol", "Vân cẩm thạch", "Mermer"), { k: "secret" }),
+    ball("chrome", N("크롬 거울", "Mirror Chrome", "Cromo espejo", "Gương crom", "Ayna Krom"), { k: "secret" }),
+    ball("aurora", N("오로라 점", "Aurora Dots", "Puntos aurora", "Chấm cực quang", "Kutup Işığı Noktalar"), { k: "secret" }),
+    ball("crown", N("왕관 점", "Crown Dots", "Puntos corona", "Chấm vương miện", "Taç Noktalar"), { k: "secret" }),
+];
+
+/** 입은 상대 · 공을 '기본으로 둔다'고 고른 값(hiq_cue_case_prefs.hero_shaft · hero_ball) */
+export const WORN_NONE = "none";
+export type WornKind = "shaft" | "ball";
+/**
+ * 입은 상대 · 공 — 고른 것(받은 것일 때만), 'none' 이면 기본, 아무것도 안 골랐으면 가장 최근에 받은 것(대표 큐와 같은 규칙).
+ * owned 는 받은 id 를 최근 것부터. 대전 화면은 같은 규칙을 SQL 로 한다(server/storage/simMatch.repo wornSql).
+ */
+export function wornOf(kind: WornKind, chosen: string | null | undefined, owned: readonly string[]): string | null {
+    if (chosen === WORN_NONE) return null;
+    if (chosen && owned.includes(chosen) && caseItem(chosen)?.kind === kind) return chosen;
+    return owned.find((id) => caseItem(id)?.kind === kind) ?? null;
+}
+
 export type Stars = 1 | 2 | 3 | 4 | 5;
 /**
  * 난이도 별(2026-10-16 오너: "팝업에 달성하기 어려운 거 별 다는 거 어때? 소유욕 더 생기고") — 조건이 얼마나 어려운가. 가진 사람 수(희귀함)와는 따로다.
@@ -288,13 +342,26 @@ export function difficulty(x: Pick<CaseItem, "rule">): Stars {
         case "invite": return by(r.n, [[1, 1], [3, 2], [10, 3], [30, 5]]);
         case "invitePick": return 5;
         case "invited": return 1;
+        // 미공개 — 화면은 별을 그리지 않는다(isSecret)
+        case "secret": return 3;
     }
 }
 
-export const CASE_ITEMS: readonly CaseItem[] = [...CUES, ...CHALKS, ...GLOVES, ...PENNANTS];
+export const CASE_ITEMS: readonly CaseItem[] = [...CUES, ...CHALKS, ...GLOVES, ...PENNANTS, ...SHAFTS, ...BALLS];
 const BY_ID = new Map(CASE_ITEMS.map((x) => [x.id, x]));
 export const caseItem = (id: string): CaseItem | null => BY_ID.get(id) ?? null;
-export const caseImage = (x: Pick<CaseItem, "kind" | "img">) => `/billiards/case/${x.kind}/${x.img}.webp`;
+/** 상대 · 공은 그림 파일이 없다 — 모양 정의에서 그린 SVG(data: 주소, 한 번 만들고 둔다) */
+const ART = new Map<string, string>();
+export const caseImage = (x: Pick<CaseItem, "kind" | "img">): string => {
+    if (x.kind !== "shaft" && x.kind !== "ball") return `/billiards/case/${x.kind}/${x.img}.webp`;
+    let url = ART.get(x.img);
+    if (!url) {
+        const svg = x.kind === "shaft" ? (SHAFT_STYLES[x.img] ? shaftSvg(SHAFT_STYLES[x.img], x.img) : "") : BALL_STYLES[x.img] ? ballSvg(BALL_STYLES[x.img], { id: x.img }) : "";
+        url = svg ? svgDataUrl(svg) : `/billiards/case/${x.kind}/${x.img}.webp`;
+        ART.set(x.img, url);
+    }
+    return url;
+};
 export const CUE_GROUPS: readonly CueGroup[] = ["limited", "real", "online", "common", "both", "crew", "stage2"];
 
 /**
@@ -312,6 +379,8 @@ export const SOON: ReadonlySet<string> = new Set([
     ...PENNANTS.map((p) => p.id),
 ]);
 export const isLive = (x: Pick<CaseItem, "id">) => !SOON.has(x.id);
+/** 조건 미공개 — 난이도 별 · 막대를 그리지 않는다 */
+export const isSecret = (x: Pick<CaseItem, "rule">) => x.rule.k === "secret";
 
 const SEASON: Readonly<Record<Season, Names>> = {
     spring: N("봄(3~5월)", "spring (Mar–May)", "primavera (mar–may)", "mùa xuân (th3–5)", "ilkbahar (Mar–May)"),
@@ -345,7 +414,11 @@ export function cueHow(x: CaseItem, l: CaseLocale, earned = false): string {
             triple3: N("3쿠션(목표 5점 이상)을 3이닝 안에 이기기", "Win 3-cushion (target 5+) within 3 innings", "Gana a tres bandas (meta 5+) en 3 entradas", "Thắng 3 băng (mục tiêu 5+) trong 3 lượt", "3 bantı (hedef 5+) 3 ıstakada kazan"),
             anniversary: N("가입한 날로부터 1년", "One year since you joined", "Un año desde que te uniste", "Một năm kể từ ngày tham gia", "Katılımının birinci yılı"),
         })[r.s]);
-        case "onTier": return T(l, N(`온라인 ${x.name.ko} 등급에 처음 오르기`, `Reach ${x.name.en} tier online`, `Alcanza el rango ${x.name.es} online`, `Lần đầu đạt hạng ${x.name.vi} online`, `Online ${x.name.tr} seviyesine ulaş`));
+        case "onTier": {
+            // 등급 이름 — 그 등급의 큐 이름(아이언~마스터)이 곧 등급 이름이다. 상대 · 공처럼 이름이 다른 물건도 등급으로 말한다
+            const tn = CUES.find((c) => c.rule.k === "onTier" && c.rule.tier === r.tier)?.name ?? x.name;
+            return T(l, N(`온라인 ${tn.ko} 등급에 처음 오르기`, `Reach ${tn.en} tier online`, `Alcanza el rango ${tn.es} online`, `Lần đầu đạt hạng ${tn.vi} online`, `Online ${tn.tr} seviyesine ulaş`));
+        }
         case "onCup": return T(l, r.place === 1 ? N("월대회 우승", "Win the monthly cup", "Gana la copa mensual", "Vô địch cúp tháng", "Aylık kupayı kazan")
             : r.place === 2 ? N("월대회 준우승", "Runner-up in the monthly cup", "Subcampeón de la copa mensual", "Á quân cúp tháng", "Aylık kupada ikinci ol")
                 : N("월대회 4강", "Reach the cup semi-finals", "Llega a semifinales de copa", "Vào bán kết cúp tháng", "Kupada yarı finale çık"));
@@ -400,6 +473,7 @@ export function cueHow(x: CaseItem, l: CaseLocale, earned = false): string {
             ? N("친구 한 명이 내 초대 링크로 가입", "A friend joins with your invite link", "Un amigo se une con tu enlace", "Một người bạn tham gia qua link mời của bạn", "Bir arkadaşın davet bağlantınla katılsın")
             : N(`친구 ${n}명이 내 초대 링크로 가입`, `${n} friends join with your invite link`, `${n} amigos se unen con tu enlace`, `${n} người bạn tham gia qua link mời của bạn`, `${n} arkadaşın davet bağlantınla katılsın`));
         case "invitePick": return T(l, N(`친구 ${INVITE_PICK_EVERY}명을 초대할 때마다 열두 디자인 가운데 하나를 골라요(디자인마다 ${INVITE_PICK_LIMIT}자루)`, `Every ${INVITE_PICK_EVERY} friends you invite, pick one of twelve designs (${INVITE_PICK_LIMIT} of each)`, `Cada ${INVITE_PICK_EVERY} amigos invitados, elige uno de doce diseños (${INVITE_PICK_LIMIT} de cada uno)`, `Cứ mời ${INVITE_PICK_EVERY} người bạn, chọn một trong mười hai mẫu (mỗi mẫu ${INVITE_PICK_LIMIT} cây)`, `Davet ettiğin her ${INVITE_PICK_EVERY} arkadaşta on iki tasarımdan birini seç (her birinden ${INVITE_PICK_LIMIT})`));
+        case "secret": return T(l, N("조건 미공개", "Condition not revealed yet", "Condición aún no revelada", "Điều kiện chưa công bố", "Koşul henüz açıklanmadı"));
         case "invited": return T(l, N("친구의 초대 링크로 가입", "Join with a friend's invite link", "Únete con el enlace de un amigo", "Tham gia qua link mời của bạn bè", "Bir arkadaşının davet bağlantısıyla katıl"));
         case "pennant": return T(l, ({
             games100: N("크루 안 경기 100판", "100 games among crewmates", "100 partidas entre miembros", "100 trận nội bộ nhóm", "Ekip içi 100 maç"),

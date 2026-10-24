@@ -320,6 +320,8 @@ export function evaluateCase(input: CaseInput): Record<string, ItemState> {
             case "limited": return limited(r.s);
             case "invite": { const t = [...(input.invites ?? [])].sort((a, b) => a - b); return state(nth(t, r.n), [count(t.length, r.n)]); }
             case "invited": return state(input.invitedAt ?? null);
+            // 조건 미공개 — 판정으로는 안 들어온다(증정으로만)
+            case "secret": return { done: false, at: null, bars: [] };
             // 고를 때만 들어온다 — 판정은 '30명까지 남은 수' 막대만
             case "invitePick": return { done: false, at: null, bars: [count((input.invites ?? []).length % INVITE_PICK_EVERY, INVITE_PICK_EVERY)] };
             default: return { done: false, at: null, bars: [], soon: true };

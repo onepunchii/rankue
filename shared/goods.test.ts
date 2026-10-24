@@ -12,9 +12,10 @@ describe("굿즈 증정 목록(2026-10-16)", () => {
             const list = goodsCatalog(sport);
             counts[sport] = list.length;
             expect(new Set(list.map((x) => x.key)).size, sport).toBe(list.length);
-            for (const x of list) if (x.image) expect(fs.existsSync(`client/public${x.image}`), `${sport} ${x.key} ${x.image}`).toBe(true);
+            // 당구 상대 · 공(2026-10-24)은 그림 파일 대신 모양 정의에서 그린 SVG(data: 주소)
+            for (const x of list) if (x.image) expect(x.image.startsWith("data:image/svg+xml") || fs.existsSync(`client/public${x.image}`), `${sport} ${x.key} ${x.image.slice(0, 60)}`).toBe(true);
         }
-        expect(counts.billiards).toBe(95 + 18 + 17 + 8);
+        expect(counts.billiards).toBe(95 + 18 + 17 + 8 + 10 + 14);
         expect(counts.fishing).toBe(24);
         expect(counts.golf).toBe(9 + 1 + 16 + 5 + 21 + 8 + 3);
         expect(counts.hiking).toBe(16 + 6 + 4 + 2 + 8 + 7);
