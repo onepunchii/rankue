@@ -51,12 +51,26 @@ describe("당구 홈", () => {
         expect(home).not.toContain('queryKey: ["/api/hiq/rankings", "3c"]');
         expect(skill).toContain('const openHistory = sample ? undefined : () => setLocation("/history");');
     });
-    it("① 닮은 프로는 실전 · 온라인 각각, 아래 프로 실력 사다리에 두 자리(오너 '각각 · 그래프가 누락' 10/24) — 3쿠션만", () => {
-        const pros = skill.slice(skill.indexOf('{cur === "3c" && ('), skill.indexOf('data-testid="home-skill-table"'));
-        expect(pros).toContain('testId="home-skill-pro-real"');
-        expect(pros).toContain('testId="home-skill-pro-online"');
-        expect(pros).toContain("<ProLadder real={realSpot} online={onlineSpot} />");
-        // 실전 기준은 실전 기록(/compare/real)의 프로 · 자리, 온라인 기준은 온라인 기록(/sim/lookalike)의 프로 · 자리 — 섞지 않는다
+    it("① 닮은 프로는 표 안에 — 실전 오른쪽에 실전 프로, 온라인 오른쪽에 온라인 프로(사진 · 이름), 아래 프로 실력 사다리에 두 자리(오너 10/24)", () => {
+        const table = skill.slice(skill.indexOf('data-testid="home-skill-table"'), skill.indexOf("{/* 프로 실력에서 내 자리"));
+        // 머리 둘째 줄: 나 · 실전 프로 · 나 · 온라인 프로 — 차례 그대로
+        const order = ["<MeHead sample={!!sample} />", 'testId="home-skill-pro-real"', "<MeHead sample={!!sample} divider />", 'testId="home-skill-pro-online"'];
+        const at = order.map((x) => table.indexOf(x));
+        for (let i = 0; i < at.length; i++) expect(at[i], order[i]).toBeGreaterThan(0);
+        for (let i = 1; i < at.length; i++) expect(at[i], order[i]).toBeGreaterThan(at[i - 1]);
+        // 줄마다 실전 나 → 실전 프로 → 온라인 나 → 온라인 프로
+        const row = table.slice(table.indexOf("<span className={cell}>{a}</span>"));
+        expect(row.indexOf("{ap}")).toBeLessThan(row.indexOf("{b}"));
+        expect(row.indexOf("{b}")).toBeLessThan(row.indexOf("{bp}"));
+        // 프로 칸 머리에 사진, 4구는 프로 없이 두 열
+        const head = skill.slice(skill.indexOf("function ProHead("));
+        expect(head).toContain("<PlayerPhoto memCode={pro.memCode}");
+        expect(skill).toContain('const withPros = cur === "3c";');
+        expect(table).toContain('withPros ? COLS_PRO : "grid-cols-3"');
+        // 예전 닮은 프로 두 칸은 걷었다
+        expect(skill).not.toContain("function ProTile(");
+        expect(skill).not.toContain('data-testid="home-skill-pros"');
+        // 실전 프로는 실전 기록(/compare/real)의 프로, 온라인 프로는 온라인 기록(/sim/lookalike)의 프로 — 섞지 않는다
         expect(skill).toContain("ready ? side?.pro ?? null : null;");
         expect(skill).toContain("ready ? spotOf(side?.tier, side?.pos) : null;");
         expect(skill).toContain("const onlinePro = lk?.ready ? lk.pro : null;");
@@ -64,13 +78,11 @@ describe("당구 홈", () => {
         // 예시는 예시 인물의 에버로 공개 API 를 그때 부른다(예시 자료에 실제 선수를 넣지 않는다) — 회원은 부르지 않는다
         expect(skill).toContain("enabled: !!sample && sampleAvg3c != null,");
         // 사다리: 다섯 칸 이름 · 실전 깃발은 위 · 온라인 깃발은 아래(붙어 있어도 겹치지 않게)
+        expect(skill).toContain("{withPros && (realSpot || onlineSpot) && <ProLadder real={realSpot} online={onlineSpot} />}");
         const ladder = skill.slice(skill.indexOf("function ProLadder("));
         expect(ladder).toContain("{real && flag(real, t(\"home.colReal\"), REAL_INK, false)}");
         expect(ladder).toContain("{online && flag(online, t(\"home.colOnline\"), \"#121722\", true)}");
         expect(ladder).toContain("const name = t(`lookalike.tierShort${i}`);");
-        // 프로 칸이 생겨 표는 실전 | 온라인 두 열
-        expect(skill).toContain('<div className="grid grid-cols-3 bg-surface-3/60');
-        expect(skill).not.toContain("grid-cols-4");
     });
     it("② 실전 점수판 — 실제 점수판 모양, 판의 숫자는 미리 보기, 입구는 홈의 두 함수", () => {
         expect(board).toContain('t("home.boardPreview")');
@@ -95,7 +107,7 @@ describe("당구 홈", () => {
         expect(skill).not.toMatch(/\.preferred\b/);
     });
     it("문구는 다섯 언어", () => {
-        const keys = ["home.skillTitle", "home.skillReal", "home.skillOnline", "home.skillNote", "home.boardTitle", "home.boardStart", "home.caseTitle", "home.caseCounts", "home.caseTier", "tour.bh.caseTitle", "tour.bh.caseBody", "home.skillProReal", "home.skillProOnline", "home.proNeedReal", "home.proNeedOnline", "home.proSoon", "home.proLadder"];
+        const keys = ["home.skillTitle", "home.skillReal", "home.skillOnline", "home.skillNote", "home.boardTitle", "home.boardStart", "home.caseTitle", "home.caseCounts", "home.caseTier", "tour.bh.caseTitle", "tour.bh.caseBody", "home.proNeedShort", "home.proNeedReal", "home.proNeedOnline", "home.proSoon", "home.proLadder"];
         for (const l of ["ko", "en", "es", "vi", "tr"]) {
             const f = read(`client/src/lib/i18n/${l}.ts`);
             for (const k of keys) expect(f, `${l} ${k}`).toContain(`"${k}":`);

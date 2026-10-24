@@ -4,9 +4,10 @@
  * 예전엔 '내 실전 기록'(RealHandicapCard) · '내 온라인 실력'(LookalikeProCard) 두 장에 닮은 프로가 둘, 점수판 카드에 내 다마가 또 있었다.
  *
  * 2026-10-24 오너: "온라인게임 실전 각각 나와 닮은 프로가 나오면 좋겠고, 프로 전체 실력 그래프에 내가 어디인지가 누락됐다,
- * 실전의 60RP 랑 상위 부분 빼 줘" → 실전 칸에서 RP · 상위 % 를 뺐다. 닮은 프로는 칸마다 하나씩(실전 기준 | 온라인 기준),
+ * 실전의 60RP 랑 상위 부분 빼 줘" → 실전 칸에서 RP · 상위 % 를 뺐다. 닮은 프로는 실전 기준 · 온라인 기준 하나씩,
  * 그 아래 프로 실력 사다리(재미 등급 다섯 칸 — proTier) 한 줄에 '실전' · '온라인' 두 자리를 같이 찍는다(두 기록이 같은 프로 무리 · 같은 식).
- * 프로 칸이 생겨 비교표의 프로 열은 뺐다(프로 에버 · 하이런은 프로 칸에 있다).
+ * 같은 날 "닮은 프로 카드 말고 표의 실전 우측에 실전 프로, 온라인 우측에 해당 프로 · 사진도" → 프로 두 칸을 걷고
+ * 표를 항목 | 실전(나 · 프로) | 온라인(나 · 프로)으로. 머리에 사진 · 이름, 누르면 선수 페이지. 4구는 실전 | 온라인 두 열.
  *
  * 배지 모양은 섞지 않는다: 둥근 메달 = 실전 다마(RealMedal) · 방패 = 온라인 등급(TierEmblem) · 육각 = 온라인 다마(OnlineDamaBadge).
  * 온라인 칸은 고른 종목(3쿠션 · 4구)에 대전이 없으면 '대전 n판이면 등급' — 다른 종목의 등급을 끌어오지 않는다.
@@ -26,6 +27,7 @@ import { realTierFor } from "@shared/realTier";
 import { RealMedal, REAL_TIER_INK } from "@/components/hiq/RealMedal";
 import { BadgeTap } from "@/components/hiq/BadgeGuideSheet";
 import { PlayerPhoto } from "@/components/hiq/PlayerPhoto";
+import { CrewAvatar } from "@/components/hiq/crew-ui";
 import { SampleBadge, useGuestGate } from "@/components/hiq/GuestGate";
 import { FormDots, fill, proName } from "@/components/hiq/compare/lookalikeUi";
 import { TIER_GLOW, TierEmblem } from "@/sim/rank/TierEmblem";
@@ -40,6 +42,8 @@ type Tier = 0 | 1 | 2 | 3 | 4;
 const ROOMS_URL = "/online-game?rooms=1";
 const REAL_INK = "#1F6B47";
 const ONLINE_INK = "#2A6E86";
+// 항목 · 실전 나 · 실전 프로 · 온라인 나 · 온라인 프로 — 360 폭 카드 안에서 숫자 칸이 50px 남짓
+const COLS_PRO = "grid-cols-[50px_repeat(4,minmax(0,1fr))]";
 
 export function HomeSkillCard({ onStartMatch, history, sample }: {
     onStartMatch: () => void;
@@ -90,8 +94,12 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
     const realSpot = cur !== "3c" ? null : sampleTwin ? spotOf(sampleTwin.tier, sampleTwin.pos) : ready ? spotOf(side?.tier, side?.pos) : null;
     const onlinePro = lk?.ready ? lk.pro : null;
     const onlineSpot = lk?.ready ? spotOf(lk.tier, lk.pos) : null;
-    const realNeed = side && !side.ready ? fill(t("home.proNeedReal"), { n: Math.max(1, side.needed - side.games) }) : t("home.proSoon");
-    const onlineNeed = fill(t("home.proNeedOnline"), { n: lk && !lk.ready ? Math.max(1, lk.needed - lk.matches) : LOOKALIKE_MIN_MATCHES });
+    const realLeft = side && !side.ready ? Math.max(1, side.needed - side.games) : null;
+    // 예시(비로그인)는 온라인 기록이 없으니 첫 기준 판 수, 회원은 받는 동안 비워 둔다
+    const onlineLeft = lk ? (lk.ready ? null : Math.max(1, lk.needed - lk.matches)) : sample ? LOOKALIKE_MIN_MATCHES : null;
+    const realNeed = realLeft != null ? fill(t("home.proNeedReal"), { n: realLeft }) : t("home.proSoon");
+    const onlineNeed = onlineLeft != null ? fill(t("home.proNeedOnline"), { n: onlineLeft }) : t("home.proSoon");
+    const withPros = cur === "3c";
 
     const goOnline = (to: string) => gate.guard(() => setLocation(to), { title: t("guestHome.gateHubTitle"), desc: t("guestHome.gateHubDesc").replace("{n}", String(placement)), from: to });
     const openPro = (p: ComparePro) => setLocation(`/pba-player/${encodeURIComponent(p.memCode)}`);
@@ -99,6 +107,8 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
     const rankUrl = `/online-game?rank=1&g=${cur}&s=all`;
     const num = (v: number | null | undefined, d = 2) => (typeof v === "number" ? v.toFixed(d) : "—");
     const cell = "py-2.5 text-center text-[15px] font-bold rk-num";
+    // 프로 열 — 옅게 물들이고 글자도 한 단계 낮춰 '나'의 숫자와 갈라 읽힌다
+    const proCell = "py-2.5 text-center text-[14px] font-semibold text-ink-3 rk-num bg-black/[0.025]";
 
     const tabs = (
         <div className="inline-flex p-[3px] rounded-full bg-surface-3 shrink-0" role="tablist">
@@ -173,39 +183,46 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
                 </button>
             </div>
 
-            {/* 나와 닮은 프로 — 칸마다 하나(실전 기준 | 온라인 기준) + 프로 실력 사다리 위 두 자리. 3쿠션만 */}
-            {cur === "3c" && (
-                <div className="mt-3.5" data-testid="home-skill-pros">
-                    <p className="text-[12.5px] font-bold text-ink-2">{t("lookalike.twin")}</p>
-                    <div className="mt-2 grid grid-cols-2 gap-2.5">
-                        <ProTile basis={t("home.skillProReal")} ink={REAL_INK} pro={realPro} need={realNeed} testId="home-skill-pro-real"
-                            onClick={realPro ? () => openPro(realPro) : sample ? undefined : onStartMatch} />
-                        <ProTile basis={t("home.skillProOnline")} ink={ONLINE_INK} pro={onlinePro} need={onlineNeed} testId="home-skill-pro-online"
-                            onClick={onlinePro ? () => openPro(onlinePro) : () => goOnline(ROOMS_URL)} />
-                    </div>
-                    {(realSpot || onlineSpot) && <ProLadder real={realSpot} online={onlineSpot} />}
-                </div>
-            )}
-
-            {/* 실전 | 온라인 — 한 표 */}
+            {/* 실전 | 온라인 한 표. 3쿠션은 칸마다 오른쪽에 그 기록으로 찾은 닮은 프로(사진 · 이름) — 2026-10-24 오너:
+                "닮은 프로 카드 말고 실전 우측에 실전 프로, 온라인 우측에 해당 프로 · 사진도". 4구는 프로 기록이 없어 두 열 */}
             <div className="mt-3.5 overflow-hidden rounded-2xl border border-black/[0.06]" data-testid="home-skill-table">
-                <div className="grid grid-cols-3 bg-surface-3/60 text-[11.5px] font-bold text-ink-3">
-                    <span className="py-2 pl-3" />
-                    <span className="py-2 text-center" style={{ color: REAL_INK }}>{t("home.colReal")}</span>
-                    <span className="py-2 text-center" style={{ color: ONLINE_INK }}>{t("home.colOnline")}</span>
+                <div className={cn("grid bg-surface-3/60 text-[11.5px] font-bold", withPros ? COLS_PRO : "grid-cols-3")}>
+                    <span />
+                    {withPros ? (
+                        <>
+                            <span className="col-span-2 pt-2 text-center" style={{ color: REAL_INK }}>{t("home.colReal")}</span>
+                            <span className="col-span-2 border-l border-black/[0.06] pt-2 text-center" style={{ color: ONLINE_INK }}>{t("home.colOnline")}</span>
+                            <span />
+                            <MeHead sample={!!sample} />
+                            <ProHead pro={realPro} left={realLeft} need={realNeed} testId="home-skill-pro-real"
+                                onClick={realPro ? () => openPro(realPro) : sample ? undefined : onStartMatch} />
+                            <MeHead sample={!!sample} divider />
+                            <ProHead pro={onlinePro} left={onlineLeft} need={onlineNeed} testId="home-skill-pro-online"
+                                onClick={onlinePro ? () => openPro(onlinePro) : () => goOnline(ROOMS_URL)} />
+                        </>
+                    ) : (
+                        <>
+                            <span className="py-2 text-center" style={{ color: REAL_INK }}>{t("home.colReal")}</span>
+                            <span className="py-2 text-center" style={{ color: ONLINE_INK }}>{t("home.colOnline")}</span>
+                        </>
+                    )}
                 </div>
                 {([
-                    [t("lookalike.rowAvg"), num(side?.avg), lk ? num(lk.avg) : "—"],
-                    [t("lookalike.rowHighRun"), side?.highRun ?? "—", lk?.highRun ?? "—"],
-                    [t("lookalike.rowHandi"), ready ? side!.handi : "—", onlineDama ?? "—"],
-                ] as const).map(([label, a, b]) => (
-                    <div key={String(label)} className="grid grid-cols-3 border-t border-black/[0.05]">
-                        <span className="py-2.5 pl-3 text-[12.5px] font-semibold text-ink-3 truncate">{label}</span>
+                    [t("lookalike.rowAvg"), num(side?.avg), lk ? num(lk.avg) : "—", realPro ? num(realPro.average) : "—", onlinePro ? num(onlinePro.average) : "—"],
+                    [t("lookalike.rowHighRun"), side?.highRun ?? "—", lk?.highRun ?? "—", realPro?.highRun ?? "—", onlinePro?.highRun ?? "—"],
+                    [t("lookalike.rowHandi"), ready ? side!.handi : "—", onlineDama ?? "—", "—", "—"],
+                ] as const).map(([label, a, b, ap, bp]) => (
+                    <div key={String(label)} className={cn("grid border-t border-black/[0.05]", withPros ? COLS_PRO : "grid-cols-3")}>
+                        <span className="flex items-center py-2.5 pl-2.5 text-[12px] font-semibold leading-tight text-ink-3 break-keep">{label}</span>
                         <span className={cell}>{a}</span>
-                        <span className={cell}>{b}</span>
+                        {withPros && <span className={proCell}>{ap}</span>}
+                        <span className={cn(cell, withPros && "border-l border-black/[0.06]")}>{b}</span>
+                        {withPros && <span className={proCell}>{bp}</span>}
                     </div>
                 ))}
             </div>
+            {/* 프로 실력에서 내 자리 — 실전 · 온라인 두 자리. 3쿠션만 */}
+            {withPros && (realSpot || onlineSpot) && <ProLadder real={realSpot} online={onlineSpot} />}
             <p className="mt-2 text-[11.5px] leading-snug text-ink-4">{t(sample ? "guestHome.sampleNote" : "home.skillNote")}</p>
 
             <div className="mt-3 grid grid-cols-2 gap-2">
@@ -222,29 +239,32 @@ function spotOf(tier: Tier | null | undefined, pos: number | null | undefined): 
     return tier != null && typeof pos === "number" ? { tier, pos } : null;
 }
 
-/** 닮은 프로 한 칸 — 프로가 없으면 몇 판 더 치면 찾아 주는지(누르면 그 판을 치러 간다) */
-function ProTile({ basis, ink, pro, need, onClick, testId }: { basis: string; ink: string; pro: ComparePro | null; need: string; onClick?: () => void; testId: string }) {
+/** 표 머리의 '나' — 회원 사진(없으면 이름 첫 글자), 예시는 랭큐 로고(RealHandicapCard 와 같은 규칙) */
+function MeHead({ sample, divider }: { sample: boolean; divider?: boolean }) {
+    const { t } = useT();
+    const { member } = useAuth();
+    return (
+        <span className={cn("flex min-w-0 flex-col items-center gap-1 px-0.5 pb-2 pt-1.5", divider && "border-l border-black/[0.06]")}>
+            <CrewAvatar src={sample ? "/icon-192.png" : (member as { profileImageUrl?: string | null } | null)?.profileImageUrl} name={sample ? "R" : member?.name ?? t("compare.me")} size={28} className="ring-2 ring-[#F5B721]" />
+            <span className="text-[10.5px] font-bold leading-tight text-ink-2">{t("compare.me")}</span>
+        </span>
+    );
+}
+
+/** 표 머리의 닮은 프로 — 사진 · 이름(두 줄까지), 누르면 선수 페이지. 아직 없으면 점선 '?' 와 'n판 더'(누르면 그 판을 치러 간다) */
+function ProHead({ pro, left, need, onClick, testId }: { pro: ComparePro | null; left: number | null; need: string; onClick?: () => void; testId: string }) {
     const { t, locale } = useT();
     return (
-        <button type="button" onClick={onClick} disabled={!onClick} data-testid={testId}
-            className="flex min-w-0 flex-col justify-start rounded-2xl border border-black/[0.07] p-2.5 text-left active:bg-black/[0.02] disabled:cursor-default">
-            <span className="block text-[11px] font-bold truncate" style={{ color: ink }}>{basis}</span>
+        <button type="button" onClick={onClick} disabled={!onClick} data-testid={testId} aria-label={pro ? proName(pro, locale) : need} title={pro ? undefined : need}
+            className="flex min-w-0 flex-col items-center gap-1 bg-black/[0.025] px-0.5 pb-2 pt-1.5 disabled:cursor-default">
             {pro ? (
-                <span className="mt-1.5 flex items-center gap-2">
-                    <PlayerPhoto memCode={pro.memCode} name={proName(pro, locale)} size={38} className="shrink-0 ring-1 ring-surface-line" />
-                    <span className="min-w-0">
-                        {/* 이름은 두 줄까지 — 칸이 좁아 '위카르 하…'로 잘렸다(360 폭 화면 확인) */}
-                        <span className="block text-[13.5px] font-bold leading-tight break-keep line-clamp-2">{proName(pro, locale)}</span>
-                        <span className="block text-[11.5px] font-semibold text-ink-3 rk-num truncate">{pro.league} · {pro.average.toFixed(2)}</span>
-                        <span className="block text-[11px] font-medium text-ink-4 rk-num truncate">{pro.highRun ? `${t("lookalike.rowHighRun")} ${pro.highRun}` : " "}</span>
-                    </span>
-                </span>
+                <PlayerPhoto memCode={pro.memCode} name={proName(pro, locale)} size={28} className="shrink-0 ring-1 ring-surface-line" />
             ) : (
-                <span className="mt-1.5 flex items-center gap-2">
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-dashed border-ink-4/60 text-[15px] font-bold text-ink-4" aria-hidden="true">?</span>
-                    <span className="min-w-0 text-[12px] font-semibold leading-snug text-ink-3 break-keep line-clamp-3">{need}</span>
-                </span>
+                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-dashed border-ink-4/60 text-[12px] font-bold text-ink-4" aria-hidden="true">?</span>
             )}
+            <span className={cn("w-full text-center text-[10.5px] font-bold leading-tight break-keep line-clamp-2", pro ? "text-ink-2" : "text-ink-4")}>
+                {pro ? proName(pro, locale) : left != null ? fill(t("home.proNeedShort"), { n: left }) : "—"}
+            </span>
         </button>
     );
 }
