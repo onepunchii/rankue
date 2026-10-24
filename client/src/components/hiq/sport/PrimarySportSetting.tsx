@@ -35,6 +35,7 @@ export function PrimarySportSetting({ current, hiking, fishing }: { current: str
     const [value, setValue] = useState<PrimarySport | null>(current === "GOLF" || current === "BILLIARDS" ? current : null);
     const [extra, setExtra] = useState<Extra | null>(current === "HIKING" || current === "FISHING" ? current : null);
     const [busy, setBusy] = useState(false);
+    const extras = (["HIKING", "FISHING"] as const).filter((x) => (x === "HIKING" ? hiking : fishing));
     // 등산(2026-10-13) · 낚시(2026-10-24)로 시작하기 — 주 종목 둘과 따로 선 칸. 서버가 그 종목을 쓸 수 있는 회원인지 확인한다
     const pickExtra = async (x: Extra) => {
         if (busy || extra === x) return;
@@ -76,17 +77,22 @@ export function PrimarySportSetting({ current, hiking, fishing }: { current: str
             </div>
             <p className="text-[12px] text-black/45 mb-4">{t("primarySport.settingsDesc")}</p>
             <SportSegment value={extra ? null : value} onChange={(s) => void pick(s)} disabled={busy} />
-            {(["HIKING", "FISHING"] as const).filter((x) => (x === "HIKING" ? hiking : fishing)).map((x) => {
-                const on = extra === x;
-                return (
-                    <button key={x} type="button" role="radio" aria-checked={on} disabled={busy} onClick={() => void pickExtra(x)} data-testid={`primary-sport-${x.toLowerCase()}`}
-                        className={cn("mt-1.5 h-12 w-full rounded-[10px] flex items-center justify-center gap-2 text-[14.5px] font-semibold transition-colors disabled:opacity-60", !on && "bg-black/[0.05] text-black/55")}
-                        style={on ? { backgroundColor: EXTRA[x].on.bg, color: EXTRA[x].on.fg } : undefined}>
-                        {EXTRA[x].icon}
-                        {t(EXTRA[x].label)}
-                    </button>
-                );
-            })}
+            {/* 등산 · 낚시 — 위의 당구 | 골프와 같은 두 칸 한 줄(2026-10-24 오너: "이 버튼도 1개로 좌우"). 하나만 쓸 수 있으면 한 칸 */}
+            {extras.length > 0 && (
+                <div role="radiogroup" aria-label={t("primarySport.settingsTitle")} className={cn("mt-1.5 grid gap-1 p-1 rounded-tile bg-black/[0.05]", extras.length > 1 ? "grid-cols-2" : "grid-cols-1")} data-testid="primary-sport-extras">
+                    {extras.map((x) => {
+                        const on = extra === x;
+                        return (
+                            <button key={x} type="button" role="radio" aria-checked={on} disabled={busy} onClick={() => void pickExtra(x)} data-testid={`primary-sport-${x.toLowerCase()}`}
+                                className={cn("h-12 rounded-[10px] flex items-center justify-center gap-2 text-[14.5px] font-semibold transition-colors disabled:opacity-60", !on && "text-black/55")}
+                                style={on ? { backgroundColor: EXTRA[x].on.bg, color: EXTRA[x].on.fg } : undefined}>
+                                {EXTRA[x].icon}
+                                {t(EXTRA[x].label)}
+                            </button>
+                        );
+                    })}
+                </div>
+            )}
         </section>
     );
 }

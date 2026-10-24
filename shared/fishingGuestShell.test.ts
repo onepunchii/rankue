@@ -70,6 +70,8 @@ describe("첫 진입 종목 고르기 — 낚시 카드(2026-10-24 오너: \"첫
     });
     it("설정 '주 종목' — 낚시를 쓸 수 있는 회원에게 낚시 줄", () => {
         expect(setting).toContain('(["HIKING", "FISHING"] as const).filter((x) => (x === "HIKING" ? hiking : fishing))');
+        // 당구 | 골프와 같은 두 칸 한 줄(오너: "이 버튼도 1개로 좌우") — 하나만 쓸 수 있으면 한 칸
+        expect(setting).toContain('extras.length > 1 ? "grid-cols-2" : "grid-cols-1"');
         expect(src("pages/hiq/settings.tsx")).toContain('fishing={(member as any)?.fishingAccess === true}');
         for (const l of ["ko", "en", "es", "vi", "tr"]) {
             const dict = src(`lib/i18n/${l}.ts`);
