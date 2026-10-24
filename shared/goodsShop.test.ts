@@ -57,4 +57,12 @@ describe("연결", () => {
             for (const k of ["shop.title", "shop.desc", "shop.notify", "shop.saved", "shop.update", "shop.cancel", "shop.pickOne", "shop.waiting", "shop.patch", "shop.failed"]) expect(f, `${l} ${k}`).toContain(`"${k}":`);
         }
     });
+    it("굿즈 증정 — 받을 회원이 오너/관리자인지 · 앱 계정인지 보이고, 앱에서 연 적 없는 계정이면 경고(오너 '선물이 안 오네' 10/24)", () => {
+        const v = read("client/src/pages/admin/GoodsView.tsx");
+        expect(v).toContain("<AccountChips m={m} />");
+        expect(v).toContain('data-testid="admin-goods-no-app"');
+    });
+    it("선물 언박싱 — 공 · 초크 · 장갑(정사각)은 네모 자리에, 큐 · 상대만 긴 홈에", () => {
+        expect(read("client/src/pages/hiq/gift.tsx")).toContain('{g.shape === "cue" ? (');
+    });
 });

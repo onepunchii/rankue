@@ -281,9 +281,16 @@ function Showcase({ g, name }: { g: GiftView; name: string }) {
                 <div className="mx-auto w-fit rounded-[6px] px-5 py-1.5" style={{ background: "linear-gradient(180deg,#F6DFA8,#D6A956 45%,#B0823A 60%,#E2BF78)", boxShadow: "0 3px 10px #00000080" }}>
                     <p className="text-[14px] font-bold tracking-[0.04em]" style={{ color: "#3A230F", textShadow: "0 1px 0 #FFF4D6" }}>{name}</p>
                 </div>
-                <div className="relative mt-5 h-[64px] rounded-full" style={{ background: "linear-gradient(180deg,#050A13,#0C1626 70%,#13203A)", boxShadow: "inset 0 3px 8px #000000" }}>
-                    {img && <img src={img} alt={name} draggable={false} className="gift-cue absolute inset-x-3 top-1/2 w-[calc(100%-24px)] -translate-y-1/2 object-contain" style={{ height: 40, filter: "drop-shadow(0 6px 6px #000000AA)" }} />}
-                </div>
+                {g.shape === "cue" ? (
+                    <div className="relative mt-5 h-[64px] rounded-full" style={{ background: "linear-gradient(180deg,#050A13,#0C1626 70%,#13203A)", boxShadow: "inset 0 3px 8px #000000" }}>
+                        {img && <img src={img} alt={name} draggable={false} className="gift-cue absolute inset-x-3 top-1/2 w-[calc(100%-24px)] -translate-y-1/2 object-contain" style={{ height: 40, filter: "drop-shadow(0 6px 6px #000000AA)" }} />}
+                    </div>
+                ) : (
+                    // 공 · 초크 · 장갑(정사각 그림) — 긴 큐 홈에 넣으면 작게 보였다(2026-10-24). 네모 벨벳 자리에
+                    <div className="relative mx-auto mt-5 h-[150px] w-[150px] rounded-[24px]" style={{ background: "radial-gradient(90% 90% at 50% 35%, #142238 0%, #0A1220 100%)", boxShadow: "inset 0 4px 10px #000000B3, 0 0 0 1.5px #E8C46A66" }}>
+                        {img && <img src={img} alt={name} draggable={false} className="gift-pop absolute inset-[14px] h-[122px] w-[122px] object-contain" style={{ filter: "drop-shadow(0 6px 6px #000000AA)" }} />}
+                    </div>
+                )}
                 {serial && <p className="mt-4 text-center"><span className="inline-block rounded-[4px] px-3 py-1 text-[15px] font-bold tabular-nums" style={{ background: "linear-gradient(180deg,#F6DFA8,#C99A4B)", color: "#3A230F", boxShadow: "0 2px 6px #00000080" }}>{serial}<span className="text-[12px] opacity-70">{limit}</span></span></p>}
             </div>
         </div>

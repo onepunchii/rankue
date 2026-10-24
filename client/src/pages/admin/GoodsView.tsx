@@ -38,6 +38,16 @@ function Thumb({ item, size = "md" }: { item: GoodsItem; size?: "md" | "lg" }) {
     );
 }
 
+/** 계정 구분 — 오너 · 관리자, 앱(휴대폰)에서 쓰는 계정인지. 이름이 비슷한 계정을 헷갈리지 않게 */
+function AccountChips({ m }: { m: Pick<AdminMember, "role" | "platform"> }) {
+    return (
+        <span className="inline-flex shrink-0 items-center gap-1">
+            {m.role === "super_admin" ? <Pill tone="brand">오너</Pill> : m.role === "admin" ? <Pill tone="info">관리자</Pill> : null}
+            {m.platform ? <Pill tone="neutral">앱 {m.platform === "ios" ? "iOS" : "안드로이드"}</Pill> : <Pill tone="warn">웹만</Pill>}
+        </span>
+    );
+}
+
 /**
  * 굿즈샵 출시 알림 신청(2026-10-24) — 큐 케이스의 '랭큐 굿즈 곧 나와요'에서 고른 것. 실물을 무엇부터 만들지 보는 숫자.
  * 출시 알림은 아직 안 보낸다(열 때 이 명단으로).
@@ -127,13 +137,19 @@ export default function GoodsView({ initialMemberId = null }: { initialMemberId?
             {/* 1. 회원 */}
             <Panel className="p-4">
                 <p className="text-[12px] font-black text-black/40">1. 받을 회원</p>
-                {member ? (
+                {member ? (<>
                     <div className="mt-2 flex items-center gap-3">
                         <MemberAvatar name={member.name} src={member.profileImageUrl} className="h-11 w-11 bg-brand/10 text-[16px] font-black text-brand" />
-                        <div className="min-w-0 flex-1"><p className="truncate text-[16px] font-black">{member.name}</p><p className="text-[12px] text-black/45">가진 굿즈 {owned.length}개 · 증정 {owned.filter((o) => o.grant).length}개</p></div>
+                        <div className="min-w-0 flex-1"><p className="flex items-center gap-1.5 truncate text-[16px] font-black">{member.name} <AccountChips m={member} /></p><p className="text-[12px] text-black/45">가진 굿즈 {owned.length}개 · 증정 {owned.filter((o) => o.grant).length}개</p></div>
                         <Button variant="outline" onClick={() => { setMemberId(null); setPick(null); }} className="h-9 text-[13px]">다른 회원</Button>
                     </div>
-                ) : (
+                    {/* 2026-10-24 오너 "나에게 보냈는데 선물이 안 오네" — 이름이 비슷한 다른 계정('랭큐' · 'rankue')을 골랐고, 그 계정은 앱에서 연 적이 없었다 */}
+                    {!member.platform && (
+                        <p className="mt-2 rounded-xl bg-amber-500/[0.1] px-3 py-2 text-[12px] leading-relaxed text-amber-900" data-testid="admin-goods-no-app">
+                            이 계정은 휴대폰 앱에서 연 적이 없어요 — 선물 알림이 휴대폰으로 가지 않고 알림함에만 남아요. 받을 사람이 맞는지 한 번 더 확인해 주세요.
+                        </p>
+                    )}
+                </>) : (
                     <div className="mt-2">
                         <SearchBox value={find} onChange={setFind} placeholder="이름 · 전화 끝 네 자리" className="w-full sm:w-80" />
                         {matches.length > 0 && (
@@ -142,6 +158,7 @@ export default function GoodsView({ initialMemberId = null }: { initialMemberId?
                                     <button key={m.id} type="button" onClick={() => { setMemberId(m.id); setFind(""); }} className="flex items-center gap-2.5 rounded-xl border border-black/[0.07] bg-white px-3 py-2 text-left hover:bg-black/[0.03]">
                                         <MemberAvatar name={m.name} src={m.profileImageUrl} className="h-8 w-8 bg-brand/10 text-[13px] font-black text-brand" />
                                         <span className="min-w-0 flex-1 truncate text-[14px] font-bold">{m.name}</span>
+                                        <AccountChips m={m} />
                                         <span className="text-[12px] text-black/40">…{String(m.phone ?? "").slice(-4)}</span>
                                     </button>
                                 ))}
