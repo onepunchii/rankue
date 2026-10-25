@@ -6,63 +6,24 @@
  * 💰 유료다(0.1원/건 — 지도를 한 번 만들 때마다. 규칙 shared/kakaoMap). 그래서:
  *   · **지도는 이 부품이 살아 있는 동안 딱 한 번 만든다**(started 깃발). 코스를 바꾸면 얹은 것만 갈아 끼우고, 종이 지도로 갔다 와도
  *     부르는 쪽(CourseMap)이 이 부품을 숨겨 둘 뿐 지우지 않는다 — 다시 만들지 않는다.
- *   · 만들기 전에 기기 하루 상한 → 서버 하루 상한(POST /hiking/map-load)을 차례로 묻는다. 하나라도 막히면 만들지 않고 onFail.
+ *   · 만들기 전에 기기 하루 상한 → 서버 하루 상한(askKakao("map") — components/kakao/kakaoSdk)을 차례로 묻는다. 하나라도 막히면 만들지 않고 onFail.
  *   · SDK 를 못 받거나(신호 없음) 카카오가 거절하면 onFail — 부르는 쪽이 종이 지도로 돌아간다.
  * 내 위치는 기기에서 받은 점을 이 화면에 그릴 뿐 서버로 보내지 않는다(카카오에는 보고 있는 지역의 지도 조각 요청만 간다).
  * ⚠️ 리터럴 색만. 글자는 12px 이상.
  */
 import { useEffect, useRef, useState } from "react";
-import { apiRequest } from "@/lib/queryClient";
 import { kakaoMapUrl } from "@/golf/components/join/joinUi";
-import { KAKAO_MAP_LOAD_API, KAKAO_MAP_SDK_URL, deviceAllows, kstDay, type KakaoMapGate } from "@shared/kakaoMap";
+import { askKakao, loadKakaoMaps, type KakaoMapFail } from "@/components/kakao/kakaoSdk";
 import { COURSE_MAP_DOT_KINDS, COURSE_MAP_LABEL_KINDS, lineBreaks } from "@shared/hikingCourseMap";
 import { hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
 import type { MountainCourse, MountainPoi } from "../lib/api";
 import { POI_COLOR } from "../theme";
 
-declare global { interface Window { kakao?: any } }
-
-const KEY = (import.meta.env.VITE_KAKAO_MAP_KEY || import.meta.env.VITE_KAKAO_JS_KEY) as string | undefined;
-const DEVICE_KEY = "rankue_kmap_day";
 const INK = "#0E2A33", TEAL = "#1F5560", PAPER = "#F4EFE3", CORAL = "#F28C6A", HERE = "#2F7BFF", SPOT_INK = "#C2552F";
 const BTN = "flex h-10 w-10 items-center justify-center text-[20px] leading-none text-[#0E2A33] active:bg-[#E4DCC8]";
 const FLOAT = { background: "#F4EFE3F2", boxShadow: "0 1px 4px rgba(14,42,51,0.28), inset 0 0 0 1px rgba(14,42,51,0.18)" } as const;
 
-export type KakaoMapFail = "device" | "cap" | "off" | "net" | "sdk";
-
-/** SDK 는 한 번만 받는다(같은 화면 안에서 여러 코스 지도가 열려도). 실패하면 다음에 다시 받을 수 있게 비운다 */
-let sdk: Promise<any> | null = null;
-function loadSdk(): Promise<any> {
-    if (window.kakao?.maps?.Map) return Promise.resolve(window.kakao);
-    if (sdk) return sdk;
-    sdk = new Promise((resolve, reject) => {
-        const s = document.createElement("script");
-        s.src = `${KAKAO_MAP_SDK_URL}?appkey=${encodeURIComponent(KEY ?? "")}&autoload=false`;
-        s.async = true;
-        const timer = window.setTimeout(() => reject(new Error("timeout")), 12_000);
-        s.onload = () => {
-            try { window.kakao.maps.load(() => { window.clearTimeout(timer); resolve(window.kakao); }); } catch (e) { window.clearTimeout(timer); reject(e); }
-        };
-        s.onerror = () => { window.clearTimeout(timer); reject(new Error("load")); };
-        document.head.appendChild(s);
-    }).catch((e) => { sdk = null; throw e; });
-    return sdk;
-}
-
-/** 띄워도 되는가 — 기기 하루 상한 → 서버 하루 상한. 허락받은 뒤에만 기기 수를 올린다 */
-async function askToOpen(): Promise<"ok" | KakaoMapFail> {
-    if (!KEY) return "sdk";
-    let stored: string | null = null;
-    try { stored = window.localStorage.getItem(DEVICE_KEY); } catch { /* 못 읽으면 막지 않는다 — 서버 상한이 뒤에 있다 */ }
-    const device = deviceAllows(stored, kstDay(new Date()));
-    if (!device.ok) return "device";
-    try {
-        const r = (await apiRequest(KAKAO_MAP_LOAD_API, { method: "POST", timeoutMs: 8000 })) as KakaoMapGate;
-        if (!r?.ok) return r?.reason === "off" ? "off" : "cap";
-    } catch { return "net"; }
-    try { window.localStorage.setItem(DEVICE_KEY, device.next); } catch { /* 이번만 */ }
-    return "ok";
-}
+export type { KakaoMapFail };
 
 /** 지도 위에 얹는 작은 표(HTML) — 카카오 CustomOverlay 의 내용 */
 function tag(html: string): HTMLDivElement {
@@ -113,10 +74,10 @@ export default function KakaoCourseMap({ courses, index, onPick, pois, summit, h
         if (started.current) return;
         started.current = true;
         void (async () => {
-            const ok = await askToOpen();
+            const ok = await askKakao("map");
             if (ok !== "ok") { if (mounted.current) failRef.current(ok); return; }
             let kakao: any;
-            try { kakao = await loadSdk(); } catch { if (mounted.current) failRef.current("sdk"); return; }
+            try { kakao = await loadKakaoMaps(); } catch { if (mounted.current) failRef.current("sdk"); return; }
             if (!mounted.current || !box.current || map.current) return;
             const p0 = sel?.line[0] ?? (summit ? [summit.lat, summit.lng] : null);
             if (!p0) { failRef.current("sdk"); return; }

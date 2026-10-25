@@ -58,13 +58,13 @@ function DaysChart({ days }: { days: HikingOverview["days"] }) {
 }
 
 /** 카카오 지도 사용(유료 0.1원/건) — 오늘 · 30일 · 어림 비용 · 상한에 걸린 수. 상한 · 끄기는 Vercel env(KAKAO_MAP_DAILY_CAP · KAKAO_MAP_OFF) */
-function KakaoMapPanel({ k }: { k: NonNullable<HikingOverview["kakaoMap"]> }) {
+function KakaoMapPanel({ k, calls }: { k: NonNullable<HikingOverview["kakaoMap"]>; calls: NonNullable<HikingOverview["kakaoCalls"]> }) {
     const today = k.days[0]?.day === new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10) ? k.days[0] : null;
     const sum = k.days.reduce((a, x) => a + x.loads, 0), refused = k.days.reduce((a, x) => a + x.refused, 0);
     return (
         <Panel className="p-4" data-testid="admin-hiking-kakao-map">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
-                <h3 className="text-[13px] font-black text-black/70">카카오 지도 <span className="font-bold text-black/40">— 코스 지도의 '실제 지도' · 유료 0.1원/건</span></h3>
+                <h3 className="text-[13px] font-black text-black/70">카카오 지도 <span className="font-bold text-black/40">— 코스 지도의 '실제 지도' · 유료 0.1원/건 · 아래는 로드뷰 · 근처 장소</span></h3>
                 {k.off ? <Pill tone="alert">꺼 둠</Pill> : <Pill tone="brand">켜짐</Pill>}
             </div>
             <div className="mt-2 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
@@ -73,6 +73,19 @@ function KakaoMapPanel({ k }: { k: NonNullable<HikingOverview["kakaoMap"]> }) {
                 <KpiTile label="상한에 걸림(30일)" value={refused} unit="번" tone={refused ? "alert" : "default"} />
                 <KpiTile label="오늘 어림 비용" value={kakaoMapWon(today?.loads ?? 0)} unit="원" />
             </div>
+            {calls.length > 0 && (
+                <div className="mt-3 overflow-hidden rounded-lg border border-black/[0.08]" data-testid="admin-hiking-kakao-calls">
+                    <div className="grid grid-cols-5 bg-black/[0.03] px-3 py-1.5 text-[11.5px] font-bold text-black/50"><span>종류</span><span className="text-right">오늘</span><span className="text-right">30일</span><span className="text-right">어림 비용</span><span className="text-right">상한 걸림</span></div>
+                    {calls.map((c) => (
+                        <div key={c.kind} className="grid grid-cols-5 border-t border-black/[0.06] px-3 py-1.5 text-[12.5px] tabular-nums">
+                            <span className="font-bold text-black/75">{c.label} <span className="font-normal text-black/40">{c.won}원/건 · 하루 {c.cap.toLocaleString()}</span></span>
+                            <span className="text-right">{c.today}</span><span className="text-right">{c.month}</span>
+                            <span className="text-right">{Math.round(c.month * c.won).toLocaleString()}원</span>
+                            <span className={`text-right ${c.refused ? "font-bold text-red-600" : "text-black/40"}`}>{c.refused}</span>
+                        </div>
+                    ))}
+                </div>
+            )}
             <p className="mt-2 text-[12px] leading-snug text-black/45">우리 서버가 허락한 수예요(카카오 청구의 기준과 같지만, 정확한 청구는 카카오 콘솔 › 통계 › 기간별 사용량). 상한은 Vercel 의 KAKAO_MAP_DAILY_CAP, 끄려면 KAKAO_MAP_OFF=1 — 바꾸면 다시 배포해야 들어가요.</p>
         </Panel>
     );
@@ -97,7 +110,7 @@ export default function HikingOverviewView() {
                 <KpiTile label="산악회" value={t.crews} unit="곳" sub={`회원 ${t.crewMembers} · 주 종목 ${t.primaryMembers}명`} />
             </div>
 
-            {d.kakaoMap && <KakaoMapPanel k={d.kakaoMap} />}
+            {d.kakaoMap && <KakaoMapPanel k={d.kakaoMap} calls={d.kakaoCalls ?? []} />}
 
             <Panel className="p-4">
                 <h3 className="mb-2 text-[13px] font-black text-black/70">최근 30일</h3>

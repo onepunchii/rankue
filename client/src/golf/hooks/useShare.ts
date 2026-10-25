@@ -20,6 +20,19 @@ export function buildGolfShareUrl(item: any): string {
     return url.toString();
 }
 
+/** 공유 글(제목 · 한 줄 · 주소) — 기기 공유 창과 카카오톡 카드가 같이 쓴다 */
+export function golfShareData(item: any): { title: string; text: string; url: string } {
+    const isJoin = item.listingType === "JOIN";
+    const name = item.isBlind ? (item.blindName || "비공개 골프장") : item.courseName;
+    return {
+        title: `[랭큐] ${name} ${isJoin ? "조인" : "예약"}`,
+        // 시각은 한국 시각으로 고정한다 — 기기 시계를 따르면 해외 접속자에게 다른 시간이 찍힌다.
+        // 조인은 1/N 이면 greenFee 가 0 이다 — 그대로 쓰면 "그린피: 0원" 이 나갔다. 화면과 같은 규칙(costText)으로 적는다.
+        text: `${kstDateLabel(item.datetime)} ${kstTime(item.datetime)}\n${isJoin ? `비용: ${costText(item)}` : `그린피: ${Number(item.greenFee ?? 0).toLocaleString()}원`}`,
+        url: buildGolfShareUrl(item),
+    };
+}
+
 export const useShare = () => {
     const [isShareModalOpen, setIsShareModalOpen] = useState(false);
     const [shareItem, setShareItem] = useState<any>(null);
@@ -36,16 +49,8 @@ export const useShare = () => {
     }, []);
 
     const handleExternalShare = useCallback(async (item: any) => {
-        const shareUrl = buildGolfShareUrl(item);
-        const isJoin = item.listingType === "JOIN";
-        const name = item.isBlind ? (item.blindName || "비공개 골프장") : item.courseName;
-        const shareData = {
-            title: `[랭큐] ${name} ${isJoin ? "조인" : "예약"}`,
-            // 시각은 한국 시각으로 고정한다 — 기기 시계를 따르면 해외 접속자에게 다른 시간이 찍힌다.
-            // 조인은 1/N 이면 greenFee 가 0 이다 — 그대로 쓰면 "그린피: 0원" 이 나갔다. 화면과 같은 규칙(costText)으로 적는다.
-            text: `${kstDateLabel(item.datetime)} ${kstTime(item.datetime)}\n${isJoin ? `비용: ${costText(item)}` : `그린피: ${Number(item.greenFee ?? 0).toLocaleString()}원`}`,
-            url: shareUrl,
-        };
+        const shareData = golfShareData(item);
+        const shareUrl = shareData.url;
 
         if (navigator.share && navigator.canShare && navigator.canShare(shareData)) {
             try {

@@ -17,12 +17,14 @@
 import { Suspense, lazy, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { LucideLocateFixed, LucideMap, LucideNavigation } from "@/lib/icons";
 import { kakaoMapUrl, kakaoRouteUrl } from "@/golf/components/join/joinUi";
+import { AROUND_HIKING, KakaoAround } from "@/components/kakao/KakaoAround";
 import { heightText, mountainPlace } from "@shared/hikingMountains";
 import { COURSE_SOURCE_NOTE } from "@shared/hikingPage";
 import { MOUNTAIN_AROUND_LABEL, courseTrailhead, trailheadName } from "@shared/hikingAround";
 import type { MountainCourse, MountainDetail } from "../lib/api";
 
 const MountainMap = lazy(() => import("./MountainMap"));
+const AROUND_TONE = { accent: "#F28C6A", onAccent: "#2A1208", text: "#F4EFE3", soft: "#F4EFE3CC", dim: "#F4EFE380", panel: "#FFFFFF14" } as const;
 /** 단추 앞의 그림 — 아주 좁은 화면(350 아래)에서는 뺀다: 지도 옆 칸이 좁아 '들머리까지 길찾기' 글자가 잘린다 */
 const ICON = "hidden h-[18px] w-[18px] shrink-0 min-[350px]:block";
 
@@ -131,6 +133,11 @@ export function MountainLocation({ d, course, fromMe, ask, asking }: {
                     </div>
                 </div>
             </div>
+            {/* 들머리 근처 주차장 · 편의점 · 식당 · 카페와 로드뷰(카카오 — 눌렀을 때만, components/kakao/KakaoAround) */}
+            {(head || hasMap) && (
+                <KakaoAround lat={head ? head.lat : d.lat!} lng={head ? head.lng : d.lng!} name={head ? name : d.name} kinds={AROUND_HIKING}
+                    place={head ? "들머리 근처" : "산 근처"} tone={AROUND_TONE} track="hiking-around" />
+            )}
             <div className="mt-3 space-y-1 border-t border-[#FFFFFF14] pt-3 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">
                 {head && course ? (
                     <>

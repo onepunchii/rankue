@@ -26,6 +26,8 @@ export interface HikingOverview {
      * 표가 아직 없으면(배포 전 마이그레이션 전) days 가 빈다.
      */
     kakaoMap?: { cap: number; off: boolean; days: { day: string; loads: number; refused: number }[] };
+    /** 로드뷰 · 근처 장소(2026-10-25) — 종류마다 오늘 · 30일 · 상한 · 건당 원(어림) */
+    kakaoCalls?: { kind: string; label: string; won: number; cap: number; today: number; month: number; refused: number }[];
 }
 
 /** 카카오 지도 비용 어림(원) — 0.1원/건 */

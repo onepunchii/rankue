@@ -26,6 +26,7 @@ import { HiqCrew, HiqStore } from "@shared/schema";
 import { useSeo } from "@/hooks/useSeo";
 import { crewTitle, crewDescription } from "@shared/crewMeta";
 import { crewImageSrc } from "@shared/crewManage";
+import { shareWithKakao } from "@/components/share/ShareChooser";
 import { useAuth } from "@/hooks/useAuth";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { ClubSettingsDialog, type ClubSettingsTab } from "@/components/hiq/ClubSettingsDialog";
@@ -350,7 +351,12 @@ export default function HiqClubDetail() {
         </div>
     );
 
-    const handleShare = async () => {
+    // 웹에서는 먼저 카카오톡 카드를 고를 수 있다(2026-10-25 — components/share/ShareChooser). 그림은 화면의 og:image(크루 대표 그림)
+    const handleShare = () => shareWithKakao({
+        title: crew?.name ?? t("clubDetail.crewFallback"), description: `${crew?.name ?? ""} ${t("clubDetail.shareText")}`.trim(),
+        url: `https://www.rankue.co.kr/club/${id ?? ""}`, buttonTitle: "크루 보기", fallback: systemShare,
+    });
+    const systemShare = async () => {
         // 공개 정본 URL 은 /club/:id 다. window.location.href 는 앱 내부 경로(/crew/:id/home,
         // localhost, 데스크톱 프레임)라 남에게 보내면 안 열린다 — 사이트맵과 같은 형태로 고정 조립.
         const shareUrl = `https://www.rankue.co.kr/club/${id ?? ""}`;

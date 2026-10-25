@@ -13,6 +13,7 @@ import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
 import { useGolfAccess } from "@/hooks/useGolfAccess";
 import { goLoginPage } from "@/components/hiq/LoginGate";
 import { LoginSheetHost } from "@/components/hiq/LoginSheet";
+import { ShareChooserHost } from "@/components/share/ShareChooser";
 import { BadgeGuideHost } from "@/components/hiq/BadgeGuideSheet";
 import { AttachPhoneSheetHost } from "@/components/hiq/AttachPhoneSheet";
 import { VisitBeacon } from "@/components/hiq/VisitBeacon";
@@ -648,6 +649,8 @@ function App() {
               <AppRoutes />
               {/* 가입·로그인 팝업(2026-10-06) — goLogin·가입 안내(guard)가 여기로 띄운다. 약관 동의(useTermsGate)를 쓰므로 이 Provider 안쪽이어야 한다 */}
               <LoginSheetHost />
+              {/* 공유 고르기(카카오톡 · 다른 앱) — 웹에서만 뜬다(components/share/ShareChooser) */}
+              <ShareChooserHost />
               {/* 전화번호 계정 잇기(2026-10-07) — 소셜로 새 계정이 만들어진 직후 "전에 전화번호로 쓰셨나요?"를 한 번 묻는다. 설정에서도 연다 */}
               <AttachPhoneSheetHost />
               {/* 배지 안내 팝업(2026-10-12) — 배지를 누르면 어떤 배지들이 있는지 보여 준다. openBadgeGuide · BadgeTap 이 여기로 띄운다 */}

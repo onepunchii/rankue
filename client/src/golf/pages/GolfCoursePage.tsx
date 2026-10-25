@@ -40,6 +40,7 @@ import { AboutInfo } from "@/golf/components/course/detail/AboutInfo";
 import { LocationCard } from "@/golf/components/course/detail/LocationCard";
 import { hereTone } from "@shared/golfHereMap";
 import { golfCourseCardUrl } from "@shared/ogCards";
+import { shareWithKakao } from "@/components/share/ShareChooser";
 import { NearbyCourses } from "@/golf/components/course/detail/NearbyCourses";
 import { NearbyPlaces } from "@/golf/components/course/detail/NearbyPlaces";
 import { SectionNav, jumpTo } from "@/golf/components/course/detail/SectionNav";
@@ -187,7 +188,12 @@ export default function GolfCoursePage() {
     }, [d, top?.price]);
     useSeo(seo);
 
-    const share = async () => {
+    // 웹에서는 먼저 카카오톡 카드를 고를 수 있다(2026-10-25 — components/share/ShareChooser)
+    const share = () => shareWithKakao({
+        title: `${d?.name ?? prefill?.name ?? "골프장"} | 랭큐 골프`, description: seo?.description, imageUrl: d ? golfCourseCardUrl(ORIGIN, d.slug) : null,
+        url: ORIGIN + coursePath(d?.slug ?? slug), buttonTitle: "골프장 보기", fallback: systemShare,
+    });
+    const systemShare = async () => {
         const name = d?.name ?? prefill?.name ?? "골프장";
         const url = ORIGIN + coursePath(d?.slug ?? slug);
         try {

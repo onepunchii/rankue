@@ -21,3 +21,15 @@ export async function takeKakaoMapLoad(cap: number): Promise<boolean> {
     return false;
 }
 
+/** 로드뷰 · 근처 장소의 오늘 한 칸(표 kakao_api_calls — 하루 · 종류마다 한 줄). 지도와 같은 규칙: 상한 아래일 때만 +1 */
+export async function takeKakaoCall(kind: "roadview" | "local", cap: number): Promise<boolean> {
+    if (cap <= 0) return false;
+    const got = rowsOf(await db.execute(sql`
+        insert into kakao_api_calls (day, kind, calls) values (${TODAY}, ${kind}, 1)
+        on conflict (day, kind) do update set calls = kakao_api_calls.calls + 1, updated_at = now()
+        where kakao_api_calls.calls < ${cap}
+        returning calls`));
+    if (got.length > 0) return true;
+    await db.execute(sql`update kakao_api_calls set refused = refused + 1, updated_at = now() where day = ${TODAY} and kind = ${kind}`);
+    return false;
+}

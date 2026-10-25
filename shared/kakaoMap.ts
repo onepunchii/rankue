@@ -19,11 +19,37 @@ export const KAKAO_MAP_SDK_URL = "https://dapi.kakao.com/v2/maps/sdk.js";
 
 export type KakaoMapGate = { ok: true } | { ok: false; reason: "off" | "cap" };
 
+/**
+ * 카카오 유료 호출의 종류(2026-10-25 오너 "로드뷰 · 근처 장소 · 카카오톡 공유도 다 해 줘") — 셋 다 같은 길로 허락받는다.
+ *   map      코스 지도의 실제 지도(지도 한 번 만들 때)            0.1원 — 공식 쿼터 문서
+ *   roadview 들머리 · 낚시터 로드뷰(로드뷰 한 번 만들 때)          지도 SDK 와 같은 값으로 어림(0.1원)
+ *   local    근처 장소 — 카테고리 하나 한 번 찾을 때(주차장 등)    2원 — 공식 쿼터 문서(지도의 20배라 상한이 가장 낮다)
+ * 카카오톡 공유는 사람이 눌러야만 나가고 서버를 거치지 않는다 — 기기 하루 상한만(KAKAO_SHARE_DEVICE_DAILY).
+ */
+export type KakaoKind = "map" | "roadview" | "local";
+export const KAKAO_KIND: Readonly<Record<KakaoKind, { cap: number; device: number; won: number; env: string; label: string }>> = {
+    map: { cap: KAKAO_MAP_DAILY_CAP_DEFAULT, device: KAKAO_MAP_DEVICE_DAILY, won: 0.1, env: "KAKAO_MAP_DAILY_CAP", label: "실제 지도" },
+    roadview: { cap: 1000, device: 20, won: 0.1, env: "KAKAO_ROADVIEW_DAILY_CAP", label: "로드뷰" },
+    local: { cap: 500, device: 30, won: 2, env: "KAKAO_LOCAL_DAILY_CAP", label: "근처 장소" },
+};
+export const isKakaoKind = (x: unknown): x is KakaoKind => x === "map" || x === "roadview" || x === "local";
+/** 카카오톡 공유 — 기기 하나의 하루 상한 */
+export const KAKAO_SHARE_DEVICE_DAILY = 30;
+
 /** env 값 → 하루 상한. 비었거나 숫자가 아니면 기본값, 0 이하면 0(=그날 내내 막힘) */
-export function kakaoMapCap(raw: string | undefined | null): number {
-    if (raw == null || raw.trim() === "") return KAKAO_MAP_DAILY_CAP_DEFAULT;
+export function kakaoCap(raw: string | undefined | null, fallback: number): number {
+    if (raw == null || raw.trim() === "") return fallback;
     const n = Math.floor(Number(raw));
-    return Number.isFinite(n) ? Math.max(0, n) : KAKAO_MAP_DAILY_CAP_DEFAULT;
+    return Number.isFinite(n) ? Math.max(0, n) : fallback;
+}
+export const kakaoMapCap = (raw: string | undefined | null): number => kakaoCap(raw, KAKAO_MAP_DAILY_CAP_DEFAULT);
+
+/** 카카오톡 공유의 링크 — 우리 정본 주소(www)로만(카카오는 앱에 등록된 도메인의 링크만 연다). 상대 · 미리보기 · localhost 도 운영 주소로 */
+export function kakaoShareUrl(u: string, origin = "https://www.rankue.co.kr"): string {
+    try {
+        const x = new URL(u, origin);
+        return x.hostname === new URL(origin).hostname ? x.toString() : `${origin}${x.pathname}${x.search}`;
+    } catch { return origin; }
 }
 
 /** 한국 날짜(YYYY-MM-DD) — 카카오 하루 한도도 한국 0시에 새로 찬다 */

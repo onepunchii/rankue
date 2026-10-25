@@ -18,8 +18,8 @@ import { deleteBlobs, isOnOwnBlobHost } from "../../utils/blob.js";
 import { trailCourses, toSummary as toTrailSummary } from "../../storage/koreaTrails.js";
 import { trailsNear } from "../../../shared/trailFestivals.js";
 import { checkHiking, requireHikingAccess } from "../../middleware/hikingAccess.js";
-import { takeKakaoMapLoad } from "../../storage/kakaoMapLoads.js";
-import { kakaoMapCap } from "../../../shared/kakaoMap.js";
+import { takeKakaoCall, takeKakaoMapLoad } from "../../storage/kakaoMapLoads.js";
+import { KAKAO_KIND, isKakaoKind, kakaoCap } from "../../../shared/kakaoMap.js";
 import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
 import { requireTermsAccepted } from "../../middleware/terms.js";
 import { distM } from "../../../shared/hikingGeo.js";
@@ -86,12 +86,16 @@ router.get("/points", asyncHandler(async (_req: any, res: any) => {
  * 오늘의 명산 사진(2026-10-21) — 100대 명산(+플러스) 가운데 한국관광공사 사진이 있는 산에서 여덟(날마다 돌아간다 — 그날은 누구에게나 같다).
  * 등산 홈의 사진 줄. 사진은 공공누리 제1 · 3유형(server/data/mountainTourPhotos), 화면이 출처를 단다.
  */
-// 카카오 지도를 띄워도 되는지(2026-10-25 — 유료 0.1원/건, 규칙 shared/kakaoMap). 띄우기 직전에 한 번, 오늘 한 칸을 쓴다.
-// 로그인 없이 — 산 화면은 누구나 본다. 하루 전체 상한에 걸리거나 꺼 두면(env KAKAO_MAP_OFF=1) 화면은 종이 지도만 쓴다.
-router.post("/map-load", asyncHandler(async (_req: any, res: any) => {
+// 카카오 유료 호출을 해도 되는지(2026-10-25 — 규칙 shared/kakaoMap KAKAO_KIND). 부르기 직전에 한 번, 오늘 한 칸을 쓴다.
+// kind: map(실제 지도 · 기본) · roadview(로드뷰) · local(근처 장소 한 번). 종류마다 하루 상한이 따로 있다(env 로 바꾼다).
+// 로그인 없이 — 산 · 낚시터 화면은 누구나 본다. 상한에 걸리거나 꺼 두면(env KAKAO_MAP_OFF=1 — 셋 다) 화면은 우리 것만 쓴다.
+router.post("/map-load", asyncHandler(async (req: any, res: any) => {
     res.set("Cache-Control", "no-store");
     if (process.env.KAKAO_MAP_OFF === "1") return sendSuccess(res, { ok: false, reason: "off" });
-    const ok = await takeKakaoMapLoad(kakaoMapCap(process.env.KAKAO_MAP_DAILY_CAP));
+    const kind = isKakaoKind(req.body?.kind) ? req.body.kind : "map";
+    const spec = KAKAO_KIND[kind];
+    const cap = kakaoCap(process.env[spec.env], spec.cap);
+    const ok = kind === "map" ? await takeKakaoMapLoad(cap) : await takeKakaoCall(kind, cap);
     return sendSuccess(res, ok ? { ok: true } : { ok: false, reason: "cap" });
 }));
 

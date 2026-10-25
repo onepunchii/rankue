@@ -160,7 +160,8 @@ describe("카드 주소와 재료", () => {
         expect(storeCardUrl("https://x.test", "C00017")).toBe(`https://x.test/og/store/C00017.png?v=${CARD_VERSION}`);
         // 화면에 글자로 따로 적어 둔 주소가 없다(예전에는 판이 올라가도 화면만 옛 주소였을 것이다)
         for (const p of ["client/src/golf/pages/GolfCoursePage.tsx", "client/src/pages/store-listing.tsx"]) expect(code(root(p)), p).not.toMatch(/\/og\/(golf-course|store)\//);
-        expect(code(root("client/src/golf/pages/GolfCoursePage.tsx")).match(/golfCourseCardUrl\(ORIGIN, d\.slug\)/g)).toHaveLength(2);
+        // 셋째는 카카오톡 공유 카드의 그림(2026-10-25 — 같은 함수를 쓴다)
+        expect(code(root("client/src/golf/pages/GolfCoursePage.tsx")).match(/golfCourseCardUrl\(ORIGIN, d\.slug\)/g)).toHaveLength(3);
         expect(code(root("client/src/pages/store-listing.tsx")).match(/storeCardUrl\("https:\/\/www\.rankue\.co\.kr", s\.code \?\? code\)/g)).toHaveLength(2);
     });
 

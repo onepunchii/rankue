@@ -1,6 +1,7 @@
 import { LucideX, LucideMessageCircle, LucideCopy, LucideMessageSquare, LucideSend } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetClose } from '@/components/ui/sheet';
-import { buildGolfShareUrl } from '../../hooks/useShare';
+import { buildGolfShareUrl, golfShareData } from '../../hooks/useShare';
+import { kakaoShareAvailable, sendKakaoShare } from '@/lib/kakaoShare';
 
 interface ShareSheetProps {
     open: boolean;
@@ -32,7 +33,15 @@ export const ShareSheet = ({ open, onOpenChange, shareItem, onExternalShare, onC
                     {/* 외부 공유 섹션 */}
                     <div className="grid grid-cols-2 gap-4">
                         <button
-                            onClick={() => onExternalShare(shareItem)}
+                            // 웹은 카카오톡 카드(단추 '티타임 보기')로, 앱 · 실패는 예전처럼 기기 공유 창(2026-10-25 — lib/kakaoShare)
+                            onClick={() => {
+                                if (!shareItem) return;
+                                if (!kakaoShareAvailable()) { onExternalShare(shareItem); return; }
+                                const data = golfShareData(shareItem);
+                                void sendKakaoShare({ title: data.title, description: data.text.replace("\n", " · "), url: data.url, buttonTitle: "티타임 보기" })
+                                    .then((r) => { if (r === "sent") onOpenChange(false); else onExternalShare(shareItem); });
+                            }}
+                            data-track-as="golf-share-kakao"
                             className="flex flex-col items-center justify-center gap-3 p-6 rounded-3xl bg-[#FAE100] hover:scale-[1.02] transition-all group"
                         >
                             <div className="w-12 h-12 rounded-2xl bg-black/5 flex items-center justify-center">

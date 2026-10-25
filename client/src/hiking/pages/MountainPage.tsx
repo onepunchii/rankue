@@ -19,6 +19,7 @@ import { LucideChevronDown, LucideChevronRight, LucideLocateFixed, LucideShare2 
 import { useSeo } from "@/hooks/useSeo";
 import { useToast } from "@/hooks/use-toast";
 import { hikingMountainCardUrl } from "@shared/ogCards";
+import { shareWithKakao } from "@/components/share/ShareChooser";
 import { heightText, hikingMountainPath, hikingRegion, hikingRegionPath, mountainPlace, sigunguText } from "@shared/hikingMountains";
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "@shared/hikingGuide";
 import { HIKING_POI_NAME, HIKING_POI_ORDER, dedupeCoursePois, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
@@ -434,8 +435,12 @@ export default function MountainPage() {
     // 도장 카드의 '정상까지' — 기기에서만 잰다
     const reach = summitReach(loc.here, d);
 
-    // 공유 — 기기의 공유 창, 없으면 주소 복사(골프장 상세와 같은 순서)
-    const share = async () => {
+    // 공유 — 기기의 공유 창, 없으면 주소 복사(골프장 상세와 같은 순서). 웹에서는 먼저 카카오톡 카드를 고를 수 있다(2026-10-25)
+    const share = () => shareWithKakao({
+        title: `${d.name} | 랭큐 등산`, description: seo?.description, imageUrl: hikingMountainCardUrl(ORIGIN, d.slug),
+        url: `${ORIGIN}${hikingMountainPath(d.slug)}`, buttonTitle: "산 정보 보기", fallback: systemShare,
+    });
+    const systemShare = async () => {
         const url = `${ORIGIN}${hikingMountainPath(d.slug)}`;
         try {
             if (navigator.share) { await navigator.share({ title: `${d.name} | 랭큐 등산`, url }); return; }

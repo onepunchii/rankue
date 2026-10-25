@@ -20,6 +20,7 @@ import { CUES, INVITE_PICK_LIMIT, INVITE_STEPS, caseImage, caseItem, type CaseIt
 import { cleanInviteCode } from "@shared/invite";
 import { CASE_SUMMARY_KEY, CUE_CASE_QUERY_KEY, saveHero, serialText, type CueCaseView } from "@/components/hiq/cueCase/cueCaseApi";
 import { INVITE_ME_KEY, claimInvite, fetchInviteMe, pickInviteCue, shareInviteLink } from "./inviteApi";
+import { shareWithKakao } from "@/components/share/ShareChooser";
 import { renderInviteCard } from "./inviteCard";
 
 const PINK = "#FF4FA3";
@@ -68,7 +69,15 @@ export function InvitePanel({ view, l, onReveal, focus = false }: { view: CueCas
         } finally { setSharing(false); }
     };
     // 버튼 하나 — 링크와 글을 보낸다(받는 쪽에 초대 카드 미리보기가 붙는다). 공유창이 없으면 복사
-    const sendLink = async () => {
+    // 웹에서는 먼저 카카오톡 카드를 고를 수 있다(2026-10-25 — components/share/ShareChooser)
+    const sendLink = () => {
+        if (!me || sharing) return;
+        shareWithKakao({
+            title: t("inv.cardTitle").replace("{name}", view.member.name), description: t("inv.shareText").replace("{name}", view.member.name),
+            url: me.url, imageUrl: "https://www.rankue.co.kr/og.png", buttonTitle: "초대 받기", fallback: systemSendLink,
+        });
+    };
+    const systemSendLink = async () => {
         if (!me || sharing) return;
         setSharing(true);
         try {

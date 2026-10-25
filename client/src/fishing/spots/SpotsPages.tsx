@@ -18,6 +18,7 @@ import { LucideChevronRight, LucideMap, LucideNavigation, LucidePhone } from "@/
 import { KOREA_MAP_PATHS } from "@/golf/data/koreaMapData";
 import { latLngToOutline } from "@/golf/lib/koreaOutline";
 import { kakaoMapUrl, kakaoRouteUrl } from "@/golf/components/join/joinUi";
+import { AROUND_FISHING, KakaoAround } from "@/components/kakao/KakaoAround";
 import { FISHING_COLORS as C, FISHING_PLACE_SOURCE, fishingSidoShort } from "@shared/fishing";
 import { fishByName } from "@shared/fishingFish";
 import { hhmm, type PortNow, type TideTurn } from "@shared/fishingPort";
@@ -362,6 +363,13 @@ export function SpotPage({ id }: { id: string }) {
                         <a href={kakaoRouteUrl(p.name, p.lat, p.lng)} target="_blank" rel="noopener noreferrer" className="flex h-11 items-center justify-center gap-1.5 rounded-xl text-[14px] font-semibold" style={{ background: C.brand, color: C.onBrand }}><LucideNavigation className="h-4 w-4" />길찾기</a>
                     </div>
                 </div>
+                {/* 낚시터 근처 낚시점 · 편의점 · 주차장 · 식당과 로드뷰(카카오 — 눌렀을 때만, components/kakao/KakaoAround) */}
+                {p.lat != null && p.lng != null && (
+                    <div className="mt-2 rounded-2xl px-3.5 pb-3" style={{ background: C.card }}>
+                        <KakaoAround lat={p.lat} lng={p.lng} name={p.name} kinds={AROUND_FISHING} place="낚시터 근처" track="fishing-around" frame="pt-3"
+                            tone={{ accent: C.brand, onAccent: C.onBrand, text: C.foam, soft: C.soft, dim: C.dim, panel: "#FFFFFF0F" }} />
+                    </div>
+                )}
             </section>
 
             {/* 이 근처 축제(2026-10-21 전국 축제 — 종목별). 가까운 낚시터 앞 — 낚시 가는 날 들를 곳 */}
