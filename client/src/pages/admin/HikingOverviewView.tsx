@@ -7,7 +7,7 @@ import { useState } from "react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { apiRequest } from "@/lib/queryClient";
-import { barScale, type HikingOverview } from "@shared/hikingOverview";
+import { barScale, kakaoMapWon, type HikingOverview } from "@shared/hikingOverview";
 import { EmptyState, KpiTile, Panel, Pill, kstDateTime } from "./adminUtils";
 
 const KEY = "/api/hiq/admin/hiking/overview";
@@ -57,6 +57,27 @@ function DaysChart({ days }: { days: HikingOverview["days"] }) {
     );
 }
 
+/** 카카오 지도 사용(유료 0.1원/건) — 오늘 · 30일 · 어림 비용 · 상한에 걸린 수. 상한 · 끄기는 Vercel env(KAKAO_MAP_DAILY_CAP · KAKAO_MAP_OFF) */
+function KakaoMapPanel({ k }: { k: NonNullable<HikingOverview["kakaoMap"]> }) {
+    const today = k.days[0]?.day === new Date(Date.now() + 9 * 3_600_000).toISOString().slice(0, 10) ? k.days[0] : null;
+    const sum = k.days.reduce((a, x) => a + x.loads, 0), refused = k.days.reduce((a, x) => a + x.refused, 0);
+    return (
+        <Panel className="p-4" data-testid="admin-hiking-kakao-map">
+            <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                <h3 className="text-[13px] font-black text-black/70">카카오 지도 <span className="font-bold text-black/40">— 코스 지도의 '실제 지도' · 유료 0.1원/건</span></h3>
+                {k.off ? <Pill tone="alert">꺼 둠</Pill> : <Pill tone="brand">켜짐</Pill>}
+            </div>
+            <div className="mt-2 grid grid-cols-2 gap-2.5 lg:grid-cols-4">
+                <KpiTile label="오늘" value={today?.loads ?? 0} unit="번" sub={`하루 상한 ${k.cap.toLocaleString()}번`} />
+                <KpiTile label="최근 30일" value={sum} unit="번" sub={`약 ${kakaoMapWon(sum).toLocaleString()}원`} tone="brand" />
+                <KpiTile label="상한에 걸림(30일)" value={refused} unit="번" tone={refused ? "alert" : "default"} />
+                <KpiTile label="오늘 어림 비용" value={kakaoMapWon(today?.loads ?? 0)} unit="원" />
+            </div>
+            <p className="mt-2 text-[12px] leading-snug text-black/45">우리 서버가 허락한 수예요(카카오 청구의 기준과 같지만, 정확한 청구는 카카오 콘솔 › 통계 › 기간별 사용량). 상한은 Vercel 의 KAKAO_MAP_DAILY_CAP, 끄려면 KAKAO_MAP_OFF=1 — 바꾸면 다시 배포해야 들어가요.</p>
+        </Panel>
+    );
+}
+
 export default function HikingOverviewView() {
     const q = useQuery<HikingOverview>({ queryKey: [KEY] });
     const [preview, setPreview] = useState<any>(null);
@@ -75,6 +96,8 @@ export default function HikingOverviewView() {
                 <KpiTile label="받은 와펜 · 핀 · 등급" value={t.awards} unit="개" />
                 <KpiTile label="산악회" value={t.crews} unit="곳" sub={`회원 ${t.crewMembers} · 주 종목 ${t.primaryMembers}명`} />
             </div>
+
+            {d.kakaoMap && <KakaoMapPanel k={d.kakaoMap} />}
 
             <Panel className="p-4">
                 <h3 className="mb-2 text-[13px] font-black text-black/70">최근 30일</h3>

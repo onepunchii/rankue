@@ -21,7 +21,15 @@ export interface HikingOverview {
     }[];
     /** 산행 전날 저녁 브리핑 — 최근 실행(보낼 시간에 돈 것과 실패만 적힌다) */
     eveRuns: { at: string; ok: boolean; trips: number; people: number; sent: number; failed: number; error: string | null }[];
+    /**
+     * 카카오 지도(2026-10-25 — 유료 0.1원/건, shared/kakaoMap) — 하루 전체 상한 · 꺼짐 스위치 · 최근 30일(새 날짜가 위).
+     * 표가 아직 없으면(배포 전 마이그레이션 전) days 가 빈다.
+     */
+    kakaoMap?: { cap: number; off: boolean; days: { day: string; loads: number; refused: number }[] };
 }
+
+/** 카카오 지도 비용 어림(원) — 0.1원/건 */
+export const kakaoMapWon = (loads: number) => Math.round(loads * 0.1);
 
 /** 막대 높이 — 30일 가운데 가장 큰 날을 꽉 차게 */
 export const barScale = (values: readonly number[]) => Math.max(1, ...values);

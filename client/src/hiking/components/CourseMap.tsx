@@ -12,9 +12,12 @@
  *     지도 밖이면 점 대신 "내 위치는 지도 밖 · 북동쪽 12km" 한 줄.
  *   · 손짓: 두 손가락으로 키우기 · 키운 뒤 끌기 · 두 번 눌러 키우기(lib/useBoxZoom), + / − / 처음 크기로 / 산 전체 보기.
  * 산 화면을 한 번 열면 받아 둔 자료만으로 그려진다 — 산에서 신호가 끊겨도 보인다.
+ * 위의 '종이 지도 | 실제 지도'(2026-10-25 오너: "주변 건물 · 도로가 안 보여 답답하다") — 실제 지도는 카카오 지도 위에 같은 코스를 얹는다(KakaoCourseMap).
+ *   종이 지도가 기본이고, 실제 지도는 눌렀을 때만 받는다(유료 0.1원/건 · shared/kakaoMap). 한 번 연 실제 지도는 숨겨 둘 뿐 지우지 않는다 —
+ *   종이 지도와 오가도 지도를 다시 만들지 않는다. 못 띄우면(상한 · 신호 없음) 종이 지도로 돌아가고 까닭을 한 줄로 적는다.
  * ⚠️ 리터럴 색만. 글자는 화면에서 12px 이상(그림 안의 글자는 '화면 1px = 몇 km'로 맞춘다), 굵기는 semibold 까지.
  */
-import { useMemo } from "react";
+import { Suspense, lazy, useMemo, useState } from "react";
 import {
     COURSE_MAP_COPY, COURSE_MAP_DOT_KINDS, COURSE_MAP_LABEL_KINDS, COURSE_MAP_MIN_VIEW_KM, boxAround, courseMapFrame, focusBox, hereOnMap, labelPx, lineBreaks, offViewNote, pickLabels,
     scaleBarKm, scaleBarText, summitRingsKm, toKmXY, type PxRect,
@@ -23,6 +26,18 @@ import { HIKING_POI_NAME, hikingPoiTitle, type HikingPoiKind } from "@shared/hik
 import type { MountainCourse, MountainPoi } from "../lib/api";
 import { useBoxZoom } from "../lib/useBoxZoom";
 import { POI_COLOR } from "../theme";
+import type { KakaoMapFail } from "./KakaoCourseMap";
+
+/** 실제 지도(카카오) — 눌렀을 때만 받는다. 키가 없는 빌드에서는 단추가 없다 */
+const KakaoCourseMap = lazy(() => import("./KakaoCourseMap"));
+const KAKAO_READY = !!(import.meta.env.VITE_KAKAO_MAP_KEY || import.meta.env.VITE_KAKAO_JS_KEY);
+const REAL_FAIL: Record<KakaoMapFail, string> = {
+    device: "오늘은 이 기기에서 실제 지도를 많이 열었어요 — 내일 다시 쓸 수 있어요. 종이 지도는 그대로 돼요.",
+    cap: "지금은 실제 지도를 쉬고 있어요 — 종이 지도를 써 주세요.",
+    off: "지금은 실제 지도를 쉬고 있어요 — 종이 지도를 써 주세요.",
+    net: "실제 지도를 불러오지 못했어요 — 신호가 약한 곳에서는 종이 지도를 써 주세요.",
+    sdk: "실제 지도를 불러오지 못했어요 — 신호가 약한 곳에서는 종이 지도를 써 주세요.",
+};
 
 /** 이름표를 먼저 다는 차례 — 자리가 겹치면 앞의 것이 남는다 */
 const LABEL_RANK: readonly string[] = ["PEAK", "SHELTER", "WATER", "TOILET", "ENTRY", "PARK", "BUS", "DANGER", "VIEW"];
@@ -38,7 +53,9 @@ type Label = { key: string; x: number; y: number; dx: number; dy: number; text: 
 /** 볼거리 점의 색(코리아둘레길의 관광지 — 2026-10-21). 길 위의 지점과 섞이지 않는 산호 잉크 */
 const SPOT_INK = "#C2552F";
 
-export function CourseMap({ courses, index, onPick, pois, summit, here, ask, asking, live, className, words, extras = [], extrasWord = "볼거리" }: {
+const NO_EXTRAS: readonly { id: string; lat: number; lng: number; name: string }[] = [];
+
+export function CourseMap({ courses, index, onPick, pois, summit, here, ask, asking, live, className, words, extras = NO_EXTRAS, extrasWord = "볼거리" }: {
     courses: readonly MountainCourse[];
     /** 고른 코스의 차례 */
     index: number;
@@ -65,6 +82,10 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
     const home = frame?.home ?? { x: -1, y: -1, w: 2, h: 2 };
     const start = useMemo(() => (frame && sel ? focusBox(frame, sel.line, summit) : home), [frame, sel, summit]); // eslint-disable-line react-hooks/exhaustive-deps
     const z = useBoxZoom(home, start, COURSE_MAP_MIN_VIEW_KM);
+    const [mode, setMode] = useState<"paper" | "real">("paper");
+    // 한 번 연 실제 지도는 붙여 둔다 — 지우고 다시 열면 지도를 또 만든다(💰)
+    const [realOn, setRealOn] = useState(false);
+    const [realNote, setRealNote] = useState<string | null>(null);
 
     // 선 — 코스가 바뀔 때만 다시 센다. 건너뛴 자리에서는 끊는다
     const paths = useMemo(() => (frame ? courses.map((c) => {
@@ -143,8 +164,21 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
     const selPath = paths[at];
 
     return (
-        <div className={className} data-testid="course-map-card">
-            <div className="relative overflow-hidden rounded-[18px]" style={{ background: `${PAPER} url(/hiking/art/map-paper.webp) center / cover`, boxShadow: "inset 0 0 0 1px rgba(14,42,51,0.16)" }}>
+        <div className={className} data-testid="course-map-card" data-mode={mode}>
+            {KAKAO_READY && (
+                <div className="mb-2 flex justify-end">
+                    <div className="inline-flex rounded-full p-[3px]" style={{ background: "#FFFFFF14" }} role="tablist" aria-label="지도 종류">
+                        {(["paper", "real"] as const).map((k) => (
+                            <button key={k} type="button" role="tab" aria-selected={mode === k} data-testid={`course-map-mode-${k}`} data-track-as={k === "real" ? "hiking-course-map-real" : "hiking-course-map-paper"}
+                                onClick={() => { if (k === "real") { setRealNote(null); setRealOn(true); } setMode(k); }}
+                                className={`h-8 rounded-full px-3.5 text-[13px] font-semibold ${mode === k ? "bg-[#F4EFE3] text-[#0E2A33]" : "text-[#F4EFE3B3]"}`}>
+                                {k === "paper" ? "종이 지도" : "실제 지도"}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            )}
+            <div className="relative overflow-hidden rounded-[18px]" style={{ background: `${PAPER} url(/hiking/art/map-paper.webp) center / cover`, boxShadow: "inset 0 0 0 1px rgba(14,42,51,0.16)", display: mode === "real" ? "none" : undefined }}>
                 <svg ref={z.svgRef} viewBox={`${v.x} ${v.y} ${v.w} ${v.h}`} role="img" aria-label={`코스 지도 — 코스 ${sel.seq} · 이 산의 코스 ${courses.length}개 · 위가 북쪽`}
                     style={{ display: "block", width: "100%", aspectRatio: `${home.w} / ${home.h}`, touchAction: z.touchAction, userSelect: "none", WebkitUserSelect: "none" }}
                     data-testid="course-map" data-scale={z.zoom.toFixed(2)} data-view-km={v.w.toFixed(2)} data-here={me ? (me.inside ? "in" : "out") : "none"} {...z.handlers}>
@@ -269,9 +303,18 @@ export function CourseMap({ courses, index, onPick, pois, summit, here, ask, ask
                 </div>
             </div>
 
-            {/* 지도 밑 — 내 위치가 지도 밖일 때의 안내, 점의 뜻, 선의 뜻 */}
-            {me && !me.inside && me.note && <p className="mt-2 text-[13px] text-[#F6D9A8] break-keep" data-testid="course-map-here-note">{me.note}</p>}
-            {me?.inside && !inView(me.x, me.y) && <p className="mt-2 text-[13px] text-[#F6D9A8] break-keep" data-testid="course-map-here-away">{offViewNote(me.x - (v.x + v.w / 2), me.y - (v.y + v.h / 2))}</p>}
+            {/* 실제 지도(카카오) — 한 번 열면 붙여 두고 보이기만 바꾼다 */}
+            {realOn && (
+                <Suspense fallback={mode === "real" ? <div className="flex items-center justify-center rounded-[18px] text-[13.5px] text-[#0E2A33B3]" style={{ aspectRatio: `${home.w} / ${home.h}`, background: PAPER }}>실제 지도를 불러오는 중…</div> : null}>
+                    <KakaoCourseMap courses={courses} index={at} onPick={onPick} pois={pois} summit={summit} here={here} extras={extras} aspect={home.w / home.h} visible={mode === "real"}
+                        onFail={(why) => { setRealOn(false); setMode("paper"); setRealNote(REAL_FAIL[why]); }} />
+                </Suspense>
+            )}
+            {realNote && <p className="mt-2 text-[13px] text-[#F6D9A8] break-keep" data-testid="course-map-real-note">{realNote}</p>}
+
+            {/* 지도 밑 — 내 위치가 지도 밖일 때의 안내(종이 지도), 점의 뜻, 선의 뜻 */}
+            {mode === "paper" && me && !me.inside && me.note && <p className="mt-2 text-[13px] text-[#F6D9A8] break-keep" data-testid="course-map-here-note">{me.note}</p>}
+            {mode === "paper" && me?.inside && !inView(me.x, me.y) && <p className="mt-2 text-[13px] text-[#F6D9A8] break-keep" data-testid="course-map-here-away">{offViewNote(me.x - (v.x + v.w / 2), me.y - (v.y + v.h / 2))}</p>}
             {(kindsShown.length > 0 || extraDots.length > 0) && (
                 <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 px-0.5 text-[12.5px] text-[#F4EFE3B3]" aria-label="점의 뜻">
                     {kindsShown.map((k) => (

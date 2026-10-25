@@ -32,6 +32,7 @@ import type { ModerationAction } from "../../lib/reportQueue.js";
 import { crewSummits } from "../../storage/hikingStamps.js";
 import { recentCronRuns } from "../../storage/cronRuns.js";
 import { fillDays, type HikingOverview } from "../../../shared/hikingOverview.js";
+import { kakaoMapCap } from "../../../shared/kakaoMap.js";
 import { listSummits, syncHikingAwards } from "../../storage/hikingStamps.js";
 import { isWithdrawnMember } from "../../../shared/chatSupport.js";
 import { goodsItem } from "../../../shared/goods.js";
@@ -329,6 +330,7 @@ router.get("/overview", asyncHandler(async (_req: any, res: any) => {
         from hiq_crews c where c.sport_category = 'HIKING' order by members desc, c.created_at limit 60`);
     const together = await Promise.all(crews.map((c) => crewSummits(String(c.id)).then((x) => x.length).catch(() => 0)));
     const eve = await recentCronRuns("hiking_eve", 10);
+    const kmap = await safeRows(sql`select to_char(day, 'YYYY-MM-DD') as day, loads, refused from kakao_map_loads where day > (now() at time zone 'Asia/Seoul')::date - 30 order by day desc`);
     const out: HikingOverview = {
         totals: {
             summits: Number(t?.summits) || 0, summitMembers: Number(t?.summit_members) || 0, records: Number(t?.records) || 0, trips: Number(t?.trips) || 0, reachedTrips: Number(t?.reached) || 0,
@@ -339,6 +341,7 @@ router.get("/overview", asyncHandler(async (_req: any, res: any) => {
         mountains: mountains.map((m) => ({ id: String(m.id), name: String(m.name), slug: String(m.slug), summits: Number(m.summits) || 0, records: Number(m.records) || 0 })),
         crews: crews.map((c, i) => ({ id: String(c.id), name: String(c.name), members: Number(c.members) || 0, next: c.next ? { title: String(c.next.title), at: String(c.next.at), mountain: c.next.mountain ?? null } : null, lastAt: c.last_at ?? null, together: together[i] })),
         eveRuns: eve.map((r) => ({ at: r.at, ok: r.ok, trips: Number(r.result?.trips) || 0, people: Number(r.result?.people) || 0, sent: Number(r.result?.sent) || 0, failed: Number(r.result?.failed) || 0, error: typeof r.result?.error === "string" ? r.result.error : null })),
+        kakaoMap: { cap: kakaoMapCap(process.env.KAKAO_MAP_DAILY_CAP), off: process.env.KAKAO_MAP_OFF === "1", days: kmap.map((r) => ({ day: String(r.day), loads: Number(r.loads) || 0, refused: Number(r.refused) || 0 })) },
     };
     res.set("Cache-Control", "private, no-store");
     return sendSuccess(res, out);

@@ -82,6 +82,32 @@ export function nearRadiusKm(kms: readonly number[]): number {
     return RADII.find((r) => far <= r * 0.86) ?? RADII[RADII.length - 1];
 }
 
+/**
+ * 판을 손으로 키우고 줄이는 단계(2026-10-25 오너: "홈의 내 근처 산에 지도 확대가 가능하면") — 반지름 km.
+ * 처음 판은 예전 그대로(가까운 산 일곱 + 명산 셋, nearRadiusKm). 키우거나 줄이면 그 반지름 안의 산을 다 그린다.
+ */
+export const NEAR_ZOOM_STEPS = [2, 5, 10, 20, 30, 50] as const;
+/** 한 판에 그리는 산의 상한 — 서울 한가운데서 50km 면 360곳이 넘는다(그림이 산으로 덮인다). 넘치면 명산을 남기고 가까운 순으로 */
+export const NEAR_ZOOM_MAX = 160;
+
+/** 다음 단계의 반지름 — dir 1 = 키우기(반지름이 작아진다) · -1 = 줄이기. 더 갈 데가 없으면 null */
+export function nearZoomNext(radiusKm: number, dir: 1 | -1): number | null {
+    if (dir === 1) {
+        const smaller = NEAR_ZOOM_STEPS.filter((r) => r < radiusKm);
+        return smaller.length ? smaller[smaller.length - 1] : null;
+    }
+    return NEAR_ZOOM_STEPS.find((r) => r > radiusKm) ?? null;
+}
+
+/** 반지름 안의 산 — 판 밖(가장자리에 쌓이는 것)은 그리지 않는다. 상한을 넘으면 명산 먼저, 나머지는 가까운 순 */
+export function nearZoomItems(points: readonly MountainPoint[], me: { lat: number; lng: number }, radiusKm: number): NearMountain[] {
+    const inside = nearestMountains(points, me, { limit: Number.MAX_SAFE_INTEGER, maxKm: radiusKm });
+    if (inside.length <= NEAR_ZOOM_MAX) return inside;
+    const famous = inside.filter((m) => m.famous).slice(0, NEAR_ZOOM_MAX);
+    const rest = inside.filter((m) => !m.famous).slice(0, NEAR_ZOOM_MAX - famous.length);
+    return [...famous, ...rest].sort((a, b) => a.km - b.km);
+}
+
 /** 판 위의 자리 — 가운데가 나, 위가 북. 반지름 1 인 판에서의 [x, y](y 는 아래로 +). 판 밖이면 가장자리로 당긴다 */
 export function nearSpot(m: Pick<NearMountain, "km" | "bearing">, radiusKm: number): [number, number] {
     const d = Math.min(1, radiusKm > 0 ? m.km / radiusKm : 1);

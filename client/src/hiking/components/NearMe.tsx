@@ -7,12 +7,12 @@
  * 위치를 먼저 묻지 않는다: 단추를 눌렀을 때만 묻고, 한 번 켠 뒤에는 묻지 않고 받을 수 있을 때만 받는다.
  * ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상, 굵기는 semibold 까지.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { getDevicePosition } from "@/hooks/useNativeBridge";
 import { hikingMountainPath } from "@shared/hikingMountains";
-import { compass8, nearKmText, nearRadiusKm, nearSpot, nearestMountains, type MountainPoint, type NearMountain } from "@shared/hikingNear";
+import { compass8, nearKmText, nearRadiusKm, nearSpot, nearZoomItems, nearZoomNext, nearestMountains, type MountainPoint, type NearMountain } from "@shared/hikingNear";
 import { HkSection } from "./HikingShell";
 import { MountainPatch } from "../stamps/MountainPatch";
 import { hikingCover } from "../theme";
@@ -62,13 +62,30 @@ export function NearMe({ famous, done }: {
     const loading = phase === "locating" || (phase === "on" && !points);
     const featured = useMemo(() => [first?.slug, firstFamous?.slug].filter((x): x is string => !!x), [first?.slug, firstFamous?.slug]);
     const [more, setMore] = useState(false);
+    // 키우기 · 줄이기(2026-10-25 오너) — null 이면 처음 판(가까운 산 일곱 + 명산 셋). 정하면 그 반지름 안의 산을 다 그린다
+    const [zoomR, setZoomR] = useState<number | null>(null);
+    const autoR = useMemo(() => nearRadiusKm(onMap.map((m) => m.km)), [onMap]);
+    const radius = zoomR ?? autoR;
+    const zoomItems = useMemo(() => (zoomR != null && me && points ? nearZoomItems(points, me, zoomR) : null), [zoomR, me, points]);
+    // 반경 안의 산이 상한(NEAR_ZOOM_MAX)보다 많으면 '몇 곳 중 몇 곳'을 말한다 — 그린 수만 말하면 그게 전부인 줄 안다
+    const zoomTotal = useMemo(() => (zoomR != null && me && points ? nearestMountains(points, me, { limit: Number.MAX_SAFE_INTEGER, maxKm: zoomR }).length : 0), [zoomR, me, points]);
+    const zoom = useCallback((dir: 1 | -1) => setZoomR((prev) => nearZoomNext(prev ?? autoR, dir) ?? prev), [autoR]);
 
     return (
         <HkSection title="내 근처의 산" aside={phase === "on" && first ? `가장 가까운 산까지 ${nearKmText(first.km)}` : "가까운 산 · 가까운 명산"}>
             <div data-testid="hk-near" data-phase={loading ? "loading" : phase}>
                 {phase === "on" && points && onMap.length > 0 ? (
                     <>
-                        <NearDial items={onMap} done={isDone} featured={featured} />
+                        <ZoomableDial radius={radius} zoomed={zoomR != null} onZoom={zoom} onReset={() => setZoomR(null)}>
+                            <NearDial items={zoomItems ?? onMap} done={isDone} featured={featured} radiusKm={radius} />
+                        </ZoomableDial>
+                        {zoomItems && (
+                            <p className="mt-1.5 text-center text-[12.5px] text-[#F4EFE3B3] break-keep" data-testid="hk-near-zoom-count">
+                                {!zoomItems.length ? `반경 ${radius}km 안에는 산이 없어요`
+                                    : zoomTotal > zoomItems.length ? `반경 ${radius}km 안의 산 ${zoomTotal}곳 — 명산과 가까운 산 ${zoomItems.length}곳을 그렸어요`
+                                    : `반경 ${radius}km 안의 산 ${zoomItems.length}곳`}
+                            </p>
+                        )}
                         <div className="mt-2.5 grid grid-cols-2 gap-2.5">
                             {first && <NearCard kind="가까운 산" m={first} info={bySlug.get(first.slug)} done={isDone(first)} />}
                             {firstFamous && <NearCard kind="가까운 명산" m={firstFamous} info={bySlug.get(firstFamous.slug)} done={isDone(firstFamous)} />}
@@ -76,7 +93,7 @@ export function NearMe({ famous, done }: {
                         {onMap.length > featured.length && (more
                             ? <NearRows items={onMap} skip={new Set(featured)} done={isDone} />
                             : <button type="button" onClick={() => setMore(true)} data-track-as="hiking-near-more" data-testid="hk-near-more" className="mt-2.5 flex h-11 w-full items-center justify-center rounded-xl bg-[#FFFFFF14] text-[14px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24]">가까운 산 {onMap.length - featured.length}곳 더 보기</button>)}
-                        <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">가운데가 지금 자리, 위쪽이 북쪽이에요. 직선 거리라 길로 가면 더 멀어요. 내 위치는 이 기기에서만 써요.</p>
+                        <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">가운데가 지금 자리, 위쪽이 북쪽이에요. 두 손가락이나 + · − 로 키우고 줄일 수 있어요. 직선 거리라 길로 가면 더 멀어요. 내 위치는 이 기기에서만 써요.</p>
                     </>
                 ) : phase === "on" && points ? (
                     <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-6 text-center text-[14px] text-[#F4EFE399] break-keep" data-testid="hk-near-none">근처에서 산을 찾지 못했어요. 전국의 산은 아래 '산' 탭에서 볼 수 있어요.</p>
@@ -131,7 +148,7 @@ const CONTOURS = [contour(R * 0.24, 4, 0.4), contour(R * 0.46, 6, 1.7), contour(
  * 산 화면도 이 판을 쓴다(가운데가 그 산 — 가까운 산의 방향과 거리): centre 로 가운데 표시 밑에 말("이 산")을 달고, label 로 그림을 읽어 주는 말을 바꾼다.
  * featured 는 카드로 따로 소개하는 산 — 가운데에서 점선을 긋고 이름 옆에 거리를 적는다.
  */
-export function NearDial({ items, done, centre, label, featured }: {
+export function NearDial({ items, done, centre, label, featured, radiusKm }: {
     items: readonly NearMountain[];
     done: (m: NearMountain) => boolean;
     /** 가운데 표시 밑에 다는 말(산 화면의 "이 산") — 없으면 '나'의 표시만 */
@@ -140,9 +157,13 @@ export function NearDial({ items, done, centre, label, featured }: {
     label?: string;
     /** 카드로 소개하는 산의 주소(slug) — 점선과 거리가 붙는다 */
     featured?: readonly string[];
+    /** 판의 반지름을 정해 줄 때(홈의 키우기 · 줄이기) — 없으면 그릴 산이 다 들어가는 값 */
+    radiusKm?: number;
 }) {
     const [, setLocation] = useLocation();
-    const radius = nearRadiusKm(items.map((m) => m.km));
+    const radius = radiusKm ?? nearRadiusKm(items.map((m) => m.km));
+    // 산이 많으면(줄여서 넓게 볼 때) 그림을 작게 — 서로 덮지 않게
+    const dense = items.length > 60 ? 0.6 : items.length > 24 ? 0.78 : 1;
     const spots = useMemo(() => {
         // 아주 가까운 산(판의 가운데에서 22 안)은 같은 방향으로 22 까지 민다 — 가운데 표시와 '이 산' 글씨를 덮지 않게(표시만, 거리 글은 그대로)
         const out = items.map((m) => {
@@ -198,12 +219,12 @@ export function NearDial({ items, done, centre, label, featured }: {
             {/* 카드의 산으로 가는 점선 */}
             {spots.filter((s) => s.star).map((s) => <path key={`l:${s.m.slug}`} d={`M${C.x} ${C.y} L${s.x.toFixed(1)} ${s.y.toFixed(1)}`} stroke={s.m.famous ? "#1F5560" : "#B5654A"} strokeOpacity="0.6" strokeWidth="1.4" strokeDasharray="2 4" strokeLinecap="round" />)}
             {spots.map((s) => {
-                const size = (s.m.famous ? 9 : 6.5) * (0.85 + Math.min(1, (s.m.heightM ?? 300) / 1500) * 0.5);
+                const size = (s.m.famous ? 9 : 6.5) * (0.85 + Math.min(1, (s.m.heightM ?? 300) / 1500) * 0.5) * (s.star ? 1 : dense);
                 const got = done(s.m);
                 const fill = got ? "#F28C6A" : s.m.kfs ? "#1F5560" : s.m.famous ? "#4E8A86" : "#8FAE9F", shade = got ? "#D2694A" : s.m.kfs ? "#143D46" : s.m.famous ? "#3A6E6A" : "#6F9183";
                 return (
                     <g key={s.m.slug} transform={`translate(${s.x.toFixed(1)} ${s.y.toFixed(1)})`} onClick={() => setLocation(hikingMountainPath(s.m.slug))} style={{ cursor: "pointer" }} data-near={s.m.slug}>
-                        <circle r="17" fill="transparent" />
+                        <circle r={17 * dense} fill="transparent" />
                         {s.star && <circle r={size + 6} fill="#F4EFE3" fillOpacity="0.72" stroke={s.m.famous ? "#1F5560" : "#B5654A"} strokeOpacity="0.55" strokeWidth="1" />}
                         {s.m.famous && <path d={`M${-size * 1.5} 2 L${-size * 0.72} ${2 - size * 0.72} L${-size * 0.1} 2 Z`} fill={shade} stroke="#0E2A33" strokeWidth="0.9" strokeLinejoin="round" />}
                         <path d={`M${-size} 2 L0 ${2 - size * 1.3} L${size} 2 Z`} fill={fill} stroke="#0E2A33" strokeWidth="0.9" strokeLinejoin="round" />
@@ -232,6 +253,39 @@ export function NearDial({ items, done, centre, label, featured }: {
                 </g>
             )}
         </svg>
+    );
+}
+
+const ZBTN = "flex h-10 w-10 items-center justify-center text-[20px] leading-none text-[#0E2A33] active:bg-[#E4DCC8] disabled:opacity-35";
+const ZFLOAT = { background: "#F4EFE3F2", boxShadow: "0 1px 4px rgba(14,42,51,0.28), inset 0 0 0 1px rgba(14,42,51,0.18)" } as const;
+
+/**
+ * 판을 키우고 줄이는 겉 — 오른쪽 위 + · − (코스 지도와 같은 모양), 두 손가락으로 벌리면 키우고 오므리면 줄인다(한 단계씩).
+ * 한 손가락은 화면을 그대로 스크롤한다(touch-action: pan-x pan-y — 브라우저의 화면 확대만 막는다). 바꾸면 왼쪽 위에 '처음으로'.
+ */
+function ZoomableDial({ radius, zoomed, onZoom, onReset, children }: { radius: number; zoomed: boolean; onZoom: (dir: 1 | -1) => void; onReset: () => void; children: React.ReactNode }) {
+    const base = useRef<number | null>(null);
+    const gap = (t: React.TouchList) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    return (
+        <div className="relative" style={{ touchAction: "pan-x pan-y" }} data-testid="hk-near-zoom" data-radius={radius}
+            onTouchStart={(e) => { base.current = e.touches.length === 2 ? gap(e.touches) : null; }}
+            onTouchMove={(e) => {
+                if (e.touches.length !== 2 || base.current == null) return;
+                const d = gap(e.touches), k = d / base.current;
+                if (k > 1.3) { onZoom(1); base.current = d; } else if (k < 0.77) { onZoom(-1); base.current = d; }
+            }}
+            onTouchEnd={(e) => { if (e.touches.length < 2) base.current = null; }}>
+            {children}
+            <div className="absolute right-2 top-2 flex flex-col overflow-hidden rounded-xl" style={ZFLOAT}>
+                <button type="button" onClick={() => onZoom(1)} disabled={nearZoomNext(radius, 1) == null} aria-label="판 키우기(더 가까이)" data-testid="hk-near-zoom-in" data-track-as="hiking-near-zoom-in" className={ZBTN}>+</button>
+                <span className="h-px bg-[#0E2A3326]" aria-hidden />
+                <button type="button" onClick={() => onZoom(-1)} disabled={nearZoomNext(radius, -1) == null} aria-label="판 줄이기(더 넓게)" data-testid="hk-near-zoom-out" data-track-as="hiking-near-zoom-out" className={ZBTN}>−</button>
+            </div>
+            {zoomed && (
+                <button type="button" onClick={onReset} data-testid="hk-near-zoom-reset" data-track-as="hiking-near-zoom-reset"
+                    className="absolute left-2 top-2 h-9 rounded-full px-3 text-[13px] font-medium text-[#0E2A33] active:bg-[#E4DCC8]" style={ZFLOAT}>처음으로</button>
+            )}
+        </div>
     );
 }
 

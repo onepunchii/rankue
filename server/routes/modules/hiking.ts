@@ -18,6 +18,8 @@ import { deleteBlobs, isOnOwnBlobHost } from "../../utils/blob.js";
 import { trailCourses, toSummary as toTrailSummary } from "../../storage/koreaTrails.js";
 import { trailsNear } from "../../../shared/trailFestivals.js";
 import { checkHiking, requireHikingAccess } from "../../middleware/hikingAccess.js";
+import { takeKakaoMapLoad } from "../../storage/kakaoMapLoads.js";
+import { kakaoMapCap } from "../../../shared/kakaoMap.js";
 import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
 import { requireTermsAccepted } from "../../middleware/terms.js";
 import { distM } from "../../../shared/hikingGeo.js";
@@ -84,6 +86,15 @@ router.get("/points", asyncHandler(async (_req: any, res: any) => {
  * 오늘의 명산 사진(2026-10-21) — 100대 명산(+플러스) 가운데 한국관광공사 사진이 있는 산에서 여덟(날마다 돌아간다 — 그날은 누구에게나 같다).
  * 등산 홈의 사진 줄. 사진은 공공누리 제1 · 3유형(server/data/mountainTourPhotos), 화면이 출처를 단다.
  */
+// 카카오 지도를 띄워도 되는지(2026-10-25 — 유료 0.1원/건, 규칙 shared/kakaoMap). 띄우기 직전에 한 번, 오늘 한 칸을 쓴다.
+// 로그인 없이 — 산 화면은 누구나 본다. 하루 전체 상한에 걸리거나 꺼 두면(env KAKAO_MAP_OFF=1) 화면은 종이 지도만 쓴다.
+router.post("/map-load", asyncHandler(async (_req: any, res: any) => {
+    res.set("Cache-Control", "no-store");
+    if (process.env.KAKAO_MAP_OFF === "1") return sendSuccess(res, { ok: false, reason: "off" });
+    const ok = await takeKakaoMapLoad(kakaoMapCap(process.env.KAKAO_MAP_DAILY_CAP));
+    return sendSuccess(res, ok ? { ok: true } : { ok: false, reason: "cap" });
+}));
+
 router.get("/featured-photos", asyncHandler(async (_req: any, res: any) => {
     const all = await allMountains();
     const pool = all.filter((m) => m.lists.some((l) => l === "kfs100" || l === "kfs100plus") && MOUNTAIN_TOUR_PHOTOS[m.slug]?.photos.length)
