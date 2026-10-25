@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { sanitizeInternalPath, deepLinkToPath, handledLinkKey, isAppSchemeLink, openedAppLink, resumeTarget, RESUME_MAX_AGE_MS } from "./deepLink";
+import { sanitizeInternalPath, deepLinkToPath, handledLinkKey, isAppSchemeLink, openedAppLink, resumeTarget, RESUME_MAX_AGE_MS, sameSiteNewWindowPath } from "./deepLink";
 import { handoffAppUrl, handoffIntentUrl } from "./loginHandoff";
 
 describe("sanitizeInternalPath", () => {
@@ -199,5 +199,50 @@ describe("handledLinkKey — 처리한 링크를 적어 둘 때의 키", () => {
         expect(bridge).toContain("if (wasLinkHandled(url)) return;");
         // 저장소에 적는 곳은 markLinkHandled 하나다
         expect(bridge.match(/storageSet\("session", HANDLED_LINKS_KEY/g)).toHaveLength(1);
+    });
+});
+
+/**
+ * 앱 안의 '새 창'(target=_blank · window.open) — 우리 화면은 앱 안에서 옮긴다(2026-10-25 오너: "관리자에서 뒤로가기 시 화면 전환이 안 되고 배경만").
+ * 안드로이드 웹뷰는 새 창이 없어 _blank 가 앱 문서를 갈아 치웠다(관리자 '매장 페이지' → 앱 전체가 그 매장 페이지로 새로 뜸 → '뒤로'가 빈 바탕).
+ */
+describe("sameSiteNewWindowPath — 앱 안의 새 창을 앱 안 이동으로", () => {
+    const H = "www.rankue.co.kr";
+    it("우리 화면 — 상대 주소 · www · apex · 지금 호스트는 경로로", () => {
+        expect(sameSiteNewWindowPath("/stores/G1ch46lr10i", H)).toBe("/stores/G1ch46lr10i");
+        expect(sameSiteNewWindowPath("https://www.rankue.co.kr/hiking/mountains/%EB%B6%81%ED%95%9C%EC%82%B0?x=1#a", H)).toBe("/hiking/mountains/%EB%B6%81%ED%95%9C%EC%82%B0?x=1#a");
+        expect(sameSiteNewWindowPath("https://rankue.co.kr/store/abc", H)).toBe("/store/abc");
+        expect(sameSiteNewWindowPath("/club/1", "localhost")).toBe("/club/1");
+    });
+    it("바깥 주소 · 서버 주소 · 파일은 그대로 둔다(null)", () => {
+        expect(sameSiteNewWindowPath("https://map.kakao.com/link/map/a,37,127", H)).toBeNull();
+        expect(sameSiteNewWindowPath("https://play.google.com/store/apps/details?id=com.rankue.app", H)).toBeNull();
+        expect(sameSiteNewWindowPath("/api/hiq/admin/export.csv", H)).toBeNull();
+        expect(sameSiteNewWindowPath("/og/player/1.png", H)).toBeNull();
+        expect(sameSiteNewWindowPath("/sitemap-stores.xml", H)).toBeNull();
+        expect(sameSiteNewWindowPath("/assets/index-abc.js", H)).toBeNull();
+        expect(sameSiteNewWindowPath("javascript:alert(1)", H)).toBeNull();
+        expect(sameSiteNewWindowPath("mailto:a@b.c", H)).toBeNull();
+        expect(sameSiteNewWindowPath("", H)).toBeNull();
+        expect(sameSiteNewWindowPath(undefined, H)).toBeNull();
+    });
+    it("앱에서만 켠다 — 링크는 화면의 onClick 다음(버블)에, 막힌 것은 건드리지 않고, window.open 도 같은 규칙", () => {
+        const nb = readFileSync(resolve(__dirname, "../client/src/lib/nativeBridge.ts"), "utf8");
+        const init = nb.slice(nb.indexOf("export function initNativeBridge("));
+        expect(init.indexOf("if (!isNative()) return;")).toBeLessThan(init.indexOf("initSameSiteNewWindow();"));
+        const fn = nb.slice(nb.indexOf("function initSameSiteNewWindow("), nb.indexOf("export function initNativeBridge("));
+        expect(fn).toContain('document.addEventListener("click", (e) => {');
+        expect(fn).not.toMatch(/addEventListener\("click", [^)]*\}, true\)/);
+        expect(fn).toContain("if (e.defaultPrevented || e.button !== 0");
+        expect(fn).toContain("window.open = ((url?: string | URL, target?: string, features?: string) => {");
+    });
+    it("index.html — 큰 스크립트를 못 받으면 한 번 새로 고친다(우리 /assets 만 · 30초 안에 두 번은 안 함)", () => {
+        const html = readFileSync(resolve(__dirname, "../client/index.html"), "utf8");
+        const head = html.slice(0, html.indexOf("</head>"));
+        expect(head).toContain("src.indexOf(location.origin + '/assets/') !== 0) return;");
+        expect(head).toContain("if (Date.now() - last < 30000) return;");
+        expect(head).toContain("window.addEventListener('error', function (e) {");
+        // 처음 부분에 — 다른 스크립트보다 앞
+        expect(head.indexOf("rk_boot_reload")).toBeLessThan(head.indexOf("<title>"));
     });
 });

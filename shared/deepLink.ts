@@ -30,6 +30,22 @@ export function sanitizeInternalPath(raw: unknown): string | null {
     return u.pathname + u.search + u.hash;
 }
 
+/**
+ * 앱 안에서 '새 창'(target=_blank · window.open)으로 여는 주소 → 앱 안에서 옮길 경로(2026-10-25 오너: "관리자에서 뒤로가기 시 화면 전환이 안 되고 배경만").
+ * 안드로이드 웹뷰에는 새 창이 없어 _blank 가 **앱 문서를 통째로 갈아 치운다**(관리자 콘솔의 '매장 페이지'를 누르면 앱 전체가 그 페이지로 새로 떴다).
+ * 그 뒤의 '뒤로'는 문서를 건너 콘솔을 다시 불러야 했고, 거기서 빈 바탕만 남았다. 우리 주소는 라우터로 옮기면 한 문서 안이라 '뒤로'가 그대로 돈다.
+ * 우리 주소(www · apex · 지금 호스트)의 **화면**만 — 서버 주소(/api · /og · /assets · 사이트맵 같은 파일)와 바깥 주소는 null(예전처럼 둔다).
+ */
+export function sameSiteNewWindowPath(href: unknown, currentHost: string): string | null {
+    if (typeof href !== "string" || !href) return null;
+    let u: URL;
+    try { u = new URL(href, `https://${currentHost}`); } catch { return null; }
+    if (u.protocol !== "https:" && u.protocol !== "http:") return null;
+    if (u.hostname !== currentHost && u.hostname !== "www.rankue.co.kr" && u.hostname !== "rankue.co.kr") return null;
+    if (/^\/(api|og|og-hub|assets)(\/|$)/.test(u.pathname) || /\.[a-z0-9]{2,5}$/i.test(u.pathname)) return null;
+    return sanitizeInternalPath(u.pathname + u.search + u.hash);
+}
+
 // rankue://open 뒤가 끝이거나 / ? # 로 이어질 때만. 'rankue://opener' 같은 다른 호스트는 걸러진다.
 const RANKUE_OPEN = /^rankue:\/\/open(?=[/?#]|$)/i;
 

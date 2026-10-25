@@ -3,6 +3,27 @@
 
 <head>
   <meta charset="UTF-8" />
+  <!-- 큰 스크립트를 못 받으면 한 번 새로 고친다(2026-10-25 — 관리자 콘솔 '뒤로'에서 빈 바탕만 남던 일).
+       '뒤로'로 돌아온 문서는 브라우저가 예전 HTML 을 다시 묻지 않고 쓸 수 있다 — 그 사이 배포가 있었으면 그 HTML 이 가리키는 /assets 파일이 없어
+       앱이 아예 뜨지 않는다(바탕색만). 새로 고침은 HTML 을 다시 묻는다. 30초 안에 또 실패하면 멈춘다(서버가 정말 아플 때 무한 새로 고침 방지).
+       늦게 받는 조각(lazy)은 lib/chunkReload 가 따로 맡는다. -->
+  <script>
+    window.addEventListener('error', function (e) {
+      var el = e && e.target;
+      var src = el && (el.src || el.href) || '';
+      if (!el || (el.tagName !== 'SCRIPT' && el.tagName !== 'LINK') || src.indexOf(location.origin + '/assets/') !== 0) return;
+      try {
+        var last = Number(sessionStorage.getItem('rk_boot_reload') || 0);
+        if (Date.now() - last < 30000) return;
+        sessionStorage.setItem('rk_boot_reload', String(Date.now()));
+      } catch (_) {
+        // 저장소를 못 쓰면 창 이름에 표시 — 이 탭에서 한 번만
+        if (/(^|;)rkr=1/.test(window.name)) return;
+        window.name = (window.name ? window.name + ';' : '') + 'rkr=1';
+      }
+      location.reload();
+    }, true);
+  </script>
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
   <!-- 앱 글꼴: 프리텐다드(가변, 동적 서브셋 — 화면에 쓰인 글자 범위만 받는다). 2026-09-21 오너: "프리텐다드로 하자".
        못 받으면 index.css 의 시스템 스택으로 자연히 떨어진다(앱 원격 URL 모드에서도 같은 링크를 쓴다). -->

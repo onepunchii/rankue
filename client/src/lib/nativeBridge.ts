@@ -15,7 +15,7 @@ import { PushNotifications, type PushNotificationSchema, type ActionPerformed, t
 import { navigate } from "wouter/use-browser-location";
 import { apiRequest } from "@/lib/queryClient";
 import { hasPlugin, isNative, nativeSupports, platform } from "@shared/nativeCaps";
-import { handledLinkKey, LAST_PATH_KEY, openedAppLink, resumeTarget, sanitizeInternalPath, type SavedPath } from "@shared/deepLink";
+import { handledLinkKey, LAST_PATH_KEY, openedAppLink, resumeTarget, sameSiteNewWindowPath, sanitizeInternalPath, type SavedPath } from "@shared/deepLink";
 import { androidStoreUrl, iosStoreUrl } from "@shared/appLinks";
 import { EDGE_SWIPE_OFF_PATH, isEdgeSwipeBack, startsAtEdge, type TouchPoint } from "@shared/edgeSwipe";
 
@@ -479,8 +479,33 @@ function initEdgeSwipeBack(): void {
     }, { passive: true });
 }
 
+/**
+ * 앱 안의 '새 창'(target=_blank 링크 · window.open)으로 여는 우리 화면은 앱 안에서 옮긴다(2026-10-25 — 규칙 shared/deepLink sameSiteNewWindowPath).
+ * 안드로이드 웹뷰는 새 창이 없어 _blank 가 앱 문서를 갈아 치웠다 — 관리자 콘솔에서 '매장 페이지'를 누른 뒤 '뒤로'가 빈 바탕만 남겼다(오너 제보).
+ * 링크는 문서의 버블 단계에서 받는다 — 화면의 onClick(React 는 #root 에서 받는다)이 먼저 돌고, 그쪽이 막았으면(defaultPrevented) 건드리지 않는다.
+ * 바깥 주소(카카오맵 · 스토어 등)는 그대로 — Capacitor 가 바깥 앱 · 브라우저로 넘긴다.
+ */
+function initSameSiteNewWindow(): void {
+    document.addEventListener("click", (e) => {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey) return;
+        const a = e.target instanceof Element ? e.target.closest<HTMLAnchorElement>("a[target=_blank]") : null;
+        if (!a || a.hasAttribute("download")) return;
+        const path = sameSiteNewWindowPath(a.getAttribute("href"), window.location.hostname);
+        if (!path) return;
+        e.preventDefault();
+        navigateInApp(path);
+    });
+    const open = window.open.bind(window);
+    window.open = ((url?: string | URL, target?: string, features?: string) => {
+        const path = url != null && (!target || target === "_blank") ? sameSiteNewWindowPath(String(url), window.location.hostname) : null;
+        if (path) { navigateInApp(path); return null; }
+        return open(url, target, features);
+    }) as typeof window.open;
+}
+
 export function initNativeBridge(): void {
     if (!isNative()) return;
+    initSameSiteNewWindow();
     if (platform() === "android") document.documentElement.classList.add("native-android");
 
     // 안드로이드 하드웨어 뒤로가기: 떠 있는 팝업 → 화면이 건 핸들러 → 뒤로 갈 곳이 있으면 back, 없으면 앱 종료 (wouter는 history API 기반)
