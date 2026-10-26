@@ -24,6 +24,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle, LucideFootprints } from "@/lib/icons";
 import { CHAT_BAN_CHOICES, type ChatBan } from "@shared/chatBan";
+import { AGE_BANDS, ageBandOf, type AgeBand } from "@shared/profileBasics";
 import MemberGamesDialog from "./MemberGamesDialog";
 import MemberActivitySheet from "./MemberActivitySheet";
 import MemberSportsSection from "./MemberSportsSection";
@@ -45,6 +46,8 @@ export type AdminMember = {
     storeSlug: string | null;
     gender: "male" | "female" | null;
     birthYear: number | null;
+    /** 나이대(10s~60s) — 비면 출생연도로 읽는다(ageBandOf) */
+    ageBand?: string | null;
     handi3c: number | null;
     handi4c: number | null;
     rating3c: number | null;
@@ -76,13 +79,15 @@ export const ADMIN_MEMBERS_KEY = ["/api/hiq/admin/members"] as const;
 /** 회원 한 명의 골프 칸 — ADMIN_MEMBERS_KEY 로 시작하므로 회원 목록을 무효화하면 함께 새로 받는다 */
 export const memberGolfKey = (id: string) => ["/api/hiq/admin/members", id, "golf"] as const;
 
-type Form ={ name: string; gender: "" | "male" | "female"; birthYear: string; handi3c: string; handi4c: string };
+type Form ={ name: string; gender: "" | "male" | "female"; ageBand: "" | AgeBand; handi3c: string; handi4c: string };
+const kstYear = () => new Date(Date.now() + 9 * 3600_000).getUTCFullYear();
 
 function toForm(m: AdminMember): Form {
     return {
         name: m.name ?? "",
         gender: m.gender ?? "",
-        birthYear: m.birthYear ? String(m.birthYear) : "",
+        // 나이대(2026-10-26 — 출생연도 칸을 나이대로). 고른 나이대가 없으면 출생연도로 읽은 나이대를 보인다
+        ageBand: ageBandOf(m, kstYear()) ?? "",
         handi3c: m.handi3c != null ? String(m.handi3c) : "",
         handi4c: m.handi4c != null ? String(m.handi4c) : "",
     };
@@ -273,7 +278,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
             const orig = toForm(member);
             if (form.name.trim() !== orig.name) body.name = form.name.trim();
             if (form.gender !== orig.gender) body.gender = form.gender || null;
-            if (form.birthYear !== orig.birthYear) body.birthYear = form.birthYear ? Number(form.birthYear) : null;
+            if (form.ageBand !== orig.ageBand) body.ageBand = form.ageBand || null;
             if (form.handi3c !== orig.handi3c) body.handi3c = form.handi3c ? Number(form.handi3c) : null;
             if (form.handi4c !== orig.handi4c) body.handi4c = form.handi4c ? Number(form.handi4c) : null;
             return apiRequest(`/api/hiq/admin/members/${member.id}`, { method: "PATCH", body });
@@ -493,11 +498,18 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                                 ))}
                                             </div>
                                         </div>
-                                        <div className="grid grid-cols-3 gap-2">
-                                            <label className="block">
-                                                <span className="text-[12px] font-bold text-black/50">출생연도</span>
-                                                <Input inputMode="numeric" value={form.birthYear} placeholder="1985" onChange={(e) => setForm({ ...form, birthYear: e.target.value.replace(/\D/g, "").slice(0, 4) })} className="mt-1 h-10 tabular-nums" />
-                                            </label>
+                                        <div>
+                                            <span className="text-[12px] font-bold text-black/50">나이대</span>
+                                            <div className="mt-1 grid grid-cols-6 gap-1.5" role="group" aria-label="나이대" data-testid="admin-age-band">
+                                                {AGE_BANDS.map((a) => (
+                                                    <button key={a} type="button" aria-pressed={form.ageBand === a} onClick={() => setForm({ ...form, ageBand: form.ageBand === a ? "" : a })}
+                                                        className={`h-9 rounded-lg text-[12.5px] font-bold ${form.ageBand === a ? "bg-brand text-white" : "bg-black/[0.05] text-black/55"}`}>
+                                                        {t(`profileBasics.age.${a}`)}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2">
                                             <label className="block">
                                                 <span className="text-[12px] font-bold text-black/50">3쿠션 핸디</span>
                                                 <Input inputMode="numeric" value={form.handi3c} onChange={(e) => setForm({ ...form, handi3c: e.target.value.replace(/\D/g, "").slice(0, 4) })} className="mt-1 h-10 tabular-nums" />

@@ -286,6 +286,8 @@ export class AdminRepository {
             storeId: hiqMembers.storeId,
             gender: hiqMembers.gender,
             birthYear: hiqMembers.birthYear,
+            // 나이대(2026-10-26 — 화면은 출생연도 대신 나이대를 보인다. 비면 출생연도로 읽는다: shared/profileBasics ageBandOf)
+            ageBand: hiqMembers.ageBand,
             rating3c: hiqMembers.rating3c,
             rating4c: hiqMembers.rating4c,
             avg3c: hiqMembers.avg3c,
@@ -337,13 +339,14 @@ export class AdminRepository {
      * (전화번호는 로그인 열쇠라 프로필과 함께 움직여야 하고, RP 는 경기 기록에서 계산되는 값이다).
      */
     async updateMemberForAdmin(id: string, patch: {
-        name?: string; gender?: "male" | "female" | null; birthYear?: number | null;
+        name?: string; gender?: "male" | "female" | null; birthYear?: number | null; ageBand?: string | null;
         handi3c?: number | null; handi4c?: number | null;
     }) {
         const set: Record<string, unknown> = {};
         if (patch.name !== undefined) set.name = patch.name;
         if (patch.gender !== undefined) set.gender = patch.gender;
         if (patch.birthYear !== undefined) set.birthYear = patch.birthYear;
+        if (patch.ageBand !== undefined) set.ageBand = patch.ageBand;
         if (patch.handi3c !== undefined) set.handi3c = patch.handi3c;
         if (patch.handi4c !== undefined) set.handi4c = patch.handi4c;
         if (Object.keys(set).length === 0) return null;

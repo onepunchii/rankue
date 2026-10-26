@@ -176,6 +176,12 @@ router.patch("/members/:id", checkSuperAdmin, asyncHandler(async (req: any, res:
         const n = Number(v);
         return Number.isInteger(n) && n >= min && n <= max ? n : "bad";
     };
+    // 나이대(2026-10-26 오너 "우리 다 나이대라 어드민도 나이대로") — 화면은 이 칸만 보낸다. 출생연도 칸은 옛 화면을 위해 남겨 둔다
+    if (b.ageBand !== undefined) {
+        const { isAgeBand } = await import("../../../shared/profileBasics.js");
+        if (b.ageBand !== null && !isAgeBand(b.ageBand)) return sendError(res, 400, "나이대 값이 올바르지 않습니다");
+        patch.ageBand = b.ageBand;
+    }
     if (b.birthYear !== undefined) {
         const v = intOrNull(b.birthYear, 1900, new Date().getFullYear());
         if (v === "bad") return sendError(res, 400, "출생연도가 올바르지 않습니다");

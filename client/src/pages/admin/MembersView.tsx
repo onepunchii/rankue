@@ -14,6 +14,9 @@ import { cn } from "@/lib/utils";
 import * as XLSX from "xlsx";
 import { type AdminMember, ADMIN_MEMBERS_KEY } from "./MemberDetailSheet";
 import { adminRoleLabel } from "@shared/adminRole";
+import { ageBandOf } from "@shared/profileBasics";
+/** 엑셀의 나이대 칸(관리 화면은 한국어 — 설정 화면의 profileBasics.age.* 와 같은 말) */
+const AGE_LABEL: Readonly<Record<string, string>> = { "10s": "10대", "20s": "20대", "30s": "30대", "40s": "40대", "50s": "50대", "60s": "60대 이상" };
 import { MemberAvatar, PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, daysSince, isKstToday, phoneLabel, KpiTile, ADMIN_STICKY_TOP, SPORT_CHIP, SportChip } from "./adminUtils";
 
 type Activity = {
@@ -91,7 +94,8 @@ export default function MembersView({ onOpenId }: {
             "이름": m.name,
             "연락처": phoneLabel(m.phone),
             "성별": m.gender === "male" ? "남" : m.gender === "female" ? "여" : "",
-            "출생연도": m.birthYear ?? "",
+            // 나이대(2026-10-26 — 출생연도 대신. 고른 나이대가 없으면 출생연도로 읽는다)
+            "나이대": AGE_LABEL[ageBandOf(m, new Date(Date.now() + 9 * 3600_000).getUTCFullYear()) ?? ""] ?? "",
             "국가": m.countryCode ?? "",
             "기기": m.platform ?? "",
             "3쿠션 RP": m.rating3c ?? 0,
