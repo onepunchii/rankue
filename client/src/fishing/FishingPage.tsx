@@ -24,7 +24,7 @@ import { cleanCoord } from "@shared/fishingSpot";
 import { FishingRanking } from "./FishingRanking";
 import { FishingGear } from "./FishingGear";
 import { AlertAppStrip } from "@/components/hiq/AlertAppStrip";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -57,6 +57,7 @@ import { FISHING_PORTS, FISHING_PORT_SOURCE, fishingPort, indexPointLabel, ports
 import { fishingPortPath } from "@shared/fishingSeaPages";
 import { bestOf, durationKo, goodSpots, hhmm, indexOutlook, rangeText, tideFlowAt, tideRange, visibilityText, windDirKo, type FishingIndexStep, type IndexMap, type IndexSpot, type PortBrief } from "@shared/fishingPort";
 import { FishingAquarium } from "./FishingAquarium";
+import { nearestPlaceName, placeSuggestions, recentPlaces, type NamedPoint } from "@shared/fishingPlaceSuggest";
 import { TankFull } from "./tank/TankFull";
 import { TANK_KEY, placeLocal, readDecorSeen, useMyTank, writeDecorSeen } from "./tank/tankData";
 import { isNightKst, type TankMode } from "./tank/engine";
@@ -153,6 +154,15 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
     const [mapFish, setMapFish] = useState<{ name: string; n: number } | null>(null);
     // 고른 바다 · 항구 · 물때의 바다 — 홈의 지도(특보 · 항구 보기)와 아래 '오늘의 바다'가 같이 쓴다(2026-10-17 두 지도를 한 장으로)
     const seaPicks = useSeaPicks();
+    // 내 위치 — 홈의 '오늘 내 앞바다'와 지도가 같이 쓴다(2026-10-26)
+    const loc = useFishingMe();
+    const [mySeaSheet, setMySeaSheet] = useState<string | null>(null);
+    // 내 자리를 알면 물때를 그 바다의 식으로(서해 · 남해/동해) — 위치를 받을 때 한 번
+    const myPort = loc.me ? nearestPort(loc.me.lat, loc.me.lng) : null;
+    useEffect(() => {
+        const t = myPort ? SEA_AREAS.find((a) => a.id === fishingPort(myPort.code)?.area)?.tide : null;
+        if (t && t !== seaPicks.sea) seaPicks.pickSea(t);
+    }, [myPort?.code]); // eslint-disable-line react-hooks/exhaustive-deps
     // 도감에서 연 어종(어탁이 없는 것)
     const [guideOpen, setGuideOpen] = useState<GuideRow | null>(null);
     // 방금 오른 단계 — 승급 창
@@ -288,6 +298,9 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             </div>
                         </div>
 
+                        {/* 오늘 내 앞바다 — 가장 가까운 항구의 특보 · 파고 · 바람 · 수온 · 물때(2026-10-26 낚시 탭 리뷰) */}
+                        <MySeaCard today={today} loc={loc} onOpen={(areaId, code) => { seaPicks.pickArea(areaId); seaPicks.pickPort(code); setMySeaSheet(areaId); }} />
+                        {mySeaSheet && <SeaAreaSheet areaId={mySeaSheet} today={today} port={seaPicks.port} onPort={seaPicks.pickPort} onClose={() => setMySeaSheet(null)} />}
                         {/* 첫 방문의 코치마크(2026-10-14) — 어종 · 바다의 칸 · 조과 적기 */}
                         <CoachTour id="fishing-home" tone="fishing" steps={[
                             { target: "fs-fish", title: "어종을 고르면", body: "지도의 바다 칸이 그 어종의 오늘 낚시지수로 칠해져요." },
@@ -296,7 +309,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                             { target: "fs-tank", title: "내 수족관", body: "잡은 어종이 어탁 그림 그대로 헤엄쳐요. 낮엔 한지, 해가 지면 밤바다." },
                         ]} />
                         {/* 지도 먼저 — 오늘 어느 바다에서 어떤 고기가 좋은가(2026-10-14 오너: "지도를 보면 아 오늘 물때와 물고기는 이렇구나") */}
-                        <FishMapHome today={today} list={list} picks={seaPicks} want={mapFish} onFish={(name) => { const f = fishByName(name); if (f) setFishOpen(f.id); }} onAdd={(place, species) => { setPreset({ place, species }); setAdding(true); }} />
+                        <FishMapHome loc={loc} today={today} list={list} picks={seaPicks} want={mapFish} onFish={(name) => { const f = fishByName(name); if (f) setFishOpen(f.id); }} onAdd={(place, species) => { setPreset({ place, species }); setAdding(true); }} />
                         {/* 나가기 전에 보는 것 — 바다의 특보 · 내 항구 · 물때(예전 출조 탭의 것) */}
                         <div id="fishing-today-block" className="scroll-mt-16"><Today today={today} list={list} picks={seaPicks} /></div>
                         {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 낚시 크루 회원 목록 · 조 나누기에 쓴다.
@@ -674,6 +687,10 @@ function ReservoirBoard() {
 }
 
 const FISH_KEY = "rankue-fishing-fish";
+/** 전국 낚시터 공개 목록(전국 낚시터 화면과 같은 열쇠 · 캐시) — 조과 적기의 '다녀온 곳' 고르기가 쓴다 */
+const SPOTS_KEY = ["/api/hiq/fishing/spots"] as const;
+type PlaceLite = { id: string; name: string; sido: string | null; sigungu: string | null; lat: number | null; lng: number | null };
+const PORT_POINTS: NamedPoint[] = FISHING_PORTS.map((p) => ({ name: p.name, lat: p.lat, lng: p.lng, sub: "항구" }));
 /** 그 지점에서 가장 가까운 항구(조석을 보여 줄 곳) */
 function nearestPort(lat: number, lng: number): { code: string; name: string; km: number } | null {
     let best: { code: string; name: string; km: number } | null = null;
@@ -686,6 +703,112 @@ function nearestPort(lat: number, lng: number): { code: string; name: string; km
 }
 
 /**
+ * 낚시 홈의 내 위치(2026-10-26 낚시 탭 리뷰 — 오너 "응"). 홈의 '오늘 내 앞바다' 카드와 지도('가까운 좋은 곳')가 한 벌을 같이 쓴다.
+ * 처음엔 누를 때만 묻고, 한 번 켠 사람은 다음부터 묻지 않고 받는다(권한이 살아 있을 때만). 기기에 남기는 것은 '켰다'는 표시 하나 —
+ * 좌표는 이 화면의 메모리에만 있고 저장 · 전송하지 않는다(조과 적기의 '지금 자리'만 사람이 켤 때 조과와 함께 저장된다).
+ */
+const FISHING_ME_KEY = "rankue-fishing-me-on";
+type FishingMe = { me: { lat: number; lng: number } | null; state: "idle" | "busy" | "denied" | "far"; locate: () => void; off: () => void };
+function useFishingMe(): FishingMe {
+    const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
+    const [state, setState] = useState<FishingMe["state"]>("idle");
+    const get = useCallback(async (prompt: boolean) => {
+        setState("busy");
+        const r = await getDevicePosition({ prompt, highAccuracy: false, timeoutMs: 10000, maximumAgeMs: 5 * 60_000 }).catch(() => null);
+        const fix = r?.status === "granted" ? r.fix : null;
+        const c = fix ? cleanCoord(fix.lat, fix.lng) : null;
+        if (c) { setMe(c); setState("idle"); keep(FISHING_ME_KEY, "1"); return; }
+        // 묻지 않고 받으려다 못 받았으면 조용히 처음 모습으로
+        setState(prompt ? (fix ? "far" : "denied") : "idle");
+    }, []);
+    useEffect(() => { try { if (localStorage.getItem(FISHING_ME_KEY) === "1") void get(false); } catch { /* 이번엔 묻지 않는다 */ } }, [get]);
+    const off = useCallback(() => { setMe(null); setState("idle"); try { localStorage.removeItem(FISHING_ME_KEY); } catch { /* 이번만 */ } }, []);
+    return { me, state, locate: () => { void get(true); }, off };
+}
+
+/**
+ * 오늘 내 앞바다(2026-10-26 낚시 탭 리뷰 — "낚시꾼이 제일 먼저 보는 것은 내 앞바다의 특보 · 파고 · 바람 · 물때"). 홈 표지 바로 아래.
+ * 가장 가까운 항구(80km 안 — nearestPort)의 하루(조석 · 지금의 바다 · 가까운 낚시지수 지점의 파고 · 바람)와 그 항구가 닿는 바다의 풍랑특보를 한 장에.
+ * ⚠️ 나가도 된다고 말하지 않는다 — 사실만 적고 출항은 해경 · 선장의 안내를 따르라고 적는다(shared/fishingSea 머리말). 누르면 그 바다의 시트.
+ */
+function MySeaCard({ today, loc, onOpen }: { today: string; loc: FishingMe; onOpen: (areaId: string, portCode: string) => void }) {
+    const port = loc.me ? nearestPort(loc.me.lat, loc.me.lng) : null;
+    const def = port ? fishingPort(port.code) : null;
+    const { data: brief, isLoading } = useQuery<PortBrief | null>({ queryKey: portKey(port?.code ?? "", today), queryFn: () => apiRequest(`/api/hiq/fishing/ports/${port!.code}?day=${today}`), enabled: !!port, staleTime: 5 * 60_000 });
+    const { data: sea } = useQuery<SeaNow | null>({ queryKey: ["/api/hiq/fishing/sea"], staleTime: 5 * 60_000 });
+    const area = def ? sea?.areas?.find((a) => a.id === def.area) ?? null : null;
+    const box = "mx-5 mt-4 rounded-2xl px-4 py-3.5";
+    if (!loc.me) return (
+        <section className={box} style={{ background: C.card, boxShadow: `inset 0 0 0 1px ${C.line}` }} data-testid="fishing-mysea" data-state="off">
+            <p className="text-[16px] font-semibold">오늘 내 앞바다</p>
+            <p className="mt-1 text-[13px] leading-snug [word-break:keep-all]" style={{ color: C.soft }}>특보 · 파고 · 바람 · 물때를 가장 가까운 항구 기준으로 한 장에 보여 드려요.</p>
+            <button type="button" onClick={loc.locate} disabled={loc.state === "busy"} data-testid="fishing-mysea-on" data-track-as="fishing-mysea-on"
+                className="mt-3 flex h-11 w-full items-center justify-center rounded-xl text-[15px] font-semibold active:opacity-90 disabled:opacity-70" style={{ background: C.brand, color: C.onBrand }}>{loc.state === "busy" ? "자리를 찾는 중…" : "내 위치로 보기"}</button>
+            {loc.state === "denied" && <p className="mt-2 text-[12.5px]" style={{ color: "#FF9C9C" }}>위치를 받지 못했어요 — 설정에서 위치 권한을 켜 주세요.</p>}
+            {loc.state === "far" && <p className="mt-2 text-[12.5px]" style={{ color: "#FF9C9C" }}>우리나라 바다 밖이라 보여 드릴 수 없어요.</p>}
+            <p className="mt-2 text-[12px]" style={{ color: C.dim }}>위치는 이 기기에서만 써요.</p>
+        </section>
+    );
+    if (!port || !def) return (
+        <section className={box} style={{ background: C.card }} data-testid="fishing-mysea" data-state="inland">
+            <p className="text-[16px] font-semibold">오늘 내 앞바다</p>
+            <p className="mt-1 text-[13px] leading-snug [word-break:keep-all]" style={{ color: C.soft }}>80km 안에 바다 항구가 없어요. 민물 낚시터는 아래 '전국 낚시터'에서 볼 수 있어요.</p>
+        </section>
+    );
+    const out = brief?.index ? indexOutlook(brief.index.rows) : null;
+    const wave = out?.wave ? `${rangeText(out.wave)}m` : brief?.now?.buoy?.wave != null ? `${brief.now.buoy.wave.toFixed(1)}m` : null;
+    const wind = out?.wind ? `${rangeText(out.wind)}m/s` : brief?.now?.buoy?.wind != null ? `${brief.now.buoy.wind.toFixed(1)}m/s` : null;
+    const wtempN = brief?.now?.wtemp ?? brief?.now?.buoy?.wtemp ?? null;
+    const now = kstMinuteNow();
+    const turns = brief?.turns ?? [];
+    const next = turns.find((t) => t.min >= now) ?? null;
+    return (
+        <section className={box} style={{ background: C.card, boxShadow: `inset 0 0 0 1px ${C.line}` }} data-testid="fishing-mysea" data-state="on">
+            <button type="button" onClick={() => onOpen(def.area, def.code)} className="flex w-full items-start justify-between gap-3 text-left active:opacity-85" data-testid="fishing-mysea-open" data-track-as="fishing-mysea-open">
+                <span className="min-w-0">
+                    <span className="block text-[16px] font-semibold">오늘 {def.name} 앞바다</span>
+                    <span className="mt-0.5 block text-[12.5px] tabular-nums" style={{ color: C.dim }}>가장 가까운 항구 · {port.km}km</span>
+                </span>
+                <span className="flex shrink-0 items-center text-[13px]" style={{ color: C.sun }}>자세히<LucideChevronRight className="h-4 w-4" aria-hidden /></span>
+            </button>
+            {area && (
+                <p className="mt-2.5 flex items-center gap-2 rounded-xl px-3 py-2 text-[14px] font-semibold" style={{ background: SEA_TONE[area.state].bg, color: SEA_TONE[area.state].text }} data-testid="fishing-mysea-warn">
+                    <i aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: SEA_TONE[area.state].dot }} />{seaHeadline(area)}
+                </p>
+            )}
+            {isLoading ? <div className="mt-2.5 h-[88px] animate-pulse rounded-xl bg-[#FFFFFF0A]" /> : (
+                <>
+                    <div className="mt-2.5 grid grid-cols-3 gap-2" data-testid="fishing-mysea-facts">
+                        {([["파고", wave], ["바람", wind], ["수온", wtempN != null ? `${wtempN.toFixed(1)}°` : null]] as const).map(([k, v]) => (
+                            <div key={k} className="rounded-xl px-3 py-2" style={{ background: "#FFFFFF0A" }}>
+                                <p className="text-[12px]" style={{ color: C.dim }}>{k}</p>
+                                <p className="mt-0.5 text-[15px] font-semibold tabular-nums">{v ?? "—"}</p>
+                            </div>
+                        ))}
+                    </div>
+                    {turns.length > 0 && (
+                        <div className="mt-2.5" data-testid="fishing-mysea-tide">
+                            <p className="text-[12px]" style={{ color: C.dim }}>오늘 물때 · 다음 것은 칠해 둬요</p>
+                            {/* 칸마다 위에 만조 · 간조, 아래에 시각 — 한 줄로 늘어놓으면 360 폭에서 다음 물때만 아랫줄로 떨어졌다 */}
+                            <div className="mt-1 grid gap-1.5" style={{ gridTemplateColumns: `repeat(${Math.min(turns.length, 4)}, minmax(0, 1fr))` }}>
+                                {turns.slice(0, 4).map((t) => (
+                                    <div key={`${t.kind}${t.min}`} className="rounded-lg px-1 py-1.5 text-center tabular-nums"
+                                        style={t === next ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0A", color: t.min < now ? C.dim : C.foam }}>
+                                        <p className="text-[12px]">{t.kind === "high" ? "만조" : "간조"}</p>
+                                        <p className="text-[14.5px] font-semibold">{hhmm(t.min)}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
+            <p className="mt-2.5 text-[12px] leading-snug [word-break:keep-all]" style={{ color: C.dim }}>{SEA_SOURCE} · {FISHING_PORT_SOURCE} 예측 — {SEA_CAUTION}</p>
+        </section>
+    );
+}
+
+/**
  * 홈의 지도 — "오늘 어느 바다에서 어떤 고기가 좋은가"를 한 장으로. 어종을 고르면 지점 마흔아홉 곳이 좋을수록 크고 짙은 점으로 찍힌다.
  * 점은 국립해양조사원의 바다낚시지수(어종 · 지점마다 매긴 다섯 단계)다 — 랭큐가 매긴 값이 아니라고 적는다. 색 띠는 기상청 풍랑특보.
  * 점을 누르면 그 자리의 오전 · 오후 · 파고 · 바람 · 수온 · 가까운 항구의 만조/간조가 지도 아래에 뜬다(다른 화면으로 가지 않는다).
@@ -695,7 +818,7 @@ const MAP_MODE_KEY = "rankue-fishing-map-mode";
 type MapMode = "index" | "sea";
 function readMapMode(): MapMode { try { return localStorage.getItem(MAP_MODE_KEY) === "sea" ? "sea" : "index"; } catch { return "index"; } }
 
-function FishMapHome({ today, list, picks, want, onFish, onAdd }: { today: string; /** 내 조과 — 고른 바다 근처의 기록을 찾는다 */ list: readonly FishingCatch[]; /** 고른 바다 · 항구('특보 · 항구' 보기에서 바다를 누르면 그 바다의 시트 — 고른 것은 기억한다) */ picks: SeaPicks; /** 어종 한 장의 '지도에서 보기' */ want: { name: string; n: number } | null; onFish: (name: string) => void; onAdd: (place: string, species?: string) => void }) {
+function FishMapHome({ today, list, picks, want, onFish, onAdd, loc }: { /** 내 위치 — 홈의 '오늘 내 앞바다'와 한 벌(useFishingMe) */ loc: FishingMe; today: string; /** 내 조과 — 고른 바다 근처의 기록을 찾는다 */ list: readonly FishingCatch[]; /** 고른 바다 · 항구('특보 · 항구' 보기에서 바다를 누르면 그 바다의 시트 — 고른 것은 기억한다) */ picks: SeaPicks; /** 어종 한 장의 '지도에서 보기' */ want: { name: string; n: number } | null; onFish: (name: string) => void; onAdd: (place: string, species?: string) => void }) {
     const [day, setDay] = useState(today);
     const [mode, setModeState] = useState<MapMode>(readMapMode);
     const setMode = (m: MapMode) => { setModeState(m); keep(MAP_MODE_KEY, m); };
@@ -703,17 +826,9 @@ function FishMapHome({ today, list, picks, want, onFish, onAdd }: { today: strin
     const [areaSheet, setAreaSheet] = useState<string | null>(null);
     // 지도 설명 · 출처 — 머리의 ⓘ 를 눌러야 펼친다(2026-10-19 오너 "이런 거 다 빼 주고")
     const [aboutOpen, setAboutOpen] = useState(false);
-    // 내 위치(2026-10-18 오너: "내 위치 기반도") — 누를 때만 묻고, 이 화면에서만 쓴다(저장 · 전송하지 않는다 — 조과 적기의 위치와 같은 손)
-    const [me, setMe] = useState<{ lat: number; lng: number } | null>(null);
-    const [meState, setMeState] = useState<"idle" | "busy" | "denied" | "far">("idle");
-    const locate = async () => {
-        if (me) { setMe(null); setMeState("idle"); return; }
-        setMeState("busy");
-        const r = await getDevicePosition({ prompt: true, highAccuracy: false, timeoutMs: 10000, maximumAgeMs: 5 * 60_000 }).catch(() => null);
-        const fix = r?.status === "granted" ? r.fix : null;
-        const c = fix ? cleanCoord(fix.lat, fix.lng) : null;
-        if (c) { setMe(c); setMeState("idle"); } else setMeState(fix ? "far" : "denied");
-    };
+    // 내 위치(2026-10-18 오너: "내 위치 기반도") — 홈의 '오늘 내 앞바다'와 한 벌(useFishingMe — 한 번 켜면 다음부터 묻지 않고 받는다)
+    const me = loc.me, meState = loc.state;
+    const locate = () => (me ? loc.off() : loc.locate());
     const kmFromMe = (p: { lat: number; lng: number }) => (me ? Math.round(Math.hypot((p.lng - me.lng) * 88.8, (p.lat - me.lat) * 111)) : null);
     const { data: map } = useQuery<IndexMap | null>({ queryKey: ["/api/hiq/fishing/index-map", day], queryFn: () => apiRequest(`/api/hiq/fishing/index-map?day=${day}`), staleTime: 10 * 60_000, placeholderData: (prev) => prev });
     const { data: sea } = useQuery<SeaNow | null>({ queryKey: ["/api/hiq/fishing/sea"], staleTime: 5 * 60_000 });
@@ -832,7 +947,9 @@ function FishMapHome({ today, list, picks, want, onFish, onAdd }: { today: strin
             {!sea0 && fish && map ? (
                     <div className="mt-2.5 rounded-2xl bg-[#FFFFFF0A] px-3.5 pb-1 pt-3" data-testid="fishing-good">
                         <div className="flex items-baseline justify-between gap-3">
-                            <p className="min-w-0 text-[13px] [word-break:keep-all]" style={{ color: C.soft }}>{good.length ? `${fish} — ${me ? "가까운 좋은 곳" : "좋은 곳"}` : `${fish} — 좋음 이상인 곳이 없어요`}<span style={{ color: C.dim }}> · 점을 눌러도 돼요</span></p>
+                            <p className="min-w-0 text-[13px] [word-break:keep-all]" style={{ color: C.soft }}>{good.length ? `${fish} — ${me ? "가까운 좋은 곳" : "좋은 곳"}` : `${fish} — 좋음 이상인 곳이 없어요`}
+                                {/* 위치를 모르면 전국 순위라 멀 수 있다 — 가까운 곳부터 보는 길을 바로 옆에 */}
+                                {!me && good.length > 0 ? <button type="button" onClick={loc.locate} className="ml-1.5 font-semibold" style={{ color: C.sun }} data-testid="fishing-good-near" data-track-as="fishing-good-near">· 가까운 곳부터</button> : <span style={{ color: C.dim }}> · 점을 눌러도 돼요</span>}</p>
                             {fishByName(fish) && <button type="button" onClick={() => onFish(fish)} className="shrink-0 text-[12.5px]" style={{ color: C.sun }} data-testid="fishing-fishmap-info">{fish} 한 장</button>}
                         </div>
                         <ul className="mt-1 divide-y divide-[#FFFFFF14]">
@@ -1529,13 +1646,32 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
     const [portrait, setPortrait] = useState(false);
     const [here, setHere] = useState<{ lat: number; lng: number } | null>(null);
     const [locating, setLocating] = useState<"idle" | "busy" | "denied" | "far">("idle");
+    // 다녀온 곳 고르기(2026-10-26 낚시 탭 리뷰 — 빈 글칸이었다): 전에 적은 곳 → 항구 → 낚시터. 낚시터 목록은 칸을 누르거나 자리를 켤 때만 받는다(공개 목록 · 같은 캐시)
+    const [placeFocus, setPlaceFocus] = useState(false);
+    const [placeFilled, setPlaceFilled] = useState<string | null>(null);
+    const spotsQ = useQuery<{ total: number; items: PlaceLite[] }>({ queryKey: SPOTS_KEY, enabled: placeFocus || !!here, staleTime: 10 * 60_000 });
+    const spotPoints = useMemo<NamedPoint[]>(() => (spotsQ.data?.items ?? []).map((x) => ({ name: x.name, lat: x.lat, lng: x.lng, sub: [fishingSidoShort(x.sido), x.sigungu].filter(Boolean).join(" ") })), [spotsQ.data]);
+    const recent = useMemo(() => recentPlaces(queryClient.getQueryData<FishingCatch[]>(KEY) ?? []), []);
+    const suggests = placeFocus ? placeSuggestions(place, { recent, ports: PORT_POINTS, spots: spotPoints }) : [];
     const takeHere = async () => {
-        if (here) { setHere(null); setLocating("idle"); return; }
+        if (here) { setHere(null); setLocating("idle"); setPlaceFilled(null); return; }
         setLocating("busy");
         const r = await getDevicePosition({ prompt: true, highAccuracy: true, timeoutMs: 10000, maximumAgeMs: 60_000 }).catch(() => null);
         const fix = r?.status === "granted" ? r.fix : null;
         const c = fix ? cleanCoord(fix.lat, fix.lng) : null;
-        if (c) { setHere(c); setLocating("idle"); } else setLocating(fix ? "far" : "denied");
+        if (!c) { setLocating(fix ? "far" : "denied"); return; }
+        setHere(c); setLocating("idle");
+        // 자리를 켜면 가장 가까운 항구의 바다로 물때를 센다
+        const near = nearestPort(c.lat, c.lng);
+        const t = near ? SEA_AREAS.find((a) => a.id === fishingPort(near.code)?.area)?.tide : null;
+        if (t) setTideSea(t);
+        // 칸이 비었으면 가까운 낚시터(2km) · 항구(15km) 이름으로 — 둘 다 멀면 비워 둔다(지어 채우지 않는다)
+        if (!place.trim()) {
+            const list = (await queryClient.fetchQuery({ queryKey: SPOTS_KEY, queryFn: () => apiRequest("/api/hiq/fishing/spots"), staleTime: 10 * 60_000 }).catch(() => null)) as { items?: PlaceLite[] } | null;
+            const pts: NamedPoint[] = (list?.items ?? []).map((x) => ({ name: x.name, lat: x.lat, lng: x.lng }));
+            const name = nearestPlaceName(c, PORT_POINTS, pts);
+            if (name) { setPlace(name.name); setPlaceFilled(name.name); }
+        }
     };
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -1673,7 +1809,29 @@ function CatchSheet({ today, onClose, onSaved, preset, before }: {
                     <label className="block"><span className="mb-1.5 block text-[13px]" style={{ color: C.soft }}>낚은 날</span>
                         <input type="date" value={day} max={today} onChange={(e) => setDay(e.target.value)} className={field} style={{ ...fieldStyle, colorScheme: "dark" }} data-testid="fishing-day" /></label>
                     <label className="block"><span className="mb-1.5 block text-[13px]" style={{ color: C.soft }}>다녀온 곳</span>
-                        <input value={place} onChange={(e) => setPlace(e.target.value)} maxLength={40} placeholder="예: 여수 국동항" className={field} style={fieldStyle} data-testid="fishing-place" /></label>
+                        <input value={place} onChange={(e) => { setPlace(e.target.value); setPlaceFilled(null); }} onFocus={() => setPlaceFocus(true)} onBlur={() => setPlaceFocus(false)}
+                            maxLength={40} placeholder="예: 여수 국동항" autoComplete="off" className={field} style={fieldStyle} data-testid="fishing-place" /></label>
+                </div>
+                {/* 고르기 — 누르면 칸에 들어간다(onMouseDown: 칸이 먼저 닫히지 않게) */}
+                {suggests.length > 0 && !(suggests.length === 1 && suggests[0].name === place.trim()) && (
+                    <ul className="-mt-3 overflow-hidden rounded-xl" style={{ background: "#FFFFFF0F" }} role="listbox" aria-label="다녀온 곳 고르기" data-testid="fishing-place-suggest">
+                        {suggests.map((x) => (
+                            <li key={`${x.kind}:${x.name}`} role="option" aria-selected={false}>
+                                <button type="button" onMouseDown={(e) => { e.preventDefault(); setPlace(x.name); setPlaceFilled(null); setPlaceFocus(false); }} className="flex min-h-11 w-full items-center gap-2 px-3.5 py-2 text-left active:bg-[#FFFFFF14]" data-testid="fishing-place-option">
+                                    <span className="min-w-0 flex-1 truncate text-[14.5px]">{x.name}</span>
+                                    <span className="shrink-0 text-[12px]" style={{ color: C.dim }}>{x.kind === "recent" ? "전에 적은 곳" : x.kind === "port" ? "항구" : x.sub ? `낚시터 · ${x.sub}` : "낚시터"}</span>
+                                </button>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+                {/* 지금 자리로 — 아래의 '지금 자리 남기기'와 같은 스위치. 칸이 비었으면 가까운 곳 이름도 채운다 */}
+                <div className="-mt-3 flex items-center gap-2">
+                    <button type="button" onClick={() => { void takeHere(); }} disabled={locating === "busy"} aria-pressed={!!here} data-testid="fishing-place-here" data-track-as="fishing-place-here"
+                        className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold active:opacity-80" style={here ? chipOn : { background: "#FFFFFF0F", color: C.sun }}>
+                        <i aria-hidden className="h-2 w-2 rounded-full" style={{ background: here ? C.onBrand : C.sun }} />{locating === "busy" ? "자리를 찾는 중…" : here ? "지금 자리 남김" : "지금 자리로"}
+                    </button>
+                    {placeFilled && <span className="min-w-0 truncate text-[12.5px]" style={{ color: C.dim }} data-testid="fishing-place-filled">가까운 곳으로 채웠어요 — 고쳐도 돼요</span>}
                 </div>
                 <div><span className="mb-1.5 block text-[13px]" style={{ color: C.soft }}>어디서</span>
                     <div className="flex flex-wrap gap-1.5">
