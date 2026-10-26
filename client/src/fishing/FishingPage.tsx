@@ -437,7 +437,7 @@ export default function FishingPage({ view = "home" }: { view?: Tab }) {
                     <div className="px-5 pt-4 pb-6"><FishingGear today={today} /></div>
                 )}
                 {tab === "rank" && (
-                    <div className="px-5 pt-4 pb-6"><FishingRanking /></div>
+                    <div className="px-5 pt-4 pb-6"><FishingRanking onAdd={() => { setPreset(null); setAdding(true); }} /></div>
                 )}
                 {tab === "trip" && (
                     <>
@@ -1403,7 +1403,7 @@ function Points({ onPick }: { onPick: (p: FishingPlace) => void }) {
                     </button>
                 ))}
             </div>
-            {isLoading ? <div className="mt-3 h-40 animate-pulse rounded-2xl bg-[#FFFFFF0F]" /> : !data?.items.length ? (
+            {isLoading ? <div className="mt-3 h-40 animate-pulse rounded-2xl bg-[#FFFFFF0F]" /> : !data?.items?.length ? (
                 <p className="mt-3 rounded-2xl px-5 py-6 text-center text-[13.5px]" style={{ background: C.card, color: C.soft }} data-testid="fishing-place-none">찾는 낚시터가 없어요. 글자를 바꿔 보세요.</p>
             ) : (
                 <ul className="mt-3 space-y-2">
@@ -1423,7 +1423,7 @@ function Points({ onPick }: { onPick: (p: FishingPlace) => void }) {
                     ))}
                 </ul>
             )}
-            {data && data.total > data.items.length && <p className="mt-3 text-center text-[12.5px]" style={{ color: C.dim }}>{data.items.length}곳만 보여요. 글자나 지역으로 좁혀 보세요.</p>}
+            {data?.items && data.total > data.items.length && <p className="mt-3 text-center text-[12.5px]" style={{ color: C.dim }}>{data.items.length}곳만 보여요. 글자나 지역으로 좁혀 보세요.</p>}
             <p className="mt-4 text-[12px] leading-relaxed" style={{ color: C.dim }}>출처: {FISHING_PLACE_SOURCE}. 방파제 · 갯바위 같은 자유 포인트는 아직 없어요. 요금은 바뀌었을 수 있어요.</p>
         </section>
     );
@@ -1465,7 +1465,7 @@ function Boats({ today }: { today: string }) {
                     className="h-11 min-w-0 flex-1 rounded-xl px-3.5 text-[14px] outline-none placeholder:text-[#F3ECDD59]" style={{ background: "#FFFFFF0F", color: C.foam }} data-testid="fishing-boat-q" />
                 <button type="submit" disabled={!cleanBoatQuery(text)} className="h-11 shrink-0 rounded-xl px-4 text-[14px] font-semibold disabled:opacity-40" style={{ background: C.brand, color: C.onBrand }}>찾기</button>
             </form>
-            {!!data?.top.length && (
+            {!!data?.top?.length && (
                 <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="배가 많은 곳">
                     {data.top.map((r) => { const w = lastWord(r.region), on = q === cleanBoatQuery(w); return (
                         <button key={r.region} type="button" aria-pressed={on} onClick={() => ask(w)} className={cn("h-9 shrink-0 rounded-full px-3 text-[13px]", on && "font-semibold")} style={on ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>

@@ -22,7 +22,8 @@ import { InsertHiqCrew } from "@shared/schema";
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
-import { useNativeBridge } from "@/hooks/useNativeBridge";
+import { getDevicePosition, useNativeBridge } from "@/hooks/useNativeBridge";
+import { regionFromCoords } from "@/components/kakao/kakaoSdk";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { useAuth } from "@/hooks/useAuth";
 import { goLogin, goLoginPage } from "@/components/hiq/LoginGate";
@@ -214,18 +215,26 @@ export default function CreateClub() {
 
     // 크루 좌표 — "현재 위치 사용" 버튼으로 취득(앱=GPS 브릿지, 웹=브라우저 폴백).
     // 미사용 시 서버가 지역 텍스트를 도시 수준 지오코딩으로 폴백.
-    const { location: gpsLocation, requestLocation } = useNativeBridge();
+    const { location: gpsLocation } = useNativeBridge();
     const [locating, setLocating] = useState(false);
     useEffect(() => {
         if (gpsLocation) set({ latitude: gpsLocation.lat, longitude: gpsLocation.lng });
     }, [gpsLocation]);
+    // 누르면 좌표를 받고 **지역 칸도 채운다**(2026-10-26 오너: "크루 개설할 때 위치 설정에 자동으로 주소가 안 뜨네") —
+    // 예전엔 좌표만 저장하고 '위치 저장됨'만 바뀌어 지역은 손으로 찾아야 했다. 지역은 카카오 좌표→행정구역(시도 시군구, components/kakao/kakaoSdk).
+    // 사람이 누른 것이라 이미 적힌 지역도 바꾼다. 주소를 못 찾아도 좌표는 남는다(거리순 크루 찾기용).
     const pickMyLocation = async () => {
         setLocating(true);
         try {
-            const result = await requestLocation();
-            if (result !== "granted") {
-                toast({ title: result === "denied" ? t("crewMgmt.locationDenied") : t("crewMgmt.locationUnavailable"), variant: "destructive" });
+            const r = await getDevicePosition({ prompt: true, highAccuracy: false, timeoutMs: 8000, maximumAgeMs: 300000 });
+            if (r.status !== "granted") {
+                toast({ title: r.status === "denied" ? t("crewMgmt.locationDenied") : t("crewMgmt.locationUnavailable"), variant: "destructive" });
+                return;
             }
+            set({ latitude: r.fix.lat, longitude: r.fix.lng });
+            const found = await regionFromCoords(r.fix.lat, r.fix.lng);
+            if ("region" in found) set({ region: found.region });
+            else toast({ title: t("createClub.regionNotFound") });
         } finally {
             setLocating(false);
         }

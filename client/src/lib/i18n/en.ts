@@ -2035,6 +2035,7 @@ const en: Dict = {
   "dashboard.completeProfile": "Complete your profile for better matches",
   "dashboard.completeProfileCta": "30s in Settings →",
   "createClub.useMyLocation": "Use my current location for this crew",
+  "createClub.regionNotFound": "Couldn't find the address — please pick the area",
   "createClub.locationSaved": "Location saved",
   "menu.mapixChip": "Neighborhood map · Notes",
   "menu.mapixTitle": "That spot only you know about",

@@ -122,8 +122,9 @@ export function HiqNavigation() {
             { id: "club", label: "hiqNavigation.club", icon: LucideFlag, path: "/club" },
             // to 는 이동할 주소, path 는 탭 켜짐 판정용 경로다. 질의를 안 붙이면 '조인' 탭인데
             // 부킹 화면이 열렸다(목록의 기본 보기가 부킹이다).
-            // 골프장 목록·상세(/golf/courses·/golf/course/:slug·의도 허브)도 조인 탭에서 들어가는 화면이라 조인 탭을 켠다.
-            { id: "join", label: "hiqNavigation.join", icon: LucideCalendarDays, path: "/golf/booking-list", to: "/golf/booking-list?view=JOIN", also: ["/golf/courses", "/golf/course", "/golf/booking", "/golf/join", "/golf/urgent"] },
+            // 골프장 목록·상세(/golf/courses·/golf/course/:slug)는 조인 탭을 켜지 않는다(2026-10-26 오너: "홈의 골프 코스 카드를 누르면 조인으로 선택된다 —
+            // 조인으로 선택되지 않게"). 홈 카드 · 검색 · 지도에서도 들어오는 화면이라 어느 탭도 켜지 않는 것이 맞다. 조인 · 부킹 허브(/golf/join …)는 그대로 조인.
+            { id: "join", label: "hiqNavigation.join", icon: LucideCalendarDays, path: "/golf/booking-list", to: "/golf/booking-list?view=JOIN", also: ["/golf/booking", "/golf/join", "/golf/urgent"] },
             // 아이콘은 달력+체크(예약) — LucideBarChart3 은 기록 아이콘이라 당구 '기록' 탭과 헷갈린다.
             { id: "myBookings", label: "hiqNavigation.myBookings", icon: LucideCalendarCheck, path: "/golf/my-bookings" },
             // 전체(≡)는 머리줄로 올라갔고 이 자리는 채팅이다(2026-09-21 오너: "전체 대신 메시지")

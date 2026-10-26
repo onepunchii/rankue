@@ -2035,6 +2035,7 @@ const es: Dict = {
   "dashboard.completeProfile": "Completa tu perfil para mejores partidas",
   "dashboard.completeProfileCta": "30 s en Ajustes →",
   "createClub.useMyLocation": "Usar mi ubicación actual",
+  "createClub.regionNotFound": "No encontramos la dirección: elige la zona",
   "createClub.locationSaved": "Ubicación guardada",
   "menu.mapixChip": "Mapa del barrio · Notas",
   "menu.mapixTitle": "Ese lugar que solo tú conoces",

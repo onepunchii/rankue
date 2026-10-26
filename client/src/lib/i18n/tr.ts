@@ -2035,6 +2035,7 @@ const tr: Dict = {
   "dashboard.completeProfile": "Daha iyi eşleşme için profilini tamamla",
   "dashboard.completeProfileCta": "Ayarlarda 30 sn →",
   "createClub.useMyLocation": "Mevcut konumumu kullan",
+  "createClub.regionNotFound": "Adres bulunamadı — bölgeyi seç",
   "createClub.locationSaved": "Konum kaydedildi",
   "menu.mapixChip": "Mahalle haritası · Notlar",
   "menu.mapixTitle": "Sadece senin bildiğin o yer",

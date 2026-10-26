@@ -2035,6 +2035,7 @@ const vi: Dict = {
   "dashboard.completeProfile": "Hoàn thiện hồ sơ để ghép trận chuẩn hơn",
   "dashboard.completeProfileCta": "30 giây trong Cài đặt →",
   "createClub.useMyLocation": "Dùng vị trí hiện tại cho crew",
+  "createClub.regionNotFound": "Không tìm được địa chỉ — hãy chọn khu vực",
   "createClub.locationSaved": "Đã lưu vị trí",
   "menu.mapixChip": "Bản đồ khu phố · Ghi chú",
   "menu.mapixTitle": "Chỗ đó chỉ bạn mới biết",

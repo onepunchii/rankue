@@ -7,7 +7,7 @@ import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
 
 const MEDAL = ["#E8B64C", "#C9D1D9", "#D08A5B"];
 
-export function FishingRanking() {
+export function FishingRanking({ onAdd }: { onAdd?: () => void } = {}) {
     const { data: species = [], isLoading } = useQuery<FishingRankSpecies[]>({ queryKey: ["/api/hiq/fishing/ranking/species"], staleTime: 60_000 });
     const [pick, setPick] = useState<string | null>(null);
     const current = pick ?? species[0]?.species ?? null;
@@ -19,10 +19,15 @@ export function FishingRanking() {
     });
 
     if (isLoading) return <div className="h-40 rounded-2xl bg-[#FFFFFF0A]" aria-busy="true" />;
+    // 비었을 때 글만 두면 막다른 화면이다(2026-10-26 낚시 탭 리뷰) — 바로 적으러 가는 단추를 같이 둔다
     if (species.length === 0) return (
-        <p className="rounded-2xl bg-[#FFFFFF0A] px-4 py-5 text-[14px] leading-relaxed text-[#F3ECDDB3] break-keep" data-testid="fishing-rank-empty">
-            아직 랭킹에 올라온 조과가 없어요. 조과를 적을 때 '랭킹에 올리기'를 켜면 그 어종의 순위에 들어가요.
-        </p>
+        <div className="rounded-2xl bg-[#FFFFFF0A] px-4 py-5" data-testid="fishing-rank-empty">
+            <p className="text-[14px] leading-relaxed text-[#F3ECDDB3] break-keep">아직 랭킹에 올라온 조과가 없어요. 조과를 적을 때 '랭킹에 올리기'를 켜면 그 어종의 순위에 들어가요.</p>
+            {onAdd && (
+                <button type="button" onClick={onAdd} data-testid="fishing-rank-add" data-track-as="fishing-rank-add"
+                    className="mt-3 flex h-12 w-full items-center justify-center rounded-xl text-[15px] font-semibold active:opacity-90" style={{ background: "#F4A963", color: "#2A1606" }}>조과 적고 랭킹에 올리기</button>
+            )}
+        </div>
     );
     return (
         <div data-testid="fishing-rank">

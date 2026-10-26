@@ -58,3 +58,25 @@ export function kakaoFailText(why: KakaoMapFail, what: string): string {
     if (why === "cap" || why === "off") return `지금은 ${what} 쉬고 있어요.`;
     return `${what} 불러오지 못했어요 — 신호가 약한 곳에서는 잠시 뒤에 다시 눌러 주세요.`;
 }
+
+/**
+ * 좌표 → '시도 시군구'(2026-10-26 오너: "크루 개설할 때 위치 설정에 자동으로 주소가 안 뜨네") — 카카오 좌표→행정구역.
+ * 사람이 '현재 위치 사용'을 눌렀을 때만 부른다(유료 — 근처 장소와 같은 하루 상한 askKakao("local")).
+ * 행정동(H) 줄을 쓴다: region_1depth(시도) + region_2depth(시군구 — '고양시 덕양구'처럼 둘이 붙어 온다). 세종처럼 시군구가 없으면 시도만.
+ */
+export async function regionFromCoords(lat: number, lng: number): Promise<{ region: string } | { fail: KakaoMapFail | "none" }> {
+    const ok = await askKakao("local");
+    if (ok !== "ok") return { fail: ok };
+    let kakao: any;
+    try { kakao = await loadKakaoMaps(); } catch { return { fail: "sdk" }; }
+    return new Promise((resolve) => {
+        try {
+            new kakao.maps.services.Geocoder().coord2RegionCode(lng, lat, (rows: any[], status: string) => {
+                if (status !== kakao.maps.services.Status.OK || !Array.isArray(rows) || !rows.length) return resolve({ fail: "none" });
+                const r = rows.find((x) => x?.region_type === "H") ?? rows[0];
+                const region = [r?.region_1depth_name, r?.region_2depth_name].filter((x) => typeof x === "string" && x.trim()).join(" ").trim();
+                resolve(region ? { region } : { fail: "none" });
+            });
+        } catch { resolve({ fail: "sdk" }); }
+    });
+}

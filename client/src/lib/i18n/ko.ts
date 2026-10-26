@@ -2037,6 +2037,7 @@ export const ko: Dict = {
   "dashboard.completeProfile": "프로필 완성하고 매칭 정확도 높이기",
   "dashboard.completeProfileCta": "설정에서 30초 →",
   "createClub.useMyLocation": "현재 위치를 크루 위치로 사용",
+  "createClub.regionNotFound": "주소를 찾지 못했어요 — 지역을 직접 골라 주세요",
   "createClub.locationSaved": "위치 저장됨",
   "menu.mapixChip": "동네 지도 · 기록",
   "menu.mapixTitle": "우리 동네, 나만 아는 그 장소",
