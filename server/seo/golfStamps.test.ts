@@ -135,7 +135,7 @@ describe("봇이 여기까지 오는 길 — 네 곳", () => {
         expect(rows[0]).toMatchObject({ loc: `${ORIGIN}${STAMPS_HUB_PATH}`, image: `${ORIGIN}/og-hub/golf-stamps.jpg?v=1`, changefreq: "monthly" });
         expect(rows.find((x) => x.loc === `${ORIGIN}${stampBookPath("gangwon")}`).image).toBe(`${ORIGIN}/og-hub/golf-stamps-gangwon.jpg?v=1`);
         expect(rows.at(-1).loc).toBe(`${ORIGIN}${STAMP_SHELF_PATH}`);
-        expect(code(read("server/sitemap.ts"))).toContain("[...golfGuideSitemapParts(), ...golfStampsSitemapParts()]");
+        expect(code(read("server/sitemap.ts"))).toContain("...golfGuideSitemapParts(), ...golfStampsSitemapParts()]");
         // 허브 내비 — 한국어 문서에만 건다
         expect(read("server/prerender.ts")).toContain("    ...(ko ? [[STAMPS_HUB_PATH, STAMPS_NAV_LABEL] as [string, string]] : []),");
         expect(STAMPS_NAV_LABEL).toBe("골프 도장깨기");

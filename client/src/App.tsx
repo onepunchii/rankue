@@ -10,7 +10,7 @@ import { AppInstallSheet } from "@/components/hiq/AppInstallSheet";
 import { HandoffRedeemer } from "@/components/hiq/HandoffRedeemer";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
-import { useGolfAccess } from "@/hooks/useGolfAccess";
+import { useGolfAccess, useGolfVisible } from "@/hooks/useGolfAccess";
 import { goLoginPage } from "@/components/hiq/LoginGate";
 import { LoginSheetHost } from "@/components/hiq/LoginSheet";
 import { ShareChooserHost } from "@/components/share/ShareChooser";
@@ -112,6 +112,11 @@ function framed<P extends object>(Page: ComponentType<P>, opts?: { wide?: boolea
 
 const FramedRegister = framed(HiqRegister);
 const FramedDashboard = framed(HiqDashboard);
+/** 골프 첫 화면 /golf — 골프를 볼 수 없는 사람(한국어가 아닌 화면)은 홈으로(골프 화면은 한국어만이다) */
+function GolfHomeRoute() {
+  const visible = useGolfVisible();
+  return visible ? <FramedDashboard /> : <Redirect to="/dashboard" replace />;
+}
 const FramedGolfRanking = framed(HiqGolfRanking);
 const FramedGolfer = framed(HiqGolfer);
 const FramedSettings = framed(HiqSettings);
@@ -479,6 +484,8 @@ function AppRoutes() {
       {/* 골프 주소는 허용된 사람에게만 연다. 예전엔 종목 스위치만 숨기고 이 라우트는 열어 둬서
           로그인한 사람이 주소만 치면 골프 화면이 그대로 열렸다(2026-09-09 프로덕션 실측).
           서버의 /api/hiq/golf/* 도 같은 목록으로 막는다 — 화면만 가리는 잠금은 잠금이 아니다. */}
+      {/* 골프 첫 화면(2026-10-26 — 예전엔 404). 주소가 골프라 종목도 골프(shared/sportRoute) → 홈이 골프 홈을 그린다 */}
+      <Route path="/golf" component={GolfHomeRoute} />
       <Route path="/golf/game/new"><GolfOnly><GolfNewGame /></GolfOnly></Route>
       <Route path="/golf/game/:id/result"><GolfOnly><GameResult /></GolfOnly></Route>
       <Route path="/golf/game/:id"><GolfOnly><GolfScorecard /></GolfOnly></Route>

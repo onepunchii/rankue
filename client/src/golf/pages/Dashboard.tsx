@@ -11,6 +11,8 @@ import { useGameStats } from "@/hooks/useGameStats";
 import { useAuth } from "@/hooks/useAuth";
 import { GuestJoinCta } from "@/components/hiq/GuestGate";
 import { GUEST_SAMPLE } from "@shared/guestSample";
+import { GOLF_HOME_PATH, golfHomeSeo } from "@shared/golfGuide";
+import { useSeo } from "@/hooks/useSeo";
 import { CoachTour } from "@/components/hiq/CoachTour";
 
 // Components
@@ -45,7 +47,10 @@ export default function GolfDashboard() {
     const scanEntry = useScanEntry();
     const [scanRoundOpen, setScanRoundOpen] = useState(false);
     const matchLogic = useGolfMatch(me);
-    const [, setLocation] = useLocation();
+    const [location, setLocation] = useLocation();
+    // 골프 첫 화면 /golf 의 제목 · 설명(2026-10-26) — 검색용 화면(server/prerender renderGolfHome)과 같은 글. /dashboard 에서는 건드리지 않는다
+    const homeSeo = golfHomeSeo();
+    useSeo(location === GOLF_HOME_PATH ? { title: homeSeo.title, description: homeSeo.description, path: GOLF_HOME_PATH, locale: "ko", image: "https://www.rankue.co.kr/og-golf.png" } : null);
     // 비로그인 방문자(2026-10-05 오너 결정: "홈을 비로그인에 다 열고, 가입 안 한 사람에겐 예시로 보여 준다").
     // 골프 홈을 그대로 열고, 내 기록이 들어갈 자리(큰 숫자·스코어 트렌드)는 예시 인물의 숫자로 채운다 — 카드마다 "예시" 표시가 붙는다.
     // 회원이면 sample 은 null 이라 아래 화면이 예전과 한 글자도 다르지 않다. 로그인 확인이 끝난 뒤에만 방문자로 본다(isGuest).

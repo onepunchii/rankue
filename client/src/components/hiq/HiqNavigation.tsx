@@ -156,7 +156,7 @@ export function HiqNavigation() {
             <div className="max-w-md mx-auto px-6 flex items-center justify-between">
                 {tabs.map((tab) => {
                     // 낚시의 옛 주소(/fishing)는 낚시 홈이다
-                    const active = isActive(tab.path, tab.also, tab.only) || (isFishing && tab.id === "home" && location === "/fishing");
+                    const active = isActive(tab.path, tab.also, tab.only) || (isFishing && tab.id === "home" && location === "/fishing") || (isGolf && tab.id === "home" && location === "/golf");
                     return (
                         <motion.button
                             key={tab.id}

@@ -269,7 +269,8 @@ async function golfCourseParts(): Promise<string[]> {
 async function golfHubParts(): Promise<string[]> {
   // 골프 읽을거리(준비물 체크리스트) — 본문이 코드에 있어 DB 가 죽어도 싣는다
   // 골프 도장깨기(책장 · 도장첩 아홉 권 · 장식장, 2026-10-12) — 이것도 본문이 코드에 있다
-  const parts: string[] = [...golfGuideSitemapParts(), ...golfStampsSitemapParts()];
+  // 골프 첫 화면(2026-10-26 — 사이트맵에 없었고 사람에겐 404였다). 조인 · 긴급 조인이 매일 바뀐다. 본문 틀이 코드에 있어 DB 가 죽어도 싣는다
+  const parts: string[] = [entry(`${ORIGIN}/golf`, { changefreq: "daily", priority: "0.9" }), ...golfGuideSitemapParts(), ...golfStampsSitemapParts()];
   try {
     const raw = await loadGolfCourseSummary();
     // 이름·슬러그가 빈 행은 프리렌더도 싣지 않는다(server/prerender.ts golfView) — 같은 기준

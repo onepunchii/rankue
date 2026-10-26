@@ -71,6 +71,19 @@ export const GOLF_GUIDE: readonly GuideSection[] = [
     },
 ];
 
+/**
+ * 골프 첫 화면(/golf — 2026-10-26 오너 "골프도 수정"). 사람에겐 404, 봇에겐 당구 셸(제목 '당구 점수판 랭큐', canonical 홈)이었다.
+ * 화면(GolfDashboard 의 useSeo — /golf 에서만)과 검색용 화면(server/prerender renderGolfHome)이 같은 글을 쓴다. 숫자는 넣지 않는다(화면과 서버가 같은 값을 갖기 어렵다).
+ */
+export const GOLF_HOME_PATH = "/golf";
+export function golfHomeSeo(): { title: string; description: string; h1: string } {
+    return {
+        h1: GOLF_INTRO.name,
+        title: "랭큐 골프 — 수수료 없는 골프 조인 · 부킹 · 전국 골프장 날씨 · 코스",
+        description: "빈자리 조인과 남는 티타임을 수수료 없이 — 호스트가 보고 승인하고 현장에서 정산해요. 오늘 긴급 조인, 전국 골프장의 날씨 · 코스 가이드, 골프 도장깨기 · 스코어 기록까지.",
+    };
+}
+
 export interface Faq { q: string; a: string }
 
 const FAQ = {

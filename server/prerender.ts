@@ -30,7 +30,7 @@ import {
   GOLF_REGIONS, GOLF_INTENTS, REGION_LABEL, INTENT_LABEL, cityShort, coursePath, listPath, manwonText, wonShort, weekdayFee,
   courseTitle, courseDescription, listTitle, listDescription, listingIntents, teePart, distinctAliases, type Fees, type GolfIntent,
 } from "../shared/golfCourse.js";
-import { GOLF_GUIDE, GOLF_INTRO, golfFaq, guideTabFor } from "../shared/golfGuide.js";
+import { GOLF_GUIDE, GOLF_HOME_PATH, GOLF_INTRO, golfFaq, golfHomeSeo, guideTabFor } from "../shared/golfGuide.js";
 import { WIND_LEVEL, baseLabel, dayLabel, dayLine, dayPop, daySky, sunTimes, type WxDay } from "../shared/golfWeather.js";
 import { PART_TEE_HOUR, briefLine, nearestTee, partOfHour, roundBrief, sunLine, teeHours } from "../shared/golfRoundBrief.js";
 import { getCourseWeather } from "./services/golfWeather.js";
@@ -417,7 +417,8 @@ type GolfListingRow = GolfSummary["listings"][number];
 export interface GolfRender { status: 200 | 301 | 404; tag: string; html: string; location?: string }
 
 /** /golf/booking-list/… 같은 앱 화면은 걸리지 않는다(키워드 뒤가 '/' 또는 끝이어야 한다). */
-const GOLF_PAGE_RE = /^\/golf\/(?:course|courses|booking|join|urgent|find)(?:\/.*)?$/;
+// 골프 첫 화면 /golf 도(2026-10-26 — 그전엔 사람에겐 404, 봇에겐 당구 셸). vercel.json 봇 라우트에도 같은 경로가 있어야 한다
+const GOLF_PAGE_RE = /^\/golf(?:\/(?:course|courses|booking|join|urgent|find)(?:\/.*)?)?\/?$/;
 
 /** 경로 한 조각 → 한글. 잘못된 퍼센트 인코딩은 null(=404). 맥의 NFD 한글도 NFC 로 접는다. */
 function golfDecode(seg: string): string | null {
@@ -1256,9 +1257,51 @@ function renderGolfFind(s: GolfSummary, segs: string[], now: number): GolfRender
   return { status: 200, tag: `golf-find:${key}${region ? `:${encodeURIComponent(region)}` : ""}`, html };
 }
 
+// ── /golf 골프 첫 화면(2026-10-26) ─────────────────────────────
+// 바로 가기(조인 · 부킹 · 긴급 · 전국 골프장 · 읽을거리 · 도장깨기 · 랭킹) · 지역별 골프장 · 이용 방법 · 자주 묻는 것. 제목은 화면과 같은 shared golfHomeSeo
+function renderGolfHome(s: GolfSummary): GolfRender {
+  const seo = golfHomeSeo();
+  const trail = golfCrumbs([{ name: "랭큐", path: "/" }, { name: seo.h1, path: GOLF_HOME_PATH }]);
+  const go: [string, string, string][] = [
+    ["/golf/join", "골프 조인", "남는 자리에 한 사람씩 — 호스트가 보고 승인"],
+    ["/golf/booking", "골프 부킹", "티타임 하나를 한 팀이 통째로"],
+    ["/golf/urgent", "긴급 조인", "오늘 치는 1인 3만 원 이하 조인"],
+    [listPath(), `전국 골프장 ${s.pages.length.toLocaleString("ko-KR")}곳`, "날씨 · 코스 가이드 · 그린피 · 이 근처 조인"],
+    ["/golf/checklist", "골프 준비물 체크리스트", "라운드 전날 챙길 것"],
+    ["/golf/terms", "골프 용어 사전", "처음 듣는 말 한 줄 풀이"],
+    ["/golf/stamps", "골프 도장깨기", "가 본 골프장마다 도장 — 도장첩 아홉 권"],
+    ["/golf-ranking", "골프 세계랭킹", "OWGR · 롤렉스 · KPGA · KLPGA"],
+    ["/golf/festivals", "골프장 근처 축제", "라운드 가는 길의 축제"],
+  ];
+  const regions = GOLF_REGIONS.filter((r) => s.pages.some((p) => p.region === r))
+    .map((r) => `<a href="${esc(listPath({ region: r }))}">${esc(REGION_LABEL[r] ?? r)} 골프장</a> (${s.pages.filter((p) => p.region === r).length})`).join(" · ");
+  const html = page({
+    title: seo.title,
+    desc: seo.description,
+    canonical: `${ORIGIN}${GOLF_HOME_PATH}`,
+    image: golfImage(),
+    jsonLd: [{ "@context": "https://schema.org", "@graph": [trail.ld, golfFaqLd(null)] }],
+    body: `<main>
+  ${trail.html}
+  <h1>${esc(seo.h1)}</h1>
+  <p>${esc(GOLF_INTRO.line)} — ${esc(GOLF_INTRO.points.join(" · "))}</p>
+  <p>${esc(seo.description)}</p>
+  <h2>바로 가기</h2>
+  <ul>
+${go.map(([href, name, sub]) => `    <li><a href="${esc(href)}">${esc(name)}</a> — ${esc(sub)}</li>`).join("\n")}
+  </ul>
+  <h2>지역별 골프장</h2>
+  <p>${regions}</p>${golfGuideHtml(null)}${golfFaqHtml(null)}
+  ${hubNav("ko")}
+</main>`,
+  });
+  return { status: 200, tag: "golf:home", html };
+}
+
 export async function renderGolfPath(pathname: string, query: Record<string, unknown> = {}): Promise<GolfRender | null> {
   const path = pathname.replace(/\/+$/, "");
   if (!GOLF_PAGE_RE.test(path)) return null;
+  if (path === GOLF_HOME_PATH) return renderGolfHome(golfView(await loadGolfCourseSummary()));
   const [, , kind, ...rest] = path.split("/");
   const s = golfView(await loadGolfCourseSummary());
   const now = Date.now();
