@@ -122,7 +122,7 @@ export function FishSheet({ fish, rec, list, today, onClose, onAdd, onMap, onRul
             <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4" style={{ borderColor: C.line }}>
                 <h2 className="flex-1 text-[16px] font-semibold">어종 한 장</h2>
                 {tank && (
-                    <button type="button" onClick={() => tank.toggle(!tank.hidden)} className="h-9 shrink-0 rounded-full px-3.5 text-[13px] font-semibold active:opacity-80"
+                    <button type="button" onClick={() => tank.toggle(!tank.hidden)} className="h-9 shrink-0 rounded-full px-3.5 text-[13px] font-semibold active:opacity-80 relative rk-hit44"
                         style={tank.hidden ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }} data-testid="fishing-fish-tank-toggle" aria-pressed={!tank.hidden}>
                         {tank.hidden ? "수조에 다시 넣기" : "수조에서 빼기"}
                     </button>

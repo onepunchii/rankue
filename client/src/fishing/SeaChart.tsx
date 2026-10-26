@@ -429,7 +429,7 @@ export function SeaChart({ areas, picked, onPick, temps, ports, port, spots, spo
                 <button type="button" aria-label="줄이기" disabled={!z.canOut} onClick={() => z.step(1 / 1.8)} className="flex h-10 w-10 items-center justify-center active:bg-[#0F28380F] disabled:opacity-35" data-testid="fishing-chart-out"><LucideMinus weight="bold" className="h-4 w-4" style={{ color: "#0F2838" }} /></button>
             </div>
             {z.moved && (
-                <button type="button" onClick={z.reset} className="absolute right-2.5 top-2.5 h-8 rounded-full px-3 text-[12.5px] font-semibold" style={{ background: "#0F2838E6", color: "#F3ECDD" }} data-testid="fishing-chart-reset">전국 보기</button>
+                <button type="button" onClick={z.reset} className="absolute right-2.5 top-2.5 h-8 rounded-full px-3 text-[12.5px] font-semibold rk-hit44" style={{ background: "#0F2838E6", color: "#F3ECDD" }} data-testid="fishing-chart-reset">전국 보기</button>
             )}
         </div>
     );

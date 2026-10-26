@@ -23,11 +23,12 @@ import { FISHING_COLORS as C, FISHING_PLACE_SOURCE, fishingSidoShort } from "@sh
 import { fishByName } from "@shared/fishingFish";
 import { hhmm, type PortNow, type TideTurn } from "@shared/fishingPort";
 import {
-    FISHING_PLACE_COUNT, FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, PLACE_KINDS, fishingRegionPath, fishingSpotPath, fishingTypePath, placeCounts, placeFeeText, placeKind, placeKindById, placeSeo, placeWhere,
+    FISHING_PLACE_COUNT, FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, PLACE_KINDS, fishingCatchPath, fishingRegionPath, fishingSpotPath, fishingTypePath, placeCounts, placeFeeText, placeKind, placeKindById, placeSeo, placeWhere,
     speciesKey, spotsHubSeo, spotsRegionSeo, spotsTypeSeo, type PlaceKindId, type PublicPlace,
 } from "@shared/fishingPlaces";
 import { art, PAPER, INK } from "../ink";
 import { ReservoirWater } from "./ReservoirWater";
+import { kmFrom, useFishingMe } from "../useFishingMe";
 import { fishingSpotCardUrl } from "@shared/ogCards";
 import { spreadBalls } from "@shared/storeDots";
 import { FISHING_SEA_PATH, fishingPortPath, seaArt } from "@shared/fishingSeaPages";
@@ -146,6 +147,8 @@ export function Row({ p, km, no }: { p: Lite; km?: number | null; /** 이 근처
 }
 
 const chip = (on: boolean) => (on ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft });
+/** 목록에 적는 거리 — 10km 안은 소수 한 자리 */
+export const kmText = (km: number | null) => (km == null ? null : km < 10 ? Math.round(km * 10) / 10 : Math.round(km));
 
 export function SpotsHub({ region, type }: { region?: string; type?: string }) {
     const [, setLocation] = useLocation();
@@ -160,7 +163,13 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
     const scopedCounts = useMemo(() => placeCounts(scoped as PublicPlace[]), [scoped]);
     const qq = q.trim().replace(/\s+/g, "");
     const fishKey = fish ? speciesKey(fish) : null;
-    const shown = scoped.filter((p) => (!fishKey || p.species.some((f) => speciesKey(f) === fishKey)) && (!qq || p.name.replace(/\s+/g, "").includes(qq) || (p.sigungu ?? "").includes(qq)));
+    // 글자는 이름 · 시군 · 대상 어종(옛 회원용 낚시터 화면이 하던 것 — 2026-10-26 두 화면을 이 화면으로 합쳤다)
+    const shown = scoped.filter((p) => (!fishKey || p.species.some((f) => speciesKey(f) === fishKey)) && (!qq || p.name.replace(/\s+/g, "").includes(qq) || (p.sigungu ?? "").includes(qq) || p.species.some((f) => f.replace(/\s+/g, "").includes(qq))));
+    // 가까운 순(2026-10-26 낚시 탭 리뷰) — 내 위치는 낚시 홈과 같은 약속(useFishingMe: 켰다는 표시만 남기고 좌표는 저장하지 않는다)
+    const loc = useFishingMe();
+    const me = loc.me;
+    const listed = shown.map((p) => ({ p, km: me && p.lat != null && p.lng != null ? kmFrom(me, { lat: p.lat, lng: p.lng }) : null }));
+    if (me) listed.sort((a, b) => (a.km ?? 1e9) - (b.km ?? 1e9));
     const seo = region ? spotsRegionSeo(region, scoped.length) : kind ? spotsTypeSeo(kind.id, scoped.length) : spotsHubSeo(all.length || FISHING_PLACE_COUNT);
     useSeo({ title: seo.title, description: seo.description, path: region ? fishingRegionPath(region) : kind ? fishingTypePath(kind.id) : FISHING_SPOTS_PATH, locale: "ko", image: "https://www.rankue.co.kr/og.png" });
     const cover = kind?.art ?? "/fishing/art/band-reservoir.webp";
@@ -175,12 +184,12 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
                 </div>
             </div>
             <div className="px-5 pt-4">
-                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="낚시터 이름 · 시군으로 찾기" className="h-12 w-full rounded-2xl px-4 text-[15px] outline-none" style={{ background: "#FFFFFF0F", color: C.foam, boxShadow: "inset 0 0 0 1px #FFFFFF1A" }} data-testid="spots-search" />
+                <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={30} placeholder="이름 · 시군 · 어종(예: 붕어)" aria-label="낚시터 찾기" className="h-12 w-full rounded-2xl px-4 text-[15px] outline-none" style={{ background: "#FFFFFF0F", color: C.foam, boxShadow: "inset 0 0 0 1px #FFFFFF1A" }} data-testid="spots-search" />
                 {/* 종류 */}
                 <div className="-mx-5 mt-3 flex gap-1.5 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="종류">
-                    <Link href={region ? fishingRegionPath(region) : FISHING_SPOTS_PATH} className="flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px]" style={chip(!kind)}>전체</Link>
+                    <Link href={region ? fishingRegionPath(region) : FISHING_SPOTS_PATH} className="flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] relative rk-hit44" style={chip(!kind)}>전체</Link>
                     {PLACE_KINDS.filter((k) => counts.kind.some(([id]) => id === k.id)).map((k) => (
-                        <Link key={k.id} href={fishingTypePath(k.id)} className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px]" style={chip(kind?.id === k.id)}>
+                        <Link key={k.id} href={fishingTypePath(k.id)} className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-3.5 text-[13px] relative rk-hit44" style={chip(kind?.id === k.id)}>
                             <i aria-hidden className="h-2 w-2 rounded-full" style={{ background: KIND_TONE[k.id] }} />{k.short} <span className="tabular-nums opacity-70">{counts.kind.find(([id]) => id === k.id)?.[1]}</span>
                         </Link>
                     ))}
@@ -188,10 +197,29 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
                 {/* 지역 */}
                 <div className="-mx-5 mt-2 flex gap-1.5 overflow-x-auto px-5 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="지역">
                     {counts.sido.map(([s, c]) => (
-                        <Link key={s} href={region === s ? FISHING_SPOTS_PATH : fishingRegionPath(s)} className="flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px]" style={chip(region === s)} data-testid="spots-region">{s} <span className="ml-1 tabular-nums opacity-70">{c}</span></Link>
+                        <Link key={s} href={region === s ? FISHING_SPOTS_PATH : fishingRegionPath(s)} className="flex h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] relative rk-hit44" style={chip(region === s)} data-testid="spots-region">{s} <span className="ml-1 tabular-nums opacity-70">{c}</span></Link>
                     ))}
                 </div>
             </div>
+            {/* 가까운 낚시터 — 위치를 켜면 지도보다 먼저 세 곳 */}
+            <section className="px-5 pt-4" data-testid="spots-near">
+                {me ? (
+                    <>
+                        <div className="flex items-center justify-between gap-2">
+                            <h2 className="text-[17px] font-semibold">가까운 낚시터</h2>
+                            <button type="button" onClick={loc.off} className="h-11 shrink-0 px-2 text-[13px]" style={{ color: C.dim }} data-testid="spots-near-off">위치 끄기</button>
+                        </div>
+                        {listed.length ? <ul className="divide-y divide-[#FFFFFF14]">{listed.slice(0, 3).map(({ p, km }) => <li key={p.id}><Row p={p} km={kmText(km)} /></li>)}</ul>
+                            : <p className="py-3 text-[13.5px]" style={{ color: C.dim }}>고른 조건에 맞는 낚시터가 없어요.</p>}
+                    </>
+                ) : (
+                    <button type="button" onClick={loc.locate} disabled={loc.state === "busy"} className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[14.5px] font-semibold active:opacity-85 disabled:opacity-70" style={{ background: "#FFFFFF0F", color: C.foam, boxShadow: "inset 0 0 0 1px #FFFFFF1A" }} data-testid="spots-near-on" data-track-as="spots-near-on">
+                        <LucideNavigation className="h-4 w-4" style={{ color: C.sun }} aria-hidden />{loc.state === "busy" ? "자리를 찾는 중…" : "내 위치에서 가까운 낚시터"}
+                    </button>
+                )}
+                {loc.state === "denied" && <p className="mt-2 text-[12.5px]" style={{ color: "#FF9C9C" }}>위치를 받지 못했어요 — 설정에서 위치 권한을 켜 주세요.</p>}
+                {loc.state === "far" && <p className="mt-2 text-[12.5px]" style={{ color: "#FF9C9C" }}>우리나라 밖이라 거리를 잴 수 없어요.</p>}
+            </section>
             {/* 지도 — 종류 색의 점 */}
             <section className="px-5 pt-5">
                 <div className="overflow-hidden rounded-2xl" style={{ boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
@@ -224,14 +252,14 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
                     <h2 className="mb-2.5 text-[17px] font-semibold">어종으로 고르기</h2>
                     <div className="flex flex-wrap gap-1.5">
                         {scopedCounts.species.slice(0, 16).map(([f, c]) => (
-                            <button key={f} type="button" aria-pressed={fish === f} onClick={() => setFish(fish === f ? null : f)} className="flex h-9 items-center rounded-full px-3 text-[13px]" style={chip(fish === f)} data-testid="spots-fish">{f} <span className="ml-1 tabular-nums opacity-70">{c}</span></button>
+                            <button key={f} type="button" aria-pressed={fish === f} onClick={() => setFish(fish === f ? null : f)} className="flex h-9 items-center rounded-full px-3 text-[13px] relative rk-hit44" style={chip(fish === f)} data-testid="spots-fish">{f} <span className="ml-1 tabular-nums opacity-70">{c}</span></button>
                         ))}
                     </div>
                 </section>
             )}
             <section className="px-5 pt-5">
-                <h2 className="mb-1 text-[17px] font-semibold">{fish ? `${fish} 낚시터` : "낚시터"} <span className="text-[13px] font-normal tabular-nums" style={{ color: C.dim }}>{shown.length.toLocaleString("ko-KR")}곳</span></h2>
-                <ul className="divide-y divide-[#FFFFFF14]">{shown.slice(0, n).map((p) => <li key={p.id}><Row p={p} /></li>)}</ul>
+                <h2 className="mb-1 text-[17px] font-semibold">{fish ? `${fish} 낚시터` : "낚시터"} <span className="text-[13px] font-normal tabular-nums" style={{ color: C.dim }}>{shown.length.toLocaleString("ko-KR")}곳{me ? " · 가까운 순" : ""}</span></h2>
+                <ul className="divide-y divide-[#FFFFFF14]" data-testid="spots-list">{listed.slice(0, n).map(({ p, km }) => <li key={p.id}><Row p={p} km={kmText(km)} /></li>)}</ul>
                 {shown.length > n && <button type="button" onClick={() => setN(n + 60)} className="mt-2 h-11 w-full rounded-xl text-[14px]" style={{ background: "#FFFFFF0F", color: C.soft }}>{(shown.length - n).toLocaleString("ko-KR")}곳 더 보기</button>}
                 {!isLoading && shown.length === 0 && <p className="py-6 text-center text-[14px]" style={{ color: C.dim }}>찾는 낚시터가 없어요.</p>}
                 <p className="mt-4 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>자료: {FISHING_PLACE_SOURCE}. 대상 어종 · 요금은 등록된 그대로이고 바뀌었을 수 있어요 — 가기 전에 낚시터에 물어보세요.</p>
@@ -390,7 +418,7 @@ export function SpotPage({ id }: { id: string }) {
             )}
 
             <section className="px-5 pt-7">
-                <button type="button" onClick={() => (member ? setLocation("/fishing") : goLogin(setLocation, fishingSpotPath(p.id)))} className="flex h-[52px] w-full items-center justify-center rounded-2xl text-[15px] font-semibold" style={{ background: C.brand, color: C.onBrand }} data-testid="spot-cta">
+                <button type="button" onClick={() => (member ? setLocation(fishingCatchPath(p.name)) : goLogin(setLocation, fishingSpotPath(p.id)))} className="flex h-[52px] w-full items-center justify-center rounded-2xl text-[15px] font-semibold" style={{ background: C.brand, color: C.onBrand }} data-testid="spot-cta">
                     {member ? "여기서 낚았으면 — 조과 적기" : "가입하고 조과 기록 · 어탁 모으기"}
                 </button>
                 <p className="mt-3 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>자료: {FISHING_PLACE_SOURCE}{p.dataDate ? ` · ${p.dataDate} 기준` : ""}. 요금 · 운영은 바뀌었을 수 있어요 — 가기 전에 낚시터에 물어보세요.</p>

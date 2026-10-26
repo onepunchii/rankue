@@ -65,9 +65,11 @@ describe("수조에서 빼기 · 지도 · 팝업(2026-10-18 오너 낚시 UX)",
         expect(chart).toContain("const PIXEL_WEIGHT: readonly number[] = [0.32, 0.45, 0.8, 1, 1];");
         const page = fs.readFileSync(new URL("../client/src/fishing/FishingPage.tsx", import.meta.url), "utf8");
         expect(page).toContain('data-testid="fishing-map-locate"');
-        // 2026-10-26: 처음엔 누를 때만 묻고(prompt), 한 번 켠 사람은 다음부터 묻지 않고 받는다 — 기기에는 '켰다' 표시만(useFishingMe)
-        expect(page).toContain("getDevicePosition({ prompt, highAccuracy: false");
-        expect(page).toContain('if (localStorage.getItem(FISHING_ME_KEY) === "1") void get(false);');
+        // 2026-10-26: 처음엔 누를 때만 묻고(prompt), 한 번 켠 사람은 다음부터 묻지 않고 받는다 — 기기에는 '켰다' 표시만(useFishingMe — 공개 화면도 쓰려고 따로 뺐다)
+        const me = fs.readFileSync(new URL("../client/src/fishing/useFishingMe.ts", import.meta.url), "utf8");
+        expect(page).toContain('import { nearestPort, useFishingMe, type FishingMe } from "./useFishingMe";');
+        expect(me).toContain("getDevicePosition({ prompt, highAccuracy: false");
+        expect(me).toContain('if (localStorage.getItem(FISHING_ME_KEY) === "1") void get(false);');
     });
 });
 

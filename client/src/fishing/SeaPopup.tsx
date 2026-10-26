@@ -118,7 +118,7 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                     <img src={`/fishing/art/sea-${areaId ?? "south-west"}.webp`} alt="" width={880} height={880} className="absolute inset-0 h-full w-full object-cover" style={{ objectPosition: "50% 55%" }} draggable={false} />
                     <div className="absolute inset-0" style={{ background: "linear-gradient(180deg,#0B1E2D33 0%,#0B1E2D00 30%,#0B1E2DCC 78%,#0B1E2D 100%)" }} aria-hidden />
                     <i aria-hidden className="absolute left-1/2 top-2 h-1 w-10 -translate-x-1/2 rounded-full" style={{ background: "#F3ECDD99" }} />
-                    <button type="button" onClick={onClose} aria-label="닫기" className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full" style={{ background: "#0B1E2D99" }} data-testid="fishing-sea-popup-close"><LucideX className="h-4 w-4" /></button>
+                    <button type="button" onClick={onClose} aria-label="닫기" className="absolute right-3 top-3 flex h-9 w-9 items-center justify-center rounded-full rk-hit44" style={{ background: "#0B1E2D99" }} data-testid="fishing-sea-popup-close"><LucideX className="h-4 w-4" /></button>
                     {tag && (
                         <span className="absolute left-4 top-3.5 flex items-center gap-1.5 rounded-full py-1 pl-1 pr-2.5 text-[12.5px] font-semibold" style={{ background: "#FBF7EE", color: state === "warn" || state === "alert" ? "#8E2A14" : "#7A5510" }} data-testid="fishing-sea-popup-tag">
                             <img src="/fishing/art/icon-storm.webp" alt="" width={128} height={128} className="h-6 w-6" />{tag}
@@ -162,7 +162,7 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                                 {c.credit && (
                                     <>
                                         <button type="button" onClick={() => setCreditOf(creditOf === c.name ? null : c.name)} aria-label={`${c.name} 사진 출처`} aria-expanded={creditOf === c.name}
-                                            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-semibold" style={{ background: "#0B1E2DB3", color: "#F3ECDD" }} data-testid="fishing-sea-photo-credit">i</button>
+                                            className="absolute right-1.5 top-1.5 flex h-7 w-7 items-center justify-center rounded-full text-[12px] font-semibold rk-hit44" style={{ background: "#0B1E2DB3", color: "#F3ECDD" }} data-testid="fishing-sea-photo-credit">i</button>
                                         {creditOf === c.name && (
                                             <div className="absolute inset-x-0 top-0 flex h-[96px] items-center rounded-t-2xl px-2.5 pr-9" style={{ background: "#0B1E2DE6" }} data-testid="fishing-sea-photo-credit-text">
                                                 <PhotoCredit author={`${c.name} — ${c.credit.a}`} license={c.credit.l} page={c.credit.p} dark />
@@ -217,7 +217,7 @@ export function SeaPopup({ spot, fish, day, today, cell, list, areas, onClose, o
                         )}
                     </div>
                     {/* 자료 출처 — 한 줄만, 누르면 펼친다(설명 글을 본문에 늘어놓지 않는다) */}
-                    <button type="button" onClick={() => setSourceOpen((v) => !v)} aria-expanded={sourceOpen} className="mx-4 mt-3 flex h-9 items-center gap-1.5 text-[12.5px]" style={{ color: C.dim }} data-testid="fishing-sea-source">
+                    <button type="button" onClick={() => setSourceOpen((v) => !v)} aria-expanded={sourceOpen} className="mx-4 mt-3 flex h-9 items-center gap-1.5 text-[12.5px] relative rk-hit44" style={{ color: C.dim }} data-testid="fishing-sea-source">
                         <span aria-hidden className="flex h-[18px] w-[18px] items-center justify-center rounded-full text-[11px] font-semibold" style={{ boxShadow: `inset 0 0 0 1.5px ${C.dim}` }}>i</span>자료 출처
                     </button>
                     {sourceOpen && (

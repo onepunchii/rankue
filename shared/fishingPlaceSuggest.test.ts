@@ -51,7 +51,8 @@ describe("화면 — 오늘 내 앞바다 · 다녀온 곳(FishingPage)", () => 
     const { resolve } = require("node:path") as typeof import("node:path");
     const src = readFileSync(resolve(__dirname, "../client/src/fishing/FishingPage.tsx"), "utf8");
     it("내 위치 — 기기에 남기는 것은 '켰다'는 표시뿐(좌표는 저장하지 않는다), 한 번 켜면 다음엔 묻지 않고 받는다", () => {
-        const hook = src.slice(src.indexOf("function useFishingMe("), src.indexOf("function MySeaCard("));
+        // 훅은 공개 화면(전국 낚시터 · 바다 물때)도 쓰려고 따로 뺐다(2026-10-26)
+        const hook = readFileSync(resolve(__dirname, "../client/src/fishing/useFishingMe.ts"), "utf8");
         expect(hook).toContain('keep(FISHING_ME_KEY, "1")');
         expect(hook).not.toMatch(/setItem\([^)]*(lat|lng|fix|JSON)/);
         expect(hook).toContain('if (localStorage.getItem(FISHING_ME_KEY) === "1") void get(false);');

@@ -34,6 +34,8 @@ export const placeKind = (raw: string | null | undefined) => PLACE_KINDS.find((k
 export const placeKindById = (id: string) => PLACE_KINDS.find((k) => k.id === id) ?? null;
 
 export const fishingSpotPath = (id: string) => `/fishing/spot/${encodeURIComponent(id)}`;
+/** 회원이 그 낚시터에서 조과 적기 — 낚시 화면이 이름을 넣고 조과 적기를 연다(FishingPage 가 ?catch= 를 읽고 지운다) */
+export const fishingCatchPath = (name: string) => `/fishing?catch=${encodeURIComponent(name.trim().slice(0, 40))}`;
 export const fishingRegionPath = (sidoShort: string) => `${FISHING_SPOTS_PATH}/region/${encodeURIComponent(sidoShort)}`;
 export const fishingTypePath = (kind: PlaceKindId) => `${FISHING_SPOTS_PATH}/type/${kind}`;
 export const isPlaceId = (v: string) => /^\d{6,24}$/.test(v);

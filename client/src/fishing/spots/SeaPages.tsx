@@ -7,7 +7,7 @@
  *
  * 값은 받은 그대로(기상청 · 국립해양조사원 · 천문연구원). '나가도 된다'고 말하지 않는다. ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지.
  */
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { useSeo } from "@/hooks/useSeo";
@@ -26,6 +26,8 @@ import { josa } from "@shared/briefingMeta";
 import { TideCurve } from "../TideCurve";
 import { PAPER } from "../ink";
 import { Row, Shell, useSpots } from "./SpotsPages";
+import { nearestPort as nearestPortAt, useFishingMe, type FishingMe } from "../useFishingMe";
+import { LucideChevronRight, LucideNavigation } from "@/lib/icons";
 
 const TONE: Readonly<Record<SeaState, { dot: string; text: string }>> = {
     clear: { dot: "#8FB3C2", text: "#F3ECDDB3" }, pre: { dot: "#F8DDB0", text: "#F8DDB0" }, far: { dot: "#F8DDB0", text: "#F8DDB0" }, warn: { dot: "#EE7B5B", text: "#F7B9A6" }, alert: { dot: "#E0533B", text: "#F7B9A6" },
@@ -55,19 +57,21 @@ type PortTurns = { day: string; rows: { code: string; name: string; area: string
 /**
  * 오늘 주요 항구의 만조 · 간조(2026-10-18) — 해역을 고르면 그 바다의 항구들. 지난 것은 옅게, 다음 것은 도드라지게. 국립해양조사원 예보 그대로
  */
-function PortTurnsBoard() {
+function PortTurnsBoard({ near }: { /** 가장 가까운 항구 — 있으면 그 바다를 열고 그 항구를 맨 위에 */ near?: { code: string; km: number } | null }) {
     const today = kstToday();
     const { data } = useQuery<PortTurns | null>({ queryKey: ["/api/hiq/fishing/sea/turns"], staleTime: 10 * 60_000 });
     const [area, setArea] = useState("west-mid");
+    const nearArea = near ? data?.rows?.find((r) => r.code === near.code)?.area ?? null : null;
+    useEffect(() => { if (nearArea) setArea(nearArea); }, [nearArea]);
     if (!data?.rows?.length) return null;
     const isToday = data.day === today, nowMin = isToday ? kstMinuteNow() : -1;
-    const rows = data.rows.filter((r) => r.area === area);
+    const rows = data.rows.filter((r) => r.area === area).sort((a, b) => Number(b.code === near?.code) - Number(a.code === near?.code));
     const areas = SEA_AREAS.filter((a) => data.rows.some((r) => r.area === a.id));
     return (
         <section className="px-5 pt-6" data-testid="sea-port-turns">
             <h2 className="mb-2.5 flex items-baseline justify-between gap-3 text-[17px] font-semibold"><span>{isToday ? "오늘" : data.day.slice(5).replace("-", "/")} 만조 · 간조</span><span className="shrink-0 text-[13px] font-normal" style={{ color: C.dim }}>국립해양조사원 예보</span></h2>
             <div className="-mx-5 mb-2.5 flex gap-1.5 overflow-x-auto px-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="해역">
-                {areas.map((a) => <button key={a.id} type="button" aria-pressed={area === a.id} onClick={() => setArea(a.id)} className="h-9 shrink-0 rounded-full px-3.5 text-[13px]" style={area === a.id ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{a.name}</button>)}
+                {areas.map((a) => <button key={a.id} type="button" aria-pressed={area === a.id} onClick={() => setArea(a.id)} className="h-9 shrink-0 rounded-full px-3.5 text-[13px] relative rk-hit44" style={area === a.id ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{a.name}</button>)}
             </div>
             <ul className="divide-y divide-[#FFFFFF14] rounded-2xl px-3.5" style={{ background: "#FFFFFF0A" }}>
                 {rows.map((r) => {
@@ -75,7 +79,7 @@ function PortTurnsBoard() {
                     return (
                         <li key={r.code}>
                             <Link href={fishingPortPath(r.name)} className="flex min-h-[56px] items-center gap-3 py-2.5 active:opacity-80">
-                                <span className="w-[64px] shrink-0 text-[15px] font-semibold">{r.name}</span>
+                                <span className="w-[64px] shrink-0"><span className="block text-[15px] font-semibold">{r.name}</span>{r.code === near?.code && <span className="block text-[12px] tabular-nums" style={{ color: C.sun }} data-testid="sea-turns-near">가까운 곳 {near.km}km</span>}</span>
                                 <span className="flex min-w-0 flex-1 flex-wrap gap-1">
                                     {r.turns.map((t) => {
                                         const past = isToday && t.min < nowMin, on = t === next && isToday;
@@ -107,7 +111,7 @@ export function TideCalendar({ sea: fixed }: { sea?: TideSea }) {
         <div data-testid="tide-calendar">
             {!fixed && (
                 <div className="mb-2.5 flex gap-1.5" role="group" aria-label="바다">
-                    {TIDE_SEAS.map((x) => <button key={x.id} type="button" aria-pressed={pick === x.id} onClick={() => setPick(x.id)} className="h-9 rounded-full px-3.5 text-[13px]" style={pick === x.id ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{x.name} <span className="opacity-70">{x.note}</span></button>)}
+                    {TIDE_SEAS.map((x) => <button key={x.id} type="button" aria-pressed={pick === x.id} onClick={() => setPick(x.id)} className="h-9 rounded-full px-3.5 text-[13px] relative rk-hit44" style={pick === x.id ? { background: C.brand, color: C.onBrand } : { background: "#FFFFFF0F", color: C.soft }}>{x.name} <span className="opacity-70">{x.note}</span></button>)}
                 </div>
             )}
             <div className="overflow-hidden rounded-2xl p-2" style={{ background: PAPER, color: "#0F2838", boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
@@ -131,15 +135,64 @@ export function TideCalendar({ sea: fixed }: { sea?: TideSea }) {
     );
 }
 
+/**
+ * 가장 가까운 항구(2026-10-26 낚시 탭 리뷰 — "가장 가까운 항구 물때를 맨 위에"). 내 위치는 낚시 홈과 같은 약속(useFishingMe — 켰다는 표시만 남는다).
+ * 물때는 아래 '만조 · 간조' 판과 같은 자료(주요 항구만 — 없는 항구면 항구 페이지로만 잇는다).
+ */
+function NearPortCard({ loc }: { loc: FishingMe }) {
+    const near = loc.me ? nearestPortAt(loc.me.lat, loc.me.lng) : null;
+    const { data } = useQuery<PortTurns | null>({ queryKey: ["/api/hiq/fishing/sea/turns"], staleTime: 10 * 60_000, enabled: !!near });
+    const today = kstToday();
+    const warn = loc.state === "denied" ? "위치를 받지 못했어요 — 설정에서 위치 권한을 켜 주세요." : loc.state === "far" ? "우리나라 밖이라 가까운 항구를 찾을 수 없어요." : null;
+    if (!loc.me) return (
+        <section className="px-5 pt-5" data-testid="sea-near">
+            <button type="button" onClick={loc.locate} disabled={loc.state === "busy"} className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl text-[14.5px] font-semibold active:opacity-85 disabled:opacity-70" style={{ background: "#FFFFFF0F", color: C.foam, boxShadow: "inset 0 0 0 1px #FFFFFF1A" }} data-testid="sea-near-on" data-track-as="sea-near-on">
+                <LucideNavigation className="h-4 w-4" style={{ color: C.sun }} aria-hidden />{loc.state === "busy" ? "자리를 찾는 중…" : "내 위치에서 가까운 항구 물때"}
+            </button>
+            {warn && <p className="mt-2 text-[12.5px]" style={{ color: "#FF9C9C" }}>{warn}</p>}
+        </section>
+    );
+    const row = near ? data?.rows?.find((r) => r.code === near.code) ?? null : null;
+    const isToday = data?.day === today, nowMin = isToday ? kstMinuteNow() : -1;
+    const next = row && isToday ? row.turns.find((t) => t.min >= nowMin) : undefined;
+    return (
+        <section className="px-5 pt-5" data-testid="sea-near">
+            {near ? (
+                <Link href={fishingPortPath(near.name)} className="block rounded-2xl px-4 py-3.5 active:opacity-85" style={{ background: "#FFFFFF0D", boxShadow: "inset 0 0 0 1px #FFFFFF14" }} data-testid="sea-near-port">
+                    <span className="flex items-center justify-between gap-2 text-[12.5px]" style={{ color: C.dim }}><span className="tabular-nums">가장 가까운 항구 · {near.km}km</span><span className="flex items-center gap-0.5">물때 곡선<LucideChevronRight weight="bold" className="h-3.5 w-3.5" aria-hidden /></span></span>
+                    <span className="mt-0.5 block text-[18px] font-semibold">{near.name}</span>
+                    {row ? (
+                        <span className="mt-2 grid grid-cols-4 gap-1.5">
+                            {row.turns.slice(0, 4).map((t) => {
+                                const on = t === next, past = isToday && t.min < nowMin;
+                                return (
+                                    <span key={`${t.kind}${t.min}`} className="rounded-xl px-1 py-1.5 text-center" style={{ background: on ? (t.kind === "high" ? "#3F86A8" : "#F3ECDD") : "#FFFFFF0D", color: on ? (t.kind === "high" ? "#FFFFFF" : "#0F2838") : C.foam, opacity: past ? 0.45 : 1 }}>
+                                        <span className="block text-[12px]">{t.kind === "high" ? "만조" : "간조"}</span>
+                                        <span className="block text-[15px] font-semibold tabular-nums">{hhmm(t.min)}</span>
+                                    </span>
+                                );
+                            })}
+                        </span>
+                    ) : <span className="mt-1 block text-[13px]" style={{ color: C.soft }}>눌러서 이 항구의 오늘 물때를 보세요.</span>}
+                </Link>
+            ) : <p className="rounded-2xl px-4 py-3.5 text-[13.5px] [word-break:keep-all]" style={{ background: "#FFFFFF0D", color: C.soft }}>80km 안에 바다 항구가 없어요.</p>}
+            <button type="button" onClick={loc.off} className="mt-1 h-11 px-1 text-[13px]" style={{ color: C.dim }} data-testid="sea-near-off">위치 끄기</button>
+        </section>
+    );
+}
+
 export function SeaHub() {
     const [, setLocation] = useLocation();
     const { data } = useSea();
     const seo = seaHubSeo();
     useSeo({ title: seo.title, description: seo.description, path: FISHING_SEA_PATH, locale: "ko", image: fishingSeaCardUrl(ORIGIN, "all") });
     const by = new Map((data?.areas ?? []).map((a) => [a.id, a]));
+    const loc = useFishingMe();
+    const near = loc.me ? nearestPortAt(loc.me.lat, loc.me.lng) : null;
     return (
         <Shell title={FISHING_SEA_LABEL}>
             <Cover src="/fishing/art/hero.webp" title={seo.h1} sub={`해역 일곱 곳 · 항구 ${FISHING_PORTS.length}곳 · ${SEA_SOURCE}`} />
+            <NearPortCard loc={loc} />
             {data?.areas?.length ? (
                 <section className="px-5 pt-5" data-testid="sea-hub-map">
                     <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
@@ -169,7 +222,7 @@ export function SeaHub() {
                     })}
                 </div>
             </section>
-            <PortTurnsBoard />
+            <PortTurnsBoard near={near} />
             <section className="px-5 pt-6" data-testid="sea-tide-calendar">
                 <h2 className="mb-2.5 text-[17px] font-semibold">물때 달력</h2>
                 <TideCalendar />
@@ -179,7 +232,7 @@ export function SeaHub() {
                 {SEA_AREAS.map((a) => (
                     <div key={a.id} className="mb-3">
                         <p className="mb-1.5 text-[13px]" style={{ color: C.dim }}>{a.name}</p>
-                        <div className="flex flex-wrap gap-1.5">{portsOf(a.id).map((p) => <Link key={p.code} href={fishingPortPath(p.name)} className="flex h-9 items-center rounded-full px-3 text-[13px]" style={{ background: p.main ? "#FFFFFF1A" : "#FFFFFF0D", color: C.foam }}>{p.name}</Link>)}</div>
+                        <div className="flex flex-wrap gap-1.5">{portsOf(a.id).map((p) => <Link key={p.code} href={fishingPortPath(p.name)} className="flex h-9 items-center rounded-full px-3 text-[13px] relative rk-hit44" style={{ background: p.main ? "#FFFFFF1A" : "#FFFFFF0D", color: C.foam }}>{p.name}</Link>)}</div>
                     </div>
                 ))}
                 <p className="mt-3 text-[12px] [word-break:keep-all]" style={{ color: C.dim }}>{SEA_CAUTION}</p>
@@ -348,7 +401,7 @@ export function PortPage({ name }: { name: string }) {
             {others.length > 0 && (
                 <section className="px-5 pt-6">
                     <h2 className="mb-2.5 text-[17px] font-semibold">{area?.name ?? "같은 바다"}의 다른 항구</h2>
-                    <div className="flex flex-wrap gap-1.5">{others.map((p) => <Link key={p.code} href={fishingPortPath(p.name)} className="flex h-9 items-center rounded-full px-3 text-[13px]" style={{ background: "#FFFFFF14", color: C.foam }}>{p.name}</Link>)}</div>
+                    <div className="flex flex-wrap gap-1.5">{others.map((p) => <Link key={p.code} href={fishingPortPath(p.name)} className="flex h-9 items-center rounded-full px-3 text-[13px] relative rk-hit44" style={{ background: "#FFFFFF14", color: C.foam }}>{p.name}</Link>)}</div>
                     <Link href={fishingSeaAreaPath(port.area)} className="mt-3 flex h-11 items-center justify-center rounded-xl text-[14px]" style={{ background: "#FFFFFF0F", color: C.soft }}>{area?.name ?? "바다"} 예보 보기</Link>
                 </section>
             )}

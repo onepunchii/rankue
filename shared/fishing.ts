@@ -70,6 +70,12 @@ export interface FishingCatch {
     note: string | null;
     /** 그날의 물때를 어느 바다 식으로 세는가(서해 7물때 · 남해/동해/제주 8물때). 민물이거나 옛 줄이면 없다 — 물때 이름은 날짜로 그때그때 센다(shared/fishingTide) */
     tideSea?: "west" | "south" | null;
+    /** 몇 시쯤(한국 시각 'HH:MM', 2026-10-26) — 안 적었으면 없다 */
+    time?: string | null;
+    /** 그 시각의 물 — 적을 때 가까운 항구의 그날 조석으로 센다(shared/fishingPort tideFlowAt). 모르면 없다 */
+    tideFlow?: CatchTideFlow | null;
+    /** 채비 — 내 장비의 '채비 조합' 이름이나 직접 적은 글(CATCH_RIG_MAX 자) */
+    rig?: string | null;
     lat?: number | null;
     lng?: number | null;
     weather?: CatchWeather | null;
@@ -83,6 +89,15 @@ export interface FishingCatch {
     rankVoid?: string | null;
 }
 export type FishingCatchInput = Omit<FishingCatch, "id" | "createdAt" | "weather">;
+export type CatchTideFlow = "들물" | "날물";
+export const CATCH_RIG_MAX = 30;
+/** 'HH:MM'(00:00~23:59)만 — 아니면 null */
+export const cleanCatchTime = (v: unknown): string | null => { const t = String(v ?? "").trim(); return /^([01]\d|2[0-3]):[0-5]\d$/.test(t) ? t : null; };
+/** 일지의 한 줄 — "06:30쯤 · 들물 · 채비 반유동 1호". 적은 게 없으면 null */
+export function catchMoreLine(c: Pick<FishingCatch, "time" | "tideFlow" | "rig">): string | null {
+    const parts = [c.time ? `${c.time}쯤` : null, c.time && c.tideFlow ? c.tideFlow : null, c.rig ? `채비 ${c.rig}` : null].filter(Boolean);
+    return parts.length ? parts.join(" · ") : null;
+}
 
 const text = (v: unknown, max: number): string => String(v ?? "").replace(/\s+/g, " ").trim().slice(0, max);
 
@@ -110,7 +125,11 @@ export function cleanCatch(raw: unknown, today: string): { ok: true; value: Fish
     const ji = o.ji == null || o.ji === "" ? null : Math.round(Number(o.ji));
     if (ji != null && !(ji >= 1 && ji <= 10)) return { ok: false, error: "갈치 굵기는 1~10지로 적어 주세요" };
     const url = (v: unknown) => (typeof v === "string" && v ? v : null);
-    return { ok: true, value: { day, place, spot, species, lengthCm: len, count, weightKg: kg, ji, released: o.released === true, photoUrl: url(o.photoUrl), thumbUrl: url(o.thumbUrl), note, tideSea: o.tideSea === "west" || o.tideSea === "south" ? o.tideSea : null, ...coordOf(o), isPublic: o.isPublic === true } };
+    // 시각 · 물 · 채비(2026-10-26) — 물은 시각이 있을 때만
+    const time = cleanCatchTime(o.time);
+    const tideFlow = time && (o.tideFlow === "들물" || o.tideFlow === "날물") ? o.tideFlow : null;
+    const rig = text(o.rig, CATCH_RIG_MAX) || null;
+    return { ok: true, value: { day, place, spot, species, lengthCm: len, count, weightKg: kg, ji, released: o.released === true, photoUrl: url(o.photoUrl), thumbUrl: url(o.thumbUrl), note, tideSea: o.tideSea === "west" || o.tideSea === "south" ? o.tideSea : null, time, tideFlow, rig, ...coordOf(o), isPublic: o.isPublic === true } };
 }
 
 export interface FishingSummary {

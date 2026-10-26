@@ -69,6 +69,8 @@ const view = (r: any): FishingCatch => ({
     lengthCm: r.length_cm == null ? null : Number(r.length_cm), count: Number(r.fish_count) || 1,
     weightKg: r.weight_kg == null ? null : Number(r.weight_kg), ji: r.ji == null ? null : Number(r.ji), released: r.released === true,
     photoUrl: r.photo_url ?? null, thumbUrl: r.thumb_url ?? null, note: r.note ?? null, tideSea: r.tide_sea === "west" || r.tide_sea === "south" ? r.tide_sea : null,
+    // 시각 · 물 · 채비(2026-10-26 — migrations/fishing_catches_v8.sql). 옛 줄은 없다
+    time: r.caught_at ?? null, tideFlow: r.tide_flow === "들물" || r.tide_flow === "날물" ? r.tide_flow : null, rig: r.rig ?? null,
     lat: r.lat == null ? null : Number(r.lat), lng: r.lng == null ? null : Number(r.lng), weather: (r.weather ?? null) as CatchWeather | null, isPublic: r.is_public === true,
     createdAt: new Date(r.created_at).toISOString(),
     // 신고로 가려진 내 조과(2026-10-17) — 랭킹 · 정출판 · 수족관에서 빠졌다. 가린 뒤에 낸 이의제기만 '냈음'으로
@@ -176,8 +178,8 @@ router.post("/catches", requireAuth, gate, asyncHandler(async (req: AuthRequest,
     }
     const weather = v.lat != null && v.lng != null ? await seaAt(v.day, v.lat, v.lng) : null;
     const [row] = rowsOf(await db.execute(sql`
-        insert into fishing_catches (member_id, fished_on, place, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url, thumb_url, note, trip_id, tide_sea, lat, lng, weather, is_public)
-        values (${req.userId!}, ${v.day}, ${v.place}, ${v.spot}, ${v.species}, ${v.lengthCm}, ${v.count}, ${v.weightKg}, ${v.ji}, ${v.released}, ${v.photoUrl}, ${v.thumbUrl}, ${v.note}, ${tripId}::uuid, ${v.tideSea ?? null}, ${v.lat ?? null}, ${v.lng ?? null}, ${weather ? JSON.stringify(weather) : null}::jsonb, ${v.isPublic === true}) returning *`));
+        insert into fishing_catches (member_id, fished_on, place, spot, species, length_cm, fish_count, weight_kg, ji, released, photo_url, thumb_url, note, trip_id, tide_sea, caught_at, tide_flow, rig, lat, lng, weather, is_public)
+        values (${req.userId!}, ${v.day}, ${v.place}, ${v.spot}, ${v.species}, ${v.lengthCm}, ${v.count}, ${v.weightKg}, ${v.ji}, ${v.released}, ${v.photoUrl}, ${v.thumbUrl}, ${v.note}, ${tripId}::uuid, ${v.tideSea ?? null}, ${v.time ?? null}, ${v.tideFlow ?? null}, ${v.rig ?? null}, ${v.lat ?? null}, ${v.lng ?? null}, ${weather ? JSON.stringify(weather) : null}::jsonb, ${v.isPublic === true}) returning *`));
     return sendSuccess(res, view(row));
 }));
 

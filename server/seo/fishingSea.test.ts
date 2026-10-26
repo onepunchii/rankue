@@ -56,7 +56,8 @@ describe("바다 · 항구 물때 공개 페이지", () => {
         const svc = read("server/services/fishingPort.ts");
         expect(svc).toContain("export async function getMainPortTurns(");
         expect(svc).toContain("const mains = FISHING_PORTS.filter((p) => p.main);");
-        expect(sea).toContain("<PortTurnsBoard />");
+        // 2026-10-26: 내 위치를 켰으면 가장 가까운 항구의 바다를 열고 그 항구를 맨 위에
+        expect(sea).toContain("<PortTurnsBoard near={near} />");
         // 항구 번호는 우리 표에 있는 것만 바깥 자료로 간다
         expect(r).toContain("FISHING_PORTS.some((p) => p.code === code)");
     });

@@ -46,6 +46,8 @@ export const LucideBeer = ((Ph as any).BeerStein ?? F) as Ph.Icon;
 export const LucideBell = ((Ph as any).Bell ?? F) as Ph.Icon;
 export const LucideBookOpen = ((Ph as any).BookOpen ?? F) as Ph.Icon;
 export const LucideFish = ((Ph as any).Fish ?? F) as Ph.Icon;
+/** 낚시어선 명부 입구(2026-10-26) */
+export const LucideShip = ((Ph as any).Boat ?? F) as Ph.Icon;
 export const LucideBriefcase = ((Ph as any).Briefcase ?? F) as Ph.Icon;
 export const LucideBuilding = ((Ph as any).Buildings ?? F) as Ph.Icon;
 export const LucideCalculator = ((Ph as any).Calculator ?? F) as Ph.Icon;

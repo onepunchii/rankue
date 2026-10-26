@@ -26,7 +26,7 @@ describe("낚시는 열려 있다(10/18 전면 공개)", () => {
 describe("조과 한 줄 다듬기", () => {
     it("앞뒤 공백을 걷고, 길이는 소수 한 자리로", () => {
         const c = ok();
-        expect(c).toEqual({ ok: true, value: { day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: 92.5, count: 12, weightKg: null, ji: null, released: false, photoUrl: null, thumbUrl: null, note: "물때 8물", tideSea: null, lat: null, lng: null, isPublic: false } });
+        expect(c).toEqual({ ok: true, value: { day: "2026-10-12", place: "여수 국동항", spot: "boat", species: "갈치", lengthCm: 92.5, count: 12, weightKg: null, ji: null, released: false, photoUrl: null, thumbUrl: null, note: "물때 8물", tideSea: null, time: null, tideFlow: null, rig: null, lat: null, lng: null, isPublic: false } });
         expect(ok({ lat: 34.74, lng: 127.74 })).toMatchObject({ ok: true, value: { lat: 34.74, lng: 127.74 } });
         expect(ok({ lat: 51.5, lng: -0.1 })).toMatchObject({ ok: true, value: { lat: null, lng: null } });
         // 물때를 세는 바다는 두 값만 받는다

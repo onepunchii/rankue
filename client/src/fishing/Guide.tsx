@@ -207,7 +207,7 @@ export function GuideBook({ onOurs, onOther }: { onOurs: (fish: FishKind) => voi
         if (regOnly) return all.filter((r) => r.reg);
         return all.filter((r) => choOf(r.name) === cho);
     }, [list, query, cho, regOnly]);
-    const chip = "h-9 min-w-9 shrink-0 rounded-full px-2.5 text-[13.5px]";
+    const chip = "relative h-9 min-w-9 shrink-0 rounded-full px-2.5 text-[13.5px] rk-hit44";
     return (
         <div data-testid="fishing-guide-book">
             <input value={q} onChange={(e) => setQ(e.target.value)} maxLength={20} placeholder="어종 이름으로 찾기 — 예: 감성돔" type="search"
@@ -262,7 +262,7 @@ export function RulesPage() {
     const [biz, setBiz] = useState(false);
     const angler = (rules ?? []).filter((r) => r.who === "angler"), business = (rules ?? []).filter((r) => r.who === "business");
     const tab = (id: "closed" | "min", label: string) => (
-        <button type="button" aria-pressed={kind === id} onClick={() => setKind(id)} className={cn("h-9 flex-1 rounded-full text-[13.5px]", kind === id && "font-semibold")} style={kind === id ? { background: "#0F2838", color: "#F3ECDD" } : { color: "#0F2838B3" }} data-testid={`fishing-rules-${id}`}>{label}</button>
+        <button type="button" aria-pressed={kind === id} onClick={() => setKind(id)} className={cn("h-9 flex-1 rounded-full text-[13.5px] relative rk-hit44", kind === id && "font-semibold")} style={kind === id ? { background: "#0F2838", color: "#F3ECDD" } : { color: "#0F2838B3" }} data-testid={`fishing-rules-${id}`}>{label}</button>
     );
     const qa = (r: RuleQa, i: number) => {
         const on = open === r.slug;
