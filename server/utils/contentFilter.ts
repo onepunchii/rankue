@@ -82,7 +82,20 @@ const ROOM_GAMBLING_PATTERNS: RegExp[] = [
 
 const ABUSE_WORDS = [
     "씨발", "시발", "병신", "지랄", "좆", "새끼야", "개새끼", "니미", "느금",
+    // 2026-10-26 보강(멀티방 대전 채팅에서 아홉 낱말을 다 비켜 간 욕설 — 오너 "채팅을 더럽게"). 평범한 글에 안 들어가는 꼴만 모든 곳에서 본다:
+    // 자모 줄임 · 소리 바꿈('시바'는 시바견이라 뺐다), 성적인 욕, 패드립의 굳은 꼴. '보지'는 '보지 마'라서 붙은 꼴만, '새끼'는 '강아지 새끼'라서 뺐다.
+    "씨바", "씨빨", "씨팔", "ㅆ발", "ㅅ발", "ㅆ바", "씨ㅂ", "씨ㅃ", "ㅆㅂ", "ㅅㅂ", "븅신", "빙신", "붕신",
+    "개색기", "개색히", "개세끼", "창녀", "창년", "개보지", "보지년", "썅년", "쌍년", "미친년", "걸레년",
+    "엠창", "니애미", "니애비", "느개비", "섹스", "강간",
 ];
+// 대전 채팅 · 방제("match" · "room")에서만 더 보는 말(2026-10-26) — 모르는 사람과 판을 치며 주고받는 짧은 말이라
+// 패드립 · 죽으라는 말 · 손가락 욕이 거의 그 뜻뿐이다. 커뮤니티 글에선 '애미야'(드라마) · '가방 뒤져 봐' · '불 꺼져' 같은 평범한 말이라 넣지 않는다.
+const MATCH_ABUSE_WORDS = [
+    "니엄마", "니어매", "니엄머", "니앰", "니에미", "니어미", "느그엄마", "느그애미", "너거엄마", "애미", "애비",
+    // '개년'은 커뮤니티의 "5개년 계획"(숫자를 걷으면 붙는다) 때문에 여기서만
+    "ㅂㅅ", "ㅈㄹ", "년아", "개년", "뒤져", "뒤질", "디져", "디질", "뒈져", "뒈질", "자살해", "죽어라", "죽을래", "꺼져",
+];
+const MATCH_ABUSE_PATTERNS: RegExp[] = [/ㅗ{2,}/];
 
 const PHONE_RE = /(01[016789])[-.\s]?\d{3,4}[-.\s]?\d{4}/g;
 // "공일공 일이삼사..." 식 한글 숫자 전화번호 — 마스킹 우회의 가장 흔한 형태
@@ -105,7 +118,8 @@ export interface FilterOptions {
     // ("내기 한 판"·"내기방"·"내기 3쿠션" — 공통 규칙은 띄어쓰기 하나로 빠져나간다). 그래서 남은 '내기'는 전부 막고,
     // 다른 언어의 내기 낱말(bet·apuesta·cá cược·bahis)도 본다. 나머지(금액×게임·거래·욕설)는 커뮤니티와 같다.
     // 안 한다는 말("내기 없음·내기X"), 사람을 가리키는 '-내기'(새내기 환영), 평범한 동사(끝내기)는 통과한다.
-    context?: "community" | "crew" | "listing" | "room";
+    // "match" — 멀티방 대전 채팅(2026-10-26). 공통 규칙 + 모르는 사람끼리의 짧은 말에서만 보는 욕(MATCH_ABUSE_WORDS).
+    context?: "community" | "crew" | "listing" | "room" | "match";
 }
 
 export function checkContent(text: string, opts: FilterOptions = {}): FilterResult {
@@ -166,11 +180,16 @@ export function checkContent(text: string, opts: FilterOptions = {}): FilterResu
     const squashed = isListing
         ? t.replace(/[\d!@#$%^&*()_+\-=~.,'"?<>[\]{}|\\/;:]/g, "")
         : t.replace(/[\s\d!@#$%^&*()_+\-=~.,'"?<>[\]{}|\\/;:]/g, "");
-    for (const w of ABUSE_WORDS) {
-        if (t.includes(w) || squashed.includes(w)) {
+    // 영문자를 끼운 우회("씨a발")도 — 한글 낱말 사이의 로마자를 걷어 본다(2026-10-26)
+    const letterless = squashed.replace(/[a-zA-Z]/g, "");
+    const strict = isRoom || opts.context === "match";
+    const words = strict ? [...ABUSE_WORDS, ...MATCH_ABUSE_WORDS] : ABUSE_WORDS;
+    for (const w of words) {
+        if (t.includes(w) || squashed.includes(w) || letterless.includes(w)) {
             return { blocked: true, reason: "부적절한 표현이 포함되어 있습니다." };
         }
     }
+    if (strict && MATCH_ABUSE_PATTERNS.some((re) => re.test(squashed))) return { blocked: true, reason: "부적절한 표현이 포함되어 있습니다." };
     return { blocked: false };
 }
 

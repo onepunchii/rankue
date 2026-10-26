@@ -13,6 +13,8 @@ const toastSpy = vi.hoisted(() => vi.fn());
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: toastSpy }) }));
 vi.mock("@/lib/i18n", () => ({ useT: () => ({ t: (k: string) => ko[k] ?? k, locale: "ko" }) }));
 vi.mock("@/lib/utils", () => ({ cn: (...a: unknown[]) => a.filter((x) => typeof x === "string" && x).join(" ") }));
+// 진행 중인 판 기권 확인 · 채팅 차단 확인(2026-10-26)
+vi.mock("@/components/AppDialog", () => ({ appConfirm: async () => true, appAlert: async () => undefined }));
 vi.mock("@/components/hiq/BallDot", async () => { const React = await import("react"); return { BallDot: () => React.createElement("span") }; });
 vi.mock("@/components/ui/button", async () => {
     const React = await import("react");
@@ -185,7 +187,8 @@ describe("RoomList", () => {
         expect(dlg.querySelector("#sim-room-password")).toBeNull();
         click(Array.from(dlg.querySelectorAll("button")).find((b) => b.textContent === ko["sim.rooms.join"])!);
         await settle(h, () => h.onOpen.mock.calls.length > 0);
-        expect(h.api.joinRoom).toHaveBeenCalledWith("r1", undefined, undefined);
+        // 넷째 칸은 진행 중인 판 기권(2026-10-26 withForfeitConfirm) — 첫 시도엔 없다
+        expect(h.api.joinRoom).toHaveBeenCalledWith("r1", undefined, undefined, undefined);
         expect(h.onOpen.mock.calls[0][0].status).toBe("playing");
     });
 
@@ -201,7 +204,7 @@ describe("RoomList", () => {
         expect(join.disabled).toBe(false);
         click(join);
         await settle(h, () => text(h).includes(ko["sim.match.badPassword"]));
-        expect(joinRoom).toHaveBeenCalledWith("r1", undefined, "0000");
+        expect(joinRoom).toHaveBeenCalledWith("r1", undefined, "0000", undefined);
         expect(h.onOpen).not.toHaveBeenCalled();
     });
 

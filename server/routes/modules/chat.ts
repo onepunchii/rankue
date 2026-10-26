@@ -23,6 +23,8 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { requireTermsAccepted } from "../../middleware/terms.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { screenCrewText } from "../../utils/crewModeration.js";
+import { chatBanOf, countChatFilterHit } from "../../storage/chatBans.js";
+import { chatBanHoursLeft } from "../../../shared/chatBan.js";
 import { notificationService } from "../../services/notificationService.js";
 import { parseRoomKey, type RoomRef } from "../../storage/chat.repo.js";
 import { msg, localeOf, memberLocale, type I18nText } from "../../lib/i18n.js";
@@ -213,8 +215,15 @@ router.post("/rooms/:key/messages", requireAuth, requireTermsAccepted, asyncHand
     // 관리자 문의는 필터를 안 건다 — 문의에 전화번호·링크가 들어가는 게 정상이다. 나머지는 크루와 같은 필터.
     let text = raw.trim();
     if (ref.kind !== "support") {
+        // 채팅 금지(2026-10-26 — shared/chatBan). 운영자 문의는 막지 않는다 — 금지에 이의를 말할 길이다
+        const ban = await chatBanOf(req.userId!);
+        if (ban) return sendError(res, 403, msg("err.chat.banned", { n: chatBanHoursLeft(ban, Date.now()) }), "CHAT_BANNED");
         const screened = screenCrewText(raw);
-        if (!screened.ok) return sendError(res, 400, screened.reason);
+        if (!screened.ok) {
+            const auto = await countChatFilterHit(req.userId!);
+            if (auto) return sendError(res, 403, msg("err.chat.banned", { n: chatBanHoursLeft(auto, Date.now()) }), "CHAT_BANNED");
+            return sendError(res, 400, screened.reason);
+        }
         text = screened.value;
     }
     const me = await storage.getMemberById(req.userId!);

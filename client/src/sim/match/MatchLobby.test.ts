@@ -11,6 +11,8 @@ import { ko } from "../../lib/i18n/ko";
 vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 vi.mock("@/lib/i18n", () => ({ useT: () => ({ t: (k: string) => ko[k] ?? k, locale: "ko" }) }));
 vi.mock("@/lib/utils", () => ({ cn: (...a: unknown[]) => a.filter((x) => typeof x === "string" && x).join(" ") }));
+// 진행 중인 판 기권 확인 · 채팅 차단 확인(2026-10-26)
+vi.mock("@/components/AppDialog", () => ({ appConfirm: async () => true, appAlert: async () => undefined }));
 vi.mock("@/components/hiq/BallDot", async () => {
     const React = await import("react");
     return { BallDot: () => React.createElement("span") };
@@ -251,7 +253,8 @@ describe("MatchLobby · 코드로 참가", () => {
         expect(h.container.querySelector("[data-testid=scaled-guest-target]")?.textContent).toBe("7");
         click(byText(h, ko["sim.match.join"])!);
         await flush();
-        expect(api.joinMatch).toHaveBeenCalledWith("123456");
+        // 넷째 칸은 진행 중인 판 기권(2026-10-26 withForfeitConfirm) — 첫 시도엔 없다
+        expect(api.joinMatch).toHaveBeenCalledWith("123456", undefined, undefined, undefined);
         expect(onStarted).toHaveBeenCalledTimes(1);
         expect(onStarted.mock.calls[0][0].myIndex).toBe(1);
     });
@@ -451,7 +454,7 @@ describe("MatchLobby · 멀티방·비밀번호·친구 초대(2026-09-08)", () 
         expect(join.disabled).toBe(false);
         click(join);
         await flush();
-        expect(api.joinMatch).toHaveBeenCalledWith("123456", undefined, "abcd");
+        expect(api.joinMatch).toHaveBeenCalledWith("123456", undefined, "abcd", undefined);
         expect(onStarted).toHaveBeenCalledTimes(1);
     });
 });

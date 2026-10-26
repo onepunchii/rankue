@@ -35,7 +35,8 @@ import { gameLabel, inningCapLabel, joinErrorKey, rulesLabel, inviteLink, shareL
 import { ChevronRightIcon, MinusIcon, PlusIcon } from "../components/railIcons";
 import { ModeInfoDialog } from "../components/ModeInfoDialog";
 import { InviteDialog } from "./InviteDialog";
-import { isValidRoomPassword, isRoomTitleRejected } from "../matchApi";
+import { isValidRoomPassword, isRoomTitleRejected, withForfeitConfirm } from "../matchApi";
+import { askForfeitPlaying } from "./forfeitConfirm";
 import { ROOM_TITLE_MAX, ROOM_TITLE_PRESETS, clampRoomTitle, roomTitleLength } from "@shared/sim/roomTitle";
 import { deviceLobbyPrefs, type LobbyPrefsStore } from "./lobbyPrefs";
 
@@ -251,10 +252,12 @@ function CreateTab({ api, pollMs, onStarted, onCreated, onWaiting, initialPublic
         setCreating(true);
         setError(null);
         try {
-            const m = await api.createMatch(buildConfig({
+            // 진행 중인 판이 있으면 먼저 묻는다 — 고르지 않으면 아무 일도 없다(2026-10-26)
+            const m = await withForfeitConfirm((o) => api.createMatch(buildConfig({
                 gameType, tableId, target: targetNum, inningCap, mode, matchPreview: "short",
                 rules: gameType === "3c" ? { ruleSet } : { threeCushionDouble, passiveOpponentContactIsFoul: false },
-            }), { isPublic, handicap, password: isPublic && password !== "" ? password : undefined, title: isPublic && title.trim() !== "" ? title : undefined });
+            }), { isPublic, handicap, password: isPublic && password !== "" ? password : undefined, title: isPublic && title.trim() !== "" ? title : undefined }, o), () => askForfeitPlaying(t));
+            if (!m) return;
             // 만든 설정을 적어 둔다 — 다음에 그대로 열린다. 방제 · 비밀번호 · 공개 여부는 적지 않는다(./lobbyPrefs).
             prefsStore.save({ gameType, tableId, handicap, target: isValidTarget(targetNum) ? targetNum : defaultTarget(gameType), mode, ruleSet, threeCushionDouble, inningCap });
             setCreated(m);
@@ -648,7 +651,8 @@ function JoinTab({ api, onStarted, onCreated, initialCode }: { api: MatchApi; on
         setJoining(true);
         setJoinError(null);
         try {
-            const m = needsPassword ? await api.joinMatch(code, undefined, password) : await api.joinMatch(code);
+            const m = await withForfeitConfirm((o) => api.joinMatch(code, undefined, needsPassword ? password : undefined, o), () => askForfeitPlaying(t));
+            if (!m) return;
             onCreated?.(m);
             onStarted(m);
         } catch (e) {

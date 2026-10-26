@@ -6,7 +6,7 @@
 import { db } from "../db.js";
 import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchChats, hiqSimMatchRatings, hiqMembers, hiqBlocks, profiles } from "../../shared/schema.js";
 import { alias } from "drizzle-orm/pg-core";
-import { eq, and, or, desc, sql, inArray, gte, isNull } from "drizzle-orm";
+import { eq, and, or, desc, sql, inArray, gte, isNull, lt } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot, HiqSimMatchChat } from "../../shared/schema.js";
 import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS, START_ABSENT_GRACE_MS, REPEAT_ABSENT_GRACE_MS } from "../../shared/sim/rules/session.js";
 import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
@@ -519,6 +519,34 @@ export class SimMatchRepository {
         return row?.n ?? 0;
     }
 
+    /** 내가 뛰고 있는 진행 중 대전(새 방 · 다른 방에 들어갈 때 — 2026-10-26 '방이 2개'). exceptId 는 뺀다 */
+    async listPlayingOf(memberId: string, exceptId?: string): Promise<MatchWithNames[]> {
+        const { q } = this.withNames();
+        const rows = await q.where(and(
+            eq(hiqSimMatches.status, "playing"),
+            or(eq(hiqSimMatches.hostId, memberId), eq(hiqSimMatches.guestId, memberId)),
+            ...(exceptId ? [sql`${hiqSimMatches.id} <> ${exceptId}`] : []),
+        )).limit(10);
+        return rows.map(named);
+    }
+
+    /**
+     * 둘 다 떠난 진행 중 대전 — 시계(turn_seen_at)가 dueBefore 보다 먼저 시작됐고, 두 선수 다 absentSince 뒤로 화면을 안 봤다.
+     * 서버리스라 따로 도는 타이머가 없어 시간 초과는 선수의 화면이 부른다 — 둘 다 나가면 아무도 안 불러 판이 영영 '진행 중'이었다(2026-10-26).
+     */
+    async listAbandonedClocks(dueBefore: Date, absentSince: Date, limit: number): Promise<string[]> {
+        const rows = await db.select({ id: hiqSimMatches.id }).from(hiqSimMatches)
+            .where(and(
+                eq(hiqSimMatches.status, "playing"),
+                // Date 는 drizzle 연산자로만 — raw sql 에 넣으면 KST 기기에서 9시간 어긋난다(timestamp 열)
+                lt(hiqSimMatches.turnSeenAt, dueBefore),
+                or(isNull(hiqSimMatches.hostSeenAt), lt(hiqSimMatches.hostSeenAt, absentSince)),
+                or(isNull(hiqSimMatches.guestSeenAt), lt(hiqSimMatches.guestSeenAt, absentSince)),
+            ))
+            .orderBy(hiqSimMatches.turnSeenAt).limit(limit);
+        return rows.map((r) => r.id);
+    }
+
     /** 상대가 hours 시간 넘게 안 들어온 waiting 대전을 canceled 로. */
     /**
      * 둘 다 떠난 대전 정리(2026-09-26 검토): 7일 넘게 샷·승리 주장이 없는 playing 대전은 무효(canceled, endReason 'stale')로
@@ -545,6 +573,20 @@ export class SimMatchRepository {
         return db.select().from(hiqSimMatchShots)
             .where(and(eq(hiqSimMatchShots.matchId, matchId), gte(hiqSimMatchShots.idx, fromIdx)))
             .orderBy(hiqSimMatchShots.idx);
+    }
+
+    /** 채팅 한 줄(신고 · 차단 — 2026-10-26). 화면은 보낸 사람 id 를 모른다 — 서버가 줄에서 찾는다 */
+    async getChatBySeq(matchId: string, seq: number): Promise<HiqSimMatchChat | null> {
+        const [row] = await db.select().from(hiqSimMatchChats)
+            .where(and(eq(hiqSimMatchChats.matchId, matchId), eq(hiqSimMatchChats.seq, seq))).limit(1);
+        return row ?? null;
+    }
+
+    /** 차단 관계(어느 쪽이 했든)인 사람들 — 대전 채팅에서 그 사람의 말을 가린다(멀티방 목록과 같은 기준) */
+    async blockedPeerIds(memberId: string): Promise<Set<string>> {
+        const rows = await db.select({ a: hiqBlocks.blockerId, b: hiqBlocks.blockedId }).from(hiqBlocks)
+            .where(or(eq(hiqBlocks.blockerId, memberId), eq(hiqBlocks.blockedId, memberId)));
+        return new Set(rows.map((r) => (r.a === memberId ? r.b : r.a)));
     }
 
     /** 채팅 따라잡기 — 샷과 같은 커서 규약(seq >= from). unique(match_id, seq) 의 btree 를 그대로 쓴다. */
@@ -678,8 +720,11 @@ export class SimMatchRepository {
         return row;
     }
 
-    /** 40초 룰 시간 초과: 샷 행 없이 이닝을 넘긴다(상태·차례·버전 갱신). 차례가 이미 바뀌었으면 null. */
-    async passTurn(a: { id: string; turn: number; newState: unknown; newTurn: number; finished: boolean; winnerIndex: number | null; endReason: string | null; strikeIndex?: 0 | 1 }): Promise<HiqSimMatch | null> {
+    /**
+     * 40초 룰 시간 초과: 샷 행 없이 이닝을 넘긴다(상태·차례·버전 갱신). 차례가 이미 바뀌었으면 null.
+     * at — 다음 차례 시계를 셀 기준 시각(없으면 지금). 둘 다 떠난 판을 서버가 따라잡을 때(sweepAbandonedClocks) 그 시간 초과가 났어야 할 시각을 준다.
+     */
+    async passTurn(a: { id: string; turn: number; newState: unknown; newTurn: number; finished: boolean; winnerIndex: number | null; endReason: string | null; strikeIndex?: 0 | 1; at?: number }): Promise<HiqSimMatch | null> {
         return db.transaction(async (tx) => {
             const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, a.id)).for("update");
             if (!m || m.status !== "playing" || m.turn !== a.turn) return null;
@@ -687,7 +732,7 @@ export class SimMatchRepository {
             const [row] = await tx.update(hiqSimMatches).set({
                 state: a.newState, turn: a.newTurn, version: m.version + 1, lastShotAt: new Date(),
                 // 시간 초과엔 재생이 없다 — 접속 중이면 바로 시작
-                turnSeenAt: nextTurnSeenAt(m, a.newTurn, a.finished, 0),
+                turnSeenAt: nextTurnSeenAt(m, a.newTurn, a.finished, 0, a.at ?? Date.now()),
                 // 차례가 바뀌면 옛 조준은 남의 것이다 — 지운다(2026-09-16)
                 aimPhi: null, aimAt: null,
                 ...(a.strikeIndex === 0 ? { hostTimeouts: m.hostTimeouts + 1 } : a.strikeIndex === 1 ? { guestTimeouts: m.guestTimeouts + 1 } : {}),

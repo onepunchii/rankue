@@ -212,6 +212,8 @@ export const vi: Record<string, string> = {
   "err.sim.tooManyTries": "Thử quá nhiều lần. Vui lòng thử lại sau",
   "err.sim.inviteCooldown": "Đã mời rồi. Bạn có thể gửi lại sau ít phút",
   "err.sim.alreadyStarted": "Trận đấu này đã bắt đầu rồi",
+  "err.sim.hasPlaying": "Bạn đang có một trận chưa xong. Hãy chọn có bỏ cuộc trước không",
+  "err.chat.banned": "Trò chuyện đang bị hạn chế theo chính sách cộng đồng. Sẽ mở lại sau {n} giờ",
   "err.sim.joinOwn": "Bạn không thể tham gia trận đấu do chính mình tạo",
   "err.sim.notJoinable": "Không thể tham gia trận đấu này",
   "err.sim.badPassword": "Mật khẩu không đúng",

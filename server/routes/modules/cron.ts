@@ -22,7 +22,7 @@ router.post("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly() });
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly(), simClocks: await simClocksQuietly() });
 }));
 
 // Vercel Cron은 GET으로 호출한다(문서 기준). 동일 핸들러를 재사용.
@@ -33,8 +33,20 @@ router.get("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly() });
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly(), simClocks: await simClocksQuietly() });
 }));
+
+// 둘 다 떠난 온라인 대전의 시계(2026-10-26 — routes/modules/simMatch sweepAbandonedClocks). 목록을 보는 사람이 없을 때의 받침 — 매시 한 번.
+// 여기서 터져도 리마인더의 응답은 깨지 않는다.
+async function simClocksQuietly(): Promise<unknown> {
+    try {
+        const { sweepAbandonedClocks } = await import("./simMatch.js");
+        return { timeouts: await sweepAbandonedClocks(50) };
+    } catch (e) {
+        console.error("[SimClocks]", e);
+        return { error: true };
+    }
+}
 
 // 라운드 전날 저녁 브리핑(2026-10-05) — 매시 도는 리마인더에 얹는다(크론 항목을 늘리지 않는다: Vercel 요금제가 개수를 센다).
 // 한국 시각 19~20시대에만 일하고 나머지 시간엔 아무것도 읽지 않는다. 여기서 터져도 크루 리마인더의 응답은 깨지 않는다.

@@ -212,6 +212,8 @@ export const ko: Record<string, string> = {
   "err.sim.tooManyTries": "시도가 너무 많아요. 잠시 후 다시 해 주세요",
   "err.sim.inviteCooldown": "방금 초대했어요. 조금 뒤에 다시 보낼 수 있어요",
   "err.sim.alreadyStarted": "이미 시작된 대전입니다",
+  "err.sim.hasPlaying": "진행 중인 대전이 있어요. 기권하고 시작할지 골라 주세요",
+  "err.chat.banned": "운영 정책에 따라 채팅이 막혀 있어요. {n}시간 뒤에 풀려요",
   "err.sim.joinOwn": "내가 만든 대전에는 참가할 수 없습니다",
   "err.sim.notJoinable": "참가할 수 없는 대전입니다",
   "err.sim.badPassword": "비밀번호가 맞지 않습니다",

@@ -46,6 +46,9 @@ const mem = vi.hoisted(() => {
         async get(id: string) { return state.rows.get(id); },
         async recentPublicRoomsByHost() { return 1; }, // 방송은 건너뛴다(같은 방장이 방금 열었다)
         async listPublicWaiting() { return state.waiting; },
+        // 2026-10-26: 만들기 전에 진행 중인 내 판을 본다(playingGate) · 목록을 볼 때 버려진 판의 시계를 센다(sweepAbandonedClocks)
+        async listPlayingOf() { return []; },
+        async listAbandonedClocks() { return []; },
     };
     const community = { async report(o: any) { state.reports.push(o); return { autoBlinded: false, authorId: null }; } };
     const notifs = { async listPushableMembers() { return []; } };

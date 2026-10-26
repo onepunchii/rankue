@@ -217,6 +217,11 @@ export function MatchMiniChat(p: {
     /** 지금 보고 있는 관전자 수(2026-09-21 오너: "채팅 바에 관전하는 사람 표시가 필요해"). 0 이면 안 그린다. */
     watchers?: number;
     disabled?: boolean;
+    /** 상대 글 말풍선을 누르면(2026-10-26) — 신고 · 차단 · 채팅 끄기 창. 없으면 말풍선은 누를 수 없는 글이다 */
+    onLineMenu?: (line: ChatLine) => void;
+    /** 상대 채팅을 껐다 — 상자 안에 '껐어요 · 켜기' 한 줄 */
+    chatOff?: boolean;
+    onChatOn?: () => void;
 }) {
     const { t } = useT();
     const [busy, setBusy] = useState(false);
@@ -246,7 +251,7 @@ export function MatchMiniChat(p: {
         if (r === "ok") { p.onDraft(""); return; }
         // 고쳐 쓸 수 있는 거부는 초안을 남기고, 더 못 보내는 것만 비운다.
         if (r === "limit") { p.onDraft(""); setNote(t("sim.emoji.limit")); return; }
-        setNote(r === "too-fast" ? t("sim.emoji.tooFast") : r === "blocked" ? t("sim.chat.blocked") : t("sim.chat.failed"));
+        setNote(r === "too-fast" ? t("sim.emoji.tooFast") : r === "blocked" ? t("sim.chat.blocked") : r === "banned" ? t("sim.chat.banned") : t("sim.chat.failed"));
     }, [p, busy, t]);
 
     const sendCode = useCallback(async (code: string) => {
@@ -307,6 +312,12 @@ export function MatchMiniChat(p: {
                 </button>
             )}
             {note && <span className="shrink-0 self-center rk-chip bg-surface-3 text-ink-2">{note}</span>}
+            {p.chatOff && (
+                <p className="hide-on-keyboard shrink-0 flex items-center justify-center gap-1.5 text-[12px] font-medium text-ink-3" data-testid="sim-chat-off-note">
+                    {t("sim.chat.menu.offNote")}
+                    {p.onChatOn && <button type="button" onClick={p.onChatOn} className="relative font-semibold text-brand rk-hit44">{t("sim.chat.menu.turnOn")}</button>}
+                </p>
+            )}
             {/* 줄 영역: 문구판이 열리면 그 자리를 문구판이 쓴다(높이 그대로). 넘치면 오래된 줄이 위로 잘린다. */}
             {p.quickOpen ? (
                 <QuickChips onPick={(code) => { void sendCode(code); }} disabled={p.disabled || busy} />
@@ -335,10 +346,15 @@ export function MatchMiniChat(p: {
                         <ul className="min-h-full flex flex-col justify-end gap-1" aria-live="polite">
                             {shown.map((l) => {
                                 const mine = l.from === p.myIndex;
+                                // 상대가 쓴 글(문구 단추 말고)만 누를 수 있다 — 신고 · 차단 · 채팅 끄기(2026-10-26)
+                                const menu = p.onLineMenu && !mine && l.kind === "text" && l.from !== CHAT_FROM_WATCHER ? p.onLineMenu : null;
+                                const Bubble = menu ? "button" : "span";
                                 return (
                                     <li key={l.id} className={cn("shrink-0 flex", mine ? "justify-end" : "justify-start")}>
-                                        <span
+                                        <Bubble
+                                            {...(menu ? { type: "button" as const, onClick: () => menu(l), "aria-label": `${l.text} — ${t("sim.chat.menu.title")}`, "data-testid": "sim-chat-line" } : {})}
                                             className={cn(
+                                                menu && "text-left active:opacity-70",
                                                 // 펼치면 긴 말도 다 보이게 줄바꿈, 접힘에선 한 줄로
                                                 "max-w-[85%] px-2.5 py-0.5 rounded-2xl text-[12.5px] leading-snug",
                                                 p.expanded ? "break-words" : "truncate",
@@ -349,7 +365,7 @@ export function MatchMiniChat(p: {
                                         >
                                             {l.from === CHAT_FROM_WATCHER && <span className={WATCHER_TAG}>{t("sim.chat.watcherTag")}</span>}
                                             {lineText(l, t)}
-                                        </span>
+                                        </Bubble>
                                     </li>
                                 );
                             })}

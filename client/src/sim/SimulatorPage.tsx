@@ -77,7 +77,11 @@ import { cueSkin } from "./render/cueSkin";
 import { CupPage } from "./cup/CupPage";
 import { CUP_PATH } from "./cup/cupApi";
 import { sanitizeCode, parseJoinParams } from "./matchApi";
-import { matchApi, type MatchPublic } from "./matchApi";
+import { matchApi, matchChatReportUrl, withForfeitConfirm, type MatchPublic } from "./matchApi";
+import { ChatLineMenu } from "./match/ChatLineMenu";
+import { ReportDialog } from "@/components/hiq/community/ReportDialog";
+import { appConfirm } from "@/components/AppDialog";
+import { askForfeitPlaying } from "./match/forfeitConfirm";
 import { MatchLobby } from "./match/MatchLobby";
 import { MATCH_LIST_QUERY_KEY } from "./match/queryKeys";
 import { endReasonText, shouldOpenMatch } from "./match/matchView";
@@ -192,6 +196,8 @@ const TABLE_INSETS: SafeInsets = { top: 8, right: 68, bottom: DOCK_HEIGHT + 8, l
 const COMPACT_BELOW_PX = 720;
 /** 대전이 아닐 때의 빈 채팅 — 매 렌더 새 배열을 만들면 memo 가 무의미해진다. */
 const EMPTY_CHAT: readonly ChatLine[] = [];
+/** 상대 채팅 끄기(2026-10-26) — 이 기기에 남긴다. 문구 단추 · 관전 응원은 그대로 보인다 */
+const CHAT_OFF_KEY = "rankue-sim-chat-off";
 /** 오른쪽 열에서 툴바를 뺀 고정 높이(md, px): 열 상하 여백(top/bottom-1.5) 12 + 큐 슬라이더 알약 최소 + 간격 8×3 + ± 36 + 샷 64. */
 const RIGHT_FIXED_MD = 12 + POWER_RAIL_MIN_MD + 8 * 3 + 36 + 64;
 
@@ -528,7 +534,9 @@ export function SimulatorPage() {
                 // same=1(채팅 '온라인 대전' 카드의 같은 점수 방): 목표를 안 보내면 서버가 방장 목표를 그대로 준다 — 둘 다 같은 점수.
                 const handi = member ? (m.gameType === "3c" ? member.handi3c : member.handi4c) : null;
                 const target = sameTarget ? undefined : handi !== null && handi !== undefined && handi >= 1 && handi <= 999 ? handi : m.hostTarget;
-                const joined = await matchApi.joinMatch(joinCode, target);
+                // 진행 중인 판이 있으면 먼저 묻는다 — 안 고르면 들어가지 않고 첫 화면으로(2026-10-26)
+                const joined = await withForfeitConfirm((o) => matchApi.joinMatch(joinCode, target, undefined, o), () => askForfeitPlaying(t));
+                if (!joined) { navigate(ENTRY_PATH, { replace: true }); return; }
                 void queryClient.invalidateQueries({ queryKey: MATCH_LIST_QUERY_KEY });
                 navigate(`/online-game?match=${joined.id}`, { replace: true });
             } catch {
@@ -1098,7 +1106,31 @@ export function SimulatorPage() {
     const lastChatSeq = chatLines.length > 0 ? chatLines[chatLines.length - 1].seq : 0;
     useEffect(() => { if (chatVisible) setSeenChatSeq(lastChatSeq); }, [chatVisible, lastChatSeq]);
     const myIdx = sim.match?.myIndex ?? -1;
-    const chatUnread = chatLines.some((l) => l.seq > seenChatSeq && l.from !== myIdx);
+    // 보이는 줄(2026-10-26 — 채팅 신고 · 차단 · 끄기): 차단 관계인 사람의 줄(서버가 글을 비워 보낸다)과 이 판에서 차단한 자리의 말은 빼고,
+    // 상대 채팅을 껐으면 상대의 글만 뺀다(문구 단추 · 관전 응원은 남는다). 내 말은 늘 보인다. 커서(chatLines)는 그대로 둔다.
+    const [chatOff, setChatOff] = useState(() => { try { return localStorage.getItem(CHAT_OFF_KEY) === "1"; } catch { return false; } });
+    const turnChatOff = useCallback((off: boolean) => { setChatOff(off); try { localStorage.setItem(CHAT_OFF_KEY, off ? "1" : "0"); } catch { /* 이번만 */ } }, []);
+    const [mutedSeat, setMutedSeat] = useState<{ matchId: string; from: number } | null>(null);
+    const [lineMenu, setLineMenu] = useState<ChatLine | null>(null);
+    const [reportLine, setReportLine] = useState<{ matchId: string; seq: number } | null>(null);
+    const mutedFrom = mutedSeat && sim.match && mutedSeat.matchId === sim.match.id ? mutedSeat.from : null;
+    const visibleChat = useMemo(
+        () => chatLines.filter((l) => l.from === myIdx || (!l.hidden && l.from !== mutedFrom && !(chatOff && l.kind === "text"))),
+        [chatLines, myIdx, mutedFrom, chatOff],
+    );
+    const blockChatLine = useCallback(async (l: ChatLine) => {
+        const id = sim.match?.id;
+        if (!id || !matchApi.blockChatSender) return;
+        const ok = await appConfirm({ title: t("sim.chat.menu.blockTitle"), message: t("sim.chat.menu.blockConfirm"), confirmText: t("sim.chat.menu.block"), cancelText: t("sim.common.cancel"), tone: "danger" });
+        if (!ok) return;
+        try {
+            await matchApi.blockChatSender(id, l.seq);
+            setMutedSeat({ matchId: id, from: l.from });
+            setLineMenu(null);
+            toast({ title: t("sim.chat.menu.blocked") });
+        } catch { toast({ title: t("sim.chat.failed") }); }
+    }, [sim.match?.id, t, toast]);
+    const chatUnread = visibleChat.some((l) => l.seq > seenChatSeq && l.from !== myIdx);
     /** 대화창 높이 상한 — 윗변이 당구 천 아래끝보다 아래에 오게(공을 가릴 수 없게). 렌더러와 같은 배치 계산을 쓴다. */
     const chatMaxH = useMemo(
         () => chatMaxHeight({ width: tableW, height: tableH, table, insets: TABLE_INSETS, bottomGap: 12, floor: 60 }),
@@ -1725,7 +1757,7 @@ export function SimulatorPage() {
                             **auto 를 붙이지 마라.** 조준 중에도 보인다: 상대 말이 안 보이면 대화가 아니라 편지가 된다. */}
                         {/* 상대 차례엔 아래 대화창이 같은 말을 계속 보여 주므로 여기는 조준·재생 중에만 */}
                         {isMatch && sim.match && sim.phase !== "waiting" && (
-                            <MatchChatLog lines={chatLines} myIndex={sim.match.myIndex} now={chatNow} />
+                            <MatchChatLog lines={visibleChat} myIndex={sim.match.myIndex} now={chatNow} />
                         )}
                         {/* 조준 중 1탭 문구(2026-09-16). 하단 입력줄은 상대 차례에만 있는데, 상대가 빗나간 직후
                             "아깝다"를 보내고 싶은 순간이 바로 내 차례다. 읽은 자리 바로 아래에서 답한다. */}
@@ -1893,7 +1925,7 @@ export function SimulatorPage() {
                                 대화 줄은 결과 배너가 뜨는 동안·재생 중엔 접는다(배너와 겹치지 않게, 굴러가는 공을 덜 가리게) —
                                 입력줄은 남겨 쓰던 글과 키보드가 살아 있다. 자리 비움은 시계가 아직 안 돌 때만. */}
                             <MatchMiniChat
-                                lines={chatLines} myIndex={sim.match.myIndex} opponentName={sim.match.opponentName}
+                                lines={visibleChat} myIndex={sim.match.myIndex} opponentName={sim.match.opponentName}
                                 draft={chatDraft} onDraft={setChatDraft}
                                 onSend={onSendChat} onSendCode={onSendChatCode}
                                 quickOpen={chatQuickOpen} onQuickOpen={setChatQuickOpen}
@@ -1906,6 +1938,8 @@ export function SimulatorPage() {
                                 onClaim={sim.phase === "waiting" && sim.match.canClaim ? () => { void onClaim(); } : null}
                                 watchers={sim.match.watchers ?? 0}
                                 disabled={!sim.match.canChat}
+                                onLineMenu={setLineMenu}
+                                chatOff={chatOff} onChatOn={() => turnChatOff(false)}
                             />
                         </div>
                     )}
@@ -2070,6 +2104,20 @@ export function SimulatorPage() {
             />
             <GuestPathGate open={guestGate} onOpenChange={setGuestGate} onSignup={() => { setGuestGate(false); goLogin(navigate, "/online-game?path=1"); }} />
             <ResignConfirm open={resignOpen} onOpenChange={setResignOpen} busy={exiting} onConfirm={() => { void onResign(); }} />
+            {/* 대전 채팅 한 줄 — 신고 · 차단 · 상대 채팅 끄기(2026-10-26) */}
+            <ChatLineMenu
+                line={lineMenu} onClose={() => setLineMenu(null)}
+                onReport={(l) => { if (sim.match) setReportLine({ matchId: sim.match.id, seq: l.seq }); setLineMenu(null); }}
+                onBlock={(l) => { void blockChatLine(l); }}
+                chatOff={chatOff} onChatOff={(off) => { turnChatOff(off); setLineMenu(null); }}
+            />
+            {reportLine && (
+                <ReportDialog
+                    open onOpenChange={(o) => { if (!o) setReportLine(null); }}
+                    targetType="member" targetId={reportLine.matchId}
+                    reportPath={matchChatReportUrl(reportLine.matchId, reportLine.seq)}
+                />
+            )}
             <InningSheet
                 open={sheetOpen} onOpenChange={setSheetOpen} log={log} completed={completed} session={sim.session} names={names} phase={sim.phase}
                 onHelp={pathView ? undefined : () => { setSheetOpen(false); setCoachReplay((n) => n + 1); }}

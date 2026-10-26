@@ -212,6 +212,8 @@ export const es: Record<string, string> = {
   "err.sim.tooManyTries": "Demasiados intentos. Inténtalo más tarde",
   "err.sim.inviteCooldown": "Ya invitado. Podrás reenviar en un momento",
   "err.sim.alreadyStarted": "Este match ya comenzó",
+  "err.sim.hasPlaying": "Tienes una partida en curso. Elige si quieres abandonarla primero",
+  "err.chat.banned": "El chat está restringido por nuestras normas. Se reactivará en {n} h",
   "err.sim.joinOwn": "No puedes unirte a tu propio match",
   "err.sim.notJoinable": "No puedes unirte a este match",
   "err.sim.badPassword": "Contraseña incorrecta",

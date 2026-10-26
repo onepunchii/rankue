@@ -30,6 +30,8 @@ import {
     chatLength, isChatCode, normalizeChatText,
 } from "../../../shared/sim/chat.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
+import { chatBanOf, countChatFilterHit } from "../../storage/chatBans.js";
+import { chatBanHoursLeft } from "../../../shared/chatBan.js";
 import { ROOM_TITLE_MAX, checkRoomTitle } from "../../../shared/sim/roomTitle.js";
 import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCHES, scaledTarget, TARGET_INNINGS, targetFor } from "../../../shared/sim/handicap.js";
 import { countWatchers } from "../../../shared/sim/watchers.js";
@@ -88,6 +90,8 @@ export const createSchema = z.object({
      * createHostMatch 는 이 칸을 **읽지 않는다**: 검사를 거친 글만 셋째 인자로 받는다(채팅 카드가 만드는 방에는 방제가 없다).
      */
     title: z.string().max(200).optional(),
+    /** 진행 중인 내 대전을 기권하고 만든다(2026-10-26) — 없이 보내면 409 HAS_PLAYING 으로 먼저 묻는다(playingGate) */
+    forfeitPlaying: z.boolean().optional(),
 });
 
 /**
@@ -105,7 +109,7 @@ export function roomTitleFor(b: { isPublic: boolean; title?: string }): { ok: tr
     const masked = checkRoomTitle([...maskContacts(c.title)].slice(0, ROOM_TITLE_MAX).join(""));
     return { ok: true, title: masked.ok ? masked.title : null };
 }
-const joinSchema = z.object({ target: z.number().int().min(1).max(999).optional(), password: z.string().max(40).optional() });
+const joinSchema = z.object({ target: z.number().int().min(1).max(999).optional(), password: z.string().max(40).optional(), forfeitPlaying: z.boolean().optional() });
 const inviteSchema = z.object({ memberId: z.string().uuid() });
 
 /** 방 비밀번호: "salt:sha256(salt+pw)". 값이 작은 비밀(방 PIN)이라 sha256 이면 충분하고, salt 로 같은 PIN 의 해시가 겹치지 않게 한다. */
@@ -196,8 +200,14 @@ export function canWriteChatText(m: { hostId: string; guestId: string | null }, 
  * sender_id 는 내보내지 않는다(이 파일의 규칙: 상대 회원 id 는 필요 없으니 이름만).
  */
 /** 관전자가 보낸 줄은 이름을 싣지 않는다 — 화면은 "관전"으로만 그린다(누가 봤는지 남기지 않는다). */
-function chatLine(c: { id: string; seq: number; senderIndex: number; kind: string; text: string; createdAt: Date }) {
-    return { id: c.id, seq: c.seq, from: c.senderIndex, kind: c.kind, text: c.text, at: c.createdAt };
+/**
+ * hidden — 차단 관계인 사람의 말(2026-10-26). 줄을 빼지 않고 글만 비운다: 화면의 커서는 seq 가 끊김 없이 이어질 때만 나아가서
+ * (simController mergeChat) 줄을 빼면 그 자리에서 멈춰 폴링마다 같은 줄을 다시 받는다.
+ */
+function chatLine(c: { id: string; seq: number; senderIndex: number; kind: string; text: string; createdAt: Date }, hidden = false) {
+    return hidden
+        ? { id: c.id, seq: c.seq, from: c.senderIndex, kind: c.kind, text: "", at: c.createdAt, hidden: true }
+        : { id: c.id, seq: c.seq, from: c.senderIndex, kind: c.kind, text: c.text, at: c.createdAt };
 }
 
 /** 관전 목록에 들어갈 한 줄. 관전은 목록에서 고르는 화면이라 점수·차례까지만 담고 공 배치는 싣지 않는다. */
@@ -388,6 +398,30 @@ async function notifyUrl(memberId: string | null | undefined, title: string | I1
  * (chatCards.ts 의 SIM_INVITE)가 같은 규칙으로 방을 만들도록 여기 하나로 둔다. 공개 방 방송은 라우트 몫.
  * rules 가 종목과 안 맞으면 null(라우트는 400).
  */
+/**
+ * 진행 중인 내 대전이 있는데 새 방을 만들거나 다른 방에 들어가려 한다(2026-10-26 오너 — 멀티방에 '방이 2개'):
+ * 예전엔 대기 방만 접어서, 치다 나간 판이 '진행 중'으로 남아 관전 목록에 하루 동안 떠 있었다.
+ * 묻지 않았으면(forfeit=false) "ask" — 화면이 "진행 중인 판이 있어요 — 기권하고 새로 만들까요?"를 묻고 forfeitPlaying 을 붙여 다시 보낸다.
+ * 무효가 아니라 **기권(상대 승)** 이다 — 무효로 닫으면 지고 있던 사람이 새 방을 열어 패배를 지울 수 있다.
+ */
+export async function playingGate(memberId: string, forfeit: boolean, exceptId?: string): Promise<MatchWithNames[] | "ask"> {
+    const playing = await storage.simMatch.listPlayingOf(memberId, exceptId);
+    if (playing.length && !forfeit) return "ask";
+    return playing;
+}
+
+/** 옛 판들을 그 사람의 기권으로 끝낸다(기권 단추와 같은 길 — finish(…, "resign") · 상대에게 알림). 새 판은 건드리지 않는다 */
+async function forfeitPlaying(memberId: string, playing: MatchWithNames[], keepId: string): Promise<void> {
+    for (const old of playing) {
+        if (old.id === keepId) continue;
+        const winnerId = old.hostId === memberId ? old.guestId : old.hostId;
+        const row = await storage.simMatch.finish(old.id, winnerId ?? null, "resign").catch((e: unknown) => { console.warn("[sim] forfeitPlaying", (e as Error)?.message); return null; });
+        if (!row) continue;
+        const meName = (old.hostId === memberId ? old.hostName : old.guestName) ?? "상대";
+        await notify(winnerId, "notif.sim.finished.title", msg("notif.sim.finished.resigned", { name: meName }), old.id).catch(() => undefined);
+    }
+}
+
 export async function createHostMatch(hostId: string, b: z.infer<typeof createSchema>, title: string | null = null): Promise<{ full: MatchWithNames; closed: number } | null> {
     const rules: Rules = b.rules ?? (b.gameType === "3c" ? DEFAULT_3C_RULES : DEFAULT_4C_RULES);
     if (rules.gameType !== b.gameType) return null;
@@ -429,9 +463,12 @@ router.post("/sim/matches", requireAuth, asyncHandler(async (req: AuthRequest, r
     const b = parsed.data;
     const titled = roomTitleFor(b);
     if (!titled.ok) return sendError(res, 400, titled.error, titled.code);
+    const playing = await playingGate(req.userId!, b.forfeitPlaying === true);
+    if (playing === "ask") return sendError(res, 409, "err.sim.hasPlaying", "HAS_PLAYING");
     const made = await createHostMatch(req.userId!, b, titled.title);
     if (!made) return sendError(res, 400, "err.sim.rulesMismatch");
     const { full, closed } = made;
+    await forfeitPlaying(req.userId!, playing, full.id);
     // 멀티방(공개)이면 알림을 받을 수 있는 회원에게 방이 열렸다고 알린다. 응답을 기다리게 하지 않는다.
     if (b.isPublic && full) {
         await broadcastRoomOpened(req.userId!, full.hostName, full).catch((e) => console.error("[RoomBroadcast]", e));
@@ -468,6 +505,8 @@ async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body:
         return sendError(res, 409, "err.sim.alreadyStarted");
     }
     if (m.status !== "waiting") return sendError(res, 409, "err.sim.notJoinable");
+    const playing = await playingGate(req.userId!, body.forfeitPlaying === true, m.id);
+    if (playing === "ask") return sendError(res, 409, "err.sim.hasPlaying", "HAS_PLAYING");
     const pwKey = `pw:${m.id}:${req.userId}`;
     if (m.passwordHash && overLimit(pwKey, PW_FAIL.max, PW_FAIL.windowMs)) return sendError(res, 429, "err.sim.tooManyTries", "TOO_MANY");
     if (!checkRoomPassword(m.passwordHash, body.password)) {
@@ -498,6 +537,8 @@ async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body:
     const balls = openingLayout(m.gameType, TABLES[m.tableId], "white");
     const started = await storage.simMatch.start(m.id, req.userId!, guestTarget, state, balls, hostTarget);
     if (!started) return sendError(res, 409, "err.sim.startedOrNotJoinable");
+    // 새 판이 시작된 뒤에 옛 판을 기권한다 — 먼저 기권하고 이 방을 남에게 뺏기면 둘 다 잃는다
+    await forfeitPlaying(req.userId!, playing, m.id);
     // 남의 방에 들어가면 내가 열어 둔 대기 방은 닫는다 — 안 닫으면 누가 그 방에 들어와 내가 이 판을 치는 동안
     // 저쪽 시계가 돌아 몰수패를 당했다(2026-09-26 검토).
     await storage.simMatch.cancelOtherWaiting(req.userId!, m.id).catch((e: unknown) => console.warn("[sim] cancelOtherWaiting", (e as Error)?.message));
@@ -667,6 +708,7 @@ router.post("/sim/matches/code/:code/join", requireAuth, asyncHandler(async (req
 
 // GET /sim/rooms — 멀티방 목록(공개·대기 중·내 방 아님·24시간 이내). 코드는 숨긴다(비밀번호 방을 코드로 우회하지 못하게).
 router.get("/sim/rooms", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    await sweepSoon();
     const rows = await storage.simMatch.listPublicWaiting(req.userId!, Date.now() - ROOM_LIST_WINDOW_MS);
     // 방장이 보고 있는 방을 먼저 — 들어가면 바로 친다. 자리 비운 방장은 알림을 받고 돌아와야 시작된다.
     // 방장 id 는 목록에서만 준다 — 신고·차단(방제와 방장 이름은 누구에게나 보이는 글이다)이 대상을 알아야 한다
@@ -705,6 +747,7 @@ router.post("/sim/matches/:id/report", requireAuth, asyncHandler(async (req: Aut
 // GET /sim/watch — 관전 목록. live = 지금 치고 있는 공개 대전, replays = 최근에 끝난 공개 대전(다시보기).
 // 오너(2026-09-12): "게임 시작하면 방이 사라지는데, 관전으로 들어가면 그 경기를 볼 수 있게".
 router.get("/sim/watch", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    await sweepSoon();
     const [live, replays] = await Promise.all([
         storage.simMatch.listWatchable(req.userId!, "playing", Date.now() - WATCH_LIVE_WINDOW_MS, 20),
         // 다시보기는 정렬(하이런·명경기)을 화면에서 하므로 후보를 넉넉히 내려 준다(2026-09-13 오너)
@@ -826,7 +869,11 @@ async function remindAbsentTurn(m: MatchWithNames, viewerIndex: 0 | 1): Promise<
  * 늦은 샷 거절(POST shots)이 같이 쓴다. myIndex = 요청한 사람 자리(알림 문구를 고르는 데만 쓴다).
  * 이미 차례가 바뀌었으면 null.
  */
-async function applyTimeout(m: MatchWithNames, myIndex: 0 | 1) {
+/**
+ * opts.at — 그 시간 초과가 났어야 할 시각(다음 차례 시계를 그때부터 센다). opts.quiet — 횟수마다 가는 알림은 빼고 끝났을 때만 알린다.
+ * 둘 다 떠난 판을 서버가 따라잡을 때(sweepAbandonedClocks) 쓴다.
+ */
+async function applyTimeout(m: MatchWithNames, myIndex: 0 | 1, opts: { at?: number; quiet?: boolean } = {}) {
     const state = m.state as SessionState;
     const applied = applyShot(state, timeoutOutcome());
     // 쓰리아웃: 이번이 그 사람의 SHOT_CLOCK_STRIKES 번째 시간 초과면 실격패(2026-09-08 오너)
@@ -840,8 +887,10 @@ async function applyTimeout(m: MatchWithNames, myIndex: 0 | 1) {
         // 시간 초과로 이닝이 넘어가며 끝난 판 — 이닝 상한일 수도, 후구를 못 채워 먼저 닿은 사람이 이긴 것(target)일 수도 있다
         finished, winnerIndex, endReason: out ? "timeout" : finishReason(state, applied.session),
         strikeIndex: m.turn === 0 ? 0 : 1,
+        at: opts.at,
     });
     if (!row) return null;
+    if (opts.quiet && !finished) return row;
     const timedOutId = m.turn === 0 ? m.hostId : m.guestId;
     const otherId = m.turn === 0 ? m.guestId : m.hostId;
     if (out) {
@@ -882,6 +931,44 @@ router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: Au
     return sendSuccess(res, publicMatch(full!, req.userId!));
 }));
 
+/**
+ * 둘 다 떠난 판의 시계(2026-10-26 오너: "왜 둘 다 나가면 초시계가 안 흘러?") — 서버리스라 따로 도는 타이머가 없어 시간 초과는
+ * 선수의 화면이 부른다(POST /timeout). 둘 다 나가면 아무도 안 불러 판이 '진행 중'으로 남았다(관전 목록 하루 · 정리 7일).
+ * 여기서 서버가 대신 센다: 두 선수 다 SWEEP_ABSENT_MS 넘게 화면을 안 봤고 차례인 사람의 시계가 끝난 판만.
+ * 시간 초과는 그때 났어야 할 시각으로 적는다(at) — 다음 차례 시계도 그때부터 세니, 오래 버려진 판은 한 번에 쓰리아웃까지 간다.
+ * 규칙은 한 명이 남아 있을 때와 같다(시간 초과 세 번이면 실격 · 레이팅도 같은 길). 횟수 알림은 빼고 끝났을 때만 알린다.
+ * 한 사람이라도 보고 있으면 건드리지 않는다 — 그 사람의 화면이 제때 부른다.
+ * 부르는 곳: 멀티방 · 관전 목록(sweepSoon — 인스턴스마다 30초에 한 번) · 매시 크론(/api/cron/reminders).
+ */
+export const SWEEP_ABSENT_MS = 2 * 60 * 1000;
+export async function sweepAbandonedClocks(limit = 5, nowMs = Date.now()): Promise<number> {
+    const clockMs = SHOT_CLOCK_S * 1000, graceMs = SHOT_CLOCK_GRACE_S * 1000;
+    const ids = await storage.simMatch.listAbandonedClocks(new Date(nowMs - clockMs - graceMs), new Date(nowMs - SWEEP_ABSENT_MS), limit);
+    let n = 0;
+    for (const id of ids) {
+        for (let i = 0; i < SHOT_CLOCK_STRIKES * 2; i++) {
+            const m = await storage.simMatch.get(id);
+            if (!m || m.status !== "playing" || !m.turnSeenAt) break;
+            const lastSeen = Math.max(m.hostSeenAt?.getTime() ?? 0, m.guestSeenAt?.getTime() ?? 0);
+            if (nowMs - lastSeen < SWEEP_ABSENT_MS) break;          // 누가 돌아왔다 — 그 사람의 화면이 센다
+            const due = m.turnSeenAt.getTime() + clockMs;
+            if (nowMs - due < graceMs) break;                        // 아직 시계가 남았다
+            // 마지막 사람이 떠나기 전으로는 당기지 않는다(그때까진 남은 사람의 화면이 불렀어야 했다)
+            const row = await applyTimeout(m, m.turn === 0 ? 1 : 0, { at: Math.max(due, lastSeen), quiet: true });
+            if (!row) break;
+            n++;
+        }
+    }
+    return n;
+}
+let lastSweepAt = 0;
+/** 목록을 볼 때 버려진 판을 먼저 정리한다 — 인스턴스마다 30초에 한 번, 실패해도 목록은 그대로 */
+async function sweepSoon(): Promise<void> {
+    if (Date.now() - lastSweepAt < 30_000) return;
+    lastSweepAt = Date.now();
+    await sweepAbandonedClocks(3).catch((e: unknown) => console.warn("[sim] sweepAbandonedClocks", (e as Error)?.message));
+}
+
 // GET /sim/matches/:id/shots?from=N — 놓친 샷 따라잡기(preState+input 으로 로컬 재시뮬)
 router.get("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
     const m = await storage.simMatch.get(req.params.id);
@@ -901,8 +988,8 @@ router.get("/sim/matches/:id/chats", requireAuth, asyncHandler(async (req: AuthR
     // 두 선수 + 관전자(공개·비밀번호 없는 대전). 쓰기는 아래 POST 가 따로 가른다.
     if (!m || !canReadChat(m, req.userId!)) return sendError(res, 404, "err.sim.matchNotFound");
     const from = Math.max(0, parseInt(String(req.query.from ?? "0"), 10) || 0);
-    const rows = await storage.simMatch.getChats(m.id, from, CHAT_PAGE_MAX);
-    return sendSuccess(res, rows.map(chatLine));
+    const [rows, blocked] = await Promise.all([storage.simMatch.getChats(m.id, from, CHAT_PAGE_MAX), storage.simMatch.blockedPeerIds(req.userId!)]);
+    return sendSuccess(res, rows.map((r) => chatLine(r, blocked.has(r.senderId))));
 }));
 
 // POST /sim/matches/:id/shots — 내 차례 샷
@@ -1021,13 +1108,22 @@ router.post("/sim/matches/:id/chat", requireAuth, asyncHandler(async (req: AuthR
         text = body.code;
     } else if (typeof body.text === "string") {
         if (!canWriteChatText(m, req.userId!)) return sendError(res, 403, "err.sim.watcherText", "WATCHER_TEXT");
+        // 채팅 금지(2026-10-26 — shared/chatBan) — 글만 막는다. 문구 단추(위 code 가지)는 그대로
+        const ban = await chatBanOf(req.userId!);
+        if (ban) return sendError(res, 403, msg("err.chat.banned", { n: chatBanHoursLeft(ban, Date.now()) }), "CHAT_BANNED");
         // 원문 방어값(정규화 전). 이걸 넘기면 정규화·필터에 긴 문자열을 태울 이유가 없다.
         if (body.text.length > 400) return sendError(res, 400, msg("err.sim.chatTooLong", { n: CHAT_MAX_CHARS }));
         const t = normalizeChatText(body.text);
         if (!t) return sendError(res, 400, "err.sim.chatEmpty");
         if (chatLength(t) > CHAT_MAX_CHARS) return sendError(res, 400, msg("err.sim.chatTooLong", { n: CHAT_MAX_CHARS }));
-        const check = checkContent(t);
-        if (check.blocked) return sendError(res, 400, check.reason ?? "err.sim.chatFiltered", "FILTERED");
+        // 대전 채팅은 "match" 맥락 — 모르는 사람끼리의 짧은 말에서만 보는 욕(패드립 · 죽으라는 말 · 손가락 욕)까지(2026-10-26)
+        const check = checkContent(t, { context: "match" });
+        if (check.blocked) {
+            // 막힌 말을 10분 안에 세 번이면 24시간 채팅 금지(countChatFilterHit)
+            const auto = await countChatFilterHit(req.userId!);
+            if (auto) return sendError(res, 403, msg("err.chat.banned", { n: chatBanHoursLeft(auto, Date.now()) }), "CHAT_BANNED");
+            return sendError(res, 400, check.reason ?? "err.sim.chatFiltered", "FILTERED");
+        }
         kind = "text";
         text = maskContacts(t);
     } else {
@@ -1046,6 +1142,48 @@ router.post("/sim/matches/:id/chat", requireAuth, asyncHandler(async (req: AuthR
         return sendError(res, 429, "err.sim.chatLimit", "LIMIT");
     }
     return sendSuccess(res, { line: chatLine(r.row), chatSeq: r.chatSeq });
+}));
+
+/**
+ * 대전 채팅 한 줄 신고 · 차단(2026-10-26 오너 — 멀티방 대전에서 성적인 욕 · 패드립이 오갔는데 판 안에서 신고할 길이 없었다).
+ * 화면은 보낸 사람 id 를 모른다 — 방 id 와 줄 번호(seq)로 부르면 서버가 줄에서 사람을 찾는다. 볼 수 있었던 줄만(canReadChat), 내 말은 안 된다.
+ */
+async function chatLineTarget(req: AuthRequest, res: any): Promise<{ m: MatchWithNames; row: NonNullable<Awaited<ReturnType<typeof storage.simMatch.getChatBySeq>>> } | null> {
+    const seq = Number(req.params.seq);
+    if (!ROOM_ID_RE.test(String(req.params.id)) || !Number.isInteger(seq) || seq < 1) { sendError(res, 404, "err.sim.matchNotFound"); return null; }
+    const m = await storage.simMatch.get(req.params.id);
+    if (!m || !canReadChat(m, req.userId!)) { sendError(res, 404, "err.sim.matchNotFound"); return null; }
+    const row = await storage.simMatch.getChatBySeq(m.id, seq);
+    if (!row) { sendError(res, 404, "err.sim.matchNotFound"); return null; }
+    if (row.senderId === req.userId) { sendError(res, 400, "err.community.cannotReportSelf"); return null; }
+    return { m, row };
+}
+
+// POST /sim/matches/:id/chats/:seq/report — 그 말을 한 사람을 회원 신고(운영자 검토 큐)로. 그때의 말을 상세에 남긴다(채팅이 지워져도 증거가 남게)
+router.post("/sim/matches/:id/chats/:seq/report", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const reason = (req.body ?? {}).reason;
+    if (!ROOM_REPORT_REASONS.includes(reason)) return sendError(res, 400, "err.community.reportReasonRequired");
+    const target = await chatLineTarget(req, res);
+    if (!target) return;
+    const { m, row } = target;
+    const said = row.kind === "code" ? `(문구) ${row.text}` : row.text;
+    await storage.community.report({
+        targetType: "member", targetId: row.senderId, reporterId: req.userId!, reason,
+        detail: `[대전 채팅 ${m.id.slice(0, 8)} · ${row.seq}번째] ${said}`.slice(0, 500),
+    });
+    try {
+        const { notifyAdminsOfReport } = await import("../../services/moderation.js");
+        await notifyAdminsOfReport({ targetType: "member", targetId: row.senderId, reason, reporterId: req.userId! });
+    } catch (e) { console.warn("[sim] chat report notify", (e as Error)?.message); }
+    return sendSuccess(res, { reported: true });
+}));
+
+// POST /sim/matches/:id/chats/:seq/block — 그 말을 한 사람 차단(커뮤니티 차단과 같은 표 — 그 사람의 방 · 채팅 · 글이 다 가려진다)
+router.post("/sim/matches/:id/chats/:seq/block", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const target = await chatLineTarget(req, res);
+    if (!target) return;
+    await storage.community.block(req.userId!, target.row.senderId);
+    return sendSuccess(res, { blocked: true, from: target.row.senderIndex });
 }));
 
 // POST /sim/matches/:id/resign — 기권

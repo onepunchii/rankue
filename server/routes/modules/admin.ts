@@ -211,6 +211,28 @@ router.post("/members/:id/status", checkSuperAdmin, asyncHandler(async (req: any
 }));
 
 /**
+ * GET · POST /admin/members/:id/chat-ban — 채팅 금지(2026-10-26 오너 — 대전 채팅의 성적인 욕 · 패드립에 계정 정지밖에 수단이 없었다).
+ * POST { hours: 24 | 168 | 720, reason? } 로 금지, { hours: null } 로 푼다. 막는 것은 자유 채팅뿐(문구 단추 · 운영자 문의는 그대로 — shared/chatBan).
+ */
+router.get("/members/:id/chat-ban", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const { chatBanOf } = await import("../../storage/chatBans.js");
+    return sendSuccess(res, { ban: await chatBanOf(req.params.id) });
+}));
+router.post("/members/:id/chat-ban", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    const member = await storage.getMemberById(req.params.id);
+    if (!member) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    const { isChatBanHours } = await import("../../../shared/chatBan.js");
+    const hours = req.body?.hours === null ? null : req.body?.hours;
+    if (hours !== null && !isChatBanHours(hours)) return sendError(res, 400, "기간을 골라 주세요");
+    const reason = typeof req.body?.reason === "string" ? req.body.reason.replace(/\s+/g, " ").trim().slice(0, 200) || null : null;
+    const by = req.signedCookies?.hiq_partner_auth ? String(req.signedCookies.hiq_partner_auth).slice(0, 60) : "admin";
+    const { setChatBan } = await import("../../storage/chatBans.js");
+    const ban = await setChatBan(member.id, hours, reason, by);
+    console.info("[admin] 채팅 금지", JSON.stringify({ memberId: member.id, hours, by }));
+    return sendSuccess(res, { ban });
+}));
+
+/**
  * POST /admin/members/:id/reset-pin — 임시 PIN 발급(2026-09-19 오너: 다대맨 문의 "PIN 을 잊어 애플로 새로 들어왔더니 기록이 다 없다").
  * 전화번호 계정은 가입 때 본인이 정한 4자리 PIN 이 있고 기본값이 없다. 보안 질문 답까지 잊으면 되찾을 길이 없어
  * 사용자가 새 계정을 만들고 기록을 잃는다. 운영자가 문의로 본인을 확인한 뒤 임시 PIN 을 발급해 전달한다.

@@ -212,6 +212,8 @@ export const en: Record<string, string> = {
   "err.sim.tooManyTries": "Too many attempts. Please try again later",
   "err.sim.inviteCooldown": "Already invited. You can send again in a bit",
   "err.sim.alreadyStarted": "This match has already started",
+  "err.sim.hasPlaying": "You have a match in progress. Choose whether to forfeit it first",
+  "err.chat.banned": "Chat is restricted under our community policy. It reopens in {n}h",
   "err.sim.joinOwn": "You can't join your own match",
   "err.sim.notJoinable": "This match can't be joined",
   "err.sim.badPassword": "Wrong password",

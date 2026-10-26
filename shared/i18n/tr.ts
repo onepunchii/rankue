@@ -212,6 +212,8 @@ export const tr: Record<string, string> = {
   "err.sim.tooManyTries": "Çok fazla deneme. Lütfen daha sonra tekrar deneyin",
   "err.sim.inviteCooldown": "Zaten davet edildi. Biraz sonra tekrar gönderebilirsiniz",
   "err.sim.alreadyStarted": "Bu maç zaten başladı",
+  "err.sim.hasPlaying": "Devam eden bir maçın var. Önce çekilip çekilmeyeceğini seç",
+  "err.chat.banned": "Sohbet, topluluk kuralları nedeniyle kısıtlandı. {n} saat sonra açılacak",
   "err.sim.joinOwn": "Kendi maçına katılamazsın",
   "err.sim.notJoinable": "Bu maça katılınamaz",
   "err.sim.badPassword": "Şifre yanlış",

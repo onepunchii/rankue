@@ -90,6 +90,37 @@ const mini = (p: Record<string, unknown>) => React.createElement(Chat.MatchMiniC
 const quickButton = (c: HTMLElement) =>
     Array.from(c.querySelectorAll("button")).find((b) => b.getAttribute("aria-label") === ko["sim.chat.quick"])!;
 
+describe("MatchMiniChat — 상대 글을 누르면 신고 · 차단 · 끄기(2026-10-26)", () => {
+    it("상대가 쓴 글만 누를 수 있다 — 내 말 · 문구 단추 · 관전 응원은 글이다", () => {
+        const picked: ChatLine[] = [];
+        const lines = [
+            line({ id: "o1", seq: 1, from: 1, text: "개못하네" }),
+            line({ id: "m1", seq: 2, from: 0, text: "ㅋㅋ" }),
+            line({ id: "o2", seq: 3, from: 1, kind: "code", text: "nice" }),
+            line({ id: "w1", seq: 4, from: 2, kind: "code", text: "watching" }),
+        ];
+        const c = mount(mini({ lines, onLineMenu: (l: ChatLine) => picked.push(l) }));
+        const pressable = Array.from(c.querySelectorAll("[data-testid=sim-chat-line]"));
+        expect(pressable).toHaveLength(1);
+        expect(pressable[0].tagName).toBe("BUTTON");
+        expect(opensPointerEvents(pressable[0], c)).toBe(true);
+        React.act(() => { (pressable[0] as HTMLButtonElement).click(); });
+        expect(picked.map((l) => l.id)).toEqual(["o1"]);
+    });
+    it("메뉴를 안 주면(관전 · 옛 화면) 누를 것이 없다", () => {
+        const c = mount(mini({ lines: [line({ id: "o1", seq: 1, from: 1 })] }));
+        expect(c.querySelectorAll("[data-testid=sim-chat-line]")).toHaveLength(0);
+    });
+    it("상대 채팅을 껐으면 상자 안에 '껐어요 · 켜기'", () => {
+        let on = 0;
+        const c = mount(mini({ chatOff: true, onChatOn: () => { on++; } }));
+        const note = c.querySelector("[data-testid=sim-chat-off-note]")!;
+        expect(note.textContent).toContain(ko["sim.chat.menu.offNote"]);
+        React.act(() => { (note.querySelector("button") as HTMLButtonElement).click(); });
+        expect(on).toBe(1);
+    });
+});
+
 describe("MatchMiniChat — 대화 줄과 입력을 한 상자에(2026-09-18)", () => {
     it("한 상자다 — 대화 줄과 입력칸이 같은 [data-sim-chat] 안에 있다", () => {
         const c = mount(mini({ lines: [line({ id: "a", seq: 1, text: "안되나" })] }));

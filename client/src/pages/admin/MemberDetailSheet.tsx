@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle, LucideFootprints } from "@/lib/icons";
+import { CHAT_BAN_CHOICES, type ChatBan } from "@shared/chatBan";
 import MemberGamesDialog from "./MemberGamesDialog";
 import MemberActivitySheet from "./MemberActivitySheet";
 import MemberSportsSection from "./MemberSportsSection";
@@ -313,6 +314,18 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
         onError: (e: any) => toast({ title: e?.message || "발송 실패", variant: "destructive" }),
     });
 
+    // 채팅 금지(2026-10-26 — shared/chatBan). 자유 채팅만 막는다(대전 문구 단추 · 운영자 문의는 그대로)
+    const chatBanKey = ["/api/hiq/admin/members", member?.id ?? "", "chat-ban"] as const;
+    const chatBanQ = useQuery<{ ban: ChatBan | null }>({ queryKey: chatBanKey, queryFn: () => apiRequest(`/api/hiq/admin/members/${member!.id}/chat-ban`), enabled: !!member, gcTime: 0 });
+    const setChatBan = useMutation({
+        mutationFn: async (hours: number | null) => apiRequest(`/api/hiq/admin/members/${member!.id}/chat-ban`, { method: "POST", body: { hours } }) as Promise<{ ban: ChatBan | null }>,
+        onSuccess: (r, hours) => {
+            toast({ title: hours == null ? "채팅 금지를 풀었습니다" : `채팅을 ${CHAT_BAN_CHOICES.find((c) => c.hours === hours)?.label ?? ""} 막았습니다` });
+            queryClient.setQueryData(chatBanKey, r);
+        },
+        onError: (e: any) => toast({ title: e?.message || "처리 실패", variant: "destructive" }),
+    });
+
     // 골프 칸 — 시트를 열 때만 받는다. 노쇼·취소 이력이 실려 있어 닫으면 캐시에서 바로 지운다(gcTime 0).
     const golfQ = useQuery<AdminMemberGolf>({ queryKey: memberGolfKey(member?.id ?? ""), enabled: !!member, gcTime: 0 });
 
@@ -587,6 +600,31 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                                 <span className="flex-1 text-[14px] font-bold">PIN 초기화</span>
                                                 <span className="text-[12px] text-black/40">임시 PIN 발급</span>
                                             </button>
+                                        )}
+                                        {!isStaff && (
+                                            <div className="px-4 py-3.5" data-testid="admin-chat-ban">
+                                                <div className="flex items-center gap-3">
+                                                    <LucideMessageCircle className="w-4 h-4 text-black/50" />
+                                                    <span className="flex-1 text-[14px] font-bold">채팅 금지</span>
+                                                    {chatBanQ.data?.ban && <span className="shrink-0 rounded-full bg-red-500/10 px-2 py-0.5 text-[11px] font-bold text-red-600">금지 중</span>}
+                                                </div>
+                                                <p className="mt-1 pl-7 text-[12px] leading-snug text-black/45 break-keep">
+                                                    {chatBanQ.data?.ban
+                                                        ? `${new Date(chatBanQ.data.ban.until).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" })}까지 · ${chatBanQ.data.ban.by === "auto" ? "자동(막힌 말 반복)" : chatBanQ.data.ban.reason ?? "운영자"}`
+                                                        : "대전 채팅 · 크루/1:1 채팅의 글을 막습니다. 문구 단추와 운영자 문의는 그대로예요."}
+                                                </p>
+                                                <div className="mt-2 flex flex-wrap gap-1.5 pl-7">
+                                                    {CHAT_BAN_CHOICES.map((c) => (
+                                                        <button key={c.hours} type="button" data-admin-write disabled={setChatBan.isPending}
+                                                            onClick={() => { void appConfirm({ message: `${m.name}님의 채팅을 ${c.label} 막을까요?`, tone: "danger", confirmText: `${c.label} 막기` }).then((ok) => { if (ok) setChatBan.mutate(c.hours); }); }}
+                                                            className="h-9 rounded-full bg-red-500/[0.08] px-3.5 text-[13px] font-bold text-red-600 disabled:opacity-50">{c.label}</button>
+                                                    ))}
+                                                    {chatBanQ.data?.ban && (
+                                                        <button type="button" data-admin-write disabled={setChatBan.isPending} onClick={() => setChatBan.mutate(null)}
+                                                            className="h-9 rounded-full bg-brand/10 px-3.5 text-[13px] font-bold text-brand disabled:opacity-50">풀기</button>
+                                                    )}
+                                                </div>
+                                            </div>
                                         )}
                                         {m.profileId && !isStaff && (
                                             <button data-admin-write

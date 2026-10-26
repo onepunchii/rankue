@@ -26,6 +26,8 @@ vi.mock("@/lib/nativeBridge", () => ({ setBackHandler: () => undefined, isNative
 // 앱 안 기록 표시(2026-10-21) — 시험은 늘 '바로 들어온' 화면이다(닫기 · 나가기가 정해 둔 곳으로 바꿔 끼운다)
 vi.mock("@/lib/inAppHistory", () => ({ cameInApp: () => false }));
 vi.mock("@/lib/utils", () => ({ cn: (...a: unknown[]) => a.filter((x) => typeof x === "string" && x).join(" ") }));
+// 진행 중인 판 기권 확인 · 채팅 차단 확인(2026-10-26)
+vi.mock("@/components/AppDialog", () => ({ appConfirm: async () => true, appAlert: async () => undefined }));
 vi.mock("@/lib/queryClient", () => ({ apiRequest: nav.apiRequest }));
 vi.mock("@/hooks/use-toast", () => ({ useToast: () => ({ toast: nav.toast }) }));
 vi.mock("@/hooks/useGameAudio", () => ({ useGameAudio: () => ({ getCtx: () => null }) }));

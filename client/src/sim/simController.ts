@@ -162,7 +162,8 @@ export interface SimAux {
 }
 
 /** 한마디 전송 결과. 서버가 내는 거부를 **전부** 담는다 — 빠뜨리면 그 안내 문구가 죽은 키가 된다. */
-export type ChatSendResult = "ok" | "too-fast" | "limit" | "blocked" | "your-turn" | "failed";
+/** banned — 채팅 금지 중(2026-10-26, 서버 403 CHAT_BANNED). 문구 단추는 그대로 쓸 수 있다 */
+export type ChatSendResult = "ok" | "too-fast" | "limit" | "blocked" | "banned" | "your-turn" | "failed";
 
 export interface SimSnapshot {
     readonly core: SimCoreState;
@@ -1059,6 +1060,7 @@ export class SimController {
             if (code === "TOO_FAST") return "too-fast";
             if (code === "LIMIT") return "limit";
             if (code === "FILTERED") return "blocked";
+            if (code === "CHAT_BANNED") return "banned";
             if (code === "YOUR_TURN") return "your-turn";
             return "failed";
         }

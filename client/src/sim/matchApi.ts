@@ -64,6 +64,13 @@ export function matchChatUrl(id: string): string {
 export function matchChatsUrl(id: string, from = 0): string {
     return `${matchUrl(id)}/chats?from=${from}`;
 }
+/** 채팅 한 줄 신고 · 차단(2026-10-26) — 화면은 보낸 사람 id 를 모른다. 방 id 와 줄 번호로 부르면 서버가 찾는다 */
+export function matchChatReportUrl(id: string, seq: number): string {
+    return `${matchUrl(id)}/chats/${seq}/report`;
+}
+export function matchChatBlockUrl(id: string, seq: number): string {
+    return `${matchUrl(id)}/chats/${seq}/block`;
+}
 
 export function matchTimeoutUrl(id: string): string {
     return `${matchUrl(id)}/timeout`;
@@ -263,6 +270,8 @@ export interface ChatLine {
     readonly kind: "text" | "code";
     readonly text: string;
     readonly at: string;
+    /** 차단 관계인 사람의 말(2026-10-26) — 서버가 글을 비우고 보낸다. 줄은 남는다(커서가 seq 로 이어지게), 화면이 그리지 않는다 */
+    readonly hidden?: boolean;
 }
 
 /** ISO 3166-1 alpha-2 만 통과시킨다 — 화면이 이 두 글자로 국기 이모지를 만든다. */
@@ -299,6 +308,7 @@ export function parseChatLine(raw: unknown): ChatLine | null {
         kind: kind === "code" ? "code" : "text",
         text,
         at: isoOrNull(raw.at) ?? "",
+        ...(raw.hidden === true ? { hidden: true } : {}),
     };
 }
 
@@ -371,6 +381,8 @@ export interface CreateMatchBody {
     readonly password?: string;
     /** 방제(멀티방, 20자). 없으면 보내지 않는다. */
     readonly title?: string;
+    /** 진행 중인 내 대전을 기권하고 만든다(409 HAS_PLAYING 에 사람이 "기권하고 만들기"를 고른 뒤에만). */
+    readonly forfeitPlaying?: true;
 }
 
 /** 방 옵션(로비의 "멀티방으로 열기" 토글·비밀번호). 설정(SimSetupConfig)과 별개다. */
@@ -393,6 +405,13 @@ export function isValidRoomPassword(pw: string): boolean {
 export interface JoinMatchBody {
     readonly target?: number;
     readonly password?: string;
+    /** 진행 중인 내 대전을 기권하고 들어간다(CreateMatchBody 와 같다). */
+    readonly forfeitPlaying?: true;
+}
+
+/** 만들기 · 참가의 덧붙임 — 진행 중인 판을 기권하고 하기(withForfeitConfirm 이 두 번째 시도에 붙인다). */
+export interface StartOptions {
+    readonly forfeitPlaying?: boolean;
 }
 
 /** 초대 보낼 수 있는 상대(GET /api/hiq/opponents 의 필요한 부분만). */
@@ -422,7 +441,7 @@ export interface OpponentLite {
 /* ------------------------------------------------------------------ 요청 매핑 */
 
 /** 설정의 알려진 필드만 옮긴다(여분 필드는 새지 않는다). 방 옵션은 따로. */
-export function toCreateMatchBody(config: SimSetupConfig, room?: RoomOptions): CreateMatchBody {
+export function toCreateMatchBody(config: SimSetupConfig, room?: RoomOptions, opts?: StartOptions): CreateMatchBody {
     const password = room?.isPublic && room.password && isValidRoomPassword(room.password) && room.password !== "" ? room.password : undefined;
     // 방제는 멀티방에만, 정리해서 20자 안일 때만 싣는다(입력칸이 이미 자른다 — 넘친 글은 서버가 거부하니 싣지 않는다)
     const titled = room?.isPublic ? checkRoomTitle(room.title) : null;
@@ -442,15 +461,32 @@ export function toCreateMatchBody(config: SimSetupConfig, room?: RoomOptions): C
         handicap: room?.handicap !== false,
         ...(password ? { password } : {}),
         ...(title ? { title } : {}),
+        ...(opts?.forfeitPlaying ? { forfeitPlaying: true as const } : {}),
     };
 }
 
 /** 게스트 다마수. 생략하면 서버가 호스트 다마수를 쓴다. 정수가 아니거나 범위 밖이면 생략. 비밀번호는 있을 때만. */
-export function toJoinBody(target?: number, password?: string): JoinMatchBody {
-    const body: { target?: number; password?: string } = {};
+export function toJoinBody(target?: number, password?: string, opts?: StartOptions): JoinMatchBody {
+    const body: { target?: number; password?: string; forfeitPlaying?: true } = {};
     if (target !== undefined && Number.isInteger(target) && target >= 1 && target <= 999) body.target = target;
     if (password) body.password = password;
+    if (opts?.forfeitPlaying) body.forfeitPlaying = true;
     return body;
+}
+
+/**
+ * 진행 중인 판이 있으면 먼저 묻는다(2026-10-26 — 멀티방에 치다 나간 판이 '진행 중'으로 남던 일).
+ * 서버가 409 HAS_PLAYING 을 주면 confirm()("진행 중인 판이 있어요 — 기권하고 새로 만들까요?")을 묻고, 고르면 기권을 붙여 다시 한다.
+ * 안 고르면 null — 부르는 쪽은 아무 일도 없던 것처럼 둔다. 다른 오류는 그대로 던진다.
+ */
+export async function withForfeitConfirm<T>(run: (opts?: StartOptions) => Promise<T>, confirm: () => Promise<boolean>): Promise<T | null> {
+    try {
+        return await run();
+    } catch (e) {
+        if (matchErrorCode(e) !== "HAS_PLAYING") throw e;
+        if (!(await confirm())) return null;
+        return run({ forfeitPlaying: true });
+    }
 }
 
 const board = (v: unknown): OpponentBoard => {
@@ -676,7 +712,7 @@ export function parseClaimResponse(raw: unknown): ClaimResponse {
 /* ------------------------------------------------------------------ 오류 분류 */
 
 /** 서버 sendError 의 code. 409 응답에 실린다. */
-export type MatchErrorCode = "NOT_YOUR_TURN" | "IDX_MISMATCH" | "RECORD_CONFLICT" | "TOO_EARLY" | "BAD_PASSWORD";
+export type MatchErrorCode = "NOT_YOUR_TURN" | "IDX_MISMATCH" | "RECORD_CONFLICT" | "TOO_EARLY" | "BAD_PASSWORD" | "HAS_PLAYING";
 
 /**
  * 방 만들기가 방제 때문에 거절됐나(금칙어 TITLE_FILTERED · 길이 TITLE_TOO_LONG).
@@ -692,7 +728,7 @@ export function matchErrorCode(err: unknown): MatchErrorCode | null {
     if (!isRecord(err)) return null;
     const data = isRecord(err.data) ? err.data : null;
     const code = data && typeof data.code === "string" ? data.code : null;
-    return code === "NOT_YOUR_TURN" || code === "IDX_MISMATCH" || code === "RECORD_CONFLICT" || code === "TOO_EARLY" || code === "BAD_PASSWORD" ? code : null;
+    return code === "NOT_YOUR_TURN" || code === "IDX_MISMATCH" || code === "RECORD_CONFLICT" || code === "TOO_EARLY" || code === "BAD_PASSWORD" || code === "HAS_PLAYING" ? code : null;
 }
 
 /**
@@ -771,15 +807,15 @@ export function matchConfig(m: MatchPublic): SimSetupConfig {
 
 export interface MatchApi {
     /** room: 멀티방(공개)·비밀번호. 없으면 코드·초대로만 들어오는 방. */
-    createMatch(config: SimSetupConfig, room?: RoomOptions): Promise<MatchPublic>;
+    createMatch(config: SimSetupConfig, room?: RoomOptions, opts?: StartOptions): Promise<MatchPublic>;
     listMatches(): Promise<readonly MatchPublic[]>;
     lookupCode(code: string): Promise<MatchPublic>;
     /** password: 비밀번호 방일 때(hasPassword). */
-    joinMatch(code: string, target?: number, password?: string): Promise<MatchPublic>;
+    joinMatch(code: string, target?: number, password?: string, opts?: StartOptions): Promise<MatchPublic>;
     /** 멀티방 목록(공개·대기 중·내 방 아님). 코드는 비어 있다. */
     listRooms(): Promise<readonly MatchPublic[]>;
     /** 목록의 방에 참가(id). 비밀번호 방이면 password. 403 BAD_PASSWORD. */
-    joinRoom(id: string, target?: number, password?: string): Promise<MatchPublic>;
+    joinRoom(id: string, target?: number, password?: string, opts?: StartOptions): Promise<MatchPublic>;
     /** 호스트가 친구에게 푸시 초대. 돌아오는 name 은 받은 사람 이름. */
     invite(id: string, memberId: string): Promise<{ name: string }>;
     /** 초대 보낼 수 있는 상대(같은 매장 회원 — 실전 매칭과 같은 목록). */
@@ -809,13 +845,15 @@ export interface MatchApi {
     sendChat?(id: string, body: { text?: string; code?: string; clientKey?: string }): Promise<{ line: ChatLine; chatSeq: number }>;
     /** 놓친 채팅 따라잡기. seq >= from 인 줄을 순서대로. */
     getChats?(id: string, from?: number): Promise<readonly ChatLine[]>;
+    /** 그 줄을 쓴 사람 차단(2026-10-26). 커뮤니티 차단과 같은 표 — 그 사람의 방 · 채팅 · 글이 다 가려진다 */
+    blockChatSender?(id: string, seq: number): Promise<void>;
 }
 
 /** request 를 주입해 만든다(테스트는 가짜 request). 응답은 {success,data} 가 이미 벗겨진 data 여야 한다. */
 export function createMatchApi(request: RequestFn): MatchApi {
     return {
-        async createMatch(config, room) {
-            return parseMatch(await request(matchesUrl(), { method: "POST", body: toCreateMatchBody(config, room) }));
+        async createMatch(config, room, opts) {
+            return parseMatch(await request(matchesUrl(), { method: "POST", body: toCreateMatchBody(config, room, opts) }));
         },
         async listMatches() {
             return parseMatchList(await request(matchesUrl(), { method: "GET" }));
@@ -823,14 +861,14 @@ export function createMatchApi(request: RequestFn): MatchApi {
         async lookupCode(code) {
             return parseMatch(await request(matchCodeUrl(sanitizeCode(code)), { method: "GET" }));
         },
-        async joinMatch(code, target, password) {
-            return parseMatch(await request(matchJoinUrl(sanitizeCode(code)), { method: "POST", body: toJoinBody(target, password) }));
+        async joinMatch(code, target, password, opts) {
+            return parseMatch(await request(matchJoinUrl(sanitizeCode(code)), { method: "POST", body: toJoinBody(target, password, opts) }));
         },
         async listRooms() {
             return parseMatchList(await request(roomsUrl(), { method: "GET" }));
         },
-        async joinRoom(id, target, password) {
-            return parseMatch(await request(matchJoinByIdUrl(id), { method: "POST", body: toJoinBody(target, password) }));
+        async joinRoom(id, target, password, opts) {
+            return parseMatch(await request(matchJoinByIdUrl(id), { method: "POST", body: toJoinBody(target, password, opts) }));
         },
         async invite(id, memberId) {
             const raw = await request(matchInviteUrl(id), { method: "POST", body: { memberId } });
@@ -857,6 +895,9 @@ export function createMatchApi(request: RequestFn): MatchApi {
         async getChats(id, from = 0) {
             const rows = await request(matchChatsUrl(id, from), { method: "GET" });
             return Array.isArray(rows) ? rows.map(parseChatLine).filter((c): c is ChatLine => c !== null) : [];
+        },
+        async blockChatSender(id, seq) {
+            await request(matchChatBlockUrl(id, seq), { method: "POST" });
         },
         async getShots(id, from) {
             return parseMatchShots(await request(matchShotsUrl(id, from), { method: "GET" }));

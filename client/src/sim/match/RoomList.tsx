@@ -16,7 +16,8 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { useT } from "@/lib/i18n";
 import { useToast } from "@/hooks/use-toast";
-import { matchApi as defaultApi, matchErrorCode, type MatchApi, type MatchPublic, type WatchCard } from "../matchApi";
+import { matchApi as defaultApi, matchErrorCode, withForfeitConfirm, type MatchApi, type MatchPublic, type WatchCard } from "../matchApi";
+import { askForfeitPlaying } from "./forfeitConfirm";
 import { gameLabel, rulesLabel, inningCapLabel } from "./matchView";
 import { roomSetKey, shouldRefreshWatch, WATCH_LIST_REFETCH_MS, WATCH_QUERY_KEY } from "../watch/watchPlan";
 import { GuestScaledTarget } from "./ScaledTarget";
@@ -196,7 +197,9 @@ function JoinDialog({ room, api, onClose, onOpen, onWatch }: { room: MatchPublic
         setJoining(true);
         setError(null);
         try {
-            const m = await api.joinRoom(room.id, undefined, room.hasPassword ? password : undefined);
+            // 진행 중인 판이 있으면 먼저 묻는다(2026-10-26)
+            const m = await withForfeitConfirm((o) => api.joinRoom(room.id, undefined, room.hasPassword ? password : undefined, o), () => askForfeitPlaying(t));
+            if (!m) return;
             void qc.invalidateQueries({ queryKey: ROOMS_QUERY_KEY });
             onOpen(m);
         } catch (e) {
