@@ -18,7 +18,9 @@ import { billiardsTermsSitemapParts } from "./seo/billiardsTerms.js";
 import { golfGuideSitemapParts } from "./seo/golfGuide.js";
 import { golfStampsSitemapParts } from "./seo/golfStamps.js";
 import { hikingSitemapParts } from "./seo/hiking.js";
-import { fishingSitemapParts } from "./seo/fishing.js";
+import { fishingSitemapParts, fishingSpotHasPhotos } from "./seo/fishing.js";
+import { fishingSpotPath } from "../shared/fishingPlaces.js";
+import { hikingMountainPath } from "../shared/hikingPage.js";
 import { fishingSeaSitemapParts } from "./seo/fishingSea.js";
 import { fishingFishSitemapParts } from "./seo/fishingFish.js";
 import { allPlaces, placesUpdatedDay } from "./storage/fishingPlaces.js";
@@ -365,6 +367,53 @@ export async function generateSitemapSection(section: SitemapSection): Promise<s
   return urlset(await SECTION_PARTS[section]());
 }
 
+/*
+ * 구글 전용 사이트맵(2026-10-26 오너 — "네이버는 지금 좋아 잘 들어와, 구글 건드리다 네이버까지 문제 생길까 봐").
+ * 14일 유입: 네이버 검색 약 9,160명 · 구글 1명. 서치콘솔은 '발견됨 - 색인 안 됨' 3,729(사이트맵 합계 10,052주소).
+ * 네이버가 보는 것(/sitemap.xml · robots.txt · 페이지)은 하나도 바꾸지 않고, 서치콘솔에만 /sitemap-google.xml 을 낸다 —
+ * 구글이 힘을 쓸 페이지만 담는다. robots.txt 에는 적지 않는다(네이버가 robots 의 Sitemap 줄을 읽을 수 있다).
+ *   그대로: core · trails · players · pba · golf · stores(얇은 매장은 이미 빠짐) · golf-courses · golf-hubs · rankings · terms · tournaments · pba-records
+ *   걸러서: hiking — 허브 · 목록 · 권역 그대로, 산 한 곳은 1 · 2단계(명산)와 소개 글이 있는 산만(작은 봉우리 3,200곳 빠짐)
+ *           festivals — 허브 + 아직 안 끝난 축제만
+ *           fishing — 허브 · 지역 · 종류 · 바다 · 항구 · 어종 그대로, 낚시터 한 곳은 한국관광공사 사진이 있는 곳만(본문 300자 남짓인 나머지는 얇다)
+ * 이미지(image:image) 줄은 그대로 싣는다 — 구글 · 네이버 모두 읽는 표준이다.
+ */
+const locOf = (part: string): string | null => /<loc>([^<]*)<\/loc>/.exec(part)?.[1] ?? null;
+/** 뺄 주소(esc 를 거친 loc 와 같은 꼴)를 받아 그 줄만 걷는다 */
+const without = (parts: string[], drop: ReadonlySet<string>) => parts.filter((p) => { const l = locOf(p); return !l || !drop.has(l); });
+
+const GOOGLE_FILTERED: Partial<Record<SitemapSection, () => Promise<string[]>>> = {
+  hiking: async () => {
+    const all = await allMountains().catch((e) => { console.warn("[sitemap] google hiking:", (e as Error)?.message); return []; });
+    const drop = new Set(all.filter((m) => !(m.tier <= 2 || m.hasGuide)).map((m) => esc(`${ORIGIN}${hikingMountainPath(m.slug)}`)));
+    return without(await SECTION_PARTS.hiking(), drop);
+  },
+  festivals: async () => {
+    const { allFestivals } = await import("./storage/festivals.js");
+    const { kstToday, festivalPath } = await import("../shared/festivals.js");
+    const today = kstToday();
+    const all = await allFestivals().catch((e) => { console.warn("[sitemap] google festivals:", (e as Error)?.message); return []; });
+    const drop = new Set(all.filter((f) => f.end < today).map((f) => esc(`${ORIGIN}${festivalPath(f.id)}`)));
+    return without(await SECTION_PARTS.festivals(), drop);
+  },
+  fishing: async () => {
+    const all = await allPlaces().catch((e) => { console.warn("[sitemap] google fishing:", (e as Error)?.message); return []; });
+    const drop = new Set(all.filter((p) => !fishingSpotHasPhotos(p)).map((p) => esc(`${ORIGIN}${fishingSpotPath(p.id)}`)));
+    return without(await SECTION_PARTS.fishing(), drop);
+  },
+};
+
+/** 구글 전용 인덱스 — 섹션 이름은 같고 주소만 /sitemap-google-<섹션>.xml */
+export function generateGoogleSitemapIndex(): string {
+  const today = day(new Date());
+  return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${
+    SITEMAP_SECTIONS.map((s) => `  <sitemap>\n    <loc>${ORIGIN}/sitemap-google-${s}.xml</loc>\n    <lastmod>${today}</lastmod>\n  </sitemap>`).join("\n")
+  }\n</sitemapindex>\n`;
+}
+export async function generateGoogleSitemapSection(section: SitemapSection): Promise<string> {
+  return urlset(await (GOOGLE_FILTERED[section] ?? SECTION_PARTS[section])());
+}
+
 /** 예전 단일 사이트맵과 같은 내용 — 테스트·점검용(전체 URL 수 세기). 서빙은 인덱스+섹션으로 한다. */
 export async function generateSitemap(): Promise<string> {
   const all: string[] = [];
@@ -387,6 +436,18 @@ export function registerSitemap(app: Express) {
     }
   });
   app.get("/sitemap-:section.xml", async (req, res) => {
+    // 구글 전용(서치콘솔에만 낸다 — 위 GOOGLE_FILTERED): /sitemap-google.xml(인덱스) · /sitemap-google-<섹션>.xml
+    if (req.params.section === "google") return send(res, generateGoogleSitemapIndex());
+    if (req.params.section.startsWith("google-")) {
+      const g = req.params.section.slice("google-".length) as SitemapSection;
+      if (!(SITEMAP_SECTIONS as readonly string[]).includes(g)) return res.status(404).type("text/plain").send("not found");
+      try {
+        return send(res, await generateGoogleSitemapSection(g));
+      } catch (e) {
+        console.error(`[sitemap] google-${g} error:`, e);
+        return res.status(500).send("sitemap error");
+      }
+    }
     const section = req.params.section as SitemapSection;
     if (!(SITEMAP_SECTIONS as readonly string[]).includes(section)) return res.status(404).type("text/plain").send("not found");
     try {

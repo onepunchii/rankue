@@ -20,6 +20,8 @@ import { FISH } from "../../shared/fishingFish.js";
 import { FISHING_TOUR_PHOTOS } from "../data/fishingTourPhotos.js";
 /** 한국관광공사 사진(2026-10-21) — 열쇠 '시도|시군구|이름'(화면과 같은 값) */
 const tourOf = (pl: { sido: string | null; sigungu: string | null; name: string }) => FISHING_TOUR_PHOTOS[`${pl.sido ?? ""}|${pl.sigungu ?? ""}|${pl.name}`]?.photos ?? [];
+/** 한국관광공사 사진이 있는 낚시터인가 — 구글 전용 사이트맵이 싣는 낚시터 한 곳의 기준(server/sitemap googleSectionParts, 2026-10-26) */
+export const fishingSpotHasPhotos = (pl: { sido: string | null; sigungu: string | null; name: string }) => tourOf(pl).length > 0;
 const tourFigures = (name: string, photos: readonly { url: string; lic: "Type1" | "Type3" }[]) => photos.length
     ? `  <h2>${esc(name)} 사진</h2>\n${photos.map((ph, i) => `  <figure><img src="${esc(ph.url)}" alt="${esc(`${name} 사진 ${i + 1}`)}" loading="lazy"><figcaption>${esc(`사진 한국관광공사 · 공공누리 제${ph.lic === "Type1" ? 1 : 3}유형`)}</figcaption></figure>`).join("\n")}\n`
     : "";
