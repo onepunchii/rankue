@@ -9,7 +9,9 @@ import { useQuery } from "@tanstack/react-query";
 import { Link, useLocation } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
 import { FISHING_COLORS as C } from "@shared/fishing";
-import { FISHING_PLACE_COUNT, FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH } from "@shared/fishingPlaces";
+import { FISHING_HOME_PATH, FISHING_PLACE_COUNT, FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, fishingHomeSeo } from "@shared/fishingPlaces";
+import { useSeo } from "@/hooks/useSeo";
+import { fishingSeaCardUrl } from "@shared/ogCards";
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingSeaAreaPath } from "@shared/fishingSeaPages";
 import { FISH_PAGES, FISHING_FISH_LABEL, FISHING_FISH_PATH } from "@shared/fishingFishPages";
 import { FISHING_CLOSED_PATH } from "@shared/fishingClosed";
@@ -41,6 +43,9 @@ function Section({ title, more, children, testId }: { title: string; more?: { hr
 }
 
 export function FishingGuestHome() {
+    // 첫 화면의 제목 · 설명(2026-10-26 — 없어서 기본 당구 제목이 남았다). 검색용 화면(server/seo/fishing renderFishingHome)과 같은 글
+    const homeSeo = fishingHomeSeo(FISHING_PLACE_COUNT, FISHING_PORTS.length);
+    useSeo({ title: homeSeo.title, description: homeSeo.description, path: FISHING_HOME_PATH, locale: "ko", image: fishingSeaCardUrl("https://www.rankue.co.kr", "all") });
     const [, setLocation] = useLocation();
     const { data: sea } = useQuery<SeaNow | null>({ queryKey: ["/api/hiq/fishing/sea"], staleTime: 5 * 60_000 });
     const { data: spots } = useSpots();

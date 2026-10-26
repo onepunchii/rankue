@@ -133,6 +133,20 @@ export function placeSeo(p: PublicPlace): { title: string; description: string; 
         description: [`${where} ${k.label}`, fish ? `대상 어종 ${top(p.species, 5)}` : null, fee ? `요금 ${fee}` : null, p.address ? `주소 ${p.address}` : null].filter(Boolean).join(". ") + ". 가까운 낚시터 · 금어기와 같이 봐요.",
     };
 }
+/**
+ * 낚시 첫 화면(/fishing — 2026-10-26 오너 "낚시 검색이 안 되는 것 같은데"). 봇에게 기본 당구 셸(제목 '당구 점수판 랭큐', canonical 은 홈)이 가서
+ * '랭큐 낚시'가 홈의 겹친 주소로 읽혔다. 화면(GuestHome useSeo)과 검색용 화면(server/seo/fishing renderFishingHome)이 같은 글을 쓴다.
+ */
+export const FISHING_HOME_PATH = "/fishing";
+export function fishingHomeSeo(total: number, ports: number): { title: string; description: string; h1: string } {
+    const n = total.toLocaleString("ko-KR");
+    return {
+        h1: "랭큐 낚시",
+        title: `랭큐 낚시 — 오늘 바다 · 물때 · 전국 낚시터 ${n}곳 · 조과 기록`,
+        description: `오늘 앞바다 풍랑특보와 항구 ${ports}곳의 만조 · 간조, 전국 낚시터 ${n}곳(저수지 · 바다 · 평지), 어종별 금어기 · 금지체장을 가입 없이 봐요. 잡은 고기는 어탁으로 남겨요.`,
+    };
+}
+
 export function spotsHubSeo(total: number): { title: string; description: string; h1: string } {
     return { h1: "전국 낚시터", title: `전국 낚시터 ${total.toLocaleString("ko-KR")}곳 — 저수지 · 바다 · 평지 낚시터 찾기 | 랭큐 낚시`, description: `지역 · 종류 · 어종으로 찾는 전국 낚시터 ${total.toLocaleString("ko-KR")}곳. 대상 어종 · 요금 · 주소를 행정안전부 낚시터정보 그대로 보여 줘요.` };
 }

@@ -1,11 +1,11 @@
 // 전국 낚시터 프리렌더(2026-10-18) — /fishing/spots(허브) · /fishing/spots/region/<시도> · /fishing/spots/type/<종류> · /fishing/spot/<id>.
 // 본문은 shared/fishingPlaces 로 화면(client/src/fishing/spots)과 같은 글을 쓴다. 받은 칸만 적는다(지어 넣지 않는다).
 // prerender.ts 와 서로 import 하는 모양이 되지만, 이 파일은 page · esc 를 함수 안에서만 부른다(최상위에서 호출하지 말 것).
-import { page, esc } from "../prerender.js";
+import { page, esc, hubNav } from "../prerender.js";
 import { entry } from "../sitemap.js";
 import { FISHING_PLACE_SOURCE, fishingSidoShort } from "../../shared/fishing.js";
 import {
-    FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, PLACE_KINDS, fishingRegionPath, fishingSpotPath, fishingTypePath, isPlaceId, nearbyPlaces, placeCounts, placeFeeText, placeKind, placeKindById,
+    FISHING_HOME_PATH, FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, PLACE_KINDS, fishingHomeSeo, fishingRegionPath, fishingSpotPath, fishingTypePath, isPlaceId, nearbyPlaces, placeCounts, placeFeeText, placeKind, placeKindById,
     placeSeo, placeWhere, spotsHubSeo, spotsRegionSeo, spotsTypeSeo, type PublicPlace,
 } from "../../shared/fishingPlaces.js";
 
@@ -13,7 +13,9 @@ import { fishingSpotCardUrl } from "../../shared/ogCards.js";
 import { FISHING_PORTS } from "../../shared/fishingStations.js";
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath } from "../../shared/fishingSeaPages.js";
 import { nearestPort } from "../../shared/fishingPlaces.js";
-import { fishingFishPath, placeFishId } from "../../shared/fishingFishPages.js";
+import { FISHING_FISH_LABEL, FISHING_FISH_PATH, FISH_PAGES, fishingFishPath, placeFishId } from "../../shared/fishingFishPages.js";
+import { FISHING_CLOSED_PATH } from "../../shared/fishingClosed.js";
+import { fishingSeaCardUrl } from "../../shared/ogCards.js";
 import { FISH } from "../../shared/fishingFish.js";
 import { FISHING_TOUR_PHOTOS } from "../data/fishingTourPhotos.js";
 /** 한국관광공사 사진(2026-10-21) — 열쇠 '시도|시군구|이름'(화면과 같은 값) */
@@ -24,8 +26,8 @@ const tourFigures = (name: string, photos: readonly { url: string; lic: "Type1" 
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FishingRender { status: 200; tag: string; html: string }
-/** 낚시터의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
-export const FISHING_SPOTS_RE = /^\/fishing\/(?:spots(?:\/(?:region|type)\/[^/]+)?|spot\/[^/]+)\/?$/;
+/** 낚시 첫 화면 · 낚시터의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다(첫 화면 /fishing 은 2026-10-26 — 그전엔 봇이 당구 셸을 받았다) */
+export const FISHING_SPOTS_RE = /^\/fishing(?:\/(?:spots(?:\/(?:region|type)\/[^/]+)?|spot\/[^/]+))?\/?$/;
 
 const crumbs = (...tail: [string, string][]) => ({
     "@context": "https://schema.org", "@type": "BreadcrumbList",
@@ -70,8 +72,51 @@ ${source()}
     return { status: 200, tag, html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${path}`, body, jsonLd: [list, crumbs(...tail)] }) };
 }
 
+/** 낚시 첫 화면(/fishing) — 바로 가기 · 지역 · 항구 물때 · 어종을 한 장에. 화면의 공개 낚시 홈(GuestHome)과 같은 제목 */
+function renderFishingHome(all: readonly PublicPlace[]): FishingRender {
+    const seo = fishingHomeSeo(all.length, FISHING_PORTS.length);
+    const go: [string, string, string][] = [
+        [FISHING_SPOTS_PATH, FISHING_SPOTS_LABEL, `${all.length.toLocaleString("ko-KR")}곳 — 지역 · 종류 · 어종 · 요금 · 가까운 낚시터`],
+        [FISHING_SEA_PATH, FISHING_SEA_LABEL, `해역별 풍랑특보 · 항구 ${FISHING_PORTS.length}곳의 만조 · 간조 · 수온`],
+        [FISHING_FISH_PATH, `${FISHING_FISH_LABEL} ${FISH_PAGES.length}종`, "어종마다 크기 기준 · 금어기 · 그 어종의 낚시터"],
+        [FISHING_CLOSED_PATH, "금어기 · 금지체장", "오늘 잡으면 안 되는 어종과 크기"],
+        ["/fishing/festivals", "낚시 축제", "바다 · 강 · 저수지 축제"],
+    ];
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › 랭큐 낚시</nav>
+  <h1>${esc(seo.h1)}</h1>
+  <p>${esc(seo.description)}</p>
+  <section>
+    <h2>바로 가기</h2>
+    <ul>
+${go.map(([href, name, sub]) => `      <li><a href="${href}">${esc(name)}</a> — ${esc(sub)}</li>`).join("\n")}
+    </ul>
+  </section>
+  <section>
+    <h2>지역 · 종류로 찾는 낚시터</h2>
+${nav(all)}
+  </section>
+  <section>
+    <h2>항구 물때표</h2>
+    <p>${FISHING_PORTS.map((pt) => `<a href="${fishingPortPath(pt.name)}">${esc(pt.name)}</a>`).join(" · ")}</p>
+  </section>
+  <section>
+    <h2>어종별 낚시</h2>
+    <p>${FISH_PAGES.map((f) => `<a href="${fishingFishPath(f.name)}">${esc(f.name)}</a>`).join(" · ")}</p>
+  </section>
+  <p>조과를 적으면 어탁이 찍히고, 잡은 어종이 내 수족관에서 헤엄쳐요. 낚시 크루와 정출 · 조과판도 같이 써요.</p>
+${source()}
+</main>
+${hubNav("ko")}`;
+    const card = { url: fishingSeaCardUrl(ORIGIN, "all"), width: 1200, height: 1200, alt: seo.h1 };
+    const ld = { "@context": "https://schema.org", "@type": "CollectionPage", name: seo.h1, description: seo.description, url: `${ORIGIN}${FISHING_HOME_PATH}` };
+    const trail = { "@context": "https://schema.org", "@type": "BreadcrumbList", itemListElement: [["랭큐", "/"], [seo.h1, FISHING_HOME_PATH]].map(([name, path], i) => ({ "@type": "ListItem", position: i + 1, name, item: `${ORIGIN}${path}` })) };
+    return { status: 200, tag: "fishing:home", html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${FISHING_HOME_PATH}`, body, image: card, jsonLd: [ld, trail] }) };
+}
+
 export async function renderFishingSpots(path: string, all: readonly PublicPlace[]): Promise<FishingRender | null> {
     const p = path.replace(/\/+$/, "") || "/";
+    if (p === FISHING_HOME_PATH) return all.length ? renderFishingHome(all) : null;
     if (p === FISHING_SPOTS_PATH) {
         const seo = spotsHubSeo(all.length);
         return listing("fishing:spots", p, seo, `전국 낚시터 ${all.length.toLocaleString("ko-KR")}곳을 지역 · 종류 · 어종으로 모았어요. 낚시터마다 대상 어종 · 요금 · 주소와 가까운 낚시터를 보여 줘요.`, all, all, []);
@@ -135,6 +180,8 @@ export function fishingSitemapParts(all: readonly PublicPlace[], updated: string
     const c = placeCounts(all);
     const at = (path: string, changefreq: string, priority: string) => entry(`${ORIGIN}${path}`, { changefreq, priority, lastmod: updated });
     return [
+        // 낚시 첫 화면(2026-10-26 — 사이트맵에 없었다). 오늘 바다 · 물때가 매일 바뀐다
+        entry(`${ORIGIN}${FISHING_HOME_PATH}`, { changefreq: "daily", priority: "0.9", lastmod: new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10), image: fishingSeaCardUrl(ORIGIN, "all") }),
         at(FISHING_SPOTS_PATH, "weekly", "0.8"),
         ...PLACE_KINDS.filter((k) => c.kind.some(([id]) => id === k.id)).map((k) => at(fishingTypePath(k.id), "weekly", "0.6")),
         ...c.sido.map(([s]) => at(fishingRegionPath(s), "weekly", "0.6")),

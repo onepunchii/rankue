@@ -58,7 +58,7 @@ describe("해외 명산 투어판 — 새 공개 주소", () => {
         expect(seo).toContain("...HIKING_ABROAD.map((c) => page(hikingAbroadPath(c.id)");
         const app = read("client/src/App.tsx");
         for (const p of ["/hiking/abroad", "/hiking/abroad/:id"]) expect(app, p).toContain(`<Route path="${p}"`);
-        expect(read("vercel.json")).toContain("|/abroad(?:/[^/]+)?)?|fishing/");
+        expect(read("vercel.json")).toContain("|/abroad(?:/[^/]+)?)?|fishing(?:/(?:");
         const src = /export const HIKING_RE = \/(.+)\/;/.exec(seo)?.[1] ?? "";
         const re = new RegExp(src);
         for (const p of ["/hiking/abroad", "/hiking/abroad/", "/hiking/abroad/fuji"]) expect(re.test(p), p).toBe(true);

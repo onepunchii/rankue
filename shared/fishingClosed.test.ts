@@ -37,7 +37,7 @@ describe("금어기 달력", () => {
     it("주소 · 검색용 화면 · 앱 라우트 · 사이트맵 · 카드", () => {
         expect(FISHING_CLOSED_PATH).toBe("/fishing/closed");
         expect(closedSeo(33).title).toContain("금어기 달력");
-        expect(read("vercel.json")).toContain("|fish(?:/[^/]+)?|closed))/?");
+        expect(read("vercel.json")).toContain("|fish(?:/[^/]+)?|closed))?)/?");
         expect(read("client/src/App.tsx")).toContain('<Route path="/fishing/closed">');
         const seo = read("server/seo/fishingFish.ts");
         expect(seo).toContain("if (p === FISHING_CLOSED_PATH) return closedPage(Date.now());");
