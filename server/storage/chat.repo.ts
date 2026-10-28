@@ -207,7 +207,7 @@ export class ChatRepository {
                 .where(and(eq(hiqCrewMembers.crewId, ref.id), eq(hiqCrewMembers.memberId, viewerId))).limit(1);
             since = m?.joinedAt;
         }
-        const rows = await db.select({ chat: hiqChatMessages, senderName: hiqMembers.name, senderProfileImage: profiles.profileImageUrl })
+        const rows = await db.select({ chat: hiqChatMessages, senderName: hiqMembers.name, senderProfileImage: profiles.profileImageUrl, senderRole: profiles.role })
             .from(hiqChatMessages)
             .leftJoin(hiqMembers, eq(hiqChatMessages.senderId, hiqMembers.id))
             .leftJoin(profiles, eq(hiqMembers.profileId, profiles.id))
@@ -224,7 +224,13 @@ export class ChatRepository {
             .orderBy(after ? asc(hiqChatMessages.createdAt) : desc(hiqChatMessages.createdAt))
             .limit(limit);
         if (!after) rows.reverse();
-        const out = rows.map((r) => ({ ...r.chat, sender: r.senderName ? { name: r.senderName, profileImageUrl: r.senderProfileImage } : null }));
+        // trusted = 오너(슈퍼 관리자)의 글 — 필터를 거치지 않았고 화면이 링크를 눌리게 그린다(2026-10-29, shared/chatLinks).
+        // 보낸 사람 가리기(문의 방)가 sender 를 바꿔도 남도록 글 쪽에 둔다. 역할 글자 자체는 내보내지 않는다.
+        const out = rows.map((r) => ({
+            ...r.chat,
+            sender: r.senderName ? { name: r.senderName, profileImageUrl: r.senderProfileImage } : null,
+            ...(r.senderRole === "super_admin" ? { trusted: true as const } : {}),
+        }));
         if (await this.hidesStaffFrom(ref, viewerId)) return maskSupportMessages(out, ref.id, tr(opts.locale ?? "ko", "ui.chat.supportTeam"));
         return out;
     }

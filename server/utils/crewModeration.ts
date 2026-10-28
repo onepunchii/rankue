@@ -21,12 +21,19 @@ export const isReportReason = (v: unknown): boolean =>
 export type Screened<T> = { ok: true; value: T } | { ok: false; reason: string };
 
 /**
+ * trusted: 오너(슈퍼 관리자)가 쓴 글 — 금칙어도 연락처 · 링크 가리기도 건너뛰고 쓴 그대로 둔다(2026-10-29 오너
+ * "관리자는 채팅에 금지 이런거 없이 다 허용하게 연락처및 링크"). 라우트가 isSuperAdmin 으로 정해 넘긴다.
+ */
+export interface ScreenOpts { trusted?: boolean }
+
+/**
  * 글·댓글·채팅처럼 여러 텍스트 필드를 한 번에 검사한다. 하나라도 걸리면 거부,
  * 통과하면 각 필드의 전화번호·외부 링크를 가린 값을 돌려준다.
  * 줄바꿈으로 이어 붙여 검사하는 이유: 패턴의 `.` 은 줄바꿈을 넘지 않아 필드끼리 이어진
  * 오탐이 생기지 않고, 태그·제목에 쪼개 넣는 우회는 같은 검사 한 번에 걸린다.
  */
-export function screenCrewFields<K extends string>(fields: Record<K, string | null | undefined>): Screened<Record<K, string | null | undefined>> {
+export function screenCrewFields<K extends string>(fields: Record<K, string | null | undefined>, opts: ScreenOpts = {}): Screened<Record<K, string | null | undefined>> {
+    if (opts.trusted) return { ok: true, value: { ...fields } };
     const keys = Object.keys(fields) as K[];
     const joined = keys.map((k) => fields[k] || "").join("\n");
     const f = checkContent(joined, { context: "crew" });
@@ -40,8 +47,8 @@ export function screenCrewFields<K extends string>(fields: Record<K, string | nu
 }
 
 /** 한 덩어리 텍스트(댓글·채팅 한 줄) */
-export function screenCrewText(text: string): Screened<string> {
-    const r = screenCrewFields({ text });
+export function screenCrewText(text: string, opts: ScreenOpts = {}): Screened<string> {
+    const r = screenCrewFields({ text }, opts);
     return r.ok ? { ok: true, value: r.value.text as string } : r;
 }
 
@@ -54,6 +61,7 @@ export function screenCrewBody<K extends string>(
     body: Partial<Record<K, unknown>> | null | undefined,
     keys: readonly K[],
     extra: readonly unknown[] = [],
+    opts: ScreenOpts = {},
 ): Screened<{ fields: Partial<Record<K, string>>; extra: unknown[] }> {
     const src = body ?? {};
     const picked = {} as Record<string, string>;
@@ -62,7 +70,7 @@ export function screenCrewBody<K extends string>(
         if (typeof v === "string") picked[k] = v;
     }
     extra.forEach((v, i) => { if (typeof v === "string") picked[`__extra_${i}`] = v; });
-    const r = screenCrewFields(picked);
+    const r = screenCrewFields(picked, opts);
     if (!r.ok) return r;
     const fields: Partial<Record<K, string>> = {};
     for (const k of keys) if (k in r.value) fields[k] = r.value[k] as string;

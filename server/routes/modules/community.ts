@@ -8,6 +8,7 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { deleteBlobs } from "../../utils/blob.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
+import { isSuperAdmin } from "../../lib/superAdmin.js";
 // 약관 미동의 회원의 UGC 작성 거절(TERMS_REQUIRED) — 작성 라우트에만 건다(middleware/terms.ts)
 import { requireTermsAccepted } from "../../middleware/terms.js";
 import { msg } from "../../lib/i18n.js";
@@ -74,8 +75,11 @@ router.post("/posts", requireAuth, requireTermsAccepted, asyncHandler(async (req
 
     // 게시 전 필터링 — 내기당구·거래·욕설은 게시 거부 (심사 차단 항목).
     // 태그·지역명도 공개 표시되므로 함께 검사한다 (마스킹 우회 통로 봉쇄).
-    const filter = checkContent([title || "", content, safeRegion || "", ...safeTags].join("\n"));
-    if (filter.blocked) return sendError(res, 400, filter.reason!);
+    // 오너(슈퍼 관리자)의 글은 거르지도 가리지도 않는다(2026-10-29 — 채팅과 같은 규칙, 공지에 링크 · 연락처를 싣는다).
+    const trusted = await isSuperAdmin(req.userId);
+    const clean = trusted ? (v: string) => v : maskContacts;
+    const filter = trusted ? null : checkContent([title || "", content, safeRegion || "", ...safeTags].join("\n"));
+    if (filter?.blocked) return sendError(res, 400, filter.reason!);
 
     // 한 큐 자랑: 사진 또는 경기결과 카드 중 최소 1개 필수 (캡션이 곧 제목)
     if (board === "brag" && !images?.length && !historyId) {
@@ -110,12 +114,12 @@ router.post("/posts", requireAuth, requireTermsAccepted, asyncHandler(async (req
         board,
         language: safeLang,
         authorId: req.userId!,
-        title: title ? maskContacts(String(title).slice(0, 100)) : null,
-        content: maskContacts(content.trim()),
+        title: title ? clean(String(title).slice(0, 100)) : null,
+        content: clean(content.trim()),
         images: images || [],
         historyId: historyId || null,
-        tags: safeTags.map(maskContacts),
-        regionName: safeRegion ? maskContacts(safeRegion) : null,
+        tags: safeTags.map(clean),
+        regionName: safeRegion ? clean(safeRegion) : null,
         storeId: isStoreBoard ? (storeId || null) : null, // 매장 연결은 store/lesson에서만
         storeName: isStoreBoard ? (storeName || null) : null,
     };
@@ -150,8 +154,9 @@ router.post("/posts/:id/comments", requireAuth, requireTermsAccepted, asyncHandl
     if (!post) return sendError(res, 404, "err.community.postNotFound");
     if (post.isBlinded) return sendError(res, 400, "err.community.blindedNoComment");
 
-    const filter = checkContent(content);
-    if (filter.blocked) return sendError(res, 400, filter.reason!);
+    const trusted = await isSuperAdmin(req.userId);
+    const filter = trusted ? null : checkContent(content);
+    if (filter?.blocked) return sendError(res, 400, filter.reason!);
 
     // 답글이면 부모 댓글. 같은 글이어야 하고 **한 단계만** 둔다 — 답글에 답하면 그 답글의 부모에 붙인다.
     // 알림은 실제로 답한 사람(바로 위 댓글 작성자)에게 간다.
@@ -173,7 +178,7 @@ router.post("/posts/:id/comments", requireAuth, requireTermsAccepted, asyncHandl
     const comment = await storage.community.createComment({
         postId: req.params.id,
         authorId: req.userId!,
-        content: maskContacts(content),
+        content: trusted ? content : maskContacts(content),
         parentId,
     } as any);
 

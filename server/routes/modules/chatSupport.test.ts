@@ -26,6 +26,8 @@ type Sent = { memberId: string; title: unknown; body: unknown; category?: string
 const mem = vi.hoisted(() => {
     const state = {
         admins: new Set<string>(),
+        /** 오너(profiles.role = super_admin) — lib/superAdmin 의 가짜가 본다 */
+        superAdmins: new Set<string>(),
         members: new Map<string, { id: string; name: string }>(),
         withdrawn: new Set<string>(),
         messages: [] as { id: string; roomKey: string; senderId: string | null; message: string; type: string }[],
@@ -76,6 +78,7 @@ vi.mock("../../db.js", () => ({ db: {}, pool: {} }));
 vi.mock("../../storage/index.js", () => ({ storage: mem.storage }));
 vi.mock("../../services/notificationService.js", () => ({ notificationService: mem.notificationService }));
 vi.mock("../../middleware/terms.js", () => ({ requireTermsAccepted: (_req: unknown, _res: unknown, next: () => void) => next() }));
+vi.mock("../../lib/superAdmin.js", () => ({ async isSuperAdmin(id: string) { return mem.state.superAdmins.has(id); } }));
 
 type FakeRes = { statusCode: number; body: any };
 type FakeReq = { userId?: string; params?: Record<string, string>; query?: Record<string, unknown>; body?: unknown; locale?: string };
@@ -116,6 +119,7 @@ const shown = (s: Sent, locale: "ko" | "en" = "ko") => ({ title: render(locale, 
 
 beforeEach(() => {
     mem.state.admins = new Set([ADMIN_A, ADMIN_B]);
+    mem.state.superAdmins = new Set();
     mem.state.members = new Map([
         [OWNER, { id: OWNER, name: "김회원" }],
         [ADMIN_A, { id: ADMIN_A, name: "최운영" }],
@@ -235,6 +239,15 @@ describe("(나) 문의 방에 쓰기 — 알림 제목과 운영자 이름", () 
     it("보낸 사람에게 돌아가는 응답은 자기 이름 그대로다", async () => {
         const r = await say(ADMIN_A, OWNER, "안녕하세요");
         expect(r.body.data).toMatchObject({ roomKey: `support:${OWNER}`, senderId: ADMIN_A, message: "안녕하세요", type: "text", sender: { name: "최운영" } });
+    });
+
+    it("오너(슈퍼 관리자)의 글은 응답에 trusted — 링크가 눌리는 표시. 다른 운영자 · 회원의 글에는 없다", async () => {
+        mem.state.superAdmins = new Set([ADMIN_A]);
+        const link = "가입은 https://www.rankue.co.kr/i/ABC 에서";
+        const mine = await say(ADMIN_A, OWNER, link);
+        expect(mine.body.data).toMatchObject({ message: link, trusted: true });
+        expect((await say(ADMIN_B, OWNER, link)).body.data.trusted).toBeUndefined();
+        expect((await say(OWNER, OWNER, link)).body.data.trusted).toBeUndefined();
     });
 });
 

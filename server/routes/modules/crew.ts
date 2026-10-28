@@ -151,7 +151,7 @@ const ACTIVITY_TEXT_KEYS = ["title", "description", "locationName", "cost"] as c
 // POST /activities - Create activity
 router.post("/:id/activities", requireAuth, requireTermsAccepted, asyncHandler(async (req: AuthRequest, res: any) => {
     if (await requireCrewMember(req, res) === null) return;
-    const screenedActivity = screenCrewBody(req.body, ACTIVITY_TEXT_KEYS);
+    const screenedActivity = screenCrewBody(req.body, ACTIVITY_TEXT_KEYS, [], { trusted: await isSuperAdmin(req.userId) });
     if (!screenedActivity.ok) return sendError(res, 400, screenedActivity.reason);
     const data = {
         ...req.body,
@@ -284,7 +284,7 @@ router.patch("/:id/activities/:activityId", requireAuth, requireTermsAccepted, a
         try { updateData.mountainSlug = await activityMountainSlugOf(req.body.mountainSlug); }
         catch (e) { console.error("[CrewActivities] 고른 산 확인:", e); }
     }
-    const screenedEdit = screenCrewBody(updateData, ACTIVITY_TEXT_KEYS);
+    const screenedEdit = screenCrewBody(updateData, ACTIVITY_TEXT_KEYS, [], { trusted: await isSuperAdmin(req.userId) });
     if (!screenedEdit.ok) return sendError(res, 400, screenedEdit.reason);
     Object.assign(updateData, screenedEdit.value.fields);
 
@@ -372,8 +372,8 @@ router.get("/:id/posts", requireAuth, asyncHandler(async (req: AuthRequest, res:
 
 // 글 쓰기·고치기에서 사람이 쓰는 칸 검사 — 제목·본문 필터(커뮤니티와 같은 차단 + 연락처 마스킹).
 // 카테고리는 화이트리스트라 필터 대상이 아니다.
-function screenPostText(title: string | null, content: string | null) {
-    return screenCrewFields({ title, content });
+function screenPostText(title: string | null, content: string | null, trusted: boolean) {
+    return screenCrewFields({ title, content }, { trusted });
 }
 
 // POST /posts
@@ -385,7 +385,7 @@ router.post("/:id/posts", requireAuth, requireTermsAccepted, asyncHandler(async 
     // 크루 게시판도 크루원끼리 보는 UGC 라 심사 요건이 똑같이 걸린다.
     const str = (v: unknown) => (typeof v === "string" ? v : null);
     if ((str(req.body?.content) || "").length > 4000) return sendError(res, 400, "err.crew.contentTooLong");
-    const screened = screenPostText(str(req.body?.title), str(req.body?.content));
+    const screened = screenPostText(str(req.body?.title), str(req.body?.content), await isSuperAdmin(req.userId));
     if (!screened.ok) return sendError(res, 400, screened.reason);
     // 카테고리 화이트리스트 — 예전엔 아무 문자열이나 받아서 일반 멤버도 "공지사항" 으로 올릴 수 있었다.
     const category = resolveCrewPostCategory(req.body?.category, isAdmin);
@@ -438,7 +438,7 @@ router.patch("/:id/posts/:postId", requireAuth, requireTermsAccepted, asyncHandl
         const content = body.content !== undefined ? str(body.content) : null;
         if (body.title !== undefined && !title?.trim()) return sendError(res, 400, "err.crew.postTitleRequired");
         if ((content || "").length > 4000) return sendError(res, 400, "err.crew.contentTooLong");
-        const screened = screenPostText(title, content);
+        const screened = screenPostText(title, content, await isSuperAdmin(req.userId));
         if (!screened.ok) return sendError(res, 400, screened.reason);
         if (body.title !== undefined) update.title = screened.value.title ?? "";
         if (body.content !== undefined) update.content = screened.value.content ?? "";
@@ -516,7 +516,7 @@ router.post("/:id/posts/:postId/comments", requireAuth, requireTermsAccepted, as
     const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
     if (!content) return sendError(res, 400, "err.crew.commentRequired");
     if (content.length > 1000) return sendError(res, 400, "err.crew.commentTooLong");
-    const screened = screenCrewText(content);
+    const screened = screenCrewText(content, { trusted: await isSuperAdmin(req.userId) });
     if (!screened.ok) return sendError(res, 400, screened.reason);
     const comment = await storage.createCrewPostComment({
         postId: req.params.postId,
@@ -611,7 +611,7 @@ router.post("/:id/photos/:photoId/comments", requireAuth, requireTermsAccepted, 
     const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
     if (!content) return sendError(res, 400, "err.crew.commentRequired");
     if (content.length > 1000) return sendError(res, 400, "err.crew.commentTooLong");
-    const screened = screenCrewText(content);
+    const screened = screenCrewText(content, { trusted: await isSuperAdmin(req.userId) });
     if (!screened.ok) return sendError(res, 400, screened.reason);
     const comment = await storage.createCrewPhotoComment({
         photoId: req.params.photoId,
@@ -652,7 +652,7 @@ router.post("/:id/photos", requireAuth, requireTermsAccepted, asyncHandler(async
     if (!validateCrewPostImages([url]).ok) return sendError(res, 400, "err.crew.postImagesInvalid");
     // 캡션도 사진첩에 그대로 보이는 글이라 같은 필터를 건다
     const rawCaption = typeof req.body?.caption === 'string' ? req.body.caption.slice(0, 500) : null;
-    const caption = rawCaption ? screenCrewText(rawCaption) : null;
+    const caption = rawCaption ? screenCrewText(rawCaption, { trusted: await isSuperAdmin(req.userId) }) : null;
     if (caption && !caption.ok) return sendError(res, 400, caption.reason);
     // 화이트리스트 — req.body를 그대로 펼치면 id/createdAt까지 통과해 PK 충돌이나
     // 목록 최상단 강제 점유가 가능하다.
@@ -707,7 +707,7 @@ router.post("/:id/chats", requireAuth, requireTermsAccepted, asyncHandler(async 
     if (req.body.message.length > 1000) return sendError(res, 400, "err.crew.messageTooLong");
     // 채팅도 필터 대상 — 내기·욕설·거래는 거부하고 전화번호·오픈채팅 링크는 가린다.
     // 가린 저장본이 알림 본문(chat.message)으로도 나가므로 푸시로 연락처가 새지 않는다.
-    const screenedChat = screenCrewText(req.body.message);
+    const screenedChat = screenCrewText(req.body.message, { trusted: await isSuperAdmin(req.userId) });
     if (!screenedChat.ok) return sendError(res, 400, screenedChat.reason);
 
     // 화이트리스트 — req.body를 그대로 펼치면 id/createdAt까지 통과해 PK 충돌이나
@@ -850,7 +850,7 @@ router.post("/:id/polls", requireAuth, requireTermsAccepted, asyncHandler(async 
     if (await requireCrewMember(req, res) === null) return;
     const { options: rawOptions, ...rest } = req.body ?? {};
     // 투표 제목·설명·선택지도 필터 — 제목은 크루원 전원의 푸시 본문으로 나간다(검토 policy:R3).
-    const screenedPoll = screenCrewBody(rest, ["title", "description"] as const, Array.isArray(rawOptions) ? rawOptions : []);
+    const screenedPoll = screenCrewBody(rest, ["title", "description"] as const, Array.isArray(rawOptions) ? rawOptions : [], { trusted: await isSuperAdmin(req.userId) });
     if (!screenedPoll.ok) return sendError(res, 400, screenedPoll.reason);
     Object.assign(rest, screenedPoll.value.fields);
 
@@ -1072,7 +1072,7 @@ router.post("/:id/tournaments", requireAuth, requireTermsAccepted, asyncHandler(
         title: rawTitle,
         description: req.body?.description ? String(req.body.description).slice(0, 500) : undefined,
         prize: req.body?.prize ? String(req.body.prize).slice(0, 100) : undefined,
-    }, ["title", "description", "prize"] as const);
+    }, ["title", "description", "prize"] as const, [], { trusted: await isSuperAdmin(req.userId) });
     if (!screenedTournament.ok) return sendError(res, 400, screenedTournament.reason);
     const { title = rawTitle, description, prize } = screenedTournament.value.fields;
     const gameType = req.body?.gameType;
@@ -1260,7 +1260,7 @@ router.patch("/:id/tournaments/:tournamentId", requireAuth, requireTermsAccepted
     if (body.description !== undefined) raw.description = body.description ? String(body.description).slice(0, 500) : "";
     if (body.prize !== undefined) raw.prize = body.prize ? String(body.prize).slice(0, 100) : "";
     // 개설과 같은 필터(검토 policy:R3) — 이름은 푸시로, 상품 칸은 금전 내기 통로가 될 수 있다.
-    const screened = screenCrewBody(raw, ["title", "description", "prize"] as const);
+    const screened = screenCrewBody(raw, ["title", "description", "prize"] as const, [], { trusted: await isSuperAdmin(req.userId) });
     if (!screened.ok) return sendError(res, 400, screened.reason);
     const f = screened.value.fields;
     if (raw.title !== undefined) patch.title = f.title ?? raw.title;
@@ -1924,7 +1924,7 @@ router.post("/:id/settlements", requireAuth, requireTermsAccepted, asyncHandler(
     // 건너뛰는 통로가 된다("5만원 내기 정산", 검토 policy:R4). 크루 맥락이라 "정모 정산", "게임비 1만원씩"은 통과한다.
     // 계좌 칸(accountNumber 등)은 넣지 않는다 — 가리면 입금할 계좌가 망가진다.
     const screenedSettlement = screenCrewBody(req.body, ["title"] as const,
-        Array.isArray(rawItems) ? rawItems.map((it: any) => it?.title) : []);
+        Array.isArray(rawItems) ? rawItems.map((it: any) => it?.title) : [], { trusted: await isSuperAdmin(req.userId) });
     if (!screenedSettlement.ok) return sendError(res, 400, screenedSettlement.reason);
     const items = Array.isArray(rawItems)
         ? rawItems.map((it: any, i: number) => (it && typeof it === "object" ? { ...it, title: screenedSettlement.value.extra[i] } : it))

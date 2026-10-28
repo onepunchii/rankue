@@ -13,12 +13,16 @@
  *  첫 글("안녕하세요")을 신고하게 된다(크루 방은 메시지 id 가 신고 대상이라 엉뚱한 글이 지워진다).
  *  무엇을 신고할지(방 종류별 대상)와 메뉴·신고 창은 부르는 쪽(pages/hiq/chat-room)이 정한다 — 여기서는 입구만 그린다.
  */
-import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactNode } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type MutableRefObject, type ReactNode } from "react";
 import { LucideSend, LucideLoader2, LucidePlus, LucideMoreHorizontal, LucideLanguages } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useT, type Locale } from "@/lib/i18n";
 import { ChatCard } from "./ChatCard";
 import { TierAvatarBadge } from "@/components/hiq/TierAvatarBadge";
+import { navigateInApp } from "@/lib/nativeBridge";
+import { outsideLinkClick } from "@/lib/openOutside";
+import { splitChatLinks } from "@shared/chatLinks";
+import { sameSiteNewWindowPath } from "@shared/deepLink";
 
 /** 앱 언어 → Intl 태그. 시각·날짜는 사전 키 대신 Intl 로 그 언어답게 그린다(표시 시간대는 KST 고정 — 서버·방 정보와 같은 기준). */
 export const INTL_TAG: Record<Locale, string> = { ko: "ko-KR", en: "en-US", es: "es-419", tr: "tr-TR", vi: "vi-VN" };
@@ -32,6 +36,8 @@ export interface ChatMsg {
     sender?: { name: string; profileImageUrl?: string | null } | null;
     /** 카드(type card·settlement·옛 GOLF_BOOKING)와 시스템 메시지 i18n 이 여기에 실린다 — 종류는 metadata.type */
     metadata?: Record<string, any> | null;
+    /** 오너(슈퍼 관리자)의 글 — 서버가 붙인다. 이 글의 주소만 눌리는 링크로 그린다(shared/chatLinks) */
+    trusted?: boolean;
     /** 낙관적 추가 상태 */
     pending?: boolean;
     failed?: boolean;
@@ -129,15 +135,51 @@ const timeLabel = (iso: string, locale: Locale) => {
     return new Intl.DateTimeFormat(INTL_TAG[locale], { hour: "numeric", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(iso));
 };
 
+/**
+ * 오너 글의 본문 — 주소를 눌리는 링크로 그린다(2026-10-29, 나누는 규칙은 shared/chatLinks).
+ * 우리 화면(www.rankue.co.kr/…)은 앱 · 웹 모두 지금 창에서 옮기고, 바깥 주소는 앱이면 앱 안 브라우저 창, 웹이면 새 탭으로 연다.
+ */
+function ChatText({ text, pressAt, mine }: { text: string; pressAt: MutableRefObject<number>; mine: boolean }) {
+    return (
+        <>
+            {splitChatLinks(text).map((p, i) => {
+                if (p.kind === "text") return <Fragment key={i}>{p.text}</Fragment>;
+                const own = sameSiteNewWindowPath(p.href, window.location.hostname);
+                const onClick = (e: MouseEvent<HTMLAnchorElement>) => {
+                    // 길게 누른 것(600ms — 메뉴가 뜬다)이면 손을 뗄 때 링크로 가지 않는다
+                    if (Date.now() - pressAt.current >= 600) { e.preventDefault(); return; }
+                    if (own) { e.preventDefault(); navigateInApp(own); return; }
+                    outsideLinkClick(p.href)(e);
+                };
+                return (
+                    <a
+                        key={i}
+                        href={own ?? p.href}
+                        target={own ? undefined : "_blank"}
+                        rel={own ? undefined : "noopener noreferrer"}
+                        onClick={onClick}
+                        className={cn("underline underline-offset-2 break-all [-webkit-touch-callout:none]", !mine && "text-brand font-medium")}
+                    >
+                        {p.text}
+                    </a>
+                );
+            })}
+        </>
+    );
+}
+
 export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete, onReport, onMenu, canMenu, translationOf, onOpenCard, onAttach, onPolish, pinned, loading, disabled, emptyText, onSeen, hasOlder, loadingOlder, onLoadOlder, roomKey, readLineAt, unreadBy }: Props) {
     const { t, locale } = useT();
     /** 신고·차단을 걸 수 있는 글 — 보낸 사람이 있는 **남의** 글. 내 글과 시스템 글(보낸 사람 없음)은 아니다. */
     const canReport = (m: ChatMsg) => !!onReport && !!meId && !!m.senderId && m.senderId !== meId && m.type !== "system";
     // 길게 누르기(600ms): 지울 수 있는 글(내 글·운영진)은 삭제 — 예전 그대로. 그 밖의 남의 글은 신고·차단. 마우스에서는 우클릭도 같다.
     const holdRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    /** 말풍선을 누르기 시작한 시각 — 길게 누른 손을 뗄 때 말풍선 안 링크가 같이 열리지 않게 한다(ChatText) */
+    const pressAtRef = useRef(0);
     /** 말풍선 메뉴를 열 수 있는 글 — 보내는 중·실패한 글과 시스템 글은 아니다. 무엇을 할 수 있는지는 부르는 쪽(canMenu)이 안다. */
     const menuable = (m: ChatMsg) => !!onMenu && m.type !== "system" && !m.pending && !m.failed && !!canMenu?.(m);
     const holdStart = (m: ChatMsg) => {
+        pressAtRef.current = Date.now();
         // 메뉴가 있으면 메뉴가 먼저다 — 삭제·신고는 그 안에 있다
         if (menuable(m)) { holdRef.current = setTimeout(() => { holdRef.current = null; onMenu?.(m); }, 600); return; }
         const act = onDelete && canDelete?.(m) ? onDelete : canReport(m) ? onReport : undefined;
@@ -297,7 +339,7 @@ export function ChatRoom({ messages, meId, onSend, onRetry, onDelete, canDelete,
                                                         m.failed && "bg-red-500/15 text-red-500 border border-red-500/30 cursor-pointer",
                                                     )}
                                                 >
-                                                    {m.type === "photo" && (m as any).metadata?.photoUrl ? <img src={(m as any).metadata.photoUrl} alt="" className="max-w-[220px] rounded-lg" /> : m.message}
+                                                    {m.type === "photo" && (m as any).metadata?.photoUrl ? <img src={(m as any).metadata.photoUrl} alt="" className="max-w-[220px] rounded-lg" /> : m.trusted ? <ChatText text={m.message} pressAt={pressAtRef} mine={mine} /> : m.message}
                                                     {m.failed && <span className="block text-[11px] mt-0.5">{t("chat.failedTap")}</span>}
                                                 </span>
                                             )}

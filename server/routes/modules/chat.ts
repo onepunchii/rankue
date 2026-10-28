@@ -24,6 +24,7 @@ import { requireTermsAccepted } from "../../middleware/terms.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { screenCrewText } from "../../utils/crewModeration.js";
 import { chatBanOf, countChatFilterHit } from "../../storage/chatBans.js";
+import { isSuperAdmin } from "../../lib/superAdmin.js";
 import { chatBanHoursLeft } from "../../../shared/chatBan.js";
 import { notificationService } from "../../services/notificationService.js";
 import { parseRoomKey, type RoomRef } from "../../storage/chat.repo.js";
@@ -213,8 +214,11 @@ router.post("/rooms/:key/messages", requireAuth, requireTermsAccepted, asyncHand
     // 보내기마다 방 전원에게 푸시가 간다 — 10초에 8건이면 멈춘다(2026-09-22 리뷰: 속도 제한이 없었다).
     if ((await storage.chat.recentSendCount(ref.key, req.userId!, 10)) >= 8) return sendError(res, 429, "err.chat.tooFast", "CHAT_TOO_FAST");
     // 관리자 문의는 필터를 안 건다 — 문의에 전화번호·링크가 들어가는 게 정상이다. 나머지는 크루와 같은 필터.
+    // 오너(슈퍼 관리자)는 어느 방에서든 금지 · 금칙어 · 연락처 가리기를 받지 않는다(2026-10-29 오너 "관리자는 채팅에 금지 이런거 없이
+    // 다 허용하게 연락처및 링크") — 받는 사람 화면에서 링크가 눌리는 것도 이 사람의 글뿐이다(messages 의 trusted · shared/chatLinks).
     let text = raw.trim();
-    if (ref.kind !== "support") {
+    const trusted = await isSuperAdmin(req.userId);
+    if (ref.kind !== "support" && !trusted) {
         // 채팅 금지(2026-10-26 — shared/chatBan). 운영자 문의는 막지 않는다 — 금지에 이의를 말할 길이다
         const ban = await chatBanOf(req.userId!);
         if (ban) return sendError(res, 403, msg("err.chat.banned", { n: chatBanHoursLeft(ban, Date.now()) }), "CHAT_BANNED");
@@ -254,7 +258,7 @@ router.post("/rooms/:key/messages", requireAuth, requireTermsAccepted, asyncHand
             : msg("notif.chat.newMessage.title", { room: info.title });
     }
     await notifyRoom(ref, req.userId!, text.slice(0, 80), heading, info.sport);
-    return sendSuccess(res, { ...row, sender: { name: me?.name ?? "", profileImageUrl: null } });
+    return sendSuccess(res, { ...row, sender: { name: me?.name ?? "", profileImageUrl: null }, ...(trusted ? { trusted: true } : {}) });
 }));
 
 router.delete("/rooms/:key/messages/:id", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {

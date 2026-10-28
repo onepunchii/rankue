@@ -39,6 +39,7 @@ vi.mock("../../db.js", () => ({ db: {}, pool: {} }));
 vi.mock("../../storage/index.js", () => ({ storage: mem.storage }));
 vi.mock("../../services/notificationService.js", () => ({ notificationService: { async sendAndSaveNotification() { /* 안 쓴다 */ } } }));
 vi.mock("../../middleware/terms.js", () => ({ requireTermsAccepted: (_req: unknown, _res: unknown, next: () => void) => next() }));
+vi.mock("../../lib/superAdmin.js", () => ({ async isSuperAdmin() { return false; } }));
 
 type FakeRes = { statusCode: number; body: any };
 function translate(req: { userId?: string; key?: string; id?: string; body?: unknown; locale?: string }): Promise<FakeRes> {

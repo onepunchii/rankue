@@ -120,11 +120,19 @@ describe("D. 채팅 금지", () => {
         expect(textBranch.indexOf("chatBanOf(")).toBeLessThan(textBranch.indexOf('checkContent(t, { context: "match" })'));
         expect(textBranch).toContain("const auto = await countChatFilterHit(req.userId!);");
     });
-    it("크루 · 1:1 채팅도 막는다 — 운영자 문의는 빼고(금지에 이의를 말할 길)", () => {
+    it("크루 · 1:1 채팅도 막는다 — 운영자 문의와 오너(슈퍼 관리자)는 빼고(문의 = 금지에 이의를 말할 길)", () => {
         const chat = read("server/routes/modules/chat.ts");
-        const at = chat.indexOf('if (ref.kind !== "support") {\n        // 채팅 금지');
+        const at = chat.indexOf('if (ref.kind !== "support" && !trusted) {\n        // 채팅 금지');
         expect(at).toBeGreaterThan(-1);
         expect(chat.slice(at, at + 400)).toContain("const ban = await chatBanOf(req.userId!);");
+        expect(chat.slice(at - 200, at)).toContain("const trusted = await isSuperAdmin(req.userId);");
+    });
+    it("오너(슈퍼 관리자)는 대전 채팅에서도 금지 · 금칙어 · 가리기를 받지 않는다(2026-10-29)", () => {
+        const send = section(route, 'router.post("/sim/matches/:id/chat"', "// POST /sim/matches/:id/resign");
+        expect(send).toContain("const trusted = await isSuperAdmin(req.userId);");
+        expect(send).toContain("const ban = trusted ? null : await chatBanOf(req.userId!);");
+        expect(send).toContain('const check = trusted ? null : checkContent(t, { context: "match" });');
+        expect(send).toContain("text = trusted ? t : maskContacts(t);");
     });
     it("관리자 — 슈퍼관리자만 정하고 푼다, 화면의 단추는 보기 전용 계정에 안 보인다", () => {
         const admin = read("server/routes/modules/admin.ts");

@@ -35,6 +35,14 @@ describe("screenCrewText — 크루 채팅·댓글", () => {
         }
     });
 
+    it("trusted(오너의 글)는 금칙어도 가리기도 건너뛴다 — 쓴 그대로(2026-10-29)", () => {
+        const t = "연락은 010-1234-5678 또는 https://open.kakao.com/o/abc · 게임비 내기 5만원";
+        expect(screenCrewText(t, { trusted: true })).toEqual({ ok: true, value: t });
+        expect(screenCrewText(t).ok).toBe(false);
+        const body = screenCrewBody({ title: "공지 https://www.rankue.co.kr/i/ABC", n: 3 }, ["title"] as const, ["010-1234-5678"], { trusted: true });
+        expect(body).toEqual({ ok: true, value: { fields: { title: "공지 https://www.rankue.co.kr/i/ABC" }, extra: ["010-1234-5678"] } });
+    });
+
     it("크루 맥락 면제는 커뮤니티에 새지 않는다 — 공개 글의 정산 요청·게임비 금액은 그대로 막힌다", () => {
         expect(checkContent("정산 부탁드려요").blocked).toBe(true);
         expect(checkContent("게임비 1만원 걸고 한판").blocked).toBe(true);

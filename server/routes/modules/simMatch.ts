@@ -31,6 +31,7 @@ import {
 } from "../../../shared/sim/chat.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
 import { chatBanOf, countChatFilterHit } from "../../storage/chatBans.js";
+import { isSuperAdmin } from "../../lib/superAdmin.js";
 import { chatBanHoursLeft } from "../../../shared/chatBan.js";
 import { ROOM_TITLE_MAX, checkRoomTitle } from "../../../shared/sim/roomTitle.js";
 import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCHES, scaledTarget, TARGET_INNINGS, targetFor } from "../../../shared/sim/handicap.js";
@@ -1108,8 +1109,10 @@ router.post("/sim/matches/:id/chat", requireAuth, asyncHandler(async (req: AuthR
         text = body.code;
     } else if (typeof body.text === "string") {
         if (!canWriteChatText(m, req.userId!)) return sendError(res, 403, "err.sim.watcherText", "WATCHER_TEXT");
-        // 채팅 금지(2026-10-26 — shared/chatBan) — 글만 막는다. 문구 단추(위 code 가지)는 그대로
-        const ban = await chatBanOf(req.userId!);
+        // 채팅 금지(2026-10-26 — shared/chatBan) — 글만 막는다. 문구 단추(위 code 가지)는 그대로.
+        // 오너(슈퍼 관리자)는 금지 · 금칙어 · 가리기를 받지 않는다(2026-10-29 — chat.ts 와 같은 규칙)
+        const trusted = await isSuperAdmin(req.userId);
+        const ban = trusted ? null : await chatBanOf(req.userId!);
         if (ban) return sendError(res, 403, msg("err.chat.banned", { n: chatBanHoursLeft(ban, Date.now()) }), "CHAT_BANNED");
         // 원문 방어값(정규화 전). 이걸 넘기면 정규화·필터에 긴 문자열을 태울 이유가 없다.
         if (body.text.length > 400) return sendError(res, 400, msg("err.sim.chatTooLong", { n: CHAT_MAX_CHARS }));
@@ -1117,15 +1120,15 @@ router.post("/sim/matches/:id/chat", requireAuth, asyncHandler(async (req: AuthR
         if (!t) return sendError(res, 400, "err.sim.chatEmpty");
         if (chatLength(t) > CHAT_MAX_CHARS) return sendError(res, 400, msg("err.sim.chatTooLong", { n: CHAT_MAX_CHARS }));
         // 대전 채팅은 "match" 맥락 — 모르는 사람끼리의 짧은 말에서만 보는 욕(패드립 · 죽으라는 말 · 손가락 욕)까지(2026-10-26)
-        const check = checkContent(t, { context: "match" });
-        if (check.blocked) {
+        const check = trusted ? null : checkContent(t, { context: "match" });
+        if (check?.blocked) {
             // 막힌 말을 10분 안에 세 번이면 24시간 채팅 금지(countChatFilterHit)
             const auto = await countChatFilterHit(req.userId!);
             if (auto) return sendError(res, 403, msg("err.chat.banned", { n: chatBanHoursLeft(auto, Date.now()) }), "CHAT_BANNED");
             return sendError(res, 400, check.reason ?? "err.sim.chatFiltered", "FILTERED");
         }
         kind = "text";
-        text = maskContacts(t);
+        text = trusted ? t : maskContacts(t);
     } else {
         return sendError(res, 400, "err.sim.chatEmpty");
     }

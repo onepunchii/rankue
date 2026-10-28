@@ -94,7 +94,7 @@ function respond(sql: string, params: unknown[]): unknown[] {
     if (q.startsWith('select "hiq_chat_messages"."id", "hiq_chat_messages"."room_key"') && q.includes('from "hiq_chat_messages" left join "hiq_members"')) {
         const hidden = (m: Msg) => q.includes('FROM "hiq_blocks" WHERE "hiq_blocks"."blocker_id" =') && params.some((p) => typeof p === "string" && blockedBy(p, m));
         return world.messages.filter((m) => m.roomKey === params[0] && !hidden(m)).sort((a, b) => b.at.localeCompare(a.at))
-            .map((m) => [m.id, m.roomKey, m.senderId, m.message, m.type, null, m.at, m.senderId ? world.members[m.senderId]?.name ?? null : null, m.senderId ? world.members[m.senderId]?.img ?? null : null]);
+            .map((m) => [m.id, m.roomKey, m.senderId, m.message, m.type, null, m.at, m.senderId ? world.members[m.senderId]?.name ?? null : null, m.senderId ? world.members[m.senderId]?.img ?? null : null, m.senderId ? world.roles[m.senderId] ?? null : null]);
     }
     // roomInfo 의 명단
     if (q.startsWith('select "hiq_members"."id", "hiq_members"."name", "profiles"."profile_image_url" from "hiq_members" left join "profiles"')) {
@@ -321,7 +321,28 @@ describe("(나) messages — 문의 방의 보낸 사람", () => {
         const rows = await repo.messages(dm, OWNER, { locale: "ko" });
         expect(rows[0].sender?.name).toBe("최운영");
         expect(rows[0].senderId).toBe(ADMIN_A);
-        expect(callsWith('"profiles"."role"')).toHaveLength(0);
+        // 따로 묻는 역할 질의(isAdmin · isSuperAdmin)가 없다 — 글 줄에 붙어 오는 보낸 사람 역할은 trusted 표시용이다
+        expect(callsWith('select "profiles"."role" from "hiq_members"')).toHaveLength(0);
+    });
+
+    it("오너(super_admin)의 글에만 trusted — 회원 · 보기 전용 관리자의 글에는 없고, 역할 글자는 응답에 없다", async () => {
+        world.roles[ADMIN_B] = "admin";
+        const dm = parseRoomKey("dm:99999999-9999-4999-8999-999999999999")!;
+        world.messages = [
+            { id: "00000000-0000-4000-8000-000000000011", roomKey: dm.key, senderId: ADMIN_A, message: "https://www.rankue.co.kr/i/ABC", type: "text", at: "2026-10-06 02:00:00" },
+            { id: "00000000-0000-4000-8000-000000000012", roomKey: dm.key, senderId: ADMIN_B, message: "그쪽 주소", type: "text", at: "2026-10-06 02:01:00" },
+            { id: "00000000-0000-4000-8000-000000000013", roomKey: dm.key, senderId: OWNER, message: "네", type: "text", at: "2026-10-06 02:02:00" },
+        ];
+        const rows = await repo.messages(dm, OWNER, { locale: "ko" });
+        expect(rows.map((r) => (r as { trusted?: boolean }).trusted ?? false)).toEqual([true, false, false]);
+        expect(JSON.stringify(rows)).not.toMatch(/super_admin|"admin"|"user"/);
+    });
+
+    it("문의 방에서 운영팀으로 가려도 오너 글의 trusted 는 남는다", async () => {
+        const rows = await repo.messages(support(OWNER), OWNER, { locale: "ko" });
+        expect(rows[0].senderId).toBe(SUPPORT_TEAM_ID);
+        expect((rows[0] as { trusted?: boolean }).trusted).toBe(true);
+        expect((rows[1] as { trusted?: boolean }).trusted).toBeUndefined();
     });
 });
 
