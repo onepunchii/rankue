@@ -1,7 +1,7 @@
 /**
  * 쇼츠 3단계 — 프레임 찍기 + 공 소리 + 음성 합쳐 output.mp4.
  *
- *   npx tsx scripts/shorts/render.ts <slug> [--preview] [--music <곡.json> | --no-music]
+ *   npx tsx scripts/shorts/render.ts <slug> [--preview] [--music <곡.json> | --no-music] [--lang en|vi]
  *
  *  - out/<slug>/shot.json · facts.json 이 있어야 한다(facts.ts). lines.json(narrate.ts)이 있으면 자막과 음성을 넣는다.
  *  - 배경 노래(기본 music/rankue-rankue.json): 득점 순간을 곡의 외침(hit)에 맞추고 영상 길이를 곡 길이에 맞춘다.
@@ -24,6 +24,8 @@ import { readOnlyDb } from "./db";
 
 const slug = process.argv[2];
 const preview = process.argv.includes("--preview");
+const langArg = process.argv.indexOf("--lang");
+const lang = langArg > 0 ? process.argv[langArg + 1] : "en"; // 화면 글자 언어(page/strings.ts)
 if (!slug) throw new Error("사용법: tsx scripts/shorts/render.ts <slug> [--preview]");
 const dir = `scripts/shorts/out/${slug}`;
 const shot = JSON.parse(readFileSync(`${dir}/shot.json`, "utf8"));
@@ -78,7 +80,7 @@ const html = `<!doctype html><html><head><meta charset="utf-8"><style>
 html,body{margin:0;background:#0b0f14;width:1080px;height:1920px;overflow:hidden}
 #stage,#overlay{position:absolute;left:0;top:0;width:1080px;height:1920px}
 </style></head><body><div id="stage"></div><canvas id="overlay" width="1080" height="1920"></canvas>
-<script>window.__DATA=${JSON.stringify({ shot, facts, lines: music ? [] : lines, wordmark, brand, fit, trials })};</script><script>${js}</script></body></html>`;
+<script>window.__DATA=${JSON.stringify({ shot, facts, lines: music ? [] : lines, wordmark, brand, fit, trials, lang })};</script><script>${js}</script></body></html>`;
 
 // 맥은 GPU(Metal), 리눅스(GitHub Actions)는 GPU 가 없어 SwiftShader 소프트웨어 WebGL
 const glArgs = process.platform === "darwin"

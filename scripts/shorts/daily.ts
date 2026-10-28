@@ -1,7 +1,8 @@
 /**
  * 매일 한 편 — 샷 고르기 → facts → render → 유튜브 업로드 → 댓글. GitHub Actions(daily-shorts.yml)가 부른다.
  *
- *   npx tsx scripts/shorts/daily.ts [--dry] [--private] [--days 3]
+ *   npx tsx scripts/shorts/daily.ts [--channel main|vn] [--dry] [--private] [--days 3]
+ *     --channel  main = 본 채널(@rrankue, 영어 화면) · vn = 베트남 채널(@rankue_vn, 베트남어 화면). 채널마다 올린 샷을 따로 센다
  *     --dry      영상까지만 만들고 올리지 않는다
  *     --private  비공개로 올린다(시험용, 댓글 생략)
  *
@@ -14,10 +15,14 @@ import { readOnlyDb } from "./db";
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { matchScore } from "./score";
-import { accessToken, assertRankueChannel, postedShots, uploadVideo, postComment } from "./youtube";
+import { accessToken, assertRankueChannel, postedShots, uploadVideo, postComment, CHANNELS, type ChannelKey } from "./youtube";
 import { buildMeta, commentText } from "./meta";
 
 const dry = process.argv.includes("--dry");
+const chArg = process.argv.indexOf("--channel");
+const channel = (chArg > 0 ? process.argv[chArg + 1] : "main") as ChannelKey;
+if (!CHANNELS[channel]) throw new Error(`모르는 채널: ${channel}`);
+const lang = CHANNELS[channel].lang;
 const privateRun = process.argv.includes("--private");
 const daysArg = process.argv.indexOf("--days");
 const DAYS = daysArg > 0 ? Number(process.argv[daysArg + 1]) : 3;
@@ -25,8 +30,8 @@ const MIN_RECENT = 5;
 const MIN_BACKLOG = 4;
 
 // ── 채널에 이미 올린 샷 ────────────────────────────────
-const token = dry ? null : await accessToken();
-const uploads = token ? await assertRankueChannel(token) : null;
+const token = dry ? null : await accessToken(channel);
+const uploads = token ? await assertRankueChannel(token, channel) : null;
 const posted = token && uploads ? await postedShots(token, uploads) : new Set<string>();
 console.log(`채널에 올린 샷 ${posted.size}개`);
 
@@ -60,17 +65,17 @@ const today = new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10).rep
 let pick: (typeof ranked)[number] | null = null;
 let slug = "";
 for (const c of ranked.slice(0, 5)) {
-    slug = `${today}-${c.match_id.slice(0, 8)}-${c.idx}`;
+    slug = `${today}-${c.match_id.slice(0, 8)}-${c.idx}${channel === "main" ? "" : `-${channel}`}`;
     console.log(`\n▶ 후보 ${c.match_id}#${c.idx} · ${c.cushions}쿠션 · ${c.recent ? "최근" : "지난 경기"} · 경기 점수 ${Math.round(c.ms)}`);
     try { run("scripts/shorts/facts.ts", [c.match_id, String(c.idx), slug]); pick = c; break; }
     catch { console.warn("  facts 실패(재시뮬 불일치 등) — 다음 후보"); }
 }
 if (!pick) throw new Error("후보 5개 모두 실패");
-run("scripts/shorts/render.ts", [slug]);
+run("scripts/shorts/render.ts", [slug, "--lang", lang]);
 
 const dir = `scripts/shorts/out/${slug}`;
 const facts = JSON.parse(readFileSync(`${dir}/facts.json`, "utf8"));
-const meta = buildMeta(facts, pick.match_id, pick.idx);
+const meta = buildMeta(facts, pick.match_id, pick.idx, lang);
 writeFileSync(`${dir}/meta.json`, JSON.stringify(meta, null, 2));
 console.log(`\n제목: ${meta.title}`);
 if (dry || !token) { console.log(`--dry: 올리지 않음 → ${dir}/output.mp4`); process.exit(0); }
@@ -81,7 +86,7 @@ console.log(`✓ 업로드 https://youtube.com/shorts/${videoId} (${privateRun ?
 if (!privateRun) {
     // 막 올린 영상은 댓글이 바로 안 붙을 때가 있어 몇 번 기다렸다 다시 해 본다
     for (let i = 0; i < 6; i++) {
-        try { await postComment(token, videoId, commentText(facts)); console.log("✓ 댓글"); break; }
+        try { await postComment(token, videoId, commentText(facts, lang), channel); console.log("✓ 댓글"); break; }
         catch (e) { if (i === 5) console.warn(`댓글 실패(영상은 올라감): ${(e as Error).message}`); else await new Promise((r) => setTimeout(r, 20_000)); }
     }
 }

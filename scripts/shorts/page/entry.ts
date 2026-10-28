@@ -14,6 +14,7 @@ import { simulateShot } from "@shared/sim/simulate";
 import type { BallState, ShotInput } from "@shared/sim/types";
 import type { SimParams } from "@shared/sim/params";
 import { buildTimeline, sceneAt, totalDuration, type FitOptions, type Scene } from "../timeline";
+import { STRINGS, type Lang } from "./strings";
 
 interface Line { start: number; end: number; text: string; speaker?: string }
 interface Data {
@@ -27,6 +28,8 @@ interface Data {
     fit?: FitOptions;
     /** 기적 지수 시도별 입력 [phi, V0, a, b](facts.ts 의 trials.json) — 1,000개 궤적 부채꼴을 그린다 */
     trials?: [number, number, number, number][];
+    /** 화면 글자 언어(채널마다) — 기본 en */
+    lang?: Lang;
 }
 declare global {
     interface Window { __DATA: Data; seek(vt: number): void; brandReady(): boolean; shortsReady: { duration: number; fps: number } }
@@ -37,7 +40,8 @@ const ACCENT = "#FFD23F";
 const INK = "#0B0F14";
 const FONT = `"Pretendard", "Apple SD Gothic Neo", sans-serif`;
 
-const { shot, facts, lines, wordmark, brand, fit, trials } = window.__DATA;
+const { shot, facts, lines, wordmark, brand, fit, trials, lang } = window.__DATA;
+const T = STRINGS[lang ?? "en"];
 const input = shot.input;
 const res = simulateShot(shot.preState, input, shot.params);
 if (res.hash !== shot.hash) throw new Error("재시뮬 해시 불일치");
@@ -109,8 +113,12 @@ function cushionsSoFar(shotT: number): number {
 }
 
 // ── 글자 ─────────────────────────────────────────────
-function text(s: string, x: number, y: number, size: number, opts: { color?: string; align?: CanvasTextAlign; weight?: number; stroke?: number } = {}) {
+function text(s: string, x: number, y: number, size: number, opts: { color?: string; align?: CanvasTextAlign; weight?: number; stroke?: number; max?: number } = {}) {
     ctx.font = `${opts.weight ?? 800} ${size}px ${FONT}`;
+    // 언어마다 길이가 달라(베트남어가 길다) 폭을 넘으면 글자를 줄인다
+    const maxW = opts.max ?? W - 80;
+    const w0 = ctx.measureText(s).width;
+    if (w0 > maxW) { size = Math.floor(size * maxW / w0); ctx.font = `${opts.weight ?? 800} ${size}px ${FONT}`; }
     ctx.textAlign = opts.align ?? "center";
     ctx.textBaseline = "middle";
     if (opts.stroke) {
@@ -155,15 +163,7 @@ function chip(label: string, x: number, y: number, size: number, align: "left" |
 const ease = (p: number) => 1 - Math.pow(1 - Math.max(0, Math.min(1, p)), 3);
 
 // ── 그래픽 층 ─────────────────────────────────────────
-/** "SUN, OCT 4 · 11:50 AM KST" — 화면 글자는 영어(2026-10-28 오너: 외국인도 본다. 한국어는 노래 · 제목이 맡는다). */
-function whenLabel(iso: string): string {
-    const k = new Date(new Date(iso).getTime() + 9 * 3600_000);
-    const h = k.getUTCHours();
-    const day = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"][k.getUTCDay()];
-    const mon = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"][k.getUTCMonth()];
-    return `${day}, ${mon} ${k.getUTCDate()} · ${((h + 11) % 12) + 1}:${String(k.getUTCMinutes()).padStart(2, "0")} ${h < 12 ? "AM" : "PM"} KST`;
-}
-const playerName = (ko: string) => ko.replace("플레이어", "PLAYER");
+const playerName = (ko: string) => T.player(ko.replace("플레이어", "").trim()); // facts 는 "플레이어 A/B"
 
 /** 중계 스코어보드: 위 줄 = 언제 · 어디서, 아래 줄 = 두 선수 점수(친 사람 쪽에 "TO SHOOT")와 이닝 · 목표. */
 function drawTopBar() {
@@ -172,23 +172,23 @@ function drawTopBar() {
     const otherBall = shooterBall === "white" ? "yellow" : "white";
     const ballFill = (id: string) => (id === "yellow" ? "#F2C230" : "#F4F1EA");
     // 위 줄
-    chip(whenLabel(facts.when.iso), 40, 56, 28, "left", "rgba(11,15,20,0.78)", "rgba(255,255,255,0.85)");
-    chip("3-CUSHION · REPLAY", W - 40, 56, 28, "right", "rgba(11,15,20,0.78)", "rgba(255,255,255,0.85)");
+    chip(T.when(facts.when.iso), 40, 56, 28, "left", "rgba(11,15,20,0.78)", "rgba(255,255,255,0.85)");
+    chip(T.tag, W - 40, 56, 28, "right", "rgba(11,15,20,0.78)", "rgba(255,255,255,0.85)");
     // 아래 줄 — 가운데 이닝 칸을 사이에 두고 좌우 선수
     const y = 140, h = 96, mid = 200, side = 360, x0 = (W - mid - side * 2) / 2;
     ctx.fillStyle = "rgba(11,15,20,0.86)";
     ctx.beginPath(); ctx.roundRect(x0, y - h / 2, side * 2 + mid, h, 22); ctx.fill();
     ctx.fillStyle = ACCENT;
     ctx.beginPath(); ctx.roundRect(x0 + side, y - h / 2, mid, h, 0); ctx.fill();
-    text(`INNING ${facts.situation.inning}`, W / 2, y - 14, 32, { color: INK, weight: 900 });
-    text(`RACE TO ${facts.situation.target}`, W / 2, y + 22, 22, { color: INK, weight: 700 });
+    text(T.inning(facts.situation.inning), W / 2, y - 14, 32, { color: INK, weight: 900, max: mid - 16 });
+    text(T.raceTo(facts.situation.target), W / 2, y + 22, 22, { color: INK, weight: 700, max: mid - 16 });
     const player = (name: string, score: number, ball: string, left: boolean, turn: boolean) => {
         const cx = left ? x0 + side / 2 : x0 + side + mid + side / 2;
         const bx = left ? x0 + 40 : x0 + side * 2 + mid - 40;
         ctx.fillStyle = ballFill(ball);
         ctx.beginPath(); ctx.arc(bx, y, 16, 0, Math.PI * 2); ctx.fill();
         text(name, cx, y - 16, 28, { weight: 700, color: "rgba(255,255,255,0.8)" });
-        if (turn) text("TO SHOOT", cx, y + 26, 20, { weight: 800, color: ACCENT });
+        if (turn) text(T.toShoot, cx, y + 26, 20, { weight: 800, color: ACCENT });
         text(String(score), left ? x0 + side - 40 : x0 + side + mid + 40, y + 2, 64, { weight: 900, align: "center" });
     };
     player(playerName(facts.players.shooter), sb.shooter, shooterBall, true, true);
@@ -208,7 +208,7 @@ function drawCounter(shotT: number, scene: Scene) {
     ctx.scale(pop, pop);
     text(String(n), 0, 0, 200, { color: n >= 3 ? ACCENT : "#fff", stroke: 18, weight: 900 });
     ctx.restore();
-    text(n === 1 ? "CUSHION" : "CUSHIONS", W / 2 + 80, 370, 40, { stroke: 10, align: "left", weight: 900 });
+    text(T.cushions(n), W / 2 + 80, 370, 40, { stroke: 10, align: "left", weight: 900 });
     if (shotT >= contact2) {
         const k = ease((shotT - contact2) / rate / 0.25);
         ctx.save();
@@ -216,7 +216,7 @@ function drawCounter(shotT: number, scene: Scene) {
         ctx.translate(W / 2, 550);
         ctx.rotate(-0.06);
         ctx.scale(0.8 + 0.2 * k, 0.8 + 0.2 * k);
-        chip("SCORE!", 0, 0, 84, "center", ACCENT, INK);
+        chip(T.score, 0, 0, 84, "center", ACCENT, INK);
         ctx.restore();
     }
 }
@@ -235,17 +235,17 @@ function drawHook(p: number) {
     const k = ease(p / 0.25);
     ctx.save();
     ctx.globalAlpha = k;
-    text("Will it", W / 2, 330, 150, { stroke: 22, weight: 900 });
-    text("go in?", W / 2, 500, 190, { stroke: 24, weight: 900, color: ACCENT });
+    text(T.hook[0], W / 2, 330, 150, { stroke: 22, weight: 900 });
+    text(T.hook[1], W / 2, 500, 190, { stroke: 24, weight: 900, color: ACCENT });
     ctx.restore();
-    chip("Count the cushions", W / 2, 680, 40, "center");
+    chip(T.hookSub, W / 2, 680, 40, "center");
 }
 
 function drawRewind(p: number) {
     ctx.fillStyle = "rgba(10,14,20,0.35)";
     ctx.fillRect(0, 0, W, H);
     for (let y = (p * 900) % 12; y < H; y += 12) { ctx.fillStyle = "rgba(255,255,255,0.05)"; ctx.fillRect(0, y, W, 2); }
-    text("◀◀  REWIND", W / 2, 420, 92, { stroke: 18, weight: 900 });
+    text(T.rewind, W / 2, 420, 92, { stroke: 18, weight: 900 });
 }
 
 /**
@@ -282,15 +282,13 @@ function drawAim(p: number) {
     ctx.fillStyle = "#D8262C";
     ctx.beginPath(); ctx.arc(tx, ty, 20, 0, Math.PI * 2); ctx.fill();
     ctx.strokeStyle = INK; ctx.lineWidth = 4; ctx.stroke();
-    const sideWord = input.a > 0.08 ? "Right english" : input.a < -0.08 ? "Left english" : "No english";
-    const vertWord = input.b > 0.15 ? "Follow" : input.b < -0.15 ? "Draw" : "Center";
-    text(`${sideWord} · ${vertWord}`, cx, y0 + h - 22, 28, { weight: 700, color: "rgba(255,255,255,0.85)" });
+    text(`${T.side(input.a)} · ${T.vert(input.b)}`, cx, y0 + h - 22, 28, { weight: 700, color: "rgba(255,255,255,0.85)", max: R * 2 + 60 });
 
     // 세기 게이지
     const gx = cx + R + 70, gw = x0 + w - 40 - gx, pct = facts.shot.cuePowerPct as number;
-    const word = pct >= 80 ? "HARD" : pct >= 55 ? "MEDIUM" : "SOFT";
+    const word = T.strength(pct);
     const fill = ease((p - 0.15) / 0.6) * pct / 100;
-    text("POWER", gx, y0 + 70, 34, { align: "left", weight: 700, color: "rgba(255,255,255,0.8)" });
+    text(T.power, gx, y0 + 70, 34, { align: "left", weight: 700, color: "rgba(255,255,255,0.8)" });
     text(`${Math.round(fill * 100)}%`, gx + gw, y0 + 70, 64, { align: "right", weight: 900, color: ACCENT });
     const segs = 10, gap = 8, sw = (gw - gap * (segs - 1)) / segs, sy = y0 + 130, sh = 96;
     const flash = p > 0.85 && p < 0.93;
@@ -353,9 +351,9 @@ function drawMiracle(p: number) {
     ctx.fillStyle = "rgba(8,11,15,0.5)";
     ctx.fillRect(0, 0, W, H);
     const m = facts.miracle;
-    text("We re-shot it", W / 2, 150, 60, { stroke: 12 });
-    text(`${m.trials.toLocaleString("en-US")} times`, W / 2, 240, 84, { color: ACCENT, weight: 900, stroke: 14 });
-    text("with tiny human errors in aim, power and spin", W / 2, 325, 30, { weight: 600, color: "rgba(255,255,255,0.8)", stroke: 8 });
+    text(T.reshot[0], W / 2, 150, 60, { stroke: 12 });
+    text(T.reshot[1](m.trials), W / 2, 240, 84, { color: ACCENT, weight: 900, stroke: 14 });
+    text(T.reshotSub, W / 2, 325, 30, { weight: 600, color: "rgba(255,255,255,0.8)", stroke: 8 });
 
     let lit: number;
     if (fan.length) {
@@ -390,12 +388,12 @@ function drawMiracle(p: number) {
     } else {
         lit = Math.round(m.hits * ease(p / 0.6));
     }
-    text(`${lit} made it`, W / 2, 1690, 120, { color: ACCENT, weight: 900, stroke: 16 });
+    text(T.made(lit), W / 2, 1690, 120, { color: ACCENT, weight: 900, stroke: 16 });
     if (p > 0.62) {
         const k = ease((p - 0.62) / 0.15);
         ctx.save(); ctx.globalAlpha = k;
         // 한 번도 안 들어갔으면 그게 이 영상의 펀치라인이다
-        text(m.hits === 0 ? "Not a single one." : `${(m.hits / m.trials * 100).toFixed(1)}% success rate`, W / 2, 1810, 60, { stroke: 12 });
+        text(T.rate(m.hits, m.trials), W / 2, 1810, 60, { stroke: 12 });
         ctx.restore();
     }
 }
@@ -424,17 +422,17 @@ function drawOutro(p: number) {
     ctx.fillRect(0, 0, W, H);
     const k = ease(p / 0.25);
     ctx.save(); ctx.globalAlpha = k;
-    text("Could YOU", W / 2, 420, 100, { weight: 900 });
-    text("make this shot?", W / 2, 540, 100, { weight: 900, color: ACCENT });
+    text(T.outro[0], W / 2, 420, 100, { weight: 900 });
+    text(T.outro[1], W / 2, 540, 100, { weight: 900, color: ACCENT });
     if (logo.complete && logo.naturalWidth) {
         const lw = 460, lh = lw * logo.naturalHeight / logo.naturalWidth;
         ctx.drawImage(logo, (W - lw) / 2, 660, lw, lh);
     } else text("RANKUE", W / 2, 700, 90, { weight: 900 });
-    text("Same layout. Real 3-cushion physics.", W / 2, 820, 40, { weight: 600, color: "rgba(255,255,255,0.8)" });
+    text(T.outroSub, W / 2, 820, 40, { weight: 600, color: "rgba(255,255,255,0.8)" });
     ctx.restore();
     // 버튼 두 개가 차례로 올라온다
     const bw = 720, bh = 160, bx = (W - bw) / 2;
-    ([["Download on the", "App Store", 0.12], ["GET IT ON", "Google Play", 0.22]] as const).forEach(([small, big, delay], i) => {
+    ([[...T.ios, 0.12], [...T.android, 0.22]] as const).forEach(([small, big, delay], i) => {
         const q = ease((p - delay) / 0.2);
         ctx.save();
         ctx.globalAlpha = q;
@@ -444,7 +442,7 @@ function drawOutro(p: number) {
     });
     const q = ease((p - 0.35) / 0.2);
     ctx.save(); ctx.globalAlpha = q;
-    chip("Search “RANKUE”", W / 2, 1360, 46, "center", ACCENT, INK);
+    chip(T.search, W / 2, 1360, 46, "center", ACCENT, INK);
     ctx.restore();
 }
 

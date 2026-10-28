@@ -53,6 +53,14 @@ function describe(f: ShotFacts) {
             cue: `세기 ${f.shot.cuePowerPct}% · ${side > 0 ? "오른쪽 회전" : side < 0 ? "왼쪽 회전" : "무회전"} · ${vert > 0 ? "밀어치기" : vert < 0 ? "끌어치기" : "중단"}`,
             path: `${BALL.ko[first as keyof typeof BALL.ko] ?? first} → ${rails.map(RAIL.ko).join("·")} (${n}쿠션) → ${BALL.ko[second as keyof typeof BALL.ko] ?? second}`,
         },
+        vi: {
+            when: `${k.getUTCDate()}/${k.getUTCMonth() + 1} (giờ Hàn)`,
+            table: `Bida 3 băng · ${f.game.tableId === "DAEDAE" ? "bàn lớn" : "bàn trung"}`,
+            state: `Lượt ${f.situation.inning} · ${sb.shooter}:${sb.other} (chạm ${f.situation.target})`,
+            cue: `Lực ${f.shot.cuePowerPct}% · ${side > 0 ? "xoáy phải" : side < 0 ? "xoáy trái" : "không xoáy"} · ${vert > 0 ? "đẩy" : vert < 0 ? "kéo" : "giữa"}`,
+            path: `${({ red: "bi đỏ", yellow: "bi vàng", white: "bi trắng" } as Record<string, string>)[first] ?? first} → ${n} băng → ${({ red: "bi đỏ", yellow: "bi vàng", white: "bi trắng" } as Record<string, string>)[second] ?? second}`,
+            pct: pct.replace(".", ","),
+        },
         en: {
             when: `${enDate} (KST)`,
             table: `3-cushion · ${f.game.tableId === "DAEDAE" ? "full-size table" : "mid-size table"}`,
@@ -63,7 +71,8 @@ function describe(f: ShotFacts) {
     };
 }
 
-export function buildMeta(f: ShotFacts, matchId: string, idx: number): VideoMeta {
+export function buildMeta(f: ShotFacts, matchId: string, idx: number, lang: "en" | "vi" = "en"): VideoMeta {
+    if (lang === "vi") return buildMetaVi(f, matchId, idx);
     const d = describe(f);
     const links = storeLinks("desc");
     const store = `🍎 App Store: ${links.ios}\n🤖 Google Play: ${links.android}`;
@@ -143,9 +152,64 @@ export function buildMeta(f: ShotFacts, matchId: string, idx: number): VideoMeta
     };
 }
 
-/** 업로드 직후 채널 이름으로 다는 댓글 — 샷 해부 + 참여 질문 + 링크(한국어 · 영어). */
-export function commentText(f: ShotFacts): string {
+/**
+ * 베트남 채널(@rankue_vn) — 기본 베트남어, 번역 en · ko. 베트남 당구 말: băng(쿠션) · ăn điểm(득점) · xoáy(회전).
+ */
+function buildMetaVi(f: ShotFacts, matchId: string, idx: number): VideoMeta {
     const d = describe(f);
+    const links = storeLinks("vn_desc");
+    const store = `🍎 App Store: ${links.ios}\n🤖 Google Play: ${links.android}`;
+    const music = "🎵 Nhạc: 랭큐! 랭큐! (RANKUE original)";
+    const shotLine = `Shot ID: ${matchId}#${idx}`;
+    const vi = {
+        title: d.hits === 0 ? `${d.n} băng mà vẫn vào?! Đánh lại 1.000 lần không lần nào vào 😳 | RANKUE`
+            : `${d.n} băng mà vẫn vào?! 😳 Đánh lại 1.000 lần | RANKUE Bida 3 băng`,
+        description: [
+            `Một cú ăn điểm ${d.n} băng có thật trong trận đấu trên RANKUE — mô phỏng bida 3 băng.`,
+            d.hits === 0 ? "Đánh lại 1.000 lần từ đúng vị trí đó với sai số nhỏ như tay người: không lần nào vào."
+                : `Đánh lại 1.000 lần từ đúng vị trí đó với sai số nhỏ như tay người: vào ${d.hits} lần (${d.vi.pct}%).`,
+            "",
+            "📋 Cú đánh",
+            `• ${d.vi.when} · ${d.vi.table}`,
+            `• ${d.vi.state}`,
+            `• ${d.vi.cue}`,
+            `• ${d.vi.path}`,
+            "",
+            "🎱 RANKUE là game mô phỏng bida theo vật lý thật. Thử ngay đúng thế bi này và thi đấu 3 băng trực tiếp với bạn bè.",
+            store, "", music, "",
+            "#Shorts #bida #bida3bang #3bang #carom #billiards #RANKUE",
+            "", shotLine,
+        ].join("\n"),
+    };
+    const en = buildMeta(f, matchId, idx, "en");
+    return {
+        title: vi.title, description: vi.description, defaultLanguage: "vi",
+        localizations: { en: en.localizations.en, ko: { title: en.title, description: en.description } },
+        tags: ["RANKUE", "bida", "bida 3 băng", "3 băng", "carom", "billiards", "game bida", "mô phỏng bida", "shorts"],
+    };
+}
+
+/** 업로드 직후 채널 이름으로 다는 댓글 — 샷 해부 + 참여 질문 + 링크(본 채널 = 한국어 · 영어, 베트남 채널 = 베트남어 · 영어). */
+export function commentText(f: ShotFacts, lang: "en" | "vi" = "en"): string {
+    const d = describe(f);
+    if (lang === "vi") {
+        const l = storeLinks("vn_comment");
+        return [
+            "🎱 Phân tích cú đánh | Shot breakdown",
+            `📅 ${d.vi.when} · ${d.vi.table}`,
+            `📊 ${d.vi.state}`,
+            `🎯 ${d.vi.cue}`,
+            `🔁 ${d.vi.path}`,
+            d.hits === 0 ? "🎲 Đánh lại 1.000 lần: không lần nào vào" : `🎲 Đánh lại 1.000 lần: vào ${d.hits} lần (${d.vi.pct}%)`,
+            "",
+            "Bạn nghĩ mình cần bao nhiêu lần mới vào? 👇",
+            "How many tries would YOU need? 👇",
+            "",
+            "📲 Thử đúng thế bi này · Try this exact layout",
+            `🍎 ${l.ios}`,
+            `🤖 ${l.android}`,
+        ].join("\n");
+    }
     const l = storeLinks("comment");
     return [
         "🎱 샷 해부 | Shot breakdown",

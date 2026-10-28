@@ -1,14 +1,18 @@
 /**
- * RANKUE 유튜브 채널(@rrankue, UC3qRIkjbA00NBQbm229UPbQ) 접근.
+ * RANKUE 유튜브 채널 접근 — 본 채널(@rrankue, 영어 화면)과 베트남 채널(@rankue_vn, 베트남어 화면).
  *
  * 인증은 사주 앱(mudang.k)과 같은 GCP OAuth 클라이언트를 쓰고, 토큰은 그때 미국 채널로 받은 것을 RANKUE 로 옮겼다
  * (2026-10-28 — 채널 이름 · 프로필을 RANKUE 로 바꾼 같은 채널). 업로드 · 댓글 스코프가 있다.
- *   YT_CLIENT_ID · YT_CLIENT_SECRET · YT_REFRESH_RANKUE
+ *   YT_CLIENT_ID · YT_CLIENT_SECRET · YT_REFRESH_RANKUE(본) · YT_REFRESH_RANKUE_VN(베트남 — 옛 사주 베트남 채널, 2026-10-29)
  *
  * 올린 샷 기록은 저장소가 아니라 채널 자체에 둔다: 설명 끝줄 "Shot ID: <matchId>#<idx>".
  * 매일 기록을 커밋하면 main 푸시마다 Vercel 운영 배포가 돌기 때문이다.
  */
-export const RANKUE_CHANNEL_ID = "UC3qRIkjbA00NBQbm229UPbQ";
+export const CHANNELS = {
+    main: { id: "UC3qRIkjbA00NBQbm229UPbQ", tokenEnv: "YT_REFRESH_RANKUE", lang: "en" },
+    vn: { id: "UCTBoc8uyKy1cxd3OU8HZk-Q", tokenEnv: "YT_REFRESH_RANKUE_VN", lang: "vi" },
+} as const;
+export type ChannelKey = keyof typeof CHANNELS;
 export const SHOT_ID_RE = /Shot ID: ([0-9a-f-]{36})#(\d+)/;
 
 const env = (k: string) => {
@@ -17,13 +21,13 @@ const env = (k: string) => {
     return v;
 };
 
-export async function accessToken(): Promise<string> {
+export async function accessToken(channel: ChannelKey = "main"): Promise<string> {
     const r = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
             client_id: env("YT_CLIENT_ID"), client_secret: env("YT_CLIENT_SECRET"),
-            refresh_token: env("YT_REFRESH_RANKUE"), grant_type: "refresh_token",
+            refresh_token: env(CHANNELS[channel].tokenEnv), grant_type: "refresh_token",
         }),
     });
     const j = await r.json();
@@ -38,11 +42,11 @@ async function api(token: string, url: string, init: RequestInit = {}) {
     return j;
 }
 
-/** 토큰이 정말 RANKUE 채널인지(다른 채널에 올리는 사고 방지). */
-export async function assertRankueChannel(token: string): Promise<string> {
+/** 토큰이 정말 그 RANKUE 채널인지(다른 채널에 올리는 사고 방지). */
+export async function assertRankueChannel(token: string, channel: ChannelKey = "main"): Promise<string> {
     const j = await api(token, "https://www.googleapis.com/youtube/v3/channels?part=contentDetails&mine=true");
     const ch = j.items?.[0];
-    if (ch?.id !== RANKUE_CHANNEL_ID) throw new Error(`토큰 채널이 RANKUE 가 아니다: ${ch?.id}`);
+    if (ch?.id !== CHANNELS[channel].id) throw new Error(`토큰 채널이 RANKUE ${channel} 가 아니다: ${ch?.id}`);
     return ch.contentDetails.relatedPlaylists.uploads;
 }
 
@@ -93,10 +97,10 @@ export async function uploadVideo(token: string, file: string, meta: VideoMeta, 
 }
 
 /** 공개 영상에 채널 이름으로 댓글(다운로드 링크). 고정은 API 로 안 된다 — 필요하면 스튜디오에서 손으로. */
-export async function postComment(token: string, videoId: string, text: string): Promise<void> {
+export async function postComment(token: string, videoId: string, text: string, channel: ChannelKey = "main"): Promise<void> {
     await api(token, "https://www.googleapis.com/youtube/v3/commentThreads?part=snippet", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ snippet: { channelId: RANKUE_CHANNEL_ID, videoId, topLevelComment: { snippet: { textOriginal: text } } } }),
+        body: JSON.stringify({ snippet: { channelId: CHANNELS[channel].id, videoId, topLevelComment: { snippet: { textOriginal: text } } } }),
     });
 }
