@@ -1,0 +1,74 @@
+name: Daily Shorts
+
+# 매일 09:30 UTC(=18:30 KST) — 「이게 들어가?」 쇼츠 한 편을 골라 렌더해 RANKUE 채널(@rrankue)에 바로 공개 + 댓글.
+# 고르는 법 · 제목 · 댓글은 scripts/shorts/daily.ts · meta.ts. 올린 샷 기록은 채널 설명의 Shot ID 라 커밋하지 않는다
+# (main 푸시마다 Vercel 운영 배포가 돌기 때문).
+on:
+  schedule:
+    - cron: "30 9 * * *"
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "public = 공개 업로드 · private = 비공개 시험 · dry = 영상만 만들기"
+        required: false
+        default: "public"
+
+concurrency:
+  group: daily-shorts
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  shorts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Install Chromium (headless WebGL) + ffmpeg + Pretendard
+        run: |
+          npx playwright install --with-deps chromium
+          sudo apt-get install -y ffmpeg
+          mkdir -p ~/.local/share/fonts
+          curl -fsSL -o /tmp/pre.zip https://github.com/orioncactus/pretendard/releases/download/v1.3.9/Pretendard-1.3.9.zip
+          unzip -oq /tmp/pre.zip -d /tmp/pre
+          find /tmp/pre -name 'Pretendard-*.otf' -exec cp {} ~/.local/share/fonts/ \;
+          fc-cache -f
+          fc-list | grep -i pretendard | head -3
+
+      - name: Make and upload today's short
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          YT_CLIENT_ID: ${{ secrets.YT_CLIENT_ID }}
+          YT_CLIENT_SECRET: ${{ secrets.YT_CLIENT_SECRET }}
+          YT_REFRESH_RANKUE: ${{ secrets.YT_REFRESH_RANKUE }}
+          MODE: ${{ inputs.mode || 'public' }}
+        run: |
+          case "$MODE" in
+            private) npx tsx scripts/shorts/daily.ts --private ;;
+            dry) npx tsx scripts/shorts/daily.ts --dry ;;
+            *) npx tsx scripts/shorts/daily.ts ;;
+          esac
+
+      # 오늘 만든 영상 · 제목 · 사실을 7일 동안 받아 볼 수 있게(프레임은 빼고)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: shorts-${{ github.run_id }}
+          retention-days: 7
+          path: |
+            scripts/shorts/out/*/output.mp4
+            scripts/shorts/out/*/meta.json
+            scripts/shorts/out/*/facts.json
+            scripts/shorts/out/*/upload.json
+          if-no-files-found: ignore
