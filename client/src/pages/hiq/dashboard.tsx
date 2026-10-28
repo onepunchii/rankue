@@ -212,7 +212,7 @@ function HiqDashboardBilliards() {
             {/* ② 실전 점수판 — 실제 점수판 모양(오너 "아 이게 실전 점수판이구나"). 입구는 위의 두 함수(비로그인은 거기서 가입 안내) */}
             <section className="mb-10" data-tour="bh-board">
                 <HomeSectionHeader title={t("home.boardTitle")} desc={t("home.boardDesc")} onGuide={() => setGuide("scoreboard")} />
-                <ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} />
+                <ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} sample={sample} />
             </section>
 
             {/* 둘러보기 — 매장 찾기·커뮤니티 */}

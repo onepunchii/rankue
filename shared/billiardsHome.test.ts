@@ -36,7 +36,7 @@ describe("당구 홈", () => {
     });
     it("① 배지 모양을 섞지 않는다 — 실전 둥근 메달 · 온라인 방패 · 온라인 다마 육각", () => {
         expect(skill).toContain("<RealMedal game={cur}");
-        expect(skill).toContain("<TierEmblem tier={s.tier.id} size={50} glow />");
+        expect(skill).toContain("<TierEmblem tier={s.tier.id} size={64} glow />");
         expect(skill).toContain("<OnlineDamaBadge target={onlineDama}");
     });
     it("① 실전 칸에 RP · 상위 % 를 두지 않는다(오너 '60RP 랑 상위 빼 줘' 10/24) — 경기 기록으로 가는 길은 그대로", () => {
@@ -81,12 +81,15 @@ describe("당구 홈", () => {
         expect(skill).toContain("{withPros && (realSpot || onlineSpot) && <ProLadder real={realSpot} online={onlineSpot} />}");
         const ladder = skill.slice(skill.indexOf("function ProLadder("));
         expect(ladder).toContain("{real && flag(real, t(\"home.colReal\"), REAL_INK, false)}");
-        expect(ladder).toContain("{online && flag(online, t(\"home.colOnline\"), \"#121722\", true)}");
+        expect(ladder).toContain("{online && flag(online, t(\"home.colOnline\"), ONLINE_BG, true)}");
         expect(ladder).toContain("const name = t(`lookalike.tierShort${i}`);");
     });
     it("② 실전 점수판 — 실제 점수판 모양, 판의 숫자는 미리 보기, 입구는 홈의 두 함수", () => {
         expect(board).toContain('t("home.boardPreview")');
-        expect(home).toContain("<ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} />");
+        expect(home).toContain("<ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} sample={sample} />");
+        // 실제 점수판의 결(오너 10/28 "느낌만") — 칸마다 목표 · 평균 · 하이런 · 남은 점수, 아래 이닝 공. 내 칸의 목표는 내 실전 3쿠션 다마
+        for (const k of ['t("playerCard.target")', 't("playerCard.average")', 't("playerCard.highRun")', 't("scoreboardBottomBar.inning")', "Math.max(0, target - score)"]) expect(board).toContain(k);
+        expect(board).toContain("const target = handi ?? 25;");
     });
     it("당구 게임 — 혼자 치기 · 같이 치기 두 카드를 띄우고, 같이 치기의 방 만들기 단추는 그림 위 하나(오너 '중복 아닌가' 10/24)", () => {
         const game = read("client/src/components/hiq/dashboard/OnlineGameCard.tsx");

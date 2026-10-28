@@ -42,6 +42,9 @@ type Tier = 0 | 1 | 2 | 3 | 4;
 const ROOMS_URL = "/online-game?rooms=1";
 const REAL_INK = "#1F6B47";
 const ONLINE_INK = "#2A6E86";
+// 온라인 칸 바탕 — 2026-10-28 오너 "곤색보다 추천 색" → 표 머리 '온라인'(ONLINE_INK)과 같은 계열의 짙은 청록(폰 당구대 천). 예전 #121722
+const ONLINE_BG = "#134755";
+const ONLINE_BG_GRAD = "linear-gradient(160deg,#1A5868 0%,#0F3843 100%)";
 // 항목 · 실전 나 · 실전 프로 · 온라인 나 · 온라인 프로 — 360 폭 카드 안에서 숫자 칸이 50px 남짓
 const COLS_PRO = "grid-cols-[50px_repeat(4,minmax(0,1fr))]";
 
@@ -133,21 +136,21 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
 
             <div className="mt-3.5 grid grid-cols-2 gap-2.5">
                 {/* 실전 — 당구장 공식 경기. 전적 줄은 온라인 칸의 전적 줄과 높이를 맞춰 맨 아래에 */}
-                <div className="flex flex-col rounded-2xl bg-[#F4F7F2] p-3 min-w-0" data-testid="home-skill-real">
-                    <p className="text-[11.5px] font-bold tracking-wide truncate" style={{ color: REAL_INK }}>{t("home.skillReal")}</p>
-                    <div className="mt-1.5 flex items-center gap-2">
+                {/* 2026-10-28 오너 "이 부분 디자인이 아쉽다" → 두 칸을 같은 틀로: 머리 한 줄 · 가운데 배지(뒤에 옅은 빛) · 이름 · 한 줄 · 맨 아래 전적 */}
+                <div className="flex flex-col items-center rounded-2xl p-3 text-center min-w-0 ring-1 ring-[#1F6B47]/10" style={{ background: "linear-gradient(170deg,#F1F7F2 0%,#E5F0E8 100%)" }} data-testid="home-skill-real">
+                    <p className="self-stretch text-left text-[11.5px] font-bold tracking-wide truncate" style={{ color: REAL_INK }}>{t("home.skillReal")}</p>
+                    <span className="relative mt-1.5 grid place-items-center">
+                        <i className="absolute h-[62px] w-[62px] rounded-full bg-white/80 blur-[6px]" aria-hidden="true" />
                         <BadgeTap guide={{ kind: "real", game: cur, handi: ready ? side!.handi : null }}>
-                            <RealMedal game={cur} handi={ready ? side!.handi : null} size={50} />
+                            <RealMedal game={cur} handi={ready ? side!.handi : null} size={64} />
                         </BadgeTap>
-                        <div className="min-w-0">
-                            <p className="text-[15px] font-black leading-tight truncate" style={ink ? { color: ink } : undefined}>{tier ? t(tier.nameKey) : t("real.tierNone")}</p>
-                            <p className="text-[12px] font-semibold text-ink-3 rk-num truncate">
-                                {ready ? fill(t("home.skillDama"), { n: side!.handi! }) : side ? fill(t("home.damaNeed"), { n: Math.max(1, side.needed - side.games) }) : " "}
-                            </p>
-                        </div>
-                    </div>
-                    <button type="button" onClick={openHistory} disabled={!openHistory} className="mt-auto block w-full pt-2 text-left disabled:cursor-default">
-                        <span className="flex items-center gap-1.5 text-[12px] font-semibold text-ink-3 rk-num">
+                    </span>
+                    <p className="mt-1 w-full text-[16px] font-black leading-tight truncate" style={ink ? { color: ink } : undefined}>{tier ? t(tier.nameKey) : t("real.tierNone")}</p>
+                    <p className="w-full text-[12px] font-semibold text-ink-3 rk-num truncate">
+                        {ready ? fill(t("home.skillDama"), { n: side!.handi! }) : side ? fill(t("home.damaNeed"), { n: Math.max(1, side.needed - side.games) }) : " "}
+                    </p>
+                    <button type="button" onClick={openHistory} disabled={!openHistory} className="mt-auto block w-full pt-2 disabled:cursor-default">
+                        <span className="flex items-center justify-center gap-1.5 text-[12px] font-semibold text-ink-3 rk-num">
                             {t("sim.entry.record").replace("{w}", String(wins)).replace("{l}", String(mine.length - wins))}
                             <FormDots results={mine.slice(0, 5).map((g) => (g.isWinner ? "W" : "L"))} />
                         </span>
@@ -155,30 +158,33 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
                 </div>
 
                 {/* 온라인 — 폰 당구대 레이팅 대전 */}
-                <button type="button" onClick={() => goOnline(s.kind === "ranked" ? rankUrl : ROOMS_URL)} className="rounded-2xl bg-[#121722] p-3 text-left text-white min-w-0" data-testid="home-skill-online" data-track-as="홈 내 실력 온라인">
-                    <span className="block text-[11.5px] font-bold tracking-wide text-[#7FD8E8] truncate">{t("home.skillOnline")}</span>
-                    <span className="mt-1.5 flex items-center gap-2">
+                <button type="button" onClick={() => goOnline(s.kind === "ranked" ? rankUrl : ROOMS_URL)} className="flex flex-col items-center rounded-2xl p-3 text-center text-white min-w-0" style={{ background: ONLINE_BG_GRAD }} data-testid="home-skill-online" data-track-as="홈 내 실력 온라인">
+                    <span className="block self-stretch text-left text-[11.5px] font-bold tracking-wide text-[#8FE3EE] truncate">{t("home.skillOnline")}</span>
+                    <span className="mt-1.5 flex w-full flex-col items-center">
                         {/* 배지를 누르면 배지 안내(겉의 단추와 따로 — BadgeTap 이 눌림을 막는다) */}
-                        <BadgeTap guide={s.kind === "ranked" ? { kind: "online", tier: s.tier.id, rating: s.rating } : { kind: "online", tier: null }}>
-                            {s.kind === "ranked" ? <TierEmblem tier={s.tier.id} size={50} glow /> : <TierEmblem tier="iron" size={50} locked />}
-                        </BadgeTap>
-                        <span className="min-w-0">
+                        <span className="relative grid place-items-center">
+                            <i className="absolute h-[62px] w-[62px] rounded-full bg-[#7FD8E8]/20 blur-[8px]" aria-hidden="true" />
+                            <BadgeTap guide={s.kind === "ranked" ? { kind: "online", tier: s.tier.id, rating: s.rating } : { kind: "online", tier: null }}>
+                                {s.kind === "ranked" ? <TierEmblem tier={s.tier.id} size={64} glow /> : <TierEmblem tier="iron" size={64} locked />}
+                            </BadgeTap>
+                        </span>
+                        <span className="mt-1 w-full min-w-0">
                             {/* 등급 이름은 한 줄, 배치 중 · 시작 권유 글은 길어서 두 줄까지(잘리면 뜻이 안 보였다 — 시안 화면 확인) */}
-                            <span className={cn("block font-black", s.kind === "ranked" ? "text-[15px] leading-tight truncate" : "text-[13.5px] leading-snug break-keep line-clamp-2")} style={s.kind === "ranked" ? { color: TIER_GLOW[s.tier.id] } : undefined}>
+                            <span className={cn("block font-black", s.kind === "ranked" ? "text-[16px] leading-tight truncate" : "text-[13.5px] leading-snug break-keep line-clamp-2")} style={s.kind === "ranked" ? { color: TIER_GLOW[s.tier.id] } : undefined}>
                                 {s.kind === "ranked" ? t(s.tier.nameKey) : s.kind === "placing" ? t("sim.rank.unranked").replace("{n}", String(s.matches)).replace("{m}", String(placement)) : t("home.skillOnlineFresh").replace("{n}", String(placement))}
                             </span>
-                            <span className="flex items-center gap-1 text-[12px] font-semibold text-white/60 rk-num">
+                            <span className="flex items-center justify-center gap-1 text-[12px] font-semibold text-white/65 rk-num">
                                 {onlineDama ? <><BadgeTap guide={{ kind: "online", dama: onlineDama }}><OnlineDamaBadge target={onlineDama} size={18} /></BadgeTap> {fill(t("home.skillDama"), { n: onlineDama })}</> : t("home.skillOnlinePlay")}
                             </span>
                         </span>
                     </span>
                     {s.kind === "ranked" || s.kind === "placing" ? (
-                        <>
-                            <span className="mt-2 block text-[20px] font-black rk-num leading-none">{s.kind === "ranked" ? s.rating.toLocaleString() : "—"}<span className="ml-0.5 text-[11px] font-bold text-[#7FD8E8]">{t("home.skillPoints")}</span></span>
+                        <span className="mt-auto flex flex-col items-center pt-2">
+                            <span className="block text-[20px] font-black rk-num leading-none">{s.kind === "ranked" ? s.rating.toLocaleString() : "—"}<span className="ml-0.5 text-[11px] font-bold text-[#8FE3EE]">{t("home.skillPoints")}</span></span>
                             <span className="mt-1.5 block text-[12px] font-semibold text-white/60 rk-num">{t("sim.entry.record").replace("{w}", String(s.wins)).replace("{l}", String(s.losses))}</span>
-                        </>
+                        </span>
                     ) : (
-                        <span className="mt-2 inline-flex h-8 items-center rounded-full bg-[color:var(--hall-lime,#9BE15D)] px-3 text-[12.5px] font-black text-[#0B1A03]">{gate.isGuest ? t("home.hubJoin") : t("lookalike.playOnline")} ›</span>
+                        <span className="mt-auto pt-2"><span className="inline-flex h-8 items-center rounded-full bg-[color:var(--hall-lime,#9BE15D)] px-3 text-[12.5px] font-black text-[#0B1A03]">{gate.isGuest ? t("home.hubJoin") : t("lookalike.playOnline")} ›</span></span>
                     )}
                 </button>
             </div>
@@ -227,7 +233,7 @@ export function HomeSkillCard({ onStartMatch, history, sample }: {
 
             <div className="mt-3 grid grid-cols-2 gap-2">
                 <button type="button" onClick={onStartMatch} data-track-as="홈 내 실력 실전 시작" className="h-11 rounded-full text-[13.5px] font-bold text-white active:opacity-90" style={{ background: REAL_INK }}>{t("home.skillStartReal")}</button>
-                <button type="button" onClick={() => goOnline(ROOMS_URL)} data-track-as="홈 내 실력 온라인 한 판" className="h-11 rounded-full bg-[#121722] text-[13.5px] font-bold text-white active:opacity-90">{t("home.skillPlayOnline")}</button>
+                <button type="button" onClick={() => goOnline(ROOMS_URL)} data-track-as="홈 내 실력 온라인 한 판" className="h-11 rounded-full text-[13.5px] font-bold text-white active:opacity-90" style={{ background: ONLINE_BG }}>{t("home.skillPlayOnline")}</button>
             </div>
         </section>
     );
@@ -294,13 +300,13 @@ function ProLadder({ real, online }: { real: Spot | null; online: Spot | null })
             <div className="relative mt-1 h-2 rounded-full bg-surface-line">
                 {[20, 40, 60, 80].map((x) => <span key={x} className="absolute inset-y-0 w-[3px] -ml-[1.5px] bg-surface-3" style={{ left: `${x}%` }} />)}
                 {real && dot(real, REAL_INK)}
-                {online && dot(online, "#121722")}
+                {online && dot(online, ONLINE_BG)}
             </div>
-            <div className="relative mt-1 h-[20px]">{online && flag(online, t("home.colOnline"), "#121722", true)}</div>
+            <div className="relative mt-1 h-[20px]">{online && flag(online, t("home.colOnline"), ONLINE_BG, true)}</div>
             {/* 칸 이름은 첫 띄어쓰기에서 두 줄로(리그 / 단계) — 한 줄이면 옆 칸 이름과 붙어 'LPBA 신인 LPBA 상위'로 읽혔다. 칸 사이 틈 없이 막대 칸과 같은 폭 */}
             <div className="mt-1 grid grid-cols-5">
                 {([0, 1, 2, 3, 4] as const).map((i) => {
-                    const here = real?.tier === i ? REAL_INK : online?.tier === i ? "#121722" : null;
+                    const here = real?.tier === i ? REAL_INK : online?.tier === i ? ONLINE_BG : null;
                     const name = t(`lookalike.tierShort${i}`);
                     const cut = name.indexOf(" ");
                     return (
