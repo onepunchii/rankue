@@ -854,9 +854,12 @@ describe("당구 홈", () => {
             const skill = code(client(`${DASH}/HomeSkillCard.tsx`));
             expect(skill).toContain("const data = sample ? sample.real : real.data;");
             expect(skill).toContain("{sample && <SampleBadge />}");
-            // 점수판 판의 숫자는 화면 미리 보기 — 예시 인물 · 내 기록을 읽지 않는다
+            // 점수판 판은 '미리 보기' 표시를 단 장면이다. 2026-10-28 오너 "여기에 내 핸디 점수 들어가면 좋지" 부터 내 칸의 목표가 내 다마 —
+            // 내 실력 카드와 같은 규칙으로 읽는다: 비로그인은 예시 인물만(서버를 부르지 않는다), 회원은 같은 캐시(compare/real)
             expect(board).toContain('t("home.boardPreview")');
-            expect(board).not.toMatch(/sample|useQuery|useAuth/);
+            expect(board).toContain('useQuery<RealCompareResponse>({ queryKey: ["/api/hiq/compare/real"], enabled: !!member && !sample,');
+            expect(board).toContain('const side = (sample ? sample.real : real.data)?.["3c"];');
+            expect(board).toContain("const myName = sample ? t(sample.nameKey) : member?.name");
         });
 
         it("막는 자리는 홈의 두 함수 한 곳 — 경기 시작·혼자 연습은 handleStartGameClick, PIN 은 handleJoinGameClick", () => {
@@ -880,7 +883,7 @@ describe("당구 홈", () => {
         });
 
         it("입구가 전부 그 두 함수로 이어진다 — 점수판 판 · 혼자 연습 · PIN · 설명 창 · 내 실력의 실전 시작", () => {
-            expect(jsx).toContain("<ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} />");
+            expect(jsx).toContain("<ScoreboardHero onStart={handleStartGameClick} onJoin={handleJoinGameClick} sample={sample} />");
             expect(jsx.match(/onStartGame=\{handleStartGameClick\}/g)).toHaveLength(1);
             expect(jsx.match(/onJoinGame=\{handleJoinGameClick\}/g)).toHaveLength(1);
             expect(board).toContain('onClick={() => onStart("match")}');

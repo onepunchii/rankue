@@ -114,7 +114,7 @@ describe("화면: 실전 등급은 어디서나 같은 식 · 다마 메달", ()
 
     it("홈 '내 실력'과 기록 화면 '내 실전 기록'이 메달을 그린다 — 공식 5판 전에는 빈 메달", () => {
         const skill = client("components/hiq/dashboard/HomeSkillCard.tsx");
-        expect(skill).toContain("<RealMedal game={cur} handi={ready ? side!.handi : null} size={50} />");
+        expect(skill).toContain("<RealMedal game={cur} handi={ready ? side!.handi : null} size={64} />");   // 2026-10-28 두 칸을 같은 틀로 — 50 → 64
         const card = client("components/hiq/dashboard/RealHandicapCard.tsx");
         expect(card).toContain("<RealMedal game={cur} handi={sideReady ? side.handi : null} size={64} />");   // 2026-10-20 시안 A — 56 → 64
         expect(card).toContain("{medalRow}");
