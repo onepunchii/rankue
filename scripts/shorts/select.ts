@@ -7,16 +7,14 @@
  * 기권·탈주로 몇 샷 만에 끝난 경기는 영상거리가 없어 MIN_SHOTS 미만이면 뺀다. 공개 방에서 끝난 경기만.
  * 경기마다 쇼츠 한 편에 쓸 대표 샷(두 번째 적구 전 쿠션이 가장 많은 득점 샷)도 같이 고른다.
  */
-import pg from "pg";
+import { readOnlyDb } from "./db";
 import { matchScore } from "./score";
 
 const days = Number(process.argv[2] ?? 7);
 const limit = Number(process.argv[3] ?? 10);
 const MIN_SHOTS = 20;
 
-const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
-await db.connect();
-await db.query("SET default_transaction_read_only = on");
+const db = await readOnlyDb();
 const rows = (await db.query(`
   with fin as (
     select m.id, m.game_type, m.table_id, m.host_id, m.guest_id, m.winner_id, m.shots, m.last_shot_at

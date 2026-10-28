@@ -10,7 +10,7 @@
  *   2) 없으면 지금까지 쌓인 전체에서 같은 기준(쿠션 MIN_BACKLOG 이상)
  * 고른 샷이 재시뮬 해시가 안 맞으면(엔진이 바뀐 옛 샷) 다음 후보로 넘어간다.
  */
-import pg from "pg";
+import { readOnlyDb } from "./db";
 import { execFileSync } from "node:child_process";
 import { readFileSync, writeFileSync } from "node:fs";
 import { matchScore } from "./score";
@@ -31,9 +31,7 @@ const posted = token && uploads ? await postedShots(token, uploads) : new Set<st
 console.log(`채널에 올린 샷 ${posted.size}개`);
 
 // ── 후보 ─────────────────────────────────────────────
-const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
-await db.connect();
-await db.query("SET default_transaction_read_only = on");
+const db = await readOnlyDb();
 const rows = (await db.query(`
   with m as (
     select m.id, m.last_shot_at, coalesce(ra.rating, 1000) ra, coalesce(rb.rating, 1000) rb,

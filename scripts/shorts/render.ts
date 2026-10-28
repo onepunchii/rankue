@@ -20,7 +20,7 @@ import { eventsForFeedback } from "../../client/src/sim/playback";
 import { impulseToGain, playbackRateFor } from "../../client/src/sim/audioMapping";
 import { buildTimeline, sceneAt, totalDuration, videoTimesOfShotTime, FPS, type FitOptions } from "./timeline";
 import { pickBrands, type BrandTableId, type TableBrandRow, type TableBrandView } from "@shared/tableBrand";
-import pg from "pg";
+import { readOnlyDb } from "./db";
 
 const slug = process.argv[2];
 const preview = process.argv.includes("--preview");
@@ -46,9 +46,7 @@ const scenes = buildTimeline({ contact2, lastCushion: cushions.at(-1) ?? contact
 
 // ── 테이블 로고 ───────────────────────────────────────
 async function liveBrand(tableId: BrandTableId): Promise<TableBrandView | null> {
-    const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
-    await db.connect();
-    await db.query("SET default_transaction_read_only = on");
+    const db = await readOnlyDb();
     const rows = (await db.query(`select * from sim_table_brands`)).rows;
     await db.end();
     const ms = (d: Date | null) => (d ? new Date(d).getTime() : null);

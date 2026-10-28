@@ -1,11 +1,12 @@
 name: Daily Shorts
 
-# 매일 09:30 UTC(=18:30 KST) — 「이게 들어가?」 쇼츠 한 편을 골라 렌더해 RANKUE 채널(@rrankue)에 바로 공개 + 댓글.
+# 매일 01:45 UTC(=10:45 KST) 시작 → 약 4~5분 뒤 11시 전후 RANKUE 채널(@rrankue)에 바로 공개 + 댓글.
+# (11시 KST = 미국 동부 전날 밤 9~10시 — 한국 점심 전 · 미국 저녁을 함께 잡는 시각. GitHub 예약은 몇 분 늦게 시작할 수 있다)
 # 고르는 법 · 제목 · 댓글은 scripts/shorts/daily.ts · meta.ts. 올린 샷 기록은 채널 설명의 Shot ID 라 커밋하지 않는다
 # (main 푸시마다 Vercel 운영 배포가 돌기 때문).
 on:
   schedule:
-    - cron: "30 9 * * *"
+    - cron: "45 1 * * *"
   workflow_dispatch:
     inputs:
       mode:

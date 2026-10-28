@@ -9,7 +9,7 @@
  *    시드가 고정이라 매번 같은 숫자가 나온다.
  *  - 회원 이름은 넣지 않는다(공개 동의 전). "플레이어 A/B"로만 부른다.
  */
-import pg from "pg";
+import { readOnlyDb } from "./db";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { simulateShot } from "@shared/sim/simulate";
 import { TABLES, DEFAULT_CUE, type SimParams } from "@shared/sim/params";
@@ -25,9 +25,7 @@ const idx = Number(idxArg);
 const slug = slugArg ?? `${matchId.slice(0, 8)}-${idx}`;
 const outDir = `scripts/shorts/out/${slug}`;
 
-const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
-await db.connect();
-await db.query("SET default_transaction_read_only = on");
+const db = await readOnlyDb();
 const m = (await db.query(
     `select id, game_type, table_id, cushion_model, condition, rules, host_target, guest_target, inning_cap from hiq_sim_matches where id = $1`, [matchId])).rows[0];
 if (!m) throw new Error(`경기 없음: ${matchId}`);
