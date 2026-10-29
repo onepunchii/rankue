@@ -1,15 +1,21 @@
 name: Daily Shorts
 
-# 하루 두 번, 채널마다:
+# 채널마다 하루 한 편:
 #   01:45 UTC(=10:45 KST) → 본 채널(@rrankue, 영어 화면) 11시 전후 공개 + 댓글
-#   12:20 UTC(=19:20 베트남) → 베트남 채널(@rankue_vn, 베트남어 화면) 저녁 7시 반 전후 공개 + 댓글 — 그날 본 채널과 같은 샷이 보통 고른다
-# (11시 KST = 미국 동부 전날 밤 9~10시 — 한국 점심 전 · 미국 저녁을 함께 잡는 시각. GitHub 예약은 몇 분 늦게 시작할 수 있다)
+#   12:20 UTC(=19:20 베트남 = 21:20 KST) → 베트남 채널(@rankue_vn, 베트남어 화면) 공개 + 댓글
+# (11시 KST = 미국 동부 전날 밤 9~10시 — 한국 점심 전 · 미국 저녁을 함께 잡는 시각)
+# GitHub 예약은 몇 시간씩 밀리거나 빠지기도 해서(2026-10-29 본 채널 6시간 지연) 채널마다 예비 시각 2개를 더 둔다.
+# 예약 실행은 --daily 라 최근 16시간 안에 그 채널에 올렸으면 바로 끝난다 → 하루 한 편만 올라간다.
 # 고르는 법 · 제목 · 댓글은 scripts/shorts/daily.ts · meta.ts. 올린 샷 기록은 채널 설명의 Shot ID 라 커밋하지 않는다
 # (main 푸시마다 Vercel 운영 배포가 돌기 때문).
 on:
   schedule:
-    - cron: "45 1 * * *"
-    - cron: "20 12 * * *"
+    - cron: "45 1 * * *"   # 본 채널
+    - cron: "17 3 * * *"   # 본 채널 예비
+    - cron: "47 5 * * *"   # 본 채널 예비
+    - cron: "20 12 * * *"  # 베트남
+    - cron: "52 13 * * *"  # 베트남 예비
+    - cron: "22 15 * * *"  # 베트남 예비
   workflow_dispatch:
     inputs:
       mode:
@@ -22,7 +28,7 @@ on:
         default: "main"
 
 concurrency:
-  group: daily-shorts-${{ github.event.schedule || inputs.channel || 'main' }}
+  group: daily-shorts-${{ (github.event.schedule == '20 12 * * *' || github.event.schedule == '52 13 * * *' || github.event.schedule == '22 15 * * *') && 'vn' || inputs.channel || 'main' }}
   cancel-in-progress: false
 
 permissions:
@@ -62,12 +68,13 @@ jobs:
           YT_REFRESH_RANKUE: ${{ secrets.YT_REFRESH_RANKUE }}
           YT_REFRESH_RANKUE_VN: ${{ secrets.YT_REFRESH_RANKUE_VN }}
           MODE: ${{ inputs.mode || 'public' }}
-          CHANNEL: ${{ github.event.schedule == '20 12 * * *' && 'vn' || inputs.channel || 'main' }}
+          CHANNEL: ${{ (github.event.schedule == '20 12 * * *' || github.event.schedule == '52 13 * * *' || github.event.schedule == '22 15 * * *') && 'vn' || inputs.channel || 'main' }}
+          DAILY: ${{ github.event_name == 'schedule' && '--daily' || '' }}
         run: |
           case "$MODE" in
             private) npx tsx scripts/shorts/daily.ts --channel "$CHANNEL" --private ;;
             dry) npx tsx scripts/shorts/daily.ts --channel "$CHANNEL" --dry ;;
-            *) npx tsx scripts/shorts/daily.ts --channel "$CHANNEL" ;;
+            *) npx tsx scripts/shorts/daily.ts --channel "$CHANNEL" $DAILY ;;
           esac
 
       # 오늘 만든 영상 · 제목 · 사실을 7일 동안 받아 볼 수 있게(프레임은 빼고)

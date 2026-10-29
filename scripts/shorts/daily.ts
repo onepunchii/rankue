@@ -32,8 +32,13 @@ const MIN_BACKLOG = 4;
 // ── 채널에 이미 올린 샷 ────────────────────────────────
 const token = dry ? null : await accessToken(channel);
 const uploads = token ? await assertRankueChannel(token, channel) : null;
-const posted = token && uploads ? await postedShots(token, uploads) : new Set<string>();
+const { shots: posted, lastAt } = token && uploads ? await postedShots(token, uploads) : { shots: new Set<string>(), lastAt: 0 };
 console.log(`채널에 올린 샷 ${posted.size}개`);
+// 예약 실행은 하루 한 편 — GitHub 예약이 몇 시간씩 밀려 예비 시각에도 돌리므로, 최근 16시간 안에 올렸으면 끝낸다
+if (process.argv.includes("--daily") && !privateRun && Date.now() - lastAt < 16 * 3600_000) {
+    console.log(`최근 업로드 ${new Date(lastAt).toISOString()} — 오늘 몫은 이미 올렸다, 끝`);
+    process.exit(0);
+}
 
 // ── 후보 ─────────────────────────────────────────────
 const db = await readOnlyDb();

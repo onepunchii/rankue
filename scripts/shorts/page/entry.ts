@@ -83,7 +83,9 @@ const FAN_DT = 1 / 60;
 const missEnd = contact2 + 0.6;
 const fan = (trials ?? []).map(([phi, V0, a, b], i) => {
     const ok = facts.miracle.hitMask[i] === "1";
-    const r = simulateShot(shot.preState, { ...input, phi, V0, a, b }, shot.params);
+    let r: ReturnType<typeof simulateShot>;
+    try { r = simulateShot(shot.preState, { ...input, phi, V0, a, b }, shot.params); }
+    catch { return null; } // 미스큐 등 범위 밖 시도(facts.ts 에서도 실패로 셌다)는 궤적 없이 건너뛴다
     const tp = makePlayback(r, effectiveBall(shot.params));
     let end = Math.min(missEnd, r.duration);
     if (ok) {
@@ -93,7 +95,7 @@ const fan = (trials ?? []).map(([phi, V0, a, b], i) => {
     const pts: number[] = [];
     for (let t = 0; t <= end + 1e-9; t += FAN_DT) { const c = tp.at(t).find((x) => x.id === input.cueBallId)!; pts.push(c.r[0], c.r[1]); }
     return { ok, end, pts, screen: null as Float32Array | null };
-});
+}).filter((x) => x !== null);
 const fanCanvas = document.createElement("canvas");
 fanCanvas.width = W; fanCanvas.height = H;
 const fanCtx = fanCanvas.getContext("2d")!;

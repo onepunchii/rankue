@@ -51,20 +51,21 @@ export async function assertRankueChannel(token: string, channel: ChannelKey = "
 }
 
 /** 채널에 이미 올린 샷(matchId#idx) 전부 — 업로드 목록 설명의 Shot ID 줄을 모은다. 비공개(시험용)는 세지 않는다. */
-export async function postedShots(token: string, uploadsPlaylist: string): Promise<Set<string>> {
+export async function postedShots(token: string, uploadsPlaylist: string): Promise<{ shots: Set<string>; lastAt: number }> {
     const out = new Set<string>();
+    let lastAt = 0; // 가장 최근 공개 영상 시각(하루 한 편 확인용)
     let page = "";
     for (let i = 0; i < 40; i++) {
         const j = await api(token, `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet,status&maxResults=50&playlistId=${uploadsPlaylist}${page ? `&pageToken=${page}` : ""}`);
         for (const it of j.items ?? []) {
             if (it.status?.privacyStatus === "private") continue;
             const m = SHOT_ID_RE.exec(String(it.snippet?.description ?? ""));
-            if (m) out.add(`${m[1]}#${m[2]}`);
+            if (m) { out.add(`${m[1]}#${m[2]}`); lastAt = Math.max(lastAt, Date.parse(it.snippet?.publishedAt ?? "") || 0); }
         }
         if (!j.nextPageToken) break;
         page = j.nextPageToken;
     }
-    return out;
+    return { shots: out, lastAt };
 }
 
 export interface VideoMeta {
