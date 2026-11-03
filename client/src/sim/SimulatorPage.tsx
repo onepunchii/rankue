@@ -1248,8 +1248,8 @@ export function SimulatorPage() {
         dirtyRef.current = true;
         window.setTimeout(() => { strokeRef.current = null; dirtyRef.current = true; void actions.shoot(); }, STROKE_MS);
     }, [actions]);
-    // 초구 타이밍 게이지(2026-11-03 오너 — ./breakGauge): 온라인 대전의 첫 샷만. 샷 단추가 게이지를 켜고, 한 번 더 누르면(또는 게이지를 누르면)
-    // 그 순간의 힘으로 바로 친다. 같은 초구 → 같은 판이 되풀이되던 '족보'를 깬다. 차례가 넘어가면(시간 초과 등) 게이지는 꺼진다.
+    // 초구 타이밍 게이지(2026-11-03 오너 — ./breakGauge): 온라인 대전의 첫 샷만. 힘 막대 자리가 게이지가 되고, 샷 단추(또는 게이지)가 켜고
+    // 한 번 더 누르면 그 순간의 힘으로 바로 친다. 같은 초구 → 같은 판이 되풀이되던 '족보'를 깬다. 차례가 넘어가면(시간 초과 등) 게이지는 꺼진다.
     const breakTurn = isBreakTurn({ mode: sim.mode, matchStatus: sim.match?.status, phase: sim.phase, shotCount: sim.session?.shotCount });
     const [breakRun, setBreakRun] = useState<{ gauge: BreakGaugeSpec; startedAt: number } | null>(null);
     const breakRunRef = useRef(breakRun);
@@ -1826,12 +1826,6 @@ export function SimulatorPage() {
                         {isMatch && sim.offline && <span className={chipNeutral}>{t("sim.match.offline")}</span>}
                         {isMatch && sim.replaying && sim.match?.opponentShot && <span className={chipBrand}>{t("sim.match.opponentShot")}</span>}
                         {isMatch && turnChip && sim.phase === "aim" && <span className={chipBrand}>{t("sim.match.yourTurn")}</span>}
-                        {/* 초구 안내 — 잘린 안내는 쓸모가 없어 드릴 힌트처럼 줄을 바꾼다 */}
-                        {breakTurn && !breakRun && (
-                            <span className={cn(chipNeutral.replace(" truncate", ""), "whitespace-normal text-left leading-snug")} data-testid="break-hint">{t("sim.break.hint")}</span>
-                        )}
-                        {/* 초구 힘 게이지 — 안내가 있던 자리에 뜬다(아래쪽 두께 독 · ± 를 가리지 않게). 누르면 멈추고 바로 친다 */}
-                        {breakTurn && breakRun && <BreakGauge gauge={breakRun.gauge} startedAt={breakRun.startedAt} onStop={stopBreak} className="pointer-events-auto" />}
                     </div>
 
                     {/* 오른쪽 열: 툴바 → 세로 큐 슬라이더(남은 높이) → ± → 샷. 이 화면의 초록은 샷 하나다. */}
@@ -1847,14 +1841,18 @@ export function SimulatorPage() {
                     >
                         {/* 툴바는 남는 높이가 없으면(compact 로도) 줄어들며 스크롤된다 — 큐 슬라이더(최소 높이)·±·샷은 항상 보인다 */}
                         <ToolRail groups={railGroups} size={compact ? "sm" : "md"} className="shrink min-h-0 overflow-y-auto overscroll-contain" />
-                        {/* 초구 차례에는 힘을 게이지가 정한다 — 슬라이더 · ± 는 잠근다 */}
-                        {pathView ? <div className="flex-1" /> : <PowerRail V0={sim.input.V0} disabled={!aiming || breakTurn} onChange={onPower} compact={compact} className="flex-1" tour="sim-power" skin={mySkin} />}
+                        {/* 초구 차례에는 힘 막대 자리를 초구 게이지가 차지한다(힘은 게이지가 정한다 — 슬라이더 · ± 는 없다) */}
+                        {pathView ? <div className="flex-1" /> : breakTurn ? (
+                            <BreakGauge run={breakRun} onPress={onShoot} compact={compact} className="flex-1" skin={mySkin} />
+                        ) : (
+                            <PowerRail V0={sim.input.V0} disabled={!aiming} onChange={onPower} compact={compact} className="flex-1" tour="sim-power" skin={mySkin} />
+                        )}
                         {/* ± 0.05 m/s: 36 px 원 두 개, 사이 8 px(탭 대상 간격 규칙) */}
-                        <div className={cn("shrink-0 flex gap-2", pathView && "hidden")}>
-                            <HoldButton label={t("sim.controls.powerDown")} disabled={!aiming || breakTurn} onTick={onPowerDown} className="h-9 w-9 rounded-pill">
+                        <div className={cn("shrink-0 flex gap-2", (pathView || breakTurn) && "hidden")}>
+                            <HoldButton label={t("sim.controls.powerDown")} disabled={!aiming} onTick={onPowerDown} className="h-9 w-9 rounded-pill">
                                 <MinusIcon />
                             </HoldButton>
-                            <HoldButton label={t("sim.controls.powerUp")} disabled={!aiming || breakTurn} onTick={onPowerUp} className="h-9 w-9 rounded-pill">
+                            <HoldButton label={t("sim.controls.powerUp")} disabled={!aiming} onTick={onPowerUp} className="h-9 w-9 rounded-pill">
                                 <PlusIcon />
                             </HoldButton>
                         </div>

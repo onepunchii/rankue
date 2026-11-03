@@ -51,7 +51,8 @@ const CUE_EDGE = "rgba(0,0,0,0.35)";
 
 /** 팁이 위. 세로 100 × 가로 20 뷰박스(높이는 px 로 늘여 그린다), 손잡이 쪽이 살짝 굵다. */
 const BUTT_PATH = "M6.8 56h6.4L14 98H6z";
-function CueStick({ height, skin }: { height: number; skin?: string | null }) {
+/** 초구 게이지(BreakGauge)도 같은 큐대를 쓴다 */
+export function CueStick({ height, skin }: { height: number; skin?: string | null }) {
     const clip = `cue-butt-${useId().replace(/:/g, "")}`;
     return (
         <svg width="20" height={height} viewBox={`0 0 20 ${CUE_PX}`} preserveAspectRatio="none" aria-hidden="true" className="block">

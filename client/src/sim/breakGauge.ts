@@ -7,11 +7,15 @@
  *
  * 규칙: 온라인 대전의 첫 샷(초구)만. 샷을 누르면 힘이 0 → 100 → 0 으로 오르내리고, 한 번 더 누르면 그 힘으로 바로 친다. 조준 · 당점은 그대로 고른다.
  * 오르내리는 빠르기와 시작점은 칠 때마다 다르다 — 손에 익힌 박자로 같은 힘을 낼 수 없게. 혼자 연습은 슬라이더 그대로다.
+ * 게임처럼(2026-11-03 오너 "게이지도 맥스파워에서 빨라지듯"): 바닥에서는 느리고 최대로 갈수록 빨라진다(u^BREAK_GAUGE_EASE) —
+ * 내려올 때는 그 거울이라 최대 근처는 늘 휙 지나간다. 센 초구일수록 맞추기 어렵다.
  */
 
-/** 0 에서 100 까지 오르는 데 걸리는 시간 — 칠 때마다 이 사이에서 고른다 */
-export const BREAK_GAUGE_RISE_MIN_MS = 650;
-export const BREAK_GAUGE_RISE_MAX_MS = 950;
+/** 0 에서 100 까지 오르는 데 걸리는 시간 — 칠 때마다 이 사이에서 고른다(최대 근처가 빨라서 직선일 때보다 조금 길게) */
+export const BREAK_GAUGE_RISE_MIN_MS = 800;
+export const BREAK_GAUGE_RISE_MAX_MS = 1100;
+/** 빨라지는 정도 — 오를 때 힘 = (지난 시간 / 오르는 시간)^이 값 */
+export const BREAK_GAUGE_EASE = 2.2;
 
 export interface BreakGauge {
     /** 0 → 100 에 걸리는 시간(ms) */
@@ -26,13 +30,17 @@ export function newBreakGauge(rand: () => number = Math.random): BreakGauge {
     return { riseMs, offsetMs: rand() * 2 * riseMs };
 }
 
-/** 게이지를 켠 지 elapsedMs 뒤의 힘 %(0~100, 끊김 없는 값 — 눈금이 없다) */
+/** 게이지를 켠 지 elapsedMs 뒤의 힘 %(0~100, 끊김 없는 값 — 눈금이 없다). 오를 때 u^k, 내릴 때 그 거울 */
 export function breakGaugePercent(g: BreakGauge, elapsedMs: number): number {
     const period = 2 * g.riseMs;
     const t = (((elapsedMs + g.offsetMs) % period) + period) % period;
-    const x = t <= g.riseMs ? t / g.riseMs : 2 - t / g.riseMs;
-    return Math.min(100, Math.max(0, x * 100));
+    const u = t <= g.riseMs ? t / g.riseMs : 2 - t / g.riseMs;
+    return Math.min(100, Math.max(0, Math.pow(u, BREAK_GAUGE_EASE) * 100));
 }
+
+/** 힘의 색 구간 — 화면이 막대 · 숫자 색을 고른다. 셀수록 붉다(오너 "파워가 세면 빨간색") */
+export type BreakZone = "soft" | "mid" | "hard" | "max";
+export const breakZone = (pct: number): BreakZone => (pct >= 85 ? "max" : pct >= 65 ? "hard" : pct >= 35 ? "mid" : "soft");
 
 /** 지금이 초구 게이지를 쓰는 차례인가 — 온라인 대전 · 치는 중 · 내 차례(aim) · 아직 아무도 안 쳤다 */
 export function isBreakTurn(s: { mode: string; matchStatus: string | null | undefined; phase: string; shotCount: number | null | undefined }): boolean {
