@@ -106,7 +106,7 @@ import { decodeReplay, encodeReplay, forSoloSession, replaySource, replayUrl, RE
 import { fileNameFor, gameBadge, replayShortText, sessionStatsLine, shotSubtitle, shotTitle } from "./share/shareCard";
 import { useShare } from "./share/useShare";
 import { activeThickness, elevationDeg, FINE_STEP_RAD, powerFromPercent, pullbackFor, stepPower, type ThicknessStep } from "./controlsMath";
-import { breakGaugePercent, isBreakTurn, newBreakGauge, type BreakGauge as BreakGaugeSpec } from "./breakGauge";
+import { breakGaugePercent, breakZone, isBreakTurn, newBreakGauge, type BreakGauge as BreakGaugeSpec } from "./breakGauge";
 import { appendShot, EMPTY_LOG, inningRows, popShot, type InningLog } from "./inningLog";
 import { makeHistoryLoader } from "./matchHistory";
 import { beginGesture, moveGesture, planGestureReset, staleResetReason, type Gesture, type GestureResetReason, pinchZoom} from "./tableGestures";
@@ -133,7 +133,7 @@ import { BestPathCard } from "./solver/BestPathCard";
 import { rankedPaths, successPct } from "./solver/bestPath";
 import { railFitsMd } from "./railLayout";
 import { ShotButton } from "./components/ShotButton";
-import { BreakGauge } from "./components/BreakGauge";
+import { BREAK_ZONE_INK, BreakGauge } from "./components/BreakGauge";
 import { SpinSheet, type SpinSheetTab } from "./components/SpinSheet";
 import { HoldButton } from "./components/HoldButton";
 import { OutcomeBanner } from "./components/OutcomeBanner";
@@ -1254,22 +1254,35 @@ export function SimulatorPage() {
     const [breakRun, setBreakRun] = useState<{ gauge: BreakGaugeSpec; startedAt: number } | null>(null);
     const breakRunRef = useRef(breakRun);
     breakRunRef.current = breakRun;
+    // 친 초구의 힘 — 멈춘 자리에 게이지를 세워 두고, 왼쪽 위에 '초구 64%' 를 남긴다(오너 11/3 "몇 쳤는지 잔류가 필요해 바로 사라지니깐 헷갈리네")
+    const [breakHit, setBreakHit] = useState<{ pct: number; matchId: string; at: number } | null>(null);
+    const breakHitRef = useRef(breakHit);
+    breakHitRef.current = breakHit;
     useEffect(() => { if (!breakTurn) setBreakRun(null); }, [breakTurn]);
     const stopBreak = useCallback(() => {
         const g = breakRunRef.current;
         if (!g) return;
+        const pct = breakGaugePercent(g.gauge, performance.now() - g.startedAt);
         breakRunRef.current = null;
         setBreakRun(null);
-        actions.setPower(powerFromPercent(breakGaugePercent(g.gauge, performance.now() - g.startedAt)));
+        const hit = { pct, matchId: sim.match?.id ?? "", at: performance.now() };
+        breakHitRef.current = hit;
+        setBreakHit(hit);
+        actions.setPower(powerFromPercent(pct));
         beginShot();
-    }, [actions, beginShot]);
+    }, [actions, beginShot, sim.match?.id]);
     const onShoot = useCallback(() => {
         if (!breakTurn) { beginShot(); return; }
         if (breakRunRef.current) { stopBreak(); return; }
+        // 멈춘 손을 떼는 순간의 click 이 게이지를 다시 켜던 것(11/3 오너 제보) — 큐가 나가는 중이거나 방금 친 초구가 있으면 켜지 않는다
+        const hit = breakHitRef.current;
+        if (strokeRef.current !== null || (hit && hit.matchId === sim.match?.id && performance.now() - hit.at < 3000)) return;
         const run = { gauge: newBreakGauge(), startedAt: performance.now() };
         breakRunRef.current = run;
         setBreakRun(run);
-    }, [beginShot, breakTurn, stopBreak]);
+    }, [beginShot, breakTurn, stopBreak, sim.match?.id]);
+    /** 친 초구의 힘을 보여 줄 때 — 이 대전의 초구 뒤, 다음 샷이 끝나기 전까지 */
+    const breakShown = breakHit && breakHit.matchId === sim.match?.id && isMatch && (sim.session?.shotCount ?? 0) <= 1 ? breakHit.pct : null;
     const onShootPathRef = useRef<() => void>(() => undefined);
     const onShootPath = useCallback(() => { onShootPathRef.current(); }, []);
     const onUndo = useCallback(() => { actions.undo(); setLog(popShot); setBanner(null); }, [actions]);
@@ -1826,6 +1839,11 @@ export function SimulatorPage() {
                         {isMatch && sim.offline && <span className={chipNeutral}>{t("sim.match.offline")}</span>}
                         {isMatch && sim.replaying && sim.match?.opponentShot && <span className={chipBrand}>{t("sim.match.opponentShot")}</span>}
                         {isMatch && turnChip && sim.phase === "aim" && <span className={chipBrand}>{t("sim.match.yourTurn")}</span>}
+                        {breakShown !== null && (
+                            <span className={cn(chipNeutral, "inline-flex items-center gap-1.5 rk-num font-black text-ink-1")} data-testid="break-hit">
+                                {t("sim.break.go")}<span style={{ color: BREAK_ZONE_INK[breakZone(breakShown)] }}>{Math.round(breakShown)}%</span>
+                            </span>
+                        )}
                     </div>
 
                     {/* 오른쪽 열: 툴바 → 세로 큐 슬라이더(남은 높이) → ± → 샷. 이 화면의 초록은 샷 하나다. */}
@@ -1843,7 +1861,7 @@ export function SimulatorPage() {
                         <ToolRail groups={railGroups} size={compact ? "sm" : "md"} className="shrink min-h-0 overflow-y-auto overscroll-contain" />
                         {/* 초구 차례에는 힘 막대 자리를 초구 게이지가 차지한다(힘은 게이지가 정한다 — 슬라이더 · ± 는 없다) */}
                         {pathView ? <div className="flex-1" /> : breakTurn ? (
-                            <BreakGauge run={breakRun} onPress={onShoot} compact={compact} className="flex-1" skin={mySkin} />
+                            <BreakGauge run={breakRun} hit={breakShown} onPress={onShoot} compact={compact} className="flex-1" skin={mySkin} />
                         ) : (
                             <PowerRail V0={sim.input.V0} disabled={!aiming} onChange={onPower} compact={compact} className="flex-1" tour="sim-power" skin={mySkin} />
                         )}

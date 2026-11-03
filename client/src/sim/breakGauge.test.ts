@@ -18,7 +18,7 @@ describe("게이지의 힘", () => {
     });
     it("최대로 갈수록 빨라진다(오너: '맥스파워에서 빨라지듯') — 마지막 10%의 시간에 오르는 힘이 처음 10%보다 훨씬 크다", () => {
         const first = p(80) - p(0), last = p(800) - p(720);
-        expect(last).toBeGreaterThan(first * 10);
+        expect(last).toBeGreaterThan(first * 5);
         // 최대 바로 옆(내려가기 시작)도 빠르다 — 센 힘은 휙 지나간다
         expect(p(800) - p(880)).toBeCloseTo(last, 6);
     });
@@ -38,6 +38,15 @@ describe("게이지의 힘", () => {
         // 같은 박자로 눌러도 판마다 힘이 다르다
         const a = newBreakGauge(() => 0.1), b = newBreakGauge(() => 0.7);
         expect(breakGaugePercent(a, 1000)).not.toBeCloseTo(breakGaugePercent(b, 1000), 1);
+    });
+    it("초구에 쓰는 힘(60~80%)에서 ±5% 안에 머무는 시간이 한 번 지나갈 때 85ms 이상 — 너무 어렵지 않게(오너 11/3 '타이밍이 어려운가')", () => {
+        const g2 = { riseMs: BREAK_GAUGE_RISE_MIN_MS, offsetMs: 0 };
+        // 오를 때 그 창을 지나는 시간을 1ms 간격으로 센다(가장 빠른 게이지 기준)
+        for (const target of [60, 70, 80]) {
+            let ms = 0;
+            for (let t = 0; t <= g2.riseMs; t++) { const v = breakGaugePercent(g2, t); if (v >= target - 5 && v <= target + 5) ms++; }
+            expect(ms, `${target}%`).toBeGreaterThanOrEqual(85);
+        }
     });
     it("색 구간 — 셀수록 붉다", () => {
         expect([0, 34.9, 35, 64.9, 65, 84.9, 85, 100].map(breakZone)).toEqual(["soft", "soft", "mid", "mid", "hard", "hard", "max", "max"]);
@@ -61,9 +70,15 @@ describe("화면: 초구는 게이지로", () => {
     const src = readFileSync(resolve(process.cwd(), "client/src/sim/SimulatorPage.tsx"), "utf8");
     it("초구 차례에는 힘 막대 자리가 게이지가 되고(± 는 숨김), 샷 단추 · 게이지가 켜고 멈춘다 — 안내 멘트는 없다(오너 11/3)", () => {
         expect(src).toContain("const breakTurn = isBreakTurn(");
-        expect(src).toContain("breakTurn ? (\n                            <BreakGauge run={breakRun} onPress={onShoot}");
+        expect(src).toContain("breakTurn ? (\n                            <BreakGauge run={breakRun} hit={breakShown} onPress={onShoot}");
         expect(src).toContain('(pathView || breakTurn) && "hidden"');
         expect(src).not.toContain("sim.break.hint");
+    });
+    it("친 초구의 힘이 남는다 — 게이지는 멈춘 자리, 왼쪽 위에 '초구 64%'(다음 샷까지) · 손을 떼는 click 이 게이지를 다시 켜지 않는다(오너 11/3)", () => {
+        expect(src).toContain("<BreakGauge run={breakRun} hit={breakShown}");
+        expect(src).toContain('data-testid="break-hit"');
+        expect(src).toContain("(sim.session?.shotCount ?? 0) <= 1 ? breakHit.pct : null");
+        expect(src).toContain("if (strokeRef.current !== null || (hit && hit.matchId === sim.match?.id && performance.now() - hit.at < 3000)) return;");
         expect(src).toContain("breakGaugePercent(g.gauge, performance.now() - g.startedAt)");
         expect(src).toContain("actions.setPower(powerFromPercent(");
     });
