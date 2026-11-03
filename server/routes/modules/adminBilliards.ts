@@ -13,10 +13,15 @@
  * GET /admin/billiards/case-audit                                   큐 케이스 맞춰 보기 — 받은 기록마다 지금 기록이 받쳐 주는가(shared/cueCaseAudit) · 한정판 번호 현황
  * GET /admin/billiards/case/:memberId                              한 사람 맞춰 보기
  * POST /admin/billiards/case/:memberId/take-back { itemIds, reason } 받쳐 주지 않는 줄만 거둔다(다시 판정해서 확인)
- * GET /admin/billiards/cups                                          월대회 — 지난 · 치르는 대회 목록 + 다음 대회(이번 달 성적이 이대로면 · 첫 라운드 대진)
+ * GET /admin/billiards/cups                                          월대회 목록(짜는 중 · 치르는 중 · 끝남 · 무효)
+ * GET /admin/billiards/cups/candidates?month=                        대회 만들기의 후보 — 그 달에 친 사람 · 추천 여부(기본 지난달)
+ * POST /admin/billiards/cups { month, memberIds }                    대회 만들기(짜는 중 — 회원에게 안 보인다)
  * GET /admin/billiards/cups/:id                                      한 대회의 대진(대전 상태 · 점수 · 운영 기록 · 바꿀 수 있는가)
- * POST /admin/billiards/cups/:id/sync                                지금 굴리기(알림까지 — 매시 크론과 같은 일)
- * POST /admin/billiards/cups/games/:gameId/extend { hours, reason }   기한 늘리기(아직 안 가려진 판)
+ * POST /admin/billiards/cups/:id/publish                             열기(첫 라운드 시각이 다 있어야) — 출전자에게 알림
+ * DELETE /admin/billiards/cups/:id                                   짜는 중인 대회 지우기
+ * POST /admin/billiards/cups/:id/void { reason }                     치르는 중인 대회 무효(열린 방을 닫는다)
+ * POST /admin/billiards/cups/:id/sync                                지금 굴리기(알림까지 — 크론과 같은 일)
+ * POST /admin/billiards/cups/games/:gameId/schedule { at, reason }   경기 시각 정하기 · 바꾸기(at = ISO, null 이면 일정 미정)
  * POST /admin/billiards/cups/games/:gameId/decide { winnerId, loserForfeit, reason }  결과 정하기(아직 안 가려진 판 · 방은 닫는다)
  * POST /admin/billiards/cups/games/:gameId/change { winnerId, loserForfeit, reason }  결과 바꾸기(다음 판이 시작 전일 때만)
  * /admin/billiards/table-brands/*                                   당구대 로고 · 광고(adminTableBrand.ts)
@@ -34,10 +39,10 @@ import { CASE_ITEMS, INVITE_PICK_LIMIT, invitePicks } from "../../../shared/cueC
 import { inviteFlags, type AdminInviteRow, type AdminInviterRow, type AdminInviteStock, type AdminInvites } from "../../../shared/inviteAdmin.js";
 import { isWithdrawnMember } from "../../../shared/chatSupport.js";
 import type { CaseAuditMember, CaseAuditSweep } from "../../../shared/cueCaseAudit.js";
-import { CUP_GAMES, CUP_MAX_ENTRANTS, CUP_MIN_MATCHES, CUP_MIN_RATING, CUP_ROUND_DAYS, cupEntrants, cupPlan, cupRounds, cupSettle, cupSize, cupStartMs, type CupGame, type CupOutcome } from "../../../shared/simCup.js";
-import { kstMonthOf } from "../../../shared/simMonthly.js";
-import { adminOutcome, canChangeResult, canDecide, downstreamOf, type AdminCupDetail, type AdminCupGameView, type AdminCupNote, type AdminCups, type AdminCupSummary } from "../../../shared/simCupAdmin.js";
-import { announce } from "../../services/simCupService.js";
+import { CUP_ENTER_EARLY_MS, CUP_GAMES, CUP_MAX_ENTRANTS, CUP_MIN_ENTRANTS, CUP_MIN_MATCHES, CUP_MIN_RATING, CUP_NO_SHOW_MS, cupRounds, type CupGame, type CupOutcome } from "../../../shared/simCup.js";
+import { kstMonthOf, shiftMonth } from "../../../shared/simMonthly.js";
+import { adminOutcome, canChangeResult, canDecide, canSchedule, downstreamOf, type AdminCupCandidates, type AdminCupDetail, type AdminCupGameView, type AdminCupNote, type AdminCupRules, type AdminCups, type AdminCupSummary } from "../../../shared/simCupAdmin.js";
+import { announce, notifySchedule, publishAndAnnounce } from "../../services/simCupService.js";
 import { isRatedMatch, onlineFlags, type AdminOnlineDetail, type AdminOnlineRow, type AdminRatingChange, type AdminRatingRow } from "../../../shared/simMatchFlags.js";
 import { storage } from "../../storage/index.js";
 import tableBrandRouter from "./adminTableBrand.js";
@@ -382,9 +387,12 @@ router.post("/case/:memberId/take-back", asyncHandler(async (req: any, res: any)
 }));
 
 // ── 월대회 ───────────────────────────────────────────────────────────────────
+// 2026-11-03 운영자가 여는 대회로: 만들기(후보에서 고름 · 짜는 중) → 판마다 시각 → 열기. 규칙은 shared/simCup, 손대도 되는 때는 shared/simCupAdmin.
 const TS = (col: string) => sql.raw(`to_char(${col}, 'YYYY-MM-DD"T"HH24:MI:SS"Z"')`);
 const OUTCOMES: readonly CupOutcome[] = ["played", "walkover", "seed", "bye", "void"];
 type CupRow = CupGame & { id: string; notes: AdminCupNote[] };
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+const CUP_RULES: AdminCupRules = { minRating: CUP_MIN_RATING, minMatches: CUP_MIN_MATCHES, maxEntrants: CUP_MAX_ENTRANTS, minEntrants: CUP_MIN_ENTRANTS, enterEarlyMin: CUP_ENTER_EARLY_MS / 60_000, noShowMin: CUP_NO_SHOW_MS / 60_000 };
 
 async function namesOf(ids: readonly (string | null)[]): Promise<Map<string, string>> {
     const list = [...new Set(ids.filter((x): x is string => !!x && UUID.test(x)))];
@@ -396,26 +404,29 @@ async function namesOf(ids: readonly (string | null)[]): Promise<Map<string, str
 async function cupGames(cupId: string): Promise<CupRow[]> {
     const rows = rowsOf(await db.execute(sql`
         select id, kind, round, slot, p1_id, p2_id, match_id, winner_id, outcome, admin_note,
-            ${TS("deadline_at")} as deadline_iso, ${TS("p1_ready_at")} as p1_ready_iso, ${TS("p2_ready_at")} as p2_ready_iso, ${TS("decided_at")} as decided_iso
+            ${TS("scheduled_at")} as scheduled_iso, ${TS("p1_ready_at")} as p1_ready_iso, ${TS("p2_ready_at")} as p2_ready_iso, ${TS("decided_at")} as decided_iso
         from hiq_sim_cup_games where cup_id = ${cupId}::uuid order by round, kind, slot`));
     return rows.map((r) => ({
         id: String(r.id), kind: r.kind === "third" ? "third" : "main", round: Number(r.round), slot: Number(r.slot),
         p1Id: r.p1_id ? String(r.p1_id) : null, p2Id: r.p2_id ? String(r.p2_id) : null,
-        deadlineMs: Date.parse(String(r.deadline_iso)), p1ReadyMs: r.p1_ready_iso ? Date.parse(String(r.p1_ready_iso)) : null, p2ReadyMs: r.p2_ready_iso ? Date.parse(String(r.p2_ready_iso)) : null,
+        scheduledMs: r.scheduled_iso ? Date.parse(String(r.scheduled_iso)) : null,
+        p1ReadyMs: r.p1_ready_iso ? Date.parse(String(r.p1_ready_iso)) : null, p2ReadyMs: r.p2_ready_iso ? Date.parse(String(r.p2_ready_iso)) : null,
         matchId: r.match_id ? String(r.match_id) : null, winnerId: r.winner_id ? String(r.winner_id) : null,
         outcome: OUTCOMES.includes(r.outcome) ? r.outcome : null, decidedMs: r.decided_iso ? Date.parse(String(r.decided_iso)) : null,
         notes: Array.isArray(r.admin_note) ? r.admin_note : [],
     }));
 }
 
-function gameView(g: CupGame & { id?: string; notes?: AdminCupNote[] }, games: readonly CupGame[], running: boolean, people: (id: string | null) => AdminCupGameView["p1"],
+function gameView(g: CupRow, games: readonly CupGame[], cupStatus: string, people: (id: string | null) => AdminCupGameView["p1"],
     match: AdminCupGameView["match"]): AdminCupGameView {
     const iso = (ms: number | null) => (ms == null || !Number.isFinite(ms) ? null : new Date(ms).toISOString());
+    const running = cupStatus === "running";
     return {
-        id: g.id ?? null, kind: g.kind, round: g.round, slot: g.slot, p1: people(g.p1Id), p2: people(g.p2Id),
-        deadlineAt: iso(g.deadlineMs) ?? "", p1Ready: g.p1ReadyMs !== null, p2Ready: g.p2ReadyMs !== null,
-        winnerId: g.winnerId, outcome: g.outcome, decidedAt: iso(g.decidedMs), match, notes: g.notes ?? [],
-        change: g.id ? canChangeResult(g, games, running) : { ok: false, why: "미리보기" }, decide: g.id ? canDecide(g, running) : { ok: false, why: "미리보기" },
+        id: g.id, kind: g.kind, round: g.round, slot: g.slot, p1: people(g.p1Id), p2: people(g.p2Id),
+        scheduledAt: iso(g.scheduledMs), p1Ready: g.p1ReadyMs !== null, p2Ready: g.p2ReadyMs !== null,
+        winnerId: g.winnerId, outcome: g.outcome, decidedAt: iso(g.decidedMs), match, notes: g.notes,
+        schedule: canSchedule(g, cupStatus, match?.status === "playing" || match?.status === "finished"),
+        change: canChangeResult(g, games, running), decide: canDecide(g, running),
     };
 }
 
@@ -428,26 +439,42 @@ const CUP_SUMMARY = sql`select c.id, c.month, c.game_type, c.status, c.size, ${T
     from hiq_sim_cups c`;
 
 router.get("/cups", asyncHandler(async (_req: any, res: any) => {
-    const now = Date.now();
-    const cups = rowsOf(await db.execute(sql`${CUP_SUMMARY} order by c.month desc, c.game_type limit 36`).catch(() => ({ rows: [] }))).map(summaryOf);
-    const deltas = await storage.simMatch.ratedDeltas();
-    const month = kstMonthOf(now);
-    const pre = CUP_GAMES.map((gameType) => ({ gameType, entrants: cupEntrants(deltas, month, gameType, now) }));
-    const names = await namesOf(pre.flatMap((p) => p.entrants.map((e) => e.memberId)));
-    const next = pre.map(({ gameType, entrants }) => {
-        const seeds = new Map(entrants.map((e) => [e.memberId, e.seed]));
-        const startMs = cupStartMs(month);
-        const games = entrants.length ? cupSettle(cupPlan(entrants, startMs), seeds, new Map(), now).games : [];
-        const by = new Map(entrants.map((e) => [e.memberId, e]));
-        const person = (id: string | null) => (id ? { id, name: names.get(id) ?? "회원", seed: by.get(id)?.seed ?? null, rating: by.get(id)?.rating ?? null } : null);
-        return {
-            month, gameType, startsAt: new Date(startMs).toISOString(), size: cupSize(entrants.length),
-            entrants: entrants.map((e) => ({ memberId: e.memberId, name: names.get(e.memberId) ?? "회원", seed: e.seed, rating: e.rating, matches: e.matches, points: e.points })),
-            games: games.filter((g) => g.kind === "main" && g.round === 1).map((g) => gameView(g, games, false, person, null)),
-        };
-    });
+    const cups = rowsOf(await db.execute(sql`${CUP_SUMMARY} order by c.created_at desc limit 36`).catch(() => ({ rows: [] }))).map(summaryOf);
     res.set("Cache-Control", "private, no-store");
-    return sendSuccess(res, { cups, next, rules: { minRating: CUP_MIN_RATING, minMatches: CUP_MIN_MATCHES, maxEntrants: CUP_MAX_ENTRANTS, roundDays: CUP_ROUND_DAYS } } satisfies AdminCups);
+    return sendSuccess(res, { cups, rules: CUP_RULES } satisfies AdminCups);
+}));
+
+/** 대회 만들기의 후보 — 그 달(기본 지난달)에 친 사람과 추천 여부. 이번 달이면 지금의 레이팅으로 */
+router.get("/cups/candidates", asyncHandler(async (req: any, res: any) => {
+    const month = MONTH_RE.test(String(req.query.month ?? "")) ? String(req.query.month) : shiftMonth(kstMonthOf(Date.now()), -1);
+    const gameType = CUP_GAMES[0];
+    const list = await storage.simCup.candidates(month, gameType, Date.now());
+    const names = await namesOf(list.map((c) => c.memberId));
+    const [taken] = rowsOf(await db.execute(sql`select status from hiq_sim_cups where month = ${month} and game_type = ${gameType} limit 1`));
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, {
+        month, gameType, taken: taken ? String(taken.status) : null,
+        candidates: list.map((c) => ({ memberId: c.memberId, name: names.get(c.memberId) ?? "회원", rating: c.rating, matches: c.matches, points: c.points, suggested: c.suggested })),
+    } satisfies AdminCupCandidates);
+}));
+
+/** 대회 만들기(짜는 중) — 고른 사람으로 대진을 짠다. 회원에게는 '열기' 전까지 안 보인다 */
+router.post("/cups", asyncHandler(async (req: any, res: any) => {
+    const month = String(req.body?.month ?? "");
+    if (!MONTH_RE.test(month)) return sendError(res, 400, "기준 달을 골라 주세요");
+    const ids: string[] = Array.isArray(req.body?.memberIds) ? req.body.memberIds.filter((x: unknown) => typeof x === "string" && UUID.test(x)) : [];
+    const made = await storage.simCup.createDraft(month, CUP_GAMES[0], ids, Date.now());
+    if ("ok" in made) return sendError(res, 409, made.why);
+    return sendSuccess(res, { ok: true, id: made.id });
+}));
+
+router.get("/cups/:id", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? "");
+    if (!UUID.test(id)) return sendError(res, 404, "대회를 찾을 수 없어요");
+    const d = await cupDetail(id);
+    if (!d) return sendError(res, 404, "대회를 찾을 수 없어요");
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, d);
 }));
 
 async function cupDetail(cupId: string): Promise<AdminCupDetail | null> {
@@ -462,7 +489,6 @@ async function cupDetail(cupId: string): Promise<AdminCupDetail | null> {
     const names = await namesOf([...entries.map((e) => String(e.member_id)), ...games.flatMap((g) => [g.p1Id, g.p2Id])]);
     const entryOf = new Map(entries.map((e) => [String(e.member_id), e]));
     const person = (id: string | null) => (id ? { id, name: names.get(id) ?? "회원", seed: entryOf.get(id)?.seed ?? null, rating: entryOf.get(id)?.rating ?? null } : null);
-    const running = cup.status === "running";
     return {
         cup, rounds: cupRounds(games),
         entries: entries.map((e) => ({ memberId: String(e.member_id), name: names.get(String(e.member_id)) ?? "회원", seed: Number(e.seed), rating: Number(e.rating), matches: Number(e.matches), points: Number(e.points), place: e.place ?? null, medal: e.medal ?? null, forfeit: e.forfeit === true })),
@@ -472,21 +498,12 @@ async function cupDetail(cupId: string): Promise<AdminCupDetail | null> {
             const ps = Array.isArray(m?.ps) ? m.ps : null;
             const hostIsP1 = m && String(m.host_id) === g.p1Id;
             const score: [number, number] | null = ps ? (hostIsP1 ? [Number(ps[0]?.score) || 0, Number(ps[1]?.score) || 0] : [Number(ps[1]?.score) || 0, Number(ps[0]?.score) || 0]) : null;
-            return gameView(g, games, running, person, m ? { id: String(m.id), status: String(m.status), score, endReason: m.end_reason ?? null } : null);
+            return gameView(g, games, cup.status, person, m ? { id: String(m.id), status: String(m.status), score, endReason: m.end_reason ?? null } : null);
         }),
     };
 }
 
-router.get("/cups/:id", asyncHandler(async (req: any, res: any) => {
-    const id = String(req.params.id ?? "");
-    if (!UUID.test(id)) return sendError(res, 404, "대회를 찾을 수 없어요");
-    const d = await cupDetail(id);
-    if (!d) return sendError(res, 404, "대회를 찾을 수 없어요");
-    res.set("Cache-Control", "private, no-store");
-    return sendSuccess(res, d);
-}));
-
-/** 굴리고 알린다 — 매시 크론(rollCups)과 같은 일을 이 대회 하나에 */
+/** 굴리고 알린다 — 크론(rollCups)과 같은 일을 이 대회 하나에 */
 async function rollOne(cupId: string) {
     const ev = await storage.simCup.sync(cupId, Date.now());
     if (ev) await announce(ev).catch((e) => console.error("[admin cup announce]", e));
@@ -499,6 +516,33 @@ router.post("/cups/:id/sync", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, { ok: true, ...(await rollOne(id)) });
 }));
 
+/** 열기 — 짜는 중 → 치르는 중. 첫 라운드의 판은 모두 시각이 있어야 한다. 출전자에게 알림 */
+router.post("/cups/:id/publish", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? "");
+    if (!UUID.test(id)) return sendError(res, 404, "대회를 찾을 수 없어요");
+    const r = await publishAndAnnounce(id, Date.now());
+    if (!r.ok) return sendError(res, 409, r.why);
+    return sendSuccess(res, r);
+}));
+
+/** 짜는 중인 대회 지우기(회원에게 보인 적이 없다) */
+router.delete("/cups/:id", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? "");
+    if (!UUID.test(id)) return sendError(res, 404, "대회를 찾을 수 없어요");
+    if (!(await storage.simCup.removeDraft(id))) return sendError(res, 409, "짜는 중인 대회만 지울 수 있어요");
+    return sendSuccess(res, { ok: true });
+}));
+
+/** 치르는 중인 대회 무효 — 열린 대회 방을 닫는다. 회원에게 안 보인다(메달은 끝난 대회에만 나간다) */
+router.post("/cups/:id/void", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.id ?? ""), reason = reasonOf(req);
+    if (!UUID.test(id)) return sendError(res, 404, "대회를 찾을 수 없어요");
+    if (!reason) return sendError(res, 400, "무효로 하는 까닭을 적어 주세요");
+    if (!(await storage.simCup.voidCup(id))) return sendError(res, 409, "치르는 중인 대회만 무효로 할 수 있어요");
+    console.info("[admin cup void]", id, await adminNameOf(req), reason);
+    return sendSuccess(res, { ok: true });
+}));
+
 /** 대진 칸 하나와 그 대회(+ 같은 대회의 모든 칸) */
 async function gameAndCup(gameId: string) {
     const [g] = rowsOf(await db.execute(sql`select g.cup_id, c.status from hiq_sim_cup_games g join hiq_sim_cups c on c.id = g.cup_id where g.id = ${gameId}::uuid`));
@@ -508,21 +552,20 @@ async function gameAndCup(gameId: string) {
     return game ? { cupId: String(g.cup_id), running: g.status === "running", games, game } : null;
 }
 const noteSql = (n: AdminCupNote) => sql`coalesce(admin_note, '[]'::jsonb) || ${JSON.stringify([n])}::jsonb`;
+const kstLabel = (ms: number) => new Date(ms + 9 * 3_600_000).toISOString().slice(5, 16).replace("-", "/").replace("T", " ");
 
-router.post("/cups/games/:gameId/extend", asyncHandler(async (req: any, res: any) => {
-    const id = String(req.params.gameId ?? ""), reason = reasonOf(req), hours = Number(req.body?.hours);
+/** 경기 시각 정하기 · 바꾸기 · 지우기({ at: ISO | null }) — 치르는 중이고 두 사람이 정해진 판이면 두 사람에게 알린다 */
+router.post("/cups/games/:gameId/schedule", asyncHandler(async (req: any, res: any) => {
+    const id = String(req.params.gameId ?? ""), reason = reasonOf(req) || "경기 시각";
     if (!UUID.test(id)) return sendError(res, 404, "대진 칸을 찾을 수 없어요");
-    if (!reason) return sendError(res, 400, "늘리는 까닭을 적어 주세요");
-    if (![12, 24, 48].includes(hours)) return sendError(res, 400, "12 · 24 · 48시간 가운데 골라 주세요");
-    const st = await gameAndCup(id);
-    if (!st) return sendError(res, 404, "대진 칸을 찾을 수 없어요");
-    if (!st.running || st.game.outcome) return sendError(res, 409, "아직 안 가려진 판만 기한을 늘릴 수 있어요");
-    const to = new Date(Math.max(st.game.deadlineMs, Date.now()) + hours * 3_600_000);
-    const note: AdminCupNote = { at: new Date().toISOString(), by: await adminNameOf(req), action: "extend", reason, text: `기한 ${hours}시간 늘림` };
-    const done = await db.update(hiqSimCupGames).set({ deadlineAt: to, remindedAt: null, adminNote: noteSql(note) as any })
-        .where(and(eq(hiqSimCupGames.id, id), isNull(hiqSimCupGames.outcome))).returning({ id: hiqSimCupGames.id });
-    if (!done.length) return sendError(res, 409, "그 사이에 결과가 났어요");
-    return sendSuccess(res, { ok: true, deadlineAt: to.toISOString() });
+    const raw = req.body?.at;
+    const at = raw === null ? null : typeof raw === "string" ? Date.parse(raw) : Number.NaN;
+    if (at !== null && !Number.isFinite(at)) return sendError(res, 400, "시각을 골라 주세요");
+    const note: AdminCupNote = { at: new Date().toISOString(), by: await adminNameOf(req), action: "schedule", reason, text: at === null ? "시각 지움(일정 미정)" : `경기 시각 ${kstLabel(at)}(한국)` };
+    const r = await storage.simCup.schedule(id, at, Date.now(), note);
+    if ("ok" in r) return sendError(res, 409, r.why);
+    if (r.cup.status === "running" && at !== null) await notifySchedule(r.game).catch((e) => console.error("[admin cup schedule notify]", e));
+    return sendSuccess(res, { ok: true, scheduledAt: at === null ? null : new Date(at).toISOString() });
 }));
 
 function pickWinner(req: any, g: CupRow): { ok: true; winnerId: string | null; loserForfeit: boolean } | { ok: false } {
@@ -569,10 +612,10 @@ router.post("/cups/games/:gameId/change", asyncHandler(async (req: any, res: any
     const note: AdminCupNote = { at, by, action: "change", reason, text: w.winnerId ? `${names.get(w.winnerId) ?? "회원"} 승으로 바꿈(${outcome === "walkover" ? "상대 기권" : "기권 아님"})` : "둘 다 기권으로 바꿈" };
     await db.transaction(async (tx: any) => {
         await tx.update(hiqSimCupGames).set({ winnerId: w.winnerId, outcome, decidedAt: new Date(), adminNote: noteSql(note) as any }).where(eq(hiqSimCupGames.id, id));
-        // 다음 판의 그 자리 — 굴림이 새 사람으로 다시 앉힌다. 옛 사람의 '들어옴'과 알림 표시를 지우고, 적어도 하루를 준다
+        // 다음 판의 그 자리 — 굴림이 새 사람으로 다시 앉힌다. 옛 사람의 입장 · 대기실 · 알림 표시를 지운다(경기 시각은 그대로 — 바꿀 일이면 운영자가 다시 정한다)
         for (const d of downstreamOf(st.game, st.games)) {
-            const ready = d.side === "p1" ? { p1ReadyAt: null } : { p2ReadyAt: null };
-            await tx.update(hiqSimCupGames).set({ ...ready, remindedAt: null, deadlineAt: new Date(Math.max(d.game.deadlineMs, Date.now() + 86_400_000)),
+            const ready = d.side === "p1" ? { p1ReadyAt: null, p1SeenAt: null } : { p2ReadyAt: null, p2SeenAt: null };
+            await tx.update(hiqSimCupGames).set({ ...ready, remindedAt: null, calledAt: null,
                 adminNote: noteSql({ at, by, action: "change", reason, text: "앞 판의 결과가 바뀌어 이 자리를 다시 앉힘" }) as any })
                 .where(and(eq(hiqSimCupGames.id, d.game.id), isNull(hiqSimCupGames.outcome), isNull(hiqSimCupGames.matchId)));
         }

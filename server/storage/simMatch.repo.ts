@@ -464,9 +464,12 @@ export class SimMatchRepository {
 
     /* ── 월대회 판(2026-10-12, storage/simCup.repo · routes/modules/simCup) ── */
 
-    /** 이 방을 대진 칸에 묶는다 — 그 칸의 상대만 들어올 수 있게 초대 대상도 같이 적는다. 대기 중인 내 방일 때만 */
+    /**
+     * 이 방을 대진 칸에 묶는다 — 그 칸의 상대만 들어올 수 있게 초대 대상도 같이 적는다. 대기 중인 내 방일 때만.
+     * 관전할 수 있게 공개로 바꾸는 것도 여기서 같이 한다(2026-11-03) — 비공개로 만든 방이 묶이기 전에 남이 들어오는 틈이 없게.
+     */
     async bindCup(id: string, hostId: string, cupGameId: string, opponentId: string): Promise<boolean> {
-        const res = await db.update(hiqSimMatches).set({ cupGameId, invitedId: opponentId })
+        const res = await db.update(hiqSimMatches).set({ cupGameId, invitedId: opponentId, isPublic: true })
             .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.hostId, hostId), eq(hiqSimMatches.status, "waiting"))).returning({ id: hiqSimMatches.id });
         return res.length > 0;
     }

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { cupPlan, cupSettle, type CupEntrant, type CupGame } from "./simCup";
-import { adminOutcome, canChangeResult, canDecide, downstreamOf } from "./simCupAdmin";
+import { adminOutcome, canChangeResult, canDecide, canSchedule, downstreamOf } from "./simCupAdmin";
 
 const read = (p: string) => readFileSync(resolve(__dirname, "..", p), "utf8");
 const START = Date.parse("2026-10-31T15:00:00Z");
@@ -13,7 +13,7 @@ const find = (gs: CupGame[], kind: "main" | "third", round: number, slot: number
 /** 8명 대진을 열고(부전승 없음) 1라운드 네 판을 판정으로 가른다 — 시드 높은 쪽이 이긴 것으로 */
 function eight() {
     const e = ent(8);
-    let gs = cupSettle(cupPlan(e, START), seeds(e), new Map(), START).games;
+    let gs = cupSettle(cupPlan(e), seeds(e), new Map(), START).games;
     for (const g of gs.filter((x) => x.round === 1)) Object.assign(g, { outcome: "played", winnerId: g.p1Id, decidedMs: START + 1 });
     gs = cupSettle(gs, seeds(e), new Map(), START + 2).games;
     return { e, gs };
@@ -43,7 +43,7 @@ describe("월대회 운영 — 손대도 되는 때", () => {
 
     it("부전승은 바꿀 수 없다", () => {
         const e = ent(5);
-        const gs = cupSettle(cupPlan(e, START), seeds(e), new Map(), START).games;
+        const gs = cupSettle(cupPlan(e), seeds(e), new Map(), START).games;
         const bye = gs.find((g) => g.outcome === "bye")!;
         expect(canChangeResult(bye, gs, true)).toEqual({ ok: false, why: "부전승은 바꿀 수 없어요" });
     });
@@ -53,6 +53,18 @@ describe("월대회 운영 — 손대도 되는 때", () => {
         expect(canDecide(find(gs, "main", 2, 0), true)).toEqual({ ok: true });
         expect(canDecide(find(gs, "main", 1, 0), true).ok).toBe(false);
         expect(canDecide(find(gs, "main", 3, 0), true)).toEqual({ ok: false, why: "두 사람이 다 앉아야 정할 수 있어요" });
+    });
+
+    it("시각 정하기: 짜는 중 · 치르는 중인 대회의, 아직 안 가려졌고 시작되지 않은 판만", () => {
+        const { gs } = eight();
+        const semi = find(gs, "main", 2, 0);
+        expect(canSchedule(semi, "draft", false)).toEqual({ ok: true });
+        expect(canSchedule(semi, "running", false)).toEqual({ ok: true });
+        expect(canSchedule(semi, "running", true)).toEqual({ ok: false, why: "이미 시작된 판이에요" });
+        expect(canSchedule(find(gs, "main", 1, 0), "running", false)).toEqual({ ok: false, why: "이미 가려진 판이에요" });
+        for (const st of ["finished", "void", "skipped"]) expect(canSchedule(semi, st, false).ok).toBe(false);
+        // 결승처럼 아직 두 사람이 안 정해진 판도 미리 정해 둘 수 있다
+        expect(canSchedule(find(gs, "main", 3, 0), "running", false)).toEqual({ ok: true });
     });
 
     it("결과의 이름 — 승자 없음 = 둘 다 기권 · 진 쪽 기권 = 기권승 · 아니면 시드와 같은 것", () => {
@@ -87,15 +99,33 @@ describe("월대회 운영 — 결과를 바꾸면 굴림이 다음 칸을 다�
 describe("월대회 운영 — 서버", () => {
     const route = read("server/routes/modules/adminBilliards.ts");
     const after = (path: string) => route.slice(route.indexOf(`router.post("/cups/games/:gameId/${path}"`));
-    it("모든 길이 까닭을 받고, 운영 기록을 칸에 남긴다", () => {
-        for (const p of ["extend", "decide", "change"]) {
+    it("결과를 정하고 바꾸는 길은 까닭을 받고, 운영 기록을 칸에 남긴다 · 시각 정하기도 기록을 남기고 두 사람에게 알린다", () => {
+        for (const p of ["decide", "change"]) {
             expect(after(p)).toMatch(/if \(!reason\) return sendError\(res, 400/);
             expect(after(p)).toMatch(/adminNote: noteSql\(/);
         }
+        expect(route).not.toContain('"/cups/games/:gameId/extend"');
+        const sch = after("schedule");
+        expect(sch).toContain('action: "schedule"');
+        expect(sch).toContain("const r = await storage.simCup.schedule(id, at, Date.now(), note);");
+        expect(sch).toContain('if (r.cup.status === "running" && at !== null) await notifySchedule(r.game)');
+    });
+
+    it("대회 만들기 → 열기 · 짜는 중 지우기 · 무효 — 대회는 운영자가 연다", () => {
+        expect(route).toContain('router.get("/cups/candidates"');
+        expect(route).toContain("const made = await storage.simCup.createDraft(month, CUP_GAMES[0], ids, Date.now());");
+        expect(route).toContain("const r = await publishAndAnnounce(id, Date.now());");
+        expect(route).toContain('router.delete("/cups/:id"');
+        expect(route).toContain("if (!(await storage.simCup.voidCup(id))) return sendError(res, 409,");
+        const repo = read("server/storage/simCup.repo.ts");
+        const publish = repo.slice(repo.indexOf("async publish("), repo.indexOf("async voidCup("));
+        // 첫 라운드의 두 사람이 앉은 판은 모두 시각이 있어야 연다
+        expect(publish).toContain('g.kind === "main" && g.round === 1 && !g.outcome && g.p1Id && g.p2Id && g.scheduledMs === null');
+        expect(repo.slice(repo.indexOf("async createDraft("), repo.indexOf("async removeDraft("))).toContain('status: "draft"');
     });
     it("결과 정하기는 열린 대회 방을 닫고 굴린다 · 바꾸기는 다음 판 그 자리의 '들어옴'을 지우고 굴린다", () => {
         expect(after("decide")).toMatch(/cancelForCup\(\[st\.game\.matchId\]\)[\s\S]*rollOne\(st\.cupId\)/);
-        expect(after("change")).toMatch(/downstreamOf\(st\.game, st\.games\)[\s\S]*p1ReadyAt: null[\s\S]*rollOne\(st\.cupId\)/);
+        expect(after("change")).toMatch(/downstreamOf\(st\.game, st\.games\)[\s\S]*p1ReadyAt: null, p1SeenAt: null[\s\S]*rollOne\(st\.cupId\)/);
     });
     it("마이그레이션은 칸 하나를 더하기만 한다", () => {
         const body = read("migrations/sim_cup_admin_note.sql").split("\n").filter((l) => l.trim() && !l.trim().startsWith("--"));

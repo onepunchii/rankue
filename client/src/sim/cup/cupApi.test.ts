@@ -1,20 +1,23 @@
-/** 월대회 응답 읽기 · 주소 · 남은 시간(2026-10-12). */
+/** 월대회 응답 읽기 · 주소 · 남은 시간(2026-10-12 · 2026-11-03 운영자가 여는 대회 — 경기 시각 · 입장 · 대기실). */
 import { describe, it, expect, vi } from "vitest";
 
 vi.mock("@/lib/queryClient", () => ({ apiRequest: vi.fn() }));
 
-import { CUP_PATH, createCupApi, cupUrl, parseCupReady, parseCupView, roundSize, timeLeft } from "./cupApi";
+import { CUP_PATH, createCupApi, cupErrorCode, cupUrl, parseCupReady, parseCupView, roundSize, timeLeft } from "./cupApi";
 
 const raw = {
     now: "2026-11-01T06:00:00.000Z",
     cup: {
         id: "c1", month: "2026-10", gameType: "3c", status: "running", size: 4, rounds: 2, startsAt: "2026-10-31T15:00:00.000Z", finishedAt: null,
         entries: [{ memberId: "a", seed: 1, rating: 1120, place: null, medal: null, forfeit: false, name: "선수1", country: "KR", tier: "silver" }],
-        games: [{ id: "g1", kind: "main", round: 1, slot: 0, p1Id: "a", p2Id: "b", deadlineAt: "2026-11-02T15:00:00.000Z", p1Ready: true, p2Ready: false, winnerId: null, outcome: null }],
-        mine: { gameId: "g1", opponentId: "b", waiting: false, deadlineAt: "2026-11-02T15:00:00.000Z", iReady: true, opponentReady: false, matchId: "m1", matchStatus: "waiting", hosting: true },
+        games: [
+            { id: "g1", kind: "main", round: 1, slot: 0, p1Id: "a", p2Id: "b", scheduledAt: "2026-11-02T12:00:00.000Z", p1Ready: true, p2Ready: false, winnerId: null, outcome: null, matchId: null, matchStatus: null },
+            { id: "g2", kind: "main", round: 1, slot: 1, p1Id: "c", p2Id: "d", scheduledAt: null, p1Ready: true, p2Ready: true, winnerId: null, outcome: null, matchId: "m9", matchStatus: "playing" },
+        ],
+        mine: { gameId: "g1", opponentId: "b", waiting: false, scheduledAt: "2026-11-02T12:00:00.000Z", window: "open", iReady: true, opponentReady: false, opponentPresent: true, matchId: null, matchStatus: null },
     },
     next: {
-        month: "2026-11", startsAt: "2026-11-30T15:00:00.000Z", daysLeft: 30, minRating: 1000, minMatches: 5, maxEntrants: 16, roundDays: 2, size: 0,
+        month: "2026-11", daysLeft: 30, minRating: 1000, minMatches: 5, maxEntrants: 16, enterEarlyMin: 10, noShowMin: 15, size: 0,
         entrants: [{ memberId: "a", seed: 1, rating: 1120, matches: 6, name: "선수1", country: "KR", tier: "silver" }],
         me: { qualified: true, seed: 1, rating: 1120, matches: 6 },
     },
@@ -25,9 +28,11 @@ describe("월대회 응답 읽기", () => {
         const v = parseCupView(raw);
         expect(v.nowMs).toBe(Date.UTC(2026, 10, 1, 6));
         expect(v.cup).toMatchObject({ id: "c1", month: "2026-10", status: "running", size: 4, rounds: 2 });
-        expect(v.cup!.games[0]).toMatchObject({ id: "g1", kind: "main", p1Id: "a", p2Id: "b", deadlineMs: Date.UTC(2026, 10, 2, 15), p1Ready: true, outcome: null });
-        expect(v.cup!.mine).toMatchObject({ gameId: "g1", opponentId: "b", iReady: true, matchId: "m1", matchStatus: "waiting", hosting: true, deadlineMs: Date.UTC(2026, 10, 2, 15) });
-        expect(v.next).toMatchObject({ month: "2026-11", minRating: 1000, minMatches: 5, maxEntrants: 16, roundDays: 2 });
+        expect(v.cup!.games[0]).toMatchObject({ id: "g1", kind: "main", p1Id: "a", p2Id: "b", scheduledMs: Date.UTC(2026, 10, 2, 12), p1Ready: true, outcome: null, matchId: null });
+        // 시각이 없는 판은 null(일정 미정) · 시작된 판은 관전할 대전 id 가 있다
+        expect(v.cup!.games[1]).toMatchObject({ scheduledMs: null, matchId: "m9", matchStatus: "playing" });
+        expect(v.cup!.mine).toEqual({ gameId: "g1", opponentId: "b", waiting: false, scheduledMs: Date.UTC(2026, 10, 2, 12), window: "open", iReady: true, opponentReady: false, opponentPresent: true, matchId: null, matchStatus: null });
+        expect(v.next).toMatchObject({ month: "2026-11", minRating: 1000, minMatches: 5, maxEntrants: 16, enterEarlyMin: 10, noShowMin: 15 });
         expect(v.next.me).toEqual({ qualified: true, seed: 1, rating: 1120, matches: 6 });
         expect(v.next.entrants[0]).toMatchObject({ memberId: "a", seed: 1, rating: 1120, matches: 6, tier: "silver" });
     });
@@ -41,31 +46,42 @@ describe("월대회 응답 읽기", () => {
         }
         const odd = parseCupView({ ...raw, cup: { ...raw.cup, mine: null, games: [{ ...raw.cup.games[0], outcome: "magic", kind: "third" }, { id: "" }], entries: [{ ...raw.cup.entries[0], tier: "legend", medal: 9 }] } });
         expect(odd.cup!.mine).toBeNull();
+        // 모르는 입장 시간은 '일정 미정'으로 읽는다(입장 단추가 열리지 않는다)
+        expect(parseCupView({ ...raw, cup: { ...raw.cup, mine: { ...raw.cup.mine, window: "soon" } } }).cup!.mine!.window).toBe("unscheduled");
         expect(odd.cup!.games).toHaveLength(1);
         expect(odd.cup!.games[0]).toMatchObject({ kind: "third", outcome: null });
         expect(odd.cup!.entries[0]).toMatchObject({ tier: null, medal: null });
     });
 
-    it("기다리기의 답: 치는 중 · 내가 방장 · 들어갈 방 — 그 밖은 버린다", () => {
-        expect(parseCupReady({ matchId: "m1", state: "hosting" })).toEqual({ matchId: "m1", state: "hosting" });
-        expect(parseCupReady({ matchId: "m1", state: "join" })).toEqual({ matchId: "m1", state: "join" });
+    it("입장의 답: 판이 열렸다(그 판 id) · 대기실에서 기다린다 — 그 밖은 버린다", () => {
+        expect(parseCupReady({ matchId: "m1", state: "playing" })).toEqual({ state: "playing", matchId: "m1" });
+        expect(parseCupReady({ matchId: null, state: "waiting", opponentReady: true })).toEqual({ state: "waiting", opponentReady: true });
         expect(parseCupReady({ matchId: "", state: "playing" })).toBeNull();
-        expect(parseCupReady({ matchId: "m1", state: "?" })).toBeNull();
+        // 옛 답(방을 열어 두고 기다리던 때)은 버린다
+        expect(parseCupReady({ matchId: "m1", state: "hosting" })).toBeNull();
+        expect(parseCupReady({ matchId: "m1", state: "join" })).toBeNull();
         expect(parseCupReady(null)).toBeNull();
     });
 
-    it("주소: 대진 · 기다리기 · 상대가 연 방에 들어가기(평소의 참가 주소)", async () => {
+    it("주소: 대진 · 입장(진행 중인 판을 기권하고 들어가기는 forfeitPlaying)", async () => {
         expect(CUP_PATH).toBe("/online-game?cup=1");
         expect(cupUrl()).toBe("/api/hiq/sim/cup?gameType=3c");
-        const request = vi.fn(async (url: string) => (url.endsWith("/ready") ? { matchId: "m7", state: "join" } : url.includes("/sim/cup") ? raw : { ok: true }));
+        const request = vi.fn(async (url: string) => (url.endsWith("/ready") ? { matchId: "m7", state: "playing" } : url.includes("/sim/cup") ? raw : { ok: true }));
         const api = createCupApi(request);
         expect((await api.get()).cup!.id).toBe("c1");
-        expect(await api.ready("g 1")).toEqual({ matchId: "m7", state: "join" });
+        expect(await api.ready("g 1")).toEqual({ state: "playing", matchId: "m7" });
         expect(request).toHaveBeenCalledWith("/api/hiq/sim/cup/games/g%201/ready", { method: "POST", body: {} });
-        await api.join("m7");
-        expect(request).toHaveBeenLastCalledWith("/api/hiq/sim/matches/m7/join", { method: "POST", body: {} });
+        await api.ready("g1", { forfeitPlaying: true });
+        expect(request).toHaveBeenLastCalledWith("/api/hiq/sim/cup/games/g1/ready", { method: "POST", body: { forfeitPlaying: true } });
         // 답이 이상하면 던진다 — 화면이 '들어갈 수 없어요'라고 말한다
         await expect(createCupApi(async () => ({})).ready("g1")).rejects.toThrow();
+    });
+
+    it("409 의 까닭을 읽는다(err.data.code) — 진행 중인 판 · 아직 입장 시간 전 · 시각 미정 · 지났다", () => {
+        expect(cupErrorCode({ data: { code: "HAS_PLAYING" } })).toBe("HAS_PLAYING");
+        expect(cupErrorCode({ data: { code: "CUP_EARLY" } })).toBe("CUP_EARLY");
+        expect(cupErrorCode(new Error("x"))).toBeNull();
+        expect(cupErrorCode(null)).toBeNull();
     });
 });
 

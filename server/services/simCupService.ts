@@ -1,16 +1,17 @@
 /**
- * 월대회의 굴림과 알림(2026-10-12 오너 "추천대로"). 저장소(storage/simCup.repo)가 "무슨 일이 났나"를 돌려주면 여기서 알린다.
- *  - openAndAnnounce: 달 마감 뒤 대회를 열고 출전자에게 대진이 나왔다고 알린다(하루 한 번 도는 정리 작업).
- *  - rollCups: 치르는 중인 대회를 지금 시각까지 굴린다 — 대진 화면을 열 때 · 대회 판이 끝난 화면 · 매시 크론. 몇 번 불러도 알림은 한 번이다.
- *  - remindDue: 기한이 하루 안으로 남은 판의 두 사람에게 한 번 알린다(매시 크론).
- * 알림은 '내가 뛰는 대전' 묶음(pref sim)으로 나간다 — 방 열림 방송과 따로 끌 수 있다. 누르면 대진 화면(/online-game?cup=1).
- * 알림이 실패해도 대진은 이미 적혔다 — 여기서 던지지 않는다.
+ * 월대회의 굴림과 알림(2026-10-12 오너 "추천대로" · 2026-11-03 운영자가 여는 대회로). 저장소(storage/simCup.repo)가 "무슨 일이 났나"를 돌려주면 여기서 알린다.
+ *  - publishAndAnnounce: 운영자가 대회를 열면 출전자에게 대진이 나왔다고 알린다.
+ *  - rollCups: 치르는 중인 대회를 지금 시각까지 굴린다 — 대진 화면 · 대기실 · 대회 판이 끝난 화면 · 크론(10분마다). 몇 번 불러도 알림은 한 번이다.
+ *  - remindDue: 경기가 하루 안으로 다가온 판의 두 사람에게 한 번 · callDue: 입장 시간이 열린 판의 두 사람에게 한 번(크론).
+ *  - notifySchedule: 운영자가 경기 시각을 정하거나 바꾸면 그 판의 두 사람에게.
+ * 시각은 알림에 적지 않는다 — 해외 회원이 있어 시간대가 갈린다. 대진표가 기기 시각으로 보여 준다.
+ * 알림은 '내가 뛰는 대전' 묶음(pref sim)으로 나간다. 누르면 대진 화면(/online-game?cup=1). 알림이 실패해도 대진은 이미 적혔다 — 여기서 던지지 않는다.
  */
 import { storage } from "../storage/index.js";
 import { notificationService } from "./notificationService.js";
 import { msg, type I18nText } from "../lib/i18n.js";
 import { cupLosers } from "../../shared/simCup.js";
-import type { CupSyncEvents } from "../storage/simCup.repo.js";
+import type { CupGameRow, CupSyncEvents } from "../storage/simCup.repo.js";
 
 export const CUP_URL = "/online-game?cup=1";
 
@@ -29,15 +30,20 @@ async function namesOf(ids: readonly (string | null)[]): Promise<Map<string, str
     return out;
 }
 
+/** 한 판의 두 사람에게 — 본문에 서로의 이름 */
+async function toBoth(games: readonly Pick<CupGameRow, "p1Id" | "p2Id">[], title: string, body: string): Promise<void> {
+    const names = await namesOf(games.flatMap((g) => [g.p1Id, g.p2Id]));
+    for (const g of games) {
+        await send(g.p1Id, title, msg(body, { name: names.get(g.p2Id ?? "") ?? "" }));
+        await send(g.p2Id, title, msg(body, { name: names.get(g.p1Id ?? "") ?? "" }));
+    }
+}
+
 /** 굴리며 생긴 일을 알린다 */
 export async function announce(ev: CupSyncEvents): Promise<void> {
-    const names = await namesOf([...ev.paired.flatMap((g) => [g.p1Id, g.p2Id])]);
-    // 다음 상대가 정해졌다 — 두 사람 모두에게
-    for (const g of ev.paired) {
-        await send(g.p1Id, "notif.cup.paired.title", msg("notif.cup.paired.body", { name: names.get(g.p2Id ?? "") ?? "" }));
-        await send(g.p2Id, "notif.cup.paired.title", msg("notif.cup.paired.body", { name: names.get(g.p1Id ?? "") ?? "" }));
-    }
-    // 기권으로 떨어진 사람 — 기한을 넘겼다고 알린다(쳐서 진 사람은 끝난 화면에서 이미 안다)
+    // 다음 상대가 정해졌다 — 두 사람 모두에게(시각이 이미 있으면 그 시각에, 없으면 운영자가 정하면 다시 알린다)
+    await toBoth(ev.paired, "notif.cup.paired.title", "notif.cup.paired.body");
+    // 기권으로 떨어진 사람 — 입장하지 않았다고 알린다(쳐서 진 사람은 끝난 화면에서 이미 안다)
     for (const g of ev.decided) {
         for (const l of cupLosers(g)) if (l.forfeit) await send(l.memberId, "notif.cup.out.title", "notif.cup.out.body");
     }
@@ -63,27 +69,37 @@ export async function rollCups(nowMs: number = Date.now()): Promise<{ cups: numb
     return out;
 }
 
-/** 달 마감 뒤 — 대회를 열고 출전자에게 알린다 */
-export async function openAndAnnounce(nowMs: number = Date.now()): Promise<{ month: string; gameType: string; status: string; size: number; entrants: number }[]> {
-    const opened = await storage.simCup.openCups(nowMs);
-    for (const o of opened) {
-        for (const memberId of o.entrants) await send(memberId, "notif.cup.open.title", msg("notif.cup.open.body", { n: o.cup.size }));
-    }
-    return opened.map((o) => ({ month: o.cup.month, gameType: o.cup.gameType, status: o.cup.status, size: o.cup.size, entrants: o.entrants.length }));
+/** 운영자가 대회를 열었다 — 출전자에게 대진이 나왔다고 알린다 */
+export async function publishAndAnnounce(cupId: string, nowMs: number = Date.now()): Promise<{ ok: true; entrants: number } | { ok: false; why: string }> {
+    const r = await storage.simCup.publish(cupId, nowMs);
+    if ("ok" in r) return r;
+    for (const memberId of r.entrants) await send(memberId, "notif.cup.open.title", msg("notif.cup.open.body", { n: r.cup.size }));
+    // 부전승 등 열자마자 가려지는 칸을 굴린다(다음 칸에 앉힌다)
+    await rollCups(nowMs).catch((e: unknown) => console.error("[cup roll]", e));
+    return { ok: true, entrants: r.entrants.length };
 }
 
-/** 기한이 하루 안으로 남은 판 — 두 사람에게 한 번 */
+/** 경기가 하루 안으로 다가온 판 — 두 사람에게 한 번 */
 export async function remindDue(nowMs: number = Date.now()): Promise<number> {
     const games = await storage.simCup.dueReminders(nowMs);
-    const names = await namesOf(games.flatMap((g) => [g.p1Id, g.p2Id]));
-    for (const g of games) {
-        await send(g.p1Id, "notif.cup.remind.title", msg("notif.cup.remind.body", { name: names.get(g.p2Id ?? "") ?? "" }));
-        await send(g.p2Id, "notif.cup.remind.title", msg("notif.cup.remind.body", { name: names.get(g.p1Id ?? "") ?? "" }));
-    }
+    await toBoth(games, "notif.cup.remind.title", "notif.cup.remind.body");
     return games.length;
 }
 
-/** 상대가 대회 방에서 기다린다 */
-export async function notifyWaiting(opponentId: string, hostName: string): Promise<void> {
-    await send(opponentId, "notif.cup.waiting.title", msg("notif.cup.waiting.body", { name: hostName }));
+/** 입장 시간이 열렸다 — 두 사람에게 한 번 */
+export async function callDue(nowMs: number = Date.now()): Promise<number> {
+    const games = await storage.simCup.dueCalls(nowMs);
+    await toBoth(games, "notif.cup.call.title", "notif.cup.call.body");
+    return games.length;
+}
+
+/** 운영자가 이 판의 경기 시각을 정했다 · 바꿨다 — 두 사람이 정해졌을 때만 */
+export async function notifySchedule(game: Pick<CupGameRow, "p1Id" | "p2Id">): Promise<void> {
+    if (!game.p1Id || !game.p2Id) return;
+    await toBoth([game], "notif.cup.schedule.title", "notif.cup.schedule.body");
+}
+
+/** 상대가 대기실에 들어왔다 — 아직 안 들어온 사람에게(처음 입장할 때 한 번) */
+export async function notifyEntered(opponentId: string, name: string): Promise<void> {
+    await send(opponentId, "notif.cup.waiting.title", msg("notif.cup.waiting.body", { name }));
 }

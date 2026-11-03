@@ -20,7 +20,7 @@ describe("크론 일의 실행 기록 — 일했거나 실패했을 때만", () 
         expect(cron).toMatch(/if \(out\.due\) await recordCronRun\("golf_eve", out\.failed === 0, out\);/);
     });
     it("월대회 굴리기는 치르는 대회가 있을 때만", () => {
-        expect(cron).toMatch(/if \(out\.cups > 0 \|\| out\.reminded > 0\) await recordCronRun\("cup_roll", true, out\);/);
+        expect(cron).toMatch(/if \(out\.cups > 0 \|\| out\.reminded > 0 \|\| out\.called > 0\) await recordCronRun\("cup_roll", true, out\);/);
     });
     it("기록을 적다 실패해도 크론의 응답은 깨지 않는다", () => {
         const s = read("server/storage/cronRuns.ts");

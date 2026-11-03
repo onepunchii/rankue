@@ -2541,7 +2541,8 @@ export const hiqSimCups = pgTable("hiq_sim_cups", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   month: text("month").notNull(),
   gameType: text("game_type", { enum: ["3c", "4c"] }).notNull(),
-  status: text("status", { enum: ["running", "finished", "skipped"] }).notNull(),
+  /** draft = 운영자가 짜는 중(회원에게 안 보인다) · running · finished · skipped(옛 자동 열기에서 인원 부족) · void = 운영자가 무효로 함(2026-11-03) */
+  status: text("status", { enum: ["draft", "running", "finished", "skipped", "void"] }).notNull(),
   /** 대진판 크기 4 · 8 · 16(열지 않았으면 0) */
   size: integer("size").default(0).notNull(),
   startsAt: timestamp("starts_at").notNull(),
@@ -2590,8 +2591,15 @@ export const hiqSimCupGames = pgTable("hiq_sim_cup_games", {
   decidedAt: timestamp("decided_at"),
   /** 기한 하루 전 알림을 보낸 때(한 번만) */
   remindedAt: timestamp("reminded_at"),
-  /** 운영 기록(2026-10-16 어드민 › 당구 › 월대회) — [{ at, by, action: extend|decide|change, reason, text }] · shared/simCupAdmin */
+  /** 운영 기록(2026-10-16 어드민 › 당구 › 월대회) — [{ at, by, action: schedule|decide|change, reason, text }] · shared/simCupAdmin */
   adminNote: jsonb("admin_note"),
+  /** 운영자가 정한 경기 시각(2026-11-03) — 없으면 '일정 미정'. 10분 전부터 입장, 15분 지나면 안 온 사람 기권(shared/simCup) */
+  scheduledAt: timestamp("scheduled_at"),
+  /** 대기실에 지금 있는가 — 입장 뒤 몇 초마다 다시 적는다. 두 사람이 함께 있을 때만 판이 시작된다 */
+  p1SeenAt: timestamp("p1_seen_at"),
+  p2SeenAt: timestamp("p2_seen_at"),
+  /** '입장할 시간이에요' 알림을 보낸 때(한 번만) */
+  calledAt: timestamp("called_at"),
 }, (t) => ({
   uniq: unique().on(t.cupId, t.kind, t.round, t.slot),
 }));

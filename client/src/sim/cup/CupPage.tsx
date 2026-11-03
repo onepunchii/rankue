@@ -1,13 +1,15 @@
 /**
  * 월대회(2026-10-12 오너: "매월 대회 … 레이팅 기준으로 출전권 → 토너먼트 → 상대방이 못 오면 기권으로 · 1~5등 메달 · 장식장" → "추천대로"). `/online-game?cup=1`.
+ * 2026-11-03 운영자가 여는 대회로(오너: "우리가 지정된 날짜에 방을 만듬 … 관전도 가능하고 … 일정시간 안들어오면 기권패").
  *
  * 위에서부터
- *  - 머리(대회 그림) → **지금 대회**(가장 최근 것): 내 경기(상대 · 기한 · 기다리기/입장) → 끝났으면 결과(메달) → 대진표(라운드마다).
- *  - **다음 대회**: 이번 달 성적으로 다음 달 1일에 연다 — 내 출전 조건(레이팅 · 이달 판 수), 지금 이대로면 나가는 사람, 규칙.
+ *  - 머리(대회 그림) → **지금 대회**(가장 최근에 연 것): 내 경기(상대 · 경기 시각 · 입장 · 대기실) → 끝났으면 결과(메달) → 대진표(라운드마다 · 시각 · 관전).
+ *  - **다음 대회**: 이번 달 성적이 이대로면 추천되는 사람과 내 추천 조건(레이팅 · 이달 판 수), 규칙. 출전자는 운영자가 확정한다.
  *
- * 대회 판은 초대 방이다. 먼저 누른 사람이 방을 열고(기다리기) 상대에게 알림이 간다 — 상대가 '입장'을 누르면 바로 시작한다.
- * 기한까지 한 사람만 들어왔으면 그 사람의 기권승이라, '기다리기'를 누른 것 자체가 기록이다.
- * 내 경기가 있는 동안에는 몇 초마다 다시 읽는다(상대가 들어왔는지 · 판이 시작됐는지). 내가 열어 둔 방에 상대가 들어오면 그 판으로 옮겨 간다.
+ * 경기는 운영자가 정한 시각 10분 전부터 '입장하기'를 누를 수 있다. 누르면 대기실 — 이 화면에 있는 동안 5초마다 '아직 있다'를 보내고,
+ * 두 사람이 다 대기실에 있으면 서버가 판을 열고 바로 시작한다(한 사람만 있는 채로 시작되지 않는다). 그 판으로 옮겨 간다.
+ * 시작 15분 뒤까지 한 사람만 입장했으면 그 사람의 기권승 — '입장하기'를 누른 것 자체가 기록이다.
+ * 시작된 판은 누구나 관전할 수 있다(대진표의 '관전' · 끝나면 '다시보기').
  *
  * 숫자와 글자는 그림에 없다 — 전부 여기서 그린다. 색 · 광택은 .rank-hall(index.css). 규칙은 shared/simCup, 값은 GET /sim/cup.
  */
@@ -19,7 +21,7 @@ import type { CupMedal } from "@shared/simCup";
 import { rankFlag } from "../rank/flag";
 import { monthLabel } from "../rank/MonthlyRank";
 import { TierEmblem } from "../rank/TierEmblem";
-import { CUP_QUERY_KEY, cupApi as defaultApi, roundSize, timeLeft, type CupApi, type CupEntry, type CupGameRow, type CupNow, type CupPerson, type CupView } from "./cupApi";
+import { CUP_PING_MS, CUP_QUERY_KEY, cupApi as defaultApi, cupErrorCode, roundSize, timeLeft, type CupApi, type CupEntry, type CupGameRow, type CupMine, type CupNow, type CupPerson, type CupView } from "./cupApi";
 import { CUP_ICON_SRC, CupMedalArt } from "./CupArt";
 
 export interface CupPageProps {
@@ -27,11 +29,13 @@ export interface CupPageProps {
     api?: CupApi;
     /** 시작된 대회 판으로 */
     onOpenMatch: (matchId: string) => void;
-    /** 내가 열어 둔 대기 방으로 */
-    onLobby?: () => void;
+    /** 남의 대회 판 관전 · 다시보기 */
+    onWatch?: (matchId: string) => void;
+    /** 진행 중인 다른 판이 있을 때 "기권하고 입장할까요?" — true 면 기권하고 들어간다 */
+    confirmForfeit?: () => Promise<boolean>;
     onRank?: () => void;
     onShelf?: () => void;
-    /** 내 경기가 있을 때 다시 읽는 간격(ms). 시험에서는 0 으로 끈다 */
+    /** 내 경기가 있을 때 다시 읽는 간격 · 대기실에서 '있다'를 다시 보내는 간격(ms). 시험에서는 0 으로 끈다 */
     pollMs?: number;
     /** 내 회원 id — 대진표 · 결과에서 내 줄에 '나'를 붙인다. 안 주면 내 경기 칸에서 알아낸다 */
     myMemberId?: string;
@@ -67,15 +71,15 @@ function Section({ title, right, children, testId }: { title: string; right?: Re
     );
 }
 
-export function CupPage({ onClose, api = defaultApi, onOpenMatch, onLobby, onRank, onShelf, pollMs = 5000, myMemberId }: CupPageProps) {
+export function CupPage({ onClose, api = defaultApi, onOpenMatch, onWatch, onRank, onShelf, pollMs = 5000, myMemberId, confirmForfeit }: CupPageProps) {
     const { t, locale } = useT();
     const qc = useQueryClient();
-    const [failed, setFailed] = useState(false);
+    const [failed, setFailed] = useState<string | null>(null);
     const q = useQuery({
         queryKey: [...CUP_QUERY_KEY, "3c"],
         queryFn: () => api.get("3c"),
         staleTime: 3000,
-        // 내 경기가 있는 동안만 다시 읽는다 — 상대가 들어왔는지, 판이 시작됐는지
+        // 내 경기가 있는 동안만 다시 읽는다 — 상대가 정해졌는지 · 시각이 정해졌는지 · 판이 시작됐는지
         refetchInterval: (query) => { const d = query.state.data as CupView | undefined; return pollMs > 0 && d?.cup?.status === "running" && d.cup.mine ? pollMs : false; },
     });
     const d = q.data;
@@ -90,42 +94,63 @@ export function CupPage({ onClose, api = defaultApi, onOpenMatch, onLobby, onRan
     }, [cup, mine, myMemberId]);
     const n = (v: number) => String(v);
 
-    // 내가 열어 둔 방에 상대가 들어왔다 — 그 판으로 옮겨 간다(첫 샷까지 2분이 주어진다)
-    const prev = useRef<string | null>(null);
+    // 대기실 — '입장하기'를 누른 뒤 이 화면에 있는 동안. 몇 초마다 ready 를 다시 보내 '아직 있다'를 알린다(서버는 두 사람이 다 있을 때만 판을 연다)
+    const [inRoom, setInRoom] = useState(false);
+    const roomGame = inRoom && mine && mine.window === "open" && !mine.matchId ? mine.gameId : null;
+    useEffect(() => { if (!mine || mine.window !== "open") setInRoom(false); }, [mine?.gameId, mine?.window]);
+    // 판이 시작됐다(상대가 들어와 서버가 열었다) — 그 판으로 옮겨 간다
+    const opened = useRef<string | null>(null);
     useEffect(() => {
-        const now = mine?.matchStatus ?? null;
-        if (prev.current === "waiting" && now === "playing" && mine?.hosting && mine.matchId) onOpenMatch(mine.matchId);
-        prev.current = now;
-    }, [mine?.matchStatus, mine?.hosting, mine?.matchId, onOpenMatch]);
+        if (inRoom && mine?.matchStatus === "playing" && mine.matchId && opened.current !== mine.matchId) { opened.current = mine.matchId; onOpenMatch(mine.matchId); }
+    }, [inRoom, mine?.matchStatus, mine?.matchId, onOpenMatch]);
 
-    const ready = useMutation({
+    const enter = useMutation({
         mutationFn: async (gameId: string) => {
-            const r = await api.ready(gameId);
-            if (r.state === "join") await api.join(r.matchId);
-            return r;
+            try { return await api.ready(gameId); } catch (e) {
+                // 진행 중인 다른 판이 있다 — 기권하고 들어갈지 묻는다
+                if (cupErrorCode(e) !== "HAS_PLAYING" || !confirmForfeit || !(await confirmForfeit())) throw e;
+                return api.ready(gameId, { forfeitPlaying: true });
+            }
         },
-        onMutate: () => setFailed(false),
+        onMutate: () => setFailed(null),
         onSuccess: (r) => {
             void qc.invalidateQueries({ queryKey: CUP_QUERY_KEY });
-            // 들어갔거나 이미 치는 중이면 그 판으로. 방을 연 쪽은 여기 남아 상대를 기다린다(대기 방으로 갈 수도 있다)
-            if (r.state !== "hosting") onOpenMatch(r.matchId);
+            if (r.state === "playing") { opened.current = r.matchId; onOpenMatch(r.matchId); return; }
+            setInRoom(true);
         },
-        onError: () => { setFailed(true); void qc.invalidateQueries({ queryKey: CUP_QUERY_KEY }); },
+        onError: (e) => { setFailed(cupErrorCode(e) ?? "FAILED"); void qc.invalidateQueries({ queryKey: CUP_QUERY_KEY }); },
     });
+    // 대기실에 있는 동안 ready 를 다시 보낸다 — playing 이 오면 그 판으로
+    useEffect(() => {
+        if (!roomGame || pollMs <= 0) return;
+        let stop = false;
+        const id = setInterval(() => {
+            api.ready(roomGame).then((r) => {
+                if (stop) return;
+                if (r.state === "playing") { opened.current = r.matchId; onOpenMatch(r.matchId); }
+            }).catch((e) => { if (!stop && cupErrorCode(e)) { setInRoom(false); void qc.invalidateQueries({ queryKey: CUP_QUERY_KEY }); } });
+        }, Math.min(pollMs, CUP_PING_MS));
+        return () => { stop = true; clearInterval(id); };
+    }, [roomGame, pollMs, api, onOpenMatch, qc]);
 
     const roundName = (g: Pick<CupGameRow, "kind" | "round">, rounds: number) => {
         if (g.kind === "third") return t("sim.cup.third");
         const size = roundSize(g.round, rounds);
         return size <= 2 ? t("sim.cup.final") : size === 4 ? t("sim.cup.semi") : t("sim.cup.roundOf").replace("{n}", n(size));
     };
-    const when = (ms: number) => { try { return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(new Date(ms)); } catch { return new Date(ms).toISOString().slice(5, 16); } };
+    // 시각은 기기의 시간대로 — 해외 회원도 자기 시각으로 본다
+    const when = (ms: number) => { try { return new Intl.DateTimeFormat(locale, { month: "short", day: "numeric", weekday: "short", hour: "numeric", minute: "2-digit" }).format(new Date(ms)); } catch { return new Date(ms).toISOString().slice(5, 16); } };
     const left = (ms: number) => {
         const l = timeLeft(ms, d?.nowMs ?? Date.now());
-        if (!l) return t("sim.cup.leftNone");
+        if (!l) return "";
         if (l.days > 0) return t("sim.cup.leftDays").replace("{d}", n(l.days)).replace("{h}", n(l.hours));
         return l.hours > 0 ? t("sim.cup.leftHours").replace("{h}", n(l.hours)).replace("{m}", n(l.minutes)) : t("sim.cup.leftMin").replace("{m}", n(l.minutes));
     };
     const placeName = (m: CupMedal) => t(`sim.cup.place${m}`);
+    const early = d?.next.enterEarlyMin ?? 10, noShow = d?.next.noShowMin ?? 15;
+    const failText = (code: string) => code === "CUP_EARLY" ? t("sim.cup.enterSoon").replace("{n}", n(early))
+        : code === "CUP_UNSCHEDULED" ? t("sim.cup.unscheduled")
+            : code === "CUP_CLOSED" ? t("sim.cup.closedWait") : t("sim.cup.readyFailed");
 
     /** 대진의 한 칸 */
     const gameRow = (g: CupGameRow, c: CupNow) => {
@@ -133,6 +158,8 @@ export function CupPage({ onClose, api = defaultApi, onOpenMatch, onLobby, onRan
         const done = !!g.outcome;
         const tag = g.outcome === "bye" ? t("sim.cup.bye") : g.outcome === "walkover" ? t("sim.cup.walkover") : g.outcome === "void" ? t("sim.cup.void") : g.outcome === "seed" ? t("sim.cup.bySeed") : null;
         const isMine = !!mine && g.id === mine.gameId;
+        const live = g.matchStatus === "playing" && g.matchId;
+        const line = tag ?? (live ? t("sim.cup.playing") : !done && g.p1Id && g.p2Id && c.status === "running" ? (g.scheduledMs !== null ? t("sim.cup.when").replace("{date}", when(g.scheduledMs)) : t("sim.cup.unscheduledShort")) : null);
         return (
             <li key={g.id} className={cn("hall-row px-3 py-2.5", isMine && "hall-row-mine")} data-game={`${g.kind}:${g.round}:${g.slot}`} data-outcome={g.outcome ?? ""}>
                 <div className="flex items-center gap-2 min-h-7">
@@ -146,12 +173,60 @@ export function CupPage({ onClose, api = defaultApi, onOpenMatch, onLobby, onRan
                         {done && g.winnerId && g.winnerId === g.p2Id && <span className="shrink-0 text-[11.5px] font-black text-[color:var(--hall-lime)]">{t("sim.cup.win")}</span>}
                     </div>
                 )}
-                {(tag || (!done && g.p1Id && g.p2Id && c.status === "running")) && (
-                    <p className="rk-num mt-1.5 pl-[26px] text-[11.5px] font-bold text-white/50 truncate">
-                        {tag ?? `${t("sim.cup.deadline").replace("{date}", when(g.deadlineMs))}`}
-                    </p>
+                {(line || (g.matchId && onWatch)) && (
+                    <div className="mt-1.5 pl-[26px] flex items-center gap-2 min-h-7">
+                        {line && <p className={cn("rk-num flex-1 min-w-0 text-[11.5px] font-bold truncate", live ? "text-[color:var(--hall-lime)]" : "text-white/50")}>{line}</p>}
+                        {g.matchId && onWatch && (
+                            <button type="button" onClick={() => onWatch(g.matchId!)} className="ml-auto h-8 px-3 shrink-0 rounded-pill border border-white/15 bg-white/[0.08] text-[12px] font-bold text-white/90 active:bg-white/15" data-testid="cup-watch" data-track-as={live ? "월대회 관전" : "월대회 다시보기"}>
+                                {t(live ? "sim.cup.btnWatch" : "sim.cup.btnReplay")}
+                            </button>
+                        )}
+                    </div>
                 )}
             </li>
+        );
+    };
+
+    /** 내 경기 카드의 아래쪽 — 시각 · 입장 · 대기실 */
+    const myAction = (m: CupMine) => {
+        if (m.matchStatus === "playing" && m.matchId) {
+            return (
+                <>
+                    <p className="text-[12.5px] font-bold text-white mt-2 break-keep" data-testid="cup-state">{t("sim.cup.playing")}</p>
+                    <div className="flex flex-wrap gap-2 mt-3">
+                        <button type="button" className={cta} onClick={() => onOpenMatch(m.matchId!)} data-testid="cup-go" data-track-as="월대회 이어서 치기">{t("sim.cup.btnBack")}</button>
+                    </div>
+                </>
+            );
+        }
+        if (m.window === "unscheduled") return <p className="text-[12.5px] font-bold text-white/80 mt-2 break-keep" data-testid="cup-state">{t("sim.cup.unscheduled")}</p>;
+        if (m.window === "closed") return <p className="text-[12.5px] font-bold text-white/80 mt-2 break-keep" data-testid="cup-state">{t("sim.cup.closedWait")}</p>;
+        if (roomGame) {
+            return (
+                <div className="mt-3 rounded-2xl border border-white/15 bg-black/25 px-3.5 py-3" data-testid="cup-room" aria-live="polite">
+                    <p className="text-[13.5px] font-black text-white">{t("sim.cup.room")}</p>
+                    <p className="mt-1 text-[12.5px] font-medium text-white/75 leading-relaxed break-keep">{t("sim.cup.roomWaiting")}</p>
+                    <p className="mt-2 flex items-center gap-2 text-[12.5px] font-bold" data-testid="cup-opp-presence" data-present={m.opponentPresent ? "1" : "0"}>
+                        <span className={cn("h-2 w-2 rounded-full", m.opponentPresent ? "bg-[color:var(--hall-lime)]" : "bg-white/25")} aria-hidden="true" />
+                        <span className={m.opponentPresent ? "text-[color:var(--hall-lime)]" : "text-white/60"}>{t(m.opponentPresent ? "sim.cup.oppOnline" : "sim.cup.oppOffline")}</span>
+                    </p>
+                    <button type="button" onClick={() => setInRoom(false)} className={cn(pill, "mt-3")} data-testid="cup-leave">{t("sim.cup.btnLeave")}</button>
+                </div>
+            );
+        }
+        const open = m.window === "open";
+        return (
+            <>
+                {open && (m.opponentPresent || m.opponentReady) && (
+                    <p className="text-[12.5px] font-bold text-[color:var(--hall-lime)] mt-2 break-keep" data-testid="cup-state">{t(m.opponentPresent ? "sim.cup.oppPresent" : "sim.cup.oppEntered")}</p>
+                )}
+                <div className="flex flex-wrap items-center gap-2 mt-3">
+                    <button type="button" className={cta} disabled={!open || enter.isPending} onClick={() => enter.mutate(m.gameId)} data-testid="cup-enter" data-track-as="월대회 입장">
+                        {t("sim.cup.btnEnter")}
+                    </button>
+                    {!open && <span className="text-[12px] font-bold text-white/60 break-keep">{t("sim.cup.enterSoon").replace("{n}", n(early))}</span>}
+                </div>
+            </>
         );
     };
 
@@ -188,9 +263,9 @@ export function CupPage({ onClose, api = defaultApi, onOpenMatch, onLobby, onRan
                             </span>
                         </div>
 
-                        {/* 내 경기 — 상대 · 기한 · 기다리기/입장 */}
+                        {/* 내 경기 — 상대 · 경기 시각 · 입장 · 대기실 */}
                         {mine && (
-                            <section className="hall-me rounded-[22px] px-4 py-4" aria-label={t("sim.cup.myGame")} data-testid="cup-mine">
+                            <section className="hall-me rounded-[22px] px-4 py-4" aria-label={t("sim.cup.myGame")} data-testid="cup-mine" data-window={mine.window}>
                                 <p className="text-[12.5px] font-black text-white/65">
                                     {t("sim.cup.myGame")}{(() => { const g = cup.games.find((x) => x.id === mine.gameId); return g ? ` · ${roundName(g, cup.rounds)}` : ""; })()}
                                 </p>
@@ -202,27 +277,16 @@ export function CupPage({ onClose, api = defaultApi, onOpenMatch, onLobby, onRan
                                             <span className="text-[13px] font-black text-white/55">VS</span>
                                             <Who p={people.get(mine.opponentId) ?? null} strong />
                                         </div>
-                                        <p className="rk-num text-[12.5px] font-bold text-white/80 mt-2" data-testid="cup-deadline">
-                                            {t("sim.cup.deadline").replace("{date}", when(mine.deadlineMs))}{" · "}<span className="text-[color:var(--hall-lime)]">{left(mine.deadlineMs)}</span>
-                                        </p>
-                                        {(mine.matchStatus === "playing" || mine.opponentReady || mine.iReady) && (
-                                            <p className="text-[12.5px] font-bold text-white mt-1.5 break-keep" data-testid="cup-state">
-                                                {mine.matchStatus === "playing" ? t("sim.cup.playing") : mine.opponentReady && !mine.hosting ? t("sim.cup.oppWaiting") : t("sim.cup.iWaiting")}
+                                        {mine.scheduledMs !== null && (
+                                            <p className="rk-num text-[12.5px] font-bold text-white/80 mt-2" data-testid="cup-when">
+                                                {t("sim.cup.when").replace("{date}", when(mine.scheduledMs))}
+                                                {mine.window === "early" && <>{" · "}<span className="text-[color:var(--hall-lime)]">{left(mine.scheduledMs)}</span></>}
+                                                {mine.window === "open" && !mine.matchId && <>{" · "}<span className="text-[color:var(--hall-lime)]">{t("sim.cup.enterOpen").replace("{n}", n(noShow))}</span></>}
                                             </p>
                                         )}
-                                        <div className="flex flex-wrap gap-2 mt-3">
-                                            {mine.matchStatus === "playing" && mine.matchId ? (
-                                                <button type="button" className={cta} onClick={() => onOpenMatch(mine.matchId!)} data-testid="cup-go" data-track-as="월대회 이어서 치기">{t("sim.cup.btnBack")}</button>
-                                            ) : mine.matchStatus === "waiting" && mine.hosting ? (
-                                                onLobby && <button type="button" className={cta} onClick={onLobby} data-testid="cup-room" data-track-as="월대회 대기 방으로">{t("sim.cup.btnRoom")}</button>
-                                            ) : (
-                                                <button type="button" className={cta} disabled={ready.isPending} onClick={() => ready.mutate(mine.gameId)} data-testid="cup-ready" data-track-as="월대회 기다리기">
-                                                    {t(mine.matchStatus === "waiting" ? "sim.cup.btnEnter" : "sim.cup.btnWait")}
-                                                </button>
-                                            )}
-                                        </div>
-                                        {failed && <p className="text-[12.5px] font-bold text-[#ffb4a8] mt-2 break-keep" role="alert" data-testid="cup-ready-failed">{t("sim.cup.readyFailed")}</p>}
-                                        <p className="text-[11.5px] font-medium text-white/55 mt-3 leading-relaxed break-keep">{t("sim.cup.readyHint")}</p>
+                                        {myAction(mine)}
+                                        {failed && <p className="text-[12.5px] font-bold text-[#ffb4a8] mt-2 break-keep" role="alert" data-testid="cup-ready-failed">{failText(failed)}</p>}
+                                        <p className="text-[11.5px] font-medium text-white/55 mt-3 leading-relaxed break-keep">{t("sim.cup.readyHint").replace("{e}", n(early)).replace("{m}", n(noShow))}</p>
                                     </>
                                 )}
                             </section>
@@ -268,7 +332,7 @@ export function CupPage({ onClose, api = defaultApi, onOpenMatch, onLobby, onRan
 
                 {d && (
                     <>
-                        {/* 다음 대회 — 이번 달 성적으로 다음 달 1일에 */}
+                        {/* 다음 대회 — 이번 달 성적이 이대로면 추천되는 사람(운영자가 확정한다) */}
                         <Section title={t("sim.cup.nextTitle").replace("{month}", monthLabel(d.next.month, locale))} testId="cup-next"
                             right={<span className="rk-num shrink-0 text-[12px] font-bold text-[color:var(--hall-lime)]">{t("sim.shelf.nowLeft").replace("{n}", n(d.next.daysLeft))}</span>}>
                             <div className="hall-row px-4 py-3.5" data-testid="cup-qual" data-qualified={d.next.me.qualified ? "1" : "0"}>
@@ -317,8 +381,9 @@ export function CupPage({ onClose, api = defaultApi, onOpenMatch, onLobby, onRan
                             <ul className="hall-row px-4 py-3.5 space-y-2">
                                 {[
                                     t("sim.cup.rule1").replace("{n}", n(d.next.maxEntrants)),
-                                    t("sim.cup.rule2").replace("{n}", n(d.next.roundDays)),
-                                    t("sim.cup.rule3"), t("sim.cup.rule4"), t("sim.cup.rule5"),
+                                    t("sim.cup.rule2").replace("{e}", n(d.next.enterEarlyMin)),
+                                    t("sim.cup.rule3").replace("{m}", n(d.next.noShowMin)),
+                                    t("sim.cup.rule4"), t("sim.cup.rule5"), t("sim.cup.rule6"),
                                 ].map((line, i) => (
                                     <li key={i} className="flex gap-2 text-[12.5px] font-medium text-white/75 leading-relaxed break-keep">
                                         <span className="shrink-0 text-white/35" aria-hidden="true">·</span><span>{line}</span>

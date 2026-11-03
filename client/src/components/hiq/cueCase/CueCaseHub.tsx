@@ -19,6 +19,7 @@ import { hubStateOf, type HubState } from "@/sim/rank/hubState";
 import { RANK_TROPHY_SRC, TIER_GLOW, TierEmblem } from "@/sim/rank/TierEmblem";
 import { CUP_ICON_SRC } from "@/sim/cup/CupArt";
 import { CUP_PATH, timeLeft } from "@/sim/cup/cupApi";
+import { cupWindow } from "@shared/simCupTime";
 import { useGuestGate } from "@/components/hiq/GuestGate";
 import { BadgeTap } from "@/components/hiq/BadgeGuideSheet";
 import { cueCasePath, readCaseSeen, useCaseSummary } from "./cueCaseApi";
@@ -70,13 +71,17 @@ export function CueCaseHub() {
     const rankSub = s.kind === "ranked" && s.rank !== null ? t("sim.rank.rankOf").replace("{r}", String(s.rank)).replace("{n}", String(s.total)) : t("home.hubRankSub");
     const dashSub = s.kind === "ranked" || s.kind === "placing" ? record(s.wins, s.losses) : t("home.hubDashSub");
     const myCup = member ? cup : null;
-    const cupLeft = myCup && !myCup.waiting ? timeLeft(myCup.deadlineMs, Date.now()) : null;
+    // 월대회 한 줄(2026-11-03 일정제) — 상대 미정 · 시각 미정 · 경기까지 남은 시간 · 입장 시간(10분 전 ~ 15분 뒤) · 판정 중
+    const cupWin = myCup && !myCup.waiting ? cupWindow(myCup.scheduledMs, Date.now()) : null;
+    const cupLeft = cupWin === "early" && myCup?.scheduledMs != null ? timeLeft(myCup.scheduledMs, Date.now()) : null;
     const cupSub = !myCup ? t("home.hubCupSub")
         : myCup.waiting ? t("home.hubCupWait")
-            : !cupLeft ? t("home.hubCupOver")
-                : cupLeft.days > 0 ? t("home.hubCupDays").replace("{d}", String(cupLeft.days)).replace("{h}", String(cupLeft.hours))
-                    : cupLeft.hours > 0 ? t("home.hubCupHours").replace("{h}", String(cupLeft.hours)).replace("{m}", String(cupLeft.minutes))
-                        : t("home.hubCupMin").replace("{m}", String(cupLeft.minutes));
+            : cupWin === "unscheduled" ? t("home.hubCupUnscheduled")
+                : cupWin === "open" ? t("home.hubCupNow")
+                    : !cupLeft ? t("home.hubCupOver")
+                        : cupLeft.days > 0 ? t("home.hubCupDays").replace("{d}", String(cupLeft.days)).replace("{h}", String(cupLeft.hours))
+                            : cupLeft.hours > 0 ? t("home.hubCupHours").replace("{h}", String(cupLeft.hours)).replace("{m}", String(cupLeft.minutes))
+                                : t("home.hubCupMin").replace("{m}", String(cupLeft.minutes));
     const counts = t("home.caseCounts")
         .replace("{c}", `${sum?.cue ?? 0}/${CUES.length}`).replace("{s}", `${sum?.shaft ?? 0}/${SHAFTS.length}`).replace("{b}", `${sum?.ball ?? 0}/${BALLS.length}`);
 
@@ -143,7 +148,7 @@ export function CueCaseHub() {
 
             <div className="relative mt-2.5 grid grid-cols-3 gap-2">
                 <Compartment icon={RANK_TROPHY_SRC} title={t("sim.rank.title")} sub={loading ? " " : rankSub} onClick={() => go(rankUrl)} trackAs="홈 큐 케이스 랭킹" testId="home-case-rank" />
-                <Compartment icon={CUP_ICON_SRC} title={t("home.hubCup")} sub={loading ? " " : cupSub} onClick={() => go(CUP_PATH)} trackAs="홈 큐 케이스 월대회" dot={!!myCup && !myCup.waiting} testId="home-case-cup" />
+                <Compartment icon={CUP_ICON_SRC} title={t("home.hubCup")} sub={loading ? " " : cupSub} onClick={() => go(CUP_PATH)} trackAs="홈 큐 케이스 월대회" dot={cupWin === "open"} testId="home-case-cup" />
                 <Compartment icon={DASH_ICON} title={t("home.hubDash")} sub={loading ? " " : dashSub} onClick={() => go(DASH_URL)} trackAs="홈 큐 케이스 대시보드" testId="home-case-dash" />
             </div>
         </section>

@@ -41,11 +41,12 @@ describe("홈 큐 케이스 허브", () => {
         expect(hub).toContain('onClick={() => setLocation("/cue-case?invite=1")}');
     });
 
-    it("월대회 칸: 내 경기가 있으면 남은 시간과 점 · 없으면 무엇을 하는 곳인지 — 비로그인에게는 내 경기가 없다", () => {
+    it("월대회 칸: 내 경기가 있으면 경기까지 남은 시간 · 시각 미정 · 입장 시간이면 점 — 없으면 무엇을 하는 곳인지, 비로그인에게는 내 경기가 없다", () => {
         expect(hub).toContain("const myCup = member ? cup : null;");
         expect(hub).toContain('const cupSub = !myCup ? t("home.hubCupSub")');
-        expect(hub).toContain("dot={!!myCup && !myCup.waiting}");
-        for (const l of LOCALES) for (const k of ["home.hubCup", "home.hubCupSub", "home.hubCupWait", "home.hubCupDays", "home.hubCupHours", "home.hubCupMin", "home.hubCupOver"]) expect(valueOf(l, k), `${l} ${k}`).toBeTruthy();
+        // 점은 입장 시간(경기 10분 전 ~ 15분 뒤)에만 — 2026-11-03 일정제
+        expect(hub).toContain('dot={cupWin === "open"}');
+        for (const l of LOCALES) for (const k of ["home.hubCup", "home.hubCupSub", "home.hubCupWait", "home.hubCupUnscheduled", "home.hubCupNow", "home.hubCupDays", "home.hubCupHours", "home.hubCupMin", "home.hubCupOver"]) expect(valueOf(l, k), `${l} ${k}`).toBeTruthy();
         // 내 경기는 내 순위 응답에 같이 온다(홈에서 요청을 하나 더 하지 않는다)
         expect(client("sim/entry/useOnlineRecord.ts")).toContain("const cp = myRank.data?.cup;");
         expect(root("server/routes/modules/sim.ts")).toContain("return sendSuccess(res, { placement: PLACEMENT_MATCHES, boards, shelf, cup });");

@@ -41,6 +41,7 @@ import type { MatchWithNames } from "../../storage/simMatch.repo.js";
 import { caseItem } from "../../../shared/cueCase.js";
 import { startTurnSeenAt } from "../../storage/simMatch.repo.js";
 import { rollCups } from "../../services/simCupService.js";
+import { CUP_MATCH } from "../../../shared/simCup.js";
 import { liveBrands } from "../../storage/tableBrands.js";
 
 const router = Router();
@@ -412,7 +413,7 @@ export async function playingGate(memberId: string, forfeit: boolean, exceptId?:
 }
 
 /** 옛 판들을 그 사람의 기권으로 끝낸다(기권 단추와 같은 길 — finish(…, "resign") · 상대에게 알림). 새 판은 건드리지 않는다 */
-async function forfeitPlaying(memberId: string, playing: MatchWithNames[], keepId: string): Promise<void> {
+export async function forfeitPlaying(memberId: string, playing: MatchWithNames[], keepId: string): Promise<void> {
     for (const old of playing) {
         if (old.id === keepId) continue;
         const winnerId = old.hostId === memberId ? old.guestId : old.hostId;
@@ -547,6 +548,41 @@ async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body:
     await notify(m.hostId, "notif.sim.started.title", msg("notif.sim.started.body", { name: guest?.name ?? "상대" }), m.id);
     const full = await storage.simMatch.get(m.id);
     return sendSuccess(res, publicMatch(full!, req.userId!));
+}
+
+/**
+ * 월대회 판을 연다(2026-11-03 — routes/modules/simCup 의 대기실). 두 사람이 대기실에 함께 있을 때만 부른다.
+ * 방은 서버가 만들고 **바로 시작한다**: 방장 = p1(시드 높은 쪽), 게스트 = p2. 공개 방이라 관전할 수 있고, 시작된 방이라 다른 사람은 못 들어온다.
+ * 그 사이에 다른 요청이 먼저 열었으면 내 방은 접고 그 방을 돌려준다(대진 칸의 match_id 를 바꿔 적는 것이 자물쇠). 실패하면 null.
+ */
+export async function startCupMatch(cup: { gameType: "3c" | "4c" }, game: { id: string; p1Id: string; p2Id: string; matchId: string | null }): Promise<string | null> {
+    const made = await createHostMatch(game.p1Id, {
+        gameType: cup.gameType, tableId: CUP_MATCH.tableId, cushionModel: "han2005", condition: 1, finishType: CUP_MATCH.finishType,
+        target: cup.gameType === "4c" ? 80 : 15, inningCap: CUP_MATCH.inningCap, aimAssist: CUP_MATCH.aimAssist, fullPreview: CUP_MATCH.fullPreview,
+        // 비공개로 만들고 대진 칸에 묶을 때 공개로 바꾼다(bindCup) — 묶이기 전에 멀티방 목록에서 남이 들어오는 틈이 없게
+        handicap: CUP_MATCH.handicap, isPublic: false,
+    });
+    if (!made) return null;
+    const roomId = made.full.id;
+    const bound = await storage.simMatch.bindCup(roomId, game.p1Id, game.id, game.p2Id);
+    if (!bound || !(await storage.simCup.setMatch(game.id, game.matchId, roomId))) {
+        await storage.simMatch.cancel(roomId, game.p1Id).catch(() => false);
+        return (await storage.simCup.game(game.id))?.game.matchId ?? null;
+    }
+    const m = (await storage.simMatch.get(roomId))!;
+    const rules = m.rules as Rules;
+    const [hostTarget, guestTarget] = await handicapTargets(m, game.p2Id, pointUnitOf(rules));
+    const state = createSession({
+        rules, finishType: m.finishType, inningCap: m.inningCap,
+        players: [
+            { id: game.p1Id, target: hostTarget, cueBallId: "white" },
+            { id: game.p2Id, target: guestTarget, cueBallId: "yellow" },
+        ],
+    });
+    const started = await storage.simMatch.start(roomId, game.p2Id, guestTarget, state, openingLayout(m.gameType, TABLES[m.tableId], "white"), hostTarget);
+    if (!started) return null;
+    await storage.simMatch.cancelOtherWaiting(game.p2Id, roomId).catch((e: unknown) => console.warn("[sim] cancelOtherWaiting", (e as Error)?.message));
+    return roomId;
 }
 
 /** 4구는 1캐롬 = pointUnit 점(관행 10), 3쿠션은 1점. 에버리지는 언제나 캐롬/이닝으로 센다. */

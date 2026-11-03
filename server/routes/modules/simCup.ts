@@ -1,12 +1,12 @@
 /**
- * 월대회 주소(2026-10-12 오너 "추천대로"). 규칙은 shared/simCup, 읽고 쓰는 것은 storage/simCup.repo, 굴림과 알림은 services/simCupService.
+ * 월대회 주소(2026-10-12 오너 "추천대로" · 2026-11-03 운영자가 여는 대회로). 규칙은 shared/simCup, 읽고 쓰는 것은 storage/simCup.repo, 굴림과 알림은 services/simCupService.
  *
- *  GET  /sim/cup?gameType=3c           대진 화면 — 가장 최근 대회(대진 · 출전자 · 내 판)와 이번 달 '지금 이대로면' 출전권. 열 때 대진을 한 번 굴린다.
- *  POST /sim/cup/games/:id/ready       기다리기 · 입장 — 들어온 것을 적고(기권 판정의 근거), 방이 없으면 내가 방장으로 연다.
+ *  GET  /sim/cup?gameType=3c           대진 화면 — 가장 최근에 연 대회(대진 · 출전자 · 내 판)와 이번 달 '지금 이대로면' 추천. 열 때 대진을 한 번 굴린다.
+ *  POST /sim/cup/games/:id/ready       입장 · 대기실에 있음 — 경기 10분 전부터 15분 뒤까지. 화면은 대기실에 있는 동안 5초마다 다시 보낸다.
+ *                                      상대도 지금 대기실에 있으면 서버가 판을 만들고 바로 시작한다(startCupMatch) — 한 사람만 있는 채로 시작되지 않는다.
  *
- * 대회 판은 **초대 방**이다: 먼저 누른 사람이 방장(비공개 · 그 칸의 상대만 초대 · cup_game_id), 상대는 평소처럼 POST /sim/matches/:id/join.
- * 코드로 들어오는 길도 그 상대만 통과한다(simMatch joinAndStart 의 가드). 조건은 평소의 레이팅 판과 같은 핸디전(CUP_MATCH) —
- * 목표 점수는 들어오는 순간 서버가 두 사람의 온라인 에버리지로 정한다.
+ * 대회 판은 두 사람이 앉은 채로 시작된 공개 방이라 관전할 수 있고, 다른 사람은 들어오지 못한다(simMatch joinAndStart 의 가드도 그대로).
+ * 대기실에 있는 동안 다른 판은 못 친다 — 진행 중인 판이 있으면 '기권하고 입장할까요?'를 묻는다(HAS_PLAYING → forfeitPlaying).
  */
 import { Router } from "express";
 import { storage } from "../../storage/index.js";
@@ -14,18 +14,18 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { PLACEMENT_MATCHES } from "../../../shared/sim/rank.js";
-import { CUP_GAMES, CUP_MATCH, CUP_PLAY_GRACE_MS } from "../../../shared/simCup.js";
-import { notifyWaiting, rollCups } from "../../services/simCupService.js";
-import { createHostMatch } from "./simMatch.js";
+import { CUP_GAMES, cupPresent, cupWindow } from "../../../shared/simCup.js";
+import { notifyEntered, rollCups } from "../../services/simCupService.js";
+import { forfeitPlaying, playingGate, startCupMatch } from "./simMatch.js";
 
 const router = Router();
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 router.get("/sim/cup", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
-    // 대회를 여는 종목만(지금은 3쿠션) — 다른 종목을 물으면 여는 종목으로 답한다
+    // 대회를 여는 종목만(3쿠션) — 다른 종목을 물어도 3쿠션으로 답한다
     const want = req.query.gameType === "4c" ? "4c" as const : "3c" as const;
     const gameType = CUP_GAMES.includes(want) ? want : CUP_GAMES[0];
-    // 화면을 열 때 대진을 굴린다 — 끝난 판의 승자 · 기한 지난 판이 바로 반영되게. 실패해도 지금 적힌 대로 보여 준다.
+    // 화면을 열 때 대진을 굴린다 — 끝난 판의 승자 · 입장 시간이 지난 판이 바로 반영되게. 실패해도 지금 적힌 대로 보여 준다.
     await rollCups(Date.now()).catch((e: unknown) => console.error("[cup roll]", e));
     return sendSuccess(res, await storage.simCup.view(req.userId!, gameType, Date.now(), PLACEMENT_MATCHES));
 }));
@@ -45,33 +45,34 @@ router.post("/sim/cup/games/:id/ready", requireAuth, asyncHandler(async (req: Au
     const opponentId = side === "p1" ? game.p2Id : game.p1Id;
     if (!opponentId) return sendError(res, 409, "err.sim.cupNoOpponent", "CUP_NO_OPPONENT");
 
+    // 이미 시작된 판 — 그 판으로(입장 시간과 상관없이 이어 친다)
     const info = game.matchId ? (await storage.simMatch.cupMatchInfo([game.matchId])).get(game.matchId) ?? null : null;
-    // 기한이 지났는데 치는 중인 판만 조금 더 열려 있다(shared/simCup CUP_PLAY_GRACE_MS) — 그 밖에는 굴림이 곧 결과를 정한다
-    if (now >= game.deadlineMs && !(info?.status === "playing" && now < game.deadlineMs + CUP_PLAY_GRACE_MS)) return sendError(res, 409, "err.sim.cupGameClosed", "CUP_CLOSED");
-    await storage.simCup.markReady(game.id, side, now);
+    if (info?.status === "playing" || info?.status === "finished") return sendSuccess(res, { matchId: game.matchId, state: "playing" });
 
-    if (info?.status === "playing") return sendSuccess(res, { matchId: game.matchId, state: "playing" });
-    if (info?.status === "waiting") return sendSuccess(res, { matchId: game.matchId, state: info.hostId === me ? "hosting" : "join" });
+    const window = cupWindow(game.scheduledMs, now);
+    if (window === "unscheduled") return sendError(res, 409, "err.sim.cupUnscheduled", "CUP_UNSCHEDULED");
+    if (window === "early") return sendError(res, 409, "err.sim.cupEarly", "CUP_EARLY");
+    if (window === "closed") return sendError(res, 409, "err.sim.cupGameClosed", "CUP_CLOSED");
 
-    // 방이 없다(처음이거나, 열어 둔 방이 접혔다) — 내가 방장으로 연다. 목표는 들어올 때 서버가 다시 정하므로 자리만 채운다.
-    const made = await createHostMatch(me, {
-        gameType: cup.gameType, tableId: CUP_MATCH.tableId, cushionModel: "han2005", condition: 1, finishType: CUP_MATCH.finishType,
-        target: cup.gameType === "4c" ? 80 : 15, inningCap: CUP_MATCH.inningCap, aimAssist: CUP_MATCH.aimAssist, fullPreview: CUP_MATCH.fullPreview,
-        handicap: CUP_MATCH.handicap, isPublic: false,
-    });
-    if (!made) return sendError(res, 500, "err.sim.badInput");
-    const roomId = made.full.id;
-    const bound = await storage.simMatch.bindCup(roomId, me, game.id, opponentId);
-    const mine = bound && await storage.simCup.setMatch(game.id, game.matchId, roomId);
-    if (!mine) {
-        // 그 사이에 상대가 먼저 방을 열었다 — 내 방은 접고 그 방으로 들어간다
-        await storage.simMatch.cancel(roomId, me).catch(() => false);
-        const again = await storage.simCup.game(game.id);
-        if (again?.game.matchId && again.game.matchId !== roomId) return sendSuccess(res, { matchId: again.game.matchId, state: "join" });
-        return sendError(res, 409, "err.sim.cupGameClosed", "CUP_CLOSED");
+    // 진행 중인 다른 판이 있으면 묻는다 — 대회 판이 시작되면 그쪽은 시계가 돌아 지게 된다
+    const playing = await playingGate(me, req.body?.forfeitPlaying === true);
+    if (playing === "ask") return sendError(res, 409, "err.sim.hasPlaying", "HAS_PLAYING");
+
+    const checked = await storage.simCup.checkIn(game.id, side, now);
+    if (!checked) return sendError(res, 409, "err.sim.cupGameClosed", "CUP_CLOSED");
+    if (playing.length) await forfeitPlaying(me, playing, "");
+    const g = checked.game;
+    // 처음 들어왔고 상대가 아직 없다 — 상대에게 '들어왔어요'(한 번)
+    if (checked.firstTime && !cupPresent(side === "p1" ? g.p2SeenMs : g.p1SeenMs, now)) {
+        const meRow = await storage.getMemberById(me).catch(() => null);
+        await notifyEntered(opponentId, String(meRow?.name ?? "")).catch(() => undefined);
     }
-    await notifyWaiting(opponentId, made.full.hostName ?? "");
-    return sendSuccess(res, { matchId: roomId, state: "hosting" });
+    // 상대도 지금 대기실에 있다 — 판을 연다(이미 열렸으면 그 판)
+    if (cupPresent(side === "p1" ? g.p2SeenMs : g.p1SeenMs, now) && g.p1Id && g.p2Id) {
+        const matchId = await startCupMatch({ gameType: cup.gameType }, { id: g.id, p1Id: g.p1Id, p2Id: g.p2Id, matchId: g.matchId });
+        if (matchId) return sendSuccess(res, { matchId, state: "playing" });
+    }
+    return sendSuccess(res, { matchId: null, state: "waiting", opponentPresent: false, opponentReady: (side === "p1" ? g.p2ReadyMs : g.p1ReadyMs) !== null });
 }));
 
 export default router;

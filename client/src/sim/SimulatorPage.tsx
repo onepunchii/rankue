@@ -2029,7 +2029,8 @@ export function SimulatorPage() {
                     <CupPage
                         onClose={() => { cupFromInside.current = false; backOr(ENTRY_PATH); }}
                         onOpenMatch={(id) => navigate(`/online-game?match=${id}`)}
-                        onLobby={() => navigate("/online-game?lobby=1")}
+                        onWatch={(id) => navigate(`/online-game?watch=${id}`)}
+                        confirmForfeit={() => appConfirm({ title: t("sim.match.hasPlaying.title"), message: t("sim.match.hasPlaying.body"), confirmText: t("sim.match.hasPlaying.ok"), cancelText: t("sim.match.hasPlaying.cancel"), tone: "danger" })}
                         onRank={() => navigate("/online-game?rank=1")}
                         onShelf={() => openShelf()}
                         myMemberId={member?.id}

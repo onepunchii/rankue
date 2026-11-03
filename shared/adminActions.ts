@@ -91,6 +91,12 @@ const LABELS: readonly (readonly [string, RegExp, string])[] = [
     ["POST", /^\/admin\/billiards\/online\/[^/]+\/restore$/, "온라인 대전 되살리기"],
     ["POST", /^\/admin\/billiards\/case\/[^/]+\/take-back$/, "큐 케이스 거두기"],
     ["POST", /^\/admin\/billiards\/cups\/[^/]+\/sync$/, "월대회 지금 굴리기"],
+    // 2026-11-03 운영자가 여는 대회 — 만들기(짜는 중) · 열기 · 지우기 · 무효 · 경기 시각
+    ["POST", /^\/admin\/billiards\/cups$/, "월대회 만들기"],
+    ["POST", /^\/admin\/billiards\/cups\/[^/]+\/publish$/, "월대회 열기"],
+    ["DELETE", /^\/admin\/billiards\/cups\/[^/]+$/, "짜던 월대회 지우기"],
+    ["POST", /^\/admin\/billiards\/cups\/[^/]+\/void$/, "월대회 무효"],
+    ["POST", /^\/admin\/billiards\/cups\/games\/[^/]+\/schedule$/, "월대회 경기 시각"],
     ["POST", /^\/admin\/billiards\/cups\/games\/[^/]+\/extend$/, "월대회 기한 늘리기"],
     ["POST", /^\/admin\/billiards\/cups\/games\/[^/]+\/decide$/, "월대회 결과 정하기"],
     ["POST", /^\/admin\/billiards\/cups\/games\/[^/]+\/change$/, "월대회 결과 바꾸기"],

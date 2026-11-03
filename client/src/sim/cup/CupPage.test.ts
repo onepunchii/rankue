@@ -1,6 +1,6 @@
 /**
- * CupPage 스모크(jsdom, QueryClientProvider, api 주입) — 월대회(2026-10-12).
- * 대회가 아직 없을 때(출전 조건만) · 치르는 중(내 경기: 기다리기 / 입장 / 대기 방 / 이어서 치기) · 끝난 뒤(메달) · 대진표의 칸.
+ * CupPage 스모크(jsdom, QueryClientProvider, api 주입) — 월대회(2026-10-12 · 2026-11-03 운영자가 여는 대회).
+ * 대회가 아직 없을 때(추천 조건만) · 치르는 중(내 경기: 경기 시각 / 입장 / 대기실 / 진행 중인 판 묻기 / 이어서 치기) · 끝난 뒤(메달) · 대진표의 칸(시각 · 관전).
  */
 import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
 import { JSDOM } from "jsdom";
@@ -39,8 +39,8 @@ const NOW = Date.UTC(2026, 10, 1, 6);   // 한국 시각 11월 1일 15시
 const DAY = 86_400_000;
 const P = (i: number, over: Partial<CupEntry> = {}): CupEntry => ({ memberId: `p${i}`, name: `선수${i}`, country: "KR", tier: "silver", seed: i, rating: 1130 - i * 10, place: null, medal: null, forfeit: false, ...over });
 const G = (kind: "main" | "third", round: number, slot: number, p1: string | null, p2: string | null, over: Partial<CupGameRow> = {}): CupGameRow =>
-    ({ id: `${kind}-${round}-${slot}`, kind, round, slot, p1Id: p1, p2Id: p2, deadlineMs: NOW + round * 2 * DAY, p1Ready: false, p2Ready: false, winnerId: null, outcome: null, ...over });
-/** 다섯 명 8강 — 1 · 2 · 3번 부전승, 나(4번)는 5번과 8강 */
+    ({ id: `${kind}-${round}-${slot}`, kind, round, slot, p1Id: p1, p2Id: p2, scheduledMs: NOW + round * DAY, p1Ready: false, p2Ready: false, winnerId: null, outcome: null, matchId: null, matchStatus: null, ...over });
+/** 다섯 명 8강 — 1 · 2 · 3번 부전승, 나(4번)는 5번과 8강. 경기는 이틀 뒤 14시(한국) — 아직 입장 시간 전 */
 const running = (mine: Partial<CupMine> = {}, games?: CupGameRow[]): CupNow => ({
     id: "cup1", month: "2026-10", gameType: "3c", status: "running", size: 8, rounds: 3,
     entries: [1, 2, 3, 4, 5].map((i) => P(i)),
@@ -48,35 +48,35 @@ const running = (mine: Partial<CupMine> = {}, games?: CupGameRow[]): CupNow => (
         G("main", 1, 0, "p1", null, { outcome: "bye", winnerId: "p1" }), G("main", 1, 1, "p4", "p5"), G("main", 1, 2, "p2", null, { outcome: "bye", winnerId: "p2" }), G("main", 1, 3, "p3", null, { outcome: "bye", winnerId: "p3" }),
         G("main", 2, 0, "p1", null), G("main", 2, 1, "p2", "p3"), G("main", 3, 0, null, null), G("third", 3, 0, null, null),
     ],
-    mine: { gameId: "main-1-1", opponentId: "p5", waiting: false, deadlineMs: NOW + 2 * DAY - 3_600_000, iReady: false, opponentReady: false, matchId: null, matchStatus: null, hosting: false, ...mine },
+    mine: { gameId: "main-1-1", opponentId: "p5", waiting: false, scheduledMs: NOW + 2 * DAY - 3_600_000, window: "early", iReady: false, opponentReady: false, opponentPresent: false, matchId: null, matchStatus: null, ...mine },
 });
 const view = (cup: CupNow | null, me: Partial<CupView["next"]["me"]> = {}): CupView => ({
     nowMs: NOW, cup,
     next: {
-        month: "2026-11", startsMs: Date.UTC(2026, 10, 30, 15), daysLeft: 30, minRating: 1000, minMatches: 5, maxEntrants: 16, roundDays: 2, size: 4,
+        month: "2026-11", daysLeft: 30, minRating: 1000, minMatches: 5, maxEntrants: 16, enterEarlyMin: 10, noShowMin: 15, size: 4,
         entrants: [1, 2, 3].map((i) => ({ ...P(i), matches: 6 })),
         me: { qualified: false, seed: null, rating: 1040, matches: 2, ...me },
     },
 });
 
-interface Harness { container: HTMLElement; unmount: () => void; qc: { invalidateQueries: () => Promise<void> }; get: ReturnType<typeof vi.fn>; ready: ReturnType<typeof vi.fn>; join: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn>; lobby: ReturnType<typeof vi.fn> }
+interface Harness { container: HTMLElement; unmount: () => void; qc: { invalidateQueries: () => Promise<void> }; get: ReturnType<typeof vi.fn>; ready: ReturnType<typeof vi.fn>; open: ReturnType<typeof vi.fn>; watch: ReturnType<typeof vi.fn>; confirm: ReturnType<typeof vi.fn> }
 const live: Harness[] = [];
 afterEach(() => { while (live.length) live.pop()!.unmount(); });
-function mount(data: CupView | Error | (() => CupView), readyAs: CupReady | Error = { matchId: "m1", state: "hosting" }) {
+type ReadyAs = CupReady | Error | ((gameId: string, opts?: { forfeitPlaying?: boolean }) => CupReady);
+function mount(data: CupView | Error | (() => CupView), readyAs: ReadyAs = { state: "waiting", opponentReady: false }, confirmAs = true) {
     const container = document.createElement("div");
     document.body.appendChild(container);
     const root = createRoot(container);
     const qc = new rq.QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
     const get = vi.fn(async () => { if (data instanceof Error) throw data; return typeof data === "function" ? data() : data; });
-    const ready = vi.fn(async () => { if (readyAs instanceof Error) throw readyAs; return readyAs; });
-    const join = vi.fn(async () => undefined);
-    const api: CupApi = { get, ready, join };
-    const open = vi.fn(), lobby = vi.fn();
+    const ready = vi.fn(async (gameId: string, opts?: { forfeitPlaying?: boolean }) => { if (readyAs instanceof Error) throw readyAs; return typeof readyAs === "function" ? readyAs(gameId, opts) : readyAs; });
+    const api: CupApi = { get, ready };
+    const open = vi.fn(), watch = vi.fn(), confirm = vi.fn(async () => confirmAs);
     React.act(() => {
         root.render(React.createElement(rq.QueryClientProvider, { client: qc },
-            React.createElement(CupPage, { onClose: () => undefined, api, onOpenMatch: open, onLobby: lobby, onRank: () => undefined, onShelf: () => undefined, pollMs: 0 })));
+            React.createElement(CupPage, { onClose: () => undefined, api, onOpenMatch: open, onWatch: watch, confirmForfeit: confirm, onRank: () => undefined, onShelf: () => undefined, pollMs: 0 })));
     });
-    const h: Harness = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); }, qc, get, ready, join, open, lobby };
+    const h: Harness = { container, unmount: () => { React.act(() => root.unmount()); container.remove(); qc.clear(); }, qc, get, ready, open, watch, confirm };
     live.push(h);
     return h;
 }
@@ -87,9 +87,11 @@ async function settle(h: Harness, until: () => boolean): Promise<void> {
 const click = (el: Element) => React.act(() => { el.dispatchEvent(new window.MouseEvent("click", { bubbles: true })); });
 const q = (h: Harness, sel: string) => h.container.querySelector(sel);
 const loaded = (h: Harness) => settle(h, () => q(h, "[data-testid=cup-next]") !== null);
+/** 서버가 409 에 실어 보내는 모양(apiRequest 가 던지는 것) */
+const http409 = (code: string) => Object.assign(new Error("409"), { data: { code } });
 
-describe("CupPage: 아직 대회가 없다 — 다음 대회의 출전 조건", () => {
-    it("내 조건 두 가지(레이팅 · 이달 판 수)와 지금 이대로면 나가는 사람, 규칙 — 대진표는 없다", async () => {
+describe("CupPage: 아직 대회가 없다 — 다음 대회의 추천 조건", () => {
+    it("내 조건 두 가지(레이팅 · 이달 판 수)와 지금 이대로면 추천되는 사람, 규칙 — 대진표는 없다", async () => {
         const h = mount(view(null));
         await loaded(h);
         expect(h.get).toHaveBeenCalledWith("3c");
@@ -105,11 +107,16 @@ describe("CupPage: 아직 대회가 없다 — 다음 대회의 출전 조건", 
         const ent = q(h, "[data-testid=cup-entrants]")!;
         expect(ent.querySelectorAll("ol li")).toHaveLength(3);
         expect(ent.textContent).toContain(ko["sim.cup.entrantsSize"].replace("{n}", "3").replace("{size}", "4"));
-        expect(q(h, "[data-testid=cup-rules]")!.querySelectorAll("li")).toHaveLength(5);
-        expect(q(h, "[data-testid=cup-rules]")!.textContent).toContain(ko["sim.cup.rule3"]);
+        // 규칙 여섯 줄 — 입장 10분 전 · 15분 뒤 기권 · 관전
+        const rules = q(h, "[data-testid=cup-rules]")!;
+        expect(rules.querySelectorAll("li")).toHaveLength(6);
+        expect(rules.textContent).toContain(ko["sim.cup.rule2"].replace("{e}", "10"));
+        expect(rules.textContent).toContain(ko["sim.cup.rule3"].replace("{m}", "15"));
+        expect(rules.textContent).toContain(ko["sim.cup.rule6"]);
+        expect(rules.textContent).not.toMatch(/이틀|\{/);
     });
 
-    it("조건을 채웠으면 시드와 함께 '출전해요' · 배치 전이면 레이팅 칸에 그렇게 적는다", async () => {
+    it("조건을 채웠으면 시드와 함께 '추천돼요' · 배치 전이면 레이팅 칸에 그렇게 적는다", async () => {
         const h = mount(view(null, { qualified: true, seed: 2, rating: 1104, matches: 7 }));
         await loaded(h);
         const qual = q(h, "[data-testid=cup-qual]")!;
@@ -121,7 +128,7 @@ describe("CupPage: 아직 대회가 없다 — 다음 대회의 출전 조건", 
         expect(q(fresh, "[data-testid=cup-qual]")!.textContent).toContain(ko["sim.cup.qualRatingNone"]);
     });
 
-    it("3명이 안 되면 대회가 열리지 않는다고 적는다 · 아무도 없으면 첫 시드를 권한다", async () => {
+    it("3명이 안 되면 그렇게 적는다 · 아무도 없으면 없다고만", async () => {
         const few = view(null); (few.next as { size: number }).size = 0; (few.next as { entrants: unknown[] }).entrants = few.next.entrants.slice(0, 2);
         const h = mount(few);
         await loaded(h);
@@ -134,60 +141,94 @@ describe("CupPage: 아직 대회가 없다 — 다음 대회의 출전 조건", 
 });
 
 describe("CupPage: 치르는 중 — 내 경기", () => {
-    it("상대 · 기한 · 남은 시간 · '기다리기' — 누르면 방을 열고(기록이 남는다) 여기 남아 상대를 기다린다", async () => {
+    it("입장 시간 전: 상대 · 경기 시각 · 남은 시간 — '입장하기'는 잠겨 있고 몇 분 전부터인지 적는다", async () => {
         const h = mount(view(running()));
         await loaded(h);
         expect(q(h, "[data-testid=cup-name]")!.textContent).toBe(ko["sim.cup.cupOf"].replace("{month}", "2026년 10월"));
         expect(q(h, "[data-testid=cup-status]")!.textContent).toBe(ko["sim.cup.statusRunning"]);
         const mine = q(h, "[data-testid=cup-mine]")!;
+        expect(mine.getAttribute("data-window")).toBe("early");
         expect(mine.textContent).toContain(`${ko["sim.cup.myGame"]} · ${ko["sim.cup.roundOf"].replace("{n}", "8")}`);
         expect(mine.textContent).toContain("선수5");
-        expect(q(h, "[data-testid=cup-deadline]")!.textContent).toContain(ko["sim.cup.leftDays"].replace("{d}", "1").replace("{h}", "23"));
-        const btn = q(h, "[data-testid=cup-ready]")!;
-        expect(btn.textContent).toBe(ko["sim.cup.btnWait"]);
-        click(btn);
-        await settle(h, () => h.ready.mock.calls.length === 1);
-        expect(h.ready).toHaveBeenCalledWith("main-1-1");
-        expect(h.join).not.toHaveBeenCalled();
-        expect(h.open).not.toHaveBeenCalled();
-    });
-
-    it("상대가 먼저 방을 열었다 — '입장하기'를 누르면 그 방에 들어가 판으로 간다", async () => {
-        const h = mount(view(running({ opponentReady: true, matchId: "m9", matchStatus: "waiting", hosting: false })), { matchId: "m9", state: "join" });
-        await loaded(h);
-        expect(q(h, "[data-testid=cup-state]")!.textContent).toBe(ko["sim.cup.oppWaiting"]);
-        const btn = q(h, "[data-testid=cup-ready]")!;
+        expect(q(h, "[data-testid=cup-when]")!.textContent).toContain(ko["sim.cup.leftDays"].replace("{d}", "1").replace("{h}", "23"));
+        const btn = q(h, "[data-testid=cup-enter]") as HTMLButtonElement;
         expect(btn.textContent).toBe(ko["sim.cup.btnEnter"]);
-        click(btn);
-        await settle(h, () => h.open.mock.calls.length === 1);
-        expect(h.join).toHaveBeenCalledWith("m9");
-        expect(h.open).toHaveBeenCalledWith("m9");
+        expect(btn.disabled).toBe(true);
+        expect(mine.textContent).toContain(ko["sim.cup.enterSoon"].replace("{n}", "10"));
+        expect(mine.textContent).toContain(ko["sim.cup.readyHint"].replace("{e}", "10").replace("{m}", "15"));
     });
 
-    it("내가 방을 열어 두었다 — '대기 방으로' · 치는 중이면 '이어서 치기'", async () => {
-        const h = mount(view(running({ iReady: true, matchId: "m1", matchStatus: "waiting", hosting: true })));
+    it("시각이 아직 없으면 운영자가 정한다고만 — 누를 것이 없다", async () => {
+        const h = mount(view(running({ scheduledMs: null, window: "unscheduled" })));
         await loaded(h);
-        expect(q(h, "[data-testid=cup-state]")!.textContent).toBe(ko["sim.cup.iWaiting"]);
-        expect(q(h, "[data-testid=cup-ready]")).toBeNull();
-        click(q(h, "[data-testid=cup-room]")!);
-        expect(h.lobby).toHaveBeenCalledTimes(1);
-        const p = mount(view(running({ iReady: true, opponentReady: true, matchId: "m1", matchStatus: "playing", hosting: true })));
+        expect(q(h, "[data-testid=cup-state]")!.textContent).toBe(ko["sim.cup.unscheduled"]);
+        expect(q(h, "[data-testid=cup-when]")).toBeNull();
+        expect(q(h, "[data-testid=cup-mine]")!.querySelector("button")).toBeNull();
+    });
+
+    it("입장 시간: '입장하기' → 대기실(상대 접속 표시 · 나가기) — 판이 열리면 그 판으로 옮겨 간다", async () => {
+        let state: CupView = view(running({ window: "open", scheduledMs: NOW + 5 * 60_000 }));
+        const h = mount(() => state);
+        await loaded(h);
+        expect(q(h, "[data-testid=cup-when]")!.textContent).toContain(ko["sim.cup.enterOpen"].replace("{n}", "15"));
+        click(q(h, "[data-testid=cup-enter]")!);
+        await settle(h, () => q(h, "[data-testid=cup-room]") !== null);
+        expect(h.ready).toHaveBeenCalledWith("main-1-1");
+        expect(q(h, "[data-testid=cup-opp-presence]")!.getAttribute("data-present")).toBe("0");
+        expect(q(h, "[data-testid=cup-room]")!.textContent).toContain(ko["sim.cup.oppOffline"]);
+        expect(h.open).not.toHaveBeenCalled();
+        // 상대가 들어와 서버가 판을 열었다(화면은 몇 초마다 스스로 읽는다 — 시험에서는 꺼 두었다)
+        state = view(running({ window: "open", scheduledMs: NOW + 5 * 60_000, iReady: true, opponentReady: true, opponentPresent: true, matchId: "m1", matchStatus: "playing" }));
+        await React.act(async () => { await h.qc.invalidateQueries(); });
+        await settle(h, () => h.open.mock.calls.length === 1);
+        expect(h.open).toHaveBeenCalledWith("m1");
+    });
+
+    it("대기실에서 나가면 입장 단추로 돌아간다", async () => {
+        const h = mount(view(running({ window: "open" })));
+        await loaded(h);
+        click(q(h, "[data-testid=cup-enter]")!);
+        await settle(h, () => q(h, "[data-testid=cup-room]") !== null);
+        click(q(h, "[data-testid=cup-leave]")!);
+        await settle(h, () => q(h, "[data-testid=cup-room]") === null && q(h, "[data-testid=cup-enter]") !== null);
+    });
+
+    it("상대가 대기실에 있으면 그렇게 알리고, 누르면 서버가 연 판으로 바로 간다", async () => {
+        const h = mount(view(running({ window: "open", opponentReady: true, opponentPresent: true })), { state: "playing", matchId: "m9" });
+        await loaded(h);
+        expect(q(h, "[data-testid=cup-state]")!.textContent).toBe(ko["sim.cup.oppPresent"]);
+        click(q(h, "[data-testid=cup-enter]")!);
+        await settle(h, () => h.open.mock.calls.length === 1);
+        expect(h.open).toHaveBeenCalledWith("m9");
+        expect(q(h, "[data-testid=cup-room]")).toBeNull();
+    });
+
+    it("진행 중인 다른 판이 있으면 묻고, 고르면 기권하고 들어간다 · 안 고르면 그대로", async () => {
+        const answer = (_id: string, opts?: { forfeitPlaying?: boolean }): CupReady => { if (!opts?.forfeitPlaying) throw http409("HAS_PLAYING"); return { state: "waiting", opponentReady: false }; };
+        const h = mount(view(running({ window: "open" })), answer);
+        await loaded(h);
+        click(q(h, "[data-testid=cup-enter]")!);
+        await settle(h, () => q(h, "[data-testid=cup-room]") !== null);
+        expect(h.confirm).toHaveBeenCalledTimes(1);
+        expect(h.ready.mock.calls.map((c) => c[1])).toEqual([undefined, { forfeitPlaying: true }]);
+        const no = mount(view(running({ window: "open" })), answer, false);
+        await loaded(no);
+        click(q(no, "[data-testid=cup-enter]")!);
+        await settle(no, () => no.confirm.mock.calls.length === 1 && q(no, "[data-testid=cup-ready-failed]") !== null);
+        expect(no.ready).toHaveBeenCalledTimes(1);
+        expect(q(no, "[data-testid=cup-room]")).toBeNull();
+    });
+
+    it("치는 중이면 '이어서 치기' · 입장 시간이 지났으면 판정을 기다린다고만", async () => {
+        const p = mount(view(running({ window: "open", iReady: true, opponentReady: true, matchId: "m1", matchStatus: "playing" })));
         await loaded(p);
         expect(q(p, "[data-testid=cup-state]")!.textContent).toBe(ko["sim.cup.playing"]);
         click(q(p, "[data-testid=cup-go]")!);
         expect(p.open).toHaveBeenCalledWith("m1");
-    });
-
-    it("내가 열어 둔 방에 상대가 들어오면(대기 → 치는 중) 그 판으로 옮겨 간다", async () => {
-        let state: CupView = view(running({ iReady: true, matchId: "m1", matchStatus: "waiting", hosting: true }));
-        const h = mount(() => state);
-        await loaded(h);
-        expect(h.open).not.toHaveBeenCalled();
-        state = view(running({ iReady: true, opponentReady: true, matchId: "m1", matchStatus: "playing", hosting: true }));
-        // '기다리기'를 누른 것처럼 다시 읽게 한다(화면은 몇 초마다 스스로 읽는다 — 시험에서는 꺼 두었다)
-        await React.act(async () => { await h.qc.invalidateQueries(); });
-        await settle(h, () => h.open.mock.calls.length === 1);
-        expect(h.open).toHaveBeenCalledWith("m1");
+        const c = mount(view(running({ window: "closed", scheduledMs: NOW - 20 * 60_000 })));
+        await loaded(c);
+        expect(q(c, "[data-testid=cup-state]")!.textContent).toBe(ko["sim.cup.closedWait"]);
+        expect(q(c, "[data-testid=cup-enter]")).toBeNull();
     });
 
     it("상대가 아직 안 정해졌으면(부전승 뒤) 기다린다고만 적는다 — 누를 것이 없다", async () => {
@@ -198,31 +239,38 @@ describe("CupPage: 치르는 중 — 내 경기", () => {
         expect(mine.querySelector("button")).toBeNull();
     });
 
-    it("들어갈 수 없으면(그 사이에 기한이 지났다) 그렇게 말한다", async () => {
-        const h = mount(view(running()), new Error("409"));
-        await loaded(h);
-        click(q(h, "[data-testid=cup-ready]")!);
-        await settle(h, () => q(h, "[data-testid=cup-ready-failed]") !== null);
-        expect(q(h, "[data-testid=cup-ready-failed]")!.textContent).toBe(ko["sim.cup.readyFailed"]);
-        expect(h.open).not.toHaveBeenCalled();
+    it("들어갈 수 없으면 까닭대로 말한다 — 입장 시간 전 · 지났다 · 그 밖", async () => {
+        for (const [err, key] of [[http409("CUP_CLOSED"), "sim.cup.closedWait"], [http409("CUP_EARLY"), "sim.cup.enterSoon"], [new Error("500"), "sim.cup.readyFailed"]] as const) {
+            const h = mount(view(running({ window: "open" })), err);
+            await loaded(h);
+            click(q(h, "[data-testid=cup-enter]")!);
+            await settle(h, () => q(h, "[data-testid=cup-ready-failed]") !== null);
+            expect(q(h, "[data-testid=cup-ready-failed]")!.textContent).toBe(ko[key].replace("{n}", "10"));
+            expect(h.open).not.toHaveBeenCalled();
+        }
     });
 
-    it("대진표: 결승부터 아래로 · 부전승은 상대 줄이 없다 · 내 판은 테두리 · 결과가 난 판은 이긴 사람이 굵다", async () => {
+    it("대진표: 결승부터 아래로 · 부전승은 상대 줄이 없다 · 내 판은 테두리 · 경기 시각 · 시작된 판은 '관전'", async () => {
         const games = [
             G("main", 1, 0, "p1", null, { outcome: "bye", winnerId: "p1" }), G("main", 1, 1, "p4", "p5", { outcome: "walkover", winnerId: "p4" }),
             G("main", 1, 2, "p2", null, { outcome: "bye", winnerId: "p2" }), G("main", 1, 3, "p3", null, { outcome: "bye", winnerId: "p3" }),
-            G("main", 2, 0, "p1", "p4"), G("main", 2, 1, "p2", "p3", { outcome: "played", winnerId: "p3" }), G("main", 3, 0, null, "p3"), G("third", 3, 0, null, "p2"),
+            G("main", 2, 0, "p1", "p4", { scheduledMs: null }), G("main", 2, 1, "p2", "p3", { matchId: "m7", matchStatus: "playing" }), G("main", 3, 0, null, null), G("third", 3, 0, null, null),
         ];
-        const h = mount(view(running({ gameId: "main-2-0", opponentId: "p1" }, games)));
+        const h = mount(view(running({ gameId: "main-2-0", opponentId: "p1", scheduledMs: null, window: "unscheduled" }, games)));
         await loaded(h);
         const rows = Array.from(h.container.querySelectorAll("[data-testid=cup-bracket] li[data-game]"));
         expect(rows.map((r) => r.getAttribute("data-game"))).toEqual(["main:3:0", "third:3:0", "main:2:0", "main:2:1", "main:1:0", "main:1:1", "main:1:2", "main:1:3"]);
         const row = (k: string) => rows.find((r) => r.getAttribute("data-game") === k)!;
         expect(row("main:2:0").className).toContain("hall-row-mine");
+        expect(row("main:2:0").textContent).toContain(ko["sim.cup.unscheduledShort"]);
         expect(row("main:1:0").textContent).toContain(ko["sim.cup.bye"]);
         expect(row("main:1:0").textContent).not.toContain(ko["sim.cup.tbd"]);
         expect(row("main:1:1").textContent).toContain(ko["sim.cup.walkover"]);
-        expect(row("main:2:1").textContent).toContain(ko["sim.cup.win"]);
+        // 치는 중인 판 — 누구나 관전
+        expect(row("main:2:1").textContent).toContain(ko["sim.cup.playing"]);
+        click(row("main:2:1").querySelector("[data-testid=cup-watch]")!);
+        expect(h.watch).toHaveBeenCalledWith("m7");
+        expect(row("main:2:0").querySelector("[data-testid=cup-watch]")).toBeNull();
         // 아직 안 정해진 자리는 '미정'
         expect(row("main:3:0").textContent).toContain(ko["sim.cup.tbd"]);
         // 라운드 이름: 결승 · 3·4위전 · 준결승 · 8강

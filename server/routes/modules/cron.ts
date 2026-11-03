@@ -50,16 +50,18 @@ async function simClocksQuietly(): Promise<unknown> {
 
 // 라운드 전날 저녁 브리핑(2026-10-05) — 매시 도는 리마인더에 얹는다(크론 항목을 늘리지 않는다: Vercel 요금제가 개수를 센다).
 // 한국 시각 19~20시대에만 일하고 나머지 시간엔 아무것도 읽지 않는다. 여기서 터져도 크루 리마인더의 응답은 깨지 않는다.
-// 월대회 굴리기(2026-10-12) — 기한이 지난 판의 기권을 가리고, 기한 하루 전인 판을 알린다. 매시 도는 리마인더에 얹는다(크론 항목을 늘리지 않는다).
-// 치르는 중인 대회가 없으면 표 하나를 읽고 끝난다. 여기서 터져도 리마인더의 응답은 깨지 않는다.
+// 월대회 굴리기(2026-10-12 · 11/03 일정제) — 입장 시간(경기 15분 뒤)이 지난 판을 가리고, 경기 하루 전 · 입장 시간이 열린 판을 알린다.
+// 매시 리마인더와 골프 날씨 · 남은 티 크론(각 20분, 엇갈려 10분마다)에 얹는다 — 크론 항목을 늘리지 않는다.
+// 판정은 대기실에 있는 사람의 5초 핑이 먼저 하고, 아무도 없으면 이 크론이 늦어도 10분 안에 한다.
+// 치르는 중인 대회가 없으면 표 하나를 읽고 끝난다. 여기서 터져도 얹힌 크론의 응답은 깨지 않는다.
 async function cupQuietly(): Promise<unknown> {
     const { recordCronRun, errorText } = await import("../../storage/cronRuns.js");
     try {
-        const { rollCups, remindDue } = await import("../../services/simCupService.js");
+        const { rollCups, remindDue, callDue } = await import("../../services/simCupService.js");
         const rolled = await rollCups(Date.now());
-        const out = { ...rolled, reminded: await remindDue(Date.now()) };
+        const out = { ...rolled, reminded: await remindDue(Date.now()), called: await callDue(Date.now()) };
         // 치르는 중인 대회가 있을 때만 적는다(실행 기록 — 어드민 현황)
-        if (out.cups > 0 || out.reminded > 0) await recordCronRun("cup_roll", true, out);
+        if (out.cups > 0 || out.reminded > 0 || out.called > 0) await recordCronRun("cup_roll", true, out);
         return out;
     } catch (e) {
         console.error("[CupRoll]", e);
@@ -285,13 +287,15 @@ async function handleGolfWeather(req: any, res: any) {
     const secret = process.env.CRON_SECRET;
     if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
     if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    // 월대회 굴리기를 먼저 — 날씨는 남은 시간 예산만큼만 돈다
+    const cup = await cupQuietly();
     const { loadGolfCourseSummary } = await import("./golfCourses.js");
     const { warmWeather } = await import("../../services/golfWeather.js");
     const s = await loadGolfCourseSummary();
     const manual = Number(req.query.budget); // 손으로 부를 때만(?budget=) — 로컬·점검용
     const budget = manual > 0 ? Math.min(20_000, manual) : Math.max(1000, 7000 - (Date.now() - t0) - 2500);
     const result = await warmWeather(s.pages, { budgetMs: budget });
-    return sendSuccess(res, { ...result, budgetMs: budget, tookMs: Date.now() - t0 });
+    return sendSuccess(res, { ...result, budgetMs: budget, tookMs: Date.now() - t0, cup });
 }
 router.get("/golf-weather", asyncHandler(handleGolfWeather));
 router.post("/golf-weather", asyncHandler(handleGolfWeather));
@@ -304,11 +308,13 @@ async function handleGolfOpenTees(req: any, res: any) {
     const secret = process.env.CRON_SECRET;
     if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
     if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    // 월대회 굴리기를 먼저(날씨 크론과 엇갈려 10분마다) — 남은 티는 남은 시간 예산만큼만
+    const cup = await cupQuietly();
     const { collectOpenTees } = await import("../../services/golfOpenTees.js");
     const manual = Number(req.query.budget);
     const budget = manual > 0 ? Math.min(20_000, manual) : Math.max(1000, 7000 - (Date.now() - t0) - 2500);
     const result = await collectOpenTees({ budgetMs: budget, force: req.query.force === "1", only: req.query.only ? String(req.query.only).normalize("NFC") : undefined });
-    return sendSuccess(res, { ...result, budgetMs: budget, tookMs: Date.now() - t0 });
+    return sendSuccess(res, { ...result, budgetMs: budget, tookMs: Date.now() - t0, cup });
 }
 router.get("/golf-open-tees", asyncHandler(handleGolfOpenTees));
 router.post("/golf-open-tees", asyncHandler(handleGolfOpenTees));
@@ -357,11 +363,8 @@ async function handleSimCleanup(req: any, res: any) {
     // 매일 03:15(한국 시각)에 도니 1일 새벽에 지난달이 마감된다. 실패해도 다른 청소 결과는 그대로 보낸다 — 다음 날 다시 마감한다.
     const shelf = await storage.simShelf.closeMonths(Date.now())
         .then((r) => r.closed).catch((e: unknown) => { console.error("[shelf close]", e); return null; });
-    // 월대회(2026-10-12) — 달이 마감됐으면 그 달의 성적으로 대회를 열고 출전자에게 알린다(shared/simCup). 종목마다 달에 한 번뿐이다.
-    // 마감 바로 뒤에 둔다 — 메달 · 배지와 같은 자료로 출전자를 정한다. 실패해도 다른 결과는 그대로 보낸다(다음 날 다시 연다).
-    const cups = await import("../../services/simCupService.js").then((m) => m.openAndAnnounce(Date.now()))
-        .catch((e: unknown) => { console.error("[cup open]", e); return null; });
-    return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, summitMisses, shelf, cups });
+    // 월대회는 여기서 열지 않는다(2026-11-03 오너 — 운영자가 어드민 › 당구 › 월대회에서 출전자를 확정하고 연다)
+    return sendSuccess(res, { sessions, matches, stalePlaying, notifications, trail, summitMisses, shelf });
 }
 router.get("/sim-cleanup", asyncHandler(handleSimCleanup));
 router.post("/sim-cleanup", asyncHandler(handleSimCleanup));
