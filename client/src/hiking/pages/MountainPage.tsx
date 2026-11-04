@@ -20,14 +20,14 @@ import { useSeo } from "@/hooks/useSeo";
 import { useToast } from "@/hooks/use-toast";
 import { hikingMountainCardUrl } from "@shared/ogCards";
 import { shareWithKakao } from "@/components/share/ShareChooser";
-import { heightText, hikingMountainPath, hikingRegion, hikingRegionPath, mountainPlace, sigunguText } from "@shared/hikingMountains";
+import { heightText, hikingMountainPath, hikingRegion, hikingRegionPath, mountainLabel, mountainPlace, sigunguText } from "@shared/hikingMountains";
 import { GUIDE_COURSE_SOURCE, GUIDE_LABEL, GUIDE_NOTE } from "@shared/hikingGuide";
 import { HIKING_POI_NAME, HIKING_POI_ORDER, dedupeCoursePois, hikingPoiTitle, type HikingPoiKind } from "@shared/hikingPois";
 import { SURFACE_COPY, surfaceNote, surfaceShares } from "@shared/hikingSurface";
 import { COURSE_MAP_COPY } from "@shared/hikingCourseMap";
-import { COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, MOUNTAIN_LABEL, OSM_NOTE, courseFacts, courseShape, courseViaNote, kmRange, listNames, mountainSeo } from "@shared/hikingPage";
-import { MOUNTAIN_AROUND_LABEL, MOUNTAIN_SECTIONS, NEARBY_DIAL_MIN, fromMeText, nearbyDialItems, shortestCourse } from "@shared/hikingAround";
-import { HikingShell, HkSection, HkSkel } from "../components/HikingShell";
+import { COURSE_SOURCE_NOTE, COURSE_TIME_NOTE, MOUNTAIN_LABEL, OSM_NOTE, courseFacts, courseShape, courseViaNote, kmRange, listNames, mountainSeo, stampLoginAsk } from "@shared/hikingPage";
+import { MOUNTAIN_AROUND_LABEL, MOUNTAIN_SECTIONS, NEARBY_DIAL_MIN, NEXT_MOUNTAINS_LABEL, fromMeText, heightVsHere, nearbyDialItems, nextMountains, shortestCourse } from "@shared/hikingAround";
+import { HikingShell, HkSection, HkSkel, askHikingLogin } from "../components/HikingShell";
 import { HkSectionNav, hkJumpTo, type HkNavItem } from "../components/HkSectionNav";
 import { MountainLocation } from "../components/MountainLocation";
 import { MountainNearbyPlaces } from "../components/MountainNearbyPlaces";
@@ -35,7 +35,7 @@ import { NearDial } from "../components/NearMe";
 import { CourseMap } from "../components/CourseMap";
 import { CourseProfile, CourseTrace, SLOPE_COLOR } from "../components/CourseParts";
 import { SLOPE_LABEL, compareCourses, courseLevel, courseSlopes, type CourseLevelId } from "@shared/hikingCourseLook";
-import { Fact, HikingCta, MountainRow, MountainWeather, SunToday } from "../components/MountainParts";
+import { Fact, HikingCta, MountainRow, MountainWeather, Peak, SunToday } from "../components/MountainParts";
 import { SummitStamp, regionInk } from "../stamps/SummitStamp";
 import { TrailSketch, shortCourseName } from "../trails/TrailParts";
 import { TRAIL_ROUTES, trailCoursePath, trailTimeText } from "@shared/koreaTrails";
@@ -45,7 +45,7 @@ import { hikingBookPath } from "../stamps/StampParts";
 import { useHikingStamps } from "../stamps/useHikingStamps";
 import { trailPath } from "../trail/useTrail";
 import { MyPhotos } from "../photos/MyPhotos";
-import { WishButton } from "../wish/WishParts";
+import { WishButton, WishFlag, useWishAfterLogin, wishAfterLogin } from "../wish/WishParts";
 import { summitReach, summitRewards } from "@shared/hikingStamps";
 import { MountainPhotos } from "../photos/MountainPhotos";
 import { HIKING_PHOTOS_ANCHOR, HIKING_PHOTO_LABEL } from "@shared/hikingPhotos";
@@ -336,6 +336,65 @@ function About({ d }: { d: MountainDetail }) {
     );
 }
 
+/**
+ * 이 근처 다른 산(2026-11-04) — 코스 구역 바로 밑, 옆으로 넘기는 카드 줄. 검색으로 온 방문자가 코스를 다 본 자리에서 '다음 산'으로 넘어가게.
+ * 카드마다 이 산과 견준 높이 · 가장 짧은 코스 · 거리. 아래의 '가까운 산'(판 · 목록)은 그대로 둔다. 셈은 shared/hikingAround(nextMountains · heightVsHere).
+ */
+function NextMountains({ d, done }: { d: MountainDetail; done: (id: string) => boolean }) {
+    const list = useMemo(() => nextMountains(d.nearby), [d.nearby]);
+    if (list.length < 2) return null;
+    return (
+        <HkSection title={NEXT_MOUNTAINS_LABEL.title} aside={NEXT_MOUNTAINS_LABEL.aside}>
+            <ul className="-mx-5 flex snap-x scroll-px-5 gap-2.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="mountain-next">
+                {list.map((m) => {
+                    const vs = heightVsHere(m.heightM, d.heightM);
+                    const got = done(m.id);
+                    const facts = [heightText(m.heightM), m.courses > 0 ? `코스 ${m.courses}개` : ""].filter(Boolean).join(" · ");
+                    return (
+                        <li key={`next:${m.id}`} className="w-[152px] shrink-0 snap-start">
+                            <Link href={hikingMountainPath(m.slug)} data-track-as="hiking-next-mountain" data-testid={`mountain-next-${m.slug}`}
+                                className="flex h-full flex-col rounded-2xl p-3 active:opacity-80" style={{ background: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }}>
+                                <span className="flex items-start justify-between gap-2">
+                                    {m.lists.includes("kfs100") ? <MountainPatch id={m.id} region={m.region} size={40} earned={got} preview /> : <Peak height={m.heightM} done={got} size={40} />}
+                                    <span className="pt-0.5 text-[12.5px] tabular-nums text-[#F6D9A8]">{m.km}km</span>
+                                </span>
+                                <span className="mt-2 block truncate text-[15.5px] font-semibold text-[#F4EFE3]">{mountainLabel(m)}</span>
+                                {facts && <span className="mt-0.5 block truncate text-[12.5px] tabular-nums text-[#F4EFE399]">{facts}</span>}
+                                <span className="mt-auto block pt-2">
+                                    {m.courses > 0 && m.minKm != null && <span className="block text-[12.5px] tabular-nums text-[#F4EFE3CC]">짧은 코스 {kmRange(m.minKm, m.minKm)}</span>}
+                                    {vs && <span className="mt-1 inline-block rounded-full bg-[#FFFFFF14] px-2 py-1 text-[12px] leading-none text-[#F4EFE3CC]">{vs}</span>}
+                                </span>
+                            </Link>
+                        </li>
+                    );
+                })}
+            </ul>
+        </HkSection>
+    );
+}
+
+/**
+ * 방문자의 아래 줄(2026-11-04) — 단추 둘. 무엇을 하려다 가입하는지 가입 팝업이 그대로 말한다.
+ *   '가고 싶은 산'     이 산을 기기에 적어 두고 가입 팝업 — 가입하면 바로 담긴다(WishParts 의 useWishAfterLogin).
+ *   '○○산 도장 받기'  "정상에서 ○○산 도장을 받아요" 가입 팝업.
+ * 예전에는 등산 화면 모두가 같은 한 줄("가입하고 산 도장 모으기")이었다 — 14일 비회원 산 화면 방문 5,327번 중 119번(2.2%)이 눌렀다.
+ */
+function GuestBar({ d }: { d: MountainDetail }) {
+    const [, setLocation] = useLocation();
+    return (
+        <div className="mx-auto flex max-w-[688px] gap-2">
+            <button type="button" onClick={() => wishAfterLogin(d.slug, d.name, setLocation)} data-track-as="hiking-join-wish" data-testid="mountain-bar-wish"
+                className="flex h-12 shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-[14.5px] font-semibold active:opacity-80" style={{ background: "#F6D9A81F", color: "#F6D9A8", boxShadow: "inset 0 0 0 1px #F6D9A866" }}>
+                <WishFlag on={false} />가고 싶은 산
+            </button>
+            <button type="button" onClick={() => askHikingLogin(setLocation, stampLoginAsk(d.name))} data-track-as="hiking-join-stamp" data-testid="mountain-bar-stamp"
+                className="h-12 min-w-0 flex-1 truncate rounded-xl bg-[#F28C6A] px-3 text-[15px] font-semibold text-[#2A1208] active:bg-[#E67C59]">
+                {d.name} 도장 받기
+            </button>
+        </div>
+    );
+}
+
 /** 한눈 숫자의 한 칸 */
 interface Stat { key: string; label: string; value: string; sub?: string; small?: boolean; onClick: () => void }
 
@@ -399,6 +458,8 @@ export default function MountainPage() {
     useSeo(seo);
     // 내 도장 — 등산을 쓸 수 있는 회원만(그 밖의 사람에게는 받는 것의 모습만 보여 준다)
     const my = useHikingStamps();
+    // 방문자 때 '가고 싶은 산'을 누르고 가입했으면 — 여기서 담는다(한 번만)
+    useWishAfterLogin();
     const mine = d ? my.stampOf(d.id) : undefined;
     // 고른 코스 — 코스 구역의 칩과 '위치 · 들머리'가 같이 쓴다. 다른 산으로 건너가면 첫 코스로 돌아간다
     const [pick, setPick] = useState<{ slug: string; i: number }>({ slug: "", i: 0 });
@@ -455,7 +516,7 @@ export default function MountainPage() {
     );
 
     return (
-        <HikingShell title={d.name} backTo={region ? hikingRegionPath(region.id) : undefined} right={shareBtn}>
+        <HikingShell title={d.name} backTo={region ? hikingRegionPath(region.id) : undefined} right={shareBtn} bar={<GuestBar d={d} />}>
             <div data-testid="mountain-page" data-slug={d.slug}>
                 {/* 표지 — 권역의 그림 위에 이름. 그림은 장식이다(실제 그 산의 모습이 아니다) */}
                 <div className="relative overflow-hidden">
@@ -504,9 +565,10 @@ export default function MountainPage() {
                             <span className="text-[13px] font-semibold" style={{ color: mine?.verified ? "#2A1208" : "#F4EFE3" }}>{MOUNTAIN_LABEL.stamp}</span>
                             {mine?.verified ? (
                                 <span className="rounded-full bg-[#2A120826] px-2 py-1 text-[12px] font-medium leading-none text-[#2A1208]">{stampDate(new Date(mine.firstAt))} 인증</span>
-                            ) : my.mine ? (
-                                <WishButton key={`wish:${d.id}`} slug={d.slug} mountainId={d.id} compact />
-                            ) : null}
+                            ) : (
+                                // 방문자에게도 보인다 — 누르면 가입 팝업, 가입하면 바로 담긴다. 등산이 안 열린 회원에게는 단추가 스스로 그리지 않는다
+                                <WishButton key={`wish:${d.id}`} slug={d.slug} mountainId={d.id} name={d.name} compact />
+                            )}
                         </div>
                         <div className="flex items-center gap-3.5 px-4 pt-3.5">
                             <div className="relative w-[92px] shrink-0">
@@ -563,6 +625,9 @@ export default function MountainPage() {
                 <HkSection title={MOUNTAIN_LABEL.courses} aside={d.courseList.length ? `${d.courseList.length}개` : undefined} sec="courses">
                     <Courses key={`courses:${d.slug}`} d={d} canStart={my.mine} i={ci} onPick={pickCourse} loc={loc} />
                 </HkSection>
+
+                {/* 이 근처 다른 산 — 코스를 다 본 자리에서 다음 산으로(두 곳 미만이면 그리지 않는다) */}
+                <NextMountains key={`next:${d.slug}`} d={d} done={(id) => my.done.has(id)} />
 
                 {/* 이 산의 사진 — 회원이 올린 공개 사진. 방문자에게도 보인다(한 장도 없으면 구역이 없다) */}
                 <MountainPhotos key={`mountain-photos:${d.slug}`} slug={d.slug} name={d.name} />

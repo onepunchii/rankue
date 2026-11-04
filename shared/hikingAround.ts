@@ -126,6 +126,30 @@ export function nearbyDialItems(centre: { lat: number | null; lng: number | null
 /** 판을 그리는 산의 수 — 한 곳뿐이면 판이 휑하다(목록만 보여 준다) */
 export const NEARBY_DIAL_MIN = 2;
 
+// ── 이 근처 다른 산(코스 구역 밑의 줄) ────────────────────────────────
+/**
+ * 검색으로 온 방문자의 '다음 산'(2026-11-04 오너: "비회원으로 접속한 사람이 최대한 CTR 을 늘리는 것을 목표로").
+ * 실측(10/21~11/04 비회원): 산 화면 방문 5,327번 중 다른 산을 눌러 넘어간 것은 91번(1.7%)이었다 — 가까운 산은 화면 맨 아래에 있었고,
+ * 끝(90%)까지 내려온 화면은 23%였다. 그래서 코스를 다 본 자리(코스 구역 바로 밑)에 옆으로 넘기는 줄을 둔다. 아래의 판 · 목록은 그대로.
+ * 코스가 있는 산이 먼저(넘어가서 볼 것이 있다), 그다음 가까운 순. NEXT_MOUNTAINS_MAX 곳까지.
+ */
+export const NEXT_MOUNTAINS_MAX = 6;
+export const NEXT_MOUNTAINS_LABEL = { title: "이 근처 다른 산", aside: "가까운 순" } as const;
+
+export function nextMountains<T extends { courses: number; km: number }>(list: readonly T[], n: number = NEXT_MOUNTAINS_MAX): T[] {
+    return list.map((m, i) => ({ m, i }))
+        .sort((a, b) => Number(b.m.courses > 0) - Number(a.m.courses > 0) || a.m.km - b.m.km || a.i - b.i)
+        .slice(0, Math.max(0, n)).map((x) => x.m);
+}
+
+/** 카드의 한 줄 — 이 산과 견준 높이. 어느 한쪽이라도 모르면 null(지어 적지 않는다). 30m 안쪽은 '비슷' */
+export function heightVsHere(other: number | null | undefined, here: number | null | undefined): string | null {
+    if (other == null || here == null || !Number.isFinite(other) || !Number.isFinite(here)) return null;
+    const d = Math.round(other - here);
+    if (Math.abs(d) < 30) return "높이가 비슷해요";
+    return `${Math.abs(d).toLocaleString("en-US")}m ${d > 0 ? "더 높아요" : "더 낮아요"}`;
+}
+
 // ── 근처 맛집 · 카페 ──────────────────────────────────────────────────
 /** 칩 — key 는 주소에 실리는 값(?kind=), word 는 검색어에 붙는 낱말이자 칩 글자 */
 export const HIKING_NEARBY_KINDS = [

@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import {
     FROM_ME_MAX_KM, HIKING_NEARBY_HOLD_MS, HIKING_NEARBY_KINDS, HIKING_NEARBY_RADIUS_KM, MOUNTAIN_AROUND_LABEL, MOUNTAIN_SECTIONS, NEARBY_DIAL_MIN, SECTION_NAV_MIN,
     cleanMountainName, courseTrailhead, fromMeText, hikingNaverMapUrl, hikingNearbyNames, hikingNearbyQuery, hikingNearbyWord, hikingPlaceUrl, isHikingNearbyKind,
-    nearbyDialItems, shortestCourse, trailheadName, type NearbySummary,
+    NEXT_MOUNTAINS_MAX, heightVsHere, nearbyDialItems, nextMountains, shortestCourse, trailheadName, type NearbySummary,
 } from "./hikingAround";
 import { naverMapSearchUrl, nearbyWordQuery } from "./golfAround";
 import type { LinePoint } from "./hikingGeo";
@@ -341,7 +341,7 @@ describe("한눈 숫자 · 구역 줄 · 공유 · 검색", () => {
         expect(page).toContain('data-track-as="hiking-mountain-share"');
         expect(page).toContain("if (navigator.share) { await navigator.share({ title: `${d.name} | 랭큐 등산`, url }); return; }");
         expect(page).toContain('try { await navigator.clipboard.writeText(url); toast({ title: "주소를 복사했어요" }); }');
-        expect(page).toContain("right={shareBtn}>");
+        expect(page).toContain("right={shareBtn} bar={<GuestBar d={d} />}>");
     });
     it("구조화 자료(Mountain)와 미리보기 그림 — 이 산의 카드(검색용 화면 · 사이트맵과 같은 주소)", () => {
         const page = read("client/src/hiking/pages/MountainPage.tsx");
@@ -363,5 +363,35 @@ describe("한눈 숫자 · 구역 줄 · 공유 · 검색", () => {
             // 화면의 글은 한국어 리터럴이다(번역 열쇠를 쓰지 않는다)
             expect(code(src), f).not.toMatch(/\bt\(["'`]/);
         }
+    });
+});
+
+describe("이 근처 다른 산 — 코스 구역 밑의 줄(2026-11-04)", () => {
+    const m = (slug: string, km: number, courses: number) => ({ slug, km, courses });
+    it("코스가 있는 산이 먼저, 그다음 가까운 순(같으면 받은 순) — 여섯 곳까지", () => {
+        const got = nextMountains([m("a", 3, 0), m("b", 5, 2), m("c", 1, 0), m("d", 9, 1), m("e", 5, 4)]).map((x) => x.slug);
+        expect(got).toEqual(["b", "e", "d", "c", "a"]);
+        const many = Array.from({ length: 9 }, (_, i) => m(`m${i}`, i, 1));
+        expect(nextMountains(many)).toHaveLength(NEXT_MOUNTAINS_MAX);
+        expect(nextMountains([])).toEqual([]);
+    });
+    it("이 산과 견준 높이 — 30m 안은 비슷, 모르면 적지 않는다", () => {
+        expect(heightVsHere(882, 762)).toBe("120m 더 높아요");
+        expect(heightVsHere(400, 1_915)).toBe("1,515m 더 낮아요");
+        expect(heightVsHere(780, 762)).toBe("높이가 비슷해요");
+        expect(heightVsHere(null, 762)).toBeNull();
+        expect(heightVsHere(500, null)).toBeNull();
+    });
+    it("산 화면: 코스 구역 바로 밑에, 카드마다 다음 산으로 가는 링크(눌림은 hiking-next-mountain 으로 센다)", () => {
+        const page = readFileSync(resolve(__dirname, "../client/src/hiking/pages/MountainPage.tsx"), "utf8");
+        const courses = page.indexOf("<Courses key={`courses:${d.slug}`}");
+        const next = page.indexOf("<NextMountains key={`next:${d.slug}`}");
+        const photos = page.indexOf("<MountainPhotos key={`mountain-photos:${d.slug}`}");
+        expect(courses).toBeGreaterThan(0);
+        expect(next).toBeGreaterThan(courses);
+        expect(photos).toBeGreaterThan(next);
+        expect(page).toContain('data-track-as="hiking-next-mountain"');
+        // 아래의 가까운 산(판 · 목록)은 그대로 남는다
+        expect(page).toContain("<NearDial key={`dial:${d.slug}`}");
     });
 });

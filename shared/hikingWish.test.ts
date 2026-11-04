@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { CREW_WISH_LABEL, CREW_WISH_LIMIT, CREW_WISH_MIN, HIKING_WISH_LABEL, HIKING_WISH_MAX, crewWishAside, crewWishChip, orderWishes, pickCrewWishes } from "./hikingWish";
+import {
+    CREW_WISH_LABEL, CREW_WISH_LIMIT, CREW_WISH_MIN, HIKING_WISH_LABEL, HIKING_WISH_MAX, WISH_AFTER_LOGIN_MAX_MS,
+    crewWishAside, crewWishChip, orderWishes, pickCrewWishes, wishAddedAfterLogin, wishAfterLoginRead, wishAfterLoginRecord, wishLoginAsk,
+} from "./hikingWish";
 
 const read = (f: string) => readFileSync(resolve(__dirname, "..", f), "utf8");
 const code = (s: string) => s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
@@ -40,7 +43,7 @@ describe("고정: 가고 싶은 산의 저장과 문", () => {
     });
     it("화면 — 방문자는 가입 안내로, 등산이 안 열린 회원에게는 단추를 그리지 않는다", () => {
         const ui = code(read("client/src/hiking/wish/WishParts.tsx"));
-        expect(ui).toContain("if (!member) { goLogin(setLocation); return; }");
+        expect(ui).toContain("if (!member) { wishAfterLogin(slug, name ?? \"\", setLocation); return; }");
         expect(ui).toContain("if (member && !w.mine) return null;");
         expect(ui).toContain('data-track-as="hiking-wish"');
     });
@@ -167,5 +170,45 @@ describe("고정: 산악회의 목표 — 함께 오른 100대 명산", () => {
         expect(goal).toBeGreaterThan(stats);
         expect(ui.indexOf("[...list].reverse().map(")).toBeGreaterThan(goal);
         expect(ui.slice(stats, goal)).not.toMatch(/kfs\s*>\s*0\s*&&/);
+    });
+});
+
+describe("방문자의 '가고 싶은 산' — 가입하고 담기(2026-11-04)", () => {
+    const T = 1_800_000_000_000;
+    it("적어 둔 것을 읽는다 — 산 · 이름, 30분이 지났거나 미래의 것 · 꼴이 틀린 것은 버린다", () => {
+        const rec = wishAfterLoginRecord("장태산", "장태산", T);
+        expect(wishAfterLoginRead(rec, T + 60_000)).toEqual({ slug: "장태산", name: "장태산" });
+        expect(wishAfterLoginRead(rec, T + WISH_AFTER_LOGIN_MAX_MS)).toEqual({ slug: "장태산", name: "장태산" });
+        expect(wishAfterLoginRead(rec, T + WISH_AFTER_LOGIN_MAX_MS + 1)).toBeNull();
+        expect(wishAfterLoginRead(rec, T - 1)).toBeNull();
+        expect(wishAfterLoginRead("{", T)).toBeNull();
+        expect(wishAfterLoginRead(null, T)).toBeNull();
+        expect(wishAfterLoginRead(JSON.stringify({ slug: "../me", name: "x", at: T }), T)).toBeNull();
+        expect(wishAfterLoginRead(JSON.stringify({ slug: "a b", at: T }), T)).toBeNull();
+        expect(wishAfterLoginRead(JSON.stringify({ slug: "북한산", at: T }), T)).toEqual({ slug: "북한산", name: "" });
+    });
+    it("가입 팝업 · 담긴 뒤의 알림 — 산 이름과 조사", () => {
+        expect(wishLoginAsk("장태산").title).toBe("장태산을 가고 싶은 산에 담아요");
+        expect(wishLoginAsk("").title).toBe("이 산을 가고 싶은 산에 담아요");
+        expect(wishAddedAfterLogin("비슬산")).toBe("비슬산을 가고 싶은 산에 담았어요");
+        expect(wishAddedAfterLogin("")).toBe(HIKING_WISH_LABEL.added);
+        expect(wishLoginAsk("장태산").desc).not.toMatch(/빨리|서두|지금 바로|놓치/);
+    });
+    it("화면: 방문자가 누르면 적어 두고 가입 팝업, 등산 화면이 가입 뒤에 담는다 — 이름은 서버로 가지 않는다", () => {
+        const parts = code(read("client/src/hiking/wish/WishParts.tsx"));
+        expect(parts).toContain("localStorage.setItem(WISH_AFTER_LOGIN_KEY, wishAfterLoginRecord(slug, name, Date.now()))");
+        expect(parts).toContain("if (!openLoginSheet(wishLoginAsk(name))) goLoginPage(setLocation);");
+        expect(parts).toMatch(/onClick=\{\(\) => \{ if \(!member\) \{ wishAfterLogin\(slug, name \?\? "", setLocation\); return; \}/);
+        // 담기는 PUT 하나(몸통 없음) — 적어 둔 것은 읽자마자 지운다
+        expect(parts).toContain('apiRequest(`/api/hiq/hiking/mountains/${encodeURIComponent(w.slug)}/wish`, { method: "PUT" })');
+        expect(parts).toContain("localStorage.removeItem(WISH_AFTER_LOGIN_KEY)");
+        const page = code(read("client/src/hiking/pages/MountainPage.tsx"));
+        expect(page).toContain("useWishAfterLogin();");
+        expect(page).toContain("bar={<GuestBar d={d} />}");
+        expect(page).toContain('data-track-as="hiking-join-wish"');
+        expect(page).toContain('data-track-as="hiking-join-stamp"');
+        // 도장 카드 머리띠의 단추가 방문자에게도 보인다
+        expect(page).toContain("<WishButton key={`wish:${d.id}`} slug={d.slug} mountainId={d.id} name={d.name} compact />");
+        expect(page).not.toContain(") : my.mine ? (\n                                <WishButton");
     });
 });

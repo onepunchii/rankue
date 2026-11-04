@@ -184,6 +184,22 @@ function sidePanelInstallVisible(): boolean {
     return false;
 }
 
+/**
+ * 화면 바닥에 늘 붙은 가입 줄이 보이는가(2026-11-04) — 등산 공개 화면(HikingShell)의 방문자 줄, 표식은 data-page-cta.
+ * 그 줄이 보이는 동안은 이 팝업이 스스로 뜨지 않는다 — 한 화면에 바닥 권유 둘은 소음이다(골프 공개 화면은 주소로 막았다, shared/installPrompt).
+ * 실측(10/21~11/04 비회원): 검색으로 산 화면에 온 방문 5,327번 중 1,875번이 20초쯤 이 팝업의 '닫기'를 눌렀다 — 방문자가 가장 많이 누른 단추였다.
+ * 회원에게는 그 줄이 없어(하단 탭) 팝업이 그대로 뜬다. 받으러 온 사람(?install=1)은 막지 않는다(otherInstallVisible 의 규칙).
+ */
+function pageCtaVisible(): boolean {
+    try {
+        for (const el of Array.from(document.querySelectorAll<HTMLElement>("[data-page-cta]"))) {
+            const r = el.getBoundingClientRect();
+            if (r.width > 0 && r.bottom > 0 && r.top < window.innerHeight) return true;
+        }
+    } catch { /* 못 찾으면 안 보이는 것으로 본다 */ }
+    return false;
+}
+
 type SheetTone = "light" | "dark";
 
 // 클래스는 통째로 적는다 — Tailwind 는 조각을 이어 붙인 이름을 못 찾는다.
@@ -639,8 +655,9 @@ export function AppInstallSheet({ path }: { path: string }) {
             // 가입이 끝나면 표시가 지워지고, 그때부터는 로그인한 사람용 팝업('앱에서 열기' — 로그인을 그대로 넘겨준다)이 뜬다.
             // 친구 초대 링크로 온 비로그인도 같은 까닭으로 가입까지 쉰다(2026-10-16 — 앱에서 가입하면 초대 표시가 끊긴다)
             busy: live.current.authLoading || screenBusy() || (!live.current.loggedIn && (!!joinStoreSlug() || !!readInviteMark())),
-            // PC(QR 판)만: 옆 패널의 설치 구역이 보이면 스스로 띄우지 않는다. 가로로 든 아이패드(스토어 단추 판)는 해당 없다
-            otherInstallVisible: env.device === "desktop" && sidePanelInstallVisible(),
+            // PC(QR 판)만: 옆 패널의 설치 구역이 보이면 스스로 띄우지 않는다. 가로로 든 아이패드(스토어 단추 판)는 해당 없다.
+            // 어느 기기든: 화면 바닥의 가입 줄(등산 공개 화면)이 보이면 스스로 띄우지 않는다
+            otherInstallVisible: (env.device === "desktop" && sidePanelInstallVisible()) || pageCtaVisible(),
             ...getRecord(),
             now: Date.now(),
             secondsOnSite: visit.seconds,

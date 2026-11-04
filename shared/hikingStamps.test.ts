@@ -223,7 +223,7 @@ describe("도장 카드 — 정상까지 · 받는 것(2026-10-13)", () => {
         expect(page).toContain('data-testid="mountain-stamp-reach"');
         expect(page).toContain('data-testid="mountain-stamp-ask"');
         // 가고 싶은 산은 카드의 머리띠 안으로 — 아래의 큰 단추는 없다
-        expect(page).toContain("<WishButton key={`wish:${d.id}`} slug={d.slug} mountainId={d.id} compact />");
+        expect(page).toContain("<WishButton key={`wish:${d.id}`} slug={d.slug} mountainId={d.id} name={d.name} compact />");
         expect(page.match(/<WishButton /g)?.length).toBe(1);
     });
 });

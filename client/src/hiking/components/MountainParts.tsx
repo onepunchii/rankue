@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/useAuth";
-import { goLogin } from "@/components/hiq/LoginGate";
+import { askHikingLogin } from "./HikingShell";
 import { LucideChevronRight } from "@/lib/icons";
 import { WX_LABEL, type CourseWeather, type WxHalf } from "@shared/golfWeather";
 import { heightText, hikingMountainPath, mountainLabel, mountainPlace } from "@shared/hikingMountains";
@@ -299,7 +299,7 @@ export function HikingCta({ className }: { className?: string }) {
             <p className="text-[16.5px] font-semibold text-[#F4EFE3] break-keep">{HIKING_CTA.title}</p>
             <p className="mt-1.5 text-[13.5px] leading-snug text-[#F4EFE3B3] break-keep">{member ? HIKING_CTA.member : HIKING_CTA.body}</p>
             {!member && (
-                <button type="button" onClick={() => goLogin(setLocation)} data-track-as="hiking-join" className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-[#F28C6A] text-[15px] font-semibold text-[#2A1208] active:bg-[#E67C59]">
+                <button type="button" onClick={() => askHikingLogin(setLocation)} data-track-as="hiking-join" className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-[#F28C6A] text-[15px] font-semibold text-[#2A1208] active:bg-[#E67C59]">
                     {HIKING_CTA.button}
                 </button>
             )}

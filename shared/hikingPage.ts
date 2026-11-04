@@ -143,6 +143,22 @@ export const HIKING_CTA = {
     member: "등산 홈에서 도장첩과 코스 지도를 열어 보세요. 등산은 한국어 화면에서 쓸 수 있어요.",
 } as const;
 
+/**
+ * 등산 화면의 가입 단추가 여는 팝업의 제목 · 한 줄(2026-11-04) — 기본 문구("랭큐 시작하기 · 기록을 쌓으려면…") 대신 등산의 말로.
+ * 산 화면에서는 무엇을 하려다 가입하는지 말한다(stampLoginAsk · shared/hikingWish 의 wishLoginAsk).
+ */
+export const HIKING_LOGIN_ASK = {
+    title: "랭큐 등산 시작하기",
+    desc: "오른 산은 도장으로, 가고 싶은 산은 목록으로 모여요. 보던 화면에서 바로 이어져요.",
+} as const;
+
+export function stampLoginAsk(name: string): { title: string; desc: string } {
+    return {
+        title: `정상에서 ${name || "이 산"} 도장을 받아요`,
+        desc: "가입하면 오른 산마다 도장이 찍히고 산행 등급이 올라요. 보던 화면에서 바로 이어져요.",
+    };
+}
+
 export { HIKING_HUB_PATH, HIKING_LISTS, hikingList, hikingListPath, hikingMountainPath, hikingRegion, hikingRegionPath };
 export type { HikingListId, HikingRegionId };
 

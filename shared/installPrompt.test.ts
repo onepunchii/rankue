@@ -783,7 +783,7 @@ describe("화면(AppInstallSheet) — 소스 검사", () => {
         expect(seen).toContain("if (r.width > 0 && r.bottom > 0 && r.top < window.innerHeight) return true;");
         const tryOpen = sheet.slice(sheet.indexOf("const tryOpen = useCallback("), sheet.indexOf("const dismiss = useCallback("));
         // 가로로 든 아이패드(스토어 단추 판)의 팝업은 죽이지 않는다 — PC 일 때만 본다
-        expect(tryOpen).toContain('otherInstallVisible: env.device === "desktop" && sidePanelInstallVisible(),');
+        expect(tryOpen).toContain('otherInstallVisible: (env.device === "desktop" && sidePanelInstallVisible()) || pageCtaVisible(),');
         // 바쁨(screenBusy)에는 넣지 않는다 — 바쁨은 ?install=1 까지 막는다
         const busy = sheet.slice(sheet.indexOf("function screenBusy(): boolean {"), sheet.indexOf("function coveredByOverlay(): boolean {"));
         expect(busy).not.toContain("sidePanelInstallVisible");
@@ -797,6 +797,20 @@ describe("화면(AppInstallSheet) — 소스 검사", () => {
         expect(frame).toContain("hidden xl:flex xl:flex-col");
         // PC 에는 본문 끝 카드가 없다 — 그래서 카드만 보던 기다림이 PC 에서는 한 번도 걸리지 않았다
         expect(client("components/hiq/AppInstallCard.tsx")).toMatch(/DesktopFrame 옆 패널이 맡는다/);
+    });
+
+    // 2026-11-04: 검색으로 산 화면에 온 방문자 36%가 20초쯤 이 팝업의 '닫기'를 눌렀다 — 화면 바닥에는 이미 등산의 가입 줄이 있었다
+    it("어느 기기든: 화면 바닥의 가입 줄(data-page-cta)이 보이는 동안은 스스로 뜨지 않는다 — 바쁨과는 따로, 등산 틀의 방문자 줄에만 표식", () => {
+        const seen = sheet.slice(sheet.indexOf("function pageCtaVisible(): boolean {"), sheet.indexOf("type SheetTone"));
+        expect(seen).toContain('document.querySelectorAll<HTMLElement>("[data-page-cta]")');
+        expect(seen).toContain("if (r.width > 0 && r.bottom > 0 && r.top < window.innerHeight) return true;");
+        // 바쁨에는 넣지 않는다 — 받으러 온 사람(?install=1)까지 막게 된다
+        const busy = sheet.slice(sheet.indexOf("function screenBusy(): boolean {"), sheet.indexOf("function coveredByOverlay(): boolean {"));
+        expect(busy).not.toContain("pageCtaVisible");
+        // 표식은 등산 틀의 방문자 줄 하나 — 회원(하단 탭)에게는 줄이 없어 팝업이 그대로 뜬다
+        const shell = code(client("hiking/components/HikingShell.tsx"));
+        expect(shell.match(/data-page-cta=/g)).toHaveLength(1);
+        expect(shell).toMatch(/\{guest && \(bar \|\| cta\) && \(\s*<div [^>]*data-page-cta="hiking">/);
     });
 
     // 2026-10-06 검토: 닫으려고 누른 '뒤로'가 팝업이 아니라 보던 화면을 닫았다 — 스스로 올라온 팝업 때문에 화면에서 쫓겨나고 7일 쉼까지 적혔다
