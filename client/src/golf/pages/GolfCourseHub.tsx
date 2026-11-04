@@ -163,7 +163,8 @@ export default function GolfCourseHub() {
     useEffect(() => { if (sort === "near" && !me && locationStatus && locationStatus !== "granted") setSort("rec"); }, [sort, me, locationStatus]);
     // 특징 필터(오너가 준 자료 — 더블이글 칩처럼): 노캐디·2인·3인 가능·잔디. 여러 개면 전부 만족(AND).
     const [feats, setFeats] = useState<string[]>([]);
-    const [onlyWatched, setOnlyWatched] = useState(false);
+    // 주말 안내 알림(?watched=1 — server/services/golfWeekendWatch)으로 오면 '내 관심'만 보이며 연다
+    const [onlyWatched, setOnlyWatched] = useState(() => typeof window !== "undefined" && new URLSearchParams(window.location.search).get("watched") === "1");
     useEffect(() => { setLimit(PAGE); }, [feats, onlyWatched]);
 
     const kmOf = useMemo(() => {

@@ -22,7 +22,7 @@ router.post("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly(), simClocks: await simClocksQuietly() });
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), golfWeekend: await golfWeekendQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly(), simClocks: await simClocksQuietly() });
 }));
 
 // Vercel Cron은 GET으로 호출한다(문서 기준). 동일 핸들러를 재사용.
@@ -33,7 +33,7 @@ router.get("/reminders", asyncHandler(async (req: any, res: any) => {
     if (auth !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
 
     const result = await runReminders();
-    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly(), simClocks: await simClocksQuietly() });
+    return sendSuccess(res, { ...result, golfEve: await golfEveQuietly(), golfWeekend: await golfWeekendQuietly(), hikingEve: await hikingEveQuietly(), cup: await cupQuietly(), simClocks: await simClocksQuietly() });
 }));
 
 // 둘 다 떠난 온라인 대전의 시계(2026-10-26 — routes/modules/simMatch sweepAbandonedClocks). 목록을 보는 사람이 없을 때의 받침 — 매시 한 번.
@@ -68,6 +68,30 @@ async function cupQuietly(): Promise<unknown> {
         await recordCronRun("cup_roll", false, { error: errorText(e) });
         return { error: true };
     }
+}
+
+// 이번 주말 관심 골프장(2026-11-04 — services/golfWeekendWatch) — 목요일 19~20시대에 한 번. 다른 날 · 다른 시간엔 아무것도 읽지 않는다.
+async function golfWeekendQuietly(): Promise<unknown> {
+    const { recordCronRun, errorText } = await import("../../storage/cronRuns.js");
+    try {
+        const { runGolfWeekendWatch } = await import("../../services/golfWeekendWatch.js");
+        const out = await runGolfWeekendWatch();
+        if (out.due) await recordCronRun("golf_weekend", out.failed === 0, out);
+        return out;
+    } catch (e) {
+        console.error("[GolfWeekendWatch]", e);
+        await recordCronRun("golf_weekend", false, { error: errorText(e) });
+        return { error: true };
+    }
+}
+// 점검용 — ?dry=1 은 보내지 않고 무엇이 갈지 세기만(시간 밖에서도 본다). vercel.json 크론에는 없다.
+async function handleGolfWeekend(req: any, res: any) {
+    const secret = process.env.CRON_SECRET;
+    if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
+    if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
+    const { runGolfWeekendWatch } = await import("../../services/golfWeekendWatch.js");
+    const dry = req.query.dry === "1";
+    return sendSuccess(res, await runGolfWeekendWatch(Date.now(), { dry, force: dry }));
 }
 
 // 산행 전날 저녁 브리핑(2026-10-13) — 내일 산악회 산행에 가는 사람에게(services/hikingEve). 골프의 것과 같은 시간대, 같은 크론에 얹는다.
@@ -120,6 +144,8 @@ async function handleGolfRoundEve(req: any, res: any) {
 }
 router.get("/golf-round-eve", asyncHandler(handleGolfRoundEve));
 router.post("/golf-round-eve", asyncHandler(handleGolfRoundEve));
+router.get("/golf-weekend", asyncHandler(handleGolfWeekend));
+router.post("/golf-weekend", asyncHandler(handleGolfWeekend));
 router.get("/hiking-eve", asyncHandler(handleHikingEve));
 router.post("/hiking-eve", asyncHandler(handleHikingEve));
 
