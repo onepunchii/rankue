@@ -17,7 +17,7 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db.js";
 import { hikingMountainPath } from "../../shared/hikingMountains.js";
-import { HIKING_GALLERY_MAX, HIKING_PHOTOS_ANCHOR, hikingPhotoCredit, hikingPhotoMonth, type HikingPhoto, type MountainPhoto } from "../../shared/hikingPhotos.js";
+import { HIKING_GALLERY_MAX, HIKING_PHOTOS_ANCHOR, RECENT_PHOTO_DAYS, RECENT_PHOTO_MAX, RECENT_PHOTO_PER_MEMBER, hikingPhotoCredit, hikingPhotoMonth, type HikingPhoto, type MountainPhoto, type RecentHikingPhoto } from "../../shared/hikingPhotos.js";
 
 type Q = ReturnType<typeof sql>;
 const rows = async <T>(q: Q): Promise<T[]> => { const r: any = await db.execute(q); return (r.rows ?? r) as T[]; };
@@ -115,6 +115,35 @@ export async function listMountainPhotos(mountainId: string, viewerId: string | 
         return r.map((x) => ({
             id: x.id, memberId: x.member_id, credit: hikingPhotoCredit(x.name), month: hikingPhotoMonth(utc(x.taken_at)),
             url: x.url, thumbUrl: x.thumb_url, width: Number(x.width), height: Number(x.height),
+        }));
+    } catch (e) {
+        if (missingTable(e) || missingColumn(e)) return [];
+        throw e;
+    }
+}
+
+/**
+ * 요즘 올라온 회원 사진(2026-11-04 — 등산 홈 · 허브의 사진 줄). 산의 사진과 같은 규칙: 공개 · 안 가려진 것, 보는 사람이 차단한 회원 제외,
+ * 이름 · 달까지의 날짜만. 30일 안 · 한 사람 둘까지(한 사람이 줄을 다 차지하지 않게) · 여덟 장까지, 새 것부터.
+ */
+export async function listRecentPublicPhotos(viewerId: string | null): Promise<RecentHikingPhoto[]> {
+    const notBlocked = viewerId && UUID.test(viewerId)
+        ? sql`and not exists (select 1 from hiq_blocks b where b.blocker_id = ${viewerId}::uuid and b.blocked_id = p.member_id)`
+        : sql``;
+    try {
+        const r = await rows<any>(sql`
+            select * from (
+                select p.id::text as id, p.member_id::text as member_id, p.url, p.thumb_url, p.width, p.height, ${at("p.taken_at")} as taken_at, p.created_at,
+                       m.name, hm.slug as mountain_slug, hm.name as mountain_name,
+                       row_number() over (partition by p.member_id order by p.created_at desc) as rn
+                from hiking_photos p
+                join hiq_members m on m.id = p.member_id and m.profile_id is not null
+                join hiking_mountains hm on hm.id = p.mountain_id
+                where p.is_public and p.hidden_at is null and p.created_at > now() - make_interval(days => ${RECENT_PHOTO_DAYS}) ${notBlocked}
+            ) x where x.rn <= ${RECENT_PHOTO_PER_MEMBER} order by x.created_at desc limit ${RECENT_PHOTO_MAX}`);
+        return r.map((x) => ({
+            id: x.id, memberId: x.member_id, credit: hikingPhotoCredit(x.name), month: hikingPhotoMonth(utc(x.taken_at)),
+            url: x.url, thumbUrl: x.thumb_url, width: Number(x.width), height: Number(x.height), mountainSlug: x.mountain_slug, mountainName: x.mountain_name,
         }));
     } catch (e) {
         if (missingTable(e) || missingColumn(e)) return [];

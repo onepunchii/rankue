@@ -11,7 +11,7 @@ import { trailheadPoint, type SummitBase } from "../../../shared/hikingSummitWx.
 import { addRecords, addSummit, addSummitMiss, listHikingAwards, listSummits, removeRecord, syncHikingAwards, CREW_TOGETHER, crewSummits } from "../../storage/hikingStamps.js";
 import { addTrip, listTrips } from "../../storage/hikingTrips.js";
 import { cleanTrip } from "../../../shared/hikingTrail.js";
-import { addPhoto, appealPhoto, listMountainPhotos, listPhotos, photoCounts, removePhoto, setPhotoPublic } from "../../storage/hikingPhotos.js";
+import { addPhoto, appealPhoto, listMountainPhotos, listPhotos, listRecentPublicPhotos, photoCounts, removePhoto, setPhotoPublic } from "../../storage/hikingPhotos.js";
 import { HIKING_GALLERY_LIMIT, HIKING_GALLERY_MAX, HIKING_PHOTO_CATEGORY, HIKING_PHOTO_DAILY_MAX, HIKING_PHOTO_LABEL, HIKING_PHOTO_PER_MOUNTAIN_MAX, HIKING_THUMB_CATEGORY, isOwnHikingPhotoUrl, validPhotoSize } from "../../../shared/hikingPhotos.js";
 import { HIKING_ALBUM_MAX, groupHikingAlbum, type AlbumMountainInfo } from "../../../shared/hikingAlbum.js";
 import { deleteBlobs, isOnOwnBlobHost } from "../../utils/blob.js";
@@ -335,6 +335,15 @@ router.get("/mountains/:slug/photos", asyncHandler(async (req: any, res: any) =>
     const limit = Math.min(Math.max(Math.floor(Number(req.query.limit)) || HIKING_GALLERY_LIMIT, 1), HIKING_GALLERY_MAX);
     res.set("Cache-Control", "private, no-store");
     return sendSuccess(res, { photos: await listMountainPhotos(m.id, viewerOf(req), limit) });
+}));
+
+/**
+ * 요즘 올라온 회원 사진(2026-11-04 오너: "홈에 등산 사진도 매력적으로 조금 크게") — 등산 홈 · 허브의 사진 줄이 '오늘의 명산' 앞에 섞는다.
+ * 산의 사진처럼 누구에게나 열려 있고, 보는 사람이 차단한 회원의 사진은 빼므로 공용 캐시에 두지 않는다.
+ */
+router.get("/recent-photos", asyncHandler(async (req: any, res: any) => {
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, { photos: await listRecentPublicPhotos(viewerOf(req)) });
 }));
 
 /** 내 사진(새 것부터) — ?mountainId= 를 주면 그 산의 것만. 올린 사람만 읽는다(비공개 · 가려진 것까지) */

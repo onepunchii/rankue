@@ -64,8 +64,25 @@ describe("등산 홈 '오늘의 명산'(2026-10-21)", () => {
         expect(h).toContain('router.get("/featured-photos"');
         expect(h).toContain('m.lists.some((l) => l === "kfs100" || l === "kfs100plus") && MOUNTAIN_TOUR_PHOTOS[m.slug]?.photos.length');
         const c = readFileSync(resolve(__dirname, "../client/src/hiking/components/FeaturedPhotos.tsx"), "utf8");
-        expect(c).toContain("if (items.length < 3) return null;");
+        expect(c).toContain("if (items.length < 3 && !members.length) return null;");
         expect(c).not.toContain("object-cover");
+        expect(c).not.toContain("objectFit");
         expect(readFileSync(resolve(__dirname, "../client/src/hiking/pages/HikingHome.tsx"), "utf8")).toContain("<FeaturedPhotos />");
+    });
+    // 2026-11-04 오너: "홈에 등산 사진도 매력적으로 조금 크게" — 회원 사진을 앞에 섞는다
+    it("회원 사진: 공개 · 안 가려진 것 · 30일 · 한 사람 둘 · 여덟 장, 차단한 회원 제외, 셋 미만이면 섞지 않음 · 허브에도", () => {
+        const st = readFileSync(resolve(__dirname, "../server/storage/hikingPhotos.ts"), "utf8");
+        const f = st.slice(st.indexOf("export async function listRecentPublicPhotos("), st.indexOf("// ── 신고 · 운영자 · 탈퇴의 길"));
+        expect(f).toContain("where p.is_public and p.hidden_at is null and p.created_at > now() - make_interval(days => ${RECENT_PHOTO_DAYS}) ${notBlocked}");
+        expect(f).toContain("x.rn <= ${RECENT_PHOTO_PER_MEMBER}");
+        expect(f).toContain("limit ${RECENT_PHOTO_MAX}");
+        expect(f).toContain("b.blocker_id = ${viewerId}::uuid and b.blocked_id = p.member_id");
+        const h = readFileSync(resolve(__dirname, "../server/routes/modules/hiking.ts"), "utf8");
+        const r = h.slice(h.indexOf('router.get("/recent-photos"'), h.indexOf('router.get("/recent-photos"') + 300);
+        expect(r).toContain('res.set("Cache-Control", "private, no-store");');
+        const c = readFileSync(resolve(__dirname, "../client/src/hiking/components/FeaturedPhotos.tsx"), "utf8");
+        expect(c).toContain("const members = got.length >= RECENT_PHOTO_MIN ? got : [];");
+        expect(c).toContain("{p.credit} · {p.month}");
+        expect(readFileSync(resolve(__dirname, "../client/src/hiking/pages/HikingHub.tsx"), "utf8")).toContain("<FeaturedPhotos />");
     });
 });

@@ -21,6 +21,7 @@ import { HikingCta, MountainRow } from "../components/MountainParts";
 import { SeasonNow } from "../components/SeasonNow";
 import { TrailsEntry } from "../trails/TrailsEntry";
 import { VisitedEntry } from "../components/VisitedEntry";
+import { FeaturedPhotos } from "../components/FeaturedPhotos";
 import { HIKING_HERO, hikingCover } from "../theme";
 import { HIKING_HUB_KEY, type HikingHubData } from "../lib/api";
 import { useHikingStamps } from "../stamps/useHikingStamps";
@@ -79,6 +80,8 @@ export default function HikingHub() {
                             )}
                         </HkSection>
 
+                        {/* 산 사진(2026-11-04) — 회원이 공개한 사진 + 한국관광공사 '오늘의 명산'. 방문자에게도(산의 사진처럼 공개된 것만) */}
+                        <FeaturedPhotos />
                         <SeasonNow mountains={data.famous} done={my.done} mine={my.mine} />
                         {/* 코리아둘레길(2026-10-21 — 국토종주는 걸어서 · 등산 안에) */}
                         <TrailsEntry />

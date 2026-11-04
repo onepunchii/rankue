@@ -49,6 +49,13 @@ export interface HikingPhoto {
 }
 /** 산 화면의 공개 사진 한 장 — 누구에게나 나간다. 날짜는 달까지만, 좌표 · 연락처는 없다 */
 export interface MountainPhoto { id: string; memberId: string; credit: string; month: string; url: string; thumbUrl: string; width: number; height: number }
+/** 등산 홈 · 허브의 사진 줄에 섞는 회원 사진(2026-11-04) — 산의 사진과 같은 것에 그 산(이름 · 주소)만 더한다 */
+export interface RecentHikingPhoto extends MountainPhoto { mountainSlug: string; mountainName: string }
+/** 사진 줄에 섞는 회원 사진 — 30일 안 · 한 사람 둘까지 · 여덟 장까지. 셋 미만이면 섞지 않는다(한두 사람의 사진만 되풀이되지 않게) */
+export const RECENT_PHOTO_DAYS = 30;
+export const RECENT_PHOTO_PER_MEMBER = 2;
+export const RECENT_PHOTO_MAX = 8;
+export const RECENT_PHOTO_MIN = 3;
 
 const BLOB_HOST_RE = /^[a-z0-9]+\.public\.blob\.vercel-storage\.com$/i;
 /**
