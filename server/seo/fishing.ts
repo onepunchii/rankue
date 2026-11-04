@@ -129,7 +129,8 @@ export async function renderFishingSpots(path: string, all: readonly PublicPlace
         const items = all.filter((x) => fishingSidoShort(x.sido) === s);
         if (!items.length) return null;
         const seo = spotsRegionSeo(s, items.length);
-        return listing(`fishing:region:${s}`, fishingRegionPath(s), seo, seo.description, items, all, [[seo.h1, fishingRegionPath(s)]]);
+        // tag 는 X-Prerender 머리에 실린다 — 한글이면 Node 가 ERR_INVALID_CHAR 로 죽고 봇은 기본 당구 셸을 받는다(2026-11-04 실측: 시도 16곳 전부). 인코딩해 싣는다
+        return listing(`fishing:region:${encodeURIComponent(s)}`, fishingRegionPath(s), seo, seo.description, items, all, [[seo.h1, fishingRegionPath(s)]]);
     }
     const typ = /^\/fishing\/spots\/type\/([^/]+)$/.exec(p);
     if (typ) {

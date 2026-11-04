@@ -37,6 +37,17 @@ describe("낚시 첫 화면 — 검색용 화면 · 봇 라우트 · 사이트�
         // 표가 비면 화면에 맡긴다(자료 탓일 수 있다)
         expect(await renderFishingSpots("/fishing", [])).toBeNull();
     });
+    // 2026-11-04: 시도 낚시터 화면(16곳)의 tag 에 한글이 실려 X-Prerender 가 죽고, 봇은 '당구 점수판 랭큐'를 받았다
+    it("시도 · 종류 · 낚시터 화면의 tag 는 ASCII 뿐(X-Prerender 머리에 실린다)", async () => {
+        for (const p of ["/fishing", "/fishing/spots", `/fishing/spots/region/${encodeURIComponent("강원")}`, "/fishing/spots/region/강원", "/fishing/spots/type/reservoir", `/fishing/spot/${(place as { id: string }).id}`]) {
+            const r = await renderFishingSpots(p, [place]);
+            expect(r, p).not.toBeNull();
+            expect(r!.tag, p).toMatch(/^[\x20-\x7e]+$/);
+        }
+        const r = await renderFishingSpots("/fishing/spots/region/강원", [place]);
+        expect(r!.html).toContain("강원");
+        expect(r!.html).not.toContain("당구 점수판");
+    });
     it("제목은 사실만 — '추천 · 초보' 같은 말 없이, 화면과 같은 함수", () => {
         const seo = fishingHomeSeo(861, 51);
         expect(seo.title).toBe("랭큐 낚시 — 오늘 바다 · 물때 · 전국 낚시터 861곳 · 조과 기록");
