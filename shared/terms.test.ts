@@ -55,6 +55,13 @@ describe("TERMS_CONTENT", () => {
 
     // 2026-09-11 에는 "비공개 기능(골프)은 서비스 설명에 없다"(오너 결정)였다. 골프는 9/13 전체 공개(GOLF_PUBLIC)가 됐고,
     // 9/30 라운드 사진이 골프장 페이지에 바로 뜨는 UGC 가 되면서 약관이 그 공개·신고·차단 규칙을 적어야 한다(오너 요청).
+    it("등산 산행 사진(2026-11-04) — 공개한 것만 닉네임과 뜬다 · 신고 · 자동 가림 · 차단 · 언제든 비공개/삭제가 두 언어에 있다", () => {
+        const ko = JSON.stringify(TERMS_CONTENT.ko), en = JSON.stringify(TERMS_CONTENT.en);
+        expect(ko).toContain("등산 산행 사진은 ‘공개’로 둔 것만 산 페이지와 등산 화면에 닉네임과 함께 보이며(날짜는 달까지), 올린 사람이 언제든 비공개로 돌리거나 지울 수 있습니다.");
+        expect(ko.match(/골프 라운드·등산 산행 사진/g)).toHaveLength(3);
+        expect(en).toContain("Hiking photos appear on the mountain's page and hiking screens with the uploader's nickname");
+        expect(en.match(/hiking photo/gi)?.length).toBe(4);
+    });
     it("골프 라운드 사진 — 공개하면 골프장 페이지에 닉네임과 뜬다·신고·차단·언제든 비공개/삭제가 두 언어에 있다", () => {
         const ko = text("ko");
         for (const must of ["골프 라운드 사진", "골프장 페이지", "닉네임", "비공개", "지울 수"]) expect(ko, must).toContain(must);
