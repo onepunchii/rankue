@@ -21,6 +21,18 @@ export const BRAND_INTL = " | RANKUE";
 // 봇 홈(server/prerender.ts "/")이 정적 셸을 통째로 대체하므로, 여기서 빠지면 구글이 사이트 이름("랭큐")을 고를 근거가 사라진다.
 const ORG_ID = `${SITE_ORIGIN}/#organization`;
 
+/**
+ * 공식 채널(2026-11-04 오너: 검색 결과 아래에 "안드로이드 버튼 애플버튼 유튜브" 단추를) — 구글은 Organization.sameAs 를 공식 프로필로 읽고,
+ * 네이버는 같은 마크업을 '연관 채널'로 읽는다. 어느 쪽도 단추를 띄워 준다고 약속하지 않는다(보이는 것은 검색엔진이 고른다).
+ * 넣는 것은 우리 것이 확실한 살아 있는 주소만 — @rankue(r 하나)는 우리 채널이 아니다(빈 채널, 업로드 스크립트의 채널 id 와 다르다).
+ */
+export const SITE_CHANNELS = [
+  "https://www.youtube.com/@rrankue",
+  "https://play.google.com/store/apps/details?id=com.rankue.app",
+  "https://apps.apple.com/kr/app/id6760333313",
+  "https://www.youtube.com/@rankue_vn",
+] as const;
+
 export const SITE_ORGANIZATION = {
   "@type": "Organization",
   "@id": ORG_ID,
@@ -30,6 +42,7 @@ export const SITE_ORGANIZATION = {
   logo: `${SITE_ORIGIN}/icon-192.png`,
   image: `${SITE_ORIGIN}/og.png`,
   description: "스마트폰으로 당구 점수를 기록·관리하는 손안의 당구 점수판. 당구 매칭과 크루(당구 커뮤니티), 매장·전국 랭킹을 함께 제공합니다.",
+  sameAs: [...SITE_CHANNELS],
 };
 
 // 검색결과 사이트 이름은 WebSite.name 하나로 정한다 — 한국어 결과에 "랭큐"가 나오게(2026-09-24).

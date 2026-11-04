@@ -20,6 +20,16 @@ describe("client/index.html 과 같은 값", () => {
     expect(byType("MobileApplication")).toEqual(SITE_APP);
   });
 
+  it("공식 채널(sameAs) — 유튜브 본 채널 · 구글 플레이 · 앱스토어 · 베트남 채널, 우리 채널이 아닌 @rankue 는 넣지 않는다(2026-11-04)", () => {
+    expect(SITE_ORGANIZATION.sameAs).toEqual([
+      "https://www.youtube.com/@rrankue",
+      "https://play.google.com/store/apps/details?id=com.rankue.app",
+      "https://apps.apple.com/kr/app/id6760333313",
+      "https://www.youtube.com/@rankue_vn",
+    ]);
+    expect(SITE_ORGANIZATION.sameAs).not.toContain("https://www.youtube.com/@rankue");
+  });
+
   it("WebSite 이름은 랭큐 하나(검색결과 사이트 이름)", () => {
     expect(SITE_WEBSITE.name).toBe("랭큐");
     expect(SITE_WEBSITE.alternateName).toEqual(["RANKUE", "랭큐 RANKUE"]);
