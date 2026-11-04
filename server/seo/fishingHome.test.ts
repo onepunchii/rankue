@@ -24,7 +24,7 @@ describe("낚시 첫 화면 — 검색용 화면 · 봇 라우트 · 사이트�
         for (const p of ["/fishing", "/fishing/", "/fishing/spots", "/fishing/spot/1234567"]) expect(FISHING_SPOTS_RE.test(p), p).toBe(true);
         for (const p of ["/fishings", "/fishing/x", "/fishing/spots/a/b/c"]) expect(FISHING_SPOTS_RE.test(p), p).toBe(false);
         // vercel 봇 라우트도 첫 화면을 같이(없으면 봇이 당구 셸을 받는다)
-        expect(read("vercel.json")).toContain("|fishing(?:/(?:spots(?:/(?:region|type)/[^/]+)?|spot/[^/]+|sea(?:/[^/]+)?|port/[^/]+|fish(?:/[^/]+)?|closed))?)/?\"");
+        expect(read("vercel.json")).toContain("|fishing(?:/(?:spots(?:/(?:region|type)/[^/]+)?|spot/[^/]+|sea(?:/[^/]+)?|port/[^/]+|tide/[^/]+|fish(?:/[^/]+)?|closed))?)/?\"");
     });
     it("검색용 화면 — 낚시 제목 · 자기 주소 canonical · 낚시터 · 물때 · 어종으로 가는 길", async () => {
         const r = await renderFishingSpots("/fishing", [place]);
@@ -60,5 +60,26 @@ describe("낚시 첫 화면 — 검색용 화면 · 봇 라우트 · 사이트�
         const parts = fishingSitemapParts([place], "2026-10-26");
         expect(parts[0]).toContain("<loc>https://www.rankue.co.kr/fishing</loc>");
         expect(parts[0]).toContain("<changefreq>daily</changefreq>");
+    });
+});
+
+describe("낚시터 화면을 고유하게(2026-11-04) — 요약 · 오늘 물때 · 대상 어종 규칙 · 같은 종류", () => {
+    const sea = { id: "202234500001000003", name: "미조방파제", kind: "바다", sido: "경상남도", sigungu: "남해군", lat: 34.71, lng: 128.04, species: ["감성돔", "볼락"], fee: null, tel: null, address: null, dataDate: null } as never;
+    const sea2 = { ...(sea as object), id: "202234500001000004", name: "상주방파제", lat: 34.72, lng: 127.99 } as never;
+    it("받은 사실로 지은 한 줄 · 오늘 물때(받았을 때만) · 감성돔 금지체장 · 같은 시도 같은 종류", async () => {
+        const r = await renderFishingSpots("/fishing/spot/202234500001000003", [sea, sea2], {
+            tideToday: async () => ({ name: "미조항", path: "/fishing/tide/%EB%AF%B8%EC%A1%B0%ED%95%AD", km: 0.9, day: "2026-11-04", tideName: "11물", turns: [{ min: 326, cm: 205, kind: "high" }, { min: 671, cm: 87, kind: "low" }] }),
+        });
+        expect(r!.html).toContain("미조방파제는 경남 남해에 있는 바다 낚시터예요. 대상 어종은 감성돔 · 볼락이고, 요금은 등록돼 있지 않아요. 가장 가까운 낚시터는 4.6km 떨어진 상주방파제예요.");
+        expect(r!.html).toContain("오늘 물때 — 미조항(0.9km)");
+        expect(r!.html).toContain("11월 4일 11물 · 만조 05:26 · 간조 11:11");
+        expect(r!.html).toContain('href="/fishing/tide/%EB%AF%B8%EC%A1%B0%ED%95%AD"');
+        expect(r!.html).toContain("대상 어종의 금어기 · 금지체장");
+        expect(r!.html).toContain("금지체장 25센티미터 이하");
+        const fee = await renderFishingSpots("/fishing/spot/202234500001000004", [sea, { ...(sea2 as object), fee: 10000 } as never], { tideToday: async () => null });
+        expect(fee!.html).toMatch(/요금은 [^<]*원으로 등록돼 있어요/);
+        // 물때를 받지 못하면 그 칸은 항구 링크로만
+        const r2 = await renderFishingSpots("/fishing/spot/202234500001000003", [sea, sea2], { tideToday: async () => null });
+        expect(r2!.html).not.toContain("오늘 물때 — ");
     });
 });

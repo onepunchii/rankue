@@ -4,6 +4,7 @@
  *   SeaHub     /fishing/sea — 판화 해도(해역 일곱 곳의 특보 물감 · 항구 점, 누르면 그 해역) · 해역 카드 · 항구 51곳
  *   SeaArea    /fishing/sea/<해역> — 표지 · 지금 특보 · 반나절 해상예보 · 그 해역의 항구 · 바다 낚시터
  *   PortPage   /fishing/port/<항구> — 날짜 칩 · 물때 곡선(만조 · 간조 · 해 뜨고 짐) · 지금 들물/날물 · 수온 · 부이 · 바다낚시지수 · 가까운 바다 낚시터
+ *   TidePointPage /fishing/tide/<물때 지점>(2026-11-04) — 포구 · 섬의 이레 만조 · 간조(조석예보) · 어림 곡선 · 가까운 항구 · 이웃 지점 · 바다 낚시터
  *
  * 값은 받은 그대로(기상청 · 국립해양조사원 · 천문연구원). '나가도 된다'고 말하지 않는다. ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지.
  */
@@ -22,6 +23,8 @@ import { nearestPort, type PublicPlace } from "@shared/fishingPlaces";
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath, fishingSeaAreaPath, portByName, portSeo, portsOf, seaArt, seaAreaById, seaAreaSeo, seaHubSeo } from "@shared/fishingSeaPages";
 import { SeaChart, SEA_LEGEND, seaWashColor, seaWashLine } from "../SeaChart";
 import { fishingSeaCardUrl } from "@shared/ogCards";
+import { cosineTide, fishingTidePath, tidePointSeo, type TidePointData, type TidePointNear } from "@shared/fishingTidePoints";
+import { fishingSpotPath } from "@shared/fishingPlaces";
 import { josa } from "@shared/briefingMeta";
 import { TideCurve } from "../TideCurve";
 import { PAPER } from "../ink";
@@ -295,6 +298,7 @@ export function SeaAreaPage({ id }: { id: string }) {
                 <h2 className="mb-2.5 text-[17px] font-semibold">{a.name} 항구 물때표</h2>
                 <div className="flex flex-wrap gap-1.5">{portsOf(id).map((p) => <Link key={p.code} href={fishingPortPath(p.name)} className="flex h-10 items-center rounded-full px-3.5 text-[14px]" style={{ background: "#FFFFFF14", color: C.foam }} data-testid="sea-area-port">{p.name}</Link>)}</div>
             </section>
+            <TidePointChips title={`${a.name}의 포구 · 섬 물때`} query={`area=${encodeURIComponent(id)}`} />
             {seaSpots.length > 0 && (
                 <section className="px-5 pt-6" data-testid="sea-area-spots">
                     <h2 className="mb-1 text-[17px] font-semibold">{a.name}의 바다 낚시터 <span className="text-[13px] font-normal tabular-nums" style={{ color: C.dim }}>{seaSpots.length}곳</span></h2>
@@ -398,6 +402,7 @@ export function PortPage({ name }: { name: string }) {
                     <ul className="divide-y divide-[#FFFFFF14]">{near.slice(0, 8).map((p) => <li key={p.id}><Row p={p} /></li>)}</ul>
                 </section>
             )}
+            <TidePointChips title={`${port.name} 가까운 포구 · 섬 물때`} query={`near=${port.code}`} />
             {others.length > 0 && (
                 <section className="px-5 pt-6">
                     <h2 className="mb-2.5 text-[17px] font-semibold">{area?.name ?? "같은 바다"}의 다른 항구</h2>
@@ -406,6 +411,106 @@ export function PortPage({ name }: { name: string }) {
                 </section>
             )}
             <p className="px-5 pt-4 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>조석 예보 · 관측: 국립해양조사원{data?.sun?.at ? ` · 해 뜨고 지는 시각: 한국천문연구원(${data.sun.at})` : ""}. 물때 이름은 음력 날짜로 센 것이에요. {SEA_CAUTION}</p>
+        </Shell>
+    );
+}
+
+/** 물때 지점 칩 줄 — 해역 화면(그 바다의 지점) · 항구 화면(가까운 지점). 없으면 칸이 없다 */
+function TidePointChips({ title, query }: { title: string; query: string }) {
+    const { data } = useQuery<{ points: TidePointNear[] | { name: string; km: null }[] }>({ queryKey: [`/api/hiq/fishing/tide-points?${query}`], staleTime: 60 * 60_000 });
+    const pts = (data?.points ?? []) as { name: string; km: number | null }[];
+    if (!pts.length) return null;
+    return (
+        <section className="px-5 pt-6" data-testid="tide-point-chips">
+            <h2 className="mb-2.5 text-[17px] font-semibold">{title}</h2>
+            <div className="flex flex-wrap gap-1.5">{pts.map((p) => (
+                <Link key={p.name} href={fishingTidePath(p.name)} className="flex h-10 items-center gap-1 rounded-full px-3.5 text-[14px]" style={{ background: "#FFFFFF14", color: C.foam }} data-track-as="fishing-tide-point">
+                    {p.name}{p.km != null && <span className="text-[12px] tabular-nums" style={{ color: C.dim }}>{p.km}km</span>}
+                </Link>
+            ))}</div>
+        </section>
+    );
+}
+
+/**
+ * 물때 지점 한 곳(2026-11-04 — shared/fishingTidePoints). 이레의 만조 · 간조는 조석예보 그대로, 곡선은 꺾임을 이은 어림(cosineTide)이다.
+ * 수온 · 지수 · 부이는 이 지점에 없다 — 가까운 항구 화면으로 잇는다.
+ */
+export function TidePointPage({ name }: { name: string }) {
+    const today = kstToday();
+    const [day, setDay] = useState(today);
+    const { data, isLoading, isError } = useQuery<TidePointData>({ queryKey: [`/api/hiq/fishing/tide/${encodeURIComponent(name)}`], staleTime: 10 * 60_000, retry: false });
+    const p = data?.point;
+    const area = p ? seaAreaById(p.area) : null;
+    const seo = p ? tidePointSeo(p, area?.name ?? null) : null;
+    useSeo(seo && p ? { title: seo.title, description: seo.description, path: fishingTidePath(p.name), locale: "ko", image: fishingSeaCardUrl(ORIGIN, p.port.name) } : null);
+    if (isLoading) return <Shell title={`${name} 물때`}><div className="space-y-3 px-5 pt-5" aria-busy="true"><div className="h-40 animate-pulse rounded-2xl bg-[#FFFFFF0F]" /><div className="h-[260px] animate-pulse rounded-2xl bg-[#FFFFFF0F]" /></div></Shell>;
+    if (isError || !data || !p || !seo) return <Shell title="물때"><p className="px-5 py-16 text-center text-[15px]" style={{ color: C.soft }}>없는 물때 지점이에요.</p></Shell>;
+    const sea = area?.tide ?? "south";
+    const days = data.days.filter((d) => d.day >= today);
+    const i = Math.max(0, days.findIndex((d) => d.day === day));
+    const cur = days[i] ?? days[0];
+    const turns = cur?.turns ?? [];
+    const prev = i > 0 ? days[i - 1].turns.at(-1) ?? null : null, next = days[i + 1]?.turns[0] ?? null;
+    // 훅이 아니다 — 위의 이른 return 뒤라 훅을 부르면 그리기마다 훅의 수가 달라진다(셈은 가볍다)
+    const points = cosineTide(turns, prev, next);
+    const isToday = cur?.day === today;
+    const nowMin = isToday ? kstMinuteNow() : null;
+    const flow = nowMin != null ? tideFlowAt(turns, nowMin) : null;
+    const tide = cur ? tideOf(cur.day, sea) : null;
+    const range = tideRange(turns);
+    return (
+        <Shell title={`${p.name} 물때`}>
+            <Cover src={seaArt(p.area)} kicker={area ? `${area.name} · 조석예보 지점` : "조석예보 지점"} title={seo.h1} sub={tide ? `${isToday ? "오늘" : fishingDayLabel(cur.day, today)} ${tide.name} · ${TIDE_PHASE_TEXT[tide.phase]}` : undefined} />
+            {days.length > 1 && (
+                <div className="flex gap-1.5 overflow-x-auto px-5 pt-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" role="group" aria-label="날짜">
+                    {days.map((d, k) => <DayChip key={d.day} day={d.day} label={k === 0 && d.day === today ? "오늘" : d.day === tideAddDays(today, 1) ? "내일" : `${Number(d.day.slice(5, 7))}/${Number(d.day.slice(8))}`} sea={sea} on={d.day === cur?.day} onPick={() => setDay(d.day)} />)}
+                </div>
+            )}
+            <section className="px-5 pt-4" data-testid="tide-point-tide">
+                {!turns.length ? <p className="rounded-2xl bg-[#FFFFFF0A] px-5 py-7 text-center text-[13.5px]" style={{ color: C.soft }}>이 날의 조석예보를 아직 받지 못했어요. 잠시 뒤에 다시 열어 주세요.</p> : (
+                    <div className="overflow-hidden rounded-2xl" style={{ background: PAPER, boxShadow: "0 1px 0 #00000040, inset 0 0 0 1px #0F28381F" }}>
+                        <TideCurve points={points} turns={turns} nowMin={nowMin} sun={null} />
+                        <div className="border-t px-3.5 py-2.5" style={{ borderColor: "#0F28381F", color: "#0F2838" }}>
+                            <p className="flex flex-wrap gap-1.5">{turns.map((t) => <span key={`${t.kind}${t.min}`} className="rounded-full px-2.5 py-1 text-[13px] font-semibold tabular-nums" style={{ background: t.kind === "high" ? "#3F86A833" : "#0F283812" }}>{t.kind === "high" ? "만조" : "간조"} {hhmm(t.min)} · {t.cm}cm</span>)}</p>
+                            {flow && <p className="mt-1.5 text-[13.5px]">지금은 <span className="font-semibold">{flow.flow}</span> — {flow.next.kind === "high" ? "만조" : "간조"}({hhmm(flow.next.min)})까지 <span className="font-semibold tabular-nums">{durationKo(flow.inMin)}</span></p>}
+                            <p className="mt-0.5 text-[12.5px]" style={{ color: "#0F2838B3" }}>{range != null ? `물높이 차 ${range}cm · ` : ""}곡선은 만조 · 간조를 이은 어림이에요</p>
+                        </div>
+                    </div>
+                )}
+            </section>
+            {/* 가까운 항구 — 수온 · 바다낚시지수 · 해 뜨고 짐은 그 화면에 */}
+            <section className="px-5 pt-4">
+                <Link href={fishingPortPath(p.port.name)} className="flex items-center gap-3 rounded-2xl px-4 py-3.5 active:opacity-80" style={{ background: "#FFFFFF0D" }} data-track-as="fishing-tide-port">
+                    <span className="min-w-0 flex-1">
+                        <span className="block text-[15px] font-semibold">가까운 항구 — {p.port.name} <span className="text-[13px] font-normal tabular-nums" style={{ color: C.dim }}>{p.port.km}km</span></span>
+                        <span className="mt-0.5 block text-[13px]" style={{ color: C.soft }}>지금 수온 · 파고 · 바다낚시지수 · 해 뜨고 지는 시각</span>
+                    </span>
+                    <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: C.dim }} aria-hidden />
+                </Link>
+            </section>
+            {data.near.length > 0 && (
+                <section className="px-5 pt-6">
+                    <h2 className="mb-2.5 text-[17px] font-semibold">가까운 포구 · 섬 물때</h2>
+                    <div className="flex flex-wrap gap-1.5">{data.near.map((x) => <Link key={x.name} href={fishingTidePath(x.name)} className="flex h-10 items-center gap-1 rounded-full px-3.5 text-[14px]" style={{ background: "#FFFFFF14", color: C.foam }} data-track-as="fishing-tide-point">{x.name}<span className="text-[12px] tabular-nums" style={{ color: C.dim }}>{x.km}km</span></Link>)}</div>
+                </section>
+            )}
+            {data.spots.length > 0 && (
+                <section className="px-5 pt-6" data-testid="tide-point-spots">
+                    <h2 className="mb-1 text-[17px] font-semibold">{p.name} 가까운 바다 낚시터 <span className="text-[13px] font-normal tabular-nums" style={{ color: C.dim }}>{data.spots.length}곳</span></h2>
+                    <ul className="divide-y divide-[#FFFFFF14]">{data.spots.map((x) => (
+                        <li key={x.id}><Link href={fishingSpotPath(x.id)} className="flex min-h-[52px] items-center gap-3 py-2 active:opacity-70" data-track-as="fishing-tide-spot">
+                            <span className="min-w-0 flex-1"><span className="block truncate text-[15px] font-semibold">{x.name}</span>{x.species.length > 0 && <span className="block truncate text-[12.5px]" style={{ color: C.soft }}>{x.species.join(" · ")}</span>}</span>
+                            <span className="shrink-0 text-[13px] tabular-nums" style={{ color: C.dim }}>{x.km}km</span>
+                        </Link></li>
+                    ))}</ul>
+                </section>
+            )}
+            <section className="px-5 pt-6">
+                <h2 className="mb-2.5 text-[17px] font-semibold">{TIDE_SEAS.find((x) => x.id === sea)?.name} 물때 달력</h2>
+                <TideCalendar sea={sea} />
+            </section>
+            <p className="px-5 pt-4 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>만조 · 간조: 국립해양조사원 조석예보({p.name} 지점). 물때 이름은 음력 날짜로 센 것이에요. {SEA_CAUTION}</p>
         </Shell>
     );
 }

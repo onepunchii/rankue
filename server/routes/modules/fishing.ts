@@ -12,6 +12,8 @@
  *   GET    /api/hiq/fishing/market       위판장 소식 — 지난 이레 어종별 경매 건수(해양수산부)
  *   GET    /api/hiq/fishing/index-map    낚시지수 지도 — 지점 마흔아홉 곳에서 어종마다 그날이 어떤가(?day=)
  *   GET    /api/hiq/fishing/ports/:code  항구 브리핑 — 조석 곡선 · 해와 달 · 지금의 바다 · 바다낚시지수(?day=)
+ *   GET    /api/hiq/fishing/tide/:name   물때 지점 — 이레의 만조 · 간조 · 가까운 지점 · 바다 낚시터(2026-11-04)
+ *   GET    /api/hiq/fishing/tide-points  물때 지점 이름들(?area= 그 바다 · ?near=<항구 코드> 가까운 순)
  *   GET    /api/hiq/fishing/crews        내가 든 크루
  *   GET    /api/hiq/fishing/trips        그 크루의 정출들 + 올해의 판(?crewId=)
  *   POST   /api/hiq/fishing/trips        정출 만들기(그 크루의 사람만)
@@ -32,6 +34,8 @@ import { getSeaFcst } from "../../services/fishingSeaFcst.js";
 import { SEA_FCST_REG } from "../../../shared/fishingSeaFcst.js";
 import { getIndexMap, getMainPortTurns, getPortBrief } from "../../services/fishingPort.js";
 import { allPlaces, placeById } from "../../storage/fishingPlaces.js";
+import { tidePointByName, tidePointData, tidePointNearPlace, tidePoints } from "../../services/fishingTidePoints.js";
+import { nearTidePoints } from "../../../shared/fishingTidePoints.js";
 import { FISHING_PORTS } from "../../../shared/fishingStations.js";
 import { isPlaceId, nearbyPlaces, nearestPort } from "../../../shared/fishingPlaces.js";
 import { nearestWeather, type CatchWeather } from "../../../shared/fishingSpot.js";
@@ -290,6 +294,24 @@ router.get("/ports/:code", asyncHandler(async (req: any, res: any) => {
     return sendSuccess(res, await getPortBrief(code, day).catch(() => null));
 }));
 
+/* ── 물때 지점(2026-11-04 — shared/fishingTidePoints · services/fishingTidePoints) — 누구나. 목록에 있는 지점만 바깥을 부른다 ── */
+router.get("/tide/:name", asyncHandler(async (req: any, res: any) => {
+    const p = tidePointByName(String(req.params.name ?? ""));
+    if (!p) return sendError(res, 404, "물때 지점을 찾을 수 없어요");
+    const data = await tidePointData(p, await allPlaces().catch(() => []), { fetch: true });
+    // 이레를 다 받았으면 한 시간, 아니면 2분(못 받은 날을 곧 다시 받게)
+    publicCache(res, data.days.every((d) => d.turns.length) ? 3600 : 120);
+    return sendSuccess(res, data);
+}));
+router.get("/tide-points", asyncHandler(async (req: any, res: any) => {
+    const all = tidePoints();
+    const area = String(req.query.area ?? "");
+    const near = FISHING_PORTS.find((x) => x.code === String(req.query.near ?? ""));
+    publicCache(res, 86_400);
+    if (near) return sendSuccess(res, { points: nearTidePoints(all, { lat: near.lat, lng: near.lng }, 10, 40) });
+    return sendSuccess(res, { points: all.filter((x) => !area || x.area === area).map((x) => ({ name: x.name, km: null })).sort((a, b) => a.name.localeCompare(b.name, "ko")) });
+}));
+
 /* ── 크루 정출판 — 정출마다 최대어 · 마릿수 · 잡어상, 한 해의 점수(shared/fishingTrip). 크루는 있는 크루(hiq_crews)를 그대로 쓴다 ── */
 
 const myCrews = (memberId: string) => db.select({ id: hiqCrews.id, name: hiqCrews.name, emblem: hiqCrews.emblem }).from(hiqCrewMembers)
@@ -385,7 +407,10 @@ router.get("/spots/:id", asyncHandler(async (req: any, res: any) => {
     const tourPhotos = FISHING_TOUR_PHOTOS[`${place.sido ?? ""}|${place.sigungu ?? ""}|${place.name}`]?.photos ?? [];
     // 이 근처 축제(2026-10-21 전국 축제 — 종목별) — 20km 안, 열렸거나 45일 안에 여는 것 셋(산 페이지와 같은 셈)
     const festivals = place.lat != null && place.lng != null ? nearbyFestivals(await tourFestivals().catch(() => []), place.lat, place.lng, kstYmd()) : [];
-    return sendSuccess(res, { place, nearby: nearbyPlaces(all, place, 6), port: port ? { code: port.code, name: port.name, km: port.km, area: port.area } : null, tourPhotos, festivals });
+    // 더 가까운 물때 지점(2026-11-04) — 항구보다 가까울 때만(포구 · 섬의 조석예보)
+    const tp = tidePointNearPlace(place);
+    const tidePoint = tp && (!port || tp.km < port.km) ? { name: tp.name, km: tp.km } : null;
+    return sendSuccess(res, { place, nearby: nearbyPlaces(all, place, 6), port: port ? { code: port.code, name: port.name, km: port.km, area: port.area } : null, tidePoint, tourPhotos, festivals });
 }));
 /** 한 곳의 오늘 물때 — 가까운 항구의 만조 · 간조 · 지금 바다(바다 낚시터만). 못 받았으면 null */
 router.get("/spots/:id/tide", asyncHandler(async (req: any, res: any) => {

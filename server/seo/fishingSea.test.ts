@@ -118,3 +118,37 @@ describe("바다 · 항구 물때 공개 페이지", () => {
         expect(JSON.stringify(fishingSeaCardInput("인천"))).not.toMatch(/\d{1,2}:\d{2}|cm|°/);
     });
 });
+
+describe("물때 지점(2026-11-04) — 포구 · 섬의 이레 물때표", () => {
+    const tp = { code: "SO_0326", name: "미조항", lat: 34.70638, lng: 128.04861, area: "south-east", port: { code: FISHING_PORTS.find((p) => p.area === "south-east")!.code, name: FISHING_PORTS.find((p) => p.area === "south-east")!.name, km: 30 } };
+    const days = [{ day: "2026-11-04", turns: [{ min: 326, cm: 205, kind: "high" as const }, { min: 671, cm: 87, kind: "low" as const }] }, { day: "2026-11-05", turns: [] }];
+    const deps: FishingSeaDeps = { ...none, tidePoints: () => [tp], tide: async () => ({ point: tp, days, near: [{ name: "상주", km: 6.2 }], spots: [{ id: "202234500001000003", name: "미조방파제", km: 1.2, species: ["감성돔"] }] }) };
+    it("주소 — 봇 라우트 · 프리렌더가 같은 길", () => {
+        for (const p of ["/fishing/tide/%EB%AF%B8%EC%A1%B0%ED%95%AD", "/fishing/tide/미조항/"]) expect(FISHING_SEA_RE.test(p)).toBe(true);
+        expect(read("vercel.json")).toContain("|port/[^/]+|tide/[^/]+|");
+    });
+    it("이레의 만조 · 간조(받은 날만) · 물때 이름 · 가까운 항구 · 이웃 지점 · 낚시터, tag 는 ASCII", async () => {
+        const r = await renderFishingSea("/fishing/tide/%EB%AF%B8%EC%A1%B0%ED%95%AD", deps, Date.parse("2026-11-04T03:00:00Z"));
+        expect(r!.tag).toBe("fishing:tide:SO_0326");
+        expect(r!.tag).toMatch(/^[\x20-\x7e]+$/);
+        const h = html(r)!;
+        expect(h.title).toBe("미조항 물때표 — 오늘 만조 · 간조 시각 · 이레 물때 · 남해동부 | 랭큐 낚시");
+        expect(h.canonical).toBe("https://www.rankue.co.kr/fishing/tide/%EB%AF%B8%EC%A1%B0%ED%95%AD");
+        expect(h.body).toContain("만조 05:26 205cm · 간조 11:11 87cm");
+        expect(h.body).toContain(`href="${fishingPortPath(tp.port.name)}"`);
+        expect(h.body).toContain('href="/fishing/tide/%EC%83%81%EC%A3%BC"');
+        expect(h.body).toContain('href="/fishing/spot/202234500001000003"');
+        // 받지 못한 날은 시각을 적지 않는다(지어 넣지 않는다)
+        expect(h.body).toMatch(/11월 5일\([^)]+\)[^<—]*<\/li>/);
+        expect(await renderFishingSea("/fishing/tide/없는곳", deps)).toBeNull();
+    });
+    it("해역 화면은 그 바다의 지점을, 항구 화면은 가까운 지점을 잇는다 · 사이트맵에 지점", async () => {
+        const a = html(await renderFishingSea(`/fishing/sea/south-east`, deps))!;
+        expect(a.body).toContain("남해동부의 포구 · 섬 물때표");
+        expect(a.body).toContain('href="/fishing/tide/%EB%AF%B8%EC%A1%B0%ED%95%AD"');
+        const near = FISHING_PORTS.filter((p) => p.area === "south-east").sort((x, y) => Math.hypot(x.lat - tp.lat, x.lng - tp.lng) - Math.hypot(y.lat - tp.lat, y.lng - tp.lng))[0];
+        const pt = html(await renderFishingSea(fishingPortPath(near.name), deps))!;
+        expect(pt.body).toContain("가까운 포구 · 섬 물때");
+        expect(fishingSeaSitemapParts("2026-11-04", [tp]).some((x) => x.includes("/fishing/tide/%EB%AF%B8%EC%A1%B0%ED%95%AD"))).toBe(true);
+    });
+});

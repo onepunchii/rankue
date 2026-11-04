@@ -22,6 +22,7 @@ import { fishingSitemapParts, fishingSpotHasPhotos } from "./seo/fishing.js";
 import { fishingSpotPath } from "../shared/fishingPlaces.js";
 import { hikingMountainPath } from "../shared/hikingPage.js";
 import { fishingSeaSitemapParts } from "./seo/fishingSea.js";
+import { tidePoints } from "./services/fishingTidePoints.js";
 import { fishingFishSitemapParts } from "./seo/fishingFish.js";
 import { allPlaces, placesUpdatedDay } from "./storage/fishingPlaces.js";
 import { allMountains, mountainUpdatedDays } from "./storage/hiking.js";
@@ -339,7 +340,7 @@ const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
   fishing: async () => {
     const all = await allPlaces().catch((e) => { console.warn("[sitemap] fishing:", (e as Error)?.message); return []; });
     // 바다 · 항구 물때(2026-10-18)는 낚시터를 못 읽어도 나간다(표가 코드에 있다)
-    return [...fishingSitemapParts(all, await placesUpdatedDay().catch(() => null)), ...fishingSeaSitemapParts(new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10)), ...fishingFishSitemapParts(await placesUpdatedDay().catch(() => null))];
+    return [...fishingSitemapParts(all, await placesUpdatedDay().catch(() => null)), ...fishingSeaSitemapParts(new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10), tidePoints()), ...fishingFishSitemapParts(await placesUpdatedDay().catch(() => null))];
   },
   // 전국 축제(2026-10-21) — 허브 + 축제마다. 표를 못 읽으면 빈 구역
   festivals: async () => {

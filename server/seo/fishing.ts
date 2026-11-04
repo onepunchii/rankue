@@ -18,6 +18,13 @@ import { FISHING_CLOSED_PATH } from "../../shared/fishingClosed.js";
 import { fishingSeaCardUrl } from "../../shared/ogCards.js";
 import { FISH } from "../../shared/fishingFish.js";
 import { FISHING_TOUR_PHOTOS } from "../data/fishingTourPhotos.js";
+import { fishAsset } from "./fishingFish.js";
+import { josa } from "../../shared/briefingMeta.js";
+import { hhmm } from "../../shared/fishingPort.js";
+import type { SpotTideToday } from "../../shared/fishingTidePoints.js";
+
+/** 낚시터 한 곳의 오늘 물때(2026-11-04 — services/fishingTidePoints spotTideToday) — prerender 가 넘긴다. 못 받았으면 null(그때는 항구 물때표 링크만) */
+export interface FishingSpotsDeps { tideToday?: (pl: PublicPlace) => Promise<SpotTideToday | null> }
 /** 한국관광공사 사진(2026-10-21) — 열쇠 '시도|시군구|이름'(화면과 같은 값) */
 const tourOf = (pl: { sido: string | null; sigungu: string | null; name: string }) => FISHING_TOUR_PHOTOS[`${pl.sido ?? ""}|${pl.sigungu ?? ""}|${pl.name}`]?.photos ?? [];
 /** 한국관광공사 사진이 있는 낚시터인가 — 구글 전용 사이트맵이 싣는 낚시터 한 곳의 기준(server/sitemap googleSectionParts, 2026-10-26) */
@@ -116,7 +123,7 @@ ${hubNav("ko")}`;
     return { status: 200, tag: "fishing:home", html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${FISHING_HOME_PATH}`, body, image: card, jsonLd: [ld, trail] }) };
 }
 
-export async function renderFishingSpots(path: string, all: readonly PublicPlace[]): Promise<FishingRender | null> {
+export async function renderFishingSpots(path: string, all: readonly PublicPlace[], deps: FishingSpotsDeps = {}): Promise<FishingRender | null> {
     const p = path.replace(/\/+$/, "") || "/";
     if (p === FISHING_HOME_PATH) return all.length ? renderFishingHome(all) : null;
     if (p === FISHING_SPOTS_PATH) {
@@ -151,10 +158,24 @@ export async function renderFishingSpots(path: string, all: readonly PublicPlace
         // 바다 낚시터는 가까운 항구의 물때표로 잇는다(화면의 '오늘 물때'와 같은 항구 — 40km 안)
         const port = nearestPort(FISHING_PORTS, pl);
         const same = all.filter((x) => x.id !== pl.id && x.sido === pl.sido && x.sigungu === pl.sigungu).slice(0, 10);
+        // 2026-11-04 낚시 3번 '낚시터 화면을 고유하게' — 봇이 받는 글이 등록 정보 한 덩이(4.6KB)뿐이었다(산 화면 17KB).
+        // 받은 사실로 지은 한 줄 요약 · 오늘 물때(바다 — 가장 가까운 물때 지점) · 대상 어종의 금어기 · 금지체장 · 같은 시도 같은 종류의 낚시터
+        const tide = await deps.tideToday?.(pl).catch(() => null) ?? null;
+        const species = pl.species.slice(0, 4);
+        // 받침에 맞춘 '이에요/예요' — 이름 끝 글자로(josa 의 이/가 판정과 같다)
+        const ieyo = (w: string) => (josa(w, "이/가").endsWith("이") ? `${w}이에요` : `${w}예요`);
+        const summary = `${josa(pl.name, "은/는")} ${placeWhere(pl)}에 있는 ${ieyo(k.label)}.${species.length ? ` 대상 어종은 ${species.join(" · ")}${pl.species.length > 4 ? " 등" : ""}이고,` : ""} 요금은 ${fee ? `${josa(fee, "로/으로")} 등록돼 있어요` : "등록돼 있지 않아요"}.${near.length && near[0].km != null ? ` 가장 가까운 낚시터는 ${near[0].km}km 떨어진 ${ieyo(near[0].name)}.` : ""}`;
+        const fishIds = [...new Set(pl.species.map(placeFishId).filter((x): x is string => !!x))].slice(0, 4);
+        const regs = fishIds.flatMap((id) => {
+            const f = FISH.find((x) => x.id === id), a = fishAsset().fish[id];
+            return f && a?.regs?.length ? [{ f, regs: a.regs }] : [];
+        });
+        const sameKind = all.filter((x) => x.id !== pl.id && x.sido === pl.sido && x.kind === pl.kind && !near.some((n) => n.id === x.id)).slice(0, 8);
         const body = `<main>
   <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${FISHING_SPOTS_PATH}">${esc(FISHING_SPOTS_LABEL)}</a> › <a href="${fishingRegionPath(sido)}">${esc(sido)} 낚시터</a> › ${esc(pl.name)}</nav>
   <h1>${esc(pl.name)}</h1>
   <p>${esc(`${placeWhere(pl)}의 ${k.label}`)}${pl.address ? ` · ${esc(pl.address)}` : ""}</p>
+  <p>${esc(summary)}</p>
 ${tourFigures(pl.name, tourOf(pl))}  <section>
     <h2>한눈에</h2>
     <dl>
@@ -164,7 +185,9 @@ ${tourFigures(pl.name, tourOf(pl))}  <section>
 ${pl.tel ? `      <dt>연락처</dt><dd>${esc(pl.tel)}</dd>\n` : ""}${pl.address ? `      <dt>주소</dt><dd>${esc(pl.address)}</dd>\n` : ""}    </dl>
   </section>
 ${near.length ? `  <section>\n    <h2>가까운 낚시터</h2>\n    <ul>\n${near.map((x) => line(x, x.km)).join("\n")}\n    </ul>\n  </section>` : ""}
-${port ? `  <section>\n    <h2>오늘 물때</h2>\n    <p>가장 가까운 항구(${port.km}km): <a href="${fishingPortPath(port.name)}">${esc(port.name)} 물때표</a> · <a href="${FISHING_SEA_PATH}">${esc(FISHING_SEA_LABEL)}</a></p>\n  </section>` : ""}
+${tide && tide.turns.length ? `  <section>\n    <h2>오늘 물때 — ${esc(tide.name)}(${tide.km}km)</h2>\n    <p>${esc(`${Number(tide.day.slice(5, 7))}월 ${Number(tide.day.slice(8))}일${tide.tideName ? ` ${tide.tideName}` : ""} · ${tide.turns.map((t) => `${t.kind === "high" ? "만조" : "간조"} ${hhmm(t.min)}`).join(" · ")}`)}</p>\n    <p><a href="${tide.path}">${esc(tide.name)} 물때표 — 이레</a>${port && port.name !== tide.name ? ` · <a href="${fishingPortPath(port.name)}">${esc(port.name)} 항구 물때 · 수온</a>` : ""} · <a href="${FISHING_SEA_PATH}">${esc(FISHING_SEA_LABEL)}</a></p>\n  </section>` : port ? `  <section>\n    <h2>오늘 물때</h2>\n    <p>가장 가까운 항구(${port.km}km): <a href="${fishingPortPath(port.name)}">${esc(port.name)} 물때표</a> · <a href="${FISHING_SEA_PATH}">${esc(FISHING_SEA_LABEL)}</a></p>\n  </section>` : ""}
+${regs.length ? `  <section>\n    <h2>대상 어종의 금어기 · 금지체장</h2>\n    <ul>\n${regs.map(({ f, regs: rs }) => `      <li><a href="${fishingFishPath(f.name)}">${esc(f.name)}</a> — ${esc(rs.map((r) => `${r.kind === "closed" ? "금어기" : "금지체장"} ${r.rule}`).join(" / "))}</li>`).join("\n")}\n    </ul>\n    <p>${esc(fishAsset().basis)}. 지역 · 해역 고시가 따로 있을 수 있어요 — <a href="${FISHING_CLOSED_PATH}">금어기 달력</a></p>\n  </section>` : ""}
+${sameKind.length ? `  <section>\n    <h2>${esc(sido)}의 다른 ${esc(k.label)}</h2>\n    <ul>\n${sameKind.map((x) => line(x)).join("\n")}\n    </ul>\n    <p><a href="${fishingTypePath(k.id)}">전국 ${esc(k.label)} 모두</a></p>\n  </section>` : ""}
 ${same.length && !near.length ? `  <section>\n    <h2>${esc(placeWhere(pl))}의 다른 낚시터</h2>\n    <ul>\n${same.map((x) => line(x)).join("\n")}\n    </ul>\n  </section>` : ""}
   <p><a href="${fishingRegionPath(sido)}">${esc(sido)} 낚시터 모두 보기</a> · <a href="${FISHING_SPOTS_PATH}">${esc(FISHING_SPOTS_LABEL)}</a></p>
 ${source()}${pl.dataDate ? `\n  <p>${esc(pl.dataDate)} 기준 자료</p>` : ""}

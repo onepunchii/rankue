@@ -287,6 +287,7 @@ const FishingSpot = lazy(() => import("@/fishing/spots/SpotsPages").then((m) => 
 const FishingSeaHub = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.SeaHub })));
 const FishingSeaArea = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.SeaAreaPage })));
 const FishingPort = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.PortPage })));
+const FishingTidePoint = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.TidePointPage })));
 const FishingFishHub = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishHub })));
 const FishingFish = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishPage })));
 const FishingClosed = lazy(() => import("@/fishing/spots/ClosedPage").then((m) => ({ default: m.ClosedPage })));
@@ -512,6 +513,7 @@ function AppRoutes() {
       <Route path="/fishing/fish">{() => <Suspense fallback={spotFallback}><FishingFishHub /></Suspense>}</Route>
       <Route path="/fishing/fish/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingFish name={decodeURIComponent(p.name)} /></Suspense>}</Route>
       <Route path="/fishing/port/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingPort name={decodeURIComponent(p.name)} /></Suspense>}</Route>
+      <Route path="/fishing/tide/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingTidePoint name={decodeURIComponent(p.name)} /></Suspense>}</Route>
       <Route path="/fishing" component={FishingRoute} />
       <Route path="/fishing/trip" component={FishingTripRoute} />
       <Route path="/fishing/book" component={FishingBookRoute} />

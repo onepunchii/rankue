@@ -1,4 +1,4 @@
-// 바다 · 항구 물때 프리렌더(2026-10-18) — /fishing/sea(허브) · /fishing/sea/<해역> · /fishing/port/<항구>.
+// 바다 · 항구 물때 프리렌더(2026-10-18) — /fishing/sea(허브) · /fishing/sea/<해역> · /fishing/port/<항구> · /fishing/tide/<물때 지점>(2026-11-04).
 // 글은 shared/fishingSeaPages 로 화면(client/src/fishing/spots/SeaPages)과 같다. 값은 받은 그대로 — 받지 못한 칸은 적지 않는다.
 // 특보 · 예보 · 조석은 deps 로 받는다(못 받거나 늦으면 null — 그래도 항구 · 해역 · 낚시터 목록은 나간다).
 // prerender.ts 와 서로 import 하는 모양이라 page · esc 는 함수 안에서만 부른다(최상위에서 호출하지 말 것).
@@ -13,17 +13,21 @@ import { FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, fishingSpotPath, nearestPort, 
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath, fishingSeaAreaPath, portByName, portSeo, portsOf, seaAreaById, seaAreaSeo, seaArt, seaHubSeo } from "../../shared/fishingSeaPages.js";
 import { fishingSeaCardUrl } from "../../shared/ogCards.js";
 import { fishingKstDay } from "../../shared/fishing.js";
+import { fishingTidePath, nearTidePoints, tidePointSeo, type TidePointData, type TidePointDef } from "../../shared/fishingTidePoints.js";
 
 const ORIGIN = "https://www.rankue.co.kr";
 export interface FishingSeaRender { status: 200; tag: string; html: string }
 /** 바다 · 항구의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
-export const FISHING_SEA_RE = /^\/fishing\/(?:sea(?:\/[^/]+)?|port\/[^/]+)\/?$/;
+export const FISHING_SEA_RE = /^\/fishing\/(?:sea(?:\/[^/]+)?|port\/[^/]+|tide\/[^/]+)\/?$/;
 
 export interface FishingSeaDeps {
     sea: () => Promise<SeaNow | null>;
     fcst: (area: string) => Promise<SeaFcst | null>;
     port: (code: string) => Promise<PortBrief | null>;
     places: () => Promise<readonly PublicPlace[]>;
+    /** 물때 지점(2026-11-04) — 목록과 한 곳의 이레. 없으면(옛 시험) 지점 없이 그린다 */
+    tidePoints?: () => readonly TidePointDef[];
+    tide?: (p: TidePointDef) => Promise<TidePointData | null>;
 }
 
 const crumbs = (...tail: [string, string][]) => ({
@@ -79,7 +83,10 @@ ${foot()}
     return { status: 200, tag: "fishing:sea", html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${FISHING_SEA_PATH}`, body, image: card, jsonLd: [list, crumbs()] }) };
 }
 
-function area(id: string, sea: SeaNow | null, fc: SeaFcst | null, all: readonly PublicPlace[]): FishingSeaRender | null {
+/** 그 바다의 물때 지점 링크(이름순) — 항구 쉰한 곳 밖의 포구 · 섬 */
+const tideLinks = (pts: readonly TidePointDef[]) => [...pts].sort((a, b) => a.name.localeCompare(b.name, "ko")).map((t) => `<a href="${fishingTidePath(t.name)}">${esc(t.name)} 물때</a>`).join(" · ");
+
+function area(id: string, sea: SeaNow | null, fc: SeaFcst | null, all: readonly PublicPlace[], tps: readonly TidePointDef[] = []): FishingSeaRender | null {
     const a = seaAreaById(id);
     if (!a) return null;
     const seo = seaAreaSeo(a);
@@ -97,6 +104,7 @@ ${slots.length ? `  <section>\n    <h2>반나절 해상예보</h2>\n    <ul>\n${
     <h2>${esc(a.name)} 항구 물때표</h2>
     <p>${portLinks(id)}</p>
   </section>
+${tps.some((t) => t.area === id) ? `  <section>\n    <h2>${esc(a.name)}의 포구 · 섬 물때표</h2>\n    <p>${tideLinks(tps.filter((t) => t.area === id))}</p>\n  </section>` : ""}
 ${spots.length ? `  <section>\n    <h2>${esc(a.name)}의 바다 낚시터</h2>\n    <ul>\n${spots.map(spotLine).join("\n")}\n    </ul>\n  </section>` : ""}
   <nav aria-label="다른 바다">
 ${SEA_AREAS.filter((x) => x.id !== id).map((x) => `    <a href="${fishingSeaAreaPath(x.id)}">${esc(x.name)} 바다</a>`).join("\n")}
@@ -107,7 +115,7 @@ ${foot()}
     return { status: 200, tag: `fishing:sea:${id}`, html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${fishingSeaAreaPath(id)}`, body, image: card, jsonLd: [crumbs([seo.h1, fishingSeaAreaPath(id)])] }) };
 }
 
-function port(name: string, brief: PortBrief | null, all: readonly PublicPlace[], nowMs: number): FishingSeaRender | null {
+function port(name: string, brief: PortBrief | null, all: readonly PublicPlace[], nowMs: number, tps: readonly TidePointDef[] = []): FishingSeaRender | null {
     const p = portByName(name);
     if (!p) return null;
     const a = seaAreaById(p.area);
@@ -127,6 +135,7 @@ ${cover(p.area, `${p.name} 바다${a ? ` — ${a.name}` : ""}`)}
     <h2>${esc(day)} ${esc(p.name)} 물때</h2>
 ${tide ? `    <p>${esc(`${tide.name} · ${TIDE_PHASE_TEXT[tide.phase]}`)} (음력 ${tide.lunar.month}월 ${tide.lunar.day}일)</p>\n` : ""}${turns.length ? `    <ul>\n${turns.map((t) => `      <li>${t.kind === "high" ? "만조" : "간조"} ${hhmm(t.min)} · ${t.cm}cm</li>`).join("\n")}\n    </ul>\n` : ""}${range != null ? `    <p>물높이 차 ${range}cm</p>\n` : ""}${sun?.rise != null && sun.set != null ? `    <p>해 뜸 ${hhmm(sun.rise)} · 해 짐 ${hhmm(sun.set)}${sun.at ? ` (한국천문연구원 ${esc(sun.at)})` : ""}</p>\n` : ""}${brief?.now?.wtemp != null ? `    <p>지금 수온 ${brief.now.wtemp.toFixed(1)}°</p>\n` : ""}  </section>
 ${spots.length ? `  <section>\n    <h2>이 물때를 쓰는 바다 낚시터</h2>\n    <ul>\n${spots.map(spotLine).join("\n")}\n    </ul>\n  </section>` : ""}
+${(() => { const near = nearTidePoints(tps.map((t) => ({ ...t })), { lat: p.lat, lng: p.lng }, 10, 40); return near.length ? `  <section>\n    <h2>${esc(p.name)} 가까운 포구 · 섬 물때</h2>\n    <p>${near.map((t) => `<a href="${fishingTidePath(t.name)}">${esc(t.name)} 물때</a>(${t.km}km)`).join(" · ")}</p>\n  </section>` : ""; })()}
 ${a ? `  <section>\n    <h2>${esc(a.name)}의 다른 항구</h2>\n    <p>${portLinks(a.id, p.code)}</p>\n    <p><a href="${fishingSeaAreaPath(a.id)}">${esc(a.name)} 바다 예보 보기</a></p>\n  </section>` : ""}
 ${foot()}
 </main>`;
@@ -143,7 +152,7 @@ export async function renderFishingSea(path: string, deps: FishingSeaDeps, nowMs
         const id = decodeURIComponent(ar[1]);
         if (!seaAreaById(id)) return null;
         const [sea, fc, all] = await Promise.all([deps.sea().catch(() => null), deps.fcst(id).catch(() => null), deps.places().catch(() => [] as PublicPlace[])]);
-        return area(id, sea, fc, all);
+        return area(id, sea, fc, all, deps.tidePoints?.() ?? []);
     }
     const pt = /^\/fishing\/port\/([^/]+)$/.exec(p);
     if (pt) {
@@ -152,17 +161,66 @@ export async function renderFishingSea(path: string, deps: FishingSeaDeps, nowMs
         const def = portByName(name);
         if (!def) return null;
         const [brief, all] = await Promise.all([deps.port(def.code).catch(() => null), deps.places().catch(() => [] as PublicPlace[])]);
-        return port(name, brief, all, nowMs);
+        return port(name, brief, all, nowMs, deps.tidePoints?.() ?? []);
+    }
+    const tp = /^\/fishing\/tide\/([^/]+)$/.exec(p);
+    if (tp) {
+        let name: string;
+        try { name = decodeURIComponent(tp[1]).normalize("NFC"); } catch { return null; }
+        const def = (deps.tidePoints?.() ?? []).find((x) => x.name === name);
+        if (!def) return null;
+        const data = await deps.tide?.(def).catch(() => null) ?? null;
+        return tidePage(def, data, nowMs);
     }
     return null;
 }
 
-/** 사이트맵 — 허브 · 해역 일곱 · 항구 51. 물때는 날마다 바뀌어 daily. 그림은 카드(/og/fishing-sea) */
-export function fishingSeaSitemapParts(today: string): string[] {
+/** 물때 지점 한 곳(2026-11-04) — 이레의 만조 · 간조(받아 둔 것만) · 물때 이름 · 가까운 항구 · 이웃 지점 · 바다 낚시터 */
+function tidePage(t: TidePointDef, data: TidePointData | null, nowMs: number): FishingSeaRender {
+    const a = seaAreaById(t.area);
+    const seo = tidePointSeo(t, a?.name ?? null);
+    const sea = a?.tide ?? "south";
+    const today = fishingKstDay(nowMs);
+    const days = data?.days ?? tideDays(today, sea, 7).map((x) => ({ day: x.ymd, turns: [] }));
+    const dayLine = (d: { day: string; turns: { kind: "high" | "low"; min: number; cm: number }[] }) => {
+        const tide = tideOf(d.day, sea);
+        const head = `${Number(d.day.slice(5, 7))}월 ${Number(d.day.slice(8))}일(${tideWeekday(d.day)})${tide ? ` ${tide.name}${tide.mark ? ` · ${tide.mark}` : ""}` : ""}`;
+        const turns = d.turns.map((x) => `${x.kind === "high" ? "만조" : "간조"} ${hhmm(x.min)} ${x.cm}cm`).join(" · ");
+        return `      <li>${esc(head)}${turns ? ` — ${esc(turns)}` : ""}</li>`;
+    };
+    const near = data?.near ?? [];
+    const spots = data?.spots ?? [];
+    const port0 = FISHING_PORTS.find((x) => x.code === t.port.code);
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${FISHING_SEA_PATH}">${esc(FISHING_SEA_LABEL)}</a>${a ? ` › <a href="${fishingSeaAreaPath(a.id)}">${esc(a.name)}</a>` : ""} › ${esc(t.name)}</nav>
+  <h1>${esc(seo.h1)}</h1>
+${cover(t.area, `${t.name} 바다${a ? ` — ${a.name}` : ""}`)}
+  <p>${esc(seo.description)}</p>
+  <section>
+    <h2>${esc(t.name)} 이레 물때표</h2>
+    <ul>
+${days.map(dayLine).join("\n")}
+    </ul>
+    <p>만조 · 간조는 국립해양조사원 조석예보(${esc(t.name)} 지점)이고, 물때 이름은 음력 날짜로 센 것이에요.</p>
+  </section>
+${port0 ? `  <section>\n    <h2>가까운 항구 — ${esc(port0.name)}(${t.port.km}km)</h2>\n    <p><a href="${fishingPortPath(port0.name)}">${esc(port0.name)} 물때 · 수온 · 바다낚시지수</a></p>\n  </section>` : ""}
+${near.length ? `  <section>\n    <h2>가까운 포구 · 섬 물때</h2>\n    <p>${near.map((x) => `<a href="${fishingTidePath(x.name)}">${esc(x.name)} 물때</a>(${x.km}km)`).join(" · ")}</p>\n  </section>` : ""}
+${spots.length ? `  <section>\n    <h2>${esc(t.name)} 가까운 바다 낚시터</h2>\n    <ul>\n${spots.map((x) => `      <li><a href="${fishingSpotPath(x.id)}">${esc(x.name)}</a> — ${x.km}km${x.species.length ? ` · ${esc(x.species.join(" · "))}` : ""}</li>`).join("\n")}\n    </ul>\n  </section>` : ""}
+${foot()}
+</main>`;
+    const card = { url: fishingSeaCardUrl(ORIGIN, port0?.name ?? "all"), width: 1200, height: 1200, alt: `${t.name} 물때표${a ? ` — ${a.name}` : ""}` };
+    const ld = { "@context": "https://schema.org", "@type": "Place", name: `${t.name} 조석예보 지점`, url: `${ORIGIN}${fishingTidePath(t.name)}`, geo: { "@type": "GeoCoordinates", latitude: t.lat, longitude: t.lng } };
+    // tag 는 X-Prerender 머리에 실린다 — 지점 코드(ASCII)만
+    return { status: 200, tag: `fishing:tide:${t.code}`, html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${fishingTidePath(t.name)}`, body, image: card, jsonLd: [ld, crumbs(...(a ? [[`${a.name} 바다`, fishingSeaAreaPath(a.id)] as [string, string]] : []), [seo.h1, fishingTidePath(t.name)])] }) };
+}
+
+/** 사이트맵 — 허브 · 해역 일곱 · 항구 51 · 물때 지점(2026-11-04). 물때는 날마다 바뀌어 daily. 그림은 카드(/og/fishing-sea) */
+export function fishingSeaSitemapParts(today: string, tps: readonly TidePointDef[] = []): string[] {
     const at = (path: string, key: string, priority: string) => entry(`${ORIGIN}${path}`, { changefreq: "daily", priority, lastmod: today, image: fishingSeaCardUrl(ORIGIN, key) });
     return [
         at(FISHING_SEA_PATH, "all", "0.7"),
         ...SEA_AREAS.map((a) => at(fishingSeaAreaPath(a.id), a.id, "0.6")),
         ...FISHING_PORTS.map((p) => at(fishingPortPath(p.name), p.name, p.main ? "0.6" : "0.5")),
+        ...tps.map((t) => entry(`${ORIGIN}${fishingTidePath(t.name)}`, { changefreq: "daily", priority: "0.5", lastmod: today })),
     ];
 }

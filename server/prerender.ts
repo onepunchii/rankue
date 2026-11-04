@@ -47,10 +47,11 @@ import { FISHING_SPOTS_RE, renderFishingSpots } from "./seo/fishing.js";
 import { allPlaces, canonicalPlaceId } from "./storage/fishingPlaces.js";
 import { fishingSpotPath } from "../shared/fishingPlaces.js";
 import { FISHING_SEA_RE, renderFishingSea } from "./seo/fishingSea.js";
+import { spotTideToday, tidePointData, tidePoints } from "./services/fishingTidePoints.js";
 import { FISHING_FISH_RE, renderFishingFish } from "./seo/fishingFish.js";
 import { getSeaNow } from "./services/fishingSea.js";
 import { getSeaFcst } from "./services/fishingSeaFcst.js";
-import { getPortBrief } from "./services/fishingPort.js";
+import { getPortBrief, officialTideTurns } from "./services/fishingPort.js";
 import { allMountains, getMountainDetail, nearbyMountains } from "./storage/hiking.js";
 import { HIKING_HUB_PATH, HIKING_NAV_LABEL } from "../shared/hikingPage.js";
 import { STAMPS_HUB_PATH, STAMPS_NAV_LABEL } from "../shared/golfStampGuide.js";
@@ -2140,6 +2141,16 @@ ${list}
         fcst: (area) => within(getSeaFcst(area)),
         port: (code) => within(getPortBrief(code, null)),
         places: async () => (await within(allPlaces())) ?? [],
+        // 물때 지점(2026-11-04) — 받아 둔 이레만 읽고, 오늘이 없으면 오늘 하나만 받는다(봇이 한꺼번에 와도 지점마다 한 번)
+        tidePoints: () => tidePoints(),
+        tide: async (tp) => within((async () => {
+          const d = await tidePointData(tp, (await within(allPlaces())) ?? [], { fetch: false });
+          if (!d.days[0]?.turns.length) {
+            const t = await officialTideTurns(tp.code, d.days[0].day).catch(() => null);
+            if (t?.length) d.days[0] = { day: d.days[0].day, turns: t };
+          }
+          return d;
+        })()),
       });
       // 없는 해역 · 항구(표가 코드에 있다 — 자료 탓일 수 없다)
       if (!r) return sendGone(res, "없는 바다 · 항구예요", "랭큐 낚시 물때 페이지에 없는 이름이에요.");
@@ -2162,7 +2173,10 @@ ${list}
         const canon = await canonicalPlaceId(old[1]);
         if (canon && canon !== old[1]) return res.redirect(301, fishingSpotPath(canon));
       }
-      const r = await renderFishingSpots(req.path, all);
+      // 바다 낚시터의 오늘 물때(2026-11-04) — 가까운 물때 지점 · 항구의 받아 둔 만조 · 간조(없으면 그날 하나만 받는다, 3초까지)
+      const r = await renderFishingSpots(req.path, all, {
+        tideToday: (pl) => Promise.race([spotTideToday(pl).catch(() => null), new Promise<null>((ok) => setTimeout(() => ok(null), 3000))]),
+      });
       // 표를 읽었는데도 없는 낚시터 · 지역 · 종류면 404(표가 비어 있으면 자료 탓일 수 있어 화면에 맡긴다)
       if (!r) return all.length ? sendGone(res, "없는 낚시터예요", "전국 낚시터 표에 없는 곳이에요.") : next();
       noStore(res);

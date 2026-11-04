@@ -63,8 +63,9 @@ const clock = (s: unknown): string | null => { const m = String(s ?? "").match(/
 
 /**
  * 그날의 공식 만조 · 간조(조석예보 고 · 저조, 2026-10-17) — 분 단위. 예보라 한 번 받으면 그대로 쓴다. 못 받으면 null(예측 조위의 꺾임으로 센다).
+ * 조석예보 지점(SO_ — 물때 지점 화면, services/fishingTidePoints)도 같은 길 · 같은 캐시(fishing_obs 'tidehl')를 쓴다(2026-11-04).
  */
-async function tideTurnsOfficial(port: FishingPort, day: string): Promise<TideTurn[] | null> {
+async function tideTurnsOfficial(port: Pick<FishingPort, "code">, day: string): Promise<TideTurn[] | null> {
     const key = `${port.code}:${day}`;
     const have = await readObs<TideTurn[]>("tidehl", key);
     if (have?.data?.length) return have.data;
@@ -79,6 +80,16 @@ async function tideTurnsOfficial(port: FishingPort, day: string): Promise<TideTu
     if (turns.length < 2) return null;
     await saveObs("tidehl", key, turns).catch(() => {});
     return turns;
+}
+/** 물때 지점 화면이 부른다 — 코드 하나 · 날 하나(받아 둔 것이 있으면 그것) */
+export const officialTideTurns = (code: string, day: string): Promise<TideTurn[] | null> => tideTurnsOfficial({ code }, day);
+/** 받아 둔 것만 읽는다(검색용 화면 · 목록 — 바깥을 부르지 않는다) */
+export async function cachedTideTurns(code: string, days: readonly string[]): Promise<Map<string, TideTurn[]>> {
+    const out = new Map<string, TideTurn[]>();
+    if (!days.length) return out;
+    const rows = rowsOf(await db.execute(sql`select key, data from fishing_obs where kind = 'tidehl' and key in (${sql.join(days.map((d) => sql`${`${code}:${d}`}`), sql`, `)})`));
+    for (const r of rows) if (Array.isArray(r.data) && r.data.length) out.set(String(r.key).slice(code.length + 1), r.data as TideTurn[]);
+    return out;
 }
 
 /** 그날의 예측 조위 — [분, cm] 10분 간격. 예측이라 한 번 받으면 그대로 쓴다 */

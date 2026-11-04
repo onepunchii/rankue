@@ -22,6 +22,7 @@ import { AROUND_FISHING, KakaoAround } from "@/components/kakao/KakaoAround";
 import { FISHING_COLORS as C, FISHING_PLACE_SOURCE, fishingSidoShort } from "@shared/fishing";
 import { fishByName } from "@shared/fishingFish";
 import { hhmm, type PortNow, type TideTurn } from "@shared/fishingPort";
+import { fishingTidePath } from "@shared/fishingTidePoints";
 import {
     FISHING_PLACE_COUNT, FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, PLACE_KINDS, fishingCatchPath, fishingRegionPath, fishingSpotPath, fishingTypePath, placeCounts, placeFeeText, placeKind, placeKindById, placeSeo, placeWhere,
     speciesKey, spotsHubSeo, spotsRegionSeo, spotsTypeSeo, type PlaceKindId, type PublicPlace,
@@ -271,6 +272,8 @@ export function SpotsHub({ region, type }: { region?: string; type?: string }) {
 
 interface RegRow { kind: "closed" | "min"; group: string; name: string; rule: string }
 type SpotDetail = { place: PublicPlace; nearby: (PublicPlace & { km: number | null })[]; port: { code: string; name: string; km: number; area: string } | null;
+    /** 항구보다 가까운 물때 지점(2026-11-04) — 옛 응답엔 없다 */
+    tidePoint?: { name: string; km: number } | null;
     /** 한국관광공사 사진(2026-10-21 — 공공누리 제1 · 3유형). 옛 응답엔 없다 */
     tourPhotos?: TourPhoto[];
     /** 이 근처 축제(2026-10-21 — 한국관광공사 · 20km · 45일). 옛 응답엔 없다 */
@@ -377,6 +380,7 @@ export function SpotPage({ id }: { id: string }) {
                         <p className="mt-1.5 text-[12px]" style={{ color: C.dim }}>국립해양조사원 조석 예보 · 관측</p>
                     </div>
                     <Link href={fishingPortPath(tide.port.name)} className="mt-2 flex h-11 items-center justify-between rounded-xl px-3.5 text-[14px]" style={{ background: "#FFFFFF0F", color: C.soft }} data-testid="spot-port-link">{tide.port.name} 물때표 — 물때 곡선 · 열흘<LucideChevronRight size={16} aria-hidden /></Link>
+                    {data?.tidePoint && <Link href={fishingTidePath(data.tidePoint.name)} className="mt-2 flex h-11 items-center justify-between rounded-xl px-3.5 text-[14px]" style={{ background: "#FFFFFF0F", color: C.soft }} data-testid="spot-tide-point-link" data-track-as="fishing-spot-tide-point">더 가까운 {data.tidePoint.name} 물때({data.tidePoint.km}km) — 이레<LucideChevronRight size={16} aria-hidden /></Link>}
                 </section>
             )}
 
