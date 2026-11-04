@@ -20,6 +20,7 @@ import { MountainMap } from "../components/MountainMap";
 import { HikingCta, MountainRow } from "../components/MountainParts";
 import { SeasonNow } from "../components/SeasonNow";
 import { TrailsEntry } from "../trails/TrailsEntry";
+import { VisitedEntry } from "../components/VisitedEntry";
 import { HIKING_HERO, hikingCover } from "../theme";
 import { HIKING_HUB_KEY, type HikingHubData } from "../lib/api";
 import { useHikingStamps } from "../stamps/useHikingStamps";
@@ -55,6 +56,8 @@ export default function HikingHub() {
                     <div className="space-y-4 px-5 pt-6" aria-busy="true"><HkSkel className="h-[420px]" /><HkSkel className="h-40" /></div>
                 ) : (
                     <>
+                        {/* 다녀온 산 고르기(2026-11-04) — 방문자도 고를 수 있다. 남기는 것은 가입 뒤 */}
+                        <div className="px-5 pt-4"><VisitedEntry /></div>
                         <HkSection title="명산 지도" aside={picked ? `${picked.name} · 산을 눌러 보세요` : "권역을 골라 보세요"}>
                             <div className="-mx-5 mb-3 flex gap-2 overflow-x-auto px-5" style={{ scrollbarWidth: "none" }} role="group" aria-label="권역 고르기">
                                 {[{ id: null as string | null, name: "전국" }, ...HIKING_REGIONS.map((r) => ({ id: r.id as string | null, name: r.name }))].map((r) => {

@@ -17,6 +17,7 @@ import { MountainMap } from "../components/MountainMap";
 import { HikingCta, MountainRow } from "../components/MountainParts";
 import { hikingCover, hikingListCover } from "../theme";
 import { useHikingStamps } from "../stamps/useHikingStamps";
+import { VisitedEntry } from "../components/VisitedEntry";
 import { mountainsKey, type MountainSummary } from "../lib/api";
 
 const PAGE = 60;
@@ -92,6 +93,8 @@ export default function HikingListPage() {
                     <div className="space-y-3 px-5 pt-6" aria-busy="true"><HkSkel className="h-12" /><HkSkel className="h-96" /></div>
                 ) : (
                     <>
+                        {/* 다녀온 산 고르기(2026-11-04) — 권역 화면은 그 권역의 100대 명산으로 연다. 산 화면에서 '뒤로'를 누르면 여기로 온다 */}
+                        {(region || group?.id === "kfs100") && <div className="px-5 pt-4"><VisitedEntry region={region?.id} /></div>}
                         {region && famous.length > 0 && (
                             <HkSection title={`${region.name}의 명산`} aside={`${famous.length}곳 · 산을 눌러 보세요`}>
                                 <MountainMap mountains={famous} region={region.id} done={my.done} />

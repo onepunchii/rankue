@@ -35,6 +35,7 @@ import { ProfileNudge } from "@/components/hiq/profile/ProfileBasics";
 import { FeaturedPhotos } from "../components/FeaturedPhotos";
 import { FestivalPicks } from "@/festivals/components/FestivalPicks";
 import { TrailsEntry } from "../trails/TrailsEntry";
+import { VisitedEntry } from "../components/VisitedEntry";
 
 const TILT = [-4, 3, -2, 5];
 
@@ -102,6 +103,8 @@ export default function HikingHome() {
                                 </Link>
                             </div>
                         )}
+                        {/* 다녀온 산 고르기(2026-11-04) — 남긴 산(인증 · 기록)이 세 곳이 안 되는 회원만. 첫날 도장첩이 비어 있지 않게 */}
+                        {s.stamps.length < 3 && <div className="px-5 pt-2"><VisitedEntry /></div>}
                         {/* 프로필 기본 두 가지(성별 · 나이대, 2026-10-20) — 비었을 때만. 산악회 회원 목록 · 조 나누기에 쓴다.
                             가장 가까운 도장첩 다음(2026-10-21 화면 확인: 표지 바로 밑이면 도장첩 카드를 밀어 냈다) */}
                         <div className="px-5 empty:hidden [&:has(>*)]:pt-2"><ProfileNudge sport="HIKING" /></div>

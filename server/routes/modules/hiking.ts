@@ -8,7 +8,7 @@ import { sendError, sendSuccess } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { allMountains, getMountainDetail, mountainById, mountainBySlug, nearbyMountains, type MountainSummary } from "../../storage/hiking.js";
 import { trailheadPoint, type SummitBase } from "../../../shared/hikingSummitWx.js";
-import { addSummit, addSummitMiss, listHikingAwards, listSummits, removeRecord, syncHikingAwards, CREW_TOGETHER, crewSummits } from "../../storage/hikingStamps.js";
+import { addRecords, addSummit, addSummitMiss, listHikingAwards, listSummits, removeRecord, syncHikingAwards, CREW_TOGETHER, crewSummits } from "../../storage/hikingStamps.js";
 import { addTrip, listTrips } from "../../storage/hikingTrips.js";
 import { cleanTrip } from "../../../shared/hikingTrail.js";
 import { addPhoto, appealPhoto, listMountainPhotos, listPhotos, photoCounts, removePhoto, setPhotoPublic } from "../../storage/hikingPhotos.js";
@@ -24,6 +24,7 @@ import { requireAuth, type AuthRequest } from "../../middleware/auth.js";
 import { requireTermsAccepted } from "../../middleware/terms.js";
 import { distM } from "../../../shared/hikingGeo.js";
 import { judgeSummit, summitHint } from "../../../shared/hikingStamps.js";
+import { cleanVisitedIds } from "../../../shared/hikingVisited.js";
 import { accuracyBand, fixErrorReason, isSummitClient } from "../../../shared/hikingSummitMiss.js";
 import { getCourseWeather } from "../../services/golfWeather.js";
 import { mountObsAll } from "../../services/hikingMountObs.js";
@@ -261,6 +262,18 @@ router.post("/summits/record", ...requireHikingAccess, asyncHandler(async (req: 
     const atMs = /^\d{4}-\d{2}-\d{2}$/.test(date) ? Date.parse(`${date}T12:00:00+09:00`) : Date.now();
     if (!Number.isFinite(atMs) || atMs > Date.now() + 3_600_000 || atMs < Date.parse("1950-01-01T00:00:00Z")) return sendError(res, 400, "날짜를 다시 골라 주세요");
     const added = await addSummit(req.userId!, m.id, { atMs, verified: false, bucket: null });
+    return sendSuccess(res, { added });
+}));
+
+/**
+ * 다녀온 산 한 번에(2026-11-04 — shared/hikingVisited) — 고른 산들에 인증 없는 기록을 오늘 날짜로. 흐린 도장이라 등급 · 와펜 · 핀에 들지 않는다.
+ * 아는 산만 받고(모르는 id 는 버린다), 기록이 이미 있는 산은 건너뛴다. 새로 남긴 수를 돌려준다.
+ */
+router.post("/summits/record-many", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    const ids = cleanVisitedIds(req.body?.mountainIds);
+    if (!ids) return sendError(res, 400, "고른 산을 다시 확인해 주세요");
+    const known = new Set((await allMountains()).map((m) => m.id));
+    const added = await addRecords(req.userId!, ids.filter((id) => known.has(id)), Date.now());
     return sendSuccess(res, { added });
 }));
 

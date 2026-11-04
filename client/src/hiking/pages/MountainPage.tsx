@@ -54,6 +54,8 @@ import { POI_COLOR, SURFACE_COLOR, hikingCover } from "../theme";
 import { mountainKey, type MountainCourse, type MountainDetail, type MountainPoi } from "../lib/api";
 import { useMyLocation, type MyLocation } from "../lib/useMyLocation";
 import { TourPhotos } from "@/components/TourPhotos";
+import { VISITED_LABEL } from "@shared/hikingVisited";
+import { visitedPath } from "../components/VisitedEntry";
 import { festivalDateKo } from "@shared/tourFestivals";
 import { festivalSportPath } from "@shared/festivals";
 
@@ -599,7 +601,16 @@ export default function MountainPage() {
                         <div className="px-4 pb-3.5">
                             {my.mine
                                 ? <SummitCheckin key={`checkin:${d.id}`} mountainId={d.id} name={d.name} stamp={mine} hasSummit={d.lat != null && d.lng != null} region={d.region} patch={kfs} />
-                                : <p className="mt-3 border-t border-[#0E2A331A] pt-3 text-[13px] leading-snug text-[#0E2A33B3] break-keep">{kfs ? "인증하면 이 산의 와펜이 배낭에 달리고, 산행 등급이 올라요." : d.tier === 1 && region ? `${region.name} 도장첩의 한 칸이에요. 다 채우면 와펜을 받아요.` : "오른 산이 늘수록 산행 등급이 올라요."}</p>}
+                                : (
+                                    <>
+                                        <p className="mt-3 border-t border-[#0E2A331A] pt-3 text-[13px] leading-snug text-[#0E2A33B3] break-keep">{kfs ? "인증하면 이 산의 와펜이 배낭에 달리고, 산행 등급이 올라요." : d.tier === 1 && region ? `${region.name} 도장첩의 한 칸이에요. 다 채우면 와펜을 받아요.` : "오른 산이 늘수록 산행 등급이 올라요."}</p>
+                                        {/* 다녀온 산 고르기(2026-11-04) — 방문자도 가입 없이 골라 볼 수 있다. 이 산의 권역부터 연다 */}
+                                        <Link href={visitedPath(d.region)} data-track-as="hiking-visited-open" data-testid="mountain-visited-open"
+                                            className="mt-2.5 flex h-10 items-center justify-center gap-1 rounded-xl bg-[#0E2A330D] text-[13.5px] font-medium text-[#0E2A33] active:bg-[#0E2A331F]">
+                                            {VISITED_LABEL.entry}<LucideChevronRight weight="bold" className="h-3.5 w-3.5" aria-hidden />
+                                        </Link>
+                                    </>
+                                )}
                         </div>
                     </div>
                 </div>

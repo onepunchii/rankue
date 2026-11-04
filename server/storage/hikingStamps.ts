@@ -2,6 +2,7 @@
  * 등산 — 정상에 오른 기록과 받은 것의 저장(2026-10-13). 규칙은 shared/hikingStamps, 표는 migrations/hiking_stamps.sql.
  *
  *  - addSummit()          정상 인증(위치로 확인됨) 또는 인증 없는 기록 한 줄. 같은 산 · 같은 날 · 같은 종류는 한 번만.
+ *  - addRecords()         인증 없는 기록을 여러 산에 한꺼번에(다녀온 산 고르기) — 기록이 있는 산은 건너뛴다.
  *                         **좌표는 받지 않는다** — 부르는 쪽(라우트)이 거리를 재고 인증 여부와 거리 구간만 넘긴다.
  *  - listSummits()        내 기록(오래된 순).
  *  - syncHikingAwards()   기록에서 받았어야 할 것(와펜 · 핀) 가운데 아직 안 적은 것을 적는다. 준 것은 거두지 않는다.
@@ -44,6 +45,21 @@ export async function addSummit(memberId: string, mountainId: string, input: { a
         values (${memberId}::uuid, ${mountainId}, (${iso(input.atMs)}::timestamptz at time zone 'UTC'), ${input.verified}, ${input.bucket}, ${kstDay(input.atMs)})
         on conflict (member_id, mountain_id, day, verified) do nothing returning id`);
     return r.length > 0;
+}
+
+/**
+ * 다녀온 산 한 번에(2026-11-04 — shared/hikingVisited) — 인증 없는 기록을 여러 산에 한 줄씩, 한 번의 쿼리로.
+ * 그 회원의 기록이 이미 있는 산(인증이든 아니든 · 날짜와 무관)은 건너뛴다. 부르는 쪽이 아는 산의 id 만 넘긴다. 새로 적은 줄 수를 돌려준다.
+ */
+export async function addRecords(memberId: string, mountainIds: readonly string[], atMs: number): Promise<number> {
+    if (!mountainIds.length) return 0;
+    const r = await rows<any>(sql`
+        insert into hiking_summits (member_id, mountain_id, at, verified, bucket, day)
+        select ${memberId}::uuid, x.id, (${iso(atMs)}::timestamptz at time zone 'UTC'), false, null, ${kstDay(atMs)}
+        from (values ${sql.join(mountainIds.map((id) => sql`(${id})`), sql`, `)}) as x(id)
+        where not exists (select 1 from hiking_summits s where s.member_id = ${memberId}::uuid and s.mountain_id = x.id)
+        on conflict (member_id, mountain_id, day, verified) do nothing returning id`);
+    return r.length;
 }
 
 /** 인증 없이 적은 기록 한 줄을 지운다(본인 것만). 인증 도장은 지우지 않는다 */

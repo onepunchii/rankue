@@ -263,6 +263,9 @@ function HikingPackRoute() { return <Suspense fallback={hikingFallback}><HikingP
 // 내 사진첩 — 등산을 쓰는 회원의 화면(검색용 화면 · 사이트맵에 싣지 않는다)
 const HikingAlbum = lazy(() => import("@/hiking/pages/AlbumPage"));
 function HikingAlbumRoute() { return <Suspense fallback={hikingFallback}><HikingAlbum /></Suspense>; }
+// 다녀온 산 한 번에 고르기(2026-11-04) — 방문자도 고를 수 있다(남기는 것은 가입 뒤)
+const HikingVisited = lazy(() => import("@/hiking/pages/VisitedPage"));
+function HikingVisitedRoute() { return <Suspense fallback={hikingFallback}><HikingVisited /></Suspense>; }
 function HikingHubRoute() { return <Suspense fallback={hikingFallback}><HikingHub /></Suspense>; }
 // 코리아둘레길(2026-10-21 — 국토종주는 걸어서 · 등산 안에) — 공개 화면. 검색용 화면은 server/seo/trails
 const TrailsHub = lazy(() => import("@/hiking/trails/TrailsHub"));
@@ -540,6 +543,7 @@ function AppRoutes() {
       <Route path="/hiking/stamps/:book" component={HikingStampBookRoute} />
       <Route path="/hiking/pack" component={HikingPackRoute} />
       <Route path="/hiking/album" component={HikingAlbumRoute} />
+      <Route path="/hiking/visited" component={HikingVisitedRoute} />
       {/* 읽을거리 — 용어 사전 · 준비물(검색용 화면 있음) */}
       <Route path="/hiking/terms" component={HikingTermsRoute} />
       <Route path="/hiking/terms/:id" component={HikingTermsRoute} />
