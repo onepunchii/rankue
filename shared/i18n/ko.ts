@@ -227,6 +227,7 @@ export const ko: Record<string, string> = {
   "err.sim.memberNotFound": "회원을 찾을 수 없습니다",
   "err.sim.notPlaying": "진행 중인 대전이 아닙니다",
   "err.sim.clockNotStarted": "아직 시계가 시작되지 않았습니다",
+  "err.sim.breakPicking": "선구를 정하는 중이에요 — 가위바위보가 끝나면 칠 수 있어요",
   "err.sim.tooEarly": "아직 기다려야 합니다",
   "err.sim.stale": "이미 차례가 바뀌었습니다",
   "err.sim.notYourTurn": "상대 차례입니다",

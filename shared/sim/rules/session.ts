@@ -36,12 +36,18 @@ export interface SessionState {
     /**
      * 후구(마지막 동점 이닝) 진행 중이면 먼저 목표에 닿은 사람의 자리. 없으면 null(2026-09-12 테스터 제보 → 오너 결정).
      *
-     * 왜 있나: 자리 0 이 매 이닝을 먼저 친다. 그 사람이 목표에 닿는 순간 끝내 버리면 상대는 그 이닝을 못 쳐 본다.
+     * 왜 있나: 선공(보통 자리 0 — 아래 first)이 매 이닝을 먼저 친다. 그 사람이 목표에 닿는 순간 끝내 버리면 상대는 그 이닝을 못 쳐 본다.
      * 그래서 3쿠션 공식전은 후공에게 한 이닝을 더 줘 이닝 수를 맞춘다 — 그게 후구다. 따라붙으면 무승부.
-     * 자리 1 이 목표에 닿았을 때는 이미 이닝이 같으므로 바로 끝난다. 혼자 치는 연습(1인)도 바로 끝난다.
+     * 후공이 목표에 닿았을 때는 이미 이닝이 같으므로 바로 끝난다. 혼자 치는 연습(1인)도 바로 끝난다.
      * 옛 대전 행에는 이 칸이 없다(undefined) — null 과 같게 다룬다.
      */
     readonly pendingWinner?: number | null;
+    /**
+     * 매 이닝을 여는 자리(선공). 없으면 0 — 예전 대전 · 혼자 연습은 늘 자리 0 이 먼저 친다.
+     * 온라인 대전은 가위바위보로 초구 칠 사람을 정한다(2026-11-04, shared/sim/breakRps) — 게스트가 이기면 1.
+     * 후구(위 pendingWinner)는 '선공이 먼저 닿았을 때'라 이 값을 본다.
+     */
+    readonly first?: number;
 }
 
 export interface CreateSessionOptions {
@@ -191,10 +197,10 @@ export function applyShot(s: SessionState, raw: ShotOutcome): ApplyResult {
             status = "finished";
             winnerIndex = null;
             pendingWinner = null;
-        } else if (players.length === 2 && s.turn === 0) {
+        } else if (players.length === 2 && s.turn === (s.first ?? 0)) {
             // 선공이 먼저 닿았다 — 후공에게 마지막 한 이닝(후구)을 준다. 아직 끝나지 않았다.
-            pendingWinner = 0;
-            turn = 1;
+            pendingWinner = s.turn;
+            turn = (s.turn + 1) % 2;
         } else {
             status = "finished";
             winnerIndex = s.turn;

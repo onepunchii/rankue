@@ -17,6 +17,7 @@
  *  - matchShotAck / matchShotFail: 내 샷 응답. 실패는 큐에 남기고 MAX_RETRIES 뒤 offline — 단 항목은 버리지 않는다(다음 폴링 성공 때 다시 보낸다).
  *  - 되돌리기·자유 배치·다시하기는 대전에 없다. record 는 항상 true.
  */
+import type { BreakRpsView } from "@shared/sim/breakRps";
 import type { BallState, ShotInput } from "@shared/sim/types";
 import { DEFAULT_CUE, TABLES, type SimParams, type TableSpec } from "@shared/sim/params";
 import { currentPlayer, isOpeningShot, objectBallIds, opponentCueBall, type GameType, type SessionState, type ShotOutcome } from "@shared/sim/rules";
@@ -225,6 +226,8 @@ export interface MatchState {
     readonly watchers: number;
     /** 상대가 자리를 비웠나(2026-09-15). 시계가 늦게 시작하는 동안 이유를 보여 주는 표시용 값. */
     readonly opponentAway: boolean;
+    /** 선구 가위바위보(2026-11-04) — 정해지기 전(winner null)에는 칠 수 없다. 가위바위보 없는 대전은 null */
+    readonly breakRps: BreakRpsView | null;
     /** 핸디전인가 — 시작 인사 화면이 "다마수는 두 사람 에버리지로 정해졌다"를 설명할 때 쓴다. */
     readonly handicap: boolean;
     /** 상대가 지금 겨누는 방향(2026-09-16). 기다리는 동안 큐대를 그린다. */
@@ -260,6 +263,7 @@ export function matchStateFrom(m: MatchPublic, myIndex: PlayerIndex): MatchState
         timeouts: m.timeouts ?? [0, 0],
         watchers: m.watchers ?? 0,
         opponentAway: m.opponentAway === true,
+        breakRps: m.breakRps ?? null,
         handicap: m.handicap === true,
         opponentAim: m.opponentAim ?? null,
         chatSeq: m.chatSeq ?? 0,
@@ -281,6 +285,8 @@ export function sameMatchMeta(a: MatchState, b: MatchState): boolean {
         && a.winnerIndex === b.winnerIndex && a.myName === b.myName && a.opponentName === b.opponentName
         && a.timeouts[0] === b.timeouts[0] && a.timeouts[1] === b.timeouts[1]
         && a.opponentAway === b.opponentAway
+        // 선구 가위바위보 — 상대가 '냈다'만 바뀐 순간도 화면에 닿아야 한다
+        && JSON.stringify(a.breakRps) === JSON.stringify(b.breakRps)
         // 상대가 말만 한 순간은 다른 필드가 하나도 안 바뀐다 — 이게 빠지면 matchSync 의 조기 반환이
         // 그 응답을 통째로 버려 채팅이 화면에 영영 안 닿는다(2026-09-16 상대 조준과 똑같은 함정).
         && a.chatSeq === b.chatSeq

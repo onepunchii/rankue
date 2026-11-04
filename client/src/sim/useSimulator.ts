@@ -10,6 +10,7 @@
  * 네트워크 대전(README "네트워크 대전 A"): actions.startMatch(match) 로 열면 mode="match", match 에 대전 뷰가 실린다.
  * 상대 차례는 phase="waiting"(입력 잠금, 폴링), 상대 샷은 phase="shooting" + replaying 으로 재생된다.
  */
+import type { BreakRpsView, RpsHand } from "@shared/sim/breakRps";
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
 import type { BallState, SimResult } from "@shared/sim/types";
 import type { SimParams } from "@shared/sim/params";
@@ -90,6 +91,8 @@ export interface SimulatorActions {
     sync(): void;
     /** 대전: 40초 룰 시간 초과 처리(화면의 시계가 0 이 되면 부른다 — 내 차례 40초 / 상대 차례 50초). 성공하면 true. */
     timeout(): Promise<boolean>;
+    /** 대전: 선구 가위바위보에 낸다(2026-11-04). 성공하면 true. */
+    pickBreak(hand: RpsHand): Promise<boolean>;
     /** 이모지 인사(대전). 거부 사유를 돌려준다. */
     /** 한마디 보내기. 자유 입력은 { text }, 고정 인사는 { code }. */
     sendChat(body: { text?: string; code?: string; clientKey?: string }): Promise<ChatSendResult>;
@@ -142,6 +145,8 @@ export interface MatchView {
     /** 두 선수가 입은 상대 · 공([호스트, 게스트], 큐 케이스 id, 2026-10-24) — 겨누는 사람의 상대 · 각자 수구의 무늬. 없으면 null */
     readonly shafts: readonly [string | null, string | null];
     readonly ballSkins: readonly [string | null, string | null];
+    /** 선구 가위바위보(2026-11-04, 보는 사람 기준) — 정해지기 전에는 칠 수 없다. 가위바위보 없는 대전은 null */
+    readonly breakRps: BreakRpsView | null;
     /** 이 대전에서 오간 한마디(오래된 것부터). 내가 보낸 것도 들어 있다. */
     readonly chat: readonly ChatLine[];
     /**
@@ -248,6 +253,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
         claim: () => ctrl.claim(),
         sync: () => ctrl.sync(),
         timeout: () => ctrl.timeout(),
+        pickBreak: (hand) => ctrl.pickBreak(hand),
         sendChat: (body) => ctrl.sendChat(body),
     }), [ctrl]);
 
@@ -283,6 +289,7 @@ export function useSimulator(options: UseSimulatorOptions = {}): Simulator {
             cues: m.cues ?? [null, null],
             shafts: m.shafts ?? [null, null],
             ballSkins: m.ballSkins ?? [null, null],
+            breakRps: m.breakRps ?? null,
             chat: aux.chat,
             // 차례는 안 본다(2026-09-18) — 내 차례 대화창은 말풍선을 눌러 직접 연다. 보낼 샷이 남은 동안만 막는다
             // (그 창에선 서버 상태가 아직 내 샷을 모른다).

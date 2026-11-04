@@ -140,12 +140,15 @@ function storedOutcome(shot: HistoryShot): ShotOutcome {
     };
 }
 
-/** 대전 시작 세션(모든 대전은 0번 자리 — 호스트 — 가 개시한다). 규칙·목표는 대전 내내 같으므로 아무 시점의 세션에서 가져온다. */
+/**
+ * 대전 시작 세션 — 선공(first, 없으면 0번 자리 — 호스트)이 개시한다. 2026-11-04 부터는 가위바위보로 게스트가 선공일 수 있다(shared/sim/breakRps).
+ * 규칙·목표·선공은 대전 내내 같으므로 아무 시점의 세션에서 가져온다.
+ */
 function openingSession(any: SessionState): SessionState {
     return {
         ...any,
         players: any.players.map((p) => ({ ...p, score: 0, innings: 0, highRun: 0, currentRun: 0 })),
-        turn: 0, shotCount: 0, status: "playing", winnerIndex: null, pendingWinner: null,
+        turn: any.first ?? 0, shotCount: 0, status: "playing", winnerIndex: null, pendingWinner: null,
     };
 }
 

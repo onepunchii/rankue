@@ -227,6 +227,7 @@ export const tr: Record<string, string> = {
   "err.sim.memberNotFound": "Üye bulunamadı",
   "err.sim.notPlaying": "Bu maç devam etmiyor",
   "err.sim.clockNotStarted": "Vuruş saati henüz başlamadı",
+  "err.sim.breakPicking": "Kimin açacağı belirleniyor — taş-kâğıt-makastan sonra vurabilirsiniz",
   "err.sim.tooEarly": "Henüz değil, biraz bekle",
   "err.sim.stale": "Sıra zaten değişti",
   "err.sim.notYourTurn": "Sıra rakibinde",

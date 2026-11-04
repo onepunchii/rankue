@@ -42,6 +42,7 @@ import { caseItem } from "../../../shared/cueCase.js";
 import { startTurnSeenAt } from "../../storage/simMatch.repo.js";
 import { rollCups } from "../../services/simCupService.js";
 import { CUP_MATCH } from "../../../shared/simCup.js";
+import { breakRpsPending, breakRpsPick, breakRpsSettle, breakRpsStart, breakRpsView, isRpsHand, parseBreakRps } from "../../../shared/sim/breakRps.js";
 import { liveBrands } from "../../storage/tableBrands.js";
 
 const router = Router();
@@ -271,6 +272,8 @@ function publicMatch(m: MatchWithNames, viewerId: string) {
         ballSkins: [wornIdOf(m.hostBall, "ball"), m.guestId ? wornIdOf(m.guestBall, "ball") : null] as const,
         myIndex, turn: m.turn, shots: m.shots, version: m.version,
         state: m.state as SessionState | null, balls: m.balls as BallState[] | null,
+        /** 선구 가위바위보(2026-11-04, shared/sim/breakRps) — 보는 사람 기준(나 · 상대). 이번 판 상대 손은 공개 전까지 '냈다'만. 없는 대전은 null */
+        breakRps: (() => { const r = parseBreakRps(m.breakRps); return r ? breakRpsView(r, myIndex) : null; })(),
         winnerIndex: m.winnerId === null ? null : m.winnerId === m.hostId ? 0 : 1,
         endReason: m.endReason, engineVersion: m.engineVersion, paramsHash: m.paramsHash,
         createdAt: m.createdAt, startedAt: m.startedAt, lastShotAt: m.lastShotAt, finishedAt: m.finishedAt,
@@ -537,7 +540,8 @@ async function joinAndStart(m: MatchWithNames, req: AuthRequest, res: any, body:
         ],
     });
     const balls = openingLayout(m.gameType, TABLES[m.tableId], "white");
-    const started = await storage.simMatch.start(m.id, req.userId!, guestTarget, state, balls, hostTarget);
+    // 첫 샷 전에 가위바위보로 초구 칠 사람을 정한다(2026-11-04) — 그동안 시계는 걸지 않는다
+    const started = await storage.simMatch.start(m.id, req.userId!, guestTarget, state, balls, hostTarget, breakRpsStart(Date.now()));
     if (!started) return sendError(res, 409, "err.sim.startedOrNotJoinable");
     // 새 판이 시작된 뒤에 옛 판을 기권한다 — 먼저 기권하고 이 방을 남에게 뺏기면 둘 다 잃는다
     await forfeitPlaying(req.userId!, playing, m.id);
@@ -579,7 +583,7 @@ export async function startCupMatch(cup: { gameType: "3c" | "4c" }, game: { id: 
             { id: game.p2Id, target: guestTarget, cueBallId: "yellow" },
         ],
     });
-    const started = await storage.simMatch.start(roomId, game.p2Id, guestTarget, state, openingLayout(m.gameType, TABLES[m.tableId], "white"), hostTarget);
+    const started = await storage.simMatch.start(roomId, game.p2Id, guestTarget, state, openingLayout(m.gameType, TABLES[m.tableId], "white"), hostTarget, breakRpsStart(Date.now()));
     if (!started) return null;
     await storage.simMatch.cancelOtherWaiting(game.p2Id, roomId).catch((e: unknown) => console.warn("[sim] cancelOtherWaiting", (e as Error)?.message));
     return roomId;
@@ -852,8 +856,14 @@ router.get("/sim/matches/:id", requireAuth, asyncHandler(async (req: AuthRequest
         // 방금 적은 내 표시를 응답에도 반영한다 — 대전 행을 한 번 더 읽지 않으려고 여기서 합친다(4초마다 오는 요청이다).
         m = { ...m, watchers: { ...(m.watchers as Record<string, number> | null ?? {}), [req.userId!]: now } };
     }
+    // 선구 가위바위보의 20초가 지났으면 정한다(한 사람만 냈으면 그 사람 · 아무도 안 냈으면 방장) — 따로 도는 타이머가 없어 폴링이 방아쇠다
+    if (m.status === "playing" && breakRpsPending(parseBreakRps(m.breakRps)) && Date.now() >= (parseBreakRps(m.breakRps)?.deadlineMs ?? Infinity)) {
+        const now = Date.now();
+        if (await storage.simMatch.decideBreak(m.id, (r) => breakRpsSettle(r, now))) m = (await storage.simMatch.get(m.id)) ?? m;
+    }
     // ?ack=1: 차례인 사람이 조준 화면에 들어왔다 → 40초 시계 시작(한 번만, 서버가 이미 적었으면 그대로). 상대·재생 중 폴링은 ack 없이 온다.
-    if (isPlayer && req.query.ack === "1" && m.status === "playing" && !m.turnSeenAt) {
+    // 선구 가위바위보 중에는 걸지 않는다(정해질 때 서버가 건다 — storage markTurnSeen 도 막는다).
+    if (isPlayer && req.query.ack === "1" && m.status === "playing" && !m.turnSeenAt && !breakRpsPending(parseBreakRps(m.breakRps))) {
         const myIndex = m.hostId === req.userId ? 0 : 1;
         if (m.turn === myIndex) {
             const row = await storage.simMatch.markTurnSeen(m.id, myIndex);
@@ -948,6 +958,25 @@ async function applyTimeout(m: MatchWithNames, myIndex: 0 | 1, opts: { at?: numb
     return row;
 }
 
+/**
+ * POST /sim/matches/:id/rps { hand } — 선구 가위바위보에 낸다(2026-11-04, shared/sim/breakRps).
+ * 한 번 내면 바꿀 수 없다. 둘 다 냈으면 그 자리에서 가린다 — 비기면 다음 판, 정해지면 이긴 사람이 흰 공 · 초구(시계도 그때 건다).
+ * 응답은 대전 행(보는 사람 기준) — 화면은 그대로 맞춘다. 선수가 아니면 '없는 대전', 정하는 중이 아니면 409.
+ */
+router.post("/sim/matches/:id/rps", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const hand = req.body?.hand;
+    if (!isRpsHand(hand)) return sendError(res, 400, "err.sim.badInput");
+    const m = await storage.simMatch.get(req.params.id);
+    if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "err.sim.matchNotFound");
+    if (m.status !== "playing" || !parseBreakRps(m.breakRps)) return sendError(res, 409, "err.sim.notPlaying");
+    const seat: 0 | 1 = m.hostId === req.userId ? 0 : 1;
+    await storage.simMatch.touchSeen(m.id, seat);
+    const now = Date.now();
+    await storage.simMatch.decideBreak(m.id, (r) => breakRpsPick(r, seat, hand, now));
+    const full = await storage.simMatch.get(m.id);
+    return sendSuccess(res, publicMatch(full!, req.userId!));
+}));
+
 // POST /sim/matches/:id/timeout — 40초 룰 시간 초과: 차례인 사람은 40초, 상대는 50초(유예 10초) 뒤부터. 서버 시계가 판정한다.
 // 샷 없이 이닝을 넘기고(foul-timeout) 차례를 바꾼다. 클라이언트는 응답의 대전 행으로 스냅한다.
 router.post("/sim/matches/:id/timeout", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
@@ -1040,6 +1069,8 @@ router.post("/sim/matches/:id/shots", requireAuth, asyncHandler(async (req: Auth
     if (!m || (m.hostId !== req.userId && m.guestId !== req.userId)) return sendError(res, 404, "err.sim.matchNotFound");
     if (m.status !== "playing") return sendError(res, 409, "err.sim.notPlaying");
     const myIndex = m.hostId === req.userId ? 0 : 1;
+    // 선구 가위바위보가 끝나기 전에는 칠 수 없다(2026-11-04)
+    if (breakRpsPending(parseBreakRps(m.breakRps))) return sendError(res, 409, "err.sim.breakPicking", "BREAK_PICKING");
     // 치는 사람도 접속 중 — 득점으로 차례가 이어지면 재생 뒤 내 시계가 바로 돈다
     await storage.simMatch.touchSeen(m.id, myIndex);
     // 응답을 못 받은 클라이언트의 재전송: 이미 기록된 내 샷이면 같은 결과를 다시 준다(멱등).
@@ -1249,6 +1280,7 @@ router.post("/sim/matches/:id/claim", requireAuth, asyncHandler(async (req: Auth
     if (m.status !== "playing") return sendError(res, 409, "err.sim.notPlaying");
     const myIndex = m.hostId === req.userId ? 0 : 1;
     if (m.turn === myIndex) return sendError(res, 409, "err.sim.claimOnMyTurn");
+    if (breakRpsPending(parseBreakRps(m.breakRps))) return sendError(res, 409, "err.sim.breakPicking", "BREAK_PICKING");
     if (Date.now() < claimableAtOf(m).getTime()) return sendError(res, 409, "err.sim.tooEarly", "TOO_EARLY");
     const row = await storage.simMatch.finish(m.id, req.userId!, "claim");
     if (!row) return sendError(res, 409, "err.sim.alreadyFinished");

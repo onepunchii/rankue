@@ -53,6 +53,7 @@ import {
     classifyMatchError, matchApi as defaultMatchApi, matchConfig,
     type ChatLine, type MatchApi, type MatchEndReason, type MatchPublic, type MatchShot, type PostShotResponse,
 } from "./matchApi";
+import type { RpsHand } from "@shared/sim/breakRps";
 import {
     createSimStore, cueBallIdOf, matchStateFrom, paramsFromConfig, sameBalls, thicknessPhi, aimCandidates, focusTarget,
     type CueInput, type MatchState, type PendingShot, type Phase, type SimCoreState, type SimStore,
@@ -198,6 +199,8 @@ export const EXIT_SYNC_WAIT_MS = 3000;
 /** 대전 폴링 주기: 상대 차례가 된 뒤 처음 1분은 빠르게, 그 뒤 느리게. */
 export const POLL_FAST_MS = 2000;
 export const POLL_SLOW_MS = 5000;
+/** 선구 가위바위보 중 폴링 간격 — 상대가 냈는지 · 공개를 빨리 보여 준다(정하는 동안 20초 남짓뿐) */
+export const POLL_RPS_MS = 1200;
 export const POLL_FAST_WINDOW_MS = 60_000;
 /** 대전 샷 전송 재시도 백오프(k번째 실패 뒤 대기). */
 export const RETRY_BACKOFF_MS: readonly number[] = [1000, 2000, 4000];
@@ -1122,6 +1125,30 @@ export class SimController {
         return ok;
     }
 
+    /**
+     * 선구 가위바위보에 낸다(2026-11-04, shared/sim/breakRps). 서버가 둘 다 낸 것을 보고 가리면 응답에 결과가 실려 오고,
+     * 게스트가 이겼으면 세션도 바뀌어 온다(흰 공 · 차례) — 폴링과 같은 길(applyMatchUpdate)로 맞춘다. 실패하면 서버 정본으로 다시 맞추고 false.
+     */
+    async pickBreak(hand: RpsHand): Promise<boolean> {
+        const s = this.store.get();
+        if (this.disposed || s.mode !== "match" || !s.match || s.match.status !== "playing" || !this.matchApi.pickRps) return false;
+        const gen = this.gen;
+        const id = s.match.matchId;
+        let ok = false;
+        await this.serial(async () => {
+            try {
+                const m = await this.matchApi.pickRps!(id, hand);
+                if (gen !== this.gen) return;
+                await this.applyMatchUpdate(gen, m);
+                ok = true;
+            } catch {
+                if (gen === this.gen) await this.resync(gen);
+            }
+        });
+        if (gen === this.gen) { this.clearPollTimer(); this.schedulePoll(); }
+        return ok;
+    }
+
     /** 승리 주장(상대가 48시간 넘게 안 쳤을 때). 아직 이르면 onMatch("claim-too-early") + 서버 값으로 갱신하고 false. */
     async claim(): Promise<boolean> {
         const s = this.store.get();
@@ -1179,7 +1206,10 @@ export class SimController {
         if (this.pollTimer !== null || this.pollInFlight) return;
         // 40초 시계를 시작해야 하면 바로(ack 폴링). 내 차례 조준 중에는 자리 표시만 살리면 되므로 언제나 느린 주기(5 s).
         // 상대 차례(waiting)는 결과를 빨리 받아야 하니 처음 1분은 2 s.
+        // 선구 가위바위보 중에는 두 사람 다 빠르게(상대가 낸 것 · 공개를 바로 보여 준다)
+        const picking = !!s.match?.breakRps && s.match.breakRps.winner === null;
         const delay = this.needsAck(s) ? 0
+            : picking ? POLL_RPS_MS
             : s.phase === "aim" ? POLL_SLOW_MS
                 : this.now() - this.waitingSince < POLL_FAST_WINDOW_MS ? POLL_FAST_MS : POLL_SLOW_MS;
         this.pollTimer = this.setTimer(() => { this.pollTimer = null; this.pollNow(); }, delay);
@@ -1289,8 +1319,10 @@ export class SimController {
         if (!sameBalls(m.balls, s.balls)) { this.snapToServer(m, meta, { count: true, notify: "mismatch" }); return; }
         // 샷 수·공은 같은데 세션이 다르다 = 샷 없이 차례가 넘어갔다(40초 시간 초과). 서버 정본으로 스냅하고 누가 넘겼는지 알린다.
         if (s.session && !sameSessionCore(m.state, s.session)) {
-            const iTimedOut = s.session.turn === meta.myIndex && m.state.turn !== s.session.turn;
-            const theyTimedOut = s.session.turn !== meta.myIndex && m.state.turn !== s.session.turn;
+            // 선구 가위바위보로 게스트가 이겼다 — 샷 없이 흰 공 · 차례가 바뀌어 온다. 시간 초과가 아니다
+            const byBreak = !!meta.breakRps && meta.breakRps.winner !== null && m.state.shotCount === 0 && s.session.shotCount === 0;
+            const iTimedOut = !byBreak && s.session.turn === meta.myIndex && m.state.turn !== s.session.turn;
+            const theyTimedOut = !byBreak && s.session.turn !== meta.myIndex && m.state.turn !== s.session.turn;
             this.snapToServer(m, meta, { count: false, notify: null });
             if (iTimedOut) this.callbacks.onMatch?.("timeout-me");
             else if (theyTimedOut) this.callbacks.onMatch?.("timeout-opponent");

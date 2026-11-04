@@ -2356,6 +2356,11 @@ export const hiqSimMatches = pgTable("hiq_sim_matches", {
    * end_reason 'void' 로 닫는다(오래 멈춘 판 정리와 같은 길 — 끝난 판을 읽는 곳은 전부 status 'finished' 만 본다). 되살리면 이 칸의 prevEndReason 으로.
    */
   adminVoid: jsonb("admin_void"),
+  /**
+   * 선구 정하기 — 가위바위보(2026-11-04, shared/sim/breakRps). 대전이 시작되면 { round, deadlineMs, picks, last, winner, by, decidedMs } 로 열리고,
+   * winner 가 정해질 때까지 샷 · 시간 초과 · 시계(turn_seen_at)를 막는다. 이 칸이 없는 대전(예전 · '한 판 더')은 예전처럼 바로 친다.
+   */
+  breakRps: jsonb("break_rps"),
   finishedAt: timestamp("finished_at"),
 }, (t) => ({
   idxCode: index("idx_sim_matches_code").on(t.code, t.status),

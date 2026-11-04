@@ -16,6 +16,7 @@ import { checkRoomTitle } from "@shared/sim/roomTitle";
 import type { BallState, ShotInput, SimEvent, Snapshot } from "@shared/sim/types";
 import type { CushionModelId, TableSpec } from "@shared/sim/params";
 import type { FinishType, GameType, Rules, SessionState, ShotOutcome } from "@shared/sim/rules";
+import { isRpsHand, type BreakRpsView, type RpsHand } from "@shared/sim/breakRps";
 import type { SimSetupConfig } from "./setupPresets";
 import { aimAssistFor } from "./setupPresets";
 import {
@@ -162,6 +163,11 @@ export interface MatchPublic {
     readonly version: number;
     /** 상대가 지금 화면을 안 보고 있다(자리 비움). 진행 중일 때만 의미가 있다. */
     readonly opponentAway: boolean;
+    /**
+     * 선구 가위바위보(2026-11-04, shared/sim/breakRps) — 보는 사람 기준. 정해지기 전(winner null)에는 칠 수 없다.
+     * 이 칸이 없는 대전(예전 · '한 판 더')은 null. **parseMatch 가 읽어야 화면에 닿는다**(hostOnline 에서 겪은 일).
+     */
+    readonly breakRps?: BreakRpsView | null;
     /** 상대가 지금 겨누는 방향(rad, ISO 시각). 내 차례거나 값이 낡았으면 null — 서버가 걸러 준다. */
     readonly opponentAim: { readonly phi: number; readonly at: string } | null;
     /**
@@ -557,6 +563,20 @@ function playerIndexOrNull(v: unknown): PlayerIndex | null {
     return v === 0 || v === 1 ? v : null;
 }
 
+/** 선구 가위바위보(보는 사람 기준) — 모양이 틀리면 null(가위바위보 없는 대전과 같다) */
+export function parseBreakRpsView(raw: unknown): BreakRpsView | null {
+    if (!isRecord(raw) || typeof raw.round !== "number" || typeof raw.deadlineMs !== "number") return null;
+    const hand = (v: unknown): RpsHand | null => (isRpsHand(v) ? v : null);
+    const last = isRecord(raw.last) && isRpsHand(raw.last.mine) && isRpsHand(raw.last.theirs) && typeof raw.last.round === "number"
+        ? { round: raw.last.round, mine: raw.last.mine, theirs: raw.last.theirs } : null;
+    return {
+        round: raw.round, deadlineMs: raw.deadlineMs, myPick: hand(raw.myPick), opponentPicked: raw.opponentPicked === true, last,
+        winner: raw.winner === "me" || raw.winner === "opponent" ? raw.winner : null,
+        by: raw.by === "rps" || raw.by === "timeout" || raw.by === "default" || raw.by === "rounds" ? raw.by : null,
+        decidedMs: typeof raw.decidedMs === "number" ? raw.decidedMs : null,
+    };
+}
+
 export function parseMatch(raw: unknown): MatchPublic {
     if (!isRecord(raw) || typeof raw.id !== "string" || typeof raw.code !== "string") throw new TypeError("match api: malformed match");
     if (!STATUSES.includes(raw.status as MatchStatus)) throw new TypeError("match api: malformed match status");
@@ -601,6 +621,7 @@ export function parseMatch(raw: unknown): MatchPublic {
         version: raw.version,
         // 옛 서버 응답에는 없다 — 없으면 "자리에 있다"로 본다(없던 안내가 새로 생기는 쪽이 안전).
         opponentAway: raw.opponentAway === true,
+        breakRps: parseBreakRpsView(raw.breakRps),
         opponentAim: isRecord(raw.opponentAim) && typeof raw.opponentAim.phi === "number" && Number.isFinite(raw.opponentAim.phi)
             ? { phi: raw.opponentAim.phi, at: isoOrNull(raw.opponentAim.at) ?? "" }
             : null,
@@ -835,6 +856,8 @@ export interface MatchApi {
     claim(id: string): Promise<ClaimResponse>;
     /** 40초 룰 시간 초과 처리(내 차례 40초 / 상대 차례 50초 뒤). 서버가 시각을 판정하고 갱신된 대전 행을 돌려준다. 없으면 시계 기능 없음. */
     timeout?(id: string): Promise<MatchPublic>;
+    /** 선구 가위바위보에 낸다(2026-11-04). 갱신된 대전 행(보는 사람 기준)을 돌려준다 */
+    pickRps?(id: string, hand: RpsHand): Promise<MatchPublic>;
     /** 내가 겨누는 방향 알리기(2026-09-16). 응답은 읽지 않는다 — 실패해도 조용히 넘어간다. */
     sendAim?(id: string, phi: number): Promise<void>;
     /**
@@ -882,6 +905,9 @@ export function createMatchApi(request: RequestFn): MatchApi {
         },
         async timeout(id) {
             return parseMatch(await request(matchTimeoutUrl(id), { method: "POST" }));
+        },
+        async pickRps(id, hand) {
+            return parseMatch(await request(`/api/hiq/sim/matches/${encodeURIComponent(id)}/rps`, { method: "POST", body: { hand } }));
         },
         async sendAim(id, phi) {
             await request(`${matchUrl(id)}/aim`, { method: "POST", body: { phi } });

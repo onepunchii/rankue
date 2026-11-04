@@ -93,6 +93,8 @@ import { setActiveMatchScreen } from "./match/liveMatchCall";
 import { RealityHint, REALITY_PREF_KEY } from "./components/RealityHint";
 import { MatchEndRapport } from "./match/MatchEndRapport";
 import { MatchIntro, INTRO_MS } from "./match/MatchIntro";
+import { BreakRpsSheet } from "./match/BreakRpsSheet";
+import { BREAK_RPS_RESULT_MS } from "@shared/sim/breakRps";
 import { aimPhi } from "./aimAssist";
 import { useSolver } from "./solver/useSolver";
 import { SolverSheet } from "./solver/SolverSheet";
@@ -351,6 +353,8 @@ export function SimulatorPage() {
     const myIndexRef = useRef<number | null>(null);
     // 시작 인사(2026-09-15 라포 3번): 첫 샷 전에 한 번만. 대전 id 를 적어 두어 같은 판에서 다시 뜨지 않게 한다.
     const [introFor, setIntroFor] = useState<string | null>(null);
+    // 선구 가위바위보(2026-11-04) — 결과를 보여 주고 닫은 대전
+    const [rpsClosedFor, setRpsClosedFor] = useState<string | null>(null);
     const introShownRef = useRef<string | null>(null);
     const [sheetOpen, setSheetOpen] = useState(false);
     // 당점·큐 각 시트. 툴바의 두 버튼이 각자 탭으로 연다
@@ -2009,6 +2013,22 @@ export function SimulatorPage() {
                             onDismiss={() => setIntroFor(null)}
                         />
                     )}
+                    {/* 선구 정하기 — 가위바위보(2026-11-04): 시작 인사 뒤, 첫 샷 전에 화면 전체를 덮는다. 정해지면 결과를 3초 보여 주고 닫는다 */}
+                    {(() => {
+                        const m = isMatch && sim.match?.status === "playing" ? sim.match : null;
+                        const rps = m?.breakRps ?? null;
+                        if (!m || !rps || introFor === m.id || rpsClosedFor === m.id) return null;
+                        const recent = rps.winner !== null && rps.decidedMs !== null && Date.now() + m.serverOffsetMs - rps.decidedMs < BREAK_RPS_RESULT_MS + 1500;
+                        if (rps.winner !== null && !recent) return null;
+                        return (
+                            <BreakRpsSheet
+                                rps={rps} myName={m.myName} opponentName={m.opponentName} isHost={m.myIndex === 0}
+                                serverOffsetMs={m.serverOffsetMs}
+                                onPick={(hand) => actions.pickBreak(hand)}
+                                onDone={() => setRpsClosedFor(m.id)}
+                            />
+                        );
+                    })()}
                     {/* 굿샷 권유(2026-09-15 라포): 상대가 득점한 직후에만. 조준을 가리지 않게 테이블 아래쪽에 잠깐. */}
                 </div>
             </div>

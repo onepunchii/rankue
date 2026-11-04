@@ -8,7 +8,8 @@ import { hiqSimMatches, hiqSimMatchShots, hiqSimMatchChats, hiqSimMatchRatings, 
 import { alias } from "drizzle-orm/pg-core";
 import { eq, and, or, desc, sql, inArray, gte, isNull, lt } from "drizzle-orm";
 import type { HiqSimMatch, HiqSimMatchShot, HiqSimMatchChat } from "../../shared/schema.js";
-import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS, START_ABSENT_GRACE_MS, REPEAT_ABSENT_GRACE_MS } from "../../shared/sim/rules/session.js";
+import { ABSENT_GRACE_MS, PRESENCE_MS, REPLAY_GRACE_MS, START_ABSENT_GRACE_MS, REPEAT_ABSENT_GRACE_MS, type SessionState } from "../../shared/sim/rules/session.js";
+import { applyBreakWinner, parseBreakRps, type BreakRps } from "../../shared/sim/breakRps.js";
 import { WATCHER_WINDOW_MS } from "../../shared/sim/watchers.js";
 import { CHAT_PAGE_MAX, chatReject, type ChatReject } from "../../shared/sim/chat.js";
 import { ratingEligibility, ratingDelta, START_RATING, SAME_PAIR_WINDOW_MS, MIN_SHOTS_EACH, AT_FAULT_END_REASONS, type RatingResult } from "../../shared/sim/rating.js";
@@ -445,7 +446,11 @@ export class SimMatchRepository {
 
     /** 게스트 참가 → playing. waiting 상태의 행을 잠그고 한 번만 성공한다. */
     /** hostTarget 은 핸디전에서만 넘어온다 — 참가하는 순간 두 사람의 에버리지로 방장 목표까지 다시 정하기 때문이다. */
-    async start(id: string, guestId: string, guestTarget: number, state: unknown, balls: unknown, hostTarget?: number): Promise<HiqSimMatch | null> {
+    /**
+     * breakRps(2026-11-04) — 주면 선구 가위바위보로 시작한다: 정해질 때까지 시계를 걸지 않는다(turn_seen_at null).
+     * 정해지는 때 decideBreak 가 초구 칠 사람의 시계를 건다.
+     */
+    async start(id: string, guestId: string, guestTarget: number, state: unknown, balls: unknown, hostTarget?: number, breakRps?: BreakRps): Promise<HiqSimMatch | null> {
         return db.transaction(async (tx) => {
             const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, id)).for("update");
             if (!m || m.status !== "waiting" || m.hostId === guestId) return null;
@@ -454,9 +459,37 @@ export class SimMatchRepository {
                 // 첫 샷(방장) 시계: 늘 건다(startTurnSeenAt). 자리에 없으면 푸시를 보고 돌아올 2분을 더 봐준다.
                 // 한때(2026-09-26 오전) 자리에 없으면 걸지 않았는데, 그러면 들어온 사람이 15분을 멍하니 기다렸다(오너 제보).
                 // 끝내 안 온 방장의 실격은 노쇼라 레이팅엔 넣지 않는다(한 번도 안 쳤다 — rating.ts).
-                turnSeenAt: startTurnSeenAt(m.hostSeenAt),
+                // 선구 가위바위보가 있으면 시계는 정해진 뒤에 건다(decideBreak).
+                turnSeenAt: breakRps ? null : startTurnSeenAt(m.hostSeenAt),
+                ...(breakRps ? { breakRps } : {}),
                 ...(typeof hostTarget === "number" ? { hostTarget } : {}),
                 startedAt: new Date(), version: m.version + 1,
+            }).where(eq(hiqSimMatches.id, id)).returning();
+            return row;
+        });
+    }
+
+    /**
+     * 선구 가위바위보를 잠그고 고친다(2026-11-04, shared/sim/breakRps). next 가 새 가위바위보 상태를 돌려주면 적는다.
+     * 방금 정해졌으면(winner 가 생겼다) 이긴 사람을 세션에 반영하고(applyBreakWinner — 흰 공 · 차례 · 선공) 그 사람의 초구 시계를 건다
+     * (startTurnSeenAt — 화면에 있으면 1분, 없으면 2분 뒤부터 40초). 버전을 올려 두 화면이 새 세션으로 맞춘다. 바뀐 것이 없으면 null.
+     */
+    async decideBreak(id: string, next: (rps: BreakRps, m: HiqSimMatch) => BreakRps): Promise<HiqSimMatch | null> {
+        return db.transaction(async (tx) => {
+            const [m] = await tx.select().from(hiqSimMatches).where(eq(hiqSimMatches.id, id)).for("update");
+            const cur = m ? parseBreakRps(m.breakRps) : null;
+            if (!m || !cur || m.status !== "playing" || cur.winner !== null || m.shots > 0) return null;
+            const rps = next(cur, m);
+            if (JSON.stringify(rps) === JSON.stringify(cur)) return null;
+            const decided = rps.winner !== null;
+            const state = decided ? applyBreakWinner(m.state as SessionState, rps.winner!) : null;
+            const [row] = await tx.update(hiqSimMatches).set({
+                breakRps: rps,
+                ...(decided ? {
+                    state, turn: rps.winner!,
+                    turnSeenAt: startTurnSeenAt(rps.winner === 0 ? m.hostSeenAt : m.guestSeenAt),
+                } : {}),
+                version: m.version + 1,
             }).where(eq(hiqSimMatches.id, id)).returning();
             return row;
         });
@@ -718,7 +751,9 @@ export class SimMatchRepository {
     /** 40초 룰: 차례인 사람이 조준 화면에 들어온 시각을 한 번만 적는다(이미 있으면 그대로 → undefined). */
     async markTurnSeen(id: string, turn: number): Promise<HiqSimMatch | undefined> {
         const [row] = await db.update(hiqSimMatches).set({ turnSeenAt: new Date() })
-            .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.status, "playing"), eq(hiqSimMatches.turn, turn), isNull(hiqSimMatches.turnSeenAt)))
+            .where(and(eq(hiqSimMatches.id, id), eq(hiqSimMatches.status, "playing"), eq(hiqSimMatches.turn, turn), isNull(hiqSimMatches.turnSeenAt),
+                // 선구 가위바위보 중에는 시계를 걸지 않는다(정해질 때 decideBreak 가 건다)
+                sql`(${hiqSimMatches.breakRps} is null or ${hiqSimMatches.breakRps} ->> 'winner' is not null)`))
             .returning();
         return row;
     }

@@ -227,6 +227,7 @@ export const vi: Record<string, string> = {
   "err.sim.memberNotFound": "Không tìm thấy thành viên",
   "err.sim.notPlaying": "Trận đấu này không đang diễn ra",
   "err.sim.clockNotStarted": "Đồng hồ đếm giờ chưa bắt đầu",
+  "err.sim.breakPicking": "Đang quyết định ai đánh trước — bạn có thể đánh sau oẳn tù tì",
   "err.sim.tooEarly": "Chưa được, hãy đợi thêm",
   "err.sim.stale": "Lượt chơi đã thay đổi rồi",
   "err.sim.notYourTurn": "Đang là lượt của đối thủ",

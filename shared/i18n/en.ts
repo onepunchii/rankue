@@ -227,6 +227,7 @@ export const en: Record<string, string> = {
   "err.sim.memberNotFound": "Member not found",
   "err.sim.notPlaying": "This match isn't in progress",
   "err.sim.clockNotStarted": "The shot clock hasn't started yet",
+  "err.sim.breakPicking": "Deciding who breaks — you can shoot after rock-paper-scissors",
   "err.sim.tooEarly": "Not yet — please wait",
   "err.sim.stale": "The turn has already changed",
   "err.sim.notYourTurn": "It's your opponent's turn",
