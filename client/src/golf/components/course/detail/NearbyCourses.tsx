@@ -6,7 +6,7 @@
 import { CourseLogo } from "../CourseLogo";
 import { Link, useLocation } from "wouter";
 import { LucideChevronRight } from "@/lib/icons";
-import { cityLabel, coursePath, manwonText } from "@shared/golfCourse";
+import { cityLabel, coursePath, manwonText, wonShort } from "@shared/golfCourse";
 import type { CourseDetail } from "@/golf/lib/courseApi";
 
 /** 1km 안은 같은 리조트의 다른 코스 페이지('설해원 더 레전드 코스' 0km, 2026-10-19) — '0km'는 틀린 값처럼 읽힌다 */
@@ -177,6 +177,40 @@ export function NearbyCourses({ items, lat, lng }: { items: Near[]; lat: number 
                     })}
                 </ul>
             </Card>
+        </Section>
+    );
+}
+
+/**
+ * 이 근처 다른 골프장(2026-11-04 오너: "순서대로 추천대로 다 진행" — 골프 4번) — 날씨 카드 바로 밑, 옆으로 넘기는 카드 줄.
+ * 검색으로 온 방문자가 날씨를 본 자리에서 다음 골프장으로(14일 비회원 상세 방문 1,625번 중 다른 골프장으로 넘어간 것 3.3% —
+ * 가까운 골프장은 화면 맨 아래에 있었다). 같은 목록(서버의 nearby — 가까운 순 여덟)을 쓰고, 아래의 판 · 목록은 그대로 둔다.
+ * 카드마다 로고 · 이름 · 자리와 거리 · 대표 그린피 · 지금 올라온 티타임 수. 두 곳 미만이면 그리지 않는다.
+ */
+export function NearbyCourseRow({ items }: { items: Near[] }) {
+    const list = items.filter((n) => n.slug && n.name?.trim()).slice(0, 6);
+    if (list.length < 2) return null;
+    return (
+        <Section title="이 근처 다른 골프장" aside={<span className="text-[12.5px] text-[#FFFFFF80]">가까운 순</span>}>
+            <ul className="-mx-5 flex snap-x scroll-px-5 gap-2.5 overflow-x-auto px-5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" data-testid="course-next">
+                {list.map((n) => {
+                    const live = n.counts.booking + n.counts.join;
+                    const where = [cityLabel(n.city, n.region), n.km != null ? (n.km < 1 ? SAME_SPOT : `${n.km}km`) : ""].filter(Boolean).join(" · ");
+                    return (
+                        <li key={`next:${n.slug}`} className="w-[156px] shrink-0 snap-start">
+                            <Link href={coursePath(n.slug)} data-track-as="golf-next-course" className="flex h-full flex-col rounded-2xl p-3 active:opacity-80" style={{ backgroundColor: "#FFFFFF0A", boxShadow: "inset 0 0 0 1px #FFFFFF14" }}>
+                                <CourseLogo logo={n.logo} name={n.name} size="sm" />
+                                <span className="mt-2 block truncate text-[15px] font-semibold text-[#FFFFFF]">{n.name}</span>
+                                {where && <span className="mt-0.5 block truncate text-[12.5px] tabular-nums text-[#FFFFFF80]">{where}</span>}
+                                <span className="mt-auto block pt-2">
+                                    {n.feeFrom ? <span className="block text-[12.5px] tabular-nums text-[#FFFFFFB3]">그린피 {wonShort(n.feeFrom)}~</span> : n.holes ? <span className="block text-[12.5px] text-[#FFFFFFB3]">{n.holes}홀</span> : null}
+                                    {live > 0 && <span className="mt-1 inline-block rounded-full px-2 py-1 text-[12px] font-semibold leading-none tabular-nums" style={{ backgroundColor: "#64DD1724", color: "#8BE84A" }}>티타임 {live}</span>}
+                                </span>
+                            </Link>
+                        </li>
+                    );
+                })}
+            </ul>
         </Section>
     );
 }

@@ -41,7 +41,7 @@ import { LocationCard } from "@/golf/components/course/detail/LocationCard";
 import { hereTone } from "@shared/golfHereMap";
 import { golfCourseCardUrl } from "@shared/ogCards";
 import { shareWithKakao } from "@/components/share/ShareChooser";
-import { NearbyCourses } from "@/golf/components/course/detail/NearbyCourses";
+import { NearbyCourseRow, NearbyCourses } from "@/golf/components/course/detail/NearbyCourses";
 import { NearbyPlaces } from "@/golf/components/course/detail/NearbyPlaces";
 import { SectionNav, jumpTo } from "@/golf/components/course/detail/SectionNav";
 import { Card, Section, Skel, type SectionId } from "@/golf/components/course/detail/ui";
@@ -313,6 +313,8 @@ function Body({ d, ids, distance, weather, linked }: { d: CourseDetail; ids: Sec
             <GolfGuestIntro className="mx-4 mt-8" />
             {/* 날씨(2026-10-05) — 골프장 이름에 붙여 가장 많이 찾는 말. 티타임 다음, 시세·그린피 앞 */}
             {ids.includes("weather") && (weather ? <WeatherCard key={`wx:${d.slug}`} wx={weather} myTees={d.myTees} onRound={setRound} slug={d.slug} name={d.name} initial={linked} /> : <WeatherSkeleton />)}
+            {/* 이 근처 다른 골프장(2026-11-04) — 날씨를 본 자리에서 다음 골프장으로. 맨 아래의 '가까운 골프장'(판 · 목록)과 같은 목록 */}
+            <NearbyCourseRow key={`nextc:${d.slug}`} items={d.nearby} />
             {ids.includes("price") && <MembershipPrices key={`price:${d.slug}`} prices={d.prices} />}
             {ids.includes("fee") && d.fees && <GreenFees fees={d.fees} />}
             {ids.includes("course") && <CourseLayout courses={d.courses} parts={d.parts} holes={d.holes} />}
