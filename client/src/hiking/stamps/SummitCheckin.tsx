@@ -25,7 +25,13 @@ import type { SummitClient } from "@shared/hikingSummitMiss";
 /** 기기 종류 — 실패의 까닭과 함께 서버에 남는다(앱 · 다른 앱 안의 브라우저 · 웹). 위치 정확도가 기기마다 달라서다 */
 const clientKind = (): SummitClient => (isNative() ? "app" : typeof navigator !== "undefined" && isInAppBrowser(navigator.userAgent) ? "inapp" : "web");
 
-interface CheckinResult { verified: boolean; reason: string; hint: string | null; added: boolean; awards: MyAward[] }
+interface CheckinResult { verified: boolean; reason: string; bucket?: string; hint: string | null; added: boolean; awards: MyAward[] }
+
+/**
+ * 정상에서 2km 넘게 떨어진 곳에서 누른 사람(2026-11-04 실측: 실패 39번 중 22번 — 대개 집에서 지난 산행을 적으려던 것)에게는
+ * 옆의 '다녀왔어요'를 가리킨다. 그 단추가 보일 때(아직 아무 기록이 없을 때)만 — 없는 단추를 가리키지 않는다.
+ */
+export const FAR_RECORD_TIP = "지난 산행이라면 옆의 '다녀왔어요'로 적어 둘 수 있어요.";
 
 export function SummitCheckin({ mountainId, name, stamp, hasSummit, region, patch }: {
     mountainId: string; name: string; stamp?: MountainStamp; hasSummit: boolean;
@@ -53,7 +59,11 @@ export function SummitCheckin({ mountainId, name, stamp, hasSummit, region, patc
         onSuccess: (r) => {
             // 거부(허락 안 함)와 못 잡음(시간 초과 · GPS 꺼짐)은 안내가 다르다 — 예전엔 못 잡아도 '허용하라'고 했다
             if ("denied" in r) { setMsg({ tone: "warn", text: r.denied === "unavailable" ? "위치를 잡지 못했어요. 하늘이 트인 곳에서 잠시 뒤 다시 눌러 주세요." : "위치를 쓸 수 없어요. 설정에서 위치를 허용한 뒤 다시 눌러 주세요." }); return; }
-            if (!r.verified) { setMsg({ tone: "warn", text: r.hint ?? "정상 가까이에서 다시 눌러 주세요." }); return; }
+            if (!r.verified) {
+                const hint = r.hint ?? "정상 가까이에서 다시 눌러 주세요.";
+                setMsg({ tone: "warn", text: r.bucket === ">2km" && !stamp ? `${hint} ${FAR_RECORD_TIP}` : hint });
+                return;
+            }
             setMsg({ tone: "ok", text: r.added ? `${name} 정상 도장이 찍혔어요.` : "오늘은 이미 인증했어요." });
             setFresh(r.awards ?? []);
             setJustNow(r.added);

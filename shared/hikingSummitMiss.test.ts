@@ -62,6 +62,13 @@ describe("연결", () => {
         expect(c).toContain("accuracy: pos.fix.accuracy, client })");
         expect(c).toContain('r.denied === "unavailable" ? "위치를 잡지 못했어요.');
     });
+    // 2026-11-04 실측: 실패 39번 중 22번이 정상에서 2km 넘게 — 대개 집에서 지난 산행을 적으려던 것
+    it("화면 — 2km 넘게 떨어져 실패하면 옆의 '다녀왔어요'를 가리킨다(그 단추가 보일 때만)", () => {
+        const c = read("client/src/hiking/stamps/SummitCheckin.tsx");
+        expect(c).toContain("text: r.bucket === \">2km\" && !stamp ? `${hint} ${FAR_RECORD_TIP}` : hint");
+        expect(c).toContain("{!done && !stamp && (");
+        expect(c).toContain("다녀왔어요\n");
+    });
     it("관리자 — 실패한 시도 목록(그 뒤의 결과까지) · 정리(180일 · 탈퇴)", () => {
         const admin = read("server/routes/modules/adminHiking.ts");
         expect(admin).toContain('router.get("/summit-misses",');
