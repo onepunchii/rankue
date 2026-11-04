@@ -22,6 +22,7 @@ import { goLogin } from "@/components/hiq/LoginGate";
 import { cn } from "@/lib/utils";
 import { useCourseWatch, type WatchFilters } from "@/golf/lib/courseApi";
 import type { GolfIntent } from "@shared/golfCourse";
+import { teeSource } from "@shared/golfOpenTee";
 import { announceAlertOn } from "./AlertReach";
 
 type Day = NonNullable<WatchFilters["days"]>[number];
@@ -283,7 +284,9 @@ export function WatchButton({ slug, myWatch, watchers, size = "lg", name, classN
                     className={cn("w-full h-[52px] rounded-2xl bg-[#FFC43D] text-[#1F1500] text-[16px] font-semibold tracking-tight flex items-center justify-center gap-2 active:bg-[#F0B22A] transition-colors", className)}
                 >
                     <LucideBellRing weight="fill" className="w-[18px] h-[18px]" />
-                    관심 등록하고 취소티 알림 받기
+                    {/* 취소티 알림은 공식 사이트의 남은 티를 받는 골프장에서만 실제로 온다(2026-11-04 — services/golfOpenTeeAlerts).
+                        그 밖의 골프장은 회원이 올린 조인 · 부킹 글로만 알림이 간다 — 그렇게 말한다(관심 등록 95건 중 90건이 받지 않는 골프장이었다) */}
+                    {teeSource(slug) ? "관심 등록하고 취소티 알림 받기" : "관심 등록하고 조인 · 부킹 알림 받기"}
                 </button>
             )}
             {sheet}

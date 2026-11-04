@@ -300,7 +300,7 @@ async function handleGolfWeather(req: any, res: any) {
 router.get("/golf-weather", asyncHandler(handleGolfWeather));
 router.post("/golf-weather", asyncHandler(handleGolfWeather));
 
-// 골프장 공식 사이트의 남은 티(2026-10-13) — 20분마다. 볼 때가 된 날(가까운 날 4시간 · 먼 날 8시간)만 시간 예산만큼 받고 나머지는 다음 차례에.
+// 골프장 공식 사이트의 남은 티(2026-10-13) — 20분마다. 받은 뒤 관심 골프장에 새로 나온 티를 알린다(2026-11-04 — services/golfOpenTeeAlerts). 볼 때가 된 날(가까운 날 4시간 · 먼 날 8시간)만 시간 예산만큼 받고 나머지는 다음 차례에.
 // 밤(23 ~ 06시)에는 쉰다. 받는 곳 · 규칙은 shared/golfOpenTee, 끄려면 GOLF_OPEN_TEES=false. 시간 예산은 날씨 크론과 같은 셈(서버리스 10초).
 // 손으로 부를 때: ?only=<slug>(한 곳만) · ?force=1(때가 안 됐어도 · 밤에도) · ?budget=<ms>
 async function handleGolfOpenTees(req: any, res: any) {
@@ -314,7 +314,10 @@ async function handleGolfOpenTees(req: any, res: any) {
     const manual = Number(req.query.budget);
     const budget = manual > 0 ? Math.min(20_000, manual) : Math.max(1000, 7000 - (Date.now() - t0) - 2500);
     const result = await collectOpenTees({ budgetMs: budget, force: req.query.force === "1", only: req.query.only ? String(req.query.only).normalize("NFC") : undefined });
-    return sendSuccess(res, { ...result, budgetMs: budget, tookMs: Date.now() - t0, cup });
+    // 받은 뒤 — 관심 골프장에 새로 나온 티(취소티)를 알린다(2026-11-04, 한 사람 · 한 골프장 세 시간에 한 통). 실패는 받기 결과를 막지 않는다
+    const { alertOpenTeeWatchers } = await import("../../services/golfOpenTeeAlerts.js");
+    const alerts = await alertOpenTeeWatchers();
+    return sendSuccess(res, { ...result, alerts, budgetMs: budget, tookMs: Date.now() - t0, cup });
 }
 router.get("/golf-open-tees", asyncHandler(handleGolfOpenTees));
 router.post("/golf-open-tees", asyncHandler(handleGolfOpenTees));
