@@ -213,7 +213,7 @@ export default function BookingList() {
         return () => { cancelled = true; };
     }, [weekDates, toast, routePath, routeSearch]);
 
-    const { bookingCounts, bookings, isLoading, isError } = useBookingData(weekDates, selectedDate, viewType, selectedFilters);
+    const { bookingCounts, bookingSide, bookings, isLoading, isError } = useBookingData(weekDates, selectedDate, viewType, selectedFilters);
     const { expandedBookingId, setExpandedBookingId } = useDeepLink(bookings, routePath);
 
     // Handle 'highlight' query param
@@ -614,6 +614,8 @@ export default function BookingList() {
                         onClearAll={clearAllFilters}
                         viewType={viewType}
                         dateLabel={weekDates[selectedDate].displayDate}
+                        bookingSide={bookingSide}
+                        onShowBookings={() => { userPickedView.current = true; setViewType('BOOKING'); }}
                     />
                 ) : grouped ? (
                     /* 골프장별 보기 — 묶음 줄을 늘어놓고, 펼친 묶음만 카드를 그린다 */

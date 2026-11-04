@@ -21,6 +21,9 @@ import { KoreaOutline } from '../course/list/KoreaOutline';
  * 빈 화면이 막다른 길로 보이지 않게, 지금 글이 올라와 있는 골프장을 그 색으로 켠다(허브 지도와 같은 뜻 — 조인 주황·부킹 라임·긴급 빨강).
  * 켜진 곳이 하나도 없으면 설명 줄도 없다(없는 것을 있는 것처럼 말하지 않는다). 골프장 목록은 골프 홈이 이미 받아 둔 캐시.
  *
+ * 조인이 빈 날에는 같은 날의 부킹 티타임 수를 보여 주고 부킹 보기로 잇는다(2026-11-04 — 새 골프 회원 74명이 첫날 '조인'을 눌렀는데
+ * 조인 글은 통틀어 0건이었다. 그 사이 부킹 목록에는 공식 사이트의 남은 티가 날마다 수백 개 있다).
+ *
  * ⚠️ 골프 테마가 `.bg-*`/`.text-*` 유틸리티를 바꿔 끼우므로 브랜드색은 인라인 style 의 리터럴 hex 로.
  */
 export interface ActiveFilter {
@@ -29,11 +32,14 @@ export interface ActiveFilter {
     remove: () => void;
 }
 
-export function EmptyResult({ activeFilters, onClearAll, viewType, dateLabel }: {
+export function EmptyResult({ activeFilters, onClearAll, viewType, dateLabel, bookingSide = 0, onShowBookings }: {
     activeFilters: ActiveFilter[];
     onClearAll: () => void;
     viewType: 'ALL' | 'BOOKING' | 'JOIN';
     dateLabel: string;
+    /** 조인 보기일 때 — 같은 날 · 같은 필터의 부킹 티타임 수(공식 사이트 남은 티 포함) */
+    bookingSide?: number;
+    onShowBookings?: () => void;
 }) {
     const isJoin = viewType === 'JOIN';
     const accent = isJoin ? '#FF6B00' : '#64DD17';
@@ -117,6 +123,20 @@ export function EmptyResult({ activeFilters, onClearAll, viewType, dateLabel }: 
                         {dateLabel}에 올라온 게 없어요.<br />
                         ↑ 위 날짜 띠에서 다른 날을 눌러 보세요.
                     </p>
+                </div>
+            )}
+
+            {isJoin && bookingSide > 0 && onShowBookings && (
+                <div className="mt-1 w-full max-w-[320px] rounded-2xl px-4 py-3.5 text-left" style={{ backgroundColor: '#64DD1714', boxShadow: 'inset 0 0 0 1px #64DD1740' }} data-testid="join-empty-bookings">
+                    <p className="text-[15px] font-bold" style={{ color: '#FFFFFF' }}>대신 이 날 부킹 티타임 {bookingSide.toLocaleString('en-US')}개</p>
+                    <p className="mt-1 text-[12.5px] leading-relaxed" style={{ color: '#FFFFFF80' }}>골프장 공식 사이트에 남은 티도 같이 보여요</p>
+                    <button
+                        type="button" onClick={onShowBookings} data-track-as="golf-join-empty-bookings"
+                        className="mt-3 h-11 w-full rounded-xl text-[14.5px] font-bold transition-transform active:scale-[0.98]"
+                        style={{ backgroundColor: '#64DD17', color: '#051907' }}
+                    >
+                        부킹 티타임 보기
+                    </button>
                 </div>
             )}
         </div>
