@@ -24,7 +24,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { HiqCrew, HiqStore } from "@shared/schema";
 import { useSeo } from "@/hooks/useSeo";
-import { crewTitle, crewDescription } from "@shared/crewMeta";
+import { crewTitle, crewDescription, crewLogoUrl } from "@shared/crewMeta";
 import { crewImageSrc } from "@shared/crewManage";
 import { shareWithKakao } from "@/components/share/ShareChooser";
 import { useAuth } from "@/hooks/useAuth";
@@ -186,12 +186,17 @@ export default function HiqClubDetail() {
     // 크루 페이지의 title/description/canonical. 조립식은 shared/crewMeta.ts 가 정본이고
     // server/prerender.ts 가 같은 함수를 쓴다 — 크롤러가 JS 를 실행했을 때와 안 했을 때의
     // 제목이 어긋나지 않게 하려는 것이다. 데이터 로딩 전에는 홈 기본값을 그대로 둔다.
+    // 회원 수는 가입 대기를 빼고 센다(검색용 화면과 같은 식), 썸네일은 크루 로고.
+    const seoCrew = crewData?.crew
+        ? { ...crewData.crew, memberCount: (crewData.members ?? []).filter((m: any) => m?.role !== "pending").length }
+        : null;
     useSeo(
-        crewData?.crew
+        seoCrew && crewData?.crew
             ? {
-                  title: crewTitle(crewData.crew),
-                  description: crewDescription(crewData.crew),
+                  title: crewTitle(seoCrew),
+                  description: crewDescription(seoCrew),
                   path: `/club/${id ?? ""}`,
+                  image: crewLogoUrl(crewData.crew) ?? undefined,
               }
             : null,
     );

@@ -10,7 +10,7 @@ import { and, asc, eq, ne, sql } from "drizzle-orm";
 import { ABOUT_CONTENT, ABOUT_LANGS, hreflangOf, type AboutContent } from "../shared/aboutContent.js";
 import { DOC_META } from "../shared/docMeta.js";
 import { absoluteLogoUrl } from "../shared/golfLogo.js";
-import { crewTitle, crewDescription } from "../shared/crewMeta.js";
+import { crewTitle, crewDescription, crewKind, crewLogoUrl, crewMeeting, crewPlace, type CrewMetaInput } from "../shared/crewMeta.js";
 import { storeTitleKo, storeDescKo, storeJsonLd, mapLink, regionTitleKo, regionDescKo, isBasicListing, isClosedListing, closedNoticeKo, licenseSinceKo, listingCityOf, cityHubPath, cityTitleKo, cityDescKo, CITY_HUB_MIN } from "../shared/storeMeta.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl, CARD_SIZE } from "./services/playerCard.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
@@ -3101,43 +3101,69 @@ ${list}
     // /club/create 는 로그인 후 쓰는 크루 생성 폼이다 — 공개 콘텐츠가 아니라 색인 대상이 아니다.
     if (id === "create") return sendNoindex(res, "크루 만들기 · 랭큐");
     let crew: Record<string, any> | null = null;
+    let members: { role?: string }[] = [];
+    let listing: { code: string; name: string } | null = null;
     try {
-      // getCrew 는 { crew, baseStore, members } 로 중첩 반환한다 — crew 만 쓴다.
-      // members 는 절대 넣지 않는다: 공개 프리렌더에 회원 명단을 노출하지 않기 위함
+      // getCrew 는 { crew, baseStore, baseListing, members } 로 중첩 반환한다.
+      // members 는 수만 센다 — 이름 · 사진은 절대 넣지 않는다: 공개 프리렌더에 회원 명단을 노출하지 않기 위함
       // (server/storage/crew.repo.ts:69 의 민감 컬럼 금지 주석과 같은 이유).
-      const r = (await storage.getCrew(id)) as { crew?: Record<string, any> } | null;
+      const r = (await storage.getCrew(id)) as { crew?: Record<string, any>; members?: { role?: string }[]; baseListing?: { code: string; name: string } | null } | null;
       crew = r?.crew ?? null;
+      members = r?.members ?? [];
+      listing = r?.baseListing ?? null;
     } catch (e) {
       // 위 /store/:slug 와 같은 이유로 예외는 404 가 아니라 503 이다.
       console.warn("[prerender] crew failed:", (e as Error)?.message);
       return sendUnavailable(res);
     }
     if (!crew?.name) return sendGone(res, "크루를 찾을 수 없습니다.", "요청한 크루 정보가 없습니다.");
-    // 조립식은 shared/crewMeta.ts 가 정본 — club-detail.tsx 의 useSeo 와 같은 함수를 쓴다.
-    const title = crewTitle(crew as { name: string });
+    // 2026-11-04 오너: 소모임 검색 결과처럼 크루마다 로고 · 제목 · 설명을 그 크루에 맞게.
+    // 조립식은 shared/crewMeta.ts 가 정본 — club-detail.tsx 의 useSeo 와 같은 함수를 쓴다. 회원 수는 가입 대기를 뺀다.
+    const memberCount = members.filter((m) => m?.role !== "pending").length;
+    const meta = { ...crew, memberCount } as CrewMetaInput;
+    // 썸네일 = 크루 로고(없으면 커버). 로고가 없는 산악회는 등산 카드, 나머지는 공용 그림
+    const logo = crewLogoUrl(crew);
+    const fallback = !logo && crew.sportCategory === "HIKING" ? hubCard(ORIGIN, "/hiking") : null;
+    const kind = [crewPlace(crew.region), crewKind(meta)].filter(Boolean).join(" ");
+    const meeting = crewMeeting(meta);
+    const url = `${ORIGIN}/club/${encodeURIComponent(id)}`;
+    const rows: [string, string][] = [
+      ...(crew.region ? [["활동 지역", esc(crew.region)] as [string, string]] : []),
+      ...(meeting ? [["정모", esc(meeting)] as [string, string]] : []),
+      ["종목", esc(crewKind(meta))],
+      ["회원", `${memberCount}명${crew.maxMembers ? ` · 정원 ${Number(crew.maxMembers)}명` : ""}`],
+      ["가입", crew.joinType === "approval" ? "운영진 승인 후 가입" : "바로 가입"],
+      ...(listing?.name ? [["활동 매장", `<a href="/stores/${encodeURIComponent(listing.code)}">${esc(listing.name)}</a>`] as [string, string]] : []),
+    ];
     res.setHeader("X-Prerender", "club");
     noStore(res);
     res.send(
       page({
-        title,
-        desc: crewDescription(crew as { name: string }),
-        canonical: `${ORIGIN}/club/${encodeURIComponent(id)}`,
+        title: crewTitle(meta),
+        desc: crewDescription(meta),
+        canonical: url,
+        image: logo ? { url: logo, width: 400, height: 400, alt: `${crew.name} 로고` } : fallback ?? undefined,
         jsonLd: [
           {
             "@context": "https://schema.org",
             "@type": "SportsTeam",
             name: crew.name,
             // 산악회를 당구 팀이라고 적지 않는다(설명 문구도 crewMeta 가 종목을 본다)
-            sport: crew.sportCategory === "HIKING" ? "Hiking" : crew.sportCategory === "FISHING" ? "Fishing" : "Billiards",
-            url: `${ORIGIN}/club/${encodeURIComponent(id)}`,
-            ...(crew.description ? { description: crew.description } : {}),
+            sport: crew.sportCategory === "HIKING" ? "Hiking" : crew.sportCategory === "FISHING" ? "Fishing" : crew.sportCategory === "GOLF" ? "Golf" : "Billiards",
+            url,
+            ...(crew.shortIntro || crew.description ? { description: crew.shortIntro || crew.description } : {}),
+            ...(logo ? { logo, image: logo } : {}),
+            ...(crew.region ? { location: { "@type": "Place", name: crew.region } } : {}),
           },
         ],
         body: `<main>
+  ${logo ? `<img src="${esc(logo)}" alt="${esc(crew.name)} 로고" width="96" height="96" />` : ""}
   <h1>${esc(crew.name)}</h1>
+  <p>${esc(kind)}</p>
   ${crew.shortIntro ? `<p>${esc(crew.shortIntro)}</p>` : ""}
   ${crew.description ? `<p>${esc(crew.description)}</p>` : ""}
-  ${crew.region ? `<p>${esc(crew.region)}</p>` : ""}
+  <dl>${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join("")}</dl>
+  <p><a href="${url}">랭큐에서 ${esc(crew.name)} 가입하기</a></p>
   <nav><a href="/">홈으로</a> <a href="/about">랭큐 소개</a></nav>
 </main>`,
       }),

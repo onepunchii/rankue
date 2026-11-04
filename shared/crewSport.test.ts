@@ -31,10 +31,11 @@ describe("산악회 일정", () => {
 });
 
 describe("크루 페이지 설명(crewMeta)", () => {
-    it("소개가 없는 산악회를 당구 크루라고 적지 않는다 — 당구 · 골프 크루의 문구는 그대로", () => {
+    it("소개가 없는 산악회 · 골프 크루를 당구 크루라고 적지 않는다 — 당구 크루의 문구는 그대로", () => {
         expect(crewDescription({ name: "새벽 능선", sportCategory: "HIKING" })).toBe("새벽 능선 — 랭큐 산악회. 함께 산에 오르고 산행 일정과 소식을 나눠요.");
         expect(crewDescription({ name: "죽방전설" })).toBe("죽방전설 — 랭큐 당구 크루. 함께 경기하고 전적·랭킹에 도전하세요.");
-        expect(crewDescription({ name: "버디찬스", sportCategory: "GOLF" })).toBe("버디찬스 — 랭큐 당구 크루. 함께 경기하고 전적·랭킹에 도전하세요.");
+        // 골프 크루를 당구 크루라고 적던 것(2026-11-04 고침)
+        expect(crewDescription({ name: "버디찬스", sportCategory: "GOLF" })).toBe("버디찬스 — 랭큐 골프 크루. 함께 라운드하고 기록과 소식을 나눠요.");
         // 소개가 있으면 종목과 무관하게 소개가 나간다
         expect(crewDescription({ name: "새벽 능선", region: "서울 은평구", shortIntro: "주말 산행", sportCategory: "HIKING" })).toBe("새벽 능선 (서울 은평구) — 주말 산행");
     });
