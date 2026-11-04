@@ -16,7 +16,7 @@ const missingTable = (e: any) => (e?.code ?? e?.cause?.code) === "42P01";
 export const WITHDRAW_PURGE_TABLES = [
     "fishing_catches", "fishing_gear", "fishing_decor_awards", "fishing_tanks", "hiq_invite_codes",
     "hiking_marks", "hiking_summits", "hiking_awards", "hiking_trips", "hiking_goals",
-    "hiking_trail_checks", "hiking_trail_stamps", "hiking_summit_misses", "goods_shop_interest",
+    "hiking_trail_checks", "hiking_trail_stamps", "hiking_summit_misses", "goods_shop_interest", "hiking_photo_cheers",
 ] as const;
 
 export async function purgeFishingHiking(memberId: string): Promise<{ blobs: string[]; removed: Record<string, number> }> {
@@ -49,6 +49,8 @@ export async function purgeFishingHiking(memberId: string): Promise<{ blobs: str
     await run("hiking_trail_stamps", sql`delete from hiking_trail_stamps where member_id = ${memberId}::uuid returning course_id`);
     // 정상 인증 실패(10/24) — 좌표는 없지만 언제 어느 산에 있었는지(혹은 가까웠는지)가 남는다
     await run("hiking_summit_misses", sql`delete from hiking_summit_misses where member_id = ${memberId}::uuid returning id`);
+    // 산행 사진에 보낸 응원(11/4) — 받은 쪽 사진의 수에서 빠진다(내 사진에 받은 것은 사진과 함께 지워진다)
+    await run("hiking_photo_cheers", sql`delete from hiking_photo_cheers where member_id = ${memberId}::uuid returning photo_id`);
     // 굿즈샵 출시 알림(10/24) — 탈퇴한 사람에게 출시 알림을 보내지 않게
     await run("goods_shop_interest", sql`delete from goods_shop_interest where member_id = ${memberId}::uuid returning member_id`);
     return { blobs, removed };

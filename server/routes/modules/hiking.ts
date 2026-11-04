@@ -11,7 +11,7 @@ import { trailheadPoint, type SummitBase } from "../../../shared/hikingSummitWx.
 import { addRecords, addSummit, addSummitMiss, listHikingAwards, listSummits, removeRecord, syncHikingAwards, CREW_TOGETHER, crewSummits } from "../../storage/hikingStamps.js";
 import { addTrip, listTrips } from "../../storage/hikingTrips.js";
 import { cleanTrip } from "../../../shared/hikingTrail.js";
-import { addPhoto, appealPhoto, listMountainPhotos, listPhotos, listRecentPublicPhotos, photoCounts, removePhoto, setPhotoPublic } from "../../storage/hikingPhotos.js";
+import { addPhoto, appealPhoto, cheerPhoto, listMountainPhotos, listPhotos, listRecentPublicPhotos, photoCounts, removePhoto, setPhotoPublic, uncheerPhoto } from "../../storage/hikingPhotos.js";
 import { HIKING_GALLERY_LIMIT, HIKING_GALLERY_MAX, HIKING_PHOTO_CATEGORY, HIKING_PHOTO_DAILY_MAX, HIKING_PHOTO_LABEL, HIKING_PHOTO_PER_MOUNTAIN_MAX, HIKING_THUMB_CATEGORY, isOwnHikingPhotoUrl, validPhotoSize } from "../../../shared/hikingPhotos.js";
 import { HIKING_ALBUM_MAX, groupHikingAlbum, type AlbumMountainInfo } from "../../../shared/hikingAlbum.js";
 import { deleteBlobs, isOnOwnBlobHost } from "../../utils/blob.js";
@@ -344,6 +344,25 @@ router.get("/mountains/:slug/photos", asyncHandler(async (req: any, res: any) =>
 router.get("/recent-photos", asyncHandler(async (req: any, res: any) => {
     res.set("Cache-Control", "private, no-store");
     return sendSuccess(res, { photos: await listRecentPublicPhotos(viewerOf(req)) });
+}));
+
+/**
+ * 산행 사진 응원(2026-11-04 — shared/hikingPhotos HIKING_CHEER_*) — 등산을 쓰는 회원만. 공개 · 안 가려진 남의 사진에, 사진 하나에 한 번.
+ * 서로 차단한 사이 · 없는 사진은 404(어느 쪽인지 알리지 않는다), 내 사진은 400. 새로 보냈으면 올린 사람에게 알림(services/hikingCheer).
+ */
+router.put("/photos/:id/cheer", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    const id = String(req.params.id);
+    const r = await cheerPhoto(id, req.userId!);
+    if (!r.ok) return r.reason === "own" ? sendError(res, 400, "내 사진에는 응원할 수 없어요") : sendError(res, 404, "없는 사진이에요");
+    if (r.added) {
+        const { notifyCheer } = await import("../../services/hikingCheer.js");
+        await notifyCheer({ photoId: id, cheererId: req.userId!, ownerId: r.ownerId, mountainName: r.mountainName, mountainSlug: r.mountainSlug, count: r.count })
+            .catch((e) => console.error("[HikingCheer]", e));
+    }
+    return sendSuccess(res, { cheered: true, count: r.count });
+}));
+router.delete("/photos/:id/cheer", ...requireHikingAccess, asyncHandler(async (req: AuthRequest, res: any) => {
+    return sendSuccess(res, { cheered: false, count: await uncheerPhoto(String(req.params.id), req.userId!) });
 }));
 
 /** 내 사진(새 것부터) — ?mountainId= 를 주면 그 산의 것만. 올린 사람만 읽는다(비공개 · 가려진 것까지) */

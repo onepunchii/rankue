@@ -27,6 +27,12 @@ export const HIKING_PHOTOS_KEY = "hiking-photos";
 export const mountainPhotosKey = (slug: string, viewer: string) => [HIKING_PHOTOS_KEY, "mountain", slug, viewer] as const;
 export class HikingPhotoError extends Error {}
 
+/** 응원 보내기 · 거두기(2026-11-04) — 남은 수와 지금 상태를 돌려준다 */
+export const cheerHikingPhoto = (id: string, on: boolean): Promise<{ cheered: boolean; count: number }> =>
+    apiRequest(`/api/hiq/hiking/photos/${encodeURIComponent(id)}/cheer`, { method: on ? "PUT" : "DELETE" });
+/** 홈 · 허브의 사진 줄(회원 사진) — 응원 뒤 같이 다시 받는다 */
+export const RECENT_PHOTOS_KEY = ["/api/hiq/hiking/recent-photos"] as const;
+
 /** 이 산의 사진(누구나) — 공개 · 안 가려진 것, 새 것부터 */
 export const fetchMountainPhotos = (slug: string): Promise<{ photos: MountainPhoto[] }> =>
     apiRequest(`/api/hiq/hiking/mountains/${encodeURIComponent(slug)}/photos?limit=${HIKING_GALLERY_LIMIT}`);

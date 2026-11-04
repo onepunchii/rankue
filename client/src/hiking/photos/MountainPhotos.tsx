@@ -6,6 +6,7 @@
  * 로그인하지 않은 사람에게도 ⋯ 는 보이고, 누르면 로그인으로 간다. 내 사진이면 그 자리에서 비공개로 돌릴 수 있다(올리기는 '내 산행 사진'에서).
  * 싣는 것은 사진 · 올린 사람의 이름 · **달까지의 날짜**뿐이다 — 정확한 날 · 시각은 그날 그 산에 있었다는 기록이 된다.
  * 누른 것의 기록에 사람 이름이 섞이지 않게 구역 이름만 남긴다(data-track-as).
+ * 응원(2026-11-04): 남의 사진을 크게 보면 '응원' 단추, 썸네일에는 받은 수, 내 사진에는 받은 수 한 줄(CheerParts).
  * 골프의 사진 화면을 가져다 쓰지 않는다. ⚠️ 리터럴 색만(theme.HK). 글자는 12px 이상, 굵기는 semibold 까지.
  */
 import { useState } from "react";
@@ -15,8 +16,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { UgcActionMenu } from "@/components/hiq/community/UgcActionMenu";
 import { LucideMoreVertical } from "@/lib/icons";
-import { HIKING_PHOTO_LABEL, HIKING_PHOTO_REPORT_TARGET, type MountainPhoto } from "@shared/hikingPhotos";
-import { HkSection } from "../components/HikingShell";
+import { HIKING_CHEER_LABEL, HIKING_PHOTO_LABEL, HIKING_PHOTO_REPORT_TARGET, type MountainPhoto } from "@shared/hikingPhotos";
+import { HkSection, askHikingLogin } from "../components/HikingShell";
+import { CheerButton, CheerCount } from "./CheerParts";
 import { PhotoStage } from "./PhotoStage";
 import { fetchMountainPhotos, mountainPhotosKey, refreshHikingPhotos, setHikingPhotoPublic } from "./photoApi";
 
@@ -85,8 +87,9 @@ export function MountainPhotos({ slug, name }: { slug: string; name: string }) {
                     {photos.map((p) => (
                         <li key={`pub:${p.id}`}>
                             <button type="button" onClick={() => { setNote(null); setOpenId(p.id); }} aria-label={`${name} 사진 크게 보기`} data-testid={`hk-mountain-photo-${p.id}`}
-                                className="block aspect-square w-full overflow-hidden rounded-xl bg-[#FFFFFF0F] active:opacity-80">
+                                className="relative block aspect-square w-full overflow-hidden rounded-xl bg-[#FFFFFF0F] active:opacity-80">
                                 <img src={p.thumbUrl} alt={`${name} 산행 사진`} loading="lazy" decoding="async" draggable={false} className="h-full w-full object-cover" />
+                                <CheerCount n={p.cheers} overlay className="absolute bottom-1 left-1" />
                             </button>
                         </li>
                     ))}
@@ -111,11 +114,15 @@ export function MountainPhotos({ slug, name }: { slug: string; name: string }) {
                             <button type="button" disabled={toPrivate.isPending} onClick={() => toPrivate.mutate(open.id)} data-testid="hk-mountain-photo-private"
                                 className="mt-3 flex h-11 w-full items-center justify-center rounded-xl bg-[#FFFFFF14] text-[14.5px] font-medium text-[#F4EFE3] active:bg-[#FFFFFF24] disabled:opacity-50">비공개로 돌리기</button>
                             <p className="mt-2 text-[12.5px] leading-snug text-[#F4EFE380] break-keep">비공개로 돌리면 이 산의 화면에서 내려가고, 내 산행 사진에만 남아요.</p>
+                            <p className="mt-2 text-[13px] text-[#F6D9A8]" data-testid="hk-photo-cheers-own">{HIKING_CHEER_LABEL.own(open.cheers ?? 0)}</p>
                         </>
                     ) : (
                         <>
                             <p className="truncate text-[15px] text-[#F4EFE3B3]">사진 · <span className="font-semibold text-[#F4EFE3]">{open.credit}</span></p>
                             <p className="mt-0.5 truncate text-[13px] text-[#F4EFE399]">{[name, open.month].filter(Boolean).join(" · ")}</p>
+                            {/* 응원 — 방문자는 사진 화면을 닫고 가입 팝업(사진 화면이 팝업보다 위층이다) */}
+                            <CheerButton key={`cheer:${open.id}`} photo={open}
+                                onGuest={() => { close(); askHikingLogin(setLocation, { title: HIKING_CHEER_LABEL.loginTitle, desc: HIKING_CHEER_LABEL.loginDesc }); }} />
                         </>
                     )}
                     {note && <p className="mt-2 text-[13px] leading-snug text-[#F6D9A8] break-keep" role="status">{note}</p>}

@@ -31,15 +31,31 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const utc = (v: unknown): string => `${String(v).replace(" ", "T")}Z`;
 const utcDate = (v: unknown): Date | null => (v == null ? null : new Date(utc(v)));
 const at = (col: string) => sql.raw(`to_char(${col}, 'YYYY-MM-DD"T"HH24:MI:SS.MS')`);
+/**
+ * 응원 칸(2026-11-04 — 표 hiking_photo_cheers) — 받은 수와, 보는 사람이 있으면 그 사람이 보냈는가. p 는 hiking_photos 의 별칭.
+ * 표가 아직 없으면(배포 순서가 어긋났을 때) 응원 없이 다시 읽는다 — 사진이 화면에서 사라지지 않게(withCheers).
+ */
+const cheerCols = (viewerId: string | null) => sql`,
+    (select count(*) from hiking_photo_cheers c where c.photo_id = p.id)::int as cheers,
+    ${viewerId && UUID.test(viewerId) ? sql`exists (select 1 from hiking_photo_cheers c where c.photo_id = p.id and c.member_id = ${viewerId}::uuid)` : sql`false`} as cheered`;
+const NO_CHEERS = sql`, 0 as cheers, false as cheered`;
+const missingCheers = (e: any) => /hiking_photo_cheers/.test(said(e));
+async function withCheers<T>(run: (cols: Q) => Promise<T>, viewerId: string | null): Promise<T> {
+    try { return await run(cheerCols(viewerId)); } catch (e) { if (missingCheers(e)) return run(NO_CHEERS); throw e; }
+}
 
 // ── 올린 사람의 길 ────────────────────────────────────────────────────
 const out = (x: any): HikingPhoto => ({
     id: x.id, mountainId: x.mountain_id, url: x.url, thumbUrl: x.thumb_url, width: Number(x.width), height: Number(x.height), takenAt: utc(x.taken_at),
-    isPublic: !!x.is_public, hidden: !!x.hidden, appealed: !!x.appealed,
+    isPublic: !!x.is_public, hidden: !!x.hidden, appealed: !!x.appealed, cheers: Number(x.cheers) || 0,
 });
 /** 가린 뒤에 낸 이의제기만 센다 — 풀렸다가 다시 가려지면 새로 낼 수 있게 */
 const MINE = sql`id::text as id, mountain_id, url, thumb_url, width, height, ${at("taken_at")} as taken_at, is_public,
-    (hidden_at is not null) as hidden, (hidden_at is not null and appeal_at is not null and appeal_at >= hidden_at) as appealed`;
+    (hidden_at is not null) as hidden, (hidden_at is not null and appeal_at is not null and appeal_at >= hidden_at) as appealed,
+    (select count(*) from hiking_photo_cheers c where c.photo_id = hiking_photos.id)::int as cheers`;
+/** 응원 표가 아직 없을 때 */
+const MINE_NO_CHEERS = sql`id::text as id, mountain_id, url, thumb_url, width, height, ${at("taken_at")} as taken_at, is_public,
+    (hidden_at is not null) as hidden, (hidden_at is not null and appeal_at is not null and appeal_at >= hidden_at) as appealed, 0 as cheers`;
 /** 새 칸이 아직 없을 때 — 있는 사진은 전부 "내 사진첩에만"의 약속 아래 올린 것이다 */
 const MINE_BEFORE = sql`id::text as id, mountain_id, url, thumb_url, width, height, ${at("taken_at")} as taken_at, false as is_public, false as hidden, false as appealed`;
 
@@ -51,6 +67,7 @@ export async function listPhotos(memberId: string, mountainId?: string | null, l
     try {
         return (await run(MINE)).map(out);
     } catch (e) {
+        if (missingCheers(e)) return (await run(MINE_NO_CHEERS)).map(out);
         if (missingTable(e)) return [];
         if (missingColumn(e)) return (await run(MINE_BEFORE)).map(out);
         throw e;
@@ -106,15 +123,15 @@ export async function listMountainPhotos(mountainId: string, viewerId: string | 
         ? sql`and not exists (select 1 from hiq_blocks b where b.blocker_id = ${viewerId}::uuid and b.blocked_id = p.member_id)`
         : sql``;
     try {
-        const r = await rows<any>(sql`
-            select p.id::text as id, p.member_id::text as member_id, p.url, p.thumb_url, p.width, p.height, ${at("p.taken_at")} as taken_at, m.name
+        const r = await withCheers((cheers) => rows<any>(sql`
+            select p.id::text as id, p.member_id::text as member_id, p.url, p.thumb_url, p.width, p.height, ${at("p.taken_at")} as taken_at, m.name ${cheers}
             from hiking_photos p
             join hiq_members m on m.id = p.member_id and m.profile_id is not null
             where p.mountain_id = ${mountainId} and p.is_public and p.hidden_at is null ${notBlocked}
-            order by p.taken_at desc, p.created_at desc limit ${n}`);
+            order by p.taken_at desc, p.created_at desc limit ${n}`), viewerId);
         return r.map((x) => ({
             id: x.id, memberId: x.member_id, credit: hikingPhotoCredit(x.name), month: hikingPhotoMonth(utc(x.taken_at)),
-            url: x.url, thumbUrl: x.thumb_url, width: Number(x.width), height: Number(x.height),
+            url: x.url, thumbUrl: x.thumb_url, width: Number(x.width), height: Number(x.height), cheers: Number(x.cheers) || 0, cheered: !!x.cheered,
         }));
     } catch (e) {
         if (missingTable(e) || missingColumn(e)) return [];
@@ -131,24 +148,55 @@ export async function listRecentPublicPhotos(viewerId: string | null): Promise<R
         ? sql`and not exists (select 1 from hiq_blocks b where b.blocker_id = ${viewerId}::uuid and b.blocked_id = p.member_id)`
         : sql``;
     try {
-        const r = await rows<any>(sql`
+        const r = await withCheers((cheers) => rows<any>(sql`
             select * from (
                 select p.id::text as id, p.member_id::text as member_id, p.url, p.thumb_url, p.width, p.height, ${at("p.taken_at")} as taken_at, p.created_at,
-                       m.name, hm.slug as mountain_slug, hm.name as mountain_name,
+                       m.name, hm.slug as mountain_slug, hm.name as mountain_name ${cheers},
                        row_number() over (partition by p.member_id order by p.created_at desc) as rn
                 from hiking_photos p
                 join hiq_members m on m.id = p.member_id and m.profile_id is not null
                 join hiking_mountains hm on hm.id = p.mountain_id
                 where p.is_public and p.hidden_at is null and p.created_at > now() - make_interval(days => ${RECENT_PHOTO_DAYS}) ${notBlocked}
-            ) x where x.rn <= ${RECENT_PHOTO_PER_MEMBER} order by x.created_at desc limit ${RECENT_PHOTO_MAX}`);
+            ) x where x.rn <= ${RECENT_PHOTO_PER_MEMBER} order by x.created_at desc limit ${RECENT_PHOTO_MAX}`), viewerId);
         return r.map((x) => ({
             id: x.id, memberId: x.member_id, credit: hikingPhotoCredit(x.name), month: hikingPhotoMonth(utc(x.taken_at)),
             url: x.url, thumbUrl: x.thumb_url, width: Number(x.width), height: Number(x.height), mountainSlug: x.mountain_slug, mountainName: x.mountain_name,
+            cheers: Number(x.cheers) || 0, cheered: !!x.cheered,
         }));
     } catch (e) {
         if (missingTable(e) || missingColumn(e)) return [];
         throw e;
     }
+}
+
+// ── 응원(2026-11-04) ─────────────────────────────────────────────────
+export type CheerResult =
+    | { ok: true; added: boolean; count: number; ownerId: string; mountainName: string | null; mountainSlug: string | null }
+    | { ok: false; reason: "missing" | "own" };
+/**
+ * 응원을 보낸다 — 공개 · 안 가려진 사진에만, 내 사진은 안 되고, 서로 차단한 사이면 없는 사진처럼 본다(막혔다는 것을 알리지 않는다).
+ * 이미 보냈으면 그대로(added:false). 받은 수 · 올린 사람(알림용)을 같이 돌려준다.
+ */
+export async function cheerPhoto(photoId: string, memberId: string): Promise<CheerResult> {
+    if (!UUID.test(photoId) || !UUID.test(memberId)) return { ok: false, reason: "missing" };
+    const [p] = await rows<any>(sql`
+        select p.member_id::text as owner_id, hm.name as mountain_name, hm.slug as mountain_slug
+        from hiking_photos p left join hiking_mountains hm on hm.id = p.mountain_id
+        where p.id = ${photoId}::uuid and p.is_public and p.hidden_at is null
+          and not exists (select 1 from hiq_blocks b where (b.blocker_id = p.member_id and b.blocked_id = ${memberId}::uuid) or (b.blocker_id = ${memberId}::uuid and b.blocked_id = p.member_id))`);
+    if (!p) return { ok: false, reason: "missing" };
+    if (p.owner_id === memberId) return { ok: false, reason: "own" };
+    const added = await rows<any>(sql`insert into hiking_photo_cheers (photo_id, member_id) values (${photoId}::uuid, ${memberId}::uuid) on conflict do nothing returning photo_id`);
+    const [c] = await rows<any>(sql`select count(*)::int as n from hiking_photo_cheers where photo_id = ${photoId}::uuid`);
+    return { ok: true, added: added.length > 0, count: Number(c?.n) || 0, ownerId: p.owner_id, mountainName: p.mountain_name ?? null, mountainSlug: p.mountain_slug ?? null };
+}
+
+/** 응원을 거둔다 — 내 것만. 남은 수를 돌려준다 */
+export async function uncheerPhoto(photoId: string, memberId: string): Promise<number> {
+    if (!UUID.test(photoId) || !UUID.test(memberId)) return 0;
+    await db.execute(sql`delete from hiking_photo_cheers where photo_id = ${photoId}::uuid and member_id = ${memberId}::uuid`);
+    const [c] = await rows<any>(sql`select count(*)::int as n from hiking_photo_cheers where photo_id = ${photoId}::uuid`);
+    return Number(c?.n) || 0;
 }
 
 // ── 신고 · 운영자 · 탈퇴의 길 ─────────────────────────────────────────

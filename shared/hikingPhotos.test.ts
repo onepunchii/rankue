@@ -175,9 +175,10 @@ describe("누구나 보는 길 — 공개 · 안 가려진 것만, 달까지만"
     });
     it("나가는 것은 사진 · 이름 · 달뿐 — 전화 · 메일 · 정확한 날이 없다", () => {
         const select = cut(pub, "select p.id::text as id", "from hiking_photos p");
-        expect(select.replace(/\s+/g, " ").trim()).toBe("select p.id::text as id, p.member_id::text as member_id, p.url, p.thumb_url, p.width, p.height, ${at(\"p.taken_at\")} as taken_at, m.name");
+        // 응원(2026-11-04)은 받은 수와 '내가 보냈는가'뿐 — 누가 보냈는지는 나가지 않는다
+        expect(select.replace(/\s+/g, " ").trim()).toBe("select p.id::text as id, p.member_id::text as member_id, p.url, p.thumb_url, p.width, p.height, ${at(\"p.taken_at\")} as taken_at, m.name ${cheers}");
         const shape = cut(pub, "return r.map((x) => ({", "}));");
-        expect(shape.match(/\b(\w+):/g)).toEqual(["id:", "memberId:", "credit:", "month:", "url:", "thumbUrl:", "width:", "height:"]);
+        expect(shape.match(/\b(\w+):/g)).toEqual(["id:", "memberId:", "credit:", "month:", "url:", "thumbUrl:", "width:", "height:", "cheers:", "cheered:"]);
         expect(shape).toContain("month: hikingPhotoMonth(utc(x.taken_at))");
         expect(shape).toContain("credit: hikingPhotoCredit(x.name)");
         expect(pub).not.toMatch(/phone|email|takenAt|appeal_text/);

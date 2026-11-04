@@ -10,6 +10,7 @@ import { Link } from "wouter";
 import { hikingMountainPath } from "@shared/hikingMountains";
 import { RECENT_PHOTO_MIN, type RecentHikingPhoto } from "@shared/hikingPhotos";
 import { HkSection } from "./HikingShell";
+import { CheerCount } from "../photos/CheerParts";
 
 type Item = { slug: string; name: string; heightM: number | null; sigungu: string | null; photo: { url: string; lic: "Type1" | "Type3" } };
 /** 사진의 높이(px) — 가로는 사진 그대로 */
@@ -34,7 +35,7 @@ export function FeaturedPhotos() {
                             <span className="absolute left-2.5 top-2.5 rounded-full px-2 py-1 text-[12px] font-medium leading-none text-[#F6D9A8]" style={{ background: "#0B1F26CC" }}>회원 사진</span>
                         </span>
                         <span className="mt-2 block text-[15.5px] font-semibold text-[#F4EFE3]">{p.mountainName}</span>
-                        <span className="block text-[12.5px] text-[#F4EFE399]">{p.credit} · {p.month}</span>
+                        <span className="flex items-center gap-1.5 text-[12.5px] text-[#F4EFE399]">{p.credit} · {p.month}<CheerCount n={p.cheers} /></span>
                     </Link>
                 ))}
                 {items.map((m, i) => (

@@ -46,9 +46,41 @@ export interface HikingPhoto {
     hidden: boolean;
     /** 지금의 가림에 이의제기를 냈다 */
     appealed: boolean;
+    /** 받은 응원 수(2026-11-04) — 옛 응답엔 없다 */
+    cheers?: number;
 }
 /** 산 화면의 공개 사진 한 장 — 누구에게나 나간다. 날짜는 달까지만, 좌표 · 연락처는 없다 */
-export interface MountainPhoto { id: string; memberId: string; credit: string; month: string; url: string; thumbUrl: string; width: number; height: number }
+export interface MountainPhoto {
+    id: string; memberId: string; credit: string; month: string; url: string; thumbUrl: string; width: number; height: number;
+    /** 받은 응원 수 · 보는 사람이 응원했는가(2026-11-04) — 옛 응답엔 없다 */
+    cheers?: number; cheered?: boolean;
+}
+
+// ── 응원(2026-11-04 오너: "사진 응원 기능만 먼저 시행하자") ─────────────────
+/**
+ * 공개 산행 사진에 다른 회원이 보내는 응원 하나. 사람마다 사진 하나에 한 번 — 다시 누르면 거둔다.
+ * 내 사진에는 못 보낸다 · 가려졌거나 비공개인 사진에는 못 보낸다 · 서로 차단한 사이에는 못 보낸다(조용히 막는다).
+ * 올린 사람에게 알림: 같은 사람의 같은 사진 응원은 한 번만(거뒀다 다시 눌러도 다시 안 간다), 푸시는 30분에 한 번 — 그 사이 것은 알림함에만.
+ * 응원은 숫자와 보낸 사람의 이름(올린 사람의 알림에만)뿐이다 — 1:1 대화로 이어지는 길은 두지 않는다(같이 산 가기는 다음 단계로 따로 정한다).
+ */
+export const HIKING_CHEER_PUSH_GAP_MIN = 30;
+export const HIKING_CHEER_LABEL = {
+    cheer: "응원",
+    cheered: "응원했어요",
+    count: (n: number) => `응원 ${n}`,
+    own: (n: number) => (n > 0 ? `응원 ${n}개를 받았어요` : "아직 받은 응원이 없어요"),
+    /** 방문자가 누르면 여는 가입 팝업 */
+    loginTitle: "산행 사진에 응원을 보내요",
+    loginDesc: "가입하면 마음에 드는 산행 사진에 응원을 보낼 수 있어요. 내 사진이 받은 응원도 알림으로 와요.",
+} as const;
+export const hikingCheerKey = (photoId: string, memberId: string) => `hk-cheer:${photoId}:${memberId}`;
+/** 올린 사람에게 가는 알림 — 보낸 사람의 이름(사진에 적히는 이름과 같은 꼴)과 그 산 */
+export function hikingCheerNotice(cheerer: string, mountain: string | null, count: number): { title: string; body: string } {
+    return {
+        title: `👏 ${cheerer || "랭큐 회원"}님이 내 산행 사진을 응원했어요`,
+        body: [mountain ? `${mountain} 사진` : "산행 사진", count > 1 ? `응원 ${count}개` : ""].filter(Boolean).join(" · "),
+    };
+}
 /** 등산 홈 · 허브의 사진 줄에 섞는 회원 사진(2026-11-04) — 산의 사진과 같은 것에 그 산(이름 · 주소)만 더한다 */
 export interface RecentHikingPhoto extends MountainPhoto { mountainSlug: string; mountainName: string }
 /** 사진 줄에 섞는 회원 사진 — 30일 안 · 한 사람 둘까지 · 여덟 장까지. 셋 미만이면 섞지 않는다(한두 사람의 사진만 되풀이되지 않게) */

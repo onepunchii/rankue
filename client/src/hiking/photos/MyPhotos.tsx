@@ -13,7 +13,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { appConfirm } from "@/components/AppDialog";
 import { useTermsGate } from "@/components/hiq/TermsConsent";
 import { LucideLock } from "@/lib/icons";
-import { HIKING_PHOTOS_ANCHOR, HIKING_PHOTO_LABEL, HIKING_PHOTO_PER_MOUNTAIN_MAX, type HikingPhoto } from "@shared/hikingPhotos";
+import { HIKING_CHEER_LABEL, HIKING_PHOTOS_ANCHOR, HIKING_PHOTO_LABEL, HIKING_PHOTO_PER_MOUNTAIN_MAX, type HikingPhoto } from "@shared/hikingPhotos";
+import { CheerCount } from "./CheerParts";
 import { stampDate } from "../lib/date";
 import { PhotoStage } from "./PhotoStage";
 import { HikingPhotoError, appealHikingPhoto, deleteHikingPhoto, myPhotosKey, refreshHikingPhotos, setHikingPhotoPublic, uploadHikingPhoto } from "./photoApi";
@@ -125,6 +126,8 @@ export function MyPhotos({ mountainId, name, compact }: { mountainId: string; na
                                 {p.hidden
                                     ? <span className="absolute left-1 top-1 rounded-full bg-[#0B1F26D9] px-1.5 py-0.5 text-[12px] leading-tight text-[#FF9C8A]">가려짐</span>
                                     : !p.isPublic && <span className="absolute left-1 top-1 flex h-[22px] w-[22px] items-center justify-center rounded-full bg-[#0B1F26D9] text-[#F6D9A8]" data-testid="hk-photo-lock"><LucideLock weight="fill" className="h-3 w-3" aria-hidden /></span>}
+                                {/* 받은 응원(2026-11-04) */}
+                                <CheerCount n={p.cheers} overlay className="absolute bottom-1 left-1" />
                             </button>
                         </li>
                     ))}
@@ -149,7 +152,7 @@ export function MyPhotos({ mountainId, name, compact }: { mountainId: string; na
                             className="h-10 rounded-full px-3.5 text-[15px] text-[#FF9C8A] active:bg-[#FFFFFF14] disabled:opacity-50">지우기</button>
                     )}>
                     <p className="truncate text-[15px] font-semibold text-[#F4EFE3]">{name}</p>
-                    <p className="mt-0.5 text-[13px] text-[#F4EFE399]">내 사진 · {stampDate(open.takenAt)}</p>
+                    <p className="mt-0.5 text-[13px] text-[#F4EFE399]">내 사진 · {stampDate(open.takenAt)}{(open.cheers ?? 0) > 0 ? ` · ${HIKING_CHEER_LABEL.own(open.cheers!)}` : ""}</p>
                     <div className="mt-3.5"><Audience on={open.isPublic} busy={audience.isPending} onPick={(isPublic) => audience.mutate({ id: open.id, isPublic })} /></div>
                     {open.hidden ? (
                         // 신고로 가려진 내 사진 — 알림과 이의제기는 늘 한 벌이다(여럿이 짜고 신고하는 것을 막는 길)
