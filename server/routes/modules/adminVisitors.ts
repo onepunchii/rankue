@@ -5,6 +5,7 @@ import { checkSuperAdmin } from "../../middleware/adminAuth.js";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { isTrailVisitor, pageKind } from "../../../shared/uiTrail.js";
+import { mergeDaily, type DailySignups, type DailyVisits } from "../../../shared/visitorDaily.js";
 
 /**
  * 관리자 콘솔 '방문자 발자국'(2026-10-08 오너: "[폴리] 어드민 보면 방문자 발자국 만들어 놓은 것처럼 우리 랭큐도") — /api/hiq/admin/visitors/*
@@ -55,7 +56,9 @@ router.get("/summary", asyncHandler(async (req: any, res: any) => {
         ), pick as (select visitor from v where ${pickOf(who)})`;
     const inPick = sql`visitor in (select visitor from pick)`;
 
-    const [totals, pages, clicks, entries, exits, hours, refs, signups, daily] = await Promise.all([
+    // 날짜별 줄의 가입 — 웹 · 앱을 고르면 가입 직후 첫 발자국이 그쪽인 사람만(shared/visitorDaily). 발자국이 없는 가입은 '전체'에만 든다
+    const joinPlace = where === "all" ? sql`true` : where === "app" ? sql`app is true` : sql`app is false`;
+    const [totals, pages, clicks, entries, exits, hours, refs, signups, dailyVisits, dailyJoins] = await Promise.all([
         db.execute(sql`${base}
             select count(*)::int as visitors, count(*) filter (where member)::int as members, count(*) filter (where not member)::int as guests,
                    count(*) filter (where ${inPick})::int as picked,
@@ -94,9 +97,18 @@ router.get("/summary", asyncHandler(async (req: any, res: any) => {
         db.execute(sql`
             with e as (select visitor, member_id, meta, created_at from ui_events where created_at >= ${since(Math.max(days, 7))}),
                  place as (select visitor from (select visitor, bool_or(meta ? 'a') as app from e group by visitor) p where ${placeOf(where)})
-            select to_char(${KST}, 'MM.DD') as d, count(distinct visitor) filter (where member_id is null)::int as guests, count(distinct visitor) filter (where member_id is not null)::int as members
-            from e where visitor in (select visitor from place) group by 1 order by 1`).then(rowsOf),
+            select to_char(${KST}, 'YYYY-MM-DD') as day, count(distinct visitor) filter (where member_id is null)::int as guests, count(distinct visitor) filter (where member_id is not null)::int as members
+            from e where visitor in (select visitor from place) group by 1 order by 1`).then((r) => rowsOf<DailyVisits>(r)),
+        // 날짜별 새 회원(한국 날짜) — hiq_members.created_at 은 시간대 없는 UTC. 첫 발자국 하나만 본다(회원 id 색인)
+        db.execute(sql`
+            select to_char((j.created_at at time zone 'UTC') at time zone 'Asia/Seoul', 'YYYY-MM-DD') as day,
+                   count(*)::int as total, count(*) filter (where ${joinPlace})::int as here
+            from (select m.created_at,
+                         (select (u.meta ? 'a') from ui_events u where u.member_id = m.id order by u.created_at, u.id limit 1) as app
+                  from hiq_members m where (m.created_at at time zone 'UTC') >= ${since(Math.max(days, 7))}) j
+            group by 1`).then((r) => rowsOf<DailySignups>(r)),
     ]);
+    const daily = mergeDaily(dailyVisits, dailyJoins);
 
     const fold = (rows: any[], keys: string[]) => {
         const m = new Map<string, Record<string, number>>();

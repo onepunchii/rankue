@@ -18,6 +18,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from "@/components/
 import { apiRequest } from "@/lib/queryClient";
 import { LucideRefreshCw } from "@/lib/icons";
 import { TRAIL_KEEP_DAYS, TRAIL_SINCE, pageKind } from "@shared/uiTrail";
+import { conversionText, dailyTotals, type DailyRow } from "@shared/visitorDaily";
 import { EmptyState, FilterChips, KpiTile, Panel, Pill, SHEET_SAFE_TOP } from "./adminUtils";
 
 type Who = "guest" | "member" | "all";
@@ -30,7 +31,7 @@ interface Summary {
     clicks: { label: string; kind: string; to: string | null; n: number; people: number }[];
     entries: { kind: string; n: number }[]; exits: { kind: string; n: number }[];
     hourly: number[]; refs: { ref: string; n: number }[]; signups: number;
-    daily: { d: string; guests: number; members: number }[];
+    daily: DailyRow[];
 }
 interface Visitor { visitor: string; member: boolean; memberId: string | null; name: string | null; pages: number; clicks: number; opened: boolean; firstAt: string; lastAt: string; stay: number; entry: string | null; exit: string | null; ref: string | null; device: string | null; os?: string | null }
 interface Trail { visitor: string; firstDay: string | null; events: { id: number; name: string; path: string | null; meta: Record<string, unknown> | null; at: string; member: boolean }[] }
@@ -98,6 +99,44 @@ function HourBars({ hourly }: { hourly: number[] }) {
 }
 
 /** 가입까지 — 비회원으로 온 사람이 어디까지 갔나. 막대는 첫 줄에 맞춘 길이 */
+/**
+ * 날짜별 방문자 · 가입 · 전환(2026-11-06 오너: "비회원 회원 그리고 오늘 회원가입 숫자도 — 회원 전환률을 알 수 있게").
+ * 전환 = 그날 가입 ÷ 그날 비회원. 웹 · 앱을 고르면 가입도 그쪽에서 한 사람만 센다(shared/visitorDaily) — 전체 가입이 다르면 괄호로.
+ */
+function DailyRows({ rows, where }: { rows: DailyRow[]; where: Where }) {
+    const max = Math.max(1, ...rows.map((r) => num(r.guests) + num(r.members)));
+    const sum = dailyTotals(rows);
+    const other = where === "web" ? "앱" : "웹";
+    return (
+        <>
+            <p className="px-4 py-3 text-[13px] text-black/60 border-b border-black/[0.05] break-keep" data-testid="visitors-daily-total">
+                {/* 날마다 센 비회원의 합이다 — 이틀 온 사람은 두 번 든다(그래서 '명'이 아니라 '방문') */}
+                {rows.length}일 합계 — 비회원 방문 <b className="text-black/80 tabular-nums">{sum.guests.toLocaleString()}</b> · 가입 <b className="text-brand tabular-nums">{sum.signups.toLocaleString()}</b>명 · 전환 <b className="text-brand tabular-nums">{sum.pct}</b>
+                {where !== "all" && sum.signupsAll !== sum.signups && <span className="text-black/40"> ({other} 가입 포함 전체 {sum.signupsAll.toLocaleString()}명)</span>}
+            </p>
+            <ul className="divide-y divide-black/[0.05]">
+                {rows.slice().reverse().map((r) => {
+                    const total = num(r.guests) + num(r.members);
+                    return (
+                        <li key={r.day} className="px-4 py-2.5" data-testid="visitors-daily-row" data-day={r.day}>
+                            <p className="flex items-baseline justify-between gap-3">
+                                <span className="text-[13px] font-bold text-black/80">{r.d}</span>
+                                <span className="shrink-0 text-[13px] font-black tabular-nums">{total.toLocaleString()}<span className="ml-0.5 text-[11.5px] font-bold text-black/40">명</span></span>
+                            </p>
+                            <p className="mt-0.5 text-[12px] text-black/45 tabular-nums break-keep">
+                                비회원 {num(r.guests).toLocaleString()} · 회원 {num(r.members).toLocaleString()} · <b className="text-brand">가입 {num(r.signups).toLocaleString()}</b>
+                                {where !== "all" && r.signupsAll !== r.signups && <span className="text-black/35"> (전체 {num(r.signupsAll).toLocaleString()})</span>}
+                                {" · "}전환 <b className="text-brand">{conversionText(num(r.signups), num(r.guests))}</b>
+                            </p>
+                            <div className="mt-1.5 h-1.5 rounded-full bg-black/[0.05] overflow-hidden"><div className="h-full rounded-full bg-brand/70" style={{ width: `${Math.round((total / max) * 100)}%` }} /></div>
+                        </li>
+                    );
+                })}
+            </ul>
+        </>
+    );
+}
+
 function Funnel({ t, signups }: { t: Summary["totals"]; signups: number }) {
     const steps: [string, number][] = [
         ["비회원으로 온 사람", num(t.cameGuest)],
@@ -187,9 +226,9 @@ export default function VisitorsView({ onOpenMember }: { onOpenMember?: (id: str
                         <Section title="오늘 시간대별" note="한국 시각 · 사람 수"><HourBars hourly={s.hourly.map(num)} /></Section>
                     </div>
 
-                    {list<Summary["daily"][number]>(s.daily).length > 1 && (
-                        <Section title="날짜별 방문자" note="비회원 · 회원(그날 로그인한 채로 본 사람)">
-                            <Bars unit="명" rows={list<Summary["daily"][number]>(s.daily).slice().reverse().map((d) => ({ label: d.d, value: num(d.guests) + num(d.members), sub: `비회원 ${num(d.guests).toLocaleString()} · 회원 ${num(d.members).toLocaleString()}` }))} />
+                    {list<DailyRow>(s.daily).length > 1 && (
+                        <Section title="날짜별 방문자 · 가입" note={`비회원 · 회원(그날 로그인한 채로 본 사람) · 가입(그날 새로 가입한 회원${where === "all" ? "" : where === "web" ? " — 웹에서 가입한 사람" : " — 앱에서 가입한 사람"}) · 전환 = 가입 ÷ 비회원`}>
+                            <DailyRows rows={list<DailyRow>(s.daily)} where={where} />
                         </Section>
                     )}
 
