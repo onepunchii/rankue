@@ -40,6 +40,7 @@ import { SummitStamp, regionInk } from "../stamps/SummitStamp";
 import { TrailSketch, shortCourseName } from "../trails/TrailParts";
 import { TRAIL_ROUTES, trailCoursePath, trailTimeText } from "@shared/koreaTrails";
 import { SummitCheckin } from "../stamps/SummitCheckin";
+import { LocationHelpButton, useLocationBlocked } from "../components/LocationHelp";
 import { MountainPatch } from "../stamps/MountainPatch";
 import { hikingBookPath } from "../stamps/StampParts";
 import { useHikingStamps } from "../stamps/useHikingStamps";
@@ -467,6 +468,8 @@ export default function MountainPage() {
     const [pick, setPick] = useState<{ slug: string; i: number }>({ slug: "", i: 0 });
     // 내 위치 — 이 기기에서만 쓴다(거리와 방향을 여기서 센다. 서버로 보내지 않고 적어 두지도 않는다)
     const loc = useMyLocation();
+    // 위치가 이미 꺼져 있는가(묻지 않고) — 도장 카드에 미리 알린다
+    const locBlocked = useLocationBlocked(!!my.mine);
     // 다른 산으로 건너가면(가까운 산의 판 · 목록) 맨 위에서 시작한다. 처음 들어올 때는 손대지 않는다(#sec-photos 로 온 알림이 제자리로 간다)
     const first = useRef(true);
     useEffect(() => {
@@ -597,10 +600,16 @@ export default function MountainPage() {
                                 className="mx-4 mt-3 flex h-10 w-[calc(100%-2rem)] items-center justify-center gap-1.5 rounded-xl bg-[#0E2A330D] text-[13.5px] text-[#0E2A33] active:bg-[#0E2A331F]">
                                 <LucideLocateFixed className="h-4 w-4 shrink-0" aria-hidden />정상까지 얼마나 남았는지 보기
                             </button>
+                        ) : locBlocked && my.mine ? (
+                            // 위치가 이미 꺼져 있다(2026-11-06) — 정상에 가서야 알면 늦다. 묻지 않고 본 값이라 권한 창은 뜨지 않는다
+                            <div className="mx-4 mt-3 rounded-xl px-3 py-2.5" style={{ background: "#A14A1E14" }} role="status" data-testid="mountain-location-off">
+                                <p className="text-[13.5px] font-medium leading-snug text-[#7A3415] break-keep">위치가 꺼져 있어요. 정상에서 인증하려면 미리 켜 두세요.</p>
+                                <LocationHelpButton trouble="denied" className="mt-2" />
+                            </div>
                         ) : null)}
                         <div className="px-4 pb-3.5">
                             {my.mine
-                                ? <SummitCheckin key={`checkin:${d.id}`} mountainId={d.id} name={d.name} stamp={mine} hasSummit={d.lat != null && d.lng != null} region={d.region} patch={kfs} />
+                                ? <SummitCheckin key={`checkin:${d.id}`} mountainId={d.id} name={d.name} stamp={mine} hasSummit={d.lat != null && d.lng != null} region={d.region} patch={kfs} helpShown={locBlocked && !mine?.verified} />
                                 : (
                                     <>
                                         <p className="mt-3 border-t border-[#0E2A331A] pt-3 text-[13px] leading-snug text-[#0E2A33B3] break-keep">{kfs ? "인증하면 이 산의 와펜이 배낭에 달리고, 산행 등급이 올라요." : d.tier === 1 && region ? `${region.name} 도장첩의 한 칸이에요. 다 채우면 와펜을 받아요.` : "오른 산이 늘수록 산행 등급이 올라요."}</p>

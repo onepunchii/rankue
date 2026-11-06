@@ -11,6 +11,8 @@ import { useLocation } from "wouter";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { getDevicePosition } from "@/hooks/useNativeBridge";
+import type { LocationTrouble } from "@shared/locationHelp";
+import { LocationHelpButton } from "../components/LocationHelp";
 import { useAuth } from "@/hooks/useAuth";
 import { useHikingAccess } from "@/hooks/useHikingAccess";
 import { goLogin } from "@/components/hiq/LoginGate";
@@ -68,7 +70,7 @@ export function TrailStampCard({ c }: { c: TrailCourseDetail }) {
     const my = useMyTrails();
     const qc = useQueryClient();
     const [, setLocation] = useLocation();
-    const [msg, setMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+    const [msg, setMsg] = useState<{ tone: "ok" | "warn"; text: string; trouble?: LocationTrouble } | null>(null);
     const [sharing, setSharing] = useState(false);
     const route = c.route as TrailRouteId;
     const label = c.key;
@@ -79,13 +81,18 @@ export function TrailStampCard({ c }: { c: TrailCourseDetail }) {
     const state: "none" | "half" | "done" = stamp ? "done" : openFresh ? "half" : "none";
 
     const check = useMutation({
-        mutationFn: async (): Promise<CheckResult | { denied: true }> => {
+        mutationFn: async (): Promise<CheckResult | { denied: LocationTrouble }> => {
             const pos = await getDevicePosition({ prompt: true, highAccuracy: true, timeoutMs: 15000, maximumAgeMs: 0 });
-            if (pos.status !== "granted") return { denied: true };
+            if (pos.status !== "granted") return { denied: pos.status === "unavailable" ? "unavailable" : "denied" };
             return apiRequest(`/api/hiq/trails/${encodeURIComponent(c.route)}/${encodeURIComponent(c.key)}/check`, { method: "POST", body: JSON.stringify({ lat: pos.fix.lat, lng: pos.fix.lng, accuracy: pos.fix.accuracy }) });
         },
         onSuccess: (r) => {
-            if ("denied" in r) { setMsg({ tone: "warn", text: "위치를 쓸 수 없어요. 설정에서 위치를 허용한 뒤 다시 눌러 주세요." }); return; }
+            if ("denied" in r) {
+                setMsg(r.denied === "unavailable"
+                    ? { tone: "warn", text: "위치를 잡지 못했어요. 하늘이 트인 곳에서 잠시 뒤 다시 눌러 주세요.", trouble: "unavailable" }
+                    : { tone: "warn", text: "위치가 꺼져 있어 확인할 수 없어요. 위치를 켜고 다시 눌러 주세요.", trouble: "denied" });
+                return;
+            }
             if (r.state === "far") { setMsg({ tone: "warn", text: r.hint ?? `코스의 시작이나 끝 ${TRAIL_END_RADIUS_M}m 안에서 눌러 주세요.` }); return; }
             const where = r.end === "start" ? c.startName ?? "코스 시작" : c.endName ?? "코스 끝";
             if (r.state === "done") setMsg({ tone: "ok", text: r.stamped ? `${where} 도착 — ${ROUTE_SHORT[route]} ${label}코스 도장이 찍혔어요.` : "이미 받은 도장이에요." });
@@ -134,6 +141,7 @@ export function TrailStampCard({ c }: { c: TrailCourseDetail }) {
                 )}
                 {stamp && <TrailStampShareSheet open={sharing} onClose={() => setSharing(false)} route={c.route} courseKey={c.key} title={`${ROUTE_SHORT[route]} ${label}코스`} />}
                 {msg && <p className="mt-2 text-[13.5px] leading-snug break-keep" style={{ color: msg.tone === "ok" ? "#2F6A0C" : "#A14A1E" }} role="status" data-testid="trail-stamp-msg">{msg.text}</p>}
+                {msg?.trouble && <LocationHelpButton trouble={msg.trouble} className="mt-2" />}
                 {member && <p className="mt-2 text-[12px] leading-snug text-[#0E2A33A6] break-keep">위치는 코스 끝까지의 거리를 재는 데만 쓰고 저장하지 않아요.</p>}
             </div>
         </div>

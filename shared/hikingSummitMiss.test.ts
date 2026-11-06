@@ -60,7 +60,10 @@ describe("연결", () => {
         const c = read("client/src/hiking/stamps/SummitCheckin.tsx");
         expect(c).toContain('body: JSON.stringify({ mountainId, fixError: pos.status, client })');
         expect(c).toContain("accuracy: pos.fix.accuracy, client })");
-        expect(c).toContain('r.denied === "unavailable" ? "위치를 잡지 못했어요.');
+        // 2026-11-06: 안내마다 '위치 켜는 방법'의 까닭(trouble)을 같이 둔다 — 거부와 못 잡음의 시트가 다르다
+        expect(c).toContain('setMsg(r.denied === "unavailable"');
+        expect(c).toContain('text: "위치를 잡지 못했어요. 하늘이 트인 곳에서 잠시 뒤 다시 눌러 주세요.", trouble: "unavailable" }');
+        expect(c).toContain('trouble: "denied" });');
     });
     // 2026-11-04 실측: 실패 39번 중 22번이 정상에서 2km 넘게 — 대개 집에서 지난 산행을 적으려던 것
     it("화면 — 2km 넘게 떨어져 실패하면 옆의 '다녀왔어요'를 가리킨다(그 단추가 보일 때만)", () => {

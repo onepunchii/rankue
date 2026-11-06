@@ -37,6 +37,7 @@ import { setVoiceOn, speakLine, voiceOn } from "../trail/speak";
 import { MY_TRIPS_KEY, dropKeptTrail, keepTrail, readKeptTrail, useTrail } from "../trail/useTrail";
 import { locationMessage } from "@shared/hikingShare";
 import { MyMarks } from "../components/MyMarks";
+import { LocationHelpButton, useLocationBlocked } from "../components/LocationHelp";
 import { Capacitor } from "@capacitor/core";
 import { Share } from "@capacitor/share";
 
@@ -64,6 +65,8 @@ export default function TrailPage() {
     const [startedAt, setStartedAt] = useState<number | null>(null);
     const [done, setDone] = useState<{ minutes: number; km: number; gainM: number; reachedSummit: boolean; saved: boolean } | null>(null);
     const active = startedAt != null && !done;
+    // 위치가 이미 꺼져 있는가 — 시작 전에만 본다(묻지 않는다). 걷는 중에는 useTrail 의 denied 가 알린다
+    const locBlocked = useLocationBlocked(!!hikingOk && !!course && startedAt == null);
     // 걷던 산행이 기기에 남아 있으면 이어서 — 잘못 눌러 화면을 떠났다 돌아와도 처음부터가 아니다
     useEffect(() => {
         if (!d || !hikingOk || startedAt != null) return;
@@ -196,7 +199,7 @@ export default function TrailPage() {
                             <p className="mb-2 flex items-center gap-2 text-[13.5px]" role="status" data-testid="trail-status">
                                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: trail.phase === "on" && s && !s.far && !s.coarse ? "#7FD48A" : trail.phase === "denied" ? "#E0533B" : "#F6D9A8" }} aria-hidden />
                                 <span className="text-[#F4EFE3CC] break-keep">
-                                    {trail.phase === "denied" ? "위치를 쓸 수 없어요. 설정에서 위치를 허용한 뒤 다시 시작해 주세요."
+                                    {trail.phase === "denied" ? "위치가 꺼져 있어요. 위치를 켜고 다시 시작해 주세요."
                                         : trail.phase === "locating" || !s ? "위치를 잡는 중이에요. 하늘이 트인 곳이면 빨라요."
                                         : trail.phase === "lost" ? "위치가 잠깐 끊겼어요. 마지막 자리를 보여 드려요."
                                         : s.coarse ? "위치가 흐려요. 마지막 자리를 보여 드려요."
@@ -205,6 +208,7 @@ export default function TrailPage() {
                                 </span>
                             </p>
                         )}
+                        {active && trail.phase === "denied" && <LocationHelpButton trouble="denied" tone="dark" className="mb-2" />}
                         {/* 해 지는 때 — 세 시간 전부터 알린다(그 전에는 그리지 않는다). 내려갈 시간을 남기라는 말 */}
                         {active && sunset && (
                             <p className="mb-2 flex items-start gap-2 rounded-xl px-3 py-2 text-[13.5px] leading-snug break-keep" role="status" data-testid="trail-sunset" data-urgent={sunset.urgent ? "1" : "0"}
@@ -237,6 +241,13 @@ export default function TrailPage() {
                                         </div>
                                     ))}
                                 </div>
+                                {/* 위치가 이미 꺼져 있으면 시작 전에 알린다(2026-11-06) — 정상에 가서야 알면 늦다 */}
+                                {locBlocked && (
+                                    <div className="mt-4 rounded-2xl px-4 py-3.5" style={{ background: "#E0533B1F", boxShadow: "inset 0 0 0 1px #E0533B80" }} role="status" data-testid="trail-location-off">
+                                        <p className="text-[14px] font-semibold leading-snug text-[#FFD4CC] break-keep">위치가 꺼져 있어요. 산행 기록과 정상 인증에 위치가 필요해요.</p>
+                                        <LocationHelpButton trouble="denied" tone="dark" className="mt-2.5" />
+                                    </div>
+                                )}
                                 <button type="button" onClick={start} data-track-as="hiking-trail-start" data-testid="trail-start" data-tour="hk-start"
                                     className="mt-4 h-14 w-full rounded-2xl bg-[#F28C6A] text-[17px] font-semibold text-[#2A1208] active:bg-[#E67C59]">산행 시작</button>
                                 <ul className="mt-4 space-y-1.5 text-[13px] leading-snug text-[#F4EFE399]" data-tour="hk-screen">

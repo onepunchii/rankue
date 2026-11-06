@@ -21,6 +21,8 @@ import { MY_STAMPS_KEY, type MyAward } from "./useHikingStamps";
 import { isNative } from "@shared/nativeCaps";
 import { isInAppBrowser } from "@shared/installPrompt";
 import type { SummitClient } from "@shared/hikingSummitMiss";
+import type { LocationTrouble } from "@shared/locationHelp";
+import { LocationHelpButton } from "../components/LocationHelp";
 
 /** 기기 종류 — 실패의 까닭과 함께 서버에 남는다(앱 · 다른 앱 안의 브라우저 · 웹). 위치 정확도가 기기마다 달라서다 */
 const clientKind = (): SummitClient => (isNative() ? "app" : typeof navigator !== "undefined" && isInAppBrowser(navigator.userAgent) ? "inapp" : "web");
@@ -33,14 +35,17 @@ interface CheckinResult { verified: boolean; reason: string; bucket?: string; hi
  */
 export const FAR_RECORD_TIP = "지난 산행이라면 옆의 '다녀왔어요'로 적어 둘 수 있어요.";
 
-export function SummitCheckin({ mountainId, name, stamp, hasSummit, region, patch }: {
+export function SummitCheckin({ mountainId, name, stamp, hasSummit, region, patch, helpShown }: {
     mountainId: string; name: string; stamp?: MountainStamp; hasSummit: boolean;
     region?: string | null;
     /** 이 산에 산 와펜이 있는가(산림청 100대 명산) — 인증한 순간 같이 보여 준다 */
     patch?: boolean;
+    /** 위 띠가 이미 '위치 켜는 방법'을 보여 주고 있다(산 화면) — 같은 단추를 두 번 두지 않는다 */
+    helpShown?: boolean;
 }) {
     const qc = useQueryClient();
-    const [msg, setMsg] = useState<{ tone: "ok" | "warn"; text: string } | null>(null);
+    // trouble — 위치를 못 받았을 때 '위치 켜는 방법' 단추를 함께 둔다(2026-11-06)
+    const [msg, setMsg] = useState<{ tone: "ok" | "warn"; text: string; trouble?: LocationTrouble } | null>(null);
     const [fresh, setFresh] = useState<MyAward[]>([]);
     // 방금 이 화면에서 새 도장을 찍었는가 — 받은 것을 그림으로 늘어놓는다
     const [justNow, setJustNow] = useState(false);
@@ -58,7 +63,12 @@ export function SummitCheckin({ mountainId, name, stamp, hasSummit, region, patc
         },
         onSuccess: (r) => {
             // 거부(허락 안 함)와 못 잡음(시간 초과 · GPS 꺼짐)은 안내가 다르다 — 예전엔 못 잡아도 '허용하라'고 했다
-            if ("denied" in r) { setMsg({ tone: "warn", text: r.denied === "unavailable" ? "위치를 잡지 못했어요. 하늘이 트인 곳에서 잠시 뒤 다시 눌러 주세요." : "위치를 쓸 수 없어요. 설정에서 위치를 허용한 뒤 다시 눌러 주세요." }); return; }
+            if ("denied" in r) {
+                setMsg(r.denied === "unavailable"
+                    ? { tone: "warn", text: "위치를 잡지 못했어요. 하늘이 트인 곳에서 잠시 뒤 다시 눌러 주세요.", trouble: "unavailable" }
+                    : { tone: "warn", text: "위치가 꺼져 있어 인증할 수 없어요. 위치를 켜고 다시 눌러 주세요.", trouble: "denied" });
+                return;
+            }
             if (!r.verified) {
                 const hint = r.hint ?? "정상 가까이에서 다시 눌러 주세요.";
                 setMsg({ tone: "warn", text: r.bucket === ">2km" && !stamp ? `${hint} ${FAR_RECORD_TIP}` : hint });
@@ -99,6 +109,7 @@ export function SummitCheckin({ mountainId, name, stamp, hasSummit, region, patc
             </div>
             {!hasSummit && <p className="mt-2 text-[12.5px] text-[#0E2A33B3] break-keep">이 산은 정상의 자리를 아직 몰라 인증할 수 없어요.</p>}
             {msg && <p className="mt-2 text-[13.5px] leading-snug break-keep" style={{ color: msg.tone === "ok" ? "#2F6A0C" : "#A14A1E" }} role="status" data-testid="summit-msg">{msg.text}</p>}
+            {msg?.trouble && !(helpShown && msg.trouble === "denied") && <LocationHelpButton trouble={msg.trouble} className="mt-2" />}
             {/* 방금 받은 것 — 산 와펜 · 오른 등급 · 핀 · 다 채운 도장첩의 와펜 */}
             {justNow && (fresh.length > 0 || patch) && (
                 <div className="mt-3 rounded-2xl bg-[#0E2A33] px-2 py-3.5 text-[#F4EFE3]" data-testid="summit-fresh">

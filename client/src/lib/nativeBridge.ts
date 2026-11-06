@@ -179,6 +179,32 @@ export async function openNotificationSettings(): Promise<boolean> {
     }
 }
 
+/**
+ * 랭큐 앱의 설정 화면(위치 권한 항목이 있는 곳)을 연다(2026-11-06 — 위치를 거부한 사람의 복구 길, shared/locationHelp).
+ * 아이폰은 한 번 거부하면 앱이 다시 물을 수 없어 이 길이 유일하다. 알림 설정과 같은 문을 쓰되 안드로이드는 앱 정보 화면(권한이 거기 있다)으로.
+ */
+export function canOpenAppSettings(): boolean {
+    return canOpenNotificationSettings();
+}
+export async function openAppSettings(): Promise<boolean> {
+    if (!canOpenAppSettings()) return false;
+    if (platform() === "ios") {
+        try {
+            window.location.href = "app-settings:";
+            return true;
+        } catch {
+            return false;
+        }
+    }
+    try {
+        const { NativeSettings, AndroidSettings, IOSSettings } = await import("capacitor-native-settings");
+        const r = await NativeSettings.open({ optionAndroid: AndroidSettings.ApplicationDetails, optionIOS: IOSSettings.App });
+        return !!r?.status;
+    } catch {
+        return false;
+    }
+}
+
 // ── 앱을 보는 중에 온 푸시 ────────────────────────────────────────────────
 // 2세대 바이너리는 capacitor.config presentationOptions 로 OS 가 배너를 띄운다. 옛 바이너리는 조용히 버리므로
 // 화면(PushPermissionSheet)이 넣어 준 처리기로 토스트를 띄운다. 둘 다 띄우면 두 번 뜬다.
