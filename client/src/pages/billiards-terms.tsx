@@ -7,6 +7,8 @@ import { useSeo } from "@/hooks/useSeo";
 import { cn } from "@/lib/utils";
 import { Section, List } from "@/components/hiq/umb/ui";
 import { TermsHeader, KoreanOnlyNote } from "@/components/hiq/terms/TermsParts";
+import { GuestCtaBar, askScoreboardSignup } from "@/components/hiq/GuestCtaBar";
+import { TERMS_GUEST_BAR } from "@shared/guestConversion";
 import { BILLIARDS_TERMS, TERM_CATEGORIES, TERMS_HUB_INTRO, termBySlug, type BilliardsTerm } from "@shared/billiardsTerms";
 import {
     TERMS_HUB_PATH, TERMS_HUB_TITLE, TERM_LABELS, termsHubDesc, termsHubJsonLd, termPath, categoryAnchorId, hasOwnPage,
@@ -167,6 +169,8 @@ export default function BilliardsTermsPage() {
                     <Link href="/stores" className="h-10 px-4 rounded-full bg-surface-1 text-[13px] font-semibold text-ink-2 inline-flex items-center shadow-[0_1px_2px_rgba(0,0,0,0.05)]">📍 전국 당구장 찾기</Link>
                 </nav>
             </div>
+            {/* 방문자의 바닥 줄(2026-11-06) — 다마 · 에버를 찾아보는 사람에게 "쳐 보면 나와요". 가입하면 홈의 실전 점수판이 바로 열린다 */}
+            <GuestCtaBar id="terms" copy={TERMS_GUEST_BAR} onClick={() => askScoreboardSignup(setLocation)} trackAs="terms-scoreboard-bar" />
         </div>
     );
 }

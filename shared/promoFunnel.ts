@@ -34,3 +34,22 @@ export function safeReturnPath(raw: unknown): string | null {
     if (!v.startsWith("/") || v.startsWith("//") || v.startsWith("/\\") || v.length > 300) return null;
     return v;
 }
+
+/** 로그인 화면(그 화면이 스스로 로그인을 띄운다) — client LoginSheet 의 LOGIN_SCREEN 과 같은 식(시험이 같은지 본다) */
+export const LOGIN_SCREEN_PATH = /^\/(?:$|hiq$|register$|auth\/)/;
+
+/**
+ * 보던 화면 위에 가입 · 로그인 팝업을 다시 여는 주소(2026-11-06) — '?login=1' 을 붙이면 그 화면에서 팝업이 열린다(LoginSheet).
+ * 카카오 동의 화면에서 '취소'한 사람이 보던 산 · 골프장이 아니라 당구 예시 홈으로 떨어졌다(10/23~11/5 웹 9명 — 그 위에 당구 도움말까지 떠 다들 나갔다).
+ * 보던 화면이 없거나 로그인 화면이면 null — 부르는 쪽이 예시 홈 위의 팝업으로 보낸다.
+ */
+export function sheetLoginPath(back: unknown): string | null {
+    const safe = safeReturnPath(back);
+    if (!safe) return null;
+    const hashAt = safe.indexOf("#");
+    const base = hashAt >= 0 ? safe.slice(0, hashAt) : safe;
+    const hash = hashAt >= 0 ? safe.slice(hashAt) : "";
+    if (LOGIN_SCREEN_PATH.test(base.split("?")[0])) return null;
+    if (/[?&]login=/.test(base)) return safe;
+    return `${base}${base.includes("?") ? "&" : "?"}login=1${hash}`;
+}

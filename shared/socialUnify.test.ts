@@ -277,7 +277,7 @@ describe("팝업이 기본 — 로그인하러 보내는 길도 예시 홈 위�
         // 팝업의 '전화번호로 계속하기' · 가입 첫 단계의 '이전'은 전화번호 카드로 간다(phone = true)
         expect(sheet).toContain("const toPhone = () => go(loginPagePath(back, true));");
         // 카카오에서 못 끝내고 돌아온 사람도 팝업으로
-        expect(code(client("pages/hiq/kakao-callback.tsx"))).toContain('return loginPagePath(safeReturnPath(back) ?? "/dashboard");');
+        expect(code(client("pages/hiq/kakao-callback.tsx"))).toContain('return sheetLoginPath(back) ?? loginPagePath("/dashboard");');
     });
 
     it("자동으로 보내는 곳(골프 전용 문 · 크루 만들기)은 그 자리에 팝업을 띄우지 않고 보낸다 — 가는 곳이 예시 홈 + 팝업", () => {

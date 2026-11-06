@@ -11,7 +11,7 @@ import { loginPagePath } from "@/components/hiq/LoginSheet";
 import { joinStoreSlug } from "@/lib/joinStore";
 import { takeKakaoPending } from "@/lib/kakaoLogin";
 import { KAKAO_REDIRECT_PATH, checkKakaoReturn, kakaoRedirectUri, type KakaoMode } from "@shared/kakaoLogin";
-import { safeReturnPath } from "@shared/promoFunnel";
+import { safeReturnPath, sheetLoginPath } from "@shared/promoFunnel";
 import { isTermsAccepted } from "@shared/terms";
 
 // 카카오 로그인에서 돌아오는 화면(/auth/kakao) — 카카오가 ?code=…&state=… 를 붙여 여기로 보낸다.
@@ -128,11 +128,12 @@ async function linkWithPin(code: string, pin: string, back: string | null): Prom
 }
 
 /**
- * 다시 로그인하러 보낼 주소 — 전체 로그인 화면이 아니라 **예시 홈 위의 가입·로그인 팝업**(2026-10-07 오너: "팝업이 기본이 되게").
- * 끝나면 back 으로 돌아간다(우리 사이트 안의 경로만 — 호스트가 다시 거른다). 없으면 홈.
+ * 다시 로그인하러 보낼 주소 — **보던 화면 위의** 가입 · 로그인 팝업(2026-11-06 — shared/promoFunnel sheetLoginPath).
+ * 예전에는 늘 예시 홈(당구) 위의 팝업이라, 산 · 골프장에서 카카오를 눌렀다가 '취소'한 사람이 당구 홈에 떨어졌다.
+ * 보던 화면이 없거나 로그인 화면이면 예전처럼 예시 홈 위의 팝업(2026-10-07 오너: "팝업이 기본이 되게").
  */
 function loginPath(back: string | null): string {
-    return loginPagePath(safeReturnPath(back) ?? "/dashboard");
+    return sheetLoginPath(back) ?? loginPagePath("/dashboard");
 }
 
 /** 못 끝냈을 때 그리는 것. 문구는 키로 들고 있다가 그릴 때 옮긴다 — 언어 사전이 늦게 실려도 그 언어로 바뀐다. */

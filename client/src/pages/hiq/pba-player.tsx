@@ -16,7 +16,9 @@ import { PlayerCheers } from "@/components/hiq/umb/PlayerCheers";
 import { ProCompareCard } from "@/components/hiq/compare/ProCompareCard";
 import { PlayerPhoto } from "@/components/hiq/PlayerPhoto";
 import { Chip } from "@/components/hiq/umb/ui";
-import { goLogin } from "@/components/hiq/LoginGate";
+import { GuestCtaBar } from "@/components/hiq/GuestCtaBar";
+import { followAfterLogin, useFollowAfterLogin } from "@/lib/followAfterLogin";
+import { followedAfterLogin, playerGuestBar } from "@shared/guestConversion";
 import { pbaCardUrl } from "@/lib/playerCard";
 import { seasonLabel, formatPrize } from "./pba";
 import { PBA_INCOME_NOTE_KO, formatPrizeKo, pbaL10n, pbaLatestSeasonRank } from "@shared/pbaMeta";
@@ -192,7 +194,8 @@ export default function HiqPbaPlayer() {
     const [followBusy, setFollowBusy] = useState(false);
     const toggleFollow = async () => {
         if (followBusy) return;
-        if (!member) { toast({ title: t.followLogin }); goLogin(setLocation); return; }
+        // 방문자 — 이 선수를 적어 두고 가입 팝업. 가입하고 돌아오면 바로 팔로우된다(2026-11-06, useFollowAfterLogin)
+        if (!member) { followAfterLogin({ kind: "pba", key: memCode, category: null, name: p ? pbaDisplayName(p, locale) : "" }, setLocation, locale === "ko"); return; }
         const cur = follow.data ?? { following: false, followers: p?.extra?.followers ?? 0 };
         const next = !cur.following;
         setFollowBusy(true);
@@ -205,6 +208,13 @@ export default function HiqPbaPlayer() {
             qc.setQueryData(followKey, cur);
         } finally { setFollowBusy(false); }
     };
+
+    // 방문자 때 '팔로우'를 누르고 가입했으면 — 여기서 팔로우한다(한 번만). 이미 팔로우 중이어도 켜기만 한다(서버가 같은 줄을 다시 만들지 않는다)
+    useFollowAfterLogin("pba", memCode || null, null, !!p, () => {
+        void apiRequest(API_FOLLOW(memCode), { method: "PUT", body: { on: true } })
+            .then((r) => { qc.setQueryData(followKey, r as { following: boolean; followers: number }); toast({ title: locale === "ko" ? followedAfterLogin("pba", p ? pbaDisplayName(p, locale) : "") : t.followOn }); })
+            .catch(() => { /* 못 했으면 화면의 팔로우 단추가 그대로 남는다 */ });
+    });
 
     const x = p?.extra;
     const lang = locale;
@@ -520,6 +530,8 @@ export default function HiqPbaPlayer() {
                     </p>
                 </main>
             )}
+            {/* 방문자의 바닥 줄 — 이 선수 소식 받기(가입하면 바로 팔로우). 줄이 보이는 동안 설치 팝업은 뜨지 않는다 */}
+            {p && <GuestCtaBar id="pba-player" copy={playerGuestBar("pba", name)} onClick={() => void toggleFollow()} trackAs="pba-player-follow-bar" />}
             <HiqNavigation />
         </div>
     );

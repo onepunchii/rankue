@@ -875,10 +875,13 @@ describe("당구 홈", () => {
         it("guard 를 거치지 않고 생성 창·PIN 창을 여는 길이 없다", () => {
             // PIN 창을 여는 곳은 guard 안 한 군데
             expect(billiards.match(/toggleModal\('join', true\)/g)).toHaveLength(1);
-            // 생성 창을 여는 곳은 guard 안 + 채팅 카드에서 이어받는 효과(회원 전용) 둘뿐
-            expect(billiards.match(/toggleModal\('game', true\)/g)).toHaveLength(2);
+            // 생성 창을 여는 곳은 guard 안 + 회원 전용 효과 둘(채팅 카드에서 이어받기 · 가입하고 바로 점수판 ?start=match — 2026-11-06) 셋뿐
+            expect(billiards.match(/toggleModal\('game', true\)/g)).toHaveLength(3);
             const effect = billiards.slice(billiards.indexOf("if (!member || matchParamRef.current) return;"));
             expect(effect.indexOf("toggleModal('game', true)")).toBeGreaterThan(0);
+            const start = billiards.slice(billiards.indexOf("if (!member || startParamRef.current) return;"));
+            expect(billiards.indexOf("if (!member || startParamRef.current) return;")).toBeGreaterThan(0);
+            expect(start.indexOf("toggleModal('game', true)")).toBeGreaterThan(0);
             expect(billiards.indexOf("gate.guard(() => {")).toBeLessThan(billiards.indexOf("if (!member || matchParamRef.current) return;"));
         });
 

@@ -215,12 +215,17 @@ async function handlePbaSync(req: any, res: any) {
     const secret = process.env.CRON_SECRET;
     if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
     if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
-    const { syncPba } = await import("../../services/pbaSync.js");
+    const { syncPba, currentPbaSeason } = await import("../../services/pbaSync.js");
+    // 관심 선수 알림(2026-11-06 — shared/pbaFollowAlert): 순위를 덮어쓰기 전에 팔로우된 선수의 순위를 찍어 두고, 덮어쓴 뒤 견준다
+    const { followedPbaRanks, notifyPbaRankChanges } = await import("../../services/pbaFollowAlerts.js");
+    const season = currentPbaSeason();
+    const before = await followedPbaRanks(season).catch((e) => { console.error("[pba] 관심 선수 순위 찍기 실패:", (e as Error)?.message); return null; });
     const result = await syncPba();
+    const followAlerts = before ? await notifyPbaRankChanges(before, season).catch((e) => { console.error("[pba] 관심 선수 알림 실패:", (e as Error)?.message); return null; }) : null;
     const { checkPbaHealth, alertIfUnhealthy } = await import("../../services/feedHealth.js");
     const issues = await checkPbaHealth();
     const alerted = await alertIfUnhealthy(issues);
-    return sendSuccess(res, { ...result, health: issues, alerted });
+    return sendSuccess(res, { ...result, followAlerts, health: issues, alerted });
 }
 router.get("/pba-sync", asyncHandler(handlePbaSync));
 router.post("/pba-sync", asyncHandler(handlePbaSync));
@@ -232,8 +237,14 @@ async function handlePbaTournaments(req: any, res: any) {
     const secret = process.env.CRON_SECRET;
     if (!secret) return sendError(res, 503, "CRON_SECRET 미설정");
     if (req.headers.authorization !== `Bearer ${secret}`) return sendError(res, 401, "인증 실패");
-    const { runPbaTournamentsCron } = await import("../../services/pbaTournaments.js");
-    return sendSuccess(res, await runPbaTournamentsCron());
+    const { runPbaTournamentsCron, pbaCronSeasons } = await import("../../services/pbaTournaments.js");
+    // 관심 선수 우승 알림(2026-11-06): 대회 표를 쓰기 전에 우승자를 찍어 두고, 쓴 뒤 우승자가 새로 생긴 대회를 본다
+    const { pbaWinnerSnapshot, notifyPbaWins } = await import("../../services/pbaFollowAlerts.js");
+    const seasons = pbaCronSeasons();
+    const before = await pbaWinnerSnapshot(seasons).catch((e) => { console.error("[pba] 우승자 찍기 실패:", (e as Error)?.message); return null; });
+    const result = await runPbaTournamentsCron();
+    const winAlerts = before ? await notifyPbaWins(before, seasons).catch((e) => { console.error("[pba] 우승 알림 실패:", (e as Error)?.message); return null; }) : null;
+    return sendSuccess(res, { ...(result as object), winAlerts });
 }
 router.get("/pba-tournaments", asyncHandler(handlePbaTournaments));
 router.post("/pba-tournaments", asyncHandler(handlePbaTournaments));

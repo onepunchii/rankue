@@ -7,6 +7,8 @@ import { TermDiagram } from "@/components/hiq/terms/TermDiagram";
 import { TERM_DIAGRAMS } from "@shared/billiardsTermDiagrams";
 import { ShareButton } from "@/components/hiq/ShareButton";
 import { TermsHeader, KoreanOnlyNote } from "@/components/hiq/terms/TermsParts";
+import { GuestCtaBar, askScoreboardSignup } from "@/components/hiq/GuestCtaBar";
+import { TERMS_GUEST_BAR } from "@shared/guestConversion";
 import { TERM_CATEGORIES, termBySlug, termsInCategory, type BilliardsTerm } from "@shared/billiardsTerms";
 import {
     TERMS_HUB_PATH, TERM_SECTIONS, TERM_LABELS, TERM_NOT_FOUND, termTitle, termDescription, termJsonLd, termPath, termAnchorPath, termHref,
@@ -179,6 +181,8 @@ export default function BilliardsTermPage() {
                     <LucideChevronRight className="w-4 h-4" />
                 </Link>
             </div>
+            {/* 방문자의 바닥 줄(2026-11-06) — 다마 · 에버를 찾아보는 사람에게 "쳐 보면 나와요". 가입하면 홈의 실전 점수판이 바로 열린다 */}
+            <GuestCtaBar id="terms" copy={TERMS_GUEST_BAR} onClick={() => askScoreboardSignup(setLocation)} trackAs="terms-scoreboard-bar" />
         </div>
     );
 }

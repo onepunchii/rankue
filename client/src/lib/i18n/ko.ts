@@ -3200,7 +3200,7 @@ export const ko: Dict = {
   "settings.notifNotice": "공지·답변",
   "settings.notifNoticeDesc": "운영 공지, 건의하신 내용의 답변",
   "settings.notifPlayers": "관심 선수",
-  "settings.notifPlayersDesc": "세계랭킹 새 회차에서 순위가 바뀌면",
+  "settings.notifPlayersDesc": "세계랭킹 · PBA 시즌 순위가 바뀌거나 우승하면",
   "settings.notifGolf": "골프",
   "settings.notifGolfDesc": "골프 크루·라운드·공지 알림",
   "settings.notifGolfJoin": "조인·부킹",

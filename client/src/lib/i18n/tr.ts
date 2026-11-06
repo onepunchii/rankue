@@ -3198,7 +3198,7 @@ const tr: Dict = {
   "settings.notifNotice": "Duyurular ve yanıtlar",
   "settings.notifNoticeDesc": "Duyurular ve önerilerine gelen yanıtlar",
   "settings.notifPlayers": "Takip edilen oyuncular",
-  "settings.notifPlayersDesc": "Takip ettiğin oyuncunun dünya sıralaması değişince",
+  "settings.notifPlayersDesc": "Takip ettiğin oyuncunun dünya ya da PBA sezon sıralaması değişince veya şampiyon olunca",
   "settings.notifGolf": "Golf",
   "settings.notifGolfDesc": "Golf ekipleri, turlar ve duyurular",
   "settings.notifGolfJoin": "Katılım ve rezervasyon",

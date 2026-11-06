@@ -17,6 +17,7 @@ import { mergeDaily, type DailySignups, type DailyVisits } from "../../../shared
  *  · 주소는 화면 종류로 묶는다(/golf/course/세레니티CC → "/golf/course/…", shared pageKind) — 낱개로 세면 상위가 전부 1건이다.
  *  · created_at 은 timestamptz 다(이 표만). 날짜 경계는 한국 자정을 timestamptz 로 바꿔 견준다 — 인덱스를 탄다.
  *  · 발자국은 60일만 둔다(정리 크론). 통계는 그 안에서만 본다.
+ *  · '가입 창을 연 사람'은 열린 창 이름이 '가입 창'인 줄만 센다(2026-11-06) — 'open' 줄에는 도움말(코치 투어)의 시작 · 끝도 섞여 있다.
  */
 const router = Router();
 router.use(checkSuperAdmin);
@@ -49,7 +50,7 @@ router.get("/summary", asyncHandler(async (req: any, res: any) => {
         ), v as (
             select visitor, bool_or(member_id is not null) as member,
                    count(*) filter (where name = 'page')::int as pages, count(*) filter (where name = 'click')::int as clicks,
-                   bool_or(name = 'open') as opened, min(created_at) as first_at, max(created_at) as last_at,
+                   bool_or(name = 'open' and meta->>'l' = '가입 창') as opened, min(created_at) as first_at, max(created_at) as last_at,
                    -- 그 기간 첫 줄에 회원 id 가 없었나 = 비회원으로 왔나(뒤에 로그인하면 member 는 true 가 된다)
                    ((array_agg(member_id order by created_at, id))[1] is null) as came_guest
             from ev group by visitor
@@ -146,7 +147,7 @@ router.get("/list", asyncHandler(async (req: any, res: any) => {
         ), v as (
             select visitor, bool_or(member_id is not null) as member, (array_agg(member_id) filter (where member_id is not null))[1] as member_id,
                    count(*) filter (where name = 'page')::int as pages, count(*) filter (where name = 'click')::int as clicks,
-                   bool_or(name = 'open') as opened, min(created_at) as first_at, max(created_at) as last_at,
+                   bool_or(name = 'open' and meta->>'l' = '가입 창') as opened, min(created_at) as first_at, max(created_at) as last_at,
                    (array_agg(path order by created_at, id) filter (where name = 'page'))[1] as entry,
                    (array_agg(path order by created_at desc, id desc) filter (where name = 'page'))[1] as exit,
                    max(meta->>'ref') as ref, max(meta->>'w') as device,

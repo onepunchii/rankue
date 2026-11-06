@@ -15,6 +15,8 @@ import { PathFinderPromo } from "@/components/promo/PathFinderPromo";
 import { useAuth } from "@/hooks/useAuth";
 import { goLogin } from "@/components/hiq/LoginGate";
 import { joinStoreFor } from "@/lib/joinStore";
+import { GuestCtaBar, askScoreboardSignup } from "@/components/hiq/GuestCtaBar";
+import { STORE_GUEST_BAR } from "@shared/guestConversion";
 import { StoreNearTable } from "@/components/hiq/stores/StoreTableMap";
 
 interface Listing {
@@ -716,6 +718,11 @@ export default function StoreListingPage() {
           </DialogContent>
         </Dialog>
       </div>
+      {/* 방문자의 바닥 줄(2026-11-06) — 길찾기를 누르는 손님은 이 당구장에 가는 사람이다: "여기서 치세요? 점수판은 랭큐".
+          가입하면 홈의 실전 점수판이 바로 열린다. 문 닫은 매장 · QR 로 온 손님(맨 위에 '이 매장 회원으로 시작하기')에게는 두지 않는다 */}
+      {s && !isClosedListing(s) && !(s.claimed && joinStoreFor(s.code)) && (
+        <GuestCtaBar id="store" copy={STORE_GUEST_BAR} onClick={() => askScoreboardSignup(setLocation)} trackAs="store-scoreboard-bar" />
+      )}
       {/* 모바일 하단 네비 — 앱에서 넘어온 사용자가 돌아갈 길, 검색 유입에는 제품 진입로.
           데스크톱은 넓은 공개 레이아웃이라 앱 탭바가 어울리지 않아 감춘다. */}
       <div className="md:hidden"><HiqNavigation /></div>

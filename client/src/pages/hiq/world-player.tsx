@@ -9,6 +9,9 @@ import type { UmbCategory } from "@/components/hiq/umb/types";
 import { umbPlayerDesc, umbPlayerTitle } from "@shared/siteGraph";
 import { umbCover } from "@shared/pageCovers";
 import { PageCover } from "@/components/hiq/PageCover";
+import { GuestCtaBar } from "@/components/hiq/GuestCtaBar";
+import { followAfterLogin } from "@/lib/followAfterLogin";
+import { playerGuestBar } from "@shared/guestConversion";
 
 const CATEGORIES = ["players", "ladies", "juniors"];
 
@@ -77,6 +80,11 @@ export default function HiqWorldPlayer() {
                 )}
             </div>
 
+            {/* 방문자의 바닥 줄 — 이 선수 소식 받기(가입하면 바로 팔로우, 2026-11-06). 줄이 보이는 동안 설치 팝업은 뜨지 않는다 */}
+            {p && umbId && (
+                <GuestCtaBar id="umb-player" copy={playerGuestBar("umb", nameMain ?? "")} trackAs="umb-player-follow-bar"
+                    onClick={() => followAfterLogin({ kind: "umb", key: umbId, category, name: nameMain ?? "" }, setLocation)} />
+            )}
             <HiqNavigation />
         </div>
     );

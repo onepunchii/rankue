@@ -1,6 +1,7 @@
 import { Suspense, lazy, useState } from "react";
 import { useLocation } from "wouter";
-import { goLogin } from "@/components/hiq/LoginGate";
+import { followAfterLogin, useFollowAfterLogin } from "@/lib/followAfterLogin";
+import { followedAfterLogin } from "@shared/guestConversion";
 import { PlayerCardShareButton } from "@/components/hiq/PlayerCardShareButton";
 import { umbCardUrl } from "@/lib/playerCard";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -141,7 +142,8 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
     const [, setLocation] = useLocation();
     const toggleFollow = async () => {
         if (!data || followBusy) return;
-        if (!member) { toast({ title: t("umb.followLogin") }); goLogin(setLocation); return; }
+        // 방문자 — 이 선수를 적어 두고 가입 팝업. 가입하고 돌아오면 바로 팔로우된다(2026-11-06, useFollowAfterLogin)
+        if (!member) { followAfterLogin({ kind: "umb", key: playerUmbId, category, name: data.player?.nativeName || data.player?.playerName || "" }, setLocation, locale === "ko"); return; }
         const next = !data.following;
         setFollowBusy(true);
         qc.setQueryData<UmbPlayerDetail>(detailKey, { ...data, following: next, followers: Math.max(0, (data.followers ?? 0) + (next ? 1 : -1)) });
@@ -154,6 +156,18 @@ export const UmbPlayerBody = ({ category, playerUmbId, onNavigate, standalone }:
             setFollowBusy(false);
         }
     };
+
+    // 방문자 때 '팔로우'를 누르고 가입했으면 — 여기서 팔로우한다(한 번만)
+    useFollowAfterLogin("umb", playerUmbId, category, !!data, () => {
+        if (!data) return;
+        const name = data.player?.nativeName || data.player?.playerName || "";
+        void apiRequest(`/api/hiq/umb/players/${category}/${playerUmbId}/follow`, { method: "PUT", body: { on: true } })
+            .then(() => {
+                qc.setQueryData<UmbPlayerDetail>(detailKey, { ...data, following: true, followers: (data.followers ?? 0) + (data.following ? 0 : 1) });
+                toast({ title: locale === "ko" ? followedAfterLogin("umb", name) : t("umb.followOn") });
+            })
+            .catch(() => { /* 못 했으면 화면의 팔로우 단추가 그대로 남는다 */ });
+    });
 
     const player = data?.player;
     const history = data?.history || [];

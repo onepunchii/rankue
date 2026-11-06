@@ -3198,7 +3198,7 @@ const vi: Dict = {
   "settings.notifNotice": "Thông báo và phản hồi",
   "settings.notifNoticeDesc": "Thông báo và phản hồi góp ý của bạn",
   "settings.notifPlayers": "Tay cơ theo dõi",
-  "settings.notifPlayersDesc": "Khi thứ hạng thế giới của tay cơ bạn theo dõi thay đổi",
+  "settings.notifPlayersDesc": "Khi thứ hạng thế giới hoặc mùa PBA của tay cơ bạn theo dõi thay đổi, hoặc khi vô địch",
   "settings.notifGolf": "Golf",
   "settings.notifGolfDesc": "Crew golf, vòng đấu và thông báo",
   "settings.notifGolfJoin": "Ghép nhóm & đặt sân",

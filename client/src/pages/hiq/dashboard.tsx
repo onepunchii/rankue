@@ -148,6 +148,24 @@ function HiqDashboardBilliards() {
         setLocation("/dashboard", { replace: true });
     }, [member, search, setLocation]);
 
+    // 가입하고 바로 점수판(2026-11-06 — 매장 · 당구 용어 화면의 '점수판 쓰기', shared/guestConversion SCOREBOARD_START_PATH).
+    // 새 회원에게 처음 묻는 종목 창(PrimarySportGate — 같은 조건)이 먼저다: 종목을 고른 뒤에 연다. 당구가 아닌 종목을 골랐으면 열지 않고 주소만 지운다.
+    const startParamRef = useRef(false);
+    useEffect(() => {
+        if (!member || startParamRef.current) return;
+        const params = new URLSearchParams(search.startsWith("?") ? search.slice(1) : search);
+        const mode = params.get("start");
+        if (mode !== "match" && mode !== "practice") return;
+        const m = member as typeof member & { primarySport?: string | null; golfAccess?: boolean };
+        if (!m.primarySport && m.golfAccess === true && locale === "ko") return;   // 종목 창이 떠 있다 — 고르면 다시 돈다
+        startParamRef.current = true;
+        setLocation("/dashboard", { replace: true });
+        if (m.primarySport && m.primarySport !== "BILLIARDS") return;
+        setMatchInvite(null);
+        setStartGameMode(mode);
+        toggleModal('game', true);
+    }, [member, search, setLocation, locale]);
+
     if (isLoading) {
         return (
             <div className="min-h-screen bg-surface-0 flex items-center justify-center">

@@ -3198,7 +3198,7 @@ const es: Dict = {
   "settings.notifNotice": "Avisos y respuestas",
   "settings.notifNoticeDesc": "Anuncios y respuestas a tus sugerencias",
   "settings.notifPlayers": "Jugadores seguidos",
-  "settings.notifPlayersDesc": "Cuando cambie el ranking mundial de un jugador que sigues",
+  "settings.notifPlayersDesc": "Cuando cambie el ranking mundial o de temporada PBA de un jugador que sigues, o gane",
   "settings.notifGolf": "Golf",
   "settings.notifGolfDesc": "Crews de golf, rondas y avisos",
   "settings.notifGolfJoin": "Grupos y reservas",

@@ -293,7 +293,12 @@ export async function syncPbaTournaments(opts: { seasons: number[] }): Promise<{
  * 일일 크론 — 현재 시즌 + 다음 시즌(4요청). 다음 시즌 일정은 5월 중순부터 올라오는데(2026-27 첫 대회 5/16 실측)
  * currentPbaSeason 은 6월에야 넘어가서, 다음 시즌까지 같이 봐야 개막 대회가 허브의 '다가오는 대회'에 뜬다.
  */
-export async function runPbaTournamentsCron() {
+/** 크론이 도는 시즌 — 지금 + 다음(관심 선수 우승 알림이 같은 시즌을 찍어 둔다) */
+export function pbaCronSeasons(): number[] {
     const cur = currentPbaSeason();
-    return syncPbaTournaments({ seasons: [cur, cur + 1] });
+    return [cur, cur + 1];
+}
+
+export async function runPbaTournamentsCron() {
+    return syncPbaTournaments({ seasons: pbaCronSeasons() });
 }
