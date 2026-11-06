@@ -17,6 +17,7 @@ import { goLogin } from "@/components/hiq/LoginGate";
 import { joinStoreFor } from "@/lib/joinStore";
 import { GuestCtaBar, askScoreboardSignup } from "@/components/hiq/GuestCtaBar";
 import { STORE_GUEST_BAR } from "@shared/guestConversion";
+import { STORE_CUP_STATUS, storeCupLine, storeCupPath } from "@shared/storeCup";
 import { StoreNearTable } from "@/components/hiq/stores/StoreTableMap";
 
 interface Listing {
@@ -283,6 +284,11 @@ export default function StoreListingPage() {
     staleTime: 10 * 60 * 1000,
     retry: false,
   });
+  // 이 매장 대회(2026-11-06 — shared/storeCup) — 인증한 매장만. 취소한 대회는 서버가 뺀다
+  const { data: cups = [] } = useQuery<Array<{ id: string; title: string; status: string; gameType: string; maxPlayers: number; bestOf: number; entryFee: number | null; startAt: string | null; participantCount?: number; championName?: string | null }>>({
+    queryKey: [`/api/hiq/store-cups?store=${code}`],
+    enabled: !!code && !!s?.claimed,
+  });
   // 좌표가 있어야 '이 근처'가 뜬다 — 폐업 안내의 '근처 영업 중인 곳' 단추도 같은 조건
   const hasCoords = !!s && s.latitude != null && s.longitude != null && Number.isFinite(Number(s.latitude)) && Number.isFinite(Number(s.longitude));
 
@@ -462,6 +468,25 @@ export default function StoreListingPage() {
                 <p className="font-bold">이번 달 이 매장에서 랭큐 점수판으로 {s.venue.monthGames}판{s.venue.live > 0 ? ` · 지금 ${s.venue.live}판 치는 중` : ""}</p>
                 {s.venue.king && <p className="mt-0.5 font-medium text-brand/80">👑 이달의 에버 왕 {s.venue.king.name} · {s.venue.king.avg.toFixed(3)}</p>}
               </div>
+            )}
+            {/* 이 매장 대회(2026-11-06) — 누르면 대회 화면(참가 신청 · 대진표) */}
+            {cups.length > 0 && locale === "ko" && (
+              <section className="mb-4" aria-label="이 매장 대회" data-testid="listing-cups">
+                <p className="text-[12px] font-bold text-black/55 mb-2">이 매장 대회</p>
+                <ul className="space-y-2">
+                  {cups.slice(0, 3).map((c) => (
+                    <li key={c.id}>
+                      <button type="button" onClick={() => setLocation(storeCupPath(c.id))} className="w-full rounded-2xl bg-white p-4 text-left shadow-[0_1px_2px_rgba(0,0,0,0.05)] active:scale-[0.99]">
+                        <span className="flex items-center gap-2">
+                          <span className={`rounded-full px-2 py-0.5 text-[11.5px] font-bold ${c.status === "recruiting" ? "bg-brand text-white" : "bg-black/[0.06] text-black/60"}`}>{STORE_CUP_STATUS[c.status] ?? c.status}</span>
+                          <span className="min-w-0 flex-1 truncate text-[15px] font-bold">{c.title}</span>
+                        </span>
+                        <span className="mt-1 block text-[12.5px] text-black/55 tabular-nums">{storeCupLine(c)} · 참가 {c.participantCount ?? 0}/{c.maxPlayers}명{c.championName ? ` · 🏆 ${c.championName}` : ""}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             )}
             {/* 사장님 공지(2026-11-06 — 예전엔 저장만 되고 어디에도 안 보였다) */}
             {s.owner?.notice && (

@@ -59,7 +59,6 @@ import HiqGolfer from "@/pages/hiq/golfer";
 import HiqWorldPlayer from "@/pages/hiq/world-player";
 import PartnerLogin from "@/pages/partner/login";
 import PartnerSettings from "@/pages/partner/settings";
-import CreateTournament from "@/pages/partner/create-tournament";
 import PartnerSubscription from "@/pages/partner/subscription";
 import PartnerTableQr from "@/pages/partner/table-qr";
 import Privacy from "@/pages/privacy";
@@ -143,6 +142,9 @@ const FramedPbaRecords = framed(HiqPbaRecords, { wide: true });
 
 // 당구 대회(2026-09-24) — 허브·PBA 시즌/대회·UMB 대회. 공유 메타(shared/tournamentMeta)가 길어 메인 청크에서 뺀다.
 const HiqTournaments = lazy(() => import("@/pages/hiq/tournaments"));
+// 매장 대회(2026-11-06 — shared/storeCup) — 참가 신청 · 대진표 · 내 경기
+const StoreCupPage = lazy(() => import("@/pages/store-cup"));
+const FramedStoreCup = framed(() => <Suspense fallback={<div className="min-h-[100dvh] bg-surface-0" aria-busy="true" />}><StoreCupPage /></Suspense>);
 const HiqTournamentDetail = lazy(() => import("@/pages/hiq/tournament-detail"));
 const tournamentsFallback = <div className="min-h-[100dvh] bg-surface-0" aria-busy="true" />;
 const FramedTournaments = framed(() => <Suspense fallback={tournamentsFallback}><HiqTournaments /></Suspense>, { wide: true });
@@ -606,6 +608,7 @@ function AppRoutes() {
       <Route path="/pba/records" component={FramedPbaRecords} />
       <Route path="/pba-player/:memCode" component={FramedPbaPlayer} />
       {/* 당구 대회(2026-09-24) — 공개. 봇에게는 server/seo/tournaments.ts. 상세 셋은 한 화면이 useRoute 로 가른다 */}
+      <Route path="/store-cup/:id" component={FramedStoreCup} />
       <Route path="/tournaments" component={FramedTournaments} />
       <Route path="/tournaments/pba/:season" component={FramedTournamentDetail} />
       <Route path="/tournaments/pba/:season/:tourCode" component={FramedTournamentDetail} />
@@ -619,7 +622,8 @@ function AppRoutes() {
       <Route path="/partner/login" component={PartnerLogin} />
       <Route path="/partner/dashboard" component={PartnerDashboard} />
       <Route path="/partner/settings" component={PartnerSettings} />
-      <Route path="/partner/create-tournament" component={CreateTournament} />
+      {/* 예전 매장 대회 만들기(저장만 됐다) → 대시보드 '대회' 탭의 새 만들기(2026-11-06 — shared/storeCup) */}
+      <Route path="/partner/create-tournament"><Redirect to="/partner/dashboard?tab=tournaments" replace /></Route>
       <Route path="/partner/subscription" component={PartnerSubscription} />
       <Route path="/partner/table-qr" component={PartnerTableQr} />
       <Route path="/admin/dashboard" component={AdminDashboard} />

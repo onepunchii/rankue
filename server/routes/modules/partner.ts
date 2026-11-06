@@ -13,6 +13,10 @@ import { storeReport } from "../../storage/storeDemand.js";
 import { renderStoreReportPng } from "../../services/storeReportCard.js";
 import { cleanStorePhotos } from "../../../shared/storePhotos.js";
 import { venueOwnerStats } from "../../storage/storeVenue.js";
+import { STORE_CUP_ERROR_TEXT, cleanStoreCup, storeCupPath } from "../../../shared/storeCup.js";
+import { screenCrewBody } from "../../utils/crewModeration.js";
+import { notificationService } from "../../services/notificationService.js";
+import { msg } from "../../lib/i18n.js";
 
 const router = Router();
 
@@ -386,6 +390,91 @@ router.patch("/members/:id/memo", requirePartner, asyncHandler(async (req: any, 
     const ok = await storage.users.setStoreMemberMemo(store.id, req.params.id, memo);
     if (!ok) return sendError(res, 404, "우리 매장 회원이 아닙니다");
     return sendSuccess(res, { success: true, memo });
+}));
+
+// ── 매장 대회(2026-11-06 — shared/storeCup): 크루 대회의 표 · 대진 엔진을 그대로 쓴다(store_id) ──────────────
+/** 우리 매장의 대회만 — 다른 매장 · 크루 대회는 없는 것으로 */
+async function ownCup(storeId: string, id: string) {
+    if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+    const d = await storage.tournaments.getDetail(id);
+    return d && d.tournament.storeId === storeId ? d : null;
+}
+
+router.get("/cups", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, await storage.tournaments.listByStore(store.id));
+}));
+
+router.post("/cups", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    // 대회를 연 사람 = 사장님의 랭큐 회원(참가 알림 · 대진 경기가 회원 기준이다). 예전 번호 + PIN 으로만 들어온 사장님은 계정이 없다
+    const owner = await storage.getMemberByProfileId(req.partnerProfileId);
+    if (!owner) return sendError(res, 400, "랭큐 계정으로 들어와야 대회를 열 수 있어요");
+    const c = cleanStoreCup(req.body, Date.now());
+    if (!c.ok) return sendError(res, 400, STORE_CUP_ERROR_TEXT[c.error]);
+    // 손님에게 공개되는 글 — 크루 대회와 같은 금칙어 거르기
+    const screened = screenCrewBody({ title: c.value.title, description: c.value.description ?? undefined, prize: c.value.prize ?? undefined }, ["title", "description", "prize"] as const);
+    if (!screened.ok) return sendError(res, 400, screened.reason);
+    const f = screened.value.fields;
+    const cup = await storage.tournaments.create({
+        storeId: store.id, crewId: null, creatorId: owner.id,
+        title: f.title ?? c.value.title, description: f.description ?? null, prize: f.prize ?? null,
+        gameType: c.value.gameType, format: "knockout", bestOf: c.value.bestOf, maxPlayers: c.value.maxPlayers,
+        recruitEnd: c.value.recruitEnd, startAt: c.value.startAt, entryFee: c.value.entryFee,
+    });
+    return sendSuccess(res, cup);
+}));
+
+router.get("/cups/:id", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    const d = await ownCup(store.id, req.params.id);
+    if (!d) return sendError(res, 404, "대회를 찾을 수 없어요");
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, d);
+}));
+
+// 대진 만들기 — 접수 마감 뒤 사장님이 누른다(시드 = 종목의 RP 순 · 4명 미만은 풀리그). 참가자에게 알림
+router.post("/cups/:id/draw", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    const d = await ownCup(store.id, req.params.id);
+    if (!d) return sendError(res, 404, "대회를 찾을 수 없어요");
+    if (d.participants.length < 2) return sendError(res, 400, "참가자가 2명 이상이어야 대진을 만들 수 있어요");
+    const result = await storage.tournaments.draw(d.tournament.id, { shuffle: !!req.body?.shuffle });
+    for (const p of d.participants) {
+        await notificationService.sendAndSaveNotification({
+            memberId: p.memberId,
+            title: msg("notif.crew.tournamentDraw.title"),
+            body: msg("notif.crew.tournamentDraw.body", { title: d.tournament.title }),
+            category: "BILLIARDS", type: "TOURNAMENT",
+            params: { url: storeCupPath(d.tournament.id), cupId: d.tournament.id },
+        }).catch((e) => console.error("[StoreCup] 대진 알림:", (e as Error)?.message));
+    }
+    return sendSuccess(res, result);
+}));
+
+router.post("/cups/:id/cancel", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    const d = await ownCup(store.id, req.params.id);
+    if (!d) return sendError(res, 404, "대회를 찾을 수 없어요");
+    if (d.tournament.status === "ended") return sendError(res, 409, "끝난 대회는 취소할 수 없어요");
+    await storage.tournaments.update(d.tournament.id, { status: "canceled" });
+    return sendSuccess(res, { canceled: true });
+}));
+
+// 참가비 받음 체크 — 돈은 랭큐가 받지 않는다(사장님이 현장에서 받고 체크만)
+router.patch("/cups/:id/fee", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    const d = await ownCup(store.id, req.params.id);
+    if (!d) return sendError(res, 404, "대회를 찾을 수 없어요");
+    const ok = await storage.tournaments.setFeePaid(d.tournament.id, String(req.body?.memberId ?? ""), !!req.body?.paid);
+    return ok ? sendSuccess(res, { paid: !!req.body?.paid }) : sendError(res, 404, "참가자를 찾을 수 없어요");
 }));
 
 // GET /partner/tournaments — 우리 매장이 연 대회(최근 10개, 참가자 수 포함)

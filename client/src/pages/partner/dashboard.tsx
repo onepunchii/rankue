@@ -30,6 +30,7 @@ import { HiqStore } from "../../../../shared/schema";
 import { useRef, useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { StoreCupsTab } from "./StoreCups";
 import html2canvas from "html2canvas";
 import { LucideLock as LockIcon } from "@/lib/icons";
 import { isNativeApp } from "@/lib/nativeBridge";
@@ -66,11 +67,6 @@ type StoreStats = {
     active30?: number;
     dormant30?: number;
     visits7?: { date: string; count: number }[];
-};
-
-type StoreTournament = {
-    id: string; title: string; status: string; gameType: string;
-    maxPlayers: number; startDate: string; participants: number;
 };
 
 type PartnerStore = HiqStore & {
@@ -119,13 +115,6 @@ function getTierName(rating: number) {
     return "Bronze";
 }
 
-const TOURNAMENT_STATUS: Record<string, { label: string; cls: string }> = {
-    recruiting: { label: "모집 중", cls: "bg-brand/10 text-brand" },
-    preparing: { label: "준비 중", cls: "bg-amber-500/10 text-amber-700" },
-    ongoing: { label: "진행 중", cls: "bg-blue-500/10 text-blue-700" },
-    ended: { label: "끝남", cls: "bg-black/[0.05] text-black/45" },
-};
-
 // --- 작은 조각들 ---
 function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
     return <div className={`bg-white rounded-[1.25rem] border border-black/[0.06] shadow-[0_1px_2px_rgba(0,0,0,0.04)] ${className}`}>{children}</div>;
@@ -169,7 +158,11 @@ export default function PartnerDashboard() {
     const [, setLocation] = useLocation();
     const { toast } = useToast();
     const posterRef = useRef<HTMLDivElement>(null);
-    const [tab, setTabState] = useState<Tab>("home");
+    // ?tab=tournaments 처럼 바로 그 탭으로(대회 참가 알림이 여기로 온다)
+    const [tab, setTabState] = useState<Tab>(() => {
+        const q = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("tab") : null;
+        return q === "members" || q === "tournaments" || q === "promo" ? q : "home";
+    });
     const [searchQuery, setSearchQuery] = useState("");
     const [memberFilter, setMemberFilter] = useState<MemberFilter>("all");
     const [memberSort, setMemberSort] = useState<MemberSort>("recent");
@@ -203,10 +196,6 @@ export default function PartnerDashboard() {
     const { data: members = [], isLoading: membersLoading } = useQuery<StoreMember[]>({ queryKey: MEMBERS_KEY, enabled: !!store });
     // 테이블 QR 로 우리 매장에서 친 경기 · 손님(2026-11-06 — shared/storeVenue)
     const { data: venue } = useQuery<VenueOwnerStats>({ queryKey: ["/api/hiq/partner/venue-stats"], enabled: !!store });
-    const { data: tournaments = [], isLoading: tournamentsLoading } = useQuery<StoreTournament[]>({
-        queryKey: ["/api/hiq/partner/tournaments"],
-        enabled: !!store && tab === "tournaments",
-    });
 
     const openMember = openId ? members.find((m) => m.id === openId) ?? null : null;
     useEffect(() => { setMemoDraft(openMember?.memo ?? ""); }, [openMember?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -563,12 +552,12 @@ export default function PartnerDashboard() {
                         </section>
 
                         {/* 대회 만들기 */}
-                        <button onClick={() => setLocation("/partner/create-tournament")}
+                        <button onClick={() => setTab("tournaments")}
                             className="w-full rounded-[1.25rem] bg-brand p-5 flex items-center justify-between text-left shadow-[0_4px_16px_rgba(0,98,65,0.18)] active:scale-[0.99] transition-transform">
                             <span>
                                 <span className="block text-[12px] font-bold text-white/80">우리 매장 이벤트</span>
                                 <span className="block mt-0.5 text-[19px] font-bold text-white">매장 대회 개최하기</span>
-                                <span className="block mt-0.5 text-[12.5px] text-white/85">3분 만에 대회 만들고 대진표 자동 생성</span>
+                                <span className="block mt-0.5 text-[12.5px] text-white/85">손님은 랭큐에서 신청 · 대진표 자동 · 결과는 점수판으로</span>
                             </span>
                             <span className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
                                 <LucideTrophy className="w-6 h-6 text-[#f3d27a]" />
@@ -663,43 +652,8 @@ export default function PartnerDashboard() {
                 )}
 
                 {tab === "tournaments" && (
-                    <>
-                        <button onClick={() => setLocation("/partner/create-tournament")}
-                            className="w-full h-14 rounded-2xl bg-brand text-white font-bold text-[16px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
-                            <LucidePlus className="w-5 h-5" /> 새 대회 만들기
-                        </button>
-                        {/* 2026-11-06: 지금은 만들어 두기만 된다 — 손님이 보는 곳 · 참가 신청 · 대진표가 아직 없다. 약속과 실제를 맞춘다(사장님 도구 '바로 고칠 것' 4번) */}
-                        <p className="rounded-xl bg-amber-500/[0.1] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-amber-900 break-keep" data-testid="partner-tournament-soon">
-                            지금은 대회 정보를 만들어 두는 단계예요. 손님 참가 신청 · 대진표 · 매장 페이지 공개는 곧 열려요.
-                        </p>
-                        <section>
-                            <SectionTitle>우리 매장 대회</SectionTitle>
-                            <Card className="overflow-hidden">
-                                {tournamentsLoading ? (
-                                    <p className="p-8 text-center text-black/40 text-sm">불러오는 중…</p>
-                                ) : tournaments.length === 0 ? (
-                                    <p className="p-8 text-center text-black/40 text-sm">아직 연 대회가 없어요. 위 버튼으로 첫 대회를 만들어 보세요.</p>
-                                ) : (
-                                    <ul className="divide-y divide-black/[0.06]">
-                                        {tournaments.map((t) => {
-                                            const st = TOURNAMENT_STATUS[t.status] ?? TOURNAMENT_STATUS.recruiting;
-                                            return (
-                                                <li key={t.id} className="px-4 py-3.5 flex items-center gap-3">
-                                                    <span className="min-w-0 flex-1">
-                                                        <span className="block font-bold text-[15px] truncate">{t.title}</span>
-                                                        <span className="block text-[12.5px] text-black/50 tabular-nums">
-                                                            {t.startDate ? KST_MD.format(new Date(t.startDate)) : "-"} · {t.gameType === "4c" ? "4구" : t.gameType === "3c" ? "3쿠션" : t.gameType} · 참가 {t.participants}/{t.maxPlayers}명
-                                                        </span>
-                                                    </span>
-                                                    <span className={`shrink-0 px-2 py-1 rounded-lg text-[12px] font-bold ${st.cls}`}>{st.label}</span>
-                                                </li>
-                                            );
-                                        })}
-                                    </ul>
-                                )}
-                            </Card>
-                        </section>
-                    </>
+                    // 매장 대회(2026-11-06 — shared/storeCup): 만들기 · 참가자 · 참가비 체크 · 대진 · 취소. 손님은 매장 페이지 → 대회 화면에서 신청
+                    <StoreCupsTab />
                 )}
 
                 {tab === "promo" && (

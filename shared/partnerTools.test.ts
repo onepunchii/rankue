@@ -67,8 +67,8 @@ describe("사장님 대시보드", () => {
         const ui = d.split("\n").filter((l) => !/^\s*(\*|\/\/|\{\/\*)/.test(l));
         expect(ui.filter((l) => l.includes("방문"))).toEqual([]);
     });
-    it("대회 탭은 아직 만들어 두기만 된다고 말한다 · 프리미엄은 당분간 모두에게", () => {
-        expect(d).toContain('data-testid="partner-tournament-soon"');
+    it("대회 탭은 실제 매장 대회(같은 날 ②로 '곧 열려요' 안내를 대신했다) · 프리미엄은 당분간 모두에게", () => {
+        expect(d).toContain("<StoreCupsTab />");
         expect(d).toContain("export const PARTNER_PREMIUM_OPEN = true;");
         expect(d).toContain("const isBasic = !PARTNER_PREMIUM_OPEN && !paidPremium;");
         expect(d).toContain('{ label: "매장 사진", done:');

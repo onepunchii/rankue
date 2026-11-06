@@ -10,6 +10,7 @@ import authRouter from "./modules/auth.js";
 import handoffRouter from "./modules/handoff.js";
 import adminRouter from "./modules/admin.js";
 import partnerRouter from "./modules/partner.js";
+import storeCupsRouter from "./modules/storeCups.js";
 import memberRouter from "./modules/member.js";
 import gameRouter from "./modules/game.js";
 import notificationRouter from "./modules/notification.js";
@@ -82,6 +83,8 @@ router.use("/admin", adminRouter);
 // 4. Partner (/partner)
 // - Handles /partner/login, /partner/store, etc.
 router.use("/partner", partnerRouter);
+// 매장 대회 — 손님 쪽(2026-11-06 — shared/storeCup): 목록 · 대회 화면 · 참가 신청
+router.use("/store-cups", storeCupsRouter);
 
 // --- Core / Root Modules ---
 

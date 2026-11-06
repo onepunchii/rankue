@@ -32,6 +32,36 @@ export class TournamentRepository {
      * 크루의 대회 목록 — 진행중 → 접수중 → 대진 확정 → 종료 순(shared/crewTournamentRules). 참가자 수를 함께 센다.
      * 접수중을 대진 확정 위로 올린 이유: 접수중은 크루원이 "지금 신청해야" 하는 대회다(2026-09-26 검토).
      */
+/**
+     * 매장 대회 목록(2026-11-06 — shared/storeCup) — 크루 대회와 같은 순서 · 같은 꼴(참가자 수 · 우승자 이름).
+     * 취소한 대회는 빼고 최근 20개.
+     */
+    async listByStore(storeId: string) {
+        const raw = await db
+            .select({ t: hiqCrewTournaments, championName: hiqMembers.name })
+            .from(hiqCrewTournaments)
+            .leftJoin(hiqMembers, eq(hiqMembers.id, hiqCrewTournaments.championId))
+            .where(and(eq(hiqCrewTournaments.storeId, storeId), sql`${hiqCrewTournaments.status} <> 'canceled'`))
+            .orderBy(desc(hiqCrewTournaments.createdAt))
+            .limit(20);
+        const ids = raw.map((r) => r.t.id);
+        const counts = ids.length
+            ? await db.select({ tid: hiqCrewTournamentParticipants.tournamentId, n: sql<number>`count(*)::int` })
+                .from(hiqCrewTournamentParticipants).where(inArray(hiqCrewTournamentParticipants.tournamentId, ids))
+                .groupBy(hiqCrewTournamentParticipants.tournamentId)
+            : [];
+        const countOf = new Map(counts.map((c) => [c.tid, Number(c.n)]));
+        return raw.map((r) => ({ ...r.t, championName: r.championName, participantCount: countOf.get(r.t.id) ?? 0 }));
+    }
+
+    /** 참가비를 받았다 · 안 받았다(매장 대회의 사장님 체크) — 그 대회의 참가자 줄만 */
+    async setFeePaid(tournamentId: string, memberId: string, paid: boolean): Promise<boolean> {
+        const r = await db.update(hiqCrewTournamentParticipants).set({ feePaid: paid })
+            .where(and(eq(hiqCrewTournamentParticipants.tournamentId, tournamentId), eq(hiqCrewTournamentParticipants.memberId, memberId)))
+            .returning({ id: hiqCrewTournamentParticipants.id });
+        return r.length > 0;
+    }
+
     async listByCrew(crewId: string) {
         // 끝난 대회는 목록에서도 우승자가 제일 중요한 정보라 이름을 같이 붙인다.
         const raw = await db
@@ -76,6 +106,8 @@ export class TournamentRepository {
                 wins: hiqCrewTournamentParticipants.wins,
                 losses: hiqCrewTournamentParticipants.losses,
                 registeredAt: hiqCrewTournamentParticipants.registeredAt,
+                // 매장 대회의 참가비 체크(2026-11-06) — 사장님 화면만 쓴다(공개 응답에서는 뺀다)
+                feePaid: hiqCrewTournamentParticipants.feePaid,
                 nickname: hiqMembers.name,
                 rating3c: hiqMembers.rating3c,
                 rating4c: hiqMembers.rating4c,
@@ -411,12 +443,17 @@ export class TournamentRepository {
         if (tournament.status === "ended" || tournament.status === "canceled") return null;
 
         // 두 선수 다 크루 정식 멤버여야 한다 — 호출자만 보면 상대가 탈퇴했어도 통과했다.
-        const rows = await db.select().from(hiqCrewMembers).where(and(
-            eq(hiqCrewMembers.crewId, tournament.crewId),
-            inArray(hiqCrewMembers.memberId, [match.p1Id, match.p2Id]),
-        ));
-        const active = rows.filter((r) => r.role !== "pending").map((r) => r.memberId);
-        if (!active.includes(match.p1Id) || !active.includes(match.p2Id)) return null;
+        // 매장 대회(2026-11-06 — store_id, crew_id 없음)는 그 매장의 공개 대회라 크루를 보지 않는다(참가 신청 = 자격)
+        if (tournament.crewId) {
+            const rows = await db.select().from(hiqCrewMembers).where(and(
+                eq(hiqCrewMembers.crewId, tournament.crewId),
+                inArray(hiqCrewMembers.memberId, [match.p1Id, match.p2Id]),
+            ));
+            const active = rows.filter((r) => r.role !== "pending").map((r) => r.memberId);
+            if (!active.includes(match.p1Id) || !active.includes(match.p2Id)) return null;
+        } else if (!tournament.storeId) {
+            return null;
+        }
 
         const opponentId = match.p1Id === callerId ? match.p2Id : match.p1Id;
         return { tournamentId: tournament.id, matchId: match.id, opponentId, crewId: tournament.crewId };

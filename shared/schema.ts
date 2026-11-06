@@ -608,8 +608,12 @@ export const hiqPollVotes = pgTable("hiq_poll_votes", {
 // 대진에서 경기를 시작할 때 기존 매칭 화면에서 그때그때 맞춘다.
 export const hiqCrewTournaments = pgTable("hiq_crew_tournaments", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
-  crewId: uuid("crew_id").references(() => hiqCrews.id, { onDelete: 'cascade' }).notNull(),
+  // 크루 대회면 crew_id, 매장 대회(2026-11-06 — shared/storeCup)면 store_id — 둘 중 하나(코드가 지킨다, migrations/store_cups.sql)
+  crewId: uuid("crew_id").references(() => hiqCrews.id, { onDelete: 'cascade' }),
+  storeId: uuid("store_id").references(() => hiqStores.id, { onDelete: 'cascade' }),
   creatorId: uuid("creator_id").references(() => hiqMembers.id).notNull(),
+  /** 참가비(원) — 매장 대회만. 돈은 랭큐가 받지 않는다(사장님이 현장에서 받고 '받음'만 체크) */
+  entryFee: integer("entry_fee"),
 
   title: text("title").notNull(),
   description: text("description"),
@@ -644,6 +648,8 @@ export const hiqCrewTournamentParticipants = pgTable("hiq_crew_tournament_partic
   status: text("status", { enum: ["active", "eliminated", "winner"] }).default("active").notNull(),
   wins: integer("wins").default(0).notNull(),   // 풀리그 순위 집계용
   losses: integer("losses").default(0).notNull(),
+  /** 매장 대회의 참가비를 받았나 — 사장님이 체크만 한다(2026-11-06) */
+  feePaid: boolean("fee_paid").default(false).notNull(),
 
   registeredAt: timestamp("registered_at").defaultNow().notNull(),
 }, (table) => [
