@@ -203,6 +203,10 @@ export const hiqClubMembers = pgTable("hiq_club_members", {
 export const hiqGames = pgTable("hiq_games", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   storeId: uuid("store_id").references(() => hiqStores.id).notNull(), // 게임이 발생한 장소
+  // 테이블 QR 로 연 경기의 매장 · 테이블(2026-11-06 — shared/storeVenue, migrations/hiq_games_venue.sql).
+  // store_id 는 지금도 '회원의 가입 매장'이다(이름과 달리) — 실제로 친 곳은 이 칸이다. QR 없이 연 경기는 비어 있다
+  venueStoreId: uuid("venue_store_id").references(() => hiqStores.id),
+  tableNo: integer("table_no"),
 
   gameMode: text("game_mode", { enum: ["match", "practice", "tournament"] }).notNull(),
   gameType: text("game_type", { enum: ["3c", "4c", "golf"] }).notNull(),

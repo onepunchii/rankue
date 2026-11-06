@@ -10,6 +10,7 @@ import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { packStoreDots, type StoreDotsWire } from "../../../shared/storeDots.js";
 import { storePhotosOf } from "../../../shared/storePhotos.js";
+import { venuePublic } from "../../storage/storeVenue.js";
 
 // 매장 디렉터리 공개 API — 지역 검색("김해 당구장") SEO 대상이라 비로그인 읽기.
 // 수정 제안·이용자 제보는 방문자가 앱 계정 없이도 보낼 수 있어야 해서 비로그인 허용.
@@ -230,7 +231,13 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
         }
     }
 
-    return sendSuccess(res, { ...pub, crews, honor, owner });
+    // 테이블 QR 로 이 매장에서 친 경기(2026-11-06 — shared/storeVenue): 이번 달 판 수 · 지금 치는 판 · 이달의 에버 왕. 인증한 매장만
+    let venue: Awaited<ReturnType<typeof venuePublic>> | null = null;
+    if (row.claimedStoreId) {
+        try { venue = await venuePublic(row.claimedStoreId); } catch (e) { console.warn("[listings] venue 계산 실패:", (e as Error)?.message); }
+    }
+
+    return sendSuccess(res, { ...pub, crews, honor, owner, venue });
 }));
 
 // POST /listings/:code/claim — 사장님 클레임 신청 (수동 승인 대기열)

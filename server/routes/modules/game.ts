@@ -6,6 +6,11 @@ import { notificationService } from "../../services/notificationService.js";
 import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { msg } from "../../lib/i18n.js";
+import { db } from "../../db.js";
+import { hiqStores } from "../../../shared/schema.js";
+import { eq } from "drizzle-orm";
+import { venueFromBody } from "../../../shared/storeVenue.js";
+import { isSystemStore } from "../../../shared/systemStores.js";
 
 const router = Router();
 
@@ -37,6 +42,19 @@ router.get("/branding/:slug", asyncHandler(async (req: any, res: any) => {
     const data = await hiqService.getBranding(req.params.slug);
     return sendSuccess(res, data);
 }));
+
+/** 경기 시작 요청의 venue → 인증 매장 id · 테이블. 시스템 매장(hiq · global) · 사장님 없는 매장 · 꼴이 틀린 것은 null */
+async function resolveVenue(raw: unknown): Promise<{ storeId: string; table: number } | null> {
+    const v = venueFromBody(raw);
+    if (!v || isSystemStore(v.slug)) return null;
+    try {
+        const [st] = await db.select({ id: hiqStores.id, ownerId: hiqStores.ownerId }).from(hiqStores).where(eq(hiqStores.slug, v.slug)).limit(1);
+        return st?.ownerId ? { storeId: st.id, table: v.table } : null;
+    } catch (e) {
+        console.warn("[game] venue 확인 실패:", (e as Error)?.message);
+        return null;
+    }
+}
 
 // --- Game Routes ---
 
@@ -172,10 +190,15 @@ router.post("/game/start", requireAuth, asyncHandler(async (req: AuthRequest, re
         startData.player1Target = Math.max(1, Number(startData.targetScore) || 15);
     }
 
+    // 테이블 QR 로 연 경기(2026-11-06 — shared/storeVenue): 그 매장 · 테이블을 같이 적는다. 사장님이 있는 실제 매장만(시스템 매장 · 없는 매장은 비운다).
+    // 소속(storeId = 가입 매장)은 그대로 — '어디서 쳤나'만 더한다. 장소가 틀려도 경기는 그대로 만든다
+    const venue = await resolveVenue(req.body?.venue);
+
     const game = await storage.startHiqGame({
         ...startData,
         status: "playing_base",
         storeId: member.storeId,
+        ...(venue ? { venueStoreId: venue.storeId, tableNo: venue.table } : {}),
         player1Id,
         player2Id,
         player3Id,

@@ -12,6 +12,7 @@ import { partnerLeads, storeListings } from "../../../shared/schema.js";
 import { storeReport } from "../../storage/storeDemand.js";
 import { renderStoreReportPng } from "../../services/storeReportCard.js";
 import { cleanStorePhotos } from "../../../shared/storePhotos.js";
+import { venueOwnerStats } from "../../storage/storeVenue.js";
 
 const router = Router();
 
@@ -358,6 +359,14 @@ router.get("/page-report.png", requirePartner, asyncHandler(async (req: any, res
     res.setHeader("Content-Type", "image/png");
     res.setHeader("Cache-Control", "private, max-age=300");
     return res.send(png);
+}));
+
+// GET /partner/venue-stats — 테이블 QR 로 우리 매장에서 친 경기 · 손님(2026-11-06 — shared/storeVenue, storage/storeVenue)
+router.get("/venue-stats", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, await venueOwnerStats(store.id));
 }));
 
 // GET /partner/members

@@ -32,6 +32,8 @@ interface Listing {
   honor?: { founder: string | null; regular: { name: string; games: number } | null } | null;
   /** 사장님이 직접 적은 것(2026-11-06) — 공지 · 주차 · 매장 사진. 인증한 매장만 */
   owner?: { notice: string | null; parking: string | null; photos: string[] } | null;
+  /** 테이블 QR 로 이 매장에서 친 경기(2026-11-06) — 이번 달 판 수 · 지금 치는 판 · 이달의 에버 왕. 인증한 매장만 */
+  venue?: { monthGames: number; live: number; king: { name: string; avg: number; games: number } | null } | null;
 }
 
 // 페이지 문구 — 디렉터리는 한국 콘텐츠지만 라벨은 5개 언어 (stores.tsx와 같은 패턴)
@@ -453,6 +455,13 @@ export default function StoreListingPage() {
                   ))}
                 </div>
               </section>
+            )}
+            {/* 이 매장에서 랭큐 점수판으로 친 경기(2026-11-06 — 테이블 QR). 한 판이라도 있을 때만 */}
+            {s.venue && s.venue.monthGames > 0 && locale === "ko" && (
+              <div className="mb-4 rounded-2xl bg-brand/[0.07] px-4 py-3 text-[13.5px] text-brand break-keep" data-testid="listing-venue">
+                <p className="font-bold">이번 달 이 매장에서 랭큐 점수판으로 {s.venue.monthGames}판{s.venue.live > 0 ? ` · 지금 ${s.venue.live}판 치는 중` : ""}</p>
+                {s.venue.king && <p className="mt-0.5 font-medium text-brand/80">👑 이달의 에버 왕 {s.venue.king.name} · {s.venue.king.avg.toFixed(3)}</p>}
+              </div>
             )}
             {/* 사장님 공지(2026-11-06 — 예전엔 저장만 되고 어디에도 안 보였다) */}
             {s.owner?.notice && (

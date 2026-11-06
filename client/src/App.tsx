@@ -61,6 +61,7 @@ import PartnerLogin from "@/pages/partner/login";
 import PartnerSettings from "@/pages/partner/settings";
 import CreateTournament from "@/pages/partner/create-tournament";
 import PartnerSubscription from "@/pages/partner/subscription";
+import PartnerTableQr from "@/pages/partner/table-qr";
 import Privacy from "@/pages/privacy";
 import AccountDelete from "@/pages/account-delete";
 import Support from "@/pages/support";
@@ -620,6 +621,7 @@ function AppRoutes() {
       <Route path="/partner/settings" component={PartnerSettings} />
       <Route path="/partner/create-tournament" component={CreateTournament} />
       <Route path="/partner/subscription" component={PartnerSubscription} />
+      <Route path="/partner/table-qr" component={PartnerTableQr} />
       <Route path="/admin/dashboard" component={AdminDashboard} />
 
       {/* 호환성 라우트 */}

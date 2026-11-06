@@ -34,7 +34,7 @@ describe("매장 사진", () => {
         expect(partner).toContain("if (patch.tableLarge !== undefined) sync.tableLarge =");
         const listings = read("server/routes/modules/listings.ts");
         expect(listings).toContain("owner = { notice: st.notice?.trim().slice(0, 500) || null, parking: st.parking?.trim().slice(0, 120) || null, photos: storePhotosOf(st.images) };");
-        expect(listings).toContain("return sendSuccess(res, { ...pub, crews, honor, owner });");
+        expect(listings).toContain("return sendSuccess(res, { ...pub, crews, honor, owner, venue });");
         const page = read("client/src/pages/store-listing.tsx");
         for (const id of ["listing-owner-photos", "listing-owner-notice", "listing-owner-parking"]) expect(page).toContain(`data-testid="${id}"`);
         expect(read("client/src/pages/partner/settings.tsx")).toContain("<StorePhotos images={(store as { images?: unknown }).images} />");

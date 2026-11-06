@@ -12,6 +12,7 @@ import { useT } from "@/lib/i18n";
 import { TARGET_INPUT_MAX, TARGET_INPUT_MIN, commitTargetText, sanitizeTargetText, stepTarget } from "@shared/targetInput";
 import { scoreboardTarget } from "@shared/realHandicap";
 import { RealMedal } from "@/components/hiq/RealMedal";
+import { clearVenue, currentVenue } from "@/lib/venue";
 
 // Player slot → billiard ball color (white 수구, yellow, red, red — the 4구 set).
 const SLOT_BALL: BallColor[] = ["white", "yellow", "red", "red"];
@@ -339,6 +340,10 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
         confirmStart, isStarting
     } = useGameCreation({ member, history, initialMode, initialType, open, tournamentMatch, initialCode, initialGameType, initialSeats, initialTarget });
 
+    // 테이블 QR 의 '지금 여기서 친다' — 창을 열 때마다 다시 읽는다(대진 경기는 매장 표시를 싣지 않는다)
+    const [venue, setVenue] = useState(() => (tournamentMatch ? null : currentVenue()));
+    useEffect(() => { if (open) setVenue(tournamentMatch ? null : currentVenue()); }, [open, tournamentMatch]);
+
     // Keep a live ref to initializeGame so the open-effect can invoke the latest version
     // WITHOUT depending on it (initializeGame is recreated whenever gameType / numberOfPlayers
     // change, and re-running it mid-session would wipe joined opponents and regenerate the PIN).
@@ -390,6 +395,14 @@ export const GameCreationModal = ({ open, onOpenChange, member, history, initial
 
                 <div className="flex-1 overflow-y-auto min-h-0 scrollbar-hide p-6 pb-32" onPointerUp={dismissKeyboardOnEmptyTap}>
                     <div className="max-w-md md:max-w-4xl mx-auto transition-all duration-300">
+                        {/* 테이블 QR 로 연 경기(2026-11-06 — shared/storeVenue): 이 경기에 매장 · 테이블이 같이 적힌다. 매장을 떠났으면 ✕ */}
+                        {venue && (
+                            <div className="mb-4 flex items-center gap-2 rounded-xl bg-brand/[0.08] px-3.5 py-2.5 text-[13.5px] font-semibold text-brand" data-testid="game-venue-chip">
+                                <span className="min-w-0 flex-1 truncate">📍 {venue.name || venue.slug} · {venue.table}번 테이블에서 치는 경기</span>
+                                <button type="button" onClick={() => { clearVenue(); setVenue(null); }} aria-label="이 매장에서 치는 경기가 아니에요"
+                                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-brand/70 hover:bg-brand/10">✕</button>
+                            </div>
+                        )}
                         <div className="flex flex-col gap-1 mb-6">
                             {/* 대진 경기는 상대가 이미 확정돼 PIN 이 없다. 그대로 두면 핀 카드가
                                 영원히 "핀 생성 중..."으로 남는다. */}

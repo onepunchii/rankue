@@ -5,6 +5,8 @@ import { HiqMember, HiqGameHistory } from "@shared/schema";
 import { SCOREBOARD_DEFAULT_TARGET, scoreboardTarget } from "@shared/realHandicap";
 import { useToast } from "@/hooks/use-toast";
 import { useT } from "@/lib/i18n";
+import { currentVenue } from "@/lib/venue";
+import { venueBody } from "@shared/storeVenue";
 
 export type PlayerType = 'member' | 'guest';
 
@@ -386,6 +388,8 @@ export const useGameCreation = ({
                 targetScore: players[0].target,
                 // 서버가 이 id 로 대진을 확인하고 상대를 직접 앉힌다(클라 값은 믿지 않는다).
                 ...(tournamentMatch ? { tournamentMatchId: tournamentMatch.matchId } : {}),
+                // 테이블 QR 로 온 경기면 그 매장 · 테이블(2026-11-06 — shared/storeVenue). 서버가 인증 매장인지 다시 본다. 대진 경기는 싣지 않는다
+                ...(tournamentMatch ? {} : venueBody(currentVenue())),
             };
 
             const game = await apiRequest("/api/hiq/game/start", {

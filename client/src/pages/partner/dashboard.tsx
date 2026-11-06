@@ -78,6 +78,7 @@ type PartnerStore = HiqStore & {
     impersonating?: boolean;
 };
 
+type VenueOwnerStats = { today: number; month: number; live: number; monthPlayers: number; players: { memberId: string; name: string; monthGames: number; lastAt: string }[]; king: { name: string; avg: number; games: number } | null };
 type Tab = "home" | "members" | "tournaments" | "promo";
 type MemberFilter = "all" | "month" | "dormant" | "new" | "memo";
 type MemberSort = "recent" | "visits" | "joined" | "skill";
@@ -200,6 +201,8 @@ export default function PartnerDashboard() {
     const { data: pageStats } = useQuery<PageStats | null>({ queryKey: ["/api/hiq/partner/page-stats"], enabled: !!store?.listing });
     const [reportOpen, setReportOpen] = useState(false);
     const { data: members = [], isLoading: membersLoading } = useQuery<StoreMember[]>({ queryKey: MEMBERS_KEY, enabled: !!store });
+    // 테이블 QR 로 우리 매장에서 친 경기 · 손님(2026-11-06 — shared/storeVenue)
+    const { data: venue } = useQuery<VenueOwnerStats>({ queryKey: ["/api/hiq/partner/venue-stats"], enabled: !!store });
     const { data: tournaments = [], isLoading: tournamentsLoading } = useQuery<StoreTournament[]>({
         queryKey: ["/api/hiq/partner/tournaments"],
         enabled: !!store && tab === "tournaments",
@@ -430,6 +433,38 @@ export default function PartnerDashboard() {
                                     <p className="text-[12px] text-black/45 font-bold mb-2">최근 7일 앱을 연 회원</p>
                                     <VisitBars days={stats.visits7} />
                                 </div>
+                            )}
+                        </Card>
+
+                        {/* 우리 매장에서 친 경기(2026-11-06 — 테이블 QR). 위의 '앱을 연 회원'과 달리 실제로 이 매장 테이블에서 친 판이다 */}
+                        <Card className="p-5">
+                            <div className="flex items-center justify-between" data-testid="partner-venue-card">
+                                <p className="text-[13px] font-bold text-black/55">우리 매장에서 친 경기 <span className="font-medium text-black/40">· 테이블 QR</span></p>
+                                <button onClick={() => setLocation("/partner/table-qr")} className="text-[12.5px] font-bold text-brand">QR 뽑기</button>
+                            </div>
+                            {venue && venue.month > 0 ? (
+                                <>
+                                    <div className="mt-2 grid grid-cols-3 gap-2 tabular-nums">
+                                        {([["오늘", venue.today, "판"], ["이번 달", venue.month, "판"], ["이번 달 손님", venue.monthPlayers, "명"]] as const).map(([k, v, u]) => (
+                                            <div key={k}><p className="text-[11.5px] font-bold text-black/45">{k}</p><p className="text-[22px] font-black">{v}<span className="ml-0.5 text-[12px] font-bold text-black/40">{u}</span></p></div>
+                                        ))}
+                                    </div>
+                                    {venue.live > 0 && <p className="mt-1 text-[12.5px] font-semibold text-brand">지금 {venue.live}판 치는 중</p>}
+                                    {venue.king && <p className="mt-1 text-[12.5px] text-black/60">👑 이달의 에버 왕 <b className="text-ink-1">{venue.king.name}</b> · {venue.king.avg.toFixed(3)} ({venue.king.games}판)</p>}
+                                    <ul className="mt-3 divide-y divide-black/[0.06] border-t border-black/[0.06]">
+                                        {venue.players.slice(0, 8).map((pl) => (
+                                            <li key={pl.memberId} className="flex items-center justify-between py-2 text-[13.5px]">
+                                                <span className="font-bold truncate">{pl.name}</span>
+                                                <span className="shrink-0 text-[12px] text-black/50 tabular-nums">이번 달 {pl.monthGames}판 · {pl.lastAt ? KST_MD.format(new Date(pl.lastAt)) : "-"}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </>
+                            ) : (
+                                <p className="mt-2 text-[13px] leading-relaxed text-black/55 break-keep">
+                                    아직 테이블 QR 로 친 경기가 없어요. 테이블마다 QR 을 붙이면 손님이 찍고 치는 경기 · 손님 · 이달의 에버 왕이 여기에 쌓여요.
+                                    이미 랭큐를 쓰는 손님도 잡혀요.
+                                </p>
                             )}
                         </Card>
 
@@ -686,6 +721,15 @@ export default function PartnerDashboard() {
                                 </Button>
                             </div>
                             <p className="mt-3 text-[11.5px] text-black/40 break-all">{joinUrl}</p>
+                        </Card>
+
+                        {/* 테이블 QR(2026-11-06) — 위 매장 QR 은 '가입하러 오는 손님'용, 이것은 '테이블에서 치는 손님'용 */}
+                        <Card className="p-5">
+                            <h3 className="font-bold text-[16px]">테이블 QR</h3>
+                            <p className="mt-1 text-[13px] leading-relaxed text-black/55 break-keep">테이블마다 붙이면 손님이 찍고 바로 랭큐 점수판으로 쳐요. 그 경기가 '우리 매장에서 친 경기'로 쌓이고, 이미 랭큐를 쓰는 손님도 잡혀요.</p>
+                            <Button onClick={() => setLocation("/partner/table-qr")} className="mt-3 h-12 w-full bg-brand text-white hover:bg-brand-strong rounded-xl text-[14px] font-bold" data-testid="partner-table-qr-open">
+                                <LucideQrCode className="w-4 h-4 mr-1.5" />테이블 QR 뽑기
+                            </Button>
                         </Card>
 
                         {/* 프리미엄 안내 — 웹에서, 아직 프리미엄이 아닐 때만. 앱 안에서는 구독 권유·가격을 보이지 않는다(감사 S9) */}
