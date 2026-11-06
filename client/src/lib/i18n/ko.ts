@@ -3187,6 +3187,8 @@ export const ko: Dict = {
   "push.view": "보기",
   "settings.notifications": "알림",
   "settings.notifKinds": "알림 종류",
+  "settings.marketing": "마케팅 정보 받기",
+  "settings.marketingDesc": "다니는 당구장의 소식 · 이벤트 · 대회 알림(광고). 언제든 끌 수 있어요",
   "settings.notifKindsDesc": "끄면 그 알림은 폰으로 오지 않아요. 알림함에는 그대로 쌓입니다",
   "settings.notifPrefFailed": "알림 설정을 바꾸지 못했어요",
   "settings.notifSim": "온라인게임 대전",

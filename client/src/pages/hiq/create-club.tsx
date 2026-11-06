@@ -107,6 +107,16 @@ export default function CreateClub() {
 
     // Store Selection State
     const [selectedStore, setSelectedStore] = useState<any>(null);
+    // 사장님의 '우리 매장 크루 만들기'(2026-11-06) — ?base=<매장 코드> 면 활동 매장을 미리 골라 둔다(크루장은 그대로 바꿀 수 있다)
+    useEffect(() => {
+        const code = new URLSearchParams(window.location.search).get("base");
+        if (!code || !/^[A-Za-z0-9_-]{1,20}$/.test(code)) return;
+        let alive = true;
+        apiRequest(`/api/hiq/listings/${code}`)
+            .then((l: any) => { if (alive && l?.code) setSelectedStore({ type: "listing", code: l.code, name: l.name, address: l.address }); })
+            .catch(() => { /* 못 찾으면 직접 고른다 */ });
+        return () => { alive = false; };
+    }, []);
 
     const createCrewMutation = useMutation({
         mutationFn: async (data: InsertHiqCrew) => {

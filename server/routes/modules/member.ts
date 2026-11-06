@@ -247,6 +247,14 @@ router.patch("/me/notification-prefs", requireAuth, asyncHandler(async (req: Aut
     return sendSuccess(res, { prefs: fullPrefs(next) });
 }));
 
+// 마케팅 정보(매장 소식 · 이벤트) 받기 — 켜고 끄기(2026-11-06). 매장 소식 알림(shared/storeNews)은 켠 사람에게만 가고,
+// 알림 본문의 '수신 거부' 안내가 이 칸을 가리킨다. 예전엔 전화번호 가입 때 한 번 묻고 바꿀 곳이 없었다.
+router.patch("/me/marketing", requireAuth, asyncHandler(async (req: AuthRequest, res: any) => {
+    const agree = req.body?.agree === true;
+    await storage.users.updateMember(req.userId!, { marketingAgree: agree });
+    return sendSuccess(res, { marketingAgree: agree });
+}));
+
 router.patch("/me", requireAuth, gateProfileUgc, asyncHandler(async (req: AuthRequest, res: any) => {
     const member = await storage.getMemberById(req.userId!);
     if (!member) return sendError(res, 404, "err.member.infoNotFound");

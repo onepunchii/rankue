@@ -3185,6 +3185,8 @@ const en: Dict = {
   "push.view": "View",
   "settings.notifications": "Notifications",
   "settings.notifKinds": "Notification types",
+  "settings.marketing": "Marketing messages",
+  "settings.marketingDesc": "News, events and tournaments from your billiards hall (ads). Turn off anytime",
   "settings.notifKindsDesc": "Turned off, these stop reaching your phone — they still appear in your inbox",
   "settings.notifPrefFailed": "Couldn't change that setting",
   "settings.notifSim": "Online matches",

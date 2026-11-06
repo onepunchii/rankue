@@ -6,7 +6,7 @@ import { asyncHandler } from "../../utils/asyncHandler.js";
 import { attemptKey, checkRateLimit, registerFailure, clearAttempts } from "./auth.js";
 import { hasSocialLogin, isAdminRole } from "../../lib/adminRole.js";
 import { applicantOf, toMyApplications } from "../../lib/partnerApply.js";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { db } from "../../db.js";
 import { partnerLeads, storeListings } from "../../../shared/schema.js";
 import { storeReport } from "../../storage/storeDemand.js";
@@ -14,6 +14,7 @@ import { renderStoreReportPng } from "../../services/storeReportCard.js";
 import { cleanStorePhotos } from "../../../shared/storePhotos.js";
 import { venueOwnerStats } from "../../storage/storeVenue.js";
 import { STORE_CUP_ERROR_TEXT, cleanStoreCup, storeCupPath } from "../../../shared/storeCup.js";
+import { STORE_NEWS_TYPE, cleanStoreNews, isKstNight, storeNewsNextAt, storeNewsNotice, topWeekdays } from "../../../shared/storeNews.js";
 import { screenCrewBody } from "../../utils/crewModeration.js";
 import { notificationService } from "../../services/notificationService.js";
 import { msg } from "../../lib/i18n.js";
@@ -371,6 +372,74 @@ router.get("/venue-stats", requirePartner, asyncHandler(async (req: any, res: an
     if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
     res.set("Cache-Control", "private, no-store");
     return sendSuccess(res, await venueOwnerStats(store.id));
+}));
+
+// ── 손님 관리(2026-11-06 — shared/storeNews) ─────────────────────────────────────────────
+// 매장 소식 — 우리 매장 회원 중 마케팅 수신 동의한 사람에게만 · (광고) 표시 · 밤엔 알림함에만 · 7일에 한 번
+async function lastStoreNewsAt(storeId: string): Promise<number | null> {
+    const [r] = (await db.execute(sql`select max(created_at) as at from hiq_notifications where type = ${STORE_NEWS_TYPE} and params->>'storeId' = ${storeId}`)).rows as any[];
+    return r?.at ? new Date(r.at).getTime() : null;
+}
+router.get("/news", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    res.set("Cache-Control", "private, no-store");
+    const last = await lastStoreNewsAt(store.id);
+    return sendSuccess(res, { lastAt: last ? new Date(last).toISOString() : null, nextAt: (() => { const n = storeNewsNextAt(last, Date.now()); return n ? new Date(n).toISOString() : null; })() });
+}));
+router.post("/news", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    const c = cleanStoreNews(req.body);
+    if (!c) return sendError(res, 400, "보낼 글을 적어 주세요");
+    const screened = screenCrewBody({ message: c.message }, ["message"] as const);
+    if (!screened.ok) return sendError(res, 400, screened.reason);
+    if (storeNewsNextAt(await lastStoreNewsAt(store.id), Date.now())) return sendError(res, 429, "매장 소식은 7일에 한 번 보낼 수 있어요");
+    const rows = (await db.execute(sql`
+        select id from hiq_members
+        where store_id = ${store.id} and marketing_agree = true
+          ${c.target === "dormant" ? sql`and (last_visited_at is null or last_visited_at < now() at time zone 'UTC' - interval '30 days')` : sql``}
+        limit 3000`)).rows as any[];
+    const listingCode = await ownListingCode(store.id);
+    const n = storeNewsNotice(store.name, screened.value.fields.message ?? c.message);
+    const night = isKstNight(Date.now());
+    let pushed = 0, inbox = 0;
+    for (const r of rows) {
+        const base = { memberId: String(r.id), title: n.title, body: n.body, category: "BILLIARDS", type: STORE_NEWS_TYPE, params: { url: listingCode ? `/stores/${listingCode}` : "/stores", storeId: store.id } };
+        try {
+            if (night) { await storage.createNotification({ ...base, isRead: false }); inbox++; }
+            else { const how = await notificationService.sendAndSaveNotification(base); if (how === "pushed") pushed++; else inbox++; }
+        } catch (e) { console.error("[StoreNews] 발송 실패:", (e as Error)?.message); }
+    }
+    return sendSuccess(res, { recipients: rows.length, pushed, inbox, night });
+}));
+
+// 손님 카드 — 이 손님이 우리 매장에서 친 최근 경기 · 자주 오는 요일(테이블 QR 경기 + 우리 매장 회원 경기, 90일)
+router.get("/members/:id/games", requirePartner, asyncHandler(async (req: any, res: any) => {
+    const store = await hiqService.getPartnerStore(req.partnerProfileId);
+    if (!store) return sendError(res, 404, "매장을 찾을 수 없습니다.");
+    if (!/^[0-9a-f-]{36}$/i.test(req.params.id)) return sendError(res, 404, "손님을 찾을 수 없어요");
+    const mid = req.params.id;
+    const games = (await db.execute(sql`
+        select g.id, g.game_type, g.game_mode, g.status, g.table_no,
+               to_char(g.played_at, 'YYYY-MM-DD"T"HH24:MI:SS"Z"') as played_at,
+               extract(dow from (g.played_at + interval '9 hours'))::int as dow,
+               case when g.player1_id = ${mid} then g.player1_score when g.player2_id = ${mid} then g.player2_score when g.player3_id = ${mid} then g.player3_score else g.player4_score end as score,
+               case when g.player1_id = ${mid} then g.player2_name else g.player1_name end as opponent
+        from hiq_games g
+        where (g.venue_store_id = ${store.id} or g.store_id = ${store.id})
+          and ${mid} in (g.player1_id, g.player2_id, g.player3_id, g.player4_id)
+          and g.played_at >= now() at time zone 'UTC' - interval '90 days'
+        order by g.played_at desc limit 60`)).rows as any[];
+    const dows = [0, 0, 0, 0, 0, 0, 0];
+    for (const g of games) dows[Number(g.dow) % 7]++;
+    res.set("Cache-Control", "private, no-store");
+    return sendSuccess(res, {
+        recent: games.slice(0, 5).map((g) => ({ id: String(g.id), gameType: String(g.game_type), mode: String(g.game_mode), playedAt: String(g.played_at), score: g.score == null ? null : Number(g.score), opponent: g.opponent ?? null, table: g.table_no == null ? null : Number(g.table_no) })),
+        total90: games.length,
+        weekdays: dows,
+        topDays: topWeekdays(dows),
+    });
 }));
 
 // GET /partner/members

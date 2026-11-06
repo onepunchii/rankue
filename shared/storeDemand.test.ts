@@ -49,7 +49,9 @@ describe("손님이 찾는 매장", () => {
     it("인증한 사장님은 자기 매장 숫자만 — 대시보드 '내 매장 페이지'와 리포트 카드(매장 코드를 받지 않는다)", () => {
         const r = read("server/routes/modules/partner.ts");
         const stats = r.slice(r.indexOf('router.get("/page-stats"'), r.indexOf('router.get("/page-report.png"'));
-        const png = r.slice(r.indexOf('router.get("/page-report.png"'), r.indexOf("// GET /partner/members"));
+        // 리포트 카드 길 하나만(2026-11-06: 그 뒤에 손님 관리 길들이 들어와 다음 'router.' 까지로 자른다)
+        const pngAt = r.indexOf('router.get("/page-report.png"');
+        const png = r.slice(pngAt, r.indexOf("\nrouter.", pngAt + 10));
         for (const b of [stats, png]) {
             expect(b).toContain("requirePartner");
             expect(b).toContain("await ownListingCode(store.id)");

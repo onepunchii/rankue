@@ -31,6 +31,7 @@ import { useRef, useState, useMemo, useEffect } from "react";
 import * as XLSX from "xlsx";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { StoreCupsTab } from "./StoreCups";
+import { MemberGames, StoreNewsCard } from "./CustomerTools";
 import html2canvas from "html2canvas";
 import { LucideLock as LockIcon } from "@/lib/icons";
 import { isNativeApp } from "@/lib/nativeBridge";
@@ -677,6 +678,20 @@ export default function PartnerDashboard() {
                             <p className="mt-3 text-[11.5px] text-black/40 break-all">{joinUrl}</p>
                         </Card>
 
+                        {/* 우리 매장 크루 만들기(2026-11-06) — 활동 매장이 우리 매장으로 골라진 크루 만들기 화면. 매장 페이지 '이 매장에서 활동하는 크루'에 뜬다 */}
+                        {store.listing && (
+                            <Card className="p-5">
+                                <h3 className="font-bold text-[16px]">우리 매장 크루 만들기</h3>
+                                <p className="mt-1 text-[13px] leading-relaxed text-black/55 break-keep">단골끼리 크루를 만들면 정모 · 크루 대회 · 채팅을 랭큐에서 하고, 매장 페이지에 '이 매장에서 활동하는 크루'로 떠요.</p>
+                                <Button onClick={() => setLocation(`/club/create?base=${store.listing!.code}`)} variant="outline" className="mt-3 h-12 w-full border-brand text-brand rounded-xl text-[14px] font-bold" data-testid="partner-crew-create">우리 매장 크루 만들기</Button>
+                            </Card>
+                        )}
+
+                        {/* 매장 소식 보내기(2026-11-06 — shared/storeNews) — 수신 동의 회원에게만 · 광고 표시 · 밤엔 알림함 · 7일에 한 번 */}
+                        <StoreNewsCard storeName={store.name}
+                            agreeAll={members.filter((m) => m.marketingAgree).length}
+                            agreeDormant={members.filter((m) => m.marketingAgree && daysAgo(m.lastVisitedAt) > 30).length} />
+
                         {/* 테이블 QR(2026-11-06) — 위 매장 QR 은 '가입하러 오는 손님'용, 이것은 '테이블에서 치는 손님'용 */}
                         <Card className="p-5">
                             <h3 className="font-bold text-[16px]">테이블 QR</h3>
@@ -779,6 +794,8 @@ export default function PartnerDashboard() {
                                         </div>
                                     ))}
                                 </div>
+                                {/* 우리 매장에서 친 최근 경기 · 자주 오는 요일(2026-11-06) */}
+                                <MemberGames memberId={openMember.id} />
                                 <div>
                                     <p className="text-[12.5px] font-bold text-black/55 mb-1.5">사장님 메모 <span className="font-medium text-black/35">(회원에게는 보이지 않아요)</span></p>
                                     <Textarea value={memoDraft} onChange={(e) => setMemoDraft(e.target.value)} maxLength={300}

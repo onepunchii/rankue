@@ -20,6 +20,7 @@ import { useT } from "@/lib/i18n";
 import { useSport } from "@/contexts/SportContext";
 import { cn } from "@/lib/utils";
 import { prefsForSport, type PrefKey, type SportScope } from "@shared/notificationPrefs";
+import { useAuth } from "@/hooks/useAuth";
 
 const PREFS_KEY = ["/api/hiq/me/notification-prefs"] as const;
 type Prefs = Partial<Record<PrefKey, boolean>>;
@@ -157,6 +158,39 @@ export function NotificationKinds({ golfAllowed }: { golfAllowed: boolean }) {
                     );
                 })}
             </div>
+            {/* 마케팅 정보 받기(2026-11-06) — 매장 소식 알림은 켠 사람에게만(shared/storeNews). 알림 본문의 '수신 거부'가 이 칸이다 */}
+            <MarketingRow />
         </section>
+    );
+}
+
+function MarketingRow() {
+    const { t } = useT();
+    const { member } = useAuth();
+    const qc = useQueryClient();
+    const { toast } = useToast();
+    const [busy, setBusy] = useState(false);
+    const on = !!(member as { marketingAgree?: boolean } | undefined)?.marketingAgree;
+    if (!member) return null;
+    const toggle = async () => {
+        setBusy(true);
+        try {
+            await apiRequest("/api/hiq/me/marketing", { method: "PATCH", body: { agree: !on } });
+            await qc.invalidateQueries({ queryKey: ["/api/hiq/me"] });
+        } catch {
+            toast({ title: t("settings.notifPrefFailed"), variant: "destructive" });
+        } finally { setBusy(false); }
+    };
+    return (
+        <div className="mt-4 flex items-center gap-3 border-t border-black/[0.06] pt-4" data-testid="settings-marketing">
+            <span className="min-w-0 flex-1">
+                <span className="block text-[14px] font-semibold">{t("settings.marketing")}</span>
+                <span className="block text-[12px] text-black/45 break-keep">{t("settings.marketingDesc")}</span>
+            </span>
+            <button type="button" role="switch" aria-checked={on} disabled={busy} onClick={() => void toggle()}
+                className={cn("relative h-7 w-12 shrink-0 rounded-full transition-colors disabled:opacity-50", on ? "bg-brand" : "bg-black/15")}>
+                <span className={cn("absolute top-0.5 h-6 w-6 rounded-full bg-white shadow transition-all", on ? "left-[22px]" : "left-0.5")} />
+            </button>
+        </div>
     );
 }

@@ -3185,6 +3185,8 @@ const vi: Dict = {
   "push.view": "Xem",
   "settings.notifications": "Thông báo",
   "settings.notifKinds": "Loại thông báo",
+  "settings.marketing": "Nhận tin tiếp thị",
+  "settings.marketingDesc": "Tin tức, sự kiện, giải đấu từ quán bi-a của bạn (quảng cáo). Tắt bất cứ lúc nào",
   "settings.notifKindsDesc": "Tắt thì không gửi đến điện thoại — vẫn có trong hộp thông báo",
   "settings.notifPrefFailed": "Không đổi được cài đặt này",
   "settings.notifSim": "Trận trực tuyến",

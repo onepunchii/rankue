@@ -3185,6 +3185,8 @@ const tr: Dict = {
   "push.view": "Gör",
   "settings.notifications": "Bildirimler",
   "settings.notifKinds": "Bildirim türleri",
+  "settings.marketing": "Pazarlama mesajları",
+  "settings.marketingDesc": "Bilardo salonundan haber, etkinlik ve turnuvalar (reklam). İstediğin zaman kapat",
   "settings.notifKindsDesc": "Kapatınca telefona gelmez; bildirim kutunda kalır",
   "settings.notifPrefFailed": "Bu ayar değiştirilemedi",
   "settings.notifSim": "Çevrimiçi maçlar",

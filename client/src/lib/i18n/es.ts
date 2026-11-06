@@ -3185,6 +3185,8 @@ const es: Dict = {
   "push.view": "Ver",
   "settings.notifications": "Notificaciones",
   "settings.notifKinds": "Tipos de notificación",
+  "settings.marketing": "Mensajes de marketing",
+  "settings.marketingDesc": "Noticias, eventos y torneos de tu billar (publicidad). Desactívalo cuando quieras",
   "settings.notifKindsDesc": "Al desactivarlas no llegan al teléfono; siguen en tu bandeja",
   "settings.notifPrefFailed": "No se pudo cambiar ese ajuste",
   "settings.notifSim": "Partidas en línea",
