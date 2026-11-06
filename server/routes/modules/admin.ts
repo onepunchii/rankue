@@ -815,7 +815,7 @@ async function issueOwnership(opts: {
     /** tx 마지막 단계 — 신청/클레임 행의 상태 갱신 */
     finalizeTx: (tx: any, listing: ListingLike, storeId: string) => Promise<void>;
 }): Promise<
-    | { ok: true; storeSlug: string; partnerPhone: string; issuedPin: string | null; notified: boolean; listing: ListingLike }
+    | { ok: true; storeSlug: string; partnerPhone: string; issuedPin: string | null; notified: boolean; pushed: boolean; listing: ListingLike }
     | { ok: false; status: number; message: string }
 > {
     const { db } = await import("../../db.js");
@@ -888,13 +888,15 @@ async function issueOwnership(opts: {
     // 승인 통보 — 신청자가 이미 랭큐 회원이면 PIN 자체가 필요 없다: SSO 가 로그인된 유저를
     // 파트너로 자동 진입시키므로(POST /partner/sso), 알림만 보내면 통화가 사라진다.
     let notified = false;
+    // 폰 알림이 실제로 나갔나(2026-11-06) — 웹으로 신청한 사장님은 알림함에만 남는다(11/3 한솔대대전용: 승인 뒤 한 번도 안 들어옴). 그때는 전화로 알려야 한다
+    let pushed = false;
     try {
         // 신청한 그 회원에게(계정으로 받은 신청) — 그 행이 없어졌으면 프로필의 회원 행으로
         const applicant = opts.applicantMemberId ? await storage.getMemberById(opts.applicantMemberId) : undefined;
         const member = applicant?.profileId === profile!.id ? applicant : await storage.getMemberByProfileId(profile!.id);
         if (member) {
             const { notificationService } = await import("../../services/notificationService.js");
-            await notificationService.sendAndSaveNotification({
+            const how = await notificationService.sendAndSaveNotification({
                 memberId: member.id,
                 title: "🎉 매장 관리 권한이 열렸습니다",
                 body: `${result.listing.name} 사장님 인증이 완료됐어요. 전체 메뉴 → 내 매장 관리에서 바로 들어가실 수 있습니다.`,
@@ -902,14 +904,15 @@ async function issueOwnership(opts: {
                 type: "partner_approved",
                 params: { url: "/partner/dashboard" },
             });
-            notified = true;
+            notified = how !== "none";
+            pushed = how === "pushed";
         }
     } catch (e) {
         // 알림 실패가 승인을 되돌리면 안 된다 — 발급은 이미 끝났다. 관리자는 PIN/전화로 폴백한다.
         console.warn("[issueOwnership] 알림 실패:", (e as Error)?.message);
     }
 
-    return { ok: true, storeSlug: result.slug, partnerPhone: phone, issuedPin, notified, listing: result.listing };
+    return { ok: true, storeSlug: result.slug, partnerPhone: phone, issuedPin, notified, pushed, listing: result.listing };
 }
 
 /**
@@ -983,6 +986,8 @@ router.post("/listing-claims/:id/approve", checkSuperAdmin, asyncHandler(async (
         issuedPin: out.issuedPin,
         // true 면 앱 알림으로 통보 완료 — 관리자가 전화할 필요 없다
         notified: out.notified,
+        // 폰 알림이 실제로 나갔나 — false 면 관리자가 전화로 알린다(partnerPhone)
+        pushed: out.pushed,
         // 랭큐 계정으로 받은 신청이었다 — 그 계정에 권한이 열렸다(PIN 없음)
         accountLinked: !!claim.applicantProfileId,
     });
@@ -1100,6 +1105,8 @@ router.post("/store-registrations/:id/approve", checkSuperAdmin, asyncHandler(as
         partnerPhone: out.partnerPhone,
         issuedPin: out.issuedPin,
         notified: out.notified,
+        // 폰 알림이 실제로 나갔나 — false 면 관리자가 전화로 알린다(partnerPhone)
+        pushed: out.pushed,
         accountLinked: !!reg.applicantProfileId,
     });
 }));

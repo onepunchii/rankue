@@ -15,6 +15,7 @@ import { HiqStore } from "../../../../shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 import { useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { StorePhotos } from "./StorePhotos";
 
 // Schema for the form
 const formSchema = z.object({
@@ -136,6 +137,8 @@ export default function PartnerSettings() {
             </div>
 
             <div className="p-6">
+                {/* 매장 사진(2026-11-06) — 올리거나 지우면 바로 저장된다. 아래 양식의 '저장'과 따로 */}
+                {store && <div className="mb-8"><StorePhotos images={(store as { images?: unknown }).images} /></div>}
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
 
@@ -178,7 +181,7 @@ export default function PartnerSettings() {
                                         <FormItem>
                                             <FormLabel>공지사항</FormLabel>
                                             <FormControl>
-                                                <Textarea {...field} placeholder="회원들에게 알릴 공지사항을 입력하세요." className="bg-black/[0.04] border-black/[0.08] min-h-[80px]" />
+                                                <Textarea {...field} placeholder="매장 페이지에 '사장님 공지'로 보여요. 예: 11월 매장 대회 접수 중" className="bg-black/[0.04] border-black/[0.08] min-h-[80px]" />
                                             </FormControl>
                                             <FormMessage />
                                         </FormItem>

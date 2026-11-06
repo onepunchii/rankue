@@ -111,6 +111,7 @@ export const hiqStores = pgTable("hiq_stores", {
   tableMedium: integer("table_medium").default(0),
 
   facilities: jsonb("facilities").$type<string[]>(), // ["smoking", "food", "lesson"]
+  // 매장 사진 — 사장님이 올린 것(2026-11-06 — shared/storePhotos: 우리 Blob 의 hiq/store-photo/ 주소만, 최대 8장). 공개 매장 페이지 맨 위 사진 줄
   images: jsonb("images").$type<string[]>(),
 
   createdAt: timestamp("created_at").defaultNow().notNull(),

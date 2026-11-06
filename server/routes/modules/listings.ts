@@ -9,6 +9,7 @@ import { and, asc, eq, ilike, or, sql } from "drizzle-orm";
 import { sendSuccess, sendError } from "../../utils/response.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { packStoreDots, type StoreDotsWire } from "../../../shared/storeDots.js";
+import { storePhotosOf } from "../../../shared/storePhotos.js";
 
 // 매장 디렉터리 공개 API — 지역 검색("김해 당구장") SEO 대상이라 비로그인 읽기.
 // 수정 제안·이용자 제보는 방문자가 앱 계정 없이도 보낼 수 있어야 해서 비로그인 허용.
@@ -217,7 +218,19 @@ router.get("/:code", asyncHandler(async (req: any, res: Response) => {
         memberCount: sql<number>`(SELECT count(*)::int FROM hiq_crew_members m WHERE m.crew_id = hiq_crews.id AND m.role != 'pending')`,
     }).from(hiqCrews).where(eq(hiqCrews.baseListingCode, req.params.code)).limit(10);
 
-    return sendSuccess(res, { ...pub, crews, honor });
+    // 사장님이 직접 적은 것(2026-11-06 — 예전엔 저장만 되고 어디에도 안 보였다): 공지 · 주차 · 매장 사진. 인증한 매장만
+    let owner: { notice: string | null; parking: string | null; photos: string[] } | null = null;
+    if (row.claimedStoreId) {
+        try {
+            const [st] = await db.select({ notice: hiqStores.notice, parking: hiqStores.parkingDescription, images: hiqStores.images })
+                .from(hiqStores).where(eq(hiqStores.id, row.claimedStoreId)).limit(1);
+            if (st) owner = { notice: st.notice?.trim().slice(0, 500) || null, parking: st.parking?.trim().slice(0, 120) || null, photos: storePhotosOf(st.images) };
+        } catch (e) {
+            console.warn("[listings] owner 읽기 실패:", (e as Error)?.message);
+        }
+    }
+
+    return sendSuccess(res, { ...pub, crews, honor, owner });
 }));
 
 // POST /listings/:code/claim — 사장님 클레임 신청 (수동 승인 대기열)

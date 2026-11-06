@@ -17,7 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { FilterChips, SearchBox, EmptyState, Panel, Pill, CallButton, kstDateTime, agoLabel } from "./adminUtils";
 
 // --- 공용: 승인 결과 상자 ---
-type IssueResult = { listingCode?: string; storeSlug?: string; partnerPhone?: string; issuedPin?: string | null; notified?: boolean; kind?: "owner" | "report"; accountLinked?: boolean };
+type IssueResult = { listingCode?: string; storeSlug?: string; partnerPhone?: string; issuedPin?: string | null; notified?: boolean; pushed?: boolean; kind?: "owner" | "report"; accountLinked?: boolean };
 
 /** 거절 — 사유(선택)를 받아 확정한다. 사유는 신청자에게 그대로 보인다(알림 · 내 신청). 브라우저 기본 창을 쓰지 않고 카드 안에서 받는다 */
 function RejectBox({ pending, onConfirm, onCancel }: { pending: boolean; onConfirm: (reason: string) => void; onCancel: () => void }) {
@@ -62,11 +62,16 @@ function IssueResultBox({ r, onClose }: { r: IssueResult; onClose: () => void })
                 <p className="font-bold text-brand mb-2">✓ 승인 완료 — 신청한 랭큐 계정에 '내 매장 관리'가 열렸습니다</p>
                 <div className="text-[14px] space-y-1">
                     {r.listingCode && <p>매장 페이지: <a className="text-brand font-bold underline" href={`/stores/${r.listingCode}`} target="_blank" rel="noreferrer">/stores/{r.listingCode}</a></p>}
-                    <p className="text-black/60">
-                        {r.notified
-                            ? "앱 알림을 보냈습니다. 따로 연락하지 않으셔도 됩니다 — 사장님이 평소 쓰는 계정의 전체 메뉴 → 내 매장 관리로 들어옵니다."
-                            : "앱 알림은 가지 못했습니다(알림이 꺼져 있을 수 있어요). 그래도 사장님이 평소 쓰는 계정의 전체 메뉴 → 내 매장 관리로 바로 들어옵니다."}
-                    </p>
+                    {/* 폰 알림이 실제로 나갔을 때만 '연락 안 해도 됨'(2026-11-06) — 웹으로 신청한 사장님은 알림함에만 남아 모른다(11/3 한솔대대전용) */}
+                    {r.pushed ? (
+                        <p className="text-black/60">사장님 휴대폰으로 앱 알림이 갔습니다. 따로 연락하지 않으셔도 됩니다 — 평소 쓰는 계정의 전체 메뉴 → 내 매장 관리로 들어옵니다.</p>
+                    ) : (
+                        <div className="mt-1 rounded-xl bg-amber-500/[0.12] px-3 py-2.5 text-amber-900" data-testid="approve-call-owner">
+                            <p className="font-bold">📞 전화로 알려 주세요 — 휴대폰 알림은 가지 않았어요</p>
+                            <p className="mt-0.5 text-[13px]">웹으로 신청했거나 알림이 꺼진 사장님이라 랭큐 알림함에만 남았어요. 승인됐다고, 랭큐에 로그인해 전체 메뉴 → 내 매장 관리로 들어오시면 된다고 전해 주세요.</p>
+                            {r.partnerPhone && <p className="mt-1 text-[14px]">신청 연락처: <b className="tabular-nums">{r.partnerPhone}</b></p>}
+                        </div>
+                    )}
                 </div>
                 <Button variant="ghost" size="sm" className="mt-2" onClick={onClose}>닫기</Button>
             </div>

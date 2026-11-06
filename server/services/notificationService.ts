@@ -66,6 +66,12 @@ export function pushOptionsFor(type: string | undefined, params: any, url: strin
     return opts;
 }
 
+/**
+ * 한 건을 보낸 결과(2026-11-06) — pushed: 폰 알림이 실제로 나갔다 · inbox: 알림함에만(앱이 없음 · 알림 끔 · 토큰 없음 · 푸시 실패) · none: 회원 없음.
+ * 사장님 승인처럼 '따로 연락해야 하나'를 가르는 곳이 쓴다(웹으로 신청한 사장님은 폰 알림을 못 받는다 — 11/3 한솔대대전용).
+ */
+export type NotifyOutcome = "pushed" | "inbox" | "none";
+
 export class NotificationService {
     /**
      * 특정 사용자에게 푸시 알림을 보내고 DB에 저장합니다.
@@ -89,11 +95,11 @@ export class NotificationService {
          * ⚠️ 관리자 broadcast·긴급 조인 같은 다른 전체 방송은 **남아야 하는 알림**이니 이 옵션을 쓰지 마라.
          */
         saveToInbox?: boolean;
-    }) {
+    }): Promise<NotifyOutcome> {
         const { memberId, category, type, params: deepLinkParams } = params;
 
         const member = await storage.getMemberById(memberId);
-        if (!member) return;
+        if (!member) return "none";
         const locale = memberLocale(member);
         const title = render(locale, params.title);
         const body = render(locale, params.body);
@@ -119,14 +125,14 @@ export class NotificationService {
         // 2. 푸시 토큰 조회 — pushToken은 profile에 있으므로 프로필이 없으면 푸시 단계만 건너뛴다.
         if (!member.profileId) {
             console.log(`[Push] No profile for member ${memberId}, ${kept}.`);
-            return;
+            return "inbox";
         }
         // 2-1. 카테고리별 켬/끔(2026-09-13 오너). **푸시만** 막는다 — 알림함 저장은 위에서 이미 끝났다.
         // 옛 호출부(golf.ts·chat.ts·관심 골프장)는 pref:"golf" 를 넘긴다 — 골프 칸이 성격별로 나뉘어(2026-10-01) type 으로 다시 고른다
         const prefKey = params.pref && params.pref !== "golf" ? params.pref : prefKeyFor(category, type, deepLinkParams);
         if (!isPushAllowed((member as { pushPrefs?: unknown }).pushPrefs, prefKey)) {
             console.log(`[Push] Muted by member ${memberId} (${prefKey}), ${kept}.`);
-            return;
+            return "inbox";
         }
 
         const profile = await storage.getProfile(member.profileId);
@@ -135,7 +141,7 @@ export class NotificationService {
         // 3. 실제 푸시 발송 — FCM(안드로이드)/APNs(iOS) 자동 판별. 토큰 없으면(NULL) DB만.
         if (!pushToken) {
             console.log(`[Push] No token for member ${memberId}, ${kept}.`);
-            return;
+            return "inbox";
         }
         const url = deepLinkUrl(category, type, deepLinkParams);
         const r = await sendPushNative(pushToken, { title, body, url, ...pushOptionsFor(type, deepLinkParams, url) });
@@ -161,6 +167,7 @@ export class NotificationService {
             default:
                 console.warn(`[Push] Not sent — push service failure for ${who}: ${r.reason}. Token kept.`);
         }
+        return r.result === "ok" ? "pushed" : "inbox";
     }
 }
 

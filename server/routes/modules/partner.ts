@@ -11,6 +11,7 @@ import { db } from "../../db.js";
 import { partnerLeads, storeListings } from "../../../shared/schema.js";
 import { storeReport } from "../../storage/storeDemand.js";
 import { renderStoreReportPng } from "../../services/storeReportCard.js";
+import { cleanStorePhotos } from "../../../shared/storePhotos.js";
 
 const router = Router();
 
@@ -180,6 +181,12 @@ router.patch("/store", requirePartner, asyncHandler(async (req: any, res: any) =
     for (const [k, v] of Object.entries(req.body || {})) {
         if (STORE_EDITABLE.has(k)) patch[k] = v;
     }
+    // 매장 사진(2026-11-06 — shared/storePhotos): 우리 Blob 의 store-photo 주소만 · 최대 8장. 꼴이 틀리면 받지 않는다
+    if (req.body?.images !== undefined) {
+        const photos = cleanStorePhotos(req.body.images);
+        if (!photos) return sendError(res, 400, "사진을 다시 올려 주세요");
+        patch.images = photos;
+    }
     const updated = await hiqService.updateStore(store.id, patch);
 
     // 클레임된 디렉토리 페이지 동기화 — 사장님이 여기서 고치면 공개 매장 페이지(/stores/:code)에
@@ -193,6 +200,9 @@ router.patch("/store", requirePartner, asyncHandler(async (req: any, res: any) =
         if (patch.phone !== undefined) sync.phone = patch.phone || null;
         if (patch.priceLarge !== undefined) sync.rate10Large = Number(patch.priceLarge) || null;
         if (patch.priceMedium !== undefined) sync.rate10Medium = Number(patch.priceMedium) || null;
+        // 테이블 수도 공개 매장 페이지에(2026-11-06 — 예전엔 저장만 되고 어디에도 안 보였다)
+        if (patch.tableLarge !== undefined) sync.tableLarge = Number(patch.tableLarge) > 0 ? Math.min(200, Math.round(Number(patch.tableLarge))) : null;
+        if (patch.tableMedium !== undefined) sync.tableMedium = Number(patch.tableMedium) > 0 ? Math.min(200, Math.round(Number(patch.tableMedium))) : null;
         if (patch.openTime !== undefined || patch.closeTime !== undefined) {
             const open = patch.openTime ?? (updated as any)?.openTime;
             const close = patch.closeTime ?? (updated as any)?.closeTime;

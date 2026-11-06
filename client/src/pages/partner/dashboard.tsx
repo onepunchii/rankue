@@ -5,8 +5,10 @@
  * 회원 목록이 300px 상자 안에서만 스크롤됐고, 숫자는 한국 오전 9시에야 '오늘'이 바뀌었다(서버 UTC).
  * 지금:
  *  - 아래 탭 4개(홈 · 회원 · 대회 · 홍보) — 엄지가 닿는 곳에서 옮겨 다닌다.
- *  - 홈: 오늘 방문(어제 대비) · 최근 7일 막대 · 회원 현황 · 매장 페이지 채우기 점검 · 이번 달 단골/실력 순위
- *  - 회원: 거르기(이번 달 활동·30일+ 미방문·신규·메모) · 정렬 · 누르면 상세 시트(전화·문자·기록·사장님 메모)
+ *  - 홈: 오늘 앱을 연 회원(어제 대비) · 최근 7일 막대 · 회원 현황 · 매장 페이지 채우기 점검 · 이번 달 단골/실력 순위
+ *    ⚠️ 2026-11-06: 여기 '접속'은 우리 매장으로 가입한 회원이 **앱을 연 날**이다(hiq_visit_logs) — 매장에 온 것이 아니다. 예전엔 '방문'이라 적어
+ *    집에서 앱을 켜도 방문으로 보였다. 실제로 매장에서 친 것은 테이블 QR(우리 매장에서 친 경기)이 따로 센다.
+ *  - 회원: 거르기(이번 달 활동·30일+ 미접속·신규·메모) · 정렬 · 누르면 상세 시트(전화·문자·기록·사장님 메모)
  *  - 대회: 만들기 + 우리 매장 대회 목록
  *  - 홍보: 매장 QR · 링크 복사 · 포스터 저장
  *  - 관리자가 '사장님 화면'으로 들어왔으면 맨 위에 '관리자로 돌아가기' 띠.
@@ -81,6 +83,8 @@ type MemberFilter = "all" | "month" | "dormant" | "new" | "memo";
 type MemberSort = "recent" | "visits" | "joined" | "skill";
 
 const MEMBERS_KEY = ["/api/hiq/partner/members"] as const;
+/** 프리미엄 기능(엑셀 · 단체 문자)을 당분간 모두에게(2026-11-06) — 유료로 묶을 때 false */
+export const PARTNER_PREMIUM_OPEN = true;
 
 // --- 표시 도우미(한국 시각) ---
 const KST_MD = new Intl.DateTimeFormat("ko-KR", { timeZone: "Asia/Seoul", month: "numeric", day: "numeric" });
@@ -96,7 +100,7 @@ function daysAgo(iso: string | null | undefined): number {
 
 function lastVisitLabel(iso: string | null | undefined): string {
     const d = daysAgo(iso);
-    if (!Number.isFinite(d)) return "방문 기록 없음";
+    if (!Number.isFinite(d)) return "접속 기록 없음";
     if (d < 1) return "오늘";
     if (d < 2) return "어제";
     if (d < 30) return `${Math.floor(d)}일 전`;
@@ -141,7 +145,7 @@ function SectionTitle({ children, right }: { children: React.ReactNode; right?: 
 function VisitBars({ days }: { days: { date: string; count: number }[] }) {
     const max = Math.max(1, ...days.map((d) => d.count));
     return (
-        <div className="flex items-end gap-1.5 h-24" role="img" aria-label="최근 7일 방문 회원 수">
+        <div className="flex items-end gap-1.5 h-24" role="img" aria-label="최근 7일 앱을 연 회원 수">
             {days.map((d, i) => {
                 const today = i === days.length - 1;
                 const wd = WEEKDAY[new Date(`${d.date}T00:00:00Z`).getUTCDay()];
@@ -237,7 +241,10 @@ export default function PartnerDashboard() {
         setLocation("/menu");
     };
 
-    const isBasic = store?.subscriptionTier !== "PREMIUM";
+    // 프리미엄(엑셀 · 단체 문자)은 당분간 모두에게 연다(2026-11-06 오너 '추천대로' — 사장님이 셋뿐이고 결제가 붙어 있지 않아 아무도 열 수 없었다).
+    // 유료로 다시 묶을 때 PARTNER_PREMIUM_OPEN 을 false 로.
+    const paidPremium = store?.subscriptionTier === "PREMIUM";
+    const isBasic = !PARTNER_PREMIUM_OPEN && !paidPremium;
     // /join?store= 는 존재하지 않는 라우트(404)였다 — 매장 공개 페이지가 올바른 착지점
     const joinUrl = store ? `${window.location.origin}/store/${store.slug}` : "";
 
@@ -282,8 +289,8 @@ export default function PartnerDashboard() {
             "3쿠션 핸디": m.handi3c ?? "",
             "4구 핸디": m.handi4c ?? "",
             "3쿠션 에버": Number(m.avg3c || 0).toFixed(3),
-            "총 방문수": m.visitCount,
-            "최근 방문": m.lastVisitedAt ? KST_YMD.format(new Date(m.lastVisitedAt)) : "-",
+            "총 접속일": m.visitCount,
+            "최근 접속": m.lastVisitedAt ? KST_YMD.format(new Date(m.lastVisitedAt)) : "-",
             "이번달 게임": m.monthlyGameCount,
             "가입일": KST_YMD.format(new Date(m.createdAt)),
             "마케팅 수신": m.marketingAgree ? "동의" : "",
@@ -350,6 +357,7 @@ export default function PartnerDashboard() {
         { label: "전화번호", done: !!store.phone },
         { label: "영업시간", done: !!(store.openTime && store.closeTime) },
         { label: "주소", done: !!store.address },
+        { label: "매장 사진", done: Array.isArray((store as { images?: unknown }).images) && ((store as { images?: unknown[] }).images?.length ?? 0) > 0 },
         { label: "테이블 수", done: ((store.tableLarge ?? 0) + (store.tableMedium ?? 0)) > 0 },
     ];
     const missing = checklist.filter((c) => !c.done);
@@ -385,7 +393,7 @@ export default function PartnerDashboard() {
                     </div>
                     <div className="min-w-0 flex-1">
                         <h1 className="text-[16px] font-bold tracking-tight truncate">{store.name}</h1>
-                        <span className="text-[11.5px] text-brand font-bold block -mt-0.5">사장님 대시보드{!isBasic && " · 프리미엄"}</span>
+                        <span className="text-[11.5px] text-brand font-bold block -mt-0.5">사장님 대시보드{paidPremium && " · 프리미엄"}</span>
                     </div>
                     <button onClick={() => setLocation("/partner/settings")} className="w-10 h-10 flex items-center justify-center rounded-full hover:bg-black/[0.05]" aria-label="매장 정보 수정">
                         <LucideSettings className="w-5 h-5 text-black/50" />
@@ -403,7 +411,7 @@ export default function PartnerDashboard() {
                         <Card className="p-5">
                             <div className="flex items-start justify-between">
                                 <div>
-                                    <p className="text-[13px] text-black/55 font-bold">오늘 방문한 회원</p>
+                                    <p className="text-[13px] text-black/55 font-bold">오늘 앱을 연 회원</p>
                                     <p className="mt-1 text-[40px] leading-none font-black tabular-nums">
                                         {stats?.visitsToday ?? 0}<span className="text-[15px] text-black/40 font-bold ml-1">명</span>
                                     </p>
@@ -419,7 +427,7 @@ export default function PartnerDashboard() {
                             </div>
                             {stats?.visits7 && stats.visits7.length > 0 && (
                                 <div className="mt-4 pt-4 border-t border-black/[0.06]">
-                                    <p className="text-[12px] text-black/45 font-bold mb-2">최근 7일 방문</p>
+                                    <p className="text-[12px] text-black/45 font-bold mb-2">최근 7일 앱을 연 회원</p>
                                     <VisitBars days={stats.visits7} />
                                 </div>
                             )}
@@ -430,7 +438,7 @@ export default function PartnerDashboard() {
                             {([
                                 ["전체 회원", stats?.totalMembers ?? members.length, "all"],
                                 ["이번 달 신규", stats?.newThisMonth ?? filterCounts.new, "new"],
-                                ["30일+ 미방문", stats?.dormant30 ?? filterCounts.dormant, "dormant"],
+                                ["30일+ 미접속", stats?.dormant30 ?? filterCounts.dormant, "dormant"],
                             ] as [string, number, MemberFilter][]).map(([label, n, f]) => (
                                 <button key={label} onClick={() => { setMemberFilter(f); setTab("members"); }}
                                     className="bg-white rounded-2xl border border-black/[0.06] p-3.5 text-left active:scale-[0.98] transition-transform">
@@ -503,7 +511,7 @@ export default function PartnerDashboard() {
                                             <span className={`w-6 text-center font-black text-[15px] ${idx === 0 ? "text-[#cba258]" : idx === 1 ? "text-slate-500" : idx === 2 ? "text-amber-700" : "text-black/35"}`}>{idx + 1}</span>
                                             <span className="ml-3 flex-1 min-w-0">
                                                 <span className="block text-[14px] font-bold truncate">{m.name}</span>
-                                                <span className="block text-[12px] text-black/50">누적 방문 {m.visitCount}회</span>
+                                                <span className="block text-[12px] text-black/50">누적 접속 {m.visitCount}일</span>
                                             </span>
                                             <span className="px-2 py-1 rounded-lg bg-brand/10 text-[12.5px] font-bold text-brand tabular-nums">
                                                 {rankingTab === "visit" ? `${m.monthlyGameCount}게임` : Number(m.avg3c).toFixed(3)}
@@ -545,7 +553,7 @@ export default function PartnerDashboard() {
                                     className="w-full h-11 pl-10 pr-3 rounded-xl bg-white border border-black/[0.08] text-[15px] outline-none focus:border-brand/40" />
                             </div>
                             <div className="flex gap-1.5 overflow-x-auto scrollbar-hide">
-                                {([["all", "전체"], ["month", "이번 달 활동"], ["dormant", "30일+ 미방문"], ["new", "이번 달 신규"], ["memo", "메모"]] as [MemberFilter, string][]).map(([k, label]) => (
+                                {([["all", "전체"], ["month", "이번 달 활동"], ["dormant", "30일+ 미접속"], ["new", "이번 달 신규"], ["memo", "메모"]] as [MemberFilter, string][]).map(([k, label]) => (
                                     <button key={k} onClick={() => { setMemberFilter(k); setMemberLimit(50); }}
                                         className={`shrink-0 h-8 px-3 rounded-full text-[12.5px] font-bold tabular-nums ${memberFilter === k ? "bg-brand text-white" : "bg-white border border-black/[0.08] text-black/60"}`}>
                                         {label} <span className={memberFilter === k ? "text-white/80" : "text-black/35"}>{filterCounts[k]}</span>
@@ -557,8 +565,8 @@ export default function PartnerDashboard() {
                         <div className="flex items-center justify-between">
                             <select value={memberSort} onChange={(e) => setMemberSort(e.target.value as MemberSort)} aria-label="정렬"
                                 className="h-9 px-2 rounded-lg bg-white border border-black/[0.08] text-[13px] font-bold text-black/65 outline-none">
-                                <option value="recent">최근 방문순</option>
-                                <option value="visits">방문 많은순</option>
+                                <option value="recent">최근 접속순</option>
+                                <option value="visits">접속 많은순</option>
                                 <option value="joined">최근 가입순</option>
                                 <option value="skill">3쿠션 에버순</option>
                             </select>
@@ -601,7 +609,7 @@ export default function PartnerDashboard() {
                                                     </span>
                                                     <span className="shrink-0 text-right">
                                                         <span className={`block text-[12.5px] font-bold ${dormant ? "text-red-600" : "text-black/70"}`}>{lastVisitLabel(m.lastVisitedAt)}</span>
-                                                        <span className="block text-[11.5px] text-black/40 tabular-nums">방문 {m.visitCount}회</span>
+                                                        <span className="block text-[11.5px] text-black/40 tabular-nums">접속 {m.visitCount}일</span>
                                                     </span>
                                                     <LucideChevronRight className="w-4 h-4 text-black/25 shrink-0" />
                                                 </button>
@@ -625,6 +633,10 @@ export default function PartnerDashboard() {
                             className="w-full h-14 rounded-2xl bg-brand text-white font-bold text-[16px] flex items-center justify-center gap-2 active:scale-[0.99] transition-transform">
                             <LucidePlus className="w-5 h-5" /> 새 대회 만들기
                         </button>
+                        {/* 2026-11-06: 지금은 만들어 두기만 된다 — 손님이 보는 곳 · 참가 신청 · 대진표가 아직 없다. 약속과 실제를 맞춘다(사장님 도구 '바로 고칠 것' 4번) */}
+                        <p className="rounded-xl bg-amber-500/[0.1] px-3.5 py-2.5 text-[12.5px] leading-relaxed text-amber-900 break-keep" data-testid="partner-tournament-soon">
+                            지금은 대회 정보를 만들어 두는 단계예요. 손님 참가 신청 · 대진표 · 매장 페이지 공개는 곧 열려요.
+                        </p>
                         <section>
                             <SectionTitle>우리 매장 대회</SectionTitle>
                             <Card className="overflow-hidden">
@@ -677,15 +689,15 @@ export default function PartnerDashboard() {
                         </Card>
 
                         {/* 프리미엄 안내 — 웹에서, 아직 프리미엄이 아닐 때만. 앱 안에서는 구독 권유·가격을 보이지 않는다(감사 S9) */}
-                        {!native && isBasic && (
+                        {!native && isBasic && !PARTNER_PREMIUM_OPEN && (
                             <div className="rounded-[1.25rem] bg-[var(--house-green)] p-6 shadow-[0_8px_30px_rgba(30,57,50,0.25)]">
                                 <span className="text-[#cba258] text-[12px] font-bold">랭큐 멤버십</span>
                                 <h3 className="text-[20px] font-bold text-white mt-0.5">프리미엄 멤버십</h3>
                                 <ul className="mt-4 space-y-3">
                                     {[
-                                        ["데이터 소유권", "회원 명부·방문 데이터 엑셀 다운로드"],
+                                        ["데이터 소유권", "회원 명부·접속 데이터 엑셀 다운로드"],
                                         ["스마트 마케팅", "수신 동의 회원 대상 단체 문자 준비"],
-                                        ["상세 분석 리포트", "매장 방문 패턴 분석"],
+                                        ["상세 분석 리포트", "회원 접속 패턴 분석"],
                                     ].map(([title, desc]) => (
                                         <li key={title} className="flex gap-3">
                                             <span className="mt-0.5 w-5 h-5 rounded-full bg-[#cba258]/[0.15] flex items-center justify-center shrink-0"><LucideCheck className="w-3 h-3 text-[#cba258]" /></span>
@@ -756,8 +768,8 @@ export default function PartnerDashboard() {
                             <div className="flex-1 min-h-0 overflow-y-auto px-5 pb-6 space-y-4" style={{ paddingBottom: "calc(env(safe-area-inset-bottom) + 1.5rem)" }}>
                                 <div className="grid grid-cols-3 gap-2">
                                     {([
-                                        ["마지막 방문", lastVisitLabel(openMember.lastVisitedAt)],
-                                        ["누적 방문", `${openMember.visitCount}회`],
+                                        ["마지막 접속", lastVisitLabel(openMember.lastVisitedAt)],
+                                        ["누적 접속", `${openMember.visitCount}일`],
                                         ["이번 달 게임", `${openMember.monthlyGameCount}판`],
                                         ["3쿠션 에버", Number(openMember.avg3c || 0).toFixed(3)],
                                         ["3쿠션 핸디", openMember.handi3c ?? "-"],
@@ -796,7 +808,7 @@ export default function PartnerDashboard() {
                         광고성 문자는 <b>수신 동의한 회원</b>에게만 보낼 수 있어요(정보통신망법). 번호를 복사해 쓰시는 문자 앱에 붙여 넣으세요 — 문자 앞에 '(광고)'와 수신거부 방법을 꼭 넣어 주세요.
                     </SheetDescription>
                     <div className="mt-4 grid grid-cols-2 gap-2">
-                        {([["all", "수신 동의 전체"], ["dormant", "30일+ 미방문"]] as const).map(([k, label]) => (
+                        {([["all", "수신 동의 전체"], ["dormant", "30일+ 미접속"]] as const).map(([k, label]) => (
                             <button key={k} onClick={() => setSmsTarget(k)}
                                 className={`h-12 rounded-xl text-[14px] font-bold border ${smsTarget === k ? "border-brand bg-brand/[0.06] text-brand" : "border-black/10 text-black/65"}`}>
                                 {label}

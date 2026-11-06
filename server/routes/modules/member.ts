@@ -7,6 +7,7 @@ import { put } from "@vercel/blob";
 import { deleteBlobs } from "../../utils/blob.js";
 import { stripImageMetadata, IMAGE_CONTENT_TYPE, IMAGE_EXT } from "../../utils/imageMeta.js";
 import { GOLF_PHOTO_CATEGORIES } from "../../../shared/golfPhoto.js";
+import { STORE_PHOTO_CATEGORY } from "../../../shared/storePhotos.js";
 import { HIKING_PHOTO_CATEGORIES } from "../../../shared/hikingPhotos.js";
 import { FISHING_PHOTO_CATEGORIES } from "../../../shared/fishing.js";
 import { removeAllWishes } from "../../storage/hikingWishes.js";
@@ -66,7 +67,8 @@ router.post("/upload", requireAuth, asyncHandler(async (req: AuthRequest, res: a
     const clean = stripImageMetadata(buffer);
     // 공개로 나갈 수 있는 골프 사진은 알아볼 수 있는 이미지만 받는다(메타를 걷었다고 장담할 수 있는 것만).
     // 등산의 산행 사진도 같다(2026-10-13) — 사진의 위치 정보를 걷었다고 장담할 수 있는 것만 받는다.
-    if ((GOLF_PHOTO_CATEGORIES.has(safeCat) || HIKING_PHOTO_CATEGORIES.has(safeCat) || FISHING_PHOTO_CATEGORIES.has(safeCat)) && !clean.type) return sendError(res, 400, "err.member.imageRequired");
+    // 매장 사진(2026-11-06)도 공개 매장 페이지에 바로 뜬다 — 같다
+    if ((GOLF_PHOTO_CATEGORIES.has(safeCat) || HIKING_PHOTO_CATEGORIES.has(safeCat) || FISHING_PHOTO_CATEGORIES.has(safeCat) || safeCat === STORE_PHOTO_CATEGORY) && !clean.type) return sendError(res, 400, "err.member.imageRequired");
     const { url } = await put(`hiq/${safeCat}/${req.userId}.${clean.type ? IMAGE_EXT[clean.type] : "webp"}`, clean.buffer, {
         access: "public",
         contentType: clean.type ? IMAGE_CONTENT_TYPE[clean.type] : "image/webp",

@@ -30,13 +30,15 @@ interface Listing {
   source?: string | null; licenseDate?: string | null; govStatus?: string | null; govClosedDate?: string | null;
   crews?: Array<{ id: string; name: string; emblem: string | null; gameType: string; memberCount: number }>;
   honor?: { founder: string | null; regular: { name: string; games: number } | null } | null;
+  /** 사장님이 직접 적은 것(2026-11-06) — 공지 · 주차 · 매장 사진. 인증한 매장만 */
+  owner?: { notice: string | null; parking: string | null; photos: string[] } | null;
 }
 
 // 페이지 문구 — 디렉터리는 한국 콘텐츠지만 라벨은 5개 언어 (stores.tsx와 같은 패턴)
 const L: Record<Locale, Record<string, string>> = {
   ko: {
     back: "매장 찾기", unverified: "수집 정보", verified: "✓ 사장님 인증", govInfo: "인허가 정보", license: "인허가", licenseSource: "행정안전부 인허가 자료", nearOpenCta: "근처 영업 중인 당구장 보기", newBadge: "새로 연 곳", fillTitle: "요금 · 영업시간이 아직 없어요", fillDesc: "다녀오셨다면 아는 만큼만 알려 주세요. 확인한 뒤 이 페이지에 싣습니다.", fillCta: "아는 만큼 알려 주기", fillDialogTitle: "이 당구장, 아는 만큼 알려 주세요", fillDialogDesc: "모르는 칸은 비워 두셔도 돼요. 확인한 내용만 이 페이지에 싣습니다.", fillTemplate: "영업시간: \n테이블(대대 · 중대 · 포켓): \n10분 요금: \n전화: ",
-    address: "주소", phone: "전화", hours: "영업시간", tables: "테이블",
+    address: "주소", phone: "전화", hours: "영업시간", tables: "테이블", ownerNotice: "사장님 공지", photos: "매장 사진", parking: "주차",
     large: "대대", medium: "중대", pocket: "포켓",
     rates: "요금", per10: "10분당", flat: "정액", won: "원",
     crewsTitle: "이 매장에서 활동하는 크루", crewMembers: "명",
@@ -64,7 +66,7 @@ const L: Record<Locale, Record<string, string>> = {
   },
   en: {
     back: "Find a venue", unverified: "Collected info", verified: "✓ Owner verified", govInfo: "Public license data", license: "Licensed", licenseSource: "Korean government license data", nearOpenCta: "See open halls nearby", newBadge: "Newly opened", fillTitle: "No rates or hours yet", fillDesc: "Been there? Tell us what you know — we'll check and add it here.", fillCta: "Share what you know", fillDialogTitle: "Tell us about this hall", fillDialogDesc: "Leave blanks for what you don't know. We only publish what we can confirm.", fillTemplate: "Hours: \nTables (carom · medium · pocket): \n10-min rate: \nPhone: ",
-    address: "Address", phone: "Phone", hours: "Hours", tables: "Tables",
+    address: "Address", phone: "Phone", hours: "Hours", tables: "Tables", ownerNotice: "Notice from the owner", photos: "Photos", parking: "Parking",
     large: "Large", medium: "Medium", pocket: "Pocket",
     rates: "Rates", per10: "per 10 min", flat: "Flat rate", won: "₩",
     crewsTitle: "Crews based at this venue", crewMembers: "members",
@@ -92,7 +94,7 @@ const L: Record<Locale, Record<string, string>> = {
   },
   vi: {
     back: "Tìm quán", unverified: "Thông tin thu thập", verified: "✓ Chủ quán xác nhận", govInfo: "Dữ liệu giấy phép", license: "Cấp phép", licenseSource: "Dữ liệu giấy phép của chính phủ Hàn Quốc", nearOpenCta: "Xem quán đang mở gần đây", newBadge: "Mới mở", fillTitle: "Chưa có giá và giờ mở cửa", fillDesc: "Bạn đã đến đây? Hãy cho biết những gì bạn biết — chúng tôi sẽ kiểm tra và thêm vào.", fillCta: "Chia sẻ thông tin", fillDialogTitle: "Cho chúng tôi biết về quán này", fillDialogDesc: "Có thể bỏ trống phần không biết. Chúng tôi chỉ đăng những gì đã xác nhận.", fillTemplate: "Giờ mở cửa: \nBàn (lớn · vừa · lỗ): \nGiá 10 phút: \nĐiện thoại: ",
-    address: "Địa chỉ", phone: "Điện thoại", hours: "Giờ mở cửa", tables: "Bàn",
+    address: "Địa chỉ", phone: "Điện thoại", hours: "Giờ mở cửa", tables: "Bàn", ownerNotice: "Thông báo của chủ quán", photos: "Ảnh quán", parking: "Đỗ xe",
     large: "Lớn", medium: "Vừa", pocket: "Pocket",
     rates: "Giá", per10: "mỗi 10 phút", flat: "Trọn gói", won: "₩",
     crewsTitle: "Crew hoạt động tại đây", crewMembers: "thành viên",
@@ -120,7 +122,7 @@ const L: Record<Locale, Record<string, string>> = {
   },
   tr: {
     back: "Salon bul", unverified: "Derlenen bilgi", verified: "✓ Sahibi onaylı", govInfo: "Resmî ruhsat bilgisi", license: "Ruhsat", licenseSource: "Kore hükümeti ruhsat verisi", nearOpenCta: "Yakındaki açık salonlar", newBadge: "Yeni açıldı", fillTitle: "Henüz fiyat ve saat yok", fillDesc: "Gittiniz mi? Bildiklerinizi paylaşın — kontrol edip buraya ekleriz.", fillCta: "Bildiklerini paylaş", fillDialogTitle: "Bu salonu anlatın", fillDialogDesc: "Bilmediklerinizi boş bırakabilirsiniz. Yalnızca doğruladıklarımızı yayınlarız.", fillTemplate: "Saatler: \nMasalar (büyük · orta · pool): \n10 dk ücret: \nTelefon: ",
-    address: "Adres", phone: "Telefon", hours: "Çalışma saatleri", tables: "Masalar",
+    address: "Adres", phone: "Telefon", hours: "Çalışma saatleri", tables: "Masalar", ownerNotice: "Salon sahibinden duyuru", photos: "Fotoğraflar", parking: "Otopark",
     large: "Büyük", medium: "Orta", pocket: "Pocket",
     rates: "Ücretler", per10: "10 dk başına", flat: "Sabit ücret", won: "₩",
     crewsTitle: "Bu salonda aktif ekipler", crewMembers: "üye",
@@ -148,7 +150,7 @@ const L: Record<Locale, Record<string, string>> = {
   },
   es: {
     back: "Buscar local", unverified: "Información recopilada", verified: "✓ Verificado", govInfo: "Datos de licencia", license: "Licencia", licenseSource: "Datos oficiales de licencias de Corea", nearOpenCta: "Ver locales abiertos cerca", newBadge: "Recién abierto", fillTitle: "Aún sin precios ni horario", fillDesc: "¿Has ido? Cuéntanos lo que sepas — lo revisaremos y lo añadiremos.", fillCta: "Compartir lo que sé", fillDialogTitle: "Cuéntanos de este local", fillDialogDesc: "Deja en blanco lo que no sepas. Solo publicamos lo que podemos confirmar.", fillTemplate: "Horario: \nMesas (grande · mediana · pool): \nTarifa 10 min: \nTeléfono: ",
-    address: "Dirección", phone: "Teléfono", hours: "Horario", tables: "Mesas",
+    address: "Dirección", phone: "Teléfono", hours: "Horario", tables: "Mesas", ownerNotice: "Aviso del local", photos: "Fotos", parking: "Estacionamiento",
     large: "Grande", medium: "Mediana", pocket: "Pocket",
     rates: "Tarifas", per10: "por 10 min", flat: "Tarifa plana", won: "₩",
     crewsTitle: "Crews activos en este local", crewMembers: "miembros",
@@ -199,6 +201,8 @@ export default function StoreListingPage() {
   const t = L[locale] ?? L.ko;
 
   const [claimOpen, setClaimOpen] = useState(false);
+  // 매장 사진 크게 보기(2026-11-06) — 앱 안에서 새 창(_blank)은 문서를 갈아 치우므로 이 화면 위에 띄운다
+  const [photoOpen, setPhotoOpen] = useState<string | null>(null);
   const [suggestOpen, setSuggestOpen] = useState(false);
   // 'fix' = 정보가 다른가요(수정 제안) · 'fill' = 요금 · 영업시간이 빈 매장의 '아는 만큼 알려 주기'(2026-10-21) — 같은 제보함으로 간다
   const [suggestMode, setSuggestMode] = useState<"fix" | "fill">("fix");
@@ -437,6 +441,27 @@ export default function StoreListingPage() {
               </div>
             ) : null; })()}
 
+            {/* 사장님이 올린 매장 사진(2026-11-06 — shared/storePhotos). 가로로 넘긴다, 누르면 크게 */}
+            {(s.owner?.photos.length ?? 0) > 0 && (
+              <section className="mb-4" aria-label={t.photos} data-testid="listing-owner-photos">
+                <p className="text-[12px] font-bold text-black/55 mb-2">{t.photos}</p>
+                <div className="-mx-5 flex gap-2 overflow-x-auto px-5 pb-1" style={{ scrollbarWidth: "none" }}>
+                  {s.owner!.photos.map((url, i) => (
+                    <button key={url} type="button" onClick={() => setPhotoOpen(url)} className="h-[150px] w-[200px] shrink-0 overflow-hidden rounded-2xl bg-black/[0.04]" aria-label={`${t.photos} ${i + 1}`}>
+                      <img src={url} alt="" loading={i < 2 ? "eager" : "lazy"} decoding="async" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+            {/* 사장님 공지(2026-11-06 — 예전엔 저장만 되고 어디에도 안 보였다) */}
+            {s.owner?.notice && (
+              <div className="mb-4 rounded-2xl bg-white p-4 shadow-[0_1px_2px_rgba(0,0,0,0.05)]" data-testid="listing-owner-notice">
+                <p className="text-[12px] font-bold text-brand">📢 {t.ownerNotice}</p>
+                <p className="mt-1 whitespace-pre-line text-[14.5px] leading-relaxed text-black/80 break-keep">{s.owner.notice}</p>
+              </div>
+            )}
+
             {/* 검색 유입 → 가입(2026-09-27 오너) — 전화·길찾기를 마친 사람에게 다음 거리: 온라인게임 '길 찾기'.
                 폐업 신고된 곳엔 '가기 전에 몸풀기'가 앞뒤가 안 맞아 뺀다(2026-10-20) */}
             {!isClosedListing(s) && <PathFinderPromo src="store" name={s.name} className="mb-4" />}
@@ -465,6 +490,12 @@ export default function StoreListingPage() {
                 <div>
                   <p className="text-[12px] font-bold text-black/55">{t.hours}</p>
                   <p className="text-[14.5px] font-medium mt-0.5 tabular-nums">{s.openHours}</p>
+                </div>
+              )}
+              {s.owner?.parking && (
+                <div data-testid="listing-owner-parking">
+                  <p className="text-[12px] font-bold text-black/55">{t.parking}</p>
+                  <p className="text-[14.5px] font-medium mt-0.5 break-keep">{s.owner.parking}</p>
                 </div>
               )}
               {tableRows.length > 0 && (
@@ -694,6 +725,15 @@ export default function StoreListingPage() {
                 {t.claimSubmit}
               </button>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* 매장 사진 크게 */}
+        <Dialog open={!!photoOpen} onOpenChange={(o) => { if (!o) setPhotoOpen(null); }}>
+          <DialogContent className="max-w-[min(92vw,720px)] border-0 bg-black p-0">
+            <DialogTitle className="sr-only">{t.photos}</DialogTitle>
+            <DialogDescription className="sr-only">{s?.name ?? ""}</DialogDescription>
+            {photoOpen && <img src={photoOpen} alt="" className="max-h-[80vh] w-full rounded-lg object-contain" />}
           </DialogContent>
         </Dialog>
 
