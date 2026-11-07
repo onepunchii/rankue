@@ -6,6 +6,11 @@ import { db } from "../db.js";
 import { hiqAppSessions } from "../../shared/schema.js";
 import { and, eq, sql } from "drizzle-orm";
 import { IDLE_END_MS, MAX_SESSION_MS, type AppPlatform } from "../../shared/appSession.js";
+import { RETENTION_DAYS, type RetentionDay, type RetentionGroup, type RetentionReport } from "../../shared/retention.js";
+
+/** 접속 기록이 쌓이기 시작한 날 — 그 전 가입자는 재방문을 셀 수 없다(shared/retention) */
+export const RETENTION_SINCE = "2026-09-13";
+const SPORT_LABEL: Readonly<Record<string, string>> = { BILLIARDS: "당구", GOLF: "골프", HIKING: "등산", FISHING: "낚시", NONE: "종목 미정" };
 
 /** SQL 에서 세션 끝 = coalesce(closed_at, last_seen_at), 길이는 상한으로 자른다(잠든 폰의 8시간짜리 방지). */
 const SESSION_END = sql`coalesce(closed_at, last_seen_at)`;
@@ -103,6 +108,61 @@ export class AppSessionRepository {
                 week: String(c.week), signed: n(c.signed), d1: n(c.d1), d7: n(c.d7), d30: n(c.d30),
                 d7Ready: c.d7_ready === true, d30Ready: c.d30_ready === true,
             })),
+        };
+    }
+
+    /**
+     * 회원 리텐션 — 업계와 같은 '그날' 셈(정의는 shared/retention 머리말). 2026-11-07 오너 "타 플랫폼 대비 리텐션" → 어드민 회원 화면 '회원이 다시 오나요'.
+     * 사람 단위(profile_id) · 탈퇴 제외 · RETENTION_SINCE 이후 가입. 앱/웹은 처음 연 곳, 종목은 처음 고른 주 종목.
+     */
+    async retention(): Promise<RetentionReport> {
+        const cols = RETENTION_DAYS.map((n) => sql.raw(`
+            count(distinct pid) filter (where signed + interval '${n + 1} days' <= now()) as e${n},
+            count(distinct pid) filter (where signed + interval '${n + 1} days' <= now() and day = ${n}) as r${n}`));
+        const rows = (await db.execute(sql`
+            with people as (
+                select coalesce(profile_id::text, id::text) as pid, min(created_at) as signed,
+                       (array_agg(primary_sport order by created_at) filter (where primary_sport is not null))[1] as sport
+                from hiq_members where phone is null or phone not like 'del-%'
+                group by 1
+            ),
+            mrow as (select id, coalesce(profile_id::text, id::text) as pid from hiq_members),
+            s as (select m.pid, a.opened_at, a.platform from hiq_app_sessions a join mrow m on m.id = a.member_id),
+            firstp as (select distinct on (pid) pid, platform from s order by pid, opened_at),
+            d as (
+                select p.pid, p.signed, coalesce(p.sport, 'NONE') as sport,
+                       case when f.platform in ('ios', 'android') then 'app' when f.platform = 'web' then 'web' else 'none' end as plat,
+                       floor(extract(epoch from (s.opened_at - p.signed)) / 86400)::int as day
+                from people p
+                left join s on s.pid = p.pid and s.opened_at >= p.signed
+                left join firstp f on f.pid = p.pid
+                where p.signed >= ${RETENTION_SINCE}::timestamp
+            )
+            select g.kind, g.key, count(distinct pid)::int as signed, ${sql.join(cols, sql`, `)}
+            from d cross join lateral (values ('all', 'all'), ('plat', plat), ('sport', sport)) as g(kind, key)
+            group by 1, 2`)).rows as Record<string, unknown>[];
+        const n = (v: unknown) => Number(v ?? 0);
+        const group = (kind: string, key: string, label: string): RetentionGroup => {
+            const r = rows.find((x) => x.kind === kind && x.key === key);
+            const days = Object.fromEntries(RETENTION_DAYS.map((d) => [d, { eligible: n(r?.[`e${d}`]), returned: n(r?.[`r${d}`]) }])) as Record<RetentionDay, { eligible: number; returned: number }>;
+            return { key, label, signed: n(r?.signed), days };
+        };
+        const [st] = (await db.execute(sql`
+            with mrow as (select id, coalesce(profile_id::text, id::text) as pid from hiq_members),
+            s as (select m.pid, a.opened_at, (a.opened_at at time zone 'UTC' at time zone 'Asia/Seoul')::date as day
+                  from hiq_app_sessions a join mrow m on m.id = a.member_id where a.platform <> 'web' and a.opened_at >= now() - interval '30 days')
+            select (select coalesce(avg(c), 0) from (select count(distinct pid) c from s where opened_at >= now() - interval '28 days' group by day) x)::float as avg_daily,
+                   (select count(distinct pid) from s)::int as monthly,
+                   (select count(*) from (select pid from s group by pid having count(distinct day) = 1) y)::int as one_day`)).rows as Record<string, unknown>[];
+        return {
+            since: RETENTION_SINCE,
+            all: group("all", "all", "전체"),
+            app: group("plat", "app", "앱으로 시작"),
+            web: group("plat", "web", "웹으로 시작"),
+            sports: ["BILLIARDS", "GOLF", "HIKING", "FISHING", "NONE"]
+                .map((k) => group("sport", k, SPORT_LABEL[k]))
+                .filter((g) => g.signed > 0),
+            stickiness: { appAvgDaily: Math.round(n(st?.avg_daily) * 10) / 10, appMonthly: n(st?.monthly), appOneDay: n(st?.one_day) },
         };
     }
 

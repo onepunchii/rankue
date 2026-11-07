@@ -123,7 +123,12 @@ router.post("/sim/recompute-ratings", checkSuperAdmin, asyncHandler(async (req: 
 
 // GET /admin/activity — 앱 접속 요약(DAU/WAU/MAU · 최근 7일 세션 · 가입 코호트 리텐션 D1/D7/D30), 2026-09-13 오너
 router.get("/activity", checkSuperAdmin, asyncHandler(async (_req: any, res: any) => {
-    return sendSuccess(res, await storage.appSessions.summary(8));
+    // 리텐션(2026-11-07 — 업계와 같은 '그날' 셈 · 앱/웹 · 종목, shared/retention). 실패해도 접속 요약은 그대로 낸다
+    const [summary, retention] = await Promise.all([
+        storage.appSessions.summary(8),
+        storage.appSessions.retention().catch((e: unknown) => { console.error("[admin retention]", e); return null; }),
+    ]);
+    return sendSuccess(res, { ...summary, retention });
 }));
 
 // GET /admin/promo-funnel — 검색 유입 → 가입 깔때기(2026-09-27): 최근 14일, 출처(store·pba·umb)·단계별 하루 유니크 방문자 합.

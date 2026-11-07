@@ -6,6 +6,7 @@
  *  - 폰은 카드 목록, 넓은 화면은 핵심 칸만 남긴 표. 줄을 누르면 회원 상세(보기·수정·조치)가 열린다.
  *  - 한 번에 50명씩, '더 보기'로 이어서.
  *  - 앱 접속 요약·가입 코호트 리텐션은 접어 두는 칸으로(필요할 때만 펼친다).
+ *  - 2026-11-07 '회원이 다시 오나요'(RetentionPanel) — 업계와 같은 셈 · 앱/웹 · 종목 · 업계 평균선. 옛 가입 주별 표는 'N일 안에 한 번이라도' 셈이라 이름을 그렇게 바꿨다.
  */
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -18,11 +19,15 @@ import { ageBandOf } from "@shared/profileBasics";
 /** 엑셀의 나이대 칸(관리 화면은 한국어 — 설정 화면의 profileBasics.age.* 와 같은 말) */
 const AGE_LABEL: Readonly<Record<string, string>> = { "10s": "10대", "20s": "20대", "30s": "30대", "40s": "40대", "50s": "50대", "60s": "60대 이상" };
 import { MemberAvatar, PlatformIcon, CountryFlag, kstDate, lastSeenLabel, lastSeenTone, daysSince, isKstToday, phoneLabel, KpiTile, ADMIN_STICKY_TOP, SPORT_CHIP, SportChip } from "./adminUtils";
+import RetentionPanel from "./RetentionPanel";
+import type { RetentionReport } from "@shared/retention";
 
 type Activity = {
     today: number; yesterday: number;
     dau: number; wau: number; mau: number; sessions7: number; avgMinutes7: number;
     cohorts: { week: string; signed: number; d1: number; d7: number; d30: number; d7Ready: boolean; d30Ready: boolean }[];
+    /** 업계와 같은 셈의 리텐션(2026-11-07) — 서버가 못 셌으면 null */
+    retention?: RetentionReport | null;
 };
 
 type Filter = "all" | "today" | "active7" | "dormant" | "new7" | "banned";
@@ -124,9 +129,10 @@ export default function MembersView({ onOpenId }: {
                         <KpiTile label="7일 세션" value={activity.sessions7} unit="회" />
                         <KpiTile label="평균 세션" value={activity.avgMinutes7} unit="분" />
                     </div>
+                    {activity.retention && <RetentionPanel r={activity.retention} />}
                     <button onClick={() => setShowRetention((v) => !v)} className="flex items-center gap-1 text-[12.5px] font-bold text-black/50 hover:text-brand">
                         <LucideChevronDown className={`w-4 h-4 transition-transform ${showRetention ? "rotate-180" : ""}`} />
-                        가입 주별 재방문(리텐션) {showRetention ? "접기" : "보기"}
+                        가입 주별 — 그 기간 안에 한 번이라도 다시 왔나 {showRetention ? "접기" : "보기"}
                     </button>
                     {showRetention && (
                         <div className="rounded-2xl overflow-hidden border border-black/10 overflow-x-auto">
@@ -135,9 +141,9 @@ export default function MembersView({ onOpenId }: {
                                     <tr className="border-b border-black/10 bg-black/[0.02]">
                                         <th className="p-3 font-black text-black/55">가입 주</th>
                                         <th className="p-3 font-black text-black/55 text-right">가입</th>
-                                        <th className="p-3 font-black text-black/55 text-right" title="가입 다음 날 다시 왔나">D1</th>
-                                        <th className="p-3 font-black text-black/55 text-right" title="가입 후 7일 안에 다시 왔나">D7</th>
-                                        <th className="p-3 font-black text-black/55 text-right" title="가입 후 30일 안에 다시 왔나">D30</th>
+                                        <th className="p-3 font-black text-black/55 text-right" title="가입 다음 날 다시 왔나">다음 날</th>
+                                        <th className="p-3 font-black text-black/55 text-right" title="가입 후 7일 안에 한 번이라도 다시 왔나">7일 안</th>
+                                        <th className="p-3 font-black text-black/55 text-right" title="가입 후 30일 안에 한 번이라도 다시 왔나">30일 안</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -155,7 +161,7 @@ export default function MembersView({ onOpenId }: {
                                     )}
                                 </tbody>
                             </table>
-                            <p className="px-3 py-2 text-[11px] text-black/40 bg-white">접속 기록은 이 기능을 켠 날부터 쌓입니다. 그 전 가입자의 D1·D7은 기록이 없어 낮게 나옵니다.</p>
+                            <p className="px-3 py-2 text-[11px] text-black/40 bg-white">이 표는 'N일 안에 한 번이라도'라 위 '회원이 다시 오나요'(그날 셈)보다 높게 나옵니다 — 업계와 견줄 때는 위 숫자를 보세요. 접속 기록은 9/13부터 쌓였습니다.</p>
                         </div>
                     )}
                 </div>
