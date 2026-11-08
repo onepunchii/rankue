@@ -120,16 +120,26 @@ describe("D. 채팅 금지", () => {
         expect(textBranch.indexOf("chatBanOf(")).toBeLessThan(textBranch.indexOf('checkContent(t, { context: "match" })'));
         expect(textBranch).toContain("const auto = await countChatFilterHit(req.userId!);");
     });
-    it("크루 · 1:1 채팅도 막는다 — 운영자 문의와 오너(슈퍼 관리자)는 빼고(문의 = 금지에 이의를 말할 길)", () => {
+    it("크루 · 1:1 채팅도 막는다 — 운영자 문의와 관리자(오너 · 보기 전용 관리자, 2026-11-08)는 빼고(문의 = 금지에 이의를 말할 길)", () => {
         const chat = read("server/routes/modules/chat.ts");
-        const at = chat.indexOf('if (ref.kind !== "support" && !trusted) {\n        // 채팅 금지');
+        const at = chat.indexOf('if (ref.kind !== "support" && !exempt) {\n        // 채팅 금지');
         expect(at).toBeGreaterThan(-1);
         expect(chat.slice(at, at + 400)).toContain("const ban = await chatBanOf(req.userId!);");
-        expect(chat.slice(at - 200, at)).toContain("const trusted = await isSuperAdmin(req.userId);");
+        const head = chat.slice(at - 300, at);
+        expect(head).toContain("const exempt = isConsoleRole(role);");
+        // 링크가 눌리는 글은 여전히 오너 글만
+        expect(head).toContain("const trusted = isSuperAdminRole(role);");
     });
-    it("오너(슈퍼 관리자)는 대전 채팅에서도 금지 · 금칙어 · 가리기를 받지 않는다(2026-10-29)", () => {
+    it("관리자 판정 — 슈퍼관리자와 보기 전용 관리자 둘 다 금지 예외(lib/superAdmin isModerationExempt)", () => {
+        const lib = read("server/lib/superAdmin.ts");
+        expect(lib).toContain("return isConsoleRole(await memberRoleOf(memberId));");
+        // 크루 글 · 커뮤니티 글도 같은 예외(권한 판정은 그대로 isSuperAdmin)
+        expect(read("server/routes/modules/crew.ts")).toContain("{ trusted: await isModerationExempt(req.userId) }");
+        expect(read("server/routes/modules/community.ts")).toContain("const trusted = await isModerationExempt(req.userId);");
+    });
+    it("오너 · 관리자는 대전 채팅에서도 금지 · 금칙어 · 가리기를 받지 않는다(2026-10-29 · 관리자 2026-11-08)", () => {
         const send = section(route, 'router.post("/sim/matches/:id/chat"', "// POST /sim/matches/:id/resign");
-        expect(send).toContain("const trusted = await isSuperAdmin(req.userId);");
+        expect(send).toContain("const trusted = await isModerationExempt(req.userId);");
         expect(send).toContain("const ban = trusted ? null : await chatBanOf(req.userId!);");
         expect(send).toContain('const check = trusted ? null : checkContent(t, { context: "match" });');
         expect(send).toContain("text = trusted ? t : maskContacts(t);");

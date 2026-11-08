@@ -78,7 +78,12 @@ vi.mock("../../db.js", () => ({ db: {}, pool: {} }));
 vi.mock("../../storage/index.js", () => ({ storage: mem.storage }));
 vi.mock("../../services/notificationService.js", () => ({ notificationService: mem.notificationService }));
 vi.mock("../../middleware/terms.js", () => ({ requireTermsAccepted: (_req: unknown, _res: unknown, next: () => void) => next() }));
-vi.mock("../../lib/superAdmin.js", () => ({ async isSuperAdmin(id: string) { return mem.state.superAdmins.has(id); } }));
+vi.mock("../../lib/superAdmin.js", () => ({
+    async isSuperAdmin(id: string) { return mem.state.superAdmins.has(id); },
+    // chat.ts 는 역할 한 칸을 읽어 금지 예외(관리자 둘 다)와 링크(오너만)를 가른다(2026-11-08)
+    async memberRoleOf(id: string) { return mem.state.superAdmins.has(id) ? "super_admin" : null; },
+    async isModerationExempt(id: string) { return mem.state.superAdmins.has(id); },
+}));
 
 type FakeRes = { statusCode: number; body: any };
 type FakeReq = { userId?: string; params?: Record<string, string>; query?: Record<string, unknown>; body?: unknown; locale?: string };

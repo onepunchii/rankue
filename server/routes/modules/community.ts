@@ -8,7 +8,7 @@ import { requireAuth, AuthRequest } from "../../middleware/auth.js";
 import { asyncHandler } from "../../utils/asyncHandler.js";
 import { deleteBlobs } from "../../utils/blob.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
-import { isSuperAdmin } from "../../lib/superAdmin.js";
+import { isModerationExempt } from "../../lib/superAdmin.js";
 // 약관 미동의 회원의 UGC 작성 거절(TERMS_REQUIRED) — 작성 라우트에만 건다(middleware/terms.ts)
 import { requireTermsAccepted } from "../../middleware/terms.js";
 import { msg } from "../../lib/i18n.js";
@@ -76,7 +76,8 @@ router.post("/posts", requireAuth, requireTermsAccepted, asyncHandler(async (req
     // 게시 전 필터링 — 내기당구·거래·욕설은 게시 거부 (심사 차단 항목).
     // 태그·지역명도 공개 표시되므로 함께 검사한다 (마스킹 우회 통로 봉쇄).
     // 오너(슈퍼 관리자)의 글은 거르지도 가리지도 않는다(2026-10-29 — 채팅과 같은 규칙, 공지에 링크 · 연락처를 싣는다).
-    const trusted = await isSuperAdmin(req.userId);
+    // 오너와 관리자(보기 전용, 2026-11-08)는 금칙어 · 가리기를 받지 않는다
+    const trusted = await isModerationExempt(req.userId);
     const clean = trusted ? (v: string) => v : maskContacts;
     const filter = trusted ? null : checkContent([title || "", content, safeRegion || "", ...safeTags].join("\n"));
     if (filter?.blocked) return sendError(res, 400, filter.reason!);
@@ -154,7 +155,8 @@ router.post("/posts/:id/comments", requireAuth, requireTermsAccepted, asyncHandl
     if (!post) return sendError(res, 404, "err.community.postNotFound");
     if (post.isBlinded) return sendError(res, 400, "err.community.blindedNoComment");
 
-    const trusted = await isSuperAdmin(req.userId);
+    // 오너와 관리자(보기 전용, 2026-11-08)는 금칙어 · 가리기를 받지 않는다
+    const trusted = await isModerationExempt(req.userId);
     const filter = trusted ? null : checkContent(content);
     if (filter?.blocked) return sendError(res, 400, filter.reason!);
 

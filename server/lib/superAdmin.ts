@@ -8,6 +8,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../db.js";
 import { hiqMembers, profiles } from "../../shared/schema.js";
+import { isConsoleRole } from "../../shared/adminRole.js";
 
 export async function isSuperAdmin(memberId: string | undefined | null): Promise<boolean> {
     if (!memberId) return false;
@@ -15,4 +16,22 @@ export async function isSuperAdmin(memberId: string | undefined | null): Promise
         .innerJoin(profiles, eq(profiles.id, hiqMembers.profileId))
         .where(eq(hiqMembers.id, memberId)).limit(1);
     return row?.role === "super_admin";
+}
+
+/** 그 회원의 역할(profiles.role) — 없으면 null */
+export async function memberRoleOf(memberId: string | undefined | null): Promise<string | null> {
+    if (!memberId) return null;
+    const [row] = await db.select({ role: profiles.role }).from(hiqMembers)
+        .innerJoin(profiles, eq(profiles.id, hiqMembers.profileId))
+        .where(eq(hiqMembers.id, memberId)).limit(1);
+    return row?.role ?? null;
+}
+
+/**
+ * 채팅 · 글 거르기를 받지 않는 사람(2026-11-08 오너: "다대맨이 채팅 금지됐다는데 관리자는 금지 안 되게 해당 사항 없게 — 보기 관리자로 지정했어").
+ * 슈퍼관리자와 관리자(보기 전용) 둘 다 — 채팅 금지 · 금칙어 · 연락처 가리기 · 자동 금지 셈을 건너뛴다.
+ * ⚠️ 받는 사람 화면에서 **링크가 눌리는 글**은 여전히 슈퍼관리자 글뿐이다(isSuperAdmin · chat.repo trusted) — 피싱 통로를 넓히지 않는다.
+ */
+export async function isModerationExempt(memberId: string | undefined | null): Promise<boolean> {
+    return isConsoleRole(await memberRoleOf(memberId));
 }

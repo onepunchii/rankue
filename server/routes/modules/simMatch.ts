@@ -31,7 +31,7 @@ import {
 } from "../../../shared/sim/chat.js";
 import { checkContent, maskContacts } from "../../utils/contentFilter.js";
 import { chatBanOf, countChatFilterHit } from "../../storage/chatBans.js";
-import { isSuperAdmin } from "../../lib/superAdmin.js";
+import { isModerationExempt } from "../../lib/superAdmin.js";
 import { chatBanHoursLeft } from "../../../shared/chatBan.js";
 import { ROOM_TITLE_MAX, checkRoomTitle } from "../../../shared/sim/roomTitle.js";
 import { handicapPair, hasEnoughRecord, MIN_INNINGS, playerAverage, RECENT_MATCHES, scaledTarget, TARGET_INNINGS, targetFor } from "../../../shared/sim/handicap.js";
@@ -1177,8 +1177,8 @@ router.post("/sim/matches/:id/chat", requireAuth, asyncHandler(async (req: AuthR
     } else if (typeof body.text === "string") {
         if (!canWriteChatText(m, req.userId!)) return sendError(res, 403, "err.sim.watcherText", "WATCHER_TEXT");
         // 채팅 금지(2026-10-26 — shared/chatBan) — 글만 막는다. 문구 단추(위 code 가지)는 그대로.
-        // 오너(슈퍼 관리자)는 금지 · 금칙어 · 가리기를 받지 않는다(2026-10-29 — chat.ts 와 같은 규칙)
-        const trusted = await isSuperAdmin(req.userId);
+        // 오너(슈퍼 관리자)와 관리자(보기 전용, 2026-11-08)는 금지 · 금칙어 · 가리기를 받지 않는다(chat.ts 와 같은 규칙)
+        const trusted = await isModerationExempt(req.userId);
         const ban = trusted ? null : await chatBanOf(req.userId!);
         if (ban) return sendError(res, 403, msg("err.chat.banned", { n: chatBanHoursLeft(ban, Date.now()) }), "CHAT_BANNED");
         // 원문 방어값(정규화 전). 이걸 넘기면 정규화·필터에 긴 문자열을 태울 이유가 없다.
