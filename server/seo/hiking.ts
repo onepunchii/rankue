@@ -39,6 +39,8 @@ import {
 } from "../../shared/hikingAbroad.js";
 import { HIKING_GRANDS, HIKING_PINS, HIKING_SERIES, hikingBooks, type HikingBookKind } from "../../shared/hikingStamps.js";
 import { MOUNTAIN_TOUR_PHOTOS } from "../data/mountainTourPhotos.js";
+import { baseLabel, dayLabel, dayLine, dayPop, daySky, type CourseWeather } from "../../shared/golfWeather.js";
+import { SUMMIT_WX_COPY, summitWx, type SummitBase } from "../../shared/hikingSummitWx.js";
 /** 한국관광공사 사진(2026-10-21) — 화면(TourPhotos)과 같은 값 · 같은 출처 표시. 3유형 변경 금지라 크기를 적지 않고 원본 그대로 */
 const tourFigures = (name: string, photos: readonly { url: string; lic: "Type1" | "Type3" }[]) => photos.length
     ? `  <h2>${esc(name)} 사진</h2>\n${photos.map((ph, i) => `  <figure><img src="${esc(ph.url)}" alt="${esc(`${name} 사진 ${i + 1}`)}" loading="lazy"><figcaption>${esc(`사진 한국관광공사 · 공공누리 제${ph.lic === "Type1" ? 1 : 3}유형`)}</figcaption></figure>`).join("\n")}\n`
@@ -138,7 +140,35 @@ ${hubNav("ko")}`;
 const NAMED_KINDS: readonly HikingPoiKind[] = ["DANGER", "SHELTER", "CULTURAL", "WILD"];
 const NAMED_MAX = 12;
 
-function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: number })[], trails: readonly TrailNear[] = []): HikingRender {
+/** 산의 날씨 — 받아 둔 기상청 예보만(봇이 올 때 기상청을 부르지 않는다). 화면(MountainParts)과 같은 자료 · 같은 말 */
+export interface MountainWx { weather: CourseWeather | null; summit: SummitBase | null }
+function weatherSection(name: string, wx: MountainWx | null | undefined, nowMs: number): string {
+    const w = wx?.weather;
+    if (!w || !w.days.length) return "";
+    const days = w.days.slice(0, 5);
+    const row = (x: CourseWeather["days"][number]) => {
+        const pop = dayPop(x);
+        return `<tr><th scope="row">${esc(dayLabel(x.date))}</th><td>${esc(daySky(x) || "—")}</td><td>${x.tmn != null ? `${x.tmn}°` : "—"}</td><td>${x.tmx != null ? `${x.tmx}°` : "—"}</td><td>${pop != null ? `${pop}%` : "—"}</td></tr>`;
+    };
+    // 정상 어림(산 아래 예보를 높이 차만큼 낮춘 값) — 들머리를 아는 산만
+    const sw = wx?.summit ? summitWx(w.hours, { heightM: wx.summit.heightM, baseM: wx.summit.baseM, nowMs }) : null;
+    const sd = sw?.days.find((x) => x.slots.filter((s) => s.tmp != null).length >= 2) ?? sw?.days[0];
+    const summitLine = sw && sd ? `${SUMMIT_WX_COPY.title}(${sw.heightM.toLocaleString("ko-KR")}m) ${sd.label} — ${sd.slots.filter((s) => s.tmp != null).map((s) => `${s.label} ${s.tmp}°${s.feel != null && s.feel !== s.tmp ? `(${SUMMIT_WX_COPY.feel} ${s.feel}°)` : ""}`).join(" · ")}` : "";
+    return `  <section>
+    <h2>${esc(name)} 날씨</h2>
+    <p>${esc(days.slice(0, 2).map((x) => dayLine(x)).join(" / "))}</p>
+${summitLine ? `    <p>${esc(summitLine)}</p>\n    <p>${esc(SUMMIT_WX_COPY.note(sw!.riseM, sw!.dropC))}</p>\n` : ""}    <table>
+      <caption>${esc(`${name} 산 아래 날씨 — 기상청 ${baseLabel(w.base)} 발표`)}</caption>
+      <thead><tr><th scope="col">날짜</th><th scope="col">하늘</th><th scope="col">최저</th><th scope="col">최고</th><th scope="col">강수확률</th></tr></thead>
+      <tbody>
+${days.map((x) => `      ${row(x)}`).join("\n")}
+      </tbody>
+    </table>
+  </section>
+`;
+}
+
+function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: number })[], trails: readonly TrailNear[] = [], wx: MountainWx | null = null, nowMs = Date.now()): HikingRender {
     const seo = mountainSeo(d);
     const g = d.guide;
     const lists = listNames(d.lists);
@@ -165,7 +195,7 @@ function mountain(d: MountainDetail, nearby: readonly (MountainSummary & { km: n
   <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${HIKING_HUB_PATH}">${esc(HIKING_NAV_LABEL)}</a>${region ? ` › <a href="${hikingRegionPath(region.id)}">${esc(`${region.name}의 산`)}</a>` : ""} › ${esc(d.name)}</nav>
   <h1>${esc(d.name)}</h1>
 ${g?.subtitle ? `  <p>${esc(g.subtitle)}</p>\n` : ""}  <p>${esc(facts.join(" · "))}</p>
-${g?.intro ? `  <p>${esc(g.intro)}</p>\n` : ""}${tourFigures(d.name, MOUNTAIN_TOUR_PHOTOS[d.slug]?.photos ?? [])}  <section>
+${g?.intro ? `  <p>${esc(g.intro)}</p>\n` : ""}${tourFigures(d.name, MOUNTAIN_TOUR_PHOTOS[d.slug]?.photos ?? [])}${weatherSection(d.name, wx, nowMs)}  <section>
     <h2>${esc(MOUNTAIN_LABEL.courses)}</h2>
 ${courses.length ? `    <p>${esc(MOUNTAIN_LABEL.coursesAside)}</p>
     <ul>
@@ -423,7 +453,7 @@ ${hubNav("ko")}`;
  * 주소 → 검색용 화면. 등산의 주소가 아니거나 없는 권역 · 목록 · 산이면 null(다음 라우트로 — 화면이 '없는 산이에요'를 그린다).
  * detail 은 산 화면일 때만 부른다(산 한 곳의 글 · 코스 · 지점).
  */
-export async function renderHiking(path: string, all: readonly MountainSummary[], detail: (slug: string) => Promise<{ d: MountainDetail; nearby: (MountainSummary & { km: number })[]; trails?: TrailNear[] } | null>): Promise<HikingRender | null> {
+export async function renderHiking(path: string, all: readonly MountainSummary[], detail: (slug: string) => Promise<{ d: MountainDetail; nearby: (MountainSummary & { km: number })[]; trails?: TrailNear[]; wx?: MountainWx | null } | null>): Promise<HikingRender | null> {
     const p = path.replace(/\/+$/, "") || "/";
     if (p === HIKING_HUB_PATH) return all.length ? hub(all) : null;
     if (p === HIKING_STAMPS_PATH) return all.length ? stamps(all) : null;
@@ -453,7 +483,7 @@ export async function renderHiking(path: string, all: readonly MountainSummary[]
         return listing(`hiking:list:${l.id}`, hikingListSeo(l, items.length), l.name, `${l.name} ${items.length.toLocaleString("en-US")}곳 — ${l.note}.`, items, items.length);
     }
     const got = await detail(key);
-    return got ? mountain(got.d, got.nearby, got.trails ?? []) : null;
+    return got ? mountain(got.d, got.nearby, got.trails ?? [], got.wx ?? null) : null;
 }
 
 /** 사이트맵 — 허브 · 권역 여덟 · 목록 다섯 · 산(코스나 글이 있는 산만 — 빈 화면을 색인에 올리지 않는다) */

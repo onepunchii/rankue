@@ -280,6 +280,8 @@ function TrailCourseRoute() { return <Suspense fallback={hikingFallback}><TrailC
 // 전국 축제(2026-10-21) — 공개 화면 · 등산의 색(shared/sportRoute). 검색용 화면은 server/seo/festivals, 봇 경로는 vercel.json
 const FestivalsHub = lazy(() => import("@/festivals/pages/FestivalsHub"));
 const FestivalPage = lazy(() => import("@/festivals/pages/FestivalPage"));
+// 축제 묶음(2026-11-08) — 달 · 시도 · 종류. 검색용 화면은 server/seo/festivals group, 셈은 shared/festivalHubs
+const FestivalGroupPage = lazy(() => import("@/festivals/pages/FestivalGroupPage"));
 function FestivalsHubRoute() { return <Suspense fallback={hikingFallback}><FestivalsHub /></Suspense>; }
 function FestivalRoute() { return <Suspense fallback={hikingFallback}><FestivalPage /></Suspense>; }
 // 낚시(2026-10-14) — 네 번째 종목의 첫 뼈대. 지금은 운영자에게만 보인다(/me 의 fishingAccess). 검색용 화면 · 사이트맵은 아직 없다
@@ -291,6 +293,7 @@ const FishingSeaHub = lazy(() => import("@/fishing/spots/SeaPages").then((m) => 
 const FishingSeaArea = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.SeaAreaPage })));
 const FishingPort = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.PortPage })));
 const FishingTidePoint = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.TidePointPage })));
+const FishingTideHub = lazy(() => import("@/fishing/spots/SeaPages").then((m) => ({ default: m.TideHub })));
 const FishingFishHub = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishHub })));
 const FishingFish = lazy(() => import("@/fishing/spots/FishPages").then((m) => ({ default: m.FishPage })));
 const FishingClosed = lazy(() => import("@/fishing/spots/ClosedPage").then((m) => ({ default: m.ClosedPage })));
@@ -516,6 +519,7 @@ function AppRoutes() {
       <Route path="/fishing/fish">{() => <Suspense fallback={spotFallback}><FishingFishHub /></Suspense>}</Route>
       <Route path="/fishing/fish/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingFish name={decodeURIComponent(p.name)} /></Suspense>}</Route>
       <Route path="/fishing/port/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingPort name={decodeURIComponent(p.name)} /></Suspense>}</Route>
+      <Route path="/fishing/tide">{() => <Suspense fallback={spotFallback}><FishingTideHub /></Suspense>}</Route>
       <Route path="/fishing/tide/:name">{(p: { name: string }) => <Suspense fallback={spotFallback}><FishingTidePoint name={decodeURIComponent(p.name)} /></Suspense>}</Route>
       <Route path="/fishing" component={FishingRoute} />
       <Route path="/fishing/trip" component={FishingTripRoute} />
@@ -528,6 +532,7 @@ function AppRoutes() {
       <Route path="/fishing/gear" component={FishingGearRoute} />
       <Route path="/fishing/tank" component={FishingTankRoute} />
       <Route path="/festivals" component={FestivalsHubRoute} />
+      <Route path="/festivals/:kind/:key">{(p: { kind: string; key: string }) => (p.kind === "month" || p.kind === "region" || p.kind === "theme") ? <Suspense fallback={hikingFallback}><FestivalGroupPage kind={p.kind} k={decodeURIComponent(p.key)} /></Suspense> : <NotFound />}</Route>
       <Route path="/festivals/:id" component={FestivalRoute} />
       {/* 종목마다의 축제 화면(2026-10-21 오너: "낚시에서 전국축제 누르면 등산으로 가잖아") — 같은 화면, 종목의 색 · 하단 탭 */}
       <Route path="/golf/festivals" component={FestivalsHubRoute} />

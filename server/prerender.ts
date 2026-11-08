@@ -2154,6 +2154,8 @@ ${list}
       });
       // 없는 해역 · 항구(표가 코드에 있다 — 자료 탓일 수 없다)
       if (!r) return sendGone(res, "없는 바다 · 항구예요", "랭큐 낚시 물때 페이지에 없는 이름이에요.");
+      // 도시 이름으로 온 물때 주소(/fishing/tide/인천) → 같은 이름의 항구 · 지점(2026-11-08)
+      if (r.status === 301 && r.location) return res.redirect(301, r.location);
       noStore(res);
       res.setHeader("X-Prerender", r.tag);
       res.status(r.status).send(r.html);
@@ -2235,7 +2237,13 @@ ${list}
         // 가까운 둘레길(10/21) — 앱 화면과 같은 셈(shared/trailFestivals trailsNear)
         const { trailCourses, toSummary } = await import("./storage/koreaTrails.js");
         const { trailsNear } = await import("../shared/trailFestivals.js");
-        return { d, nearby: nearbyMountains(all, d), trails: d.lat != null && d.lng != null ? trailsNear(trailCourses().map(toSummary), d.lat, d.lng) : [] };
+        // 산의 날씨(2026-11-08 — '설악산 날씨' 67 · '한라산 날씨' 51) — 화면 API 와 같은 자리(들머리 격자, 모르면 정상 좌표)의 받아 둔 예보만, 2초까지
+        const { trailheadPoint } = await import("../shared/hikingSummitWx.js");
+        const base = trailheadPoint(d.heightM, d.courseList);
+        const at = base ?? (d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null);
+        const weather = at ? await Promise.race([getCourseWeather({ lat: at.lat, lng: at.lng }, { fetch: false }).catch(() => null), new Promise<null>((ok) => setTimeout(() => ok(null), 2000))]) : null;
+        const wx = { weather, summit: weather && base && d.heightM != null ? { heightM: d.heightM, baseM: base.m } : null };
+        return { d, nearby: nearbyMountains(all, d), trails: d.lat != null && d.lng != null ? trailsNear(trailCourses().map(toSummary), d.lat, d.lng) : [], wx };
       });
       // 산 표를 읽었는데 없는 산 · 권역 · 목록 · 용어 · 해외 코스면 404(허브처럼 자료가 비어서 못 그린 경우는 화면에 맡긴다)
       if (!r) return all.length && /^\/hiking\/(?:regions|lists|mountains|terms|abroad)\/[^/]+\/?$/.test(req.path) ? sendGone(res, "없는 산이에요", "랭큐 등산에 없는 페이지예요.") : next();

@@ -27,6 +27,7 @@ import { FestivalPicks } from "../components/FestivalPicks";
 import { FestSection, festSportOfPath, festTheme } from "../theme";
 import { FestShell } from "../FestShell";
 import { FESTIVALS_KEY, festivalLayerKey, type FestivalLayerData, type FestivalsData } from "../api";
+import { FESTIVAL_THEMES, festivalMonthPath, festivalRegionLong, festivalRegionPath, festivalThemePath } from "@shared/festivalHubs";
 
 const LIST_SHOW = 20;
 const md = (ymd: string) => `${Number(ymd.slice(4, 6))}월 ${Number(ymd.slice(6, 8))}일`;
@@ -189,6 +190,15 @@ export default function FestivalsHub() {
                                     )}
                                 </>
                             )}
+                        </FestSection>
+
+                        {/* 달 · 지역 · 종류 묶음(2026-11-08 — '11월 축제' · '부산 축제' · '불꽃축제'로 찾아온 사람의 화면) */}
+                        <FestSection title="달 · 지역 · 종류로 보기" testId="festival-groups">
+                            <div className="flex flex-wrap gap-1.5">
+                                {[...Array.from({ length: 12 }, (_, i) => [festivalMonthPath(i + 1), `${i + 1}월`] as const), ...FESTIVAL_THEMES.map((x) => [festivalThemePath(x.slug), x.name] as const), ...FESTIVAL_REGIONS.map((r) => [festivalRegionPath(r), festivalRegionLong(r)] as const)].map(([href, label]) => (
+                                    <Link key={href} href={href} className="flex h-9 items-center rounded-full px-3.5 text-[13px] active:opacity-80" style={{ color: `${t.text}B3`, boxShadow: `inset 0 0 0 1px ${t.text}29` }}>{label}</Link>
+                                ))}
+                            </div>
                         </FestSection>
 
                         <div className="px-5 pb-6 pt-8">

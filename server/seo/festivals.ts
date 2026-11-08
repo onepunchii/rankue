@@ -13,6 +13,11 @@ import { coursePath } from "../../shared/golfCourse.js";
 import { fishingSpotPath } from "../../shared/fishingPlaces.js";
 import { trailCoursePath, type TrailRouteId } from "../../shared/koreaTrails.js";
 import { festivalCardUrl, hubCard } from "../../shared/ogCards.js";
+import {
+    FESTIVAL_THEMES, festivalGroupPaths, festivalInSitemap, festivalMonthPath, festivalMonthSeo, festivalRegionByName, festivalRegionLong, festivalRegionPath, festivalRegionSeo,
+    festivalsOfMonth, festivalsOfRegion, festivalsOfTheme, festivalThemeBySlug, festivalThemePath, festivalThemeSeo,
+} from "../../shared/festivalHubs.js";
+import { FESTIVAL_REGIONS } from "../../shared/festivals.js";
 
 /** 본문 제목 바로 밑에 그 화면의 미리보기 그림(등산 · 골프장 검색용 화면과 같은 꼴 — og:image 와 같은 한 장) */
 const withCard = (body: string, card: { url: string; width: number; height: number; alt: string } | null | undefined): string =>
@@ -22,7 +27,8 @@ const ORIGIN = "https://www.rankue.co.kr";
 export interface FestivalRender { status: 200; tag: string; html: string }
 /** 축제의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
 // 종목마다의 축제 화면(/golf · /hiking · /fishing/festivals…)도 같은 글 — 정본(canonical)은 /festivals… 하나(주소창에서 복사해 보낸 링크도 카드가 붙게)
-export const FESTIVALS_RE = /^\/(?:(?:golf|hiking|fishing)\/)?festivals(?:\/\d{1,12})?\/?$/;
+// 달 · 시도 · 종류 묶음(2026-11-08 — shared/festivalHubs)은 /festivals/<month|region|theme>/<키> 하나뿐(종목 주소 없이)
+export const FESTIVALS_RE = /^\/(?:(?:golf|hiking|fishing)\/)?festivals(?:\/\d{1,12}|\/(?:month|region|theme)\/[^/]+)?\/?$/;
 
 type Around = {
     mountains: { slug: string; name: string; heightM: number | null; km: number }[];
@@ -39,6 +45,16 @@ const crumbs = (...tail: [string, string][]) => ({
 const isoDay = (ymd: string) => `${ymd.slice(0, 4)}-${ymd.slice(4, 6)}-${ymd.slice(6, 8)}`;
 const line = (f: FestivalRow, today: string) =>
     `      <li><a href="${festivalPath(f.id)}">${esc(f.title)}</a> — ${esc([festivalPeriod(f, true), f.region, festivalBadge(f, today)].filter(Boolean).join(" · "))}</li>`;
+/** 달 · 시도 · 종류 묶음으로 가는 줄(허브 · 묶음 화면 아래) */
+const groupNav = () => `  <nav aria-label="달마다 축제">
+${Array.from({ length: 12 }, (_, i) => `    <a href="${festivalMonthPath(i + 1)}">${i + 1}월 축제</a>`).join("\n")}
+  </nav>
+  <nav aria-label="지역 축제">
+${FESTIVAL_REGIONS.map((r) => `    <a href="${festivalRegionPath(r)}">${esc(festivalRegionLong(r))} 축제</a>`).join("\n")}
+  </nav>
+  <nav aria-label="종류별 축제">
+${FESTIVAL_THEMES.map((t) => `    <a href="${festivalThemePath(t.slug)}">${esc(t.name)}</a>`).join("\n")}
+  </nav>`;
 const nav = () => `  <nav aria-label="둘러보기">
     <a href="${FESTIVALS_PATH}">${esc(FESTIVALS_H1)}</a>
     <a href="${HIKING_HUB_PATH}">전국 명산</a>
@@ -81,6 +97,7 @@ ${x.items.map((f) => line(f, today)).join("\n")}
     </ul>`).join("\n")}
   </section>
   <p>${esc(FESTIVAL_CREDIT)}</p>
+${groupNav()}
 ${nav()}
 </main>
 ${hubNav("ko")}`;
@@ -162,9 +179,69 @@ ${hubNav("ko")}`;
     return { status: 200, tag: "festivals:one", html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card), jsonLd: [event, crumbs([f.title, seo.path])], image: card }) };
 }
 
+/** 달 · 시도 · 종류 묶음 한 장(2026-11-08) — 목록 + 묶음 사이 줄. 축제가 하나도 없으면 null(404) */
+function group(kind: "month" | "region" | "theme", key: string, all: readonly FestivalRow[], today: string): FestivalRender | null {
+    const year = today.slice(0, 4);
+    let seo: { path: string; h1: string; title: string; desc: string };
+    let sections: { h: string; items: readonly FestivalRow[] }[];
+    let tag: string;
+    if (kind === "month") {
+        const m = Number(key);
+        if (!Number.isInteger(m) || m < 1 || m > 12 || String(m) !== key) return null;
+        const r = festivalsOfMonth(all, m, today);
+        if (!r.items.length) return null;
+        seo = festivalMonthSeo(m, r);
+        sections = [{ h: `${r.year}년 ${m}월에 ${r.past ? "열렸던" : "열리는"} 축제 ${r.items.length}곳`, items: r.items }];
+        tag = `festivals:month:${m}`;
+    } else if (kind === "region") {
+        const r = festivalRegionByName(key);
+        if (!r) return null;
+        const g = festivalsOfRegion(all, r, today);
+        if (!g.live.length && !g.past.length) return null;
+        seo = festivalRegionSeo(r, g, year);
+        sections = [{ h: `지금 · 곧 열리는 ${festivalRegionLong(r)} 축제 ${g.live.length}곳`, items: g.live }, { h: `최근 1년에 열린 ${festivalRegionLong(r)} 축제 ${g.past.length}곳`, items: g.past }];
+        tag = "festivals:region";
+    } else {
+        const t = festivalThemeBySlug(key);
+        if (!t) return null;
+        const g = festivalsOfTheme(all, t, today);
+        if (!g.live.length && !g.past.length) return null;
+        seo = festivalThemeSeo(t, g, year);
+        sections = [{ h: `지금 · 곧 열리는 ${t.name} ${g.live.length}곳`, items: g.live }, { h: `최근 1년에 열린 ${t.name} ${g.past.length}곳`, items: g.past }];
+        tag = "festivals:theme";
+    }
+    const shown = sections.filter((x) => x.items.length);
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${FESTIVALS_PATH}">${esc(FESTIVALS_H1)}</a> › ${esc(seo.h1)}</nav>
+  <h1>${esc(seo.h1)}</h1>
+  <p>${esc(seo.desc)}</p>
+${shown.map((x) => `  <section>
+    <h2>${esc(x.h)}</h2>
+    <ul>
+${x.items.map((f) => line(f, today)).join("\n")}
+    </ul>
+  </section>`).join("\n")}
+  <p>${esc(FESTIVAL_CREDIT)}</p>
+${groupNav()}
+${nav()}
+</main>
+${hubNav("ko")}`;
+    const items = shown.flatMap((x) => x.items);
+    const list = { "@context": "https://schema.org", "@type": "ItemList", name: seo.h1, numberOfItems: items.length, itemListElement: items.slice(0, 100).map((f, i) => ({ "@type": "ListItem", position: i + 1, name: f.title, url: `${ORIGIN}${festivalPath(f.id)}` })) };
+    const card = hubCard(ORIGIN, FESTIVALS_PATH);
+    // 꼬리표는 X-Prerender 머리에 실린다 — 영문 · 숫자만(한글 금지)
+    return { status: 200, tag, html: page({ lang: "ko", title: seo.title, desc: seo.desc, canonical: `${ORIGIN}${seo.path}`, body: withCard(body, card ? { ...card, alt: seo.h1 } : card), jsonLd: [list, crumbs([seo.h1, seo.path])], ...(card ? { image: { ...card, alt: seo.h1 } } : {}) }) };
+}
+
 export async function renderFestivals(path: string, all: readonly FestivalRow[], today: string, detail: (id: string) => Promise<{ f: FestivalDetail; around: Around } | null>): Promise<FestivalRender | null> {
     const p = path.replace(/\/+$/, "").replace(/^\/(?:golf|hiking|fishing)(?=\/festivals(?:\/|$))/, "") || "/";
     if (p === FESTIVALS_PATH) return all.length ? hub(all, today) : null;
+    const g = /^\/festivals\/(month|region|theme)\/([^/]+)$/.exec(p);
+    if (g) {
+        let key: string;
+        try { key = decodeURIComponent(g[2]); } catch { return null; }
+        return all.length ? group(g[1] as "month" | "region" | "theme", key, all, today) : null;
+    }
     const m = /^\/festivals\/(\d{1,12})$/.exec(p);
     if (!m) return null;
     const d = await detail(m[1]);
@@ -177,6 +254,9 @@ export function festivalSitemapParts(all: readonly FestivalRow[], today: string)
     const day = (ymd: string | null) => (ymd ? isoDay(ymd) : null);
     return [
         entry(`${ORIGIN}${FESTIVALS_PATH}`, { changefreq: "daily", priority: "0.7", lastmod: isoDay(today), image: hubCard(ORIGIN, FESTIVALS_PATH)?.url }),
-        ...all.map((f) => entry(`${ORIGIN}${festivalPath(f.id)}`, { changefreq: "weekly", priority: f.end >= today ? "0.6" : "0.4", lastmod: day(f.mod), image: festivalCardUrl(ORIGIN, f.id), ...(f.image ? { images: [f.image] } : {}) })),
+        // 달 · 시도 · 종류 묶음(2026-11-08)
+        ...festivalGroupPaths(all, today).map((path) => entry(`${ORIGIN}${path}`, { changefreq: "daily", priority: "0.6", lastmod: isoDay(today), image: hubCard(ORIGIN, FESTIVALS_PATH)?.url })),
+        // 끝난 지 90일 넘은 축제는 뺀다(2026-11-08 — 2024년 행사가 남아 있었다. 페이지는 그대로)
+        ...all.filter((f) => festivalInSitemap(f, today)).map((f) => entry(`${ORIGIN}${festivalPath(f.id)}`, { changefreq: "weekly", priority: f.end >= today ? "0.6" : "0.4", lastmod: day(f.mod), image: festivalCardUrl(ORIGIN, f.id), ...(f.image ? { images: [f.image] } : {}) })),
     ];
 }

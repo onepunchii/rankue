@@ -35,7 +35,8 @@ import { SEA_FCST_REG } from "../../../shared/fishingSeaFcst.js";
 import { getIndexMap, getMainPortTurns, getPortBrief } from "../../services/fishingPort.js";
 import { allPlaces, placeById } from "../../storage/fishingPlaces.js";
 import { tidePointByName, tidePointData, tidePointNearPlace, tidePoints } from "../../services/fishingTidePoints.js";
-import { nearTidePoints } from "../../../shared/fishingTidePoints.js";
+import { fishingTidePath, nearTidePoints, tideAlias } from "../../../shared/fishingTidePoints.js";
+import { fishingPortPath } from "../../../shared/fishingSeaPages.js";
 import { FISHING_PORTS } from "../../../shared/fishingStations.js";
 import { isPlaceId, nearbyPlaces, nearestPort } from "../../../shared/fishingPlaces.js";
 import { nearestWeather, type CatchWeather } from "../../../shared/fishingSpot.js";
@@ -297,7 +298,12 @@ router.get("/ports/:code", asyncHandler(async (req: any, res: any) => {
 /* ── 물때 지점(2026-11-04 — shared/fishingTidePoints · services/fishingTidePoints) — 누구나. 목록에 있는 지점만 바깥을 부른다 ── */
 router.get("/tide/:name", asyncHandler(async (req: any, res: any) => {
     const p = tidePointByName(String(req.params.name ?? ""));
-    if (!p) return sendError(res, 404, "물때 지점을 찾을 수 없어요");
+    if (!p) {
+        // 도시 이름(인천 · 강릉)이면 같은 이름의 항구 · 지점 주소를 알려 준다 — 화면이 그리로 옮긴다(2026-11-08, 봇은 301)
+        const al = tideAlias(String(req.params.name ?? ""), tidePoints().map((x) => x.name), FISHING_PORTS.map((x) => x.name));
+        if (al) { publicCache(res, 86_400); return sendSuccess(res, { redirect: al.kind === "port" ? fishingPortPath(al.name) : fishingTidePath(al.name) }); }
+        return sendError(res, 404, "물때 지점을 찾을 수 없어요");
+    }
     const data = await tidePointData(p, await allPlaces().catch(() => []), { fetch: true });
     // 이레를 다 받았으면 한 시간, 아니면 2분(못 받은 날을 곧 다시 받게)
     publicCache(res, data.days.every((d) => d.turns.length) ? 3600 : 120);
@@ -309,7 +315,8 @@ router.get("/tide-points", asyncHandler(async (req: any, res: any) => {
     const near = FISHING_PORTS.find((x) => x.code === String(req.query.near ?? ""));
     publicCache(res, 86_400);
     if (near) return sendSuccess(res, { points: nearTidePoints(all, { lat: near.lat, lng: near.lng }, 10, 40) });
-    return sendSuccess(res, { points: all.filter((x) => !area || x.area === area).map((x) => ({ name: x.name, km: null })).sort((a, b) => a.name.localeCompare(b.name, "ko")) });
+    // area 는 전국 물때표 허브(2026-11-08)가 바다마다 나누려고 쓴다
+    return sendSuccess(res, { points: all.filter((x) => !area || x.area === area).map((x) => ({ name: x.name, km: null, area: x.area })).sort((a, b) => a.name.localeCompare(b.name, "ko")) });
 }));
 
 /* ── 크루 정출판 — 정출마다 최대어 · 마릿수 · 잡어상, 한 해의 점수(shared/fishingTrip). 크루는 있는 크루(hiq_crews)를 그대로 쓴다 ── */

@@ -13,12 +13,12 @@ import { FISHING_SPOTS_LABEL, FISHING_SPOTS_PATH, fishingSpotPath, nearestPort, 
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath, fishingSeaAreaPath, portByName, portSeo, portsOf, seaAreaById, seaAreaSeo, seaArt, seaHubSeo } from "../../shared/fishingSeaPages.js";
 import { fishingSeaCardUrl } from "../../shared/ogCards.js";
 import { fishingKstDay } from "../../shared/fishing.js";
-import { fishingTidePath, nearTidePoints, tidePointSeo, type TidePointData, type TidePointDef } from "../../shared/fishingTidePoints.js";
+import { fishingTidePath, nearTidePoints, tideAlias, tideHubFaq, tideHubSeo, tidePointSeo, tideTodaySentence, TIDE_HUB_LABEL, TIDE_HUB_PATH, type TidePointData, type TidePointDef } from "../../shared/fishingTidePoints.js";
 
 const ORIGIN = "https://www.rankue.co.kr";
-export interface FishingSeaRender { status: 200; tag: string; html: string }
-/** 바다 · 항구의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다 */
-export const FISHING_SEA_RE = /^\/fishing\/(?:sea(?:\/[^/]+)?|port\/[^/]+|tide\/[^/]+)\/?$/;
+export interface FishingSeaRender { status: 200 | 301; tag: string; html: string; location?: string }
+/** 바다 · 항구의 주소인가 — vercel.json 봇 라우트에도 같은 경로가 있어야 한다. /fishing/tide 홀로는 전국 물때표 허브(2026-11-08) */
+export const FISHING_SEA_RE = /^\/fishing\/(?:sea(?:\/[^/]+)?|port\/[^/]+|tide(?:\/[^/]+)?)\/?$/;
 
 export interface FishingSeaDeps {
     sea: () => Promise<SeaNow | null>;
@@ -43,7 +43,7 @@ const seaSpotsOf = (all: readonly PublicPlace[], pick: (code: string, area: stri
     all.filter((p) => { if (p.kind !== "바다") return false; const n = nearestPort(FISHING_PORTS, p); return !!n && pick(n.code, n.area); });
 const nowLines = (a: SeaArea | null | undefined) => (a ? [seaHeadline(a), ...seaNotes(a)] : []);
 const foot = () => `  <p>자료: ${esc(SEA_SOURCE)} · ${esc(SEA_FCST_SOURCE)} · 국립해양조사원 조석 예보 · 한국천문연구원 출몰시각. 받은 그대로 보여 주고, 바뀌었을 수 있어요. ${esc(SEA_CAUTION)}</p>
-  <p><a href="${FISHING_SPOTS_PATH}">${esc(FISHING_SPOTS_LABEL)}</a> · <a href="/?login=1">가입하고 조과 기록 · 어탁 모으기</a></p>`;
+  <p><a href="${TIDE_HUB_PATH}">${esc(TIDE_HUB_LABEL)}</a> · <a href="${FISHING_SPOTS_PATH}">${esc(FISHING_SPOTS_LABEL)}</a> · <a href="/?login=1">가입하고 조과 기록 · 어탁 모으기</a></p>`;
 const cover = (area: string, alt: string) => `  <img src="${ORIGIN}${seaArt(area)}" width="640" height="640" alt="${esc(alt)}" loading="eager">`;
 
 /** 앞으로 4주 물때(서해 · 남해 동해 제주) — 음력으로 센 것, 바깥 자료 없음. 한국 달력을 모르는 환경이면 빈 글 */
@@ -81,6 +81,40 @@ ${foot()}
     const list = { "@context": "https://schema.org", "@type": "ItemList", name: seo.h1, numberOfItems: FISHING_PORTS.length, itemListElement: FISHING_PORTS.map((p, i) => ({ "@type": "ListItem", position: i + 1, name: `${p.name} 물때`, url: `${ORIGIN}${fishingPortPath(p.name)}` })) };
     const card = { url: fishingSeaCardUrl(ORIGIN, "all"), width: 1200, height: 1200, alt: seo.h1 };
     return { status: 200, tag: "fishing:sea", html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${FISHING_SEA_PATH}`, body, image: card, jsonLd: [list, crumbs()] }) };
+}
+
+/**
+ * 전국 물때표 허브(2026-11-08) — 오늘 물때 한 줄(음력) · 바다마다 항구 + 포구 · 섬 링크 · 앞으로 4주 물때 · 묻고 답하기.
+ * 바깥 자료를 기다리지 않는다(지점마다의 만조 · 간조는 각 화면에) — 그래서 늘 같은 모양으로 나간다.
+ */
+function tideHub(tps: readonly TidePointDef[], nowMs: number): FishingSeaRender {
+    const seo = tideHubSeo(FISHING_PORTS.length, tps.length);
+    const today = fishingKstDay(nowMs);
+    const lead = tideTodaySentence(today);
+    const faq = tideHubFaq(today);
+    const body = `<main>
+  <nav aria-label="경로"><a href="/">랭큐 홈</a> › <a href="${FISHING_SEA_PATH}">${esc(FISHING_SEA_LABEL)}</a> › ${esc(TIDE_HUB_LABEL)}</nav>
+  <h1>${esc(seo.h1)}</h1>
+${lead ? `  <p><strong>${esc(lead)}</strong></p>\n` : ""}  <p>${esc(seo.description)}</p>
+${SEA_AREAS.map((a) => {
+        const pts = tps.filter((t) => t.area === a.id);
+        return `  <section>
+    <h2><a href="${fishingSeaAreaPath(a.id)}">${esc(a.name)} 물때표</a> — ${esc(a.hint)}</h2>
+    <p>항구: ${portLinks(a.id)}</p>
+${pts.length ? `    <p>포구 · 섬: ${tideLinks(pts)}</p>\n` : ""}  </section>`;
+    }).join("\n")}
+${tideCalendar(nowMs)}
+  <section>
+    <h2>묻고 답하기</h2>
+${faq.map((f) => `    <h3>${esc(f.q)}</h3>\n    <p>${esc(f.a)}</p>`).join("\n")}
+  </section>
+${foot()}
+</main>`;
+    const items = [...FISHING_PORTS.map((p) => ({ name: `${p.name} 물때`, url: `${ORIGIN}${fishingPortPath(p.name)}` })), ...tps.map((t) => ({ name: `${t.name} 물때`, url: `${ORIGIN}${fishingTidePath(t.name)}` }))];
+    const list = { "@context": "https://schema.org", "@type": "ItemList", name: seo.h1, numberOfItems: items.length, itemListElement: items.map((x, i) => ({ "@type": "ListItem", position: i + 1, ...x })) };
+    const faqLd = { "@context": "https://schema.org", "@type": "FAQPage", mainEntity: faq.map((f) => ({ "@type": "Question", name: f.q, acceptedAnswer: { "@type": "Answer", text: f.a } })) };
+    const card = { url: fishingSeaCardUrl(ORIGIN, "all"), width: 1200, height: 1200, alt: seo.h1 };
+    return { status: 200, tag: "fishing:tide-hub", html: page({ lang: "ko", title: seo.title, desc: seo.description, canonical: `${ORIGIN}${TIDE_HUB_PATH}`, body, image: card, jsonLd: [list, faqLd, crumbs([TIDE_HUB_LABEL, TIDE_HUB_PATH])] }) };
 }
 
 /** 그 바다의 물때 지점 링크(이름순) — 항구 쉰한 곳 밖의 포구 · 섬 */
@@ -163,12 +197,18 @@ export async function renderFishingSea(path: string, deps: FishingSeaDeps, nowMs
         const [brief, all] = await Promise.all([deps.port(def.code).catch(() => null), deps.places().catch(() => [] as PublicPlace[])]);
         return port(name, brief, all, nowMs, deps.tidePoints?.() ?? []);
     }
+    if (p === TIDE_HUB_PATH) return tideHub(deps.tidePoints?.() ?? [], nowMs);
     const tp = /^\/fishing\/tide\/([^/]+)$/.exec(p);
     if (tp) {
         let name: string;
         try { name = decodeURIComponent(tp[1]).normalize("NFC"); } catch { return null; }
-        const def = (deps.tidePoints?.() ?? []).find((x) => x.name === name);
-        if (!def) return null;
+        const tps = deps.tidePoints?.() ?? [];
+        const def = tps.find((x) => x.name === name);
+        if (!def) {
+            // 도시 이름으로 온 주소('인천 물때') → 같은 이름의 항구 · 지점으로 301(2026-11-08)
+            const al = tideAlias(name, tps.map((x) => x.name), FISHING_PORTS.map((x) => x.name));
+            return al ? { status: 301, tag: "fishing:tide:301", html: "", location: `${ORIGIN}${al.kind === "port" ? fishingPortPath(al.name) : fishingTidePath(al.name)}` } : null;
+        }
         const data = await deps.tide?.(def).catch(() => null) ?? null;
         return tidePage(def, data, nowMs);
     }
@@ -219,6 +259,7 @@ export function fishingSeaSitemapParts(today: string, tps: readonly TidePointDef
     const at = (path: string, key: string, priority: string) => entry(`${ORIGIN}${path}`, { changefreq: "daily", priority, lastmod: today, image: fishingSeaCardUrl(ORIGIN, key) });
     return [
         at(FISHING_SEA_PATH, "all", "0.7"),
+        at(TIDE_HUB_PATH, "all", "0.8"),
         ...SEA_AREAS.map((a) => at(fishingSeaAreaPath(a.id), a.id, "0.6")),
         ...FISHING_PORTS.map((p) => at(fishingPortPath(p.name), p.name, p.main ? "0.6" : "0.5")),
         ...tps.map((t) => entry(`${ORIGIN}${fishingTidePath(t.name)}`, { changefreq: "daily", priority: "0.5", lastmod: today })),

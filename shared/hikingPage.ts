@@ -52,7 +52,12 @@ export function hikingListSeo(l: { id: string; name: string; note?: string }, n:
     return { path: hikingListPath(l.id), title: `${LIST_TITLE[l.id]?.(count) ?? `${l.name} ${count}곳 — 높이 · 등산코스`}${BRAND}`, desc: `${l.name} ${n.toLocaleString("en-US")}곳의 높이와 위치, 등산 코스를 한눈에.${l.note ? ` ${l.note}.` : ""}` };
 }
 
-export interface SeoMountain { slug: string; name: string; heightM: number | null; sido: string | null; sigungu: string | null; courses: number; minKm: number | null; maxKm: number | null; lists: readonly string[]; subtitle?: string | null }
+export interface SeoMountain { slug: string; name: string; heightM: number | null; sido: string | null; sigungu: string | null; courses: number; minKm: number | null; maxKm: number | null; lists: readonly string[]; subtitle?: string | null; lat?: number | null }
+/**
+ * 제목에 '날씨'를 넣는 산(2026-11-08 — 네이버 검색어 트렌드 12개월: 설악산 날씨 67 · 한라산 날씨 51 > 관악산 등산코스 43 · 북한산 등산코스 28, 당구장=100).
+ * 날씨 칸이 실제로 서는 산(좌표가 있어 기상청 격자를 잡는 산)이면서 공식 목록(100대 명산 · 국립공원 …)에 든 산만 — 나머지는 그대로 두고 견준다.
+ */
+export const mountainTitleWeather = (m: Pick<SeoMountain, "lat" | "lists">): boolean => m.lat != null && listNames(m.lists).length > 0;
 /** "3.2~11.4km" · "7.1km" */
 export const kmRange = (min: number | null, max: number | null): string => {
     if (min == null || max == null) return "";
@@ -65,9 +70,11 @@ const shortKm = (min: number | null): string => (min == null ? "" : `${(Math.rou
 export function mountainSeo(m: SeoMountain): HikingSeo {
     const h = heightText(m.heightM), place = mountainPlace(m);
     // "설악산 등산코스 9개 · 최단 0.9km · 높이 1,708m" — 코스가 하나면 그 길이만, 없으면 '등산코스'를 쓰지 않는다
+    // 날씨 칸이 서는 목록의 산은 '최단' 대신 '날씨'(2026-11-08 — mountainTitleWeather): "설악산 등산코스 9개 · 날씨 · 높이 1,708m"
+    const wx = mountainTitleWeather(m);
     const head = m.courses > 1
-        ? [`${m.name} 등산코스 ${m.courses}개`, shortKm(m.minKm) ? `최단 ${shortKm(m.minKm)}` : "", h ? `높이 ${h}` : ""]
-        : m.courses === 1 ? [`${m.name} 등산코스`, shortKm(m.minKm), h ? `높이 ${h}` : ""]
+        ? [`${m.name} 등산코스 ${m.courses}개`, wx ? "날씨" : shortKm(m.minKm) ? `최단 ${shortKm(m.minKm)}` : "", h ? `높이 ${h}` : ""]
+        : m.courses === 1 ? [`${m.name} 등산코스`, wx ? "날씨" : shortKm(m.minKm), h ? `높이 ${h}` : ""]
         : [`${m.name} 등산`, h ? `높이 ${h}` : "", "위치 · 날씨"];
     // 채비 지점(주차장 · 화장실 · 약수터)과 길의 종류는 산림청 100대 명산 코스 파일에서 온 코스에만 있다
     const rich = m.lists.includes("kfs100");

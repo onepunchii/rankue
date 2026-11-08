@@ -5,6 +5,7 @@
  *   SeaArea    /fishing/sea/<해역> — 표지 · 지금 특보 · 반나절 해상예보 · 그 해역의 항구 · 바다 낚시터
  *   PortPage   /fishing/port/<항구> — 날짜 칩 · 물때 곡선(만조 · 간조 · 해 뜨고 짐) · 지금 들물/날물 · 수온 · 부이 · 바다낚시지수 · 가까운 바다 낚시터
  *   TidePointPage /fishing/tide/<물때 지점>(2026-11-04) — 포구 · 섬의 이레 만조 · 간조(조석예보) · 어림 곡선 · 가까운 항구 · 이웃 지점 · 바다 낚시터
+ *   TideHub    /fishing/tide(2026-11-08) — 전국 물때표: 오늘 물때 · 만조 · 간조 판 · 바다마다 항구 + 포구 · 섬 · 물때 달력 · 묻고 답하기
  *
  * 값은 받은 그대로(기상청 · 국립해양조사원 · 천문연구원). '나가도 된다'고 말하지 않는다. ⚠️ 리터럴 색만. 글자 12px 이상, 굵기는 semibold 까지.
  */
@@ -23,7 +24,7 @@ import { nearestPort, type PublicPlace } from "@shared/fishingPlaces";
 import { FISHING_SEA_LABEL, FISHING_SEA_PATH, fishingPortPath, fishingSeaAreaPath, portByName, portSeo, portsOf, seaArt, seaAreaById, seaAreaSeo, seaHubSeo } from "@shared/fishingSeaPages";
 import { SeaChart, SEA_LEGEND, seaWashColor, seaWashLine } from "../SeaChart";
 import { fishingSeaCardUrl } from "@shared/ogCards";
-import { cosineTide, fishingTidePath, tidePointSeo, type TidePointData, type TidePointNear } from "@shared/fishingTidePoints";
+import { cosineTide, fishingTidePath, tideHubFaq, tideHubSeo, tidePointSeo, tideTodayParts, TIDE_HUB_LABEL, TIDE_HUB_PATH, type TideAliasAnswer, type TidePointData, type TidePointNear } from "@shared/fishingTidePoints";
 import { fishingSpotPath } from "@shared/fishingPlaces";
 import { josa } from "@shared/briefingMeta";
 import { TideCurve } from "../TideCurve";
@@ -232,6 +233,10 @@ export function SeaHub() {
             </section>
             <section className="px-5 pt-6" data-testid="sea-ports">
                 <h2 className="mb-2.5 text-[17px] font-semibold">항구 물때표</h2>
+                <Link href={TIDE_HUB_PATH} className="mb-3 flex items-center gap-3 rounded-2xl px-4 py-3.5 active:opacity-80" style={{ background: "#FFFFFF0D" }} data-track-as="fishing-tide-hub">
+                    <span className="min-w-0 flex-1"><span className="block text-[15px] font-semibold">{TIDE_HUB_LABEL}</span><span className="mt-0.5 block text-[13px]" style={{ color: C.soft }}>항구 {FISHING_PORTS.length}곳 + 포구 · 섬 물때를 한 장에</span></span>
+                    <LucideChevronRight weight="bold" className="h-4 w-4 shrink-0" style={{ color: C.dim }} aria-hidden />
+                </Link>
                 {SEA_AREAS.map((a) => (
                     <div key={a.id} className="mb-3">
                         <p className="mb-1.5 text-[13px]" style={{ color: C.dim }}>{a.name}</p>
@@ -240,6 +245,71 @@ export function SeaHub() {
                 ))}
                 <p className="mt-3 text-[12px] [word-break:keep-all]" style={{ color: C.dim }}>{SEA_CAUTION}</p>
             </section>
+        </Shell>
+    );
+}
+
+/**
+ * 전국 물때표(2026-11-08 — 검색어 '물때표' 112 · '물때' 28, 당구장=100). 검색용 화면(server/seo/fishingSea tideHub)과 같은 말.
+ * 오늘 물때(음력) → 가까운 항구 · 오늘 만조 · 간조 판 → 바다마다 항구 + 포구 · 섬 → 물때 달력 → 묻고 답하기.
+ */
+export function TideHub() {
+    const today = kstToday();
+    const { data } = useQuery<{ points: { name: string; km: null; area?: string }[] }>({ queryKey: ["/api/hiq/fishing/tide-points?all=1"], staleTime: 60 * 60_000 });
+    const pts = data?.points ?? [];
+    const seo = tideHubSeo(FISHING_PORTS.length, pts.length || 107);
+    useSeo({ title: seo.title, description: seo.description, path: TIDE_HUB_PATH, locale: "ko", image: fishingSeaCardUrl(ORIGIN, "all") });
+    const loc = useFishingMe();
+    const near = loc.me ? nearestPortAt(loc.me.lat, loc.me.lng) : null;
+    const parts = tideTodayParts(today);
+    const faq = tideHubFaq(today);
+    return (
+        <Shell title={TIDE_HUB_LABEL}>
+            <Cover src="/fishing/art/hero.webp" kicker={FISHING_SEA_LABEL} title={seo.h1} sub={`항구 ${FISHING_PORTS.length}곳 · 포구 · 섬 ${pts.length || 107}곳 · 국립해양조사원 조석예보`} />
+            {parts.length > 0 && (
+                <section className="px-5 pt-5" data-testid="tide-hub-today">
+                    <h2 className="mb-2.5 text-[17px] font-semibold">오늘 물때 <span className="text-[13px] font-normal" style={{ color: C.dim }}>{fishingDayLabel(today, today)}</span></h2>
+                    <div className="grid grid-cols-2 gap-2.5">{parts.map((x) => (
+                        <div key={x.sea} className="rounded-2xl px-4 py-3.5" style={{ background: "#FFFFFF0D" }}>
+                            <p className="text-[12.5px]" style={{ color: C.dim }}>{x.sea}</p>
+                            <p className="mt-0.5 text-[22px] font-semibold leading-tight">{x.name}{x.mark && <span className="ml-1.5 align-middle text-[13px] font-semibold" style={{ color: C.foam }}>{x.mark}</span>}</p>
+                            <p className="mt-1 text-[12.5px] [word-break:keep-all]" style={{ color: C.soft }}>{x.phase}</p>
+                        </div>
+                    ))}</div>
+                </section>
+            )}
+            <NearPortCard loc={loc} />
+            <PortTurnsBoard near={near} />
+            <section className="px-5 pt-6" data-testid="tide-hub-places">
+                <h2 className="mb-2.5 text-[17px] font-semibold">바다마다 물때표</h2>
+                {SEA_AREAS.map((a) => {
+                    const here = pts.filter((x) => x.area === a.id);
+                    return (
+                        <div key={a.id} className="mb-4">
+                            <Link href={fishingSeaAreaPath(a.id)} className="mb-1.5 flex items-center gap-1 text-[14px] font-semibold" style={{ color: C.foam }}>{a.name} <span className="text-[12px] font-normal" style={{ color: C.dim }}>{a.hint}</span><LucideChevronRight weight="bold" className="h-3.5 w-3.5" style={{ color: C.dim }} aria-hidden /></Link>
+                            <div className="flex flex-wrap gap-1.5">
+                                {portsOf(a.id).map((p) => <Link key={p.code} href={fishingPortPath(p.name)} className="flex h-9 items-center rounded-full px-3 text-[13px] relative rk-hit44" style={{ background: "#FFFFFF1A", color: C.foam }}>{p.name}</Link>)}
+                                {here.map((p) => <Link key={p.name} href={fishingTidePath(p.name)} className="flex h-9 items-center rounded-full px-3 text-[13px] relative rk-hit44" style={{ background: "#FFFFFF0A", color: C.soft }} data-track-as="fishing-tide-point">{p.name}</Link>)}
+                            </div>
+                        </div>
+                    );
+                })}
+                <p className="text-[12px] [word-break:keep-all]" style={{ color: C.dim }}>진한 칩은 항구(조위관측소 — 수온 · 바다낚시지수도), 옅은 칩은 포구 · 섬(조석예보 지점)이에요.</p>
+            </section>
+            <section className="px-5 pt-6">
+                <h2 className="mb-2.5 text-[17px] font-semibold">물때 달력</h2>
+                <TideCalendar />
+            </section>
+            <section className="px-5 pt-6" data-testid="tide-hub-faq">
+                <h2 className="mb-2 text-[17px] font-semibold">묻고 답하기</h2>
+                {faq.map((f) => (
+                    <div key={f.q} className="border-b py-3" style={{ borderColor: "#FFFFFF14" }}>
+                        <h3 className="text-[15px] font-semibold">{f.q}</h3>
+                        <p className="mt-1 text-[13.5px] leading-relaxed [word-break:keep-all]" style={{ color: C.soft }}>{f.a}</p>
+                    </div>
+                ))}
+            </section>
+            <p className="px-5 pt-4 text-[12px] leading-relaxed [word-break:keep-all]" style={{ color: C.dim }}>{SEA_CAUTION}</p>
         </Shell>
     );
 }
@@ -439,12 +509,17 @@ function TidePointChips({ title, query }: { title: string; query: string }) {
 export function TidePointPage({ name }: { name: string }) {
     const today = kstToday();
     const [day, setDay] = useState(today);
-    const { data, isLoading, isError } = useQuery<TidePointData>({ queryKey: [`/api/hiq/fishing/tide/${encodeURIComponent(name)}`], staleTime: 10 * 60_000, retry: false });
+    const { data: raw, isLoading, isError } = useQuery<TidePointData | TideAliasAnswer>({ queryKey: [`/api/hiq/fishing/tide/${encodeURIComponent(name)}`], staleTime: 10 * 60_000, retry: false });
+    // 도시 이름으로 온 주소('인천 물때')는 같은 이름의 항구 · 지점으로 옮긴다(2026-11-08 — 봇은 301)
+    const [, setLocation] = useLocation();
+    const redirect = raw && "redirect" in raw ? raw.redirect : null;
+    useEffect(() => { if (redirect) setLocation(redirect, { replace: true }); }, [redirect, setLocation]);
+    const data = raw && "point" in raw ? raw : undefined;
     const p = data?.point;
     const area = p ? seaAreaById(p.area) : null;
     const seo = p ? tidePointSeo(p, area?.name ?? null) : null;
     useSeo(seo && p ? { title: seo.title, description: seo.description, path: fishingTidePath(p.name), locale: "ko", image: fishingSeaCardUrl(ORIGIN, p.port.name) } : null);
-    if (isLoading) return <Shell title={`${name} 물때`}><div className="space-y-3 px-5 pt-5" aria-busy="true"><div className="h-40 animate-pulse rounded-2xl bg-[#FFFFFF0F]" /><div className="h-[260px] animate-pulse rounded-2xl bg-[#FFFFFF0F]" /></div></Shell>;
+    if (isLoading || redirect) return <Shell title={`${name} 물때`}><div className="space-y-3 px-5 pt-5" aria-busy="true"><div className="h-40 animate-pulse rounded-2xl bg-[#FFFFFF0F]" /><div className="h-[260px] animate-pulse rounded-2xl bg-[#FFFFFF0F]" /></div></Shell>;
     if (isError || !data || !p || !seo) return <Shell title="물때"><p className="px-5 py-16 text-center text-[15px]" style={{ color: C.soft }}>없는 물때 지점이에요.</p></Shell>;
     const sea = area?.tide ?? "south";
     const days = data.days.filter((d) => d.day >= today);

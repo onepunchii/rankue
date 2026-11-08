@@ -24,7 +24,7 @@ describe("낚시 첫 화면 — 검색용 화면 · 봇 라우트 · 사이트�
         for (const p of ["/fishing", "/fishing/", "/fishing/spots", "/fishing/spot/1234567"]) expect(FISHING_SPOTS_RE.test(p), p).toBe(true);
         for (const p of ["/fishings", "/fishing/x", "/fishing/spots/a/b/c"]) expect(FISHING_SPOTS_RE.test(p), p).toBe(false);
         // vercel 봇 라우트도 첫 화면을 같이(없으면 봇이 당구 셸을 받는다)
-        expect(read("vercel.json")).toContain("|fishing(?:/(?:spots(?:/(?:region|type)/[^/]+)?|spot/[^/]+|sea(?:/[^/]+)?|port/[^/]+|tide/[^/]+|fish(?:/[^/]+)?|closed))?)/?\"");
+        expect(read("vercel.json")).toContain("|fishing(?:/(?:spots(?:/(?:region|type)/[^/]+)?|spot/[^/]+|sea(?:/[^/]+)?|port/[^/]+|tide(?:/[^/]+)?|fish(?:/[^/]+)?|closed))?)/?\"");
     });
     it("검색용 화면 — 낚시 제목 · 자기 주소 canonical · 낚시터 · 물때 · 어종으로 가는 길", async () => {
         const r = await renderFishingSpots("/fishing", [place]);

@@ -91,7 +91,7 @@ describe("낚시 어종 공개 페이지", () => {
         expect(await renderFishingFish("/fishing/fish/%E0%A4%A", places)).toBeNull();
     });
     it("길 — 봇 라우트 · 프리렌더 · 앱 라우트 · 사이트맵 · 공개 자료 길", () => {
-        expect(read("vercel.json")).toContain("|port/[^/]+|tide/[^/]+|fish(?:/[^/]+)?|");
+        expect(read("vercel.json")).toContain("|port/[^/]+|tide(?:/[^/]+)?|fish(?:/[^/]+)?|");
         expect(read("server/prerender.ts")).toContain("app.get(FISHING_FISH_RE, async (req, res, next) => {");
         const app = read("client/src/App.tsx");
         expect(app).toContain('<Route path="/fishing/fish">');

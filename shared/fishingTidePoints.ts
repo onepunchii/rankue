@@ -11,6 +11,7 @@
  * ⚠️ 서버가 임포트하는 shared 파일 — 상대 임포트는 반드시 './x.js'.
  */
 import type { TideTurn, TidePoint } from "./fishingPort.js";
+import { tideOf, tideWeekday, TIDE_PHASE_TEXT, TIDE_SEAS } from "./fishingTide.js";
 
 export const FISHING_TIDE_BASE = "/fishing/tide";
 export const fishingTidePath = (name: string) => `${FISHING_TIDE_BASE}/${encodeURIComponent(name)}`;
@@ -24,8 +25,62 @@ export interface TidePointNear { name: string; km: number }
 export interface TidePointSpot { id: string; name: string; km: number; species: string[] }
 /** 낚시터 한 곳의 오늘 물때(바다 낚시터 — 가장 가까운 물때 지점이나 항구) — 검색용 화면이 쓴다 */
 export interface SpotTideToday { name: string; path: string; km: number; day: string; tideName: string | null; turns: TideTurn[] }
-/** GET /api/hiq/fishing/tide/:name 의 답 */
+/** GET /api/hiq/fishing/tide/:name 의 답 — 지점이 아니고 도시 이름이면(tideAlias) redirect 만 온다 */
 export interface TidePointData { point: TidePointDef; days: TidePointDay[]; near: TidePointNear[]; spots: TidePointSpot[] }
+export interface TideAliasAnswer { redirect: string }
+
+/**
+ * 전국 물때표 허브 /fishing/tide(2026-11-08 — 네이버 검색어 트렌드 12개월: '물때표' 112 · '물때' 28, 당구장=100).
+ * 항구 51곳(조위관측소 · /fishing/port)과 포구 · 섬 107곳(조석예보 지점 · /fishing/tide/<이름>)을 바다마다 한 장에 묶는다.
+ * 전엔 이 주소가 없어서 봇에게 당구 셸이 나갔다. 오늘 물때 이름은 음력으로 센 것 — 바깥 자료 없이 늘 나온다.
+ */
+export const TIDE_HUB_PATH = FISHING_TIDE_BASE;
+export const TIDE_HUB_LABEL = "전국 물때표";
+export function tideHubSeo(ports: number, points: number): { title: string; description: string; h1: string } {
+    return {
+        h1: TIDE_HUB_LABEL,
+        title: `전국 물때표 — 오늘 물때 · 항구 ${ports}곳 · 포구 · 섬 ${points}곳 만조 · 간조 | 랭큐 낚시`,
+        description: `서해 · 남해 · 동해 · 제주 항구 ${ports}곳과 포구 · 섬 ${points}곳의 오늘 만조 · 간조 시각을 국립해양조사원 조석예보로, 사리 · 조금 물때를 음력으로 셈해 한 장에 모았어요.`,
+    };
+}
+/** 오늘의 물때 한 줄(바다 둘) — "11월 8일(일) 서해 4물 · 남해 · 동해 · 제주 5물". 한국 달력을 모르는 환경이면 빈 목록 */
+export interface TideTodayPart { sea: string; name: string; mark: string | null; phase: string }
+export function tideTodayParts(ymd: string): TideTodayPart[] {
+    const out: TideTodayPart[] = [];
+    for (const x of TIDE_SEAS) { const t = tideOf(ymd, x.id); if (t) out.push({ sea: x.name, name: t.name, mark: t.mark, phase: TIDE_PHASE_TEXT[t.phase] }); }
+    return out;
+}
+export function tideTodaySentence(ymd: string): string | null {
+    const parts = tideTodayParts(ymd);
+    if (!parts.length) return null;
+    const head = `${Number(ymd.slice(5, 7))}월 ${Number(ymd.slice(8))}일(${tideWeekday(ymd)})`;
+    return `오늘 ${head} 물때는 ${parts.map((x) => `${x.sea} ${x.name}${x.mark ? `(${x.mark})` : ""}`).join(", ")}이에요.`;
+}
+/** 허브의 묻고 답하기 — 사이트의 다른 화면과 같은 말(TideCalendar · 지점 화면 각주)만 */
+export function tideHubFaq(ymd: string): { q: string; a: string }[] {
+    const today = tideTodaySentence(ymd);
+    return [
+        ...(today ? [{ q: "오늘 물때는 몇 물인가요?", a: `${today} 물때는 음력 날짜로 센 것이에요.` }] : []),
+        { q: "물때는 어떻게 세나요?", a: "물때는 음력 날짜로 세요. 서해는 7물때, 남해 · 동해 · 제주는 8물때로 불러요. 사리 무렵엔 물이 세게 가고, 조금 무렵엔 물이 거의 안 가요." },
+        { q: "만조 · 간조 시각은 어디 자료인가요?", a: "항구는 국립해양조사원 조위관측소의 조석 예보, 포구 · 섬은 국립해양조사원 조석예보 지점의 고조 · 저조 예보를 그대로 보여 줘요." },
+    ];
+}
+
+/**
+ * 도시 이름으로 온 물때 주소(/fishing/tide/인천 — '인천 물때' 14 · 그전엔 404) → 같은 이름의 항구 · 물때 지점.
+ * 이름을 지어 붙이지 않는다 — 그대로 같은 이름, 또는 '항'을 붙이거나 뗀 이름만 본다. 못 찾으면 null(404).
+ */
+export function tideAlias(name: string, points: readonly string[], ports: readonly string[]): { kind: "port" | "point"; name: string } | null {
+    const n = name.normalize("NFC").trim();
+    if (!n || points.includes(n)) return null;
+    const bare = n.endsWith("항") ? n.slice(0, -1) : null;
+    if (ports.includes(n)) return { kind: "port", name: n };
+    if (bare && ports.includes(bare)) return { kind: "port", name: bare };
+    if (ports.includes(`${n}항`)) return { kind: "port", name: `${n}항` };
+    if (points.includes(`${n}항`)) return { kind: "point", name: `${n}항` };
+    if (bare && points.includes(bare)) return { kind: "point", name: bare };
+    return null;
+}
 
 /** 검색 · 화면이 같이 쓰는 제목 · 설명 — 있는 것만 말한다 */
 export function tidePointSeo(p: Pick<TidePointDef, "name" | "port">, areaName: string | null): { title: string; description: string; h1: string } {

@@ -17,8 +17,17 @@ import { bestOf, indexScore, type IndexMap } from "./fishingPort.js";
 export const FISHING_FISH_PATH = "/fishing/fish";
 export const FISHING_FISH_LABEL = "낚시 어종";
 export const fishingFishPath = (name: string) => `${FISHING_FISH_PATH}/${encodeURIComponent(name)}`;
-/** 주소의 이름으로 — 우리 표에 있는 어종만 */
-export const fishBySlug = (s: string): FishKind | null => fishByName(s.normalize("NFC"));
+/**
+ * 사람들이 검색창에 쓰는 다른 이름(2026-11-08 — 네이버 검색어 트렌드 12개월: '쭈꾸미 낚시' 35 · 갑오징어 낚시 5.1, 당구장=100).
+ * 표준말은 '주꾸미'지만 검색은 '쭈꾸미'로 온다 — 제목 · 설명에 같이 적고, /fishing/fish/쭈꾸미 로 와도 같은 장(정본 주소는 표준말).
+ * 실제로 잰 것만 넣는다.
+ */
+export const FISH_SEARCH_ALIAS: Readonly<Record<string, string>> = { jukkumi: "쭈꾸미" };
+const ALIAS_TO_NAME: Readonly<Record<string, string>> = Object.fromEntries(Object.entries(FISH_SEARCH_ALIAS).map(([id, a]) => [a, FISH.find((f) => f.id === id)?.name ?? ""]));
+/** 주소의 이름으로 — 우리 표에 있는 어종만(검색 이름도 받는다) */
+export const fishBySlug = (s: string): FishKind | null => { const n = s.normalize("NFC"); return fishByName(ALIAS_TO_NAME[n] || n); };
+/** "주꾸미(쭈꾸미)" — 검색 이름이 있으면 괄호로 */
+export const fishSearchName = (f: Pick<FishKind, "id" | "name">) => (FISH_SEARCH_ALIAS[f.id] ? `${f.name}(${FISH_SEARCH_ALIAS[f.id]})` : f.name);
 export const waterWord = (f: Pick<FishKind, "water">) => (f.water === "sea" ? "바다" : "민물");
 
 /**
@@ -35,8 +44,8 @@ export function fishSpotCounts(all: readonly Pick<PublicPlace, "species">[]): Ma
     return m;
 }
 
-/** "3짜 30cm · 4짜 40cm · 5짜 50cm" */
-export const tierLine = (f: FishKind) => f.tiers.map((t) => `${t.name} ${fishValueText(f.unit, t.min)}`).join(" · ");
+/** "3짜 30cm · 4짜 40cm · 5짜 50cm" — 이름이 곧 값인 단계(주꾸미 '10수')는 한 번만(전엔 "10수 10수"로 겹쳤다) */
+export const tierLine = (f: FishKind) => f.tiers.map((t) => { const v = fishValueText(f.unit, t.min); return v === t.name ? t.name : `${t.name} ${v}`; }).join(" · ");
 export const hasRegs = (f: Pick<FishKind, "id">) => (FISH_REG_NAMES[f.id] ?? []).length > 0;
 /** 바다 어종 먼저, 표의 차례대로 */
 export const FISH_PAGES: readonly FishKind[] = [...FISH.filter((f) => f.water === "sea"), ...FISH.filter((f) => f.water === "fresh")];
@@ -48,8 +57,8 @@ export function fishHubSeo(): { title: string; description: string; h1: string }
 export function fishPageSeo(f: FishKind, spots: number): { title: string; description: string; h1: string } {
     const tiers = f.tiers.slice(0, 3).map((t) => t.name).join(" · ");
     const bits = [`${tiers} 기준`, hasRegs(f) ? "금어기 · 금지체장" : null, spots > 0 ? `${f.name} 낚시터 ${spots}곳` : null].filter(Boolean).join(" · ");
-    const desc = [`낚시꾼이 부르는 ${f.name}의 크기(${tierLine(f)})`, hasRegs(f) ? "금어기 · 금지체장(수산자원관리법 시행령)" : null, spots > 0 ? `${josa(f.name, "을/를")} 노리는 낚시터 ${spots}곳` : null, f.water === "sea" ? "오늘 바다낚시지수 · 위판장 소식" : null].filter(Boolean).join(", ");
-    return { h1: `${f.name} 낚시`, title: `${f.name} 낚시 — ${bits} | 랭큐 낚시`, description: `${desc} — 한 장에 모았어요.` };
+    const desc = [`낚시꾼이 부르는 ${fishSearchName(f)}의 크기(${tierLine(f)})`, hasRegs(f) ? "금어기 · 금지체장(수산자원관리법 시행령)" : null, spots > 0 ? `${josa(f.name, "을/를")} 노리는 낚시터 ${spots}곳` : null, f.water === "sea" ? "오늘 바다낚시지수 · 위판장 소식" : null].filter(Boolean).join(", ");
+    return { h1: `${f.name} 낚시`, title: `${fishSearchName(f)} 낚시 — ${bits} | 랭큐 낚시`, description: `${desc} — 한 장에 모았어요.` };
 }
 
 /** 카드 글(server/services/fishingSpotCard 와 같은 틀 — 표지는 바다/저수지 판화, 어탁은 그 어종) */

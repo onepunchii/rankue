@@ -102,9 +102,10 @@ describe("바다 · 항구 물때 공개 페이지", () => {
         expect(page).toContain("<TideCalendar />");
         expect(page).toContain('<TideCalendar sea={area?.tide ?? "south"} />');
     });
-    it("사이트맵 — 허브 · 해역 일곱 · 항구 51, 모두 카드 그림", () => {
+    it("사이트맵 — 허브 · 전국 물때표(2026-11-08) · 해역 일곱 · 항구 51, 모두 카드 그림", () => {
         const parts = fishingSeaSitemapParts("2026-10-18").map((x) => JSON.parse(x) as { loc: string; image: string });
-        expect(parts.length).toBe(1 + SEA_AREAS.length + FISHING_PORTS.length);
+        expect(parts.length).toBe(2 + SEA_AREAS.length + FISHING_PORTS.length);
+        expect(parts.some((x) => x.loc.endsWith("/fishing/tide"))).toBe(true);
         expect(parts.every((x) => x.image.includes("/og/fishing-sea/"))).toBe(true);
         expect(parts.some((x) => x.loc.endsWith(fishingSeaAreaPath("jeju")))).toBe(true);
         expect(read("server/sitemap.ts")).toContain("...fishingSeaSitemapParts(");
@@ -125,7 +126,7 @@ describe("물때 지점(2026-11-04) — 포구 · 섬의 이레 물때표", () =
     const deps: FishingSeaDeps = { ...none, tidePoints: () => [tp], tide: async () => ({ point: tp, days, near: [{ name: "상주", km: 6.2 }], spots: [{ id: "202234500001000003", name: "미조방파제", km: 1.2, species: ["감성돔"] }] }) };
     it("주소 — 봇 라우트 · 프리렌더가 같은 길", () => {
         for (const p of ["/fishing/tide/%EB%AF%B8%EC%A1%B0%ED%95%AD", "/fishing/tide/미조항/"]) expect(FISHING_SEA_RE.test(p)).toBe(true);
-        expect(read("vercel.json")).toContain("|port/[^/]+|tide/[^/]+|");
+        expect(read("vercel.json")).toContain("|port/[^/]+|tide(?:/[^/]+)?|");
     });
     it("이레의 만조 · 간조(받은 날만) · 물때 이름 · 가까운 항구 · 이웃 지점 · 낚시터, tag 는 ASCII", async () => {
         const r = await renderFishingSea("/fishing/tide/%EB%AF%B8%EC%A1%B0%ED%95%AD", deps, Date.parse("2026-11-04T03:00:00Z"));
