@@ -77,3 +77,12 @@ export function feeText(won: number): string {
     if (tail) return `${won.toLocaleString("ko-KR")}원`;
     return [man ? `${man}만` : "", chun ? `${chun}천` : ""].filter(Boolean).join(" ") + "원";
 }
+
+/** 사이트맵에 남기는 날(2026-11-08 — 검색용 화면 server/seo/storeCup) — 접수 · 진행 중이면 늘, 끝난 대회는 30일까지, 취소는 안 올린다 */
+export const STORE_CUP_SITEMAP_DAYS = 30;
+export function storeCupInSitemap(c: { status: string; updatedAt: Date | string | null }, nowMs = Date.now()): boolean {
+    if (c.status === "canceled") return false;
+    if (c.status !== "ended") return true;
+    const at = c.updatedAt ? new Date(c.updatedAt).getTime() : 0;
+    return nowMs - at <= STORE_CUP_SITEMAP_DAYS * 86_400_000;
+}

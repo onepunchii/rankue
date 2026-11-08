@@ -86,9 +86,10 @@ describe("산 제목의 '날씨'", () => {
         expect(mountainSeo({ ...base, lists: [], lat: 38.1 }).title).toBe("설악산 등산코스 9개 · 최단 0.9km · 높이 1,708m | 랭큐 등산");
         expect(mountainSeo({ ...base, lists: ["kfs100"], lat: null }).title).toContain("최단 0.9km");
     });
-    it("검색용 화면에 받아 둔 예보 — 봇이 올 때 기상청을 부르지 않는다", () => {
+    it("검색용 화면의 예보 — 목록의 산만 그 자리에서 받는다", () => {
         const p = read("server/prerender.ts");
-        expect(p).toContain("getCourseWeather({ lat: at.lat, lng: at.lng }, { fetch: false })");
+        // 제목에 '날씨'를 단 산만 그 자리에서 받는다 — 나머지는 받아 둔 것만
+        expect(p).toContain("getCourseWeather({ lat: at.lat, lng: at.lng }, { fetch: mountainTitleWeather(d) })");
         expect(read("server/seo/hiking.ts")).toContain("${weatherSection(d.name, wx, nowMs)}");
     });
 });
@@ -133,5 +134,41 @@ describe("축제 — 달 · 시도 · 종류 묶음 · 사이트맵", () => {
         const locs = festivalSitemapParts(all, today).join("\n");
         expect(locs).not.toContain("/festivals/3\"");
         expect(locs).toContain("/festivals/month/11");
+    });
+});
+
+describe("P1 — 매장 대회 · 선수 제목 · 단풍 · 매장 사진 사이트맵", () => {
+    it("매장 대회 검색용 화면 — SportsEvent · 매장으로 잇기 · 참가자 이름 없음", async () => {
+        const { renderStoreCup, STORE_CUP_RE } = await import("./storeCup");
+        expect(STORE_CUP_RE.test("/store-cup/c0000000-0000-4000-8000-000000000001")).toBe(true);
+        const r = renderStoreCup({
+            cup: { id: "c0000000-0000-4000-8000-000000000001", title: "11월 3쿠션 매장 대회", description: null, status: "recruiting", gameType: "3c", maxPlayers: 16, bestOf: 3, recruitEnd: "2026-11-18T14:00:00Z", startAt: "2026-11-20T10:00:00Z", prize: null, entryFee: 10000 },
+            store: { name: "한솔대대전용", listingCode: "C01184", address: "경기 화성시 병점동", region: "경기" }, players: 4, champion: null,
+        });
+        const d = doc(r.html);
+        expect(d.title).toBe("11월 3쿠션 매장 대회 — 한솔대대전용 당구 대회 · 11월 20일 (금) | 랭큐");
+        const ld = JSON.stringify(d.jsonLd);
+        expect(ld).toContain('"@type":"SportsEvent"');
+        expect(ld).toContain('"priceCurrency":"KRW"');
+        expect(d.body).toContain('href="/stores/C01184"');
+        expect(read("vercel.json")).toContain("|(?:store|club|r|i|store-cup)/[^/]+|");
+        expect(read("server/sitemap.ts")).toContain("storeCupInSitemap({ status: r.status, updatedAt: r.updated_at })");
+    });
+    it("매장 대회 사이트맵 — 끝난 지 30일까지, 취소는 안 올린다", async () => {
+        const { storeCupInSitemap } = await import("../../shared/storeCup");
+        const now = Date.parse("2026-11-08T00:00:00Z");
+        expect(storeCupInSitemap({ status: "recruiting", updatedAt: null }, now)).toBe(true);
+        expect(storeCupInSitemap({ status: "ended", updatedAt: "2026-10-20T00:00:00Z" }, now)).toBe(true);
+        expect(storeCupInSitemap({ status: "ended", updatedAt: "2026-09-01T00:00:00Z" }, now)).toBe(false);
+        expect(storeCupInSitemap({ status: "canceled", updatedAt: null }, now)).toBe(false);
+    });
+    it("PBA 상위 20위는 '경기 결과 · 순위', 나머지는 그대로", async () => {
+        const { pbaPlayerTitleKo } = await import("../../shared/pbaMeta");
+        expect(pbaPlayerTitleKo("김가영", "LPBA", "5억원", { season: 2026, rank: 1 })).toBe("김가영 경기 결과 · 순위 — LPBA 상금랭킹 1위 · 통산 상금 5억원 | 랭큐");
+        expect(pbaPlayerTitleKo("양교천", "PBA", "330만원", { season: 2026, rank: 120 })).toBe("양교천 상금·연봉 — PBA 통산 상금 330만원 | 랭큐");
+        expect(read("server/prerender.ts")).toContain("PP.playerTitle(name, p.league, prizeStr, pbaLatestSeasonRank(p.seasons))");
+    });
+    it("매장 사이트맵에 사장님 사진", () => {
+        expect(read("server/sitemap.ts")).toContain("...(own?.images.length ? { images: own.images } : {})");
     });
 });

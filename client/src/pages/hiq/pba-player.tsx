@@ -234,7 +234,7 @@ export default function HiqPbaPlayer() {
     useSeo({
         // 선수 카드 PNG — 프리렌더와 같은 주소. 제목·설명·구조화데이터도 프리렌더와 같은 함수·같은 인자.
         image: cardUrl,
-        title: p ? L10.playerTitle(name, p.league, prizeStr) : "PBA | 랭큐",
+        title: p ? L10.playerTitle(name, p.league, prizeStr, latest) : "PBA | 랭큐",
         description: p
             ? L10.playerDesc(name, lang === "ko" ? p.nameEn : null, p.league, prizeStr, p.average, p.highRun, latest, x?.wins.length)
             : "PBA 선수 프로필",

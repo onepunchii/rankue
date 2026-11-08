@@ -64,8 +64,9 @@ describe("용어 목록", () => {
 });
 
 describe("자세한 풀이(자기 페이지)", () => {
-    it("열여섯 개 — 뜻·쓰임·예시·헷갈리는 점이 다 있고 색인 기준(300자)을 넘는다", () => {
-        expect(pages.length).toBe(16);
+    it("스물네 개(2026-11-08 — 검색량이 잡힌 여덟 개 더: 홀인원 · 그늘집 · 그린피 · 캐디피 · 레이업 · 생크 · 디봇 · 탑볼) — 뜻·쓰임·예시·헷갈리는 점이 다 있고 색인 기준(300자)을 넘는다", () => {
+        expect(pages.length).toBe(24);
+        for (const s of ["홀인원", "그늘집", "그린피", "캐디피", "레이업", "생크", "디봇", "탑볼"]) expect(hasGolfTermPage(golfTermBySlug(s)!), s).toBe(true);
         for (const t of pages) {
             for (const k of ["meaning", "usage", "example", "confusion"] as const) expect(t.page![k].length, `${t.term}.${k}`).toBeGreaterThan(40);
             expect(golfTermBodyChars(t), t.term).toBeGreaterThanOrEqual(GOLF_TERM_MIN_CHARS);

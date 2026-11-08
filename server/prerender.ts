@@ -70,6 +70,7 @@ import {
 import { renderTournaments, type TournamentsRender } from "./seo/tournaments.js";
 import { renderPbaRecords, type PbaRecordsRender } from "./seo/pbaRecords.js";
 import { tournamentsRepo } from "./storage/tournaments.repo.js";
+import { STORE_CUP_RE, renderStoreCup } from "./seo/storeCup.js";
 import { COUNTRY_INDEX_MIN, MOVERS_PATH, countryPath, fedNameKo, type UmbCat } from "../shared/umbCountryMeta.js";
 import { hasTourPage, pbaTourPath, tourNameWithSeason, umbEventPath, umbEventSlug } from "../shared/tournamentMeta.js";
 import {
@@ -2237,11 +2238,14 @@ ${list}
         // 가까운 둘레길(10/21) — 앱 화면과 같은 셈(shared/trailFestivals trailsNear)
         const { trailCourses, toSummary } = await import("./storage/koreaTrails.js");
         const { trailsNear } = await import("../shared/trailFestivals.js");
-        // 산의 날씨(2026-11-08 — '설악산 날씨' 67 · '한라산 날씨' 51) — 화면 API 와 같은 자리(들머리 격자, 모르면 정상 좌표)의 받아 둔 예보만, 2초까지
+        // 산의 날씨(2026-11-08 — '설악산 날씨' 67 · '한라산 날씨' 51) — 화면 API 와 같은 자리(들머리 격자, 모르면 정상 좌표)의 예보.
+        // 제목에 '날씨'를 단 산(공식 목록 · 좌표 — mountainTitleWeather)만 받아 둔 것이 없을 때 그 자리에서 받는다(같은 격자는 새 발표 전엔 다시 안 받는다 · 2.5초까지).
+        // 나머지 산은 받아 둔 것만 — 봇이 산 3,700곳을 돌 때 기상청을 두드리지 않게.
         const { trailheadPoint } = await import("../shared/hikingSummitWx.js");
+        const { mountainTitleWeather } = await import("../shared/hikingPage.js");
         const base = trailheadPoint(d.heightM, d.courseList);
         const at = base ?? (d.lat != null && d.lng != null ? { lat: d.lat, lng: d.lng } : null);
-        const weather = at ? await Promise.race([getCourseWeather({ lat: at.lat, lng: at.lng }, { fetch: false }).catch(() => null), new Promise<null>((ok) => setTimeout(() => ok(null), 2000))]) : null;
+        const weather = at ? await Promise.race([getCourseWeather({ lat: at.lat, lng: at.lng }, { fetch: mountainTitleWeather(d) }).catch(() => null), new Promise<null>((ok) => setTimeout(() => ok(null), 2500))]) : null;
         const wx = { weather, summit: weather && base && d.heightM != null ? { heightM: d.heightM, baseM: base.m } : null };
         return { d, nearby: nearbyMountains(all, d), trails: d.lat != null && d.lng != null ? trailsNear(trailCourses().map(toSummary), d.lat, d.lng) : [], wx };
       });
@@ -2483,7 +2487,7 @@ ${list}
         image: { url: pbaCard, width: CARD_SIZE, height: CARD_SIZE, alt: pbaCardAlt },
         // ko 는 한글 이름, 그 외 언어는 로마자 원표기(현지 팬이 검색하는 형태)
         // 통산 상금(제목)·최근 시즌 상금랭킹·우승 횟수(설명) — 화면 pba-player.tsx 가 같은 인자로 부른다
-        title: PP.playerTitle(name, p.league, prizeStr),
+        title: PP.playerTitle(name, p.league, prizeStr, pbaLatestSeasonRank(p.seasons)),
         desc: PP.playerDesc(name, ko ? p.nameEn : null, p.league, prizeStr, p.average, p.highRun, pbaLatestSeasonRank(p.seasons), x?.wins.length),
         canonical: ko
           ? `${ORIGIN}/pba-player/${encodeURIComponent(p.memCode)}`
@@ -3101,6 +3105,34 @@ ${list}
 </main>`,
       }),
     );
+  });
+
+  // 매장 대회(2026-11-08 — 키워드 보강 P1): SportsEvent · 매장으로 잇기. 참가자 이름은 싣지 않는다(수만). 글은 server/seo/storeCup
+  app.get(STORE_CUP_RE, async (req, res, next) => {
+    if (!isBot(req)) return next();
+    const id = STORE_CUP_RE.exec(req.path)?.[1] ?? "";
+    try {
+      const d = await storage.tournaments.getDetail(id);
+      if (!d || !d.tournament.storeId || d.tournament.status === "canceled") return sendGone(res, "대회를 찾을 수 없어요", "끝났거나 취소된 매장 대회예요.");
+      const { hiqStores } = await import("../shared/schema.js");
+      const { eq } = await import("drizzle-orm");
+      const [st] = await db.select({ name: hiqStores.name }).from(hiqStores).where(eq(hiqStores.id, d.tournament.storeId)).limit(1);
+      const [l] = await db.select({ code: storeListings.code, address: storeListings.address, region: storeListings.region }).from(storeListings).where(eq(storeListings.claimedStoreId, d.tournament.storeId)).limit(1);
+      const t = d.tournament as any;
+      const champ = t.championId ? (d.participants as any[]).find((p) => p.memberId === t.championId)?.nickname ?? null : null;
+      const r = renderStoreCup({
+        cup: { id: t.id, title: t.title, description: t.description ?? null, status: t.status, gameType: t.gameType, maxPlayers: t.maxPlayers, bestOf: t.bestOf, recruitEnd: t.recruitEnd ?? null, startAt: t.startAt ?? null, prize: t.prize ?? null, entryFee: t.entryFee ?? null },
+        store: { name: st?.name ?? "당구장", listingCode: l?.code ?? null, address: l?.address ?? null, region: l?.region ?? null },
+        players: (d.participants as any[]).length,
+        champion: champ,
+      });
+      noStore(res);
+      res.setHeader("X-Prerender", r.tag);
+      res.status(r.status).send(r.html);
+    } catch (e) {
+      console.warn("[prerender] store cup:", (e as Error)?.message);
+      return sendUnavailable(res);
+    }
   });
 
   app.get("/club/:id", async (req, res, next) => {

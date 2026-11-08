@@ -206,7 +206,7 @@ describe("화면의 글 · 따로 선 세계", () => {
         // 우리가 보증하지 않는 말은 쓰지 않는다
         for (const g of HIKING_GROUPS) expect(hikingListSeo(g, 10).title, g.id).not.toMatch(/추천|초보|베스트|BEST|인기/);
         expect(hikingListSeo({ id: "kfs100", name: "산림청 100대 명산" }, 100).title).toBe("100대 명산 리스트 · 지도 — 산림청 100대 명산 100곳 등산코스 | 랭큐 등산");
-        expect(hikingListSeo({ id: "maple", name: "단풍 산" }, 27).title).toBe("단풍 명산 27곳 — 가을 단풍 산행 등산코스 | 랭큐 등산");
+        expect(hikingListSeo({ id: "maple", name: "단풍 산" }, 27).title).toBe("단풍 명소 · 단풍 명산 27곳 — 가을 단풍 산행 등산코스 | 랭큐 등산");
         expect(hikingListSeo({ id: "처음-보는-묶음", name: "새 묶음" }, 5).title).toBe("새 묶음 5곳 — 높이 · 등산코스 | 랭큐 등산");
         expect(hikingRegionSeo(HIKING_REGIONS[1], 447).title).toBe("강원 명산 · 등산코스 — 강원의 산 447곳 | 랭큐 등산");
         // 카드에 싣는 것 — 100대 명산이면 와펜, 아니면 속한 묶음 하나를 이름표로

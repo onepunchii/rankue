@@ -57,9 +57,18 @@ export function pbaLatestSeasonRank(seasons: ReadonlyArray<{ season: number; pri
  * ko 제목·설명 — 화면(pba-player.tsx)과 프리렌더가 **이 둘만** 부른다(PBA_L10N.ko 도 같은 함수).
  * 상금은 pbaPrizeText 로 만든 글("330만원")을 받는다 — 예전엔 화면만 '원'을 빼서 봇과 한 글자 달랐다.
  */
-export const pbaPlayerTitleKo = (nameKo: string, league: string, prize?: string | null) =>
+/**
+ * 상위 선수(최근 시즌 상금랭킹 PBA_TOP_TITLE_RANK 위 안)는 이름만으로 찾는다(2026-11-08 네이버 검색어 트렌드 12개월, 당구장=100:
+ * 김가영 57 · 스롱피아비 24 · 산체스 21 · 이미래 17 · 조재호 10 — 'PBA 결과' 6.3, 'PBA 순위' 0.3). 그 사람은 경기 결과 · 순위를 보러 온다 →
+ * 제목 앞을 '경기 결과 · 순위'로, 숫자는 시즌 순위 · 통산 상금. 나머지 선수는 그대로('OOO 연봉' 검색).
+ */
+export const PBA_TOP_TITLE_RANK = 20;
+export const pbaPlayerTitleKo = (nameKo: string, league: string, prize?: string | null, rank?: PbaSeasonRank | null) => {
+    const hasPrize = !!prize && prize !== "-";
+    if (rank && rank.rank <= PBA_TOP_TITLE_RANK) return `${nameKo} 경기 결과 · 순위 — ${league} 상금랭킹 ${rank.rank}위${hasPrize ? ` · 통산 상금 ${prize}` : ""} | 랭큐`;
     // 통산 상금을 제목에 — "OOO 연봉" 검색에 숫자로 답하되, 그 숫자가 연봉이 아니라 '통산 상금'임을 같은 줄에 적는다(2026-09-24)
-    prize && prize !== "-" ? `${nameKo} 상금·연봉 — ${league} 통산 상금 ${prize} | 랭큐` : `${nameKo} 상금·연봉 — ${league} 프로당구 선수 | 랭큐`;
+    return hasPrize ? `${nameKo} 상금·연봉 — ${league} 통산 상금 ${prize} | 랭큐` : `${nameKo} 상금·연봉 — ${league} 프로당구 선수 | 랭큐`;
+};
 
 export const pbaPlayerDescKo = (
     nameKo: string, nameEn: string | null | undefined, league: string,
@@ -94,7 +103,7 @@ interface PbaL10n {
     listTitle: string;
     listDesc: string;
     /** prize = pbaPrizeText 글. ko 만 제목에 싣는다 */
-    playerTitle: (name: string, league: string, prize?: string | null) => string;
+    playerTitle: (name: string, league: string, prize?: string | null, rank?: PbaSeasonRank | null) => string;
     playerDesc: (name: string, nameEn: string | null | undefined, league: string, prize: string, average: unknown, highRun: unknown, seasonRank?: PbaSeasonRank | null, wins?: number) => string;
     incomeNote: string;
     incomeQ: (name: string) => string;

@@ -75,7 +75,7 @@ describe("친구 초대 — 서버 · 화면", () => {
     it("링크로 온 비로그인에게는 설치 팝업이 가입까지 쉰다(앱에서 가입하면 표시가 끊긴다) · 봇에게는 미리보기", () => {
         expect(read("client/src/components/hiq/AppInstallSheet.tsx")).toContain("(!live.current.loggedIn && (!!joinStoreSlug() || !!readInviteMark()))");
         expect(read("server/prerender.ts")).toContain('app.get("/i/:code"');
-        expect(read("vercel.json")).toContain("(?:store|club|r|i)/[^/]+");
+        expect(read("vercel.json")).toContain("(?:store|club|r|i|store-cup)/[^/]+");
         expect(read("client/src/App.tsx")).toContain('<Route path="/i/:code" component={InviteRoute} />');
     });
 });

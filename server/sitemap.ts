@@ -6,6 +6,8 @@ import { LISTING_BASIC, LISTING_LIVE } from "./storage/listingSql.js";
 import { CITY_HUB_MIN, cityHubPath, listingCityOf } from "../shared/storeMeta.js";
 import { hreflangOf } from "../shared/aboutContent.js";
 import { asc, sql } from "drizzle-orm";
+import { storeCupInSitemap, storeCupPath } from "../shared/storeCup.js";
+import { storePhotosOf } from "../shared/storePhotos.js";
 import { playerCardUrl, golferCardUrl, pbaCardUrl } from "./services/playerCard.js";
 import { loadGolfCourseSummary } from "./routes/modules/golfCourses.js";
 import { golfCourseCardUrl } from "./services/golfCourseCard.js";
@@ -138,6 +140,16 @@ async function coreParts(): Promise<string[]> {
     console.warn("[sitemap] regions failed:", (e as Error)?.message);
   }
 
+  // 매장 대회(2026-11-08) — 접수 · 진행 중, 끝난 지 30일 안(shared/storeCup storeCupInSitemap). 검색용 화면은 server/seo/storeCup
+  try {
+    const rows = await db.execute(sql`select id, status, updated_at from hiq_crew_tournaments where store_id is not null and status <> 'canceled' order by updated_at desc limit 500`);
+    for (const r of ((rows as any).rows ?? rows) as { id: string; status: string; updated_at: string | Date }[]) {
+      if (storeCupInSitemap({ status: r.status, updatedAt: r.updated_at })) parts.push(entry(`${ORIGIN}${storeCupPath(r.id)}`, { changefreq: "daily", priority: "0.5", lastmod: r.updated_at }));
+    }
+  } catch (e) {
+    console.warn("[sitemap] store cups failed:", (e as Error)?.message);
+  }
+
   // 크루
   try {
     const crews = await storage.getCrewsForSitemap();
@@ -229,10 +241,18 @@ async function storeParts(): Promise<string[]> {
   const parts: string[] = [];
   try {
     // 인허가 자료로만 들어온 얇은 매장 · 폐업한 곳은 사이트맵에 넣지 않는다(2026-10-19 — 페이지는 noindex, storage/listingSql)
-    const listings = await db.select({ code: storeListings.code, updatedAt: storeListings.updatedAt })
+    const listings = await db.select({ code: storeListings.code, updatedAt: storeListings.updatedAt, claimedStoreId: storeListings.claimedStoreId })
       .from(storeListings).where(sql`not ${LISTING_BASIC} and ${LISTING_LIVE}`).orderBy(asc(storeListings.code));
-    // 이미지 사이트맵 = 매장 카드(2026-09-30) — 페이지 대표 이미지와 같은 주소
-    for (const l of listings) parts.push(entry(`${ORIGIN}/stores/${l.code}`, { changefreq: "monthly", priority: "0.4", lastmod: l.updatedAt, image: storeCardUrl(ORIGIN, l.code) }));
+    // 사장님이 올린 매장 사진(2026-11-08 — 사장님 도구가 채운 것이 검색에도 실리게). 우리 Blob 의 매장 사진 주소만(storePhotosOf)
+    type PhotoRow = { id: string; images: unknown; updated_at: string | Date | null };
+    const photoRows: PhotoRow[] = await db.execute(sql`select id::text as id, images, updated_at from hiq_stores where images is not null`).then((r: any) => (r.rows ?? r) as PhotoRow[]).catch(() => [] as PhotoRow[]);
+    const photos = new Map<string, { images: string[]; at: string | Date | null }>(photoRows.map((r) => [r.id, { images: storePhotosOf(r.images).slice(0, 4), at: r.updated_at }]));
+    // 이미지 사이트맵 = 매장 카드(2026-09-30) — 페이지 대표 이미지와 같은 주소 + 사장님 사진
+    for (const l of listings) {
+      const own = l.claimedStoreId ? photos.get(String(l.claimedStoreId)) : undefined;
+      const lastmod = own?.at && l.updatedAt && new Date(own.at) > new Date(l.updatedAt) ? own.at : l.updatedAt;
+      parts.push(entry(`${ORIGIN}/stores/${l.code}`, { changefreq: "monthly", priority: own?.images.length ? "0.5" : "0.4", lastmod, image: storeCardUrl(ORIGIN, l.code), ...(own?.images.length ? { images: own.images } : {}) }));
+    }
   } catch (e) {
     console.warn("[sitemap] listings failed:", (e as Error)?.message);
   }
