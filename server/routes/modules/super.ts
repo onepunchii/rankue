@@ -100,10 +100,33 @@ router.get("/super-summary", async (req, res) => {
         // null 유지 → "미설정"
     }
 
+    // 네이버 검색 유입(사람 수) — 2026-11-07 네이버 순위 강등 뒤 회복을 매일 보려고 넣었다.
+    // ui_events 의 page 이벤트 중 referrer 가 네이버 검색인 방문자(유니크). 비교용으로 지난주 같은 요일도 낸다.
+    let naverYesterday: number | null = null;
+    let naverLastWeek: number | null = null;
+    try {
+        const r = await db.execute(sql`
+            with d as (select ((now() at time zone 'Asia/Seoul')::date - 1) as y)
+            select
+              count(distinct visitor) filter (where (created_at at time zone 'Asia/Seoul')::date = (select y from d))::int     as y,
+              count(distinct visitor) filter (where (created_at at time zone 'Asia/Seoul')::date = (select y from d) - 7)::int as w
+            from ui_events
+            where name = 'page' and meta->>'ref' like '%naver%'
+              and created_at >= (now() - interval '9 days')
+        `);
+        const row = ((r as unknown as { rows?: { y: number; w: number }[] }).rows ?? [])[0];
+        naverYesterday = row?.y ?? 0;
+        naverLastWeek = row?.w ?? 0;
+    } catch {
+        // null 유지 → 지표에서 빠짐
+    }
+
     // 서비스 특성 지표 (쿼리 실패분은 제외)
     const metrics: { label: string; value: number | string }[] = [
         { label: "접속자(오늘)", value: visitorsToday ?? "미설정" },
         { label: "접속자(어제)", value: visitorsYesterday ?? "미설정" },
+        { label: "네이버 유입(어제)", value: naverYesterday },
+        { label: "네이버 유입(지난주 같은 요일)", value: naverLastWeek },
         { label: "매장", value: storesTotal },
         { label: "매장회원", value: storeMembersTotal },
         // ⚠️ 이건 웹 접속자가 아니라 **회원의 매장 방문 기록**(hiq_visit_logs)이다.
