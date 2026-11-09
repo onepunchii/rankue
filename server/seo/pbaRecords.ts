@@ -4,7 +4,7 @@ import { storage } from "../storage/index.js";
 import { PBA_INCOME_NOTE_KO } from "../../shared/pbaMeta.js";
 import {
     LEAGUE_KO, PBA_RECORDS_H1, PBA_RECORDS_PATH, PBA_RECORDS_RULE_KO, PBA_RECORDS_TITLE, PBA_RECORDS_TOP, PBA_RECORD_DEFS,
-    cutKo, eligibleKo, leagueFactsKo, pbaRecordsDescription, pbaRecordsEmpty, pbaRecordsIndexable, pbaRecordsLdNodes, pbaRecordsUpdated,
+    cutKo, eligibleKo, leagueFactsKo, pbaRecordsDescription, pbaRecordsEmpty, pbaRecordsIndexable, pbaRecordsLdNodes,
     recordLineKo, recordValue, type PbaRecordSection, type PbaRecordsLeague, type PbaRecordsReport,
 } from "../../shared/pbaRecordsMeta.js";
 
@@ -111,12 +111,17 @@ export async function renderPbaRecords(pathname: string, query: Record<string, s
     return renderReport(report);
 }
 
-/** 사이트맵 "pba-records" 섹션 — 이 페이지 한 줄. 색인 기준(pbaRecordsIndexable)을 못 넘으면 비운다. */
+/**
+ * 사이트맵 "pba-records" 섹션 — 이 페이지 한 줄. 색인 기준(pbaRecordsIndexable)을 못 넘으면 비운다.
+ * lastmod 는 싣지 않는다(2026-11-09). 전엔 pbaRecordsUpdated = max(pba_players.updated_at) 였는데, 그 칸은 pba-sync 가 선수를
+ * 돌아가며 다시 받으러 갈 때마다(받기에 실패해도 · 값이 그대로여도) 앞으로 민다 — 그래서 날마다 '오늘'이 찍혔다.
+ * 통산 기록 값이 실제로 바뀐 날은 어디에도 남지 않아 진짜 날짜를 낼 수 없다.
+ */
 export async function pbaRecordsSitemapParts(): Promise<string[]> {
     try {
         const r = await storage.pba.getRecords();
         if (pbaRecordsEmpty(r) || !pbaRecordsIndexable(r)) return [];
-        return [entry(`${ORIGIN}${PBA_RECORDS_PATH}`, { changefreq: "weekly", priority: "0.6", lastmod: pbaRecordsUpdated(r) })];
+        return [entry(`${ORIGIN}${PBA_RECORDS_PATH}`, { changefreq: "weekly", priority: "0.6" })];
     } catch (e) {
         console.warn("[sitemap] pba records failed:", (e as Error)?.message);
         return [];

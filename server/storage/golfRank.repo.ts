@@ -230,20 +230,30 @@ export class GolfRankRepository {
 
     /* ── 사이트맵·요약 ── */
 
-    /** 세계 랭킹은 톱 150 + 한국 선수(500위 이내), 투어 랭킹은 전원. lastmod 는 회차 날짜.
+    /** 세계 랭킹은 톱 150 + 한국 선수(500위 이내), 투어 랭킹은 전원. lastmod 는 회차 날짜와 그 회차를 받아 넣은 날(KST) 중 이른 날("YYYY-MM-DD").
      *  2026-09-14 톱 300+한국 전원에서 축소 — 사이트맵 5,173 URL 중 4개 색인 사태의 다이어트(umb.repo 참고). */
-    async getPlayersForSitemap(): Promise<Array<{ tour: GolfTour; playerId: string; lastmod: Date }>> {
-        const out: Array<{ tour: GolfTour; playerId: string; lastmod: Date }> = [];
+    async getPlayersForSitemap(): Promise<Array<{ tour: GolfTour; playerId: string; lastmod: string }>> {
+        const out: Array<{ tour: GolfTour; playerId: string; lastmod: string }> = [];
         for (const tour of Object.keys(GOLF_TOUR_META) as GolfTour[]) {
             const [latest] = await this.getLatestEditions(tour, 1);
             if (!latest) continue;
             const cond = GOLF_TOUR_META[tour].world
                 ? or(sql`${golfRankings.rank} <= 150`, and(eq(golfRankings.country, "KOR"), sql`${golfRankings.rank} <= 500`))!
                 : sql`true`;
-            const rows = await db.select({ playerId: golfRankings.playerId }).from(golfRankings)
+            const rows = await db.select({
+                playerId: golfRankings.playerId,
+                // 그 회차를 받아 넣은 날(KST) — created_at 은 시간대 없는 timestamp 에 UTC 벽시계로 찍힌다(크론 21:50 UTC 가 21:50)
+                ingested: sql<string | null>`to_char((${golfRankings.createdAt} AT TIME ZONE 'UTC') AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD')`,
+            }).from(golfRankings)
                 .where(and(eq(golfRankings.tour, tour), eq(golfRankings.edition, latest.edition), cond)).orderBy(asc(golfRankings.rank));
-            // 롤렉스 회차 날짜는 발표보다 며칠 뒤(9/24 수집분이 9/28)라 그대로 쓰면 미래 lastmod 가 된다 — 지금을 넘지 않게(2026-09-24)
-            const lastmod = new Date(Math.min(new Date(latest.editionDate).getTime(), Date.now()));
+            // 롤렉스 회차 날짜는 발표 · 수집보다 한 주쯤 뒤다(11/3 에 받은 표가 '11/9 회차'). 전엔 '지금을 넘지 않게' 잘라서(2026-09-24)
+            // 받은 다음 날부터 회차 날짜까지 날마다 그날 날짜가 찍혔다 — 롤렉스 선수 230명이 매일 바뀐 것처럼 보였다(2026-11-09 실측).
+            // 선수 페이지가 실제로 바뀐 날은 우리가 그 회차를 받아 넣은 날이다. OWGR 은 회차(일요일)가 수집(월 · 화)보다 앞이고,
+            // KPGA · KLPGA 는 회차 = 받은 날(KST)이라 둘 다 지금처럼 회차 날짜가 그대로 나간다.
+            const editionDay = new Date(latest.editionDate).toISOString().slice(0, 10);
+            let ingested: string | null = null;
+            for (const r of rows as Array<{ ingested: string | null }>) if (r.ingested && (!ingested || r.ingested < ingested)) ingested = r.ingested;
+            const lastmod = ingested && ingested < editionDay ? ingested : editionDay;
             for (const r of rows) out.push({ tour, playerId: r.playerId, lastmod });
         }
         return out;

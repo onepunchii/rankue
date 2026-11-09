@@ -97,9 +97,11 @@ describe("낚시 어종 공개 페이지", () => {
         expect(app).toContain('<Route path="/fishing/fish">');
         expect(app).toContain('<Route path="/fishing/fish/:name">');
         expect(read("server/sitemap.ts")).toContain("...fishingFishSitemapParts(");
-        const parts = fishingFishSitemapParts("2026-10-18").map((x) => JSON.parse(x) as { loc: string; image?: string });
+        const parts = fishingFishSitemapParts().map((x) => JSON.parse(x) as { loc: string; image?: string; lastmod?: string });
         expect(parts.length).toBe(2 + FISH.length); // 허브 · 금어기 달력 · 22종
         expect(parts.slice(2).every((x) => x.image?.includes("/og/fishing-fish/"))).toBe(true);
+        // 고친 날이 적힌 곳이 없는 글이라 lastmod 를 싣지 않는다(2026-11-09 — 전엔 낚시터 표 날짜를 빌려 썼다)
+        expect(parts.every((x) => x.lastmod === undefined)).toBe(true);
         const r = read("server/routes/modules/fishing.ts");
         expect(r).toContain('router.get("/market", asyncHandler(');
         expect(r).toContain('router.get("/index-map", asyncHandler(');

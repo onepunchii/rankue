@@ -127,11 +127,16 @@ export async function renderFishingFish(p0: string, places: () => Promise<readon
     return f ? one(f, await places().catch(() => [])) : null;
 }
 
-/** 사이트맵 — 허브 · 22종. 그림은 어종 카드(/og/fishing-fish) */
-export function fishingFishSitemapParts(updated: string | null): string[] {
+/**
+ * 사이트맵 — 허브 · 22종 · 금어기. 그림은 어종 카드(/og/fishing-fish).
+ * lastmod 는 싣지 않는다(2026-11-09). 전엔 낚시터 표(fishing_places)를 마지막으로 고친 날(10-13)을 찍었는데, 이 화면들의 본문은
+ * 어종 글 · 금어기 표(server/assets/fishing/fish-pages.json, 10-18)와 코드이고 화면 자체도 10-18 에 생겼다 — 생기기 전 날짜였다.
+ * 금어기 화면은 '오늘 금어기인 어종'이 철마다 바뀐다. 이 글들에는 고친 날이 적혀 있지 않아 진짜 날짜를 낼 수 없다.
+ */
+export function fishingFishSitemapParts(): string[] {
     return [
-        entry(`${ORIGIN}${FISHING_FISH_PATH}`, { changefreq: "weekly", priority: "0.7", lastmod: updated }),
-        entry(`${ORIGIN}${FISHING_CLOSED_PATH}`, { changefreq: "monthly", priority: "0.6", lastmod: updated, image: fishingSeaCardUrl(ORIGIN, "closed") }),
-        ...FISH_PAGES.map((f) => entry(`${ORIGIN}${fishingFishPath(f.name)}`, { changefreq: "weekly", priority: "0.6", lastmod: updated, image: fishingFishCardUrl(ORIGIN, f.id) })),
+        entry(`${ORIGIN}${FISHING_FISH_PATH}`, { changefreq: "weekly", priority: "0.7" }),
+        entry(`${ORIGIN}${FISHING_CLOSED_PATH}`, { changefreq: "monthly", priority: "0.6", image: fishingSeaCardUrl(ORIGIN, "closed") }),
+        ...FISH_PAGES.map((f) => entry(`${ORIGIN}${fishingFishPath(f.name)}`, { changefreq: "weekly", priority: "0.6", image: fishingFishCardUrl(ORIGIN, f.id) })),
     ];
 }

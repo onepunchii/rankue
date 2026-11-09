@@ -42,8 +42,18 @@ export interface GolfTerm {
     links?: { href: string; label: string }[];
 }
 
-/** 본문을 마지막으로 고친 날 — 사이트맵 lastmod. 글을 고치면 같이 바꾼다. */
-export const GOLF_TERMS_UPDATED = "2026-10-05";
+/**
+ * 사전(허브의 목록 · 링크)을 마지막으로 고친 날 — 허브의 사이트맵 lastmod. 용어를 더하거나 풀이 페이지가 생기면 같이 바꾼다.
+ * 2026-11-08 풀이 페이지가 8개 늘었는데(16 → 24) 이 날짜가 그대로여서, 새 페이지까지 생기기 전 날짜(10-05)로 나갔다(2026-11-09 바로잡음).
+ */
+export const GOLF_TERMS_UPDATED = "2026-11-08";
+/** 풀이 페이지(/golf/terms/:slug) 첫 16개를 낸 날 — 아래 표에 없는 풀이 페이지의 사이트맵 lastmod */
+export const GOLF_TERM_PAGES_FIRST = "2026-10-05";
+/** 그 뒤에 풀이를 새로 쓰거나 고친 페이지 → 그 날(사이트맵 lastmod). 풀이를 쓰거나 고치면 여기 적고 GOLF_TERMS_UPDATED 도 같이 바꾼다 */
+export const GOLF_TERM_PAGE_UPDATED: Readonly<Record<string, string>> = {
+    홀인원: "2026-11-08", 그늘집: "2026-11-08", 그린피: "2026-11-08", 캐디피: "2026-11-08",
+    레이업: "2026-11-08", 생크: "2026-11-08", 디봇: "2026-11-08", 탑볼: "2026-11-08",
+};
 
 export const GOLF_TERM_CATEGORIES: { id: GolfTermCategory; label: string; emoji: string }[] = [
     { id: "score", label: "스코어", emoji: "⛳" },

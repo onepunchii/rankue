@@ -508,7 +508,8 @@ export function hikingSitemapParts(all: readonly MountainSummary[], days: Readon
         page(HIKING_ABROAD_PATH, { changefreq: "monthly", priority: "0.6" }),
         ...HIKING_ABROAD.map((c) => page(hikingAbroadPath(c.id), { changefreq: "monthly", priority: "0.5" })),
         ...HIKING_REGIONS.map((r) => page(hikingRegionPath(r.id), { changefreq: "weekly", priority: "0.6", lastmod: latest(all.filter((m) => m.region === r.id)) })),
-        ...HIKING_GROUPS.map((l) => page(hikingListPath(l.id), { changefreq: "weekly", priority: l.kind === "list" ? "0.7" : "0.5", lastmod: everything })),
+        // 목록도 권역처럼 거기 실린 산 가운데 가장 늦은 날(2026-11-09 — 전엔 전국 3,800곳의 최댓값이라 목록 밖의 산 하나만 고쳐도 열세 목록이 같이 움직였다)
+        ...HIKING_GROUPS.map((l) => page(hikingListPath(l.id), { changefreq: "weekly", priority: l.kind === "list" ? "0.7" : "0.5", lastmod: latest(all.filter((m) => inHikingGroup(l, m))) })),
         ...all.filter((m) => m.courses > 0 || m.hasGuide).map((m) => entry(`${ORIGIN}${hikingMountainPath(m.slug)}`, {
             changefreq: "monthly", priority: m.tier === 1 ? "0.7" : m.tier === 2 ? "0.5" : "0.4", lastmod: days.get(m.id) ?? null, image: hikingMountainCardUrl(ORIGIN, m.slug),
         })),

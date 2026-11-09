@@ -104,11 +104,15 @@ function urlset(parts: string[]): string {
   return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9" xmlns:xhtml="http://www.w3.org/1999/xhtml" xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">\n${parts.join("\n")}\n</urlset>\n`;
 }
 
-/** 인덱스 — 자식 사이트맵 전부. lastmod 는 오늘(매일 갱신되는 브리핑·커뮤니티가 있어 사실에 가깝다). */
+/**
+ * 인덱스 — 자식 사이트맵 전부. lastmod 는 싣지 않는다(2026-11-09).
+ * 전엔 열다섯 파일 모두에 '오늘'을 찍었다 — 용어 사전 · 둘레길처럼 몇 주째 그대로인 파일도 매일 바뀌었다고 알린 셈이다.
+ * 파일마다 진짜 날짜(실린 주소 lastmod 의 최댓값)를 내려면 인덱스 한 번에 열다섯 구역을 다 만들어야 해서(등산만 수 초) 빼는 쪽을 골랐다.
+ * 사이트맵 규격에서 인덱스의 lastmod 는 선택이고, 검색엔진은 자식 파일을 제 주기로 다시 읽는다.
+ */
 export function generateSitemapIndex(): string {
-  const today = day(new Date());
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${
-    SITEMAP_SECTIONS.map((s) => `  <sitemap>\n    <loc>${ORIGIN}/sitemap-${s}.xml</loc>\n    <lastmod>${today}</lastmod>\n  </sitemap>`).join("\n")
+    SITEMAP_SECTIONS.map((s) => `  <sitemap>\n    <loc>${ORIGIN}/sitemap-${s}.xml</loc>\n  </sitemap>`).join("\n")
   }\n</sitemapindex>\n`;
 }
 
@@ -260,7 +264,10 @@ async function storeParts(): Promise<string[]> {
 }
 
 // 골프장 490곳(2026-09-24) — 한국어 전용이라 hreflang 없음. 주소의 한글은 coursePath 가 퍼센트 인코딩한다.
-// lastmod = 골프장 행 갱신·회원권 시세 기준일·가장 최근 글 중 가장 늦은 날. 비공개·가려진 글은 페이지에 안 나오므로 뺀다.
+// lastmod = 골프장 행 갱신·회원권 현재가가 마지막으로 바뀐 날·가장 최근 글 중 가장 늦은 날. 비공개·가려진 글은 페이지에 안 나오므로 뺀다.
+// 시세는 '기준일(as_of)'이 아니라 값이 바뀐 날이다(2026-11-09) — 기준일은 시세가 그대로여도 피드가 돌 때마다 하루씩 넘어가서
+// 시세가 있는 132곳이 매일 바뀌었다고 알렸다(10-24~11-07 보름 중 값이 실제로 움직인 날은 나흘). 종목마다 '마지막으로 값이 달랐던 날 다음의 첫 줄'
+// = 지금 현재가가 시작된 날(한 번도 안 바뀌었으면 첫 줄). 이력 인덱스(item_id, d)를 거꾸로 읽어 종목마다 몇 줄만 본다.
 async function golfCourseParts(): Promise<string[]> {
   const parts: string[] = [];
   // 회원이 공개한 라운드 사진(2026-09-30) — 골프장마다 최신 SITEMAP_PHOTO_LIMIT 장, 카드 뒤에. 실패해도 카드는 싣는다.
@@ -270,13 +277,23 @@ async function golfCourseParts(): Promise<string[]> {
   });
   try {
     const r: any = await db.execute(sql`
+      with moved as (
+        select m.slug, max((
+          select min(h.d) from golf_membership_price_history h
+          where h.item_id = m.item_id and h.d > coalesce((
+            select max(h2.d) from golf_membership_price_history h2 where h2.item_id = m.item_id and h2.price <> m.price
+          ), '-infinity'::date)
+        )) as d
+        from golf_membership_prices m group by m.slug
+      )
       select p.slug, p.logo, to_char(greatest(
         p.updated_at::date,
-        (select max(m.as_of) from golf_membership_prices m where m.slug = p.slug),
+        mv.d,
         (select max(b.created_at)::date from golf_bookings b
            where b.course_id = any(p.course_ids::text[]) and b.is_blinded = false and coalesce(b.is_blind, false) = false)
       ), 'YYYY-MM-DD') as lastmod
-      from golf_course_pages p where p.slug <> '' and btrim(p.name) <> '' order by p.slug`);
+      from golf_course_pages p left join moved mv on mv.slug = p.slug
+      where p.slug <> '' and btrim(p.name) <> '' order by p.slug`);
     for (const x of (r.rows ?? r) as { slug: string; logo: string | null; lastmod: string | null }[]) {
       // 이미지 사이트맵 = 골프장 카드(490곳 전부 — 페이지 대표 이미지와 같은 주소, 2026-09-30). 예전엔 로고가 있는 296곳만 로고.
       parts.push(entry(`${ORIGIN}${coursePath(x.slug)}`, { changefreq: "daily", priority: "0.6", lastmod: x.lastmod, image: golfCourseCardUrl(ORIGIN, x.slug), images: photos.get(x.slug) }));
@@ -360,7 +377,8 @@ const SECTION_PARTS: Record<SitemapSection, () => Promise<string[]>> = {
   fishing: async () => {
     const all = await allPlaces().catch((e) => { console.warn("[sitemap] fishing:", (e as Error)?.message); return []; });
     // 바다 · 항구 물때(2026-10-18)는 낚시터를 못 읽어도 나간다(표가 코드에 있다)
-    return [...fishingSitemapParts(all, await placesUpdatedDay().catch(() => null)), ...fishingSeaSitemapParts(new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10), tidePoints()), ...fishingFishSitemapParts(await placesUpdatedDay().catch(() => null))];
+    // 바다 · 항구 · 물때 화면의 lastmod 는 오늘(KST) — 본문이 그날의 만조 · 간조 · 앞으로 4주 물때 · 반나절 예보라 실제로 날마다 바뀐다(2026-11-09 확인)
+    return [...fishingSitemapParts(all, await placesUpdatedDay().catch(() => null)), ...fishingSeaSitemapParts(new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10), tidePoints()), ...fishingFishSitemapParts()];
   },
   // 전국 축제(2026-10-21) — 허브 + 축제마다. 표를 못 읽으면 빈 구역
   festivals: async () => {
@@ -424,11 +442,10 @@ const GOOGLE_FILTERED: Partial<Record<SitemapSection, () => Promise<string[]>>> 
   },
 };
 
-/** 구글 전용 인덱스 — 섹션 이름은 같고 주소만 /sitemap-google-<섹션>.xml */
+/** 구글 전용 인덱스 — 섹션 이름은 같고 주소만 /sitemap-google-<섹션>.xml. lastmod 는 위 인덱스와 같은 이유로 싣지 않는다 */
 export function generateGoogleSitemapIndex(): string {
-  const today = day(new Date());
   return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${
-    SITEMAP_SECTIONS.map((s) => `  <sitemap>\n    <loc>${ORIGIN}/sitemap-google-${s}.xml</loc>\n    <lastmod>${today}</lastmod>\n  </sitemap>`).join("\n")
+    SITEMAP_SECTIONS.map((s) => `  <sitemap>\n    <loc>${ORIGIN}/sitemap-google-${s}.xml</loc>\n  </sitemap>`).join("\n")
   }\n</sitemapindex>\n`;
 }
 export async function generateGoogleSitemapSection(section: SitemapSection): Promise<string> {

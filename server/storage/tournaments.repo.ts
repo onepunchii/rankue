@@ -24,9 +24,9 @@ const UPCOMING_DAYS = 365;
 
 let pbaCache: { at: number; rows: PbaTourRow[] } | null = null;
 
-/** UMB 대회 한 개 + 부문별로 포인트를 읽을 곳(가장 최근 회차의 열) */
+/** UMB 대회 한 개 + 부문별로 포인트를 읽을 곳(가장 최근 회차의 열). firstDate = 그 라벨이 처음 실린 회차 날짜 */
 interface UmbIndexEntry extends UmbEventSummary {
-    parts: Array<{ category: UmbCat; edition: string; editionDate: string; colKey: string; label: string; players: number }>;
+    parts: Array<{ category: UmbCat; edition: string; editionDate: string; firstDate: string; colKey: string; label: string; players: number }>;
 }
 let umbCache: { at: number; entries: UmbIndexEntry[] } | null = null;
 
@@ -157,17 +157,18 @@ export class TournamentsRepository {
         if (umbCache && Date.now() - umbCache.at < UMB_TTL_MS) return umbCache.entries;
         const result: any = await db.execute(sql`
             with latest as (
-                select distinct on (category, label) category, label, edition, edition_date, col_key
+                select distinct on (category, label) category, label, edition, edition_date, col_key,
+                    min(edition_date) over (partition by category, label) as first_date
                 from umb_events
                 order by category, label, edition_date desc
             )
-            select l.category, l.label, l.edition, to_char(l.edition_date, 'YYYY-MM-DD') as edition_date, l.col_key,
+            select l.category, l.label, l.edition, to_char(l.edition_date, 'YYYY-MM-DD') as edition_date, to_char(l.first_date, 'YYYY-MM-DD') as first_date, l.col_key,
                 count(r.id) filter (where (r.event_points->>l.col_key)::numeric > 0)::int as players
             from latest l
             left join umb_rankings r on r.category = l.category and r.edition = l.edition
-            group by l.category, l.label, l.edition, l.edition_date, l.col_key
+            group by l.category, l.label, l.edition, l.edition_date, l.first_date, l.col_key
         `);
-        const raw = (result.rows ?? result) as Array<{ category: UmbCat; label: string; edition: string; edition_date: string; col_key: string; players: number }>;
+        const raw = (result.rows ?? result) as Array<{ category: UmbCat; label: string; edition: string; edition_date: string; first_date: string; col_key: string; players: number }>;
 
         const bySlug = new Map<string, UmbIndexEntry>();
         for (const r of raw) {
@@ -179,7 +180,7 @@ export class TournamentsRepository {
                 slug, kind: p.kind as "worldcup" | "worldchamp", org: p.org, city: p.city!, country: p.country!, date: p.date!,
                 categories: [], players: 0, parts: [],
             };
-            const part = { category: r.category, edition: r.edition, editionDate: r.edition_date, colKey: r.col_key, label: r.label, players: Number(r.players) };
+            const part = { category: r.category, edition: r.edition, editionDate: r.edition_date, firstDate: r.first_date, colKey: r.col_key, label: r.label, players: Number(r.players) };
             const at = e.parts.findIndex((x) => x.category === r.category);
             // 같은 부문에 라벨 표기가 다른 칸이 둘이면 더 최근 회차 쪽
             if (at < 0) e.parts.push(part);
@@ -199,9 +200,15 @@ export class TournamentsRepository {
         return (await this.umbIndex()).map(summaryOf);
     }
 
-    /** 사이트맵 lastmod — 대회마다 포인트를 읽은 회차 중 가장 최근 날짜(표가 마지막으로 바뀔 수 있었던 날) */
+    /**
+     * 사이트맵 lastmod — 대회마다(부문 칸 중 가장 늦은) 그 대회 포인트가 처음 실린 회차 날짜 = 대회 표가 공개된 날.
+     * 전엔 '포인트를 읽은 가장 최근 회차'였는데, 새 회차가 들어올 때마다 지난 대회 표까지 모두 그 날짜로 바뀌었다고 알렸다 —
+     * 실제로는 회차 이름만 바뀌고 표는 그대로다(2026-11-09 실측: 남자 23 → 24 회차에서 월드컵 · 세계선수권 8곳 표가 한 줄도 안 바뀜).
+     * 표가 바뀌는 드문 경우(선수가 랭킹에서 빠짐 — 앤트워프 21 → 22 회차 149 → 148명)는 이 날짜에 안 잡힌다(늦게 알릴 뿐 거짓 '새것'은 아니다).
+     * 회차마다 표를 견줘 바뀐 날을 정확히 내려면 umb_rankings 전체의 jsonb 를 훑어야 해서(수 초) 사이트맵 요청에 얹지 않는다.
+     */
     async getUmbEventDates(): Promise<Map<string, string>> {
-        return new Map((await this.umbIndex()).map((e) => [e.slug, e.parts.map((p) => p.editionDate).sort()[e.parts.length - 1]]));
+        return new Map((await this.umbIndex()).map((e) => [e.slug, e.parts.map((p) => p.firstDate).sort()[e.parts.length - 1]]));
     }
 
     /** UMB 대회 한 개 — 부문별 포인트 표. 모르는 슬러그면 null(404) */

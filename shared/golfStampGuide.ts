@@ -15,8 +15,8 @@ export const STAMPS_HUB_PATH = "/golf/stamps";
 export const STAMP_SHELF_PATH = "/golf/shelf";
 export const stampBookPath = (id: string) => `${STAMPS_HUB_PATH}/${id}`;
 
-/** 글을 고친 날 — 사이트맵의 lastmod */
-export const STAMP_GUIDE_UPDATED = "2026-10-12";
+/** 글을 고친 날 — 사이트맵의 lastmod. 2026-10-13 '도장의 깊이'(책장 안내 한 단계 · 도장첩마다 깊이 설명 · 장식장 시즌 태그 · 한정 볼마커)를 실을 때 안 바꿨던 것을 바로잡음(2026-11-09) */
+export const STAMP_GUIDE_UPDATED = "2026-10-13";
 
 /** 화면의 이름 */
 export const STAMPS_H1 = "도장깨기";

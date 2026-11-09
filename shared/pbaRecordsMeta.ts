@@ -238,7 +238,7 @@ export const pbaRecordsEmpty = (r: PbaRecordsReport) => r.leagues.every((l) => l
 export const pbaRecordsIndexable = (r: PbaRecordsReport) =>
     PBA_RECORD_LEAGUES.every((lg) => (recordLeague(r, lg)?.qualified ?? 0) >= PBA_RECORDS_TOP);
 
-/** 두 리그 중 더 늦은 갱신일 — 사이트맵 lastmod·설명문 */
+/** 두 리그 중 더 늦은 갱신일 — 설명문. '다시 받으러 간 날'이라 값이 그대로여도 매일 움직여 사이트맵 lastmod 로는 쓰지 않는다(2026-11-09) */
 export function pbaRecordsUpdated(r: PbaRecordsReport): string | null {
     const ds = r.leagues.map((l) => l.updated).filter((d): d is string => !!d).sort();
     return ds.length ? ds[ds.length - 1] : null;

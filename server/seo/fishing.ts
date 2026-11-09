@@ -206,8 +206,10 @@ export function fishingSitemapParts(all: readonly PublicPlace[], updated: string
     const c = placeCounts(all);
     const at = (path: string, changefreq: string, priority: string) => entry(`${ORIGIN}${path}`, { changefreq, priority, lastmod: updated });
     return [
-        // 낚시 첫 화면(2026-10-26 — 사이트맵에 없었다). 오늘 바다 · 물때가 매일 바뀐다
-        entry(`${ORIGIN}${FISHING_HOME_PATH}`, { changefreq: "daily", priority: "0.9", lastmod: new Date(Date.now() + 9 * 3600_000).toISOString().slice(0, 10), image: fishingSeaCardUrl(ORIGIN, "all") }),
+        // 낚시 첫 화면(2026-10-26 — 사이트맵에 없었다). lastmod 는 싣지 않는다(2026-11-09) — 전엔 날마다 '오늘'을 찍었지만
+        // 이 주소의 검색용 화면(renderFishingHome)은 바로 가기 · 지역 · 항구 · 어종 링크와 낚시터 수뿐이라 날마다 바뀌지 않는다
+        // (오늘 물때 · 바다는 항구 · 물때 화면에 있다). 링크 목록은 코드에 있어 고친 날을 알 수 없다
+        entry(`${ORIGIN}${FISHING_HOME_PATH}`, { changefreq: "daily", priority: "0.9", image: fishingSeaCardUrl(ORIGIN, "all") }),
         at(FISHING_SPOTS_PATH, "weekly", "0.8"),
         ...PLACE_KINDS.filter((k) => c.kind.some(([id]) => id === k.id)).map((k) => at(fishingTypePath(k.id), "weekly", "0.6")),
         ...c.sido.map(([s]) => at(fishingRegionPath(s), "weekly", "0.6")),

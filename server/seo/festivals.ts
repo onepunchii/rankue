@@ -248,14 +248,21 @@ export async function renderFestivals(path: string, all: readonly FestivalRow[],
     return d ? one(d.f, d.around, today) : null;
 }
 
-/** 사이트맵 — 허브 + 축제마다(고친 날 · 사진) */
+/**
+ * 사이트맵 — 허브 + 축제마다(고친 날 · 사진).
+ * 허브와 달 · 시도 · 종류 묶음에는 lastmod 를 싣지 않는다(2026-11-09). 전엔 날마다 '오늘'을 찍었는데, 날마다 바뀌는 건
+ * 알약('D-5' · '3일 남음')뿐이고 목록 자체는 그렇지 않다 — 지금 자료로 지난 30일을 다시 그려 보면 허브는 12일, 1 ~ 8월 · 12월 묶음은
+ * 0일만 실린 축제가 바뀌었다. 목록이 바뀐 날을 정확히 내려면 화면마다 지난 날들을 다시 그리면서 축제가 표에 들어온 날(created_at) ·
+ * 빠진 날(seen_at + 사흘) · 자료를 고친 날까지 맞춰 봐야 해서, 그 셈을 사이트맵에 얹는 대신 빼는 쪽을 골랐다.
+ * 축제 한 곳의 lastmod 는 관광공사 자료의 고친 날(modifiedtime) 그대로다.
+ */
 export function festivalSitemapParts(all: readonly FestivalRow[], today: string): string[] {
     if (!all.length) return [];
     const day = (ymd: string | null) => (ymd ? isoDay(ymd) : null);
     return [
-        entry(`${ORIGIN}${FESTIVALS_PATH}`, { changefreq: "daily", priority: "0.7", lastmod: isoDay(today), image: hubCard(ORIGIN, FESTIVALS_PATH)?.url }),
+        entry(`${ORIGIN}${FESTIVALS_PATH}`, { changefreq: "daily", priority: "0.7", image: hubCard(ORIGIN, FESTIVALS_PATH)?.url }),
         // 달 · 시도 · 종류 묶음(2026-11-08)
-        ...festivalGroupPaths(all, today).map((path) => entry(`${ORIGIN}${path}`, { changefreq: "daily", priority: "0.6", lastmod: isoDay(today), image: hubCard(ORIGIN, FESTIVALS_PATH)?.url })),
+        ...festivalGroupPaths(all, today).map((path) => entry(`${ORIGIN}${path}`, { changefreq: "daily", priority: "0.6", image: hubCard(ORIGIN, FESTIVALS_PATH)?.url })),
         // 끝난 지 90일 넘은 축제는 뺀다(2026-11-08 — 2024년 행사가 남아 있었다. 페이지는 그대로)
         ...all.filter((f) => festivalInSitemap(f, today)).map((f) => entry(`${ORIGIN}${festivalPath(f.id)}`, { changefreq: "weekly", priority: f.end >= today ? "0.6" : "0.4", lastmod: day(f.mod), image: festivalCardUrl(ORIGIN, f.id), ...(f.image ? { images: [f.image] } : {}) })),
     ];

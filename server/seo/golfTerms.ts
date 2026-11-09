@@ -14,7 +14,7 @@
 import { page, esc, hubNav } from "../prerender.js";
 import { entry } from "../sitemap.js";
 import {
-    GOLF_TERMS, GOLF_TERMS_INTRO, GOLF_TERMS_UPDATED, GOLF_TERM_CATEGORIES, golfTermBySlug, golfTermsInCategory, type GolfTerm,
+    GOLF_TERMS, GOLF_TERMS_INTRO, GOLF_TERMS_UPDATED, GOLF_TERM_CATEGORIES, GOLF_TERM_PAGES_FIRST, GOLF_TERM_PAGE_UPDATED, golfTermBySlug, golfTermsInCategory, type GolfTerm,
 } from "../../shared/golfTerms.js";
 import {
     GOLF_TERMS_H1, GOLF_TERMS_PATH, GOLF_TERMS_TITLE, GOLF_TERM_NOT_FOUND, GOLF_TERM_SECTIONS, golfCategoryAnchorId, golfTermAnchorPath,
@@ -127,10 +127,14 @@ export function renderGolfTerms(pathname: string): GolfTermsRender | null {
     return renderTerm(t);
 }
 
-/** 사이트맵 "terms" 섹션에 얹는다 — 허브 + 색인 기준을 넘는 용어 페이지. lastmod 는 본문을 고친 날 */
+/**
+ * 사이트맵 "terms" 섹션에 얹는다 — 허브 + 색인 기준을 넘는 용어 페이지. lastmod 는 본문을 고친 날:
+ * 허브는 사전 전체(GOLF_TERMS_UPDATED), 풀이 페이지는 그 풀이를 쓰거나 고친 날(GOLF_TERM_PAGE_UPDATED · 없으면 첫 16개를 낸 날).
+ * 한 페이지만 새로 써도 나머지까지 같은 날로 바뀌었다고 알리지 않게 페이지마다 따로 둔다(2026-11-09).
+ */
 export function golfTermsSitemapParts(): string[] {
     return [
         entry(`${ORIGIN}${GOLF_TERMS_PATH}`, { changefreq: "monthly", priority: "0.7", lastmod: GOLF_TERMS_UPDATED }),
-        ...GOLF_TERMS.filter(isIndexableGolfTerm).map((t) => entry(`${ORIGIN}${golfTermPath(t.slug)}`, { changefreq: "monthly", priority: "0.5", lastmod: GOLF_TERMS_UPDATED })),
+        ...GOLF_TERMS.filter(isIndexableGolfTerm).map((t) => entry(`${ORIGIN}${golfTermPath(t.slug)}`, { changefreq: "monthly", priority: "0.5", lastmod: GOLF_TERM_PAGE_UPDATED[t.slug] ?? GOLF_TERM_PAGES_FIRST })),
     ];
 }

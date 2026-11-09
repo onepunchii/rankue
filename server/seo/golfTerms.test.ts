@@ -11,7 +11,7 @@ vi.mock("../prerender.js", () => ({
 vi.mock("../sitemap.js", () => ({ entry: (loc: string, opts?: object) => JSON.stringify({ loc, ...opts }) }));
 
 import { renderGolfTerms, golfTermsSitemapParts } from "./golfTerms.js";
-import { GOLF_TERMS, GOLF_TERMS_UPDATED, golfTermBySlug } from "../../shared/golfTerms.js";
+import { GOLF_TERMS, GOLF_TERMS_UPDATED, GOLF_TERM_PAGES_FIRST, GOLF_TERM_PAGE_UPDATED, golfTermBySlug } from "../../shared/golfTerms.js";
 import { GOLF_TERMS_PATH, GOLF_TERMS_TITLE, golfTermAnchorPath, golfTermPath, hasGolfTermPage } from "../../shared/golfTermsMeta.js";
 
 const ORIGIN = "https://www.rankue.co.kr";
@@ -83,6 +83,19 @@ describe("사이트맵과 길", () => {
         expect(got[0]).toEqual({ loc: `${ORIGIN}${GOLF_TERMS_PATH}`, changefreq: "monthly", priority: "0.7", lastmod: GOLF_TERMS_UPDATED });
         expect(got.map((g) => g.loc)).toContain(`${ORIGIN}${golfTermPath("버디")}`);
         expect(got.map((g) => g.loc)).not.toContain(`${ORIGIN}${golfTermPath("파")}`);
+    });
+    it("풀이 페이지는 그 풀이를 쓴 날로 — 2026-11-08 에 새로 쓴 8개만 11-08, 첫 16개는 10-05(2026-11-09)", () => {
+        const got = golfTermsSitemapParts().map((s) => JSON.parse(s) as { loc: string; lastmod: string });
+        const at = (slug: string) => got.find((g) => g.loc === `${ORIGIN}${golfTermPath(slug)}`)?.lastmod;
+        expect(GOLF_TERMS_UPDATED).toBe("2026-11-08");
+        expect(at("홀인원")).toBe("2026-11-08");
+        expect(at("캐디피")).toBe("2026-11-08");
+        expect(at("버디")).toBe(GOLF_TERM_PAGES_FIRST);
+        expect(got.filter((g) => g.lastmod === "2026-11-08")).toHaveLength(1 + 8);
+        // 표의 이름이 실제 풀이 페이지와 맞고(오타 방지), 어느 페이지도 허브보다 늦지 않다
+        const pages = new Set(GOLF_TERMS.filter(hasGolfTermPage).map((t) => t.slug));
+        for (const slug of Object.keys(GOLF_TERM_PAGE_UPDATED)) expect(pages.has(slug), slug).toBe(true);
+        for (const g of got) expect(g.lastmod <= GOLF_TERMS_UPDATED, g.loc).toBe(true);
     });
     it("vercel.json 봇 라우트 · 프리렌더 라우트 · 화면 라우트 · 허브 내비 · 사이트맵이 같은 경로를 안다", () => {
         const vercel = JSON.parse(read("vercel.json")).routes.find((x: any) => String(x.src).includes("billiards/terms"));
