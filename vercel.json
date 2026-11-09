@@ -45,7 +45,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
+          "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Daum/[0-9]|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
         }
       ],
       "dest": "/api/index.ts"
@@ -56,7 +56,7 @@
         {
           "type": "header",
           "key": "user-agent",
-          "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
+          "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Daum/[0-9]|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
         }
       ],
       "dest": "/api/index.ts"
@@ -71,6 +71,17 @@
     {
       "src": "/\\.well-known/.*",
       "status": 404
+    },
+    {
+      "src": "/(.*)",
+      "has": [
+        {
+          "type": "header",
+          "key": "user-agent",
+          "value": ".*([Bb]ot|[Cc]rawler|[Ss]pider|scrap|Daumoa|Daum/[0-9]|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool).*"
+        }
+      ],
+      "dest": "/api/index.ts"
     },
     {
       "src": "/(.*)",

@@ -4,6 +4,7 @@ import express, { type Request, Response, NextFunction } from "express";
 import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes.js";
 import { serveStatic } from "./vite.js";
+import { isBot, sendNoindex } from "./prerender.js";
 import { errorHandler } from "./middleware/error.js";
 import { startNotificationScheduler } from "./services/notificationScheduler.js";
 
@@ -39,6 +40,15 @@ if (!process.env.VERCEL) {
 
 // Register HiQ API Routes
 const server = await registerRoutes(app);
+
+// 봇 종착점 — 프리렌더·API 어디에도 안 걸린 봇 요청(모르는 주소, 프리렌더가 next() 로 흘린 잘못된 값).
+// 예전엔 정적 SPA 셸(200 · 홈 제목 · canonical '/')이 나가 무한한 '홈 중복' 문서가 됐다(2026-11 점검 R2).
+// vercel.json 의 맨 끝 봇 catch-all 이 이리로 보낸다. 실제 앱 화면(/dashboard 등)일 수도 있어 404 대신 noindex 로 끝낸다.
+app.use((req, res, next) => {
+  if ((req.method !== "GET" && req.method !== "HEAD") || !isBot(req) || req.path.startsWith("/api/")) return next();
+  if (/\.[a-z0-9]{2,5}$/i.test(req.path)) return res.status(404).end();
+  return sendNoindex(res, "랭큐 RANKUE");
+});
 
 // Error Handler
 app.use(errorHandler);

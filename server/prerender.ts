@@ -103,12 +103,12 @@ const ORIGIN = "https://www.rankue.co.kr";
 //    실제 관문은 vercel 쪽이다(거기서 안 걸리면 요청이 이 함수에 도달조차 못 한다).
 //    그래서 서버 정규식만 넓혀 봐야 의미가 없고, 두 곳을 늘 같이 고쳐야 한다.
 //
-// Daum 이 아니라 Daumoa 인 이유: 다음 앱 인앱브라우저의 UA 가 "DaumApps" 라서
-// Daum 으로 잡으면 실사용자가 앱 JS 없는 정적 페이지를 받게 된다. 크롤러는 Daumoa 다.
+// Daum 이 아니라 Daumoa·Daum/숫자 인 이유: 다음 앱 인앱브라우저의 UA 가 "DaumApps" 라서
+// Daum 으로 잡으면 실사용자가 앱 JS 없는 정적 페이지를 받게 된다. 크롤러는 Daumoa 와 "Daum/4.1" 형태(2026-11 추가 — 빠져 있어 Daum 에겐 전 페이지가 홈 셸이었다).
 // Lighthouse·HeadlessChrome 는 일부러 뺐다 — 검색 크롤러가 아닌데 프리렌더를 주면
 // PageSpeed 가 실제 앱이 아닌 정적 페이지를 측정해 성능 점수를 왜곡한다.
 const BOT_RE =
-  /bot|crawler|spider|scrap|Daumoa|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool/i;
+  /bot|crawler|spider|scrap|Daumoa|Daum\/[0-9]|Yeti|facebookexternalhit|ChatGPT-User|Claude-User|Claude-Web|Perplexity-User|meta-externalagent|cohere-ai|anthropic-ai|Google-Extended|InspectionTool/i;
 
 // BOT_RE 는 /i 라서 vercel 쪽 패턴의 **상위집합**이다. 이게 중요한 불변식이다:
 // vercel 이 통과시킨 요청은 여기서도 반드시 봇으로 판정되므로, 프로덕션에서 아래
