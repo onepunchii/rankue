@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LucidePhone, LucideBell, LucideHistory, LucideKeyRound, LucideShieldAlert, LucideSave, LucideStore, LucideMessageCircle, LucideFootprints } from "@/lib/icons";
 import { CHAT_BAN_CHOICES, type ChatBan } from "@shared/chatBan";
 import { AGE_BANDS, ageBandOf, type AgeBand } from "@shared/profileBasics";
+import { VISIT_STRIP_DAYS, visitCellLabel, type VisitCell, type VisitStrip } from "@shared/memberVisitDays";
 import MemberGamesDialog from "./MemberGamesDialog";
 import MemberActivitySheet from "./MemberActivitySheet";
 import MemberSportsSection from "./MemberSportsSection";
@@ -91,6 +92,44 @@ function toForm(m: AdminMember): Form {
         handi3c: m.handi3c != null ? String(m.handi3c) : "",
         handi4c: m.handi4c != null ? String(m.handi4c) : "",
     };
+}
+
+export const memberVisitDaysKey = (id: string) => ["/api/hiq/admin/members", id, "visit-days"] as const;
+
+/**
+ * 최근 30일 접속 띠(2026-11-18 오너: "언제언제 들어왔는지") — 하루 한 칸, 왼쪽이 30일 전 · 오른쪽이 오늘.
+ * 칸을 누르면(또는 올리면) 그날 날짜와 연 횟수가 아래 줄에 나온다. 가입 전의 날은 점선 칸.
+ * 누름을 켜고 끄는 식으로 만들지 말 것 — 터치는 올림 → 누름이 연달아 와서 켜자마자 꺼진다.
+ */
+function VisitStripCard({ strip, isLoading, isError }: { strip?: VisitStrip; isLoading: boolean; isError: boolean }) {
+    const [picked, setPicked] = useState<VisitCell | null>(null);
+    return (
+        <div className="mt-2 rounded-xl bg-black/[0.03] px-3 py-2.5" data-testid="visit-strip">
+            <p className="text-[11px] font-bold text-black/45">
+                최근 {VISIT_STRIP_DAYS}일{strip ? <span className="text-[rgba(0,0,0,0.87)]"> · {strip.activeDays}일 접속</span> : null}
+            </p>
+            {strip ? (
+                <>
+                    <div className="mt-2 flex gap-[3px]" role="list" aria-label={`최근 ${VISIT_STRIP_DAYS}일 접속`}>
+                        {strip.cells.map((c) => (
+                            <button
+                                key={c.day} type="button" role="listitem" title={visitCellLabel(c)} aria-label={visitCellLabel(c)}
+                                onClick={() => setPicked(c)} onMouseEnter={() => setPicked(c)}
+                                className={`h-6 flex-1 min-w-0 rounded-[3px] border ${c.n > 0 ? "bg-brand border-brand" : c.before ? "border-dashed border-black/15" : "bg-white border-black/15"} ${picked?.day === c.day ? "ring-2 ring-black/40" : ""}`}
+                            />
+                        ))}
+                    </div>
+                    <div className="mt-1 flex justify-between text-[11px] text-black/45">
+                        <span>{VISIT_STRIP_DAYS}일 전</span>
+                        <span className="font-bold text-black/60 tabular-nums">{picked ? visitCellLabel(picked) : ""}</span>
+                        <span>오늘</span>
+                    </div>
+                </>
+            ) : (
+                <p className="mt-1.5 text-[12px] text-black/40">{isError ? "접속한 날을 불러오지 못했습니다" : isLoading ? "불러오는 중…" : ""}</p>
+            )}
+        </div>
+    );
 }
 
 function Stat({ label, children }: { label: string; children: React.ReactNode }) {
@@ -333,6 +372,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
 
     // 골프 칸 — 시트를 열 때만 받는다. 노쇼·취소 이력이 실려 있어 닫으면 캐시에서 바로 지운다(gcTime 0).
     const golfQ = useQuery<AdminMemberGolf>({ queryKey: memberGolfKey(member?.id ?? ""), enabled: !!member, gcTime: 0 });
+    const visitQ = useQuery<VisitStrip>({ queryKey: memberVisitDaysKey(member?.id ?? ""), enabled: !!member, gcTime: 0 });
 
     const toggleManager = useMutation({
         mutationFn: async (on: boolean) =>
@@ -470,6 +510,7 @@ export default function MemberDetailSheet({ member, onClose }: { member: AdminMe
                                         <Stat label="온라인 대전">{m.simMatches ?? 0}</Stat>
                                         <Stat label="가입일"><span className="text-[13px]">{kstDate(m.createdAt)}</span></Stat>
                                     </div>
+                                    <VisitStripCard key={m.id} strip={visitQ.data} isLoading={visitQ.isLoading} isError={visitQ.isError} />
                                     <p className="mt-2 text-[12px] text-black/45">
                                         가입 경로: {m.storeName ?? "-"}{m.marketingAgree ? " · 마케팅 수신 동의" : ""}
                                     </p>

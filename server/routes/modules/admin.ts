@@ -17,7 +17,7 @@ import adminVisitorsRouter from "./adminVisitors.js";
 import adminStoreDemandRouter from "./adminStoreDemand.js";
 import { getMemberGolfForAdmin, setBookingManagerRole, setSubAdminRole } from "../../storage/adminMemberGolf.js";
 import { getMemberSportsForAdmin } from "../../storage/adminMemberSports.js";
-import { getMemberActivityForAdmin } from "../../storage/adminMemberActivity.js";
+import { getMemberActivityForAdmin, getMemberVisitDaysForAdmin } from "../../storage/adminMemberActivity.js";
 import { activityDaysOf } from "../../../shared/memberActivity.js";
 import { isSuperAdminRole } from "../../../shared/adminRole.js";
 import { checkSubAdminRequest, subAdminBlockedMessage } from "../../lib/subAdmin.js";
@@ -302,6 +302,17 @@ router.get("/members/:id/activity", checkSuperAdmin, asyncHandler(async (req: an
     const activity = await getMemberActivityForAdmin(req.params.id, activityDaysOf(req.query.days));
     if (!activity) return sendError(res, 404, "회원을 찾을 수 없습니다");
     return sendSuccess(res, activity);
+}));
+
+/**
+ * GET /admin/members/:id/visit-days — 회원 상세 창의 '최근 30일 접속' 띠(2026-11-18 오너: "언제언제 들어왔는지").
+ * 하루 한 칸 · 들어온 날과 그날 연 횟수만. 조회라 보기 전용 관리자도 본다.
+ */
+router.get("/members/:id/visit-days", checkSuperAdmin, asyncHandler(async (req: any, res: any) => {
+    if (!MEMBER_ID_RE.test(req.params.id)) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    const strip = await getMemberVisitDaysForAdmin(req.params.id);
+    if (!strip) return sendError(res, 404, "회원을 찾을 수 없습니다");
+    return sendSuccess(res, strip);
 }));
 
 /**

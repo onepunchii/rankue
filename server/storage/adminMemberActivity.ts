@@ -19,6 +19,8 @@ import {
     type ActivityDays, type ActivityRecordRow, type ActivitySessionRow, type ActivityTrailRow, type MemberActivity,
 } from "../../shared/memberActivity.js";
 
+import { buildVisitStrip, visitStripSince, type VisitDayRow, type VisitStrip } from "../../shared/memberVisitDays.js";
+
 const rowsOf = <T>(r: unknown): T[] => ((r as { rows?: T[] })?.rows ?? []);
 const FMT = sql.raw(`'YYYY-MM-DD"T"HH24:MI:SS'`);
 /** 시간대 없는 UTC 칸 → 한국 시각 글자 */
@@ -135,4 +137,24 @@ export async function getMemberActivityForAdmin(memberId: string, days: Activity
         trail: rowsOf<ActivityTrailRow>(trailRes).reverse(),
         records: rowsOf<ActivityRecordRow>(recordRes).reverse(),
     });
+}
+
+/**
+ * 회원 한 명의 '최근 30일 접속' 띠(2026-11-18 오너: "언제언제 들어왔는지") — 들어온 한국 날짜와 그날 연 횟수만 읽는다.
+ * 회원 상세 창을 열 때 부른다. 없는 회원이면 null.
+ */
+export async function getMemberVisitDaysForAdmin(memberId: string, now: Date = new Date()): Promise<VisitStrip | null> {
+    const { sinceIso, fromDay } = visitStripSince(now);
+    const id = sql`${memberId}::uuid`;
+    const [who, dayRes] = await Promise.all([
+        db.execute(sql`select to_char(created_at + interval '9 hours', 'YYYY-MM-DD') as joined from hiq_members where id = ${id}`),
+        db.execute(sql`
+            select to_char(${KDAY(sql`opened_at`)}, 'YYYY-MM-DD') as day, count(*)::int as n
+            from hiq_app_sessions
+            where member_id = ${id} and opened_at >= (${sinceIso}::timestamptz at time zone 'UTC')
+            group by 1 order by 1`),
+    ]);
+    const member = rowsOf<{ joined: string | null }>(who)[0];
+    if (!member) return null;
+    return buildVisitStrip(rowsOf<VisitDayRow>(dayRes), fromDay, member.joined);
 }
