@@ -21,8 +21,9 @@ n=$("$P/psql" "$DST_URL" -Atc "select count(*) from pg_tables where schemaname='
 [ "$n" = 0 ] || { echo "받는 쪽 public 에 표가 ${n}개 있음 — 멈춤"; exit 1; }
 
 echo "▶ 원본 덤프(읽기만)"
-"$P/pg_dump" -Fc --no-owner --no-acl -N neon_auth -d "$SRC_URL" -f "$WORK/db.dump"
-ls -lh "$WORK/db.dump" | awk '{print "  덤프 크기", $5}'
+# 디렉터리 형식 + 4개 동시(같은 스냅숏을 나눠 읽음) — 2026-11-24 리허설에서 한 줄로 받으니 랭큐 296MB 에 9분 넘게 걸렸다
+"$P/pg_dump" -Fd -j 4 --no-owner --no-acl -N neon_auth -d "$SRC_URL" -f "$WORK/db.dump"
+du -sh "$WORK/db.dump" | awk '{print "  덤프 크기", $1}'
 [ "$DRY" = dry ] && { echo "dry: 여기까지"; exit 0; }
 
 echo "▶ 받는 쪽에 넣기"
