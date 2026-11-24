@@ -12,6 +12,9 @@ import * as schema from "../shared/schema.js";
 //  - 그 밖(Supabase 풀러 등): node-postgres Pool. Neon 드라이버는 Neon 전용 WebSocket 프록시가 있어야 해서
 //    Supabase 에는 붙지 않는다. 폴리(server/db.ts)가 같은 방식으로 Supabase·Neon 모두에서 돌았다.
 // 그래서 주소만 바꾸면 드라이버도 따라 바뀐다 — 이전 당일 코드 배포 없이 환경변수만 바꾸면 된다.
+// Vercel 의 DATABASE_URL 은 Neon 연동(스토어)이 관리해 직접 바꿀 수 없다 → SUPABASE_DB_URL 이 있으면 그것을 쓴다
+// (2026-11-24 이전). 다른 곳(스크립트 등)도 같은 주소를 보게 process.env 자체를 바꿔 둔다.
+if (process.env.SUPABASE_DB_URL) process.env.DATABASE_URL = process.env.SUPABASE_DB_URL;
 const url = process.env.DATABASE_URL;
 const hasDbUrl = !!url;
 const isNeon = !!url && /\.neon\.tech/.test(url);
