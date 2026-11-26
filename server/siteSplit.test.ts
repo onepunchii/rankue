@@ -1,6 +1,6 @@
 // 도메인 나누기 미들웨어(2026-11-26) — 실제 express 위에서 본다. 뒤의 사이트맵 · 프리렌더는 가짜로 세워 '나가는 글이 어떻게 고쳐지는가'만 본다.
 // 규칙과 까닭은 shared/siteSplit.ts 머리말, 순수 함수의 시험은 shared/siteSplit.test.ts.
-import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterAll, afterEach, beforeEach } from "vitest";
 import express from "express";
 import type { AddressInfo } from "node:net";
 
@@ -8,6 +8,7 @@ import type { AddressInfo } from "node:net";
 vi.mock("./prerender.js", () => ({ isBot: (req: express.Request) => /bot|Yeti|Daum\/[0-9]/i.test(req.get("user-agent") || "") }));
 
 import { registerSiteSplit } from "./siteSplit";
+import { MAIN_DEINDEX_LIVE } from "../shared/siteSplit";
 
 const MAIN = "https://www.rankue.co.kr";
 const KR = "https://www.rankue.kr";
@@ -41,6 +42,8 @@ beforeAll(async () => {
     base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });
 afterAll(() => { server.close(); });
+// co.kr 쪽은 두 단계로 켠다(shared 의 MAIN_DEINDEX_LIVE) — 시험은 켠 상태를 기준으로 보고, 끈 상태 · 기본값은 따로 본다
+beforeEach(() => { process.env.SITE_SPLIT = "on"; });
 afterEach(() => { reached = []; delete process.env.SITE_SPLIT; });
 
 const BOT = "Mozilla/5.0 (compatible; Yeti/1.1; +https://naver.me/spd)";
@@ -169,6 +172,14 @@ describe("www.rankue.co.kr — 골프 색인을 뺀다", () => {
         expect(html).toContain('content="index, follow');
         expect(await (await get("/sitemap-golf.xml")).text()).toContain("/golf/course/a");
         expect(await (await get("/sitemap.xml")).text()).toContain("sitemap-golf-courses.xml");
+    });
+
+    it("환경변수가 없으면 MAIN_DEINDEX_LIVE 를 따른다 — .kr 규칙은 그 값과 무관하게 늘 선다", async () => {
+        delete process.env.SITE_SPLIT;
+        const html = await (await get("/golf/course/a")).text();
+        expect(html.includes("noindex, follow")).toBe(MAIN_DEINDEX_LIVE);
+        expect((await get("/stores", { host: "www.rankue.kr" })).status).toBe(404);
+        expect(await (await get("/golf/course/a", { host: "www.rankue.kr" })).text()).toContain(`${KR}/golf/course/a`);
     });
 
     it("사람 요청 · 모르는 호스트는 건드리지 않는다", async () => {

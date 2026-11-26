@@ -10,13 +10,13 @@
  */
 import type { Express, Request, Response, NextFunction } from "express";
 import {
-    KR_SITEMAP_SECTIONS, isAssetPath, krAllowed, krHtml, krRobotsTxt, krSitemapIndex, krSitemapXml,
+    KR_SITEMAP_SECTIONS, MAIN_DEINDEX_LIVE, isAssetPath, krAllowed, krHtml, krRobotsTxt, krSitemapIndex, krSitemapXml,
     mainDeindexed, mainNoindexHtml, mainSitemapXml, mainUrlFor, siteOfHost, type Site,
 } from "../shared/siteSplit.js";
 import { isBot } from "./prerender.js";
 
-/** co.kr 쪽 변경(noindex · 사이트맵 제외)을 끄는 스위치 — 되돌릴 일이 생기면 SITE_SPLIT=off */
-export const splitOn = () => process.env.SITE_SPLIT !== "off";
+/** co.kr 쪽 변경(noindex · 사이트맵 제외)이 켜졌는가 — 기본은 shared 의 MAIN_DEINDEX_LIVE, 환경변수 SITE_SPLIT=on|off 가 덮는다 */
+export const splitOn = () => (process.env.SITE_SPLIT === "on" ? true : process.env.SITE_SPLIT === "off" ? false : MAIN_DEINDEX_LIVE);
 
 export function siteOfReq(req: Request): Site {
     // Vercel 은 Host 에 사용자가 연 도메인을 그대로 준다. 앞단이 바꿔 주는 환경을 위해 x-forwarded-host 를 먼저 본다

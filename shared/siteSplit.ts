@@ -11,11 +11,15 @@
  *  4. 두 도메인을 서로 대량으로 링크하지 않는다 — .kr 봇 화면에는 co.kr 로 가는 링크를 싣지 않는다.
  *  5. 얇은 묶음(시군 허브 131 · 조건 조합 21 · 도장첩 10 · 프로 선수 634)은 .kr 에 가져가지 않는다(11/26 전수 점검: 고유 본문 13~23%).
  *
- * 끄는 법: 환경변수 SITE_SPLIT=off 면 co.kr 이 예전처럼 돌아간다(noindex · 사이트맵 제외를 안 한다). .kr 쪽 규칙은 그대로 —
- * .kr 을 닫으려면 Vercel 에서 도메인을 뗀다. 종목을 더 옮길 때는 KR_ALLOWED 와 vercel.json 의 .kr 규칙을 **같이** 고친다(시험이 견준다).
+ * 두 단계로 켠다: ① .kr 규칙만 먼저 배포해 .kr 응답을 확인하고(MAIN_DEINDEX_LIVE=false — co.kr 은 예전 그대로)
+ * ② DNS 가 붙은 날 MAIN_DEINDEX_LIVE 를 true 로 바꿔 co.kr 의 골프 색인을 뺀다. ①과 ② 사이에는 같은 글이 두 도메인에서 index 로 나가므로
+ * **며칠씩 벌려 두지 말 것**. 환경변수 SITE_SPLIT=on|off 가 이 값을 덮는다(급히 되돌릴 때). .kr 을 닫으려면 Vercel 에서 도메인을 뗀다. 종목을 더 옮길 때는 KR_ALLOWED 와 vercel.json 의 .kr 규칙을 **같이** 고친다(시험이 견준다).
  *
  * 이 파일은 순수 함수만 둔다(서버 · 화면 · 시험이 같이 쓴다). 요청을 받아 가르는 일은 server/siteSplit.ts.
  */
+
+/** co.kr 의 골프 색인 빼기(noindex · 사이트맵 제외)를 켰는가 — 머리말의 ②. 켜는 날 true 로 */
+export const MAIN_DEINDEX_LIVE = false;
 
 export const MAIN_ORIGIN = "https://www.rankue.co.kr";
 export const KR_ORIGIN = "https://www.rankue.kr";
