@@ -19,7 +19,8 @@
  */
 
 /** co.kr 의 골프 색인 빼기(noindex · 사이트맵 제외)를 켰는가 — 머리말의 ②. 켜는 날 true 로 */
-export const MAIN_DEINDEX_LIVE = false;
+// 2026-11-26 16:10 켬 — DNS · https 가 붙고 .kr 527주소를 https 로 전수 확인한 뒤(전부 200 · index · 자기 canonical · co.kr 글자 0)
+export const MAIN_DEINDEX_LIVE = true;
 
 export const MAIN_ORIGIN = "https://www.rankue.co.kr";
 export const KR_ORIGIN = "https://www.rankue.kr";
