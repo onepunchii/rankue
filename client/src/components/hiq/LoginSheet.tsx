@@ -30,6 +30,7 @@
  *     전화번호로 쓰던 사람이 큰 단추를 눌러 새 계정이 생겨도, 바로 "전에 전화번호로 쓰셨나요?"(AttachPhoneSheet)가 기존 계정에 이어 준다.
  * 뒤로: 기기의 '뒤로'는 보던 화면이 아니라 이 팝업을 닫는다(hooks/useBackToClose).
  */
+import { leaveKrFor } from "@/lib/krSite";
 import { trailOpen } from "@/lib/trail";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type PointerEvent as ReactPointerEvent } from "react";
 import { useLocation, useSearch } from "wouter";
@@ -111,6 +112,9 @@ export function loginPagePath(back: string, phone = false): string {
  */
 export function openLoginSheet(opts: LoginSheetOptions = {}): boolean {
     if (!hostMounted || typeof window === "undefined") return false;
+    // 골프 도메인(www.rankue.kr) — 로그인은 원래 사이트에서 한다(쿠키 · 소셜 로그인 등록이 co.kr 뿐이다). 보던 화면으로 돌아오게 주소를 싣는다
+    const left = leaveKrFor(loginPagePath(opts.from ?? window.location.pathname + window.location.search));
+    if (left) return left;
     if (LOGIN_SCREEN.test(window.location.pathname)) return false;
     setState({ open: true, opts });
     trailOpen("가입 창");   // 방문자 발자국 — '가입까지'의 한 칸(관리자 콘솔)

@@ -8,6 +8,7 @@ import { ProfileBasicsHost } from "@/components/hiq/profile/ProfileBasics";
 import { PresenceArrivals } from "@/components/hiq/presence/PresenceArrivals";
 import { AppInstallSheet } from "@/components/hiq/AppInstallSheet";
 import { HandoffRedeemer } from "@/components/hiq/HandoffRedeemer";
+import { KrSiteGuard } from "@/lib/krSite";
 import { useAuth } from "@/hooks/useAuth";
 import { AppSessionTracker } from "@/components/hiq/AppSessionTracker";
 import { useGolfAccess, useGolfVisible } from "@/hooks/useGolfAccess";
@@ -668,6 +669,8 @@ function App() {
             {/* '앱에서 열기'(2026-10-06) — 웹의 로그인을 넘겨받는다: 앱이 커스텀 스킴으로 받아 건넨 한 번짜리 토큰을, 물어본 뒤 쿠키와 바꾼다. 화면 없음.
                 주소에 실려 온 토큰은 쓰지 않고 지우기만 한다(2026-10-06 검토). 다른 화면보다 먼저 둔다(주소에서 지우는 일이 가장 먼저여야 한다) */}
             <HandoffRedeemer />
+            {/* 골프 도메인(www.rankue.kr, 2026-11-26) — 골프 공개 화면 밖으로 나가면 원래 사이트의 같은 주소로 보낸다. 화면 없음 */}
+            <KrSiteGuard />
             {/* 이용약관 동의 시트 — 첫 글쓰기·첫 소셜 로그인 때 뜬다(감사 S4). 화면 어디서나 useTermsGate 로 부른다 */}
             <TermsConsentProvider>
               <AppRoutes />

@@ -18,6 +18,22 @@
   ],
   "routes": [
     {
+      "src": "/(.*)",
+      "has": [{ "type": "host", "value": "^rankue\\.kr$" }],
+      "status": 308,
+      "headers": { "Location": "https://www.rankue.kr/$1" }
+    },
+    {
+      "src": "^/(?:robots\\.txt)?$",
+      "has": [{ "type": "host", "value": "^www\\.rankue\\.kr$" }],
+      "dest": "/api/index.ts"
+    },
+    {
+      "src": "^/(?!(?:api|og|\\.well-known)/)(?!sitemap(?:-[a-z]+(?:-[a-z]+)*)?\\.xml$)(?![^?]*\\.[a-zA-Z0-9]{2,5}$)(?!golf(?:/(?:courses(?:/[^/]+)?|course/[^/]+|booking|join|urgent|checklist|terms(?:/[^/]+)?))?/?$).*",
+      "has": [{ "type": "host", "value": "^www\\.rankue\\.kr$" }],
+      "dest": "/api/index.ts"
+    },
+    {
       "src": "/\\.well-known/(apple-app-site-association|assetlinks\\.json)",
       "headers": {
         "Content-Type": "application/json"
@@ -83,6 +99,11 @@
         }
       ],
       "dest": "/api/index.ts"
+    },
+    {
+      "src": "/(.*)",
+      "has": [{ "type": "host", "value": "^www\\.rankue\\.kr$" }],
+      "dest": "/index.kr.html"
     },
     {
       "src": "/(.*)",

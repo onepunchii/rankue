@@ -10,9 +10,13 @@ import { registerSitemap } from "./sitemap.js";
 import { registerRss } from "./rss.js";
 import { registerPrerender } from "./prerender.js";
 import { registerOgImages } from "./ogImage.js";
+import { registerSiteSplit } from "./siteSplit.js";
 
 export async function registerRoutes(app: Express): Promise<Server> {
   console.log("=== HiQ Billiards API Starting ===");
+
+  // 도메인 나누기(2026-11-26) — www.rankue.kr 은 골프만. **반드시 맨 앞**: 뒤의 사이트맵 · 프리렌더가 내보내는 글을 여기서 감싸 고친다.
+  registerSiteSplit(app);
 
   // 동적 sitemap.xml (정적 페이지 + 크루 + 매장) — SPA/정적 폴백보다 먼저 등록
   registerSitemap(app);
