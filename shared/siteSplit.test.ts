@@ -188,6 +188,11 @@ describe("사이트맵", () => {
         expect(locs(mainSitemapXml(index))).toEqual(["core", "golf", "stores"].map((s) => `${MAIN_ORIGIN}/sitemap-${s}.xml`));
     });
 
+    it("co.kr 의 구글 전용 묶음에서도 같은 구역을 뺀다", () => {
+        const index = `<sitemapindex>\n${["core", "golf", "golf-courses", "golf-hubs"].map((s) => `  <sitemap>\n    <loc>${MAIN_ORIGIN}/sitemap-google-${s}.xml</loc>\n  </sitemap>`).join("\n")}\n</sitemapindex>`;
+        expect(locs(mainSitemapXml(index))).toEqual(["core", "golf"].map((s) => `${MAIN_ORIGIN}/sitemap-google-${s}.xml`));
+    });
+
     it(".kr — 여는 주소만, 도메인은 .kr(그림 주소 포함)", () => {
         const out = krSitemapXml(mixed);
         expect(locs(out)).toEqual(["/golf", "/golf/course/a", "/golf/courses/경기", "/golf/terms/버디"].map((p) => KR_ORIGIN + p));

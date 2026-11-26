@@ -237,7 +237,8 @@ export function mainSitemapXml(xml: string): string {
     if (xml.includes("<sitemapindex")) {
         return xml.replace(/[ \t]*<sitemap>[\s\S]*?<\/sitemap>\s*/g, (block) => {
             const loc = locOf(block) ?? "";
-            return MAIN_EMPTY_SECTIONS.some((s) => loc.endsWith(`/sitemap-${s}.xml`)) ? "" : block;
+            // 구글 전용 묶음(/sitemap-google.xml)의 같은 구역(/sitemap-google-<구역>.xml)도 같이 뺀다
+            return MAIN_EMPTY_SECTIONS.some((s) => loc.endsWith(`/sitemap-${s}.xml`) || loc.endsWith(`/sitemap-google-${s}.xml`)) ? "" : block;
         });
     }
     return filterUrls(xml, (p) => !mainDeindexed(p));
